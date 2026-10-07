@@ -5262,7 +5262,7 @@ void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, con
     }
 }
 
-void ALTextView::drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_top, F32 left, F32 alpha)
+void ALTextView::drawPreedit(S32 line, S32 r, S32 screen_top, F32 left, F32 alpha)
 {
     static LLUICachedControl<S32> marker_thickness("UIPreeditMarkerThickness", 1);
     static LLUICachedControl<S32> standout_thickness("UIPreeditStandoutThickness", 2);
@@ -5271,16 +5271,16 @@ void ALTextView::drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_
     S32            from  = mPreeditBegin.column;
     for (size_t i = 0; i < mPreeditSegmentEnds.size(); ++i)
     {
-        const S32 to = mPreeditBegin.column + mPreeditSegmentEnds[i];
-        const S32 lo = llmax(from, row.begin);
-        const S32 hi = llmin(to, row.end);
-        from         = to;
-        if (lo >= hi)
+        const S32         to = mPreeditBegin.column + mPreeditSegmentEnds[i];
+        const ALTextRange segment(ALTextPos(line, from), ALTextPos(line, to));
+        from = to;
+        // The segment's span on the row: out to the row's end where it goes
+        // on to the next.
+        F32 x0, x1;
+        if (segment.empty() || !spanOnRow(line, r, segment, x0, x1))
         {
             continue;
         }
-        const F32 x0        = mLayout.xOf(line, lo);
-        const F32 x1        = mLayout.xOf(line, hi);
         const S32 thickness = llmax(1, static_cast<S32>(i < mPreeditStandouts.size() && mPreeditStandouts[i] ? standout_thickness : marker_thickness));
         const S32 y         = screen_top - row_h + 1;
         gl_rect_2d_in_batch(static_cast<S32>(left + x0), y + thickness, static_cast<S32>(left + x1), y, ink);
@@ -5433,7 +5433,7 @@ void ALTextView::drawRows(const LLRect& text)
         const ALTextLayout::Line& laid = mLayout.line(seen.line);
         if (hasPreedit() && seen.line == mPreeditBegin.line)
         {
-            drawPreedit(seen.line, laid.rows[static_cast<size_t>(seen.row)], seen.screenTop, left, alpha);
+            drawPreedit(seen.line, seen.row, seen.screenTop, left, alpha);
         }
         drawUnderlines(seen.line, laid, seen.row, seen.screenTop, left, alpha);
     }

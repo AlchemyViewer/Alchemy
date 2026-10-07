@@ -950,4 +950,104 @@ namespace tut
         ensure("lexed to its end: the block gone", editor->foldRegions().empty());
         editor->die();
     }
+
+    // What is being composed is underlined under its own text on each row
+    // its line wraps it over: on the first, from where it starts to the
+    // row's end; on the next, from the row's start to where it ends.
+    template<> template<>
+    void altextview_gl_object::test<14>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::string words;
+        for (S32 i = 0; i < 16; ++i)
+        {
+            words += "MMMM ";
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "view";
+        p.rect         = LLRect(0, H, W, 0);
+        p.default_text = words;
+        // The skin's colours are not loaded here: the text's is given, on
+        // black.
+        p.text_color   = LLUIColor(LLColor4::white);
+        p.bg_visible   = false;
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        view->setWordWrap(true);
+        const auto frame = [&]() {
+            gl().clearFramebuffer();
+            glEnable(GL_BLEND);
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
+            view->draw();
+            gGL.flush();
+            glDisable(GL_BLEND);
+            glFinish();
+            return ll_test::readFramebufferRGBA(W, H);
+        };
+        // Laid out by a frame, as it is drawn.
+        frame();
+        const std::vector<ALTextLayout::Row> rows = view->layout().line(0).rows;
+        ensure("the line wraps, three words or more to its first row", rows.size() >= 2 && rows[0].end > 15);
+        // From the third word of the first row to the end of the first word
+        // of the second.
+        const S32 begin = 10;
+        const S32 end   = rows[1].begin + 4;
+        ensure("it ends inside the second row", end < rows[1].end);
+        const std::vector<U8> plain = frame();
+        view->preeditor().markAsPreedit(begin, end - begin);
+        ensure("composing", view->hasPreedit());
+        const std::vector<U8> composed = frame();
+
+        // The columns of a row's band in which anything changed between the
+        // two frames, and how many of them lie in [from, to).
+        const LLRect text    = view->textRect();
+        const auto   columns = [&](size_t r) {
+            std::vector<bool> out(static_cast<size_t>(W), false);
+            const S32         top = text.mTop - (view->layout().lineTop(0) + rows[r].top - view->scrollY());
+            for (S32 y = llmax(0, top - rows[r].height); y < llmin(H, top); ++y)
+            {
+                for (S32 x = 0; x < W; ++x)
+                {
+                    const size_t i = (static_cast<size_t>(y) * W + x) * 4;
+                    if (plain[i] != composed[i] || plain[i + 1] != composed[i + 1] || plain[i + 2] != composed[i + 2])
+                    {
+                        out[static_cast<size_t>(x)] = true;
+                    }
+                }
+            }
+            return out;
+        };
+        const auto changed_in = [](const std::vector<bool>& cols, S32 from, S32 to) {
+            S32 found = 0;
+            for (S32 x = llmax(0, from); x < llmin(W, to); ++x)
+            {
+                found += cols[static_cast<size_t>(x)] ? 1 : 0;
+            }
+            return found;
+        };
+
+        const S32               first_from = text.mLeft + static_cast<S32>(view->layout().xOf(0, begin));
+        const S32               first_to   = text.mLeft + static_cast<S32>(rows[0].width);
+        const std::vector<bool> first      = columns(0);
+        ensure("nothing on the first row left of where it starts: " + std::to_string(changed_in(first, 0, first_from)),
+               changed_in(first, 0, first_from) == 0);
+        ensure("under its text to the first row's end: " + std::to_string(changed_in(first, first_from, first_to)) + " of " +
+                   std::to_string(first_to - first_from),
+               changed_in(first, first_from, first_to) * 4 >= (first_to - first_from) * 3);
+        ensure("nothing past the first row's end", changed_in(first, first_to, W) == 0);
+
+        const S32               second_from = text.mLeft + static_cast<S32>(view->layout().xOf(0, rows[1].begin));
+        const S32               second_to   = text.mLeft + static_cast<S32>(view->layout().xOf(0, end));
+        const std::vector<bool> second      = columns(1);
+        ensure("under its text on the second row: " + std::to_string(changed_in(second, second_from, second_to)) + " of " +
+                   std::to_string(second_to - second_from),
+               changed_in(second, second_from, second_to) * 4 >= (second_to - second_from) * 3);
+        ensure("nothing on the second row past where it ends",
+               changed_in(second, 0, second_from) == 0 && changed_in(second, second_to, W) == 0);
+        view->die();
+    }
 }

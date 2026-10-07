@@ -1218,7 +1218,7 @@ private:
     // A row's lines under its text -- what is being composed, and the links
     // and the styles that underline -- added to the triangles being drawn,
     // as gl_rect_2d_in_batch adds them, so that every row's are one draw.
-    void drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_top, F32 left, F32 alpha);
+    void drawPreedit(S32 line, S32 row, S32 screen_top, F32 left, F32 alpha);
     void drawUnderlines(S32 line, const ALTextLayout::Line& laid, S32 row, S32 screen_top, F32 left, F32 alpha);
     void colorRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha);
     // The atoms and the misspellings of a row, drawn over its glyphs.
