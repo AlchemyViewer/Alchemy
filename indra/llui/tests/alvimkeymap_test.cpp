@@ -2892,9 +2892,9 @@ namespace tut
     template<> template<>
     void alvimkeymap_object::test<98>()
     {
-        set_test_name("an operator before a key that is no motion fails and types nothing: dn d/ c) yz dv gUp ysq d\"");
+        set_test_name("an operator before a key that is no motion, or a motion that cannot go, fails and types nothing: dn before any search, c) yz dv gUp ysq d\"");
         ALCodeEditor& e = make("foo bar\n");
-        for (const char* typed : { "dn", "d/", "c)", "yz", "dv", "gUp", "ysq", "d\"" })
+        for (const char* typed : { "dn", "c)", "yz", "dv", "gUp", "ysq", "d\"" })
         {
             const std::string what(typed);
             keys(typed);
@@ -3308,5 +3308,111 @@ namespace tut
         keys("vl");
         vim->takeLine(*editor, ':', "set ic", true);
         ensure("the selection let go of at its caret", vim->mode() == ALVimKeymap::Mode::Normal && caretText() == "0:1" && !editor->hasSelection());
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<130>()
+    {
+        set_test_name("/ and ? after an operator are its motion, up to the match and not into it; an offset of lines makes it lines, /e takes the match's end");
+        ALCodeEditor& e = make("one foo two\n");
+        keys("d/foo<CR>");
+        ensure_equals("d/foo up to the match", flat(e.text()), std::string("foo two|"));
+        ensure("normal mode, nothing pending", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+        ensure_equals("what it took in the register", vim->registerText('"'), std::string("one "));
+
+        make("alpha beta gamma\n");
+        keys("$c?beta<CR>X<Esc>");
+        ensure_equals("c?beta back to the match, the caret's character left, then typed into", flat(editor->text()), std::string("alpha Xa|"));
+        ensure("normal mode after the insert", vim->mode() == ALVimKeymap::Mode::Normal);
+
+        make("one foo two\n");
+        keys("d/foo/e<CR>");
+        ensure_equals("/foo/e through the match's last character", flat(editor->text()), std::string(" two|"));
+
+        make("one\ntwo\nthree foo\nfour\n");
+        keys("d/foo/-<CR>");
+        ensure_equals("/foo/- the lines down to the one before the match's", flat(editor->text()), std::string("three foo|four|"));
+
+        make("a\nb foo\nc\nd\n");
+        keys("jly/foo/+1<CR>");
+        ensure_equals("/foo/+1 yanks the lines, its own whole", vim->registerText('"'), std::string("b foo\nc"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<131>()
+    {
+        set_test_name("n and N after an operator are its motion, the last search's again; a count before the operator or after it is the match that many on");
+        ALCodeEditor& e = make("a foo b foo c foo\n");
+        keys("/foo<CR>dn");
+        ensure_equals("dn up to the next match", flat(e.text()), std::string("a foo c foo|"));
+        keys("$dN");
+        ensure_equals("dN back to the one before, the caret's character left", flat(e.text()), std::string("a foo c o|"));
+
+        make("a x b x c x d\n");
+        keys("2d/x<CR>");
+        ensure_equals("2d/x up to the second x", flat(editor->text()), std::string("x c x d|"));
+        keys("u0d2n");
+        ensure_equals("and d2n", flat(editor->text()), std::string("x c x d|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<132>()
+    {
+        set_test_name("the search line after an operator lights as a plain one does; Escape or a backspace on the empty line lets the operator go, and a search that finds nothing fails it");
+        ALCodeEditor& e = make("one two\n");
+        keys("d/o");
+        ensure("the search line", vim->mode() == ALVimKeymap::Mode::Search);
+        ensure_equals("each match lit as typed", e.highlights(ALCodeEditor::Highlight::Search).size(), size_t(2));
+        keys("<Esc>");
+        ensure("let go of, the operator with it", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+        ensure("the matches put out", e.highlights(ALCodeEditor::Highlight::Search).empty());
+        ensure_equals("nothing taken", flat(e.text()), std::string("one two|"));
+        keys("x");
+        ensure_equals("the next key a command of its own", flat(e.text()), std::string("ne two|"));
+        keys("d/<BS>x");
+        ensure_equals("a backspace on the empty line lets it go as well", flat(e.text()), std::string("e two|"));
+
+        keys("yw");
+        keys("d/zzz<CR>");
+        ensure("not found, and said", vim->messageIsError() && vim->message().find("Pattern not found: zzz") != std::string::npos);
+        ensure("the operator let go of", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+        ensure_equals("nothing taken", flat(e.text()), std::string("e two|"));
+        ensure_equals("the register as it was", vim->registerText('"'), std::string("e "));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<133>()
+    {
+        set_test_name(". after d/foo looks for foo again, whatever was searched for since; a search an operator takes to a line's first column ends with the line before, and is lines from a line's start");
+        ALCodeEditor& e = make("a foo b bar c foo d bar\n");
+        keys("d/foo<CR>");
+        ensure_equals("d/foo", flat(e.text()), std::string("foo b bar c foo d bar|"));
+        keys("/bar<CR>.");
+        ensure_equals(". up to the next foo, not the next bar", flat(e.text()), std::string("foo b foo d bar|"));
+
+        make("ab\ncd\n");
+        keys("d/cd<CR>");
+        ensure_equals("from the line's start, the line whole", flat(editor->text()), std::string("cd|"));
+        keys("p");
+        ensure_equals("put back as a line", flat(editor->text()), std::string("cd|ab|"));
+
+        make("ab\ncd\n");
+        keys("ld/cd<CR>");
+        ensure_equals("from inside it, to the line's end", flat(editor->text()), std::string("a|cd|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<134>()
+    {
+        set_test_name("a count typed before a search line goes with it, let go of by Escape or by a backspace on its empty line");
+        ALCodeEditor& e = make("abcdef\n");
+        keys("3/<Esc>");
+        ensure("Escape: nothing pending", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+        keys("x");
+        ensure_equals("x after it takes one character, not three", flat(e.text()), std::string("bcdef|"));
+        keys("3/<BS>");
+        ensure("a backspace on the empty line: nothing pending", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+        keys("x");
+        ensure_equals("one character again", flat(e.text()), std::string("cdef|"));
     }
 }

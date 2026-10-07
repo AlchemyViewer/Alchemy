@@ -347,6 +347,12 @@ private:
     std::optional<bool> visualKey(ALTextView& view, llwchar ch);
     std::optional<bool> normalKey(ALTextView& view, llwchar ch);
     bool                motionKey(ALTextView& view, llwchar ch);
+    // An operator over a search's motion -- / and ? entered after it, n
+    // and N -- from the caret to where the last search goes, `forward` or
+    // back, the counts' match on: exclusive and charwise, as vim's is;
+    // lines for an offset of lines, and inclusive for one from the match's
+    // end (:help search-offset). One that finds nothing fails the operator.
+    bool                searchMotion(ALTextView& view, bool forward);
     // A key that waits for the one after it -- a register's name, g's and
     // z's commands, r's character, a text object's kind -- and that one:
     // what the waiting key is picks a function from PENDING_KEYS, each

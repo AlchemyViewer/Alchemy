@@ -138,6 +138,9 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                 line.clear();
                 cursor = 0;
                 backFromLine(view);
+                // What waited on the line goes with it: a count, and an
+                // operator the search was to be the motion of.
+                mVim.clearPending();
                 if (mVim.mMode == ALVimKeymap::Mode::Normal)
                 {
                     mVim.moveTo(view, view.caret());
@@ -181,7 +184,10 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                 historyAt = -1;
                 if (line.empty())
                 {
+                    // Let go of as Escape lets it go, and what waited on
+                    // it with it.
                     backFromLine(view);
+                    mVim.clearPending();
                 }
                 else if (cursor > 0)
                 {
@@ -267,6 +273,12 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                         mVim.mSearch.offset = offset;
                     }
                     mVim.mSearch.forward = which == '/';
+                    if (mVim.mOperator)
+                    {
+                        // The motion of the operator waiting on the line:
+                        // the operator over the stretch to where it goes.
+                        return mVim.searchMotion(view, mVim.mSearch.forward);
+                    }
                     if (!mVim.mSearch.pattern.empty())
                     {
                         mVim.mSearch.search(view, mVim.mSearch.pattern, mVim.mSearch.forward, 1, mVim.mSearch.wholeWord, mVim.mSearch.offset);

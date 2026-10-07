@@ -2009,6 +2009,22 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
         mPending = ch;
         return true;
     }
+    if (ch == '/' || ch == '?')
+    {
+        // A search the motion: its line typed, the operator waiting on it
+        // -- over the stretch to where it goes once the line is entered
+        // (searchMotion), or let go of with the line.
+        mCommandLine.kind      = ch;
+        mCommandLine.historyAt = -1;
+        mCommandLine.line.clear();
+        mCommandLine.cursor = 0;
+        setMode(view, Mode::Search);
+        return true;
+    }
+    if (ch == 'n' || ch == 'N')
+    {
+        return searchMotion(view, ch == 'n' ? mSearch.forward : !mSearch.forward);
+    }
     // cw on a word is ce: the space after it is not eaten. On the word's
     // last character the first word is the one it ends, as vim's cw has
     // it -- a one-letter word changes alone -- and the count's others are
@@ -2058,6 +2074,44 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
         // $ ends past the last character rather than on it, but is vim's
         // inclusive motion all the same: d2$ onto an empty line takes the
         // break before it.
+        adjustExclusiveEnd(d, span.range, span.linewise);
+    }
+    applyOperator(view, op, span, 1);
+    finishCommand(op != 'y');
+    return true;
+}
+
+bool ALVimKeymap::searchMotion(ALTextView& view, bool forward)
+{
+    const ALTextDocument& d = view.document();
+    // The operator's count and the motion's together: 2dn is d2n, the
+    // second match on.
+    const S32     count = countTimes(countOr(mOperatorCount), countOr(mCount));
+    const llwchar op    = mOperator;
+    if (mSearch.pattern.empty())
+    {
+        say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
+        clearPending();
+        return true;
+    }
+    const ALTextPos                from   = cursor(view);
+    const ALVimSearch::Offset      offset = mSearch.offset;
+    const std::optional<ALTextPos> to     = mSearch.target(view, mSearch.pattern, forward, count, mSearch.wholeWord, offset);
+    if (!to)
+    {
+        // Said already: the operator fails, and nothing is changed.
+        clearPending();
+        return true;
+    }
+    Span span;
+    span.range    = ALTextRange(from, *to).normalised();
+    span.linewise = offset.kind == 'l';
+    if (offset.kind == 'e')
+    {
+        span.range.end = d.nextCluster(span.range.end);
+    }
+    else
+    {
         adjustExclusiveEnd(d, span.range, span.linewise);
     }
     applyOperator(view, op, span, 1);
