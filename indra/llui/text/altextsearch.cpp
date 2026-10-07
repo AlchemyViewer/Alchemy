@@ -397,6 +397,10 @@ namespace
                         {
                             break;
                         }
+                        // On from its end, as a pattern goes on: no match
+                        // overlaps the one before it.
+                        at = finish;
+                        continue;
                     }
                     at = options.caseSensitive ? begin + 1 : utf8str_decode_at(text, begin).next;
                 }

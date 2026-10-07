@@ -419,4 +419,28 @@ namespace tut
         const ALTextRange ending(ALTextPos(0, 0), ALTextPos(0, 3));
         ensure_equals("ending inside one: what is before it", said(ALTextSearch::matches(doc, ".", options, &ending)), std::string("0:0-1 0:1-2"));
     }
+
+    template<> template<>
+    void altextsearch_object::test<15>()
+    {
+        set_test_name("plain text goes on from the end of each match, as a pattern does: no match overlaps the one before it");
+        ALTextDocument doc;
+        doc.setText("aaaa\n///x\naaa aa\n");
+        ALTextSearchOptions options;
+        ensure_equals("aa twice in aaaa, without regard to case", said(ALTextSearch::matches(doc, "aa", options)), std::string("0:0-2 0:2-4 2:0-2 2:4-6"));
+        options.caseSensitive = true;
+        ensure_equals("and by case", said(ALTextSearch::matches(doc, "aa", options)), std::string("0:0-2 0:2-4 2:0-2 2:4-6"));
+        ensure_equals("// once in ///", said(ALTextSearch::matches(doc, "//", options)), std::string("1:0-2"));
+        options.regex = true;
+        ensure_equals("as many as the pattern finds", said(ALTextSearch::matches(doc, "aa", options)), std::string("0:0-2 0:2-4 2:0-2 2:4-6"));
+        options.regex     = false;
+        options.wholeWord = true;
+        ensure_equals("one that is not a whole word steps on by a character", said(ALTextSearch::matches(doc, "aa", options)), std::string("2:4-6"));
+        options.wholeWord     = false;
+        options.caseSensitive = false;
+        std::vector<std::pair<ALTextRange, std::string>> edits = ALTextSearch::replacements(doc, "aa", options, "b");
+        ensure_equals("as many replaced as there are", edits.size(), size_t(4));
+        doc.replaceMany(std::move(edits));
+        ensure_equals("each replaced whole", doc.text(), std::string("bb\n///x\nba b\n"));
+    }
 }
