@@ -62,7 +62,11 @@ ALCodeCards::Composition ALCodeCards::compose(const std::vector<Problem>& proble
     {
         LLStringUtil::format_map_t args;
         args["[TITLE]"] = fix.title;
-        out.text += "\n" + alSaid("CodeFixLink", "Fix: [TITLE]", args);
+        if (!out.text.empty())
+        {
+            out.text += "\n";
+        }
+        out.text += alSaid("CodeFixLink", "Fix: [TITLE]", args);
         out.fixLines.emplace_back(line_count++, fix.value);
     }
     if (!says.empty())
