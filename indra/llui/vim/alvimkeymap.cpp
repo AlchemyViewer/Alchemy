@@ -4523,58 +4523,80 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         case '\'':
         case '`':
         {
-            const std::string& line  = d.line(from.line);
-            const char         quote = static_cast<char>(what);
-            // The pair around the caret: the first quote before or at it
-            // that opens, and its close after.
-            S32 open = -1;
-            S32 close = -1;
-            S32 col   = 0;
-            while (col < static_cast<S32>(line.size()))
+            // vim's current_quote() with nothing selected, on the caret's line:
+            // on a quote, the pair it is one of, counted from the line's start;
+            // else from the last quote before the caret -- which may be the one
+            // that closes the quoted text before it, so that between two of
+            // them it is what lies between -- or, with none before, from the
+            // first after it, to the next quote. A quote after a backslash
+            // closes nothing, as 'quoteescape' has it. i" is inside the quotes,
+            // and a count of two or more takes them as well; a" takes them and
+            // the blanks after, or where none follow, the blanks before.
+            const std::string& line      = d.line(from.line);
+            const char         quote     = static_cast<char>(what);
+            const S32          size      = static_cast<S32>(line.size());
+            S32                col_start = llmin(from.column, size);
+            S32                col_end   = -1;
+            if (col_start < size && line[col_start] == quote)
             {
-                if (line[col] == quote)
+                const S32 first = col_start;
+                col_start       = 0;
+                while (true)
                 {
-                    const size_t next = line.find(quote, col + 1);
-                    if (next == std::string::npos)
+                    col_start = nextQuote(line, col_start, quote, false);
+                    if (col_start < 0 || col_start > first)
+                    {
+                        return false;
+                    }
+                    col_end = nextQuote(line, col_start + 1, quote, true);
+                    if (col_end < 0)
+                    {
+                        return false;
+                    }
+                    if (first <= col_end)
                     {
                         break;
                     }
-                    if (from.column >= col && from.column <= static_cast<S32>(next))
-                    {
-                        open  = col;
-                        close = static_cast<S32>(next);
-                        break;
-                    }
-                    col = static_cast<S32>(next) + 1;
-                    continue;
+                    col_start = col_end + 1;
                 }
-                ++col;
-            }
-            if (open < 0)
-            {
-                // The first pair after the caret, as vim allows.
-                const size_t first = line.find(quote, from.column);
-                const size_t next  = first == std::string::npos ? std::string::npos : line.find(quote, first + 1);
-                if (next == std::string::npos)
-                {
-                    return false;
-                }
-                open  = static_cast<S32>(first);
-                close = static_cast<S32>(next);
-            }
-            if (around)
-            {
-                S32 end = close + 1;
-                while (end < static_cast<S32>(line.size()) && isSpace(line[end]))
-                {
-                    ++end;
-                }
-                out.range = ALTextRange(ALTextPos(from.line, open), ALTextPos(from.line, end));
             }
             else
             {
-                out.range = ALTextRange(ALTextPos(from.line, open + 1), ALTextPos(from.line, close));
+                col_start = prevQuote(line, col_start, quote, true);
+                if (col_start >= size || line[col_start] != quote)
+                {
+                    col_start = nextQuote(line, col_start, quote, false);
+                    if (col_start < 0)
+                    {
+                        return false;
+                    }
+                }
+                col_end = nextQuote(line, col_start + 1, quote, true);
+                if (col_end < 0)
+                {
+                    return false;
+                }
             }
+            if (around)
+            {
+                const auto blank = [&line, size](S32 col) { return col >= 0 && col < size && (line[col] == ' ' || line[col] == '\t'); };
+                if (blank(col_end + 1))
+                {
+                    while (blank(col_end + 1))
+                    {
+                        ++col_end;
+                    }
+                }
+                else
+                {
+                    while (col_start > 0 && blank(col_start - 1))
+                    {
+                        --col_start;
+                    }
+                }
+            }
+            const bool quotes = around || count > 1;
+            out.range         = ALTextRange(ALTextPos(from.line, quotes ? col_start : col_start + 1), ALTextPos(from.line, quotes ? col_end + 1 : col_end));
             return true;
         }
         case '(':

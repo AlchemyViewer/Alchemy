@@ -5276,4 +5276,31 @@ namespace tut
         keys("A<C-d><Esc>");
         ensure_equals("two spaces and a tab, a step wide, gone whole, as vim's", flat(e.text()), std::string("foo|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<186>()
+    {
+        set_test_name("a quote object goes from the last quote before the caret, so between two quoted texts it is what lies between; a count of two takes the quotes, a\" the blanks before where none follow, and a quote after a backslash closes nothing");
+        ALCodeEditor& e = make("x \"ab\" y \"ef\"\n");
+        e.setCaret(ALTextPos(0, 7));
+        keys("di\"");
+        ensure_equals("di\" between two quoted texts takes what lies between", flat(e.text()), std::string("x \"ab\"\"ef\"|"));
+        ensure_equals("what it took", vim->registerText('"'), std::string(" y "));
+
+        make("x \"ab\" y\n");
+        editor->setCaret(ALTextPos(0, 3));
+        keys("d2i\"");
+        ensure_equals("d2i\" takes the quotes, not the blanks", flat(editor->text()), std::string("x  y|"));
+
+        make("x \"ab\",\n");
+        editor->setCaret(ALTextPos(0, 3));
+        keys("da\"");
+        ensure_equals("da\" with no blank after takes the blanks before", flat(editor->text()), std::string("x,|"));
+
+        make("x \"a\\\"b\" y\n");
+        editor->setCaret(ALTextPos(0, 3));
+        keys("di\"");
+        ensure_equals("di\" passes over an escaped quote", flat(editor->text()), std::string("x \"\" y|"));
+        ensure_equals("and takes it with the rest", vim->registerText('"'), std::string("a\\\"b"));
+    }
 }
