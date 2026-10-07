@@ -1328,6 +1328,15 @@ void LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t 
 void LLSDXMLParser::Impl::endElement(Element element)
 {
     --mDepth;
+    if (mTooDeep)
+    {
+        // The element that crossed the limit was never started -- nothing
+        // was pushed for it -- so there is nothing to end. A self-closing
+        // tag reaches here in the same scan that started it, before the
+        // run loop sees mTooDeep; popping would take its parent's slot, or
+        // an empty stack's back.
+        return;
+    }
     if (mSkipping)
     {
         if (mDepth < mSkipThrough)

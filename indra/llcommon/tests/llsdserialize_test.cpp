@@ -1147,6 +1147,90 @@ namespace tut
             1);
     }
 
+    template<> template<>
+    void TestLLSDXMLParsingObject::test<7>()
+    {
+        // The depth limit counts every element, <llsd> itself included.
+        ensureParse(
+            "two deep fits a limit of two",
+            "<llsd><integer>1</integer></llsd>",
+            LLSD(1),
+            1,
+            2);
+        ensureParse(
+            "two deep fails a limit of one",
+            "<llsd><integer>1</integer></llsd>",
+            LLSD(),
+            LLSDParser::PARSE_FAILURE,
+            1);
+        // A self-closing element past the limit is started and ended in one
+        // scan: it must not pop what it never pushed.
+        ensureParse(
+            "a self-closing element past the limit",
+            "<llsd><integer/></llsd>",
+            LLSD(),
+            LLSDParser::PARSE_FAILURE,
+            1);
+        ensureParse(
+            "a self-closing element past the limit inside a map",
+            "<llsd><map><key>a</key><map><key>b</key><undef/></map></map></llsd>",
+            LLSD(),
+            LLSDParser::PARSE_FAILURE,
+            3);
+        LLSD nested = LLSD::emptyMap();
+        nested["a"] = LLSD::emptyMap();
+        nested["a"]["b"] = 1;
+        // Two maps and an integer: three values parsed.
+        ensureParse(
+            "the same within the limit",
+            "<llsd><map><key>a</key><map><key>b</key><integer>1</integer></map></map></llsd>",
+            nested,
+            3,
+            5);
+        ensureParse(
+            "no limit",
+            "<llsd><map><key>a</key><map><key>b</key><integer>1</integer></map></map></llsd>",
+            nested,
+            3,
+            -1);
+    }
+
+    template<> template<>
+    void TestLLSDXMLParsingObject::test<8>()
+    {
+        // Character references must name an XML Char: a surrogate, a
+        // non-character or a C0 control other than tab, newline and return
+        // would otherwise come out as bytes no UTF-8 reader takes.
+        ensureParse(
+            "a tab by reference",
+            "<llsd><string>a&#x9;b</string></llsd>",
+            LLSD("a\tb"),
+            1);
+        ensureParse(
+            "a C1 control by reference is a Char",
+            "<llsd><string>a&#x85;b</string></llsd>",
+            LLSD("a\xC2\x85" "b"),
+            1);
+        ensureParse(
+            "a line separator by reference is a Char",
+            "<llsd><string>a&#x2028;b</string></llsd>",
+            LLSD("a\xE2\x80\xA8" "b"),
+            1);
+        ensureParse(
+            "an astral character by reference",
+            "<llsd><string>&#x1F305;</string></llsd>",
+            LLSD("\xF0\x9F\x8C\x85"),
+            1);
+        for (const char* reference : { "&#xD800;", "&#xDFFF;", "&#xFFFE;", "&#xFFFF;", "&#x1;", "&#0;", "&#x110000;" })
+        {
+            ensureParse(
+                std::string("not a Char: ") + reference,
+                std::string("<llsd><string>") + reference + "</string></llsd>",
+                LLSD(),
+                LLSDParser::PARSE_FAILURE);
+        }
+    }
+
     /*
     TODO:
         test XML parsing

@@ -867,7 +867,9 @@ public:
 
     // `max_depth`, where given, fails a document whose elements nest deeper
     // than that: for text from outside, whose nesting could be chosen to
-    // exhaust the stack that frees what was parsed.
+    // exhaust the stack that frees what was parsed. Every element counts,
+    // <llsd> and <key> among them (the notation and binary parsers count
+    // containers alone); -1 is unlimited for all three.
     static S32 fromXMLEmbedded(LLSD& sd, std::istream& str, bool emit_errors=true, S32 max_depth=-1)
     {
         // no need for max_bytes since xml formatting is not
