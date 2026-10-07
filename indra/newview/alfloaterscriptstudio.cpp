@@ -8940,7 +8940,7 @@ void ALFloaterScriptStudio::addGoCommands()
     // The next change since the script was saved, or the one before, as
     // vim's ]c and [c step: in a comparison its changes, in the source the
     // script's own, a peek open there going along.
-    for (const auto& [name, forward] : { std::pair{ "next_change", true }, std::pair{ "previous_change", false } })
+    for (const auto& [name, forward] : { std::pair{ "next_difference", true }, std::pair{ "previous_difference", false } })
     {
         mCommands.add(
             name,

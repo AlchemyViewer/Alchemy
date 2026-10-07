@@ -1203,13 +1203,13 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_problem" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_problem" />
             </menu_item_call>
-            <menu_item_call label="Next Change" layout="topleft" name="next_change">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_change" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_change" />
+            <menu_item_call label="Next Change" layout="topleft" name="next_difference">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_difference" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_difference" />
             </menu_item_call>
-            <menu_item_call label="Previous Change" layout="topleft" name="previous_change">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_change" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_change" />
+            <menu_item_call label="Previous Change" layout="topleft" name="previous_difference">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_difference" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_difference" />
             </menu_item_call>
             <menu_item_call label="Next Left From LSL" layout="topleft" name="next_migration">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_migration" />
