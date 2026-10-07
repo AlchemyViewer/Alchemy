@@ -361,4 +361,19 @@ namespace tut
         }
         ensure("the step beside it", ALScriptKeymap::menuKey("next_difference") == (ALKeyChord{ KEY_F5, MASK_ALT }));
     }
+
+    template<> template<>
+    void alscriptkeymap_object::test<11>()
+    {
+        set_test_name("keys kept for a menu's command the table no longer has, renamed or gone, take nothing from the commands that have them");
+        // Go > Next Change was next_change until it was told from Next Edit
+        // Location, the editor's command of that name.
+        ensure("no menu command now", !ALScriptKeymap::isMenuCommand("next_change"));
+        ALScriptKeymap::rebindMenu("next_change", { ALKeyChord{ KEY_F5, MASK_ALT }, ALKeyChord{ KEY_F8, MASK_NONE } });
+        ensure("the step's key its own still", ALScriptKeymap::menuKey("next_difference") == (ALKeyChord{ KEY_F5, MASK_ALT }));
+        ensure("and a problem's", has(ALScriptKeymap::menuKeys("next_problem"), ALKeyChord{ KEY_F8, MASK_NONE }));
+        ensure("the editor's command of that name untouched", ALScriptKeymap::keysOf(ALScriptKeymap::current(), C::NextChange).empty() ==
+                                                                  ALScriptKeymap::keysOf(ALKeymap::standard(), C::NextChange).empty());
+        ALScriptKeymap::restoreAll();
+    }
 }

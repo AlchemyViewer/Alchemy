@@ -371,7 +371,12 @@ namespace
             for (LLSD::map_const_iterator it = bound.beginMap(); it != bound.endMap(); ++it)
             {
                 const ALScriptKeymap::Owner owner = ownerNamed(it->first);
-                if (owner.command == ALEditorCommand::None && owner.menu.empty())
+                // Nothing that is a command now: an editor's name it does
+                // not know, or a menu's command the table no longer has,
+                // renamed or gone, whose keys would otherwise be taken from
+                // the commands that have them for a name no menu asks for.
+                if ((owner.command == ALEditorCommand::None && owner.menu.empty()) ||
+                    (!owner.menu.empty() && !ALScriptKeymap::isMenuCommand(owner.menu)))
                 {
                     continue;
                 }
