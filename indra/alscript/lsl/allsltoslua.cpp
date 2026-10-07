@@ -2931,8 +2931,18 @@ namespace
             case OP_DIV:
                 if (lt == LST_INTEGER && rt == LST_INTEGER)
                 {
-                    note(e, "SluaIntegerDivision", "// rounds down, and LSL's integer / rounded toward zero: they differ where the answer is negative.");
-                    return infix("//", MUL);
+                    // LSL's integers divide toward nought, and Luau's // rounds
+                    // down: the same where neither side is below nought.
+                    if (notBelowZero(lhs) && notBelowZero(rhs))
+                    {
+                        return infix("//", MUL);
+                    }
+                    // Elsewhere the quotient as a double, cut toward nought by
+                    // bit32.s32: for two 32-bit integers a double's quotient is
+                    // never so far out that the cut misses LSL's. math.modf
+                    // would cut it too, but leave a -0 that tostring writes,
+                    // and -2147483648 / -1 unwrapped, where LSO wraps it.
+                    return { "bit32.s32(" + infix("/", MUL).text + ")" };
                 }
                 return infix("/", MUL);
             case OP_MOD:
@@ -2940,8 +2950,15 @@ namespace
                 {
                     return { "vector.cross(" + value(lhs).text + ", " + value(rhs).text + ")" };
                 }
-                note(e, "SluaModulo", "Luau's % takes the divisor's sign, and LSL's took the dividend's: they differ where one is negative.");
-                return infix("%", MUL);
+                // LSL's remainder takes the dividend's sign, as math.fmod's
+                // does, and Luau's % the divisor's: the same where neither
+                // side is below nought. Only text tells fmod's from LSL's:
+                // a dividend below nought that divides whole leaves -0.
+                if (notBelowZero(lhs) && notBelowZero(rhs))
+                {
+                    return infix("%", MUL);
+                }
+                return { "math.fmod(" + value(lhs).text + ", " + value(rhs).text + ")" };
             case OP_EQ:
             case OP_NEQ:
             {
@@ -3261,11 +3278,10 @@ namespace
                 case OP_POST_DECR: return old + " - " + bracketed(v, ADD + 1);
                 case OP_MUL_ASSIGN: return old + " * " + bracketed(v, MUL + 1);
                 case OP_DIV_ASSIGN:
+                    // An integer toward nought, as / of two is written.
                     if (t == LST_INTEGER && rhs && rhs->getIType() == LST_INTEGER)
                     {
-                        note(rhs, "SluaIntegerDivision",
-                             "// rounds down, and LSL's integer / rounded toward zero: they differ where the answer is negative.");
-                        return old + " // " + bracketed(v, MUL + 1);
+                        return "bit32.s32(" + old + " / " + bracketed(v, MUL + 1) + ")";
                     }
                     return old + " / " + bracketed(v, MUL + 1);
                 case OP_MOD_ASSIGN:
@@ -3274,8 +3290,7 @@ namespace
                     {
                         return "vector.cross(" + old + ", " + v.text + ")";
                     }
-                    note(rhs, "SluaModulo", "Luau's % takes the divisor's sign, and LSL's took the dividend's: they differ where one is negative.");
-                    return old + " % " + bracketed(v, MUL + 1);
+                    return "math.fmod(" + old + ", " + v.text + ")";
                 default: return v.text;
             }
         };
@@ -3385,12 +3400,13 @@ namespace
                 case OP_POST_DECR: line(name + " -= 1"); return;
                 case OP_SUB_ASSIGN: line(name + " -= " + v.text); return;
                 case OP_MUL_ASSIGN: line(name + " *= " + v.text); return;
+                // An integer's / and % as they are of two: Luau's //= rounds
+                // down and its %= takes the divisor's sign, and nothing knows
+                // a variable it assigns is not below nought.
                 case OP_DIV_ASSIGN:
                     if (type == LST_INTEGER && rhs && rhs->getIType() == LST_INTEGER)
                     {
-                        note(rhs, "SluaIntegerDivision",
-                             "// rounds down, and LSL's integer / rounded toward zero: they differ where the answer is negative.");
-                        line(name + " //= " + v.text);
+                        line(name + " = bit32.s32(" + name + " / " + bracketed(v, MUL + 1) + ")");
                         return;
                     }
                     line(name + " /= " + v.text);
@@ -3398,9 +3414,7 @@ namespace
                 case OP_MOD_ASSIGN:
                     if (type == LST_INTEGER)
                     {
-                        note(rhs, "SluaModulo",
-                             "Luau's % takes the divisor's sign, and LSL's took the dividend's: they differ where one is negative.");
-                        line(name + " %= " + v.text);
+                        line(name + " = math.fmod(" + name + ", " + v.text + ")");
                         return;
                     }
                     break;

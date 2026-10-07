@@ -168,7 +168,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<2>()
     {
-        set_test_name("expressions: conditions as LSL reads them, comparisons as 1 or 0 where they are numbers, integer division and remainder noted, lists grown and measured");
+        set_test_name("expressions: conditions as LSL reads them, comparisons as 1 or 0 where they are numbers, integer division and remainder toward nought, lists grown and measured");
         const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
                                               "    integer a = 7; integer b = 2; float f = 1.5; string s = \"x\"; list l = [1, 2];\n"
                                               "    integer same = a == b;\n"
@@ -188,8 +188,8 @@ namespace tut
         ensure("an integer's truth: " + r.text, has(r, "if a ~= 0 then"));
         ensure("a string's: " + r.text, has(r, "if s ~= \"\" then"));
         ensure("and: " + r.text, has(r, "if a > 1 and #l > 1 then"));
-        ensure("integer division: " + r.text, has(r, "local q = a // b") && noted(r, "SluaIntegerDivision"));
-        ensure("remainder: " + r.text, has(r, "local m = a % b") && noted(r, "SluaModulo"));
+        ensure("integer division: " + r.text, has(r, "local q = bit32.s32(a / b)"));
+        ensure("remainder: " + r.text, has(r, "local m = math.fmod(a, b)"));
         ensure("a list no other holds grown in place: " + r.text, has(r, "table.insert(l, 3)") && has(r, "table.append(l, 4, \"five\")") &&
                                                                     !has(r, "joinLists"));
         ensure("TRUE and FALSE: " + r.text, has(r, "local t = 1") && has(r, "if false then"));
@@ -407,10 +407,10 @@ namespace tut
         set_test_name("no comments where they are not wanted: the notes are still said");
         ALLSLToSLua::Options options;
         options.comments = false;
-        const ALLSLToSLua::Result r = ALLSLToSLua::convert("default { state_entry() { integer a = 7 / 2; llOwnerSay((string)a); } }\n", options);
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert("default { state_entry() { list l = [7]; integer a = l == [2]; llOwnerSay((string)a); } }\n", options);
         ensure("converted", r.converted);
         ensure("no comment: " + r.text, !has(r, "-- LSL:"));
-        ensure("but noted", noted(r, "SluaIntegerDivision"));
+        ensure("but noted", noted(r, "SluaListCompare"));
     }
 
     template<> template<>
@@ -620,7 +620,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<16>()
     {
-        set_test_name("LSL's /= and %=, and x = x op y, as Luau's own compound assignments, noted as / and % are; a vector's %= its cross product");
+        set_test_name("x = x op y as Luau's own compound assignments; an integer's /= and %= written whole, as / and % are; a vector's %= its cross product");
         const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
                                               "    integer a = 7; float f = 3.0; vector v = <1, 0, 0>;\n"
                                               "    a /= 2; a %= 3; f /= 2.0; v %= <0, 1, 0>;\n"
@@ -628,8 +628,8 @@ namespace tut
                                               "    b = b + c; b = b - (c - 1); b = b - c - 1; c = c * 2 + b; s = s + \"y\" + (string)b;\n"
                                               "    llOwnerSay((string)a + (string)f + (string)v + s + (string)(b + c));\n"
                                               "} }\n");
-        ensure("integer division: " + r.text, has(r, "a //= 2") && noted(r, "SluaIntegerDivision"));
-        ensure("remainder: " + r.text, has(r, "a %= 3") && noted(r, "SluaModulo"));
+        ensure("integer division: " + r.text, has(r, "a = bit32.s32(a / 2)") && !has(r, "//="));
+        ensure("remainder: " + r.text, has(r, "a = math.fmod(a, 3)") && !has(r, "%="));
         ensure("a float's: " + r.text, has(r, "f /= 2.0"));
         ensure("a vector's cross product: " + r.text, has(r, "v = vector.cross(v, vector(0, 1, 0))"));
         ensure("x = x op y: " + r.text, has(r, "b += c") && has(r, "b -= c - 1"));
@@ -991,7 +991,7 @@ namespace tut
         ensure_equals("one index note for one function", indexes, size_t(1));
         ensure("a found index and a boolean: " + listed, noted(r, "SluaIndexFound", "SubStringIndex") && noted(r, "SluaBool", "SameGroup"));
         ensure("words filled: " + listed, has(r, "-- LSL: llcompat.GetSubString takes indexes from 0, as LSL did; ll.GetSubString takes them from 1."));
-        ensure("the lint by key", std::string(ALLSLToSLua::lintOf("SluaIndex")) == "SlCompatCall" && !ALLSLToSLua::lintOf("SluaIntegerDivision"));
+        ensure("the lint by key", std::string(ALLSLToSLua::lintOf("SluaIndex")) == "SlCompatCall" && !ALLSLToSLua::lintOf("SluaListCompare"));
 
         // The studio's words: each comment's, each note's, and the header's,
         // a line at a time.
@@ -2049,5 +2049,51 @@ namespace tut
                                                   "}\n");
         ensure("set to what is not written nought, every: " + again.text,
                has(again, "timerHandle = LLTimers:every(seconds, function") && !has(again, "LLTimers:once(seconds, function"));
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<75>()
+    {
+        set_test_name("an integer's / and % as LSL's, toward nought and the remainder of the dividend's sign: bit32.s32 of the quotient and "
+                      "math.fmod, unnoted; // and % where neither side is below nought; compound ones written whole; a float's / as it was");
+        const char* const script = "integer gSize = 16;\n"
+                                   "default { touch_start(integer n) {\n"
+                                   "    integer a = n - 3; integer b = 1 - n; float f = 2.5;\n"
+                                   "    integer q = a / b; integer m = a % b;\n"
+                                   "    integer sum = (a + 1) / (b - 2) + (a + 1) % (b - 2);\n"
+                                   "    integer back = -7 / 2 + 7 % -2;\n"
+                                   "    integer cut = gSize / 4 + gSize % 3 + (n & 255) / 16 + (n & 255) % gSize;\n"
+                                   "    integer half = a / gSize;\n"
+                                   "    a /= b; a %= b; b = b / 2; b = b % 3;\n"
+                                   "    f = f / 2;\n"
+                                   "    llOwnerSay((string)(q + m + sum + back + cut + half + a + b) + (string)f);\n"
+                                   "} }\n";
+        const ALLSLToSLua::Result r = convert(script);
+        ensure("toward nought: " + r.text, has(r, "local q = bit32.s32(a / b)") && has(r, "local m = math.fmod(a, b)"));
+        ensure("bracketed as / binds: " + r.text, has(r, "bit32.s32((a + 1) / (b - 2)) + math.fmod(a + 1, b - 2)"));
+        ensure("a side below nought: " + r.text, has(r, "bit32.s32(-7 / 2) + math.fmod(7, -2)"));
+        ensure("neither below nought: " + r.text, has(r, "gSize // 4 + gSize % 3 + bit32.band(n, 255) // 16 + bit32.band(n, 255) % gSize"));
+        ensure("one known, not the other: " + r.text, has(r, "local half = bit32.s32(a / gSize)"));
+        ensure("compound ones whole: " + r.text, has(r, "a = bit32.s32(a / b)") && has(r, "a = math.fmod(a, b)") && has(r, "b = bit32.s32(b / 2)") &&
+                                                    has(r, "b = math.fmod(b, 3)") && !has(r, "//=") && !has(r, "%="));
+        ensure("a float's: " + r.text, has(r, "f /= 2"));
+        ensure("unnoted: " + r.text, !noted(r, "SluaIntegerDivision") && !noted(r, "SluaModulo"));
+        checksClean(r);
+        // Typed, each one a number to the checker, strict under the grid's
+        // solver: math.fmod's one answer and bit32.s32's.
+        ALLSLToSLua::Options options;
+        options.types                 = true;
+        const ALLSLToSLua::Result typed = ALLSLToSLua::convert(script, options);
+        ensure("typed: " + typed.text, has(typed, "local q: number = bit32.s32(a / b)") && has(typed, "local m: number = math.fmod(a, b)"));
+        checksClean(typed);
+        if (!newSolver)
+        {
+            std::string said;
+            for (const ALScriptProblem& p : service.check("--!strict\n" + typed.text))
+            {
+                said += p.severity == ALScriptProblem::Severity::Error ? p.message + "\n" : std::string();
+            }
+            ensure("strict:\n" + said + "---\n" + typed.text, said.empty());
+        }
     }
 }
