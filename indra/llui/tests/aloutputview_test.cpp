@@ -416,4 +416,31 @@ namespace tut
         v.setFilter(nullptr);
         ensure_equals("shown again, found again", v.findMatches().size(), size_t(2));
     }
+
+    template<> template<>
+    void aloutputview_object::test<11>()
+    {
+        set_test_name("a lone CR in what was said is a line as the document makes it one: said again, let go of, and its links on it");
+        ALOutputView& v = make(10);
+        v.append(entry("", "before"));
+        v.append(entry("", "Status:\rok"));
+        ensure_equals("the second over two lines", v.document().lineCount(), 3);
+        ALOutputView::Entry again = entry("", "Status:\rok");
+        again.time                = "12:00:05";
+        v.append(again);
+        ensure_equals("said again: both its lines put back, none left over", v.text(),
+                      std::string("[12:00:00] Thing: before\n[12:00:05] Thing (\xC3\x97" "2): Status:\nok"));
+        ensure_equals("kept as the document reads it", v.entries().back().text, std::string("Status:\nok"));
+
+        v.append(entry("", "see\rhttp://example.com/x"));
+        v.append(entry("", "last"));
+        ensure_equals("the next after it where it starts", v.document().line(5), std::string("[12:00:00] Thing: last"));
+        ensure_equals("the URL on the line it is on", v.substitutions().size(), size_t(1));
+        ensure("at its start", v.substitutions()[0].range == ALTextRange(ALTextPos(4, 0), ALTextPos(4, 20)));
+
+        v.setCapacity(2);
+        ensure_equals("the oldest gone with all their lines, the rest whole", v.text(),
+                      std::string("[12:00:00] Thing: see\nhttp://example.com/x\n[12:00:00] Thing: last"));
+        ensure("the URL slid up with its line", v.substitutions().size() == 1 && v.substitutions()[0].range.begin == ALTextPos(1, 0));
+    }
 }

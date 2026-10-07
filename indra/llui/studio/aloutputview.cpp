@@ -27,6 +27,7 @@
 #include "aloutputview.h"
 
 #include "alanchoredranges.h"
+#include "allinebreaks.h"
 #include "alviewtype.h"
 #include "llsdutil.h"
 #include "llurlaction.h"
@@ -90,20 +91,10 @@ ALOutputView::Laid ALOutputView::lay(const Entry& entry)
         laid.text += ": ";
     }
     laid.textBegin = static_cast<S32>(laid.text.size());
-    // What was said, its lines after the first indented under it.
-    size_t from = 0;
-    while (true)
-    {
-        const size_t nl = entry.text.find('\n', from);
-        laid.text.append(entry.text, from, nl == std::string::npos ? std::string::npos : nl - from);
-        if (nl == std::string::npos)
-        {
-            break;
-        }
-        laid.text += '\n';
-        ++laid.lines;
-        from = nl + 1;
-    }
+    // What was said, each of its breaks -- LF alone, as append() keeps
+    // them -- a line more.
+    laid.text += entry.text;
+    laid.lines += static_cast<S32>(std::count(entry.text.begin(), entry.text.end(), '\n'));
     return laid;
 }
 
@@ -278,19 +269,9 @@ const ALOutputView::Decor& ALOutputView::decorOf(size_t index, const Laid& laid)
         source.value   = LLSD(static_cast<S32>(mSerials[index]));
         addInOrder(decor.links, std::move(source));
     }
-    // The lines as shown, for the links on them.
-    std::vector<std::string_view> lines;
-    lines.reserve(static_cast<size_t>(laid.lines));
-    for (size_t from = 0;;)
-    {
-        const size_t nl = laid.text.find('\n', from);
-        lines.emplace_back(laid.text.data() + from, (nl == std::string::npos ? laid.text.size() : nl) - from);
-        if (nl == std::string::npos)
-        {
-            break;
-        }
-        from = nl + 1;
-    }
+    // The lines as shown, for the links on them: split as the document
+    // splits them.
+    const std::vector<std::string_view> lines = ALLineBreaks::views(laid.text);
     // The entry's own links within what was said: a line's bytes as the
     // entry has them are the text's, but for the first line's, which
     // start after the stamp and the source.
@@ -432,6 +413,13 @@ const ALOutputView::Entry* ALOutputView::entryOf(U32 serial) const
 void ALOutputView::append(Entry entry)
 {
     entry.lane = llmin<U8>(entry.lane, LANES - 1);
+    // What was said in the lines the document makes of it: a lone CR is a
+    // break there as LF is, and CRLF one break, so that the lines counted
+    // for an entry are the lines it is shown over.
+    if (entry.text.find('\r') != std::string::npos)
+    {
+        entry.text = ALLineBreaks::withLineFeeds(entry.text);
+    }
     // The same as the last thing said: that one, said once more.
     if (!mEntries.empty())
     {
