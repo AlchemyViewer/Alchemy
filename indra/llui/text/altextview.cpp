@@ -4694,10 +4694,10 @@ void ALTextView::placeFindBar()
 void ALTextView::queryChanged()
 {
     // A text of a script's size looked through at once, as the query is
-    // typed; a longer one once the query has stopped changing for a
-    // moment, as it is after an edit, not at every key.
-    constexpr size_t AT_ONCE = 256 * 1024;
-    if (mDocument.byteCount() > AT_ONCE)
+    // typed; one long enough to be looked through on a worker once the
+    // query has stopped changing for a moment, as it is after an edit,
+    // not at every key.
+    if (mDocument.byteCount() > ALTextFind::ON_A_WORKER)
     {
         mFind.stale();
         return;
