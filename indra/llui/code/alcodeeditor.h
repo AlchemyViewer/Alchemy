@@ -1173,6 +1173,17 @@ private:
     // The bracket the call shown opens with, or none: the signature stays
     // while the caret is inside the call, across its lines.
     ALTextPos               mSignatureOpen{ -1, -1 };
+    // Where that call closes, as last found -- for which bracket and which
+    // text, and whether it closes nearby at all -- which every frame holds
+    // the caret against while the signature is up.
+    struct SignatureClose
+    {
+        ALTextPos open{ -1, -1 };
+        U32       version = 0;
+        bool      found   = false;
+        ALTextPos at;
+    };
+    mutable SignatureClose  mSignatureClose;
     symbol_request_t        mSymbolRequest;
     link_request_t          mLinkRequest;
     // The icons the completions wear, by name (iconOf).

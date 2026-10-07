@@ -4636,14 +4636,21 @@ bool ALCodeEditor::signatureShown() const
     {
         return mCards.signatureFor(caret());
     }
-    // Inside the call's brackets, on whichever of its lines.
+    // Inside the call's brackets, on whichever of its lines: where they
+    // close found once for the bracket and the text, not at every frame.
     const ALTextPos at = caret();
     if (!(mSignatureOpen < at))
     {
         return false;
     }
-    ALTextPos close;
-    return !const_cast<ALBracketIndex&>(mBracketIndex).match(mSignatureOpen, close, ALBracketIndex::NEARBY) || !(close < at);
+    SignatureClose& close = mSignatureClose;
+    if (close.open != mSignatureOpen || close.version != document().version())
+    {
+        close.open    = mSignatureOpen;
+        close.version = document().version();
+        close.found   = const_cast<ALBracketIndex&>(mBracketIndex).match(mSignatureOpen, close.at, ALBracketIndex::NEARBY);
+    }
+    return !close.found || !(close.at < at);
 }
 
 S32 ALCodeEditor::argumentAt(const ALTextPos& open, const ALTextPos& at)
