@@ -142,6 +142,10 @@ std::string ALVimKeymap::status() const
         {
             // What is pending, as vim's showcmd has it.
             std::string pending;
+            if (mRegisterCount > 0)
+            {
+                pending += std::to_string(mRegisterCount);
+            }
             if (mRegister)
             {
                 pending += std::string("\"") + mRegister;
@@ -794,10 +798,20 @@ void ALVimKeymap::clearPending()
     mSurroundWaiting = false;
     mCount         = 0;
     mRegister      = 0;
+    mRegisterCount = 0;
     mOperator      = 0;
     mOperatorCount = 0;
     mPending       = 0;
     mObjectKind    = 0;
+}
+
+void ALVimKeymap::takeRegisterCount()
+{
+    if (mRegisterCount > 0)
+    {
+        mCount         = countTimes(mRegisterCount, countOr(mCount));
+        mRegisterCount = 0;
+    }
 }
 
 void ALVimKeymap::finishCommand(bool changed)
@@ -885,6 +899,7 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
         // Back in the jump list, or forward again, the count times: the
         // host's, which goes between its tabs as well.
         const auto jump = [&](bool back) {
+            takeRegisterCount();
             const S32 times = countOr(mCount);
             clearPending();
             for (S32 n = 0; n < times && mHooks.command; ++n)
@@ -944,6 +959,8 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
         }
         if (ctrl && !(input.mask & MASK_ALT))
         {
+            // A chord is a command's own key, and no digit of its count.
+            takeRegisterCount();
             switch (input.key)
             {
                 case 'O':
@@ -1091,6 +1108,8 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
         mPending = '"';
         return true;
     }
+    // The command's own key: a count before a register's name counts too.
+    takeRegisterCount();
 
     // An operator, or its motion.
     if (mOperator)
@@ -1195,8 +1214,14 @@ bool ALVimKeymap::afterRegisterName(ALTextView& view, llwchar pending, llwchar c
     if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '"' || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '+' ||
         ch == '*')
     {
+        // A count typed before the name is kept, for the one typed after
+        // it to multiply (takeRegisterCount).
         mRegister = static_cast<char>(ch);
-        mCount    = 0;
+        if (mCount > 0)
+        {
+            mRegisterCount = countTimes(countOr(mRegisterCount), mCount);
+        }
+        mCount = 0;
         return true;
     }
     clearPending();

@@ -4050,4 +4050,33 @@ namespace tut
         ex("0put x");
         ensure_equals("lines counted from 0: :0put x under the first, the line shown as 0", flat(zero.text()), std::string("a|b|b|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<149>()
+    {
+        set_test_name("a count typed before a register's name counts, multiplied by one typed after it, for p, yy, dd and an operator's motion");
+        ALCodeEditor& e = make("ab\n");
+        keys("\"ayl3\"ap");
+        ensure_equals("3\"ap: put three times", flat(e.text()), std::string("aaaab|"));
+        ensure_equals("the caret on the last put", caretText(), std::string("0:3"));
+
+        make("ab\n");
+        keys("\"ayl2\"a3");
+        ensure_equals("both counts shown as they were typed", vim->status(), std::string("2\"a3"));
+        keys("p");
+        ensure_equals("2\"a3p: six times", flat(editor->text()), std::string("aaaaaaab|"));
+        ensure_equals("the caret on the last put", caretText(), std::string("0:6"));
+
+        make("1\n2\n3\n4\n5\n");
+        keys("3\"ayy");
+        ensure_equals("3\"ayy: three lines yanked into a", vim->registerText('a'), std::string("1\n2\n3"));
+        keys("2\"add");
+        ensure_equals("2\"add: two lines deleted", flat(editor->text()), std::string("3|4|5|"));
+        ensure_equals("into a", vim->registerText('a'), std::string("1\n2"));
+
+        make("1\n2\n3\n4\n5\n6\n7\n8\n");
+        keys("2\"ad3d");
+        ensure_equals("2\"ad3d: six lines deleted", flat(editor->text()), std::string("7|8|"));
+        ensure_equals("into a", vim->registerText('a'), std::string("1\n2\n3\n4\n5\n6"));
+    }
 }

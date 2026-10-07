@@ -403,6 +403,10 @@ private:
     bool      isVisual() const { return mMode == Mode::Visual || mMode == Mode::VisualLine || mMode == Mode::VisualBlock; }
     void   finishCommand(bool changed);
     void   clearPending();
+    // The count typed before a register's name and the one typed after
+    // it, multiplied into the command's, as vim's are: once a key of the
+    // command's own comes, which is no digit of the count.
+    void   takeRegisterCount();
 
     // Modes. Every change of one, the parts' as well, is setMode's, which
     // takes up and lets go of what each mode holds while it lasts on the
@@ -494,11 +498,13 @@ private:
     U32   mGeneration = 1;
 
     // What normal mode has read so far: a count (0 for none), a register
-    // (0 for the unnamed), an operator waiting for its motion with its
-    // own count, and a character waiting for the one that completes it
-    // (f, t, r, m, `, ', ", g, z, Z, i, a) with the count that came before.
+    // (0 for the unnamed) with the count typed before its name, an
+    // operator waiting for its motion with its own count, and a character
+    // waiting for the one that completes it (f, t, r, m, `, ', ", g, z, Z,
+    // i, a) with the count that came before.
     S32     mCount        = 0;
     char    mRegister     = 0;
+    S32     mRegisterCount = 0;
     llwchar mOperator     = 0;
     S32     mOperatorCount = 0;
     llwchar mPending      = 0;
