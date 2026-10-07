@@ -2510,7 +2510,9 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 }
                 span.range = ALTextRange(from, end);
             }
-            if (span.range.empty())
+            // Nothing to take: x and X do nothing, where s on an empty line
+            // goes on to insert, as vim's cl does.
+            if (span.range.empty() && ch != 's')
             {
                 clearPending();
                 return true;
@@ -3703,15 +3705,20 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             {
                 return;
             }
-            // Nothing to take out -- D or d$ on an empty line -- puts
-            // nothing in a register either, as vim's delete has it: what
-            // the registers and the clipboard hold stays. c still keeps
-            // its empty stretch and goes on to insert, as vim's change does.
-            if (op == 'd' && !span.linewise && !span.block && span.range.empty())
+            // Nothing to take out -- D or d$ on an empty line, s on one --
+            // puts nothing in a register either, as vim's delete has it:
+            // what the registers and the clipboard hold stays. c still
+            // goes on to insert over its empty stretch, as vim's change
+            // does.
+            const bool nothing = !span.linewise && !span.block && span.range.empty();
+            if (nothing && op == 'd')
             {
                 return;
             }
-            store(mRegister, text, span.linewise, span.block, false);
+            if (!nothing)
+            {
+                store(mRegister, text, span.linewise, span.block, false);
+            }
             if (op == 'c')
             {
                 view.undoJournal().beginGroup();

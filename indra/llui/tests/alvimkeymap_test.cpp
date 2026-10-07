@@ -3389,6 +3389,25 @@ namespace tut
     }
 
     template<> template<>
+    void alvimkeymap_object::test<120>()
+    {
+        set_test_name("s on an empty line inserts there, with a count before it too, the registers left as they were; S as it did");
+        ALCodeEditor& e = make("abc\n\n\n\nxyz\n");
+        keys("yiwjs");
+        ensure("s on an empty line: insert mode", vim->mode() == ALVimKeymap::Mode::Insert);
+        keys("new<Esc>");
+        ensure_equals("what was typed there", flat(e.text()), std::string("abc|new|||xyz|"));
+        keys("j3sx<Esc>");
+        ensure_equals("3s as well", flat(e.text()), std::string("abc|new|x||xyz|"));
+        ensure_equals("nothing taken, so the register as it was", vim->registerText('"'), std::string("abc"));
+        keys("u");
+        ensure_equals("each one step to undo", flat(e.text()), std::string("abc|new|||xyz|"));
+        e.setCaret(ALTextPos(3, 0));
+        keys("Sy<Esc>");
+        ensure_equals("S on an empty line inserts too", flat(e.text()), std::string("abc|new||y|xyz|"));
+    }
+
+    template<> template<>
     void alvimkeymap_object::test<130>()
     {
         set_test_name("/ and ? after an operator are its motion, up to the match and not into it; an offset of lines makes it lines, /e takes the match's end");
