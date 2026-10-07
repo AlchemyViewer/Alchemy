@@ -32,13 +32,6 @@
 
 namespace
 {
-    // What a string or a comment is made of, where a bracket is none.
-    bool quiet(ALSyntaxKind kind)
-    {
-        return kind == ALSyntaxKind::String || kind == ALSyntaxKind::Comment || kind == ALSyntaxKind::DocComment ||
-               kind == ALSyntaxKind::Escape || kind == ALSyntaxKind::AttributeValue;
-    }
-
     // Which kind a bracket is: round, square, curly.
     size_t kindOf(char c)
     {
@@ -146,7 +139,7 @@ const ALBracketIndex::Line& ALBracketIndex::lineAt(S32 line)
             {
                 ++t;
             }
-            if (t < tokens->size() && (*tokens)[t].begin <= i && quiet((*tokens)[t].kind))
+            if (t < tokens->size() && (*tokens)[t].begin <= i && alSyntaxKindIsQuiet((*tokens)[t].kind))
             {
                 continue;
             }

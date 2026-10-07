@@ -80,6 +80,24 @@ enum class ALSyntaxKind : U8
     COUNT
 };
 
+// What a string or a comment is made of -- a path among them, drawn as a
+// string -- where a bracket is no bracket and what is typed is prose.
+inline bool alSyntaxKindIsQuiet(ALSyntaxKind kind)
+{
+    switch (kind)
+    {
+        case ALSyntaxKind::String:
+        case ALSyntaxKind::Comment:
+        case ALSyntaxKind::DocComment:
+        case ALSyntaxKind::Escape:
+        case ALSyntaxKind::AttributeValue:
+        case ALSyntaxKind::Path:
+            return true;
+        default:
+            return false;
+    }
+}
+
 const char*                  alSyntaxKindName(ALSyntaxKind kind);
 std::optional<ALSyntaxKind>  alSyntaxKindFromName(std::string_view name);
 

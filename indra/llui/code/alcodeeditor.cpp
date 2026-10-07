@@ -98,13 +98,6 @@ namespace
     const char* const MARK_COLOR_NAMES[] = { "TextFgColor", "CodeMarkNote", "CodeMarkWarning", "CodeMarkError", "CodeMarkRuntime" };
     static_assert(sizeof(MARK_COLOR_NAMES) / sizeof(MARK_COLOR_NAMES[0]) == static_cast<size_t>(ALCodeEditor::Mark::COUNT), "every mark has a colour");
 
-    // What a string or a comment is made of.
-    bool quiet(ALSyntaxKind kind)
-    {
-        return kind == ALSyntaxKind::String || kind == ALSyntaxKind::Comment || kind == ALSyntaxKind::DocComment ||
-               kind == ALSyntaxKind::Escape || kind == ALSyntaxKind::AttributeValue;
-    }
-
     ALSyntaxKind kindOfTable(std::string_view table)
     {
         if (table == "function") return ALSyntaxKind::Function;
@@ -3516,7 +3509,7 @@ bool ALCodeEditor::inProse(const ALTextPos& at)
     {
         if (token.begin <= column && column < token.end)
         {
-            return quiet(token.kind);
+            return alSyntaxKindIsQuiet(token.kind);
         }
     }
     return false;
