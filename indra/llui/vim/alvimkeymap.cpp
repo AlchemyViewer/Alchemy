@@ -2314,6 +2314,35 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
             clearPending();
             return true;
         }
+        case 'O':
+        {
+            // o, but in a block the other corner on the caret's own line:
+            // the caret and the anchor trade the block's columns as the
+            // reader counts them, each staying on its line -- the caret to
+            // the right edge, or to the left where it is at the right
+            // already, as vim's O has it. A block taken with $ is one of
+            // its columns again.
+            if (mMode != Mode::VisualBlock)
+            {
+                std::swap(mVisualAnchor, mVisualCaret);
+            }
+            else
+            {
+                const S32       tab    = view.getTabWidth();
+                const ALTextPos anchor = d.clamp(mVisualAnchor);
+                const ALTextPos caret  = d.clamp(mVisualCaret);
+                S32             left   = 0;
+                S32             right  = 0;
+                blockColumns(d, anchor, caret, tab, left, right);
+                const ALTextPos to_right = d.posAtDisplayColumn(caret.line, right, tab);
+                const bool      at_right = to_right == caret;
+                mVisualAnchor            = d.posAtDisplayColumn(anchor.line, at_right ? right : left, tab);
+                mVisualCaret             = at_right ? d.posAtDisplayColumn(caret.line, left, tab) : to_right;
+            }
+            showVisual(view);
+            clearPending();
+            return true;
+        }
         case 'v':
         case 'V':
         case 0x16:

@@ -3408,6 +3408,31 @@ namespace tut
     }
 
     template<> template<>
+    void alvimkeymap_object::test<121>()
+    {
+        set_test_name("visual O: in a block the other corner on the caret's own line, the columns traded; in charwise and linewise visual as o");
+        ALCodeEditor& e = make("abcdef\nabcdef\nabcdef\n");
+        keys("l<C-v>jllO");
+        ensure("still the block, no line opened", vim->mode() == ALVimKeymap::Mode::VisualBlock && flat(e.text()) == "abcdef|abcdef|abcdef|");
+        ensure_equals("the caret to the block's left, on its own line", caretText(), std::string("1:1"));
+        keys("O");
+        ensure_equals("and back to its right", caretText(), std::string("1:3"));
+        keys("jOd");
+        ensure_equals("the same columns, a line further", flat(e.text()), std::string("aef|aef|aef|"));
+
+        make("one two\n");
+        keys("vllO");
+        ensure("charwise: still visual", vim->mode() == ALVimKeymap::Mode::Visual);
+        ensure_equals("the caret to the other end", caretText(), std::string("0:0"));
+        keys("d");
+        ensure_equals("the same characters", editor->document().line(0), std::string(" two"));
+
+        make("a\nb\nc\nd\n");
+        keys("jVjOkd");
+        ensure_equals("linewise: the caret to the first line, which k goes on from", flat(editor->text()), std::string("d|"));
+    }
+
+    template<> template<>
     void alvimkeymap_object::test<130>()
     {
         set_test_name("/ and ? after an operator are its motion, up to the match and not into it; an offset of lines makes it lines, /e takes the match's end");
