@@ -766,6 +766,7 @@ void LLWindowSDL::destroyContext()
     mHasDeferredCursorWarp = false;
     mAbsoluteCursorPosition = false;
     mRelativeMouseMode = false;
+    mOccluded = false;
     mDialogDepth = 0;
     mDialogSavedRelativeMode = false;
     mPendingDropFiles.clear();
@@ -872,7 +873,10 @@ bool LLWindowSDL::getMinimized()
             result = true;
         }
     }
-    return result;
+    // A Wayland window is never told it was minimised, only suspended; see
+    // mOccluded. Occlusion isn't counted elsewhere: on X11 it only comes with
+    // a minimise, and on macOS it means covered or on another Space.
+    return result || mOccluded;
 }
 
 bool LLWindowSDL::getMaximized()
@@ -2320,6 +2324,15 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 
         case SDL_EVENT_WINDOW_EXPOSED:
         {
+            // A Wayland window leaving the suspended state is exposed, and that
+            // is its restore. A size change while still suspended also exposes
+            // it, but SDL occludes it again in the same breath, so the flag
+            // already says occluded by the time the event is read here.
+            if (mOccluded && !(SDL_GetWindowFlags(mWindow) & SDL_WINDOW_OCCLUDED))
+            {
+                mOccluded = false;
+                mCallbacks->handleActivate(this, true);
+            }
             mCallbacks->handlePaint(this, 0, 0, 0, 0);
             break;
         }
@@ -2433,6 +2446,14 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             break;
         case SDL_EVENT_WINDOW_MINIMIZED:
             mCallbacks->handleActivate(this, false);
+            break;
+        case SDL_EVENT_WINDOW_OCCLUDED:
+            // Wayland's minimise; see mOccluded.
+            if (mServerProtocol == Wayland && !mOccluded)
+            {
+                mOccluded = true;
+                mCallbacks->handleActivate(this, false);
+            }
             break;
         case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
         {

@@ -449,6 +449,12 @@ private:
     enum EServerProtocol{ X11, Wayland, Unknown };
     EServerProtocol mServerProtocol = Unknown;
 
+    // Wayland only: set from SDL_EVENT_WINDOW_OCCLUDED until the EXPOSED that
+    // follows the window's return. xdg-shell never tells a client it was
+    // minimised; the toplevel's "suspended" state, which SDL reports as
+    // occlusion, is what arrives instead. getMinimized() counts it.
+    bool mOccluded = false;
+
 #if LL_WINDOWS
     // Install/remove a WndProc subclass on the SDL window's HWND so we can
     // service WM_COPYDATA (SLURL hand-off from a second instance) — SDL3's
