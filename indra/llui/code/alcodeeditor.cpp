@@ -4632,7 +4632,11 @@ void ALCodeEditor::dropTyping()
 
 bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 {
+    // The card goes with a key, and comes again only once the mouse has
+    // moved: what a key leaves under a still mouse -- the next page, a
+    // line taken away -- is not what it rested on.
     hideCard();
+    mHoverTried = true;
     // A peek open steps by the keys a comparison steps by, ahead of the
     // misspellings they otherwise walk.
     if (key == KEY_F7 && (mask == MASK_NONE || mask == MASK_SHIFT) && mPeek && mPeek->isOpen())
@@ -4844,6 +4848,9 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 
 bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
 {
+    // A character as any key: the card goes until the mouse moves.
+    hideCard();
+    mHoverTried = true;
     const bool typing   = typingText();
     const bool was_open = completionOpen();
     // At several carets the signature and a snippet's stops, each about
@@ -5327,6 +5334,13 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
             }
             return ALTextView::handleToolTip(x, y, mask);
         }
+        // The card once a rest, as on the text: what it said stands until
+        // the mouse moves, and one a key put away stays away as long.
+        if (mHoverTried)
+        {
+            return cardShown() || ALTextView::handleToolTip(x, y, mask);
+        }
+        mHoverTried = true;
         std::vector<CardProblem> problems;
         for (const Decoration* each : decorationsOn(line))
         {
@@ -5384,6 +5398,14 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
         // which draw watches for, rather than at the tooltip's own time.
         return true;
     }
+    // Asked for once a rest, here or by pump, rather than at every pass
+    // the mouse stays still for: the card it brought stands, or there is
+    // none, until the mouse moves; one a key put away stays away as long.
+    if (mHoverTried)
+    {
+        return cardShown() || ALTextView::handleToolTip(x, y, mask);
+    }
+    mHoverTried = true;
     return hoverCardAt(x, y) || ALTextView::handleToolTip(x, y, mask);
 }
 

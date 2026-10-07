@@ -633,12 +633,15 @@ namespace tut
         ensure("shown again", e.cardShown());
         key(KEY_RIGHT);
         ensure("a key hides it", !e.cardShown());
-        // A problem's message comes the same way, from the gutter.
+        // A problem's message comes the same way, from the gutter, the
+        // mouse moved there.
         ALCodeEditor::Decoration d;
         d.range   = ALTextRange(ALTextPos(1, 0), ALTextPos(1, 6));
         d.message = "something is wrong here";
         e.setDecorations({ d });
-        e.handleToolTip(e.leftEdge() + 2, text.mTop - e.layout().rowHeight() - e.layout().rowHeight() / 2, MASK_NONE);
+        const S32 gutter_y = text.mTop - e.layout().rowHeight() - e.layout().rowHeight() / 2;
+        e.handleHover(e.leftEdge() + 2, gutter_y, MASK_NONE);
+        e.handleToolTip(e.leftEdge() + 2, gutter_y, MASK_NONE);
         ensure("the gutter's card", e.cardShown() && e.card()->text() == "something is wrong here");
     }
 
@@ -3201,5 +3204,88 @@ namespace tut
         ensure("kept, the mouse on the line's row in the gutter", e.cardShown());
         e.handleHover(x, y - 2 * row_h, MASK_NONE);
         ensure("gone from another row", !e.cardShown());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<87>()
+    {
+        set_test_name("a card a key put away stays away under a still mouse, a word a page brings under it brings none, and the mouse moving brings one again");
+        std::string text;
+        for (int i = 0; i < 60; ++i)
+        {
+            text += "llSay(0, \"line " + std::to_string(i) + "\");\n";
+        }
+        ALCodeEditor& e = make(text.c_str());
+        e.setHoverProvider([](const ALTextPos&, std::string_view word, std::string& out) {
+            if (word != "llSay")
+            {
+                return false;
+            }
+            out = "llSay(integer channel, string msg)";
+            return true;
+        });
+        const LLRect text_rect = e.textRect();
+        S32          row;
+        const S32    x = text_rect.mLeft + static_cast<S32>(e.layout().xOf(0, 2, &row)) + 1;
+        const S32    y = text_rect.mTop - e.layout().rowHeight() / 2;
+        e.handleHover(x, y, MASK_NONE);
+        ensure("a card", e.handleToolTip(x, y, MASK_NONE) && e.cardShown());
+        key(KEY_DOWN);
+        ensure("a key put it away", !e.cardShown());
+        // The frames after, the mouse still.
+        e.handleHover(x, y, MASK_NONE);
+        e.handleToolTip(x, y, MASK_NONE);
+        ensure("not back while the mouse is still", !e.cardShown());
+        key(KEY_PAGE_DOWN);
+        ensure("other lines under the mouse", e.scrollY() > 0);
+        e.handleHover(x, y, MASK_NONE);
+        e.handleToolTip(x, y, MASK_NONE);
+        ensure("none for the word scrolled under it", !e.cardShown());
+        // Moved: a card may come again.
+        e.handleHover(x + 1, y, MASK_NONE);
+        ensure("the mouse moved: a card again", e.handleToolTip(x + 1, y, MASK_NONE) && e.cardShown());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<88>()
+    {
+        set_test_name("the card is worked out once a rest, not again at every tooltip pass the mouse stays still for, on a word or on a mark");
+        ALCodeEditor& e = make("llSay(0, x);\nsecond line\n");
+        size_t hovered = 0;
+        e.setHoverProvider([&hovered](const ALTextPos&, std::string_view word, std::string& out) {
+            ++hovered;
+            out = "about " + std::string(word);
+            return true;
+        });
+        size_t fixed = 0;
+        e.setFixProvider([&fixed](S32, std::vector<ALCodeEditor::Fix>&) { ++fixed; });
+        e.setFixHandler([](const LLSD&) {});
+        ALCodeEditor::Decoration d;
+        d.range   = ALTextRange(ALTextPos(1, 0), ALTextPos(1, 6));
+        d.message = "something is wrong here";
+        e.setDecorations({ d });
+        const LLRect text  = e.textRect();
+        const S32    row_h = e.layout().rowHeight();
+        S32          row;
+        const S32    x = text.mLeft + static_cast<S32>(e.layout().xOf(0, 2, &row)) + 1;
+        const S32    y = text.mTop - row_h / 2;
+        // Frame after frame, the mouse still on the word.
+        for (int frame = 0; frame < 5; ++frame)
+        {
+            e.handleHover(x, y, MASK_NONE);
+            e.handleToolTip(x, y, MASK_NONE);
+        }
+        ensure("a card", e.cardShown());
+        ensure_equals("the word asked about once", hovered, size_t(1));
+        // And on the next line's mark, past the change bar.
+        const S32 gutter_x = e.leftEdge() + 8;
+        const S32 gutter_y = text.mTop - row_h - row_h / 2;
+        for (int frame = 0; frame < 5; ++frame)
+        {
+            e.handleHover(gutter_x, gutter_y, MASK_NONE);
+            e.handleToolTip(gutter_x, gutter_y, MASK_NONE);
+        }
+        ensure("the mark's card", e.cardShown() && e.card()->text().find("something is wrong here") != std::string::npos);
+        ensure_equals("its fixes asked for once", fixed, size_t(1));
     }
 }

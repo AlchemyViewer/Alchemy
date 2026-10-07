@@ -991,7 +991,8 @@ private:
     bool     mHoverCards = true;
     F32      mHoverDelay = -1.f;
     // How long the mouse has rested, and whether the card was asked for
-    // since it last moved.
+    // since it last moved -- or put away by a key, which leaves it to come
+    // again only once the mouse moves.
     LLFrameTimer mMouseRest;
     bool         mHoverTried = false;
     // What the hover provider said of the word asked about, shown where
