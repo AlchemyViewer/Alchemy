@@ -94,9 +94,16 @@ static void handleUrl(const char* url_utf8);
 #if LL_LINUX && LL_DBUS
 #include "llviewerwindow.h" // bringToFront() for a SLURL handed over the bus
 #include <dbus/dbus.h>
-#include <unistd.h>         // close() for the logind inhibitor fd
+#include <unistd.h>         // getpagesize(), getppid(), readlink()
 
-#define VIEWERAPI_SERVICE   "com.secondlife.ViewerAppAPIService"
+// The bus name is the application ID, one to a channel, so a link is handed
+// only to a running viewer of this channel: not another channel's, nor Linden
+// Lab's or another fork's, which share LL's com.secondlife.ViewerAppAPIService.
+// ViewerInstall.cmake builds the ID to the bus's rules, dot-separated elements
+// of [a-z0-9_] none beginning with a digit; only the length is left to check.
+// The object path and interface stay LL's.
+#define VIEWERAPI_SERVICE   AL_VIEWER_APP_ID
+static_assert(sizeof(VIEWERAPI_SERVICE) - 1 <= 255, "A D-Bus name is at most 255 characters");
 #define VIEWERAPI_PATH      "/com/secondlife/ViewerAppAPI"
 #define VIEWERAPI_INTERFACE "com.secondlife.ViewerAppAPI"
 #endif
@@ -717,13 +724,24 @@ bool LLAppViewerSDL::initSLURLHandler()
     }
 
     // Claim the well-known service name. DO_NOT_QUEUE so we never silently wait
-    // behind an existing owner; the marker-file guard upstream ensures we only
-    // reach here as the primary instance.
-    dbus_bus_request_name(gDBusConn, VIEWERAPI_SERVICE, DBUS_NAME_FLAG_DO_NOT_QUEUE, &err);
+    // behind an existing owner. A name another process holds, as it is for a
+    // second viewer of this channel (AllowMultipleViewers), is no error to
+    // libdbus, only a reply, so the reply is what says the name is ours.
+    const int reply = dbus_bus_request_name(gDBusConn, VIEWERAPI_SERVICE, DBUS_NAME_FLAG_DO_NOT_QUEUE, &err);
     if (dbus_error_is_set(&err))
     {
         LL_WARNS() << "Failed to acquire dbus name " << VIEWERAPI_SERVICE << ": " << err.message << LL_ENDL;
         dbus_error_free(&err);
+        return false;
+    }
+    if (reply != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER
+        && reply != DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER)
+    {
+        const char* result = reply == DBUS_REQUEST_NAME_REPLY_EXISTS   ? "EXISTS, another process owns it"
+                           : reply == DBUS_REQUEST_NAME_REPLY_IN_QUEUE ? "IN_QUEUE, behind its owner"
+                                                                       : "an unknown reply";
+        LL_WARNS() << "Failed to acquire dbus name " << VIEWERAPI_SERVICE << ": " << result
+                   << " (" << reply << ")" << LL_ENDL;
         return false;
     }
 
