@@ -101,7 +101,12 @@ public:
             // Its item gone from its object or the inventory.
             Orphaned,
             // Its object out of reach: sent when a person asks again.
-            Pending
+            Pending,
+            // Not sent, many at once: the scripter, asked whether to send
+            // again the scripts an include's save changes, said Don't Send,
+            // and they wait, pending, for Send from Files. One outcome for
+            // them all, of no one script: its words, whole, in `why`.
+            NotSent
         };
         What        what = What::Sent;
         ALScriptRef ref;
@@ -145,8 +150,8 @@ public:
     void link(ALMasterLink link);
     void unlink(const ALScriptRef& ref);
     // Scripts not sent when they might have been, waiting to be sent by
-    // hand.
-    void markPending(const std::vector<ALScriptRef>& refs);
+    // hand; how many of them are linked still, and so marked.
+    size_t markPending(const std::vector<ALScriptRef>& refs);
 
     // A file written by the studio: no outside save for the watch, each
     // script it masters sent as a save of the master is, and the scripts
@@ -162,6 +167,10 @@ public:
     // What was said with no studio window to hear it, for the window opened
     // next to list; given once.
     std::vector<Outcome> takeUnheard();
+    // An outcome told: to the windows listening, or, with none, to the
+    // toasts and kept. A send's as it ends, and what came of a question
+    // about many at once.
+    void tell(const Outcome& outcome);
 
     // The folders a script on disk may read from, as its includes and
     // requires do -- the include folders, what a configuration on disk
@@ -197,9 +206,6 @@ private:
     void heardSaved(const ALScriptSaved& saved);
     // Saves heard by the watch, once their burst went quiet.
     void released(const std::vector<std::string>& masters, const std::vector<std::string>& includes);
-    // An outcome told: to the windows listening, or, with none, to the
-    // toasts and kept.
-    void tell(const Outcome& outcome);
     // Whether a studio window is open where it can be seen.
     static bool studioInSight();
     // The sends whose turn it is, started; and a script forgotten once

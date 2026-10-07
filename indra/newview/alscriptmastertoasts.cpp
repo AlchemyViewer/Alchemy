@@ -101,6 +101,11 @@ void ALScriptMasterToasts::say()
 // static
 std::string ALScriptMasterToasts::wordsFor(const Outcome& outcome)
 {
+    // Of many scripts at once, and in words already.
+    if (outcome.what == Outcome::What::NotSent)
+    {
+        return outcome.why;
+    }
     LLStringUtil::format_map_t args;
     args["[NAME]"] = outcome.itemName;
     args["[FILE]"] = gDirUtilp->getBaseFileName(outcome.master);
@@ -116,6 +121,7 @@ std::string ALScriptMasterToasts::wordsFor(const Outcome& outcome)
         case Outcome::What::Suspended: key = "ScriptMasterToastSuspended"; break;
         case Outcome::What::Orphaned: key = "ScriptMasterToastOrphaned"; break;
         case Outcome::What::Pending: key = "ScriptMasterToastPending"; break;
+        case Outcome::What::NotSent: break;
     }
     return LLTrans::getString(key, args);
 }

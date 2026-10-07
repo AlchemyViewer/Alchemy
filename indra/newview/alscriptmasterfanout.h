@@ -43,9 +43,10 @@
 // just as they went last are dropped. Then, where more would change than
 // the scripter set (`ALScriptMastersAskOver`, 8), or they are in more than
 // one object, the scripter is asked once (ALMasterPlan::askFirst): Send All,
-// or Don't Send, which leaves them pending. Under that, each is sent as the
-// studio's own sends are, which a change in the world holds, and said. A
-// file saved while a round is under way is the next round's.
+// or Don't Send, which leaves them pending, and says so once for them all.
+// Under that, each is sent as the studio's own sends are, which a change in
+// the world holds, and said. A file saved while a round is under way is the
+// next round's.
 class ALScriptMasterFanOut
 {
 public:
@@ -60,6 +61,8 @@ private:
     void probed(const ALMasterLink& link, bool changing);
     void decide();
     void sendAll(bool send);
+    // The files the round is for, in words: the first, and how many more.
+    std::string filesNamed() const;
 
     // The round under way: what changed, the links to probe and being
     // probed, and those that would change.

@@ -665,6 +665,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptMasterFilesB">[FILE] and [COUNT] other files</string>
 	<string name="ScriptMasterPlacesA">all in one place</string>
 	<string name="ScriptMasterPlacesB">across [COUNT] places</string>
+	<string name="ScriptMasterNotSentA">One script that includes [FILES] was not sent; Send from Files sends it.</string>
+	<string name="ScriptMasterNotSentB">[COUNT] scripts that include [FILES] were not sent; Send from Files sends them.</string>
 	<string name="BridgeNotSaved">Not saved: [REASON]</string>
 	<string name="BridgeSentCompiledAsIs">The compiled half was changed and its source was not, so it went up as it is rather than as its source expands.</string>
 	<string name="PreprocIncludeSentWithout">include file '[1]' could not be fetched, and the script went up without it</string>

@@ -749,5 +749,7 @@ void ALScriptStudioMasters::heard(const ALScriptDiskMasters::Outcome& outcome)
         case What::Suspended: said("MasterSuspended", true, { "master_find", "master_unlink" }); return;
         case What::Orphaned: said("MasterOrphaned", false, { "master_unlink" }); return;
         case What::Pending: said("MasterPending", false, { "master_send" }); return;
+        // Of many scripts at once, in words already.
+        case What::NotSent: mServices.report(outcome.why, false); return;
     }
 }

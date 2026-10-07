@@ -392,22 +392,23 @@ void ALScriptDiskMasters::unlink(const ALScriptRef& ref)
     }
 }
 
-void ALScriptDiskMasters::markPending(const std::vector<ALScriptRef>& refs)
+size_t ALScriptDiskMasters::markPending(const std::vector<ALScriptRef>& refs)
 {
-    ALMasterLinks* all = links();
-    bool           any = false;
+    ALMasterLinks* all    = links();
+    size_t         marked = 0;
     for (const ALScriptRef& ref : refs)
     {
         if (ALMasterLink* link = all ? all->find(ref.object, ref.item) : nullptr)
         {
             link->state = ALMasterLink::State::Pending;
-            any         = true;
+            ++marked;
         }
     }
-    if (any)
+    if (marked > 0)
     {
         changed();
     }
+    return marked;
 }
 
 void ALScriptDiskMasters::wrote(const std::string& path)

@@ -164,15 +164,12 @@ void ALScriptMasterFanOut::decide()
         sendAll(true);
         return;
     }
-    // Asked once for them all, the files named: the first, and how many
-    // more; and in how many places, an object or the inventory each.
-    LLStringUtil::format_map_t files;
-    files["[FILE]"]  = gDirUtilp->getBaseFileName(mIncludes.front());
-    files["[COUNT]"] = llformat("%d", (S32)(mIncludes.size() - 1));
+    // Asked once for them all, the files named; and in how many places, an
+    // object or the inventory each.
     LLStringUtil::format_map_t places;
     places["[COUNT]"] = llformat("%d", (S32)in_objects);
     LLSD question;
-    question["FILES"]  = LLTrans::getString(mIncludes.size() > 2 ? "ScriptMasterFilesB" : mIncludes.size() > 1 ? "ScriptMasterFilesTwo" : "ScriptMasterFilesA", files);
+    question["FILES"]  = filesNamed();
     question["COUNT"]  = (S32)mChanging.size();
     question["PLACES"] = LLTrans::getString(in_objects > 1 ? "ScriptMasterPlacesB" : "ScriptMasterPlacesA", places);
     const std::weak_ptr<bool> alive = mAlive;
@@ -201,9 +198,33 @@ void ALScriptMasterFanOut::sendAll(bool send)
     }
     else
     {
-        // Not sent, and waiting to be: Send from Files sends them.
-        index.markPending(refs);
+        // Not sent, and waiting to be: Send from Files sends them. Said once
+        // for them all, as the question was asked -- those linked still,
+        // since the question waited on the scripter -- wherever the sends'
+        // outcomes are said.
+        if (const size_t pending = index.markPending(refs); pending > 0)
+        {
+            LLStringUtil::format_map_t args;
+            args["[COUNT]"] = llformat("%d", (S32)pending);
+            args["[FILES]"] = filesNamed();
+            ALScriptDiskMasters::Outcome said;
+            said.what = ALScriptDiskMasters::Outcome::What::NotSent;
+            said.why  = LLTrans::getString(pending > 1 ? "ScriptMasterNotSentB" : "ScriptMasterNotSentA", args);
+            index.tell(said);
+        }
     }
     mChanging.clear();
     start();
+}
+
+std::string ALScriptMasterFanOut::filesNamed() const
+{
+    if (mIncludes.empty())
+    {
+        return std::string();
+    }
+    LLStringUtil::format_map_t files;
+    files["[FILE]"]  = gDirUtilp->getBaseFileName(mIncludes.front());
+    files["[COUNT]"] = llformat("%d", (S32)(mIncludes.size() - 1));
+    return LLTrans::getString(mIncludes.size() > 2 ? "ScriptMasterFilesB" : mIncludes.size() > 1 ? "ScriptMasterFilesTwo" : "ScriptMasterFilesA", files);
 }
