@@ -85,6 +85,10 @@ public:
     // the caret, and the last visual area.
     typedef ALVimPattern Pattern;
     Pattern              patternOf(const std::string& vim, std::optional<bool> force_case = std::nullopt) const;
+    // The case a pattern matched without smartcase is matched by, where it
+    // says nothing of its own: as ignorecase alone says. Nothing for one
+    // matched with it, which patternOf works out.
+    std::optional<bool>  caseWithoutSmartCase(bool no_smartcase) const;
     ALVimPattern::Places placesOf(const ALTextView& view) const;
     // The pattern's matches within a scope, the places applied, with
     // where each whole match began.
@@ -117,9 +121,10 @@ public:
 
     // The search, for n and N; :s and :g set it too, and * and # -- a whole
     // word as \<word\>, as vim's are spelt -- whose case goes by
-    // ignorecase alone, smartcase let be, for their n and N as well, as
-    // vim's does. How case is matched is in the keymap's shared state:
-    // sensitive unless :set ignorecase says, as vim's own default is.
+    // ignorecase alone, smartcase let be, for their n and N as well, and
+    // for :s and :g that use it again, as vim's does. How case is matched
+    // is in the keymap's shared state: sensitive unless :set ignorecase
+    // says, as vim's own default is.
     std::string pattern;
     Offset      offset{};
     bool        forward     = true;

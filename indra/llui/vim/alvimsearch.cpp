@@ -60,7 +60,7 @@ std::optional<ALTextPos> ALVimSearch::target(ALTextView& view, const std::string
     options.regex = true;
     // A pattern in vim's spelling; what * and # look for in its case as
     // ignorecase alone says.
-    const Pattern pattern_in = patternOf(pattern, no_smartcase ? std::optional<bool>(!mVim.mShared->ignoreCase) : std::nullopt);
+    const Pattern pattern_in = patternOf(pattern, caseWithoutSmartCase(no_smartcase));
     options.caseSensitive    = pattern_in.caseSensitive;
     const Found&                    found_now = found(view, pattern_in, options);
     const std::vector<ALTextRange>& matches   = found_now.matches;
@@ -106,6 +106,11 @@ std::optional<ALTextPos> ALVimSearch::target(ALTextView& view, const std::string
 ALVimSearch::Pattern ALVimSearch::patternOf(const std::string& vim, std::optional<bool> force_case) const
 {
     return ALVimPattern::of(vim, mVim.mEx->lastReplacement, { mVim.mShared->ignoreCase, mVim.mShared->smartCase }, force_case);
+}
+
+std::optional<bool> ALVimSearch::caseWithoutSmartCase(bool no_smartcase) const
+{
+    return no_smartcase ? std::optional<bool>(!mVim.mShared->ignoreCase) : std::nullopt;
 }
 
 ALVimPattern::Places ALVimSearch::placesOf(const ALTextView& view) const
@@ -184,7 +189,7 @@ std::optional<ALTextRange> ALVimSearch::matchNear(ALTextView& view, bool forward
     }
     ALTextSearchOptions options;
     options.regex         = true;
-    const Pattern parsed  = patternOf(pattern, noSmartCase ? std::optional<bool>(!mVim.mShared->ignoreCase) : std::nullopt);
+    const Pattern parsed  = patternOf(pattern, caseWithoutSmartCase(noSmartCase));
     options.caseSensitive = parsed.caseSensitive;
     const Found&                    found_now = found(view, parsed, options);
     const std::vector<ALTextRange>& matches   = found_now.matches;

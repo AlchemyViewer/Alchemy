@@ -5484,4 +5484,49 @@ namespace tut
         keys("v$<Esc>gvjd");
         ensure_equals("gv, then j to the next line's end", flat(editor->text()), std::string("q|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<193>()
+    {
+        set_test_name(":s// and :g// after * # or g* match as the search did, without smartcase, and so does n after them; after a pattern typed for :s, :s// goes by smartcase again");
+        make("Foo foo foo Foo\n");
+        ex("set ic scs");
+        keys("*");
+        ex("s//X/g");
+        ensure_equals(":s// after * takes the word in every case", flat(editor->text()), std::string("X X X X|"));
+
+        make("Foo foo foo Foo\n");
+        ex("set ic scs");
+        editor->setCaret(ALTextPos(0, 12));
+        keys("#");
+        ex("s//X/g");
+        ensure_equals("and after #", flat(editor->text()), std::string("X X X X|"));
+
+        make("Foo foox bar\n");
+        ex("set ic scs");
+        keys("g*");
+        ex("s//X/g");
+        ensure_equals("and after g*", flat(editor->text()), std::string("X Xx bar|"));
+
+        make("Foo\nfoo\nbar\nFOO\n");
+        ex("set ic scs");
+        keys("*");
+        ex("g//d");
+        ensure_equals(":g// after * takes the lines with the word in any case", flat(editor->text()), std::string("bar|"));
+
+        make("Foo x\nfoo foo\n");
+        ex("set ic scs");
+        keys("*");
+        ex("s//X/");
+        keys("n");
+        ensure_equals("n after that :s// still without smartcase", caretText(), std::string("1:2"));
+
+        make("Foo foo\nFoo foo\n");
+        ex("set ic scs");
+        keys("*");
+        ex("s/Foo/X/");
+        keys("j");
+        ex("s//Y/g");
+        ensure_equals("a pattern typed for :s, and :s// after it, by smartcase", flat(editor->text()), std::string("X foo|Y foo|"));
+    }
 }

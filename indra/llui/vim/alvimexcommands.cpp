@@ -1436,7 +1436,10 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
     }
     std::string command = p1 < spec.size() ? spec.substr(p1 + 1) : std::string();
     LLStringUtil::trim(command);
-    if (pattern.empty())
+    // The last search used again is matched as it was: without smartcase,
+    // where * made it.
+    const bool again = pattern.empty();
+    if (again)
     {
         pattern = mVim.mSearch.pattern;
     }
@@ -1446,7 +1449,7 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
         return false;
     }
     mVim.mSearch.pattern     = pattern;
-    mVim.mSearch.noSmartCase = false;
+    mVim.mSearch.noSmartCase = again && mVim.mSearch.noSmartCase;
     if (!ranged)
     {
         // The whole text; the empty line after a final newline is no
@@ -1460,7 +1463,7 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
     }
     ALTextSearchOptions options;
     options.regex         = true;
-    const ALVimPattern pattern_in = mVim.mSearch.patternOf(pattern);
+    const ALVimPattern pattern_in = mVim.mSearch.patternOf(pattern, mVim.mSearch.caseWithoutSmartCase(mVim.mSearch.noSmartCase));
     options.caseSensitive    = pattern_in.caseSensitive;
     const ALTextRange        scope(d.lineStart(first), d.lineEnd(last));
     std::string              error;
@@ -1634,6 +1637,9 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
     // flags, or with them after &&.
     std::string        pattern, with, flags;
     const std::string& rest = spec;
+    // The last search used again is matched as it was: without smartcase,
+    // where * made it.
+    bool again = false;
     if (rest.empty() || rest[0] == '&')
     {
         if (mVim.mSearch.pattern.empty())
@@ -1642,6 +1648,7 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
             return false;
         }
         pattern = mVim.mSearch.pattern;
+        again   = true;
         with    = lastReplacement;
         flags   = rest.empty() ? std::string() : rest.substr(1);
     }
@@ -1676,6 +1683,7 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
         if (pattern.empty())
         {
             pattern = mVim.mSearch.pattern;
+            again   = true;
         }
         if (pattern.empty())
         {
@@ -1709,7 +1717,7 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
         flags = lastSubstituteFlags + flags.substr(1);
     }
     mVim.mSearch.pattern        = pattern;
-    mVim.mSearch.noSmartCase    = false;
+    mVim.mSearch.noSmartCase    = again && mVim.mSearch.noSmartCase;
     lastReplacement      = with;
     lastSubstituteFlags  = flags;
     const bool every      = flags.find('g') != std::string::npos;
@@ -1721,7 +1729,9 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
     const ALTextDocument& d = view.document();
     ALTextSearchOptions   options;
     options.regex         = true;
-    const ALVimPattern pattern_in = mVim.mSearch.patternOf(pattern, exactcase ? std::optional<bool>(true) : anycase ? std::optional<bool>(false) : std::nullopt);
+    const ALVimPattern pattern_in = mVim.mSearch.patternOf(pattern, exactcase ? std::optional<bool>(true)
+                                                                    : anycase ? std::optional<bool>(false)
+                                                                              : mVim.mSearch.caseWithoutSmartCase(mVim.mSearch.noSmartCase));
     options.caseSensitive    = pattern_in.caseSensitive;
     // Without g, the first match of each line alone, nothing made of what
     // would replace the rest; not where the pattern names places its
