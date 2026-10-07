@@ -154,8 +154,10 @@ void ALScriptStudioMasters::linkToFile(Doc& doc)
             }
             if (answer == Unsaved::Discard)
             {
-                // Linked as a tab with nothing typed is; what was typed is
-                // set aside as the tab goes, as any thrown away is.
+                // Linked as a tab with nothing typed is, the file held up to
+                // the tab's text as last saved, which is the world's; what
+                // was typed is set aside as the tab goes, as any thrown away
+                // is.
                 linkTo(*asked, path, ALMasterLink::Made::Picked);
                 return;
             }
@@ -222,9 +224,14 @@ void ALScriptStudioMasters::linkTo(Doc& doc, const std::string& path, ALMasterLi
     const bool        bridged = mWindow.heldByBridge(ref);
     // Whether the file is what the script is now: if not, the first save
     // of it sends it, what the world had kept in History. What was typed
-    // here and written to it is not in the world.
+    // here and written to it is not in the world; nor is what was typed
+    // and is let go of, so the tab's text as last saved is held up to the
+    // file -- and nothing is, where an undo past the save and an edit
+    // after it left no saved text to step back to.
+    const std::optional<std::string> held =
+        doc.editor->isDirty() ? doc.editor->undoJournal().savedText() : std::optional<std::string>(doc.editor->wholeText());
     std::string on_disk;
-    const bool  differs = written || !ALFileRead::whole(path, on_disk, ALDiskIncludes::MAX_BYTES) || on_disk != doc.editor->wholeText();
+    const bool  differs = written || !held || !ALFileRead::whole(path, on_disk, ALDiskIncludes::MAX_BYTES) || on_disk != *held;
     if (!differs)
     {
         // The file as the world has it: the link starts from it, as from a
