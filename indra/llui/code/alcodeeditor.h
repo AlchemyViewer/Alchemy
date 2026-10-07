@@ -334,8 +334,11 @@ public:
     bool lineChanged(S32 line) const;
     // The text's changes since it was saved, exactly, with the lines of
     // both (ALChangesSinceSaved): worked out again only where the text or
-    // its history moved; none where nothing says what was saved.
-    std::shared_ptr<const ALChangesSinceSaved::Known> changesSinceSaved() { return mSinceSaved.of(document(), undoJournal()); }
+    // its history moved; none where nothing says what was saved. A line
+    // barred that none of them is on -- typed on and put back as it was
+    // saved -- loses its bar as they are worked out, so that the bars, a
+    // peek and ]c agree on what has changed.
+    std::shared_ptr<const ALChangesSinceSaved::Known> changesSinceSaved();
     // A peek at the change since the text was saved that a line is in
     // (ALChangePeek): its lines as they were, in a gap under them, with
     // the change taken back and the steps to the others. What a press on

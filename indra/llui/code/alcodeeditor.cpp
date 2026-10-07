@@ -744,6 +744,50 @@ bool ALCodeEditor::lineChanged(S32 line) const
     return line >= 0 && line < static_cast<S32>(mChanged.size()) && mChanged[static_cast<size_t>(line)] != 0;
 }
 
+std::shared_ptr<const ALChangesSinceSaved::Known> ALCodeEditor::changesSinceSaved()
+{
+    std::shared_ptr<const ALChangesSinceSaved::Known> known = mSinceSaved.of(document(), undoJournal());
+    if (!known || known->version != document().version())
+    {
+        return known;
+    }
+    // The bars mark every line an edit touched, the changes what differs
+    // from the saved text: a bar stays only on a line a change is on, as a
+    // press on it finds one (ALChangePeek::changeAt) -- one of its lines,
+    // or for lines only taken out, the line after them or the one before.
+    const S32         count = llmin(static_cast<S32>(mChanged.size()), document().lineCount());
+    std::vector<bool> held(static_cast<size_t>(llmax(count, 0)), false);
+    const auto        hold = [&held, count](S32 line) {
+        if (line >= 0 && line < count)
+        {
+            held[static_cast<size_t>(line)] = true;
+        }
+    };
+    for (const ALChangesSinceSaved::Change& change : known->changes)
+    {
+        if (change.nowCount > 0)
+        {
+            for (S32 l = change.now; l < change.now + change.nowCount && l < count; ++l)
+            {
+                hold(l);
+            }
+        }
+        else
+        {
+            hold(change.now);
+            hold(change.now - 1);
+        }
+    }
+    for (S32 l = 0; l < count; ++l)
+    {
+        if (!held[static_cast<size_t>(l)])
+        {
+            mChanged[static_cast<size_t>(l)] = 0;
+        }
+    }
+    return known;
+}
+
 void ALCodeEditor::resetDirty()
 {
     ALTextView::resetDirty();
