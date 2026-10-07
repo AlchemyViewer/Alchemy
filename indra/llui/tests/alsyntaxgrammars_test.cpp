@@ -447,6 +447,13 @@ namespace tut
                       std::string("property:url|punctuation: =|text: |string:\"http://x\"|text: at |number:10|text::|number:30"));
         ensure_equals("the next line a key again", lexed("config", "name = Door", state, words), std::string("property:name|punctuation: =|text: Door"));
         ensure_equals("a line with no key, text", lexed("config", "just words here", state, words), std::string("text:just words here"));
+        ensure_equals("and after it, a key again", lexed("config", "name = Door", state, words), std::string("property:name|punctuation: =|text: Door"));
+        ensure_equals("a comment after words with no key", lexed("config", "just words # here", state, words),
+                      std::string("text:just words|comment: # here"));
+        ensure_equals("a section and a comment after it", lexed("config", "[Door] ; the door", state, words),
+                      std::string("type:[Door]|comment: ; the door"));
+        ensure_equals("a key after a section", lexed("config", "[Door] name = x", state, words),
+                      std::string("type:[Door]|text: |property:name|punctuation: =|text: x"));
     }
     template<> template<>
     void alsyntaxgrammars_object::test<14>()
