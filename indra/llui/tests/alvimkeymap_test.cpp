@@ -2888,4 +2888,19 @@ namespace tut
         keys("p");
         ensure_equals("nothing to put", flat(editor->text()), std::string("delta"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<98>()
+    {
+        set_test_name("an operator before a key that is no motion fails and types nothing: dn d/ c) yz dv gUp ysq d\"");
+        ALCodeEditor& e = make("foo bar\n");
+        for (const char* typed : { "dn", "d/", "c)", "yz", "dv", "gUp", "ysq", "d\"" })
+        {
+            const std::string what(typed);
+            keys(typed);
+            ensure_equals(what + " leaves the text as it was", flat(e.text()), std::string("foo bar|"));
+            ensure(what + ": normal mode, nothing pending", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+            ensure(what + ": the caret where it was", e.caret() == ALTextPos(0, 0));
+        }
+    }
 }

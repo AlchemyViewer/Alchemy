@@ -1973,9 +1973,12 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     Motion m = motion(view, m_ch, countTimes(countOr(mOperatorCount), count), 0);
     if (!m.ok || !m.moved)
     {
-        mFailed = mFailed || m.ok;
+        // A key that is no motion, or one that could not move: the
+        // operator fails, and the key is taken all the same -- never left
+        // for the view to type into the text.
+        mFailed = true;
         clearPending();
-        return m.ok;
+        return true;
     }
     Span            span;
     const ALTextPos from = cursor(view);
