@@ -26,7 +26,6 @@
 
 #include "alscriptfixes.h"
 
-#include "allsltraits.h"
 #include "alscriptlexicon.h"
 #include "llstring.h"
 
@@ -286,13 +285,18 @@ namespace
     }
 
     // The arguments of the call a stretch of a line holds, each as its
-    // columns, blanks off: split at the commas outside brackets, strings,
-    // and LSL's vector and rotation literals -- a `<` where an argument
-    // or an element begins.
-    std::vector<std::pair<S32, S32>> callArguments(std::string_view line, S32 from, S32 to)
+    // columns, blanks off: split at the commas outside brackets, SLua's
+    // tables, strings, and LSL's vector and rotation literals -- a `<`
+    // where an argument or an element begins. Where the call closes, the
+    // column of its `)` in `close`; -1 where it does not on the line.
+    std::vector<std::pair<S32, S32>> callArguments(std::string_view line, S32 from, S32 to, S32* close = nullptr)
     {
         std::vector<std::pair<S32, S32>> out;
-        const size_t                     open = line.find('(', static_cast<size_t>(llmax(0, from)));
+        if (close)
+        {
+            *close = -1;
+        }
+        const size_t open = line.find('(', static_cast<size_t>(llmax(0, from)));
         if (open == std::string_view::npos || static_cast<S32>(open) >= to)
         {
             return out;
@@ -323,13 +327,13 @@ namespace
             }
             const bool starting = at_start;
             at_start            = false;
-            if (c == '"')
+            if (c == '"' || c == '\'' || c == '`')
             {
                 quote = c;
             }
-            else if (c == '(' || c == '[')
+            else if (c == '(' || c == '[' || c == '{')
             {
-                closers.push_back(c == '(' ? ')' : ']');
+                closers.push_back(c == '(' ? ')' : c == '[' ? ']' : '}');
                 at_start = true;
             }
             else if (c == '<' && starting)
@@ -351,6 +355,10 @@ namespace
                 }
                 if (c == ')')
                 {
+                    if (close)
+                    {
+                        *close = i;
+                    }
                     return out;
                 }
                 begin    = i + 1;
@@ -360,6 +368,155 @@ namespace
             {
                 at_start = true;
             }
+        }
+        return out;
+    }
+
+    // Whether a SLua expression binds as one beside any operator: a name, a
+    // number, a string, and what calls, indexes or takes a member of one --
+    // nothing at its top but those and the brackets it opens; not `..`,
+    // which binds looser than `+`.
+    bool primary(std::string_view expression)
+    {
+        std::vector<char> closers;
+        char              quote = 0;
+        for (size_t i = 0; i < expression.size(); ++i)
+        {
+            const char c = expression[i];
+            if (quote)
+            {
+                if (c == '\\')
+                {
+                    ++i;
+                }
+                else if (c == quote)
+                {
+                    quote = 0;
+                }
+            }
+            else if (c == '"' || c == '\'' || c == '`')
+            {
+                quote = c;
+            }
+            else if (c == '(' || c == '[' || c == '{')
+            {
+                closers.push_back(c == '(' ? ')' : c == '[' ? ']' : '}');
+            }
+            else if (!closers.empty())
+            {
+                if (c == closers.back())
+                {
+                    closers.pop_back();
+                }
+            }
+            else if ((!identifierByte(c) && c != '.' && c != ':') || expression.compare(i, 2, "..") == 0)
+            {
+                return false;
+            }
+        }
+        return !expression.empty() && !quote && closers.empty();
+    }
+
+    // What a deprecated call is written as instead, decided for each and
+    // not left to the name the definitions give: by that name alone where
+    // what it names takes the same arguments; as a call of its own where it
+    // takes them otherwise, the arguments by their places -- $1 as written,
+    // ($1) bracketed where it does not bind as one; and not at all where no
+    // call does what it did. ll.DetectedKey's getKey and ll.AdjustDamage's
+    // adjustDamage want the event's table, which a call has not got;
+    // typeof answers a name where ll.GetListEntryType answered a number;
+    // table.remove, table.insert and table.find take one place or item
+    // where the list functions took a stretch or a list; lljson is not
+    // LSL's JSON; ll.ParticleSystem and the camera and media calls take
+    // rules where the old ones took values. Not preferred where the two
+    // part over what an ordinary script gives them: vector.normalize makes
+    // NaN of a zero vector, which ll.VecNorm keeps; llbase64.decode keeps
+    // what is not UTF-8, where ll.Base64ToString made it '?'; and
+    // ll.XorBase64 is not what ll.XorBase64Strings worked out. ll.Round's
+    // math.floor(x + 0.5) is LSL's, where math.round rounds a half away
+    // from nought. In `lsl`, the LSL function Tailslide names, where it
+    // takes the same arguments: not llParticleSystem for llMakeFire.
+    struct Instead
+    {
+        std::string_view was;
+        std::string_view now;
+        bool             preferred = true;
+        std::string_view lsl;
+    };
+
+    constexpr Instead INSTEAD[] = {
+        { "ll.Abs", "math.abs" },
+        { "ll.Acos", "math.acos" },
+        { "ll.Asin", "math.asin" },
+        { "ll.Atan2", "math.atan2" },
+        { "ll.Base64ToString", "llbase64.decode", false },
+        { "ll.Ceil", "math.ceil" },
+        { "ll.Cos", "math.cos" },
+        { "ll.Fabs", "math.abs" },
+        { "ll.Floor", "math.floor" },
+        { "ll.GetUnixTime", "os.time" },
+        { "ll.Log", "math.log" },
+        { "ll.Log10", "math.log10" },
+        { "ll.OwnerSay", "print" },
+        { "ll.Rot2Fwd", "quaternion.tofwd" },
+        { "ll.Rot2Left", "quaternion.toleft" },
+        { "ll.Rot2Up", "quaternion.toup" },
+        { "ll.Round", "math.floor(($1) + 0.5)" },
+        { "ll.SetLinkPrimitiveParams", "ll.SetLinkPrimitiveParamsFast" },
+        { "ll.SetPrimitiveParams", "ll.SetLinkPrimitiveParamsFast(LINK_THIS, $1)" },
+        { "ll.Sin", "math.sin" },
+        { "ll.SoundPreload", "ll.PreloadSound", true, "llPreloadSound" },
+        { "ll.Sqrt", "math.sqrt" },
+        { "ll.StringToBase64", "llbase64.encode" },
+        { "ll.Tan", "math.tan" },
+        { "ll.VecDist", "vector.magnitude(($1) - ($2))" },
+        { "ll.VecMag", "vector.magnitude" },
+        { "ll.VecNorm", "vector.normalize", false },
+        { "ll.XorBase64Strings", "ll.XorBase64", false },
+        { "ll.XorBase64StringsCorrect", "ll.XorBase64" },
+        { "table.getn", "#($1)" },
+    };
+
+    const Instead* instead(std::string_view was)
+    {
+        for (const Instead& row : INSTEAD)
+        {
+            if (row.was == was)
+            {
+                return &row;
+            }
+        }
+        return nullptr;
+    }
+
+    // A row's call written over the arguments given, or nothing where they
+    // are not as many as it takes.
+    std::optional<std::string> insteadCall(std::string_view now, const std::vector<std::string_view>& args)
+    {
+        std::string out;
+        size_t      wanted = 0;
+        for (size_t i = 0; i < now.size(); ++i)
+        {
+            const bool   bracketed = now.compare(i, 2, "($") == 0 && i + 3 < now.size() && now[i + 3] == ')';
+            const size_t at        = bracketed ? i + 1 : i;
+            if (now[at] != '$' || at + 1 >= now.size() || now[at + 1] < '1' || now[at + 1] > '9')
+            {
+                out += now[i];
+                continue;
+            }
+            const size_t which = static_cast<size_t>(now[at + 1] - '1');
+            wanted             = llmax(wanted, which + 1);
+            if (which >= args.size())
+            {
+                return std::nullopt;
+            }
+            const std::string_view arg = args[which];
+            out += bracketed && !primary(arg) ? "(" + std::string(arg) + ")" : std::string(arg);
+            i = bracketed ? i + 3 : at + 1;
+        }
+        if (wanted != args.size())
+        {
+            return std::nullopt;
         }
         return out;
     }
@@ -1652,16 +1809,22 @@ namespace ALScriptFixes
                 fix.preferred   = true;
                 changeName(problem, lines, args[0], args[1], std::move(fix), false);
             }
-            else if (!lua && is(key, Fixed::LSLDeprecatedWithReplacement) && args.size() == 2 && isIdentifier(args[0]) && isIdentifier(args[1]))
+            else if (!lua && is(key, Fixed::LSLDeprecatedWithReplacement) && args.size() == 2 && isIdentifier(args[0]) && isIdentifier(args[1]) &&
+                     args[0].rfind("ll", 0) == 0)
             {
-                // Only where the replacement is one name: Tailslide says
-                // some in prose ("llPlaySound, llLoopSound, or
-                // llTriggerSound"), which is the scripter's to choose among.
-                // Not safe: a replacement does its own thing, not the
-                // deprecated one's.
-                ALScriptFix fix = titled("ScriptFixUseInstead", "Use '[2]' instead of '[1]'", { args[0], args[1] });
-                fix.preferred   = true;
-                changeName(problem, lines, args[0], args[1], std::move(fix), false);
+                // Only where the replacement is one name, and one INSTEAD
+                // says takes the same arguments: Tailslide says some in
+                // prose ("llPlaySound, llLoopSound, or llTriggerSound"),
+                // which is the scripter's to choose among, and llMakeFire's
+                // llParticleSystem takes rules. Not safe: a replacement does
+                // its own thing, not the deprecated one's.
+                const Instead* row = instead("ll." + args[0].substr(2));
+                if (row && row->lsl == args[1])
+                {
+                    ALScriptFix fix = titled("ScriptFixUseInstead", "Use '[2]' instead of '[1]'", { args[0], args[1] });
+                    fix.preferred   = row->preferred;
+                    changeName(problem, lines, args[0], args[1], std::move(fix), false);
+                }
             }
             else if (lua && (is(key, Fixed::LuauLintLocalUnused) || is(key, Fixed::LuauLintFunctionUnused) || is(key, Fixed::LuauLintImportUnused)) && args.size() == 1 &&
                      isIdentifier(args[0]) && args[0].front() != '_')
@@ -1709,27 +1872,47 @@ namespace ALScriptFixes
             else if (lua &&
                      (is(key, Fixed::LuauLintDeprecatedGlobal) || is(key, Fixed::LuauLintDeprecatedFunctionUse) || is(key, Fixed::LuauLintDeprecatedFunctionUseReason) ||
                       is(key, Fixed::LuauLintDeprecatedMemberUse) || is(key, Fixed::LuauLintDeprecatedMemberUseReason)) &&
-                     args.size() >= 2 && isDottedName(args[0]) && isDottedName(args[1]))
+                     !args.empty() && isDottedName(args[0]))
             {
-                // What the definitions say to use instead, where they name
-                // one thing, put in place of the whole of what was written
-                // -- and only where that is the name the lint said, as it
-                // is for `ll.Abs` and not for an alias of it. Not where what
-                // they name takes other arguments -- ll.SetPrimitiveParams'
-                // ll.SetLinkPrimitiveParamsFast wants a link first -- which
-                // the name alone would leave a call that cannot work. Not
-                // safe: the reason usually says how the two differ.
-                const ALLSLTraits::Trait* row = args[0].rfind("ll.", 0) == 0 ? ALLSLTraits::of(("ll" + args[0].substr(3)).c_str()) : nullptr;
-                if (problem.endLine == problem.line && !(row && (row->slua & ALLSLTraits::SluaUseDiffers)))
+                // What INSTEAD says, put in place of the whole of what was
+                // written -- and only where that is the name the lint said,
+                // as it is for `ll.Abs` and not for an alias of it. A call
+                // of its own replaces the call, which must close on the
+                // line. Not safe: the reason usually says how the two
+                // differ.
+                const Instead*         row  = instead(args[0]);
+                const std::string_view line = lines.line(problem.line);
+                if (row && problem.endLine == problem.line && problem.column >= 0 && problem.endColumn <= static_cast<S32>(line.size()) &&
+                    line.substr(problem.column, problem.endColumn - problem.column) == args[0])
                 {
-                    const std::string_view line = lines.line(problem.line);
-                    if (problem.column >= 0 && problem.endColumn <= static_cast<S32>(line.size()) &&
-                        line.substr(problem.column, problem.endColumn - problem.column) == args[0])
+                    if (row->now.find('$') == std::string_view::npos)
                     {
-                        ALScriptFix fix = titled("ScriptFixUseInstead", "Use '[2]' instead of '[1]'", { args[0], args[1] });
-                        fix.preferred   = true;
-                        fix.edits.push_back({ problem.line, problem.column, problem.line, problem.endColumn, args[1] });
+                        ALScriptFix fix = titled("ScriptFixUseInstead", "Use '[2]' instead of '[1]'", { args[0], std::string(row->now) });
+                        fix.preferred   = row->preferred;
+                        fix.edits.push_back({ problem.line, problem.column, problem.line, problem.endColumn, std::string(row->now) });
                         problem.fixes.push_back(std::move(fix));
+                    }
+                    else
+                    {
+                        const size_t open  = line.find_first_not_of(" \t", static_cast<size_t>(problem.endColumn));
+                        S32          close = -1;
+                        const std::vector<std::pair<S32, S32>> spans =
+                            open != std::string_view::npos && line[open] == '('
+                                ? callArguments(line, static_cast<S32>(open), static_cast<S32>(line.size()), &close)
+                                : std::vector<std::pair<S32, S32>>();
+                        std::vector<std::string_view> given;
+                        for (const auto& [from, to] : spans)
+                        {
+                            given.push_back(line.substr(from, to - from));
+                        }
+                        const std::optional<std::string> now = close >= 0 ? insteadCall(row->now, given) : std::nullopt;
+                        if (now)
+                        {
+                            ALScriptFix fix = titled("ScriptFixWriteIt", "Write it [1]", { *now });
+                            fix.preferred   = row->preferred;
+                            fix.edits.push_back({ problem.line, problem.column, problem.line, close + 1, *now });
+                            problem.fixes.push_back(std::move(fix));
+                        }
                     }
                 }
             }
