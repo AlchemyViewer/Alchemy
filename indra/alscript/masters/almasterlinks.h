@@ -80,6 +80,10 @@ struct ALMasterLink
     std::string master;
     Made        made = Made::Picked;
     bool        lua  = false;
+    // A notecard's link rather than a script's: its text goes up as the
+    // file has it, nothing expanded or compiled. A notecard that carries
+    // items is never linked, since a file cannot hold them.
+    bool        notecard = false;
     // The compile target last sent with: "mono", "lsl2" or "luau".
     std::string target;
     // The item's asset after the last upload made through the link, or as

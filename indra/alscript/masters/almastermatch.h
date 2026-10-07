@@ -57,6 +57,10 @@ struct ALMasterMatch
     static constexpr size_t NAME_ENTRIES = 32768;
     static constexpr size_t NAME_FILES   = 4096;
 
+    // What a notecard's master may be called: text, a notecard's own, or
+    // JSON, which scripts read from notecards.
+    static const std::vector<std::string>& notecardExtensions();
+
     // The file a script says it was made from: an `// @file <path>` comment
     // (`-- @file` in SLua) on a line of its own among the first HINT_LINES
     // of its source, the path the rest of the line, quotes taken off; else

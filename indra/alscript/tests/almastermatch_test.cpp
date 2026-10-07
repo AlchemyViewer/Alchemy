@@ -361,4 +361,16 @@ namespace tut
                       almastermatch_data::joined(ALMasterMatch::byName("util", blessed, true)), almastermatch_data::joined({ luau, deep, lua }));
         ensure_equals("and LSL's for LSL", ALMasterMatch::byName("util", blessed, false).size(), size_t(1));
     }
+
+    template<> template<>
+    void almastermatch_object::test<8>()
+    {
+        set_test_name("a notecard's master is text, a notecard's own, or JSON, in any case, and never a script");
+        const std::vector<std::string>& notecards = ALMasterMatch::notecardExtensions();
+        ensure("text", ALDiskIncludes::extensionOf("readme.txt", notecards) != 0);
+        ensure("a notecard", ALDiskIncludes::extensionOf("Config.NOTECARD", notecards) != 0);
+        ensure("JSON", ALDiskIncludes::extensionOf("data/settings.json", notecards) != 0);
+        ensure("not a script", ALDiskIncludes::extensionOf("door.lsl", notecards) == 0);
+        ensure("nor SLua", ALDiskIncludes::extensionOf("door.luau", notecards) == 0);
+    }
 }

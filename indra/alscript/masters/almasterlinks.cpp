@@ -387,6 +387,10 @@ LLSD ALMasterLinks::toLLSD() const
         record["master"]      = link.master;
         record["made"]        = wordOf(link.made, MADE_WORDS);
         record["lua"]         = link.lua;
+        if (link.notecard)
+        {
+            record["notecard"] = true;
+        }
         record["target"]      = link.target;
         record["base"]        = link.base;
         record["hash"]        = link.hash;
@@ -448,7 +452,8 @@ ALMasterLinks ALMasterLinks::fromLLSD(const LLSD& llsd)
         {
             link.state = valueOf(record["state"].asString(), STATE_WORDS, ALMasterLink::State::Suspended);
         }
-        link.lua    = record["lua"].asBoolean();
+        link.lua      = record["lua"].asBoolean();
+        link.notecard = record["notecard"].asBoolean();
         link.target = record["target"].asString();
         // A base that is not a key is none: the world is taken to have moved.
         keyIn(record["base"], link.base);

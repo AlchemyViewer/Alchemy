@@ -569,4 +569,21 @@ namespace tut
         ensure("an item of no such name has none", links.orphansNamed("window", "Door").empty());
         ensure("nor an item with no name", links.orphansNamed("", "Door").empty());
     }
+
+    template<> template<>
+    void almasterlinks_object::test<12>()
+    {
+        set_test_name("a notecard's link comes back through the LLSD as one, and a script's says nothing of it");
+        ALMasterLinks links;
+        ALMasterLink  note = almasterlinks_data::link(1, 10, "/s/readme.txt");
+        note.notecard      = true;
+        links.put(note);
+        links.put(almasterlinks_data::link(1, 11, "/s/lamp.lsl"));
+        const LLSD llsd = links.toLLSD();
+        ensure("written where set", llsd["links"][0]["notecard"].asBoolean());
+        ensure("and not where not", !llsd["links"][1].has("notecard"));
+        const ALMasterLinks read = ALMasterLinks::fromLLSD(llsd);
+        ensure("read back a notecard's", read.of(almasterlinks_data::key(1), almasterlinks_data::key(10))->notecard);
+        ensure("and a script's", !read.of(almasterlinks_data::key(1), almasterlinks_data::key(11))->notecard);
+    }
 }

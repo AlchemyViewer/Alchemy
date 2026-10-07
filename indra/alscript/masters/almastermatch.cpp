@@ -190,6 +190,13 @@ namespace
 }
 
 // static
+const std::vector<std::string>& ALMasterMatch::notecardExtensions()
+{
+    static const std::vector<std::string> extensions = { ".txt", ".notecard", ".json" };
+    return extensions;
+}
+
+// static
 std::optional<std::string> ALMasterMatch::hintOf(std::string_view source, std::string_view compiled, bool lua)
 {
     const std::string_view     lead = lua ? "--" : "//";
