@@ -60,11 +60,17 @@ namespace ALDiffSplice
     // The options' anchors are of the texts as they are. A side that did
     // not change is passed as itself, both as it was and as it is. Where
     // lines are told the same by their regions, each text as it is read
-    // whole by the options' lexer.
+    // whole by the options' lexer, and the lines after a change held to
+    // read as they did.
     bool splice(std::vector<ALTextDiff::Run>& runs, const std::vector<std::string>& left_was, const std::vector<std::string>& left,
                 const std::vector<std::string>& right_was, const std::vector<std::string>& right, const ALTextDiff::Options& options);
     // A side as it is, how many lines it had, and where the two differ
     // (ALDiffEdit::edgesOf): where that is known already, not found again.
+    // Where lines are told the same by their regions, its edges take in
+    // the lines after an edit that it made read otherwise -- a block
+    // comment opened or closed above them -- though they are as they were,
+    // so that they are compared again: what is outside the stretch keeps
+    // the runs it had.
     // And its lines' regions as the options' lexer read it whole, a line
     // each, where lines are told the same by them (Likeness::byRegions);
     // without them there, the whole compared again.

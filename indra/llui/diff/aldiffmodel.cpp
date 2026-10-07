@@ -198,10 +198,12 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, cons
     const bool                shown_left = given_left != mSwapped;
     const size_t              shown      = shown_left ? 0 : 1;
     // Where a grammar says how lines read, the regions the lines of the
-    // changes after the edit were read in, before it reads the side again.
-    const bool                           regioned = static_cast<bool>(mOptions.lexer);
-    const bool                           had      = regioned && (shown ? shownRegions().second : shownRegions().first);
-    const std::vector<std::pair<S32, size_t>> read_before = had ? readFrom(shown, was - edges.tail) : std::vector<std::pair<S32, size_t>>();
+    // changes after the edit were read in, before it reads the side again;
+    // every line's after it, where lines are told the same by them.
+    const bool                           regioned   = static_cast<bool>(mOptions.lexer);
+    const bool                           by_regions = regioned && mOptions.like.byRegions() && !mOptions.like.ignoreComments;
+    const bool                           had        = regioned && (shown ? shownRegions().second : shownRegions().first);
+    const std::vector<std::pair<S32, size_t>> read_before = had ? readFrom(shown, was - edges.tail, by_regions) : std::vector<std::pair<S32, size_t>>();
     // The moves' ids of the lines edited let go of, those after moved along.
     mMoveFinder.edited(given_left, edges.head, was - edges.tail, static_cast<S32>(lines.size()) - edges.tail);
     side = std::move(lines);
@@ -222,8 +224,34 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, cons
     // them after: what the lines compared again are told the same by, where
     // they are so.
     const auto [left_regions, right_regions] = shownRegions();
+    // The edit reaches as far as the lines after it that now read otherwise
+    // -- a block comment opened or closed -- of its changes, or of every
+    // line where lines are told the same by their regions; or to the end
+    // where the grammar's regions are missing before or after: one past
+    // the last of them, as the side now is. A change's words and tokens are
+    // cut otherwise there, and a line told the same by its regions may be
+    // the same as its other no longer, or a change none: compared again
+    // with the edit, as the whole would be.
+    S32 reach = -1;
+    if (regioned)
+    {
+        const line_regions_t now = shown_left ? left_regions : right_regions;
+        reach                    = had && now ? -1 : static_cast<S32>(side.size());
+        for (auto it = read_before.rbegin(); reach < 0 && it != read_before.rend(); ++it)
+        {
+            if (hashOf((*now)[static_cast<size_t>(it->first + moved)]) != it->second)
+            {
+                reach = it->first + moved + 1;
+            }
+        }
+    }
+    ALDiffEdit::Edges compared = edges;
+    if (by_regions && reach >= 0)
+    {
+        compared.tail = std::min(edges.tail, static_cast<S32>(side.size()) - reach);
+    }
     const std::vector<std::string>& other = given_left ? mRightLines : mLeftLines;
-    const ALDiffSplice::Side        changed{ side, was, edges, shown_left ? left_regions : right_regions };
+    const ALDiffSplice::Side        changed{ side, was, compared, shown_left ? left_regions : right_regions };
     const ALDiffSplice::Side        same{ other, static_cast<S32>(other.size()), ALDiffEdit::Edges{ static_cast<S32>(other.size()), 0 },
                                    shown_left ? right_regions : left_regions };
     const bool spliced = shown_left ? ALDiffSplice::splice(mRuns, changed, same, options) : ALDiffSplice::splice(mRuns, same, changed, options);
@@ -232,26 +260,10 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, cons
         build();
         return;
     }
-    // The edit reaches as far as the lines of changes after it now read
-    // otherwise -- a block comment opened or closed -- whose words and
-    // tokens are cut otherwise: laid out and read again to the last of
-    // them, or to the end where the grammar's regions are missing before
-    // or after.
-    if (regioned)
+    // Laid out and read again to the last line read otherwise.
+    if (reach >= 0)
     {
-        const line_regions_t now   = shown ? shownRegions().second : shownRegions().first;
-        S32                  reach = had && now ? -1 : static_cast<S32>(side.size());
-        for (const auto& [line, hash] : read_before)
-        {
-            if (reach < static_cast<S32>(side.size()) && hashOf((*now)[static_cast<size_t>(line + moved)]) != hash)
-            {
-                reach = line + moved + 1;
-            }
-        }
-        if (reach >= 0)
-        {
-            again.tail = std::min(again.tail, static_cast<S32>(side.size()) - reach);
-        }
+        again.tail = std::min(again.tail, static_cast<S32>(side.size()) - reach);
     }
     if (options.algorithm == ALTextDiff::Algorithm::Structural)
     {
@@ -267,11 +279,20 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, cons
     layout(options, {}, &again);
 }
 
-std::vector<std::pair<S32, size_t>> ALDiffModel::readFrom(size_t side, S32 from) const
+std::vector<std::pair<S32, size_t>> ALDiffModel::readFrom(size_t side, S32 from, bool every) const
 {
     std::vector<std::pair<S32, size_t>> out;
     const line_regions_t                regions = side ? shownRegions().second : shownRegions().first;
     const Kind                          own     = side ? Kind::Added : Kind::Removed;
+    if (every && regions)
+    {
+        out.reserve(regions->size() - static_cast<size_t>(from));
+        for (S32 line = from; line < static_cast<S32>(regions->size()); ++line)
+        {
+            out.emplace_back(line, hashOf((*regions)[static_cast<size_t>(line)]));
+        }
+        return out;
+    }
     for (const ALTextDiff::Run& run : mRuns)
     {
         const S32 start = side ? run.right : run.left;

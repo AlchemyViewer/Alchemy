@@ -26,8 +26,10 @@
 
 #include "aldiffmodel.h"
 
+#include "aldifflexer.h"
 #include "aldiffsame.h"
 #include "alstructuraldiff.h"
+#include "alsyntaxgrammar.h"
 
 #include "../test/lltut.h"
 
@@ -39,6 +41,10 @@
 #include <memory>
 #include <string>
 #include <vector>
+
+#ifndef LLUI_TEST_APP_DIR
+#  define LLUI_TEST_APP_DIR ""
+#endif
 
 namespace tut
 {
@@ -1722,5 +1728,53 @@ namespace tut
         ensure_equals("by patience: one", m.conflictCount(), 1);
         m.setAlgorithm(ALTextDiff::Algorithm::Histogram);
         ensure_equals("and back: none", m.conflictCount(), 0);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<40>()
+    {
+        set_test_name("blanks let go of with the LSL grammar: a block comment's opener broken and mended compares again the lines after it that read otherwise, a line the same changed and back, as afresh; an edit that reads none so, only around itself");
+        std::string                                  error;
+        const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+        ensure("the LSL grammar", lsl != nullptr);
+        // A string differing only by its blanks, inside a block comment on
+        // both sides, where they are let go of; and a change further down.
+        const auto script = [](const char* opener, const char* said, const char* thirty, const char* fifty) {
+            return aldiffmodel_data::lines(60, { { 10, opener }, { 14, said }, { 16, "*/" }, { 30, thirty }, { 50, fifty } });
+        };
+        const std::string left   = script("/* note", "llSay(0, \"a b\");", "line 30", "fifty");
+        const std::string typed  = script("/* note", "llSay(0, \"a  b\");", "line 30 typed", "FIFTY");
+        const std::string broken = script("/ note", "llSay(0, \"a  b\");", "line 30 typed", "FIFTY");
+        ALTextDiff::Likeness like;
+        like.ignoreWhitespace = true;
+        m.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+        m.setLikeness(like);
+        m.setTexts(left, script("/* note", "llSay(0, \"a  b\");", "line 30", "FIFTY"));
+        ensure_equals("the string's blanks let go of inside the comment: the change further down alone", m.changeCount(), 1);
+
+        // Typed in below the comment, reading no line after it otherwise:
+        // compared again and laid out again only around itself.
+        m.setRightText(typed);
+        ensure_equals("typed in: a change of its own", m.changeCount(), 2);
+        ensure("typed in: only around it compared again", ALDiffSplice::lastCompared() > 0 && ALDiffSplice::lastCompared() <= 4);
+        ensure("typed in: laid out again in part", !m.relaid().whole);
+
+        // The comment's opener broken, and mended: the lines down to its
+        // close read otherwise, the string there its blanks' own and then
+        // let go of again; those lines compared again with the edit, and
+        // none further.
+        const auto as_afresh = [&](const std::string& right, S32 changes, const std::string& where) {
+            m.setRightText(right);
+            const S32 compared = ALDiffSplice::lastCompared();
+            ensure_equals(where + ": changes", m.changeCount(), changes);
+            ALDiffModel fresh;
+            fresh.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+            fresh.setLikeness(like);
+            fresh.setTexts(left, right);
+            aldiffmodel_data::sameLayout(m, fresh, where);
+            ensure_equals(where + ": compared again down to the comment's close", compared, 14);
+        };
+        as_afresh(broken, 4, "the opener broken");
+        as_afresh(typed, 2, "mended");
     }
 }

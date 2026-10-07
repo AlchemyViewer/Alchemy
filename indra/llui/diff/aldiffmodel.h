@@ -496,7 +496,8 @@ private:
     void              layout(const ALTextDiff::Options& options, const std::vector<bool>& open = {}, const Relayout* again = nullptr);
     // A side's lines made anew, its text already so: compared again only
     // where it changed (ALDiffSplice) where that is enough, and laid out
-    // again only there.
+    // again only there -- there taking in the lines after it that now read
+    // otherwise by its grammar, as far as the last of them.
     void              resplice(bool given_left, std::vector<std::string> lines, const ALDiffEdit::Edges& edges);
     // The rows' lines of the right's text: side by side the column showing
     // it, inline the right's as shown, or swapped the left's.
@@ -505,11 +506,13 @@ private:
     // after an edit, given the runs before it, only the changes that are
     // not as they were.
     void              readTokens(const std::vector<ALTextDiff::Run>* was = nullptr, const ALStructuralDiff::Edited* edited = nullptr);
-    // The lines of a side's changes from a line on, each with its regions
-    // as read (by a hash of them): what an edit before them may have made
-    // read otherwise -- a block comment opened or closed -- which cuts
-    // their words and tokens.
-    std::vector<std::pair<S32, size_t>> readFrom(size_t side, S32 from) const;
+    // The lines of a side's changes from a line on, or with `every` each
+    // of its lines from it, each with its regions as read (by a hash of
+    // them): what an edit before them may have made read otherwise -- a
+    // block comment opened or closed -- which cuts their words and tokens,
+    // and where lines are told the same by their regions, which of them
+    // are the same.
+    std::vector<std::pair<S32, size_t>> readFrom(size_t side, S32 from, bool every = false) const;
     // Each pair's or range's lines on one side, where they now are: those
     // of a pair or range whose first line went taken back.
     static ALTextDiff::ranges_t carried(const ALTextDiff::ranges_t& ranges, bool left, S32 was, const LineMap& map);
