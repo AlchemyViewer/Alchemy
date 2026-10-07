@@ -4792,4 +4792,30 @@ namespace tut
         ensure_equals("dge from an empty line: back to the b, the line after it kept", flat(editor->text()), std::string("a|cd|"));
         ensure_equals("what it took", vim->registerText('"'), std::string("b\n"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<167>()
+    {
+        set_test_name("a count past one on a doubled operator -- dd yy cc >> gUU, Y and S -- fails from the last line, and from an earlier one takes the lines there are");
+        ALCodeEditor& e = make("a\nb\nc");
+        keys("ylG");
+        for (const char* typed : { "2dd", "2yy", "2>>", "2gUU", "2Y", "2ccX<Esc>", "2SX<Esc>" })
+        {
+            const std::string what(typed);
+            keys(typed);
+            ensure_equals(what + " on the last line: nothing changed", flat(e.text()), std::string("a|b|c"));
+            ensure_equals(what + ": nothing kept", vim->registerText('"'), std::string("a"));
+            ensure(what + ": normal mode, nothing pending", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+        }
+        ex("normal 2ddiQ");
+        ensure_equals("failed, so the keys after it are not run", flat(e.text()), std::string("a|b|c"));
+        keys("1dd");
+        ensure_equals("a count of one takes the last line", flat(e.text()), std::string("a|b"));
+
+        make("a\nb\nc\nd");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("5dd");
+        ensure_equals("5dd with three lines left takes the three", flat(editor->text()), std::string("a"));
+        ensure_equals("and keeps them", vim->registerText('"'), std::string("b\nc\nd"));
+    }
 }

@@ -2866,15 +2866,23 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     }
     // The operator doubled -- dd, yy, cc, >>, <<, == -- is the line, and
     // the count more: a motion from the caret, as vim's is, to the first
-    // non-blank of the last of them. gUU leaves the caret at its start, on
-    // the line's first non-blank or before it, and 2gUU where it was.
+    // non-blank of the last of them, as many as there are -- but a count
+    // past one from the last line fails, as vim's motion down fails there.
+    // gUU leaves the caret at its start, on the line's first non-blank or
+    // before it, and 2gUU where it was.
     if (ch == op || (op == '~' && ch == '~') || (op == 'u' && ch == 'u') || (op == 'U' && ch == 'U') ||
         (op == COMMENT_OPERATOR && ch == 'c'))
     {
         const S32       lines = countTimes(countOr(mOperatorCount), count);
+        const ALTextPos from  = cursor(view);
+        if (lines > 1 && from.line + 1 >= d.lineCount())
+        {
+            mFailed = true;
+            clearPending();
+            return true;
+        }
         Span            span;
         span.linewise         = true;
-        const ALTextPos from  = cursor(view);
         const S32       last  = llmin(d.lineCount() - 1, from.line + lines - 1);
         span.range            = ALTextRange(from, ALTextPos(last, firstNonBlankColumn(d, last))).normalised();
         applyOperator(view, op, span, 1);
@@ -3565,7 +3573,15 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             Span span;
             if (ch == 'Y')
             {
+                // yy: a count past one from the last line fails it, as
+                // the operator doubled fails (operatorKey).
                 const S32 first = view.caret().line;
+                if (count > 1 && first + 1 >= d.lineCount())
+                {
+                    mFailed = true;
+                    clearPending();
+                    return true;
+                }
                 const S32 last  = llmin(d.lineCount() - 1, first + count - 1);
                 span.linewise   = true;
                 span.range      = ALTextRange(d.lineStart(first), d.lineEnd(last));
@@ -3588,8 +3604,16 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 clearPending();
                 return true;
             }
+            // cc: a count past one from the last line fails it, as the
+            // operator doubled fails (operatorKey).
             Span      span;
             const S32 first = view.caret().line;
+            if (count > 1 && first + 1 >= d.lineCount())
+            {
+                mFailed = true;
+                clearPending();
+                return true;
+            }
             const S32 last  = llmin(d.lineCount() - 1, first + count - 1);
             span.linewise   = true;
             span.range      = ALTextRange(d.lineStart(first), d.lineEnd(last));
