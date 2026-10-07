@@ -177,6 +177,7 @@ void LLDir_Linux::initAppDirs(const std::string &app_name,
     if (app_home_env)
     {
         // user has specified own userappdir i.e. $SECONDLIFE_USER_DIR
+        // mOSCacheDir stays empty, so the cache stays inside it too.
         mOSUserAppDir = *app_home_env;
     }
     else
@@ -188,6 +189,18 @@ void LLDir_Linux::initAppDirs(const std::string &app_name,
         std::string lower_app_name(app_name);
         LLStringUtil::toLower(lower_app_name);
         mOSUserAppDir += lower_app_name;
+
+        // The cache goes under $XDG_CACHE_HOME, which the XDG spec says to
+        // ignore unless it is absolute, or ~/.cache.
+        auto xdg_cache_home(LLStringUtil::getoptenv("XDG_CACHE_HOME"));
+        if (xdg_cache_home && !xdg_cache_home->empty() && xdg_cache_home->front() == '/')
+        {
+            mOSCacheDir = *xdg_cache_home;
+        }
+        else
+        {
+            mOSCacheDir = mOSUserDir + "/.cache";
+        }
     }
 
     // create any directories we expect to write to.
@@ -198,6 +211,13 @@ void LLDir_Linux::initAppDirs(const std::string &app_name,
         LL_WARNS() << "Couldn't create app user dir " << mOSUserAppDir << LL_ENDL;
         LL_WARNS() << "Default to base dir" << mOSUserDir << LL_ENDL;
         mOSUserAppDir = mOSUserDir;
+    }
+
+    if (!mOSCacheDir.empty() && LLFile::mkdir(mOSCacheDir) == -1)
+    {
+        LL_WARNS() << "Couldn't create OS cache dir " << mOSCacheDir << LL_ENDL;
+        LL_WARNS() << "Default to app user dir " << mOSUserAppDir << LL_ENDL;
+        mOSCacheDir = "";
     }
 
     res = LLFile::mkdir(getExpandedFilename(LL_PATH_LOGS,""));
