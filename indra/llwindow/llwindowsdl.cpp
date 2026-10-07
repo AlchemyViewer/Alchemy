@@ -3622,11 +3622,16 @@ LLSD LLWindowSDL::getNativeKeyData()
 // Must begin with protocol identifier.
 void LLWindowSDL::spawnWebBrowser(const std::string& escaped_url, bool async)
 {
+    // The scheme has to lead the URL: found anywhere in it, "smb://host/x?http:"
+    // would pass and SDL_OpenURL would hand it to the desktop's smb handler.
+    // A scheme's case doesn't matter (RFC 3986 3.1), so "HTTPS:" is "https:".
+    const std::string_view url(escaped_url);
     bool found = false;
     S32 i;
     for (i = 0; i < gURLProtocolWhitelistCount; i++)
     {
-        if (escaped_url.find(gURLProtocolWhitelist[i]) != std::string::npos)
+        const std::string& scheme = gURLProtocolWhitelist[i];
+        if (LLStringUtil::isEqualInsensitiveASCII(url.substr(0, scheme.size()), scheme))
         {
             found = true;
             break;
