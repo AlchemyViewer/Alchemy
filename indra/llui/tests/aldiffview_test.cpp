@@ -1681,4 +1681,27 @@ namespace tut
                                                    kept.right()->layout().gapRows(model.foldGapLine(Column::Right, 1)) == 0);
         sameShown(kept, whole, "every run opened inline");
     }
+
+    template<> template<>
+    void aldiffview_object::test<43>()
+    {
+        set_test_name("the converter's notes beside the left's line whichever side shows it, swapped and back, inline where it is after each edit of the right; let go of with a left of another version");
+        ALDiffView& d = make("a\nb\nc\nd", "a\nB\nc\nd");
+        d.setNotes({ { 2, "about c", "the tip" } });
+        ensure("on the left", d.left()->noteAt(2) == "about c" && d.right()->noteAt(2).empty());
+        d.setSwapped(true);
+        ensure("swapped: on the right, none on the left", d.right()->noteAt(2) == "about c" && d.left()->noteAt(2).empty());
+        d.setSwapped(false);
+        ensure("and back", d.left()->noteAt(2) == "about c" && d.right()->noteAt(2).empty());
+        d.setRightText("a\nB\nput in\nc\nd");
+        ensure("the right made anew: the left's as it was", d.left()->noteAt(2) == "about c");
+        d.setInline(true);
+        const S32 at = d.model().lineShowing(ALDiffModel::Column::Inline, true, 2);
+        ensure("inline, beside where the line is", at >= 0 && d.inlined()->noteAt(at) == "about c");
+        d.setRightText("a\nB\nput in\nmore\nc\nd");
+        const S32 now = d.model().lineShowing(ALDiffModel::Column::Inline, true, 2);
+        ensure("and where it is after another edit, nowhere else", now == at + 1 && d.inlined()->noteAt(now) == "about c" && d.inlined()->noteAt(at).empty());
+        d.setLeftText("a\nb\nc\nd!");
+        ensure("a left of another version: let go of", d.inlined()->noteAt(d.model().lineShowing(ALDiffModel::Column::Inline, true, 2)).empty());
+    }
 }

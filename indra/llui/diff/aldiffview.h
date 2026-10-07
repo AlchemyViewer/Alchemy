@@ -444,6 +444,16 @@ private:
     // filled again.
     std::optional<U32>        mFilledAt[2];
     bool                      mFoldsStale[2] = { false, false };
+    // The notes each editor was last given -- the left's, the right's and
+    // the one inline's -- and the version its text was then: given again
+    // only where they are others, or there are some and the text has been
+    // edited since, which slides them with its lines.
+    struct NotesGiven
+    {
+        std::optional<U32>             version;
+        std::vector<ALDiffModel::Note> notes;
+    };
+    NotesGiven                mNotesGiven[3];
     // The grammar words are cut by: none for prose.
     std::shared_ptr<const ALSyntaxGrammar> mLexedBy;
     // Whether letting case go is offered.

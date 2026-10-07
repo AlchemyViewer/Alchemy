@@ -597,12 +597,25 @@ void ALDiffView::setNotes(std::vector<ALDiffModel::Note> notes)
 
 void ALDiffView::applyNotes(ALCodeEditor* side)
 {
+    // Not again where the side has them already: a right typed in leaves
+    // the left's notes, which are a converted script's hundreds, where they
+    // were, and the right has none to clear.
+    std::vector<ALDiffModel::Note> notes = mModel.notesIn(columnOf(side));
+    NotesGiven&                    given = mNotesGiven[static_cast<size_t>(columnOf(side))];
+    const U32                      now   = side->document().version();
+    if (given.version && given.notes == notes && (notes.empty() || *given.version == now))
+    {
+        return;
+    }
     std::vector<ALCodeEditor::LineNote> said;
-    for (const ALDiffModel::Note& note : mModel.notesIn(columnOf(side)))
+    said.reserve(notes.size());
+    for (const ALDiffModel::Note& note : notes)
     {
         said.push_back(ALCodeEditor::LineNote{ note.line, note.text, note.tip });
     }
     side->setLineNotes(said);
+    given.version = now;
+    given.notes   = std::move(notes);
 }
 
 void ALDiffView::refreshLinked()

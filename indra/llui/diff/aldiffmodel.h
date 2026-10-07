@@ -353,6 +353,8 @@ public:
         S32         line = 0;
         std::string text;
         std::string tip;
+
+        bool operator==(const Note& other) const = default;
     };
     void                     setNotes(std::vector<Note> notes);
     const std::vector<Note>& notes() const { return mNotes; }

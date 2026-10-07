@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <boost/container_hash/hash.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <iterator>
 #include <limits>
@@ -1802,7 +1803,9 @@ S32 ALDiffModel::lineShowing(Column column, bool given_left, S32 line) const
 
 std::vector<ALDiffModel::Note> ALDiffModel::notesIn(Column column) const
 {
-    std::vector<Note> out;
+    // Each line's in order of its first note, those after joined to it.
+    std::vector<Note>                       out;
+    boost::unordered_flat_map<S32, size_t> at;
     for (const Note& note : mNotes)
     {
         const S32 line = lineShowing(column, true, note.line);
@@ -1810,15 +1813,16 @@ std::vector<ALDiffModel::Note> ALDiffModel::notesIn(Column column) const
         {
             continue;
         }
-        const auto same = std::find_if(out.begin(), out.end(), [line](const Note& one) { return one.line == line; });
-        if (same == out.end())
+        const auto [it, first] = at.try_emplace(line, out.size());
+        if (first)
         {
             out.push_back(Note{ line, note.text, note.tip });
         }
         else
         {
-            same->text += " \xC2\xB7 " + note.text;
-            same->tip += "\n" + note.tip;
+            Note& same = out[it->second];
+            same.text.append(" \xC2\xB7 ").append(note.text);
+            same.tip.append("\n").append(note.tip);
         }
     }
     return out;
