@@ -171,7 +171,8 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
     const S32 count = doc.lineCount();
     // Each block's last line by its first, the widest where several start
     // on a line; then in order, with no sort.
-    std::vector<S32> end_of(static_cast<size_t>(count), -1);
+    std::vector<S32>& end_of = mEndOf;
+    end_of.assign(static_cast<size_t>(count), -1);
     if (mBlocks)
     {
         bySyntax(doc, end_of);
@@ -184,10 +185,10 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
         // without them; the syntax pass pairs them as it goes.
         if (!mLineComment.empty())
         {
-            std::vector<S32> open;
+            mMarked.clear();
             for (S32 l = 0; l < count; ++l)
             {
-                pairMarker(lineAt(doc, l).marker, l, open, end_of);
+                pairMarker(lineAt(doc, l).marker, l, mMarked, end_of);
             }
         }
     }
@@ -206,18 +207,16 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
 
 void ALFoldModel::bySyntax(const ALTextDocument& doc, std::vector<S32>& end_of)
 {
+    const S32 count = doc.lineCount();
     // What is open, each where it opened and whether it opened its line.
-    struct Opened
-    {
-        S32  line;
-        bool first;
-    };
-    const S32           count = doc.lineCount();
-    std::vector<Opened> open;
+    std::vector<Opened>& open = mOpen;
+    open.clear();
     // The blocks, as they close; those opened on a line of their own go
     // with their headers after.
-    std::vector<Region> alone;
-    std::vector<S32>    marked;
+    std::vector<Region>& alone = mAlone;
+    alone.clear();
+    std::vector<S32>& marked = mMarked;
+    marked.clear();
     for (S32 l = 0; l < count; ++l)
     {
         const Line& line = lineAt(doc, l);
@@ -357,8 +356,9 @@ std::vector<S32> ALFoldModel::openAt(const ALTextDocument& doc, S32 tab_width, S
 
 void ALFoldModel::byIndent(const ALTextDocument& doc, std::vector<S32>& end_of)
 {
-    const S32        count = doc.lineCount();
-    std::vector<S32> indent(static_cast<size_t>(count), -1);
+    const S32         count  = doc.lineCount();
+    std::vector<S32>& indent = mIndents;
+    indent.assign(static_cast<size_t>(count), -1);
     for (S32 l = 0; l < count; ++l)
     {
         indent[static_cast<size_t>(l)] = lineAt(doc, l).indent;
