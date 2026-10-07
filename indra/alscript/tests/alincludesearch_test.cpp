@@ -197,6 +197,8 @@ namespace tut
         const LLUUID      self  = LLUUID::generateNewID();
 
         ALIncludeSearch::Asking asking(bool lua = false) const { return { ALIncludeIdentity::ofItem(prim, self), lua }; }
+        // Called from a lambda by its class's name: MSVC finds no static
+        // member of the fixture from one, whatever it captures.
         static ALIncludeSearch::Where where(bool world, bool disk, std::vector<std::string> folders = {})
         {
             ALIncludeSearch::Where out;
@@ -631,7 +633,7 @@ namespace tut
         const auto found = [&](const std::string& name, const ALIncludeSearch::Where& in, ALIncludeSearch::wanted_t* wanted = nullptr) {
             ALPreprocessor::Include     include;
             std::vector<std::string>    aliases;
-            const ALPreprocessor::Found said = search.resolve(ask(name, true, own.self), include, own, in, wanted, false, &aliases);
+            const ALPreprocessor::Found said = search.resolve(alincludesearch_data::ask(name, true, own.self), include, own, in, wanted, false, &aliases);
             return said == ALPreprocessor::Found::Yes ? include.path : said == ALPreprocessor::Found::Pending ? std::string("pending") : std::string();
         };
         ensure_equals("beside it", found("./util", on), util.path);
@@ -696,7 +698,7 @@ namespace tut
         const auto found = [&](const std::string& name, const ALIncludeSearch::Asking& who, const ALIncludeSearch::Where& in) {
             ALPreprocessor::Include  include;
             std::vector<std::string> aliases;
-            return search.resolve(ask(name, true, who.self), include, who, in, nullptr, false, &aliases) == ALPreprocessor::Found::Yes ? include.path
+            return search.resolve(alincludesearch_data::ask(name, true, who.self), include, who, in, nullptr, false, &aliases) == ALPreprocessor::Found::Yes ? include.path
                                                                                                                                        : std::string();
         };
         ensure_equals("an object's script, through the studio's alias", found("@lib/util", in_object, disk), ALIncludeIdentity::ofFile(util));
@@ -738,7 +740,7 @@ namespace tut
         const auto missed = [&](const std::string& name, const ALIncludeSearch::Asking& who) {
             ALPreprocessor::Include  include;
             std::vector<std::string> aliases;
-            ensure(name + ": found nothing now", search.resolve(ask(name, true, who.self), include, who, disk, nullptr, false, &aliases) ==
+            ensure(name + ": found nothing now", search.resolve(alincludesearch_data::ask(name, true, who.self), include, who, disk, nullptr, false, &aliases) ==
                                                      ALPreprocessor::Found::No);
             return include;
         };
@@ -812,7 +814,7 @@ namespace tut
         const auto why = [&](const std::string& name) {
             ALPreprocessor::Include  found;
             std::vector<std::string> aliases;
-            search.resolve(ask(name, true, own.self), found, own, disk, nullptr, false, &aliases);
+            search.resolve(alincludesearch_data::ask(name, true, own.self), found, own, disk, nullptr, false, &aliases);
             return found.why;
         };
         ensure_equals("nothing so named", why("./nowhere"), std::string("could not resolve child component \"nowhere\""));
@@ -908,14 +910,14 @@ namespace tut
         // Each step's disk read again, as a change of settings has it.
         U32        generation = 0;
         const auto disk       = [&]() {
-            ALIncludeSearch::Where out = where(false, true, { s.at("proj") });
+            ALIncludeSearch::Where out = alincludesearch_data::where(false, true, { s.at("proj") });
             out.generation             = ++generation;
             return out;
         };
         const auto resolved = [&](const std::string& name, std::string* why = nullptr) {
             ALPreprocessor::Include  found;
             std::vector<std::string> aliases;
-            const bool yes = search.resolve(ask(name, true, own.self), found, own, disk(), nullptr, false, &aliases) == ALPreprocessor::Found::Yes;
+            const bool yes = search.resolve(alincludesearch_data::ask(name, true, own.self), found, own, disk(), nullptr, false, &aliases) == ALPreprocessor::Found::Yes;
             if (why)
             {
                 *why = found.why;
@@ -1013,7 +1015,7 @@ namespace tut
         const auto found = [&](const std::string& name, const ALIncludeSearch::Where& in) {
             ALPreprocessor::Include  include;
             std::vector<std::string> aliases;
-            return search.resolve(ask(name, true, in_object.self), include, in_object, in, nullptr, false, &aliases) == ALPreprocessor::Found::Yes
+            return search.resolve(alincludesearch_data::ask(name, true, in_object.self), include, in_object, in, nullptr, false, &aliases) == ALPreprocessor::Found::Yes
                        ? include.path
                        : std::string();
         };
