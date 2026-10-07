@@ -1074,6 +1074,71 @@ namespace tut
         ensure_equals("as invalid params", refusal["error"]["code"].asInteger(), LLSD::Integer(-32602));
         ensure_contains("saying why", refusal["error"]["message"].asString(), "no such script");
     }
+
+    template<> template<>
+    void WebsocketMgrTestObjectType::test<17>()
+    {
+        set_test_name("sends taken while the server thread is busy count against the most a connection may hold");
+
+        // Holds the server thread as the connection opens, so that nothing
+        // sent meanwhile is queued, let alone written, until it is let go.
+        class HeldServer : public LLWebsocketMgr::WSServer
+        {
+        public:
+            using LLWebsocketMgr::WSServer::WSServer;
+
+            void onConnectionOpened(const LLWebsocketMgr::WSConnection::ptr_t& connection) override
+            {
+                mConnection = connection;
+                mOpened     = true;
+                // Let go at the latest here, where the test failed before
+                // it could.
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+                while (!mRelease && std::chrono::steady_clock::now() < deadline)
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+            }
+            void onConnectionClosed(const LLWebsocketMgr::WSConnection::ptr_t&) override { ++mClosed; }
+
+            LLWebsocketMgr::WSConnection::ptr_t mConnection; ///< Set before mOpened
+            std::atomic<bool>                   mOpened{ false };
+            std::atomic<bool>                   mRelease{ false };
+            std::atomic<int>                    mClosed{ 0 };
+        };
+
+        const U16 port = unusedPort();
+        if (!port)
+        {
+            skip("no port free to listen on");
+        }
+        const std::string name    = "held_test";
+        LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
+        auto              server  = std::make_shared<HeldServer>(name, port, true);
+        ensure("added", manager.addServer(server));
+        ensure("started", manager.startServer(name));
+
+        TestClient client;
+        const bool opened = client.open(port) == 101 && waitFor([&]() { return server->mOpened.load(); });
+
+        // Nothing goes out while the thread is held: 31 whole megabytes,
+        // and what each message costs, fit in the 32 MB; a 32nd does not.
+        const std::string megabyte(1024 * 1024, 'x');
+        int               sent = 0;
+        while (opened && sent < 128 && server->mConnection->sendMessage(megabyte))
+        {
+            ++sent;
+        }
+        const bool refused = opened && !server->mConnection->sendMessage(megabyte);
+        server->mRelease   = true;
+        const bool dropped = waitFor([&]() { return server->mClosed == 1; });
+        manager.removeServer(name);
+
+        ensure("opened", opened);
+        ensure_equals("taken up to the most it may hold", sent, 31);
+        ensure("and refused after", refused);
+        ensure("dropped", dropped);
+    }
 }
 
 #endif
