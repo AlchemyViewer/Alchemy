@@ -4380,7 +4380,12 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             const std::string needle = utf8Of(want);
             const std::string& line  = d.line(from.line);
+            const S32          size  = static_cast<S32>(line.size());
             S32                col   = from.column;
+            // A character on or back along the line, however many bytes it
+            // takes, and never off the line.
+            const auto after  = [&](S32 at) { return at < size ? d.nextCluster(ALTextPos(from.line, at)).column : size; };
+            const auto before = [&](S32 at) { return at > 0 ? d.prevCluster(ALTextPos(from.line, at)).column : 0; };
             // A t or T typed to the character beside the caret stops where it
             // is, so an operator takes the character under it. Said again by
             // ; or , it goes past that character instead, as vim's does
@@ -4391,13 +4396,24 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                 size_t found;
                 if (forward)
                 {
-                    const S32 start = col + 1 + ((past_beside && n == 0) ? 1 : 0);
-                    found           = start < static_cast<S32>(line.size()) ? line.find(needle, start) : std::string::npos;
+                    // From the character after the caret's, or after the one
+                    // after it.
+                    S32 start = after(col);
+                    if (past_beside && n == 0)
+                    {
+                        start = after(start);
+                    }
+                    found = start < size ? line.find(needle, static_cast<size_t>(start)) : std::string::npos;
                 }
                 else
                 {
-                    const S32 start = col - 1 - ((past_beside && n == 0) ? 1 : 0);
-                    found           = start >= 0 ? line.rfind(needle, start) : std::string::npos;
+                    // Before the caret's character, or before the one before.
+                    S32 end = col;
+                    if (past_beside && n == 0)
+                    {
+                        end = before(end);
+                    }
+                    found = end > 0 ? line.rfind(needle, static_cast<size_t>(end - 1)) : std::string::npos;
                 }
                 if (found == std::string::npos)
                 {
@@ -4408,7 +4424,8 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             if (till)
             {
-                col += forward ? -1 : static_cast<S32>(needle.size());
+                // Beside it: on the character before it, or after it.
+                col = forward ? before(col) : after(col);
             }
             m.to        = ALTextPos(from.line, col);
             m.inclusive = forward;

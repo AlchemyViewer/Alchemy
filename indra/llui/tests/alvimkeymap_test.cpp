@@ -5148,4 +5148,27 @@ namespace tut
         keys("0*nn");
         ensure_equals("and *", caretText(), std::string("0:12"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<180>()
+    {
+        set_test_name("t and T, and ; and , after them, step by whole characters, however many bytes each takes: ; goes past the one beside the caret");
+        make("a" "\xC3\xA9" "xbx\n");
+        keys("tx");
+        ensure_equals("t onto the character of two bytes before the x", caretText(), std::string("0:1"));
+        keys(";");
+        ensure_equals("; past the x beside it, to before the next", caretText(), std::string("0:4"));
+
+        make("\xC3\xA9" "xax\n");
+        keys("tx;");
+        ensure_equals("from a character of two bytes under the caret", caretText(), std::string("0:3"));
+
+        make("\xC3\xA9" "b" "\xC3\xA9" "a\n");
+        editor->setCaret(ALTextPos(0, 5));
+        keys("T");
+        editor->handleUnicodeCharHere(static_cast<llwchar>(0xE9));
+        ensure_equals("T to the character of two bytes beside the caret: where it is", caretText(), std::string("0:5"));
+        keys(";");
+        ensure_equals("; past it, to after the one before", caretText(), std::string("0:2"));
+    }
 }
