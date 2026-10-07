@@ -735,8 +735,14 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
     auto   lineNumber = [&](S32& out) { return lineAddress(view, line, at_, out); };
     if (line[0] == '%')
     {
+        // 1,$: the empty line after a final line break is no line of the
+        // text's, as $ leaves it out.
         first  = 0;
         last   = d.lineCount() - 1;
+        if (last > 0 && d.lineLength(last) == 0)
+        {
+            --last;
+        }
         ranged = true;
         at_    = 1;
     }

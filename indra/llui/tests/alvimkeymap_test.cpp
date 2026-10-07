@@ -3026,4 +3026,19 @@ namespace tut
         keys("gg:+1d<CR>");
         ensure_equals(":+1d takes the line below", flat(moved.text()), std::string("x 2|y|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<105>()
+    {
+        set_test_name("% is 1,$: the empty line after a final line break is none of its lines, for :s, :normal and :y");
+        ALCodeEditor& e = make("a\nb\n");
+        keys(":%s/$/;/<CR>");
+        ensure_equals(":%s/$/;/ ends the two lines, and makes no third", flat(e.text()), std::string("a;|b;|"));
+        keys("u");
+        keys(":%norm A;<CR>");
+        ensure_equals(":%norm A; types on the two lines alone", flat(e.text()), std::string("a;|b;|"));
+        keys("u");
+        keys(":%y<CR>");
+        ensure_equals(":%y yanks the two lines", vim->registerText('0'), std::string("a\nb"));
+    }
 }
