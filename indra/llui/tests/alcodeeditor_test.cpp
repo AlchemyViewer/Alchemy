@@ -3454,4 +3454,22 @@ namespace tut
         ensure("its own line edited, the mark gone with what it said", e.markAt(3) == ALCodeEditor::Mark::None);
         ensure("and moved on", features->marksRevision() != was);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<93>()
+    {
+        set_test_name("with nobody to ask, a word from a table named for any kind is offered as that kind");
+        ALCodeEditor& e = make("", "lsl");
+        e.highlighter().ownWords().set("namespace", { "Vehicles" });
+        type("Vehi");
+        key(' ', MASK_CONTROL);
+        const ALCodeEditor::Completion* found = nullptr;
+        for (const ALCodeEditor::Completion& c : e.completions())
+        {
+            found = c.text == "Vehicles" ? &c : found;
+        }
+        ensure("offered", e.completionOpen() && found);
+        ensure("as a namespace", found->kind == ALSyntaxKind::Namespace);
+        ensure_equals("and said to be one", found->detail, std::string("namespace"));
+    }
 }

@@ -99,18 +99,6 @@ namespace
     const char* const MARK_COLOR_NAMES[] = { "TextFgColor", "CodeMarkNote", "CodeMarkWarning", "CodeMarkError", "CodeMarkRuntime" };
     static_assert(sizeof(MARK_COLOR_NAMES) / sizeof(MARK_COLOR_NAMES[0]) == static_cast<size_t>(ALCodeEditor::Mark::COUNT), "every mark has a colour");
 
-    ALSyntaxKind kindOfTable(std::string_view table)
-    {
-        if (table == "function") return ALSyntaxKind::Function;
-        if (table == "event") return ALSyntaxKind::Event;
-        if (table == "type") return ALSyntaxKind::Type;
-        if (table == "constant") return ALSyntaxKind::Constant;
-        if (table == "control") return ALSyntaxKind::Control;
-        if (table == "keyword") return ALSyntaxKind::Keyword;
-        if (table == "deprecated") return ALSyntaxKind::Deprecated;
-        return ALSyntaxKind::Text;
-    }
-
     // What a string's text reads as, for the names a host offers for it to
     // be matched against: a quote or a backslash escaped is itself -- the
     // escapes a host writes its names with -- and an escape only begun at
@@ -2752,9 +2740,10 @@ void ALCodeEditor::vocabularyCompletions(std::string_view prefix, std::vector<Co
         {
             continue;
         }
+        // A table is named for the kind of word it holds.
         Completion c;
         c.text   = word;
-        c.kind   = kindOfTable(table);
+        c.kind   = alSyntaxKindFromName(table).value_or(ALSyntaxKind::Text);
         c.detail = alSyntaxKindName(c.kind);
         out.push_back(std::move(c));
     }
