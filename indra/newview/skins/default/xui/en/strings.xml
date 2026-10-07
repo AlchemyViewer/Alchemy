@@ -1221,16 +1221,6 @@ floats were single precision; SLua's numbers are doubles, which do neither.</str
 	<string name="WorkspaceNothingToDo">nothing to do</string>
 	<string name="WorkspaceQueueCannotOpen">the queue could not be opened</string>
 	<string name="WorkspaceQueueWouldNotStart">the queue could not start</string>
-
-	<!-- A Lightbox Look shared as a notecard (allooknotecard.cpp, alfloaterlightbox.cpp):
-	     the notecard's description, the name a Look gets where it brings none,
-	     and the sentences an import's toast adds for what else happened. -->
-	<string name="LightBoxLookNotecardDescription">Lightbox Look</string>
-	<string name="LightBoxLookImportFallbackName">Shared Look</string>
-	<string name="LightBoxLookImportRenamedNote">You already had a different Look called '[WANTED]', so this one is called '[NAME]'.</string>
-	<string name="LightBoxLookImportSameNote">You already had this Look, as '[NAME]'.</string>
-	<string name="LightBoxLookImportUnknownNote">[COUNT] settings this viewer does not have were left out.</string>
-	<string name="LightBoxLookImportIgnoredNote">[COUNT] settings were not valid and were ignored.</string>
 	<string name="AnalysisNoLuauDefinitions">No Luau definitions at [PATH]</string>
 	<string name="AnalysisNoLSLBuiltins">No LSL builtins</string>
 
@@ -1262,6 +1252,15 @@ floats were single precision; SLua's numbers are doubles, which do neither.</str
 	<string name="NotecardCopyFailed">[NAME] could not be copied: not connected to a region</string>
 	<string name="NotecardCopyRefused">[NAME] could not be copied: [ERROR]</string>
 	<string name="NotecardFull">[NAME] is full: a notecard holds at most [LIMIT] bytes</string>
+
+	<!-- A Lightbox Look shared as a notecard (allooknotecard.cpp, alfloaterlightbox.cpp):
+	     the notecard's description, the name a Look gets where it brings none,
+	     and the sentences an import's toast adds for what else happened. -->
+	<string name="LightBoxLookNotecardDescription">Lightbox Look</string>
+	<string name="LightBoxLookImportFallbackName">Shared Look</string>
+	<string name="LightBoxLookImportRenamedNote">You already had a different Look called '[WANTED]', so this one is called '[NAME]'.</string>
+	<string name="LightBoxLookImportUnknownNote">[COUNT] settings this viewer does not have were left out.</string>
+	<string name="LightBoxLookImportIgnoredNote">[COUNT] settings were not valid and were ignored.</string>
 
 	<!-- ToolTips for notecards -->
 	<string name="TooltipNotecardNotAllowedTypeDrop">

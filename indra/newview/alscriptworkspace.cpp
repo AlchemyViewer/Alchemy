@@ -953,14 +953,8 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
     {
         sender.request = newRequest();
     }
-    // Nothing a notecard is read back with takes more text than this -- the
-    // reader refuses the whole notecard -- so nothing more is written.
-    if (text.size() > static_cast<size_t>(LLNotecard::MAX_SIZE))
+    if (notecardTooLarge(text, error))
     {
-        LLStringUtil::format_map_t args;
-        args["[SIZE]"]  = std::to_string(text.size());
-        args["[LIMIT]"] = std::to_string(static_cast<S32>(LLNotecard::MAX_SIZE));
-        error           = LLTrans::getString("WorkspaceNotecardTooLarge", args);
         return false;
     }
     LLNotecard notecard(LLNotecard::MAX_SIZE);
@@ -1048,6 +1042,22 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
     return true;
 }
 
+// static
+bool ALScriptWorkspace::notecardTooLarge(const std::string& text, std::string& error)
+{
+    // Nothing a notecard is read back with takes more text than this -- the
+    // reader refuses the whole notecard -- so nothing more is written.
+    if (text.size() <= static_cast<size_t>(LLNotecard::MAX_SIZE))
+    {
+        return false;
+    }
+    LLStringUtil::format_map_t args;
+    args["[SIZE]"]  = std::to_string(text.size());
+    args["[LIMIT]"] = std::to_string(static_cast<S32>(LLNotecard::MAX_SIZE));
+    error           = LLTrans::getString("WorkspaceNotecardTooLarge", args);
+    return true;
+}
+
 bool ALScriptWorkspace::inventoryNotecardUploadUrl(std::string& url, std::string& error) const
 {
     LLViewerRegion* region = gAgent.getRegion();
@@ -1086,16 +1096,8 @@ bool ALScriptWorkspace::createNotecardWithText(const std::string& name, const st
     // Refused before anything is made: an item whose text the upload would
     // refuse, or that nothing could upload to, would be an empty notecard
     // left in the inventory.
-    if (text.size() > static_cast<size_t>(LLNotecard::MAX_SIZE))
-    {
-        LLStringUtil::format_map_t args;
-        args["[SIZE]"]  = std::to_string(text.size());
-        args["[LIMIT]"] = std::to_string(static_cast<S32>(LLNotecard::MAX_SIZE));
-        error           = LLTrans::getString("WorkspaceNotecardTooLarge", args);
-        return false;
-    }
     std::string url;
-    if (!inventoryNotecardUploadUrl(url, error))
+    if (notecardTooLarge(text, error) || !inventoryNotecardUploadUrl(url, error))
     {
         return false;
     }
@@ -1115,7 +1117,10 @@ bool ALScriptWorkspace::createNotecardWithText(const std::string& name, const st
                 {
                     removeNotecardNeverWritten(result.ref.item);
                 }
-                callback(result);
+                if (callback)
+                {
+                    callback(result);
+                }
             },
             why);
         if (!sent)
@@ -1126,7 +1131,10 @@ bool ALScriptWorkspace::createNotecardWithText(const std::string& name, const st
             result.ref   = ref;
             result.kind  = ALScriptKind::Notecard;
             result.error = why;
-            callback(result);
+            if (callback)
+            {
+                callback(result);
+            }
         }
     });
     std::string desc = description;

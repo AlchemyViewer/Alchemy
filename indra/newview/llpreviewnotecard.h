@@ -222,6 +222,9 @@ private:
     // The notecard loaded again for a Take Theirs, whose text goes in over
     // what was typed rather than as a fresh load.
     bool                       mTakingTheirs = false;
+    // The offer to import the Look this notecard holds, answered one way or
+    // another: not made again for a load of a save heard from elsewhere.
+    bool                       mLookOfferAnswered = false;
     // Where the caret and the view were, for a load of a save heard from
     // elsewhere to put them back.
     std::optional<std::pair<ALTextPos, S32>> mKeepPlace;

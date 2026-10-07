@@ -93,6 +93,23 @@ public:
     /// stands in for the file system that would overwrite it, and on
     /// Windows and macOS that file system does not care about case.
     bool presetExists(const std::string& subdirectory, const std::string& name);
+    /// Whether no preset may be saved under that name: the default preset's,
+    /// in any case and as translated -- the rule the Save As dialog refuses
+    /// by, and the one a Look from outside is held to.
+    static bool isReservedPresetName(const std::string& name);
+
+    /// What a Look's map says about one setting: nothing; a value that is
+    /// refused (ALLookFormat::sanitizeLookValue, by the setting's own type,
+    /// or no such setting, or an entry without a Value); or a value as it
+    /// is to be written, in `clean`. `ctrl`, where asked for, is the
+    /// setting itself, null where there is none.
+    enum class LookEntry
+    {
+        Absent,
+        Refused,
+        Taken
+    };
+    LookEntry judgeLookEntry(const LLSD& settings, const std::string& ctrl_name, LLSD& clean, LLControlVariable** ctrl = nullptr);
 
     /// What was taken from a Look as it was applied or saved: written,
     /// present but malformed and so skipped, and not a Look's setting at
@@ -107,13 +124,14 @@ public:
     // loadFromFile), so shared Look files cannot carry unrelated settings;
     // and every value is judged first (ALLookFormat::sanitizeLookValue),
     // so a file cannot put a NaN, a wrong type or a path into one either.
-    // `counts`, where given, says what was written and what was skipped.
-    bool loadLooksPreset(std::string name, LookSettingCounts* counts = nullptr);
+    bool loadLooksPreset(std::string name);
     /// The whitelisted settings as they stand, in the shape a Look file has.
     LLSD captureLookSettings();
     /// A Look from outside -- `name -> {Type, Value}`, as a notecard carries
     /// one -- written to the Looks folder under `name`, normalised to the
-    /// shape a saved Look has, with only the values that pass judgment.
+    /// shape a saved Look has, with the values that pass judgment and the
+    /// setting's own default in place of each that does not, so that the
+    /// file is the full snapshot a saved Look is.
     /// Nothing is applied, and the active Look is not changed; the list
     /// signal fires. False where the name is reserved, nothing passed, or
     /// the file could not be written.
@@ -167,9 +185,6 @@ public:
     static LLSD describeSetting(LLControlVariable& ctrl, const LLSD& value);
     /// Every named setting's entry, with its live value, put into `params`.
     void addLiveSettings(const std::vector<std::string>& names, LLSD& params);
-    /// Whether `value` may be written to the named setting, and as what
-    /// (ALLookFormat::sanitizeLookValue, by the setting's own type).
-    bool sanitizeLookValueForControl(const std::string& ctrl_name, const LLSD& value, LLSD& clean);
     /// The whitelisted settings a Look's map carries written, each judged
     /// first, and the rest reset where the map is a full snapshot. The
     /// body of loadLooksPreset, for a Look that is already a map.

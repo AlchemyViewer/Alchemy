@@ -347,6 +347,9 @@ private:
     // region's capability for it. False, with why, where there is no
     // region or it has none.
     bool        inventoryNotecardUploadUrl(std::string& url, std::string& error) const;
+    // Whether a text is more than a notecard holds (LLNotecard::MAX_SIZE),
+    // with why in words where it is.
+    static bool notecardTooLarge(const std::string& text, std::string& error);
     bool        scriptMessage(const ALScriptRef& ref, const char* message, bool running, bool with_running, std::string& error);
 
     compiled_signal_t             mCompiled;

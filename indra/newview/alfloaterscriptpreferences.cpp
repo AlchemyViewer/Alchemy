@@ -62,10 +62,8 @@
 #include "llviewerinventory.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
-#include "llagent.h"
 #include "llfloaterperms.h"
 #include "llnotecard.h"
-#include "llviewerassettype.h"
 
 #include <algorithm>
 #include <functional>

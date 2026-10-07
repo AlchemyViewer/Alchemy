@@ -1011,35 +1011,48 @@ bool LLPresetsManager::readPresetFile(const std::string& subdirectory, const std
 bool LLPresetsManager::writePresetFile(const std::string& subdirectory, const std::string& name, const LLSD& params)
 {
     const std::string full_path = getPresetFilePath(subdirectory, name);
-    llofstream        preset_file(full_path.c_str());
-    if (!preset_file.is_open())
+    // Written beside the file and moved over it once it is whole, so that a
+    // disk that fills halfway, or a viewer that dies, leaves the preset
+    // that was there rather than a short one. The list is read from
+    // "*.xml", which the half-written file is not.
+    const std::string temp_path = full_path + ".tmp";
     {
-        LL_WARNS("Presets") << "Cannot open for output preset file " << full_path << LL_ENDL;
-        return false;
+        llofstream preset_file(temp_path.c_str());
+        if (!preset_file.is_open())
+        {
+            LL_WARNS("Presets") << "Cannot open for output preset file " << temp_path << LL_ENDL;
+            return false;
+        }
+        LLPointer<LLSDFormatter> formatter = new LLSDXMLFormatter();
+        const bool               formatted = formatter->format(params, preset_file, LLSDFormatter::OPTIONS_PRETTY) >= 0;
+        const bool               written   = formatted && !preset_file.fail();
+        preset_file.close();
+        if (!written || preset_file.fail())
+        {
+            LL_WARNS("Presets") << "Could not write preset file " << temp_path << LL_ENDL;
+            LLFile::remove(temp_path);
+            return false;
+        }
     }
-    LLPointer<LLSDFormatter> formatter = new LLSDXMLFormatter();
-    formatter->format(params, preset_file, LLSDFormatter::OPTIONS_PRETTY);
-    const bool written = !preset_file.fail();
-    preset_file.close();
-    if (!written || preset_file.fail())
+    if (LLFile::rename(temp_path, full_path) != 0)
     {
-        // A full disk, say: the file is there and short, and must not be
-        // reported as saved.
-        LL_WARNS("Presets") << "Could not write preset file " << full_path << LL_ENDL;
+        LL_WARNS("Presets") << "Could not move preset file " << temp_path << " over " << full_path << LL_ENDL;
+        LLFile::remove(temp_path);
         return false;
     }
     LL_DEBUGS("Presets") << "saved preset '" << name << "'; " << params.size() << " parameters" << LL_ENDL;
     return true;
 }
 
-// A refused value as a log line can show it. A scalar is shown, cut short;
-// a map or an array is only described: streaming one recurses once per
-// level of nesting, and a stranger's notecard can nest a value fifteen
-// hundred deep in twenty kilobytes, which is the main thread's whole
-// stack on Windows. The parser now refuses such a text, and this does not
-// rely on it.
-static std::string refusedValueText(const LLSD& value)
+// A refused entry's value as a log line can show it. A scalar is shown,
+// cut short; a map or an array is only described: streaming one recurses
+// once per level of nesting, and a stranger's notecard can nest a value
+// fifteen hundred deep in twenty kilobytes, which is the main thread's
+// whole stack on Windows. The parser now refuses such a text, and this
+// does not rely on it.
+static std::string refusedEntryText(const LLSD& entry)
 {
+    const LLSD& value = entry.isMap() && entry.has("Value") ? entry["Value"] : entry;
     if (value.isMap())
     {
         return "a map of " + std::to_string(value.size());
@@ -1058,6 +1071,14 @@ static std::string refusedValueText(const LLSD& value)
         shown += "...";
     }
     return shown;
+}
+
+// static
+bool LLPresetsManager::isReservedPresetName(const std::string& name)
+{
+    std::string upper(name);
+    LLStringUtil::toUpper(upper);
+    return upper == PRESETS_DEFAULT_UPPER || name == LLTrans::getString(PRESETS_DEFAULT);
 }
 
 bool LLPresetsManager::presetExists(const std::string& subdirectory, const std::string& name)
@@ -1114,10 +1135,27 @@ LLSD LLPresetsManager::captureLookSettings()
     return params;
 }
 
-bool LLPresetsManager::sanitizeLookValueForControl(const std::string& ctrl_name, const LLSD& value, LLSD& clean)
+LLPresetsManager::LookEntry LLPresetsManager::judgeLookEntry(const LLSD& settings, const std::string& ctrl_name, LLSD& clean, LLControlVariable** ctrl)
 {
-    LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
-    return ctrl && ALLookFormat::sanitizeLookValue(ctrl_name, LLControlGroup::typeEnumToString(ctrl->type()), value, clean);
+    LLControlVariable* control = gSavedSettings.getControl(ctrl_name).get();
+    if (ctrl)
+    {
+        *ctrl = control;
+    }
+    if (!settings.isMap() || !settings.has(ctrl_name))
+    {
+        return LookEntry::Absent;
+    }
+    // Judged before it is written: a value of the wrong type, a NaN, a LUT
+    // name that reaches out of its folder, by the setting's own type. A
+    // Look file is written by hand or shared as readily as a notecard is.
+    const LLSD& entry = settings[ctrl_name];
+    if (!control || !entry.isMap() || !entry.has("Value") ||
+        !ALLookFormat::sanitizeLookValue(ctrl_name, LLControlGroup::typeEnumToString(control->type()), entry["Value"], clean))
+    {
+        return LookEntry::Refused;
+    }
+    return LookEntry::Taken;
 }
 
 LLPresetsManager::LookSettingCounts LLPresetsManager::applyLookSettings(const LLSD& params)
@@ -1127,40 +1165,28 @@ LLPresetsManager::LookSettingCounts LLPresetsManager::applyLookSettings(const LL
     std::vector<std::string> allowed;
     getLooksControlNames(allowed);
 
-    auto carries = [&params](const std::string& ctrl_name)
-    {
-        if (!params.has(ctrl_name))
-        {
-            return false;
-        }
-        const LLSD& entry = params[ctrl_name];
-        return entry.isMap() && entry.has("Value");
-    };
-
     LookSettingCounts counts;
     mIgnoreChangedSignal = true;
     for (const std::string& ctrl_name : allowed)
     {
-        if (!carries(ctrl_name))
+        LLSD               clean;
+        LLControlVariable* ctrl = nullptr;
+        switch (judgeLookEntry(params, ctrl_name, clean, &ctrl))
         {
-            continue;
+            case LookEntry::Absent:
+                break;
+            case LookEntry::Refused:
+                // Skipped, as a malformed key always was, and counted so
+                // that the user can be told -- by name here, so that a Look
+                // that loses a setting can be looked into.
+                LL_WARNS("Presets") << "Look setting '" << ctrl_name << "' refused and skipped: " << refusedEntryText(params[ctrl_name]) << LL_ENDL;
+                ++counts.rejected;
+                break;
+            case LookEntry::Taken:
+                ctrl->set(clean);
+                ++counts.accepted;
+                break;
         }
-        // Judged before it is written: a value of the wrong type, a NaN, a
-        // LUT name that reaches out of its folder. Skipped, as a malformed
-        // key always was, and counted so that the user can be told. A Look
-        // file is written by hand or shared as readily as a notecard is.
-        LLSD clean;
-        if (!sanitizeLookValueForControl(ctrl_name, params[ctrl_name]["Value"], clean))
-        {
-            // By name, so that a Look that loses a setting can be looked
-            // into: the toast only counts them.
-            LL_WARNS("Presets") << "Look setting '" << ctrl_name << "' refused and skipped: " << refusedValueText(params[ctrl_name]["Value"])
-                                << LL_ENDL;
-            ++counts.rejected;
-            continue;
-        }
-        gSavedSettings.getControl(ctrl_name)->set(clean);
-        ++counts.accepted;
     }
 
     // A Look is a full snapshot of the whitelist, so a whitelisted key the
@@ -1195,7 +1221,7 @@ LLPresetsManager::LookSettingCounts LLPresetsManager::applyLookSettings(const LL
     return counts;
 }
 
-bool LLPresetsManager::loadLooksPreset(std::string name, LookSettingCounts* counts)
+bool LLPresetsManager::loadLooksPreset(std::string name)
 {
     LLSD params;
     if (!readPresetFile(PRESETS_LOOKS, name, params))
@@ -1204,10 +1230,6 @@ bool LLPresetsManager::loadLooksPreset(std::string name, LookSettingCounts* coun
     }
 
     const LookSettingCounts applied = applyLookSettings(params);
-    if (counts)
-    {
-        *counts = applied;
-    }
     if (applied.accepted == 0)
     {
         LL_WARNS("Presets") << "Look '" << name << "' contained no applicable settings" << LL_ENDL;
@@ -1225,7 +1247,7 @@ bool LLPresetsManager::loadLooksPreset(std::string name, LookSettingCounts* coun
 bool LLPresetsManager::saveSharedLook(const std::string& name, const LLSD& shared_settings, LookSettingCounts& counts)
 {
     counts = LookSettingCounts();
-    if (name.empty() || name == PRESETS_DEFAULT || name == LLTrans::getString(PRESETS_DEFAULT))
+    if (name.empty() || isReservedPresetName(name))
     {
         LL_WARNS("Presets") << "A shared Look cannot be saved as '" << name << "'" << LL_ENDL;
         return false;
@@ -1239,31 +1261,37 @@ bool LLPresetsManager::saveSharedLook(const std::string& name, const LLSD& share
     getLooksControlNames(allowed);
 
     // Normalised to the shape a saved Look has -- the live setting's own
-    // Comment, Persist and Type beside the value -- and holding only the
-    // values that passed judgment. What loadLooksPreset then applies is a
-    // Look file like any other, so Revert, the dirty mark and Save behave
-    // for an imported Look exactly as they do for one saved here. A value
-    // skipped is not in the file, so a later apply resets that setting to
-    // its default along with every other the file lacks.
+    // Comment, Persist and Type beside the value -- so that what
+    // loadLooksPreset then applies is a Look file like any other, and
+    // Revert, the dirty mark and Save behave for an imported Look exactly
+    // as they do for one saved here. A value that fails judgment is
+    // written as the setting's default, counted, and named in the log: the
+    // file stays the full snapshot a saved Look is, and applying it puts
+    // that setting where a Look that never had it would, whatever the
+    // previous grade left there.
     LLSD params = LLSD::emptyMap();
     for (const std::string& ctrl_name : allowed)
     {
-        if (!shared_settings.has(ctrl_name))
-        {
-            continue;
-        }
-        const LLSD&        entry = shared_settings[ctrl_name];
-        LLControlVariable* ctrl  = gSavedSettings.getControl(ctrl_name).get();
         LLSD               clean;
-        if (!ctrl || !entry.isMap() || !entry.has("Value") || !sanitizeLookValueForControl(ctrl_name, entry["Value"], clean))
+        LLControlVariable* ctrl = nullptr;
+        switch (judgeLookEntry(shared_settings, ctrl_name, clean, &ctrl))
         {
-            LL_WARNS("Presets") << "Shared Look '" << name << "': setting '" << ctrl_name << "' refused and left out: "
-                                << refusedValueText(entry.isMap() ? entry["Value"] : entry) << LL_ENDL;
-            ++counts.rejected;
-            continue;
+            case LookEntry::Absent:
+                break;
+            case LookEntry::Refused:
+                LL_WARNS("Presets") << "Shared Look '" << name << "': setting '" << ctrl_name << "' refused and left at its default: "
+                                    << refusedEntryText(shared_settings[ctrl_name]) << LL_ENDL;
+                if (ctrl)
+                {
+                    params[ctrl_name] = describeSetting(*ctrl, ctrl->getDefault());
+                }
+                ++counts.rejected;
+                break;
+            case LookEntry::Taken:
+                params[ctrl_name] = describeSetting(*ctrl, clean);
+                ++counts.accepted;
+                break;
         }
-        params[ctrl_name] = describeSetting(*ctrl, clean);
-        ++counts.accepted;
     }
     // Keys that are no Look's setting: another viewer's, or nobody's.
     const std::set<std::string> whitelist(allowed.begin(), allowed.end());
@@ -1299,11 +1327,21 @@ bool LLPresetsManager::lookHoldsSameSettings(const std::string& name, const LLSD
     getLooksControlNames(allowed);
     for (const std::string& ctrl_name : allowed)
     {
-        // Each side's value as it would be written, or none where the side
-        // lacks the setting or its value would be refused.
+        // Each side's value as it would be written: a refused value as the
+        // default saveSharedLook writes in its place, and none where the
+        // side lacks the setting.
         const auto written = [this, &ctrl_name](const LLSD& settings, LLSD& value) {
-            return settings.has(ctrl_name) && settings[ctrl_name].isMap() && settings[ctrl_name].has("Value") &&
-                   sanitizeLookValueForControl(ctrl_name, settings[ctrl_name]["Value"], value);
+            LLControlVariable* ctrl = nullptr;
+            switch (judgeLookEntry(settings, ctrl_name, value, &ctrl))
+            {
+                case LookEntry::Taken:
+                    return true;
+                case LookEntry::Refused:
+                    return ctrl && ALLookFormat::sanitizeLookValue(ctrl_name, LLControlGroup::typeEnumToString(ctrl->type()), ctrl->getDefault(), value);
+                case LookEntry::Absent:
+                    break;
+            }
+            return false;
         };
         LLSD       mine;
         LLSD       theirs;

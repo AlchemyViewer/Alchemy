@@ -29,8 +29,8 @@
 #include "allookformat.h"
 #include "alscriptworkspace.h"
 
-#include "llagent.h"
 #include "llagentui.h"
+#include "llapp.h"
 #include "lldir.h"
 #include "llfile.h"
 #include "llfloaterperms.h"
@@ -42,6 +42,8 @@
 #include "llversioninfo.h"
 #include "llviewerinventory.h"
 
+#include <map>
+
 // The format's own limit stands in for the notecard's so that the format
 // can be tested without the inventory library; this is where the two are
 // held to the same number.
@@ -50,21 +52,31 @@ static_assert(ALLookFormat::NOTECARD_BYTE_LIMIT == static_cast<size_t>(LLNotecar
 
 namespace
 {
-    // The names no Look may be saved under: the default preset's, which
-    // savePreset refuses, in English and as translated.
-    bool isReservedLookName(const std::string& name)
-    {
-        return name == PRESETS_DEFAULT || name == LLTrans::getString(PRESETS_DEFAULT);
-    }
-
     // The name a Look from outside is saved under: the first of its own
-    // name, "name (2)", "name (3)" and so on that is free, or that an
-    // identical Look already holds. Empty where none could be found, which
-    // takes a thousand Looks of one name.
+    // name, "name (2)", "name (3)" and so on that no Look has, or that an
+    // identical Look already holds -- then that Look's name as it is spelt
+    // here. Names are matched without regard to case, as the file systems
+    // of Windows and macOS match them (LLPresetsManager::presetExists says
+    // why), and the spelling on disk is the one the list and the bar know.
+    // Empty where none could be found, which takes a thousand Looks of one
+    // name.
     std::string chooseImportedLookName(const std::string& wanted, const LLSD& settings, bool& already_had)
     {
         LLPresetsManager& presets = LLPresetsManager::instance();
         already_had               = false;
+
+        // The Looks there are, read from the folder once: lower-cased, to
+        // the spelling on disk.
+        LLPresetsManager::preset_name_list_t names;
+        presets.loadPresetNamesFromDir(PRESETS_LOOKS, names, DEFAULT_HIDE);
+        std::map<std::string, std::string> held;
+        for (const std::string& existing : names)
+        {
+            std::string lower(existing);
+            LLStringUtil::toLower(lower);
+            held.emplace(lower, existing);
+        }
+
         for (S32 n = 1; n < 1000; ++n)
         {
             const std::string candidate = ALLookFormat::numberedLookName(wanted, n);
@@ -72,18 +84,21 @@ namespace
             {
                 return std::string();
             }
-            if (isReservedLookName(candidate))
+            if (LLPresetsManager::isReservedPresetName(candidate))
             {
                 continue;
             }
-            if (!presets.presetExists(PRESETS_LOOKS, candidate))
+            std::string lower(candidate);
+            LLStringUtil::toLower(lower);
+            const auto taken = held.find(lower);
+            if (taken == held.end())
             {
                 return candidate;
             }
-            if (presets.lookHoldsSameSettings(candidate, settings))
+            if (presets.lookHoldsSameSettings(taken->second, settings))
             {
                 already_had = true;
-                return candidate;
+                return taken->second;
             }
         }
         return std::string();
@@ -97,7 +112,7 @@ void ALLookNotecard::shareLookAsNotecard(const std::string& look_name, const LLS
     LLAgentUI::buildFullname(look.metadata.author);
     look.metadata.viewer = LLVersionInfo::instance().getChannelAndVersion();
     look.metadata.date   = LLDate::now();
-    look.settings        = ALLookFormat::settingsWithoutDescriptions(look_file_params);
+    look.settings        = look_file_params; // composeNotecardText takes the descriptions off
 
     LLSD args;
     args["NAME"] = look_name;
@@ -130,6 +145,11 @@ void ALLookNotecard::shareLookAsNotecard(const std::string& look_name, const LLS
         notecard_name, LLTrans::getString("LightBoxLookNotecardDescription"), gInventory.findCategoryUUIDForType(LLFolderType::FT_NOTECARD),
         text, next_owner_perms,
         [args](const ALScriptCompileResult& result) {
+            if (LLApp::isExiting())
+            {
+                // The upload answers after the notifications are gone.
+                return;
+            }
             LLSD said = args;
             if (!result.success)
             {
@@ -169,7 +189,7 @@ void ALLookNotecard::importLookFromNotecardText(const std::string& text, const s
     {
         wanted = ALLookFormat::lookNameFromNotecardName(notecard_name);
     }
-    if (wanted.empty() || isReservedLookName(wanted))
+    if (wanted.empty() || LLPresetsManager::isReservedPresetName(wanted))
     {
         wanted = LLTrans::getString("LightBoxLookImportFallbackName");
     }
@@ -193,10 +213,9 @@ void ALLookNotecard::importLookFromNotecardText(const std::string& text, const s
     // the renderer; say so instead, by the name as it was written -- judged
     // and cut to a bare file name -- never as the notecard spelt it.
     LLSD lut_value;
-    if (look.settings.has("RenderColorGradeLUT") &&
-        ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", look.settings["RenderColorGradeLUT"]["Value"], lut_value))
+    if (LLPresetsManager::instance().judgeLookEntry(look.settings, "RenderColorGradeLUT", lut_value) == LLPresetsManager::LookEntry::Taken)
     {
-        const std::string lut = lut_value.asString();
+        const std::string& lut = lut_value.asStringRef();
         if (!lut.empty() && !colorLutFileIsInstalled(lut))
         {
             imported.missingLut = lut;

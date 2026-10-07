@@ -2267,13 +2267,13 @@ void ALFloaterLightBox::onWhiteBalancePicked(const LLColor3& sample)
     gSavedSettings.setF32("RenderColorGradeWhiteBalanceDuv", solved.mDuv);
 }
 
-void ALFloaterLightBox::applyLookAsOneUndoStep(const std::string& look_name, const std::string& history_label)
+bool ALFloaterLightBox::applyLookAsOneUndoStep(const std::string& look_name, const std::string& history_label)
 {
     // Applying a Look writes every whitelisted key it carries. That is one
     // choice, so it is one undo step -- and it is the step a user most
     // wants back, having tried a Look on top of work they liked.
     ScopedHistoryGroup group(mHistory, history_label);
-    LLPresetsManager::getInstance()->loadLooksPreset(look_name);
+    return LLPresetsManager::getInstance()->loadLooksPreset(look_name);
 }
 
 void ALFloaterLightBox::onLookSelected()
@@ -2428,6 +2428,7 @@ void ALFloaterLightBox::finishSharedLookImport(const ALLookNotecard::ImportedLoo
             break;
     }
 
+    bool applied = false;
     if (what == SharedLookImport::SaveAndApply)
     {
         // In the Lightbox, opened if need be, so that the apply is one undo
@@ -2440,26 +2441,24 @@ void ALFloaterLightBox::finishSharedLookImport(const ALLookNotecard::ImportedLoo
             lightbox->closePopover(false);
             LLStringUtil::format_map_t label;
             label["[NAME]"] = imported.lookName;
-            lightbox->applyLookAsOneUndoStep(imported.lookName, lightbox->getString("history_look_import", label));
+            applied         = lightbox->applyLookAsOneUndoStep(imported.lookName, lightbox->getString("history_look_import", label));
         }
     }
 
-    // What else there is to say: found here already, renamed, settings left
-    // out. Each a sentence, so the toast reads whatever came together.
+    // What else there is to say: renamed, settings left out. Each a
+    // sentence after a space -- the templates end on their own sentence
+    // and [NOTE] -- so the toast reads whatever came together.
     std::string note;
     const auto  say = [&note](const std::string& sentence) {
-        if (!note.empty())
-        {
-            note += ' ';
-        }
+        note += ' ';
         note += sentence;
     };
     LLStringUtil::format_map_t words;
     words["[NAME]"]   = imported.lookName;
     words["[WANTED]"] = imported.wantedName;
-    if (imported.lookName != imported.wantedName)
+    if (!imported.alreadyHad && imported.lookName != imported.wantedName)
     {
-        say(LLTrans::getString(imported.alreadyHad ? "LightBoxLookImportSameNote" : "LightBoxLookImportRenamedNote", words));
+        say(LLTrans::getString("LightBoxLookImportRenamedNote", words));
     }
     if (imported.counts.unknown > 0)
     {
@@ -2473,7 +2472,12 @@ void ALFloaterLightBox::finishSharedLookImport(const ALLookNotecard::ImportedLoo
     }
     args["NAME"] = imported.lookName;
     args["NOTE"] = note;
-    LLNotificationsUtil::add(what == SharedLookImport::SaveAndApply ? "LightBoxLookImported" : "LightBoxLookAdded", args);
+    // Said as it went: applied and new here, applied and already here, added
+    // and not applied, or already here and left as it was -- which is also
+    // what an apply that failed comes to, the Look being in the list still.
+    const char* const outcome = applied ? (imported.alreadyHad ? "LightBoxLookApplied" : "LightBoxLookImported")
+                                        : (imported.alreadyHad ? "LightBoxLookAlreadyHad" : "LightBoxLookAdded");
+    LLNotificationsUtil::add(outcome, args);
 
     if (!imported.missingLut.empty())
     {

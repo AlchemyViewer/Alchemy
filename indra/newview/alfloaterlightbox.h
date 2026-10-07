@@ -296,8 +296,9 @@ public:
     void onClickLookRevert();
     void refreshLooksBar();
     /// Apply a saved Look as one undo step called @a history_label: what
-    /// choosing a Look, Revert and an import all do.
-    void applyLookAsOneUndoStep(const std::string& look_name, const std::string& history_label);
+    /// choosing a Look, Revert and an import all do. False where the Look
+    /// could not be read, and nothing was written.
+    bool applyLookAsOneUndoStep(const std::string& look_name, const std::string& history_label);
     /// The settings as they stand, into a notecard named for the Look.
     void onClickLookShare();
     /// What a shared Look is called: the active Look; the last applied one

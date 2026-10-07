@@ -34,7 +34,6 @@
 #include "llfloaterreg.h"
 #include "llnotificationsutil.h"
 #include "llpresetsmanager.h"
-#include "lltrans.h"
 
 namespace
 {
@@ -119,10 +118,7 @@ void LLFloaterSavePrefPreset::onBtnSave()
 {
     std::string name = mPresetCombo->getSimple();
 
-    std::string upper_name(name);
-    LLStringUtil::toUpper(upper_name);
-
-    if ((name == LLTrans::getString(PRESETS_DEFAULT)) || (upper_name == PRESETS_DEFAULT_UPPER))
+    if (LLPresetsManager::isReservedPresetName(name))
     {
         LLNotificationsUtil::add("DefaultPresetNotSaved");
         closeFloater();

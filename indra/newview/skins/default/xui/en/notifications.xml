@@ -9849,12 +9849,22 @@ The Look &apos;[NAME]&apos; could not be saved to your Looks.
     <tag>fail</tag>
   </notification>
 
+  <!-- The four ways an import ends. [NOTE] is empty or holds further
+       sentences, each with its own leading space, so none goes here. -->
   <notification
     icon="notifytip.tga"
     name="LightBoxLookImported"
     log_to_chat="false"
     type="notifytip">
-Applied the Look &apos;[NAME]&apos; and added it to your Looks. Ctrl+Z in the Lightbox takes it back. [NOTE]
+Applied the Look &apos;[NAME]&apos; and added it to your Looks. Ctrl+Z in the Lightbox takes it back.[NOTE]
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookApplied"
+    log_to_chat="false"
+    type="notifytip">
+Applied the Look &apos;[NAME]&apos;, which you already had. Ctrl+Z in the Lightbox takes it back.[NOTE]
   </notification>
 
   <notification
@@ -9862,7 +9872,15 @@ Applied the Look &apos;[NAME]&apos; and added it to your Looks. Ctrl+Z in the Li
     name="LightBoxLookAdded"
     log_to_chat="false"
     type="notifytip">
-Added the Look &apos;[NAME]&apos; to your Looks. [NOTE]
+Added the Look &apos;[NAME]&apos; to your Looks.[NOTE]
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookAlreadyHad"
+    log_to_chat="false"
+    type="notifytip">
+You already have this Look, as &apos;[NAME]&apos;; nothing was added.[NOTE]
   </notification>
 
   <notification

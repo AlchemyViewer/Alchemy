@@ -405,15 +405,16 @@ void LLPreviewNotecard::loaded(const ALScriptLoaded& answer)
     mText->setMaxBytes(LLNotecard::MAX_SIZE);
     showModifiable(mModifiable);
     hideNotice();
-    // Before the link to a file and the recovery offers below, which take
-    // the line over where there is one: where saves go, and unsaved work,
-    // outrank a Look to try.
-    offerSharedLookImport(answer.text);
-    showLinked();
     if (mCompare && mCompare->getVisible())
     {
         toggleCompare();
     }
+    // After the comparison is put away, which relabels the notice's third
+    // button for its own ends; before the link to a file and the recovery
+    // offers below, which take the line over where there is one: where
+    // saves go, and unsaved work, outrank a Look to try.
+    offerSharedLookImport(answer.text);
+    showLinked();
     mAssetStatus = PREVIEW_ASSET_LOADED;
     mKeeper.forget();
     syncExternal();
@@ -433,8 +434,10 @@ void LLPreviewNotecard::offerSharedLookImport(const std::string& notecard_text)
 {
     // A glance, not a parse: the Lightbox parses once, when asked. And
     // asked it must be -- a notecard given can open on its own, so opening
-    // one applies nothing; the click is the consent.
-    if (!ALLookFormat::looksLikeLookNotecard(notecard_text))
+    // one applies nothing; the click is the consent. Asked once: a notecard
+    // saved again elsewhere is loaded again, and the offer is not to come
+    // back every time once it has been answered.
+    if (mLookOfferAnswered || !ALLookFormat::looksLikeLookNotecard(notecard_text))
     {
         return;
     }
@@ -444,15 +447,20 @@ void LLPreviewNotecard::offerSharedLookImport(const std::string& notecard_text)
     showNotice(getString("LookOffer"),
                { { getString("LookApply"),
                    [this, text]() {
+                       mLookOfferAnswered = true;
                        hideNotice();
                        ALFloaterLightBox::importSharedLookFromText(text, mNoteName, ALFloaterLightBox::SharedLookImport::SaveAndApply);
                    } },
                  { getString("LookAdd"),
                    [this, text]() {
+                       mLookOfferAnswered = true;
                        hideNotice();
                        ALFloaterLightBox::importSharedLookFromText(text, mNoteName, ALFloaterLightBox::SharedLookImport::SaveOnly);
                    } },
-                 { getString("LookNotNow"), [this]() { hideNotice(); } } });
+                 { getString("LookNotNow"), [this]() {
+                      mLookOfferAnswered = true;
+                      hideNotice();
+                  } } });
 }
 
 void LLPreviewNotecard::showUnloaded(const std::string& why)
