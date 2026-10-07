@@ -456,4 +456,28 @@ namespace tut
         ensure_equals("and out", made(text, indentLines(doc, selections, false, spaces), placed), std::string("a\nb\nc\nd"));
         ensure_equals("those with nothing to take left to slide; the other moved", placed, std::string("- - 3:1-3:0 "));
     }
+
+    template<> template<>
+    void altextindent_object::test<14>()
+    {
+        set_test_name("lines shifted out by how wide their blanks are drawn: spaces before a tab go with it, and the caret stays on its character");
+        const std::string    text = "  \tfoo\n \t\tbar\n\t  baz\n      qux";
+        const ALTextDocument doc(text);
+        ALTextIndent::Options hard;
+        hard.tabWidth = 4;
+        const Change one = ALTextIndent::shiftLines(doc, 0, 3, 1, false, hard);
+        ensure_equals("each a tab's width out", applied(text, one), std::string("foo\n\tbar\n  baz\n  qux"));
+        bool taken_from_the_front = one.replacements.size() == 4;
+        for (const Replacement& replacement : one.replacements)
+        {
+            taken_from_the_front = taken_from_the_front && replacement.range.begin.column == 0 && replacement.text.empty();
+        }
+        ensure("each taken from the line's front", taken_from_the_front);
+        ensure_equals("two levels", applied(text, ALTextIndent::shiftLines(doc, 0, 3, 2, false, hard)), std::string("foo\nbar\nbaz\nqux"));
+
+        // The caret on the f of foo, past the spaces and the tab.
+        const std::vector<ALTextEditing::Group> groups = indentLines(doc, { ALTextRange(ALTextPos(0, 3), ALTextPos(0, 3)) }, false, hard);
+        ensure("one group", groups.size() == 1 && groups[0].placed.size() == 1);
+        ensure("the caret still on the f", groups[0].placed[0].second == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)));
+    }
 }

@@ -657,29 +657,20 @@ Change shiftLines(const ALTextDocument& doc, S32 first, S32 last, S32 levels, bo
             }
             continue;
         }
-        // Out: each level a tab, or up to a tab's width of spaces.
-        S32 taken = 0;
-        for (S32 n = 0; n < levels; ++n)
+        // Out: each level a tab's width less, as the blanks are drawn --
+        // spaces before a tab are as wide as the tab, and go with it --
+        // taken from the front, so that the blanks left are as wide as is
+        // left of them.
+        size_t    lead   = 0;
+        const S32 wanted = llmax(0, alBlanksWidth(line, width, &lead) - levels * width);
+        size_t    taken  = 0;
+        while (taken < lead && alBlanksWidth(std::string_view(line).substr(taken), width) > wanted)
         {
-            if (taken < static_cast<S32>(line.size()) && line[taken] == '\t')
-            {
-                ++taken;
-                continue;
-            }
-            S32 spaces = 0;
-            while (spaces < width && taken + spaces < static_cast<S32>(line.size()) && line[taken + spaces] == ' ')
-            {
-                ++spaces;
-            }
-            if (spaces == 0)
-            {
-                break;
-            }
-            taken += spaces;
+            ++taken;
         }
         if (taken > 0)
         {
-            change.replacements.push_back({ ALTextRange(ALTextPos(l, 0), ALTextPos(l, taken)), std::string() });
+            change.replacements.push_back({ ALTextRange(ALTextPos(l, 0), ALTextPos(l, static_cast<S32>(taken))), std::string() });
         }
     }
     return change;

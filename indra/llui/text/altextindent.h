@@ -185,8 +185,9 @@ namespace ALTextIndent
                                                   const Options& options);
     // Lines first through last so many levels in, those that are not
     // empty -- a tab a level, or a tab's width of spaces where tabs are
-    // soft -- or out, each level a tab or up to a tab's width of spaces:
-    // vim's > and <. The replacements alone, each at a line's start.
+    // soft -- or out, each level a tab's width of their blanks as they are
+    // drawn, taken from the front: vim's > and <. The replacements alone,
+    // each at a line's start.
     Change shiftLines(const ALTextDocument& doc, S32 first, S32 last, S32 levels, bool in, const Options& options);
     // The leading blanks of lines first through last made again of spaces,
     // or of tabs as far as they go, a tab `tab_width` wide: vim's :retab,
