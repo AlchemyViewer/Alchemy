@@ -1450,13 +1450,10 @@ std::vector<S32> ALCodeEditor::stickyLines(bool fresh)
     }
     // The first row on screen, and the blocks around its line that start
     // above it: their first lines, outermost first, the innermost few --
-    // kept for as long as the text, the top line and the folds are.
-    if (mStickyValid && !fresh)
-    {
-        return mSticky;
-    }
+    // kept for as long as the text, the top line and the folds are, and
+    // between frames for as long as the top line is.
     const S32 top_line = posAtLocal(textRect().mLeft, textRect().mTop - 1, false).line;
-    if (mStickyValid && mStickyVersion == document().version() && mStickyTop == top_line && mStickyFolded == mFolds.folded())
+    if (mStickyValid && mStickyTop == top_line && (!fresh || (mStickyVersion == document().version() && mStickyFolded == mFolds.folded())))
     {
         return mSticky;
     }

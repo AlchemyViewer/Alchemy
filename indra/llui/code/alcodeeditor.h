@@ -859,7 +859,10 @@ private:
     // inner; and the number of rows they take.
     // Worked out afresh as the view is drawn, which reads the lines above
     // the top anyway; asked for between -- a scroll to the caret, a click
-    // -- as last drawn, so that a batch's edit is not lexed for them.
+    // -- as last drawn while the top line is the one drawn, so that a
+    // batch's edit is not lexed for them, and worked out for the top line
+    // where the view has scrolled to another: what a scroll asks at each
+    // place it tries.
     std::vector<S32> stickyLines(bool fresh = false);
     S32              stickyRows();
     // What is drawn over the top of the text: the pinned headers too.

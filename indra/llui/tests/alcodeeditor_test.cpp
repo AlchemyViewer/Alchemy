@@ -3153,4 +3153,30 @@ namespace tut
         ensure("the fold down with its header", f.isFolded(1) && !f.isFolded(0));
         ensure("hiding its block there", !f.layout().hidden(1) && f.layout().hidden(2) && f.layout().hidden(4) && !f.layout().hidden(5));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<85>()
+    {
+        set_test_name("a line scrolled up to from where nothing is pinned comes out from under the headers pinned over it there");
+        std::string text = "default\n{\n    state_entry()\n    {\n";
+        for (int i = 0; i < 80; ++i)
+        {
+            text += "        llOwnerSay(\"line " + std::to_string(i) + "\");\n";
+        }
+        text += "    }\n}\n";
+        for (int i = 0; i < 100; ++i)
+        {
+            text += "// after " + std::to_string(i) + "\n";
+        }
+        ALCodeEditor& e = make(text.c_str());
+        e.setStickyHeaders(true);
+        const S32 row_h = e.layout().rowHeight();
+        // At the end, past every block, where nothing is pinned; then up
+        // into the handler, where its state and it are.
+        e.setCaret(ALTextPos(185, 0));
+        ensure("the view past the blocks", e.scrollY() > e.layout().lineTop(86));
+        e.setCaret(ALTextPos(40, 8));
+        const S32 below = e.layout().lineTop(40) - e.scrollY();
+        ensure("below the two pinned headers: " + std::to_string(below) + " of " + std::to_string(row_h), below >= 2 * row_h);
+    }
 }
