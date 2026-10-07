@@ -220,16 +220,35 @@ void ALScriptMasterUpload::find()
     ALScriptWorkspace::instance().listContents(
         mRef.object,
         [self](const ALScriptContents& contents) {
-            self->found(contents.fetched ? ALScriptDiskMasters::itemOf(self->mRef) : nullptr);
+            if (!contents.fetched)
+            {
+                self->unanswered();
+                return;
+            }
+            self->found(ALScriptDiskMasters::itemOf(self->mRef));
         },
         /*from_region*/ mRefetch);
+}
+
+void ALScriptMasterUpload::unanswered()
+{
+    // No answer is not an answer that the item is gone: the region slow, or
+    // the object gone out of sight before it said. Whether the item is
+    // there is not known, and the send waits to be made by hand, as one to
+    // an object out of reach does; only an answer that came without it
+    // orphans the link.
+    const bool in_sight = gObjectList.findObject(mRef.object) != nullptr;
+    mUpdated.state      = ALMasterLink::State::Pending;
+    mChanged            = true;
+    end(Outcome::What::Pending, LLTrans::getString(in_sight ? "ScriptMasterNoContents" : "ScriptMasterOutOfReach"));
 }
 
 void ALScriptMasterUpload::found(LLInventoryItem* item)
 {
     if (!item)
     {
-        // Gone from where it was; or, an object's, out of reach again.
+        // Gone from where it was, the inventory or an object that said what
+        // it holds; or, an object's, out of reach again.
         const bool gone = mRef.inInventory() || gObjectList.findObject(mRef.object);
         mUpdated.state  = gone ? ALMasterLink::State::Orphaned : ALMasterLink::State::Pending;
         if (gone)

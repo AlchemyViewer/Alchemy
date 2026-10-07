@@ -109,6 +109,8 @@ private:
     void masterRead(const ALFileStamp& stamp, std::string text, bool whole);
     void find();
     void found(LLInventoryItem* item);
+    // An object's contents not said by the region in time.
+    void unanswered();
     void prepared(const ALScriptPrepared& prepared);
     void worldHas(const LLUUID& asset);
     void worldText(const ALScriptLoaded& loaded);

@@ -642,6 +642,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptMasterGone">its file is no longer there</string>
 	<string name="ScriptMasterUnreadable">its file could not be read</string>
 	<string name="ScriptMasterOutOfReach">its object is out of reach</string>
+	<string name="ScriptMasterNoContents">the region did not say in time what its object holds</string>
 	<string name="ScriptMasterItemGone">it is gone from where it was</string>
 	<string name="ScriptMasterNotSLua">its file is SLua, and the script is no longer</string>
 	<string name="ScriptMasterNotLSL">its file is LSL, and the script is no longer</string>
