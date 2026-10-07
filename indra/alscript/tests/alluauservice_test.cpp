@@ -1951,4 +1951,28 @@ namespace tut
         ensure("hover finds it", hover.found);
         ensure("a number: " + hover.label, hover.label.find("number") != std::string::npos);
     }
+
+    template<> template<>
+    void alluauservice_object::test<53>()
+    {
+        set_test_name("LLEvents:on's signature is the form its event's name fits: a detected event's handler given the detected table, another's "
+                      "its own arguments; the first form where no name is written yet");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script = "LLEvents:on(\"listen\", function(channel, name, id, msg) end)\n"     // 0
+                                   "LLEvents:on(\"touch_start\", function(detected) end)\n"               // 1
+                                   "LLEvents:once(\"timer\", function() end)\n"                           // 2
+                                   "LLEvents:on(\n";                                                      // 3
+        const auto shown = [&](S32 line, S32 column) {
+            const ALScriptSignature sig = service.signature(script, line, column);
+            return sig.found && sig.overloads.size() == 2 ? sig.overload : -1;
+        };
+        const ALScriptSignature listen = service.signature(script, 0, 24);
+        ensure("found, both forms", listen.found && listen.overloads.size() == 2);
+        ensure("listen, not a detected event: " + listen.label, listen.overload == 1 && listen.parameters.size() == 2 &&
+                                                                 listen.parameters[1].find("Detected") == std::string::npos);
+        ensure_equals("touch_start, a detected event", shown(1, 29), 0);
+        ensure_equals("once too", shown(2, 25), 1);
+        ensure_equals("in the name, as it is written", shown(0, 14), 1);
+        ensure_equals("no name yet", shown(3, 12), 0);
+    }
 }
