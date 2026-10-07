@@ -2571,9 +2571,12 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                     std::vector<std::pair<ALTextRange, std::string>> edits;
                     for (const ALTextRange& piece : pieces)
                     {
-                        // A line short of the block padded out to it.
-                        std::string with = one_line ? (piece.empty() ? padTo(d, piece.begin.line, span.left, view.getTabWidth()) : std::string()) + put_this.text
-                                                    : std::string();
+                        // A line that stops short of the block left as it
+                        // is, as vim's blockwise put leaves it; one that
+                        // reaches the block's first column has the text
+                        // added at its end.
+                        const bool  short_of = piece.empty() && !padTo(d, piece.begin.line, span.left, view.getTabWidth()).empty();
+                        std::string with     = one_line && !short_of ? put_this.text : std::string();
                         if (!piece.empty() || !with.empty())
                         {
                             edits.emplace_back(piece, std::move(with));

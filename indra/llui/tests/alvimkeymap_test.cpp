@@ -3963,4 +3963,26 @@ namespace tut
         ensure_equals("what the block held in the unnamed register, a line each", vim->registerText('"'), std::string("bc\nfg"));
         ensure_equals("and in 1", vim->registerText('1'), std::string("bc\nfg"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<146>()
+    {
+        set_test_name("visual block p of one line leaves a line that stops short of the block as it is, and adds to one that reaches its first column");
+        ALCodeEditor& e = make("abcd\na\nabcd\nZ\n");
+        keys("3j\"xylgg2l<C-v>jj\"xp");
+        ensure_equals("the short line not padded out", flat(e.text()), std::string("abZd|a|abZd|Z|"));
+        ensure_equals("the caret at the block's corner", caretText(), std::string("0:2"));
+
+        make("abcd\n\nabcd\nZ\n");
+        keys("3j\"xylgg2l<C-v>jj\"xp");
+        ensure_equals("nor an empty line", flat(editor->text()), std::string("abZd||abZd|Z|"));
+
+        make("abcd\nab\nabcd\nZ\n");
+        keys("3j\"xylgg2l<C-v>jj\"xp");
+        ensure_equals("a line that ends at the block's first column has it added", flat(editor->text()), std::string("abZd|abZ|abZd|Z|"));
+
+        make("abcd\na\nabcd\n");
+        keys("gg2l<C-v>jj\"_p");
+        ensure_equals("\"_p: the block taken out, the short line as it was", flat(editor->text()), std::string("abd|a|abd|"));
+    }
 }
