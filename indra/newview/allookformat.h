@@ -97,8 +97,9 @@ namespace ALLookFormat
 
     // The notecard's text: the note, then the Look as XML -- indented where
     // that fits in a notecard, run together where only that does. False
-    // where even that is too long; `text` then holds the long form, so the
-    // caller can say by how much.
+    // where even that is too long -- `text` then holds the run-together
+    // form, so the caller can say by how much -- or where the XML could not
+    // be written at all, with `text` empty.
     bool composeNotecardText(const SharedLook& look, std::string& text);
 
     // The Look a notecard's text holds. Whatever stands before the first
@@ -123,8 +124,9 @@ namespace ALLookFormat
     // Integer or a text that is a number and nothing else (a dropdown
     // writes its item's value as a string), finite, and whole for an
     // integer setting; a Boolean, or 0 and 1 as an Integer or a Real, or
-    // the words true and false; a String without control characters, and
-    // for RenderColorGradeLUT a bare file name; three finite numbers for a
+    // the words true and false; a String that prints and is well-formed
+    // UTF-8, and for RenderColorGradeLUT a bare file name of a kind the
+    // renderer decodes or nothing at all; three finite numbers for a
     // Vector3 or a Color3, or four with the last ignored; and, for an LLSD
     // setting, a tone curve as ALToneCurveSet reads one. Anything else is
     // refused, and so is any type not named here. The one place a value
@@ -138,8 +140,15 @@ namespace ALLookFormat
     const std::vector<std::string>& colorLutExtensions();
     // A LUT setting as a bare file name with one of those extensions, or
     // empty for no LUT: whatever stood before the last path separator is
-    // taken off, so the name joined to the LUT folder stays inside it.
+    // taken off, so the name joined to the LUT folder stays inside it; and
+    // a device's name (isWindowsDeviceName) is no LUT.
     std::string lutFileNameOnly(const std::string& lut_setting);
+    // Whether Windows would open a file of that name as a device, whatever
+    // folder it is in: CON, NUL, COM1 and the rest, with whatever follows
+    // the first dot ignored ("NUL.tar.gz" is NUL), spaces at the end of the
+    // stem ignored, and the superscript digits beside COM and LPT. Nothing
+    // may be saved or opened under such a name.
+    bool isWindowsDeviceName(const std::string& file_name);
 
     // A text from outside as it may be shown or used as a name: without
     // control characters, '|' (which inventory names may not hold), or the
@@ -147,7 +156,9 @@ namespace ALLookFormat
     // trimmed, and cut to `byte_limit` on a character boundary.
     std::string cleanMetadataText(const std::string& raw, size_t byte_limit);
     // A Look's name from a text from outside: cleaned to LOOK_NAME_BYTE_LIMIT,
-    // and empty where nothing but dots and spaces is left.
+    // and empty where nothing but dots and spaces is left, or where the
+    // name is a device's (isWindowsDeviceName) -- a Look is a file called
+    // after it.
     std::string lookNameFromUntrustedText(const std::string& raw);
     // What a Look's notecard is called: NOTECARD_NAME_PREFIX and the name,
     // within what an item's name holds.
@@ -158,6 +169,6 @@ namespace ALLookFormat
     // The n-th name tried for a Look called `wanted`: the name itself for 1,
     // then "wanted (2)", "wanted (3)" and so on, each within
     // LOOK_NAME_BYTE_LIMIT with the name cut to make room. Empty for n
-    // below 1.
+    // below 1, and for a name that is nothing.
     std::string numberedLookName(const std::string& wanted, S32 n);
 }

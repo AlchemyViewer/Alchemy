@@ -242,14 +242,15 @@ namespace tut
         LLSD settings              = LLSD::emptyMap();
         settings["RenderExposure"] = entry("F32", 0.5);
         const std::string text     = composed(lookNamed("Soft Film", settings));
-        ensure("opens with the declaration or the note", text.rfind("<?xml", 0) == 0 || text.rfind("\n<!--", 0) == 0);
-        ensure("the note follows the declaration", text.find("<!-- Alchemy Lightbox Look") != std::string::npos);
+        ensure("opens with the note", text.rfind("<!-- Alchemy Lightbox Look", 0) == 0);
+        ensure("the Look follows the note", text.find("<llsd>") != std::string::npos && text.find("<llsd>") > text.find("-->"));
 
         ALLookFormat::SharedLook back;
         ensure("as written", ALLookFormat::parseNotecardText(text, back));
         ensure("after a byte-order mark", ALLookFormat::parseNotecardText("\xEF\xBB\xBF" + text, back));
         ensure("after blank lines", ALLookFormat::parseNotecardText("\n\n\n" + text, back));
         ensure("after a line of prose", ALLookFormat::parseNotecardText("my favourite look\n" + text, back));
+        ensure("after a line of prose with a bracket in it", ALLookFormat::parseNotecardText("I <3 this look\n" + text, back));
 
         std::string crlf;
         for (char c : text)
@@ -408,6 +409,9 @@ namespace tut
         ensure("as an integer too", out.isInteger() && out.asInteger() == 4);
         ensure("fraction text refused", !accepts("S32", "5.5"));
         ensure("prose refused", !accepts("S32", "five"));
+        ensure("a whole exponent text taken", accepts("S32", "1e3", &out));
+        ensure("as the integer", out.isInteger() && out.asInteger() == 1000);
+        ensure("far below the range refused", !accepts("S32", -3e10));
         ensure("unsigned round trip taken", accepts("U32", -1, &out));
         ensure("kept signed", out.isInteger() && out.asInteger() == -1);
     }
@@ -438,6 +442,10 @@ namespace tut
         ensure("as false", out.isBoolean() && !out.asBoolean());
         ensure("the digit taken", accepts("Boolean", "1", &out));
         ensure("as true", out.isBoolean() && out.asBoolean());
+        ensure("the other digit taken", accepts("Boolean", "0", &out));
+        ensure("as false", out.isBoolean() && !out.asBoolean());
+        ensure("a padded word taken", accepts("Boolean", " true ", &out));
+        ensure("as true", out.isBoolean() && out.asBoolean());
         ensure("another word refused", !accepts("Boolean", "yes"));
         ensure("an empty text refused", !accepts("Boolean", ""));
         ensure("an array refused", !accepts("Boolean", LLSD::emptyArray()));
@@ -456,6 +464,12 @@ namespace tut
         mixed.append(3);
         ensure("vector of integers and reals taken", accepts("Vector3", mixed, &out));
         ensure("all reals", out[0].isReal() && out[1].isReal() && out[2].isReal());
+        LLSD texts = LLSD::emptyArray();
+        texts.append("0.1");
+        texts.append("0.2");
+        texts.append("0.3");
+        ensure("numeric texts taken", accepts("Color3", texts, &out));
+        ensure("as reals", out[0].isReal() && out[1].isReal() && out[2].isReal());
 
         LLSD two = LLSD::emptyArray();
         two.append(0.1);
@@ -467,6 +481,10 @@ namespace tut
         ensure("four taken", accepts("Color3", four, &out));
         ensure("cut to three", out.isArray() && out.size() == 3);
         ensure_approximately_equals("the third kept", out[2].asReal(), 0.3, 20);
+        LLSD fourth_junk = triple(0.1, 0.2, 0.3);
+        fourth_junk.append("alpha");
+        ensure("a fourth element is not even looked at", accepts("Color3", fourth_junk, &out));
+        ensure("and is gone", out.size() == 3);
         LLSD five = four;
         five.append(1.0);
         ensure("five refused", !accepts("Color3", five));
@@ -501,6 +519,28 @@ namespace tut
         overflow.append(beyond);
         overflow.append(triple(1.0, 1.0, 0.0));
         ensure("a point past float range refused", !accepts("LLSD", overflow));
+        // A malformed point among sound ones is dropped by the curve model
+        // (pointsFromLLSD skips it), as it always was for a file: the curve
+        // is taken with what is left, as long as that is still a curve.
+        LLSD pair_a = LLSD::emptyArray();
+        pair_a.append(0.0);
+        pair_a.append(0.0);
+        LLSD pair_bad = LLSD::emptyArray();
+        pair_bad.append(0.5);
+        pair_bad.append("x");
+        LLSD pair_c = LLSD::emptyArray();
+        pair_c.append(1.0);
+        pair_c.append(1.0);
+        LLSD mixed_curve = LLSD::emptyArray();
+        mixed_curve.append(pair_a);
+        mixed_curve.append(pair_bad);
+        mixed_curve.append(pair_c);
+        ensure("a malformed point is dropped and the rest taken", accepts("LLSD", mixed_curve, &out));
+        ensure_equals("two points left", out.size(), size_t(2));
+        LLSD too_few = LLSD::emptyArray();
+        too_few.append(pair_a);
+        too_few.append(pair_bad);
+        ensure("but not where too few are left", !accepts("LLSD", too_few));
         ensure("a string refused", !accepts("LLSD", "[[0,0],[1,1]]"));
         ensure("a map refused", !accepts("LLSD", LLSD::emptyMap()));
     }
@@ -520,23 +560,43 @@ namespace tut
         ensure_equals("not an image", ALLookFormat::lutFileNameOnly("notes.txt"), "");
         ensure_equals("no extension", ALLookFormat::lutFileNameOnly("warm"), "");
         ensure_equals("a bare dot at the end", ALLookFormat::lutFileNameOnly("warm."), "");
-        // Names older Windows opens as devices, whatever folder they are in.
-        for (const char* device : { "CON.cube", "con.png", "Nul.tga", "COM1.cube", "lpt9.jpg", "AUX.webp", "PRN.bmp", "CONOUT$.cube" })
+        ensure_equals("nothing before the dot is no file", ALLookFormat::lutFileNameOnly(".cube"), "");
+        // Names Windows before 11 opens as devices, whatever folder they are
+        // in and whatever follows the first dot.
+        for (const char* device : { "CON.cube", "con.png", "Nul.tga", "COM1.cube", "lpt9.jpg", "AUX.webp", "PRN.bmp", "CONOUT$.cube", "com1.warm.cube",
+                                    "NUL.tar.cube", "con .cube", "COM\xC2\xB9.cube", "LPT\xC2\xB3.png" })
         {
             ensure_equals(std::string("a device name is no LUT: ") + device, ALLookFormat::lutFileNameOnly(device), "");
         }
         ensure_equals("a name that merely starts like one is a LUT", ALLookFormat::lutFileNameOnly("console.cube"), "console.cube");
-        ensure_equals("and one with a dot in it", ALLookFormat::lutFileNameOnly("com1.warm.cube"), "com1.warm.cube");
+        ensure_equals("and one with a digit too many", ALLookFormat::lutFileNameOnly("COM10.cube"), "COM10.cube");
+        ensure("a device name is a device name", ALLookFormat::isWindowsDeviceName("NUL") && ALLookFormat::isWindowsDeviceName("nul.foo.bar") &&
+                                                     ALLookFormat::isWindowsDeviceName("COM1 ") && ALLookFormat::isWindowsDeviceName("lpt0"));
+        ensure("and other names are not", !ALLookFormat::isWindowsDeviceName("NULL") && !ALLookFormat::isWindowsDeviceName("COM") &&
+                                              !ALLookFormat::isWindowsDeviceName("COM1x") && !ALLookFormat::isWindowsDeviceName(""));
 
         LLSD out;
         ensure("the setting goes through the same cut", ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", "..\\..\\x.cube", out));
         ensure_equals("and comes out bare", out.asString(), "x.cube");
+        ensure("no LUT is taken", ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", "", out));
+        ensure_equals("as nothing", out.asString(), "");
+        ensure("spaces alone are no LUT", ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", "   ", out));
+        ensure_equals("and nothing too", out.asString(), "");
+        // A name that is no LUT's is refused, not quietly made into no LUT,
+        // so that the import counts it among what the Look lost.
+        ensure("the wrong kind of file refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", "notes.txt", out));
+        ensure("a device refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", "CON.cube", out));
+        ensure("a folder refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", "luts/", out));
         ensure("a control character refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", std::string("warm\n.cube"), out));
+        ensure("a C1 control refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", std::string("warm\xC2\x85.cube"), out));
+        ensure("a line separator refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", std::string("warm\xE2\x80\xA8.cube"), out));
         ensure("an encoded surrogate refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", std::string("warm\xED\xA0\x80.cube"), out));
+        ensure("an overlong form refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", std::string("warm\xC0\x80.cube"), out));
         ensure("too long refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", std::string(300, 'x') + ".cube", out));
         ensure("a number refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", 5, out));
         ensure("another string setting is not cut", ALLookFormat::sanitizeLookValue("RenderSomeName", "String", "a/b", out));
         ensure_equals("and keeps its slash", out.asString(), "a/b");
+        ensure("but is held to print too", !ALLookFormat::sanitizeLookValue("RenderSomeName", "String", std::string("a\x7F" "b"), out));
     }
 
     // Types a Look does not carry are refused outright.
@@ -590,6 +650,26 @@ namespace tut
         ensure_equals("an emoji stays", ALLookFormat::lookNameFromUntrustedText("Soft \xF0\x9F\x8C\x85"), "Soft \xF0\x9F\x8C\x85");
         ensure_equals("trimmed", ALLookFormat::lookNameFromUntrustedText("  Soft Film  "), "Soft Film");
         ensure_equals("accents stay", ALLookFormat::lookNameFromUntrustedText("Caf\xC3\xA9"), "Caf\xC3\xA9");
+        // Format characters that carry their weight stay: a joiner holds a
+        // family emoji together, a non-joiner shapes Persian, and a mark
+        // only sets the direction of what stands next to it.
+        ensure_equals("a zero-width joiner stays", ALLookFormat::lookNameFromUntrustedText("\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x91\xA7"),
+                      "\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x91\xA7");
+        ensure_equals("a zero-width non-joiner stays", ALLookFormat::lookNameFromUntrustedText("\xD9\x85\xDB\x8C\xE2\x80\x8C\xD8\xAE"),
+                      "\xD9\x85\xDB\x8C\xE2\x80\x8C\xD8\xAE");
+        ensure_equals("a left-to-right mark stays", ALLookFormat::lookNameFromUntrustedText("Soft\xE2\x80\x8E" "Film"), "Soft\xE2\x80\x8E" "Film");
+        ensure_equals("a line separator goes", ALLookFormat::lookNameFromUntrustedText("Soft\xE2\x80\xA8" "Film"), "SoftFilm");
+        ensure_equals("a Windows line break is one space", ALLookFormat::lookNameFromUntrustedText("Soft\r\nFilm"), "Soft Film");
+        // The cut can land after a space; the name must not end on it.
+        ensure_equals("no space left at the end of a cut", ALLookFormat::lookNameFromUntrustedText(std::string(62, 'a') + " b"), std::string(62, 'a'));
+        ensure_equals("the limit itself is whole", ALLookFormat::lookNameFromUntrustedText(std::string(63, 'a')).size(), ALLookFormat::LOOK_NAME_BYTE_LIMIT);
+        ensure_equals("one past it is cut", ALLookFormat::lookNameFromUntrustedText(std::string(64, 'a')).size(), ALLookFormat::LOOK_NAME_BYTE_LIMIT);
+        // A Look is a file called after it, and Windows opens some names as
+        // devices whatever folder they are in.
+        ensure_equals("a device name is nothing", ALLookFormat::lookNameFromUntrustedText("COM1"), "");
+        ensure_equals("with an extension too", ALLookFormat::lookNameFromUntrustedText("NUL.foo"), "");
+        ensure_equals("in any case", ALLookFormat::lookNameFromUntrustedText("con"), "");
+        ensure_equals("a name that merely starts like one stays", ALLookFormat::lookNameFromUntrustedText("console"), "console");
         ensure_equals("spaces alone are nothing", ALLookFormat::lookNameFromUntrustedText("   "), "");
         ensure_equals("dots alone are nothing", ALLookFormat::lookNameFromUntrustedText(". . ."), "");
         ensure_equals("nothing is nothing", ALLookFormat::lookNameFromUntrustedText(""), "");
@@ -601,6 +681,9 @@ namespace tut
         ensure_equals("the name comes back out", ALLookFormat::lookNameFromNotecardName("Lightbox Look: Soft Film"), "Soft Film");
         ensure_equals("a notecard named otherwise is taken whole", ALLookFormat::lookNameFromNotecardName("My Note"), "My Note");
         ensure_equals("a prefix alone is nothing", ALLookFormat::lookNameFromNotecardName("Lightbox Look: "), "");
+        ensure_equals("a notecard named after a device gives no name back", ALLookFormat::lookNameFromNotecardName("Lightbox Look: NUL"), "");
+        const std::string cut_name = ALLookFormat::notecardNameForLook(std::string(47, 'a') + " bb");
+        ensure("a notecard's name does not end on the space the cut left", !cut_name.empty() && cut_name.back() != ' ');
     }
 
     // The note is static text: a name that would end a comment cannot.
@@ -613,7 +696,7 @@ namespace tut
         const std::string text     = composed(lookNamed(name, settings));
         const size_t      note     = text.find("<!--");
         const size_t      note_end = text.find("-->", note);
-        ensure("the note ends where it was written to", text.substr(note, note_end - note).find(name) == std::string::npos);
+        ensure("the note is closed before the Look begins", note != std::string::npos && note_end != std::string::npos && note_end < text.find("<llsd"));
         ALLookFormat::SharedLook back;
         ensure("and the Look reads", ALLookFormat::parseNotecardText(text, back));
         ensure_equals("with its name", back.metadata.name, name);
@@ -634,6 +717,17 @@ namespace tut
         ensure("a long name makes room", second.size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
         ensure("for its number", second.size() >= 4 && second.compare(second.size() - 4, 4, " (2)") == 0);
         ensure_equals("a long name is cut even first", ALLookFormat::numberedLookName(std::string(70, 'L'), 1).size(), ALLookFormat::LOOK_NAME_BYTE_LIMIT);
+        ensure_equals("no name numbers to nothing", ALLookFormat::numberedLookName("", 2), "");
+        // Twenty-one hiragana, 63 bytes: the room for the number is made on
+        // a character boundary.
+        std::string cjk;
+        for (S32 i = 0; i < 21; ++i)
+        {
+            cjk += "\xE3\x81\x82";
+        }
+        const std::string cjk_second = ALLookFormat::numberedLookName(cjk, 2);
+        ensure("a wide name makes room on a boundary", utf8str_is_valid(cjk_second) && cjk_second.size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
+        ensure("and ends with its number", cjk_second.size() >= 4 && cjk_second.compare(cjk_second.size() - 4, 4, " (2)") == 0);
     }
 
     // The shapes a Look written by the viewer actually carries, as the first
@@ -727,6 +821,7 @@ namespace tut
                             ensure("String is short", clean.isString() && clean.asString().size() <= 255);
                             const std::string s = clean.asString();
                             ensure("LUT has no separator", s.find_first_of("/\\") == std::string::npos);
+                            ensure("LUT is a file name or nothing", s.empty() || ALLookFormat::lutFileNameOnly(s) == s);
                         }
                         else if (type == "Vector3" || type == "Color3")
                         {
@@ -749,6 +844,13 @@ namespace tut
                         {
                             ensure("Rect never passes", false);
                         }
+                    }
+                    // Any other String setting takes the same text uncut.
+                    LLSD plain;
+                    if (ALLookFormat::sanitizeLookValue("RenderSomething", "String", value, plain))
+                    {
+                        ensure("a plain String is short and prints",
+                               plain.isString() && plain.asString().size() <= 255 && !LLStringUtil::containsNonprintable(plain.asString()));
                     }
                 }
                 ensure("name within limit", look.metadata.name.size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
@@ -887,7 +989,7 @@ namespace tut
         {
             const auto nested = [](const char* open_tag, const char* close_tag, bool close) {
                 const std::string head = "<llsd>";
-                const std::string tail = std::string(close ? "" : "") + "</llsd>";
+                const std::string tail = "</llsd>";
                 const size_t      per  = std::strlen(open_tag) + (close ? std::strlen(close_tag) : 0);
                 const size_t      room = ALLookFormat::NOTECARD_BYTE_LIMIT - head.size() - tail.size();
                 const size_t      depth = room / per;

@@ -41,21 +41,21 @@ namespace
     const std::string METADATA_KEY_STRING(ALLookFormat::METADATA_KEY);
     const std::string NOTECARD_NAME_PREFIX_STRING(ALLookFormat::NOTECARD_NAME_PREFIX);
 
-    // What the notecard says about itself, for whoever opens it, under the
-    // XML declaration where a parser skips a comment. Static text on
-    // purpose: a Look's name or author written into it could carry "--",
-    // which ends an XML comment early and leaves the rest of the notecard
-    // unreadable.
-    const char* const NOTE = "\n<!-- Alchemy Lightbox Look. Drop this notecard on the Lightbox window, or open\n"
+    // What the notecard says about itself, for whoever opens it: first in
+    // the text, where a parser skips a comment (LLSDXMLFormatter writes no
+    // XML declaration to put it under). Static text on purpose: a Look's
+    // name or author written into it could carry "--", which ends an XML
+    // comment early and leaves the rest of the notecard unreadable.
+    const char* const NOTE = "<!-- Alchemy Lightbox Look. Drop this notecard on the Lightbox window, or open\n"
                              "     it and press Apply Look, to add it to your Looks. Only Lightbox settings\n"
-                             "     are read from it, and anything malformed is ignored. -->";
+                             "     are read from it, and anything malformed is ignored. -->\n";
 
     // The longest a Look's author or viewer is let be said to be.
     constexpr size_t PROVENANCE_BYTE_LIMIT = 128;
 
     // How far into a text the reserved key has to stand to count. A Look
-    // notecard opens with the declaration, the note and that key, well
-    // inside this; prose that mentions the key far down is not one.
+    // notecard opens with the note and that key, well inside this; prose
+    // that mentions the key far down is not one.
     constexpr size_t DETECT_WINDOW = 4096;
 
     // A text that is a number and nothing else. A dropdown bound to a numeric
@@ -100,7 +100,7 @@ namespace
         }
         if (value.isString())
         {
-            return numberFromText(value.asString(), out);
+            return numberFromText(value.asStringRef(), out);
         }
         return false;
     }
@@ -137,34 +137,20 @@ namespace
         return true;
     }
 
-    bool hasControlCharacters(const std::string& text)
-    {
-        return std::any_of(text.begin(), text.end(), [](char c) {
-            const unsigned char byte = static_cast<unsigned char>(c);
-            return byte < 0x20 || byte == 0x7F;
-        });
-    }
-
-    // The note put under the XML declaration, or first where there is none.
-    std::string withNote(std::string xml)
-    {
-        const size_t declared = xml.find("?>");
-        xml.insert(declared == std::string::npos ? 0 : declared + 2, NOTE);
-        return xml;
-    }
-
-    std::string renderLook(const LLSD& body, bool pretty)
+    // The Look as XML under the note. False where the formatter gave up on
+    // it (LLSDXMLFormatter::format returns -1 out of memory), so that a
+    // partial Look is never passed off as one; `text` is then empty.
+    bool renderLook(const LLSD& body, bool pretty, std::string& text)
     {
         std::ostringstream xml;
-        if (pretty)
+        const S32          written = pretty ? LLSDSerialize::toPrettyXML(body, xml) : LLSDSerialize::toXML(body, xml);
+        if (written < 0)
         {
-            LLSDSerialize::toPrettyXML(body, xml);
+            text.clear();
+            return false;
         }
-        else
-        {
-            LLSDSerialize::toXML(body, xml);
-        }
-        return withNote(xml.str());
+        text = NOTE + xml.str();
+        return true;
     }
 } // namespace
 
@@ -208,20 +194,23 @@ bool ALLookFormat::composeNotecardText(const SharedLook& look, std::string& text
     // Indented where it fits: that is the form a person opening the notecard
     // can read. A Look with long hand-made curves can run past the limit
     // that way and still fit run together, which the parser reads alike.
-    text = renderLook(body, true);
+    if (!renderLook(body, true, text))
+    {
+        return false;
+    }
     if (text.size() <= NOTECARD_BYTE_LIMIT)
     {
         return true;
     }
-    text = renderLook(body, false);
-    return text.size() <= NOTECARD_BYTE_LIMIT;
+    return renderLook(body, false, text) && text.size() <= NOTECARD_BYTE_LIMIT;
 }
 
 bool ALLookFormat::parseNotecardText(std::string_view text, SharedLook& look)
 {
     // Whatever was put above the header -- a byte-order mark, blank lines,
-    // a line of someone's own -- is not the Look.
-    const size_t start = text.find('<');
+    // a line of someone's own, with whatever brackets it has -- is not the
+    // Look: the Look begins at its <llsd> element.
+    const size_t start = text.find("<llsd");
     if (start == std::string_view::npos)
     {
         return false;
@@ -318,10 +307,12 @@ bool ALLookFormat::sanitizeLookValue(const std::string& control_name, const std:
         {
             return false;
         }
-        std::string text = value.asString();
-        // Well-formed UTF-8 as well: the parser lets a character reference
-        // spell a surrogate, and a file written with one never reads again.
-        if (text.size() > LUT_NAME_BYTE_LIMIT || hasControlCharacters(text) || !utf8str_is_valid(text))
+        std::string text = value.asStringRef();
+        // Nothing that does not print -- the controls, the line and
+        // paragraph separators -- and nothing that is not UTF-8: the parser
+        // lets a character reference spell a surrogate, and a file written
+        // with one never reads again.
+        if (text.size() > LUT_NAME_BYTE_LIMIT || LLStringUtil::containsNonprintable(text))
         {
             return false;
         }
@@ -329,8 +320,19 @@ bool ALLookFormat::sanitizeLookValue(const std::string& control_name, const std:
         {
             // The renderer joins this to the LUT folder (setupGradingLUT), so
             // only a bare name may go in, or a shared Look could read any
-            // file on the disk.
-            text = lutFileNameOnly(text);
+            // file on the disk. Nothing at all is no LUT, and taken; a name
+            // that is not a LUT's -- the wrong kind of file, a device's
+            // name -- is refused rather than quietly made into no LUT, so
+            // that it is counted among what the Look lost.
+            LLStringUtil::trim(text);
+            if (!text.empty())
+            {
+                text = lutFileNameOnly(text);
+                if (text.empty())
+                {
+                    return false;
+                }
+            }
         }
         sanitized = text;
         return true;
@@ -387,12 +389,11 @@ std::string ALLookFormat::lutFileNameOnly(const std::string& lut_setting)
     const size_t separator = lut_setting.find_last_of("/\\");
     std::string  name      = separator == std::string::npos ? lut_setting : lut_setting.substr(separator + 1);
     LLStringUtil::trim(name);
-    if (name.empty() || name == "." || name == "..")
-    {
-        return std::string();
-    }
+    // Something before the dot as well as after it: ".cube" is no file
+    // (LLDir::getExtension, which the renderer and the picker read the
+    // kind by, takes a leading dot as no extension), and neither is "..".
     const size_t dot = name.find_last_of('.');
-    if (dot == std::string::npos || dot + 1 >= name.size())
+    if (dot == std::string::npos || dot == 0 || dot + 1 >= name.size())
     {
         return std::string();
     }
@@ -403,44 +404,85 @@ std::string ALLookFormat::lutFileNameOnly(const std::string& lut_setting)
     {
         return std::string();
     }
-    // Windows before 11 opens "CON.cube" or "COM1.png" as the device, whatever
-    // the folder, and the renderer opens the LUT at every start: a Look
-    // naming one could hang the viewer on a serial port. No LUT is called that.
-    std::string stem = name.substr(0, dot);
-    LLStringUtil::toUpper(stem);
-    static const char* const DEVICE_NAMES[] = { "CON",  "PRN",  "AUX",  "NUL",  "CONIN$", "CONOUT$", "COM0", "COM1", "COM2", "COM3", "COM4", "COM5",
-                                                "COM6", "COM7", "COM8", "COM9", "LPT0",   "LPT1",    "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7",
-                                                "LPT8", "LPT9" };
+    // The renderer opens the LUT at every start: a Look naming a device
+    // could hang the viewer on a serial port. No LUT is called that.
+    if (isWindowsDeviceName(name))
+    {
+        return std::string();
+    }
+    return name;
+}
+
+bool ALLookFormat::isWindowsDeviceName(const std::string& file_name)
+{
+    // Windows before 11 opens "CON", "COM1.png" and "NUL.tar.gz" alike as
+    // the device: whatever folder the name is in, whatever follows its
+    // first dot, and with spaces at the end of the stem ignored. The stem
+    // is compared in ASCII upper case, by hand, so that no locale has a
+    // say in it.
+    std::string stem = file_name.substr(0, file_name.find('.'));
+    LLStringUtil::trimTail(stem);
+    for (char& c : stem)
+    {
+        if (c >= 'a' && c <= 'z')
+        {
+            c = static_cast<char>(c - ('a' - 'A'));
+        }
+    }
+    static const char* const DEVICE_NAMES[] = { "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$" };
     for (const char* device : DEVICE_NAMES)
     {
         if (stem == device)
         {
-            return std::string();
+            return true;
         }
     }
-    return name;
+    // COM and LPT with a digit -- or with one of the superscript digits
+    // U+00B9, U+00B2 and U+00B3, which Windows reserves beside them: in
+    // UTF-8 the byte C2 and then B9, B2 or B3.
+    if (stem.size() < 4 || (stem.compare(0, 3, "COM") != 0 && stem.compare(0, 3, "LPT") != 0))
+    {
+        return false;
+    }
+    const std::string digit = stem.substr(3);
+    if (digit.size() == 1)
+    {
+        return digit[0] >= '0' && digit[0] <= '9';
+    }
+    if (digit.size() == 2 && static_cast<unsigned char>(digit[0]) == 0xC2)
+    {
+        const unsigned char second = static_cast<unsigned char>(digit[1]);
+        return second == 0xB9 || second == 0xB2 || second == 0xB3;
+    }
+    return false;
 }
 
 namespace
 {
     // Whether a character may stand in a Look's name or provenance: one
-    // that draws. Out go the controls (C0, DEL, C1), the '|' an inventory
-    // name cannot hold, U+100000 and up (the notecard editor shows these as
-    // the slots of embedded items, ALNotecardItems, so a name holding one
-    // would open with a broken item button in it), the replacement
-    // character that malformed bytes decode to, the non-characters, and
-    // the format characters that draw nothing yet change how what is
-    // around them reads -- the bidi controls, which could make one Look's
-    // name read as another's in the list, and the zero-width ones.
+    // that draws. Out go whatever has no printed form (LLStringOps::
+    // isNonprintable: the C0 and C1 controls, DEL, the line and paragraph
+    // separators), the '|' an inventory name cannot hold, U+100000 and up
+    // (the notecard editor shows these as the slots of embedded items,
+    // ALNotecardItems, so a name holding one would open with a broken item
+    // button in it), the replacement character that malformed bytes decode
+    // to, the non-characters, and the format characters that draw nothing
+    // yet change how what is around them reads: the bidi embeddings,
+    // overrides and isolates, which could make one Look's name read as
+    // another's in the list, the zero-width space, the word joiner and its
+    // kin, the byte-order mark, the annotation marks and the tags. The
+    // zero-width joiner and non-joiner stay, and so do the bidi marks
+    // (U+061C, U+200E, U+200F): a Persian name needs its non-joiner, a
+    // family emoji its joiner, and a mark only sets the direction of what
+    // stands next to it.
     bool drawsInName(llwchar cp)
     {
-        if (cp < 0x20 || cp == 0x7F || (cp >= 0x80 && cp <= 0x9F) || cp == '|' || cp >= 0x100000 || cp == 0xFFFD)
+        if (LLStringOps::isNonprintable(cp) || cp == '|' || cp >= 0x100000 || cp == 0xFFFD)
         {
             return false;
         }
-        if (cp == 0x061C || (cp >= 0x200B && cp <= 0x200F) || (cp >= 0x202A && cp <= 0x202E) || (cp >= 0x2060 && cp <= 0x206F) ||
-            cp == 0xFEFF || (cp >= 0xFFF9 && cp <= 0xFFFB) || (cp >= 0xFDD0 && cp <= 0xFDEF) || (cp & 0xFFFE) == 0xFFFE ||
-            (cp >= 0xE0000 && cp <= 0xE007F))
+        if (cp == 0x200B || (cp >= 0x202A && cp <= 0x202E) || (cp >= 0x2060 && cp <= 0x206F) || cp == 0xFEFF || (cp >= 0xFFF9 && cp <= 0xFFFB) ||
+            (cp >= 0xFDD0 && cp <= 0xFDEF) || (cp & 0xFFFE) == 0xFFFE || (cp >= 0xE0000 && cp <= 0xE007F))
         {
             return false;
         }
@@ -463,7 +505,11 @@ std::string ALLookFormat::cleanMetadataText(const std::string& raw, size_t byte_
         const LLCodepointAt at = utf8str_decode_at(raw, i);
         if (at.cp == '\t' || at.cp == '\n' || at.cp == '\r')
         {
-            clean.push_back(' ');
+            // A line break or a tab is a space; a Windows line break is one.
+            if (!(at.cp == '\r' && at.next < raw.size() && raw[at.next] == '\n'))
+            {
+                clean.push_back(' ');
+            }
         }
         else if (drawsInName(at.cp))
         {
@@ -472,13 +518,20 @@ std::string ALLookFormat::cleanMetadataText(const std::string& raw, size_t byte_
         i = at.next;
     }
     LLStringUtil::trim(clean);
-    return utf8str_truncate(clean, static_cast<S32>(byte_limit));
+    // Cut, then trimmed again: the cut can end on a space, and a name with
+    // one at the end would read back without it.
+    clean = utf8str_truncate(clean, static_cast<S32>(byte_limit));
+    LLStringUtil::trimTail(clean);
+    return clean;
 }
 
 std::string ALLookFormat::lookNameFromUntrustedText(const std::string& raw)
 {
     std::string name = cleanMetadataText(raw, LOOK_NAME_BYTE_LIMIT);
-    if (name.find_first_not_of(". ") == std::string::npos)
+    // Nothing worth calling a name: dots and spaces alone, or a name that
+    // Windows would open as a device once it is a file -- a Look is saved
+    // as its name and ".xml", and LLURI::escape leaves letters as they are.
+    if (name.find_first_not_of(". ") == std::string::npos || isWindowsDeviceName(name))
     {
         return std::string();
     }
@@ -487,7 +540,9 @@ std::string ALLookFormat::lookNameFromUntrustedText(const std::string& raw)
 
 std::string ALLookFormat::notecardNameForLook(const std::string& look_name)
 {
-    return utf8str_truncate(NOTECARD_NAME_PREFIX_STRING + look_name, static_cast<S32>(LOOK_NAME_BYTE_LIMIT));
+    std::string name = utf8str_truncate(NOTECARD_NAME_PREFIX_STRING + look_name, static_cast<S32>(LOOK_NAME_BYTE_LIMIT));
+    LLStringUtil::trimTail(name);
+    return name;
 }
 
 std::string ALLookFormat::lookNameFromNotecardName(const std::string& notecard_name)
@@ -501,7 +556,7 @@ std::string ALLookFormat::lookNameFromNotecardName(const std::string& notecard_n
 
 std::string ALLookFormat::numberedLookName(const std::string& wanted, S32 n)
 {
-    if (n < 1)
+    if (n < 1 || wanted.empty())
     {
         return std::string();
     }
