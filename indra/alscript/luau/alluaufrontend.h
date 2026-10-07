@@ -91,9 +91,10 @@ struct ALLuauFrontend
         const Luau::Config& getConfig(const Luau::ModuleName& name, const Luau::TypeCheckLimits&) const override;
     };
 
-    // What takeChecked takes, as the check's hook fills it.
-    mutable std::mutex               checkedMutex;
-    mutable std::vector<std::string> checkedNow;
+    // What takeChecked takes, as the check's hook fills it: by the script
+    // whose check it was, each module once.
+    mutable std::mutex checkedMutex;
+    mutable boost::unordered_flat_map<std::string, std::vector<std::string>, ll::string_hash, std::equal_to<>> checkedNow;
 
     ScriptResolver                  files;
     ModeResolver                    configs;
@@ -211,10 +212,15 @@ struct ALLuauFrontend
     Luau::CheckResult checkWithModules(const Luau::FrontendOptions& options);
     std::unique_ptr<ALLuauTaskPool> modulePool;
 
-    // The modules a check checked, as Luau checked each -- on whichever
-    // thread it was -- for what is told of them beyond their errors: their
-    // lints. Taken, which empties it.
+    // The modules the script's checks checked, as Luau checked each -- on
+    // whichever thread it was -- for what is told of them beyond their
+    // errors: their lints. Every check of the script's own module, a
+    // question's as much as a check's, and one stopped part way: kept
+    // until taken, so that the check that tells them tells each, however
+    // the questions before it went. Taken, which empties the script's;
+    // forgotten with a script let go of.
     std::vector<std::string> takeChecked();
+    void                     forgetChecked(const std::string& name);
 
     // The module a question reads, checked where it is not the text's
     // yet; none where the check was stopped. Under the new solver there is

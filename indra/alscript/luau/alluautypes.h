@@ -32,6 +32,11 @@
 
 #include <string>
 
+namespace Luau
+{
+    struct ToStringOptions;
+}
+
 // What the service and the classes over its front end (ALLuauFrontend)
 // all read Luau's answers with, said one way wherever they are said.
 // Luau's headers come with it, as with the front end's.
@@ -44,7 +49,13 @@ namespace ALLuauTypes
 
     // How a type prints beside a name: a table's first few fields and
     // how many more, since `ll` has hundreds and a tip is one glance.
-    std::string typeText(Luau::TypeId type);
+    // And the whole of one, a field a line, for what a hover says below
+    // its label, cut short only past a few hundred fields. Each
+    // exhaustive where asked: what a named type stands for, rather than
+    // its name.
+    Luau::ToStringOptions glanceOptions(bool exhaustive = false);
+    Luau::ToStringOptions wholeOptions(bool exhaustive = false);
+    std::string           typeText(Luau::TypeId type);
 
     // The function type a call's callee has, or the first of an
     // overloaded one's.

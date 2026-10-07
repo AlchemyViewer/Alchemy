@@ -1699,4 +1699,141 @@ namespace tut
         }
         service.setDocument("");
     }
+
+    template<> template<>
+    void alluauservice_object::test<49>()
+    {
+        set_test_name("a module a question checked before the script's check is told at that check all the same -- its lints, a require in it of what returns two values, what it exports -- and once");
+        ensure("definitions loaded: " + error, loaded);
+        service.setDocument("asked first");
+        service.setConfig(ALLuauConfig());
+        const std::string util = "--!strict\n"                   // 0
+                                 "local unusedThing = 1\n"       // 1
+                                 "local two = require(\"two\")\n" // 2
+                                 "local M = {}\n"                // 3
+                                 "M.n = two\n"                   // 4
+                                 "return M\n";                   // 5
+        ALLuauService::Modules modules;
+        modules.modules.push_back({ "disk:/lib/asked.luau", util });
+        modules.modules.push_back({ "disk:/lib/two.luau", "return 1, 2\n" });
+        modules.reaches.push_back({ "", "util", "disk:/lib/asked.luau" });
+        modules.reaches.push_back({ "disk:/lib/asked.luau", "two", "disk:/lib/two.luau" });
+        service.setModules(modules);
+        // Strict, so that a hover checks the script as a check does under
+        // either solver, and its modules with it: the check after finds
+        // nothing to check.
+        const std::string script = "--!strict\nlocal util = require(\"util\")\nprint(util.n)\n";
+        service.hover(script, 2, 7);
+        const size_t checks = service.typeChecks();
+        const auto   told   = [](const ALScriptProblems& found, const std::string& code_or_key, S32 line) {
+            return std::any_of(found.begin(), found.end(), [&](const ALScriptProblem& problem) {
+                return problem.file == "disk:/lib/asked.luau" && (problem.code == code_or_key || problem.key == code_or_key) && problem.line == line;
+            });
+        };
+        const ALScriptProblems problems = service.check(script);
+        ensure_equals("the check found the script checked", service.typeChecks(), checks);
+        ensure("the module's lint: " + said(problems), told(problems, "LocalUnused", 1));
+        ensure("its require of what returns two values: " + said(problems), told(problems, "LuauModuleNotOneValue", 2));
+        const std::optional<std::vector<std::string>> kept = ALLuauExports::checkedOf("disk:/lib/asked.luau", util);
+        ensure("what it exports, as its type says", kept && std::find(kept->begin(), kept->end(), "n") != kept->end());
+        // Told, and so not told again for the same text.
+        const ALScriptProblems again = service.check(script);
+        ensure("once: " + said(again), !told(again, "LocalUnused", 1));
+        service.setDocument("");
+    }
+
+    template<> template<>
+    void alluauservice_object::test<50>()
+    {
+        set_test_name("a hover on the name of a type the definitions declare says it, with nowhere in the script to go -- its place is a line of their file -- while the script's own goes where it declares it");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script = "--!strict\n"                         // 0
+                                   "local id: uuid = ll.GetOwner()\n"   // 1
+                                   "local r: rotation = ll.GetRot()\n"  // 2
+                                   "type Pair = { a: number }\n"        // 3
+                                   "local p: Pair = { a = 1 }\n"        // 4
+                                   "print(id, r, p)\n";                 // 5
+        ALScriptHover hover = service.hover(script, 1, 11); // `uuid`, an extern type
+        ensure("uuid, said: " + hover.label, hover.found && hover.label.rfind("type uuid", 0) == 0);
+        ensure("nowhere to go", !hover.hasDefinition);
+        hover = service.hover(script, 2, 10); // `rotation`, an alias
+        ensure("rotation, said: " + hover.label, hover.found && hover.label.rfind("type rotation", 0) == 0);
+        ensure("nowhere to go either", !hover.hasDefinition);
+        hover = service.hover(script, 4, 10); // `Pair`
+        ensure("the script's own, where it declares it", hover.found && hover.hasDefinition && hover.definitionFile.empty() && hover.definitionLine == 3);
+    }
+
+    template<> template<>
+    void alluauservice_object::test<51>()
+    {
+        set_test_name("what a module checked exports, as its type says, leaves out a field no script could write after a dot, as what its text says does");
+        ensure("definitions loaded: " + error, loaded);
+        service.setDocument("keywords");
+        service.setConfig(ALLuauConfig());
+        const std::string util = "--!strict\nreturn { [\"end\"] = 1, ok = 2, [\"not\"] = 3, export = 4 }\n";
+        ALLuauService::Modules modules;
+        modules.modules.push_back({ "disk:/lib/keywords.luau", util });
+        modules.reaches.push_back({ "", "util", "disk:/lib/keywords.luau" });
+        service.setModules(modules);
+        service.check("local util = require(\"util\")\nprint(util.ok)\n");
+        const std::optional<std::vector<std::string>> kept = ALLuauExports::checkedOf("disk:/lib/keywords.luau", util);
+        ensure("kept as its type says", kept.has_value());
+        ensure("the names, a word only a statement begins with among them, and no keyword", *kept == std::vector<std::string>({ "ok", "export" }));
+        ensure("as its text alone says", ALLuauExports::of(util) == std::vector<std::string>({ "ok", "export" }));
+        service.setDocument("");
+    }
+
+    template<> template<>
+    void alluauservice_object::test<52>()
+    {
+        set_test_name("a module's lints are told as the configuration of the script that requires it says, a module having none of its own: one it turns off not told, one it makes an error an error, every one where all are, Luau's and the studio's own alike");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string module = "local unusedThing = 1\n"       // 0
+                                   "local function helper() end\n" // 1
+                                   "local n = 1\n"                 // 2
+                                   "n = n + 1\n"                   // 3
+                                   "local M = {}\n"                // 4
+                                   "M.n = n\n"                     // 5
+                                   "return M\n";                   // 6
+        // Each in a script of its own, with a module of its own, checked
+        // the first time.
+        const auto checked = [&](const char* id, const std::string& key, const ALLuauConfig& config) {
+            service.setDocument(id);
+            service.setConfig(config);
+            ALLuauService::Modules modules;
+            modules.modules.push_back({ key, module });
+            modules.reaches.push_back({ "", "util", key });
+            service.setModules(modules);
+            return service.check("local util = require(\"util\")\nprint(util.n)\n");
+        };
+        const auto told = [](const ALScriptProblems& found, const std::string& code) -> const ALScriptProblem* {
+            for (const ALScriptProblem& problem : found)
+            {
+                if (!problem.file.empty() && problem.code == code)
+                {
+                    return &problem;
+                }
+            }
+            return nullptr;
+        };
+
+        ALLuauConfig some;
+        some.lints &= ~ALLuauConfig::lintBit("LocalUnused");
+        some.fatalLints |= ALLuauConfig::lintBit("FunctionUnused");
+        const ALScriptProblems problems = checked("some", "disk:/lib/some.luau", some);
+        ensure("one it turns off, not told: " + said(problems), !told(problems, "LocalUnused"));
+        const ALScriptProblem* fatal = told(problems, "FunctionUnused");
+        ensure("one it makes an error, an error: " + said(problems), fatal && fatal->severity == ALScriptProblem::Severity::Error);
+        const ALScriptProblem* compound = told(problems, "SlCompoundAssign");
+        ensure("the studio's own as it says, no error: " + said(problems), compound && compound->severity != ALScriptProblem::Severity::Error);
+
+        ALLuauConfig all;
+        all.lintErrors = true;
+        const ALScriptProblems errors = checked("all", "disk:/lib/all.luau", all);
+        const ALScriptProblem* unused = told(errors, "LocalUnused");
+        ensure("every one an error, Luau's: " + said(errors), unused && unused->severity == ALScriptProblem::Severity::Error);
+        compound = told(errors, "SlCompoundAssign");
+        ensure("and the studio's own: " + said(errors), compound && compound->severity == ALScriptProblem::Severity::Error);
+        service.setDocument("");
+    }
 }

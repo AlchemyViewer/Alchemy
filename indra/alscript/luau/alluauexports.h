@@ -29,6 +29,11 @@
 #include <string_view>
 #include <vector>
 
+namespace Luau
+{
+    class AstStatBlock;
+}
+
 // What a module exports, as its text says it: the names of the table it
 // returns. Read by Luau's parser alone, with nothing checked -- a module
 // is read for this whether or not it type checks, and many are read at
@@ -49,6 +54,13 @@
 namespace ALLuauExports
 {
     std::vector<std::string> of(std::string_view source);
+    // The same of a module already parsed, whole: what the analysis has
+    // of a module it checked, which it does not parse again for this.
+    std::vector<std::string> of(const Luau::AstStatBlock& root);
+
+    // Whether a field's name is one a script could write after a dot:
+    // a name, and not one of Luau's keywords -- `util.end` does not parse.
+    bool isName(std::string_view name);
 
     // What a module the analysis checked was found to export -- the names
     // of the table its type says it returns, whatever built it, as a parse

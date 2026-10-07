@@ -105,11 +105,16 @@ Luau::FrontendOptions ALLuauFrontend::limited() const
         options.moduleTimeLimitSec = timeLimit;
     }
     options.cancellationToken = stop;
-    // Each module as Luau checks it, for its lints: noted, and nothing
-    // more, since it may be on a thread of the pool's.
-    options.customModuleCheck = [this](const Luau::SourceModule& source, const Luau::Module&) {
+    // Each module as Luau checks it, for its lints: noted as the script's
+    // whose check it is, and nothing more, since it may be on a thread of
+    // the pool's.
+    options.customModuleCheck = [this, script = moduleName](const Luau::SourceModule& source, const Luau::Module&) {
         const std::lock_guard<std::mutex> lock(checkedMutex);
-        checkedNow.push_back(source.name);
+        std::vector<std::string>&         noted = checkedNow[script];
+        if (std::find(noted.begin(), noted.end(), source.name) == noted.end())
+        {
+            noted.push_back(source.name);
+        }
     };
     return options;
 }
@@ -117,7 +122,20 @@ Luau::FrontendOptions ALLuauFrontend::limited() const
 std::vector<std::string> ALLuauFrontend::takeChecked()
 {
     const std::lock_guard<std::mutex> lock(checkedMutex);
-    return std::exchange(checkedNow, {});
+    const auto                        noted = checkedNow.find(moduleName);
+    if (noted == checkedNow.end())
+    {
+        return std::vector<std::string>();
+    }
+    std::vector<std::string> out = std::move(noted->second);
+    checkedNow.erase(noted);
+    return out;
+}
+
+void ALLuauFrontend::forgetChecked(const std::string& name)
+{
+    const std::lock_guard<std::mutex> lock(checkedMutex);
+    checkedNow.erase(name);
 }
 
 Luau::FrontendOptions ALLuauFrontend::autocompleteOptions() const
@@ -202,6 +220,19 @@ Luau::CheckResult ALLuauFrontend::checkWithModules(const Luau::FrontendOptions& 
     {
         modulePool = std::make_unique<ALLuauTaskPool>(ALLuauTaskPool::threadsWanted());
     }
+    // Luau tells its one internal error reporter the name of each module
+    // as it begins to check it, on whichever thread that is. Given room
+    // for the longest name it could be told first -- every module Luau
+    // can check is one it can read -- no thread's copy reallocates the
+    // string another is copying into or reading. The threads still race
+    // over its characters, so which name it holds is only as sure as their
+    // order: what nothing reads but the message of an internal error.
+    size_t longest = moduleName.size();
+    for (const auto& [name, text] : files.texts)
+    {
+        longest = std::max(longest, name.size());
+    }
+    frontend->iceHandler.moduleName.reserve(longest);
     frontend->queueModuleCheck(moduleName);
     const std::vector<Luau::ModuleName> checked =
         frontend->checkQueuedModules(options, [this](std::vector<std::function<void()>> tasks) { modulePool->run(std::move(tasks)); });

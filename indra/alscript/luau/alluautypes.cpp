@@ -48,14 +48,29 @@ namespace ALLuauTypes
         return span;
     }
 
-    std::string typeText(Luau::TypeId type)
+    Luau::ToStringOptions glanceOptions(bool exhaustive)
     {
-        Luau::ToStringOptions options;
+        Luau::ToStringOptions options(exhaustive);
         options.functionTypeArguments = true;
         options.hideNamedFunctionTypeParameters = false;
         options.maxTableLength = 8;
         options.maxTypeLength  = 1000;
-        return Luau::toString(type, options);
+        return options;
+    }
+
+    Luau::ToStringOptions wholeOptions(bool exhaustive)
+    {
+        Luau::ToStringOptions options(exhaustive);
+        options.functionTypeArguments = true;
+        options.useLineBreaks         = true;
+        options.maxTableLength        = 200;
+        options.maxTypeLength         = 20000;
+        return options;
+    }
+
+    std::string typeText(Luau::TypeId type)
+    {
+        return Luau::toString(type, glanceOptions());
     }
 
     const Luau::FunctionType* functionOf(Luau::TypeId type)

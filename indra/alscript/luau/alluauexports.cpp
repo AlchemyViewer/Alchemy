@@ -37,18 +37,13 @@
 
 namespace
 {
-    bool isName(std::string_view word)
-    {
-        return ALScriptLexicon::isName(word) && !ALScriptLexicon::isLuauKeyword(word);
-    }
-
     struct Names
     {
         std::vector<std::string> out;
 
         void add(std::string_view name)
         {
-            if (isName(name) && std::find(out.begin(), out.end(), name) == out.end())
+            if (ALLuauExports::isName(name) && std::find(out.begin(), out.end(), name) == out.end())
             {
                 out.emplace_back(name);
             }
@@ -134,20 +129,38 @@ namespace
 
 namespace ALLuauExports
 {
+    bool isName(std::string_view name)
+    {
+        // Not a reserved word, which no `util.` may be followed by; continue,
+        // export and const are words only where a statement begins, and
+        // name a field as any other name does.
+        const bool contextual = name == "continue" || name == "export" || name == "const";
+        return ALScriptLexicon::isName(name) && (contextual || !ALScriptLexicon::isLuauKeyword(name));
+    }
+
     std::vector<std::string> of(std::string_view source)
     {
         Luau::Allocator     allocator;
         Luau::AstNameTable  table(allocator);
         Luau::ParseOptions  options;
         Luau::ParseResult   parsed = Luau::Parser::parse(source.data(), source.size(), table, allocator, options);
-        Names               names;
-        if (!parsed.root || !parsed.errors.empty() || parsed.root->body.size == 0)
+        if (!parsed.root || !parsed.errors.empty())
+        {
+            return std::vector<std::string>();
+        }
+        return of(*parsed.root);
+    }
+
+    std::vector<std::string> of(const Luau::AstStatBlock& root)
+    {
+        Names names;
+        if (root.body.size == 0)
         {
             return names.out;
         }
         // What the module gives is what its last statement returns: one
         // value, at the top.
-        Luau::AstStatReturn* returned = parsed.root->body.data[parsed.root->body.size - 1]->as<Luau::AstStatReturn>();
+        Luau::AstStatReturn* returned = root.body.data[root.body.size - 1]->as<Luau::AstStatReturn>();
         if (!returned || returned->list.size != 1)
         {
             return names.out;
@@ -165,7 +178,7 @@ namespace ALLuauExports
         }
         // A local table: what it was made with, and what the statements at
         // the top put in it, in the order they do.
-        for (Luau::AstStat* stat : parsed.root->body)
+        for (Luau::AstStat* stat : root.body)
         {
             if (Luau::AstStatLocal* declared = stat->as<Luau::AstStatLocal>())
             {
@@ -206,10 +219,11 @@ namespace ALLuauExports
     namespace
     {
         // What each module checked was found to export, by its key and its
-        // text's hash, the latest last.
+        // text's length and hash, the latest last.
         struct Checked
         {
             std::string              key;
+            size_t                   size = 0;
             size_t                   hash = 0;
             std::vector<std::string> names;
         };
@@ -223,7 +237,7 @@ namespace ALLuauExports
         const size_t                      hash = std::hash<std::string_view>()(text);
         const std::lock_guard<std::mutex> lock(sCheckedMutex);
         sChecked.erase(std::remove_if(sChecked.begin(), sChecked.end(), [&key](const Checked& one) { return one.key == key; }), sChecked.end());
-        sChecked.push_back({ key, hash, std::move(names) });
+        sChecked.push_back({ key, text.size(), hash, std::move(names) });
         if (sChecked.size() > CHECKED_KEPT)
         {
             sChecked.pop_front();
@@ -236,7 +250,7 @@ namespace ALLuauExports
         const std::lock_guard<std::mutex> lock(sCheckedMutex);
         for (const Checked& one : sChecked)
         {
-            if (one.key == key && one.hash == hash)
+            if (one.key == key && one.size == text.size() && one.hash == hash)
             {
                 return one.names;
             }

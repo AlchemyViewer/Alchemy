@@ -77,9 +77,11 @@ namespace
     const char* const MODULE_NOT_ONE_VALUE = "This module returns [1] values; a module must return exactly one to be required";
 
     using ALLuauTypes::functionOf;
+    using ALLuauTypes::glanceOptions;
     using ALLuauTypes::positionOf;
     using ALLuauTypes::spanOf;
     using ALLuauTypes::typeText;
+    using ALLuauTypes::wholeOptions;
 
     ALScriptProblem problemAt(const Luau::Location& where,
                               ALScriptProblem::Severity severity,
@@ -391,8 +393,8 @@ namespace
     // The names of the table a checked module's type says it returns -- a
     // metatable's own table for one returned with setmetatable -- in the
     // order its fields were declared, those a script could write after a
-    // dot; nothing where its type is no table, as a nonstrict check may
-    // leave it.
+    // dot, as its text's are taken; nothing where its type is no table, as
+    // a nonstrict check may leave it.
     std::optional<std::vector<std::string>> exportedNames(const Luau::Module& module)
     {
         const std::optional<Luau::TypeId> returned = Luau::first(module.returnType);
@@ -413,7 +415,7 @@ namespace
         std::vector<std::pair<Luau::Position, std::string>> found;
         for (const auto& [name, field] : table->props)
         {
-            if (ALScriptLexicon::isName(name))
+            if (ALLuauExports::isName(name))
             {
                 found.emplace_back(field.location ? field.location->begin : Luau::Position(UINT32_MAX, 0), name);
             }
@@ -1121,8 +1123,11 @@ void ALLuauService::setConfig(const ALLuauConfig& config)
     own.lintErrors              = config.lintErrors;
     own.globals                 = config.globals;
     // The globals are bound into the environment as the script is
-    // checked; a change to them is a change to the script.
+    // checked; a change to them is a change to the script. Its base is
+    // one checked under the configuration before, so no fragment answers
+    // over it until the script is checked again.
     front.frontend->markDirty(front.moduleName);
+    front.baseTexts.erase(front.moduleName);
 }
 
 void ALLuauService::setPassedOver(std::vector<std::pair<S32, S32>> lines)
@@ -1212,6 +1217,7 @@ void ALLuauService::setDocument(std::string_view id)
         front.baseTexts.erase(gone);
         front.configs.configs.erase(gone);
         front.askedModes.erase(gone);
+        front.forgetChecked(gone);
         // Its modules too, where no script kept requires them.
         if (const auto used = front.requiredBy.find(gone); used != front.requiredBy.end())
         {
@@ -1241,12 +1247,25 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     front.sync(source);
     // What was found the first time, where the text has not changed since.
     Luau::CheckResult result;
-    front.takeChecked();
     if (front.stoppedIn(front.checkScript(&result)))
     {
         return ALScriptProblems();
     }
-    const std::vector<std::string> checked = front.takeChecked();
+    // Each module checked since the script's last check told what it
+    // found: by this one, or before it by a question -- which checks the
+    // script as a check does, and leaves this one nothing to check -- or by
+    // a check stopped part way, which told nothing. Those the script still
+    // requires; told once.
+    std::vector<std::string> checked;
+    const auto               required = front.requiredBy.find(front.moduleName);
+    for (std::string& name : front.takeChecked())
+    {
+        if (name == front.moduleName ||
+            (required != front.requiredBy.end() && std::find(required->second.begin(), required->second.end(), name) != required->second.end()))
+        {
+            checked.push_back(std::move(name));
+        }
+    }
 
     ALScriptProblems problems;
     if (!result.timeoutHits.empty())
@@ -1380,7 +1399,7 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     // A module that returns more than one value, which Luau's require
     // stops at as it runs and its type checker passes over -- it says only
     // of one that returns none -- said at each require of it, the
-    // script's and those of each module checked now: the bundle a save
+    // script's and those of each module checked, as above: the bundle a save
     // sends does not count as it runs, which would cost every script that
     // requires anything bytecode of its own.
     const auto returnsMany = [&](const std::string& requiring, const std::string& file) {
@@ -1489,9 +1508,12 @@ ALScriptProblems ALLuauService::check(std::string_view source)
             problems.push_back(std::move(problem));
         }
     }
-    // Each module checked now, its lints too, as its type errors are told:
+    // Each module checked, its lints too, as its type errors are told:
     // Luau's and the studio's own, in its lines, as its own selene comments
-    // say of them. None offers a fix here, being another file's.
+    // say of them, and as the script's configuration does -- a module has
+    // none of its own, and Luau lints one with every lint on and none an
+    // error. None offers a fix here, being another file's.
+    const Luau::Config& script_config = front.configs.getConfig(front.moduleName, {});
     for (const std::string& name : checked)
     {
         const Luau::SourceModule* module_of = name != front.moduleName && name.rfind("module:", 0) == 0 ? front.frontend->getSourceModule(name)
@@ -1507,29 +1529,37 @@ ALScriptProblems ALLuauService::check(std::string_view source)
         // What it exports, as its type says, for what is offered from it;
         // with what its text says outright, so that nothing the text alone
         // would have offered is lost. Its text alone where its type says
-        // nothing.
+        // nothing. What its text says read from the parse the check had,
+        // not parsed again, and only where it parsed whole, as ever.
         if (std::optional<std::vector<std::string>> names = exportedNames(*checked_module))
         {
-            for (std::string& said : ALLuauExports::of(text->second))
+            if (module_of->root && module_of->parseErrors.empty())
             {
-                if (std::find(names->begin(), names->end(), said) == names->end())
+                for (std::string& said : ALLuauExports::of(*module_of->root))
                 {
-                    names->push_back(std::move(said));
+                    if (std::find(names->begin(), names->end(), said) == names->end())
+                    {
+                        names->push_back(std::move(said));
+                    }
                 }
             }
             ALLuauExports::checked(file, text->second, std::move(*names));
         }
-        for (const Luau::LintWarning& warning : checked_module->lintResult.errors)
+        for (const std::vector<Luau::LintWarning>* found : { &checked_module->lintResult.errors, &checked_module->lintResult.warnings })
         {
-            lint(its, warning, ALScriptProblem::Severity::Error, file);
+            for (const Luau::LintWarning& warning : *found)
+            {
+                if (script_config.enabledLint.isEnabled(warning.code))
+                {
+                    lint(its, warning,
+                         script_config.lintErrors || script_config.fatalLint.isEnabled(warning.code) ? ALScriptProblem::Severity::Error
+                                                                                                     : ALScriptProblem::Severity::Warning,
+                         file);
+                }
+            }
         }
-        for (const Luau::LintWarning& warning : checked_module->lintResult.warnings)
-        {
-            lint(its, warning, ALScriptProblem::Severity::Warning, file);
-        }
-        ALScriptProblems    own;
-        const Luau::Config& config = front.configs.getConfig(name, {});
-        ALScriptLintPass::check(text->second, *module_of, checked_module.get(), front.slLints, front.slFatalLints, config.lintErrors, own);
+        ALScriptProblems own;
+        ALScriptLintPass::check(text->second, *module_of, checked_module.get(), front.slLints, front.slFatalLints, script_config.lintErrors, own);
         for (ALScriptProblem& problem : own)
         {
             const Luau::Location where(Luau::Position(problem.line, problem.column), Luau::Position(problem.endLine, problem.endColumn));
@@ -1598,6 +1628,22 @@ std::vector<ALScriptCompletion> ALLuauService::complete(std::string_view source,
 
 namespace
 {
+    // Whether the type a name finds from a scope is bound in it or one
+    // around it below the global scope -- the script's own -- rather than
+    // in the global scope, where the definitions' are; as Luau looks one
+    // up, the nearest first.
+    bool boundBelowGlobals(const Luau::Scope& scope, const std::string& name)
+    {
+        for (const Luau::Scope* each = &scope; each && each->parent; each = each->parent.get())
+        {
+            if (each->exportedTypeBindings.count(name) || each->privateTypeBindings.count(name))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // A type's name in an annotation -- `Point` in `local p: Point`, in
     // `util.Point` -- which Luau's own question of the type at a place
     // passes over: the type it names, as its declaration reads, `type
@@ -1642,21 +1688,11 @@ namespace
                                   (parameters.empty() ? std::string() : "<" + parameters + ">");
         // What it stands for, not its own name again, which a named table
         // would otherwise be said as.
-        Luau::ToStringOptions glance;
-        glance.functionTypeArguments = true;
-        glance.exhaustive            = true;
-        glance.maxTableLength        = 8;
-        glance.maxTypeLength         = 1000;
-        const std::string body       = Luau::toString(named->type, glance);
-        answer.found                 = true;
-        answer.label                 = body == name ? "type " + shown : "type " + shown + " = " + body;
-        Luau::ToStringOptions whole;
-        whole.functionTypeArguments = true;
-        whole.exhaustive            = true;
-        whole.useLineBreaks         = true;
-        whole.maxTableLength        = 200;
-        whole.maxTypeLength         = 20000;
-        if (const std::string full = Luau::toString(named->type, whole); body != name && (full != body || full.find('\n') != std::string::npos))
+        const std::string body = Luau::toString(named->type, glanceOptions(/*exhaustive*/ true));
+        answer.found           = true;
+        answer.label           = body == name ? "type " + shown : "type " + shown + " = " + body;
+        if (const std::string full = Luau::toString(named->type, wholeOptions(/*exhaustive*/ true));
+            body != name && (full != body || full.find('\n') != std::string::npos))
         {
             answer.typeDetail = full;
         }
@@ -1666,7 +1702,10 @@ namespace
             answer.link          = doc->link;
         }
         // Where it was declared: in a module it requires, by the module's
-        // key; else in the script, where Luau says.
+        // key; else in the script, where Luau says -- not the definitions',
+        // found in the global scope around the script's, whose place Luau
+        // keeps from their own file, which the studio would read as a line
+        // of the script.
         if (const std::optional<ALLuauNavigation::Declared> declared = navigation.declaredAt(module, source, at))
         {
             answer.hasDefinition    = true;
@@ -1674,7 +1713,7 @@ namespace
             answer.definitionColumn = static_cast<S32>(declared->where.begin.column);
             answer.definitionFile   = declared->file;
         }
-        else if (named->definitionLocation && !reference->prefix)
+        else if (named->definitionLocation && !reference->prefix && boundBelowGlobals(*scope, name))
         {
             answer.hasDefinition    = true;
             answer.definitionLine   = static_cast<S32>(named->definitionLocation->begin.line);
@@ -1773,10 +1812,7 @@ ALScriptHover ALLuauService::hover(std::string_view source, S32 line, S32 column
     const Luau::FunctionType* function = functionOf(followed);
     if (function && !name.empty() && Luau::get<Luau::FunctionType>(followed))
     {
-        Luau::ToStringOptions options;
-        options.functionTypeArguments = true;
-        options.maxTableLength        = 8;
-        options.maxTypeLength         = 1000;
+        Luau::ToStringOptions options = glanceOptions();
         answer.label                  = "function " + Luau::toStringNamedFunction(name, *function, options);
     }
     else if (name.empty())
@@ -1790,21 +1826,9 @@ ALScriptHover ALLuauService::hover(std::string_view source, S32 line, S32 column
     }
 
     // The whole of a type the label only glances at.
+    if (const std::string full = Luau::toString(*type, wholeOptions()); full != typeText(*type) || full.find('\n') != std::string::npos)
     {
-        Luau::ToStringOptions whole;
-        whole.functionTypeArguments = true;
-        whole.useLineBreaks         = true;
-        whole.maxTableLength        = 200;
-        whole.maxTypeLength         = 20000;
-        const std::string full = Luau::toString(*type, whole);
-        Luau::ToStringOptions glance;
-        glance.functionTypeArguments = true;
-        glance.maxTableLength        = 8;
-        glance.maxTypeLength         = 1000;
-        if (full != Luau::toString(*type, glance) || full.find('\n') != std::string::npos)
-        {
-            answer.typeDetail = full;
-        }
+        answer.typeDetail = full;
     }
 
     // What is wanted here, where it is known and is not what is here.
