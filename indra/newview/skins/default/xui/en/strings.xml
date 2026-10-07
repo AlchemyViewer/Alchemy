@@ -649,6 +649,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocMacroRedefined">macro '[1]' redefined</string>
 	<string name="PreprocModuleNotFound">could not find module '[1]'</string>
 	<string name="PreprocModuleBesideInit">'[1]' is both [2] and the folder's init [3]; the file is taken</string>
+	<string name="PreprocRequireUnread">'[1]' is never read, but [2] still goes with the script, since a require runs it: about [3] bytes of bytecode</string>
 	<string name="PreprocModuleNotFoundWhy">could not find module '[1]': [2]</string>
 	<string name="PreprocRequireNoChildAmbiguous">could not find module '[1]': '[2]' is ambiguous there</string>
 	<string name="PreprocRequireNoChild">could not find module '[1]': there is no '[2]'</string>
@@ -771,6 +772,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixChange">Change '[1]' to '[2]'</string>
 	<string name="ScriptFixUseInstead">Use '[2]' instead of '[1]'</string>
 	<string name="ScriptFixUnused">Rename to '_[1]'</string>
+	<string name="ScriptFixRemoveRequire">Remove the require of [1]</string>
 	<string name="ScriptFixSuppress">Suppress '[1]' on this line</string>
 	<string name="ScriptFixCast">Cast to [1]</string>
 	<string name="ScriptFixCompare">Compare with '=='</string>

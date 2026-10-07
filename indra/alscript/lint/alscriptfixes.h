@@ -27,6 +27,7 @@
 #include "alscriptproblem.h"
 #include "alsourcemap.h"
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -84,6 +85,18 @@ namespace ALScriptFixes
                 return std::nullopt;
             }
             return mStarts[line] + static_cast<size_t>(column);
+        }
+        // The place an offset is, the other way; false past the text.
+        bool placeOf(size_t offset, S32& line, S32& column) const
+        {
+            if (offset > mText.size())
+            {
+                return false;
+            }
+            const auto after = std::upper_bound(mStarts.begin(), mStarts.end(), offset);
+            line             = static_cast<S32>(after - mStarts.begin()) - 1;
+            column           = static_cast<S32>(offset - mStarts[line]);
+            return true;
         }
 
     private:

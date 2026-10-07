@@ -1244,4 +1244,39 @@ namespace tut
         ensure_equals("already", made("--!strict\nprint(1)\n"), std::string("(none)"));
         ensure_equals("past the head, not read", made("print(1)\n--!nonstrict\n"), std::string("--!strict\nprint(1)\n--!nonstrict\n"));
     }
+
+    template<> template<>
+    void object::test<43>()
+    {
+        set_test_name("a require nothing reads may be taken out, its line with it: offered after marking it unused, neither safe nor preferred, since a require runs its module");
+        ensure("definitions: " + error, luauLoaded);
+        const auto removal = [this](const std::string& script) -> const ALScriptFix* {
+            static ALScriptProblems problems;
+            problems                       = check(script, true);
+            const ALScriptProblem* problem = keyed(problems, "LuauLintImportUnused");
+            ensure("said: " + said(problems), problem != nullptr && !problem->fixes.empty());
+            ensure_equals("marking it unused first", problem->fixes.front().title.substr(0, 9), std::string("Rename to"));
+            for (const ALScriptFix& fix : problem->fixes)
+            {
+                if (fix.title.rfind("Remove the require", 0) == 0)
+                {
+                    return &fix;
+                }
+            }
+            return nullptr;
+        };
+        const std::string script = "local util = require(\"util\")\nprint(1)\n";
+        const ALScriptFix* fix   = removal(script);
+        ensure("offered", fix != nullptr);
+        ensure_equals("its words", fix->title, std::string("Remove the require of \"util\""));
+        ensure("neither preferred nor safe", !fix->preferred && !fix->safe);
+        ensure_equals("its line gone", ALScriptFixes::apply(script, *fix).value_or("(not made)"), std::string("print(1)\n"));
+
+        const std::string bare = "local util = require 'util'; print(1)\n";
+        fix                    = removal(bare);
+        ensure("without brackets, and its ;", fix != nullptr);
+        ensure_equals("the statement alone gone", ALScriptFixes::apply(bare, *fix).value_or("(not made)"), std::string("print(1)\n"));
+
+        ensure("a module named by an expression: nothing to name", removal("local name = 'util'\nlocal util = require(name)\n") == nullptr);
+    }
 }

@@ -194,6 +194,20 @@ namespace tut
             return ALPreprocessor::run(ended(source, ending), o);
         }
 
+        // The same but the notes of a require nothing reads, which a script
+        // made to try something else may leave about (test 50 tries them).
+        static std::string faults(const ALPreprocessor::Result& r)
+        {
+            ALPreprocessor::Result kept;
+            for (const ALScriptProblem& p : r.problems)
+            {
+                if (p.key != "PreprocRequireUnread")
+                {
+                    kept.problems.push_back(p);
+                }
+            }
+            return messages(kept);
+        }
         static std::string messages(const ALPreprocessor::Result& r)
         {
             std::string out;
@@ -553,7 +567,7 @@ namespace tut
         add("b", "return 42\n");
         add("c", "return require(\"c\")\n");
         r = ALPreprocessor::run("local a = require(\"a\")\nlocal b = require('b')\nlocal x = require(name)\n", options(true));
-        ensure_equals("problems", messages(r), std::string());
+        ensure_equals("problems", faults(r), std::string());
         // Numbered as met: a, then what a requires.
         const std::string bundled = bundleOf({ "local b = require(2)\nreturn { b = b }\n", "return 42\n" },
                                              "local a = require(1)\nlocal b = require(2)\nlocal x = require(name)\n");
@@ -961,7 +975,7 @@ namespace tut
         module.path = "disk:C:\\Users\\me\\lib\\util.luau";
         files["./util"] = module;
         r = ALPreprocessor::run("local util = require(\"./util\")\n", options(true));
-        ensure_equals("nothing wrong", messages(r), std::string());
+        ensure_equals("nothing wrong", faults(r), std::string());
         ensure("required by its number: " + r.text, r.text.find("local util = require(1)") != std::string::npos);
         ensure("no path: " + r.text, r.text.find("disk:") == std::string::npos && r.text.find("Users") == std::string::npos);
     }
@@ -1306,7 +1320,7 @@ namespace tut
         add("c", "return 3\n");
         add("i", "return 9\n");
         const ALPreprocessor::Result r = ALPreprocessor::run(source, options(true));
-        ensure_equals("problems", messages(r), std::string());
+        ensure_equals("problems", faults(r), std::string());
         // Each module's function is put at the top once, and asked for by
         // its number where it was called for.
         size_t numbered = 0;
@@ -1425,7 +1439,7 @@ namespace tut
         add("m", "return 1\n");
         const ALPreprocessor::Result r =
             ALPreprocessor::run("-- @file vehicle/hovertext.luau\n--!strict\n--!nolint LocalUnused\nlocal m = require(\"m\")\n", options(true));
-        ensure_equals("problems", messages(r), std::string());
+        ensure_equals("problems", faults(r), std::string());
         ensure_equals("the header first, whole", r.text.substr(0, r.text.find("do\n    local modules")),
                       std::string("-- @file vehicle/hovertext.luau\n--!strict\n--!nolint LocalUnused\n"));
         ensure("each header line its own", r.map.toSource(1, 0).found() && r.map.toSource(1, 0).file == 0 && r.map.toSource(1, 0).line == 1);
@@ -1796,7 +1810,7 @@ namespace tut
             out.passedOver = "both/init.luau";
             return ALPreprocessor::Found::Yes;
         };
-        const ALPreprocessor::Result r = ALPreprocessor::run("local both = require('./both')\n", o);
+        const ALPreprocessor::Result r = ALPreprocessor::run("local both = require('./both')\nprint(both)\n", o);
         ensure_equals("one said", r.problems.size(), size_t(1));
         const ALScriptProblem& said = r.problems[0];
         ensure("a warning", said.severity == ALScriptProblem::Severity::Warning && said.key == "PreprocModuleBesideInit");
@@ -1965,5 +1979,50 @@ namespace tut
         // Nothing moved: none at all.
         r = ALPreprocessor::run("integer a;\n\ndefault { state_entry() { } }\n", lsl);
         ensure("nothing to say: " + r.text, r.text.find("@line") == std::string::npos);
+    }
+
+    template<> template<>
+    void alpreprocessor_object::test<50>()
+    {
+        set_test_name("SLua: a module required only where nothing reads it is said at each such require, with what it weighs; kept in the bundle, since a require runs it");
+        add("util", "local M = {}\nfunction M.twice(n) return n * 2 end\nreturn M\n");
+        add("used", "return 1\n");
+        const auto notes = [](const ALPreprocessor::Result& r) {
+            std::vector<const ALScriptProblem*> out;
+            for (const ALScriptProblem& p : r.problems)
+            {
+                if (p.key == "PreprocRequireUnread")
+                {
+                    out.push_back(&p);
+                }
+            }
+            return out;
+        };
+
+        ALPreprocessor::Result r = ALPreprocessor::run("local util = require(\"util\")\nlocal used = require(\"used\")\nprint(used)\n", options(true));
+        std::vector<const ALScriptProblem*> said = notes(r);
+        ensure_equals("one note: " + messages(r), said.size(), size_t(1));
+        ensure("a note, at the require", said[0]->severity == ALScriptProblem::Severity::Note && said[0]->line == 0 && said[0]->column == 13);
+        ensure("naming the local and the module", said[0]->args.size() == 3 && said[0]->args[0] == "util" && said[0]->args[1] == "util");
+        ensure("with its weight: " + said[0]->args[2], std::atoi(said[0]->args[2].c_str()) > 0);
+        ensure("still in the bundle", r.text.find("M.twice") != std::string::npos);
+
+        ensure("a name begun with _ is meant", notes(ALPreprocessor::run("local _util = require(\"util\")\n", options(true))).empty());
+        ensure("read through another require of it: removing this one saves nothing",
+               notes(ALPreprocessor::run("local a = require(\"util\")\nlocal b = require(\"util\")\nprint(b)\n", options(true))).empty());
+        ensure("read in an interpolated string", notes(ALPreprocessor::run("local util = require(\"util\")\nprint(`{util}`)\n", options(true))).empty());
+        ensure("the require not the whole of the value", notes(ALPreprocessor::run("local util = require(\"util\") or {}\nprint(1)\n", options(true))).empty());
+        ensure("a require as a statement, for what it does", notes(ALPreprocessor::run("require(\"util\")\n", options(true))).empty());
+
+        // In a module: said in its file.
+        ALPreprocessor::Include wrap;
+        wrap.text      = "local inner = require(\"util\")\nreturn 1\n";
+        wrap.name      = "wrap.luau";
+        wrap.path      = "disk:/lib/wrap.luau";
+        files["wrap"]  = wrap;
+        r              = ALPreprocessor::run("local w = require(\"wrap\")\nprint(w)\n", options(true));
+        said           = notes(r);
+        ensure_equals("one, in the module: " + messages(r), said.size(), size_t(1));
+        ensure("in its file, at its require", said[0]->file == "disk:/lib/wrap.luau" && said[0]->line == 0 && said[0]->args[0] == "inner");
     }
 }

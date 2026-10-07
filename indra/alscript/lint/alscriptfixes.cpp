@@ -919,6 +919,99 @@ namespace
         }
         return out + "\"";
     }
+
+    // The statement `local name = require("module")` whose name is at the
+    // place given, from `local` to the require's end, and the module as it
+    // is written there; false for anything else -- a name typed, two
+    // declared, a require of something other than a string.
+    bool requireDeclaring(const ALScriptFixes::Lines& lines, S32 line, S32 column, S32 endColumn, S32& from_line, S32& from_column, S32& to_line, S32& to_column,
+                          std::string& module)
+    {
+        const std::string_view      text  = lines.text();
+        const std::optional<size_t> start = lines.offsetOf(line, column);
+        const std::optional<size_t> end   = lines.offsetOf(line, endColumn);
+        if (!start || !end)
+        {
+            return false;
+        }
+        const auto blank = [&text](size_t at) { return at < text.size() && std::isspace(static_cast<unsigned char>(text[at])); };
+        const auto word  = [&text](size_t at, std::string_view w) {
+            return text.compare(at, w.size(), w) == 0 && (at + w.size() >= text.size() || !identifierByte(text[at + w.size()]));
+        };
+        // `local` before the name, and nothing of a name before it.
+        size_t before = *start;
+        while (before > 0 && blank(before - 1))
+        {
+            --before;
+        }
+        if (before < 5 || before == *start || text.compare(before - 5, 5, "local") != 0 || (before > 5 && identifierByte(text[before - 6])))
+        {
+            return false;
+        }
+        const size_t local = before - 5;
+        // `= require`, then the module, in brackets or not.
+        size_t at = *end;
+        while (blank(at))
+        {
+            ++at;
+        }
+        if (at >= text.size() || text[at] != '=')
+        {
+            return false;
+        }
+        ++at;
+        while (blank(at))
+        {
+            ++at;
+        }
+        if (!word(at, "require"))
+        {
+            return false;
+        }
+        at += 7;
+        while (blank(at))
+        {
+            ++at;
+        }
+        const bool bracketed = at < text.size() && text[at] == '(';
+        if (bracketed)
+        {
+            ++at;
+            while (blank(at))
+            {
+                ++at;
+            }
+        }
+        if (at >= text.size() || (text[at] != '"' && text[at] != '\''))
+        {
+            return false;
+        }
+        const char   quote  = text[at];
+        const size_t opened = at++;
+        while (at < text.size() && text[at] != quote && text[at] != '\n')
+        {
+            at += text[at] == '\\' ? 2 : 1;
+        }
+        if (at >= text.size() || text[at] != quote)
+        {
+            return false;
+        }
+        module = std::string(text.substr(opened, at + 1 - opened));
+        ++at;
+        if (bracketed)
+        {
+            while (blank(at))
+            {
+                ++at;
+            }
+            if (at >= text.size() || text[at] != ')')
+            {
+                return false;
+            }
+            ++at;
+        }
+        return lines.placeOf(local, from_line, from_column) && lines.placeOf(at, to_line, to_column);
+    }
 }
 
 namespace ALScriptFixes
@@ -1584,6 +1677,18 @@ namespace ALScriptFixes
                     fix.safe        = true;
                     fix.edits.push_back({ problem.line, problem.column, problem.line, problem.column, "_" });
                     problem.fixes.push_back(std::move(fix));
+                }
+                // A require nobody reads, taken out: the module goes from
+                // what a save sends where nothing else requires it. Neither
+                // safe nor preferred, since a require runs its module, and
+                // that may be why it is there.
+                S32         from_line = 0, from_column = 0, to_line = 0, to_column = 0;
+                std::string module;
+                if (is(key, Fixed::LuauLintImportUnused) && problem.line == problem.endLine &&
+                    requireDeclaring(lines, problem.line, problem.column, problem.endColumn, from_line, from_column, to_line, to_column, module))
+                {
+                    ALScriptFix fix = titled("ScriptFixRemoveRequire", "Remove the require of [1]", { module });
+                    offerRemoval(problem, lines, from_line, from_column, to_line, to_column, std::move(fix));
                 }
             }
             else if (lua && is(key, Fixed::LuauKeyNotFoundDidYouMean) && args.size() == 3 && isIdentifier(args[0]) && isIdentifier(args[2]))

@@ -40,6 +40,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <ctime>
 #include <deque>
 #include <limits>
@@ -4445,6 +4446,8 @@ namespace
     // that a script bundles alike in either; a number, so that no file's
     // identity -- a disk path among them -- is written into what a save
     // sends.
+    void assemble(const Tokens& tokens, ALPreprocessor::Result& result, bool lua);
+
     class Requires
     {
     public:
@@ -4455,6 +4458,7 @@ namespace
 
         void gather(Tokens& tokens, const std::string& from)
         {
+            const boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> named = namesIn(tokens);
             Tokens out;
             size_t i = 0;
             while (i < tokens.size())
@@ -4472,6 +4476,18 @@ namespace
                         size_t            number = 0;
                         if (resolve(name, from, t, tokens[b], number))
                         {
+                            // Whether what it gives is read: a require all
+                            // of whose are not is said with its weight.
+                            const std::string& key  = mModules[number - 1].first;
+                            const std::string  kept = unread(out, tokens, c, named);
+                            if (kept.empty())
+                            {
+                                mRead.insert(key);
+                            }
+                            else
+                            {
+                                mUnread[key].push_back({ t, kept });
+                            }
                             out.push_back(synth(Kind::Ident, "require", t));
                             out.push_back(synth(Kind::Punct, "(", t));
                             out.push_back(synth(Kind::Number, std::to_string(number), t));
@@ -4564,7 +4580,109 @@ namespace
             return out;
         }
 
+        // Each module required only where nothing reads what it gives, said
+        // at each such require with what it weighs: it goes with the script
+        // all the same, since a require runs it, and that may be why it is
+        // there. Where something reads it anywhere, taking these out would
+        // save nothing, and nothing is said.
+        void noteUnread()
+        {
+            static const size_t EMPTY = ALScriptWeigh::slua("").total;
+            // In the order the modules were met, the same each run.
+            for (const auto& [key, body] : mModules)
+            {
+                const auto unread = mUnread.find(key);
+                const auto made   = mMade.find(key);
+                if (unread == mUnread.end() || mRead.count(key) || made == mMade.end())
+                {
+                    continue;
+                }
+                const std::vector<Unread>& sites = unread->second;
+                const ALScriptWeight weight = ALScriptWeigh::slua(made->second.text);
+                if (!weight.compiled)
+                {
+                    continue;
+                }
+                const std::string bytes = std::to_string(weight.total > EMPTY ? weight.total - EMPTY : weight.total);
+                for (const Unread& site : sites)
+                {
+                    mEngine.problem(ALScriptProblem::Severity::Note, "PreprocRequireUnread",
+                                    "'[1]' is never read, but [2] still goes with the script, since a require runs it: about [3] bytes of bytecode",
+                                    { site.name, made->second.name, bytes }, site.at);
+                }
+            }
+        }
+
     private:
+        // Each name the tokens hold, and how often: an identifier, or a
+        // word in an interpolated string, which may be a name read there.
+        static boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> namesIn(const Tokens& tokens)
+        {
+            boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> out;
+            for (const Token& t : tokens)
+            {
+                if (t.kind == Kind::Ident)
+                {
+                    ++out[t.text];
+                }
+                else if (t.kind == Kind::String && !t.text.empty() && t.text.front() == '`')
+                {
+                    size_t at = 0;
+                    while (at < t.text.size())
+                    {
+                        if (std::isalpha(static_cast<unsigned char>(t.text[at])) || t.text[at] == '_')
+                        {
+                            const size_t begin = at;
+                            while (at < t.text.size() && (std::isalnum(static_cast<unsigned char>(t.text[at])) || t.text[at] == '_'))
+                            {
+                                ++at;
+                            }
+                            ++out[t.text.substr(begin, at - begin)];
+                        }
+                        else
+                        {
+                            ++at;
+                        }
+                    }
+                }
+            }
+            return out;
+        }
+
+        // The name a require's value is given where nothing reads it --
+        // `local name = require("x")`, the require the whole of its value,
+        // the name in the file nowhere else -- or nothing. A name begun
+        // with `_` says it is meant: nothing.
+        static std::string unread(const Tokens& before, const Tokens& tokens, size_t closed,
+                                  const boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>>& named)
+        {
+            // Back past the `=` to the name, and `local` before it.
+            std::array<const Token*, 3> back{};
+            size_t                      found = 0;
+            for (auto it = before.rbegin(); it != before.rend() && found < back.size(); ++it)
+            {
+                if (!it->blank())
+                {
+                    back[found++] = &*it;
+                }
+            }
+            if (found < back.size() || !back[0]->is(Kind::Punct, "=") || back[1]->kind != Kind::Ident || !back[2]->is(Kind::Ident, "local"))
+            {
+                return std::string();
+            }
+            const std::string& name = back[1]->text;
+            // Nothing after the call that goes on with it.
+            const size_t next = skipBlank(tokens, closed + 1);
+            const bool   ends = next >= tokens.size() || tokens[next].is(Kind::Punct, ";") ||
+                              (tokens[next].kind == Kind::Ident && tokens[next].text != "and" && tokens[next].text != "or");
+            const auto   uses = named.find(name);
+            if (!ends || name.empty() || name.front() == '_' || uses == named.end() || uses->second != 1)
+            {
+                return std::string();
+            }
+            return name;
+        }
+
         // A module found nowhere, said with why where that is known: keyed
         // where the reason is one the map knows, so that a skin may say it
         // in its own words, else in Luau's.
@@ -4717,6 +4835,12 @@ namespace
             mModules.emplace_back(key, Tokens());
             Tokens body;
             mEngine.module(found, body);
+            // Its text as made, to weigh where nothing reads it.
+            {
+                ALPreprocessor::Result made;
+                assemble(body, made, true);
+                mMade[key] = Made{ std::move(made.text), found.name.empty() ? name : found.name };
+            }
             // Kept as the run made it, its requires still calls, where the
             // analyzers want each module apart.
             if (mOptions.apart)
@@ -4738,6 +4862,22 @@ namespace
         // Each module's number, and by it, its identity and text.
         boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> mNumbers;
         std::vector<std::pair<std::string, Tokens>>                                      mModules;
+        // Each module's text as the run made it, and its name.
+        struct Made
+        {
+            std::string text;
+            std::string name;
+        };
+        boost::unordered_flat_map<std::string, Made, ll::string_hash, std::equal_to<>> mMade;
+        // The modules something reads, and each require of another whose
+        // value nothing reads, by the module: where, and the name it is given.
+        struct Unread
+        {
+            Token       at;
+            std::string name;
+        };
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>                mRead;
+        boost::unordered_flat_map<std::string, std::vector<Unread>, ll::string_hash, std::equal_to<>> mUnread;
         // Each module as the run made it, before its requires became
         // numbers (Options::apart).
         std::vector<std::pair<std::string, Tokens>> mApart;
@@ -5111,6 +5251,7 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
             as_made = tokens;
         }
         gathered.gather(tokens, std::string());
+        gathered.noteUnread();
         if (options.apart && !gathered.apart().empty())
         {
             // Each piece assembled over the same files as the whole.
