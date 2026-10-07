@@ -103,8 +103,7 @@ const std::vector<ALTextDocument::Edit::LineSpan>& ALTextDocument::Edit::lineSpa
         span.first    = removed.begin.line;
         span.last     = removed.end.line;
         span.made     = 1 + breaksInserted();
-        span.lastKept = span.last > span.first && removed.end.column == 0 &&
-                        (inserted.empty() ? removed.begin.column == 0 : inserted.back() == '\n');
+        span.lastKept = removed.end.column == 0 && (inserted.empty() ? removed.begin.column == 0 : inserted.back() == '\n');
         span.firstColumn = removed.begin.column;
         span.shiftAfter  = span.made - (span.last - span.first + 1);
         out.push_back(span);
@@ -114,9 +113,8 @@ const std::vector<ALTextDocument::Edit::LineSpan>& ALTextDocument::Edit::lineSpa
     S32 made_from = 0;
     for (const Part& part : parts)
     {
-        const bool kept = part.before.end.line > part.before.begin.line && part.before.end.column == 0 &&
-                          (part.after.empty() ? part.before.begin.column == 0
-                                              : part.after.end.column == 0 && part.after.end.line > part.after.begin.line);
+        const bool kept = part.before.end.column == 0 && (part.after.empty() ? part.before.begin.column == 0
+                                                                             : part.after.end.column == 0 && part.after.end.line > part.after.begin.line);
         if (!out.empty() && part.before.begin.line <= out.back().last)
         {
             LineSpan& span = out.back();

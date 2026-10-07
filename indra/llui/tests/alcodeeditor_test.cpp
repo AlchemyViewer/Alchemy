@@ -3132,4 +3132,25 @@ namespace tut
         ensure("nothing folded", !e.isFolded(0) && !e.isFolded(1));
         ensure("nothing hidden", !e.layout().anyHidden() && !e.layout().hidden(1));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<84>()
+    {
+        set_test_name("a folded header taken with the whole lines below it does not fold the block that comes up in its place; Return at its start takes the fold down with it");
+        ALCodeEditor& e = make("foo()\n{\n    x();\n}\nbar()\n{\n    y();\n}");
+        ensure("folds", e.foldAt(0));
+        // From the header's start to the next line in sight, deleted.
+        e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 0)));
+        key(KEY_DELETE);
+        ensure_equals("the block gone", e.document().line(0), std::string("bar()"));
+        ensure("the one in its place not folded", !e.isFolded(0) && !e.layout().anyHidden());
+
+        ALCodeEditor& f = make("foo()\n{\n    x();\n}\nbar()");
+        ensure("folds", f.foldAt(0));
+        f.setCaret(ALTextPos(0, 0));
+        key(KEY_RETURN);
+        ensure_equals("a line put in above", f.document().line(1), std::string("foo()"));
+        ensure("the fold down with its header", f.isFolded(1) && !f.isFolded(0));
+        ensure("hiding its block there", !f.layout().hidden(1) && f.layout().hidden(2) && f.layout().hidden(4) && !f.layout().hidden(5));
+    }
 }
