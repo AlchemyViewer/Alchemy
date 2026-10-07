@@ -16,8 +16,8 @@ add_library(alscript STATIC)
 #   luau/          the SLua analyzer over Second Life's fork of Luau;
 #   masters/       files on disk as the masters of scripts in the world:
 #                  the links and the file they are kept in, finding a
-#                  master, what a send does, the changes to them gathered
-#                  over a burst, and the sends underway;
+#                  master, what a send does, the files watched and their
+#                  changes gathered over a burst, and the sends underway;
 #   preprocessor/  the preprocessor, its includes and what it keeps.
 target_sources(
   alscript
@@ -72,11 +72,13 @@ target_sources(
     luau/alluautaskpool.cpp
     luau/alluautypes.cpp
     masters/almasterburst.cpp
+    masters/almasterclock.cpp
     masters/almasterindex.cpp
     masters/almasterlinks.cpp
     masters/almastermatch.cpp
     masters/almasterplan.cpp
     masters/almasterqueue.cpp
+    masters/almasterwatch.cpp
     preprocessor/aldiskcache.cpp
     preprocessor/aldiskincludes.cpp
     preprocessor/alincludeidentity.cpp
@@ -155,11 +157,13 @@ target_sources(
         luau/alluautaskpool.h
         luau/alluautypes.h
         masters/almasterburst.h
+        masters/almasterclock.h
         masters/almasterindex.h
         masters/almasterlinks.h
         masters/almastermatch.h
         masters/almasterplan.h
         masters/almasterqueue.h
+        masters/almasterwatch.h
         preprocessor/aldiskcache.h
         preprocessor/aldiskincludes.h
         preprocessor/alincludeidentity.h
@@ -334,13 +338,15 @@ if(AL_BUILD_TESTS)
   al_add_test(alscripttempfiles PROJECT alscript LIBRARIES alscript llcommon)
   # Disk masters: the changes gathered over a burst, the links and their
   # index, the index kept in a file, a master found from what a script says
-  # or its name, what a send does, and the sends underway.
+  # or its name, what a send does, the sends underway, and the files watched
+  # for saves made outside.
   al_add_test(almasterburst PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almasterindex PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almasterlinks PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almastermatch PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almasterplan PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almasterqueue PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(almasterwatch PROJECT alscript LIBRARIES alscript llcommon)
   # The preprocessor against C11's 6.10, clause by clause.
   al_add_test(alpreprocessorc11 PROJECT alscript LIBRARIES alscript llcommon)
   # What LSL may change and the order it runs in, over scripts parsed with

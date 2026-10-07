@@ -31,9 +31,7 @@
 #include "alscriptenvelope.h"
 #include "alserialworker.h"
 #include "aluploadheader.h"
-#include "llcallbacklist.h"
 #include "llsdserialize.h"
-#include "lltimer.h"
 
 #include <condition_variable>
 #include <mutex>
@@ -101,15 +99,6 @@ struct ALMasterIndex::Writer
         }
     }
 };
-
-// static
-ALMasterIndex::Clock ALMasterIndex::frames()
-{
-    Clock clock;
-    clock.after = [](std::function<void()> callable, F32 seconds) { doAfterInterval(std::move(callable), seconds); };
-    clock.now   = []() { return static_cast<F64>(LLTimer::getTotalSeconds()); };
-    return clock;
-}
 
 ALMasterIndex::ALMasterIndex(std::string path, Clock clock)
 : mPath(std::move(path)), mClock(std::move(clock)), mWriter(std::make_shared<Writer>())

@@ -205,7 +205,6 @@ if(AL_BUILD_VIEWER)
     alscriptmasterfanout.cpp
     alscriptmastertoasts.cpp
     alscriptmasterupload.cpp
-    alscriptmasterwatch.cpp
     alscriptobjectcheck.cpp
     alscriptrecompile.cpp
     alscriptnavigation.cpp
@@ -1103,7 +1102,6 @@ if(AL_BUILD_VIEWER)
     alscriptmasterfanout.h
     alscriptmastertoasts.h
     alscriptmasterupload.h
-    alscriptmasterwatch.h
     alscriptstudiodiskmasters.h
     alscriptstudiomasters.h
     alscriptstudiorecovery.h

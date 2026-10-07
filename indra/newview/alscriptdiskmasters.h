@@ -29,6 +29,7 @@
 #include "almasterlinks.h"
 #include "almasterplan.h"
 #include "almasterqueue.h"
+#include "almasterwatch.h"
 #include "alscripttypes.h"
 #include "llsingleton.h"
 
@@ -43,7 +44,6 @@
 class ALScriptMasterAdopt;
 class ALScriptMasterFanOut;
 class ALScriptMasterToasts;
-class ALScriptMasterWatch;
 
 // The scripts in the world, the agent's own inventory's and its objects',
 // whose master is a file on disk: the file is what the script is, and
@@ -63,7 +63,7 @@ class ALScriptMasterWatch;
 //
 // Links are live while the agent is logged in, whether or not a studio
 // window is open: the masters and the files they include are watched for
-// saves made outside the studio (ALScriptMasterWatch, while
+// saves made outside the studio (ALMasterWatch, while
 // `ALScriptMastersEnabled`), a master's save sending its scripts and an
 // include's sending again those whose last expansion read it
 // (ALScriptMasterFanOut). What came of each send is told to whoever
@@ -228,7 +228,7 @@ private:
     // so named.
     ALMasterQueue                                                             mQueue;
     boost::unordered_flat_map<std::string, ALScriptRef, ll::string_hash, std::equal_to<>> mQueued;
-    std::unique_ptr<ALScriptMasterWatch>                                      mWatch;
+    std::unique_ptr<ALMasterWatch>                                            mWatch;
     std::unique_ptr<ALScriptMasterFanOut>                                     mFanOut;
     std::unique_ptr<ALScriptMasterAdopt>                                      mAdopt;
     std::unique_ptr<ALScriptMasterToasts>                                     mToasts;

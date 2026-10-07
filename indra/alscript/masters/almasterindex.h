@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "almasterclock.h"
 #include "almasterlinks.h"
 
 #include "lluuid.h"
@@ -93,16 +94,10 @@ class ALSerialWorker;
 class ALMasterIndex
 {
 public:
-    // How the index waits: `after` runs a callable on this thread so many
-    // seconds from now, and `now` says the time, in seconds. The viewer's
-    // frames by default (doAfterInterval, LLTimer); a test's own, so that it
-    // drives the time itself.
-    struct Clock
-    {
-        std::function<void(std::function<void()> callable, F32 seconds)> after;
-        std::function<F64()>                                             now;
-    };
-    static Clock frames();
+    // How the index waits: the viewer's frames by default, a test's own
+    // time to drive it (ALMasterClock).
+    typedef ALMasterClock Clock;
+    static Clock frames() { return ALMasterClock::frames(); }
 
     // How long the index waits, after a change, for the changes after it
     // before it is written; how long at most from the first not yet written,

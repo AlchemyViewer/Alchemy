@@ -1,5 +1,5 @@
 /**
- * @file alscriptmasterwatch.cpp
+ * @file almasterwatch.cpp
  * @brief The files on disk whose saves send linked scripts, watched.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -22,40 +22,25 @@
  * $/LicenseInfo$
  */
 
+#include "linden_common.h"
 
-#include "llviewerprecompiledheaders.h"
-
-#include "alscriptmasterwatch.h"
+#include "almasterwatch.h"
 
 #include "alserialworker.h"
 #include "alwatchedfile.h"
-#include "llcallbacklist.h"
 #include "llsingleton.h"
-#include "lltimer.h"
-#include "llviewercontrol.h"
 #include "workqueue.h"
 
 namespace
 {
-    // How often a file is looked at: a master, the file a scripter saves,
-    // soonest; an include a little less often; and everything less often
-    // still where there is a great deal of it.
-    constexpr F32    MASTER_PERIOD  = 0.5f;
-    constexpr F32    INCLUDE_PERIOD = 1.0f;
-    constexpr F32    MANY_PERIOD    = 2.0f;
-    constexpr size_t MANY           = 256;
-    // How long an emptied file is held before it is taken as empty, as an
-    // external editor's emptied copy is (ALScriptExternalEditor::changed).
-    constexpr F64    EMPTIED_HOLD   = 1.5;
-
     // The thread the files newly watched are first looked at on: made with
     // the first such look, closed as the viewer goes. Owned by no watch, so
     // that one let go of -- the links all gone, or the setting turned off --
     // never waits on a slow drive: what a look finds for a watch gone finds
     // nobody.
-    class ALScriptMasterWatchDisk final : public LLSingleton<ALScriptMasterWatchDisk>
+    class ALMasterWatchDisk final : public LLSingleton<ALMasterWatchDisk>
     {
-        LLSINGLETON_EMPTY_CTOR(ALScriptMasterWatchDisk);
+        LLSINGLETON_EMPTY_CTOR(ALMasterWatchDisk);
         void cleanupSingleton() override
         {
             if (mThread)
@@ -85,21 +70,64 @@ namespace
     };
 }
 
-ALScriptMasterWatch::ALScriptMasterWatch(released_t released)
-: mReleased(std::move(released))
+// static
+ALMasterWatch::look_t ALMasterWatch::offThread()
+{
+    return [](std::vector<std::string> paths, stamped_t found) {
+        const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop");
+        if (!main_loop)
+        {
+            // No main loop to hand them back to -- a test -- so looked at
+            // here.
+            std::vector<ALFileStamp> stamps;
+            stamps.reserve(paths.size());
+            for (const std::string& path : paths)
+            {
+                stamps.push_back(ALFileStamp::of(path));
+            }
+            found(std::move(stamps));
+            return true;
+        }
+        // Every file looked at together, on the thread, and what was found
+        // handed back to the main thread: nothing of the watch's is touched
+        // out there.
+        return ALMasterWatchDisk::instance().post(
+            [main_loop, paths = std::move(paths), found = std::move(found)](const ALSerialWorker& thread) mutable {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_FILE("script masters first looked at");
+                std::vector<ALFileStamp> stamps;
+                stamps.reserve(paths.size());
+                for (const std::string& path : paths)
+                {
+                    if (thread.closing())
+                    {
+                        // The viewer going: nothing more is watched.
+                        return;
+                    }
+                    stamps.push_back(ALFileStamp::of(path));
+                }
+                main_loop->post([found = std::move(found), stamps = std::move(stamps)]() mutable { found(std::move(stamps)); });
+            });
+    };
+}
+
+ALMasterWatch::ALMasterWatch(released_t released, ALMasterClock clock, look_t look)
+: mReleased(std::move(released)), mClock(std::move(clock)), mLook(std::move(look))
 {
 }
 
-ALScriptMasterWatch::~ALScriptMasterWatch() = default;
+ALMasterWatch::~ALMasterWatch() = default;
 
-void ALScriptMasterWatch::watch(const std::vector<ALMasterLinks::Watched>& files)
+void ALMasterWatch::setQuiet(F64 quiet)
 {
-    static LLCachedControl<F32> quiet(gSavedSettings, "ALScriptMastersQuiet", 1.f);
-    mBurst.setQuiet(llmax(0.f, (F32)quiet));
+    mBurst.setQuiet(llmax(0.0, quiet));
+}
+
+void ALMasterWatch::watch(const std::vector<ALMasterLinks::Watched>& files)
+{
     const bool many = files.size() > MANY;
     boost::unordered_flat_map<std::string, Watching, ll::string_hash, std::equal_to<>> kept;
     boost::unordered_flat_map<std::string, Pending, ll::string_hash, std::equal_to<>>  waiting;
-    std::vector<Looked>                                                                to_look;
+    std::vector<std::string>                                                           keys;
     std::vector<std::string>                                                           paths;
     const U32                                                                          asked = mAsked + 1;
     for (const ALMasterLinks::Watched& one : files)
@@ -136,7 +164,7 @@ void ALScriptMasterWatch::watch(const std::vector<ALMasterLinks::Watched>& files
         {
             pending.path  = one.path;
             pending.asked = asked;
-            to_look.push_back({ key, ALFileStamp() });
+            keys.push_back(key);
             paths.push_back(one.path);
         }
         pending.master = one.master;
@@ -151,45 +179,27 @@ void ALScriptMasterWatch::watch(const std::vector<ALMasterLinks::Watched>& files
     }
     mFiles   = std::move(kept);
     mPending = std::move(waiting);
-    if (to_look.empty())
+    if (keys.empty())
     {
         return;
     }
     mAsked = asked;
-    const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop");
-    if (!main_loop)
-    {
-        // No main loop to hand them back to -- a test -- so looked at here.
-        for (size_t i = 0; i < to_look.size(); ++i)
-        {
-            to_look[i].stamp = ALFileStamp::of(paths[i]);
-        }
-        looked(asked, to_look);
-        return;
-    }
-    // Every new file of the call looked at together, on the thread, and
-    // what was found handed back to the main thread, where the watches are
-    // made: nothing of this is touched out there.
+    // Every new file of the call looked at together, away from this thread,
+    // and the watches made here from what was found, where this is still.
     const std::weak_ptr<bool> alive  = mAlive;
-    const bool                posted = ALScriptMasterWatchDisk::instance().post(
-        [this, alive, main_loop, asked, paths = std::move(paths), to_look = std::move(to_look)](const ALSerialWorker& thread) mutable {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_FILE("script masters first looked at");
-            for (size_t i = 0; i < to_look.size(); ++i)
-            {
-                if (thread.closing())
-                {
-                    // The viewer going: nothing more is watched.
-                    return;
-                }
-                to_look[i].stamp = ALFileStamp::of(paths[i]);
-            }
-            main_loop->post([this, alive, asked, to_look = std::move(to_look)]() {
-                if (alive.lock())
-                {
-                    looked(asked, to_look);
-                }
-            });
-        });
+    const bool                posted = mLook(std::move(paths), [this, alive, asked, keys = std::move(keys)](std::vector<ALFileStamp> stamps) {
+        if (!alive.lock())
+        {
+            return;
+        }
+        std::vector<Looked> found;
+        found.reserve(keys.size());
+        for (size_t i = 0; i < keys.size() && i < stamps.size(); ++i)
+        {
+            found.push_back({ keys[i], stamps[i] });
+        }
+        looked(asked, found);
+    });
     if (!posted)
     {
         // The viewer going: nothing more is watched.
@@ -197,7 +207,7 @@ void ALScriptMasterWatch::watch(const std::vector<ALMasterLinks::Watched>& files
     }
 }
 
-void ALScriptMasterWatch::looked(U32 asked, const std::vector<Looked>& found)
+void ALMasterWatch::looked(U32 asked, const std::vector<Looked>& found)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
     for (const Looked& one : found)
@@ -233,7 +243,7 @@ void ALScriptMasterWatch::looked(U32 asked, const std::vector<Looked>& found)
     }
 }
 
-void ALScriptMasterWatch::seen(const std::string& path)
+void ALMasterWatch::seen(const std::string& path)
 {
     const std::string key = ALMasterLinks::keyOf(path);
     if (const auto found = mFiles.find(key); found != mFiles.end())
@@ -250,7 +260,34 @@ void ALScriptMasterWatch::seen(const std::string& path)
     }
 }
 
-void ALScriptMasterWatch::heard(const std::string& path)
+bool ALMasterWatch::watching(const std::string& path) const
+{
+    return mFiles.contains(ALMasterLinks::keyOf(path));
+}
+
+bool ALMasterWatch::waiting(const std::string& path) const
+{
+    return mPending.contains(ALMasterLinks::keyOf(path));
+}
+
+std::optional<F32> ALMasterWatch::periodOf(const std::string& path) const
+{
+    const auto found = mFiles.find(ALMasterLinks::keyOf(path));
+    return found != mFiles.end() ? std::optional<F32>(found->second.period) : std::nullopt;
+}
+
+void ALMasterWatch::lookNow()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_FILE;
+    // What is heard only waits in the burst: nothing watched changes as the
+    // files are gone through.
+    for (auto& [key, watching] : mFiles)
+    {
+        watching.file->check();
+    }
+}
+
+void ALMasterWatch::heard(const std::string& path)
 {
     const auto found = mFiles.find(ALMasterLinks::keyOf(path));
     if (found == mFiles.end())
@@ -261,26 +298,30 @@ void ALScriptMasterWatch::heard(const std::string& path)
     // held until it has stayed empty a while.
     const ALWatchedFile& file    = *found->second.file;
     const bool           emptied = file.there() && file.stamp().size == 0;
-    const F64            now     = LLTimer::getTotalSeconds();
+    const F64            now     = mClock.now();
     mBurst.changed(path, now, emptied ? EMPTIED_HOLD : 0.0);
     schedule();
 }
 
-void ALScriptMasterWatch::schedule()
+void ALMasterWatch::schedule()
 {
-    // A later change only puts the burst's time off, never forward: a look
-    // already coming finds nothing yet, and comes again.
+    // A later change mostly puts the burst's time off: a look already coming
+    // then finds nothing yet, and comes again. An emptied file filled again
+    // brings it forward, its hold gone: a look sooner is asked, and the one
+    // coming does nothing.
     const std::optional<F64> due = mBurst.dueAt();
-    if (!due || mScheduled)
+    if (!due || (mScheduled && *due >= mScheduledAt))
     {
         return;
     }
     mScheduled                      = true;
-    const F64                 now   = LLTimer::getTotalSeconds();
+    mScheduledAt                    = *due;
+    const U32                 which = ++mTicks;
+    const F64                 now   = mClock.now();
     const std::weak_ptr<bool> alive = mAlive;
-    doAfterInterval(
-        [this, alive]() {
-            if (alive.lock())
+    mClock.after(
+        [this, alive, which]() {
+            if (alive.lock() && which == mTicks)
             {
                 mScheduled = false;
                 tick();
@@ -289,11 +330,11 @@ void ALScriptMasterWatch::schedule()
         (F32)llmax(0.05, *due - now));
 }
 
-void ALScriptMasterWatch::tick()
+void ALMasterWatch::tick()
 {
     std::vector<std::string> masters;
     std::vector<std::string> includes;
-    const F64                now = LLTimer::getTotalSeconds();
+    const F64                now = mClock.now();
     for (const std::string& path : mBurst.release(now))
     {
         if (const auto found = mFiles.find(ALMasterLinks::keyOf(path)); found != mFiles.end())

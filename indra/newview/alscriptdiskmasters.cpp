@@ -32,7 +32,6 @@
 #include "alscriptmasterfanout.h"
 #include "alscriptmastertoasts.h"
 #include "alscriptmasterupload.h"
-#include "alscriptmasterwatch.h"
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
@@ -116,6 +115,7 @@ void ALScriptDiskMasters::start()
 void ALScriptDiskMasters::rewatch()
 {
     static LLCachedControl<bool> enabled(gSavedSettings, "ALScriptMastersEnabled", true);
+    static LLCachedControl<F32>  quiet(gSavedSettings, "ALScriptMastersQuiet", 1.f);
     ALMasterIndex*               links_now = mIndex.get();
     if (!enabled || !links_now || links_now->empty())
     {
@@ -125,9 +125,11 @@ void ALScriptDiskMasters::rewatch()
     }
     if (!mWatch)
     {
-        mWatch = std::make_unique<ALScriptMasterWatch>(
+        mWatch = std::make_unique<ALMasterWatch>(
             [this](const std::vector<std::string>& masters, const std::vector<std::string>& includes) { released(masters, includes); });
     }
+    // How long a burst of saves must go quiet: the scripter's, as it stands.
+    mWatch->setQuiet((F32)quiet);
     mWatch->watch(links_now->watched());
 }
 
