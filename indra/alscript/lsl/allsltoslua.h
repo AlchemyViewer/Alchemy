@@ -74,7 +74,8 @@ public:
         bool detectedTable = true;
         // SLua's ll rather than llcompat where it means the same: a boolean
         // answer, a constant index moved on by one, a find's answer read
-        // against nil.
+        // against nil, and the script's time, where it resets it, read
+        // from a clock of its own.
         bool sluaCalls = true;
         // What SLua has in a call's stead where it means the same: math,
         // vector and quaternion's functions, ^, print, os.time, table.find.

@@ -1895,4 +1895,47 @@ namespace tut
         const ALLSLToSLua::Result none = convert("default { state_entry() { llOwnerSay((string)llVecMag(<1, 2, 3>)); } }\n");
         ensure("no helper unasked: " + none.text, !has(none, "vecNorm"));
     }
+
+    template<> template<>
+    void allsltoslua_object::test<65>()
+    {
+        set_test_name("a script that resets its time keeps a clock of its own, script-wide as a state change leaves LSL's: ll.GetTime read "
+                      "from timeBase, each reset setting it again; one that only reads keeps ll.GetTime; close to LSL, llcompat's three");
+        const ALLSLToSLua::Result r = convert("float timeBase;\n"
+                                              "default {\n"
+                                              "    state_entry() { llResetTime(); state running; }\n"
+                                              "}\n"
+                                              "state running {\n"
+                                              "    state_entry() { timeBase = llGetTime(); }\n"
+                                              "    touch_start(integer n) {\n"
+                                              "        float lap = llGetAndResetTime();\n"
+                                              "        llGetAndResetTime();\n"
+                                              "        llOwnerSay((string)(lap + timeBase) + \" \" + (string)(llGetTime() * 2));\n"
+                                              "    }\n"
+                                              "}\n");
+        ensure("the clock, once, over everything: " + r.text,
+               count(r, "local timeBase = ll.GetTime()") == 1 && r.text.find("local timeBase = ll.GetTime()") < r.text.find("local states"));
+        ensure("the script's own name made another: " + r.text, has(r, "local timeBase_ = 0") && has(r, "timeBase_ = ll.GetTime() - timeBase"));
+        ensure("a reset: " + r.text, has(r, "state_entry = function()\n        timeBase = ll.GetTime()\n        setState(\"running\")"));
+        ensure("both, as a value, through the helper: " + r.text,
+               has(r, "local lap = getAndResetTime()") && count(r, "local function getAndResetTime(): number") == 1);
+        ensure("both where nothing reads the time, the reset alone: " + r.text,
+               has(r, "local lap = getAndResetTime()\n        timeBase = ll.GetTime()\n"));
+        ensure("a read bracketed: " + r.text, has(r, "(ll.GetTime() - timeBase) * 2"));
+        ensure("nothing of llcompat's: " + r.text, !has(r, "llcompat.ResetTime") && !has(r, "llcompat.GetAndResetTime") &&
+                                                     !noted(r, "SluaCompatOnly", "ResetTime") && !noted(r, "SluaCompatOnly", "GetAndResetTime"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result reads = convert("default { touch_start(integer n) { llOwnerSay((string)llGetTime()); } }\n");
+        ensure("only read, ll's: " + reads.text, has(reads, "ll.GetTime()") && !has(reads, "timeBase"));
+
+        const ALLSLToSLua::Result close = ALLSLToSLua::convert("default { touch_start(integer n) {\n"
+                                                               "    llOwnerSay((string)llGetTime());\n"
+                                                               "    llResetTime();\n"
+                                                               "} }\n",
+                                                               ALLSLToSLua::Options::closeToLSL());
+        ensure("close to LSL, llcompat's together: " + close.text,
+               has(close, "llcompat.GetTime()") && has(close, "llcompat.ResetTime()") && !has(close, "ll.GetTime") && !has(close, "timeBase"));
+        checksClean(close);
+    }
 }

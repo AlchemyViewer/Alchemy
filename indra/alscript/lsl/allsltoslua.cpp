@@ -224,7 +224,7 @@ namespace
             "rawget", "rawset", "rawequal", "rawlen", "setmetatable", "getmetatable", "require", "lljson", "llbase64",
             // What the text written here defines of its own.
             "states", "currentState", "setState", "joinLists", "lslInteger", "lslFloat", "vecNorm", "detected", "setTimer",
-            "timerHandle", "timerHandler",
+            "timerHandle", "timerHandler", "timeBase", "getAndResetTime",
         };
         return RESERVED.contains(name);
     }
@@ -565,6 +565,11 @@ namespace
         std::optional<Expr> idiom(LSLFunctionExpression* e, const std::string& lsl, std::string& called);
         // What was detected, from the handler's own table.
         std::optional<Expr> detected(LSLFunctionExpression* e, const std::string& lsl);
+        // LSL's script time where the script resets it: read from the
+        // script's own clock (mTimeBase), or from llcompat's alone
+        // (mCompatTime); nothing for any other call, or where the script
+        // resets nothing and ll.GetTime is LSL's llGetTime.
+        std::optional<Expr> scriptTime(const std::string& lsl, std::string& called);
         // A call to a function answering an index or -1, which ll answers
         // from one or nil, read against nil where it is only asked whether
         // it found: `found` says whether the test is of finding.
@@ -855,6 +860,15 @@ namespace
         bool mManyStates = false;
         // llSetTimerEvent's timer on LLTimers, where the script sets one.
         bool mTimers = false;
+        // Where the script resets its time: a clock of its own, timeBase,
+        // that ll.GetTime is read from and each reset sets again, as SLua's
+        // ll has no ResetTime and llcompat's may not move the clock ll and
+        // LLTimers share; or, where SLua's ll is not asked for, llcompat's
+        // GetTime beside its resets. And the helper llGetAndResetTime is
+        // read through, where one is.
+        bool mTimeBase        = false;
+        bool mCompatTime      = false;
+        bool mGetAndResetTime = false;
         // Inside a handler of an event SLua hands what was detected, where
         // the detected table is read.
         bool mInDetected = false;
@@ -2386,6 +2400,44 @@ namespace
         return Expr{ "detected[" + at + "]:" + std::string(found->second) + "()", PRIMARY, found->second == "getGroup" };
     }
 
+    std::optional<Expr> Writer::scriptTime(const std::string& lsl, std::string& called)
+    {
+        // llcompat's GetTime beside llcompat's resets, which are LSL's
+        // together; the resets themselves go llcompat's way, and are noted.
+        if (mCompatTime)
+        {
+            if (lsl != "llGetTime")
+            {
+                return std::nullopt;
+            }
+            called = "llcompat.GetTime";
+            return Expr{ "llcompat.GetTime()" };
+        }
+        if (!mTimeBase)
+        {
+            return std::nullopt;
+        }
+        // The time since the last reset, as LSL counted it; a reset, a
+        // statement; and both, through the helper (helpers).
+        if (lsl == "llGetTime")
+        {
+            called = "ll.GetTime";
+            return Expr{ "ll.GetTime() - timeBase", ADD };
+        }
+        if (lsl == "llResetTime")
+        {
+            called = "timeBase";
+            return Expr{ "timeBase = ll.GetTime()" };
+        }
+        if (lsl == "llGetAndResetTime")
+        {
+            called           = "getAndResetTime";
+            mGetAndResetTime = true;
+            return Expr{ "getAndResetTime()" };
+        }
+        return std::nullopt;
+    }
+
     std::optional<Expr> Writer::idiom(LSLFunctionExpression* e, const std::string& lsl, std::string& called)
     {
         const auto arg = [&](int at) { return value(argumentAt(e, at)); };
@@ -2551,6 +2603,10 @@ namespace
         {
             called = "setTimer";
             return { "setTimer(" + args(e->getArguments(), params) + ")" };
+        }
+        if (std::optional<Expr> time = scriptTime(lsl, called))
+        {
+            return *time;
         }
         if (mOptions.detectedTable && mInDetected)
         {
@@ -3370,6 +3426,17 @@ namespace
             }
             case NODE_FUNCTION_EXPRESSION:
             {
+                // The script's own clock reset where nothing takes the time
+                // it read, the reset alone; and read for nothing, the call
+                // alone, as a difference is no statement.
+                const std::string_view name = static_cast<LSLFunctionExpression*>(e)->getIdentifier()->getName();
+                if (mTimeBase && (name == "llGetAndResetTime" || name == "llGetTime"))
+                {
+                    const bool reset = name == "llGetAndResetTime";
+                    sameAs(name, reset ? "timeBase" : "ll.GetTime");
+                    line(reset ? "timeBase = ll.GetTime()" : "ll.GetTime()");
+                    return;
+                }
                 // One SLua has nowhere, over a line of its own.
                 const ALLSLTraits::Trait* trait = ALLSLTraits::of(static_cast<LSLFunctionExpression*>(e)->getIdentifier()->getName());
                 if (trait && (trait->slua & ALLSLTraits::SluaAbsent))
@@ -6345,6 +6412,28 @@ end
 
 )LUA";
         }
+        // The script's own clock, from where it was last reset: a
+        // script-wide local, which a state change leaves as it left LSL's.
+        if (mTimeBase)
+        {
+            out += R"LUA(-- LSL's script time, which llResetTime set back to nought: SLua's ll has
+-- no ResetTime, so the script keeps a clock of its own, read as
+-- ll.GetTime() - timeBase.
+local timeBase = ll.GetTime()
+
+)LUA";
+        }
+        if (mGetAndResetTime)
+        {
+            out += R"LUA(-- LSL's llGetAndResetTime: the time since the last reset, and a reset.
+local function getAndResetTime(): number
+    local was = timeBase
+    timeBase = ll.GetTime()
+    return timeBase - was
+end
+
+)LUA";
+        }
         // LSL's casts of a string, as LSL converts a list's item, which is
         // the same: llcompat's, as tonumber reads text its own way.
         if (mLslInteger)
@@ -6386,13 +6475,22 @@ end
         // What the script sets going: a timer on LLTimers where it sets one.
         LSLASTNode* first = mScript->getStates()->getChild(0);
         mManyStates       = first && first->getNext();
+        // And where it resets its time, the clock it is read from.
+        bool resets = false;
         walk(mScript, [&](LSLASTNode* node) {
-            if (mOptions.llTimers && node->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
-                std::string_view(static_cast<LSLFunctionExpression*>(node)->getIdentifier()->getName()) == "llSetTimerEvent")
+            if (node->getNodeSubType() != NODE_FUNCTION_EXPRESSION)
+            {
+                return;
+            }
+            const std::string_view name = static_cast<LSLFunctionExpression*>(node)->getIdentifier()->getName();
+            if (mOptions.llTimers && name == "llSetTimerEvent")
             {
                 mTimers = true;
             }
+            resets |= name == "llResetTime" || name == "llGetAndResetTime";
         });
+        mTimeBase   = resets && mOptions.sluaCalls;
+        mCompatTime = resets && !mOptions.sluaCalls;
         forgetMemoryHacks();
         findTextKeys();
         findListTypes();
