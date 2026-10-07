@@ -1706,4 +1706,21 @@ namespace tut
         ensure("given again: found again by the new one", has_base(*again) && !has_base(*compared));
         ensure_equals("settled still", m.conflictCount(), 0);
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<39>()
+    {
+        set_test_name("a merge found again as the way the lines that stay are chosen is turned, as the comparison is");
+        // Theirs moved X from the end to the start; ours changed b. By
+        // histogram, a b a kept and X put in before them and taken out
+        // after, b apart from both; by patience, X kept and the three lines
+        // before it taken out, b among them.
+        m.setTexts("X\na\nb\na", "a\nB\na\nX");
+        m.setMergeBase("a\nb\na\nX");
+        ensure_equals("by histogram: none", m.conflictCount(), 0);
+        m.setAlgorithm(ALTextDiff::Algorithm::Patience);
+        ensure_equals("by patience: one", m.conflictCount(), 1);
+        m.setAlgorithm(ALTextDiff::Algorithm::Histogram);
+        ensure_equals("and back: none", m.conflictCount(), 0);
+    }
 }

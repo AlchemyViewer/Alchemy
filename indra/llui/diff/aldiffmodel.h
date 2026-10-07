@@ -536,6 +536,10 @@ private:
     // lines are whole -- an edit takes the lines it keeps out of the side
     // as it was before it reads that side's regions.
     void              mergeRead();
+    // The merge, where there is one, found again by the options as they now
+    // are (mergeOptions): what lines are told the same by, how the lines
+    // that stay are chosen, and the grammar, each as it is set.
+    void              refreshMerge();
 
     std::string           mLeftText;
     std::string           mRightText;

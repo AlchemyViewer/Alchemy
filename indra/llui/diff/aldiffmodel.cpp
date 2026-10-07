@@ -334,10 +334,7 @@ void ALDiffModel::setSwapped(bool swapped)
 void ALDiffModel::setLikeness(const ALTextDiff::Likeness& like)
 {
     mOptions.like = like;
-    if (mMerge)
-    {
-        mMerge->setOptions(mergeOptions());
-    }
+    refreshMerge();
     // The runs are others now, but one hiding the same first line of the
     // right as one the reader opened is the same to the reader: open.
     const std::vector<S32> opened = openedLines();
@@ -356,6 +353,7 @@ void ALDiffModel::setAlgorithm(ALTextDiff::Algorithm algorithm)
     if (mOptions.algorithm != algorithm)
     {
         mOptions.algorithm            = algorithm;
+        refreshMerge();
         const std::vector<S32> opened = openedLines();
         build();
         reopen(opened);
@@ -374,12 +372,16 @@ void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t mergin
         setLikeness(like);
         return;
     }
-    // The merge read by the grammar now given.
+    refreshMerge();
+    build(foldsOpen());
+}
+
+void ALDiffModel::refreshMerge()
+{
     if (mMerge)
     {
         mMerge->setOptions(mergeOptions());
     }
-    build(foldsOpen());
 }
 
 // --- made --------------------------------------------------------------------------
