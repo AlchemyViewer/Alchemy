@@ -4057,9 +4057,19 @@ std::vector<ALTextRange> ALCodeEditor::placesOf(const std::string& wanted, bool 
     {
         return out;
     }
-    // Taken already: any over one of the selections.
-    const auto taken = [&taken_in](const ALTextRange& range) {
-        return std::any_of(taken_in.begin(), taken_in.end(), [&range](const ALTextRange& one) { return range.overlaps(one.normalised()); });
+    // Taken already: any over one of the selections. They lie apart, so in
+    // the order they begin the first to end past a place's start is the
+    // only one that can be over it.
+    std::vector<ALTextRange> held;
+    held.reserve(taken_in.size());
+    for (const ALTextRange& one : taken_in)
+    {
+        held.push_back(one.normalised());
+    }
+    std::sort(held.begin(), held.end(), [](const ALTextRange& a, const ALTextRange& b) { return a.begin < b.begin; });
+    const auto taken = [&held](const ALTextRange& range) {
+        const auto past = std::upper_bound(held.begin(), held.end(), range.begin, [](const ALTextPos& at, const ALTextRange& r) { return at < r.end; });
+        return past != held.end() && range.overlaps(*past);
     };
     // Each line once, from `from` round to it again.
     for (S32 step = 0; step <= count && out.size() < most; ++step)
@@ -4076,8 +4086,10 @@ std::vector<ALTextRange> ALCodeEditor::placesOf(const std::string& wanted, bool 
             {
                 continue;
             }
+            // Found in the order they lie, round from `from` and short of it
+            // again: only the last found can be over the next.
             const ALTextRange range(ALTextPos(line, static_cast<S32>(at)), ALTextPos(line, static_cast<S32>(end)));
-            if (!taken(range) && std::none_of(out.begin(), out.end(), [&range](const ALTextRange& r) { return range.overlaps(r); }))
+            if (!taken(range) && (out.empty() || !range.overlaps(out.back())))
             {
                 out.push_back(range);
             }
