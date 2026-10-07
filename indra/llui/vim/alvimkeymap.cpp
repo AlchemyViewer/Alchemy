@@ -627,9 +627,10 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
         mCommandInputs.pop_back();
     }
     // A command done that was no vertical move forgets the wanted
-    // column; one still being typed -- a count, an operator -- keeps
-    // it, and so does a key nobody took, whose character is to come.
-    if (taken && (mMode == Mode::Normal || isVisual()) && !mVerticalMove && mCount == 0 && !mOperator && !mPending)
+    // column; one still being typed -- a count, a register's name, an
+    // operator -- keeps it, and so does a key nobody took, whose
+    // character is to come.
+    if (taken && (mMode == Mode::Normal || isVisual()) && !mVerticalMove && mCount == 0 && !mRegister && !mOperator && !mPending)
     {
         // A block taken to every line's end with $ no longer reaches
         // them, and is lit again as it is.

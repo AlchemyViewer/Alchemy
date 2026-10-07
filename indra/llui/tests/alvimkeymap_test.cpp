@@ -5007,4 +5007,17 @@ namespace tut
         ensure_equals("visual p over it: the short line as it was", flat(editor->text()), std::string("abXYd|a|abXYd|XY|"));
         ensure_equals("what it replaced kept as a delete keeps it", vim->registerText('"'), std::string("c\n \nc"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<174>()
+    {
+        set_test_name("a register's name typed before a motion keeps the column j and k want, with a count before it as well: $ then \"aj goes to the next line's end");
+        make("abcdef\nabcdefghij\n");
+        keys("$\"aj");
+        ensure_equals("$ then \"aj: the line's end", caretText(), std::string("1:9"));
+
+        make("abcdef\nx\nabcdefghij\n");
+        keys("$2\"aj");
+        ensure_equals("$ then 2\"aj", caretText(), std::string("2:9"));
+    }
 }
