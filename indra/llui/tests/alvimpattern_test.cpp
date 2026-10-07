@@ -151,4 +151,16 @@ namespace tut
         ensure_equals("themselves", ALVimPattern::replacementOf("\\&\\~\\\\"), std::string("&~\\\\"));
         ensure_equals("case", ALVimPattern::replacementOf("\\u\\1\\e"), std::string("\\u$1\\E"));
     }
+
+    template<> template<>
+    void alvimpattern_object::test<6>()
+    {
+        set_test_name("\\{,m} counts from none, as many as m, the lazy one and very magic's too");
+        ensure_equals("up to two", regexOf("x\\{,2}y"), std::string("x{0,2}y"));
+        ensure_equals("as few as may be", regexOf("x\\{-,2}y"), std::string("x{0,2}?y"));
+        ensure_equals("very magic", regexOf("\\v-{,3}a"), std::string("-{0,3}a"));
+        ensure_equals("found as vim finds them", found("xxy x{,2}y", ALVimPattern::of("x\\{,2}y", std::string(), plain)), std::string("xxy|y"));
+        ensure_equals("the lazy one", found("xxxy", ALVimPattern::of("x\\{-,2}y", std::string(), plain)), std::string("xxy"));
+        ensure_equals("very magic's", found("---a", ALVimPattern::of("\\v-{,3}a", std::string(), plain)), std::string("---a"));
+    }
 }

@@ -92,6 +92,16 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         }
         return close;
     };
+    // What a count's braces hold as the engine's repeat: n,m, n and n, as
+    // they are; ,m from none, which the engine would take for the braces
+    // themselves; nothing, or a comma alone, any number, as *.
+    auto repeatOf = [](const std::string& body) {
+        if (body.empty() || body == ",")
+        {
+            return std::string("*");
+        }
+        return body[0] == ',' ? "{0" + body + "}" : "{" + body + "}";
+    };
     // How deep in the engine's brackets the output is, so that a \zs at
     // the top can split the pattern into groups.
     S32   depth    = 0;
@@ -148,18 +158,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     {
                         body.erase(0, 1);
                     }
-                    if (body.empty())
-                    {
-                        out.regex += "*";
-                    }
-                    else if (body == ",")
-                    {
-                        out.regex += "*";
-                    }
-                    else
-                    {
-                        out.regex += "{" + body + "}";
-                    }
+                    out.regex += repeatOf(body);
                     if (lazy)
                     {
                         out.regex += "?";
@@ -436,7 +435,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         {
                             body.erase(0, 1);
                         }
-                        out.regex += body.empty() || body == "," ? std::string("*") : "{" + body + "}";
+                        out.regex += repeatOf(body);
                         if (lazy)
                         {
                             out.regex += "?";
