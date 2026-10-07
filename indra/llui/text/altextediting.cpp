@@ -27,24 +27,16 @@
 
 #include "altextediting.h"
 
+#include "altextchars.h"
+
 #include <algorithm>
 
 namespace
 {
-    bool isBlank(char c)
-    {
-        return c == ' ' || c == '\t';
-    }
-
     // Where a line's text begins, past its blanks.
     S32 indentationOf(const std::string& line)
     {
-        S32 n = 0;
-        while (n < static_cast<S32>(line.size()) && isBlank(line[n]))
-        {
-            ++n;
-        }
-        return n;
+        return static_cast<S32>(alLeadingBlankBytes(line));
     }
 
     // Lines first through last again, under them.

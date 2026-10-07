@@ -36,11 +36,6 @@
 
 namespace
 {
-    bool isBlank(char c)
-    {
-        return c == ' ' || c == '\t';
-    }
-
     // Blanks as wide as asked: tabs, then spaces for what is left; or
     // spaces alone.
     std::string blanksOf(S32 width, S32 tab_width, bool tabs)
@@ -48,6 +43,17 @@ namespace
         tab_width = llmax(1, tab_width);
         return tabs ? std::string(static_cast<size_t>(width / tab_width), '\t') + std::string(static_cast<size_t>(width % tab_width), ' ')
                     : std::string(static_cast<size_t>(width), ' ');
+    }
+
+    // The nearest line above one with anything on it, or -1.
+    S32 filledAbove(const ALTextDocument& doc, S32 line)
+    {
+        S32 above = line - 1;
+        while (above >= 0 && alLeadingBlankBytes(doc.line(above)) == doc.line(above).size())
+        {
+            --above;
+        }
+        return above;
     }
 }
 
@@ -192,21 +198,13 @@ std::string closingIndent(const ALTextDocument& doc, S32 line, const ALSyntaxGra
             return leadingBlanks(doc, opened.line);
         }
     }
-    S32 above = line - 1;
-    while (above >= 0 && leadingBlanks(doc, above).size() == doc.line(above).size())
-    {
-        --above;
-    }
+    const S32 above = filledAbove(doc, line);
     if (above < 0)
     {
         return std::string();
     }
-    const std::string above_lead = leadingBlanks(doc, above);
-    std::string_view  above_text = doc.line(above);
-    while (!above_text.empty() && isBlank(above_text.back()))
-    {
-        above_text.remove_suffix(1);
-    }
+    const std::string      above_lead = leadingBlanks(doc, above);
+    const std::string_view above_text = alTrimmedEnd(doc.line(above));
     return grammar && grammar->opensBlock(above_text) ? above_lead : outdented(above_lead, options);
 }
 
@@ -244,27 +242,6 @@ std::optional<Replacement> closingBeforeReturn(const ALTextDocument& doc, const 
 
 namespace
 {
-    // The text with its trailing blanks gone.
-    std::string_view trimmedEnd(std::string_view text)
-    {
-        while (!text.empty() && isBlank(text.back()))
-        {
-            text.remove_suffix(1);
-        }
-        return text;
-    }
-
-    // The nearest line above one with anything on it, or -1.
-    S32 filledAbove(const ALTextDocument& doc, S32 line)
-    {
-        S32 above = line - 1;
-        while (above >= 0 && doc.line(above).find_first_not_of(" \t\r") == std::string::npos)
-        {
-            --above;
-        }
-        return above;
-    }
-
     // The head that sent a line in for its one statement -- `if (a)` over
     // it -- or the outermost of a run of them, each further out than the
     // last; where there is none, nothing.
@@ -275,7 +252,7 @@ namespace
         S32                        width = alBlanksWidth(indent, tab_width);
         for (S32 above = filledAbove(doc, line); above >= 0; above = filledAbove(doc, above))
         {
-            const std::string_view text = trimmedEnd(doc.line(above));
+            const std::string_view text = alTrimmedEnd(doc.line(above));
             size_t                 lead = 0;
             const S32              own  = alBlanksWidth(text, tab_width, &lead);
             if (own >= width || !grammar->opensOnce(text))
@@ -316,21 +293,17 @@ Split splitLine(const ALTextDocument& doc, const ALTextRange& selection, const A
     const ALTextRange  sel    = selection.normalised();
     const std::string& line   = doc.line(sel.begin.line);
     S32                blanks = 0;
-    while (blanks < sel.begin.column && blanks < static_cast<S32>(line.size()) && isBlank(line[blanks]))
+    while (blanks < sel.begin.column && blanks < static_cast<S32>(line.size()) && alBlankByte(line[blanks]))
     {
         ++blanks;
     }
-    const std::string indent = line.substr(0, blanks);
-    std::string_view  before(line.data(), sel.begin.column);
-    while (!before.empty() && isBlank(before.back()))
-    {
-        before.remove_suffix(1);
-    }
+    const std::string      indent = line.substr(0, blanks);
+    const std::string_view before = alTrimmedEnd(std::string_view(line.data(), sel.begin.column));
     // What goes down with the caret, without the blanks it began with,
     // which the new indentation stands in for.
     const std::string& end_line = doc.line(sel.end.line);
     S32                skipped  = sel.end.column;
-    while (skipped < static_cast<S32>(end_line.size()) && isBlank(end_line[skipped]))
+    while (skipped < static_cast<S32>(end_line.size()) && alBlankByte(end_line[skipped]))
     {
         ++skipped;
     }
@@ -437,7 +410,7 @@ Outdent outdentAsTyped(const ALTextDocument& doc, const ALTextPos& anchor, const
     if (content.size() == 1 && grammar->keptLevelWithOnce(content))
     {
         const S32 above = filledAbove(doc, line);
-        if (above >= 0 && grammar->opensOnce(trimmedEnd(doc.line(above))))
+        if (above >= 0 && grammar->opensOnce(alTrimmedEnd(doc.line(above))))
         {
             const std::string head = leadingBlanks(doc, above);
             if (alBlanksWidth(head, options.tabWidth) < alBlanksWidth(lead, options.tabWidth))
@@ -530,18 +503,10 @@ std::optional<PastePlan> planPaste(const ALTextDocument& doc, const ALTextRange&
         return plan;
     }
     // Nothing else on the line: where the line above says a line goes.
-    S32 above = sel.begin.line - 1;
-    while (above >= 0 && doc.line(above).find_first_not_of(" \t\r") == std::string::npos)
-    {
-        --above;
-    }
+    const S32 above = filledAbove(doc, sel.begin.line);
     if (above >= 0)
     {
-        std::string_view above_text = doc.line(above);
-        while (!above_text.empty() && isBlank(above_text.back()))
-        {
-            above_text.remove_suffix(1);
-        }
+        const std::string_view above_text = alTrimmedEnd(doc.line(above));
         plan.base = alBlanksWidth(above_text, options.tabWidth) + (grammar->opensBlock(above_text) ? level : 0);
     }
     std::string_view head = pasted.substr(pasted.find_first_not_of(" \t\r\n"));

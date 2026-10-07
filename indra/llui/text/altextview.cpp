@@ -2419,13 +2419,8 @@ ALTextRange ALTextView::moved(ALEditorCommand command, const ALTextRange& select
         {
             // To the first thing on the line, or to the line's start from
             // there.
-            const std::string& line   = mDocument.line(caret.line);
-            S32                indent = 0;
-            while (indent < static_cast<S32>(line.size()) && (line[indent] == ' ' || line[indent] == '\t'))
-            {
-                ++indent;
-            }
-            to = ALTextPos(caret.line, caret.column == indent ? 0 : indent);
+            const S32 indent = static_cast<S32>(alLeadingBlankBytes(mDocument.line(caret.line)));
+            to               = ALTextPos(caret.line, caret.column == indent ? 0 : indent);
             break;
         }
         case C::MoveLineEnd:

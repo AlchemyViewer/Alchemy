@@ -151,13 +151,41 @@ inline T alNextTabStop(T at, T tab_width)
     }
 }
 
+// A blank, as a line's indentation and its end count one: a space or a
+// tab.
+inline bool alBlankByte(char c)
+{
+    return c == ' ' || c == '\t';
+}
+
+// How many bytes the blanks a text begins with are.
+inline size_t alLeadingBlankBytes(std::string_view text)
+{
+    size_t at = 0;
+    while (at < text.size() && alBlankByte(text[at]))
+    {
+        ++at;
+    }
+    return at;
+}
+
+// The text without the blanks it ends with.
+inline std::string_view alTrimmedEnd(std::string_view text)
+{
+    while (!text.empty() && alBlankByte(text.back()))
+    {
+        text.remove_suffix(1);
+    }
+    return text;
+}
+
 // How wide the blanks a text begins with are drawn, in display columns,
 // each tab to its next stop; and how many bytes they are.
 inline S32 alBlanksWidth(std::string_view text, S32 tab_width, size_t* bytes = nullptr)
 {
     S32    width = 0;
     size_t at    = 0;
-    for (; at < text.size() && (text[at] == ' ' || text[at] == '\t'); ++at)
+    for (; at < text.size() && alBlankByte(text[at]); ++at)
     {
         width = text[at] == '\t' ? alNextTabStop(width, tab_width) : width + 1;
     }
