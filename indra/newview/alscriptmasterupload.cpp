@@ -200,9 +200,13 @@ void ALScriptMasterUpload::worldHas(const LLUUID& asset)
     // read, to tell a real change from the same text gone up another way.
     mWorldMoved = asset.notNull() && mLink.base.notNull() && asset != mLink.base;
     // A probe asked of it reads it whatever the base: what the world holds
-    // is what it is asked. One that is not reads it never. A notecard's is
+    // is what it is asked. One that is not reads it where it moved, and
+    // where nothing was ever sent through the link: its base is what the
+    // item held when it was linked, so nothing has moved, and yet the
+    // first send goes over what the world has -- which may be a co-owner's
+    // work, and is kept first where it is not what goes up. A notecard's is
     // read always, for the items it may have come to carry.
-    const bool read = mProbed ? mProbeWorld && asset.notNull() : mWorldMoved || (mLink.notecard && asset.notNull());
+    const bool read = mProbed ? mProbeWorld && asset.notNull() : asset.notNull() && (mWorldMoved || firstSend() || mLink.notecard);
     if (!read)
     {
         decide();
@@ -259,7 +263,22 @@ void ALScriptMasterUpload::decide()
         end(Outcome::What::Failed, LLTrans::getString("ScriptMasterExpandFailed"));
         return;
     }
-    switch (ALMasterPlan::decide(mKind, mWorldMoved, mWorldSame, unchanged, skip_unchanged))
+    ALMasterPlan::Do plan = ALMasterPlan::decide(mKind, mWorldMoved, mWorldSame, unchanged, skip_unchanged);
+    if (plan == ALMasterPlan::Do::Send && firstSend() && mAsset.notNull() && !mWorldSame)
+    {
+        // The first send through a link goes over what the world held when
+        // it was linked, which the plan sees as no move: it is kept first,
+        // as what a move brought is. A send of the studio's own that could
+        // not read it, to keep it, goes no further: a save of the master
+        // goes up all the same, as every save does.
+        if (!mWorldRead && mKind == ALMasterPlan::Send::Derived)
+        {
+            end(Outcome::What::Failed, LLTrans::getString("ScriptMasterWorldUnread"));
+            return;
+        }
+        plan = ALMasterPlan::Do::SendKeepingTheirs;
+    }
+    switch (plan)
     {
         case ALMasterPlan::Do::Skip:
             // Nothing to send: where the world moved, it holds what the
@@ -278,25 +297,31 @@ void ALScriptMasterUpload::decide()
             end(Outcome::What::Held);
             return;
         case ALMasterPlan::Do::SendKeepingTheirs:
-            // What the world had, in History before it is gone over, under
-            // the item, as every save keeps what it sends.
-            if (!mWorldText.empty())
-            {
-                ALScriptSaved theirs;
-                theirs.ref    = mRef;
-                theirs.kind   = ALScriptKind::Script;
-                theirs.text   = mWorldText;
-                theirs.asset  = mAsset;
-                theirs.sender = ALScriptSender(ALScriptOrigin::Disk);
-                ALScriptWorkspace::instance().keepInHistory(theirs);
-                mKeptTheirs = true;
-            }
+            keepTheirs();
             upload();
             return;
         case ALMasterPlan::Do::Send:
             upload();
             return;
     }
+}
+
+void ALScriptMasterUpload::keepTheirs()
+{
+    // What the world had, in History before it is gone over, under the
+    // item, as every save keeps what it sends: a notecard's as a notecard.
+    if (mWorldText.empty())
+    {
+        return;
+    }
+    ALScriptSaved theirs;
+    theirs.ref    = mRef;
+    theirs.kind   = mLink.notecard ? ALScriptKind::Notecard : ALScriptKind::Script;
+    theirs.text   = mWorldText;
+    theirs.asset  = mAsset;
+    theirs.sender = ALScriptSender(ALScriptOrigin::Disk);
+    ALScriptWorkspace::instance().keepInHistory(theirs);
+    mKeptTheirs = true;
 }
 
 void ALScriptMasterUpload::upload()

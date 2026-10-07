@@ -649,6 +649,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptMasterNotScript">it is no longer a script</string>
 	<string name="ScriptMasterNotecardCarries">it carries items in the world, which a file cannot hold</string>
 	<string name="ScriptMasterExpandFailed">the preprocessor found errors in it, listed among its file's problems</string>
+	<string name="ScriptMasterWorldUnread">what it holds in-world could not be read, to keep it in History first</string>
 	<string name="ScriptMasterToastFailed">[FILE] was not sent to [NAME]: [WHY].</string>
 	<string name="ScriptMasterToastNotCompiled">[NAME] went up from [FILE], and did not compile.</string>
 	<string name="ScriptMasterToastHeld">[NAME] was changed in-world since [FILE] was last sent to it, so it was not sent.</string>

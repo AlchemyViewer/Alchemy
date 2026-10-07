@@ -43,10 +43,12 @@ class LLInventoryItem;
 //  - the file expanded as a file on disk is, its includes read from beside
 //    it, with an upload header naming it where headers are on;
 //  - the world asked what it holds, and, where that is not what the last
-//    send left, its text read and hashed beside what would go up;
+//    send left or nothing went up through the link yet, its text read and
+//    hashed beside what would go up;
 //  - what the plan says done (ALMasterPlan): the world's text kept in
-//    History first where it is gone over, a send of the studio's own held
-//    where the world moved under it;
+//    History first where it is gone over -- by the first send through a
+//    link too, which the plan sees as no move -- a send of the studio's
+//    own held where the world moved under it;
 //  - sent, through the workspace as every save goes, and the link moved on.
 // What came of it goes to ALScriptDiskMasters::finished, which tells
 // whoever listens. A save always goes up: what the preprocessor found is
@@ -95,12 +97,17 @@ private:
     void worldHas(const LLUUID& asset);
     void worldText(const ALScriptLoaded& loaded);
     void decide();
+    // What the world holds kept in History, before it is gone over.
+    void keepTheirs();
     void upload();
     void uploaded(const ALScriptCompileResult& result);
     void end(Outcome::What what, const std::string& why = std::string(), std::optional<ALScriptCompileResult> result = std::nullopt);
     // What a text hashes to as the link keeps it: a script's as the
     // envelope's halves, a notecard's as its text.
     std::string hashOf(const std::string& text) const;
+    // Whether nothing has gone up through the link yet: its base is what
+    // the item held when it was linked, not what a send left.
+    bool firstSend() const { return mLink.hash.empty(); }
 
     ALMasterLink       mLink;
     ALMasterLink       mUpdated;
