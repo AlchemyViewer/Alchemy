@@ -1254,9 +1254,13 @@ private:
     // back -- else as it is.
     ALTextPos snapped(const ALTextPos& pos, const ALTextPos& from) const;
     // The substitution or the atom under a local point, if the point is
-    // on its glyphs.
+    // on its glyphs on the row under it.
     const Substitution* linkAtLocal(S32 x, S32 y);
     const Atom*         atomAtLocal(S32 x, S32 y);
+    // An atom's box as the layout put it: the row its gap is on, and the
+    // gap's x's across that row, from its pen and its advance. False where
+    // its line has no gap for it.
+    bool                atomBox(const Atom& atom, S32& row, F32& x0, F32& x1);
     // The atom whose view has the keyboard, or -1; and the keyboard taken
     // back from a view about to lose its box.
     S32                 focusedAtom() const;

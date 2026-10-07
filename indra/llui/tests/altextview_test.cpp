@@ -2863,4 +2863,79 @@ namespace tut
         ensure("down again", v.perform(ALEditorCommand::MoveDown));
         ensure("to where it began", v.caret() == end);
     }
+
+    template<> template<>
+    void altextview_object::test<91>()
+    {
+        set_test_name("a link that wraps is followed from the whole of each of its rows, and not from the text after it");
+        ALTextView& v = make("");
+        v.setWordWrap(true);
+        v.setText(std::string(200, 'a'));
+        const S32 fits = v.layout().line(0).rows[0].end;
+        ensure("a row holds a few letters", fits > 6);
+        // A word too long for a row, shown as it is: all of the first two
+        // rows and three letters of the third, so that it ends near that
+        // row's start, left of where most of it stands on the rows above.
+        const S32 length = 2 * fits + 3;
+        v.setText(std::string(static_cast<size_t>(length), 'u') + " now");
+        ALTextView::Substitution link;
+        link.range = ALTextRange(ALTextPos(0, 0), ALTextPos(0, length));
+        link.link  = true;
+        link.value = "followed";
+        v.addSubstitution(link);
+        ensure_equals("three rows", v.layout().rowCount(0), 3);
+        std::string followed;
+        v.onLinkClicked([&followed](const ALTextView::Substitution& s) { followed = s.value.asString(); });
+        const auto click = [&](S32 column) {
+            S32 x = 0, y = 0;
+            pointOf(0, column, x, y);
+            followed.clear();
+            v.handleMouseDown(x, y, MASK_NONE);
+            v.handleMouseUp(x, y, MASK_NONE);
+            return followed;
+        };
+        ensure_equals("from the middle of the first row", click(fits / 2), std::string("followed"));
+        ensure_equals("from the middle of the second", click(fits + fits / 2), std::string("followed"));
+        ensure_equals("from the third, where it ends", click(2 * fits + 1), std::string("followed"));
+        ensure("not from the word after it", click(length + 2).empty());
+    }
+
+    template<> template<>
+    void altextview_object::test<92>()
+    {
+        set_test_name("an atom that ends a row is clicked on its box, and a view in it is put in its box on that row");
+        ALTextView& v = make("");
+        v.setWordWrap(true);
+        v.setText("aa" + ALTextView::atomPlaceholder() + "bbbbbb");
+        const S32 wrap   = v.layout().wrapWidth();
+        const S32 before = static_cast<S32>(v.layout().xOf(0, 2));
+        // As wide as what is left of the row but two pixels: the word after
+        // it goes to the next row, and the atom ends the first.
+        ALTextView::Atom picture;
+        picture.at    = ALTextPos(0, 2);
+        picture.width = wrap - before - 2;
+        picture.value = 7;
+        v.addAtom(picture);
+        ensure("the atom ends the first row", v.layout().rowCount(0) == 2 && v.layout().line(0).rows[0].end == 5);
+        S32 clicked = 0;
+        v.onAtomClicked([&clicked](const ALTextView::Atom& a) { clicked = a.value.asInteger(); });
+        S32 x, y;
+        pointOf(0, 2, x, y);
+        x += picture.width / 2;
+        v.handleMouseDown(x, y, MASK_NONE);
+        v.handleMouseUp(x, y, MASK_NONE);
+        ensure_equals("clicked on its box", clicked, 7);
+        LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
+        bp.name                 = "inline";
+        bp.label                = "Go";
+        bp.rect                 = LLRect(0, 20, 40, 0);
+        LLButton*        button = LLUICtrlFactory::create<LLButton>(bp);
+        ALTextView::Atom widget = picture;
+        widget.view             = button;
+        v.setAtoms({ widget });
+        v.placeAtomViews();
+        ensure("shown", button->getVisible());
+        ensure_equals("from where the layout put its box", button->getRect().mLeft, before);
+        ensure("as wide as its box", llabs(button->getRect().getWidth() - picture.width) <= 1);
+    }
 }

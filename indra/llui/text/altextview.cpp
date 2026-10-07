@@ -1740,11 +1740,11 @@ void ALTextView::placeAtomViews()
         const bool line_in_sight = row_h > 0 && atom.at.line < mDocument.lineCount() && !mLayout.hidden(atom.at.line) &&
                                    mLayout.lineTop(atom.at.line) < mScrollY + text.getHeight() &&
                                    mLayout.lineTop(atom.at.line) + mLayout.lineHeight(atom.at.line) > mScrollY;
-        if (line_in_sight)
+        S32 row = -1;
+        F32 x0  = 0.f;
+        F32 x1  = 0.f;
+        if (line_in_sight && atomBox(atom, row, x0, x1))
         {
-            S32       row;
-            const F32 x0     = mLayout.xOf(atom.at.line, atom.at.column, &row);
-            const F32 x1     = mLayout.xOf(atom.at.line, atomRange(atom).end.column);
             const S32 top    = screenTopOf(text, atom.at.line, row);
             const S32 height = mLayout.rowHeightOf(atom.at.line, row);
             if (top > text.mBottom && top - height < text.mTop)
@@ -1897,12 +1897,14 @@ const ALTextView::Substitution* ALTextView::linkAtLocal(S32 x, S32 y)
     {
         return nullptr;
     }
-    // On its glyphs, not merely on its line past its end.
-    S32       row;
-    const F32 x0 = mLayout.xOf(at.line, sub->range.begin.column, &row);
-    const F32 x1 = mLayout.xOf(at.line, sub->range.end.column);
-    const F32 xr = static_cast<F32>(x - text.mLeft) + mScrollX;
-    return xr >= x0 && xr < x1 ? sub : nullptr;
+    // On its glyphs, not merely on its line past its end: its span on the
+    // row under the point, which is each row's own where it wraps.
+    const S32 doc_y = (text.mTop - y) + mScrollY;
+    const S32 row   = mLayout.rowAtY(at.line, doc_y - mLayout.lineTop(at.line));
+    const F32 xr    = static_cast<F32>(x - text.mLeft) + mScrollX;
+    F32       x0    = 0.f;
+    F32       x1    = 0.f;
+    return spanOnRow(at.line, row, sub->range, x0, x1) && xr >= x0 && xr < x1 ? sub : nullptr;
 }
 
 const ALTextView::Atom* ALTextView::atomAtLocal(S32 x, S32 y)
@@ -1918,11 +1920,50 @@ const ALTextView::Atom* ALTextView::atomAtLocal(S32 x, S32 y)
     {
         return nullptr;
     }
-    S32       row;
-    const F32 x0 = mLayout.xOf(at.line, atom->at.column, &row);
-    const F32 x1 = mLayout.xOf(at.line, atomRange(*atom).end.column);
-    const F32 xr = static_cast<F32>(x - text.mLeft) + mScrollX;
-    return xr >= x0 && xr < x1 ? atom : nullptr;
+    // On its box, on the row under the point.
+    S32       row   = -1;
+    F32       x0    = 0.f;
+    F32       x1    = 0.f;
+    const S32 doc_y = (text.mTop - y) + mScrollY;
+    const F32 xr    = static_cast<F32>(x - text.mLeft) + mScrollX;
+    return atomBox(*atom, row, x0, x1) && row == mLayout.rowAtY(at.line, doc_y - mLayout.lineTop(at.line)) && xr >= x0 && xr < x1 ? atom : nullptr;
+}
+
+bool ALTextView::atomBox(const Atom& atom, S32& row, F32& x0, F32& x1)
+{
+    const ALTextLayout::Line& laid   = mLayout.line(atom.at.line);
+    const S32                 column = atom.at.column;
+    // Its gap: the glyph on its first byte with an atom's id, after any
+    // inlay at the column; searched for where the clusters are in order.
+    size_t k = 0;
+    if (laid.ordered)
+    {
+        k = static_cast<size_t>(std::partition_point(laid.glyphs.begin(), laid.glyphs.end(), [column](const ALTextLayout::Glyph& g) { return g.cluster < column; }) -
+                                laid.glyphs.begin());
+    }
+    for (; k < laid.glyphs.size(); ++k)
+    {
+        const ALTextLayout::Glyph& glyph = laid.glyphs[k];
+        if (laid.ordered && glyph.cluster > column)
+        {
+            break;
+        }
+        if (glyph.cluster != column || !isAtomId(glyph.substitution))
+        {
+            continue;
+        }
+        // The row whose glyphs end past it.
+        const auto on = std::upper_bound(laid.rows.begin(), laid.rows.end(), k, [](size_t at, const ALTextLayout::Row& r) { return at < r.glyphEnd; });
+        if (on == laid.rows.end())
+        {
+            return false;
+        }
+        row = static_cast<S32>(on - laid.rows.begin());
+        x0  = glyph.pen - on->xStart;
+        x1  = x0 + glyph.advance;
+        return true;
+    }
+    return false;
 }
 
 // --- the spell check -------------------------------------------------------------
