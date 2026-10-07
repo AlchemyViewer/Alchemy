@@ -31,6 +31,9 @@
 
 #include "../test/lltut.h"
 
+#include "Luau/Allocator.h"
+#include "Luau/Lexer.h"
+
 #include <filesystem>
 #include <fstream>
 #include <set>
@@ -110,6 +113,63 @@ namespace tut
                 }
             }
             ensure("checks as SLua:\n" + said + "---\n" + r.text, said.empty());
+        }
+
+        // The comment Luau's own lexer reads beginning at `at` in the text,
+        // all of it: a line's to its line's end, a block's to its close.
+        // Nothing where none begins there, or a block is never closed.
+        static std::string commentAt(const std::string& slua, size_t at)
+        {
+            std::vector<size_t> starts{ 0 };
+            for (size_t i = 0; i < slua.size(); ++i)
+            {
+                if (slua[i] == '\n')
+                {
+                    starts.push_back(i + 1);
+                }
+            }
+            Luau::Allocator    allocator;
+            Luau::AstNameTable names(allocator);
+            Luau::Lexer        lexer(slua.data(), slua.size(), names);
+            lexer.setSkipComments(false);
+            for (const Luau::Lexeme* token = &lexer.next(); token->type != Luau::Lexeme::Eof; token = &lexer.next())
+            {
+                const size_t from = starts[token->location.begin.line] + token->location.begin.column;
+                if (from < at)
+                {
+                    continue;
+                }
+                if (from > at || (token->type != Luau::Lexeme::Comment && token->type != Luau::Lexeme::BlockComment))
+                {
+                    return {};
+                }
+                return slua.substr(from, starts[token->location.end.line] + token->location.end.column - from);
+            }
+            return {};
+        }
+        static std::string commentAt(const std::string& slua, const std::string& begins)
+        {
+            const size_t at = slua.find(begins);
+            ensure("written: " + begins + "\n" + slua, at != std::string::npos);
+            return commentAt(slua, at);
+        }
+        // A toggle turned the other way in SLua: a dash taken out of its
+        // opener's ---, or put in a block comment's --; the comment that
+        // begins there then.
+        static std::string toggled(const std::string& slua, const std::string& opener, bool off = true)
+        {
+            const size_t at = slua.find(opener);
+            ensure("written: " + opener + "\n" + slua, at != std::string::npos);
+            std::string other = slua;
+            if (off)
+            {
+                other.erase(at, 1);
+            }
+            else
+            {
+                other.insert(at, "-");
+            }
+            return commentAt(other, at);
         }
 
         static bool has(const ALLSLToSLua::Result& r, const std::string& text) { return r.text.find(text) != std::string::npos; }
@@ -1448,7 +1508,7 @@ namespace tut
         ensure("after its statement: " + r.text, has(r, "local S_MASK: number = -268435456 -- -268435456\n"));
         ensure("a rule of slashes: " + r.text, has(r, "\n---------------------------------------------------------------\n") ||
                                                     has(r, "------------------------- DEBUGGING ---------------------------\n"));
-        ensure("the toggle: " + r.text, has(r, "---[[\nlocal function get(") && has(r, "end\n\n--]]\n"));
+        ensure("the toggle: " + r.text, has(r, "---[[\nlocal function get(") && has(r, "end\n--]]\n"));
         ensure("the toggle the other way: " + r.text, has(r, "--[[\nstring old() { return \"\"; }\n--]]"));
         ensure("an if on one line on one: " + r.text,
                has(r, "    if bit32.btest(parcelFlags, PARCEL_FLAG_ALLOW_CREATE_OBJECTS) then return 1 end -- may build\n"));
@@ -2138,5 +2198,155 @@ namespace tut
         ensure("given no text: " + given.text, noted(given, "SluaKeyEmpty") && noted(given, "SluaKeyCase"));
         ensure("nothing else said of them: " + given.text, !noted(given, "SluaKeyText") && !noted(given, "SluaUuidText"));
         checksClean(given);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<90>()
+    {
+        set_test_name("the //* toggle with a word after its star: ---[[ and the word over the code, --]] under it, which SLua reads as "
+                      "two line comments, and a dash taken out of the opener as the block comment the closer closes");
+        ALLSLToSLua::Options options;
+        options.types               = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert("//* OVERRIDE\n"
+                                                           "integer allowAttachedAO;\n"
+                                                           "//*/\n"
+                                                           "default { state_entry() { if (allowAttachedAO) llOwnerSay(\"on\"); } }\n",
+                                                           options);
+        ensure("converted", r.converted);
+        ensure("the toggle: " + r.text, has(r, "\n---[[ OVERRIDE\nlocal allowAttachedAO: boolean = false\n--]]\n"));
+        ensure_equals("the opener a line comment", commentAt(r.text, "---[["), std::string("---[[ OVERRIDE"));
+        ensure_equals("the closer one", commentAt(r.text, "--]]"), std::string("--]]"));
+        ensure_equals("turned off", toggled(r.text, "---[["), std::string("--[[ OVERRIDE\nlocal allowAttachedAO: boolean = false\n--]]"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<91>()
+    {
+        set_test_name("what is half of a toggle: an opener only where a closer follows it, and no rule of stars nor a comment closed on "
+                      "its line once a / is out; openers since the last closer share the next; a closer's own comment after it SLua's");
+        const ALLSLToSLua::Result lone = convert("integer a;\n"
+                                                 "//* nothing closes this\n"
+                                                 "integer b;\n"
+                                                 "default { state_entry() { llOwnerSay((string)(a + b)); } }\n");
+        ensure("a lone opener a comment with a star: " + lone.text, has(lone, "\n--* nothing closes this\nlocal b = 0\n") && !has(lone, "---["));
+        checksClean(lone);
+
+        const ALLSLToSLua::Result r = convert("//* not one */\n"
+                                              "//**************\n"
+                                              "integer c = 1;\n"
+                                              "//* one\n"
+                                              "integer d = 2;\n"
+                                              "//* two\n"
+                                              "integer e = 3;\n"
+                                              "//*/ // both\n"
+                                              "//*/\n"
+                                              "default { state_entry() { llOwnerSay((string)(c + d + e)); } }\n");
+        ensure("closed on its line: " + r.text, has(r, "\n--* not one */\n"));
+        ensure("a rule of stars: " + r.text, has(r, "\n--**************\n"));
+        ensure("two openers and a closer, then one alone: " + r.text,
+               has(r, "\n---[[ one\nlocal d = 2\n---[[ two\nlocal e = 3\n--]] -- both\n--]]\n"));
+        ensure_equals("the first off", toggled(r.text, "---[[ one"), std::string("--[[ one\nlocal d = 2\n---[[ two\nlocal e = 3\n--]]"));
+        ensure_equals("the second off", toggled(r.text, "---[[ two"), std::string("--[[ two\nlocal e = 3\n--]]"));
+        std::string off = r.text;
+        off.erase(off.find("---[[ one"), 1);
+        ensure_equals("the closer's own comment after it, off", commentAt(off, "-- both"), std::string("-- both"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<92>()
+    {
+        set_test_name("the toggle the other way, /* over the code and //*/ under it: --[[ and --]], which a dash put in the opener makes two "
+                      "line comments again; and an opener over code before one, which shares its closer");
+        const ALLSLToSLua::Result r = convert("/* OVERRIDE\n"
+                                              "integer allowAttachedAO;\n"
+                                              "//*/\n"
+                                              "//* A\n"
+                                              "integer x = 1;\n"
+                                              "/* B\n"
+                                              "integer y = 2;\n"
+                                              "//*/\n"
+                                              "default { state_entry() { llOwnerSay((string)x); } }\n");
+        ensure_equals("one block comment", commentAt(r.text, "--[[ OVERRIDE"), std::string("--[[ OVERRIDE\ninteger allowAttachedAO;\n--]]"));
+        // What it holds stays LSL: nothing says it is code.
+        std::string on = r.text;
+        on.insert(on.find("--[[ OVERRIDE"), "-");
+        ensure_equals("turned on, the opener a line comment", commentAt(on, "---[[ OVERRIDE"), std::string("---[[ OVERRIDE"));
+        ensure_equals("and the closer", commentAt(on, "--]]"), std::string("--]]"));
+        ensure_equals("the opener over code off, to the closer of the one after it", toggled(r.text, "---[[ A"),
+                      std::string("--[[ A\nlocal x = 1\n\n--[[ B\ninteger y = 2;\n--]]"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<93>()
+    {
+        set_test_name("a toggle's level, the fewest =s nothing between its first opener and its closer closes once it is off: past a ]] "
+                      "in a string or a comment in it, the opener and closer of one pair at one; nought where the script leaves no byte "
+                      "to mark it with");
+        const ALLSLToSLua::Result r = convert("//* OVERRIDE\n"
+                                              "string s = \"]]\";\n"
+                                              "//*/\n"
+                                              "default { state_entry() { llOwnerSay(s); } }\n");
+        ensure("past a string's ]]: " + r.text, has(r, "\n---[=[ OVERRIDE\nlocal s = \"]]\"\n--]=]\n"));
+        ensure_equals("off", toggled(r.text, "---[=["), std::string("--[=[ OVERRIDE\nlocal s = \"]]\"\n--]=]"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result shared = convert("//* A\n"
+                                                   "integer x = 1; /* one */\n"
+                                                   "/* B\n"
+                                                   "string s = \"]]\";\n"
+                                                   "//*/\n"
+                                                   "default { state_entry() { llOwnerSay((string)x); } }\n");
+        ensure("one level for the pair: " + shared.text, has(shared, "\n---[=[ A\nlocal x = 1 --[[ one ]]\n") &&
+                                                             has(shared, "\n--[=[ B\nstring s = \"]]\";\n--]=]\n"));
+        ensure_equals("the opener off", toggled(shared.text, "---[=[ A"),
+                      std::string("--[=[ A\nlocal x = 1 --[[ one ]]\n\n--[=[ B\nstring s = \"]]\";\n--]=]"));
+        checksClean(shared);
+
+        std::string every = "// ";
+        for (char c = 1; c < ' '; ++c)
+        {
+            if (c != '\t' && c != '\n' && c != '\r')
+            {
+                every += c;
+            }
+        }
+        const ALLSLToSLua::Result unmarked = convert(every + "\ninteger y;\n//* A\ninteger x = 1;\n//*/\n"
+                                                             "default { state_entry() { llOwnerSay((string)(x + y)); } }\n");
+        ensure("paired still: " + unmarked.text, has(unmarked, "\n---[[ A\nlocal x = 1\n--]]\n"));
+        ensure_equals("no byte of its own left in", count(unmarked, std::string(1, '\x01')), size_t(1));
+        checksClean(unmarked);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<94>()
+    {
+        set_test_name("where a toggle sits: after code on its line, which stays when it is off, the closer after code it turns off; in a "
+                      "handler; and from the script's first comments, kept off the helpers written over the code");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    integer a = 1; //* A\n"
+                                              "    llOwnerSay((string)a); //*/\n"
+                                              "    //* DEBUG\n"
+                                              "    llOwnerSay(\"debug\");\n"
+                                              "    //*/\n"
+                                              "    llOwnerSay(\"done\");\n"
+                                              "} }\n");
+        ensure("after code: " + r.text, has(r, "\nlocal a = 1 ---[[ A\nprint(tostring(a)) --]]\n"));
+        ensure_equals("off from it", toggled(r.text, "---[[ A"), std::string("--[[ A\nprint(tostring(a)) --]]"));
+        ensure("in a handler: " + r.text, has(r, "\n---[[ DEBUG\nprint(\"debug\")\n--]]\nprint(\"done\")\n"));
+        ensure_equals("off", toggled(r.text, "---[[ DEBUG"), std::string("--[[ DEBUG\nprint(\"debug\")\n--]]"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result top = convert("//* DEBUG\n"
+                                                "\n"
+                                                "list l = [1];\n"
+                                                "//*/\n"
+                                                "default { state_entry() { llOwnerSay((string)(l + [2])); } }\n");
+        ensure("the helper over it: " + top.text, has(top, "local function joinLists(") &&
+                                                      top.text.find("local function joinLists(") < top.text.find("---[[ DEBUG"));
+        ensure_equals("off", toggled(top.text, "---[[ DEBUG"), std::string("--[[ DEBUG\nlocal l = {1}\n--]]"));
+        checksClean(top);
     }
 }

@@ -441,6 +441,8 @@ namespace
             // A blank line over it in the LSL, which it keeps.
             bool        apart   = false;
             bool        written = false;
+            // A toggle's closer, //*/, which is about the code over it.
+            bool        closer  = false;
         };
         // Each comment in the LSL, given to the node it is written over --
         // a global, a function, a state, a handler, a statement -- or to
@@ -477,6 +479,13 @@ namespace
         // text, a line's break.
         std::string trailing(const std::vector<size_t>& given, bool* takes_line = nullptr);
         void        putTrailing(size_t end, const std::string& after);
+        // A toggle's brackets -- ---[[ over code and --]] under it, and a
+        // block comment ending in a --]] -- are written with a byte the
+        // script has none of between them, where their level goes; nought
+        // where it has every one. Once the text is whole, each pair at the
+        // level nothing between its first opener and its closer closes.
+        char        mToggleMark = 0;
+        std::string leveled(const std::string& text) const;
 
         // Declarations on lines one after another that the LSL lined up --
         // each one line, given a value, and their = at one column, or the
@@ -1138,6 +1147,20 @@ namespace
                 ++at.column;
             }
         };
+        // The byte a toggle's level is marked with: one the script has none
+        // of, so nothing written of it has one either.
+        for (char c = 1; c < ' ' && !mToggleMark; ++c)
+        {
+            if (c != '\t' && c != '\n' && c != '\r' && src.find(c) == std::string_view::npos)
+            {
+                mToggleMark = c;
+            }
+        }
+        const std::string mark = mToggleMark ? std::string(1, mToggleMark) : std::string();
+        // The openers since the last closer, by the comment and what follows
+        // the star; and each opener with the closer it was paired with.
+        std::vector<std::pair<size_t, std::string>> pending;
+        std::vector<std::pair<size_t, size_t>>      pairs;
         for (size_t i = 0; i < src.size();)
         {
             const char c = src[i];
@@ -1166,6 +1189,13 @@ namespace
             Comment k;
             k.at = at;
             size_t end;
+            // //* over code and //*/ under it, which a / taken out of the
+            // first makes a block comment: ---[[ and --]], which a - taken
+            // out of the first makes one. A closer is one whatever is before
+            // it, and so is a block comment that ends in one, the toggle
+            // turned off; an opener is one where something after it closes
+            // it, and a comment that begins with a star where nothing does.
+            bool closes = false;
             if (src[i + 1] == '/')
             {
                 end              = std::min(src.find('\n', i), src.size());
@@ -1180,12 +1210,27 @@ namespace
                     body = " " + body;
                 }
                 k.text = "--" + body;
-                if (body == "*" || body == "*/")
+                if (body.compare(0, 2, "*/") == 0)
                 {
-                    // //* over code and //*/ under it, which a / taken out of
-                    // the first makes a block comment: ---[[ and --]], which a
-                    // - taken out of the first makes one.
-                    k.text = body == "*" ? "---[[" : "--]]";
+                    // What follows it is the LSL's code once the toggle is
+                    // off, and a comment there SLua's.
+                    std::string  rest = body.substr(2);
+                    const size_t own  = rest.find_first_not_of(" \t");
+                    if (own != std::string::npos && rest.compare(own, 2, "//") == 0)
+                    {
+                        const std::string said = rest.substr(own + 2);
+                        rest                   = rest.substr(0, own) + "--" + (!said.empty() && said[0] == '[' ? " " : "") + said;
+                    }
+                    k.text   = "--]" + mark + "]" + rest;
+                    k.closer = true;
+                    closes   = true;
+                }
+                else if (!body.empty() && body[0] == '*' && (body.size() == 1 || (body[1] != '*' && body[1] != '/')) &&
+                         body.find("*/") == std::string::npos)
+                {
+                    // A word after the star or not, but no rule of stars, nor
+                    // a block comment closed on its line once a / is out.
+                    pending.emplace_back(mComments.size(), body.substr(1));
                 }
                 else if (!body.empty() && body[0] == '/')
                 {
@@ -1217,7 +1262,11 @@ namespace
                 {
                     body += " ";
                 }
-                k.text = "--[" + level + "[" + body + (toggled ? "--" : "") + "]" + level + "]";
+                // A toggle's, marked: its level is what nothing from the
+                // first opener over it closes.
+                const std::string bracket = toggled && !mark.empty() ? mark : level;
+                k.text                    = "--[" + bracket + "[" + body + (toggled ? "--" : "") + "]" + bracket + "]";
+                closes                    = toggled;
                 if (body.size() > 1 && body.front() == '*' && body.back() == '*' && body.find('\n') == std::string::npos)
                 {
                     // A rule of stars on its line, a heading in it or not: of
@@ -1236,6 +1285,15 @@ namespace
                 step(src[i++]);
             }
             k.endLine = at.line;
+            if (closes)
+            {
+                for (const auto& [opener, rest] : pending)
+                {
+                    mComments[opener].text = "---[" + mark + "[" + rest;
+                    pairs.emplace_back(opener, mComments.size());
+                }
+                pending.clear();
+            }
             mComments.push_back(std::move(k));
         }
         // Whether a line of the LSL, from one, is blank.
@@ -1287,6 +1345,16 @@ namespace
         {
             --about;
             next = mComments[about].at.line;
+        }
+        // Not from a toggle's opener whose closer is further on: what is
+        // written between the top and the code, the helpers, would be in it.
+        for (const auto& [opener, closer] : pairs)
+        {
+            if (opener < about && closer >= about)
+            {
+                about = opener;
+                break;
+            }
         }
         for (size_t k = 0; k < mComments.size(); ++k)
         {
@@ -1488,7 +1556,15 @@ namespace
             return;
         }
         c.written = true;
-        if (c.apart && !mText.empty() && mText.compare(mText.size() - std::min<size_t>(mText.size(), 2), 2, "\n\n") != 0)
+        const bool blank_over = mText.size() >= 2 && mText.compare(mText.size() - 2, 2, "\n\n") == 0;
+        if (c.closer && !c.apart && blank_over)
+        {
+            // Under the code it closes, over the blank line written after
+            // that, which the LSL did not have.
+            putTrailing(mText.size() - 1, indent() + c.text + "\n");
+            return;
+        }
+        if (c.apart && !mText.empty() && !blank_over)
         {
             mText += "\n";
         }
@@ -1584,12 +1660,13 @@ namespace
             c.written = true;
             after += " " + c.text;
             // A line's comment, which takes the rest of its line: not a long
-            // one, `--[[ ]]` or `--[==[ ]==]`, which closes where it is.
+            // one, `--[[ ]]` or `--[==[ ]==]`, which closes where it is, nor
+            // a toggle's, its level marked.
             size_t level = 2;
             if (level < c.text.size() && c.text[level] == '[')
             {
                 ++level;
-                while (level < c.text.size() && c.text[level] == '=')
+                while (level < c.text.size() && (c.text[level] == '=' || (mToggleMark && c.text[level] == mToggleMark)))
                 {
                     ++level;
                 }
@@ -6719,7 +6796,61 @@ end
             span.sluaFirst += above;
             span.sluaLast += above;
         }
-        return out + mText;
+        return leveled(out + mText);
+    }
+
+    std::string Writer::leveled(const std::string& text) const
+    {
+        if (!mToggleMark || text.find(mToggleMark) == std::string::npos)
+        {
+            return text;
+        }
+        // Each mark, an opener's after its [ and a closer's after its ]: the
+        // openers since one closer the next one's, all at the level of the
+        // fewest =s that nothing from the first of them to it closes, which
+        // is what a - taken out of any of them comments out.
+        std::vector<std::pair<size_t, size_t>> levels;
+        std::vector<size_t>                    opens;
+        for (size_t at = text.find(mToggleMark); at != std::string::npos; at = text.find(mToggleMark, at + 1))
+        {
+            if (at > 0 && text[at - 1] == '[')
+            {
+                opens.push_back(at);
+                continue;
+            }
+            std::string held;
+            if (!opens.empty())
+            {
+                held = text.substr(opens.front() + 2, at - 1 - (opens.front() + 2));
+                std::erase(held, mToggleMark);
+            }
+            std::string level;
+            while (held.find("]" + level + "]") != std::string::npos)
+            {
+                level += "=";
+            }
+            for (size_t opener : opens)
+            {
+                levels.emplace_back(opener, level.size());
+            }
+            levels.emplace_back(at, level.size());
+            opens.clear();
+        }
+        // Any written after their closer, as they stand.
+        for (size_t opener : opens)
+        {
+            levels.emplace_back(opener, 0);
+        }
+        std::string out;
+        size_t      from = 0;
+        for (const auto& [at, n] : levels)
+        {
+            out.append(text, from, at - from);
+            out.append(n, '=');
+            from = at + 1;
+        }
+        out.append(text, from, std::string::npos);
+        return out;
     }
 
     void Writer::endSpans()
