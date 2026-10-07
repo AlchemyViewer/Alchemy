@@ -2354,7 +2354,8 @@ namespace tut
     void allsltoslua_object::test<85>()
     {
         set_test_name("a call the definitions deprecate, naming what to use where SLua's own word names nothing, is noted with it: "
-                      "llMakeFire's ll.ParticleSystem, llSoundPreload's ll.PreloadSound, llXorBase64Strings' ll.XorBase64");
+                      "llMakeFire's ll.ParticleSystem, llSoundPreload's ll.PreloadSound; llXorBase64Strings' ll.XorBase64 in a note of "
+                      "its own, which says how the two differ");
         const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
                                               "    llMakeFire(10, 1.0, 1.0, 1.0, PI, \"\", ZERO_VECTOR);\n"
                                               "    llSoundPreload(\"boom\");\n"
@@ -2369,8 +2370,8 @@ namespace tut
         };
         ensure("each, for what it names: " + r.text,
                named("MakeFire", "ll.ParticleSystem") && named("SoundPreload", "ll.PreloadSound") &&
-                   named("SetPrimitiveParams", "ll.SetLinkPrimitiveParamsFast") && named("XorBase64Strings", "ll.XorBase64") &&
-                   named("TakeCamera", "ll.SetCameraParams"));
+                   named("SetPrimitiveParams", "ll.SetLinkPrimitiveParamsFast") && named("TakeCamera", "ll.SetCameraParams"));
+        ensure("XorBase64Strings' own: " + r.text, noted(r, "SluaXorBase64Wrong") && !named("XorBase64Strings", "ll.XorBase64"));
         ensure("said so: " + r.text, has(r, "-- LSL: SLua deprecates ll.MakeFire, for ll.ParticleSystem.\n"));
         ensure("none said bare: " + r.text, !noted(r, "SluaDeprecated"));
         checksClean(r);
