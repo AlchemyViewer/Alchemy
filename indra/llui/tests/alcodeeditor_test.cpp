@@ -3545,4 +3545,21 @@ namespace tut
         f.document().replace(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)), "q");
         ensure_equals("kept by the line typed in", f.noteAt(1), std::string("b's"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<97>()
+    {
+        set_test_name("Escape making a snippet's mirrors what the first holds leaves the caret where it was in the text, past the mirrors before it");
+        ALCodeEditor& e = make("", "lsl");
+        e.setAutoComplete(false);
+        e.insertSnippet("for (${1:i} = 0; $1 < n; ++$1)");
+        ensure_equals("the mirrors show what the first holds", e.document().line(0), std::string("for (i = 0; i < n; ++i)"));
+        type("idx");
+        key(KEY_END);
+        ensure("at the line's end, the stops still there", e.caret() == ALTextPos(0, 25) && !e.placeholders().empty());
+        key(KEY_ESCAPE);
+        ensure_equals("the mirrors made what it holds", e.document().line(0), std::string("for (idx = 0; idx < n; ++idx)"));
+        ensure("the caret still at the line's end: " + std::to_string(e.caret().column), e.caret() == ALTextPos(0, 29));
+        ensure("the stops let go", e.placeholders().empty());
+    }
 }

@@ -4031,7 +4031,8 @@ ALSnippetSession::Expansion ALCodeEditor::expandSnippet(std::string_view body, c
 
 void ALCodeEditor::syncMirrors(S32 index)
 {
-    // As one edit, one step to undo, and the selection as it was.
+    // As one edit, one step to undo, and the selection where it was in the
+    // text, moved along by the mirrors made before it.
     std::string            wanted;
     const std::vector<S32> stale = mSnippet.staleMirrors(index, document(), wanted);
     if (stale.empty())
@@ -4048,10 +4049,10 @@ void ALCodeEditor::syncMirrors(S32 index)
     // All of them as one edit.
     undoJournal().beginGroup();
     mSnippet.setSyncing(true);
-    editMany(std::move(edits), was.end);
+    const ALTextDocument::Edit done = editMany(std::move(edits), [&was](const ALTextDocument::Edit& made) { return made.placed(was.end); });
     mSnippet.setSyncing(false);
     undoJournal().endGroup();
-    placeSelection(document().clamp(was.begin), document().clamp(was.end));
+    placeSelection(document().clamp(done.placed(was.begin)), document().clamp(done.placed(was.end)));
     afterEdit();
 }
 
