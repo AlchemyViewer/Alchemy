@@ -3228,4 +3228,53 @@ namespace tut
         keys("<C-v>rx");
         ensure_equals("and in a block", editor->document().line(0), std::string("x"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<114>()
+    {
+        set_test_name(": typed over a visual selection is over its lines: '<,'> are the selection it let go of, which gv selects again");
+        ALCodeEditor& e = make("a\nb\nc\nd\n");
+        keys("jVj:d<CR>");
+        ensure_equals("the two lines selected deleted", flat(e.text()), std::string("a|d|"));
+
+        make("ab\ncd\nef\n");
+        keys("l<C-v>j:<Esc>");
+        ensure("the block put out", editor->highlights(ALCodeEditor::Highlight::Block).empty());
+        keys("gv");
+        ensure("gv selects the block again", vim->mode() == ALVimKeymap::Mode::VisualBlock && editor->highlights(ALCodeEditor::Highlight::Block).size() == 2);
+        keys("<Esc>");
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<115>()
+    {
+        set_test_name("q: over a visual selection lets it go as : does, q/ keeps it as / does, and a block left for insert mode or an asking g& is put out: gv selects it again");
+        ALCodeEditor& e = make("ab\ncd\n");
+        keys("<C-v>jq:");
+        ensure("q: opens the : line", vim->mode() == ALVimKeymap::Mode::Command);
+        ensure("the block put out", e.highlights(ALCodeEditor::Highlight::Block).empty());
+        keys("<Esc>gv");
+        ensure("gv selects it again", vim->mode() == ALVimKeymap::Mode::VisualBlock);
+        keys("<Esc>");
+
+        make("one foo two\n");
+        keys("vq/foo<CR>");
+        ensure("q/ searches over the selection", vim->mode() == ALVimKeymap::Mode::Visual);
+        keys("d");
+        ensure_equals("which runs to the match", flat(editor->text()), std::string("oo two|"));
+
+        make("ab\ncd\n");
+        keys("<C-v>jgi<Esc>");
+        ensure("insert mode puts the block out", vim->mode() == ALVimKeymap::Mode::Normal && editor->highlights(ALCodeEditor::Highlight::Block).empty());
+        keys("gv");
+        ensure("and keeps it for gv", vim->mode() == ALVimKeymap::Mode::VisualBlock);
+        keys("<Esc>");
+
+        make("a\na\n");
+        keys(":s/a/b/c<CR>q<C-v>jg&");
+        ensure("an asking g& over a block puts it out", vim->mode() == ALVimKeymap::Mode::Confirm && editor->highlights(ALCodeEditor::Highlight::Block).empty());
+        keys("qgv");
+        ensure("and keeps it for gv after", vim->mode() == ALVimKeymap::Mode::VisualBlock);
+        keys("<Esc>");
+    }
 }

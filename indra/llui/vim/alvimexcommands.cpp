@@ -448,7 +448,7 @@ bool ALVimExCommands::confirmKey(ALTextView& view, const ALVimInput& input)
 void ALVimExCommands::endConfirming(ALTextView& view)
 {
     const ALTextDocument& d = view.document();
-    mVim.mMode                   = ALVimKeymap::Mode::Normal;
+    mVim.setMode(view, ALVimKeymap::Mode::Normal);
     if (confirming.lastLine >= 0)
     {
         const S32 line = llclamp(confirming.lastLine, 0, d.lineCount() - 1);
@@ -1566,7 +1566,7 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
                   [](const std::pair<ALTextRange, std::string>& a, const std::pair<ALTextRange, std::string>& b) { return a.first.begin < b.first.begin; });
         view.undoJournal().endGroup();
         confirming.undoStep = view.undoJournal().groupStep();
-        mVim.mMode                = ALVimKeymap::Mode::Confirm;
+        mVim.setMode(view, ALVimKeymap::Mode::Confirm);
         askNext(view);
         return false;
     }
@@ -1739,7 +1739,7 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
         // asking ends, so nothing is done here.
         confirming       = Confirming();
         confirming.edits = std::move(edits);
-        mVim.mMode             = ALVimKeymap::Mode::Confirm;
+        mVim.setMode(view, ALVimKeymap::Mode::Confirm);
         askNext(view);
         return false;
     }

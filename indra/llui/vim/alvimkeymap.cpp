@@ -217,7 +217,7 @@ void ALVimKeymap::mouseChanged(ALTextView& view)
         mVisualCaret  = to;
         if (mMode == Mode::Normal || mMode == Mode::VisualBlock)
         {
-            mMode = Mode::Visual;
+            setMode(view, Mode::Visual);
         }
         showVisual(view);
         mWantColumn = -1;
@@ -241,32 +241,19 @@ void ALVimKeymap::mouseChanged(ALTextView& view)
             mVisualAnchor = d.prevCluster(sel.begin);
             mVisualCaret  = sel.end;
         }
-        if (mMode == Mode::Normal)
+        // A block's lit columns put out as it goes (setMode).
+        if (mMode == Mode::Normal || mMode == Mode::VisualBlock)
         {
-            mMode = Mode::Visual;
-        }
-        else if (mMode == Mode::VisualBlock)
-        {
-            mMode = Mode::Visual;
-            if (ALVimHost* host = view.vimHost())
-            {
-                host->clearLayer(ALVimHost::Layer::Block);
-            }
+            setMode(view, Mode::Visual);
         }
     }
     else
     {
-        // A click: normal mode, the caret on the character it landed on.
+        // A click: normal mode, the caret on the character it landed on,
+        // the selection kept for gv.
         if (isVisual())
         {
-            mVisualLast       = mMode;
-            mVisualLastAnchor = mVisualAnchor;
-            mVisualLastCaret  = mVisualCaret;
-            mMode             = Mode::Normal;
-            if (ALVimHost* host = view.vimHost())
-            {
-                host->clearLayer(ALVimHost::Layer::Block);
-            }
+            setMode(view, Mode::Normal);
         }
         // The character pressed, whichever half of it, rather than the
         // boundary nearest the press; past a line's end, its last.
@@ -614,13 +601,11 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
         case Mode::Command:
         case Mode::Search:
             taken = mCommandLine.commandLine(view, input);
+            // What is typed so far lit; leaving the line puts it out
+            // (setMode).
             if (mMode == Mode::Search)
             {
                 mSearch.incrementalSearch(view);
-            }
-            else
-            {
-                mSearch.endIncremental(view);
             }
             break;
         case Mode::Confirm:
@@ -658,9 +643,7 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
     }
     else if (mOneCommand == 1 && taken && mMode == Mode::Normal && mCount == 0 && !mOperator && !mPending && !mRegister)
     {
-        mOneCommand = 0;
-        mMode       = Mode::Insert;
-        view.undoJournal().beginGroup();
+        setMode(view, Mode::Insert);
     }
     bump();
     return taken;
@@ -1263,13 +1246,18 @@ bool ALVimKeymap::afterRecord(ALTextView& view, llwchar pending, llwchar ch)
             });
             return true;
         }
-        mSearchVisual = Mode::Normal;
-        mMode     = ch == ':' ? Mode::Command : Mode::Search;
+        // Over a visual selection, as : and / are typed over one: q: lets
+        // it go, q/ and q? keep it for what they find to extend.
+        if (ch == ':' && isVisual())
+        {
+            leaveVisual(view);
+        }
         mCommandLine.kind = ch;
         mCommandLine.historyPrefix.clear();
         mCommandLine.historyAt  = history.empty() ? -1 : static_cast<S32>(history.size()) - 1;
         mCommandLine.line       = history.empty() ? std::string() : history.back();
         mCommandLine.cursor = mCommandLine.line.size();
+        setMode(view, ch == ':' ? Mode::Command : Mode::Search);
         return true;
     }
     clearPending();
@@ -1621,7 +1609,7 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
             {
                 mVisualAnchor = mVisualLastAnchor;
                 mVisualCaret  = mVisualLastCaret;
-                mMode         = mVisualLast;
+                setMode(view, mVisualLast);
                 showVisual(view);
             }
             clearPending();
@@ -1905,7 +1893,7 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
         {
             mVisualAnchor = span.range.begin;
             mVisualCaret  = span.linewise ? span.range.end : d.prevCluster(span.range.end);
-            mMode         = span.linewise ? Mode::VisualLine : Mode::Visual;
+            setMode(view, span.linewise ? Mode::VisualLine : Mode::Visual);
             showVisual(view);
             clearPending();
             return true;
@@ -2280,7 +2268,7 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
             }
             else
             {
-                mMode = which;
+                setMode(view, which);
                 showVisual(view);
             }
             clearPending();
@@ -2671,27 +2659,26 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             clearPending();
             return true;
         case ':':
-            mMode      = Mode::Command;
             mCommandLine.kind  = ':';
             mCommandLine.historyAt = -1;
             mCommandLine.line      = visual ? std::string("'<,'>") : mCount > 0 ? std::string(".,.+") + std::to_string(mCount - 1) : std::string();
             mCommandLine.cursor = mCommandLine.line.size();
             if (visual)
             {
+                // Let go of first, for '< '> to be the lines it was.
                 leaveVisual(view);
-                mMode = Mode::Command;
             }
+            setMode(view, Mode::Command);
             return true;
         case '/':
         case '?':
             // Over a visual selection, which stays: what is found extends
-            // it.
-            mSearchVisual = visual ? mMode : Mode::Normal;
-            mMode      = Mode::Search;
+            // it (setMode).
             mCommandLine.kind  = ch;
             mCommandLine.historyAt = -1;
             mCommandLine.line.clear();
             mCommandLine.cursor = 0;
+            setMode(view, Mode::Search);
             return true;
         case 'n':
         case 'N':
@@ -2726,7 +2713,7 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             if (editing)
             {
                 enterInsert(view, count);
-                mMode = Mode::Replace;
+                setMode(view, Mode::Replace);
             }
             else
             {
@@ -3937,24 +3924,66 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
     moveTo(view, past ? view.caret() : text.find('\n') == std::string::npos ? d.prevCluster(view.caret()) : where);
 }
 
+// --- modes ------------------------------------------------------------------------------
+
+void ALVimKeymap::setMode(ALTextView& view, Mode to, bool grouped)
+{
+    const Mode from = mMode;
+    if (to == from)
+    {
+        return;
+    }
+    const auto visual_mode = [](Mode which) { return which == Mode::Visual || which == Mode::VisualLine || which == Mode::VisualBlock; };
+    const auto insert_mode = [](Mode which) { return which == Mode::Insert || which == Mode::Replace; };
+    // The selection held before and after: a visual mode's own, or the one
+    // the search line is typed over -- the one it was opened from.
+    const Mode held = visual_mode(from) ? from : from == Mode::Search ? mSearchVisual : Mode::Normal;
+    const Mode kept = visual_mode(to) ? to : to == Mode::Search ? held : Mode::Normal;
+    if (held != Mode::Normal && kept == Mode::Normal)
+    {
+        // Let go of: what gv selects again and '< '> stand for.
+        mVisualLast       = held;
+        mVisualLastAnchor = mVisualAnchor;
+        mVisualLastCaret  = mVisualCaret;
+    }
+    if (held == Mode::VisualBlock && kept != Mode::VisualBlock)
+    {
+        if (ALVimHost* host = view.vimHost())
+        {
+            host->clearLayer(ALVimHost::Layer::Block);
+        }
+    }
+    mSearchVisual = to == Mode::Search ? kept : Mode::Normal;
+    if (from == Mode::Search)
+    {
+        mSearch.endIncremental(view);
+    }
+    if (insert_mode(from) && !insert_mode(to))
+    {
+        view.undoJournal().endGroup();
+    }
+    mMode = to;
+    if (insert_mode(to) && !insert_mode(from))
+    {
+        if (!grouped)
+        {
+            view.undoJournal().beginGroup();
+        }
+        // Ctrl-O's wait over, whether its command is done or inserts itself
+        // -- o, A, cw -- which is then the insert it went back to: Escape
+        // ends it, as vim's does.
+        mOneCommand = 0;
+    }
+    bump();
+}
+
 // --- insert mode ------------------------------------------------------------------------
 
 void ALVimKeymap::enterInsert(ALTextView& view, S32 count, bool grouped)
 {
-    if (mMode == Mode::Normal && !grouped)
-    {
-        view.undoJournal().beginGroup();
-    }
-    else if (mMode != Mode::Insert && mMode != Mode::Replace)
-    {
-        // From an operator: the group is the operator's, opened by it.
-    }
-    mMode        = Mode::Insert;
+    setMode(view, Mode::Insert, grouped);
     mInsertCount = llmax(1, count);
     mWantColumn  = -1;
-    // Ctrl-O's one command inserting itself -- o, A, cw -- is the insert
-    // it went back to: Escape ends it, as vim's does.
-    mOneCommand  = 0;
     mInsertStart = view.caret();
     mInsertMoved = false;
     mInsertOpened = false;
@@ -4042,8 +4071,7 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
     mBlockInsert    = false;
     mInsertRegister = false;
     mInsertMoved    = false;
-    view.undoJournal().endGroup();
-    mMode = Mode::Normal;
+    setMode(view, Mode::Normal);
     // Where inserting stopped, for gi to go back to: vim's ^ mark.
     mMarks['^'] = view.caret();
     // The caret steps back onto the last character typed.
@@ -4125,8 +4153,7 @@ bool ALVimKeymap::insertControl(ALTextView& view, const Input& input)
             // One command of normal mode, then inserting again; the
             // command may take the caret off what was typed.
             typingLeft(view);
-            view.undoJournal().endGroup();
-            mMode       = Mode::Normal;
+            setMode(view, Mode::Normal);
             mOneCommand = 2;
             bump();
             return true;
@@ -4542,25 +4569,17 @@ void ALVimKeymap::enterVisual(ALTextView& view, Mode which)
         mVisualAnchor = view.caret();
         mVisualCaret  = view.caret();
     }
-    mMode = which;
+    setMode(view, which);
     showVisual(view);
     bump();
 }
 
 void ALVimKeymap::leaveVisual(ALTextView& view)
 {
-    if (mMode == Mode::Visual || mMode == Mode::VisualLine || mMode == Mode::VisualBlock)
-    {
-        mVisualLast       = mMode;
-        mVisualLastAnchor = mVisualAnchor;
-        mVisualLastCaret  = mVisualCaret;
-    }
+    // Normal mode at the visual caret; the selection kept for gv, and a
+    // block's columns put out (setMode).
     const ALTextPos caret = cursor(view);
-    mMode                 = Mode::Normal;
-    if (ALVimHost* host = view.vimHost())
-    {
-        host->clearLayer(ALVimHost::Layer::Block);
-    }
+    setMode(view, Mode::Normal);
     view.setCaret(caret);
     moveTo(view, caret);
     bump();
@@ -4677,13 +4696,12 @@ void ALVimKeymap::takeLine(ALTextView& view, llwchar kind, const std::string& te
 {
     clearPending();
     mCommandLine.completion = ALVimCommandLine::Completion();
-    mSearchVisual = Mode::Normal;
-    mMode       = kind == ':' ? Mode::Command : Mode::Search;
     mCommandLine.kind   = kind;
     mCommandLine.line       = text;
     mCommandLine.cursor = mCommandLine.line.size();
     mCommandLine.historyAt  = -1;
     mCommandLine.historyPrefix.clear();
+    setMode(view, kind == ':' ? Mode::Command : Mode::Search);
     if (run)
     {
         // As Enter on the line: vim's window runs the row it is pressed

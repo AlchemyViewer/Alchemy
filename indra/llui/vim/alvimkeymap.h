@@ -388,9 +388,17 @@ private:
     void   finishCommand(bool changed);
     void   clearPending();
 
-    // Modes. Insert mode is one step to undo, in a group it opens; or in
-    // one the caller opened already, `grouped`, where what it put in first
-    // -- the line `o` opens, what `c` took out -- is part of the step.
+    // Modes. Every change of one, the parts' as well, is setMode's, which
+    // takes up and lets go of what each mode holds while it lasts on the
+    // way, whatever changed it: insert mode's step to undo, opened coming
+    // in -- or one the caller opened already, `grouped`, where what it put
+    // in first, the line `o` opens or what `c` took out, is part of the
+    // step -- and closed going out, Ctrl-O's wait over once it is in; a
+    // visual selection let go of, kept for gv and '< '>, a block's lit
+    // columns put out with it -- but not by a search line opened over it,
+    // which keeps it to go back to (mSearchVisual); and what the search
+    // line lit as it was typed, put out as it is left.
+    void setMode(ALTextView& view, Mode to, bool grouped = false);
     void enterInsert(ALTextView& view, S32 count, bool grouped = false);
     void leaveInsert(ALTextView& view);
     void enterVisual(ALTextView& view, Mode which);
@@ -532,10 +540,10 @@ private:
     Mode      mVisualLast = Mode::Normal;
     ALTextPos mVisualLastAnchor;
     ALTextPos mVisualLastCaret;
-    // The visual mode a search line was opened over, which entering the
+    // The visual mode the search line was opened over, which entering the
     // line or letting it go goes back to, what is found moving the visual
-    // caret as vim's search does; normal mode for one opened in normal
-    // mode.
+    // caret as vim's search does; normal mode for one opened from any
+    // other, and while no search line is being typed (setMode).
     Mode      mSearchVisual = Mode::Normal;
 
     // Insert mode: how many times what is typed goes in, and whether on a

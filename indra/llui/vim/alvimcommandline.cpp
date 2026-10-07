@@ -137,8 +137,7 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
             case KEY_ESCAPE:
                 line.clear();
                 cursor = 0;
-                backFromLine();
-                mVim.mSearch.endIncremental(view);
+                backFromLine(view);
                 if (mVim.mMode == ALVimKeymap::Mode::Normal)
                 {
                     mVim.moveTo(view, view.caret());
@@ -182,7 +181,7 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                 historyAt = -1;
                 if (line.empty())
                 {
-                    backFromLine();
+                    backFromLine(view);
                 }
                 else if (cursor > 0)
                 {
@@ -235,7 +234,7 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                 const llwchar     which   = kind;
                 line.clear();
                 cursor = 0;
-                backFromLine();
+                backFromLine(view);
                 historyAt  = -1;
                 remember(which, entered);
                 if (which == ':')
@@ -253,7 +252,6 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                     const bool   has_offset = entered.size() > pattern.size();
                     if (has_offset && !ALVimSearch::parseOffset(offset_text, offset))
                     {
-                        mVim.mSearch.endIncremental(view);
                         mVim.say(ALVimKeymap::said("VimBadOffset", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", entered } }), true);
                         mVim.finishCommand(false);
                         return true;
@@ -269,7 +267,6 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                         mVim.mSearch.offset = offset;
                     }
                     mVim.mSearch.forward = which == '/';
-                    mVim.mSearch.endIncremental(view);
                     if (!mVim.mSearch.pattern.empty())
                     {
                         mVim.mSearch.search(view, mVim.mSearch.pattern, mVim.mSearch.forward, 1, mVim.mSearch.wholeWord, mVim.mSearch.offset);
@@ -301,12 +298,12 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
     return true;
 }
 
-void ALVimCommandLine::backFromLine()
+void ALVimCommandLine::backFromLine(ALTextView& view)
 {
     // A search typed over a visual selection goes back to it, for what it
-    // finds to move the visual caret; anything else to normal mode.
-    mVim.mMode         = kind == ':' ? ALVimKeymap::Mode::Normal : mVim.mSearchVisual;
-    mVim.mSearchVisual = ALVimKeymap::Mode::Normal;
+    // finds to move the visual caret; anything else to normal mode. What
+    // the line lit as it was typed goes out with it (setMode).
+    mVim.setMode(view, kind == ':' ? ALVimKeymap::Mode::Normal : mVim.mSearchVisual);
 }
 
 void ALVimCommandLine::dropCompletion()
