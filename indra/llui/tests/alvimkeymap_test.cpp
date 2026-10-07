@@ -5199,4 +5199,18 @@ namespace tut
         keys("ggVj2>");
         ensure_equals("two levels on each line", flat(e.text()), std::string("        a|        b|c|d|e|f|g|h|i|j|k|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<183>()
+    {
+        set_test_name("Tab on the : line with the cursor back in the range completes a name where the cursor is, the rest of the line kept after it, as vim's does");
+        make("x\n");
+        keys(":10,20del<Home><Right><Tab>");
+        ensure_equals("a name put in at the cursor, nothing doubled", vim->commandLine(), std::string("1center0,20del"));
+        keys("<Esc>");
+        ensure_equals("Escape puts the line back as it was", vim->commandLine(), std::string("10,20del"));
+        keys("<Esc>:10,20<Left><Tab>");
+        ensure_equals("in a range with no name after it", vim->commandLine(), std::string("10,2center0"));
+        keys("<Esc><Esc>");
+    }
 }

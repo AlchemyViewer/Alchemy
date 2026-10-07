@@ -362,7 +362,10 @@ void ALVimCommandLine::complete(ALTextView& view, bool forward)
         if (cursor <= name_end)
         {
             // The name itself: the keymap's own, the long forms, and the
-            // host's.
+            // host's. The cursor back in the range is where a name would
+            // begin, as vim takes it: what is before it is the range, and
+            // what is after it stays.
+            word_start = std::min(name_start, cursor);
             static const char* OWN[] = { "center",   "changes",  "cmap",     "cnoremap", "cunmap",   "delete",   "display",  "global",
                                          "imap",     "inoremap", "iunmap",   "join",     "left",     "let",      "map",      "mapclear",
                                          "mark",     "marks",    "nmap",     "nnoremap", "nohlsearch", "noremap", "normal",  "nunmap",
