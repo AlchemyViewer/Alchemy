@@ -30,18 +30,69 @@
 #include "alscriptenvelope.h"
 #include "alscriptmodules.h"
 #include "alscriptworkspace.h"
+#include "alserialworker.h"
 #include "aluploadheader.h"
 #include "llinventory.h"
 #include "llinventorydefines.h"
+#include "llsingleton.h"
 #include "lltrans.h"
 #include "llviewercontrol.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
+#include "workqueue.h"
 
 namespace
 {
     // The target a notecard's text is hashed under.
     constexpr const char* NOTECARD = "notecard";
+
+    // A master as one look at the disk found it: whether it is there, when
+    // it was written, and its text, where it read whole.
+    struct MasterRead
+    {
+        ALFileStamp stamp;
+        std::string text;
+        bool        whole = false;
+    };
+
+    // Safe on any thread.
+    MasterRead readMaster(const std::string& path)
+    {
+        MasterRead read;
+        read.stamp = ALFileStamp::of(path);
+        read.whole = read.stamp.exists && ALFileRead::whole(path, read.text, ALDiskIncludes::MAX_BYTES);
+        return read;
+    }
+
+    // The thread every send and probe reads its master on, one after
+    // another: made with the first, closed as the viewer goes. A master may
+    // be on a slow drive or a share far away, and as large as a file a
+    // script may read, and the main thread waits on neither. Owned by no
+    // send, so that what one reads finds it still there.
+    class ALScriptMasterReads final : public LLSingleton<ALScriptMasterReads>
+    {
+        LLSINGLETON_EMPTY_CTOR(ALScriptMasterReads);
+        void cleanupSingleton() override
+        {
+            if (mThread)
+            {
+                mThread->close();
+            }
+        }
+
+    public:
+        bool post(std::function<void()> job)
+        {
+            if (!mThread)
+            {
+                mThread = std::make_unique<ALSerialWorker>("ScriptMasterReads");
+            }
+            return mThread->post(std::move(job));
+        }
+
+    private:
+        std::unique_ptr<ALSerialWorker> mThread;
+    };
 
     // What a text hashes to beside what a send would make of the master:
     // an envelope's halves, or the text where it is none.
@@ -83,7 +134,31 @@ std::string ALScriptMasterUpload::hashOf(const std::string& text) const
 
 void ALScriptMasterUpload::read()
 {
-    mStamp = ALFileStamp::of(mLink.master);
+    // Looked at and read on the masters' thread; what it found handed back
+    // to this send on the main thread, which alone goes on with it. With no
+    // main loop to hand it back to -- a test -- or the thread closed as the
+    // viewer goes, read here.
+    if (const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop"))
+    {
+        std::shared_ptr<ALScriptMasterUpload> self   = shared_from_this();
+        const std::string                     master = mLink.master;
+        if (ALScriptMasterReads::instance().post([self, main_loop, master]() mutable {
+                // Shared, not copied, on its way: the queue copies what it
+                // is given, and the text may be large.
+                const std::shared_ptr<MasterRead> read = std::make_shared<MasterRead>(readMaster(master));
+                main_loop->post([self = std::move(self), read]() { self->masterRead(read->stamp, std::move(read->text), read->whole); });
+            }))
+        {
+            return;
+        }
+    }
+    MasterRead read = readMaster(mLink.master);
+    masterRead(read.stamp, std::move(read.text), read.whole);
+}
+
+void ALScriptMasterUpload::masterRead(const ALFileStamp& stamp, std::string text, bool whole)
+{
+    mStamp = stamp;
     if (!mStamp.exists)
     {
         mUpdated.state = ALMasterLink::State::Suspended;
@@ -91,11 +166,17 @@ void ALScriptMasterUpload::read()
         end(Outcome::What::Suspended, LLTrans::getString("ScriptMasterGone"));
         return;
     }
-    if (!ALFileRead::whole(mLink.master, mText, ALDiskIncludes::MAX_BYTES))
+    if (!whole)
     {
         end(Outcome::What::Failed, LLTrans::getString("ScriptMasterUnreadable"));
         return;
     }
+    mText = std::move(text);
+    find();
+}
+
+void ALScriptMasterUpload::find()
+{
     if (mRef.inInventory())
     {
         found(ALScriptDiskMasters::itemOf(mRef));

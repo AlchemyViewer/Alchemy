@@ -37,7 +37,8 @@ class LLInventoryItem;
 
 // A script sent from its master, step by step, each on the main thread as
 // the one before it answers:
-//  - the file read whole;
+//  - the file looked at and read whole, on a thread of its own, since a
+//    drive may be slow or a share far away;
 //  - the item found -- an object's asked of the region, which keeps what
 //    a co-owner saved where the object's own copy does not;
 //  - the file expanded as a file on disk is, its includes read from beside
@@ -91,7 +92,11 @@ public:
     ALScriptMasterUpload(const ALMasterLink& link, ALMasterPlan::Send kind);
 
 private:
+    // The master looked at and read, off the main thread; what was found;
+    // and the item looked for.
     void read();
+    void masterRead(const ALFileStamp& stamp, std::string text, bool whole);
+    void find();
     void found(LLInventoryItem* item);
     void prepared(const ALScriptPrepared& prepared);
     void worldHas(const LLUUID& asset);
