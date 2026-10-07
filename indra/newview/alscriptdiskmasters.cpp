@@ -26,11 +26,8 @@
 
 #include "alscriptdiskmasters.h"
 
-#include "alfilewrite.h"
 #include "allinelabel.h"
-#include "alserialworker.h"
 #include "alluauconfig.h"
-#include "alscriptenvelope.h"
 #include "alscriptmasteradopt.h"
 #include "alscriptmasterfanout.h"
 #include "alscriptmastertoasts.h"
@@ -39,21 +36,13 @@
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
-#include "aluploadheader.h"
-#include "llcallbacklist.h"
 #include "lldir.h"
 #include "llfloaterreg.h"
 #include "llinventorymodel.h"
-#include "llsdserialize.h"
-#include "lltimer.h"
 #include "llviewercontrol.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
-
-#include <condition_variable>
-#include <mutex>
-#include <sstream>
 
 namespace
 {
@@ -61,15 +50,6 @@ namespace
     // How many outcomes are kept for a window to list that had none to hear
     // them: the latest.
     constexpr size_t      UNHEARD    = 50;
-    // How long the index waits for the changes after one before it is
-    // written, and how long at most from the first not yet written: sends
-    // ending one after another for a minute still write it every few
-    // seconds.
-    constexpr F64         SAVE_QUIET  = 1.0;
-    constexpr F64         SAVE_LATEST = 5.0;
-    // How long changes made one after another are gathered before the
-    // watch and the listeners hear of them.
-    constexpr F32         CHANGE_SOON = 0.25f;
 
     // A path as the links keep it: the file's own, links followed.
     std::string canonical(const std::string& path)
@@ -77,68 +57,10 @@ namespace
         const std::string identity = ALScriptModules::identity("disk:" + path);
         return identity.rfind("disk:", 0) == 0 ? identity.substr(5) : path;
     }
-
-    // What the world's text would hash to beside ours: an envelope's halves,
-    // or the text where it is none.
-    std::string hashOfWorld(const std::string& text, const std::string& target)
-    {
-        if (const std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(text))
-        {
-            return ALUploadHeader::hashOf(envelope->compileTarget.empty() ? target : envelope->compileTarget, envelope->source,
-                                          envelope->expanded);
-        }
-        return ALUploadHeader::hashOfPlain(target, text);
-    }
 }
 
-// What the index's writer is handed: the index in words, whole, made on the
-// main thread, with the file it goes in -- the newest only, since each is
-// all of it -- and whether one is being written now, by the writer's thread
-// or by the main one. One write at a time, whichever thread makes it, so
-// that two never meet in the file put beside the index on the way.
-struct ALScriptDiskMasters::Writer
-{
-    struct Text
-    {
-        std::string path;
-        std::string text;
-    };
-    std::mutex              mutex;
-    std::condition_variable changed;
-    std::optional<Text>     waiting;
-    bool                    busy = false;
-
-    // What waits written, and what comes meanwhile, on whichever thread
-    // asks: one being written already by another is waited for first, so
-    // that all that was handed over is on the disk as this returns.
-    void drain()
-    {
-        std::unique_lock<std::mutex> lock(mutex);
-        for (;;)
-        {
-            changed.wait(lock, [this] { return !busy; });
-            if (!waiting)
-            {
-                return;
-            }
-            const Text one = std::move(*waiting);
-            waiting.reset();
-            busy = true;
-            lock.unlock();
-            if (!ALFileWrite::whole(one.path, one.text, /*durable*/ true))
-            {
-                LL_WARNS("ScriptMasters") << "Could not write " << one.path << LL_ENDL;
-            }
-            lock.lock();
-            busy = false;
-            changed.notify_all();
-        }
-    }
-};
-
 ALScriptDiskMasters::ALScriptDiskMasters()
-: mFanOut(std::make_unique<ALScriptMasterFanOut>()), mAdopt(std::make_unique<ALScriptMasterAdopt>()), mToasts(std::make_unique<ALScriptMasterToasts>()),
-  mWriter(std::make_shared<Writer>())
+: mFanOut(std::make_unique<ALScriptMasterFanOut>()), mAdopt(std::make_unique<ALScriptMasterAdopt>()), mToasts(std::make_unique<ALScriptMasterToasts>())
 {
     mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptSaved& saved) { heardSaved(saved); });
 }
@@ -147,167 +69,35 @@ ALScriptDiskMasters::~ALScriptDiskMasters() = default;
 
 void ALScriptDiskMasters::cleanupSingleton()
 {
-    // The thread closed first, the write it is making finished: what waited
-    // for it, passed over as it closed, is written here with what changed
-    // since, so that no change is lost as the viewer goes.
-    if (mWriterThread)
-    {
-        mWriterThread->close();
-    }
-    saveNow();
+    // What the index has waiting written as the viewer goes, so that no
+    // change is lost with it.
+    mIndexConnection.disconnect();
+    mIndex.reset();
 }
 
-ALMasterLinks* ALScriptDiskMasters::links()
+ALMasterIndex* ALScriptDiskMasters::links()
 {
     if (!gDirUtilp || gDirUtilp->getLindenUserDir().empty())
     {
         return nullptr;
     }
     const std::string path = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, INDEX_FILE);
-    if (path != mFor)
+    if (!mIndex || mIndex->path() != path)
     {
-        // What the account before changed written first, to its own file.
-        saveNow();
-        // Another account's, or the first asked for: read whole. What will
-        // not read is no links, said, and not written over until a link
-        // changes.
-        mFor   = path;
-        mLinks = ALMasterLinks();
-        std::string text;
-        if (ALFileRead::whole(path, text, ALDiskIncludes::MAX_BYTES))
-        {
-            LLSD               llsd;
-            std::istringstream in(text);
-            if (LLSDSerialize::fromXML(llsd, in) > 0)
-            {
-                mLinks = ALMasterLinks::fromLLSD(llsd);
-            }
-            else
-            {
-                LL_WARNS("ScriptMasters") << "Could not read " << path << "; no scripts are linked to files" << LL_ENDL;
-            }
-        }
-        // Orphans kept a while, for a script taken and rezzed again.
-        if (mLinks.prune(LLDate::now()) > 0)
-        {
-            save();
-        }
+        // Another account's, or the first asked for: what the account before
+        // changed written first, to its own file, as its index goes.
+        mIndexConnection.disconnect();
+        mIndex.reset();
+        mIndex           = std::make_unique<ALMasterIndex>(path);
+        mIndexConnection = mIndex->onChanged([this]() { changed(); });
     }
-    return &mLinks;
-}
-
-void ALScriptDiskMasters::save()
-{
-    // Asked only where something changed, so that an index that would not
-    // read is not written over until a link changes.
-    if (mFor.empty())
-    {
-        return;
-    }
-    const F64 now = LLTimer::getTotalSeconds();
-    if (!mDirty)
-    {
-        mDirty      = true;
-        mDirtySince = now;
-    }
-    mDirtyLast = now;
-    saveSoon();
-}
-
-void ALScriptDiskMasters::saveSoon()
-{
-    // A later change only puts the time off: a write already coming finds
-    // it not yet due, and comes again.
-    if (mSaveComing)
-    {
-        return;
-    }
-    mSaveComing                     = true;
-    const F64                 now   = LLTimer::getTotalSeconds();
-    const F64                 due   = llmin(mDirtyLast + SAVE_QUIET, mDirtySince + SAVE_LATEST);
-    const std::weak_ptr<bool> alive = mAlive;
-    doAfterInterval(
-        [this, alive]() {
-            if (alive.lock())
-            {
-                mSaveComing = false;
-                saveDue();
-            }
-        },
-        (F32)llmax(0.05, due - now));
-}
-
-void ALScriptDiskMasters::saveDue()
-{
-    if (!mDirty)
-    {
-        return;
-    }
-    const F64 now = LLTimer::getTotalSeconds();
-    if (now < llmin(mDirtyLast + SAVE_QUIET, mDirtySince + SAVE_LATEST))
-    {
-        saveSoon();
-        return;
-    }
-    handOver();
-    if (!mWriterThread)
-    {
-        mWriterThread = std::make_unique<ALSerialWorker>("ScriptMastersIndex");
-    }
-    // Written out there, after any write handed over before it. The viewer
-    // going, it is written here.
-    const std::shared_ptr<Writer> writer = mWriter;
-    if (!mWriterThread->post([writer]() { writer->drain(); }))
-    {
-        writer->drain();
-    }
-}
-
-void ALScriptDiskMasters::handOver()
-{
-    if (!mDirty || mFor.empty())
-    {
-        return;
-    }
-    mDirty = false;
-    std::ostringstream out;
-    LLSDSerialize::toPrettyXML(mLinks.toLLSD(), out);
-    const std::lock_guard<std::mutex> lock(mWriter->mutex);
-    mWriter->waiting = Writer::Text{ mFor, out.str() };
-}
-
-void ALScriptDiskMasters::saveNow()
-{
-    handOver();
-    mWriter->drain();
+    return mIndex.get();
 }
 
 void ALScriptDiskMasters::changed()
 {
-    save();
     rewatch();
     mChanged();
-}
-
-void ALScriptDiskMasters::changedSoon()
-{
-    save();
-    if (mChangeComing)
-    {
-        return;
-    }
-    mChangeComing                   = true;
-    const std::weak_ptr<bool> alive = mAlive;
-    doAfterInterval(
-        [this, alive]() {
-            if (alive.lock())
-            {
-                mChangeComing = false;
-                rewatch();
-                mChanged();
-            }
-        },
-        CHANGE_SOON);
 }
 
 void ALScriptDiskMasters::start()
@@ -326,7 +116,7 @@ void ALScriptDiskMasters::start()
 void ALScriptDiskMasters::rewatch()
 {
     static LLCachedControl<bool> enabled(gSavedSettings, "ALScriptMastersEnabled", true);
-    ALMasterLinks*               links_now = mFor.empty() ? nullptr : &mLinks;
+    ALMasterIndex*               links_now = mIndex.get();
     if (!enabled || !links_now || links_now->empty())
     {
         // Nothing to watch: no thread asked to look at anything.
@@ -343,59 +133,34 @@ void ALScriptDiskMasters::rewatch()
 
 std::optional<ALMasterLink> ALScriptDiskMasters::linkOf(const ALScriptRef& ref)
 {
-    ALMasterLinks* all = links();
-    const ALMasterLink* found = all ? all->of(ref.object, ref.item) : nullptr;
-    return found ? std::optional<ALMasterLink>(*found) : std::nullopt;
+    ALMasterIndex* index = links();
+    return index ? index->linkOf(ref.object, ref.item) : std::nullopt;
 }
 
 std::vector<ALMasterLink> ALScriptDiskMasters::mastering(const std::string& master)
 {
     // Asked as menus are drawn: nothing asked of the disk while there is
     // nothing linked.
-    std::vector<ALMasterLink> out;
-    if (ALMasterLinks* all = links(); all && !all->empty())
-    {
-        for (const ALMasterLink* one : all->mastering(canonical(master)))
-        {
-            out.push_back(*one);
-        }
-    }
-    return out;
+    ALMasterIndex* index = links();
+    return index && !index->empty() ? index->mastering(canonical(master)) : std::vector<ALMasterLink>();
 }
 
 std::vector<ALMasterLink> ALScriptDiskMasters::all()
 {
-    ALMasterLinks* links_now = links();
-    return links_now ? links_now->all() : std::vector<ALMasterLink>();
+    ALMasterIndex* index = links();
+    return index ? index->all() : std::vector<ALMasterLink>();
 }
 
 std::vector<ALMasterLink> ALScriptDiskMasters::affectedBy(const std::string& include)
 {
-    std::vector<ALMasterLink> out;
-    if (ALMasterLinks* links_now = links(); links_now && !links_now->empty())
-    {
-        for (const ALMasterLink* one : links_now->affectedBy(ALScriptModules::identity("disk:" + include)))
-        {
-            out.push_back(*one);
-        }
-    }
-    return out;
+    ALMasterIndex* index = links();
+    return index && !index->empty() ? index->affectedBy(ALScriptModules::identity("disk:" + include)) : std::vector<ALMasterLink>();
 }
 
 std::vector<ALMasterLink> ALScriptDiskMasters::linksIn(const LLUUID& object)
 {
-    std::vector<ALMasterLink> out;
-    if (ALMasterLinks* links_now = links())
-    {
-        for (const ALMasterLink& one : links_now->all())
-        {
-            if (one.object == object)
-            {
-                out.push_back(one);
-            }
-        }
-    }
-    return out;
+    ALMasterIndex* index = links();
+    return index ? index->linksIn(object) : std::vector<ALMasterLink>();
 }
 
 void ALScriptDiskMasters::link(ALMasterLink link)
@@ -407,8 +172,8 @@ void ALScriptDiskMasters::link(ALMasterLink link)
 
 void ALScriptDiskMasters::link(std::vector<ALMasterLink> made)
 {
-    ALMasterLinks* all = links();
-    if (!all || made.empty())
+    ALMasterIndex* index = links();
+    if (!index || made.empty())
     {
         return;
     }
@@ -420,9 +185,8 @@ void ALScriptDiskMasters::link(std::vector<ALMasterLink> made)
         {
             unknown.push_back(one);
         }
-        all->put(std::move(one));
     }
-    changed();
+    index->link(std::move(made));
     // Last: a probe may answer as it is asked, and finds the links made.
     if (!unknown.empty())
     {
@@ -433,61 +197,42 @@ void ALScriptDiskMasters::link(std::vector<ALMasterLink> made)
 void ALScriptDiskMasters::adopted(const ALScriptRef& ref, const std::string& master, const std::vector<std::string>& uses, bool missed,
                                   const std::string& hash, S64 stamp)
 {
-    ALMasterLinks* all  = links();
-    ALMasterLink*  link = all ? all->find(ref.object, ref.item) : nullptr;
-    // Linked still, to that file, and knowing nothing still: a send that
-    // ended meanwhile, or a link made again, knows better.
-    if (!link || ALMasterLinks::keyOf(link->master) != ALMasterLinks::keyOf(master) || !ALScriptMasterAdopt::knowsNothing(*link))
+    if (ALMasterIndex* index = links())
     {
-        return;
+        index->adopted(ref.object, ref.item, master, uses, missed, hash, stamp);
     }
-    if (uses.empty() && !missed && hash.empty())
-    {
-        // Nothing learned: nothing changed.
-        return;
-    }
-    link->uses   = uses;
-    link->missed = missed;
-    if (!hash.empty())
-    {
-        link->hash  = hash;
-        link->stamp = stamp;
-    }
-    changedSoon();
 }
 
 void ALScriptDiskMasters::unlink(const ALScriptRef& ref)
 {
-    if (ALMasterLinks* all = links(); all && all->remove(ref.object, ref.item))
+    ALMasterIndex* index = links();
+    if (index && index->linkOf(ref.object, ref.item))
     {
         // One on its way goes on, and finds no link to move on as it ends.
         mQueue.drop(ref.id());
-        changed();
+        index->unlink(ref.object, ref.item);
     }
 }
 
 size_t ALScriptDiskMasters::markPending(const std::vector<ALScriptRef>& refs)
 {
-    ALMasterLinks* all    = links();
-    size_t         marked = 0;
+    ALMasterIndex* index = links();
+    if (!index)
+    {
+        return 0;
+    }
+    std::vector<ALMasterIndex::Item> items;
+    items.reserve(refs.size());
     for (const ALScriptRef& ref : refs)
     {
-        if (ALMasterLink* link = all ? all->find(ref.object, ref.item) : nullptr)
-        {
-            link->state = ALMasterLink::State::Pending;
-            ++marked;
-        }
+        items.emplace_back(ref.object, ref.item);
     }
-    if (marked > 0)
-    {
-        changed();
-    }
-    return marked;
+    return index->markPending(items);
 }
 
 void ALScriptDiskMasters::wrote(const std::string& path)
 {
-    if (links() == nullptr || mLinks.empty())
+    if (ALMasterIndex* index = links(); !index || index->empty())
     {
         return;
     }
@@ -542,19 +287,11 @@ void ALScriptDiskMasters::send(const ALScriptRef& ref, ALMasterPlan::Send kind)
 
 void ALScriptDiskMasters::finished(const Outcome& outcome, const std::optional<ALMasterLink>& updated)
 {
-    if (updated)
+    // Unless let go of while it was on its way. Saved as another item, the
+    // link is that one's.
+    if (ALMasterIndex* index = updated ? links() : nullptr)
     {
-        if (ALMasterLinks* all = links(); all && all->of(outcome.ref.object, outcome.ref.item))
-        {
-            // Unless let go of while it was on its way. Saved as another
-            // item, the link is that one's.
-            if (updated->item != outcome.ref.item)
-            {
-                all->remove(outcome.ref.object, outcome.ref.item);
-            }
-            all->put(*updated);
-            changed();
-        }
+        index->finished(outcome.ref.object, outcome.ref.item, *updated);
     }
     tell(outcome);
     startTurns(mQueue.finished(outcome.ref.id()));
@@ -640,30 +377,21 @@ void ALScriptDiskMasters::heardSaved(const ALScriptSaved& saved)
     {
         return;
     }
-    ALMasterLinks* all  = links();
-    ALMasterLink*  link = all ? all->find(saved.ref.object, saved.ref.item) : nullptr;
-    if (!link || saved.asset == link->base)
-    {
-        return;
-    }
     // What went up the same as what the master last sent -- a recompile,
-    // the VS Code plugin sending the same file -- moves on what the link
-    // is of, and is nothing to say.
-    const std::string world = link->notecard ? ALUploadHeader::hashOfPlain("notecard", saved.text) : hashOfWorld(saved.text, link->target);
-    if (!link->hash.empty() && world == link->hash)
+    // the VS Code plugin sending the same file -- moves on what the link is
+    // of, and is nothing to say.
+    ALMasterIndex* index = links();
+    if (!index || index->heardSaved(saved.ref.object, saved.ref.item, saved.asset, saved.text) != ALMasterIndex::Heard::Differing)
     {
-        link->base = saved.asset;
-        save();
         return;
     }
-    link->state = ALMasterLink::State::Differing;
-    Outcome outcome;
+    const std::optional<ALMasterLink> link = index->linkOf(saved.ref.object, saved.ref.item);
+    Outcome                           outcome;
     outcome.what     = Outcome::What::Differing;
     outcome.ref      = saved.ref;
-    outcome.master   = link->master;
-    outcome.itemName = link->itemName;
+    outcome.master   = link ? link->master : std::string();
+    outcome.itemName = link ? link->itemName : std::string();
     outcome.by       = saved.sender.origin;
-    changed();
     tell(outcome);
 }
 

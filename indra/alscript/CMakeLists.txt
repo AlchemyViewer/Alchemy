@@ -15,9 +15,9 @@ add_library(alscript STATIC)
 #   lsl/optimizer/ the LSL optimizer, a pass a file;
 #   luau/          the SLua analyzer over Second Life's fork of Luau;
 #   masters/       files on disk as the masters of scripts in the world:
-#                  the links, finding a master, what a send does, the
-#                  changes to them gathered over a burst, and the sends
-#                  underway;
+#                  the links and the file they are kept in, finding a
+#                  master, what a send does, the changes to them gathered
+#                  over a burst, and the sends underway;
 #   preprocessor/  the preprocessor, its includes and what it keeps.
 target_sources(
   alscript
@@ -72,6 +72,7 @@ target_sources(
     luau/alluautaskpool.cpp
     luau/alluautypes.cpp
     masters/almasterburst.cpp
+    masters/almasterindex.cpp
     masters/almasterlinks.cpp
     masters/almastermatch.cpp
     masters/almasterplan.cpp
@@ -154,6 +155,7 @@ target_sources(
         luau/alluautaskpool.h
         luau/alluautypes.h
         masters/almasterburst.h
+        masters/almasterindex.h
         masters/almasterlinks.h
         masters/almastermatch.h
         masters/almasterplan.h
@@ -331,9 +333,10 @@ if(AL_BUILD_TESTS)
   al_add_test(alnotecardformat PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscripttempfiles PROJECT alscript LIBRARIES alscript llcommon)
   # Disk masters: the changes gathered over a burst, the links and their
-  # index, a master found from what a script says or its name, what a send
-  # does, and the sends underway.
+  # index, the index kept in a file, a master found from what a script says
+  # or its name, what a send does, and the sends underway.
   al_add_test(almasterburst PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(almasterindex PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almasterlinks PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almastermatch PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almasterplan PROJECT alscript LIBRARIES alscript llcommon)

@@ -25,6 +25,7 @@
 #pragma once
 
 #include "aldiskincludes.h"
+#include "almasterindex.h"
 #include "almasterlinks.h"
 #include "almasterplan.h"
 #include "almasterqueue.h"
@@ -43,19 +44,22 @@ class ALScriptMasterAdopt;
 class ALScriptMasterFanOut;
 class ALScriptMasterToasts;
 class ALScriptMasterWatch;
-class ALSerialWorker;
 
 // The scripts in the world, the agent's own inventory's and its objects',
 // whose master is a file on disk: the file is what the script is, and
 // saving it sends it up. Which file masters which script is the account's
-// (ALMasterLinks, in script_masters.llsd under the account's folder), so
-// that another account on this computer never uploads into this one's
-// objects; a link is made only by a person's click, and nothing a script
-// says makes one. Each send is ALScriptMasterUpload's: the file read and
-// expanded as a file on disk is, the world asked what it holds first, and
-// what the plan says done (ALMasterPlan) -- a save of the master always
-// goes up, keeping first what the world had where it moved. Four go at a
-// time, and one at a time for each script (ALMasterQueue).
+// (ALMasterIndex, script_masters.llsd under the account's folder), so that
+// another account on this computer never uploads into this one's objects;
+// a link is made only by a person's click, and nothing a script says makes
+// one. This owns the index of the account in hand: it gives the index
+// paths as the links keep them, their links on disk followed, and keeps
+// what is the viewer's -- the sends, the watch and the telling.
+//
+// Each send is ALScriptMasterUpload's: the file read and expanded as a
+// file on disk is, the world asked what it holds first, and what the plan
+// says done (ALMasterPlan) -- a save of the master always goes up, keeping
+// first what the world had where it moved. Four go at a time, and one at a
+// time for each script (ALMasterQueue).
 //
 // Links are live while the agent is logged in, whether or not a studio
 // window is open: the masters and the files they include are watched for
@@ -65,14 +69,9 @@ class ALSerialWorker;
 // (ALScriptMasterFanOut). What came of each send is told to whoever
 // listens -- every studio window's Output, kept for the window opened
 // next where there is none -- and, with no window in sight, the failures
-// and conflicts said in a toast (ALScriptMasterToasts).
-//
-// The index is written whole, and forced out to the disk, a moment after
-// the last change to it rather than at each: a checkout's sends, or an
-// include's dozens, end one after another, and each moves its link on. It
-// is put into words on the main thread and written on a thread of its own,
-// one write after another, the newest only where several wait; and at once,
-// here, whatever waits, when the account changes and as the viewer goes.
+// and conflicts said in a toast (ALScriptMasterToasts). Whatever the index
+// has waiting to be written is written as the account changes and as the
+// viewer goes.
 class ALScriptDiskMasters : public LLSingleton<ALScriptDiskMasters>
 {
     LLSINGLETON(ALScriptDiskMasters);
@@ -201,23 +200,11 @@ public:
     static LLInventoryItem* itemOf(const ALScriptRef& ref);
 
 private:
-    // The links of the account in hand: loaded the first time they are
-    // asked for, and again for another account.
-    ALMasterLinks* links();
-    // The index to be written a moment from now: once nothing has changed
-    // for a second, and no later than a few after the first change not yet
-    // written.
-    void           save();
-    void           saveSoon();
-    void           saveDue();
-    // What changed put into words, and handed to the writer; and that and
-    // whatever the writer has waiting written here, before this returns.
-    void           handOver();
-    void           saveNow();
+    // The index of the account in hand: read the first time it is asked
+    // for, and again for another account, that one's written first.
+    ALMasterIndex* links();
+    // The index changed: what is watched, and whoever listens told.
     void           changed();
-    // The same a moment from now, once for changes made one after another:
-    // what the probes of links just made find.
-    void           changedSoon();
     // What is watched, as the links stand now.
     void           rewatch();
     // A save of a linked script heard from elsewhere.
@@ -231,8 +218,8 @@ private:
     void startTurns(std::vector<std::pair<std::string, ALMasterPlan::Send>> turns);
     void forgetQueued(const std::string& id);
 
-    std::string                        mFor;
-    ALMasterLinks                      mLinks;
+    std::unique_ptr<ALMasterIndex>     mIndex;
+    boost::signals2::scoped_connection mIndexConnection;
     boost::signals2::scoped_connection mSavedConnection;
     boost::signals2::scoped_connection mEnabledConnection;
     outcome_signal_t                   mOutcome;
@@ -246,18 +233,4 @@ private:
     std::unique_ptr<ALScriptMasterAdopt>                                      mAdopt;
     std::unique_ptr<ALScriptMasterToasts>                                     mToasts;
     std::vector<Outcome>                                                      mUnheard;
-    // What the writer's thread is handed, and the thread, made with the
-    // first write; whether a change is not yet handed over, and since when,
-    // and when the last was; and whether a write is coming.
-    struct Writer;
-    std::shared_ptr<Writer>                                                   mWriter;
-    std::unique_ptr<ALSerialWorker>                                           mWriterThread;
-    bool                                                                      mDirty      = false;
-    F64                                                                       mDirtySince = 0.0;
-    F64                                                                       mDirtyLast  = 0.0;
-    bool                                                                      mSaveComing = false;
-    // Whether changedSoon's change is coming.
-    bool                                                                      mChangeComing = false;
-    // Held while this is, for a timer to know it still is.
-    std::shared_ptr<bool>                                                     mAlive = std::make_shared<bool>(true);
 };

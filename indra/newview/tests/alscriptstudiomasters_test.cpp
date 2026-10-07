@@ -62,24 +62,29 @@ namespace
         std::vector<std::pair<ALScriptRef, ALMasterPlan::Send>> sent;
     };
     IndexAsked gIndexAsked;
+    // The links, let go of with the index.
+    ALMasterLinks gLinks;
 }
 
 ALScriptDiskMasters::ALScriptDiskMasters() {}
-ALScriptDiskMasters::~ALScriptDiskMasters() = default;
+ALScriptDiskMasters::~ALScriptDiskMasters()
+{
+    gLinks = ALMasterLinks();
+}
 // Nothing written, so nothing waits to be as the links go.
 void ALScriptDiskMasters::cleanupSingleton() {}
 ALScriptMasterWatch::~ALScriptMasterWatch() = default;
 
 std::optional<ALMasterLink> ALScriptDiskMasters::linkOf(const ALScriptRef& ref)
 {
-    const ALMasterLink* link = mLinks.of(ref.object, ref.item);
+    const ALMasterLink* link = gLinks.of(ref.object, ref.item);
     return link ? std::optional<ALMasterLink>(*link) : std::nullopt;
 }
 
 std::vector<ALMasterLink> ALScriptDiskMasters::mastering(const std::string& master)
 {
     std::vector<ALMasterLink> out;
-    for (const ALMasterLink* link : mLinks.mastering(master))
+    for (const ALMasterLink* link : gLinks.mastering(master))
     {
         out.push_back(*link);
     }
@@ -101,14 +106,14 @@ void ALScriptDiskMasters::link(std::vector<ALMasterLink> made)
     }
     for (ALMasterLink& one : made)
     {
-        mLinks.put(std::move(one));
+        gLinks.put(std::move(one));
     }
     mChanged();
 }
 
 void ALScriptDiskMasters::unlink(const ALScriptRef& ref)
 {
-    if (mLinks.remove(ref.object, ref.item))
+    if (gLinks.remove(ref.object, ref.item))
     {
         mChanged();
     }
