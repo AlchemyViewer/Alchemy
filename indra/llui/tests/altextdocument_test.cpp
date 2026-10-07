@@ -575,4 +575,20 @@ namespace tut
         doc.setText("again\nand again");
         agrees("a text put in whole");
     }
+
+    template<> template<>
+    void altextdocument_object::test<23>()
+    {
+        set_test_name("words as code reads them never stop inside a character: a keycap's mark goes with what joins it, and so does a blank a mark is put on");
+        // x, a blank, # with U+FE0F and U+20E3 on it, a blank, y.
+        const ALTextDocument keycap("x #\xEF\xB8\x8F\xE2\x83\xA3 y");
+        ensure("from the mark, past the keycap and the blank after it", keycap.nextCodeWord(ALTextPos(0, 2)) == ALTextPos(0, 10));
+        ensure("back over it whole", keycap.prevCodeWord(ALTextPos(0, 10)) == ALTextPos(0, 2));
+        ensure("up to it as before", keycap.nextCodeWord(ALTextPos(0, 0)) == ALTextPos(0, 2));
+        // a, a blank with a combining acute on it, z.
+        const ALTextDocument accent("a \xCC\x81z");
+        ensure("forward past the blank and its mark", accent.nextCodeWord(ALTextPos(0, 0)) == ALTextPos(0, 4));
+        ensure("and from the blank itself", accent.nextCodeWord(ALTextPos(0, 1)) == ALTextPos(0, 4));
+        ensure("back to the blank the mark is on", accent.prevCodeWord(ALTextPos(0, 4)) == ALTextPos(0, 1));
+    }
 }

@@ -35,6 +35,20 @@
 namespace
 {
     const std::string EMPTY_LINE;
+
+    // A place of a line moved onto a grapheme boundary: the one at or after
+    // it, or at or before it. Between two plain ASCII characters is one
+    // already -- all that can join to one is not ASCII, but for a carriage
+    // return and the line feed after it, which no line holds -- and needs
+    // no asking.
+    size_t onBoundary(const std::string& line, size_t at, bool forward)
+    {
+        if (at > 0 && at < line.size() && static_cast<unsigned char>(line[at]) < 0x80 && static_cast<unsigned char>(line[at - 1]) < 0x80)
+        {
+            return at;
+        }
+        return forward ? utf8str_grapheme_align_forward(line, at) : utf8str_grapheme_align_backward(line, at);
+    }
 }
 
 ALTextPos alTextEnd(const ALTextPos& at, std::string_view text)
@@ -567,17 +581,8 @@ ALTextRange ALTextDocument::clampBytes(const ALTextRange& range) const
 
 ALTextPos ALTextDocument::clamp(ALTextPos pos) const
 {
-    pos = clampBytes(pos);
-    // Between two plain ASCII characters is a boundary -- all that can join
-    // to one is not ASCII, but for a carriage return and the line feed
-    // after it, which no line holds -- and needs no asking.
-    const std::string& line = mLines[pos.line];
-    const size_t       at   = static_cast<size_t>(pos.column);
-    if (at > 0 && at < line.size() && static_cast<unsigned char>(line[at]) < 0x80 && static_cast<unsigned char>(line[at - 1]) < 0x80)
-    {
-        return pos;
-    }
-    pos.column = static_cast<S32>(utf8str_grapheme_align_backward(line, at));
+    pos        = clampBytes(pos);
+    pos.column = static_cast<S32>(onBoundary(mLines[pos.line], static_cast<size_t>(pos.column), false));
     return pos;
 }
 
@@ -682,12 +687,16 @@ ALTextPos ALTextDocument::nextCodeWord(ALTextPos pos, bool parts) const
         {
             ++at;
         }
+        // A mark that a character past ASCII joins -- `#` of a keycap --
+        // takes the whole of what it is a part of.
+        at = onBoundary(l, at, true);
     }
     while (at < n && codeRunOf(l[at]) == CodeRun::Blank)
     {
         ++at;
     }
-    return ALTextPos(pos.line, static_cast<S32>(at));
+    // Likewise a blank that a mark after it joins: an accent on a space.
+    return ALTextPos(pos.line, static_cast<S32>(onBoundary(l, at, true)));
 }
 
 ALTextPos ALTextDocument::prevCodeWord(ALTextPos pos, bool parts) const
@@ -715,7 +724,9 @@ ALTextPos ALTextDocument::prevCodeWord(ALTextPos pos, bool parts) const
             }
         }
     }
-    return ALTextPos(pos.line, static_cast<S32>(at));
+    // Never inside a character: back to the start of what the run's first
+    // byte is a part of.
+    return ALTextPos(pos.line, static_cast<S32>(onBoundary(l, at, false)));
 }
 
 ALTextRange ALTextDocument::wordAt(ALTextPos pos) const
