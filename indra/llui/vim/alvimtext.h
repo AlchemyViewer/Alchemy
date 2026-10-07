@@ -340,4 +340,8 @@ namespace ALVimText
     // a hundred thousand of a register a hundred kilobytes long is ten
     // gigabytes. A megabyte is more than any script.
     inline constexpr size_t MAX_COUNT_TEXT = 1024 * 1024;
+    // vim's 'report' as it is by default: a change of more lines than this
+    // -- lines deleted, yanked or shifted -- or of more substitutions is
+    // said, and a smaller one is not.
+    inline constexpr S32 REPORT_THRESHOLD = 2;
 }

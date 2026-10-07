@@ -4904,7 +4904,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             store(mRegister, text, span.linewise, span.block, true);
             if (span.linewise)
             {
-                if (pieces.size() == 1 && last > first)
+                if (pieces.size() == 1 && last - first + 1 > REPORT_THRESHOLD)
                 {
                     say(alSaidCount("VimLinesYanked", last - first + 1, "1 line yanked", "[COUNT] lines yanked"));
                 }
@@ -4987,7 +4987,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                     view.deleteRange(whole);
                     const S32 line = llmin(first, d.lineCount() - 1);
                     view.setCaret(ALTextPos(line, firstNonBlankColumn(d, line)));
-                    if (last > first)
+                    if (last - first + 1 > REPORT_THRESHOLD)
                     {
                         say(alSaidCount("VimFewerLines", last - first + 1, "1 fewer line", "[COUNT] fewer lines"));
                     }
@@ -5054,7 +5054,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                 view.replaceAll(std::move(edits));
             }
             moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
-            if (last > first)
+            if (last - first + 1 > REPORT_THRESHOLD)
             {
                 say(alSaidCount(op == '>' ? "VimLinesShiftedRight" : "VimLinesShiftedLeft", last - first + 1, op == '>' ? "1 line >ed 1 time" : "1 line <ed 1 time",
                                 op == '>' ? "[COUNT] lines >ed 1 time" : "[COUNT] lines <ed 1 time"));

@@ -4841,4 +4841,36 @@ namespace tut
         ensure("ciw on an empty line, then p: nothing said: " + vim->message(), vim->message().empty());
         ensure_equals("and nothing put", flat(editor->text()), std::string("|abc|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<169>()
+    {
+        set_test_name("how many lines a change took, yanked or shifted is said for more than two, as vim's report has it, and not for two; and so are substitutions");
+        ALCodeEditor& e = make("a\nb\nc\nd\ne\nf\n");
+        keys("2yy");
+        ensure("2yy: nothing said: " + vim->message(), vim->message().empty());
+        keys("3yy");
+        ensure_equals("3yy", vim->message(), std::string("3 lines yanked"));
+        keys("2dd");
+        ensure("2dd: nothing said: " + vim->message(), vim->message().empty());
+        ensure_equals("the two gone", flat(e.text()), std::string("c|d|e|f|"));
+        keys("3dd");
+        ensure_equals("3dd", vim->message(), std::string("3 fewer lines"));
+
+        make("a\nb\nc\n");
+        keys("2>>");
+        ensure("2>>: nothing said: " + vim->message(), vim->message().empty());
+        keys("3>>");
+        ensure_equals("3>>", vim->message(), std::string("3 lines >ed 1 time"));
+
+        make("x\nx\ny\n");
+        keys(":g/x/d<CR>");
+        ensure("two lines taken by :g: nothing said: " + vim->message(), vim->message().empty());
+        ensure_equals("both gone", flat(editor->text()), std::string("y|"));
+
+        make("a a\nb\n");
+        keys(":s/a/b/g<CR>");
+        ensure("two substitutions: nothing said: " + vim->message(), vim->message().empty());
+        ensure_equals("both made", flat(editor->text()), std::string("b b|b|"));
+    }
 }

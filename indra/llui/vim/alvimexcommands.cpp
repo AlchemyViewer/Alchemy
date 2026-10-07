@@ -458,7 +458,7 @@ void ALVimExCommands::endConfirming(ALTextView& view)
     {
         mVim.moveTo(view, view.caret());
     }
-    if (confirming.made > 1)
+    if (confirming.made > REPORT_THRESHOLD)
     {
         mVim.say(ALVimKeymap::substitutionsSaid(confirming.made, confirming.lines));
     }
@@ -1379,11 +1379,11 @@ void ALVimExCommands::applyGlobalBatch(ALTextView& view, GlobalBatch& batch)
         landing = llclamp(landing, 0, d.lineCount() - 1);
         mVim.moveTo(view, ALTextPos(landing, firstNonBlankColumn(d, landing)));
     }
-    if (batch.substitutions > 1)
+    if (batch.substitutions > REPORT_THRESHOLD)
     {
         mVim.say(ALVimKeymap::substitutionsSaid(batch.substitutions, batch.substitutedLines));
     }
-    else if (batch.deletedLines > 1)
+    else if (batch.deletedLines > REPORT_THRESHOLD)
     {
         mVim.say(alSaidCount("VimFewerLines", batch.deletedLines, "1 fewer line", "[COUNT] fewer lines"));
     }
@@ -1798,7 +1798,7 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
     }
     landing = llclamp(landing, 0, d.lineCount() - 1);
     mVim.moveTo(view, ALTextPos(landing, firstNonBlankColumn(d, landing)));
-    if (count > 1)
+    if (count > REPORT_THRESHOLD)
     {
         mVim.say(ALVimKeymap::substitutionsSaid(count, lines));
     }
