@@ -64,7 +64,8 @@ public:
     bool searching() const { return mWorking != nullptr; }
     // Past this many bytes, a text is looked through on a worker.
     static constexpr size_t ON_A_WORKER = 256 * 1024;
-    // Nothing found, and nothing to look through again: the find put away.
+    // Nothing found, and nothing to look through again: the find put away,
+    // and with it the stretch a find in a selection kept to.
     void clear();
     // An edit of the text: the matches after it slide, those it cut
     // through go, and a selection kept to grows or shrinks with what is

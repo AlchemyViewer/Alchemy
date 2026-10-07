@@ -172,4 +172,18 @@ namespace tut
         find.stale();
         ensure("not due at the next change", !find.due());
     }
+
+    template<> template<>
+    void altextfind_object::test<6>()
+    {
+        set_test_name("put away, a find in a selection lets go of the stretch it kept to: asked for again, it keeps to the selection then");
+        const ALTextDocument doc("one two\none two\none two\n");
+        ALTextFind           find;
+        find.search(doc, "one", ALTextSearchOptions(), true, ALTextRange(ALTextPos(0, 0), ALTextPos(0, 7)));
+        ensure_equals("in the first line's selection", find.count(), size_t(1));
+        find.clear();
+        find.search(doc, "one", ALTextSearchOptions(), true, ALTextRange(ALTextPos(1, 0), ALTextPos(2, 7)));
+        ensure_equals("in the selection made since", find.count(), size_t(2));
+        ensure("on its lines", find.matches()[0].begin.line == 1 && find.matches()[1].begin.line == 2);
+    }
 }

@@ -162,6 +162,10 @@ void ALTextFind::clear()
     mMatches.clear();
     mCurrent = -1;
     mStale   = false;
+    // And the stretch a find in a selection kept to: the next one asked
+    // for keeps to the selection then.
+    mInSelection = false;
+    mScope       = ALTextRange();
 }
 
 void ALTextFind::edited(const ALTextDocument::Edit& edit)
