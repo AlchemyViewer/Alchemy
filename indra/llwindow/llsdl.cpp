@@ -166,6 +166,12 @@ void set_sdl_hints()
                     // sequence (LLAppViewer), and transient teardown of the
                     // main window must never be read as a request to quit.
                     {SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE, "0"},
+
+                    // Why the screensaver is held off while the viewer has
+                    // focus, as the desktop's power applet shows it beside
+                    // the app over D-Bus on Linux. SDL's own is "Playing a
+                    // game". English: translations aren't loaded this early.
+                    {SDL_HINT_SCREENSAVER_INHIBIT_ACTIVITY_NAME, "Viewing a virtual world"},
             };
 
     for (auto hint: hintList)
