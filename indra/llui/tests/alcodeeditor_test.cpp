@@ -2293,6 +2293,13 @@ namespace tut
         ensure_equals("with the brackets", grown(), std::string("(0, \"hi there\")"));
         e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
         ensure("moved by hand: nothing to go back through", !e.canPerform(ALEditorCommand::ShrinkSelection));
+
+        // Selected by hand from inside a pair to past where it closes: the
+        // pair around all of it, not the line.
+        e.setText("f((a) + b)");
+        e.setSelection(ALTextRange(ALTextPos(0, 3), ALTextPos(0, 9)));
+        ensure_equals("past the pair it crosses, the inside of the one around it", grown(), std::string("(a) + b"));
+        ensure_equals("then with its brackets", grown(), std::string("((a) + b)"));
     }
 
     template<> template<>
