@@ -372,27 +372,15 @@ Combined combine(std::vector<Group> groups, size_t count)
         return groups[a].replacements.empty() && !groups[b].replacements.empty();
     });
 
-    // Where each replacement kept so far ended, in the text before and in
-    // the text after: a place at or past one moves by the last of them as
-    // the place where it ended does (ALTextDocument::Edit's batch).
-    std::vector<std::pair<ALTextPos, ALTextPos>> ends;
-    const auto moved = [&ends](const ALTextPos& pos) {
-        const auto after = std::upper_bound(ends.begin(), ends.end(), pos, [](const ALTextPos& p, const std::pair<ALTextPos, ALTextPos>& end) { return p < end.first; });
-        if (after == ends.begin())
-        {
-            return pos;
-        }
-        const auto& [before_end, after_end] = *(after - 1);
-        if (pos.line == before_end.line)
-        {
-            return ALTextPos(after_end.line, after_end.column + (pos.column - before_end.column));
-        }
-        return ALTextPos(pos.line + (after_end.line - before_end.line), pos.column);
-    };
+    // The replacements kept so far, as the stretches of the batch they will
+    // be, each as it is in the text before and in the text after: a place
+    // at or past one moves by the last of them as the place where it ended
+    // does, as the document slides one past a batch.
+    ALTextDocument::Edit kept;
     for (const size_t g : order)
     {
         Group& group = groups[g];
-        if (!group.replacements.empty() && !ends.empty() && group.replacements.front().range.normalised().begin < ends.back().first)
+        if (!group.replacements.empty() && !kept.parts.empty() && group.replacements.front().range.normalised().begin < kept.parts.back().before.end)
         {
             // Over a replacement before it: left out.
             continue;
@@ -403,13 +391,14 @@ Combined combine(std::vector<Group> groups, size_t count)
         {
             if (index < count)
             {
-                out.selections[index] = ALTextRange(moved(selection.begin), moved(selection.end));
+                out.selections[index] = ALTextRange(kept.slidPast(selection.begin), kept.slidPast(selection.end));
             }
         }
         for (Replacement& replacement : group.replacements)
         {
             const ALTextRange range = replacement.range.normalised();
-            ends.emplace_back(range.end, endOf(moved(range.begin), replacement.text));
+            const ALTextPos   begin = kept.slidPast(range.begin);
+            kept.parts.push_back({ range, ALTextRange(begin, alTextEnd(begin, replacement.text)) });
             out.replacements.push_back({ range, std::move(replacement.text) });
         }
     }
