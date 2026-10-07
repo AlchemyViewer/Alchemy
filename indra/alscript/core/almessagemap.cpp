@@ -283,8 +283,12 @@ namespace
         { "PreprocRequireBadPrefix", "require path must start with a valid prefix: ./, ../, or @" },
         { "PreprocRequireReserved", "the alias '@[2]' is reserved: aliases starting @sl- are Second Life's" },
         { "PreprocRequireClimbs", "a require through an alias may not climb out of its folder: '[2]'" },
+        { "PreprocRequireAliasNamesDisk", "the alias stands for '[2]', a path on disk, which a configuration in the world may not name" },
         { "PreprocRequireAliasTarget", "the alias stands for '[2]', which is not there" },
         { "PreprocRequireNoModule", "could not find a module at '[2]'" },
+        { "PreprocRequireNotAdmitted", "'[2]' is there, but no include folder or alias lets a require read it" },
+        { "PreprocRequireAliasRefused", "the configuration in '[2]' names '[3]', which is outside it and outside the include folders" },
+        { "PreprocRequireConfigBroken", "the configuration '[2]' could not be read: [3]" },
     };
 
     // A template cut at its marks: the literal stretches, and the number

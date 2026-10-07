@@ -32,6 +32,7 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <map>
@@ -221,6 +222,15 @@ namespace tut
         ALIncludeWorld::Item item(const std::string& name, bool in_inventory)
         {
             return { ALIncludeIdentity::ofItem(in_inventory ? LLUUID::null : prim, LLUUID::generateNewID()), name, LLUUID::generateNewID() };
+        }
+        // What the search before LAD9 finds of a require, as a require found
+        // nowhere asks it (ALIncludeSearch::searchedBefore): the file on
+        // disk it takes first, or nothing.
+        std::string searched(const std::string& name, const ALIncludeSearch::Asking& who, const ALIncludeSearch::Where& in)
+        {
+            bool                                          unknown = false;
+            const std::vector<ALIncludeSearch::Candidate> found   = search.candidatesFor(ask(name, true, who.self), who, in, {}, unknown);
+            return found.empty() ? std::string() : found.front().file;
         }
     };
 
@@ -414,7 +424,10 @@ namespace tut
     // ours -- the nearest `.luaurc` wins, which the plugin reverses. The
     // tree is a scripter's two folders on disk, world includes off as they
     // are by default (LAD10). Studio aliases (LA22) come with LA22. The
-    // search before LA15 is kept beside each, for what changed.
+    // search before LA15 is kept beside each, for what changed: asked of
+    // the code still, which keeps it for a require found nowhere, for each
+    // name it took; an alias's it read through the `.luaurc`, which is gone,
+    // and is kept as it found it.
     struct RequireCase
     {
         // What it shows, and whose case it is.
@@ -550,7 +563,14 @@ namespace tut
         };
 
         const ALIncludeSearch::Where disk = where(false, true, { s.at("proj"), s.at("elsewhere") });
-        const std::string            root = s.root.generic_string() + "/";
+        // A file by its path from the tree, `/` between the parts.
+        const auto under_tree = [&s](const std::string& file) {
+            std::string path = fsyspath(s.root).string() + "/";
+            std::string at   = file;
+            std::replace(path.begin(), path.end(), '\\', '/');
+            std::replace(at.begin(), at.end(), '\\', '/');
+            return at.compare(0, path.size(), path) == 0 ? at.substr(path.size()) : at;
+        };
         for (const RequireCase& one : cases)
         {
             const std::string             from = std::string(one.from) == "object" ? asking(true).self : ALIncludeIdentity::ofFile(s.at(one.from));
@@ -562,14 +582,19 @@ namespace tut
             std::string                   under;
             if (said == ALPreprocessor::Found::Yes && ALIncludeIdentity::fileOf(found.path, file))
             {
-                under = fsyspath(file).generic_string();
-                under = under.compare(0, root.size(), root) == 0 ? under.substr(root.size()) : under;
+                under = under_tree(file);
             }
             ensure_equals(std::string(one.what) + ": as LAD9 has it", under, std::string(one.chosen));
-            // A case where all agree was found so before.
-            if (!*one.rule)
+            if (*one.name != '@')
             {
-                ensure_equals(std::string(one.what) + ": as before", std::string(one.chosen), std::string(one.before));
+                // A name the search before took: asked of it.
+                const std::string before = searched(one.name, own, disk);
+                ensure_equals(std::string(one.what) + ": as before", before.empty() ? before : under_tree(before), std::string(one.before));
+            }
+            else if (!*one.rule)
+            {
+                // An alias's, where all agree: found so before.
+                ensure_equals(std::string(one.what) + ": as before", under, std::string(one.before));
             }
         }
     }
@@ -783,7 +808,7 @@ namespace tut
         Scratch           s;
         const std::string script = s.write("proj/main.luau", "return require('./both')\n");
         const std::string file   = s.write("proj/both.luau", "return 'file'\n");
-        const std::string init   = s.write("proj/both/init.luau", "return 'init'\n");
+        s.write("proj/both/init.luau", "return 'init'\n");
         s.write("proj/alone/init.luau", "return 'alone'\n");
         const ALIncludeSearch::Where  disk = where(false, true, { s.at("proj") });
         const ALIncludeSearch::Asking own{ ALIncludeIdentity::ofFile(script), true };
@@ -791,7 +816,8 @@ namespace tut
         std::vector<std::string>      aliases;
         ensure("found", search.resolve(ask("./both", true, own.self), found, own, disk, nullptr, false, &aliases) == ALPreprocessor::Found::Yes);
         ensure_equals("the file", found.path, ALIncludeIdentity::ofFile(file));
-        ensure_equals("the init passed over", found.passedOver, init);
+        ensure_equals("the init passed over, by its path from the folder both are in", found.passedOver, std::string("both/init.luau"));
+        ensure_equals("as the file taken is, by its name", found.name, std::string("both.luau"));
         ALPreprocessor::Include alone;
         ensure("a folder's init alone", search.resolve(ask("./alone", true, own.self), alone, own, disk, nullptr, false, &aliases) ==
                                             ALPreprocessor::Found::Yes &&
@@ -851,6 +877,7 @@ namespace tut
         s.write("proj/.luaurc", "{\"aliases\": {\"shared\": \"./lib\", \"sl-std\": \"./lib\"}}");
         s.write("tools/t.luau", "return 1\n");
         const std::string inc = s.write("proj/inc.lsl", "integer x;\n");
+        s.write("proj/defs.lslh", "#define X 1\n");
         ALIncludeSearch::Where disk = where(false, true, { s.at("proj") });
         disk.aliases                = { { "tools", s.at("tools") } };
         const ALIncludeSearch::Asking own{ ALIncludeIdentity::ofFile(script), true };
@@ -867,8 +894,9 @@ namespace tut
         ensure_equals("a name part typed: the same, for the editor to narrow", labels("./li"), labels("./"));
         ensure_equals("in a folder: its own, and up", labels("./lib/"), std::string("../ http net sub/"));
         ensure_equals("a name part typed there", labels("./lib/ne"), labels("./lib/"));
-        ensure_equals("through a .luaurc's alias", labels("@shared/"), std::string("../ http net sub/"));
-        ensure_equals("through the studio's", labels("@tools/"), std::string("../ t"));
+        ensure_equals("through a .luaurc's alias, which may not climb: no way up", labels("@shared/"), std::string("http net sub/"));
+        ensure_equals("nor further in", labels("@shared/sub/"), std::string("deep"));
+        ensure_equals("through the studio's", labels("@tools/"), std::string("t"));
         ensure_equals("a reserved alias walks nowhere", labels("@sl-std/"), std::string());
 
         // Every module offered is what a require of it finds.
@@ -888,14 +916,25 @@ namespace tut
         }
         ensure_equals("each one's whole path", search.suggest(own.self, "./lib/", true, own, disk)[1].path, std::string("./lib/http"));
 
-        // An include's: the file's own folder, by its search, names whole.
+        // An include's: the file's own folder, by its search, names whole --
+        // an include's own `.lslh` and `.lsli` as well as `.lsl`.
         const ALIncludeSearch::Asking lsl{ ALIncludeIdentity::ofFile(inc), false };
-        std::string                   said;
-        for (const ALRequireNavigation::Suggestion& one : search.suggest(lsl.self, "", false, lsl, disk))
-        {
-            said += (said.empty() ? "" : " ") + one.path + (one.folder ? "/" : "");
-        }
-        ensure_equals("an LSL include's", said, std::string("inc.lsl lib/"));
+        const auto                    included = [&](const std::string& typed) {
+            std::string said;
+            for (const ALRequireNavigation::Suggestion& one : search.suggest(lsl.self, typed, false, lsl, disk))
+            {
+                said += (said.empty() ? "" : " ") + one.path + (one.folder ? "/" : "");
+            }
+            return said;
+        };
+        ensure_equals("an LSL include's", included(""), std::string("defs.lslh inc.lsl lib/"));
+        ensure_equals("in a folder under it", included("lib/"), std::string("lib/sub/"));
+        // Only under the folders the search looks in, however it is typed:
+        // not up out of them, nor from a root elsewhere, nor another
+        // machine's share.
+        ensure_equals("not up out of them", included("../"), std::string());
+        ensure_equals("nor from a root elsewhere", included(fsyspath(s.root).string() + "/"), std::string());
+        ensure_equals("nor a share", included("\\\\alincludesearch.invalid\\share\\"), std::string());
     }
 
     template<> template<>
@@ -967,10 +1006,14 @@ namespace tut
         std::error_code ec;
         fs::remove(fsyspath(rc), ec);
 
-        // One that does not run: passed over, as a .luaurc that does not
-        // parse is.
+        // One that does not run: an alias walked past it stops there, as
+        // Luau's navigator stops at a .luaurc that does not parse, and says
+        // why; passed over in the chain the analyzer reads, as such a
+        // .luaurc is.
         s.write("proj/.config.luau", "error('broken')\n");
-        ensure("broken: its alias gone", resolved("@lib/net", &why).empty() && why == "@lib is not a valid alias");
+        ensure("broken: its alias gone", resolved("@lib/net", &why).empty());
+        ensure("said why, naming it: " + why, why.find("the configuration '") == 0 && why.find(".config.luau' could not be read: ") != std::string::npos);
+        ensure_equals("nor suggested past it", suggested(), std::string("./ ../"));
         ensure_equals("not in the chain", chain(), std::string(".luaurc"));
 
         // A script in the world, world includes off: the one at the top of
@@ -1040,5 +1083,212 @@ namespace tut
         both.aliases                = { { "inv", "libfolder" }, { "lib", s.at("library") } };
         ensure_equals("each its own", found("@lib/util", both), ALIncludeIdentity::ofFile(disk_util));
         ensure_equals("and the world's", found("@inv/util", both), util.path);
+    }
+
+    template<> template<>
+    void alincludesearch_object::test<17>()
+    {
+        set_test_name("a path a script or a configuration wrote is asked of the disk only where it is, as written, under a folder a require reads or the configuration's own: never another machine's share, a device, or another drive by a part of a name");
+        Scratch           s;
+        const std::string script = s.write("proj/main.luau", "return 1\n");
+        const std::string util   = s.write("proj/lib/util.luau", "return 'util'\n");
+        s.write("abroad/e.luau", "return 'e'\n");
+        // Each written with `/`, which a configuration's text keeps as it is.
+        const auto forward = [](std::string path) {
+            std::replace(path.begin(), path.end(), '\\', '/');
+            return path;
+        };
+        const std::string lib    = forward(s.at("proj/lib"));
+        const std::string abroad = forward(s.at("abroad"));
+        s.write("proj/.luaurc", "{\"aliases\": {\"own\": \"" + lib + "\", \"share\": \"//alincludesearch.invalid/share\", "
+                                "\"nt\": \"/?\?/UNC/alincludesearch.invalid/share\", \"ntlocal\": \"/?\?/" + lib + "\", \"abroad\": \"" + abroad +
+                                "\", \"sl-std\": \"./lib\"}}");
+        const ALIncludeSearch::Asking own{ ALIncludeIdentity::ofFile(script), true };
+        const auto found = [&](const std::string& name, const ALIncludeSearch::Where& in, std::string* why = nullptr) {
+            ALPreprocessor::Include  include;
+            std::vector<std::string> aliases;
+            const bool yes = search.resolve(alincludesearch_data::ask(name, true, own.self), include, own, in, nullptr, false, &aliases) == ALPreprocessor::Found::Yes;
+            if (why)
+            {
+                *why = include.why;
+            }
+            return yes ? include.path : std::string();
+        };
+
+        // Opened from the disk, in no include folder: what its configuration
+        // names from a root under its own folder is all it reaches.
+        const ALIncludeSearch::Where loose = where(false, true);
+        ensure_equals("from a root, under the configuration's own folder", found("@own/util", loose), ALIncludeIdentity::ofFile(util));
+        ensure_equals("not a require's own path from a root, which no folder lets in", found(util, loose), std::string());
+
+        const ALIncludeSearch::Where disk = where(false, true, { s.at("proj") });
+        std::string                  why;
+        // What an alias names out of every folder it may: said so, and the
+        // disk not asked to say it.
+        const auto outside = [&s](const std::string& named) {
+            return "the configuration in '" + s.at("proj") + "' names '" + named + "', which is outside it and outside the include folders";
+        };
+        ensure_equals("under an include folder", found(util, disk), ALIncludeIdentity::ofFile(util));
+        ensure("an alias naming another machine's share: not asked",
+               found("@share/x", disk, &why).empty() && why == outside("//alincludesearch.invalid/share"));
+        ensure("nor by the NT namespace's name for one", found("@nt/x", disk, &why).empty() && why == outside("/?\?/UNC/alincludesearch.invalid/share"));
+        ensure("nor its name for a local folder", found("@ntlocal/util", disk, &why).empty() && why == outside("/?\?/" + lib));
+        ensure("a folder that is there, out of every folder it may name: not said to be missing",
+               found("@abroad/e", disk, &why).empty() && why == outside(abroad));
+        ensure("a require naming one", found("//alincludesearch.invalid/share/x", disk, &why).empty() &&
+                                           why == "could not find '//alincludesearch.invalid/share/x'");
+        ensure("in Windows's separators", found("\\\\alincludesearch.invalid\\share\\x", disk).empty() &&
+                                              found("\\??\\UNC\\alincludesearch.invalid\\share\\x", disk).empty());
+        ensure("a device's path to a file under the folder", found("\\\\?\\" + util, disk).empty() && found("\\\\.\\" + util, disk).empty() &&
+                                                                  found("\\??\\" + util, disk).empty());
+        ensure("another drive's folder by a part of a name", found("./D:/x", disk, &why).empty() && why == "could not resolve child component \"D:\"");
+        ALPreprocessor::Include include;
+        ensure("nor an LSL include naming a share", search.resolve(ask("//alincludesearch.invalid/share/x.lsl"), include, asking(), disk, nullptr, false) ==
+                                                        ALPreprocessor::Found::No);
+        // Nor are those modules' folders, for what a script may name; nor
+        // an alias Second Life keeps.
+        std::string prefixes;
+        for (const auto& [prefix, folder] : search.moduleFolders(own, disk))
+        {
+            prefixes += prefix + " ";
+        }
+        ensure_equals("the module folders: the scripter's, and the alias's that may be read", prefixes, std::string(" @own/ "));
+
+        // A configuration's folder reached through a link names its own
+        // folder as it stands, and is let in so.
+        std::error_code ec;
+        fs::create_directory_symlink(s.root / "proj", s.root / "linked", ec);
+        if (!ec)
+        {
+            const std::string             through = ALIncludeIdentity::ofFile(s.at("linked/main.luau"));
+            const ALIncludeSearch::Asking linked{ through, true };
+            ALPreprocessor::Include       reached;
+            std::vector<std::string>      aliases;
+            ensure("through a link", search.resolve(ask("@own/util", true, through), reached, linked, loose, nullptr, false, &aliases) ==
+                                         ALPreprocessor::Found::Yes &&
+                                         reached.path == ALIncludeIdentity::ofFile(util));
+        }
+    }
+
+    template<> template<>
+    void alincludesearch_object::test<18>()
+    {
+        set_test_name("why a require found nothing where the walk reached a file: no folder lets it in, or its configuration may not bless what an alias reached; a configuration that cannot be read ends a walk for an alias past it; a world .luaurc naming the disk");
+        Scratch           s;
+        const std::string loose = s.write("loose/main.luau", "return 1\n");
+        s.write("loose/sibling.luau", "return 1\n");
+        s.write("loose/.luaurc", "{\"aliases\": {\"out\": \"../outside\"}}");
+        s.write("outside/x.luau", "return 1\n");
+        s.write("inc/empty.luau", "return 1\n");
+        const auto why = [&](const std::string& name, const std::string& from, const ALIncludeSearch::Where& in) {
+            const ALIncludeSearch::Asking who{ from, true };
+            ALPreprocessor::Include       include;
+            std::vector<std::string>      aliases;
+            const ALPreprocessor::Found   said = search.resolve(alincludesearch_data::ask(name, true, from), include, who, in, nullptr, false, &aliases);
+            return said == ALPreprocessor::Found::Yes ? std::string("found") : include.why;
+        };
+        const ALIncludeSearch::Where disk = where(false, true, { s.at("inc") });
+        ensure_equals("a file beside one opened from the disk, in no include folder", why("./sibling", ALIncludeIdentity::ofFile(loose), disk),
+                      "'" + s.at("loose/sibling.luau") + "' is there, but no include folder or alias lets a require read it");
+        ensure_equals("an alias reaching out of its configuration's folder", why("@out/x", ALIncludeIdentity::ofFile(loose), disk),
+                      "the configuration in '" + s.at("loose") + "' names '" + s.at("outside") +
+                          "', which is outside it and outside the include folders");
+
+        // A configuration that does not parse ends a walk for an alias past
+        // it, as Luau's navigator's ends: the farther one's alias is not
+        // reached through it.
+        s.write("proj/.luaurc", "{\"aliases\": {\"lib\": \"./lib\"}}");
+        s.write("proj/lib/x.luau", "return 1\n");
+        s.write("proj/src/.luaurc", "{not json");
+        s.write("proj/src/near.luau", "return 1\n");
+        const std::string            inner = ALIncludeIdentity::ofFile(s.write("proj/src/main.luau", "return 1\n"));
+        const ALIncludeSearch::Where both  = where(false, true, { s.at("inc"), s.at("proj") });
+        const std::string            said  = why("@lib/x", inner, both);
+        ensure("not reached through it: " + said, said.find("the configuration '" + s.at("proj/src/.luaurc") + "' could not be read: ") == 0);
+        ensure_equals("a path walks as ever", why("./near", inner, both), std::string("found"));
+
+        // A world .luaurc's alias naming the disk: why it is not walked.
+        const ALIncludeWorld::Item main{ ALIncludeIdentity::ofItem(LLUUID::null, LLUUID::generateNewID()), "main", LLUUID::generateNewID() };
+        const ALIncludeWorld::Item config{ ALIncludeIdentity::ofItem(LLUUID::null, LLUUID::generateNewID()), ".luaurc", LLUUID::generateNewID() };
+        world.folders["wproj"].parent = std::string();
+        world.folders["wproj"].items  = { main, config };
+        world.itemFolders[main.path]  = "wproj";
+        texts.put(config.path, config.assetId, "{\"aliases\": {\"far\": \"/somewhere/on/disk\"}}");
+        ensure_equals("a world configuration naming the disk", why("@far/x", main.path, where(true, true, { s.at("inc") })),
+                      std::string("the alias stands for '/somewhere/on/disk', a path on disk, which a configuration in the world may not name"));
+    }
+
+    template<> template<>
+    void alincludesearch_object::test<19>()
+    {
+        set_test_name("paths suggested from a script in no place -- in an object, world includes off -- offer the aliases of the .luaurc at the top of the scripter's include folders, as a require from it walks them; a module and a folder of one name, as @self lays one out, both");
+        Scratch s;
+        s.write("inc/.luaurc", "{\"aliases\": {\"top\": \"./libs\"}}");
+        s.write("inc/libs/x.luau", "return 1\n");
+        s.write("inc/libs/selfish.luau", "return require('@self/child')\n");
+        s.write("inc/libs/selfish/child.luau", "return 1\n");
+        const ALIncludeSearch::Where  off       = where(false, true, { s.at("inc") });
+        const ALIncludeSearch::Asking in_object = asking(true);
+        const auto labels = [&](const std::string& typed) {
+            std::string out;
+            for (const ALRequireNavigation::Suggestion& one : search.suggest(in_object.self, typed, true, in_object, off))
+            {
+                out += (out.empty() ? "" : " ") + one.label + (one.folder ? "/" : "");
+            }
+            return out;
+        };
+        ensure_equals("the top's alias, then ./ and ../", labels(""), std::string("@top/ .// ..//"));
+        ensure_equals("a module and its folder, each", labels("@top/"), std::string("selfish selfish/ x"));
+        ensure_equals("into the folder", labels("@top/selfish/"), std::string("child"));
+        ALPreprocessor::Include  found;
+        std::vector<std::string> aliases;
+        ensure("and walked so", search.resolve(ask("@top/selfish/child", true, in_object.self), found, in_object, off, nullptr, false, &aliases) ==
+                                    ALPreprocessor::Found::Yes);
+    }
+
+    template<> template<>
+    void alincludesearch_object::test<20>()
+    {
+        set_test_name("an alias of a .luaurc on disk naming a module lets in its file alone; one naming an alias Second Life keeps walks nowhere; a studio alias offered for an include folder is named past every alias in reach");
+        Scratch           s;
+        const std::string script = s.write("loose/main.luau", "return 1\n");
+        const std::string json   = s.write("loose/vendor/json.luau", "return 'json'\n");
+        const std::string util   = s.write("loose/lib/util.luau", "return 'util'\n");
+        s.write("loose/vendor/other.luau", "return 'other'\n");
+        s.write("loose/.luaurc", "{\"aliases\": {\"json\": \"./vendor/json\", \"lib\": \"./lib\", \"sl-std\": \"./lib\", \"x\": \"@sl-std\"}}");
+        s.write("inc/empty.luau", "return 1\n");
+        const ALIncludeSearch::Where  disk = where(false, true, { s.at("inc") });
+        const ALIncludeSearch::Asking own{ ALIncludeIdentity::ofFile(script), true };
+        // One run's: what an alias blesses stays blessed for the rest of it.
+        std::vector<std::string> run;
+        const auto found = [&](const std::string& name, std::string* why = nullptr) {
+            ALPreprocessor::Include include;
+            const bool yes = search.resolve(alincludesearch_data::ask(name, true, own.self), include, own, disk, nullptr, false, &run) == ALPreprocessor::Found::Yes;
+            if (why)
+            {
+                *why = include.why;
+            }
+            return yes ? include.path : std::string();
+        };
+        std::string why;
+        ensure_equals("an alias naming a module", found("@json"), ALIncludeIdentity::ofFile(json));
+        ensure("blessed for the run, alone", run.size() == 1 && run[0] == s.at("loose/vendor/json.luau"));
+        ensure_equals("its file alone, the rest of the run: nothing beside it", found("./vendor/other"), std::string());
+        ensure_equals("an alias naming a folder", found("@lib/util"), ALIncludeIdentity::ofFile(util));
+        ensure("one naming an alias Second Life keeps: no configuration's", found("@x/util", &why).empty() && why == "@sl-std is not a valid alias");
+
+        // A studio alias named after an include folder, where an alias of
+        // the .luaurc at its top -- in reach of a script in an object -- has
+        // that name already, and a require would go through it first.
+        s.write("other/.luaurc", "{\"aliases\": {\"other\": \"./sub\"}}");
+        s.write("other/sub/z.luau", "return 1\n");
+        const std::string            solo  = s.write("other/solo.luau", "return 'solo'\n");
+        const ALIncludeSearch::Where mine  = where(false, true, { s.at("other") });
+        ALPreprocessor::Include      include;
+        std::vector<std::string>     aliases;
+        ensure("found nothing now", search.resolve(ask("solo", true, asking(true).self), include, asking(true), mine, nullptr, false, &aliases) ==
+                                        ALPreprocessor::Found::No);
+        ensure_equals("found before", include.searched, solo);
+        ensure("named past the .luaurc's own", include.moves.size() == 1 && include.moves[0].require == "@other2/solo" && include.moves[0].alias == "other2");
     }
 }

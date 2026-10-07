@@ -38,6 +38,8 @@
 #include <utility>
 #include <vector>
 
+namespace tut { struct alincludesearch_data; }
+
 // What finding an include asks of the world a script is in, which only the
 // viewer can answer -- its inventory, what an object holds -- and a test
 // fakes. Items by their identities (ALIncludeIdentity).
@@ -156,7 +158,8 @@ public:
     // gathers it -- and with none where the object has not said what it
     // holds; No where nothing is so named. `retry` asks again for what
     // failed before. `alias_folders` gathers the folders the aliases of a
-    // `.luaurc` on disk bless, for the rest of a run.
+    // `.luaurc` on disk bless -- or a module's files, each alone -- for the
+    // rest of a run.
     ALPreprocessor::Found resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Asking& asking, const Where& where,
                                   wanted_t* wanted, bool retry, std::vector<std::string>* alias_folders = nullptr);
     // The `.luaurc` files over a file, nearest first, as Luau reads a chain
@@ -235,6 +238,10 @@ public:
     static std::vector<std::string> foldersOf(const std::string& name);
 
 private:
+    // The require parity suite asks the search before LAD9 itself, as a
+    // require found nowhere does (searchedBefore).
+    friend struct ::tut::alincludesearch_data;
+
     // The places a SLua require is walked through, as this search sees
     // them now (alincludesearch.cpp).
     class Places;
@@ -281,16 +288,16 @@ private:
         std::string luaurc;
         std::string luau;
     };
-    // A folder's own; each folder's from one up to the root that has
-    // either, nearest first; and at the top of each of the scripter's
-    // include folders that has either, in their order.
-    DiskConfig              configIn(const std::string& dir);
+    // Each folder's from one up to the root that has either, nearest
+    // first; and at the top of each of the scripter's include folders that
+    // has either, in their order. A walk's own climb reads a folder's from
+    // the same look up the folders (Places).
     std::vector<DiskConfig> configsUp(const std::string& dir, const Where& where);
     std::vector<DiskConfig> configsAtTop(const Where& where);
-    // One read as a `.luaurc` reads: its `.luaurc`, or its `.config.luau`
-    // run (ALLuauConfigScript) -- no text, and why, where that fails -- or
-    // ambiguous, with both. False where it has neither, or the file cannot
-    // be read.
+    // One read as a `.luaurc` reads, and named by its file: its `.luaurc`,
+    // or its `.config.luau` run (ALLuauConfigScript) -- no text, and why,
+    // where that fails -- or ambiguous, with both. False where it has
+    // neither, or the file cannot be read.
     bool readConfig(const DiskConfig& config, ALRequirePlaces::Config& out);
     // A file on disk a blessed folder admits, where it stands: what may be
     // asked the text of from now on.

@@ -1793,14 +1793,14 @@ namespace tut
             out.text       = "return 1\n";
             out.name       = "both.luau";
             out.path       = "disk:/proj/both.luau";
-            out.passedOver = "/proj/both/init.luau";
+            out.passedOver = "both/init.luau";
             return ALPreprocessor::Found::Yes;
         };
         const ALPreprocessor::Result r = ALPreprocessor::run("local both = require('./both')\n", o);
         ensure_equals("one said", r.problems.size(), size_t(1));
         const ALScriptProblem& said = r.problems[0];
         ensure("a warning", said.severity == ALScriptProblem::Severity::Warning && said.key == "PreprocModuleBesideInit");
-        ensure("naming both", said.args == std::vector<std::string>({ "./both", "both.luau", "/proj/both/init.luau" }));
+        ensure("naming both, each from the folder both are in", said.args == std::vector<std::string>({ "./both", "both.luau", "both/init.luau" }));
         ensure("the module taken", r.text.find("return 1") != std::string::npos);
     }
 

@@ -26,6 +26,7 @@
 
 #include "alrequirenavigation.h"
 
+#include "aldiskincludes.h"
 #include "alluauconfig.h"
 
 #include "Luau/FileResolver.h"
@@ -45,12 +46,7 @@ namespace
 
     bool endsWithScript(const std::string& name)
     {
-        const auto ends = [&name](std::string_view extension) {
-            return name.size() >= extension.size() &&
-                   std::equal(extension.begin(), extension.end(), name.end() - extension.size(),
-                              [](char a, char b) { return a == std::tolower(static_cast<unsigned char>(b)); });
-        };
-        return ends(".luau") || ends(".lua");
+        return ALDiskIncludes::extensionOf(name, ALDiskIncludes::scriptExtensions(true)) != 0;
     }
 
     std::string jsonString(const std::string& text)
@@ -186,27 +182,32 @@ namespace
 
         ConfigBehavior getConfigBehavior() const override { return ConfigBehavior::GetConfig; }
 
-        // The configuration's aliases, as our own parse reads it -- which
+        // The configuration's aliases, as our own parse read it -- which
         // knows the studio's lints, Luau's does not -- each path one of
         // ours to walk, and each that names another alias as it is, for
-        // the navigator to follow. One that does not parse names none.
+        // the navigator to follow; none reserved, which no configuration
+        // may name. One that does not parse, or did not run, ends the walk
+        // there, as it ends Luau's navigator's, and says why.
         std::optional<std::string> getConfig() const override
         {
-            ALLuauConfig parsed;
-            std::string  error;
-            if (!ALLuauConfig::parse(mConfig.text, parsed, error))
+            if (!mConfig.error.empty())
             {
-                return std::string("{}");
+                mMissed = "the configuration '" + mConfig.file + "' could not be read: " + mConfig.error;
+                return std::nullopt;
             }
             std::string json = "{\"aliases\": {";
             bool        first = true;
-            for (const auto& [alias, value] : parsed.aliases)
+            for (const auto& [alias, value] : mConfig.aliases)
             {
+                if (ALLuauConfig::reservedAlias(alias))
+                {
+                    continue;
+                }
                 std::string said = value;
                 if (said.empty() || said.front() != '@')
                 {
                     said = std::string(TARGET) + std::to_string(mTargets.size());
-                    mTargets.push_back({ mConfig.base, value, mConfig.onDisk });
+                    mTargets.push_back({ mConfig.base, value, mConfig.onDisk, mConfig.file });
                 }
                 json += (first ? "" : ", ") + jsonString(alias) + ": " + jsonString(said);
                 first = false;
@@ -226,7 +227,7 @@ namespace
                 return NavigateResult::NotFound;
             }
             const Target target = mTargets[index];
-            mMissedTarget       = target.value;
+            mMissed             = "the alias stands for '" + target.value + "', which is not there";
             std::string  value  = target.value;
             std::replace(value.begin(), value.end(), '\\', '/');
             while (value.size() > 1 && value.back() == '/')
@@ -237,9 +238,19 @@ namespace
             {
                 // A path from a root: on disk, and only from a configuration
                 // on disk; one in the world names only the world.
-                std::string folder, name;
-                if (!target.onDisk || !mPlaces.placeOfAbsolute(value, folder, name))
+                if (!target.onDisk)
                 {
+                    mMissed = "the alias stands for '" + target.value + "', a path on disk, which a configuration in the world may not name";
+                    return NavigateResult::NotFound;
+                }
+                std::string folder, name;
+                if (!mPlaces.placeOfAbsolute(value, target.base, folder, name))
+                {
+                    // Out of every folder it may name, as it is written --
+                    // said so, and nothing asked of the disk to say it.
+                    const size_t slash = target.file.find_last_of("/\\");
+                    mMissed = "the configuration in '" + (slash == std::string::npos ? target.file : target.file.substr(0, slash)) + "' names '" +
+                              target.value + "', which is outside it and outside the include folders";
                     return NavigateResult::NotFound;
                 }
                 mAt = Position{ folder, name.empty() ? std::nullopt : std::optional<std::string>(name) };
@@ -261,18 +272,15 @@ namespace
             }
             if (target.onDisk)
             {
-                std::string folder;
-                if (folderOf(mAt, folder))
-                {
-                    mPlaces.aliasReached(target.base, folder);
-                }
+                mPlaces.aliasReached(target.base, mAt.folder, mAt.name.value_or(std::string()));
             }
-            mMissedTarget.clear();
+            mMissed.clear();
             return NavigateResult::Success;
         }
-        // What the last alias the walk went through stood for, where it was
-        // not there: Luau names it by our own word for it.
-        const std::string& missedTarget() const { return mMissedTarget; }
+        // Why the walk stopped, where Luau would name it by our own word for
+        // it: the last alias it went through stood for nothing there, or a
+        // configuration on its way could not be read.
+        const std::string& missed() const { return mMissed; }
 
         const Position& at() const { return mAt; }
         bool            pending() const { return mPending; }
@@ -296,11 +304,14 @@ namespace
         }
 
     private:
+        // What an alias of a configuration stands for, from its folder; and
+        // the configuration's file, for what is said of it.
         struct Target
         {
             std::string base;
             std::string value;
             bool        onDisk = false;
+            std::string file;
         };
 
         ALRequirePlaces&                mPlaces;
@@ -309,7 +320,7 @@ namespace
         mutable bool                    mPending = false;
         mutable ALRequirePlaces::Config mConfig;
         mutable std::vector<Target>     mTargets;
-        std::string                     mMissedTarget;
+        mutable std::string             mMissed;
     };
 
     // Luau's words for what went wrong, the last it said.
@@ -341,56 +352,6 @@ namespace
             return std::nullopt;
         }
         return context.at();
-    }
-
-    // The aliases in reach of a file: each configuration's from its folder
-    // up, the nearest's first, then the studio's; none Second Life keeps.
-    // A folder with both a `.luaurc` and a `.config.luau` ends the walk, as
-    // it ends the navigator's with an error: only what is nearer reaches.
-    std::vector<std::string> aliasesFrom(ALRequirePlaces& places, const std::string& from)
-    {
-        std::vector<std::string> out;
-        const auto               add = [&out](const std::string& alias) {
-            if (alias.compare(0, 3, "sl-") != 0 && alias != "self" && std::find(out.begin(), out.end(), alias) == out.end())
-            {
-                out.push_back(alias);
-            }
-        };
-        std::string folder, stem;
-        bool        more = places.placeOf(from, folder, stem);
-        for (size_t up = 0; up < 64; ++up)
-        {
-            ALRequirePlaces::Config config;
-            const Known             said = places.config(folder, config);
-            if (said == Known::Yes && config.ambiguous)
-            {
-                return out;
-            }
-            if (said == Known::Yes)
-            {
-                ALLuauConfig parsed;
-                std::string  error;
-                if (ALLuauConfig::parse(config.text, parsed, error))
-                {
-                    for (const auto& [alias, value] : parsed.aliases)
-                    {
-                        add(alias);
-                    }
-                }
-            }
-            if (!more)
-            {
-                break;
-            }
-            std::string above;
-            more   = places.parentOf(folder, above) == Known::Yes;
-            folder = above;
-        }
-        for (const std::string& alias : places.studioAliasNames())
-        {
-            add(alias);
-        }
-        return out;
     }
 
     // A place in the tree Luau's suggester walks: the file asking, or
@@ -447,7 +408,7 @@ namespace
         std::vector<Luau::RequireAlias> getAvailableAliases() const override
         {
             std::vector<Luau::RequireAlias> out;
-            for (const std::string& alias : aliasesFrom(mPlaces, mFrom))
+            for (const std::string& alias : ALRequireNavigation::aliasesFrom(mPlaces, mFrom))
             {
                 out.emplace_back(alias, std::vector<std::string>{ "folder" });
             }
@@ -502,8 +463,16 @@ namespace ALRequireNavigation
         {
             return out;
         }
+        // Up is offered but through an alias, which may not climb out of
+        // its folder (navigatorPath): `@self`'s may, as Luau's own.
+        std::string alias, rest;
+        const bool  climbs = typed.empty() || typed.front() != '@' || (ALLuauConfig::aliasOf(typed, alias, rest) && alias == "self");
         for (const Luau::RequireSuggestion& one : *found)
         {
+            if (one.label == ".." && !climbs)
+            {
+                continue;
+            }
             Suggestion said;
             said.label  = one.label;
             said.path   = one.fullPath;
@@ -543,7 +512,7 @@ namespace ALRequireNavigation
             out.path              = "./" + own + (own.empty() || rest.empty() ? "" : "/") + rest;
             return out;
         }
-        if (alias.compare(0, 3, "sl-") == 0)
+        if (ALLuauConfig::reservedAlias(alias))
         {
             out.error = "the alias '@" + alias + "' is reserved: aliases starting @sl- are Second Life's";
             return out;
@@ -570,9 +539,9 @@ namespace ALRequireNavigation
         if (ALLuauConfig::absolute(name))
         {
             // A path from a root, which the navigator does not walk: where
-            // it stands, on disk.
+            // it stands, on disk, where a folder a require reads holds it.
             std::string at_folder, at_name;
-            if (!places.placeOfAbsolute(name, at_folder, at_name))
+            if (!places.placeOfAbsolute(name, std::string(), at_folder, at_name))
             {
                 out.error = "could not find '" + name + "'";
                 return out;
@@ -597,8 +566,7 @@ namespace ALRequireNavigation
             if (navigator.navigate(path) != Luau::Require::Navigator::Status::Success)
             {
                 out.found = context.pending() ? Known::Pending : Known::No;
-                out.error = context.missedTarget().empty() ? errors.what
-                                                           : "the alias stands for '" + context.missedTarget() + "', which is not there";
+                out.error = context.missed().empty() ? errors.what : context.missed();
                 return out;
             }
         }
@@ -644,6 +612,52 @@ namespace ALRequireNavigation
         else
         {
             out.files = std::move(init);
+        }
+        return out;
+    }
+
+    std::vector<std::string> aliasesFrom(ALRequirePlaces& places, const std::string& from)
+    {
+        std::vector<std::string> out;
+        const auto               add = [&out](const std::string& alias) {
+            if (!ALLuauConfig::reservedAlias(alias) && std::find(out.begin(), out.end(), alias) == out.end())
+            {
+                out.push_back(alias);
+            }
+        };
+        // Up from the file's folder as the navigator climbs for an alias;
+        // from a file in no place, from where the walk of one starts --
+        // nowhere, above which are the scripter's include folders.
+        std::string folder, stem;
+        if (!places.placeOf(from, folder, stem))
+        {
+            folder.clear();
+        }
+        for (size_t up = 0; up < 64; ++up)
+        {
+            ALRequirePlaces::Config config;
+            const Known             said = places.config(folder, config);
+            if (said == Known::Yes && (config.ambiguous || !config.error.empty()))
+            {
+                return out;
+            }
+            if (said == Known::Yes)
+            {
+                for (const auto& [alias, value] : config.aliases)
+                {
+                    add(alias);
+                }
+            }
+            std::string above;
+            if (places.parentOf(folder, above) != Known::Yes)
+            {
+                break;
+            }
+            folder = above;
+        }
+        for (const std::string& alias : places.studioAliasNames())
+        {
+            add(alias);
         }
         return out;
     }

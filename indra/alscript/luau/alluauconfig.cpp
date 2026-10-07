@@ -278,11 +278,19 @@ bool ALLuauConfig::parseChain(const std::vector<std::string_view>& nearest_first
 }
 
 // static
+bool ALLuauConfig::reservedAlias(std::string_view name)
+{
+    std::string lower(name);
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lower == "self" || lower.compare(0, 3, "sl-") == 0;
+}
+
+// static
 bool ALLuauConfig::studioAliasName(std::string_view name)
 {
     std::string lower(name);
     std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    if (lower.empty() || lower == "self" || lower.compare(0, 3, "sl-") == 0 || !Luau::isValidAlias(lower) || lower.front() == '@')
+    if (lower.empty() || reservedAlias(lower) || !Luau::isValidAlias(lower) || lower.front() == '@')
     {
         return false;
     }

@@ -33,7 +33,6 @@
 #include "fsyspath.h"
 
 #include <algorithm>
-#include <cstring>
 #include <string_view>
 
 namespace
@@ -48,33 +47,16 @@ namespace
     constexpr S32    FOLDER_DEPTH   = 3;
     constexpr size_t FOLDER_ENTRIES = 4096;
     constexpr size_t FOLDER_FILES   = 256;
-    bool endsWith(const std::string& text, const char* tail)
-    {
-        const size_t n = strlen(tail);
-        return text.size() > n && text.compare(text.size() - n, n, tail) == 0;
-    }
-
-    // What a file of each language is called on disk: what a require
-    // finds without its extension, and what an include is written with.
-    const std::vector<const char*>& extensionsOf(bool lua)
-    {
-        static const std::vector<const char*> LUA{ ".luau", ".lua" };
-        static const std::vector<const char*> LSL{ ".lsl", ".lslh", ".lsli" };
-        return lua ? LUA : LSL;
-    }
+    // How many looks a file in none of them is kept through: one look
+    // serves every script open, each with folders of its own.
+    constexpr U32    LOOKS_KEPT     = 32;
 
     // A name without the extension the preprocessor puts back on it when
-    // it looks for a file: a SLua module's, `.lsl`.
+    // it looks for a file, in any case: a SLua module's, `.lsl`.
     std::string stemOf(const std::string& name, bool lua)
     {
-        for (const char* extension : lua ? extensionsOf(true) : std::vector<const char*>{ ".lsl" })
-        {
-            if (endsWith(name, extension))
-            {
-                return name.substr(0, name.size() - strlen(extension));
-            }
-        }
-        return name;
+        static const std::vector<std::string> LSL{ ".lsl" };
+        return name.substr(0, name.size() - ALDiskIncludes::extensionOf(name, lua ? ALDiskIncludes::scriptExtensions(true) : LSL));
     }
 
     bool contains(const std::vector<std::string>& list, const std::string& word)
@@ -120,32 +102,35 @@ const std::vector<std::string>* ALModuleLook::fileExports(const std::string& fil
         return nullptr;
     }
     OnDisk& on = mOnDisk[(lua ? "lua:" : "lsl:") + file];
+    on.look    = mLooks;
     if (!(on.stamp == stamp))
     {
         on.stamp    = stamp;
         on.text.clear();
         on.readable = ALDiskIncludes::readOrdinary(file, on.text) && on.text.size() <= MODULE_BYTES;
         on.exports  = on.readable ? (lua ? ALLuauExports::of(on.text) : ALLSLExports::of(on.text)) : std::vector<std::string>();
-        on.checked  = false;
-    }
-    // What the analysis found, where it checked the file as it stands.
-    if (lua && on.readable && !on.checked)
-    {
-        if (std::optional<std::vector<std::string>> checked = ALLuauExports::checkedOf(ALIncludeIdentity::ofFile(file), on.text))
+        if (!lua)
         {
-            on.exports = std::move(*checked);
-            on.checked = true;
+            // Nothing checked is asked of LSL's: its text is done with.
+            std::string().swap(on.text);
         }
     }
-    return on.readable ? &on.exports : nullptr;
+    // What the analysis found, where it checked the file as it stands --
+    // asked each look, as an open text's is, since it may have checked it
+    // since, or again with other exports.
+    on.checked.reset();
+    if (lua && on.readable)
+    {
+        on.checked = ALLuauExports::checkedOf(ALIncludeIdentity::ofFile(file), on.text);
+    }
+    return !on.readable ? nullptr : on.checked ? &*on.checked : &on.exports;
 }
 
 void ALModuleLook::listFolder(const std::string& prefix, const std::string& folder, const ALDiskIncludes& blessed, bool lua,
                                  std::vector<Candidate>& found, boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>>& at)
 {
-    const std::vector<const char*>& wanted = extensionsOf(lua);
-    const std::vector<std::string>  extensions(wanted.begin(), wanted.end());
-    for (const ALDiskIncludes::Listed& listed : blessed.filesUnder(folder, extensions, FOLDER_DEPTH, FOLDER_ENTRIES, FOLDER_FILES))
+    for (const ALDiskIncludes::Listed& listed :
+         blessed.filesUnder(folder, ALDiskIncludes::scriptExtensions(lua), FOLDER_DEPTH, FOLDER_ENTRIES, FOLDER_FILES))
     {
         // By its path from the folder: a require without its extension, an
         // include as it is named. A folder's `init.luau` is the folder's
@@ -199,6 +184,7 @@ std::vector<ALModuleLook::Candidate> ALModuleLook::look(const Input& look)
     std::vector<Candidate>                                                            found;
     boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> at;
     at[look.self] = std::string::npos;
+    ++mLooks;
     for (const Text& one : look.texts)
     {
         if (at.emplace(one.path, found.size()).second)
@@ -215,6 +201,9 @@ std::vector<ALModuleLook::Candidate> ALModuleLook::look(const Input& look)
     {
         listFolder(prefix, folder, blessed, lua, found, at);
     }
+    // A file no look has been through for a while let go of, and its text
+    // with it: one that went, or is in no folder of a script open now.
+    boost::unordered::erase_if(mOnDisk, [this](const auto& one) { return mLooks - one.second.look > LOOKS_KEPT; });
 
     // The names each might be found by, after those its folders give it:
     // its own, its own without its extension, and its own under each alias

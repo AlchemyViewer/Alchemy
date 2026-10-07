@@ -194,6 +194,17 @@ namespace tut
                                        m.key == "PreprocRequireReserved" && m.args[1] == "sl-std");
         ensure("a folder with both configurations", ALMessageMap::luauRequire("could not resolve alias \"lib\" (ambiguous configuration file)", m) &&
                                                         m.key == "PreprocRequireConfigAmbiguous" && m.args[1] == "lib");
+        ensure("a file nothing lets in", ALMessageMap::luauRequire("'C:/lib/x.luau' is there, but no include folder or alias lets a require read it", m) &&
+                                             m.key == "PreprocRequireNotAdmitted" && m.args[1] == "C:/lib/x.luau");
+        ensure("an alias past its configuration's folder",
+               ALMessageMap::luauRequire("the configuration in 'C:/lib' names 'D:/out', which is outside it and outside the include folders", m) &&
+                   m.key == "PreprocRequireAliasRefused" && m.args == std::vector<std::string>({ "", "C:/lib", "D:/out" }));
+        ensure("a configuration that could not be read",
+               ALMessageMap::luauRequire("the configuration 'C:/lib/.luaurc' could not be read: expected value", m) &&
+                   m.key == "PreprocRequireConfigBroken" && m.args == std::vector<std::string>({ "", "C:/lib/.luaurc", "expected value" }));
+        ensure("a world alias naming the disk",
+               ALMessageMap::luauRequire("the alias stands for '/x', a path on disk, which a configuration in the world may not name", m) &&
+                   m.key == "PreprocRequireAliasNamesDisk" && m.args[1] == "/x");
         ensure("a reason of no known shape", !ALMessageMap::luauRequire("something else went wrong", m));
         ensure("its keys known as such", ALMessageMap::requireReason("PreprocRequireNoChild") && !ALMessageMap::requireReason("PreprocRequireTooDeep"));
     }

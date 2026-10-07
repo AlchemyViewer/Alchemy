@@ -27,6 +27,7 @@
 #include "lluuid.h"
 #include "stdtypes.h"
 
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -63,8 +64,12 @@ public:
     // which is a file in its folder like any other (LAD2). False where it
     // is in no folder known.
     virtual bool placeOf(const std::string& path, std::string& folder, std::string& name) = 0;
-    // The same of a path from a root, which is on disk or nowhere.
-    virtual bool placeOfAbsolute(const std::string& path, std::string& folder, std::string& name) = 0;
+    // The same of a path from a root, which is on disk or nowhere: only one
+    // that is, as written, under a folder a require reads -- or under
+    // `config_folder`, that of the configuration whose alias names it --
+    // since nothing on the disk may be asked of a path somebody else wrote
+    // until it is: not another machine's share, nor a device.
+    virtual bool placeOfAbsolute(const std::string& path, const std::string& config_folder, std::string& folder, std::string& name) = 0;
     // The folder above one; No at the top.
     virtual Known parentOf(const std::string& folder, std::string& out) = 0;
     // The folder of a name in a folder.
@@ -78,15 +83,23 @@ public:
     struct Config
     {
         std::string text;
+        // The file it is, for what is said of it: on disk its path, in the
+        // world its name.
+        std::string file;
         // Whether it is on disk, and the folder its aliases' paths are
         // from: its own, or for one at the top of a scripter's include
         // folder, which governs a script in the world, that folder.
         bool        onDisk = false;
         std::string base;
         // Both a `.luaurc` and a `.config.luau` there, which Luau takes as
-        // neither; or a `.config.luau` that did not run, no text, and why.
-        bool        ambiguous = false;
-        std::string error;
+        // neither. Else its aliases as our own parse reads them
+        // (ALLuauConfig::parse), by name in lower case, each the path or the
+        // alias it stands for; or, where it does not parse or a
+        // `.config.luau` did not run, none, and why -- which ends a walk for
+        // an alias there, as it ends Luau's navigator's.
+        bool                               ambiguous = false;
+        std::map<std::string, std::string> aliases;
+        std::string                        error;
     };
     // Yes where it has one, ambiguous or not; Pending where its text is on
     // its way.
@@ -106,9 +119,11 @@ public:
     };
     virtual Known children(const std::string& folder, std::vector<Child>& out) = 0;
     // An alias of the configuration of `config_folder`, which is on disk,
-    // has reached a folder: blessed for the run where the configuration
-    // may bless it (ALDiskIncludes::blessFromConfig).
-    virtual void aliasReached(const std::string& config_folder, const std::string& folder) = 0;
+    // has reached a folder, or a name in one: what it stands for blessed
+    // for the run where the configuration may bless it (ALDiskIncludes::
+    // blessFromConfig) -- the folder; or a module's files, each alone, and
+    // the folder of its name, where there is one, for its init.
+    virtual void aliasReached(const std::string& config_folder, const std::string& folder, const std::string& name) = 0;
 };
 
 // A SLua require as the plugin's rules have it (LAD9), walked by Luau's
@@ -149,7 +164,8 @@ namespace ALRequireNavigation
     // suggester offers it (Luau::RequireSuggester) over the places, walked
     // by the same rules as a require: before the first slash, the aliases
     // in reach of the file and `./` and `../`; after it, what the folder
-    // the path reaches holds, and `..`. Each with the whole path it puts in
+    // the path reaches holds, and `..` but through an alias other than
+    // `@self`, which may not climb. Each with the whole path it puts in
     // the string, escaped as a string holds it, and whether it is a folder,
     // which a path goes on through.
     struct Suggestion
@@ -159,4 +175,13 @@ namespace ALRequireNavigation
         bool        folder = false;
     };
     std::vector<Suggestion> suggest(ALRequirePlaces& places, const std::string& from, const std::string& typed);
+
+    // The aliases in reach of a file, as a require from it may name them:
+    // each configuration's from its folder up -- from a file in no place,
+    // the scripter's include folders' -- the nearest's first, then the
+    // studio's; none reserved (ALLuauConfig::reservedAlias). A folder whose
+    // configuration ends a walk -- both a `.luaurc` and a `.config.luau`,
+    // or one that cannot be read -- ends this too: only what is nearer
+    // reaches.
+    std::vector<std::string> aliasesFrom(ALRequirePlaces& places, const std::string& from);
 }

@@ -33,6 +33,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -109,13 +110,16 @@ private:
     boost::unordered_flat_map<std::string, Read, ll::string_hash, std::equal_to<>> mRead;
     struct OnDisk
     {
-        ALFileStamp              stamp;
-        bool                     readable = false;
-        std::vector<std::string> exports;
-        // Its text, for what the analysis found of it; and whether that
-        // has been taken.
-        std::string              text;
-        bool                     checked = false;
+        ALFileStamp                             stamp;
+        bool                                    readable = false;
+        std::vector<std::string>                exports;
+        // A SLua module's text, for what the analysis found of it, which
+        // is asked each look: nothing kept of LSL's. And what it found.
+        std::string                             text;
+        std::optional<std::vector<std::string>> checked;
+        // The last look it was in: one in none of the last few is let go.
+        U32                                     look = 0;
     };
     boost::unordered_flat_map<std::string, OnDisk, ll::string_hash, std::equal_to<>> mOnDisk;
+    U32                                                                              mLooks = 0;
 };

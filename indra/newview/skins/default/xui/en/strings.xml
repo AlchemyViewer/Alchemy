@@ -663,6 +663,10 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocRequireClimbs">could not find module '[1]': a require through an alias may not climb out of its folder, as '[2]' does</string>
 	<string name="PreprocRequireAliasTarget">could not find module '[1]': its alias stands for '[2]', which is not there</string>
 	<string name="PreprocRequireNoModule">could not find module '[1]': there is no module at '[2]'</string>
+	<string name="PreprocRequireAliasNamesDisk">could not find module '[1]': its alias stands for '[2]', a path on disk, which a .luaurc in the world may not name</string>
+	<string name="PreprocRequireNotAdmitted">could not find module '[1]': '[2]' is there, but no include folder or alias lets a require read it. Add its folder with Build &gt; Add Include Folder...</string>
+	<string name="PreprocRequireAliasRefused">could not find module '[1]': the configuration in '[2]' names '[3]', which is outside its folder and outside the include folders</string>
+	<string name="PreprocRequireConfigBroken">could not find module '[1]': the configuration '[2]' on the way could not be read: [3]</string>
 	<string name="PreprocModuleSearched">could not find module '[1]': a require no longer searches the include folders, where it found [2]</string>
 	<string name="PreprocNoVariableBefore">no variable before '[1]'</string>
 	<string name="PreprocNotAnInteger">'[1]' is not an integer constant</string>
