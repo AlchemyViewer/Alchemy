@@ -1915,7 +1915,10 @@ bool ALVimKeymap::afterMotionKey(ALTextView& view, llwchar pending, llwchar ch)
     // f, F, t, T, ` and ': motions with an argument.
     Motion m = motion(view, pending, count, ch);
     mFailed  = mFailed || (m.ok && !m.moved);
-    if (!m.ok)
+    // One that could not move -- f with no such character on the line, a
+    // mark not set -- fails an operator with it, as vim's does: nothing
+    // changed or kept, and no insert for c.
+    if (!m.ok || (mOperator && !m.moved))
     {
         clearPending();
         return true;

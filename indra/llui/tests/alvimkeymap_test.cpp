@@ -3329,6 +3329,28 @@ namespace tut
     }
 
     template<> template<>
+    void alvimkeymap_object::test<118>()
+    {
+        set_test_name("an operator over f, t, F, T or a mark that cannot move fails whole: nothing changed, no insert, the register and . as they were");
+        ALCodeEditor& e = make("abc def\n");
+        keys("xyiww");
+        keys("cfz");
+        ensure("cfz with no z: still normal mode", vim->mode() == ALVimKeymap::Mode::Normal);
+        ensure("and no step to undo left open", !e.undoJournal().inGroup());
+        ensure_equals("nothing changed", flat(e.text()), std::string("bc def|"));
+        ensure_equals("the register as it was", vim->registerText('"'), std::string("bc"));
+        keys("ytz");
+        ensure_equals("ytz keeps nothing", vim->registerText('"'), std::string("bc"));
+        keys("dFz");
+        keys("c`q");
+        ensure("c to a mark not set: still normal mode", vim->mode() == ALVimKeymap::Mode::Normal);
+        ensure_equals("still nothing changed", flat(e.text()), std::string("bc def|"));
+        ensure_equals("nor the register", vim->registerText('"'), std::string("bc"));
+        keys(".");
+        ensure_equals(". is the x before them", flat(e.text()), std::string("bc ef|"));
+    }
+
+    template<> template<>
     void alvimkeymap_object::test<130>()
     {
         set_test_name("/ and ? after an operator are its motion, up to the match and not into it; an offset of lines makes it lines, /e takes the match's end");
