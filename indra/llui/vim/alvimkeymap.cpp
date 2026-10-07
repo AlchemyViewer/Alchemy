@@ -2267,19 +2267,50 @@ namespace
         return WordObject{ start, p, inclusive };
     }
 
+    // vim's startPS() for a paragraph: a line that begins one with no blank
+    // line before it -- a formfeed at its start, or after a dot one of the
+    // nroff macros of the default 'paragraphs' and 'sections', a blank in
+    // them matching a blank or the line's end.
+    bool startsParagraph(const ALTextDocument& d, S32 line)
+    {
+        static constexpr std::string_view MACROS("IPLPPPQPP TPHPLIPpLpItpplpipbpSHNHH HUnhsh");
+        const std::string&                text = d.line(line);
+        if (!text.empty() && text[0] == '\f')
+        {
+            return true;
+        }
+        if (text.empty() || text[0] != '.')
+        {
+            return false;
+        }
+        const char first  = text.size() > 1 ? text[1] : '\0';
+        const char second = text.size() > 2 ? text[2] : '\0';
+        for (size_t i = 0; i + 1 < MACROS.size(); i += 2)
+        {
+            if ((MACROS[i] == first || (MACROS[i] == ' ' && (first == '\0' || first == ' '))) &&
+                (MACROS[i + 1] == second || (MACROS[i + 1] == ' ' && (first == '\0' || second == '\0' || second == ' '))))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // vim's current_par() over a line, nothing selected: back to the start of
     // the paragraph or of the blank lines the line is in, then on by the
     // count's -- ip counting a paragraph or a run of blank lines as one, the
     // run the line is in among them; ap a paragraph with the blank lines after
     // it, or blank lines with the paragraph after them. An ap that ends on no
-    // blank line takes the blank lines before it instead. The first and the
-    // last lines; false where the count runs past the text's end.
+    // blank line takes the blank lines before it instead. A paragraph ends
+    // where another begins with no blank line between (startsParagraph). The
+    // first and the last lines; false where the count runs past the text's
+    // end.
     bool paragraphObject(const ALTextDocument& d, S32 line, bool around, S32 count, S32& first, S32& last)
     {
         const S32  lines          = d.lineCount();
         const bool white_in_front = lineBlank(d, line);
         S32        start          = line;
-        while (start > 0 && lineBlank(d, start - 1) == white_in_front)
+        while (start > 0 && lineBlank(d, start - 1) == white_in_front && (white_in_front || !startsParagraph(d, start)))
         {
             --start;
         }
@@ -2300,7 +2331,7 @@ namespace
             if (around || !do_white)
             {
                 ++end;
-                while (end < lines - 1 && !lineBlank(d, end + 1))
+                while (end < lines - 1 && !lineBlank(d, end + 1) && !startsParagraph(d, end + 1))
                 {
                     ++end;
                 }
@@ -5158,7 +5189,9 @@ std::optional<bool> ALVimKeymap::visualObject(ALTextView& view, llwchar kind, ll
                         line -= step;
                         break;
                     }
-                    while (line != edge && (lineBlank(d, line + step) ? 1 : 0) == blank)
+                    // A paragraph also ends where another begins with no blank
+                    // line between (startsParagraph).
+                    while (line != edge && (lineBlank(d, line + step) ? 1 : 0) == blank && (blank || !startsParagraph(d, step > 0 ? line + 1 : line)))
                     {
                         line += step;
                     }

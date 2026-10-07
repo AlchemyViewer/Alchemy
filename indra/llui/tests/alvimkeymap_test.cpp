@@ -5434,4 +5434,37 @@ namespace tut
         keys("dit");
         ensure_equals("from inside the attribute, its quotes single", flat(editor->text()), std::string("<a title='x>y'></a>|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<191>()
+    {
+        set_test_name("a paragraph object ends where a formfeed or an nroff macro of 'paragraphs' or 'sections' begins another");
+        ALCodeEditor& e = make("a\nb\n.PP\nc\nd");
+        keys("dip");
+        ensure_equals("ip stops before .PP", flat(e.text()), std::string(".PP|c|d"));
+
+        make("a\n.SH\nc\nd");
+        editor->setCaret(ALTextPos(3, 0));
+        keys("dip");
+        ensure_equals("and goes back no further than .SH", flat(editor->text()), std::string("a"));
+
+        make("a\n\fb\nc\nd");
+        editor->setCaret(ALTextPos(3, 0));
+        keys("dip");
+        ensure_equals("or than a formfeed", flat(editor->text()), std::string("a"));
+
+        make("a\n.XX\nc\nd");
+        editor->setCaret(ALTextPos(3, 0));
+        keys("dip");
+        ensure_equals("a macro of neither is no boundary", flat(editor->text()), std::string(""));
+
+        make("a\nb\n.PP\nc\n\nd");
+        editor->setCaret(ALTextPos(2, 0));
+        keys("dap");
+        ensure_equals("ap from the macro's line, with the blank line after", flat(editor->text()), std::string("a|b|d"));
+
+        make("a\nb\nc\n.PP\nd");
+        keys("Vjipy");
+        ensure_equals("V ip taken on stops before it too", vim->registerText('"'), std::string("a\nb\nc"));
+    }
 }
