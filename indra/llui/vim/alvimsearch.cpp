@@ -246,6 +246,87 @@ void ALVimSearch::splitOffset(const std::string& line, llwchar kind, std::string
 }
 
 // static
+std::string ALVimSearch::backwardPattern(const std::string& typed)
+{
+    // As vim's skip_regexp() reads one: a [] collection -- \[ one under \V
+    // -- passed over to its ], as skip_anyof() finds it; elsewhere \? made
+    // a ?, and every other backslash kept with what follows it.
+    const size_t size         = typed.size();
+    const auto   collectionAt = [&typed, size](size_t p) {
+        if (p < size && typed[p] == '^')
+        {
+            ++p;
+        }
+        if (p < size && (typed[p] == ']' || typed[p] == '-'))
+        {
+            ++p;
+        }
+        static constexpr std::string_view ESCAPED("]^-n\\rtebdoxuU");
+        while (p < size && typed[p] != ']')
+        {
+            if (typed[p] == '-')
+            {
+                ++p;
+                if (p < size && typed[p] != ']')
+                {
+                    ++p;
+                }
+            }
+            else if (typed[p] == '\\' && p + 1 < size && ESCAPED.find(typed[p + 1]) != std::string_view::npos)
+            {
+                p += 2;
+            }
+            else if (typed[p] == '[' && p + 1 < size && (typed[p + 1] == ':' || typed[p + 1] == '=' || typed[p + 1] == '.'))
+            {
+                // [:alpha:] and the like, to their own close.
+                const char   kind  = typed[p + 1];
+                const size_t close = typed.find(std::string{ kind, ']' }, p + 2);
+                p                  = close == std::string::npos ? p + 1 : close + 2;
+            }
+            else
+            {
+                ++p;
+            }
+        }
+        return p;
+    };
+    std::string out;
+    out.reserve(size);
+    bool nomagic = false;
+    for (size_t i = 0; i < size; ++i)
+    {
+        const bool bracket = typed[i] == '[' && !nomagic;
+        if (bracket || (typed[i] == '\\' && i + 1 < size && typed[i + 1] == '[' && nomagic))
+        {
+            const size_t end = collectionAt(bracket ? i + 1 : i + 2);
+            out.append(typed, i, end < size ? end + 1 - i : std::string::npos);
+            if (end >= size)
+            {
+                break;
+            }
+            i = end;
+            continue;
+        }
+        if (typed[i] == '\\' && i + 1 < size)
+        {
+            const char next = typed[++i];
+            if (next != '?')
+            {
+                out += '\\';
+            }
+            out += next;
+            if (next == 'v' || next == 'V')
+            {
+                nomagic = next == 'V';
+            }
+            continue;
+        }
+        out += typed[i];
+    }
+    return out;
+}
+
+// static
 bool ALVimSearch::parseOffset(const std::string& text, Offset& out)
 {
     // [+-]N lines, e[+-N] from the end, s[+-N] or b[+-N] from the start;
@@ -323,10 +404,11 @@ void ALVimSearch::incrementalSearch(ALTextView& view)
         view.scrollToCaret();
         return;
     }
-    // What is typed so far may not be a pattern yet: nothing lit then.
+    // What is typed so far may not be a pattern yet: nothing lit then. After
+    // ?, \? is the ? itself (backwardPattern).
     ALTextSearchOptions options;
     options.regex                            = true;
-    const Pattern parsed                     = patternOf(pattern);
+    const Pattern parsed                     = patternOf(mVim.mCommandLine.kind == '?' ? backwardPattern(pattern) : pattern);
     options.caseSensitive                    = parsed.caseSensitive;
     const Found&                    found_now = found(view, parsed, options);
     const std::vector<ALTextRange>& matches   = found_now.matches;

@@ -60,6 +60,10 @@ public:
     // A search line's pattern and offset: split at the first unescaped
     // `kind` after the pattern.
     static void splitOffset(const std::string& line, llwchar kind, std::string& pattern, std::string& offset_text);
+    // A pattern typed after ? as vim reads it: \? there is the ? itself,
+    // since a ? would end the pattern, outside a [] collection; the rest as
+    // it was typed.
+    static std::string backwardPattern(const std::string& typed);
     static bool parseOffset(const std::string& text, Offset& out);
     ALTextPos   offsetFrom(const ALTextDocument& d, const ALTextRange& match, const Offset& offset) const;
     // Searching, with the last pattern kept for n and N, and its offset:

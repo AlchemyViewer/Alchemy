@@ -3386,27 +3386,33 @@ bool ALVimKeymap::starSearch(ALTextView& view, bool forward, bool whole)
     const ALTextRange word(ALTextPos(from.line, begin), ALTextPos(from.line, end));
     // A word is looked for whole, as \<word\>, or anywhere for g* and g#;
     // other characters anywhere, as themselves: a backslash before each
-    // that a pattern reads as more, as vim's * puts one. A word has none
-    // of them. Kept so spelt as the last pattern, for what takes it up --
-    // n, :s//, :g// -- to look for the same, its case as ignorecase alone
-    // says.
+    // that a pattern reads as more, as vim's * puts one -- for # and g#
+    // before a ? as well, which would end what ? types. A word has none
+    // of them. Into the search history so, and kept as the last pattern as
+    // ? reads it (backwardPattern), for what takes it up -- n, :s//, :g//
+    // -- to look for the same, its case as ignorecase alone says.
     static constexpr std::string_view SPECIAL("/.*~[^$\\");
+    static constexpr std::string_view SPECIAL_BACKWARD("/?.*~[^$\\");
     std::string                       pattern;
     for (const char c : d.text(word))
     {
-        if (SPECIAL.find(c) != std::string_view::npos)
+        if ((forward ? SPECIAL : SPECIAL_BACKWARD).find(c) != std::string_view::npos)
         {
             pattern += '\\';
         }
         pattern += c;
     }
-    mSearch.pattern     = whole && keyword ? "\\<" + pattern + "\\>" : pattern;
+    if (whole && keyword)
+    {
+        pattern = "\\<" + pattern + "\\>";
+    }
+    // Into the search history as vim's * puts it there, for the search
+    // line to find again.
+    mCommandLine.remember('/', pattern);
+    mSearch.pattern     = forward ? pattern : ALVimSearch::backwardPattern(pattern);
     mSearch.forward     = forward;
     mSearch.noSmartCase = true;
     mSearch.offset      = ALVimSearch::Offset();
-    // Into the search history as vim's * puts it there, for the search
-    // line to find again.
-    mCommandLine.remember('/', mSearch.pattern);
     // Looked for from the word's start, as vim puts the caret there first:
     // # from inside a word goes to the one before it, not to its own start.
     if (mOperator)

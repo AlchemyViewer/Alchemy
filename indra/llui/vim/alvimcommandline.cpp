@@ -264,7 +264,8 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                     }
                     if (!pattern.empty())
                     {
-                        mVim.mSearch.pattern     = pattern;
+                        // After ?, \? is the ? itself, as vim reads it.
+                        mVim.mSearch.pattern     = which == '?' ? ALVimSearch::backwardPattern(pattern) : pattern;
                         mVim.mSearch.noSmartCase = false;
                         mVim.mSearch.offset      = offset;
                     }

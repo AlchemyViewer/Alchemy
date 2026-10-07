@@ -5529,4 +5529,23 @@ namespace tut
         ex("s//Y/g");
         ensure_equals("a pattern typed for :s, and :s// after it, by smartcase", flat(editor->text()), std::string("X foo|Y foo|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<194>()
+    {
+        set_test_name("after ?, \\? is a ? itself, as vim reads it, and # puts a ? into the search history so");
+        typedef std::vector<std::string> history_t;
+        make("x ?? ??\n");
+        editor->setCaret(ALTextPos(0, 5));
+        keys("#");
+        ensure_equals("# on ?? back to the one before", caretText(), std::string("0:2"));
+        ensure("the history has each ? escaped", vim->shared().search == history_t{ "\\?\\?" });
+
+        make("a?b x a?b\n");
+        editor->setCaret(ALTextPos(0, 8));
+        keys("?a\\?b<CR>");
+        ensure_equals("?a\\?b finds a?b itself", caretText(), std::string("0:6"));
+        keys("n");
+        ensure_equals("and n goes on with it", caretText(), std::string("0:0"));
+    }
 }
