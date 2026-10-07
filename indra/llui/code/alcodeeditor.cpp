@@ -3991,23 +3991,23 @@ void ALCodeEditor::syncMirrors(S32 index)
 {
     // As one edit, one step to undo, and the selection as it was.
     std::string            wanted;
-    const std::vector<S32> order = mSnippet.staleMirrors(index, document(), wanted);
-    if (order.empty())
+    const std::vector<S32> stale = mSnippet.staleMirrors(index, document(), wanted);
+    if (stale.empty())
     {
         return;
     }
     const ALTextRange                                was = selection();
     std::vector<std::pair<ALTextRange, std::string>> edits;
-    edits.reserve(order.size());
-    for (const S32 k : order)
+    edits.reserve(stale.size());
+    for (const S32 k : stale)
     {
         edits.emplace_back(mSnippet.mirrors()[static_cast<size_t>(k)].range, wanted);
     }
     // All of them as one edit.
     undoJournal().beginGroup();
-    mSnippet.syncingAll();
+    mSnippet.setSyncing(true);
     editMany(std::move(edits), was.end);
-    mSnippet.syncing(-1);
+    mSnippet.setSyncing(false);
     undoJournal().endGroup();
     placeSelection(document().clamp(was.begin), document().clamp(was.end));
     afterEdit();

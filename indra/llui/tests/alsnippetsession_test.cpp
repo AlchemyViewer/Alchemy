@@ -85,19 +85,25 @@ namespace tut
     template<> template<>
     void alsnippetsession_object::test<3>()
     {
-        set_test_name("mirrors: those that no longer read as their stop, the last first; the one being brought up is what the edit put in");
+        set_test_name("mirrors: those that no longer read as their stop; brought up as one batch, as the editor does, each is what the batch put in its place");
         ALTextDocument doc("i = i + i;\n");
         session.start({ range(0, 0, 1) }, ALTextPos(0, 10), { { 0, range(0, 4, 5) }, { 0, range(0, 8, 9) } });
         session.slide(doc.replace(range(0, 0, 1), "count"));
         std::string            wanted;
         const std::vector<S32> stale = session.staleMirrors(0, doc, wanted);
         ensure_equals("what the stop holds", wanted, std::string("count"));
-        ensure("both, the last in the text first", stale.size() == 2 && stale[0] == 1 && stale[1] == 0);
-        session.syncing(1);
-        session.slide(doc.replace(session.mirrors()[1].range, wanted));
-        session.syncing(-1);
-        ensure("brought up whole", doc.text(session.mirrors()[1].range) == "count");
-        ensure("one left", session.staleMirrors(0, doc, wanted).size() == 1);
+        ensure("both", stale == std::vector<S32>({ 0, 1 }));
+        std::vector<std::pair<ALTextRange, std::string>> edits;
+        for (const S32 k : stale)
+        {
+            edits.emplace_back(session.mirrors()[static_cast<size_t>(k)].range, wanted);
+        }
+        session.setSyncing(true);
+        session.slide(doc.replaceMany(std::move(edits)));
+        session.setSyncing(false);
+        ensure("each brought up whole", doc.text(session.mirrors()[0].range) == "count" && doc.text(session.mirrors()[1].range) == "count");
+        ensure_equals("the line", doc.line(0), std::string("count = count + count;"));
+        ensure("none left", session.staleMirrors(0, doc, wanted).empty());
         ensure("none for another stop", session.staleMirrors(3, doc, wanted).empty());
     }
 
@@ -141,9 +147,9 @@ namespace tut
             {
                 edits.emplace_back(session.mirrors()[static_cast<size_t>(k)].range, wanted);
             }
-            session.syncingAll();
+            session.setSyncing(true);
             session.slide(doc.replaceMany(std::move(edits)));
-            session.syncing(-1);
+            session.setSyncing(false);
         };
 
         const ALSnippetSession::Expansion whole = ALSnippetSession::expand("local ${1:name} = require(\"${2:$1}\")", ALTextPos(0, 0), "");

@@ -395,7 +395,7 @@ void ALSnippetSession::start(std::vector<ALTextRange> stops, const ALTextPos& af
     mAt      = mStops.empty() ? -1 : 0;
     mMirrors = std::move(mirrors);
     mLanding = landing;
-    mSyncing = -1;
+    mSyncing = false;
 }
 
 void ALSnippetSession::clear()
@@ -435,16 +435,11 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
                                   : std::all_of(edit.parts.begin(), edit.parts.end(),
                                                 [&inside](const ALTextDocument::Edit::Part& part) { return inside(part.before); });
     };
-    for (S32 k = 0; k < static_cast<S32>(mMirrors.size());)
+    for (size_t k = 0; k < mMirrors.size();)
     {
-        Mirror&                          mirror = mMirrors[static_cast<size_t>(k)];
-        const std::optional<ALTextRange> made   = mSyncing == SYNCING_ALL ? replaced(mirror.range) : std::nullopt;
-        if (k == mSyncing)
-        {
-            mirror.range = edit.rangeAfter();
-            ++k;
-        }
-        else if (made)
+        Mirror&                          mirror = mMirrors[k];
+        const std::optional<ALTextRange> made   = mSyncing ? replaced(mirror.range) : std::nullopt;
+        if (made)
         {
             mirror.range = *made;
             ++k;
@@ -455,11 +450,7 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
         }
         else
         {
-            mMirrors.erase(mMirrors.begin() + k);
-            if (mSyncing > k)
-            {
-                --mSyncing;
-            }
+            mMirrors.erase(mMirrors.begin() + static_cast<std::ptrdiff_t>(k));
         }
     }
     for (S32 i = 0; i < static_cast<S32>(mStops.size());)
@@ -476,7 +467,7 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
         {
             ++i;
         }
-        else if (mSyncing == SYNCING_ALL && holds(r))
+        else if (mSyncing && holds(r))
         {
             // A mirror inside it made again, or the whole of it: it grows
             // and shrinks with what went in, rather than going.
@@ -504,16 +495,9 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
             }
         }
     }
-    if (!edit.parts.empty())
+    if (!edit.parts.empty() || removed.end <= mAfter)
     {
         mAfter = edit.slidPast(mAfter);
-    }
-    else if (mAfter.line == removed.end.line || mAfter.line > removed.end.line)
-    {
-        if (removed.end <= mAfter)
-        {
-            mAfter = edit.slidPast(mAfter);
-        }
     }
     if (mStops.empty() || mAt < 0)
     {
@@ -536,19 +520,18 @@ bool ALSnippetSession::reaches(S32 line) const
 
 std::vector<S32> ALSnippetSession::staleMirrors(S32 index, const ALTextDocument& text, std::string& wanted) const
 {
-    std::vector<S32> order;
+    std::vector<S32> stale;
     if (index < 0 || index >= static_cast<S32>(mStops.size()) || mMirrors.empty())
     {
-        return order;
+        return stale;
     }
     wanted = text.text(mStops[static_cast<size_t>(index)]);
     for (S32 k = 0; k < static_cast<S32>(mMirrors.size()); ++k)
     {
         if (mMirrors[static_cast<size_t>(k)].of == index && text.text(mMirrors[static_cast<size_t>(k)].range) != wanted)
         {
-            order.push_back(k);
+            stale.push_back(k);
         }
     }
-    std::sort(order.begin(), order.end(), [this](S32 a, S32 b) { return mMirrors[static_cast<size_t>(b)].range.begin < mMirrors[static_cast<size_t>(a)].range.begin; });
-    return order;
+    return stale;
 }
