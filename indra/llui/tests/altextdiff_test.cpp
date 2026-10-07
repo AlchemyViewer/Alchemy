@@ -1516,4 +1516,24 @@ namespace tut
         ensure("the line the same: anchored", told_same(runs, 25));
         ensure("as the whole would find them: anchored", runs == ALTextDiff::lines(l_lines, r_typed, anchored));
     }
+
+    template<> template<>
+    void altextdiff_object::test<31>()
+    {
+        set_test_name("a word changed into one like it, case let go of: marked by what differs but for case; a string's case its own");
+        typedef ALTextDiff::spans_t S;
+        S                    left, right;
+        ALTextDiff::Likeness cased;
+        cased.ignoreCase = true;
+        ALTextDiff::words("x = getValue;", "x = GETVALUES;", left, right);
+        ensure("as they are: the whole of each", left == S{ { 4, 12 } } && right == S{ { 4, 13 } });
+        ALTextDiff::words("x = getValue;", "x = GETVALUES;", left, right, as(cased));
+        ensure("case let go of: the letter put on alone", left.empty() && right == S{ { 12, 13 } });
+        const std::string was     = "say(\"getValue\");";
+        const std::string now     = "say(\"GETVALUES\");";
+        const auto        was_reg = quoted(was);
+        const auto        now_reg = quoted(now);
+        ALTextDiff::words(was, now, left, right, as(cased), &was_reg, &now_reg);
+        ensure("in a string: the whole of each", left == S{ { 5, 13 } } && right == S{ { 5, 14 } });
+    }
 }

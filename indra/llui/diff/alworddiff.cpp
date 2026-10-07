@@ -111,6 +111,12 @@ namespace
         return at >= text.size() || (static_cast<unsigned char>(text[at]) & 0xC0) != 0x80;
     }
 
+    // A byte as a word's are told the same: its case let go of, where it is.
+    char folded(char c, bool fold)
+    {
+        return fold && c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+    }
+
 }
 
 void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff::spans_t& left_out, ALTextDiff::spans_t& right_out,
@@ -154,21 +160,25 @@ void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff:
             continue;
         }
         // One word changed into one like it: the characters that differ,
-        // those both start and end with set aside -- at a character's edge
-        // -- where they are at least half the shorter, and it is long
-        // enough that a part of it reads as one: not a digit put on a
-        // number.
+        // those both start and end with set aside -- at a character's edge,
+        // told the same as the words were, their case let go of outside a
+        // string where it is -- where they are at least half the shorter,
+        // and it is long enough that a part of it reads as one: not a digit
+        // put on a number.
         if (op.left[1] - op.left[0] == 1 && op.right[1] - op.right[0] == 1)
         {
             const Token& l = lw[static_cast<size_t>(op.left[0])];
             const Token& r = rw[static_cast<size_t>(op.right[0])];
             if (ALDiffTokens::isWord(left, l) && ALDiffTokens::isWord(right, r))
             {
-                const std::string_view lt   = left.substr(static_cast<size_t>(l.begin), static_cast<size_t>(l.end - l.begin));
-                const std::string_view rt   = right.substr(static_cast<size_t>(r.begin), static_cast<size_t>(r.end - r.begin));
-                const size_t           most = std::min(lt.size(), rt.size());
-                size_t                 head = 0;
-                while (head < most && lt[head] == rt[head])
+                const std::string_view lt     = left.substr(static_cast<size_t>(l.begin), static_cast<size_t>(l.end - l.begin));
+                const std::string_view rt     = right.substr(static_cast<size_t>(r.begin), static_cast<size_t>(r.end - r.begin));
+                const size_t           most   = std::min(lt.size(), rt.size());
+                const bool             fold_l = options.like.ignoreCase && l.region != ALTextDiff::Region::String;
+                const bool             fold_r = options.like.ignoreCase && r.region != ALTextDiff::Region::String;
+                const auto             alike  = [&](size_t at_l, size_t at_r) { return folded(lt[at_l], fold_l) == folded(rt[at_r], fold_r); };
+                size_t                 head   = 0;
+                while (head < most && alike(head, head))
                 {
                     ++head;
                 }
@@ -177,7 +187,7 @@ void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff:
                     --head;
                 }
                 size_t tail = 0;
-                while (tail < most - head && lt[lt.size() - 1 - tail] == rt[rt.size() - 1 - tail])
+                while (tail < most - head && alike(lt.size() - 1 - tail, rt.size() - 1 - tail))
                 {
                     ++tail;
                 }
