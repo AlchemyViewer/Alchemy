@@ -184,4 +184,29 @@ namespace tut
         ensure_equals("and the dollar", found("cost$x", ALVimPattern::of("cost$x", std::string(), plain)), std::string("cost$x"));
         ensure_equals("each at its branch's end", found("ab\nb a", ALVimPattern::of("a$\\|^b", std::string(), plain)), std::string("b|a"));
     }
+
+    template<> template<>
+    void alvimpattern_object::test<8>()
+    {
+        set_test_name("\\ze looks ahead to the end of its branch alone, and \\@= \\@! \\@<= \\@<! \\@> look round the atom before them");
+        ensure_equals("closed at the \\|", regexOf("foo\\zebar\\|qux"), std::string("foo(?=bar)|qux"));
+        ensure_equals("and at its group's close", regexOf("\\(a\\zeb\\)"), std::string("(a(?=b))"));
+        ensure_equals("or at a \\| in the group", regexOf("\\(foo\\zebar\\|baz\\)"), std::string("(foo(?=bar)|baz)"));
+        ensure_equals("very magic's too", regexOf("\\vfoo\\zebar|qux"), std::string("foo(?=bar)|qux"));
+        ensure_equals("each branch as vim takes it", found("qux\nfooqux\nfoobar", ALVimPattern::of("foo\\zebar\\|qux", std::string(), plain)),
+                      std::string("qux|qux|foo"));
+        ensure_equals("in a group", found("foobar bazz", ALVimPattern::of("\\(foo\\zebar\\|baz\\)", std::string(), plain)), std::string("foo|baz"));
+
+        ensure_equals("a group looked ahead at", regexOf("foo\\(bar\\)\\@="), std::string("foo(?=(bar))"));
+        ensure_equals("a character looked behind", regexOf("x\\@<=y"), std::string("(?<=x)y"));
+        ensure_equals("not behind, with how far", regexOf("\\(foo\\)\\@123<!bar"), std::string("(?<!(foo))bar"));
+        ensure_equals("very magic's", regexOf("\\vfoo(bar)@!"), std::string("foo(?!(bar))"));
+        ensure_equals("taken whole", regexOf("\\(a*\\)\\@>b"), std::string("(?>(a*))b"));
+        ensure_equals("in a branch of its own", regexOf("a\\(b\\)\\@=\\|c"), std::string("a(?=(b))|c"));
+        ensure_equals("ahead", found("foobar foobaz", ALVimPattern::of("foo\\(bar\\)\\@=", std::string(), plain)), std::string("foo"));
+        ensure_equals("not behind", found("foobar xbar", ALVimPattern::of("\\(foo\\)\\@<!bar", std::string(), plain)), std::string("bar"));
+        ensure_equals("behind a character of two bytes", found("\xC3\xA9x ax", ALVimPattern::of("\xC3\xA9\\@<=x", std::string(), plain)), std::string("x"));
+        ensure_equals("not ahead, very magic", found("foobar foobaz", ALVimPattern::of("\\vfoo(bar)@!", std::string(), plain)), std::string("foo"));
+        ensure_equals("never given back", found("aaab", ALVimPattern::of("\\(a*\\)\\@>ab", std::string(), plain)), std::string());
+    }
 }
