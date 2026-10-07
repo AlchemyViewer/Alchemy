@@ -34,6 +34,7 @@
 #include "aldiffview.h"
 #include "aldiskincludes.h"
 #include "alflatbutton.h"
+#include "alfloaterscriptpreferences.h"
 #include "allinebreaks.h"
 #include "allsltoslua.h"
 #include "allsltraits.h"
@@ -62,6 +63,7 @@
 #include "aljumpbar.h"
 #include "aloutputview.h"
 #include "alpanelist.h"
+#include "alpanelscriptaliases.h"
 #include "llsdutil.h"
 #include "alscopebar.h"
 #include "alscriptfixes.h"
@@ -221,17 +223,16 @@ namespace
         }
         bool nameStudioAlias(const std::string& name, const std::string& folder) override
         {
-            std::vector<ALScriptPreprocessor::StudioAlias> aliases = ALScriptPreprocessor::studioAliases();
-            for (const ALScriptPreprocessor::StudioAlias& alias : aliases)
+            // Under the name the rewritten require says, unless that is
+            // another folder's by now.
+            if (!ALPanelScriptAliases::addStudioAlias(name, folder, true))
             {
-                if (LLStringUtil::compareInsensitive(alias.name, name) == 0)
-                {
-                    return alias.folder == folder;
-                }
+                return false;
             }
-            aliases.push_back({ name, folder });
-            ALScriptPreprocessor::setStudioAliases(aliases);
             gSavedSettings.setBOOL("ALScriptPreprocDiskIncludes", true);
+            // The fix's doing, not the preferences': their Cancel leaves the
+            // alias, as it leaves the require rewritten to use it.
+            ALFloaterScriptPreferences::keepChanged({ "ALScriptSLuaAliases", "ALScriptPreprocDiskIncludes" });
             return true;
         }
     };
@@ -942,12 +943,14 @@ void ALFloaterScriptStudio::listenToSettings()
     // The preprocessor's settings, from the menu here or the preferences:
     // every script expanded and checked again, and the transforms' words
     // coloured as they now are -- a moment after the last change, since a
-    // field typed in changes its setting at every key.
+    // field typed in changes its setting at every key. The SLua aliases
+    // with them, and world includes, which an inventory folder's alias is
+    // read under: a require through one found, or not, again.
     for (const char* setting :
          { "ALScriptPreprocEnabled", "ALScriptPreprocSwitch", "ALScriptPreprocLazyLists", "ALScriptPreprocCompress", "ALScriptPreprocOptimizer",
            "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings", "ALScriptPreprocOptimizerInlining", "ALScriptPreprocExtensions",
            "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder", "ALScriptPreprocDefines",
-           "ALScriptPreprocLineComments" })
+           "ALScriptPreprocLineComments", "ALScriptSLuaAliases", "ALScriptPreprocWorldIncludes" })
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
         {

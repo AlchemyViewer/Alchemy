@@ -546,37 +546,12 @@ ALCodeEditor::Completion ALScriptStudioWords::completionFor(const Vocab& word, b
         // detail types it -- `type name` there, `name: type` here.
         if (lua)
         {
-            std::string  params;
-            const size_t open  = word.detail.find('(');
-            const size_t close = word.detail.rfind(')');
-            if (open != std::string::npos && close != std::string::npos && close > open)
+            // Split as the editor splits a signature's for its stops: a
+            // type's own brackets and commas kept, a variadic `...`.
+            std::string params;
+            for (const ALSnippetSession::Parameter& one : ALSnippetSession::parameters(word.detail, word.text))
             {
-                S32    depth = 0;
-                size_t start = open + 1;
-                for (size_t i = open + 1; i <= close; ++i)
-                {
-                    const char ch = word.detail[i];
-                    if (i < close && ch != ',')
-                    {
-                        depth += (ch == '{' || ch == '[' || ch == '(') ? 1 : (ch == '}' || ch == ']' || ch == ')') ? -1 : 0;
-                        continue;
-                    }
-                    if (depth > 0)
-                    {
-                        continue;
-                    }
-                    std::string piece = word.detail.substr(start, i - start);
-                    LLStringUtil::trim(piece);
-                    start = i + 1;
-                    if (piece.empty())
-                    {
-                        continue;
-                    }
-                    const size_t space = piece.rfind(' ');
-                    params += (params.empty() ? "" : ", ") + (space == std::string::npos ? piece
-                                                              : typed                    ? piece.substr(space + 1) + ": " + piece.substr(0, space)
-                                                                                         : piece.substr(space + 1));
-                }
+                params += (params.empty() ? "" : ", ") + (typed && !one.type.empty() ? one.name + ": " + one.type : one.name);
             }
             c.snippet = "function LLEvents." + word.text + "(" + params + ")\n    $0\nend";
         }

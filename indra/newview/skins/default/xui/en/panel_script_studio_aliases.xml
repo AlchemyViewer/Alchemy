@@ -4,17 +4,22 @@
      stands for, which naming it lets a require read. -->
 <panel
  follows="left|top"
- height="104"
+ height="130"
  layout="topleft"
  name="aliases_panel"
  width="370">
     <panel.string name="NoAlias">No aliases. Use Add... to name a folder, or drop one from your inventory.</panel.string>
+    <panel.string name="NoAliasWorldOff">No aliases. Use Add... to name a folder.</panel.string>
+    <panel.string name="AliasTip">@[NAME]: [FOLDER]</panel.string>
     <panel.string name="InventoryFolder">Inventory: [NAME]</panel.string>
     <panel.string name="InventoryFolderGone">Inventory folder not found</panel.string>
     <panel.string name="InventoryFolderTip">An inventory folder, which a require reads from while world includes are on.</panel.string>
     <panel.string name="InventoryFolderOffTip">An inventory folder, which a require reads from only while world includes are on, which they are not.</panel.string>
+    <panel.string name="DiskFolderGone">Not found: [FOLDER]</panel.string>
+    <panel.string name="DiskFolderGoneTip">[FOLDER] is not there: a require through this alias finds nothing until it is.</panel.string>
     <panel.string name="DiskFolderOffTip">[FOLDER], which a require reads from only while files on disk may be read, which they may not.</panel.string>
     <panel.string name="DropFolder">Name this inventory folder an alias</panel.string>
+    <panel.string name="DropFolderWorldOff">An inventory folder is read as an alias only while world includes are on, which they are not.</panel.string>
     <panel.string name="NameTaken">'[NAME]' is already an alias.</panel.string>
     <panel.string name="NameBad">An alias's name is letters, digits, - _ and . -- not self, and not starting sl-.</panel.string>
     <text
@@ -83,12 +88,14 @@
      tool_tip="The selected alias's name: type another and press Return"
      top_delta="-2"
      width="120" />
+    <!-- Why a name typed was not taken, on a line of its own to wrap. -->
     <text
      follows="left|top"
-     height="16"
+     height="28"
      layout="topleft"
-     left_pad="6"
+     left="20"
      name="said"
-     top_delta="2"
-     width="170" />
+     top_pad="4"
+     width="350"
+     wrap="true" />
 </panel>

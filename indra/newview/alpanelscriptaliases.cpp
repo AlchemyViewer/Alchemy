@@ -30,6 +30,7 @@
 #include "alluauconfig.h"
 #include "alpanelist.h"
 #include "alscriptpreprocessor.h"
+#include "fsyspath.h"
 #include "lldir.h"
 #include "lldirpicker.h"
 #include "llinventorymodel.h"
@@ -39,6 +40,8 @@
 #include "llviewercontrol.h"
 
 #include <algorithm>
+#include <filesystem>
+#include <system_error>
 
 static LLPanelInjector<ALPanelScriptAliases> t_script_aliases("al_panel_script_aliases");
 
@@ -51,7 +54,6 @@ bool ALPanelScriptAliases::postBuild()
     mList = getChild<ALPaneList>("aliases");
     mName = getChild<LLLineEditor>("alias_name");
     mSaid = getChild<LLTextBox>("said");
-    mList->setEmpty(getString("NoAlias"), LLStringUtil::null);
     mList->setCommitOnSelectionChange(true);
     mList->setCommitCallback([this](LLUICtrl*, const LLSD&) { refreshChosen(); });
     mName->setCommitOnFocusLost(true);
@@ -77,10 +79,13 @@ void ALPanelScriptAliases::refresh()
     mList->deleteAllItems();
     const bool disk  = gSavedSettings.getBOOL("ALScriptPreprocDiskIncludes");
     const bool world = ALScriptPreprocessor::worldIncludes();
+    // An inventory folder offered only while one dropped would be read.
+    mList->setEmpty(getString(world ? "NoAlias" : "NoAliasWorldOff"), LLStringUtil::null);
     for (const ALScriptPreprocessor::StudioAlias& alias : ALScriptPreprocessor::studioAliases())
     {
-        // A folder on disk by its path; an inventory folder by its name,
-        // as the inventory has it now.
+        // A folder on disk by its path, said not found where it is not
+        // there now; an inventory folder by its name, as the inventory has
+        // it now.
         LLUUID      inventory;
         std::string shown = alias.folder;
         std::string tip   = alias.folder;
@@ -90,14 +95,30 @@ void ALPanelScriptAliases::refresh()
             shown = category ? getString("InventoryFolder", { { "[NAME]", category->getName() } }) : getString("InventoryFolderGone");
             tip   = getString(world ? "InventoryFolderTip" : "InventoryFolderOffTip");
         }
-        else if (!disk)
+        else
         {
-            tip = getString("DiskFolderOffTip", { { "[FOLDER]", alias.folder } });
+            std::error_code error;
+            const bool      there = std::filesystem::is_directory(fsyspath(alias.folder), error);
+            if (!there)
+            {
+                shown = getString("DiskFolderGone", { { "[FOLDER]", alias.folder } });
+            }
+            if (!disk)
+            {
+                tip = getString("DiskFolderOffTip", { { "[FOLDER]", alias.folder } });
+            }
+            else if (!there)
+            {
+                tip = getString("DiskFolderGoneTip", { { "[FOLDER]", alias.folder } });
+            }
         }
+        // The name whole, which the narrow column may cut, with what it
+        // stands for.
         LLSD row;
         row["value"]                  = alias.name;
         row["columns"][0]["column"]   = "alias";
         row["columns"][0]["value"]    = "@" + alias.name;
+        row["columns"][0]["tool_tip"] = getString("AliasTip", { { "[NAME]", alias.name }, { "[FOLDER]", shown } });
         row["columns"][1]["column"]   = "folder";
         row["columns"][1]["value"]    = shown;
         row["columns"][1]["tool_tip"] = tip;
@@ -107,6 +128,8 @@ void ALPanelScriptAliases::refresh()
     {
         mList->selectByValue(chosen);
     }
+    // What was said of a name tried is past once the setting has changed.
+    mSaid->setText(LLStringUtil::null);
     refreshChosen();
 }
 
@@ -121,7 +144,8 @@ void ALPanelScriptAliases::refreshChosen()
     {
         mName->setText(chosen ? chosen->getValue().asString() : std::string());
     }
-    mSaid->setText(LLStringUtil::null);
+    // What was said of a name tried stays: a name committed by clicking
+    // another row is turned down just before that row is chosen.
 }
 
 void ALPanelScriptAliases::onAdd()
@@ -133,20 +157,11 @@ void ALPanelScriptAliases::onAdd()
              {
                  return;
              }
-             std::vector<ALScriptPreprocessor::StudioAlias> aliases = ALScriptPreprocessor::studioAliases();
-             std::vector<std::string>                       taken;
-             for (const ALScriptPreprocessor::StudioAlias& alias : aliases)
-             {
-                 if (alias.folder == picked.front())
-                 {
-                     return;
-                 }
-                 taken.push_back(alias.name);
-             }
-             aliases.push_back({ ALLuauConfig::studioAliasFor(gDirUtilp->getBaseFileName(picked.front()), taken), picked.front() });
-             ALScriptPreprocessor::setStudioAliases(aliases);
              // Nothing on disk is read while the disk's switch is off.
-             gSavedSettings.setBOOL("ALScriptPreprocDiskIncludes", true);
+             if (addStudioAlias(gDirUtilp->getBaseFileName(picked.front()), picked.front(), false))
+             {
+                 gSavedSettings.setBOOL("ALScriptPreprocDiskIncludes", true);
+             }
          },
          folders.empty() ? std::string() : folders.front()))
         ->getFile();
@@ -159,33 +174,80 @@ bool ALPanelScriptAliases::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
     {
         return LLPanel::handleDragAndDrop(x, y, mask, drop, cargo_type, cargo_data, accept, tooltip_msg);
     }
+    // An inventory folder's alias is read only while world includes are
+    // on, which are the scripter's to turn on and not the drop's: while
+    // they are off, one dropped would be an alias nothing reads.
+    if (!ALScriptPreprocessor::worldIncludes())
+    {
+        *accept     = ACCEPT_NO;
+        tooltip_msg = getString("DropFolderWorldOff");
+        return true;
+    }
     const LLInventoryCategory* category = static_cast<const LLInventoryCategory*>(cargo_data);
     *accept                             = ACCEPT_YES_SINGLE;
     tooltip_msg                         = getString("DropFolder");
     if (drop)
     {
-        addInventoryFolder(category->getUUID(), category->getName());
+        // Named after itself, as a folder on disk is; never twice.
+        addStudioAlias(category->getName(), ALScriptPreprocessor::inventoryAliasFolder(category->getUUID()), false);
     }
     return true;
 }
 
-void ALPanelScriptAliases::addInventoryFolder(const LLUUID& folder, const std::string& name)
+// static
+bool ALPanelScriptAliases::addStudioAlias(const std::string& name, const std::string& folder, bool exact)
 {
-    // Named after itself, as a folder on disk is; never twice. World
-    // includes are the scripter's to turn on, not the drop's.
-    const std::string                              id      = ALScriptPreprocessor::inventoryAliasFolder(folder);
     std::vector<ALScriptPreprocessor::StudioAlias> aliases = ALScriptPreprocessor::studioAliases();
     std::vector<std::string>                       taken;
     for (const ALScriptPreprocessor::StudioAlias& alias : aliases)
     {
-        if (alias.folder == id)
+        // An exact name is looked for by itself, a made one by its folder.
+        const bool same = sameFolder(alias.folder, folder);
+        if (exact ? LLStringUtil::compareInsensitive(alias.name, name) == 0 : same)
         {
-            return;
+            return same;
         }
         taken.push_back(alias.name);
     }
-    aliases.push_back({ ALLuauConfig::studioAliasFor(name, taken), id });
+    aliases.push_back({ exact ? name : ALLuauConfig::studioAliasFor(name, taken), folder });
     ALScriptPreprocessor::setStudioAliases(aliases);
+    return true;
+}
+
+// static
+bool ALPanelScriptAliases::sameFolder(const std::string& a, const std::string& b)
+{
+    if (a == b)
+    {
+        return true;
+    }
+    LLUUID     inventory_a;
+    LLUUID     inventory_b;
+    const bool in_a = ALScriptPreprocessor::inventoryAliasFolder(a, inventory_a);
+    const bool in_b = ALScriptPreprocessor::inventoryAliasFolder(b, inventory_b);
+    if (in_a || in_b)
+    {
+        return in_a && in_b && inventory_a == inventory_b;
+    }
+    // The path made plain -- its `.` and `..` gone, a separator at its end
+    // dropped -- and where the two still differ, the disk asked whether
+    // they are one folder: a case apart on Windows, a link.
+    const auto plain = [](const std::string& folder) {
+        std::filesystem::path path = fsyspath(folder).lexically_normal();
+        if (!path.has_filename())
+        {
+            path = path.parent_path();
+        }
+        return path;
+    };
+    const std::filesystem::path path_a = plain(a);
+    const std::filesystem::path path_b = plain(b);
+    if (path_a == path_b)
+    {
+        return true;
+    }
+    std::error_code error;
+    return std::filesystem::equivalent(path_a, path_b, error) && !error;
 }
 
 void ALPanelScriptAliases::onRemove()
@@ -209,6 +271,8 @@ void ALPanelScriptAliases::onRename()
     {
         return;
     }
+    // Each name tried says anew whether it was taken.
+    mSaid->setText(LLStringUtil::null);
     const std::string was = chosen->getValue().asString();
     std::string       now = mName->getText();
     LLStringUtil::trim(now);

@@ -476,4 +476,25 @@ namespace tut
         ALCodeEditor& e = editor("llSetLinkAlpha(2, ", false);
         ensure("the call around a place", Words::callAt(e, ALTextPos(0, 18), callee, argument) && callee == "llSetLinkAlpha" && argument == 1);
     }
+
+    template<> template<>
+    void alscriptstudiowords_object::test<16>()
+    {
+        set_test_name("an SLua handler's parameters split as a signature's are: a type's own commas, colons and arrow its own, a variadic `...` however written");
+        slua["events"]["mapped"] = LLSD().with("arguments", LLSD().with(0, argument("pairs", "Map<K, V>")).with(1, argument("n", "number")));
+        slua["events"]["called"] =
+            LLSD().with("arguments", LLSD().with(0, argument("back", "(number) -> ()")).with(1, argument("data", "{[string]: any}")));
+        slua["events"]["varied"] = LLSD().with("arguments", LLSD().with(0, argument("first", "number")).with(1, argument("...", "any")));
+        slua["events"]["bare"]   = LLSD().with("arguments", LLSD().with(0, argument("...any", "")));
+        Words::forget();
+        const auto handler = [](const char* name, bool typed) { return Words::completionFor(*Words::word(true, name), true, typed).snippet; };
+        ensure_equals("a generic's comma", handler("mapped", true), std::string("function LLEvents.mapped(pairs: Map<K, V>, n: number)\n    $0\nend"));
+        ensure_equals("and untyped", handler("mapped", false), std::string("function LLEvents.mapped(pairs, n)\n    $0\nend"));
+        ensure_equals("a function type's arrow, a table type's colon", handler("called", true),
+                      std::string("function LLEvents.called(back: (number) -> (), data: {[string]: any})\n    $0\nend"));
+        ensure_equals("a variadic typed", handler("varied", true), std::string("function LLEvents.varied(first: number, ...: any)\n    $0\nend"));
+        ensure_equals("and not", handler("varied", false), std::string("function LLEvents.varied(first, ...)\n    $0\nend"));
+        ensure_equals("one written ...any", handler("bare", true), std::string("function LLEvents.bare(...: any)\n    $0\nend"));
+        ensure_equals("and untyped", handler("bare", false), std::string("function LLEvents.bare(...)\n    $0\nend"));
+    }
 }

@@ -453,7 +453,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="auto_complete"
-             tool_tip="The completion list opens as you type; off, only when you press Control-Space"
+             tool_tip="The completion list opens as you type; off, only when you press Control-Space. An SLua handler completes with Luau types while LSL to SLua's Luau types option is on"
              top_pad="6"
              width="370" />
             <text
@@ -922,7 +922,7 @@ end</floater.string>
              class="al_panel_script_aliases"
              filename="panel_script_studio_aliases.xml"
              follows="left|top"
-             height="104"
+             height="130"
              layout="topleft"
              left="12"
              name="aliases_panel"
