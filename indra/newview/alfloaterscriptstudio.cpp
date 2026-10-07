@@ -3281,21 +3281,16 @@ void ALFloaterScriptStudio::findNotecardReaders(const Doc& doc)
     const std::string name = doc.name;
     auto read = [gather, name](const ALScriptRef& ref, const std::string& script, const std::string& text) {
         const std::vector<ALScriptSpan> spans = ALNotecardFormat::readersOf(text, name);
-        size_t                          from  = 0;
-        S32                             line  = 0;
+        // The lines they are on, for the list to show, split as readersOf
+        // splits them.
+        const ALScriptPlaces::Lines lines(text);
         for (const ALScriptSpan& span : spans)
         {
-            // The line it is on, for the list to show.
-            for (; line < span.line && from != std::string::npos; ++line)
-            {
-                from = text.find('\n', from);
-                from = from == std::string::npos ? from : from + 1;
-            }
             Doc::Place place;
             place.span     = span;
             place.file     = ALScriptPreprocessor::pathOf(ref);
             place.fileName = script;
-            place.text     = from == std::string::npos ? std::string() : text.substr(from, text.find('\n', from) - from);
+            place.text     = lines.line(span.line);
             place.at       = span.column + 1;
             gather->found.places.push_back(std::move(place));
         }
