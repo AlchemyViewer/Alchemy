@@ -3066,17 +3066,28 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             }
             else if (given > 0)
             {
-                // The count given takes the place of the one recorded.
-                while (from < change.size() && change[from].isChar && isDigit(change[from].ch))
-                {
-                    ++from;
-                }
+                // The count given takes the place of the ones recorded,
+                // before a register's name and after it.
+                const auto past_count = [&change](size_t at) {
+                    while (at < change.size() && change[at].isChar && isDigit(change[at].ch))
+                    {
+                        ++at;
+                    }
+                    return at;
+                };
+                from = past_count(from);
                 for (const char digit : std::to_string(given))
                 {
                     Input in;
                     in.isChar = true;
                     in.ch     = static_cast<llwchar>(digit);
                     feed(view, in);
+                }
+                while (from + 1 < change.size() && change[from].isChar && change[from].ch == '"')
+                {
+                    feed(view, change[from]);
+                    feed(view, change[from + 1]);
+                    from = past_count(from + 2);
                 }
             }
             for (size_t i = from; i < change.size(); ++i)

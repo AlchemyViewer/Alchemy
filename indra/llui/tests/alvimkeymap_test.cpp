@@ -219,7 +219,7 @@ namespace tut
 
     // More than TUT's fifty a group holds by default, which runs the first
     // fifty and says nothing of the rest: keep this above the highest test.
-    typedef test_group<alvimkeymap_data, 150> alvimkeymap_group;
+    typedef test_group<alvimkeymap_data, 160> alvimkeymap_group;
     typedef alvimkeymap_group::object    alvimkeymap_object;
     alvimkeymap_group                    alvimkeymap_group_instance("alvimkeymap");
 
@@ -4078,5 +4078,22 @@ namespace tut
         keys("2\"ad3d");
         ensure_equals("2\"ad3d: six lines deleted", flat(editor->text()), std::string("7|8|"));
         ensure_equals("into a", vim->registerText('a'), std::string("1\n2\n3\n4\n5\n6"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<150>()
+    {
+        set_test_name(". with a count puts it in place of the counts on either side of a register's name; without one, . counts as they did");
+        ALCodeEditor& e = make("ab\n");
+        keys("\"ayl\"a3p4.");
+        ensure_equals("\"a3p then 4.: four more", flat(e.text()), std::string("aaaaaaaab|"));
+
+        make("ab\n");
+        keys("\"ayl2\"a3p4.");
+        ensure_equals("2\"a3p then 4.: four more, not twelve", flat(editor->text()), std::string("aaaaaaaaaaab|"));
+
+        make("ab\n");
+        keys("\"ayl2\"a3p.");
+        ensure_equals("2\"a3p then .: six more", flat(editor->text()), std::string("aaaaaaaaaaaaab|"));
     }
 }
