@@ -372,6 +372,9 @@ public:
 
 
     const std::string& getMediaName() const { return mMediaName; };
+    // The stream's tags, as a movie plugin gives them with the name: TITLE,
+    // ARTIST, icy-name and icy-url, as the music ticker reads them.
+    const LLSD& getMediaMetadata() const { return mMediaMetadata; };
     std::string getMediaDescription() const { return mMediaDescription; };
 
     // Crash the plugin.  If you use this outside of a testbed, you will be punished.
@@ -514,6 +517,7 @@ protected:
     int             mContextMenuY;
 
     std::string     mMediaName;
+    LLSD            mMediaMetadata;
     std::string     mMediaDescription;
 
     LLColor4        mBackgroundColor;

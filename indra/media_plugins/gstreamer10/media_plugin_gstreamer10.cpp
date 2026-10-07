@@ -109,7 +109,7 @@ private:
     void update();
     void copyFrame(GstSample* sample);
     void setVideoSize(int width, int height);
-    void updateTitle(const GstTagList* tags);
+    void updateMetadata(const GstTagList* tags);
 
     /*virtual*/ void setDirty(int left, int top, int right, int bottom);
     void sendTimeUpdate();
@@ -121,6 +121,8 @@ private:
     // The URL playing, for the browser messages the media system tracks.
     std::string mURL;
     std::string mTitle;
+    // The stream's tags, as the music ticker reads them.
+    LLSD mMetadata;
 
     double mVolume;
     bool mIsLooping;
@@ -260,7 +262,7 @@ gboolean MediaPluginGStreamer10::processGSTEvents(GstBus *bus, GstMessage *messa
             llgst_message_parse_tag(message, &tags);
             if (tags)
             {
-                updateTitle(tags);
+                updateMetadata(tags);
                 llgst_tag_list_unref(tags);
             }
             break;
@@ -347,11 +349,18 @@ bool MediaPluginGStreamer10::navigateTo( const std::string& url )
 
     mURL = url;
     mTitle.clear();
+    mMetadata = LLSD::emptyMap();
     mSeekWanted = false;
     mAtEnd = false;
     mBuffering = false;
     mCurTime = 0.0;
     mDuration = 0.0;
+
+    // The last media's name and tags go with it.
+    LLPluginMessage name_message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "name_text");
+    name_message.setValue("name", mTitle);
+    name_message.setValueLLSD("metadata", mMetadata);
+    sendMessage(name_message);
 
     // The media system keeps its idea of the page from the browser messages,
     // which the movie plugins have always sent too (MAINT-6528).
@@ -517,30 +526,51 @@ void MediaPluginGStreamer10::setVideoSize(int width, int height)
     }
 }
 
-// "Artist - Title" where the stream says both, as a radio station does of
-// the song it is playing; the title alone otherwise.
-void MediaPluginGStreamer10::updateTitle(const GstTagList* tags)
+// The stream's tags, under the names the music ticker reads, which are
+// FMOD's: TITLE and ARTIST, and a radio station's name and page as its
+// icy-name and icy-url headers give them; souphttpsrc tags the page as the
+// location, and other sources as the homepage. A radio station names the song
+// playing in its title. Tags accumulate: a station's come once, at the
+// start, and a song's with each song. The media's name is "Artist - Title"
+// where the stream says both, the title alone otherwise.
+void MediaPluginGStreamer10::updateMetadata(const GstTagList* tags)
 {
-    gchar* title = nullptr;
-    gchar* artist = nullptr;
-    llgst_tag_list_get_string(tags, GST_TAG_TITLE, &title);
-    llgst_tag_list_get_string(tags, GST_TAG_ARTIST, &artist);
-
-    std::string name;
-    if (artist && *artist && title && *title)
-        name = std::string(artist) + " - " + title;
-    else if (title && *title)
-        name = title;
-    llg_free(title);
-    llg_free(artist);
-
-    if (!name.empty() && name != mTitle)
+    static const struct
     {
-        mTitle = name;
-        LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "name_text");
-        message.setValue("name", mTitle);
-        sendMessage(message);
+        const char* tag;
+        const char* key;
+    } tag_keys[] = {
+        { GST_TAG_TITLE, "TITLE" },
+        { GST_TAG_ARTIST, "ARTIST" },
+        { GST_TAG_ORGANIZATION, "icy-name" },
+        { GST_TAG_HOMEPAGE, "icy-url" },
+        { GST_TAG_LOCATION, "icy-url" },
+    };
+
+    bool changed = false;
+    for (const auto& tag_key : tag_keys)
+    {
+        gchar* value = nullptr;
+        if (llgst_tag_list_get_string(tags, tag_key.tag, &value) && value && *value &&
+            mMetadata[tag_key.key].asString() != value)
+        {
+            mMetadata[tag_key.key] = std::string(value);
+            changed = true;
+        }
+        llg_free(value);
     }
+    if (!changed)
+        return;
+
+    const LLSD& metadata = mMetadata;
+    const std::string artist = metadata["ARTIST"].asString();
+    const std::string title = metadata["TITLE"].asString();
+    mTitle = (!artist.empty() && !title.empty()) ? artist + " - " + title : title;
+
+    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "name_text");
+    message.setValue("name", mTitle);
+    message.setValueLLSD("metadata", mMetadata);
+    sendMessage(message);
 }
 
 // The time and the duration ride on every update, as the media controls

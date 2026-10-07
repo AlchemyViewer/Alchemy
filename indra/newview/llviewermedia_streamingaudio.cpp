@@ -33,6 +33,7 @@
 #include "llviewermedia_streamingaudio.h"
 
 #include "llmimetypes.h"
+#include "llsdutil.h"
 #include "lldir.h"
 
 LLStreamingAudio_MediaPlugins::LLStreamingAudio_MediaPlugins() :
@@ -82,6 +83,8 @@ void LLStreamingAudio_MediaPlugins::start(const std::string& url)
     {
         LL_INFOS() << "setting stream to NULL"<< LL_ENDL;
         mURL.clear();
+        mLastPlaying = 0;
+        setMetadata(LLSD());
         mMediaPlugin->stop();
         delete mMediaPlugin;
         mMediaPlugin = nullptr;
@@ -91,6 +94,8 @@ void LLStreamingAudio_MediaPlugins::start(const std::string& url)
 void LLStreamingAudio_MediaPlugins::stop()
 {
     LL_INFOS() << "Stopping internet stream." << LL_ENDL;
+    mLastPlaying = 0;
+    setMetadata(LLSD());
     if(mMediaPlugin)
     {
         mMediaPlugin->stop();
@@ -120,8 +125,26 @@ void LLStreamingAudio_MediaPlugins::pause(int pause)
 
 void LLStreamingAudio_MediaPlugins::update()
 {
-    if (mMediaPlugin)
-        mMediaPlugin->idle();
+    if (!mMediaPlugin)
+        return;
+
+    mMediaPlugin->idle();
+
+    // The ticker hears of new tags, as FMOD's stream tells it, and of the
+    // stream starting or pausing, which is all a stream without tags says.
+    const int playing = isPlaying();
+    const LLSD& metadata = mMediaPlugin->getMediaMetadata();
+    if (playing != mLastPlaying || !llsd_equals(metadata, mMetadata))
+    {
+        mLastPlaying = playing;
+        setMetadata(metadata);
+    }
+}
+
+void LLStreamingAudio_MediaPlugins::setMetadata(const LLSD& metadata)
+{
+    mMetadata = metadata.isMap() ? metadata : LLSD::emptyMap();
+    mMetadataUpdateSignal(mMetadata);
 }
 
 int LLStreamingAudio_MediaPlugins::isPlaying()
