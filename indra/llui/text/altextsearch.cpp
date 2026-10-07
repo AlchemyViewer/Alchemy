@@ -31,6 +31,7 @@
 #include <boost/regex/icu.hpp>
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <iterator>
 #include <memory>
@@ -258,6 +259,18 @@ namespace
         const auto full = [&out, &options]() { return options.limit > 0 && out.size() >= options.limit; };
         const ALTextRange   within = scope ? scope->normalised() : ALTextRange(doc.start(), doc.end());
         const std::string_view needle = query;
+        // Without regard to case, the ASCII bytes a plain match may begin
+        // at: those that lower as the query's first character does. Any
+        // other is passed over without a character decoded or compared.
+        std::array<bool, 0x80> begins_at{};
+        if (!options.regex && !options.caseSensitive)
+        {
+            const llwchar first = LLStringOps::toLower(utf8str_decode_at(needle, 0).cp);
+            for (size_t b = 0; b < begins_at.size(); ++b)
+            {
+                begins_at[b] = LLStringOps::toLower(static_cast<llwchar>(b)) == first;
+            }
+        }
 
         // One stretch of text searched from `from` to `to`, each match's
         // offsets turned into places by `posOf`. The text is a line, or the
@@ -367,8 +380,8 @@ namespace
             else
             {
                 // As it is by find; without regard to case codepoint by
-                // codepoint at each character, nothing lowered and nothing
-                // allocated.
+                // codepoint at each character a match may begin at, nothing
+                // lowered and nothing allocated.
                 size_t at = static_cast<size_t>(from);
                 while (at < static_cast<size_t>(to))
                 {
@@ -377,6 +390,19 @@ namespace
                     {
                         begin = text.find(needle, at);
                         if (begin == std::string::npos || begin >= static_cast<size_t>(to))
+                        {
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        // An ASCII byte is a character of its own.
+                        while (begin < static_cast<size_t>(to) && static_cast<unsigned char>(text[begin]) < 0x80 &&
+                               !begins_at[static_cast<unsigned char>(text[begin])])
+                        {
+                            ++begin;
+                        }
+                        if (begin >= static_cast<size_t>(to))
                         {
                             break;
                         }

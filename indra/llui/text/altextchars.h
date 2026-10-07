@@ -91,7 +91,8 @@ inline bool alRegexSpecial(char c)
 }
 
 // The end of a match of the needle at `at` in the hay, or npos. Without
-// regard to case it compares codepoint by codepoint.
+// regard to case it compares codepoint by codepoint: two ASCII bytes as
+// they are, a character each, and past ASCII decoded.
 inline size_t alMatchAt(std::string_view hay, size_t at, std::string_view needle, bool case_insensitive)
 {
     if (!case_insensitive)
@@ -109,6 +110,18 @@ inline size_t alMatchAt(std::string_view hay, size_t at, std::string_view needle
         if (h >= hay.size())
         {
             return std::string_view::npos;
+        }
+        const unsigned char hb = static_cast<unsigned char>(hay[h]);
+        const unsigned char nb = static_cast<unsigned char>(needle[n]);
+        if (hb < 0x80 && nb < 0x80)
+        {
+            if (hb != nb && LLStringOps::toLower(static_cast<char>(hb)) != LLStringOps::toLower(static_cast<char>(nb)))
+            {
+                return std::string_view::npos;
+            }
+            ++h;
+            ++n;
+            continue;
         }
         const LLCodepointAt hc = utf8str_decode_at(hay, h);
         const LLCodepointAt nc = utf8str_decode_at(needle, n);

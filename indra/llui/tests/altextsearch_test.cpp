@@ -443,4 +443,18 @@ namespace tut
         doc.replaceMany(std::move(edits));
         ensure_equals("each replaced whole", doc.text(), std::string("bb\n///x\nba b\n"));
     }
+
+    template<> template<>
+    void altextsearch_object::test<16>()
+    {
+        set_test_name("without regard to case, plain text is found where it begins with a character past ASCII that lowers to an ASCII letter, "
+                      "and an ASCII letter where it begins with one past ASCII that lowers to it");
+        ALTextDocument doc;
+        // The Kelvin sign, which lowers to k, and the capital I with a dot
+        // above, which lowers to i.
+        doc.setText("\xE2\x84\xAA" "elvin kelvin\n" "\xC4\xB0" "f if\n");
+        ALTextSearchOptions options;
+        ensure_equals("kelvin from the Kelvin sign, and from k", said(ALTextSearch::matches(doc, "kelvin", options)), std::string("0:0-8 0:9-15"));
+        ensure_equals("\xC4\xB0" "f, and if", said(ALTextSearch::matches(doc, "\xC4\xB0" "f", options)), std::string("1:0-3 1:4-6"));
+    }
 }
