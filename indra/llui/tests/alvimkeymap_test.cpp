@@ -3811,4 +3811,82 @@ namespace tut
         keys("#");
         ensure_equals("# from inside a word to the one before it, not to its own start", caretText(), std::string("0:0"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<142>()
+    {
+        set_test_name("a g key after an operator that is no motion fails it, nothing changed and nothing begun -- gi and gI put the caret where vim's do first; a g operator doubled is the line");
+        ALCodeEditor& e = make("one two\nTHREE FOUR\nfive six\n");
+        keys("jjllia<Esc>");
+        e.setCaret(ALTextPos(1, 0));
+        keys("yw");
+        const std::string text = flat(e.text());
+        ensure_equals("inserted on the third line", text, std::string("one two|THREE FOUR|fiave six|"));
+        for (const char* typed : { "dgi", "cgi", "ygi", "2dgi", "dgI", "dgJ", "dgp", "dg;", "dgt", "dgv", "dgrx", "dgx", "dgc", "cgu" })
+        {
+            const std::string what(typed);
+            e.setCaret(ALTextPos(1, 3));
+            keys(typed);
+            ensure(what + ": normal mode, nothing pending", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+            ensure_equals(what + ": nothing changed", flat(e.text()), text);
+            ensure_equals(what + ": the register as it was", vim->registerText('"'), std::string("THREE "));
+            const std::string caret = what.find("gi") != std::string::npos ? "2:3" : what == "dgI" ? "1:0" : "1:3";
+            ensure_equals(what + ": the caret", caretText(), caret);
+        }
+        e.setCaret(ALTextPos(1, 3));
+        keys("dguw");
+        ensure_equals("dgu let go of, the w after it a motion of its own", caretText(), std::string("1:6"));
+        ensure_equals("nothing lowered", flat(e.text()), text);
+        keys("gugu");
+        ensure_equals("gugu lowers the line", e.document().line(1), std::string("three four"));
+        ensure_equals("the caret at its start", caretText(), std::string("1:0"));
+        keys("gUgU");
+        ensure_equals("gUgU raises it", e.document().line(1), std::string("THREE FOUR"));
+        keys("g~g~");
+        ensure_equals("g~g~ swaps its case", e.document().line(1), std::string("three four"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<143>()
+    {
+        set_test_name("gv after an operator gives it the last visual area as it was selected, characters, lines or a block, and . does it over as much from the caret");
+        ALCodeEditor& e = make("one two\nthree four\n");
+        keys("vl<Esc>");
+        e.setCaret(ALTextPos(1, 3));
+        keys("dgv");
+        ensure_equals("dgv deletes what was selected", flat(e.text()), std::string("e two|three four|"));
+        ensure("normal mode, nothing pending", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+        ensure_equals("the caret where it began", caretText(), std::string("0:0"));
+        ensure_equals("and the register", vim->registerText('"'), std::string("on"));
+
+        make("one two\nthree four\n");
+        keys("wvl<Esc>");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("ygv");
+        ensure_equals("ygv yanks it", vim->registerText('"'), std::string("tw"));
+        ensure_equals("the caret to its start", caretText(), std::string("0:4"));
+        keys("cgvX<Esc>");
+        ensure_equals("cgv changes it", flat(editor->text()), std::string("one Xo|three four|"));
+        ensure("back in normal mode", vim->mode() == ALVimKeymap::Mode::Normal);
+
+        make("one two\nthree four\n");
+        keys("Vj<Esc>");
+        editor->setCaret(ALTextPos(0, 1));
+        keys("gUgv");
+        ensure_equals("gUgv over the lines a line-wise one took", flat(editor->text()), std::string("ONE TWO|THREE FOUR|"));
+        ensure_equals("the caret at their start", caretText(), std::string("0:0"));
+
+        make("abc def ghi\nxyz\n");
+        keys("wvl<Esc>0dgv");
+        ensure_equals("dgv from before the area", flat(editor->text()), std::string("abc f ghi|xyz|"));
+        keys("0.");
+        ensure_equals(". as much again from the caret", flat(editor->text()), std::string("c f ghi|xyz|"));
+        ensure_equals("what . took", vim->registerText('"'), std::string("ab"));
+
+        make("abcd\nefgh\nijkl\n");
+        keys("lj<C-v>l<Esc>gg0dgv");
+        ensure_equals("dgv over a block takes its columns", flat(editor->text()), std::string("abcd|eh|ijkl|"));
+        ensure_equals("the caret at its corner", caretText(), std::string("1:1"));
+        ensure_equals("the block's text", vim->registerText('"'), std::string("fg"));
+    }
 }

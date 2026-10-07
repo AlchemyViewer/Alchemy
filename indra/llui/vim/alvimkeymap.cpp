@@ -1412,6 +1412,53 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
     const bool            visual  = mMode != Mode::Normal;
     const bool            editing = !view.isReadOnly();
     const S32             count   = countOr(mCount);
+    // After an operator the g keys that are motions -- gg g_ ge gE gj gk
+    // g* g# gn gN -- go on to take it, gv to give it the last visual area,
+    // gr to wait for its character, and a g operator doubled, g~g~ gugu
+    // gUgU gcgc, is its lines as g~~ is. Any other key is no motion, and
+    // the operator fails as it does before any key that is none
+    // (operatorKey): nothing changed and nothing begun, the caret moved
+    // only where vim's gI and gi move it first, to the line's first column
+    // and to where inserting last stopped.
+    if (mOperator)
+    {
+        switch (ch)
+        {
+            case 'g':
+            case '_':
+            case 'e':
+            case 'E':
+            case 'j':
+            case 'k':
+            case '*':
+            case '#':
+            case 'n':
+            case 'N':
+            case 'r':
+            case 'v':
+                break;
+            default:
+            {
+                const bool doubled = (ch == 'c' && mOperator == COMMENT_OPERATOR) || ((ch == '~' || ch == 'u' || ch == 'U') && mOperator == ch);
+                if (doubled)
+                {
+                    return operatorKey(view, mOperator);
+                }
+                const auto inserted = mMarks.find('^');
+                if (ch == 'I')
+                {
+                    moveTo(view, d.lineStart(cursor(view).line));
+                }
+                else if (ch == 'i' && inserted != mMarks.end())
+                {
+                    moveTo(view, inserted->second);
+                }
+                mFailed = true;
+                clearPending();
+                return true;
+            }
+        }
+    }
     switch (ch)
     {
         case 'g':
@@ -1585,14 +1632,10 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
         {
             // The host's tabs: gt the next, {N}gt the Nth; gT
             // back one, or N.
-            const S32  given    = mCount;
-            const bool operated = mOperator != 0;
+            const S32 given = mCount;
             clearPending();
-            if (!operated)
-            {
-                const std::string tabs = ch == 't' ? "tabnext" : "tabprevious";
-                mEx->runCommand(view, given > 0 ? tabs + " " + std::to_string(given) : tabs);
-            }
+            const std::string tabs = ch == 't' ? "tabnext" : "tabprevious";
+            mEx->runCommand(view, given > 0 ? tabs + " " + std::to_string(given) : tabs);
             return true;
         }
         case '&':
@@ -1604,6 +1647,44 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
             }
             return true;
         case 'v':
+            if (mOperator)
+            {
+                // {op}gv: the operator over the last visual area as it was
+                // selected -- characters, lines or a block -- as vim's is;
+                // with none, no motion. `.` does it again as a visual
+                // operation is done again, over as much from the caret, by
+                // visual mode's key for the operator -- but for c, whose
+                // insert has `.` type its keys again as they were typed.
+                const llwchar op = mOperator;
+                if (mVisualLast == Mode::Normal)
+                {
+                    mFailed = true;
+                    clearPending();
+                    return true;
+                }
+                mVisualAnchor = d.clamp(mVisualLastAnchor);
+                mVisualCaret  = d.clamp(mVisualLastCaret);
+                setMode(view, mVisualLast);
+                const Span span = visualSpan(view);
+                setMode(view, Mode::Normal);
+                if (op != 'c')
+                {
+                    noteVisualOperation(span);
+                    mVisualPending.opAt = mCommandInputs.size();
+                    if (op == COMMENT_OPERATOR)
+                    {
+                        mCommandInputs.push_back(Input::character('g'));
+                        mCommandInputs.push_back(Input::character('c'));
+                    }
+                    else
+                    {
+                        mCommandInputs.push_back(Input::character(op == SURROUND_OPERATOR ? static_cast<llwchar>('S') : op));
+                    }
+                }
+                applyOperator(view, op, span, 1);
+                finishCommand(op != 'y');
+                return true;
+            }
             if (mVisualLast != Mode::Normal)
             {
                 mVisualAnchor = mVisualLastAnchor;
@@ -1719,13 +1800,19 @@ bool ALVimKeymap::afterZ(ALTextView& view, llwchar pending, llwchar ch)
 bool ALVimKeymap::afterGr(ALTextView& view, llwchar pending, llwchar ch)
 {
     // grn rename, grr the references, gra the fixes and actions
-    // at the caret: the editor's own.
+    // at the caret: the editor's own. After an operator gr is no motion,
+    // and the character after it goes with the operator it fails.
     const ALEditorCommand command = ch == 'n' ? ALEditorCommand::Rename
                                     : ch == 'r' ? ALEditorCommand::FindReferences
                                     : ch == 'a' ? ALEditorCommand::QuickFix
                                                 : ALEditorCommand::None;
+    const bool operated = mOperator != 0;
     clearPending();
-    if (command != ALEditorCommand::None)
+    if (operated)
+    {
+        mFailed = true;
+    }
+    else if (command != ALEditorCommand::None)
     {
         view.perform(command);
     }
