@@ -4696,4 +4696,24 @@ namespace tut
         keys("di(w");
         ensure_equals("and the operator: w a motion of its own", flat(editor->text()), std::string("def|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<163>()
+    {
+        set_test_name(". after c over a visual area -- cgv, or c over a selection -- changes as much again from the caret with what was typed, as . after any visual operation does");
+        ALCodeEditor& e = make("one two\nthree four\n");
+        keys("wvl<Esc>cgvXY<Esc>");
+        ensure_equals("cgv changes the last visual area", flat(e.text()), std::string("one XYo|three four|"));
+        keys("0.");
+        ensure_equals(". as many characters again from the caret, the same text typed", flat(e.text()), std::string("XYe XYo|three four|"));
+        ensure_equals("what . took", vim->registerText('"'), std::string("on"));
+
+        make("a\nb\nc\nd\ne\n");
+        keys("Vj<Esc>jjcgvX<Esc>j.");
+        ensure_equals("cgv over lines, then . over as many lines", flat(editor->text()), std::string("X|X|e|"));
+
+        make("ab cdef gh\n");
+        keys("viwcX<Esc>w.");
+        ensure_equals("viw c, then . over as many characters as the word had, not the word there", flat(editor->text()), std::string("X Xef gh|"));
+    }
 }

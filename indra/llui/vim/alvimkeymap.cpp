@@ -585,6 +585,7 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
         if (mMode == Mode::Normal && mCount == 0 && !mRegister && !mOperator && !mPending)
         {
             mCommandInputs.clear();
+            mVisualPending.valid = false;
             // Each command typed is a step of its own to undo, however
             // close on the last it came; what a macro or :normal plays is
             // one step, the group play holds open.
@@ -837,7 +838,12 @@ void ALVimKeymap::finishCommand(bool changed)
             mLastChange       = mCommandInputs;
         }
     }
-    mVisualPending.valid = false;
+    // A visual operation that goes on to insert -- c -- is done when the
+    // insert is: what `.` repeats is the operator with what was typed.
+    if (!inserting())
+    {
+        mVisualPending.valid = false;
+    }
 }
 
 void ALVimKeymap::noteVisualOperation(const ALTextDocument& d, const Span& span, S32 lines_hint)
@@ -1697,8 +1703,8 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
                 // selected -- characters, lines or a block -- as vim's is;
                 // with none, no motion. `.` does it again as a visual
                 // operation is done again, over as much from the caret, by
-                // visual mode's key for the operator -- but for c, whose
-                // insert has `.` type its keys again as they were typed.
+                // visual mode's key for the operator -- c's with what its
+                // insert typed.
                 const llwchar op = mOperator;
                 if (mVisualLast == Mode::Normal)
                 {
@@ -1717,19 +1723,16 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
                 const bool over_lines = op == '>' || op == '<' || op == '=' || op == COMMENT_OPERATOR || op == SURROUND_OPERATOR;
                 const Span span       = visualSpan(view, !over_lines);
                 setMode(view, Mode::Normal);
-                if (op != 'c')
+                noteVisualOperation(d, span);
+                mVisualPending.opAt = mCommandInputs.size();
+                if (op == COMMENT_OPERATOR)
                 {
-                    noteVisualOperation(d, span);
-                    mVisualPending.opAt = mCommandInputs.size();
-                    if (op == COMMENT_OPERATOR)
-                    {
-                        mCommandInputs.push_back(Input::character('g'));
-                        mCommandInputs.push_back(Input::character('c'));
-                    }
-                    else
-                    {
-                        mCommandInputs.push_back(Input::character(op == SURROUND_OPERATOR ? static_cast<llwchar>('S') : op));
-                    }
+                    mCommandInputs.push_back(Input::character('g'));
+                    mCommandInputs.push_back(Input::character('c'));
+                }
+                else
+                {
+                    mCommandInputs.push_back(Input::character(op == SURROUND_OPERATOR ? static_cast<llwchar>('S') : op));
                 }
                 applyOperator(view, op, span, 1);
                 finishCommand(op != 'y');
