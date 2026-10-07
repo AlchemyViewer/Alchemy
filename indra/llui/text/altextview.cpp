@@ -3759,70 +3759,6 @@ LLRect ALTextView::anchorOf(const ALTextRange& range)
     return anchor;
 }
 
-void ALTextView::forEachVisibleRow(const LLRect& text, const std::function<void(S32, S32, S32)>& visit)
-{
-    const S32 row_h = mLayout.rowHeight();
-    if (row_h <= 0)
-    {
-        return;
-    }
-    const S32 count    = mDocument.lineCount();
-    const S32 bottom_y = mScrollY + text.getHeight();
-    for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
-    {
-        if (mLayout.hidden(line))
-        {
-            continue;
-        }
-        const ALTextLayout::Line& laid = mLayout.line(line);
-        const S32                 top  = mLayout.lineTop(line);
-        if (top >= bottom_y)
-        {
-            break;
-        }
-        for (size_t r = 0; r < laid.rows.size(); ++r)
-        {
-            const S32 row_top = top + laid.rows[r].top;
-            if (row_top + laid.rows[r].height <= mScrollY)
-            {
-                continue;
-            }
-            if (row_top >= bottom_y)
-            {
-                break;
-            }
-            visit(line, static_cast<S32>(r), text.mTop - (row_top - mScrollY));
-        }
-    }
-}
-
-void ALTextView::forEachVisibleGap(const LLRect& text, const std::function<void(S32, S32, S32)>& visit)
-{
-    if (!mAnyGap || mLayout.rowHeight() <= 0)
-    {
-        return;
-    }
-    const S32 count    = mDocument.lineCount();
-    const S32 bottom_y = mScrollY + text.getHeight();
-    const auto shown   = [&](S32 line) {
-        const S32 top    = mLayout.gapTop(line);
-        const S32 height = mLayout.gapHeight(line);
-        if (height > 0 && top < bottom_y && top + height > mScrollY)
-        {
-            visit(line, text.mTop - (top - mScrollY), height);
-        }
-        return top < bottom_y;
-    };
-    for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
-    {
-        if (!mLayout.hidden(line) && !shown(line))
-        {
-            return;
-        }
-    }
-    shown(count);
-}
-
 // --- LLEditMenuHandler ---------------------------------------------------------
 
 void ALTextView::undo()
@@ -5276,8 +5212,6 @@ void ALTextView::drawRows(const LLRect& text)
         return;
     }
     const F32  alpha       = getDrawContext().mAlpha;
-    const S32  count       = mDocument.lineCount();
-    const S32  bottom_y    = mScrollY + text.getHeight();
     const bool show_caret  = keyboardOnText() && gFocusMgr.getAppHasFocus() && !mReadOnly;
     const F32  blink       = mBlink.getElapsedTimeF32();
     const bool caret_on    = show_caret && (!mCaretBlink || blink < BLINK_DELAY || (static_cast<S32>(blink * 2.f) & 1));
@@ -5293,36 +5227,12 @@ void ALTextView::drawRows(const LLRect& text)
     // things over the text lie over the next row's text, where they reach
     // it, rather than under.
     mRowsSeen.clear();
-    for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
-    {
-        if (mLayout.hidden(line))
-        {
-            continue;
-        }
-        const ALTextLayout::Line& laid = mLayout.line(line);
-        const S32                 top  = mLayout.lineTop(line);
-        if (top >= bottom_y)
-        {
-            break;
-        }
-        for (size_t r = 0; r < laid.rows.size(); ++r)
-        {
-            const ALTextLayout::Row& row     = laid.rows[r];
-            const S32                row_top = top + row.top;
-            if (row_top + row.height <= mScrollY)
-            {
-                continue;
-            }
-            if (row_top >= bottom_y)
-            {
-                break;
-            }
-            // The row's top on the screen, and the top of its text's band,
-            // which is the row's bottom part where a box made it taller.
-            const S32 row_screen_top = text.mTop - (row_top - mScrollY);
-            mRowsSeen.push_back(RowSeen{ line, static_cast<S32>(r), row_screen_top, row_screen_top - row.textTop() });
-        }
-    }
+    forEachVisibleRow(text, [&](S32 line, S32 r, S32 row_screen_top) {
+        // And the top of its text's band, which is the row's bottom part
+        // where a box made it taller.
+        const ALTextLayout::Row& row = mLayout.line(line).rows[static_cast<size_t>(r)];
+        mRowsSeen.push_back(RowSeen{ line, r, row_screen_top, row_screen_top - row.textTop() });
+    });
 
     // Behind the text: the selections and what the find bar found.
     const std::vector<ALTextRange>& matches   = mFind.matches();

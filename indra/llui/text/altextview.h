@@ -1000,13 +1000,76 @@ protected:
     static S32 squiggleMiddle(S32 text_top, S32 ascent);
     // The screen y of the top of a line's row -- the row's own top; a row
     // a box made taller than the font's line holds its text at its
-    // bottom -- and every row on screen in turn, for a subclass drawing
-    // beside them.
-    S32  screenTopOf(const LLRect& text, S32 line, S32 row) const;
-    void forEachVisibleRow(const LLRect& text, const std::function<void(S32 line, S32 row, S32 screen_top)>& visit);
+    // bottom -- and every row on screen in turn, each line laid out as it
+    // is reached, for what draws the rows and a subclass drawing beside
+    // them: told the line, the row and the row's top on the screen, by
+    // whatever is callable so, as it is rather than wrapped.
+    S32 screenTopOf(const LLRect& text, S32 line, S32 row) const;
+    template <typename Visit>
+    void forEachVisibleRow(const LLRect& text, Visit&& visit)
+    {
+        if (mLayout.rowHeight() <= 0)
+        {
+            return;
+        }
+        const S32 count    = mDocument.lineCount();
+        const S32 bottom_y = mScrollY + text.getHeight();
+        for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
+        {
+            if (mLayout.hidden(line))
+            {
+                continue;
+            }
+            const ALTextLayout::Line& laid = mLayout.line(line);
+            const S32                 top  = mLayout.lineTop(line);
+            if (top >= bottom_y)
+            {
+                break;
+            }
+            for (size_t r = 0; r < laid.rows.size(); ++r)
+            {
+                const S32 row_top = top + laid.rows[r].top;
+                if (row_top + laid.rows[r].height <= mScrollY)
+                {
+                    continue;
+                }
+                if (row_top >= bottom_y)
+                {
+                    break;
+                }
+                visit(line, static_cast<S32>(r), text.mTop - (row_top - mScrollY));
+            }
+        }
+    }
     // Every gap on screen: the line it is above (one past the last for
     // the gap below the text), its top on the screen and its height.
-    void forEachVisibleGap(const LLRect& text, const std::function<void(S32 line, S32 screen_top, S32 height)>& visit);
+    template <typename Visit>
+    void forEachVisibleGap(const LLRect& text, Visit&& visit)
+    {
+        if (!mAnyGap || mLayout.rowHeight() <= 0)
+        {
+            return;
+        }
+        const S32  count    = mDocument.lineCount();
+        const S32  bottom_y = mScrollY + text.getHeight();
+        const auto shown    = [&](S32 line) {
+            const S32 top    = mLayout.gapTop(line);
+            const S32 height = mLayout.gapHeight(line);
+            if (height > 0 && top < bottom_y && top + height > mScrollY)
+            {
+                visit(line, text.mTop - (top - mScrollY), height);
+            }
+            return top < bottom_y;
+        };
+        for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
+        {
+            if (!mLayout.hidden(line) && !shown(line))
+            {
+                return;
+            }
+        }
+        shown(count);
+    }
     // Every change goes through here: the document, the journal, the
     // caret, and whoever is listening.
     ALTextDocument::Edit edit(const ALTextRange& range, std::string_view text);
