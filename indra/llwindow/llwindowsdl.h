@@ -314,8 +314,9 @@ private:
     U32 mKeyRawScanCode = 0;
 
     // Per-frame mouse-motion accumulator. SDL_EVENT_MOUSE_MOTION delivers
-    // event.motion.xrel/yrel (relative motion since the last event in
-    // screen-coord units); we scale by pixel density and sum into this
+    // event.motion.xrel/yrel (relative motion since the last event, in
+    // screen-coord units unless relative mode gives device counts); we
+    // scale the screen-coord kind by pixel density and sum into this
     // member so getCursorDelta() — queried once per frame from
     // LLViewerWindow::updateMouseDelta — sees every motion event, not
     // just the last-position-minus-first-position which truncates to zero

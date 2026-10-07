@@ -1885,8 +1885,21 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // down); negate it on the way into the accumulator so the
             // viewer's "-dy pitches the camera up" math behaves the same
             // on both backends. X is Y-RIGHT-positive on both, no flip.
-            mMouseDeltaAccumX += event.motion.xrel * scale;
-            mMouseDeltaAccumY -= event.motion.yrel * scale;
+            //
+            // Emulated motion, touch and pen's included, is a difference of
+            // screen coordinates and scales to pixels like the position. A
+            // mouse's relative-mode motion on Wayland, X11 and Windows is the
+            // device's own unaccelerated counts, as Win32's raw input is,
+            // which no density applies to: scaled, it made mouselook twice as
+            // fast at 200%. Cocoa's is NSEvent's deltaX/Y, in points like the
+            // cursor, so macOS still scales it.
+#if LL_DARWIN
+            const float delta_scale = scale;
+#else
+            const float delta_scale = (mRelativeMouseMode && !from_absolute_device) ? 1.f : scale;
+#endif
+            mMouseDeltaAccumX += event.motion.xrel * delta_scale;
+            mMouseDeltaAccumY -= event.motion.yrel * delta_scale;
 
             // When relative mode is on, motion.x/y is undefined (SDL parks
             // the cursor) and we're in mouselook — UI hover/hit-testing
