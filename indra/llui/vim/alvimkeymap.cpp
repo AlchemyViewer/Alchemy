@@ -2291,44 +2291,73 @@ namespace
         }
     }
 
-    // The opener of a kind left open around a place, then as many more out
-    // as counted, or as many as there are: through the view's bracket index
-    // where there is one, as % goes, else -- an angle bracket -- by the text
-    // alone, nesting counted. An opener at the place itself is the first
-    // where `here` says, as it is under the caret; a visual selection's
-    // start looks for the one before it, as vim's does. False where there is
-    // none.
-    bool openerAround(const ALTextDocument& d, ALBracketIndex* index, char opener, const ALTextPos& from, bool here, S32 count, ALTextPos& open)
+    // A position stepped as vim's inc() steps one: a character on, 0 along
+    // the line, 2 onto its end, 1 onto the next line's start; -1 at the end
+    // of the text, where it stays. incl() goes past the end of a line that is
+    // not empty as well.
+    S32 incPos(const ALTextDocument& d, ALTextPos& p)
     {
-        open = from;
+        if (!atLineEnd(d, p))
+        {
+            p = d.nextCluster(p);
+            return atLineEnd(d, p) ? 2 : 0;
+        }
+        if (p.line + 1 >= d.lineCount())
+        {
+            return -1;
+        }
+        p = ALTextPos(p.line + 1, 0);
+        return 1;
+    }
+    S32 inclPos(const ALTextDocument& d, ALTextPos& p)
+    {
+        const S32 r = incPos(d, p);
+        return r >= 1 && p.column > 0 ? incPos(d, p) : r;
+    }
+    // And back, as dec() and decl(): 0 along the line, 1 onto the end of the
+    // line before -- for decl(), onto its last character, where it has one;
+    // -1 at the start of the text.
+    S32 decPos(const ALTextDocument& d, ALTextPos& p)
+    {
+        if (p.column > 0)
+        {
+            p = d.prevCluster(p);
+            return 0;
+        }
+        if (p.line <= 0)
+        {
+            return -1;
+        }
+        p = d.lineEnd(p.line - 1);
+        return 1;
+    }
+    S32 declPos(const ALTextDocument& d, ALTextPos& p)
+    {
+        const S32 r = decPos(d, p);
+        return r == 1 && p.column > 0 ? decPos(d, p) : r;
+    }
+    // vim's inindent(): whether a place is in its line's indent, `extra`
+    // columns on from it as well.
+    bool inIndent(const ALTextDocument& d, const ALTextPos& p, S32 extra)
+    {
+        return firstNonBlankColumn(d, p.line) >= p.column + extra;
+    }
+
+    // The opener of a kind left open before a place, the place itself not
+    // counted, as vim's findmatch() looks back for one: through the view's
+    // bracket index where there is one, as % goes, else -- an angle bracket
+    // -- by the text alone, nesting counted. False where there is none.
+    bool openerBefore(const ALTextDocument& d, ALBracketIndex* index, char opener, const ALTextPos& from, ALTextPos& open)
+    {
         if (index)
         {
-            ALTextPos paired;
-            if (!(here && at(d, from) == opener && index->match(from, paired, ALBracketIndex::ANYWHERE)) &&
-                !index->enclosing(from, opener, 1, open, ALBracketIndex::ANYWHERE))
-            {
-                return false;
-            }
-            for (S32 n = 1; n < count; ++n)
-            {
-                ALTextPos outer;
-                if (!index->enclosing(open, opener, 1, outer, ALBracketIndex::ANYWHERE))
-                {
-                    break;
-                }
-                open = outer;
-            }
-            return true;
+            return index->enclosing(from, opener, 1, open, ALBracketIndex::ANYWHERE);
         }
         const char closer = partnerOf(opener);
         S32        depth  = 0;
-        bool       found  = here && at(d, open) == opener;
-        while (!found)
+        open              = from;
+        while (stepBack(d, open))
         {
-            if (!stepBack(d, open))
-            {
-                return false;
-            }
             const char c = at(d, open);
             if (c == closer)
             {
@@ -2338,43 +2367,164 @@ namespace
             {
                 if (depth == 0)
                 {
-                    found = true;
+                    return true;
                 }
-                else
+                --depth;
+            }
+        }
+        return false;
+    }
+    // And the first after it that no closer before it leaves unmatched, as
+    // findmatch() looks forward for one, across lines: in x ) (a) there is
+    // none.
+    bool openerAfter(const ALTextDocument& d, ALBracketIndex* index, char opener, const ALTextPos& from, ALTextPos& open)
+    {
+        const char closer = partnerOf(opener);
+        S32        depth  = 0;
+        const auto take   = [&depth, &open, opener, closer](char c, const ALTextPos& p) {
+            if (c == closer)
+            {
+                ++depth;
+            }
+            else if (c == opener)
+            {
+                if (depth == 0)
                 {
-                    --depth;
+                    open = p;
+                    return true;
+                }
+                --depth;
+            }
+            return false;
+        };
+        if (index)
+        {
+            for (S32 line = from.line; line < d.lineCount(); ++line)
+            {
+                for (const auto& [column, c] : index->bracketsOn(line))
+                {
+                    if ((line > from.line || column > from.column) && take(c, ALTextPos(line, column)))
+                    {
+                        return true;
+                    }
                 }
             }
+            return false;
+        }
+        ALTextPos p = from;
+        while (stepOn(d, p))
+        {
+            if (take(at(d, p), p))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // vim's current_block(): the block of a kind a bracket object takes, as
+    // its two ends -- the opener and its closer, or, inside, the first and
+    // the last characters between them. From the caret, past the opener
+    // under it -- and for { past an indent before one: the opener left open
+    // before it, the count of them out; or, where none is, the count's
+    // opener after it. A count past the blocks there are is none. Inside
+    // starts the next line where the opener ends its line, and ends on the
+    // line before where only an indent comes before the closer, `sol` -- the
+    // line's break the block's as well; where the brackets hold nothing,
+    // `end` is before `start`. A selection of more than one character,
+    // `anchor` to `caret`, is looked from its start; and over one of any size,
+    // `visual`, where what the block holds is no more than the selection does,
+    // the next block out is taken instead, and brackets that hold nothing are
+    // none.
+    struct BlockObject
+    {
+        ALTextPos start;
+        ALTextPos end;
+        bool      sol = false;
+    };
+    std::optional<BlockObject> blockObject(const ALTextDocument& d, ALBracketIndex* index, char opener, bool around, S32 count, const ALTextPos& anchor,
+                                           const ALTextPos& caret, bool visual)
+    {
+        const auto match = [&d, index](const ALTextPos& open, ALTextPos& close) {
+            return index ? index->match(open, close, ALBracketIndex::ANYWHERE) : matchBracket(d, open, close);
+        };
+        ALTextPos from      = caret;
+        ALTextPos old_start = caret;
+        ALTextPos old_end   = caret;
+        if (anchor == caret)
+        {
+            if (opener == '{')
+            {
+                while (inIndent(d, from, 1) && incPos(d, from) == 0)
+                {
+                }
+            }
+            if (at(d, from) == opener)
+            {
+                from = d.nextCluster(from);
+            }
+        }
+        else if (anchor < caret)
+        {
+            old_start = anchor;
+            from      = anchor;
+        }
+        else
+        {
+            old_end = anchor;
+        }
+        ALTextPos  open;
+        const bool back = openerBefore(d, index, opener, from, open);
+        if (!back && !openerAfter(d, index, opener, from, open))
+        {
+            return std::nullopt;
         }
         for (S32 n = 1; n < count; ++n)
         {
-            ALTextPos outer = open;
-            depth           = 0;
-            bool more       = false;
-            while (stepBack(d, outer))
+            ALTextPos next;
+            if (!(back ? openerBefore(d, index, opener, open, next) : openerAfter(d, index, opener, open, next)))
             {
-                const char c = at(d, outer);
-                if (c == closer)
+                return std::nullopt;
+            }
+            open = next;
+        }
+        BlockObject block;
+        block.start = open;
+        if (!match(open, block.end))
+        {
+            return std::nullopt;
+        }
+        while (!around)
+        {
+            const ALTextPos closer = block.end;
+            inclPos(d, block.start);
+            block.sol = block.end.column == 0;
+            declPos(d, block.end);
+            while (inIndent(d, block.end, 1))
+            {
+                block.sol = true;
+                if (declPos(d, block.end) != 0)
                 {
-                    ++depth;
-                }
-                else if (c == opener)
-                {
-                    if (depth == 0)
-                    {
-                        more = true;
-                        break;
-                    }
-                    --depth;
+                    break;
                 }
             }
-            if (!more)
+            // Brackets that hold nothing are nothing to select.
+            if (visual && block.start == closer)
+            {
+                return std::nullopt;
+            }
+            if (!visual || block.start < old_start || old_end < block.end || block.start == block.end)
             {
                 break;
             }
-            open = outer;
+            ALTextPos before = old_start;
+            declPos(d, before);
+            if (!openerBefore(d, index, opener, before, block.start) || !match(block.start, block.end))
+            {
+                return std::nullopt;
+            }
         }
-        return true;
+        return block;
     }
 
     // A tag and the one that closes it, as offsets into the text: where
@@ -4610,26 +4760,32 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         case '<':
         case '>':
         {
-            // The opener under the caret where it is code, else the one left
-            // open before it, and as many more out as counted (openerAround).
-            const char opener = objectOpener(what);
-            ALTextPos  open;
-            if (!openerAround(d, opener != '<' ? &bracketsOf(view) : nullptr, opener, from, true, count, open))
+            // The block around the caret, or after it (blockObject): a( its
+            // brackets and what they hold. i( through the character before
+            // the closer; where the closer is alone on its line, up to that
+            // line's start, as an exclusive motion goes there -- the lines
+            // between whole where the block starts a line; nothing where the
+            // brackets hold nothing.
+            const char                       opener = objectOpener(what);
+            const std::optional<BlockObject> block  = blockObject(d, opener != '<' ? &bracketsOf(view) : nullptr, opener, around, count, from, from, false);
+            if (!block)
             {
                 return false;
             }
-            ALTextPos close;
-            if (!matchBracketIn(view, open, close))
+            ALTextPos end = block->end;
+            if (block->sol && !around)
             {
-                return false;
+                inclPos(d, end);
+                out.range = ALTextRange(block->start, std::max(block->start, end));
+                adjustExclusiveEnd(d, out.range, out.linewise);
             }
-            if (around)
+            else if (block->start <= end)
             {
-                out.range = ALTextRange(open, d.nextCluster(close));
+                out.range = ALTextRange(block->start, atLineEnd(d, end) ? end : d.nextCluster(end));
             }
             else
             {
-                out.range = ALTextRange(d.nextCluster(open), close);
+                out.range = ALTextRange(block->start, block->start);
             }
             return true;
         }
@@ -4805,51 +4961,23 @@ std::optional<bool> ALVimKeymap::visualObject(ALTextView& view, llwchar kind, ll
         case '<':
         case '>':
         {
-            if (anchor == caret)
-            {
-                return std::nullopt;
-            }
-            // The block around the selection's start, the count of them out,
-            // looked for from before it (openerAround).
-            const char      opener = objectOpener(what);
-            ALBracketIndex* index  = opener != '<' ? &bracketsOf(view) : nullptr;
-            ALTextPos       open;
-            ALTextPos       close;
-            if (!openerAround(d, index, opener, low, false, count, open) || !matchBracketIn(view, open, close))
+            // The block around the selection, from its start, or the next
+            // block out where it holds no more than the selection does -- of
+            // one character, too, so that i( on () fails (blockObject). Where
+            // the closer is alone on its line, the selection takes the break
+            // after the last character as well.
+            const char                       opener = objectOpener(what);
+            const std::optional<BlockObject> block  = blockObject(d, opener != '<' ? &bracketsOf(view) : nullptr, opener, around, count, anchor, caret, true);
+            if (!block)
             {
                 return false;
             }
-            ALTextPos first = open;
-            ALTextPos last  = close;
-            // Inside it, which must hold something; where it holds no more
-            // than the selection does, inside the block around that one.
-            while (!around)
+            ALTextPos last = block->end;
+            if (block->sol && !atLineEnd(d, last))
             {
-                first = d.nextCluster(open);
-                last  = d.prevCluster(close);
-                if (first == close)
-                {
-                    return false;
-                }
-                if (first < low || high < last || first == last)
-                {
-                    break;
-                }
-                // From the character before the selection, a line's end
-                // passed over.
-                ALTextPos before = low;
-                stepBack(d, before);
-                if (atLineEnd(d, before) && before.column > 0)
-                {
-                    stepBack(d, before);
-                }
-                const ALTextPos inner = open;
-                if (!openerAround(d, index, opener, before, false, 1, open) || !(open < inner) || !matchBracketIn(view, open, close))
-                {
-                    return false;
-                }
+                incPos(d, last);
             }
-            mVisualAnchor = first;
+            mVisualAnchor = block->start;
             mVisualCaret  = last;
             setMode(view, Mode::Visual);
             break;

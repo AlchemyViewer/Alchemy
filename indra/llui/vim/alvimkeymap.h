@@ -417,7 +417,8 @@ private:
     // on rather than choose afresh: words on from the caret, or back where it
     // is before the anchor; the brackets, the tag or the quotes around the
     // selection, the next ones out where what they hold is no more than it
-    // holds; paragraphs on from the caret's line, or back. Nothing where the
+    // holds -- the brackets over a selection of one character as well;
+    // paragraphs on from the caret's line, or back. Nothing where the
     // selection is no more, and the object is chosen afresh (textObject);
     // false where there is nothing more to take.
     std::optional<bool> visualObject(ALTextView& view, llwchar kind, llwchar what, S32 count);

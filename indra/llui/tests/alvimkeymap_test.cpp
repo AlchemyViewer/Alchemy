@@ -5303,4 +5303,61 @@ namespace tut
         ensure_equals("di\" passes over an escaped quote", flat(editor->text()), std::string("x \"\" y|"));
         ensure_equals("and takes it with the rest", vim->registerText('"'), std::string("a\\\"b"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<187>()
+    {
+        set_test_name("a bracket object with no block around the caret takes the next one, on across lines; a count past the blocks there are fails; inside, a closer alone on its line leaves the lines that hold the brackets, and i( on () fails in visual mode");
+        ALCodeEditor& e = make("x (a) y\n");
+        keys("di(");
+        ensure_equals("di( before a block takes what the next one holds", flat(e.text()), std::string("x () y|"));
+
+        make("x\n(a) y\n");
+        keys("di(");
+        ensure_equals("the next block on a line after", flat(editor->text()), std::string("x|() y|"));
+
+        make("x ) (a) y\n");
+        keys("di(");
+        ensure_equals("a closer before it leaves none", flat(editor->text()), std::string("x ) (a) y|"));
+
+        make("x (a) y\n");
+        keys("vli(y");
+        ensure_equals("vi( over a selection before a block", vim->registerText('"'), std::string("a"));
+
+        make("((a))\n");
+        editor->setCaret(ALTextPos(0, 2));
+        keys("d3i(");
+        ensure_equals("3i( with two blocks fails", flat(editor->text()), std::string("((a))|"));
+        keys("d2i(");
+        ensure_equals("2i( takes the outer", flat(editor->text()), std::string("()|"));
+
+        make("{\n  x\n}\n");
+        editor->setCaret(ALTextPos(1, 2));
+        keys("di{");
+        ensure_equals("di{ with the closer alone on its line takes the line between", flat(editor->text()), std::string("{|}|"));
+
+        make("(\nfoo\n)\n");
+        editor->setCaret(ALTextPos(1, 1));
+        keys("di(");
+        ensure_equals("and with the brackets on lines of their own", flat(editor->text()), std::string("(|)|"));
+
+        make("{x\n}\n");
+        editor->setCaret(ALTextPos(0, 1));
+        keys("di{");
+        ensure_equals("from the opener's line, up to its end", flat(editor->text()), std::string("{|}|"));
+
+        make("{\n  x\n}\n");
+        editor->setCaret(ALTextPos(1, 2));
+        keys("vi{y");
+        ensure_equals("vi{ takes the line's break as well", vim->registerText('"'), std::string("  x\n"));
+
+        make("x () y\n");
+        editor->setCaret(ALTextPos(0, 3));
+        keys("vi(y");
+        ensure_equals("vi( on () fails, the selection as it was", vim->registerText('"'), std::string(")"));
+
+        make("x () y\n");
+        keys("vi(y");
+        ensure_equals("and before one, the next block holding nothing", vim->registerText('"'), std::string("x"));
+    }
 }
