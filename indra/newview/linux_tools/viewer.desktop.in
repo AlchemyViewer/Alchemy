@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=@AL_APP_NAME@
+GenericName=Second Life Viewer
+Comment=Visit Second Life and other virtual worlds
+Exec=@AL_LINUX_PACKAGE@ %u
+Icon=@AL_APP_ID@
+Terminal=false
+Categories=Game;Simulation;
+Keywords=Second Life;SL;OpenSimulator;Virtual World;Metaverse;
+MimeType=x-scheme-handler/secondlife;x-scheme-handler/x-grid-location-info;
+StartupNotify=true
+StartupWMClass=@AL_APP_ID@
+SingleMainWindow=true
+PrefersNonDefaultGPU=true

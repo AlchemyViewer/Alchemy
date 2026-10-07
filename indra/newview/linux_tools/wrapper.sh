@@ -1,9 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ## Here are some configuration options for Linux Client Users.
 
 ## - Avoids using any OpenAL audio driver.
 #export LL_BAD_OPENAL_DRIVER=x
+
+## - Leaves the application menu alone: the viewer is not added to it, nor
+##   made the handler of secondlife:// links, when it is run.
+#export AL_NO_DESKTOP_INTEGRATION=1
 
 ## GL Driver Options
 export mesa_glthread=true
@@ -24,36 +28,28 @@ export mesa_glthread=true
 ## Nothing worth editing below this line.
 ##-------------------------------------------------------------------
 
-SCRIPTSRC=$(readlink -f "$0" || echo "$0")
-RUN_PATH=$(dirname "${SCRIPTSRC}" || echo .)
-echo "Running from ${RUN_PATH}"
-cd "${RUN_PATH}" || exit
+# Run from a symlink, such as one on the PATH, too: the tree is where the
+# script itself is.
+script=$(readlink -f -- "${BASH_SOURCE[0]}")
+cd -- "$(dirname -- "$script")" || exit 1
 
-# Re-register the secondlife:// protocol handler every launch, for now.
-./etc/register_secondlifeprotocol.sh
+# Adds this tree to the application menu and makes it the handler of
+# secondlife:// links when nothing has, or points them here from another
+# tree of the same channel. A failure is not the viewer's.
+if [[ -x etc/desktop_integration.sh ]]; then
+    etc/desktop_integration.sh refresh || echo "Desktop integration failed; see etc/desktop_integration.sh" >&2
+fi
 
-# Re-register the application with the desktop system every launch, for now.
-./etc/refresh_desktop_app_entry.sh
-
-# Copy "$@" to ARGS array specifically to delete the --skip-gridargs switch.
-# The gridargs.dat file is no more, but we still want to avoid breaking
-# scripts that invoke this one with --skip-gridargs.
-ARGS=()
-for ARG in "$@"; do
-    if [ "--skip-gridargs" != "$ARG" ]; then
-        ARGS[${#ARGS[*]}]="$ARG"
+# --skip-gridargs is gone with gridargs.dat; scripts still pass it.
+args=()
+for arg in "$@"; do
+    if [[ $arg != "--skip-gridargs" ]]; then
+        args+=("$arg")
     fi
 done
 
-# Run the program.
-# Don't quote $LL_WRAPPER because, if empty, it should simply vanish from the
-# command line. But DO quote "${ARGS[@]}": preserve separate args as
-# individually quoted.
-$LL_WRAPPER bin/alchemy-bin "${ARGS[@]}"
-LL_RUN_ERR=$?
-
-# Handle any resulting errors
-if [ $LL_RUN_ERR -ne 0 ]; then
-	# generic error running the binary
-	echo "*** Bad shutdown ($LL_RUN_ERR). ***"
-fi
+# A secondlife:// or x-grid-location-info:// link, which the desktop entry
+# passes, is the viewer's positional argument. $LL_WRAPPER is unquoted so it
+# vanishes when empty.
+# shellcheck disable=SC2086
+exec $LL_WRAPPER bin/alchemy-bin "${args[@]}"

@@ -46,6 +46,12 @@
 #include "SDL3/SDL.h"
 
 #include "llsdl.h"
+
+// The application ID: the Wayland app ID and X11 class, named for the desktop
+// entry. The Linux build gives each channel its own (cmake/ViewerInstall.cmake).
+#ifndef AL_VIEWER_APP_ID
+#define AL_VIEWER_APP_ID "org.alchemyviewer.viewer"
+#endif
 #include "llwindowsdl.h"
 
 #if LL_WINDOWS
@@ -410,7 +416,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     // This needs to be set as early as possible
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, LLVersionInfo::getInstance()->getChannel().c_str());
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, LLVersionInfo::getInstance()->getVersion().c_str());
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "org.alchemyviewer.viewer");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, AL_VIEWER_APP_ID);
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "Linden Research Inc");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "Copyright (c) Linden Research, Inc. 2025");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://www.secondlife.com");
