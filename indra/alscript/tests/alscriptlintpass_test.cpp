@@ -941,4 +941,67 @@ namespace tut
         ensure_equals("not SLua's, whose numbers are doubles", found("local a = 4294967296\n", "SlIntegerPast32Bits", ALScriptProblem::Severity::Warning, true),
                       std::string());
     }
+    template<> template<>
+    void object::test<25>()
+    {
+        set_test_name("SlNumberTruth beyond numbers: a uuid, a vector, a quaternion, a string, a list and an integer read as a condition, or "
+                      "under not, each fixed as LSL asked it; not a boolean, a table that is no list, nor what may be nil though typed not -- "
+                      "a table read by a key, a local declared with no value, or one given either");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local id = ll.GetOwner()\n"
+                                       "local v = ll.GetPos()\n"
+                                       "local r = ll.GetRot()\n"
+                                       "local s = ll.GetObjectName()\n"
+                                       "local l = {1, 2}\n"
+                                       "local i = 5i\n"
+                                       "if id then print(1) end\n"
+                                       "if v and s then print(2) end\n"
+                                       "while r do break end\n"
+                                       "if l then print(3) end\n"
+                                       "if i then print(4) end\n"
+                                       "print(not s, not id, not l, not (v), not r, not i)\n"
+                                       "local names: {[string]: string} = {}\n"
+                                       "local named = names[\"a\"]\n"
+                                       "if names[\"a\"] or named then print(5) end\n"
+                                       "local later: string\n"
+                                       "if later then print(later) end\n"
+                                       "local t = {a = 1}\n"
+                                       "local b = true\n"
+                                       "if t or b or ll.GetOwner() then print(t) end\n",
+                                       "SlNumberTruth", ALScriptProblem::Severity::Warning);
+        ensure_equals("each", said,
+                      std::string("6 LuauLintSlUuidTruth|id|id.istruthy\n"
+                                  "7 LuauLintSlVectorTruth|v|v ~= ZERO_VECTOR\n"
+                                  "7 LuauLintSlStringTruth|s|s ~= \"\"\n"
+                                  "8 LuauLintSlQuaternionTruth|r|r ~= ZERO_ROTATION\n"
+                                  "9 LuauLintSlListTruth|l|#l > 0\n"
+                                  "10 LuauLintSlIntegerTruth|i|i ~= 0i\n"
+                                  "11 LuauLintSlStringTruthNot|s|s == \"\"\n"
+                                  "11 LuauLintSlUuidTruthNot|id|not id.istruthy\n"
+                                  "11 LuauLintSlListTruthNot|l|#l == 0\n"
+                                  "11 LuauLintSlVectorTruthNot|(v)|(v) == ZERO_VECTOR\n"
+                                  "11 LuauLintSlQuaternionTruthNot|r|r == ZERO_ROTATION\n"
+                                  "11 LuauLintSlIntegerTruthNot|i|i == 0i\n"
+                                  "19 LuauLintSlUuidTruth|ll.GetOwner()|ll.GetOwner().istruthy\n"));
+        ensure_equals("a uuid", fixed("local id = ll.GetOwner()\nif id then print(id) end\n", "LuauLintSlUuidTruth", "Write it id.istruthy", false),
+                      std::string("local id = ll.GetOwner()\nif id.istruthy then print(id) end\n"));
+        ensure_equals("a uuid under not", fixed("if not ll.GetOwner() then print(1) end\n", "LuauLintSlUuidTruthNot", "Write it not ll.GetOwner().istruthy", false),
+                      std::string("if not ll.GetOwner().istruthy then print(1) end\n"));
+        ensure_equals("a vector", fixed("local v = ll.GetPos()\nwhile v do break end\n", "LuauLintSlVectorTruth", "Write it v ~= ZERO_VECTOR", false),
+                      std::string("local v = ll.GetPos()\nwhile v ~= ZERO_VECTOR do break end\n"));
+        ensure_equals("a quaternion", fixed("local r = ll.GetRot()\nprint(not r)\n", "LuauLintSlQuaternionTruthNot", "Write it r == ZERO_ROTATION", false),
+                      std::string("local r = ll.GetRot()\nprint(r == ZERO_ROTATION)\n"));
+        ensure_equals("a string, an if-then-else bracketed first", fixed("local c = true\nif (if c then \"a\" else \"\") then print(c) end\n",
+                                                                        "LuauLintSlStringTruth", "Write it (if c then \"a\" else \"\") ~= \"\"", false),
+                      std::string("local c = true\nif ((if c then \"a\" else \"\") ~= \"\") then print(c) end\n"));
+        ensure_equals("a list", fixed("local l = {1}\nif l then print(l) end\n", "LuauLintSlListTruth", "Write it #l > 0", false),
+                      std::string("local l = {1}\nif #l > 0 then print(l) end\n"));
+        ensure_equals("a list under not", fixed("local l = {1}\nprint(not l)\n", "LuauLintSlListTruthNot", "Write it #l == 0", false),
+                      std::string("local l = {1}\nprint(#l == 0)\n"));
+        ensure_equals("an integer", fixed("local i = 5i\nif i then print(i) end\n", "LuauLintSlIntegerTruth", "Write it i ~= 0i", false),
+                      std::string("local i = 5i\nif i ~= 0i then print(i) end\n"));
+        ensure_equals("a number read by a key: not said either", found("local counts: {[string]: number} = {}\nif counts[\"a\"] then print(1) end\n",
+                                                                          "SlNumberTruth", ALScriptProblem::Severity::Warning),
+                      std::string());
+    }
 }

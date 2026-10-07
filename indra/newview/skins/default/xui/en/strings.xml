@@ -984,6 +984,18 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlCompoundAssign">Luau's [2]= says this once: [1] [2]= ...</string>
 	<string name="LuauLintSlNumberTruth">[1] is a number, and Luau counts every number true, 0 too: [1] ~= 0 asks whether it is not 0</string>
 	<string name="LuauLintSlNumberTruthNot">not [1] is always false: [1] is a number, and Luau counts every number true, 0 too. [1] == 0 asks whether it is 0</string>
+	<string name="LuauLintSlIntegerTruth">[1] is an integer, and SLua counts every integer true, 0i too: [2] asks whether it is not 0</string>
+	<string name="LuauLintSlIntegerTruthNot">not [1] is always false: [1] is an integer, and SLua counts every integer true, 0i too. [2] asks whether it is 0</string>
+	<string name="LuauLintSlStringTruth">[1] is a string, and SLua counts every string true, "" too: [2] asks whether it is not empty</string>
+	<string name="LuauLintSlStringTruthNot">not [1] is always false: [1] is a string, and SLua counts every string true, "" too. [2] asks whether it is empty</string>
+	<string name="LuauLintSlUuidTruth">[1] is a uuid, and SLua counts every uuid true, NULL_KEY too: [2] asks whether it is not NULL_KEY</string>
+	<string name="LuauLintSlUuidTruthNot">not [1] is always false: [1] is a uuid, and SLua counts every uuid true, NULL_KEY too. [2] asks whether it is NULL_KEY</string>
+	<string name="LuauLintSlVectorTruth">[1] is a vector, and SLua counts every vector true, ZERO_VECTOR too: [2] asks whether it is not zero</string>
+	<string name="LuauLintSlVectorTruthNot">not [1] is always false: [1] is a vector, and SLua counts every vector true, ZERO_VECTOR too. [2] asks whether it is zero</string>
+	<string name="LuauLintSlQuaternionTruth">[1] is a quaternion, and SLua counts every quaternion true, ZERO_ROTATION too: [2] asks whether it is not ZERO_ROTATION</string>
+	<string name="LuauLintSlQuaternionTruthNot">not [1] is always false: [1] is a quaternion, and SLua counts every quaternion true, ZERO_ROTATION too. [2] asks whether it is ZERO_ROTATION</string>
+	<string name="LuauLintSlListTruth">[1] is a list, and SLua counts every table true, an empty one too: [2] asks whether it has anything in it</string>
+	<string name="LuauLintSlListTruthNot">not [1] is always false: [1] is a list, and SLua counts every table true, an empty one too. [2] asks whether it is empty</string>
 	<string name="LuauLintSlNilSentinel">[1] == [4] never holds: [2] answers [3] where it finds nothing, not [4]. [1] == [3] asks whether it found nothing</string>
 	<string name="LuauLintSlNilSentinelAlways">[1] ~= [4] always holds: [2] answers [3] where it finds nothing, not [4]. [1] ~= [3] asks whether it found something</string>
 	<string name="LuauLintSlNilSentinelOrder">Comparing [1] with a number is an error where [2] finds nothing: it answers nil there, not -1. [1] [5] asks the same</string>

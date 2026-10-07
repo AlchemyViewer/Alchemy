@@ -1120,9 +1120,16 @@ namespace tut
                                                      "j ..= \"y\"\n"
                                                      "local function f(p) if p then return 1 end return 0 end\n"
                                                      "if copy or s or j then print(f(n)) end\n");
-        // The new solver types j a number still, and is taken at its word.
-        ensure("a copy only: " + (given.empty() ? std::string() : given[0]),
-               given.size() == (newSolver ? 2u : 1u) && given[0] == "LuauLintSlNumberTruth copy 7");
+        // The new solver types j a number still, and s the string it was
+        // last given, which SLua counts true as it does every string, and
+        // is taken at its word.
+        std::string all;
+        for (const std::string& one : given)
+        {
+            all += one + "|";
+        }
+        ensure("a copy only: " + all, given.size() == (newSolver ? 3u : 1u) && given[0] == "LuauLintSlNumberTruth copy 7" &&
+                                          (!newSolver || (given[1] == "LuauLintSlStringTruth s 7" && given[2] == "LuauLintSlNumberTruth j 7")));
     }
 
     template<> template<>
