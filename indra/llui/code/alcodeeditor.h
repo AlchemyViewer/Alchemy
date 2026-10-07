@@ -883,6 +883,9 @@ private:
     bool              mFoldsDirty = false;
     const FoldRegion* regionStartingAt(S32 line);
     const FoldRegion* regionAround(S32 line);
+    // The block that starts at a line, of those the frame draws by
+    // (ensureRegions), looked up without the blocks being found again.
+    const FoldRegion* drawnRegionStartingAt(S32 line) const;
     // The box drawn after a folded block's first line, in local
     // coordinates, or an empty rect.
     LLRect foldBoxOf(S32 line, const LLRect& text);

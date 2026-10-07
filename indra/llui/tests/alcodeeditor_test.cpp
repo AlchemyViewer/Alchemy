@@ -3368,4 +3368,35 @@ namespace tut
         e.handleMouseUp(fold_x, y, MASK_NONE);
         ensure("the header's block folded", e.isFolded(2) && !e.isFolded(hidden));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<90>()
+    {
+        set_test_name("a folded script edited so that every line after the edit starts otherwise: the folds settled once it is lexed to its end, a "
+                      "slice a frame, not the whole of it lexed in the frame of the edit");
+        std::string text = "default\n{\n    state_entry()\n    {\n        integer x = 1;\n    }\n";
+        for (S32 i = 0; i < 3000; ++i)
+        {
+            text += "    integer y = 2;\n";
+        }
+        text += "}\n";
+        ALCodeEditor& e = make("");
+        e.setText(text);
+        const S32 last = e.document().lineCount() - 1;
+        e.setCaret(ALTextPos(0, 0));
+        ensure("folds", e.foldAt(2));
+        ensure("its lines hidden", e.layout().hidden(3) && e.layout().hidden(5) && !e.layout().hidden(6));
+
+        // A string opened at the top runs on to the end: every line after
+        // it starts in it, and the block is gone.
+        e.document().insert(ALTextPos(0, 0), "\"");
+        e.pump();
+        e.highlighter().tokens(last);
+        ensure("the frame after the edit left most of the text to lex: " + std::to_string(e.highlighter().lastLexed()) + " of " +
+                   std::to_string(last + 1),
+               e.highlighter().lastLexed() > last / 2);
+        ensure("the fold as the edit left it meanwhile", e.isFolded(2) && e.layout().hidden(3));
+        e.pump();
+        ensure("lexed to its end, the next frame lets go of the fold whose block went", !e.isFolded(2) && !e.layout().anyHidden());
+    }
 }

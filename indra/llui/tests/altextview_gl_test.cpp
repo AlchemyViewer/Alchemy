@@ -902,4 +902,52 @@ namespace tut
                every_line == one_line);
         view->die();
     }
+
+    // The blocks the gutter draws its markers by are found again once the
+    // text is lexed to its end: an edit that changes how every line after
+    // it starts -- a string left open at the top -- has the lines in sight
+    // lexed in the frame after it, and of the rest a slice, not the whole.
+    template<> template<>
+    void altextview_gl_object::test<13>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::string text = "default\n{\n";
+        for (S32 i = 0; i < 3000; ++i)
+        {
+            text += "    integer x = 1;\n";
+        }
+        text += "}\n";
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name              = "editor";
+        p.rect              = LLRect(0, H, W, 0);
+        p.syntax            = "lsl";
+        p.show_fold_markers = true;
+        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        editor->setFont(LLFontGL::getFontMonospace());
+        editor->setText(text);
+        const S32  last  = editor->document().lineCount() - 1;
+        const auto frame = [&]() {
+            gl().clearFramebuffer();
+            editor->draw();
+            gGL.flush();
+            glFinish();
+        };
+        editor->highlighter().tokens(last);
+        frame();
+        ensure_equals("the block", editor->foldRegions().size(), size_t(1));
+
+        editor->document().insert(ALTextPos(0, 0), "\"");
+        frame();
+        editor->highlighter().tokens(last);
+        ensure("the frame after the edit left most of the text to lex: " + std::to_string(editor->highlighter().lastLexed()) + " of " +
+                   std::to_string(last + 1),
+               editor->highlighter().lastLexed() > last / 2);
+        frame();
+        ensure("lexed to its end: the block gone", editor->foldRegions().empty());
+        editor->die();
+    }
 }

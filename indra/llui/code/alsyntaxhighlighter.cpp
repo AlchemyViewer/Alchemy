@@ -193,6 +193,17 @@ void ALSyntaxHighlighter::onEdit(const ALTextDocument::Edit& edit)
 
 void ALSyntaxHighlighter::ensure(S32 line)
 {
+    lex(line, S32_MAX);
+}
+
+bool ALSyntaxHighlighter::lexSome(S32 most)
+{
+    lex(static_cast<S32>(mLines.size()) - 1, most);
+    return !mDocument || !mGrammar || mFirstDirty >= static_cast<S32>(mLines.size());
+}
+
+void ALSyntaxHighlighter::lex(S32 line, S32 most)
+{
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     mLastLexed = 0;
     if (!mDocument || !mGrammar || mLines.empty())
@@ -207,8 +218,11 @@ void ALSyntaxHighlighter::ensure(S32 line)
     compactStates();
     std::vector<ALSyntaxToken> fresh;
     // Each line starts in the state the one before ends in, by number: a
-    // copy of it only for a line lexed anew.
-    for (S32 i = mFirstDirty; i <= line; ++i)
+    // copy of it only for a line lexed anew. A line that lexes as it did
+    // costs nothing against `most`: the stop is at the first that would
+    // be lexed past it.
+    S32 i = mFirstDirty;
+    for (; i <= line; ++i)
     {
         Line&     entry = mLines[i];
         const U32 start = (i == 0) ? mInitialState : mLines[i - 1].end;
@@ -216,6 +230,10 @@ void ALSyntaxHighlighter::ensure(S32 line)
         {
             // Lexes as it did.
             continue;
+        }
+        if (mLastLexed >= most)
+        {
+            break;
         }
         ALSyntaxState state = mStates[start];
         mGrammar->lexLine(mDocument->line(i), state, fresh, *mWords);
@@ -229,7 +247,7 @@ void ALSyntaxHighlighter::ensure(S32 line)
         entry.end   = intern(std::move(state));
         entry.valid = true;
     }
-    mFirstDirty = line + 1;
+    mFirstDirty = i;
 }
 
 const std::vector<ALSyntaxToken>& ALSyntaxHighlighter::tokens(S32 line)

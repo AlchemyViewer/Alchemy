@@ -878,13 +878,9 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     const LLColor4  fold    = foldColor() % alpha;
     const LLColor4  changed = changedColor() % alpha;
     const S32       caret_line = caret().line;
-    if (mShowFoldMarkers)
-    {
-        ensureRegions();
-    }
     // The block under the mouse in the fold column shows how far it
     // runs: a line down the column from its first row to its last.
-    const FoldRegion* shown = mShowFoldMarkers && mGutterHover && mGutterHoverLine >= 0 ? regionStartingAt(mGutterHoverLine) : nullptr;
+    const FoldRegion* shown = mShowFoldMarkers && mGutterHover && mGutterHoverLine >= 0 ? drawnRegionStartingAt(mGutterHoverLine) : nullptr;
     S32               guide_top = 0, guide_bottom = 0;
     // The numbers are placed as they come and drawn together after the
     // rest, one call for all of them rather than one for each.
@@ -1012,7 +1008,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         // A marker at a block's first line: pointing right at a folded
         // one, always; pointing down at an open one, while the mouse is
         // over the gutter, so that the gutter is quiet otherwise.
-        const bool marker = mShowFoldMarkers && regionStartingAt(line) && (isFolded(line) || mGutterHover);
+        const bool marker = mShowFoldMarkers && drawnRegionStartingAt(line) && (isFolded(line) || mGutterHover);
         if (!mShowLineNumbers && !marker && mShowFoldMarkers)
         {
             // Without the numbers there is no mark column: the host's sign
@@ -1564,6 +1560,12 @@ void ALCodeEditor::drawBeforeRows(const LLRect& text)
         LLLocalClipRect clip(text);
         gl_rect_2d(text.mLeft, top, text.mRight, top - layout().rowHeight(), currentLineColor() % alpha);
     }
+    // The blocks this frame draws by: the gutter's markers, and the box
+    // after a folded block's first line.
+    if (mShowFoldMarkers || !mFolds.folded().empty())
+    {
+        ensureRegions();
+    }
     drawGutter(text, alpha);
 }
 
@@ -1613,7 +1615,7 @@ LLRect ALCodeEditor::noteBoxOf(S32 line, const LLRect& text)
 // What a folded block's box says: how many lines are folded away.
 std::string ALCodeEditor::foldBoxText(S32 line)
 {
-    const FoldRegion* region = regionStartingAt(line);
+    const FoldRegion* region = drawnRegionStartingAt(line);
     const S32         hidden = region ? region->end - region->start : 0;
     return hidden > 0 ? "... " + std::to_string(hidden) : std::string("...");
 }
@@ -1977,7 +1979,23 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
 
 void ALCodeEditor::ensureRegions()
 {
-    folds().regions(document(), getTabWidth());
+    // Found again once every line is lexed, a slice more of the text lexed
+    // each frame until it is, and drawn as last found meanwhile: an edit
+    // that changes how every line after it starts -- a quote or a comment
+    // left open -- would have the whole text lexed in the frame after it
+    // to find them.
+    ALFoldModel& model = folds();
+    if (!model.hasSyntax() || highlighter().lexSome())
+    {
+        model.regions(document(), getTabWidth());
+    }
+}
+
+const ALCodeEditor::FoldRegion* ALCodeEditor::drawnRegionStartingAt(S32 line) const
+{
+    const std::vector<FoldRegion>& drawn = mFolds.lastFound();
+    const auto it = std::lower_bound(drawn.begin(), drawn.end(), line, [](const FoldRegion& region, S32 l) { return region.start < l; });
+    return (it != drawn.end() && it->start == line) ? &*it : nullptr;
 }
 
 const std::vector<ALCodeEditor::FoldRegion>& ALCodeEditor::foldRegions()
@@ -2012,7 +2030,10 @@ bool ALCodeEditor::isFolded(S32 line) const
 
 void ALCodeEditor::settleFolds()
 {
-    if (mFoldsDirty)
+    // Once every line is lexed, as the gutter's blocks are found
+    // (ensureRegions): until then what the folds hide stays as the edits
+    // moved it, and the next frame asks again.
+    if (mFoldsDirty && (!folds().hasSyntax() || highlighter().lexSome()))
     {
         applyFolds();
     }

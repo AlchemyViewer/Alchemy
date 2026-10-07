@@ -89,6 +89,7 @@ public:
     // moves when they may have -- its tokens' -- so that a line is asked
     // again only then. None: blocks by indentation.
     void setSyntax(blocks_t blocks, revision_t revision);
+    bool hasSyntax() const { return static_cast<bool>(mBlocks); }
     // The line comment the text is written with, whose `#region` and
     // `#endregion` fold what is between them.
     void setLineComment(std::string token);
@@ -98,6 +99,10 @@ public:
     // wide as `tab_width` says.
     const std::vector<Region>& regions(const ALTextDocument& doc, S32 tab_width);
     void                       invalidate() { mValid = false; }
+    // The blocks as last found, not found again: what a view draws while
+    // the syntax they are found by is still being worked out down the
+    // text, which finding them now would work out all at once.
+    const std::vector<Region>& lastFound() const { return mRegions; }
     // The block that starts at a line; and the innermost one around it --
     // of those that hold it, the one that starts last.
     const Region* startingAt(const ALTextDocument& doc, S32 tab_width, S32 line);
