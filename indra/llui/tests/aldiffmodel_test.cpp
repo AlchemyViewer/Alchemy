@@ -342,6 +342,18 @@ namespace tut
         m.setFoldOpen(0, true);
         m.setSwapped(true);
         ensure("swapped, open still", m.foldCount() == 1 && m.foldOpen(0));
+
+        // Two lines put in before the run: it hides the left's lines from 3
+        // and the right's from 5, and is open still whichever side each is
+        // shown on.
+        m.setSwapped(false);
+        m.setTexts(lines(30).c_str(), ("new 0\nnew 1\n" + lines(30, { { 27, "line 27 changed" } })).c_str());
+        ensure("the run's first lines the left's 3 and the right's 5", m.foldCount() == 1 && m.foldFirstLine(Column::Left, 0) == 3 && m.foldFirstLine(Column::Right, 0) == 5);
+        m.setFoldOpen(0, true);
+        m.setSwapped(true);
+        ensure("lines put in before it: swapped, open still", m.foldCount() == 1 && m.foldOpen(0));
+        m.setSwapped(false);
+        ensure("and swapped back", m.foldCount() == 1 && m.foldOpen(0));
     }
 
     template<> template<>
@@ -1801,5 +1813,32 @@ namespace tut
         m.setFoldOpen(0, true);
         m.setLeftText(lines(40, { { 2, "two" }, { 20, "twenty!" }, { 37, "thirty-seven" } }));
         ensure("ranges let go of: the first open still, the second folded", m.ranges().empty() && m.foldCount() == 2 && m.foldOpen(0) && !m.foldOpen(1));
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<42>()
+    {
+        set_test_name("pairs that line the texts up otherwise: a run opened stays open where it hides the same first line of the right, though there are fewer runs now, and more again after");
+        // Twenty lines the same, then ten that went from before thirty more
+        // to after them: by lines the thirty kept, the ten taken out and put
+        // in; paired, the ten kept, the thirty taken out and put in.
+        const auto block = [](const char* said, S32 count) {
+            std::string out;
+            for (S32 n = 0; n < count; ++n)
+            {
+                out += said + std::to_string(n) + "\n";
+            }
+            return out;
+        };
+        const std::string same  = block("same ", 20);
+        const std::string moved = block("moved ", 10);
+        const std::string rest  = block("rest ", 30);
+        m.setTexts(same + moved + rest + "end", same + rest + moved + "end");
+        ensure_equals("by lines: the twenty folded, and the thirty", m.foldCount(), 2);
+        m.setFoldOpen(0, true);
+        ensure("paired: laid out again", m.setPairs({ { 20, 29, 50, 59 } }));
+        ensure("the thirty a change now, the ten too few to fold: the twenty alone, open still", m.foldCount() == 1 && m.foldOpen(0));
+        ensure("unpaired: laid out again", m.setPairs({}));
+        ensure("two runs again: the twenty open still, the thirty folded", m.foldCount() == 2 && m.foldOpen(0) && !m.foldOpen(1));
     }
 }

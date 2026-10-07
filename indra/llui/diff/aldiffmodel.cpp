@@ -119,7 +119,7 @@ bool ALDiffModel::setPairs(ALTextDiff::ranges_t pairs)
     {
         return false;
     }
-    build(foldsOpen());
+    rebuild();
     return true;
 }
 
@@ -282,7 +282,7 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, cons
         edited.was[1 - shown]   = static_cast<S32>(other.size());
         readTokens(&again.runs, &edited);
     }
-    layout(options, {}, &again);
+    layout(options, &again);
 }
 
 std::vector<std::pair<S32, size_t>> ALDiffModel::readFrom(size_t side, S32 from, bool every) const
@@ -349,12 +349,25 @@ void ALDiffModel::reopen(const std::vector<S32>& opened)
     }
 }
 
+void ALDiffModel::rebuild()
+{
+    // The runs may be others now, but one hiding the same first line of
+    // the right as one the reader opened is the same to the reader: open.
+    const std::vector<S32> opened = openedLines();
+    build();
+    reopen(opened);
+}
+
 void ALDiffModel::setSwapped(bool swapped)
 {
     if (mSwapped != swapped)
     {
-        mSwapped = swapped;
-        build(foldsOpen());
+        // The runs open read from the column the right is shown in, before
+        // the swap moves it to the other.
+        const std::vector<S32> opened = openedLines();
+        mSwapped                      = swapped;
+        build();
+        reopen(opened);
     }
 }
 
@@ -362,28 +375,22 @@ void ALDiffModel::setLikeness(const ALTextDiff::Likeness& like)
 {
     mOptions.like = like;
     refreshMerge();
-    // The runs are others now, but one hiding the same first line of the
-    // right as one the reader opened is the same to the reader: open.
-    const std::vector<S32> opened = openedLines();
-    build();
-    reopen(opened);
+    rebuild();
 }
 
 void ALDiffModel::setSame(ALTextDiff::same_t same)
 {
     mOptions.same = std::move(same);
-    build(foldsOpen());
+    rebuild();
 }
 
 void ALDiffModel::setAlgorithm(ALTextDiff::Algorithm algorithm)
 {
     if (mOptions.algorithm != algorithm)
     {
-        mOptions.algorithm            = algorithm;
+        mOptions.algorithm = algorithm;
         refreshMerge();
-        const std::vector<S32> opened = openedLines();
-        build();
-        reopen(opened);
+        rebuild();
     }
 }
 
@@ -400,7 +407,7 @@ void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t mergin
         return;
     }
     refreshMerge();
-    build(foldsOpen());
+    rebuild();
 }
 
 void ALDiffModel::refreshMerge()
@@ -493,7 +500,7 @@ std::pair<ALDiffModel::line_regions_t, ALDiffModel::line_regions_t> ALDiffModel:
     return *mRegions;
 }
 
-void ALDiffModel::build(const std::vector<bool>& open)
+void ALDiffModel::build()
 {
     mRegions.reset();
     const std::vector<std::string>& left    = shownLeft();
@@ -508,7 +515,7 @@ void ALDiffModel::build(const std::vector<bool>& open)
     if (options.algorithm != ALTextDiff::Algorithm::Structural)
     {
         mRuns = ALTextDiff::lines(left, right, options);
-        layout(options, open);
+        layout(options);
         return;
     }
     // By structure: the lines' runs, then their changes read as tokens.
@@ -516,7 +523,7 @@ void ALDiffModel::build(const std::vector<bool>& open)
     by_lines.algorithm           = ALTextDiff::Algorithm::Histogram;
     mRuns                        = ALTextDiff::lines(left, right, by_lines);
     readTokens();
-    layout(options, open);
+    layout(options);
 }
 
 void ALDiffModel::readTokens(const std::vector<ALTextDiff::Run>* was, const ALStructuralDiff::Edited* edited)
@@ -549,7 +556,7 @@ void ALDiffModel::readTokens(const std::vector<ALTextDiff::Run>* was, const ALSt
     mByTokens[1] = std::move(by_tokens.rightByTokens);
 }
 
-void ALDiffModel::layout(const ALTextDiff::Options& options, const std::vector<bool>& open, const Relayout* again)
+void ALDiffModel::layout(const ALTextDiff::Options& options, const Relayout* again)
 {
     ++mLayouts;
     // What is shown on the left and on the right: the texts as given, or
@@ -1111,13 +1118,6 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const std::vector<b
             {
                 mInlineOf[side][static_cast<size_t>(by_row[row])] = column.lineOf[row];
             }
-        }
-    }
-    if (open.size() == folds.size())
-    {
-        for (size_t n = 0; n < folds.size(); ++n)
-        {
-            folds[n].open = open[n];
         }
     }
     mFolds = std::move(folds);
@@ -1801,17 +1801,6 @@ bool ALDiffModel::foldOpen(S32 fold) const
 void ALDiffModel::setFoldOpen(S32 fold, bool open)
 {
     mFolds[static_cast<size_t>(fold)].open = open;
-}
-
-std::vector<bool> ALDiffModel::foldsOpen() const
-{
-    std::vector<bool> open;
-    open.reserve(mFolds.size());
-    for (const Fold& fold : mFolds)
-    {
-        open.push_back(fold.open);
-    }
-    return open;
 }
 
 S32 ALDiffModel::foldLines(S32 fold) const
