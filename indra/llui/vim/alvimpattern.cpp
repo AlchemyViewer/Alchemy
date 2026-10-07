@@ -32,6 +32,84 @@
 
 #include <algorithm>
 
+namespace
+{
+    // Whether a pattern has a capital in it, as vim's smartcase asks
+    // (pat_has_uppercase): one after a backslash is no capital -- \S, \V,
+    // and \_S and \%V with the character after their _ or % -- nor in a
+    // very magic pattern one after a bare % or _, where a backslash is no
+    // more than itself. How magic the pattern is goes by the last \v or \V
+    // in it outside a bracket expression, as vim measures it for this.
+    bool hasCapital(const std::string& vim)
+    {
+        enum class Magic : U8
+        {
+            On,
+            Very,
+            None
+        };
+        Magic magic = Magic::On;
+        for (size_t i = 0; i < vim.size(); ++i)
+        {
+            if ((vim[i] == '[' && magic != Magic::None) || (vim[i] == '\\' && i + 1 < vim.size() && vim[i + 1] == '[' && magic == Magic::None))
+            {
+                // Through to the bracket's close; an unclosed one runs on to
+                // the end.
+                size_t j = vim[i] == '[' ? i + 1 : i + 2;
+                if (j < vim.size() && vim[j] == '^')
+                {
+                    ++j;
+                }
+                if (j < vim.size() && vim[j] == ']')
+                {
+                    ++j;
+                }
+                while (j < vim.size() && vim[j] != ']')
+                {
+                    j += (vim[j] == '\\' && j + 1 < vim.size()) ? 2u : 1u;
+                }
+                i = j;
+            }
+            else if (vim[i] == '\\' && i + 1 < vim.size())
+            {
+                ++i;
+                magic = vim[i] == 'v' ? Magic::Very : vim[i] == 'V' ? Magic::None : magic;
+            }
+        }
+        for (size_t i = 0; i < vim.size();)
+        {
+            const unsigned char c = static_cast<unsigned char>(vim[i]);
+            if (c >= 0x80)
+            {
+                const LLCodepointAt cp = utf8str_decode_at(vim, i);
+                if (cp.next > i + 1 && LLStringOps::isUpper(cp.cp))
+                {
+                    return true;
+                }
+                i = llmax(cp.next, i + 1);
+            }
+            else if (c == '\\' && magic != Magic::Very)
+            {
+                const bool two = i + 2 < vim.size() && (vim[i + 1] == '_' || vim[i + 1] == '%');
+                i += two ? 3u : (i + 1 < vim.size() ? 2u : 1u);
+            }
+            else if ((c == '%' || c == '_') && magic == Magic::Very)
+            {
+                i += i + 1 < vim.size() ? 2u : 1u;
+            }
+            else if (c >= 'A' && c <= 'Z')
+            {
+                return true;
+            }
+            else
+            {
+                ++i;
+            }
+        }
+        return false;
+    }
+}
+
 // static
 ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_replacement, const Case& case_rules, std::optional<bool> force_case)
 {
@@ -717,7 +795,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     }
     else if (case_rules.ignore)
     {
-        out.caseSensitive = case_rules.smart && std::any_of(vim.begin(), vim.end(), [](char c) { return c >= 'A' && c <= 'Z'; });
+        out.caseSensitive = case_rules.smart && hasCapital(vim);
     }
     else
     {

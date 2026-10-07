@@ -209,4 +209,24 @@ namespace tut
         ensure_equals("not ahead, very magic", found("foobar foobaz", ALVimPattern::of("\\vfoo(bar)@!", std::string(), plain)), std::string("foo"));
         ensure_equals("never given back", found("aaab", ALVimPattern::of("\\(a*\\)\\@>ab", std::string(), plain)), std::string());
     }
+
+    template<> template<>
+    void alvimpattern_object::test<9>()
+    {
+        set_test_name("smartcase passes over the letter after a backslash, as vim's does, but not in very magic, and counts a capital past ASCII");
+        ALVimPattern::Case smart;
+        smart.ignore = true;
+        smart.smart  = true;
+        ensure("\\S is no capital", !ALVimPattern::of("foo\\S", std::string(), smart).caseSensitive);
+        ensure("nor \\V", !ALVimPattern::of("\\Vfoo", std::string(), smart).caseSensitive);
+        ensure("nor the V of \\%V", !ALVimPattern::of("foo\\%V", std::string(), smart).caseSensitive);
+        ensure("nor the S of \\_S", !ALVimPattern::of("foo\\_S", std::string(), smart).caseSensitive);
+        ensure("nor what ~ puts in", !ALVimPattern::of("~", std::string("ABC"), smart).caseSensitive);
+        ensure("but very magic's \\S is", ALVimPattern::of("\\vfoo\\S", std::string(), smart).caseSensitive);
+        ensure("and a capital in a bracket", ALVimPattern::of("foo[A]", std::string(), smart).caseSensitive);
+        ensure("and in \\%[]", ALVimPattern::of("foo\\%[AB]", std::string(), smart).caseSensitive);
+        ensure("and one past ASCII", ALVimPattern::of("\xC3\x89" "a", std::string(), smart).caseSensitive);
+        ensure("but not a small one", !ALVimPattern::of("\xC3\xA9" "a", std::string(), smart).caseSensitive);
+        ensure_equals("found without regard to case", found("FOO1 foo1", ALVimPattern::of("foo\\S", std::string(), smart)), std::string("FOO1|foo1"));
+    }
 }
