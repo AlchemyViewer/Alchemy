@@ -24,6 +24,7 @@
 
 #include "linden_common.h"
 
+#include "alfindbar.h"
 #include "aloutputview.h"
 
 #include "../llfocusmgr.h"
@@ -396,5 +397,23 @@ namespace tut
         v.append(plain);
         v.setFilter(nullptr);
         ensure_equals("counted out of sight too", v.document().line(4), std::string("[12:00:00] Thing (\xC3\x97" "3): plain"));
+    }
+
+    template<> template<>
+    void aloutputview_object::test<10>()
+    {
+        set_test_name("the find bar over a log finds what it takes after it looked, and what a filter shows again");
+        ALOutputView& v = make(10);
+        v.append(entry("", "needle one"));
+        v.showFind(false);
+        v.findBar()->setQuery("needle");
+        ensure_equals("one", v.findMatches().size(), size_t(1));
+        v.append(entry("", "needle two"));
+        v.append(entry("", "hay"));
+        ensure_equals("the one taken after it looked, found", v.findMatches().size(), size_t(2));
+        v.setFilter([](const ALOutputView::Entry& e) { return e.text != "needle one"; });
+        ensure_equals("filtered out, not found", v.findMatches().size(), size_t(1));
+        v.setFilter(nullptr);
+        ensure_equals("shown again, found again", v.findMatches().size(), size_t(2));
     }
 }

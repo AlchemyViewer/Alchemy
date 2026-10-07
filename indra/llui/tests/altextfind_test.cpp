@@ -146,4 +146,30 @@ namespace tut
         ensure("looked for again", find.collect(doc, ALTextRange(), true) && !find.isStale());
         ensure("the one typed meanwhile among them", !find.matches().empty() && find.matches()[0] == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 8)));
     }
+
+    template<> template<>
+    void altextfind_object::test<5>()
+    {
+        set_test_name("a text that changes too often to settle -- a log taking entries -- is looked through again all the same, once it has waited long enough");
+        ALTextFind find;
+        LLFrameTimer::updateFrameTime();
+        find.stale();
+        ensure("not at the change", !find.due());
+        // A change every 20 ms, well within the settle, for up to 2 s.
+        bool due = false;
+        for (S32 step = 0; step < 100 && !due; ++step)
+        {
+            ms_sleep(20);
+            LLFrameTimer::updateFrameTime();
+            find.stale();
+            due = find.due();
+        }
+        ensure("due though it never settled", due);
+
+        // Looked through, the wait starts again at the next change.
+        const ALTextDocument doc("x");
+        find.search(doc, "x", ALTextSearchOptions(), false, ALTextRange());
+        find.stale();
+        ensure("not due at the next change", !find.due());
+    }
 }

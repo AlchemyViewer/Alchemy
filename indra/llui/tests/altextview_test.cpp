@@ -3036,4 +3036,21 @@ namespace tut
         ensure_equals("one step back", v.text(), std::string("if x then\n    y()\n    end"));
         ensure("where Return was pressed, and nothing before it", v.caret() == ALTextPos(2, 7) && !v.canPerform(ALEditorCommand::Undo));
     }
+
+    template<> template<>
+    void altextview_object::test<96>()
+    {
+        set_test_name("the find bar looks through the text again however it changed: put in whole, replaced by its host, added to at its end");
+        ALTextView& v = make("one two one\n");
+        v.showFind(false);
+        v.findBar()->setQuery("one");
+        ensure_equals("two", v.findMatches().size(), size_t(2));
+        v.setText("one one one\none\n");
+        ensure_equals("put in whole: every one of the new text", v.findMatches().size(), size_t(4));
+        v.replaceText(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 3)), "one one");
+        ensure_equals("replaced by its host", v.findMatches().size(), size_t(5));
+        v.document().append("\none");
+        ensure_equals("added to at its end", v.findMatches().size(), size_t(6));
+        ensure_equals("and said", v.findBar()->countSaid(), std::string("6"));
+    }
 }

@@ -2276,8 +2276,14 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
         }
     }
     // What the find bar found slides with the text, and so do the carets
-    // besides the main one.
+    // besides the main one. The bar looks through the text again once it
+    // settles, whoever changed it: an edit command, the host putting text
+    // in, a log taking an entry.
     mFind.edited(edit);
+    if (findShown())
+    {
+        mFind.stale();
+    }
     mCarets.apply(edit);
     // And the main one as they do, for an edit a host makes to the document
     // itself; an edit made through the view puts it after. Moved, it is out
@@ -2612,7 +2618,6 @@ void ALTextView::afterEdit()
     scrollToCaret();
     if (findShown())
     {
-        mFind.stale();
         mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error(), mFind.capped());
     }
     mChanged();
@@ -4726,14 +4731,6 @@ void ALTextView::queryChanged()
         return;
     }
     refreshFind();
-}
-
-void ALTextView::findChanged()
-{
-    if (findShown())
-    {
-        mFind.stale();
-    }
 }
 
 void ALTextView::refreshFind()

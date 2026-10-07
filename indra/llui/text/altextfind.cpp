@@ -178,6 +178,10 @@ void ALTextFind::edited(const ALTextDocument::Edit& edit)
 
 void ALTextFind::stale()
 {
+    if (!mStale)
+    {
+        mStaleFor.reset();
+    }
     mStale = true;
     mSettle.reset();
 }
@@ -185,7 +189,11 @@ void ALTextFind::stale()
 bool ALTextFind::due() const
 {
     constexpr F32 SETTLE = 0.2f;
-    return mStale && mSettle.getElapsedTimeF32() >= SETTLE;
+    // No longer than this between looks however often the text changes: a
+    // log taking entries faster than it settles is looked through all the
+    // same.
+    constexpr F32 LONGEST = 1.f;
+    return mStale && (mSettle.getElapsedTimeF32() >= SETTLE || mStaleFor.getElapsedTimeF32() >= LONGEST);
 }
 
 S32 ALTextFind::nearest(const ALTextPos& from, bool forward) const

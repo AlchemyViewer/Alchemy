@@ -939,9 +939,6 @@ protected:
     // is brought into sight: whatever a subclass left for after its edits,
     // done once rather than at each.
     virtual void editsDone() {}
-    // The text changed other than by an edit command -- a log laid out
-    // again -- so that the find bar looks for its query again.
-    void         findChanged();
     virtual void drawBeforeRows(const LLRect& text) {}
     virtual void drawRowExtras(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha) {}
     // Over every row, still clipped to the text: what floats above the
