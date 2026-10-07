@@ -86,6 +86,10 @@
     <menu_item_call.on_enable function="Explorer.Enable" parameter="stop" />
   </menu_item_call>
   <menu_item_separator layout="topleft" />
+  <menu_item_call label="Link Scripts to Files..." layout="topleft" name="link_scripts">
+    <menu_item_call.on_click function="Explorer.Action" parameter="link_scripts" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="link_scripts" />
+  </menu_item_call>
   <menu_item_call label="Send from Files" layout="topleft" name="send_from_files">
     <menu_item_call.on_click function="Explorer.Action" parameter="send_from_files" />
     <menu_item_call.on_enable function="Explorer.Enable" parameter="send_from_files" />

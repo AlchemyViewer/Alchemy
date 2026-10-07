@@ -774,6 +774,9 @@ void ALFloaterScriptStudio::findPanes()
     mWeightsStrings = mWeightsPane->stringsList();
     mInspectorPane = getChild<ALScriptInspectorPane>("inspector_pane");
     mExplorerPane  = getChild<ALScriptExplorerPane>("explorer_pane");
+    // Out of the way until the Explorer asks for it.
+    mLinkPane      = getChild<ALScriptLinkPane>("link_tab");
+    mBottomTabs->setTabVisibility(mLinkPane, false);
     mCompileTarget = getChild<LLComboBox>("compile_target");
     mRunning       = getChild<LLCheckBoxCtrl>("running");
     mExperience    = getChild<LLComboBox>("experience");
@@ -5800,6 +5803,7 @@ void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)
                      : name == "references_tab" ? static_cast<LLUICtrl*>(mReferencesPane->list())
                      : name == "output_tab"     ? static_cast<LLUICtrl*>(mOutputPane->view())
                      : name == "weights_tab"    ? static_cast<LLUICtrl*>(mWeightsParts)
+                     : name == "link_tab"       ? static_cast<LLUICtrl*>(mLinkPane->list())
                                                 : nullptr;
     if (list)
     {
@@ -6164,6 +6168,22 @@ void ALFloaterScriptStudio::objectChecked(const ALScriptObjectCheck::Done& done)
         said = sentences(said, counted("LookupUnread", static_cast<S32>(done.unread.size()), { { "[NAMES]", listed(done.unread) } }));
     }
     report(said, mCheckedErrors > 0 || done.unlisted > 0 || !done.unread.empty());
+}
+
+void ALFloaterScriptStudio::linkScripts(std::vector<ALScriptLinkScripts::Prim> prims)
+{
+    mBottomTabs->setTabVisibility(mLinkPane, true);
+    showBottom("link_tab", true);
+    mLinkPane->gather(std::move(prims));
+}
+
+void ALFloaterScriptStudio::linkPaneDone(bool linked)
+{
+    mBottomTabs->setTabVisibility(mLinkPane, false);
+    if (linked)
+    {
+        showBottom("output_tab");
+    }
 }
 
 void ALFloaterScriptStudio::recompileScripts(std::vector<ALScriptRecompile::One> scripts, std::vector<std::pair<LLUUID, std::string>> prims,
@@ -10189,7 +10209,8 @@ void ALFloaterScriptStudio::writeSharedState(LLSD& state) const
     {
         mSearchPane->saveState(state);
     }
-    if (mBottomTabs && mBottomTabs->getCurrentPanel())
+    // Not the Link tab, which is hidden again as the window opens.
+    if (mBottomTabs && mBottomTabs->getCurrentPanel() && mBottomTabs->getCurrentPanel() != mLinkPane)
     {
         state["bottom_tab"] = mBottomTabs->getCurrentPanel()->getName();
     }

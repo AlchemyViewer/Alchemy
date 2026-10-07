@@ -905,6 +905,11 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
     {
         return !rows.empty();
     }
+    if (action == "link_scripts")
+    {
+        // An object or a prim, in sight, which may be changed.
+        return any([&](const Choice& row) { return !row.isItem() && present(row) && changeable(row); });
+    }
     if (action == "send_from_files")
     {
         // A script linked to a file, or an object or a prim holding one:
@@ -1119,9 +1124,42 @@ void ALScriptExplorerPane::act(const std::string& action)
     {
         mWindow->checkScripts(rows.front().root);
     }
+    else if (action == "link_scripts")
+    {
+        linkScripts(rows);
+    }
     else if (action == "send_from_files")
     {
         sendFromFiles(rows);
+    }
+}
+
+void ALScriptExplorerPane::linkScripts(const std::vector<Choice>& rows)
+{
+    // Every prim of each object chosen, and each prim chosen, once, with
+    // what its object is called and where it is in words.
+    std::vector<ALScriptLinkScripts::Prim> prims;
+    boost::unordered_flat_set<LLUUID>     taken;
+    for (const Choice& row : rows)
+    {
+        if (row.isItem())
+        {
+            continue;
+        }
+        for (const auto& [prim, name] : mModel.containerPrims({ row }))
+        {
+            if (taken.insert(prim).second)
+            {
+                Choice at;
+                at.root = row.root;
+                at.prim = prim;
+                prims.push_back({ prim, row.root, mModel.nameOf(row.root), mModel.placeOf(at) });
+            }
+        }
+    }
+    if (!prims.empty())
+    {
+        mWindow->linkScripts(std::move(prims));
     }
 }
 

@@ -198,6 +198,8 @@ if(AL_BUILD_VIEWER)
     alpanelscriptaliases.cpp
     alpanelscriptkeymap.cpp
     alscriptlinkbadges.cpp
+    alscriptlinkpane.cpp
+    alscriptlinkscripts.cpp
     alscriptlookup.cpp
     alscriptmasterfanout.cpp
     alscriptmastertoasts.cpp
@@ -1057,6 +1059,8 @@ if(AL_BUILD_VIEWER)
     alpanelscriptaliases.h
     alpanelscriptkeymap.h
     alscriptlinkbadges.h
+    alscriptlinkpane.h
+    alscriptlinkscripts.h
     alscriptlookup.h
     alscriptobjectcheck.h
     alscriptrecompile.h

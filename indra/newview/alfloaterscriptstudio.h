@@ -26,6 +26,7 @@
 
 #include "alcodeeditor.h"
 #include "alscriptexplorerpane.h"
+#include "alscriptlinkpane.h"
 #include "alnotecardembedded.h"
 #include "alscriptoutputpane.h"
 #include "alscriptproblemspane.h"
@@ -139,7 +140,8 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptObjectCheck::Window, public ALScriptRecompile::Window, public ALScriptStudioHistory::Window,
                                     public ALScriptStudioCompareWith::Window, public ALScriptStudioMerging::Window,
                                     public ALScriptStudioSelections::Window, public ALScriptStudioExpandedCompare::Window,
-                                    public ALScriptStudioComparePairs::Window, public ALScriptStudioMasters::Window
+                                    public ALScriptStudioComparePairs::Window, public ALScriptStudioMasters::Window,
+                                    public ALScriptLinkPane::Window
 {
     friend class LLFloaterReg;
 
@@ -998,6 +1000,11 @@ private:
     void showExplorer() override;
     void explorerPinsChanged() override { saveState(); }
     void checkScripts(const LLUUID& root) override { checkObject(root); }
+    // The Link tab shown, listing the scripts of the prims with a file
+    // proposed for each; and hidden again once it is done with
+    // (ALScriptLinkPane::Window), Output shown where it said what it linked.
+    void linkScripts(std::vector<ALScriptLinkScripts::Prim> prims) override;
+    void linkPaneDone(bool linked) override;
     void itemRenamed(const ALScriptRef& ref, const std::string& name) override;
     void itemDeleted(const ALScriptRef& ref) override;
     bool unsavedAnywhere(const ALScriptRef& ref) const override;
@@ -1337,6 +1344,8 @@ private:
     ALPaneList*                        mWeightsParts      = nullptr;
     ALPaneList*                        mWeightsStrings    = nullptr;
     ALScriptExplorerPane*              mExplorerPane  = nullptr;
+    // The Link tab, hidden but while there is something to link.
+    ALScriptLinkPane*                  mLinkPane      = nullptr;
     // What each of the menus' items does, whether it can, and whether it
     // is on, by the item's name.
     ALScriptStudioCommands             mCommands;

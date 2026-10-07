@@ -667,6 +667,53 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="MasterGaveWay">[NAME] is linked to [FILE] now: its tab gave way to the file's, where it is changed from here on.</floater.string>
     <floater.string name="MasterLinkedUnsaved">[NAME] is linked to [FILE] now, and what was typed here is not in the file: copy it into the file to keep it, or Unlink to save it from here.</floater.string>
     <floater.string name="MasterEditedOutside">[NAME] is linked to [FILE]: the file is opened in the external editor in its place.</floater.string>
+    <floater.string name="LinkHeadListing">Asking what [OBJECTS] holds...</floater.string>
+    <floater.string name="LinkHeadReading">Reading the scripts of [OBJECTS]: [DONE] of [COUNT]...</floater.string>
+    <floater.string name="LinkHeadMatchingA">Looking on disk for the file of 1 script...</floater.string>
+    <floater.string name="LinkHeadMatchingB">Looking on disk for the files of [COUNT] scripts...</floater.string>
+    <floater.string name="LinkHeadNone">No script of [OBJECTS] is left to link</floater.string>
+    <floater.string name="LinkHeadFoundA">1 script of [OBJECTS]</floater.string>
+    <floater.string name="LinkHeadFoundB">[COUNT] scripts of [OBJECTS]</floater.string>
+    <floater.string name="LinkHeadAlreadyA">1 linked already</floater.string>
+    <floater.string name="LinkHeadAlreadyB">[COUNT] linked already</floater.string>
+    <floater.string name="LinkHeadUnreadA">1 you cannot read</floater.string>
+    <floater.string name="LinkHeadUnreadB">[COUNT] you cannot read</floater.string>
+    <floater.string name="LinkHeadUnlistedA">1 prim did not say what it holds</floater.string>
+    <floater.string name="LinkHeadUnlistedB">[COUNT] prims did not say what they hold</floater.string>
+    <floater.string name="LinkHeadChecking">checking which differ in-world</floater.string>
+    <floater.string name="LinkHeadLinking">linking</floater.string>
+    <floater.string name="LinkFileNone">None found: choose a file</floater.string>
+    <floater.string name="LinkFileChooseA">Choose the file...</floater.string>
+    <floater.string name="LinkFileChooseB">Choose one of [COUNT] files...</floater.string>
+    <floater.string name="LinkHowHint">its @file</floater.string>
+    <floater.string name="LinkHowNamed">named by the script</floater.string>
+    <floater.string name="LinkHowRecord">an earlier link</floater.string>
+    <floater.string name="LinkHowName">its name</floater.string>
+    <floater.string name="LinkHowPicked">picked</floater.string>
+    <floater.string name="LinkWorldAsking">checking...</floater.string>
+    <floater.string name="LinkWorldSame">same</floater.string>
+    <floater.string name="LinkWorldDiffers">differs</floater.string>
+    <floater.string name="LinkWorldUnknown">can't tell</floater.string>
+    <floater.string name="LinkTipHint">It names [HINT] as its file.</floater.string>
+    <floater.string name="LinkTipHintWhy">It names [HINT] as its file, which is not used: [WHY].</floater.string>
+    <floater.string name="LinkTipNamed">The script names this file, which is not called [NAME]: be sure it is the file you mean before you link it.</floater.string>
+    <floater.string name="LinkTipRecord">A script called [NAME] was linked to this file before it was taken; this may be it, rezzed again.</floater.string>
+    <floater.string name="LinkTipChoicesA">1 file could be its: choose it.</floater.string>
+    <floater.string name="LinkTipChoicesB">[COUNT] files could be its: choose one.</floater.string>
+    <floater.string name="LinkTipRecordsA">1 earlier link could be its: choose it.</floater.string>
+    <floater.string name="LinkTipRecordsB">[COUNT] earlier links of scripts called [NAME] had different files: choose one.</floater.string>
+    <floater.string name="LinkTipUnknown">Whether it is what the script holds in-world can't be told: its text in-world could not be read.</floater.string>
+    <floater.string name="LinkTipUnknownWhy">Whether it is what the script holds in-world can't be told: [WHY].</floater.string>
+    <floater.string name="LinkTipNotOwned">Not your object, so it is not ticked: tick it to link it.</floater.string>
+    <floater.string name="LinkChooseTitle">The file for [NAME]</floater.string>
+    <floater.string name="LinkChoosePlaceholder">Type to find a file</floater.string>
+    <floater.string name="LinkChoosePick">Another file...</floater.string>
+    <floater.string name="LinkChoosePickDetail">Pick any file on disk</floater.string>
+    <floater.string name="LinkedOne">[NAME] to [FILE]</floater.string>
+    <floater.string name="LinkedScriptsA">Linked [LIST].</floater.string>
+    <floater.string name="LinkedScriptsB">Linked [COUNT] scripts to their files: [LIST].</floater.string>
+    <floater.string name="LinkedSendingA">Sending the 1 that differs.</floater.string>
+    <floater.string name="LinkedSendingB">Sending the [COUNT] that differ.</floater.string>
     <floater.string name="ExplorerSendingFromFilesA">Sending 1 script from its file.</floater.string>
     <floater.string name="ExplorerSendingFromFilesB">Sending [COUNT] scripts from their files.</floater.string>
     <floater.string name="ExplorerSendUnsavedA">1 was not sent: its file has unsaved changes in a tab.</floater.string>
@@ -2821,6 +2868,15 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                                 </layout_panel>
                             </layout_stack>
                         </panel>
+                        <panel
+                         class="script_studio_link"
+                         filename="panel_script_studio_link.xml"
+                         follows="all"
+                         height="168"
+                         label="Link to Files"
+                         layout="topleft"
+                         name="link_tab"
+                         width="574" />
                     </tab_container>
                 </layout_panel>
             </layout_stack>
