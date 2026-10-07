@@ -223,8 +223,8 @@ namespace
             "torotation", "touuid", "ipairs", "pairs", "next", "select", "error", "assert", "pcall", "xpcall", "unpack",
             "rawget", "rawset", "rawequal", "rawlen", "setmetatable", "getmetatable", "require", "lljson", "llbase64",
             // What the text written here defines of its own.
-            "states", "currentState", "setState", "joinLists", "lslInteger", "lslFloat", "vecNorm", "detected", "setTimer",
-            "timerHandle", "timerHandler", "timeBase", "getAndResetTime",
+            "states", "currentState", "setState", "lslInteger", "lslFloat", "vecNorm", "detected", "setTimer", "timerHandle",
+            "timerHandler", "timeBase", "getAndResetTime",
         };
         return RESERVED.contains(name);
     }
@@ -717,7 +717,7 @@ namespace
         // does not.
         Shared handedOn(LSLASTNode* read) const;
         // l += x, l += [x, y], l += other, l = l + x and l = x + l written
-        // as table.insert or table.move on l; false where it is none of
+        // as table.insert or table.extend on l; false where it is none of
         // them, l is held elsewhere -- noted, with why -- or what is added
         // could change l.
         bool grow(LSLLValueExpression* target, const std::string& name, LSLOperator op, LSLExpression* rhs);
@@ -871,7 +871,6 @@ namespace
         // nought; and declared any whole number, by what it is.
         boost::unordered_flat_set<LSLSymbol*>      mSteadyNonNegative;
         boost::unordered_flat_map<LSLSymbol*, int> mSteadyWhole;
-        bool mJoinLists  = false;
         bool mLslInteger = false;
         bool mLslFloat   = false;
         bool mVecNorm    = false;
@@ -3014,10 +3013,31 @@ namespace
             case OP_PLUS:
                 if (lt == LST_LIST || rt == LST_LIST)
                 {
-                    mJoinLists = true;
-                    const Expr a = value(lhs);
-                    const Expr b = value(rhs);
-                    return { "joinLists(" + (lt == LST_LIST ? a.text : "{" + a.text + "}") + ", " + (rt == LST_LIST ? b.text : "{" + b.text + "}") + ")" };
+                    // A new list of both, the left's then the right's:
+                    // table.extend puts the right's on the end of the left
+                    // and answers it. The left is copied first where
+                    // something else may hold it. A new one -- written out,
+                    // or a library call's -- needs no copy, and is said to
+                    // hold any value, as LSL's lists did: Luau's old solver
+                    // would otherwise hold every item of both to the type of
+                    // the left's first. Another +'s answer already is one.
+                    const Expr     a     = value(lhs);
+                    const Expr     b     = value(rhs);
+                    LSLExpression* left  = unbracketed(lhs);
+                    std::string    first = "table.clone(" + a.text + ")";
+                    if (lt != LST_LIST)
+                    {
+                        first = "{" + a.text + "} :: { any }";
+                    }
+                    else if (left->getNodeSubType() == NODE_BINARY_EXPRESSION && left->getOperation() == OP_PLUS)
+                    {
+                        first = a.text;
+                    }
+                    else if (left->getNodeSubType() != NODE_LVALUE_EXPRESSION && fresh(left))
+                    {
+                        first = bracketed(a, PRIMARY) + " :: { any }";
+                    }
+                    return { "table.extend(" + first + ", " + (rt == LST_LIST ? b.text : "{" + b.text + "}") + ")" };
                 }
                 if (lt == LST_STRING || lt == LST_KEY || rt == LST_STRING || rt == LST_KEY)
                 {
@@ -3395,8 +3415,8 @@ namespace
                     }
                     if (t == LST_LIST)
                     {
-                        mJoinLists = true;
-                        return "joinLists(" + old + ", " + (rhs && rhs->getIType() == LST_LIST ? v.text : "{" + v.text + "}") + ")";
+                        // Something else may hold the list: a new one.
+                        return "table.extend(table.clone(" + old + "), " + (rhs && rhs->getIType() == LST_LIST ? v.text : "{" + v.text + "}") + ")";
                     }
                     return old + " + " + bracketed(v, ADD + 1);
                 case OP_SUB_ASSIGN:
@@ -5437,7 +5457,7 @@ namespace
         // of them all, which has each before it adds any, as a list written
         // out had -- and of several parts, each runs apart -- but one alone,
         // which table.insert, a builtin of Luau's, adds faster; and more than
-        // a call takes well, a table of them moved on.
+        // a call takes well, a table of them put on the end.
         std::vector<std::string> values;
         const auto               append = [&]() {
             std::string all;
@@ -5451,7 +5471,7 @@ namespace
             }
             else if (values.size() > 32)
             {
-                line("table.move({" + all + "}, 1, " + std::to_string(values.size()) + ", #" + name + " + 1, " + name + ")");
+                line("table.extend(" + name + ", {" + all + "})");
             }
             else if (!values.empty())
             {
@@ -5491,22 +5511,12 @@ namespace
                     }
                     break;
                 case Kind::Named:
-                {
-                    // Which may be l itself: table.move copies as memmove.
-                    const std::string other = expr(unwrapped(part.e)).text;
-                    line("table.move(" + other + ", 1, #" + other + ", #" + name + " + 1, " + name + ")");
-                    break;
-                }
                 case Kind::Other:
-                {
-                    const std::string each = name == "item" ? "value" : "item";
-                    line("for _, " + each + " in " + expr(part.e).text + " do");
-                    ++mDepth;
-                    line("table.insert(" + name + ", " + each + ")");
-                    --mDepth;
-                    line("end");
+                    // Another list's items, put on the end by table.extend,
+                    // which runs what it is given once; it may be l itself,
+                    // which it copies as memmove.
+                    line("table.extend(" + name + ", " + expr(part.e).text + ")");
                     break;
-                }
             }
         }
         append();
@@ -6617,17 +6627,6 @@ namespace
 
     void Writer::helpers(std::string& out)
     {
-        if (mJoinLists)
-        {
-            out += R"LUA(-- LSL's + on lists: a new list of both, the left's then the right's.
-local function joinLists(a: { any }, b: { any }): { any }
-    local out = table.clone(a)
-    table.move(b, 1, #b, #out + 1, out)
-    return out
-end
-
-)LUA";
-        }
         if (mVecNorm)
         {
             out += R"LUA(-- LSL's llVecNorm: a vector one long the same way; a zero vector stays

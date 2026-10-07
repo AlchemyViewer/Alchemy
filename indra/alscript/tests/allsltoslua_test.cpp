@@ -251,7 +251,7 @@ namespace tut
         ensure("integer division: " + r.text, has(r, "local q = bit32.s32(a / b)"));
         ensure("remainder: " + r.text, has(r, "local m = math.fmod(a, b)"));
         ensure("a list no other holds grown in place: " + r.text, has(r, "table.insert(l, 3)") && has(r, "table.append(l, 4, \"five\")") &&
-                                                                    !has(r, "joinLists"));
+                                                                    !has(r, "table.extend"));
         ensure("TRUE and FALSE: " + r.text, has(r, "local t = 1") && has(r, "if false then"));
         ensure("a float as LSL writes it: " + r.text, has(r, "string.format(\"%.6f\", f)"));
         ensure("a string as an integer, as a list's item converts it: " + r.text,
@@ -614,19 +614,19 @@ namespace tut
                                               "    show(kept() + b + a + gAll + gStored);\n"
                                               "} }\n");
         ensure("a local returned, grown in place: " + r.text, has(r, "local out = ll.ParseString2List(s, {\",\"}, {})") && has(r, "table.insert(out, \"end\")"));
-        ensure("a call's list, each put in: " + r.text, has(r, "gAll = parts(\"a,b\")") && has(r, "for _, item in parts(\"c\") do") &&
-                                                         has(r, "    table.insert(gAll, item)"));
+        ensure("a call's list, put on the end: " + r.text, has(r, "gAll = parts(\"a,b\")") && has(r, "table.extend(gAll, parts(\"c\"))"));
         ensure("prepended: " + r.text, has(r, "table.insert(gAll, 1, \"first\")"));
-        ensure("a list by its name: " + r.text, has(r, "table.move(more, 1, #more, #gAll + 1, gAll)"));
+        ensure("a list by its name: " + r.text, has(r, "table.extend(gAll, more)"));
         ensure("several that do not run apart, each had before any is added: " + r.text, has(r, "table.append(gAll, ll.GetTime(), ll.Frand(1.0))"));
         ensure("passed to a function that only reads it: " + r.text, has(r, "table.insert(gSeen, n)"));
         ensure("passed to one that keeps it: " + r.text,
-               has(r, "gPassed = joinLists(gPassed, {n})") &&
+               has(r, "gPassed = table.extend(table.clone(gPassed), {n})") &&
                    has(r, "-- LSL: LSL's lists were values, and gPassed is passed to a function of the script's that keeps it"));
-        ensure("returned: " + r.text, has(r, "gKept = joinLists(gKept, {2})") && has(r, "gKept is returned by a function"));
-        ensure("given to another: " + r.text, has(r, "a = joinLists(a, {2})") && has(r, "a is given to another variable"));
+        ensure("returned: " + r.text, has(r, "gKept = table.extend(table.clone(gKept), {2})") && has(r, "gKept is returned by a function"));
+        ensure("given to another: " + r.text, has(r, "a = table.extend(table.clone(a), {2})") && has(r, "a is given to another variable"));
         ensure("read where a call in the statement grows it: " + r.text,
-               has(r, "gGrown = joinLists(gGrown, {1})") && has(r, "gGrown is read where a call of the script's in the same statement changes it"));
+               has(r, "gGrown = table.extend(table.clone(gGrown), {1})") &&
+                   has(r, "gGrown is read where a call of the script's in the same statement changes it"));
         ensure("said once for each: " + r.text, count(r, "and gPassed is") == 1);
         checksClean(r);
     }
@@ -2341,12 +2341,12 @@ namespace tut
 
         const ALLSLToSLua::Result top = convert("//* DEBUG\n"
                                                 "\n"
-                                                "list l = [1];\n"
+                                                "vector v = <1, 2, 3>;\n"
                                                 "//*/\n"
-                                                "default { state_entry() { llOwnerSay((string)(l + [2])); } }\n");
-        ensure("the helper over it: " + top.text, has(top, "local function joinLists(") &&
-                                                      top.text.find("local function joinLists(") < top.text.find("---[[ DEBUG"));
-        ensure_equals("off", toggled(top.text, "---[[ DEBUG"), std::string("--[[ DEBUG\nlocal l = {1}\n--]]"));
+                                                "default { state_entry() { llOwnerSay((string)llVecNorm(v)); } }\n");
+        ensure("the helper over it: " + top.text, has(top, "local function vecNorm(") &&
+                                                      top.text.find("local function vecNorm(") < top.text.find("---[[ DEBUG"));
+        ensure_equals("off", toggled(top.text, "---[[ DEBUG"), std::string("--[[ DEBUG\nlocal v = vector(1, 2, 3)\n--]]"));
         checksClean(top);
     }
 
@@ -2374,6 +2374,47 @@ namespace tut
         ensure("XorBase64Strings' own: " + r.text, noted(r, "SluaXorBase64Wrong") && !named("XorBase64Strings", "ll.XorBase64"));
         ensure("said so: " + r.text, has(r, "-- LSL: SLua deprecates ll.MakeFire, for ll.ParticleSystem.\n"));
         ensure("none said bare: " + r.text, !noted(r, "SluaDeprecated"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<55>()
+    {
+        set_test_name("lists appended with table.extend, which runs what it is given once and answers the list: a list by its name, "
+                      "itself, a call's, many values; + in an expression on a copy of the left, but for a new one, said to hold any "
+                      "value, and another +'s answer; no joinLists");
+        const ALLSLToSLua::Result r = convert("list gKept = [1];\n"
+                                              "list kept() { return gKept; }\n"
+                                              "show(list l) { llOwnerSay(llDumpList2String(l, \",\")); }\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    list all = llParseString2List(\"a,b\", [\",\"], []);\n"
+                                              "    list more = [4, 5];\n"
+                                              "    all += more;\n"
+                                              "    all += all;\n"
+                                              "    all += llList2List(more, 0, n);\n"
+                                              "    all += [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, "
+                                              "26, 27, 28, 29, 30, 31, 32, \"x\"];\n"
+                                              "    show(all);\n"
+                                              "    show(kept() + more + all);\n"
+                                              "    show(more + n);\n"
+                                              "    show(n + more);\n"
+                                              "    show([PRIM_NAME, \"x\"] + more);\n"
+                                              "    show(llParseString2List(\"c\", [], []) + [1] + [<1, 2, 3>]);\n"
+                                              "    llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_COLOR, ALL_SIDES, <1, 1, 1>, 1.0] + more);\n"
+                                              "} }\n");
+        ensure("a list by its name: " + r.text, has(r, "table.extend(all, more)"));
+        ensure("itself: " + r.text, has(r, "table.extend(all, all)"));
+        ensure("a call's, run once: " + r.text, has(r, "table.extend(all, llcompat.List2List(more, 0, n))") && !has(r, "for _, item in"));
+        ensure("many values: " + r.text, has(r, "table.extend(all, {0, 1, 2,") && has(r, "32, \"x\"})"));
+        ensure("one copy, of the variable a call answers: " + r.text,
+               has(r, "show(table.extend(table.extend(table.clone(kept()), more), all))"));
+        ensure("a variable copied: " + r.text, has(r, "show(table.extend(table.clone(more), {n}))"));
+        ensure("a value: " + r.text, has(r, "show(table.extend({n} :: { any }, more))"));
+        ensure("written out: " + r.text, has(r, "show(table.extend({PRIM_NAME, \"x\"} :: { any }, more))") &&
+                                             has(r, "table.extend({PRIM_COLOR, ALL_SIDES, vector(1, 1, 1), 1.0} :: { any }, more)"));
+        ensure("a library call's: " + r.text,
+               has(r, "show(table.extend(table.extend(ll.ParseString2List(\"c\", {}, {}) :: { any }, {1}), {vector(1, 2, 3)}))"));
+        ensure("no helper, nor a move: " + r.text, !has(r, "joinLists") && !has(r, "table.move("));
         checksClean(r);
     }
 }
