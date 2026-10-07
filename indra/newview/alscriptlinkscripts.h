@@ -147,7 +147,15 @@ public:
         World       world = World::Unasked;
         std::string worldWhy;
         std::string ours;
-        bool        ticked = false;
+        // What a link made from the answer keeps, as a send's would: the
+        // file's stamp as that read found it, the files on disk its
+        // expansion read, and whether the expansion had a problem. Kept
+        // once the world has answered about the file now chosen.
+        bool                     answered = false;
+        S64                      stamp    = 0;
+        std::vector<std::string> uses;
+        bool                     missed = false;
+        bool                     ticked = false;
         // Which ask of the world is the last, for the answer to a file
         // since changed to be let go of.
         U32         asked = 0;
@@ -194,9 +202,11 @@ public:
     void tick(size_t index, bool ticked);
 
     // The link a row makes, as matched, its base the item's asset as it
-    // was read; where the world holds what the file makes, with that and
-    // the file's stamp as of now, so that it is not sent again for nothing.
-    ALMasterLink linkOf(const Row& row, S64 stamp) const;
+    // was read, with what the world's answer about its file found: the
+    // files its expansion read, so that an include's save sends it; and,
+    // where the world holds what the file makes, that and the file's stamp
+    // as the same read found it, so that it is not sent again for nothing.
+    ALMasterLink linkOf(const Row& row) const;
 
     // What Link made: each script linked, where it is, its file, and
     // whether it was sent from it.
@@ -211,13 +221,11 @@ public:
         };
         std::vector<One> ones;
     };
-    // The rows ticked linked (linkOf), the stamps of the files the world
-    // holds already looked at off the main thread first; then, where
-    // `send_differing`, those that differ sent from their files as the
-    // studio's own send, which a change in the world since holds. Told
-    // what was made once it is, and what was proposed let go of.
-    void link(bool send_differing, std::function<void(const Linked&)> done);
-    bool linking() const { return mLinking; }
+    // The rows ticked linked (linkOf); then, where `send_differing`, those
+    // that differ sent from their files as the studio's own send, which a
+    // change in the world since holds. What was proposed let go of, and
+    // what was made told.
+    Linked link(bool send_differing);
 
     // Whether a file is called what an item is, in any case, a script's
     // extension aside on both.
@@ -292,7 +300,6 @@ private:
     // How many rows the world is being asked about.
     S32                      mAsking      = 0;
     bool                     mFeedingAsks = false;
-    bool                     mLinking     = false;
     // Told to give up, the look at the disk under way.
     std::shared_ptr<std::atomic<bool>> mStop;
     // Held while this is, for an answer to know it still is.

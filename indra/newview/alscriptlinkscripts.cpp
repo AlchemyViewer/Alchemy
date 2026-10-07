@@ -128,7 +128,6 @@ void ALScriptLinkScripts::cancel()
     mNextRead = 0;
     mReading  = 0;
     mAsking   = 0;
-    mLinking  = false;
 }
 
 void ALScriptLinkScripts::start(std::vector<Prim> prims)
@@ -607,8 +606,12 @@ void ALScriptLinkScripts::ask(size_t index)
         // Not the answer about a file chosen since.
         if (index < mRows.size() && mRows[index].asked == asked)
         {
-            Row& answered = mRows[index];
-            answered.ours = probe.ours;
+            Row& answered     = mRows[index];
+            answered.ours     = probe.ours;
+            answered.answered = true;
+            answered.stamp    = probe.stamp;
+            answered.uses     = probe.uses;
+            answered.missed   = probe.missed;
             if (probe.what != ALScriptDiskMasters::Outcome::What::Sent || !probe.worldRead)
             {
                 answered.world    = World::Unknown;
@@ -658,6 +661,10 @@ bool ALScriptLinkScripts::choose(size_t index, const std::string& file, How how)
     row.world  = World::Unasked;
     row.worldWhy.clear();
     row.ours.clear();
+    row.answered = false;
+    row.stamp    = 0;
+    row.uses.clear();
+    row.missed = false;
     ++row.asked;
     mChanged();
     feedAsks();
@@ -673,7 +680,7 @@ void ALScriptLinkScripts::tick(size_t index, bool ticked)
     }
 }
 
-ALMasterLink ALScriptLinkScripts::linkOf(const Row& row, S64 stamp) const
+ALMasterLink ALScriptLinkScripts::linkOf(const Row& row) const
 {
     ALMasterLink link;
     link.object     = row.ref.object;
@@ -687,118 +694,58 @@ ALMasterLink ALScriptLinkScripts::linkOf(const Row& row, S64 stamp) const
     link.objectName = row.objectName;
     link.regionName = row.regionName;
     link.linked     = LLDate::now();
+    if (row.answered)
+    {
+        link.uses   = row.uses;
+        link.missed = row.missed;
+    }
     // The world holds what the file makes now: so the link says, as one
-    // sent would, and a send of it changing nothing is skipped.
-    if (row.world == World::Same && stamp != 0)
+    // sent would, the hash and the stamp of one read, and a send of it
+    // changing nothing is skipped.
+    if (row.world == World::Same && row.stamp != 0)
     {
         link.hash  = row.ours;
-        link.stamp = stamp;
+        link.stamp = row.stamp;
     }
     return link;
 }
 
-void ALScriptLinkScripts::link(bool send_differing, std::function<void(const Linked&)> done)
+ALScriptLinkScripts::Linked ALScriptLinkScripts::link(bool send_differing)
 {
-    if (mStage != Stage::Done || mLinking)
+    Linked linked;
+    if (mStage != Stage::Done)
     {
-        return;
+        return linked;
     }
-    std::vector<Row> chosen;
+    std::vector<ALMasterLink> links;
+    std::vector<ALScriptRef>  sends;
     for (const Row& row : mRows)
     {
-        if (row.ticked && !row.file.empty())
+        if (!row.ticked || row.file.empty())
         {
-            chosen.push_back(row);
+            continue;
         }
+        links.push_back(linkOf(row));
+        const bool send = send_differing && row.world == World::Differs;
+        if (send)
+        {
+            sends.push_back(row.ref);
+        }
+        linked.ones.push_back({ row.name, row.place, row.file, send });
     }
-    if (chosen.empty())
+    if (links.empty())
     {
-        return;
+        return linked;
     }
-    mLinking = true;
-    mChanged();
-    // The files the world holds already: their stamps, which the links
-    // keep as a send's would be.
-    std::vector<std::string> same;
-    for (const Row& row : chosen)
+    // Linked all at once: the index written, the files watched and the tabs
+    // and the Explorer told once for them all. Then those that differ sent,
+    // each through its link.
+    ALScriptDiskMasters& masters = ALScriptDiskMasters::instance();
+    masters.link(std::move(links));
+    for (const ALScriptRef& ref : sends)
     {
-        if (row.world == World::Same)
-        {
-            same.push_back(row.file);
-        }
+        masters.send(ref, ALMasterPlan::Send::Derived);
     }
-    const U32                 generation = mGeneration;
-    const std::weak_ptr<bool> alive      = mAlive;
-    auto finish = [this, alive, generation, chosen = std::move(chosen), send_differing, done = std::move(done)](const std::vector<ALFileStamp>& stamps) {
-        if (!alive.lock() || generation != mGeneration)
-        {
-            return;
-        }
-        ALScriptDiskMasters&      masters = ALScriptDiskMasters::instance();
-        Linked                    linked;
-        std::vector<ALMasterLink> links;
-        std::vector<ALScriptRef>  sends;
-        size_t                    at = 0;
-        for (const Row& row : chosen)
-        {
-            S64 stamp = 0;
-            if (row.world == World::Same && at < stamps.size())
-            {
-                const ALFileStamp& was = stamps[at++];
-                stamp                  = was.exists ? was.time : 0;
-            }
-            links.push_back(linkOf(row, stamp));
-            const bool send = send_differing && row.world == World::Differs;
-            if (send)
-            {
-                sends.push_back(row.ref);
-            }
-            linked.ones.push_back({ row.name, row.place, row.file, send });
-        }
-        // Linked all at once: the index written, the files watched and the
-        // tabs and the Explorer told once for them all. Then those that
-        // differ sent, each through its link.
-        masters.link(std::move(links));
-        for (const ALScriptRef& ref : sends)
-        {
-            masters.send(ref, ALMasterPlan::Send::Derived);
-        }
-        cancel();
-        done(linked);
-    };
-    const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop");
-    const auto                 stamp_all = [](const std::vector<std::string>& files) {
-        std::vector<ALFileStamp> stamps;
-        stamps.reserve(files.size());
-        for (const std::string& file : files)
-        {
-            stamps.push_back(ALFileStamp::of(file));
-        }
-        return stamps;
-    };
-    if (same.empty() || !main_loop)
-    {
-        finish(stamp_all(same));
-        return;
-    }
-    const auto shared = std::make_shared<decltype(finish)>(std::move(finish));
-    const bool posted = ALScriptLinkDisk::instance().post([main_loop, shared, same = std::move(same)](const ALSerialWorker& thread) {
-        // Given up as the viewer quits, which waits on this.
-        std::vector<ALFileStamp> stamps;
-        stamps.reserve(same.size());
-        for (const std::string& file : same)
-        {
-            if (thread.closing())
-            {
-                return;
-            }
-            stamps.push_back(ALFileStamp::of(file));
-        }
-        main_loop->post([shared, stamps = std::move(stamps)]() { (*shared)(stamps); });
-    });
-    if (!posted)
-    {
-        // Closing: linked with no stamps, as a link made by hand is.
-        (*shared)({});
-    }
+    cancel();
+    return linked;
 }

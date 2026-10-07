@@ -683,7 +683,6 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="LinkHeadUnlistedA">1 prim did not say what it holds</floater.string>
     <floater.string name="LinkHeadUnlistedB">[COUNT] prims did not say what they hold</floater.string>
     <floater.string name="LinkHeadChecking">checking which differ in-world</floater.string>
-    <floater.string name="LinkHeadLinking">linking</floater.string>
     <floater.string name="LinkFileNone">None found: choose a file</floater.string>
     <floater.string name="LinkFileChooseA">Choose the file...</floater.string>
     <floater.string name="LinkFileChooseB">Choose one of [COUNT] files...</floater.string>

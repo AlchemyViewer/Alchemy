@@ -141,11 +141,7 @@ std::string ALScriptLinkPane::head() const
     {
         aside.push_back(mServices->counted("LinkHeadUnlisted", tally.unlisted));
     }
-    if (mGather.linking())
-    {
-        aside.push_back(mServices->words("LinkHeadLinking"));
-    }
-    else if (mGather.asking())
+    if (mGather.asking())
     {
         aside.push_back(mServices->words("LinkHeadChecking"));
     }
@@ -275,7 +271,7 @@ void ALScriptLinkPane::fill()
     mList->setRows(std::move(rows));
     // Choosing and linking once what is found is in, and not while it is
     // being linked.
-    const bool ready = mGather.stage() == Stage::Done && !mGather.linking();
+    const bool ready = mGather.stage() == Stage::Done;
     mChoose->setEnabled(ready && mList->getFirstSelected() != nullptr);
     mLink->setEnabled(ready && std::any_of(all.begin(), all.end(), [](const Row& row) { return row.ticked && !row.file.empty(); }));
 }
@@ -303,7 +299,7 @@ void ALScriptLinkPane::chooseFile()
 {
     const LLScrollListItem* item  = mList->getFirstSelected();
     const size_t            index = item ? static_cast<size_t>(item->getValue().asInteger()) : mGather.rows().size();
-    if (mGather.stage() != Stage::Done || mGather.linking() || index >= mGather.rows().size())
+    if (mGather.stage() != Stage::Done || index >= mGather.rows().size())
     {
         return;
     }
@@ -383,34 +379,30 @@ void ALScriptLinkPane::chosenFor(const ALScriptRef& ref, const std::string& valu
 
 void ALScriptLinkPane::linkTicked()
 {
-    const LLHandle<LLPanel> handle = getHandle();
-    mGather.link(mSendDiffers->get(), [handle](const ALScriptLinkScripts::Linked& linked) {
-        ALScriptLinkPane* pane = ALViewType::as<ALScriptLinkPane>(handle.get());
-        if (!pane || linked.ones.empty())
-        {
-            return;
-        }
-        // What was linked, each to its file in full, in Output; and how
-        // many of them are on their way up.
-        ALScriptStudioServices&  services = *pane->mServices;
-        std::vector<std::string> each;
-        S32                      sent = 0;
-        for (const ALScriptLinkScripts::Linked::One& one : linked.ones)
-        {
-            const std::string name =
-                one.place.empty() ? one.name : services.words("ScriptInObject", { { "[NAME]", one.name }, { "[OBJECT]", one.place } });
-            each.push_back(services.words("LinkedOne", { { "[NAME]", name }, { "[FILE]", one.file } }));
-            sent += one.sent ? 1 : 0;
-        }
-        std::string said = services.counted("LinkedScripts", static_cast<S32>(linked.ones.size()), { { "[LIST]", services.listed(each) } });
-        if (sent > 0)
-        {
-            said = services.sentences(said, services.counted("LinkedSending", sent));
-        }
-        services.report(said);
-        pane->fill();
-        pane->mWindow->linkPaneDone(true);
-    });
+    const ALScriptLinkScripts::Linked linked = mGather.link(mSendDiffers->get());
+    if (linked.ones.empty())
+    {
+        return;
+    }
+    // What was linked, each to its file in full, in Output; and how many
+    // of them are on their way up.
+    std::vector<std::string> each;
+    S32                      sent = 0;
+    for (const ALScriptLinkScripts::Linked::One& one : linked.ones)
+    {
+        const std::string name =
+            one.place.empty() ? one.name : mServices->words("ScriptInObject", { { "[NAME]", one.name }, { "[OBJECT]", one.place } });
+        each.push_back(mServices->words("LinkedOne", { { "[NAME]", name }, { "[FILE]", one.file } }));
+        sent += one.sent ? 1 : 0;
+    }
+    std::string said = mServices->counted("LinkedScripts", static_cast<S32>(linked.ones.size()), { { "[LIST]", mServices->listed(each) } });
+    if (sent > 0)
+    {
+        said = mServices->sentences(said, mServices->counted("LinkedSending", sent));
+    }
+    mServices->report(said);
+    fill();
+    mWindow->linkPaneDone(true);
 }
 
 void ALScriptLinkPane::cancel()
