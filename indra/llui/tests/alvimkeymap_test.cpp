@@ -4216,4 +4216,46 @@ namespace tut
         ensure_equals("ci( between two brackets", flat(editor->text()), std::string("f(X)|"));
         ensure_equals("keeps nothing", vim->registerText('"'), std::string("f"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<154>()
+    {
+        set_test_name("a delete over a search, n and N, * and #, %, { and } or ` to a mark goes in 1 however little it takes, those before it moving along, "
+                      "and in - as well; one over w goes in - alone");
+        ALCodeEditor& e = make("a foo b foo c\n");
+        keys("d/foo<CR>");
+        ensure_equals("d/foo within a line: in 1", vim->registerText('1'), std::string("a "));
+        ensure_equals("and in -", vim->registerText('-'), std::string("a "));
+        keys("dn");
+        ensure_equals("what is left", flat(e.text()), std::string("foo c|"));
+        ensure_equals("dn: in 1", vim->registerText('1'), std::string("foo b "));
+        ensure_equals("the one before moved along to 2", vim->registerText('2'), std::string("a "));
+
+        make("f(x) y\n");
+        editor->setCaret(ALTextPos(0, 1));
+        keys("d%");
+        ensure_equals("d%", vim->registerText('1'), std::string("(x)"));
+
+        make("foo bar\n");
+        editor->setCaret(ALTextPos(0, 4));
+        keys("d{");
+        ensure_equals("d{", vim->registerText('1'), std::string("foo "));
+
+        make("foo bar\n");
+        keys("4|ma0d`a");
+        ensure_equals("d`a", vim->registerText('1'), std::string("foo"));
+
+        make("foo bar foo\n");
+        keys("d*");
+        ensure_equals("d*", vim->registerText('1'), std::string("foo bar "));
+
+        make("a foo\n");
+        keys("c/foo<CR>X<Esc>");
+        ensure_equals("c/foo as well", vim->registerText('1'), std::string("a "));
+
+        make("foo bar\n");
+        keys("dw");
+        ensure_equals("dw: in -", vim->registerText('-'), std::string("foo "));
+        ensure_equals("and not in 1", vim->registerText('1'), std::string());
+    }
 }

@@ -269,6 +269,10 @@ private:
         // keeps as an empty register, where one an exclusive motion made,
         // s or c0 there, keeps nothing.
         bool        inclusive = false;
+        // Over one of the motions whose delete vim keeps in register 1
+        // however little it takes: a search, n and N, * and #, %, { and },
+        // and ` to a mark.
+        bool        registerOne = false;
     };
 
     // A key as typed: recorded where a macro is being, then through the
@@ -438,8 +442,9 @@ private:
     // (ALVimText::blockPiece): what is cut, lit, replaced and put into.
     std::vector<ALTextRange> blockPieces(const ALTextView& view, const Span& span) const;
 
-    // Registers, the unnamed one on the clipboard.
-    void     store(char name, std::string text, bool linewise, bool block, bool yanked);
+    // Registers, the unnamed one on the clipboard; a delete in 1 whatever
+    // its size where `register_one` says (Span::registerOne).
+    void     store(char name, std::string text, bool linewise, bool block, bool yanked, bool register_one = false);
     Register fetch(char name) const;
     // gp and gP, `past`: the caret after what was put.
     void     put(ALTextView& view, char name, bool after, S32 count, bool past = false);

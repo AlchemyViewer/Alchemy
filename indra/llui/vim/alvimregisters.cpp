@@ -42,7 +42,7 @@ void ALVimRegisters::setClipboard(copy_t copy, paste_t paste)
     mPaste = std::move(paste);
 }
 
-void ALVimRegisters::store(char name, std::string text, bool linewise, bool block, bool yanked, bool unnamed_clipboard)
+void ALVimRegisters::store(char name, std::string text, bool linewise, bool block, bool yanked, bool unnamed_clipboard, bool register_one)
 {
     Register reg;
     reg.text     = std::move(text);
@@ -87,24 +87,29 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
     {
         mRegisters['0'] = reg;
     }
-    else if (linewise || reg.text.find('\n') != std::string::npos)
-    {
-        // A delete of a line or more: the last nine kept, newest first,
-        // each moved down one rather than copied.
-        for (char n = '9'; n > '1'; --n)
-        {
-            const auto older = mRegisters.find(static_cast<char>(n - 1));
-            if (older != mRegisters.end())
-            {
-                mRegisters[n] = std::move(older->second);
-            }
-        }
-        mRegisters['1'] = reg;
-    }
     else
     {
-        // A smaller delete.
-        mRegisters['-'] = reg;
+        const bool lines = linewise || reg.text.find('\n') != std::string::npos;
+        if (lines || register_one)
+        {
+            // A delete of a line or more, or a smaller one `register_one`
+            // says is kept here: the last nine kept, newest first, each
+            // moved down one rather than copied.
+            for (char n = '9'; n > '1'; --n)
+            {
+                const auto older = mRegisters.find(static_cast<char>(n - 1));
+                if (older != mRegisters.end())
+                {
+                    mRegisters[n] = std::move(older->second);
+                }
+            }
+            mRegisters['1'] = reg;
+        }
+        if (!lines)
+        {
+            // A smaller delete.
+            mRegisters['-'] = reg;
+        }
     }
     // The unnamed register: the clipboard, which the world shares, where
     // the setting says so; the editor's own otherwise.

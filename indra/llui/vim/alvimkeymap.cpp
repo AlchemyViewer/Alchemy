@@ -2264,6 +2264,7 @@ bool ALVimKeymap::afterMotionKey(ALTextView& view, llwchar pending, llwchar ch)
         span.range           = ALTextRange(from, m.to).normalised();
         span.linewise        = m.linewise;
         span.inclusive       = m.inclusive;
+        span.registerOne     = pending == '`';
         if (m.inclusive)
         {
             span.range.end = d.nextCluster(span.range.end);
@@ -2408,6 +2409,7 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     span.range           = ALTextRange(from, m.to).normalised();
     span.linewise        = m.linewise;
     span.inclusive       = m.inclusive || m_ch == '$';
+    span.registerOne     = m_ch == '%' || m_ch == '{' || m_ch == '}';
     if (m.inclusive)
     {
         span.range.end = d.nextCluster(span.range.end);
@@ -2447,9 +2449,10 @@ bool ALVimKeymap::searchMotion(ALTextView& view, bool forward, std::optional<ALT
         return true;
     }
     Span span;
-    span.range     = ALTextRange(from, *to).normalised();
-    span.linewise  = offset.kind == 'l';
-    span.inclusive = offset.kind == 'e';
+    span.range       = ALTextRange(from, *to).normalised();
+    span.linewise    = offset.kind == 'l';
+    span.inclusive   = offset.kind == 'e';
+    span.registerOne = true;
     if (offset.kind == 'e')
     {
         span.range.end = d.nextCluster(span.range.end);
@@ -4120,7 +4123,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             }
             if (!nothing || span.inclusive)
             {
-                store(mRegister, text, span.linewise, span.block, false);
+                store(mRegister, text, span.linewise, span.block, false, span.registerOne);
             }
             if (op == 'c')
             {
@@ -4277,9 +4280,9 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
 
 // --- registers --------------------------------------------------------------------------
 
-void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, bool yanked)
+void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, bool yanked, bool register_one)
 {
-    mShared->registers.store(name, std::move(text), linewise, block, yanked, mShared->unnamedClipboard);
+    mShared->registers.store(name, std::move(text), linewise, block, yanked, mShared->unnamedClipboard, register_one);
 }
 
 ALVimKeymap::Register ALVimKeymap::fetch(char name) const
