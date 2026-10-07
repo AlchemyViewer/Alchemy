@@ -350,10 +350,12 @@ finally:
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
-#if (LL_WINDOWS || LL_LINUX) && LL_VELOPACK
+#if LL_VELOPACK
     // Velopack MUST be initialized first - it may handle install/uninstall
-    // commands and exit the process before we do anything else. On Linux it
-    // has no hooks to run, and finds the AppImage it updates, if any.
+    // commands and exit the process before we do anything else, and it
+    // finishes an update the last run applied. Every platform's viewer
+    // starts here but Windows' native one (llappviewerwin32.cpp); on Linux
+    // there are no hooks to run, and it finds the AppImage it updates, if any.
     if (!velopack_initialize())
     {
         // Velopack handled the invocation (install/uninstall hook); exit
