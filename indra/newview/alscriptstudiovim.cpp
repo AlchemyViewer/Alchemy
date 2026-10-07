@@ -35,9 +35,12 @@
 #include "alvimtext.h"
 #include "fsyspath.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
+#include <iterator>
 #include <string_view>
 
 namespace
@@ -414,7 +417,7 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
             entry.text = std::string(kind) + " history:";
             for (size_t i = 0; i < lines.size(); ++i)
             {
-                entry.text += llformat("\n%3d  %s", static_cast<int>(i + 1), lines[i].c_str());
+                fmt::format_to(std::back_inserter(entry.text), "\n{:3}  {}", i + 1, lines[i]);
             }
             mWindow.output(entry);
         };
@@ -864,10 +867,10 @@ void ALScriptStudioVim::listTabs()
     for (const Doc* doc : mServices.openDocs())
     {
         const char  mark = doc == front ? '%' : doc == alternate ? '#' : ' ';
-        std::string row  = llformat("%3d %c%c%c%c \"%s\"", ++number, mark, doc == front ? 'a' : 'h', doc->modifiable ? ' ' : '-',
-                                    doc->unsaved() ? '+' : ' ', doc->name.c_str());
+        std::string row  = fmt::format("{:3} {}{}{}{} \"{}\"", ++number, mark, doc == front ? 'a' : 'h', doc->modifiable ? ' ' : '-',
+                                       doc->unsaved() ? '+' : ' ', doc->name);
         row.resize(std::max<size_t>(row.size() + 1, 40), ' ');
-        entry.text += "\n" + row + llformat("line %d", doc->editor ? doc->editor->caret().line + 1 : 0);
+        entry.text += "\n" + row + fmt::format("line {}", doc->editor ? doc->editor->caret().line + 1 : 0);
     }
     mWindow.output(entry);
     mWindow.showOutput();

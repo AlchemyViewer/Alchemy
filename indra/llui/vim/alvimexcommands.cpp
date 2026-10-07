@@ -35,11 +35,15 @@
 #include "alvimtext.h"
 #include "llstring.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 #include <optional>
+#include <string_view>
 
 using namespace ALVimText;
 
@@ -168,7 +172,7 @@ namespace
         {
             case Op::On:
             case Op::Query:
-                shown = llformat("  %s=%d", name, number);
+                shown = fmt::format("  {}={}", name, number);
                 return true;
             case Op::Default:
                 number = fallback;
@@ -1204,7 +1208,8 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
             const ALTextPos p    = d.clamp(changes[static_cast<size_t>(i)]);
             std::string     line = d.line(p.line);
             LLStringUtil::trimHead(line);
-            text += llformat("\n%c%5d %5d %4d ", i == at ? '>' : ' ', std::abs(at - i), p.line + 1, p.column) + line.substr(0, 60);
+            fmt::format_to(std::back_inserter(text), "\n{}{:5} {:5} {:4} {}", i == at ? '>' : ' ', std::abs(at - i), p.line + 1, p.column,
+                           std::string_view(line).substr(0, 60));
         }
         if (at >= static_cast<S32>(changes.size()))
         {
@@ -1825,7 +1830,7 @@ void ALVimExCommands::listRegisters(ALTextView& view, const std::string& names)
     auto        row  = [&](char kind, char name, const std::string& held) {
         if (!held.empty() && (names.empty() || names.find(name) != std::string::npos))
         {
-            text += llformat("\n  %c  \"%c   ", kind, name) + listed(held, 70);
+            fmt::format_to(std::back_inserter(text), "\n  {}  \"{}   {}", kind, name, listed(held, 70));
         }
     };
     for (const char* name = "\"0123456789abcdefghijklmnopqrstuvwxyz-"; *name; ++name)
@@ -1856,7 +1861,7 @@ void ALVimExCommands::listMarks(ALTextView& view, const std::string& names)
         const ALTextPos p = d.clamp(at);
         std::string     line = d.line(p.line);
         LLStringUtil::trimHead(line);
-        text += llformat("\n %c %6d %4d ", name, p.line + 1, p.column) + listed(line, 60);
+        fmt::format_to(std::back_inserter(text), "\n {} {:6} {:4} {}", name, p.line + 1, p.column, listed(line, 60));
     }
     list(view, text);
 }

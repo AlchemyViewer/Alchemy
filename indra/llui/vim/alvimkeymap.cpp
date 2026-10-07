@@ -37,10 +37,13 @@
 #include "llclipboard.h"
 #include "llstring.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 #include <optional>
 
 using namespace ALVimText;
@@ -5220,7 +5223,8 @@ ALVimKeymap::Register ALVimKeymap::fetch(char name) const
 
 void ALVimKeymap::tooMuch(size_t bytes)
 {
-    say(said("VimCountTooLarge", "Too large a count: it would put in [SIZE,number,1] MB", { { "[SIZE]", llformat("%f", (F64)bytes / (1024.0 * 1024.0)) } }), true);
+    say(said("VimCountTooLarge", "Too large a count: it would put in [SIZE,number,1] MB", { { "[SIZE]", fmt::format("{:f}", static_cast<F64>(bytes) / (1024.0 * 1024.0)) } }),
+        true);
 }
 
 void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool past)
@@ -6427,7 +6431,7 @@ void ALVimKeymap::suggest(ALTextView& view, S32 given)
         std::string list;
         for (size_t i = 0; i < items.size(); ++i)
         {
-            list += llformat("%s%d \"%s\"", i ? "  " : "", static_cast<int>(i + 1), items[i].c_str());
+            fmt::format_to(std::back_inserter(list), "{}{} \"{}\"", i ? "  " : "", i + 1, items[i]);
         }
         say(list);
         return;
