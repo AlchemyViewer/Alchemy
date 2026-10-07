@@ -27,6 +27,9 @@
 #include "alscriptmasterupload.h"
 
 #include "alfilewrite.h"
+#include "alrecovery.h"
+#include "alrecoverystore.h"
+#include "alsavehistory.h"
 #include "alscriptenvelope.h"
 #include "alscriptworkspace.h"
 #include "alserialworker.h"
@@ -45,6 +48,9 @@ namespace
 {
     // The target a notecard's text is hashed under.
     constexpr const char* NOTECARD = "notecard";
+    // How many of an item's newest saves in History a world that moved is
+    // looked for among, as a text this viewer kept already.
+    constexpr size_t      HISTORY_NEWEST = 10;
 
     // A master as one look at the disk found it: whether it is there, when
     // it was written, and its text, where it read whole.
@@ -366,6 +372,61 @@ void ALScriptMasterUpload::worldText(const ALScriptLoaded& loaded)
         mWorldSame    = hashOf(mWorldText) == mOurs;
         mWorldCarries = loaded.notecard && !loaded.embedded.empty();
     }
+    // Moved, to a text that is not what goes up: a change made in the
+    // world, unless it is a text this viewer kept already as it went up --
+    // a send of this link's whose moving the base on was lost, the index
+    // written a moment after a send ends and a crash coming first.
+    if (mWorldRead && mWorldMoved && !mWorldSame && !mWorldCarries)
+    {
+        askHistory();
+        return;
+    }
+    decide();
+}
+
+void ALScriptMasterUpload::askHistory()
+{
+    const std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
+    if (!history)
+    {
+        decide();
+        return;
+    }
+    // Looked for as History keeps a save: under the item, a script by its
+    // envelope's source half, a notecard by its whole text.
+    const std::string key  = ALRecoveryStore::keyOf(mRef.object, mRef.item, std::string());
+    auto              text = std::make_shared<std::string>(mWorldText);
+    if (!mLink.notecard)
+    {
+        if (std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(mWorldText))
+        {
+            *text = std::move(envelope->source);
+        }
+    }
+    const LLUUID asset = mAsset;
+    // Read on the thread History is written on, after every save it was
+    // given to keep before this; what it found handed back to the main
+    // thread. With no main loop to hand it back to -- a test -- read here;
+    // with the thread stopped, as the viewer quits, not read at all.
+    const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop");
+    if (!main_loop)
+    {
+        historyHas(history->holds(key, asset, *text, HISTORY_NEWEST));
+        return;
+    }
+    std::shared_ptr<ALScriptMasterUpload> self = shared_from_this();
+    if (!ALRecoveryWriter::instance().post([self, main_loop, history, key, asset, text]() mutable {
+            const bool kept = history->holds(key, asset, *text, HISTORY_NEWEST);
+            main_loop->post([self = std::move(self), kept]() { self->historyHas(kept); });
+        }))
+    {
+        decide();
+    }
+}
+
+void ALScriptMasterUpload::historyHas(bool kept)
+{
+    mWorldOurs = kept;
     decide();
 }
 
@@ -389,7 +450,7 @@ void ALScriptMasterUpload::decide()
         found.unchanged    = unchanged;
         found.worldRead    = mWorldRead;
         found.worldSame    = mWorldSame;
-        found.worldMoved   = mWorldMoved;
+        found.worldMoved   = mWorldMoved && !mWorldOurs;
         found.preprocessed = mPrepared.errors;
         found.stamp        = mStamp.time;
         found.uses         = usesOf(mPrepared);
@@ -407,8 +468,17 @@ void ALScriptMasterUpload::decide()
         end(Outcome::What::Failed, LLTrans::getString("ScriptMasterExpandFailed"));
         return;
     }
-    ALMasterPlan::Do plan = ALMasterPlan::decide(mKind, mWorldMoved, mWorldSame, unchanged, skip_unchanged);
-    if (plan == ALMasterPlan::Do::Send && firstSend() && mAsset.notNull() && !mWorldSame)
+    // Moved to a text this viewer kept already: nothing of anybody else's
+    // is there, and nothing would be lost. Not moved, for the plan; kept
+    // already, so nothing kept again, nor said to be; and the link of what
+    // the world holds now, as a skip leaves it.
+    if (mWorldOurs)
+    {
+        mUpdated.base = mAsset;
+        mChanged      = true;
+    }
+    ALMasterPlan::Do plan = ALMasterPlan::decide(mKind, mWorldMoved && !mWorldOurs, mWorldSame, unchanged, skip_unchanged);
+    if (plan == ALMasterPlan::Do::Send && firstSend() && mAsset.notNull() && !mWorldSame && !mWorldOurs)
     {
         // The first send through a link goes over what the world held when
         // it was linked, which the plan sees as no move: it is kept first,

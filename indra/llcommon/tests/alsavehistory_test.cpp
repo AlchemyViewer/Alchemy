@@ -230,4 +230,31 @@ namespace tut
         }
         ensure_equals("what a write cut short is none", history.count("item:a"), 2U);
     }
+
+    template<> template<>
+    void alsavehistory_object::test<8>()
+    {
+        set_test_name("a text kept already, by the asset its save made or by the text, among a key's newest; not past them, nor another key's");
+        ALSaveHistory history(folder);
+        const F64     now = LLDate::now().secondsSinceEpoch();
+        history.keep(saved("item:a", "one", now - 60.0));
+        history.keep(saved("item:a", "two", now - 50.0));
+        history.keep(saved("item:a", "three", now - 40.0));
+        history.keep(saved("item:b", "other", now - 30.0));
+        const LLUUID elsewhere = LLUUID::generateNewID("elsewhere");
+        ensure("by the asset its save made, whatever the text", history.holds("item:a", LLUUID::generateNewID("two"), "not it", 10));
+        // The same text sent again made another asset, and was not kept
+        // again: found by the text.
+        ensure("by the text, under an asset no save made", history.holds("item:a", elsewhere, "one", 10));
+        ensure("a text of the same length that is not one", !history.holds("item:a", elsewhere, "owe", 10));
+        ensure("nor one never kept", !history.holds("item:a", elsewhere, "four", 10));
+        ensure("nor without an asset", !history.holds("item:a", LLUUID::null, "four", 10));
+        // Among the newest two only: "one" is the third.
+        ensure("the newest", history.holds("item:a", elsewhere, "three", 2));
+        ensure("past the newest, by the text", !history.holds("item:a", elsewhere, "one", 2));
+        ensure("past the newest, by the asset", !history.holds("item:a", LLUUID::generateNewID("one"), "x", 2));
+        ensure("another key's is not this one's", !history.holds("item:a", LLUUID::generateNewID("other"), "other", 10));
+        ensure("nothing for a key never saved", !history.holds("item:c", LLUUID::generateNewID("one"), "one", 10));
+        ensure("nor for no key", !history.holds("", LLUUID::generateNewID("one"), "one", 10));
+    }
 }

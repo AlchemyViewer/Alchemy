@@ -72,12 +72,17 @@ class ALSerialWorker;
 // what would go up -- the master unchanged since -- a send of the studio's
 // own is skipped and the base moved, and a save of the master goes up again
 // as any save does, no change in the world said. Where the master changed
-// since, the lost send's own text reads as a change made in the world: a
-// save of the master still goes up, keeping that text in History first and
-// saying the world changed, and a send of the studio's own is held until
-// the scripter sends it. Nothing is lost, but that is said once wrongly. A
-// link nothing went up through reads the world at its first send whatever
-// its base, so a lost first send comes to the same. The files read, and
+// since, the world holds the lost send's own text, which History kept as
+// it went up: a text among the item's newest there is no change made in
+// the world, and the send goes as though the world had not moved, nothing
+// kept again and nothing said, the base moved on to what the world holds.
+// Only where History has it not -- turned off, unreadable, or past those
+// newest -- does that text read as a change made in the world: a save of
+// the master still goes up, keeping it in History first and saying the
+// world changed, and a send of the studio's own is held until the
+// scripter sends it, which loses nothing but says it once wrongly. A link
+// nothing went up through reads the world at its first send whatever its
+// base, so a lost first send comes to the same. The files read, and
 // whether one was missed, are learned again at the link's next send: until
 // then an include's save may not send it again.
 //

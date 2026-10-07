@@ -45,7 +45,9 @@ class LLInventoryItem;
 //    it, with an upload header naming it where headers are on;
 //  - the world asked what it holds, and, where that is not what the last
 //    send left or nothing went up through the link yet, its text read and
-//    hashed beside what would go up;
+//    hashed beside what would go up; where it moved to another text,
+//    History asked whether this viewer kept that one already as it went
+//    up, which is no change of anybody else's;
 //  - what the plan says done (ALMasterPlan): the world's text kept in
 //    History first where it is gone over -- by the first send through a
 //    link too, which the plan sees as no move -- a send of the studio's
@@ -81,7 +83,8 @@ public:
         std::string   itemName;
         // What would go up, hashed as the link keeps it; whether that is
         // what went up last; whether the world's text was read, and holds
-        // it already; whether the world moved since the link's base.
+        // it already; whether the world moved since the link's base, to
+        // a text this viewer did not keep already in History.
         std::string ours;
         bool        unchanged  = false;
         bool        worldRead  = false;
@@ -114,6 +117,10 @@ private:
     void prepared(const ALScriptPrepared& prepared);
     void worldHas(const LLUUID& asset);
     void worldText(const ALScriptLoaded& loaded);
+    // Whether History kept the world's text already, as a save of this
+    // viewer's went up: asked off the main thread; and what it said.
+    void askHistory();
+    void historyHas(bool kept);
     void decide();
     // What the world holds kept in History, before it is gone over.
     void keepTheirs();
@@ -144,6 +151,8 @@ private:
     std::string        mWorldText;
     bool               mKeptTheirs = false;
     bool               mWorldRead  = false;
+    // Moved to a text History kept already: no change of anybody else's.
+    bool               mWorldOurs  = false;
     // A notecard that carries items in the world.
     bool               mWorldCarries = false;
     // Told what was found, where this is a probe and sends nothing; and

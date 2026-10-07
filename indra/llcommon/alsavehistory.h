@@ -88,6 +88,12 @@ public:
     // The text read in, for a save a listing read the start of; false
     // where its file is gone or cannot be read.
     bool load(ALSavedText& saved) const;
+    // Whether one of a key's `newest` saves made `asset`, or holds `text`:
+    // a text kept already. By the asset first, which a listing reads; then
+    // by the text, read only of a save of its length -- a save of the text
+    // kept last is not kept again, so the asset a later save of it made has
+    // no save of its own.
+    bool holds(const std::string& key, const LLUUID& asset, const std::string& text, size_t newest) const;
     // A key's saves moved to another, behind whatever that has: a notecard
     // in an object that its save gave a new item.
     bool rekey(const std::string& from, const std::string& to);
