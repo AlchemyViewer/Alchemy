@@ -2470,17 +2470,64 @@ bool ALVimKeymap::searchMotion(ALTextView& view, bool forward, std::optional<ALT
 
 bool ALVimKeymap::starSearch(ALTextView& view, bool forward, bool whole)
 {
-    const ALTextDocument& d    = view.document();
-    const ALTextRange     word = d.wordAt(cursor(view));
-    if (word.empty())
+    const ALTextDocument& d     = view.document();
+    const ALTextPos       from  = cursor(view);
+    const std::string&    text  = d.line(from.line);
+    const S32             size  = static_cast<S32>(text.size());
+    const S32             caret = llclamp(from.column, 0, size);
+    // What vim's find_ident_under_cursor() takes, by vim's classes: the word
+    // under the caret, or the first after it on the line -- so on a blank,
+    // the word after it; and where no word follows, the other characters
+    // under the caret or after it, back to where their run begins and on
+    // to the next blank. Nothing but blanks to the line's end is nothing.
+    const auto cls   = [&text](S32 i) { return classOf(text[static_cast<size_t>(i)], false); };
+    S32        begin = caret;
+    while (begin < size && cls(begin) != 1)
+    {
+        ++begin;
+    }
+    const bool keyword = begin < size;
+    if (!keyword)
+    {
+        begin = caret;
+        while (begin < size && cls(begin) == 0)
+        {
+            ++begin;
+        }
+    }
+    if (begin >= size)
     {
         mFailed = true;
         clearPending();
         return true;
     }
-    mSearch.pattern   = d.text(word);
+    const S32 kind = cls(begin);
+    while (begin > 0 && cls(begin - 1) == kind)
+    {
+        --begin;
+    }
+    S32 end = begin;
+    while (end < size && (keyword ? cls(end) == kind : cls(end) != 0))
+    {
+        ++end;
+    }
+    const ALTextRange word(ALTextPos(from.line, begin), ALTextPos(from.line, end));
+    // A word is looked for whole, or anywhere for g* and g#; other
+    // characters anywhere, as themselves: a backslash before each that a
+    // pattern reads as more, as vim's * puts one. A word has none of them.
+    static constexpr std::string_view SPECIAL("/.*~[^$\\");
+    std::string                       pattern;
+    for (const char c : d.text(word))
+    {
+        if (SPECIAL.find(c) != std::string_view::npos)
+        {
+            pattern += '\\';
+        }
+        pattern += c;
+    }
+    mSearch.pattern   = pattern;
     mSearch.forward   = forward;
-    mSearch.wholeWord = whole;
+    mSearch.wholeWord = whole && keyword;
     mSearch.offset    = ALVimSearch::Offset();
     // Looked for from the word's start, as vim puts the caret there first:
     // # from inside a word goes to the one before it, not to its own start.
@@ -2488,7 +2535,7 @@ bool ALVimKeymap::starSearch(ALTextView& view, bool forward, bool whole)
     {
         return searchMotion(view, forward, word.begin);
     }
-    mSearch.search(view, mSearch.pattern, forward, countOr(mCount), whole, mSearch.offset, word.begin);
+    mSearch.search(view, mSearch.pattern, forward, countOr(mCount), mSearch.wholeWord, mSearch.offset, word.begin);
     clearPending();
     return true;
 }

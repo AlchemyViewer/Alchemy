@@ -368,12 +368,14 @@ private:
     // match's end (:help search-offset). One that finds nothing fails the
     // operator.
     bool                searchMotion(ALTextView& view, bool forward, std::optional<ALTextPos> search_from = std::nullopt);
-    // * # g* g#: the word under the caret looked for, whole or -- `whole`
-    // false, g* and g# -- anywhere, forward or back, the count's match on;
-    // from the word's start, so that the word itself is passed over. The
-    // caret goes there, or an operator waiting takes the stretch to there
-    // (searchMotion), and n and N go on with it. No word under the caret
-    // fails the command, the operator with it.
+    // * # g* g#: the word under the caret or the first after it on the
+    // line looked for, whole or -- `whole` false, g* and g# -- anywhere,
+    // forward or back, the count's match on; where no word follows, the
+    // other characters there, as they are. From the word's start, so that
+    // the word itself is passed over. The caret goes there, or an operator
+    // waiting takes the stretch to there (searchMotion), and n and N go on
+    // with it. Nothing but blanks from the caret to the line's end fails
+    // the command, the operator with it.
     bool                starSearch(ALTextView& view, bool forward, bool whole);
     // A key that waits for the one after it -- a register's name, g's and
     // z's commands, r's character, a text object's kind -- and that one:

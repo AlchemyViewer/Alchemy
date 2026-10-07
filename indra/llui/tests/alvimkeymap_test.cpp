@@ -4293,4 +4293,53 @@ namespace tut
         ensure_equals("g~g~", editor->document().line(0), std::string("   ABC DEF"));
         ensure_equals("the caret to the first non-blank", caretText(), std::string("0:3"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<156>()
+    {
+        set_test_name("* # g* g# on a blank take the word after it on the line, and where no word follows the other characters there, as they are; a word is one by vim's classes");
+        ALCodeEditor& e = make("foo bar baz\n");
+        e.setCaret(ALTextPos(0, 3));
+        keys("d*");
+        ensure_equals("d* on the blank up to the bar after it, found again round the end", flat(e.text()), std::string("foobar baz|"));
+        ensure_equals("the blank taken", vim->registerText('"'), std::string(" "));
+
+        make("foo bar baz bar\n");
+        editor->setCaret(ALTextPos(0, 3));
+        keys("*");
+        ensure_equals("* on the blank to the next whole bar", caretText(), std::string("0:12"));
+        keys("n");
+        ensure_equals("n goes on with it", caretText(), std::string("0:4"));
+
+        make("bar foo bar baz\n");
+        editor->setCaret(ALTextPos(0, 7));
+        keys("d#");
+        ensure_equals("d# on the blank back to the bar before the next one", flat(editor->text()), std::string(" bar baz|"));
+        ensure_equals("what d# took", vim->registerText('"'), std::string("bar foo"));
+
+        make("foo bar baz barx\n");
+        editor->setCaret(ALTextPos(0, 3));
+        keys("dg*");
+        ensure_equals("dg* on the blank up to the bar in barx", flat(editor->text()), std::string("foobarx|"));
+
+        make("x+=1\na +=\n");
+        editor->setCaret(ALTextPos(1, 2));
+        keys("*");
+        ensure_equals("no word after the caret: += looked for as it is, round the end", caretText(), std::string("0:1"));
+        editor->setCaret(ALTextPos(1, 3));
+        keys("*");
+        ensure_equals("from the middle of the run, the run whole", caretText(), std::string("0:1"));
+        editor->setCaret(ALTextPos(1, 2));
+        keys("d*");
+        ensure_equals("d* back round to the += before it", flat(editor->text()), std::string("x+=|"));
+
+        make("x.*1\na .*\n");
+        editor->setCaret(ALTextPos(1, 2));
+        keys("*");
+        ensure_equals(".* looked for as itself, not as a pattern", caretText(), std::string("0:1"));
+
+        make("foo.bar foo\n");
+        keys("*");
+        ensure_equals("the word is foo, as vim's classes have it, not foo.bar", caretText(), std::string("0:8"));
+    }
 }
