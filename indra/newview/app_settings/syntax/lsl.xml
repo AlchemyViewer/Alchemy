@@ -7,12 +7,14 @@
   chars (a class, with min and max; unicode for everything beyond ASCII),
   word (an identifier, looked up in `tables`, each a table and the kind a
   word found there is), span (an opening with an end, an escape, and
-  multiline), span_regex with end_regex (where \1 stands for the opening's
-  first capture), regex (anchored where it is tried; not_after_chars, a
-  class the character before it may not be in, and consume, the group that
-  is the token, the rest of the match only read), or eol (the line's end;
-  unless_after names what, ending a line, carries the state on to the
-  next). It names the kind it makes and where it goes: push, pop or next.
+  multiline; one that is not ends with its line, but for a line that ends
+  in its unless_after, as an eol's), span_regex with end_regex (where \1
+  stands for the opening's first capture), regex (anchored where it is
+  tried; not_after_chars, a class the character before it may not be in,
+  and consume, the group that is the token, the rest of the match only
+  read), or eol (the line's end; unless_after names what, ending a line,
+  carries the state on to the next, unless it is part of a longer escape).
+  It names the kind it makes and where it goes: push, pop or next.
   What nothing matches is one character of the state's default kind.
   Patterns are RE2's, which has no lookaround and no backreference:
   not_after_chars, consume and an opener's unless stand in for them.

@@ -711,11 +711,20 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
         }
         end.endTemplate = end.endRegex && endTemplate(end.text, end.endPrefix, end.endSuffix);
         inside.rules.push_back(std::move(end));
-        if (in.has("multiline") && !in["multiline"].asBoolean())
+        const bool multiline = !in.has("multiline") || in["multiline"].asBoolean();
+        if (multiline && in.has("unless_after"))
+        {
+            error = where + "unless_after is for a span its line's end closes";
+            return false;
+        }
+        if (!multiline)
         {
             Rule eol;
             eol.match = Rule::Match::Eol;
             eol.then  = Rule::Then::Pop;
+            // What, ending a line, keeps the span open over it, as an eol
+            // rule's does: Luau's backslash before a line break.
+            eol.text  = in["unless_after"].asString();
             inside.rules.push_back(std::move(eol));
         }
         // The rule pushes the state; the state is added after the rules
@@ -1367,10 +1376,20 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
     }
     const size_t len = line.size();
 
-    auto emit = [&tokens](size_t begin, size_t end, ALSyntaxKind kind) {
+    // The last escape made, as it was made rather than as it ran together
+    // with its neighbours: whether the line ends in a character an escape
+    // kept.
+    size_t escape_begin = 0;
+    size_t escape_end   = 0;
+    auto emit = [&tokens, &escape_begin, &escape_end](size_t begin, size_t end, ALSyntaxKind kind) {
         if (end <= begin)
         {
             return;
+        }
+        if (kind == ALSyntaxKind::Escape)
+        {
+            escape_begin = begin;
+            escape_end   = end;
         }
         if (!tokens.empty() && tokens.back().kind == kind && tokens.back().end == static_cast<S32>(begin))
         {
@@ -1567,7 +1586,16 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
             }
             if (kept.size() >= eol->text.size() && kept.compare(kept.size() - eol->text.size(), eol->text.size(), eol->text) == 0)
             {
-                break;
+                // Unless it is the character an escape kept, or keeps one
+                // itself: `\\` carries nothing on to the next line, and
+                // neither does `\ `. An escape that is the text alone, with
+                // nothing after it to keep, keeps the line's end.
+                const size_t at      = kept.size() - eol->text.size();
+                const bool   escaped = escape_end > at && escape_begin < kept.size() && (escape_begin != at || escape_end != kept.size());
+                if (!escaped)
+                {
+                    break;
+                }
             }
         }
         go(*eol, std::string());

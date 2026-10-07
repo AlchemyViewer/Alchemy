@@ -506,4 +506,30 @@ namespace tut
                       std::string("text:x |operator:=|text: |number:.5|text: |operator:+|text: |number:1."));
         ensure_equals("the varargs", lexed("slua", "f(...)", state, words), std::string("text:f|punctuation:(...)"));
     }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<16>()
+    {
+        set_test_name("SLua: a string whose line ends in a backslash goes on onto the next, as Luau reads it, and one whose line ends in an escaped backslash ends with it");
+        ALSyntaxWords words;
+        ALSyntaxState state;
+        ensure_equals("a backslash at the end", lexed("slua", "local s = \"one\\", state, words),
+                      std::string("control:local|text: s |operator:=|text: |string:\"one|escape:\\"));
+        ensure("still in the string", state.frames.size() == 2);
+        ensure_equals("which the next line closes", lexed("slua", "two\" .. x", state, words), std::string("string:two\"|text: |punctuation:..|text: x"));
+        ensure("and code after it", state.frames.size() == 1);
+        ensure_equals("in single quotes", lexed("slua", "s = 'one\\", state, words), std::string("text:s |operator:=|text: |string:'one|escape:\\"));
+        ensure_equals("goes on too", lexed("slua", "two'", state, words), std::string("string:two'"));
+        ensure_equals("an escaped backslash", lexed("slua", "s = 'a\\\\", state, words), std::string("text:s |operator:=|text: |string:'a|escape:\\\\"));
+        ensure("ends with its line", state.frames.size() == 1);
+        ensure_equals("so the next is code", lexed("slua", "y = 1", state, words), std::string("text:y |operator:=|text: |number:1"));
+        ensure_equals("and so does an escape of a blank", lexed("slua", "s = 'a\\ ", state, words), std::string("text:s |operator:=|text: |string:'a|escape:\\ "));
+        ensure("ended", state.frames.size() == 1);
+        ensure_equals("an interpolated string with a backslash at the end", lexed("slua", "s = `one\\", state, words),
+                      std::string("text:s |operator:=|text: |string:`one\\"));
+        ensure_equals("goes on", lexed("slua", "two` y", state, words), std::string("string:two`|text: y"));
+        ensure("and ends", state.frames.size() == 1);
+        ensure_equals("one with an escaped backslash", lexed("slua", "s = `a\\\\", state, words), std::string("text:s |operator:=|text: |string:`a|escape:\\\\"));
+        ensure("ends with its line", state.frames.size() == 1);
+    }
 }
