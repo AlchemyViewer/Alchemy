@@ -4870,7 +4870,7 @@ void LLAppViewer::sendViewerStatistics(bool include_preferences)
 
 void LLAppViewer::migrateCacheDirectory()
 {
-#if LL_WINDOWS || LL_DARWIN
+#if LL_WINDOWS || LL_DARWIN || LL_LINUX
     // NOTE: (Nyx) as of 1.21, cache for mac is moving to /library/caches/Alchemy from
     // /library/application support/Alchemy/cache This should clear/delete the old dir.
 
@@ -4885,6 +4885,10 @@ void LLAppViewer::migrateCacheDirectory()
     //   C:\Users\James\AppData\Local\Alchemy
     //
     // Note the absence of \cache on the second path.  James.
+    //
+    // The Linux cache moved from ~/.alchemynext/cache to
+    // $XDG_CACHE_HOME/AlchemyNext. With ALCHEMYNEXT_USER_DIR set it stays in
+    // that directory, where the old and new paths are the same.
 
     // Only do this once per fresh install of this version.
     if (gSavedSettings.getBOOL("MigrateCacheDirectory"))
@@ -4894,8 +4898,20 @@ void LLAppViewer::migrateCacheDirectory()
         std::string old_cache_dir = gDirUtilp->add(gDirUtilp->getOSUserAppDir(), "cache");
         std::string new_cache_dir = gDirUtilp->getCacheDir(true);
 
-        if (gDirUtilp->fileExists(old_cache_dir))
+        if (old_cache_dir != new_cache_dir && gDirUtilp->fileExists(old_cache_dir))
         {
+#if LL_LINUX
+            // Nothing is at the new place before the first run that uses it,
+            // so the cache moves whole, by one rename, subfolders and all. A
+            // rename across filesystems fails, and the old cache is purged.
+            if (!gDirUtilp->fileExists(new_cache_dir)
+                && LLFile::rename(old_cache_dir, new_cache_dir) == 0)
+            {
+                LL_INFOS() << "Moved cache from " << old_cache_dir << " to " << new_cache_dir << LL_ENDL;
+                return;
+            }
+#endif
+
             LL_INFOS() << "Migrating cache from " << old_cache_dir << " to " << new_cache_dir << LL_ENDL;
 
             // Migrate inventory cache to avoid pain to inventory database after mass update
@@ -4935,7 +4951,7 @@ void LLAppViewer::migrateCacheDirectory()
             }
         }
     }
-#endif // LL_WINDOWS || LL_DARWIN
+#endif // LL_WINDOWS || LL_DARWIN || LL_LINUX
 }
 
 //static
