@@ -1206,12 +1206,18 @@ S32 ALTextLayout::columnAt(S32 index, S32 r, F32 x, bool round)
     // and the one that begins the cluster before it: x lies between their
     // left edges. The pens go forward whichever way the text is written,
     // so both are found by a search, and a step or two over the glyphs of
-    // one cluster.
+    // one cluster. An inlay is a cell of its own, though it shares its
+    // column with the character beside it: a point on it is its column,
+    // and the character rounds by its own middle, not by the middle of
+    // the two together.
     if (row.glyphBegin >= row.glyphEnd)
     {
         return row.end;
     }
-    const auto starts_one = [&](size_t k) { return k == row.glyphBegin || entry.glyphs[k].cluster != entry.glyphs[k - 1].cluster; };
+    const auto starts_one = [&](size_t k) {
+        return k == row.glyphBegin || entry.glyphs[k].cluster != entry.glyphs[k - 1].cluster ||
+               (entry.glyphs[k].inlay >= 0) != (entry.glyphs[k - 1].inlay >= 0);
+    };
     const auto first      = entry.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphBegin);
     const auto end        = entry.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphEnd);
     size_t     k = static_cast<size_t>(std::partition_point(first + 1, end, [&](const Glyph& g) { return g.pen - row.xStart <= x; }) - entry.glyphs.begin());

@@ -94,13 +94,16 @@ namespace tut
             }
             // A row the line wraps after ends at the next row's start, which
             // is not a place on it: on or past its last cluster is that one.
+            // An inlay is a cell of its own beside the character that shares
+            // its column.
             const bool wraps_after = row.glyphEnd < line.glyphs.size();
             S32        cluster     = row.begin;
             F32        left        = 0.f;
             for (size_t k = row.glyphBegin; k <= row.glyphEnd; ++k)
             {
                 const bool at_end     = (k == row.glyphEnd);
-                const bool starts_one = at_end || k == row.glyphBegin || line.glyphs[k].cluster != line.glyphs[k - 1].cluster;
+                const bool starts_one = at_end || k == row.glyphBegin || line.glyphs[k].cluster != line.glyphs[k - 1].cluster ||
+                                        (line.glyphs[k].inlay >= 0) != (line.glyphs[k - 1].inlay >= 0);
                 if (!starts_one)
                 {
                     continue;
@@ -973,5 +976,42 @@ namespace tut
         layout.setHidden(ALTextLayout::HiddenBy::Host, 0, 0, true);
         ensure_equals("everything hidden: none", layout.visibleBefore(last + 1), -1);
         layout.setGapProvider(nullptr);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<26>()
+    {
+        set_test_name("an inlay is a cell of its own: a click on the half of the character beside it nearer it is before the character, and a click on it is its column");
+        ready("f(a, b)");
+        layout.setInlayProvider([](S32 line, std::vector<ALTextLayout::Inlay>& out) {
+            out.push_back(ALTextLayout::Inlay{ 2, 40.f, true, 0 });
+            out.push_back(ALTextLayout::Inlay{ 5, 40.f, false, 1 });
+        });
+        // An argument's name before 'a', which the caret at a's column
+        // stands after.
+        const F32 a_left  = layout.xOf(0, 2);
+        const F32 a_right = layout.xOf(0, 3);
+        ensure("the name before a", a_left >= 40.f && a_right > a_left);
+        ensure_equals("a's near half: before a", layout.columnAt(0, 0, a_left + (a_right - a_left) * 0.25f, true), 2);
+        ensure_equals("a's far half: after it", layout.columnAt(0, 0, a_left + (a_right - a_left) * 0.75f, true), 3);
+        ensure_equals("the name's near half: a's column", layout.columnAt(0, 0, a_left - 30.f, true), 2);
+        ensure_equals("its far half too", layout.columnAt(0, 0, a_left - 5.f, true), 2);
+        // A word after the text before 'b', which the caret at b's column
+        // stands before.
+        const ALTextLayout::Line& line   = layout.line(0);
+        F32                       b_left = -1.f;
+        for (const ALTextLayout::Glyph& glyph : line.glyphs)
+        {
+            if (glyph.cluster == 5 && glyph.inlay < 0)
+            {
+                b_left = glyph.pen - line.rows[0].xStart;
+                break;
+            }
+        }
+        const F32 b_right = layout.xOf(0, 6);
+        ensure("the word before b", b_left >= layout.xOf(0, 5) + 39.f && b_right > b_left);
+        ensure_equals("b's near half: before b", layout.columnAt(0, 0, b_left + (b_right - b_left) * 0.25f, true), 5);
+        ensure_equals("the word's far half: b's column", layout.columnAt(0, 0, b_left - 5.f, true), 5);
+        searchedAsWalked(0);
     }
 }
