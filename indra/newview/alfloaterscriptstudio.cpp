@@ -689,14 +689,14 @@ void ALFloaterScriptStudio::buildMenus()
     const std::function<void(LLView*)> resolve = [&](LLView* menu) {
         for (LLView* child : *menu->getChildList())
         {
-            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(child))
+            if (LLMenuItemBranchGL* branch = child->as<LLMenuItemBranchGL>())
             {
                 if (LLMenuGL* under = branch->getBranch())
                 {
                     resolve(under);
                 }
             }
-            else if (LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child); item && !dynamic_cast<LLMenuItemSeparatorGL*>(item))
+            else if (LLMenuItemGL* item = child->as<LLMenuItemGL>(); item && !item->as<LLMenuItemSeparatorGL>())
             {
                 mMenuItems.emplace(item->getName(), item);
             }
@@ -5253,7 +5253,7 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteCommands()
     std::function<void(LLView*, const std::string&)> collect = [&](LLView* menu, const std::string& path) {
         for (LLView* child : *menu->getChildList())
         {
-            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(child))
+            if (LLMenuItemBranchGL* branch = child->as<LLMenuItemBranchGL>())
             {
                 if (LLMenuGL* under = branch->getBranch())
                 {
@@ -5261,8 +5261,8 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteCommands()
                 }
                 continue;
             }
-            LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child);
-            if (!item || dynamic_cast<LLMenuItemSeparatorGL*>(item) || item->getLabel().empty() || item->getName() == "command_palette" ||
+            LLMenuItemGL* item = child->as<LLMenuItemGL>();
+            if (!item || item->as<LLMenuItemSeparatorGL>() || item->getLabel().empty() || item->getName() == "command_palette" ||
                 item->getName() == "quick_open")
             {
                 continue;
@@ -5279,7 +5279,7 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteCommands()
             one.value  = "cmd:" + item->getName();
             // A toggle says which way it is set, before its keys: the menu
             // shows a mark, and a row here has none.
-            if (dynamic_cast<LLMenuItemCheckGL*>(item))
+            if (item->as<LLMenuItemCheckGL>())
             {
                 const std::string state = getString(mCommands.checked(item->getName()) ? "PaletteOn" : "PaletteOff");
                 one.detail              = one.detail.empty() ? state : state + "   " + one.detail;
@@ -5819,7 +5819,7 @@ void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)
     if (list)
     {
         list->setFocus(true);
-        if (LLScrollListCtrl* rows = dynamic_cast<LLScrollListCtrl*>(list); rows && !rows->getFirstSelected())
+        if (LLScrollListCtrl* rows = list->as<LLScrollListCtrl>(); rows && !rows->getFirstSelected())
         {
             // Somewhere to start from: the first row there is to choose,
             // in the order shown.

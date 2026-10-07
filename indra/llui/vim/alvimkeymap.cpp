@@ -1280,7 +1280,7 @@ bool ALVimKeymap::afterRecord(ALTextView& view, llwchar pending, llwchar ch)
             // meanwhile, and both are looked for again.
             const LLHandle<LLUICtrl> handle = view.getHandle();
             mHooks.historyWindow(view, kind, history, [handle, kind](const std::string& line, bool run) {
-                ALTextView*  again = dynamic_cast<ALTextView*>(handle.get());
+                ALTextView*  again = ALViewType::as<ALTextView>(handle.get());
                 ALVimKeymap* vim   = again ? dynamic_cast<ALVimKeymap*>(again->modalKeymap()) : nullptr;
                 if (vim)
                 {
@@ -6284,7 +6284,7 @@ void ALVimKeymap::suggest(ALTextView& view, S32 given)
     // again at the caret.
     const LLHandle<LLUICtrl> handle = view.getHandle();
     mHooks.pick(view, view.document().text(word), items, [handle](size_t index) {
-        ALTextView* again = dynamic_cast<ALTextView*>(handle.get());
+        ALTextView* again = ALViewType::as<ALTextView>(handle.get());
         if (again && again->misspelledAt(again->caret()))
         {
             again->refreshSuggestions();
