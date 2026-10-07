@@ -4942,15 +4942,19 @@ void ALTextView::drawRowAt(S32 line, S32 r, F32 left, S32 screen_top, F32 alpha)
     {
         return;
     }
+    // As much of it as is in sight across the text, as a row of the text
+    // draws of itself: a minified script's header may be a line of tens of
+    // thousands of glyphs.
     const ALTextLayout::Row& row         = laid.rows[static_cast<size_t>(r)];
-    const size_t             glyph_count = row.glyphEnd - row.glyphBegin;
+    const ALTextLayout::Row  in_sight    = rowInSight(laid, row, textRect());
+    const size_t             glyph_count = in_sight.glyphEnd - in_sight.glyphBegin;
     if (!glyph_count)
     {
         return;
     }
-    colorRow(line, laid, row, alpha);
-    tintRow(line, laid, row, alpha, mColorScratch);
-    mFont->renderGlyphs(&laid.placed[row.glyphBegin], mColorScratch.data(), glyph_count, left - row.xStart, static_cast<F32>(screen_top - row.ascent));
+    colorRow(line, laid, in_sight, alpha);
+    tintRow(line, laid, in_sight, alpha, mColorScratch);
+    mFont->renderGlyphs(&laid.placed[in_sight.glyphBegin], mColorScratch.data(), glyph_count, left - row.xStart, static_cast<F32>(screen_top - row.ascent));
 }
 
 void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha)

@@ -962,8 +962,9 @@ protected:
     // glyphs ask for a few kinds thousands of times.
     typedef std::array<LLColor4U, static_cast<size_t>(ALSyntaxKind::COUNT)> kind_inks_t;
     const kind_inks_t& kindInks(F32 alpha);
-    // A line's row drawn at a place, coloured as it is in the text: what
-    // a header pinned at the top is drawn with.
+    // A line's row drawn at a place, coloured as it is in the text, as much
+    // of it as is in sight across the text scrolled as it is: what a header
+    // pinned at the top is drawn with.
     void drawRowAt(S32 line, S32 row, F32 left, S32 screen_top, F32 alpha);
     // Whether a click lands where the last one did, which is what makes
     // it the next of a run; and the run armed for a third click, once a
