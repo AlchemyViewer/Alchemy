@@ -1964,13 +1964,33 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
         mPending = ch;
         return true;
     }
-    // cw on a word is ce: the space after it is not eaten.
-    llwchar m_ch = ch;
-    if (op == 'c' && (ch == 'w' || ch == 'W') && classOf(at(d, cursor(view)), ch == 'W') != 0)
+    // cw on a word is ce: the space after it is not eaten. On the word's
+    // last character the first word is the one it ends, as vim's cw has
+    // it -- a one-letter word changes alone -- and the count's others are
+    // the words after.
+    llwchar         m_ch  = ch;
+    S32             times = countTimes(countOr(mOperatorCount), count);
+    const ALTextPos here  = cursor(view);
+    const bool      big   = ch == 'W';
+    if (op == 'c' && (ch == 'w' || ch == 'W') && classOf(at(d, here), big) != 0)
     {
-        m_ch = ch == 'w' ? 'e' : 'E';
+        m_ch = big ? 'E' : 'e';
+        if (classOf(at(d, d.nextCluster(here)), big) != classOf(at(d, here), big))
+        {
+            --times;
+        }
     }
-    Motion m = motion(view, m_ch, countTimes(countOr(mOperatorCount), count), 0);
+    Motion m;
+    if (times > 0)
+    {
+        m = motion(view, m_ch, times, 0);
+    }
+    else
+    {
+        m.ok        = true;
+        m.to        = here;
+        m.inclusive = true;
+    }
     if (!m.ok || !m.moved)
     {
         // A key that is no motion, or one that could not move: the

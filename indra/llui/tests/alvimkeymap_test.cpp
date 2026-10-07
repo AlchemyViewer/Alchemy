@@ -2903,4 +2903,20 @@ namespace tut
             ensure(what + ": the caret where it was", e.caret() == ALTextPos(0, 0));
         }
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<99>()
+    {
+        set_test_name("cw on a word's last character, or on a one-letter word, changes that word alone; c2w there the next as well");
+        ALCodeEditor& e = make("integer i = 0;\nfoo bar\nab cd ef\n");
+        e.setCaret(ALTextPos(0, 8));
+        keys("cwj<Esc>");
+        ensure_equals("a one-letter word, not what follows it", e.document().line(0), std::string("integer j = 0;"));
+        e.setCaret(ALTextPos(1, 2));
+        keys("cwX<Esc>");
+        ensure_equals("from a word's last character, that character", e.document().line(1), std::string("foX bar"));
+        e.setCaret(ALTextPos(2, 1));
+        keys("c2wX<Esc>");
+        ensure_equals("c2w from there: the word it ends and the next", e.document().line(2), std::string("aX ef"));
+    }
 }
