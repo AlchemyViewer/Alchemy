@@ -576,7 +576,9 @@ namespace tut
             {
                 return ALPreprocessor::Found::No;
             }
-            out.text = readFile(path.string());
+            // Named by its class: MSVC finds no static member from a lambda
+            // that does not hold `this`.
+            out.text = alluaufragment_data::readFile(path.string());
             out.name = path.filename().string();
             out.path = "disk:/" + out.name;
             return ALPreprocessor::Found::Yes;
