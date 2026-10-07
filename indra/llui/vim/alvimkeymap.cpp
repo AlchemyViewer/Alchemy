@@ -3233,44 +3233,52 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         case 'w':
         case 'W':
         {
+            // On the caret's line, as vim counts them: iw a word or the
+            // blanks between, each one of the count; aw a word with the
+            // blanks after it, or blanks with the word after them, each
+            // of the count another. An aw that ends on no blank takes the
+            // blanks before it instead, but not a line's indent.
             const bool big = what == 'W';
             ALTextPos  begin = from;
-            ALTextPos  end   = from;
             const S32  cls   = classOf(at(d, from), big);
             while (begin.column > 0 && classOf(at(d, d.prevCluster(begin)), big) == cls)
             {
                 begin = d.prevCluster(begin);
             }
-            while (!atLineEnd(d, end) && classOf(at(d, end), big) == cls)
-            {
-                end = d.nextCluster(end);
-            }
+            // Past the characters of one class from a position.
+            const auto past_run = [&d, big](ALTextPos p) {
+                const S32 run = classOf(at(d, p), big);
+                while (!atLineEnd(d, p) && classOf(at(d, p), big) == run)
+                {
+                    p = d.nextCluster(p);
+                }
+                return p;
+            };
+            // One of the count, from where the last ended.
+            const auto step = [&](ALTextPos p) {
+                const bool blank = classOf(at(d, p), big) == 0;
+                p                = past_run(p);
+                if (around && !atLineEnd(d, p) && (blank || classOf(at(d, p), big) == 0))
+                {
+                    p = past_run(p);
+                }
+                return p;
+            };
+            ALTextPos end = step(begin);
             for (S32 n = 1; n < count && !atLineEnd(d, end); ++n)
             {
-                const S32 next = classOf(at(d, end), big);
-                while (!atLineEnd(d, end) && classOf(at(d, end), big) == next)
-                {
-                    end = d.nextCluster(end);
-                }
+                end = step(end);
             }
-            if (around)
+            if (around && cls != 0 && end > begin && classOf(at(d, d.prevCluster(end)), big) != 0)
             {
-                // The blanks after it, or before it where there are none after.
-                ALTextPos after = end;
-                while (!atLineEnd(d, after) && isSpace(at(d, after)))
+                ALTextPos before = begin;
+                while (before.column > 0 && classOf(at(d, d.prevCluster(before)), big) == 0)
                 {
-                    after = d.nextCluster(after);
+                    before = d.prevCluster(before);
                 }
-                if (after != end)
+                if (before.column > 0)
                 {
-                    end = after;
-                }
-                else
-                {
-                    while (begin.column > 0 && isSpace(at(d, d.prevCluster(begin))))
-                    {
-                        begin = d.prevCluster(begin);
-                    }
+                    begin = before;
                 }
             }
             if (begin == end)

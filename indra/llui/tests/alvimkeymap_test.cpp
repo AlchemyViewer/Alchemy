@@ -3351,6 +3351,44 @@ namespace tut
     }
 
     template<> template<>
+    void alvimkeymap_object::test<119>()
+    {
+        set_test_name("a count of aw counts words with their blanks, of iw words and the blanks between alike; aw on blanks takes the word after, and leaves an indent");
+        ALCodeEditor& e = make("foo bar baz\n");
+        keys("2daw");
+        ensure_equals("2daw: two words and the blanks after them", e.document().line(0), std::string("baz"));
+        keys("u");
+        e.setCaret(ALTextPos(0, 4));
+        keys("d2aw");
+        ensure_equals("d2aw from the middle: the blank before, none being after", e.document().line(0), std::string("foo"));
+        keys("u");
+        e.setCaret(ALTextPos(0, 0));
+        keys("2diw");
+        ensure_equals("2diw: the word and the blank after", e.document().line(0), std::string("bar baz"));
+        keys("u");
+        e.setCaret(ALTextPos(0, 0));
+        keys("3diw");
+        ensure_equals("3diw: to the second word's end", e.document().line(0), std::string(" baz"));
+        keys("u");
+        e.setCaret(ALTextPos(0, 0));
+        keys("v2awd");
+        ensure_equals("v2aw selects as much", e.document().line(0), std::string("baz"));
+
+        make("foo.x bar.y baz\n");
+        keys("2daW");
+        ensure_equals("2daW by WORDs", editor->document().line(0), std::string("baz"));
+
+        make("foo   bar baz\n");
+        editor->setCaret(ALTextPos(0, 4));
+        keys("daw");
+        ensure_equals("daw on blanks: they and the word after", editor->document().line(0), std::string("foo baz"));
+
+        make("  foo\n");
+        keys("^daw");
+        ensure_equals("daw on a line's only word leaves its indent", editor->document().line(0), std::string("  "));
+    }
+
+    template<> template<>
     void alvimkeymap_object::test<130>()
     {
         set_test_name("/ and ? after an operator are its motion, up to the match and not into it; an offset of lines makes it lines, /e takes the match's end");
