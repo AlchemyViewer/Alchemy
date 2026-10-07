@@ -41,11 +41,11 @@
 // or lacks the function, so that what the script does stays what it did.
 //
 // Where the two languages mean different things and the text cannot say the
-// same -- integer division rounding down, a jump SLua has no goto for,
-// LSL's lists compared by their lengths -- the place is noted rather than
-// guessed: a `-- LSL:` comment over the line, and a note of the same words
-// at the LSL's place. Where SLua has a way of its own -- LLTimers, the
-// detected table, indexing -- the note says so too.
+// same -- a key of no text, which SLua makes NULL_KEY, a jump SLua has no
+// goto for, LSL's lists compared by their lengths -- the place is noted
+// rather than guessed: a `-- LSL:` comment over the line, and a note of the
+// same words at the LSL's place. Where SLua has a way of its own --
+// LLTimers, the detected table, indexing -- the note says so too.
 class ALLSLToSLua
 {
 public:
