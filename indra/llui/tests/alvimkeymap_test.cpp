@@ -3211,4 +3211,21 @@ namespace tut
         ensure("and after cw", vim->mode() == ALVimKeymap::Mode::Normal);
         ensure_equals("the word changed", flat(e.text()), std::string("yz|x!|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<113>()
+    {
+        set_test_name("visual r puts one character in place of each character, however many bytes it takes");
+        ALCodeEditor& e = make("h\xc3\xa9llo\n");
+        keys("v$rx");
+        ensure_equals("five characters, five x", e.document().line(0), std::string("xxxxx"));
+
+        make("a\xf0\x9f\x98\x80" "b\n");
+        keys("v$rx");
+        ensure_equals("an emoji one", editor->document().line(0), std::string("xxx"));
+
+        make("\xc3\xa9\n");
+        keys("<C-v>rx");
+        ensure_equals("and in a block", editor->document().line(0), std::string("x"));
+    }
 }

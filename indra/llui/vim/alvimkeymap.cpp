@@ -1368,8 +1368,9 @@ bool ALVimKeymap::afterReplace(ALTextView& view, llwchar pending, llwchar ch)
         {
             if (!piece.empty())
             {
+                // One for each character, however many bytes it takes.
                 std::string with;
-                for (S32 c = piece.begin.column; c < piece.end.column; ++c)
+                for (ALTextPos p = piece.begin; p < piece.end; p = d.nextCluster(p))
                 {
                     with += utf8Of(ch);
                 }
