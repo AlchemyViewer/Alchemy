@@ -163,4 +163,25 @@ namespace tut
         ensure_equals("the lazy one", found("xxxy", ALVimPattern::of("x\\{-,2}y", std::string(), plain)), std::string("xxy"));
         ensure_equals("very magic's", found("---a", ALVimPattern::of("\\v-{,3}a", std::string(), plain)), std::string("---a"));
     }
+
+    template<> template<>
+    void alvimpattern_object::test<7>()
+    {
+        set_test_name("a magic ^ is a line's start only first in a branch, a $ its end only last in one, and either is itself elsewhere");
+        ensure_equals("a power", regexOf("x^2"), std::string("x\\^2"));
+        ensure_equals("a dollar", regexOf("cost$x"), std::string("cost\\$x"));
+        ensure_equals("at the pattern's ends", regexOf("^a$"), std::string("^a$"));
+        ensure_equals("last before \\|, first after it", regexOf("a$\\|^b"), std::string("a$|^b"));
+        ensure_equals("in a group", regexOf("\\(^a$\\)"), std::string("(^a$)"));
+        ensure_equals("in one not counted", regexOf("\\%(^a\\)"), std::string("(?:^a)"));
+        ensure_equals("a \\c between putting in nothing", regexOf("\\c^a$\\c"), std::string("^a$"));
+        ensure_equals("about a line break", regexOf("a$\\n^b"), std::string("a$\\n^b"));
+        ensure_equals("a second ^ is itself", regexOf("^^a"), std::string("^\\^a"));
+        ensure_equals("a $ before very magic's |", regexOf("a$\\v|b"), std::string("a$|b"));
+        ensure_equals("but not before a b", regexOf("a$\\vb"), std::string("a\\$b"));
+        ensure_equals("very magic's are the line's ends anywhere", regexOf("\\va^b$c"), std::string("a^b$c"));
+        ensure_equals("found as vim finds it", found("y = x^2;", ALVimPattern::of("x^2", std::string(), plain)), std::string("x^2"));
+        ensure_equals("and the dollar", found("cost$x", ALVimPattern::of("cost$x", std::string(), plain)), std::string("cost$x"));
+        ensure_equals("each at its branch's end", found("ab\nb a", ALVimPattern::of("a$\\|^b", std::string(), plain)), std::string("b|a"));
+    }
 }

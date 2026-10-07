@@ -42,7 +42,9 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // nomagic, where only ^ $ and the backslash items are special. \zs
     // is \K; \ze looks ahead at the rest; \{-} is *?; the classes \a \l
     // \u \x \o \h \i \k are brackets; \c and \C say how case is matched;
-    // a bracket expression is copied through as it stands.
+    // a bracket expression is copied through as it stands. A magic ^ is a
+    // line's start only first in a branch, a $ its end only last in one,
+    // and either is itself anywhere else.
     ALVimPattern        out;
     std::optional<bool> case_in_pattern;
     enum class Magic : U8
@@ -102,32 +104,73 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         }
         return body[0] == ',' ? "{0" + body + "}" : "{" + body + "}";
     };
+    // Whether a magic ^ read now is the line's start, as vim has it: at
+    // the pattern's start, and after \( \%( \| \& or \n, a \c, a \v and
+    // the like between them putting in nothing; anywhere else it is
+    // itself.
+    bool at_start = true;
+    // Whether a magic $ before `k` is the line's end, as vim has it: at the
+    // pattern's end, and before \| \) \& or \n -- or very magic's | ) and &
+    // where a \v comes between -- a \c, a \v and the like between them
+    // putting in nothing; anywhere else it is itself.
+    auto endsAt = [&vim](size_t k) {
+        constexpr std::string_view SWITCHES("cCmMvVZ");
+        constexpr std::string_view ENDS("|&)");
+        bool                       very = false;
+        while (k + 1 < vim.size() && vim[k] == '\\' && SWITCHES.find(vim[k + 1]) != std::string_view::npos)
+        {
+            if (vim[k + 1] == 'v')
+            {
+                very = true;
+            }
+            else if (vim[k + 1] == 'm' || vim[k + 1] == 'M' || vim[k + 1] == 'V')
+            {
+                very = false;
+            }
+            k += 2;
+        }
+        if (k >= vim.size())
+        {
+            return true;
+        }
+        if (vim[k] == '\\')
+        {
+            return k + 1 < vim.size() && (ENDS.find(vim[k + 1]) != std::string_view::npos || vim[k + 1] == 'n');
+        }
+        return very && ENDS.find(vim[k]) != std::string_view::npos;
+    };
     // How deep in the engine's brackets the output is, so that a \zs at
     // the top can split the pattern into groups.
     S32   depth    = 0;
     for (size_t i = 0; i < vim.size(); ++i)
     {
-        const char c = vim[i];
+        const char c          = vim[i];
+        const bool start_here = at_start;
+        at_start              = false;
         if (c == '\\' && i + 1 < vim.size())
         {
             const char n = vim[++i];
             switch (n)
             {
-                case 'v': magic = Magic::Very; continue;
-                case 'm': magic = Magic::Magic; continue;
+                case 'v': magic = Magic::Very; at_start = start_here; continue;
+                case 'm': magic = Magic::Magic; at_start = start_here; continue;
                 case 'M':
-                case 'V': magic = Magic::None; continue;
-                case 'c': case_in_pattern = false; continue;
-                case 'C': case_in_pattern = true; continue;
+                case 'V': magic = Magic::None; at_start = start_here; continue;
+                case 'c': case_in_pattern = false; at_start = start_here; continue;
+                case 'C': case_in_pattern = true; at_start = start_here; continue;
                 case '(':
                     out.regex += magic == Magic::Very ? "\\(" : "(";
                     depth += magic == Magic::Very ? 0 : 1;
+                    at_start = magic != Magic::Very;
                     continue;
                 case ')':
                     out.regex += magic == Magic::Very ? "\\)" : ")";
                     depth -= magic == Magic::Very ? 0 : 1;
                     continue;
-                case '|': out.regex += magic == Magic::Very ? "\\|" : "|"; continue;
+                case '|':
+                    out.regex += magic == Magic::Very ? "\\|" : "|";
+                    at_start = magic != Magic::Very;
+                    continue;
                 case '+': out.regex += magic == Magic::Very ? "\\+" : "+"; continue;
                 case '?':
                 case '=': out.regex += magic == Magic::Very ? std::string(1, n) : "?"; continue;
@@ -195,6 +238,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         out.regex += "(?:";
                         ++depth;
                         ++i;
+                        at_start = true;
                         continue;
                     }
                     if (i + 1 < vim.size() && vim[i + 1] == '[')
@@ -353,6 +397,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     out.acrossLines |= n == 'n';
                     out.regex += '\\';
                     out.regex += n;
+                    at_start = n == 'n' || (n == '&' && magic != Magic::Very);
                     continue;
             }
         }
@@ -403,6 +448,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                             out.regex += "(?:";
                             ++depth;
                             ++i;
+                            at_start = true;
                         }
                         else if (i + 1 < vim.size() && vim[i + 1] == '[')
                         {
@@ -449,16 +495,18 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                             literal(r);
                         }
                         break;
-                    case '(': out.regex += c; ++depth; break;
+                    case '(': out.regex += c; ++depth; at_start = true; break;
                     case ')': out.regex += c; --depth; break;
+                    case '|':
+                    case '&': out.regex += c; at_start = true; break;
                     default: out.regex += c; break;
                 }
                 break;
             case Magic::Magic:
                 switch (c)
                 {
-                    case '^':
-                    case '$':
+                    case '^': out.regex += start_here ? "^" : "\\^"; break;
+                    case '$': out.regex += endsAt(i + 1) ? "$" : "\\$"; break;
                     case '.':
                     case '*': out.regex += c; break;
                     case '~':
