@@ -874,11 +874,18 @@ namespace tut
         keys(":%s/x\\nb/Q/c<CR>");
         ensure_equals("the question says how many lines", vim->status(), std::string("replace with Q (over 2 lines) (y/n/a/q/l)?"));
         keys("q");
-        // The lines are run from the top down: the first gathers its
-        // edit, the next errors.
+        // The lines are run from the top down: a line with none to
+        // substitute is no error under :g, as in vim, and the asking is
+        // over what the others gathered.
         keys(":g/a/s/x/X/c<CR>");
+        ensure("asking", vim->mode() == ALVimKeymap::Mode::Confirm);
+        keys("y");
+        ensure_equals("the one there was", flat(e.text()), std::string("a X|b|a y|a z|"));
+        keys("u");
+        // The first gathers its edit, the command after it errors.
+        keys(":g/a/s/x/X/c|nosuch<CR>");
         ensure("not asking", vim->mode() == ALVimKeymap::Mode::Normal);
-        ensure_equals("the error, and that nothing was done", vim->message(), std::string("E486: Pattern not found: x -- nothing substituted"));
+        ensure_equals("the error, and that nothing was done", vim->message(), std::string("E492: Not an editor command: nosuch -- nothing substituted"));
         ensure_equals("nothing was", flat(e.text()), std::string("a x|b|a y|a z|"));
     }
     template<> template<>
@@ -6327,5 +6334,35 @@ namespace tut
         ensure("none after one that fails", maps.match(ALVimMappings::NORMAL, maps.keysOf("E"), true).full == nullptr);
         ensure_equals("the one said", errors.size(), size_t(1));
         ensure("by its line", errors[0].find("line 2:") == 0 && errors[0].find("E518") != std::string::npos);
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<213>()
+    {
+        set_test_name(":g says nothing of its command's lines while it runs and once it is through says the substitutions made, or the lines there are more or fewer of, and a :s that finds none on a line is no error there");
+        const char* five = "a1\nb\na2\nc\na3";
+        const auto  run  = [&](const char* text, const char* line) {
+            make(text);
+            keys(line);
+            return vim->message();
+        };
+        ensure_equals(":d", run(five, ":g/a/d<CR>"), std::string("3 fewer lines"));
+        ensure_equals("two said of by none", run("a\nb\na", ":g/a/d<CR>"), std::string());
+        ensure_equals(":s", run(five, ":g/a/s/a/x/<CR>"), std::string("3 substitutions on 3 lines"));
+        ensure_equals("several a line", run("aa\nb\naaa", ":g/a/s/a/x/g<CR>"), std::string("5 substitutions on 2 lines"));
+        ensure_equals("none on some lines", run(five, ":g/./s/a/x/<CR>"), std::string("3 substitutions on 3 lines"));
+        ensure_equals("and all made", flat(editor->text()), std::string("x1|b|x2|c|x3"));
+        ensure_equals("none on any", run(five, ":g/a/s/zzz/y/<CR>"), std::string());
+        ensure("and no error", !vim->messageIsError());
+        ensure_equals("counted only, as substitutions", run(five, ":g/./s/a//n<CR>"), std::string("3 substitutions on 3 lines"));
+        ensure_equals(":t", run(five, ":g/a/t.<CR>"), std::string("3 more lines"));
+        ensure_equals("each its own lines added up", run("a\nb\na\nb\na\nb", ":g/a/t.|t.<CR>"), std::string("6 more lines"));
+        ensure_equals(":j", run("a\n1\na\n2\na\n3\na\n4", ":g/a/j<CR>"), std::string("4 fewer lines"));
+        ensure_equals(":j with a count", run("a\n1\n2\na\n3\n4\na\n5\n6", ":g/a/j 3<CR>"), std::string("6 fewer lines"));
+        ensure_equals("and made", flat(editor->text()), std::string("a 1 2|a 3 4|a 5 6"));
+        ensure_equals("what each would say not said", run("a\n1\n2\nx\na\n3\n4\ny", ":g/a/normal 3dd<CR>"), std::string("6 fewer lines"));
+        ensure_equals(":normal of none", run(five, ":g/a/normal Ax<CR>"), std::string());
+        ensure_equals("a | after it", run(five, ":g/a/d|s/b/q/<CR>"), std::string("3 fewer lines"));
+        ensure_equals("substitutions before lines", run("a\na\na\na", ":g/a/s/a/x/|d<CR>"), std::string("4 substitutions on 4 lines"));
     }
 }

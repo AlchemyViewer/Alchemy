@@ -1730,17 +1730,6 @@ void ALVimExCommands::applyGlobalBatch(ALTextView& view, GlobalBatch& batch)
         landing = llclamp(landing, 0, d.lineCount() - 1);
         mVim.moveTo(view, ALTextPos(landing, firstNonBlankColumn(d, landing)));
     }
-    // Substitutions said only over more than one line, as a :s untyped
-    // says them (substitute): vim runs a :g's commands as none of them
-    // typed.
-    if (batch.substitutions > REPORT_THRESHOLD && batch.substitutedLines > 1)
-    {
-        mVim.say(ALVimKeymap::substitutionsSaid(batch.substitutions, batch.substitutedLines));
-    }
-    else if (batch.deletedLines > REPORT_THRESHOLD)
-    {
-        mVim.say(alSaidCount("VimFewerLines", batch.deletedLines, "1 fewer line", "[COUNT] fewer lines"));
-    }
 }
 
 bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged, const std::string& spec, bool invert)
@@ -1843,9 +1832,12 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
     // One step to undo for the lot; an asking :s among the commands
     // gathers its edits here and the asking runs once, in order, after.
     view.undoJournal().beginGroup();
-    confirming           = Confirming();
-    confirming.gathering = true;
-    mInGlobal             = true;
+    confirming              = Confirming();
+    confirming.gathering    = true;
+    mInGlobal               = true;
+    mGlobalSubstitutions    = 0;
+    mGlobalSubstitutedLines = 0;
+    const S32 lines_before  = d.lineCount();
     if (globalBatches(command))
     {
         // Each line changed only where it is, in the text as it was: the
@@ -1935,6 +1927,27 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
     }
     mInGlobal             = false;
     confirming.gathering = false;
+    if (!mVim.mMessageError && confirming.edits.empty())
+    {
+        // What the commands made, said once, as vim's :g says it: the
+        // substitutions, where there were more than vim's report over more
+        // than one line, as a :s untyped says them (substitute) -- vim
+        // runs a :g's commands as none of them typed -- or else the lines
+        // there are now more or fewer of.
+        const S32 more = d.lineCount() - lines_before;
+        if (mGlobalSubstitutions > REPORT_THRESHOLD && mGlobalSubstitutedLines > 1)
+        {
+            mVim.say(ALVimKeymap::substitutionsSaid(mGlobalSubstitutions, mGlobalSubstitutedLines));
+        }
+        else if (more > 0)
+        {
+            mVim.sayMoreLines(more);
+        }
+        else if (-more > REPORT_THRESHOLD)
+        {
+            mVim.say(alSaidCount("VimFewerLines", -more, "1 fewer line", "[COUNT] fewer lines"));
+        }
+    }
     if (mVim.mMessageError && !confirming.edits.empty())
     {
         // An error part way: what was gathered from the lines before it
@@ -2091,7 +2104,8 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
     }
     if (matches.empty())
     {
-        if (!quiet)
+        // None on a :g's line is no error, as vim's :s says none there.
+        if (!quiet && !mInGlobal)
         {
             mVim.say(ALVimKeymap::said("VimPatternNotFound", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", pattern } }), true);
         }
@@ -2115,9 +2129,19 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
         edits.emplace_back(match, count_only ? std::string() : std::move(replaced[m]));
     }
     const S32 count = static_cast<S32>(edits.size());
+    if (mInGlobal && !asking)
+    {
+        // Added up for the :g to say once it is through, as substitutions
+        // even where they were only counted, as vim's are.
+        mGlobalSubstitutions += count;
+        mGlobalSubstitutedLines += lines;
+    }
     if (count_only)
     {
-        mVim.say(ALVimKeymap::matchesSaid(count, lines));
+        if (!mInGlobal)
+        {
+            mVim.say(ALVimKeymap::matchesSaid(count, lines));
+        }
         return false;
     }
     if (asking && !view.isReadOnly())
@@ -2153,8 +2177,6 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
         globalBatch->landing      = edits.back().first.normalised().begin;
         globalBatch->landingBelow = static_cast<S32>(std::count(edits.back().second.begin(), edits.back().second.end(), '\n'));
         globalBatch->landed       = true;
-        globalBatch->substitutions += count;
-        globalBatch->substitutedLines += lines;
         for (auto& edit : edits)
         {
             globalBatch->edits.push_back(std::move(edit));
@@ -2169,9 +2191,9 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
     mVim.moveTo(view, ALTextPos(landing, firstNonBlankColumn(d, landing)));
     // Said for more than vim's report, as vim's do_sub_msg says it: over
     // more than one line, or over one where the line was typed -- not
-    // played, not run again by & or @:, and not a :g's command, which vim
-    // runs as none of them typed.
-    if (count > REPORT_THRESHOLD && (lines > 1 || (mLineTyped && mVim.keyTyped() && !mInGlobal)))
+    // played, not run again by & or @: -- and by the :g a :g's command is
+    // run by, once it is through.
+    if (!mInGlobal && count > REPORT_THRESHOLD && (lines > 1 || (mLineTyped && mVim.keyTyped())))
     {
         mVim.say(ALVimKeymap::substitutionsSaid(count, lines));
     }

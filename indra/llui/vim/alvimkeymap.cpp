@@ -313,6 +313,12 @@ bool ALVimKeymap::typingLine(std::string& line, S32& caret) const
 
 void ALVimKeymap::say(const std::string& message, bool error)
 {
+    // Nothing but an error while a :g runs its command, which says what
+    // they did once it is through, as vim's global_busy keeps them.
+    if (!error && mEx && mEx->inGlobal())
+    {
+        return;
+    }
     mMessage      = message;
     mMessageError = error;
     mFailed       = mFailed || error;
@@ -5869,7 +5875,6 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                         mEx->globalBatch->landing      = whole.begin;
                         mEx->globalBatch->landingBelow = 0;
                         mEx->globalBatch->landed       = true;
-                        mEx->globalBatch->deletedLines += last - first + 1;
                         return;
                     }
                     view.deleteRange(whole);
