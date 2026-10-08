@@ -1687,7 +1687,7 @@ bool LLAppViewer::doFrame()
 
             if (mRandomizeFramerate)
             {
-                ms_sleep(rand() % 200);
+                ms_sleep(ll_rand(200));
             }
 
             if (mPeriodicSlowFrame
