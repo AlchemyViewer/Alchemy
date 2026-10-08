@@ -6123,4 +6123,44 @@ namespace tut
         ensure_equals("d} from the paragraph's second character", flat(editor->text()), std::string("a||b"));
         ensure_equals("said", vim->message(), std::string("3 fewer lines"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<208>()
+    {
+        set_test_name("visual p and P say how many more lines they put, as a put does -- lines in place of lines, lines into characters with the line broken round them, characters over lines -- and nothing of the lines they replaced");
+        const char* text = "one\ntwo\nthree\nfour\nfive\nsix";
+        make(text);
+        keys("3yyGVp");
+        ensure_equals("3yy then Vp", flat(editor->text()), std::string("one|two|three|four|five|one|two|three"));
+        ensure_equals("said", vim->message(), std::string("3 more lines"));
+
+        make(text);
+        keys("3yyGVP");
+        ensure_equals("VP too", vim->message(), std::string("3 more lines"));
+
+        make(text);
+        keys("3yyjjjV2jp");
+        ensure_equals("over as many lines", flat(editor->text()), std::string("one|two|three|one|two|three"));
+        ensure_equals("said all the same", vim->message(), std::string("3 more lines"));
+
+        make(text);
+        keys("yyGV3p");
+        ensure_equals("a count's copies", vim->message(), std::string("3 more lines"));
+
+        make(text);
+        keys("3yyjlvp");
+        ensure_equals("lines into a character", flat(editor->text()), std::string("one|t|one|two|three|o|three|four|five|six"));
+        ensure_equals("the line broken round them counted", vim->message(), std::string("4 more lines"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("v3jyG0vp");
+        ensure_equals("characters over four lines", flat(editor->text()), std::string("one|two|three|four|five|ne|two|three|foix"));
+        ensure_equals("said by their breaks", vim->message(), std::string("3 more lines"));
+
+        make(text);
+        keys("yyjV3jp");
+        ensure_equals("a line over four", flat(editor->text()), std::string("one|one|six"));
+        ensure("nothing said of the lines it replaced: " + vim->message(), vim->message().empty());
+    }
 }

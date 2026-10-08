@@ -3957,9 +3957,10 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                         }
                         text += put_this.text;
                     }
+                    const std::string put_in = split ? "\n" + text + "\n" : text;
                     view.deleteRange(span.range);
                     view.setCaret(span.range.begin);
-                    view.insertText(split ? "\n" + text + "\n" : text);
+                    view.insertText(put_in);
                     if (lines)
                     {
                         const S32 line = span.range.begin.line + (split ? 1 : 0);
@@ -3969,6 +3970,12 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                     {
                         moveTo(view, text.empty() ? view.caret() : text.find('\n') != std::string::npos ? span.range.begin : d.prevCluster(view.caret()));
                     }
+                    // The lines the put adds, said as a put says them: a line
+                    // for each break it puts in, and one more where lines go
+                    // in the place of lines. What it replaced is not said, as
+                    // vim takes the selection out without a word.
+                    const S32 breaks = static_cast<S32>(std::count(put_in.begin(), put_in.end(), '\n'));
+                    sayMoreLines(lines && !split ? breaks + 1 : breaks);
                 }
                 view.undoJournal().endGroup();
                 if (ch == 'p' && (span.linewise || span.block || !span.range.empty()))
