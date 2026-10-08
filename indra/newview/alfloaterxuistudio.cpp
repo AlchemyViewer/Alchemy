@@ -3127,7 +3127,7 @@ bool ALFloaterXUIStudio::onChannelChanged(const std::string& channel, const LLSD
         mChannels->addElement(row(id, {
             { "channel", channel },
             { "name", note->getName() },
-            { "time", LLDate(LLTimer::getTotalSeconds()).toHTTPDateString("%H:%M:%S") },
+            { "time", LLDate::now().toHTTPDateString("%H:%M:%S") },
             { "message", message } }));
         // A session's worth of notifications through ten channels is not a
         // list anybody reads to the bottom of, and the pointers held for
