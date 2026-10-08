@@ -133,7 +133,10 @@ void LLStreamingAudio_MediaPlugins::update()
     // The ticker hears of new tags, as FMOD's stream tells it, and of the
     // stream starting or pausing, which is all a stream without tags says.
     const int playing = isPlaying();
-    const LLSD& metadata = mMediaPlugin->getMediaMetadata();
+    // A plugin that has sent no tags yet holds none, which is no tags, as
+    // mMetadata keeps it; else the two differ every frame until tags come.
+    const LLSD& raw = mMediaPlugin->getMediaMetadata();
+    const LLSD metadata = raw.isMap() ? raw : LLSD::emptyMap();
     if (playing != mLastPlaying || !llsd_equals(metadata, mMetadata))
     {
         mLastPlaying = playing;
