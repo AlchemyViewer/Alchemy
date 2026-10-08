@@ -1350,11 +1350,13 @@ bool ALVimKeymap::afterPlay(ALTextView& view, llwchar pending, llwchar ch)
     }
     if (name == ':')
     {
-        // The last : line again.
+        // The last : line run again, the ": register: while a line runs,
+        // the one before it.
         clearPending();
-        mLastPlayed = ':';
-        const std::vector<std::string>& history = mCommandLine.historyOf(':');
-        if (history.empty())
+        mLastPlayed      = ':';
+        mKeepCommandLine = false;
+        const std::string line = mShared->commandLine;
+        if (line.empty())
         {
             say(said("VimNoPreviousCommand", "E30: No previous command line"), true);
             return true;
@@ -1362,7 +1364,7 @@ bool ALVimKeymap::afterPlay(ALTextView& view, llwchar pending, llwchar ch)
         view.undoJournal().beginGroup();
         for (S32 n = 0; n < count; ++n)
         {
-            mEx->runCommand(view, history.back());
+            mEx->runCommand(view, line);
             if (mMessageError)
             {
                 break;
@@ -6007,6 +6009,15 @@ void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, 
 
 ALVimKeymap::Register ALVimKeymap::fetch(char name) const
 {
+    // The registers vim keeps itself and lets be read only: what the last
+    // insert typed, the last : line run and the last search.
+    if (name == '.' || name == ':' || name == '/')
+    {
+        Register reg;
+        reg.text = name == '.' ? mLastTyped : name == ':' ? mShared->commandLine : mSearch.pattern;
+        reg.held = !reg.text.empty();
+        return reg;
+    }
     return mShared->registers.fetch(name, mShared->unnamedClipboard);
 }
 

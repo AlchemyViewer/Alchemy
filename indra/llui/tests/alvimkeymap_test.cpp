@@ -219,7 +219,7 @@ namespace tut
 
     // More than TUT's fifty a group holds by default, which runs the first
     // fifty and says nothing of the rest: keep this above the highest test.
-    typedef test_group<alvimkeymap_data, 210> alvimkeymap_group;
+    typedef test_group<alvimkeymap_data, 220> alvimkeymap_group;
     typedef alvimkeymap_group::object    alvimkeymap_object;
     alvimkeymap_group                    alvimkeymap_group_instance("alvimkeymap");
 
@@ -1526,9 +1526,12 @@ namespace tut
         ensure("the heading", listed[0].compare(0, 17, "Type Name Content") == 0);
         ensure("a yank of lines", listed[0].find("\n  l  \"0   one^J") != std::string::npos);
         ensure("a named one, of characters, a tab as ^I", listed[0].find("\n  c  \"a   ^I") != std::string::npos);
-        ensure("the last : line", listed[0].find("\n  c  \":   registers") != std::string::npos);
+        ensure("no : line run before it", listed[0].find("\":") == std::string::npos);
         keys(":di a<CR>");
         ensure("only those named", listed[1].find("\"0") == std::string::npos && listed[1].find("\"a") != std::string::npos);
+        keys(":di :<CR>");
+        ensure("the : line run before this one", listed.back().find("\n  c  \":   di a") != std::string::npos);
+        listed.pop_back();
 
         keys("mb:marks<CR>");
         ensure_equals("marks", listed[2], std::string("mark line  col file/text\n b      2    0 two three"));
@@ -6162,5 +6165,54 @@ namespace tut
         keys("yyjV3jp");
         ensure_equals("a line over four", flat(editor->text()), std::string("one|one|six"));
         ensure("nothing said of the lines it replaced: " + vim->message(), vim->message().empty());
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<209>()
+    {
+        set_test_name(":put of the registers vim keeps itself: : the line run before this one and / the last search as lines, . the last insert typed in after the caret, and each its own error while it holds nothing");
+        make("one\ntwo");
+        keys(":put :<CR>");
+        ensure_equals("no : line yet", vim->message(), std::string("E30: No previous command line"));
+        keys(":put .<CR>");
+        ensure_equals("nothing typed yet", vim->message(), std::string("E29: No inserted text yet"));
+        keys(":put /<CR>");
+        ensure_equals("no search yet", vim->message(), std::string("E35: No previous regular expression"));
+        ensure_equals("nothing put", flat(editor->text()), std::string("one|two"));
+
+        make("one\ntwo");
+        keys(":s/o/0/<CR>:put :<CR>");
+        ensure_equals(": the line before", flat(editor->text()), std::string("0ne|s/o/0/|two"));
+        keys(":put :<CR>");
+        ensure_equals("which is this one the second time", flat(editor->text()), std::string("0ne|s/o/0/|put :|two"));
+
+        make("one\ntwo");
+        keys("/tw<CR>:put /<CR>");
+        ensure_equals("/ the search", flat(editor->text()), std::string("one|two|tw"));
+
+        make("one\ntwo");
+        keys("Ahey<Esc>:put .<CR>");
+        ensure_equals(". typed in after the caret", flat(editor->text()), std::string("oneheyhey|two"));
+        ensure_equals("the caret on its last character", caretText(), std::string("0:8"));
+
+        make("one two\nthree");
+        keys("wiab<Esc>");
+        editor->setCaret(ALTextPos(0, 1));
+        keys(":2put .<CR>");
+        ensure_equals("on the range's line, the column kept", flat(editor->text()), std::string("one abtwo|thabree"));
+        ensure_equals("there", caretText(), std::string("1:3"));
+        editor->setCaret(ALTextPos(0, 2));
+        keys(":put! .<CR>");
+        ensure_equals("with ! at the caret", flat(editor->text()), std::string("onabe abtwo|thabree"));
+        ensure_equals("and there", caretText(), std::string("0:3"));
+        editor->setCaret(ALTextPos(1, 0));
+        keys(":0put .<CR>");
+        ensure_equals(":0put as :1put!", flat(editor->text()), std::string("abonabe abtwo|thabree"));
+
+        make("a a a");
+        keys(":s/a/b/<CR>:normal @:<CR>");
+        ensure_equals("@: in a line runs the one before it", flat(editor->text()), std::string("b b a"));
+        keys("@:");
+        ensure_equals("and that line is never the : register", flat(editor->text()), std::string("b b b"));
     }
 }

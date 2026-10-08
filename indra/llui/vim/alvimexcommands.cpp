@@ -1215,7 +1215,9 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         // put, as an empty line is, and so is an empty last line of
         // several. What _ gives back is no text, which as a line is an
         // empty one. The register is the one named after it, as for :d
-        // and :y, or the unnamed one.
+        // and :y, or the unnamed one; : is the last line run and / the
+        // last search, put as lines, and . the last insert's text, which
+        // vim types in instead.
         char        named = 0;
         S32         lines = 0;
         std::string error;
@@ -1231,7 +1233,47 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         const ALVimRegisters::Register reg = mVim.fetch(named);
         if (!reg.held && named != '_')
         {
-            mVim.say(ALVimKeymap::said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, named ? named : '"') } }), true);
+            if (named == '.')
+            {
+                mVim.say(ALVimKeymap::said("VimNoInsertedText", "E29: No inserted text yet"), true);
+            }
+            else if (named == ':')
+            {
+                mVim.say(ALVimKeymap::said("VimNoPreviousCommand", "E30: No previous command line"), true);
+            }
+            else if (named == '/')
+            {
+                mVim.say(ALVimKeymap::said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
+            }
+            else
+            {
+                mVim.say(ALVimKeymap::said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, named ? named : '"') } }),
+                         true);
+            }
+            return;
+        }
+        if (named == '.')
+        {
+            // The last insert's text typed in again, as vim's :put . types
+            // it whatever its line: after the character under the caret on
+            // the range's last line, or at it with ! and for :0put, the
+            // caret's column kept; the caret then on the last character
+            // typed, as Escape leaves it.
+            const S32       line = before_first ? 0 : last;
+            const ALTextPos end  = d.lineEnd(line);
+            ALTextPos       at   = d.clamp(ALTextPos(line, llmin(view.caret().column, end.column)));
+            if (at == end && end.column > 0)
+            {
+                at = d.prevCluster(at);
+            }
+            if (!bang && !before_first && at < end)
+            {
+                at = d.nextCluster(at);
+            }
+            view.setCaret(at);
+            view.insertText(reg.text);
+            const ALTextPos typed = view.caret();
+            mVim.moveTo(view, typed.column > 0 ? d.prevCluster(typed) : typed);
             return;
         }
         // Characters ending in a line break -- text copied from elsewhere,
@@ -1979,8 +2021,8 @@ void ALVimExCommands::listRegisters(ALTextView& view, const std::string& names)
         const ALVimRegisters::Register held = mVim.fetch(*name);
         row(held.block ? 'b' : held.linewise ? 'l' : 'c', *name, held.linewise && !held.text.empty() ? held.text + "\n" : held.text);
     }
-    row('c', ':', mVim.mShared->command.empty() ? std::string() : mVim.mShared->command.back());
-    row('c', '/', mVim.mSearch.pattern);
+    row('c', ':', mVim.fetch(':').text);
+    row('c', '/', mVim.fetch('/').text);
     list(view, text);
 }
 

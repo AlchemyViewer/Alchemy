@@ -530,6 +530,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimConfirmReplaceLines">replace with [WITH] (over [COUNT] lines) (y/n/a/q/l)?</string>
 	<string name="VimTooRecursive">E169: Command too recursive</string>
 	<string name="VimNoPreviousCommand">E30: No previous command line</string>
+	<string name="VimNoInsertedText">E29: No inserted text yet</string>
 	<string name="VimNoPreviousPattern">E35: No previous regular expression</string>
 	<string name="VimMarkNotSet">E20: Mark not set</string>
 	<string name="CodeFixSpelling">Change to "[WORD]"</string>
