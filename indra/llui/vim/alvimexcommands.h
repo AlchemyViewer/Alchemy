@@ -47,6 +47,10 @@ public:
 
     // The : line.
     void runCommand(ALTextView& view, const std::string& line);
+    // The : line run as one entered on it, by a key from the keyboard or
+    // not -- a macro's, :normal's, a mapping's -- as vim's KeyTyped has it:
+    // a :s over one line says how many it made only where it was typed.
+    void runEntered(ALTextView& view, const std::string& line, bool typed);
     bool substitute(ALTextView& view, S32 first, S32 last, const std::string& spec);
     // Vim's spelling of a replacement -- & for the match, \1 for a group,
     // ~ for the last replacement, \r for a line break -- as the search
@@ -140,4 +144,6 @@ private:
     // Whether a :g is running its command over lines, which another :g
     // may not do, as vim has it (E147).
     bool mInGlobal = false;
+    // Whether the line being run was entered by a key typed (runEntered).
+    bool mLineTyped = false;
 };

@@ -5852,4 +5852,30 @@ namespace tut
         ensure_equals("moved by a :g", flat(editor->text()), std::string("three|four|five|one|two|six|"));
         ensure(":m under a :g: nothing said: " + vim->message(), vim->message().empty());
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<203>()
+    {
+        set_test_name("more than two substitutions on one line are said only where the : line was typed, as vim's do_sub_msg has it: not from a macro, by @: or under a :g; over more lines they are said however the line came");
+        make("a a a\nx\n");
+        keys(":s/a/b/g<CR>");
+        ensure_equals("typed", vim->message(), std::string("3 substitutions on 1 line"));
+        keys("uqqgg:s/a/b/g<CR>q");
+        keys("u@q");
+        ensure_equals("the macro made them", flat(editor->text()), std::string("b b b|x|"));
+        ensure("played from a macro: nothing said: " + vim->message(), vim->message().empty());
+        keys("ugg@:");
+        ensure_equals("@: made them", flat(editor->text()), std::string("b b b|x|"));
+        ensure("run again by @:: nothing said: " + vim->message(), vim->message().empty());
+        keys("ug&");
+        ensure_equals("g& typed", vim->message(), std::string("3 substitutions on 1 line"));
+        keys("u:g/a/s/a/b/g<CR>");
+        ensure_equals("a :g made them", flat(editor->text()), std::string("b b b|x|"));
+        ensure("under a :g over one line: nothing said: " + vim->message(), vim->message().empty());
+
+        make("a a\na a\n");
+        keys("qq:%s/a/b/g<CR>q");
+        keys("u@q");
+        ensure_equals("from a macro over two lines", vim->message(), std::string("4 substitutions on 2 lines"));
+    }
 }

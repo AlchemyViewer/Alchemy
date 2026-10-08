@@ -314,6 +314,9 @@ private:
     // for the text, as the view hears of a paste, not one a character.
     bool holds(const Input& input) const;
     void flushHeld(ALTextView& view);
+    // Whether the key being fed came from the keyboard, as vim's KeyTyped
+    // has it: not from `.`, a macro, :normal or a mapping.
+    bool keyTyped() const { return !mReplaying && mPlaying == 0 && mMapped == 0; }
     // The mapping mode keys are looked up in now: none while a command
     // waits for a character of its own -- f's, r's, the second of g's.
     U8   mapMode() const;

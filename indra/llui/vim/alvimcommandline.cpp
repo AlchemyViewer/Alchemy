@@ -235,7 +235,8 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                 remember(which, entered);
                 if (which == ':')
                 {
-                    mVim.mEx->runCommand(view, entered);
+                    // Typed where the Enter that ends it was.
+                    mVim.mEx->runEntered(view, entered, mVim.keyTyped());
                 }
                 else
                 {

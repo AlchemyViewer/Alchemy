@@ -1720,11 +1720,12 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
             return true;
         }
         case '&':
-            // The last :s again on every line, with its flags.
+            // The last :s again on every line, with its flags: a line typed
+            // where the g& was, as vim's runs it.
             clearPending();
             if (editing)
             {
-                mEx->runCommand(view, "%s//~/&");
+                mEx->runEntered(view, "%s//~/&", keyTyped());
             }
             return true;
         case 'v':

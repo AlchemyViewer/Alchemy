@@ -462,7 +462,9 @@ void ALVimExCommands::endConfirming(ALTextView& view)
     {
         mVim.moveTo(view, view.caret());
     }
-    if (confirming.made > REPORT_THRESHOLD)
+    // As :s says it (substitute), typed where the answer that ended the
+    // asking was.
+    if (confirming.made > REPORT_THRESHOLD && (confirming.lines > 1 || mVim.keyTyped()))
     {
         mVim.say(ALVimKeymap::substitutionsSaid(confirming.made, confirming.lines));
     }
@@ -722,6 +724,16 @@ void ALVimExCommands::source(ALVimKeymap::Shared& shared, std::string_view text,
                 ALVimKeymap::said("VimrcLine", "line [NUMBER]: [ERROR]", { { "[NUMBER]", std::to_string(line_number) }, { "[ERROR]", error } }));
         }
     }
+}
+
+void ALVimExCommands::runEntered(ALTextView& view, const std::string& line, bool typed)
+{
+    // As it was for a line this one runs inside -- a :normal's -- once
+    // this one is done.
+    const bool was = mLineTyped;
+    mLineTyped     = typed;
+    runCommand(view, line);
+    mLineTyped = was;
 }
 
 void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
@@ -1406,7 +1418,10 @@ void ALVimExCommands::applyGlobalBatch(ALTextView& view, GlobalBatch& batch)
         landing = llclamp(landing, 0, d.lineCount() - 1);
         mVim.moveTo(view, ALTextPos(landing, firstNonBlankColumn(d, landing)));
     }
-    if (batch.substitutions > REPORT_THRESHOLD)
+    // Substitutions said only over more than one line, as a :s untyped
+    // says them (substitute): vim runs a :g's commands as none of them
+    // typed.
+    if (batch.substitutions > REPORT_THRESHOLD && batch.substitutedLines > 1)
     {
         mVim.say(ALVimKeymap::substitutionsSaid(batch.substitutions, batch.substitutedLines));
     }
@@ -1840,7 +1855,11 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
     }
     landing = llclamp(landing, 0, d.lineCount() - 1);
     mVim.moveTo(view, ALTextPos(landing, firstNonBlankColumn(d, landing)));
-    if (count > REPORT_THRESHOLD)
+    // Said for more than vim's report, as vim's do_sub_msg says it: over
+    // more than one line, or over one where the line was typed -- not
+    // played, not run again by & or @:, and not a :g's command, which vim
+    // runs as none of them typed.
+    if (count > REPORT_THRESHOLD && (lines > 1 || (mLineTyped && mVim.keyTyped() && !mInGlobal)))
     {
         mVim.say(ALVimKeymap::substitutionsSaid(count, lines));
     }
