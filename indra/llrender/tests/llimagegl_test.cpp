@@ -551,6 +551,36 @@ namespace tut
                       std::memcmp(dst->getData(), sd, (size_t)W * H * 4), 0);
     }
 
+    // The pick mask of a texture still being uploaded waits for that texture:
+    // getMask answers for the one on screen, and off the main thread building the
+    // mask in place freed the buffer getMask was reading. It publishes with the
+    // texture, and an upload that never publishes leaves it alone.
+    template<> template<>
+    void llimagegl_object::test<14>()
+    {
+        constexpr U16 W = 16, H = 16;
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        ensure("createGLTexture succeeded",
+               img->createGLTexture(0, makeRaw(W, H, 4, 0xFF).get()));
+        const LLVector2 centre(0.5f, 0.5f);
+        ensure("opaque texture picks", img->getMask(centre));
+
+        LLPointer<LLImageRaw> clear = makeRaw(W, H, 4, 0x00);
+
+        img->beginUpload();
+        img->updatePickMask(W, H, clear->getData());
+        ensure("the mask on screen answers while the upload is in flight",
+               img->getMask(centre));
+        img->endUpload();
+        ensure("an upload that never published leaves the mask alone",
+               img->getMask(centre));
+
+        img->beginUpload();
+        img->updatePickMask(W, H, clear->getData());
+        img->syncTexName(img->getTexName());
+        ensure("the new mask publishes with its texture", !img->getMask(centre));
+    }
+
     // An edit writes through the ACTIVE unit, and a bind that finds the texture
     // already cached on slot 0 skips activating it. With another unit left active
     // the write went to whatever that unit held. The glyph atlas does exactly this:

@@ -283,6 +283,8 @@ public:
     bool getUseMipMaps() const { return mUseMipMaps; }
     void setUseMipMaps(bool usemips) { mUseMipMaps = usemips; }
     void setHasMipMaps(bool hasmips) { mHasMipMaps = hasmips; }
+    // Build the pick mask from level-0 RGBA8 data. During an upload in flight, or off the
+    // main thread, the result waits for the texture it describes to publish.
     void updatePickMask(S32 width, S32 height, const U8* data_in);
 // [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
     bool getMask(const LLVector2 &tc) const;
@@ -341,9 +343,16 @@ private:
     // existing texture must release the old accounting themselves.
     void allocateTextureStorage(S32 width, S32 height, bool has_mips);
 
-    U32 createPickMask(S32 pWidth, S32 pHeight);
     void freePickMask();
     bool isCompressed() const;
+
+    // The alpha facts an upload derives, routed through mPendingAlpha when stagesAlpha().
+    // setPickMask takes ownership of mask, which may be null for "no pick mask".
+    bool stagesAlpha() const;
+    void setPickMask(U8* mask, U16 width, U16 height);
+    void setIsMask(bool is_mask);
+    void publishPendingAlpha();
+    void discardPendingAlpha();
 
     // Warn when an upload runs off the main thread without the snapshot beginUpload takes.
     void checkUploadBegun() const;
@@ -362,6 +371,23 @@ private:
     LLAtomicU32 mAlphaAnalysisSerial; // for request tracking.
     S8   mAlphaStride ;
     S8   mAlphaOffset ;
+
+    // The pick mask and mask verdict of a texture that has not published yet.
+    //
+    // getMask and getIsAlphaMask answer for the texture mTexName names, and the main thread
+    // asks them every frame (hover picking, the alpha pool). An off-thread upload building
+    // the mask in place would free the buffer getMask was reading, so it builds here
+    // instead and syncTexName swaps it in with the texture.
+    struct PendingAlpha
+    {
+        U8*  mPickMask       = nullptr;
+        U16  mPickMaskWidth  = 0;
+        U16  mPickMaskHeight = 0;
+        bool mHasPickMask    = false; // a result is waiting, possibly "no pick mask"
+        bool mIsMask         = false;
+        bool mHasIsMask      = false;
+    };
+    PendingAlpha mPendingAlpha;
 
     // Geometry of the texture mTexName currently names, captured when an off-thread
     // upload begins overwriting the members with the *next* texture's geometry.
@@ -491,7 +517,8 @@ public:
     // the six per-face objects only ever write sub-images.
     void markStorageAllocated() { mStorageAllocated = true; }
 
-    //similar to setTexName, but will call deleteTextures on mTexName if mTexName is not 0 or texname
+    // Publish texname in place of mTexName, deleting the old one, along with what the
+    // upload that built it staged (the pick mask), then end the upload. Main thread.
     void syncTexName(LLGLuint texname);
 
     // Bracket an upload handed to the LLImageGL thread, on the MAIN thread: begin before

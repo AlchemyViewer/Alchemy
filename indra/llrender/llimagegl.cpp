@@ -780,6 +780,7 @@ void LLImageGL::cleanup()
         destroyGLTexture();
     }
     freePickMask();
+    discardPendingAlpha();
 
     mSaveData = NULL; // deletes data
 }
@@ -2061,6 +2062,9 @@ void LLImageGL::endUpload()
 {
     llassert(on_main_thread());
     mUploadInFlight = false;
+
+    // Whatever the upload staged and did not publish describes a texture that never was.
+    discardPendingAlpha();
 }
 
 void LLImageGL::checkUploadBegun() const
@@ -2083,10 +2087,74 @@ void LLImageGL::syncTexName(LLGLuint texname)
             LLImageGL::deleteTextures(1, &mTexName);
         }
         mTexName = texname;
+
+        // The alpha facts derived from the new texture publish with it.
+        publishPendingAlpha();
     }
 
     // Members and mTexName describe the same texture again.
     endUpload();
+}
+
+bool LLImageGL::stagesAlpha() const
+{
+    // Off the main thread, getMask and getIsAlphaMask may be reading the published values
+    // at this very moment; on it, they answer for mTexName, which an upload in flight has
+    // not replaced yet.
+    return mUploadInFlight || !on_main_thread();
+}
+
+void LLImageGL::setPickMask(U8* mask, U16 width, U16 height)
+{
+    if (stagesAlpha())
+    {
+        delete[] mPendingAlpha.mPickMask;
+        mPendingAlpha.mPickMask       = mask;
+        mPendingAlpha.mPickMaskWidth  = width;
+        mPendingAlpha.mPickMaskHeight = height;
+        mPendingAlpha.mHasPickMask    = true;
+        return;
+    }
+
+    freePickMask();
+    mPickMask       = mask;
+    mPickMaskWidth  = width;
+    mPickMaskHeight = height;
+}
+
+void LLImageGL::setIsMask(bool is_mask)
+{
+    if (stagesAlpha())
+    {
+        mPendingAlpha.mIsMask    = is_mask;
+        mPendingAlpha.mHasIsMask = true;
+        return;
+    }
+
+    mIsMask = is_mask;
+}
+
+void LLImageGL::publishPendingAlpha()
+{
+    if (mPendingAlpha.mHasPickMask)
+    {
+        freePickMask();
+        mPickMask       = mPendingAlpha.mPickMask;
+        mPickMaskWidth  = mPendingAlpha.mPickMaskWidth;
+        mPickMaskHeight = mPendingAlpha.mPickMaskHeight;
+        mPendingAlpha.mPickMask = nullptr;
+    }
+    if (mPendingAlpha.mHasIsMask)
+    {
+        mIsMask = mPendingAlpha.mIsMask;
+    }
+    mPendingAlpha = PendingAlpha();
+}
+
+void LLImageGL::discardPendingAlpha()
+{
+    delete[] mPendingAlpha.mPickMask;
+    mPendingAlpha = PendingAlpha();
 }
 
 bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compressed_ok) const
@@ -2679,7 +2747,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         // but increment either way, for extra safety.
         ++mAlphaAnalysisSerial;
 
-        mIsMask = analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride);
+        setIsMask(analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride));
         return;
     }
 
@@ -2697,7 +2765,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
     if (!data_copy)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-        mIsMask = analyzeAlphaData(data_in, w, h, alpha_offset, alpha_stride);
+        setIsMask(analyzeAlphaData(data_in, w, h, alpha_offset, alpha_stride));
         return;
     }
     memcpy(data_copy, static_cast<const U8*>(data_in), data_size);
@@ -2759,31 +2827,8 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
         // Queues not available - fall back to synchronous analysis
         delete[] data_copy;
-        mIsMask = analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride);
+        setIsMask(analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride));
     }
-}
-
-//----------------------------------------------------------------------------
-U32 LLImageGL::createPickMask(S32 pWidth, S32 pHeight)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    freePickMask();
-    // updatePickMask walks the source with `for (x = 0; x < width; x += 2)`,
-    // so the actual cells-per-row stored linearly in the bitmap is
-    // ceil(width/2). The reader must use the same stride, otherwise odd
-    // widths read from the wrong row.
-    U32 stride_w = (U32)((pWidth + 1) / 2);
-    U32 stride_h = (U32)((pHeight + 1) / 2);
-
-    U32 size = stride_w * stride_h;
-    size = (size + 7) / 8; // pixelcount-to-bits
-    mPickMask = new U8[size];
-    mPickMaskWidth = stride_w;
-    mPickMaskHeight = stride_h;
-
-    memset(mPickMask, 0, sizeof(U8) * size);
-
-    return size;
 }
 
 //----------------------------------------------------------------------------
@@ -2831,16 +2876,23 @@ void LLImageGL::updatePickMask(S32 width, S32 height, const U8* data_in)
       && (mFormatPrimary != GL_SRGB_ALPHA)))
     {
         //cannot generate a pick mask for this texture
-        freePickMask();
+        setPickMask(nullptr, 0, 0);
         return;
     }
 
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
-#ifdef SHOW_ASSERT
-    const U32 pickSize = createPickMask(width, height);
-#else // SHOW_ASSERT
-    createPickMask(width, height);
-#endif // SHOW_ASSERT
+    // Built aside and handed over whole: setPickMask holds it back until the texture it
+    // was made from is the one mTexName names, and getMask may be reading the published
+    // mask from the main thread while this runs on the LLImageGL thread.
+    //
+    // The walk below steps two texels at a time, so a row holds ceil(width/2) cells and
+    // getMask has to use that stride, or odd widths read from the wrong row.
+    const U32 stride_w = (U32)((width + 1) / 2);
+    const U32 stride_h = (U32)((height + 1) / 2);
+    const U32 size = (stride_w * stride_h + 7) / 8; // pixelcount-to-bits
+    U8* mask = new U8[size];
+    memset(mask, 0, size);
 
     U32 pick_bit = 0;
 
@@ -2854,14 +2906,16 @@ void LLImageGL::updatePickMask(S32 width, S32 height, const U8* data_in)
             {
                 U32 pick_idx = pick_bit/8;
                 U32 pick_offset = pick_bit%8;
-                llassert(pick_idx < pickSize);
+                llassert(pick_idx < size);
 
-                mPickMask[pick_idx] |= 1 << pick_offset;
+                mask[pick_idx] |= 1 << pick_offset;
             }
 
             ++pick_bit;
         }
     }
+
+    setPickMask(mask, (U16)stride_w, (U16)stride_h);
 }
 
 //bool LLImageGL::getMask(const LLVector2 &tc)
