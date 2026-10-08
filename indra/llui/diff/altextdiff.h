@@ -158,11 +158,29 @@ namespace ALTextDiff
     // tells a line that now reads otherwise -- a block comment opened above
     // it -- from how it read.
     size_t hashOf(const regions_t& regions);
+    // How many lines' stretches have been made a number, on the thread that
+    // asks, since it began: what a test holds an edit's cost to.
+    U64    hashed();
     // A text's lines, the stretches of each, by a grammar: what a
     // comparison of code is given by whoever knows its language. Without
     // one, a line's words are cut by their bytes alone (prose, notecards).
     // What it answers stays its own until it is asked again.
     typedef std::function<const std::vector<regions_t>&(const std::vector<std::string>& lines)> lexer_t;
+    // What a lexer that reads a text again in place of one it held says of
+    // a text it holds, asked by the regions it answered for it: a number
+    // that is that text's alone, nought for a text it does not hold; and
+    // where it read the text again in place of another, that one's number,
+    // and the first line from which each line has the regions of the line
+    // of that one it was -- past those of the lines the two share at their
+    // end that an edit made read otherwise, a block comment opened or
+    // closed above them. Nought for the other where it read the text whole.
+    struct Reread
+    {
+        U64 text = 0;
+        U64 was  = 0;
+        S32 same = 0;
+    };
+    typedef std::function<Reread(const std::vector<regions_t>& regions)> reread_t;
 
     // Words that mean the same in the two texts though written otherwise
     // (ALDiffSame): none, or a table made once and shared.

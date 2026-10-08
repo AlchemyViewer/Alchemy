@@ -402,10 +402,11 @@ void ALDiffModel::setAlgorithm(ALTextDiff::Algorithm algorithm)
     }
 }
 
-void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging)
+void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging, ALTextDiff::reread_t reread)
 {
     mOptions.lexer = std::move(lexer);
     mMergeLexer    = std::move(merging);
+    mReread        = std::move(reread);
     if (!mOptions.lexer && mOptions.like.ignoreComments)
     {
         // Lines told the same otherwise now: as setLikeness.

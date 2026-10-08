@@ -42,6 +42,9 @@ namespace
 {
     typedef ALTextDiff::Run  Run;
     typedef ALTextDiff::Kind Kind;
+
+    // A test's hook, of the thread that hashed.
+    thread_local U64 sHashed = 0;
 }
 
 const char* ALTextDiff::algorithmName(Algorithm algorithm)
@@ -134,6 +137,7 @@ namespace
 
 size_t ALTextDiff::hashOf(const regions_t& regions)
 {
+    ++sHashed;
     size_t hash = regions.size();
     for (const Piece& piece : regions)
     {
@@ -142,6 +146,11 @@ size_t ALTextDiff::hashOf(const regions_t& regions)
         boost::hash_combine(hash, static_cast<U8>(piece.region));
     }
     return hash;
+}
+
+U64 ALTextDiff::hashed()
+{
+    return sHashed;
 }
 
 std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like, const regions_t* regions)

@@ -264,4 +264,83 @@ namespace tut
         ALTextDiff::words(was[0], now[0], left, right, options, &was_regions, &now_regions);
         ensure("in words, the string's blanks marked, the code's not", left == ALTextDiff::spans_t{ { 11, 13 } } && right == ALTextDiff::spans_t{ { 12, 13 } });
     }
+
+    template<> template<>
+    void aldifflexer_object::test<6>()
+    {
+        set_test_name("what it says it read again: each text it holds numbered; one read again in place of another said to be from it, every line from the end of the edit on, or from past a comment it opened, read as it was; one read whole from none; regions it does not hold, nothing");
+        ensure("the LSL grammar", lsl != nullptr);
+        std::vector<std::string> left;
+        for (S32 n = 0; n < 100; ++n)
+        {
+            left.push_back(n == 25 ? "    done */" : "integer v" + std::to_string(n) + " = " + std::to_string(n) + ";");
+        }
+        std::vector<std::string> right = left;
+        right[80]                      = "llSay(0, \"right\");";
+
+        // Two texts asked for in turn, as a comparison does: each read
+        // whole, and numbered as no other is; asked for again, as they were.
+        ALDiffLexer              lexer(lsl);
+        const auto&              left_read  = lexer.regions(left);
+        const auto&              right_read = lexer.regions(right);
+        const ALTextDiff::Reread left_said  = lexer.reread(left_read);
+        const ALTextDiff::Reread right_said = lexer.reread(right_read);
+        ensure("each numbered, read whole", left_said.text > 0 && right_said.text > 0 && left_said.text != right_said.text && left_said.was == 0 &&
+                                                right_said.was == 0);
+        lexer.regions(left);
+        lexer.regions(right);
+        ensure("held: as they were", lexer.reread(left_read).text == left_said.text && lexer.reread(right_read).text == right_said.text);
+
+        // Typed in on the right, reading nothing after it otherwise: read
+        // again in its place, from it, each line from the one after the edit
+        // as it was.
+        std::vector<std::string> typed = right;
+        typed[50] += " // typed";
+        lexer.regions(left);
+        const auto&              typed_read = lexer.regions(typed);
+        const ALTextDiff::Reread typed_said = lexer.reread(typed_read);
+        ensure("in the right's place", &typed_read == &right_read);
+        ensure("from the right, the lines after the edit as they were", typed_said.text != right_said.text && typed_said.was == right_said.text &&
+                                                                            typed_said.same == 51);
+        ALDiffLexer fresh(lsl);
+        ensure("as read afresh", typed_read == fresh.regions(typed));
+
+        // A comment opened above line 25, which closes it: the lines down to
+        // it read otherwise, and those after as they were.
+        std::vector<std::string> opened = typed;
+        opened[20]                      = "/* opened";
+        lexer.regions(left);
+        const auto&              opened_read = lexer.regions(opened);
+        const ALTextDiff::Reread opened_said = lexer.reread(opened_read);
+        ensure_equals("from the line after the comment's close", opened_said.same, 26);
+        ensure("from the text typed", opened_said.was == typed_said.text);
+        ALDiffLexer fresh_opened(lsl);
+        ensure("as read afresh, the comment's lines its", opened_read == fresh_opened.regions(opened) && opened_read[23].size() == 1 &&
+                                                               opened_read[23][0].region == ALTextDiff::Region::Comment);
+
+        // A line put in near the top: those after it as they were, moved
+        // along.
+        std::vector<std::string> put = opened;
+        put.insert(put.begin() + 5, "string s;");
+        lexer.regions(left);
+        const auto&              put_read = lexer.regions(put);
+        const ALTextDiff::Reread put_said = lexer.reread(put_read);
+        ensure("from the text opened, from the line after the one put in", put_said.was == opened_said.text && put_said.same == 6);
+        ALDiffLexer fresh_put(lsl);
+        ensure("as read afresh", put_read == fresh_put.regions(put));
+
+        // Most of it another: read whole, from none.
+        std::vector<std::string> other;
+        for (S32 n = 0; n < 100; ++n)
+        {
+            other.push_back("llOwnerSay(\"" + std::to_string(n) + "\");");
+        }
+        lexer.regions(left);
+        const auto&              other_read = lexer.regions(other);
+        const ALTextDiff::Reread other_said = lexer.reread(other_read);
+        ensure("read whole: from none, numbered anew", other_said.was == 0 && other_said.text > put_said.text);
+        ensure("the left, asked for each time, as it was", lexer.reread(left_read).text == left_said.text);
+        const std::vector<ALTextDiff::regions_t> copied = other_read;
+        ensure_equals("regions it does not hold: nothing", lexer.reread(copied).text, U64(0));
+    }
 }

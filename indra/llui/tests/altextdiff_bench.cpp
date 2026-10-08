@@ -268,12 +268,18 @@ int main(int, char**)
     std::string                            error;
     std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
     const auto lexer = [&lsl]() { return lsl ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)) : ALTextDiff::lexer_t(); };
-    const auto laid  = [&](const std::string& left, const std::string& right, bool grammar) {
+    // A model's lexer as a view gives it: saying what it read again.
+    const auto lexing = [&lsl](ALDiffModel& model) {
+        const std::shared_ptr<ALDiffLexer> compared = lsl ? std::make_shared<ALDiffLexer>(lsl) : nullptr;
+        model.setLexer(compared ? ALDiffLexer::lexerOf(compared) : ALTextDiff::lexer_t(), ALTextDiff::lexer_t(),
+                       compared ? ALDiffLexer::rereadOf(compared) : ALTextDiff::reread_t());
+    };
+    const auto laid = [&](const std::string& left, const std::string& right, bool grammar) {
         return ms_per_item(1, [&] {
             ALDiffModel model;
             if (grammar)
             {
-                model.setLexer(lexer());
+                lexing(model);
             }
             model.setTexts(left, right);
             g_sink = g_sink + static_cast<size_t>(model.rowCount(ALDiffModel::Layout::Sides));
@@ -285,14 +291,19 @@ int main(int, char**)
     row("a thousand edits, words by LSL's grammar", laid(small_t, small1kt, true), laid(big_t, big1kt, true));
     // A live comparison, the right typed in: a character put in a line
     // near the middle and compared again, then taken out and compared
-    // again; per keystroke.
+    // again; per keystroke. Blanks let go of where asked, which a grammar's
+    // strings keep.
     const auto typed = [&](const std::string& left, const std::string& right, bool grammar = false,
-                           ALTextDiff::Algorithm algorithm = ALTextDiff::Algorithm::Histogram, const ALTextDiff::ranges_t& ranges = {}) {
+                           ALTextDiff::Algorithm algorithm = ALTextDiff::Algorithm::Histogram, const ALTextDiff::ranges_t& ranges = {},
+                           bool blanks = false) {
         ALDiffModel model;
         if (grammar)
         {
-            model.setLexer(lexer());
+            lexing(model);
         }
+        ALTextDiff::Likeness like;
+        like.ignoreWhitespace = blanks;
+        model.setLikeness(like);
         model.setAlgorithm(algorithm);
         model.setTexts(left, right, ranges);
         const size_t at   = right.find('\n', right.size() / 2);
@@ -307,6 +318,8 @@ int main(int, char**)
     row("a keystroke, ten edits", typed(small_t, small10t), typed(big_t, big10t));
     row("a keystroke, a thousand edits", typed(small_t, small1kt), typed(big_t, big1kt));
     row("a keystroke, a thousand edits, LSL's grammar", typed(small_t, small1kt, true), typed(big_t, big1kt, true));
+    row("a keystroke, a thousand edits, LSL's, blanks let go", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Histogram, {}, true),
+        typed(big_t, big1kt, true, ALTextDiff::Algorithm::Histogram, {}, true));
     row("a keystroke, a thousand edits, by structure", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Structural),
         typed(big_t, big1kt, true, ALTextDiff::Algorithm::Structural));
     {
@@ -344,6 +357,8 @@ int main(int, char**)
         const std::string    big_c   = converted(big, big_ranges);
         row("a keystroke, every line converted, anchored", typed(small_t, small_c, false, ALTextDiff::Algorithm::Histogram, small_ranges),
             typed(big_t, big_c, false, ALTextDiff::Algorithm::Histogram, big_ranges));
+        row("a keystroke, converted, LSL's, blanks let go", typed(small_t, small_c, true, ALTextDiff::Algorithm::Histogram, small_ranges, true),
+            typed(big_t, big_c, true, ALTextDiff::Algorithm::Histogram, big_ranges, true));
     }
 
     std::printf("\nWhat it says (5,000 lines)\n");

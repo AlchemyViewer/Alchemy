@@ -191,8 +191,10 @@ public:
     // let go of. And the merge's, a lexer of its own over the same grammar
     // (mergeOptions): a lexer holds the last two texts it read, which are
     // the comparison's, and a merge reads three. Without it, the merge
-    // reads by the comparison's.
-    void    setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging = ALTextDiff::lexer_t());
+    // reads by the comparison's. And what the comparison's says it read
+    // again of a text (ALTextDiff::reread_t), where it says.
+    void    setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging = ALTextDiff::lexer_t(),
+                     ALTextDiff::reread_t reread = ALTextDiff::reread_t());
 
     // The texts as given, their line endings LF as an editor reads them.
     const std::string&           leftText() const { return mLeftText; }
@@ -565,8 +567,10 @@ private:
     std::vector<S32>      mRangeOrder[2];
     std::vector<S32>      mRangeReach[2];
     ALTextDiff::Options   mOptions;
-    // The lexer a merge reads by, where it has one of its own.
+    // The lexer a merge reads by, where it has one of its own; and what the
+    // comparison's says it read again, where it says.
     ALTextDiff::lexer_t   mMergeLexer;
+    ALTextDiff::reread_t  mReread;
     bool                  mSwapped  = false;
     bool                  mFoldSame = true;
     ColumnData            mColumns[3];
