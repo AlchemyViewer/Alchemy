@@ -324,18 +324,24 @@ void LLImageGL::cleanupClass()
     const bool gl_alive = gGLManager.mInited;
 
     // Uploads handed over and never published. Their thread is gone, and so by now is
-    // whatever was waiting to finish them, so their fences and textures go too; the
-    // textures into the ring drained below.
+    // whatever was waiting to finish them, so their fences and textures go too. With GL
+    // up the textures join the ring drained below, which releases their accounting; with
+    // it gone deleteTextures drops the name unrecorded, so the accounting is released here
+    // -- left behind, the next context reissuing the name would find it already allocated.
     for (PendingPublish& pending : sPendingPublishes)
     {
-        if (gl_alive)
-        {
-            glDeleteSync(pending.mFence);
-        }
         pending.mImage->mOnPublished.clear();
         pending.mImage->mPublishesPending = 0;
         pending.mImage->endUpload();
-        deleteTextures(1, &pending.mName);
+        if (gl_alive)
+        {
+            glDeleteSync(pending.mFence);
+            deleteTextures(1, &pending.mName);
+        }
+        else
+        {
+            free_tex_image(pending.mName);
+        }
     }
     sPendingPublishes.clear();
 
