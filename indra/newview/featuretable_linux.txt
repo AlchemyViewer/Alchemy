@@ -1,4 +1,4 @@
-version 59
+version 60
 // The version number above should be incremented IF AND ONLY IF some
 // change has been made that is sufficiently important to justify
 // resetting the graphics preferences of all users to the recommended
@@ -68,8 +68,8 @@ RenderFSAAType			    1	2
 RenderFSAASamples			1	3
 RenderMaxTextureIndex		1	16
 RenderGLContextCoreProfile         1   1
-RenderGLMultiThreadedTextures      1   0
-RenderGLMultiThreadedMedia         1   0
+RenderGLMultiThreadedTextures      1   1
+RenderGLMultiThreadedMedia         1   1
 RenderReflectionProbeResolution 1 128
 RenderScreenSpaceReflections 1  1
 RenderMirrors				1	1
@@ -416,14 +416,13 @@ RenderAnisotropicLevel			1	0
 RenderFSAAType  			1	0
 RenderFSAASamples			1	0
 RenderGLContextCoreProfile  1   0
-RenderGLMultiThreadedMedia  1   0
 RenderDownScaleMethod       1   0
 
-list AMD
-RenderGLMultiThreadedTextures      1   0
-
+// NVIDIA's own driver slices texture uploads on the main thread, as on
+// Windows, so they stay there. The Mesa drivers upload whole images
+// (should_stagger_image_set in llimagegl.cpp) and so upload off-thread.
 list NVIDIA
-RenderGLMultiThreadedMedia         1   1
+RenderGLMultiThreadedTextures      1   0
 
 list GL3
 RenderFSAAType  			0	0
