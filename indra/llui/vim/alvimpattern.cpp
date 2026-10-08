@@ -36,6 +36,143 @@
 
 namespace
 {
+    // vim's classes in a bracket expression, [:alpha:] and the rest, each
+    // as what the engine reads for it in a bracket of its own: what the
+    // class holds where vim keeps to ASCII or the engine has no such
+    // class, the engine's class where both go by Unicode.
+    struct BracketClass
+    {
+        std::string_view name;
+        std::string_view engine;
+    };
+    constexpr BracketClass BRACKET_CLASSES[] = {
+        { "alnum", "A-Za-z0-9" },
+        { "alpha", "A-Za-z" },
+        { "blank", " \\t" },
+        { "cntrl", "\\x00-\\x1f\\x7f" },
+        { "digit", "0-9" },
+        { "graph", "!-~" },
+        { "lower", "[:lower:]" },
+        { "print", "[:print:]" },
+        { "punct", "!-/:-@\\[-`{-~" },
+        { "space", " \\t\\r\\n\\v\\f" },
+        { "upper", "[:upper:]" },
+        { "xdigit", "0-9A-Fa-f" },
+        { "tab", "\\t" },
+        { "return", "\\r" },
+        { "backspace", "\\x08" },
+        { "escape", "\\x1b" },
+        { "ident", "A-Za-z0-9_" },
+        { "keyword", "A-Za-z0-9_" },
+        { "fname", "A-Za-z0-9/.\\-_+,#$%~=" },
+    };
+
+    // A bracket expression of vim's, its [ at `at`, as vim's skip_anyof
+    // reads it: a ^ first negates it and a ] or - after that is itself; a
+    // backslash takes the character after it with it only where it is
+    // one vim means something by there, and is itself before any other;
+    // [:alpha:] [=a=] and [.a.] are whole, and any other [ is itself.
+    // The index of its ] comes back, or npos where none closes it; the
+    // engine's spelling of it is put in `engine` where one is given.
+    size_t bracketOf(std::string_view vim, size_t at, std::string* engine = nullptr)
+    {
+        constexpr std::string_view TAKEN("]^-n\\nrtebdoxuU");
+        auto put = [engine](std::string_view s) {
+            if (engine)
+            {
+                *engine += s;
+            }
+        };
+        put("[");
+        size_t j = at + 1;
+        if (j < vim.size() && vim[j] == '^')
+        {
+            put("^");
+            ++j;
+        }
+        if (j < vim.size() && (vim[j] == ']' || vim[j] == '-'))
+        {
+            put(vim[j] == ']' ? "\\]" : "\\-");
+            ++j;
+        }
+        while (j < vim.size() && vim[j] != ']')
+        {
+            if (vim[j] == '\\' && j + 1 < vim.size() && TAKEN.find(vim[j + 1]) != std::string_view::npos)
+            {
+                put(vim.substr(j, 2));
+                j += 2;
+            }
+            else if (vim[j] == '\\')
+            {
+                put("\\\\");
+                ++j;
+            }
+            else if (vim[j] == '[' && j + 1 < vim.size() && vim[j + 1] == ':')
+            {
+                const size_t close = vim.find(":]", j + 2);
+                const std::string_view name = close == std::string_view::npos ? std::string_view() : vim.substr(j + 2, close - j - 2);
+                const BracketClass* known =
+                    std::find_if(std::begin(BRACKET_CLASSES), std::end(BRACKET_CLASSES), [name](const BracketClass& c) { return c.name == name; });
+                if (known == std::end(BRACKET_CLASSES))
+                {
+                    put("\\[");
+                    ++j;
+                    continue;
+                }
+                put(known->engine);
+                j = close + 2;
+            }
+            else if (vim[j] == '[' && j + 1 < vim.size() && (vim[j + 1] == '=' || vim[j + 1] == '.'))
+            {
+                // One character between the two = or . and the ] after
+                // them.
+                const char   how  = vim[j + 1];
+                const size_t next = j + 2 < vim.size() ? utf8str_decode_at(vim, j + 2).next : j + 2;
+                if (next + 1 >= vim.size() || next <= j + 2 || vim[next] != how || vim[next + 1] != ']')
+                {
+                    put("\\[");
+                    ++j;
+                    continue;
+                }
+                const std::string_view one = vim.substr(j + 2, next - j - 2);
+                if (how == '=')
+                {
+                    put("[=");
+                    put(one);
+                    put("=]");
+                }
+                else
+                {
+                    put(alRegexSpecial(one[0]) || one[0] == '-' || one[0] == ']' ? "\\" : "");
+                    put(one);
+                }
+                j = next + 2;
+            }
+            else if (vim[j] == '[')
+            {
+                put("\\[");
+                ++j;
+            }
+            else if (vim[j] == '-' && vim.substr(j + 1, 2) == "\\n")
+            {
+                // No range to a line break: the - itself.
+                put("\\-");
+                ++j;
+            }
+            else
+            {
+                put(vim.substr(j, 1));
+                ++j;
+            }
+        }
+        if (j >= vim.size())
+        {
+            return std::string::npos;
+        }
+        put("]");
+        return j;
+    }
+
     // Each backslash item in a pattern outside its bracket expressions,
     // the character after the backslash handed to `item`, as vim walks a
     // pattern for what it says of itself (skip_regexp): what opens a
@@ -50,20 +187,7 @@ namespace
             {
                 // Through to the bracket's close; an unclosed one runs on to
                 // the end.
-                size_t j = vim[i] == '[' ? i + 1 : i + 2;
-                if (j < vim.size() && vim[j] == '^')
-                {
-                    ++j;
-                }
-                if (j < vim.size() && vim[j] == ']')
-                {
-                    ++j;
-                }
-                while (j < vim.size() && vim[j] != ']')
-                {
-                    j += (vim[j] == '\\' && j + 1 < vim.size()) ? 2u : 1u;
-                }
-                i = j;
+                i = std::min(bracketOf(vim, vim[i] == '[' ? i : i + 1), vim.size());
             }
             else if (vim[i] == '\\' && i + 1 < vim.size())
             {
@@ -183,9 +307,9 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // look round the atom before them; \{-} is *?; the classes \a \l \u
     // \x \o \h \i \k are brackets; \c and \C say how case is matched, and
     // \Z that composing characters are passed over; a bracket expression
-    // is copied through as it stands. A magic ^ is a line's start only
-    // first in a branch, a $ its end only last in one, and either is
-    // itself anywhere else.
+    // is read as vim reads one, its classes as what they hold. A magic ^
+    // is a line's start only first in a branch, a $ its end only last in
+    // one, and either is itself anywhere else.
     ALVimPattern        out;
     std::optional<bool> case_in_pattern;
     enum class Magic : U8
@@ -215,32 +339,18 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
             literal(r);
         }
     };
-    // A bracket expression through to its close, as it stands. `at` is
-    // the [; the index of the ] comes back, or npos where none closes it.
+    // A bracket expression through to its close, as the engine spells it.
+    // `at` is the [; the index of the ] comes back, or npos where none
+    // closes it.
     auto bracket = [&](size_t at) {
-        size_t j = at + 1;
-        if (j < vim.size() && vim[j] == '^')
-        {
-            ++j;
-        }
-        if (j < vim.size() && vim[j] == ']')
-        {
-            ++j;
-        }
-        while (j < vim.size() && vim[j] != ']')
-        {
-            if (vim[j] == '\\' && j + 1 < vim.size())
-            {
-                ++j;
-            }
-            ++j;
-        }
-        if (j >= vim.size())
+        std::string  engine;
+        const size_t j = bracketOf(vim, at, &engine);
+        if (j == std::string::npos)
         {
             return std::string::npos;
         }
         out.acrossLines |= vim.find("\\n", at) < j;
-        out.regex.append(vim, at, j - at + 1);
+        out.regex += engine;
         return j;
     };
     // %[abc]: a, ab or abc -- each item optional and the next only with
@@ -819,16 +929,17 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         }
                         else if (cls == '[')
                         {
-                            // \_[abc]: the bracket expression with a line
-                            // break in it.
-                            const size_t close = vim.find(']', i + 1);
+                            // \_[abc]: the bracket expression or a line
+                            // break, which a ^ negating it leaves be.
+                            std::string  engine;
+                            const size_t close = bracketOf(vim, i, &engine);
                             if (close == std::string::npos)
                             {
                                 out.regex += "\\[";
                             }
                             else
                             {
-                                out.regex += "[\\n" + vim.substr(i + 1, close - i - 1) + "]";
+                                out.regex += "(?:" + engine + "|\\n)";
                                 i = close;
                             }
                         }

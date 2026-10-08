@@ -387,4 +387,24 @@ namespace tut
                       std::string("foo|foo"));
     }
 
+    template<> template<>
+    void alvimpattern_object::test<18>()
+    {
+        set_test_name("a bracket expression is read as vim reads one: its [:classes:] whole, and a backslash itself before what means nothing there");
+        ensure_equals("a class", found("ab1c", ALVimPattern::of("[[:alpha:]]\\+", std::string(), plain)), std::string("ab|c"));
+        ensure_equals("two", found("ab1c", ALVimPattern::of("[[:alpha:][:digit:]]\\+", std::string(), plain)), std::string("ab1c"));
+        ensure_equals("a ] after it", found("a]b", ALVimPattern::of("[[:alpha:]]]", std::string(), plain)), std::string("a]"));
+        ensure_equals("negated", found("ab1]", ALVimPattern::of("[^[:alpha:]]\\+", std::string(), plain)), std::string("1]"));
+        ensure_equals("vim's letters are ASCII's", found("\xC3\xA9 a", ALVimPattern::of("[[:alpha:]]", std::string(), plain)), std::string("a"));
+        ensure_equals("its lower case Unicode's", found("\xC3\xA9 A", ALVimPattern::of("[[:lower:]]", std::string(), plain)), std::string("\xC3\xA9"));
+        ensure_equals("vim's own classes", found("a\tb", ALVimPattern::of("a[[:tab:]]b", std::string(), plain)), std::string("a\tb"));
+        ensure_equals("a name vim does not know is no class", found("o] :]", ALVimPattern::of("[[:foo:]]", std::string(), plain)), std::string("o]|:]"));
+        ensure_equals("a collating element", found("abc", ALVimPattern::of("[[.c.]]", std::string(), plain)), std::string("c"));
+        ensure_equals("an equivalence class", found("\xC3\xA1" "b", ALVimPattern::of("[[=a=]]", std::string(), plain)), std::string("\xC3\xA1"));
+        ensure_equals("a backslash itself", found("x s\\", ALVimPattern::of("[\\s]\\+", std::string(), plain)), std::string("s\\"));
+        ensure_equals("before a ] not", found("a]", ALVimPattern::of("[\\]]", std::string(), plain)), std::string("]"));
+        ensure_equals("\\_[ with a ^, or a line break", found("xa^b\nyc", ALVimPattern::of("b\\_[^ab]y", std::string(), plain)), std::string("b\ny"));
+        ensure_equals("and the characters it does not hold", found("xa^b\nyc", ALVimPattern::of("a\\_[^ab]b", std::string(), plain)), std::string("a^b"));
+    }
+
 }
