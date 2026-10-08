@@ -250,7 +250,7 @@ void LLBuyCurrencyHTML::openWebFloater( bool has_target, const std::string& mess
     }
 
     LLBuyCurrencyHTML::showDialog(sum - gStatusBar->getBalance());
-    LLFloaterBuyCurrencyHTML* floater = dynamic_cast<LLFloaterBuyCurrencyHTML*>(LLFloaterReg::getInstance("buy_currency_html"));
+    LLFloaterBuyCurrencyHTML* floater = LLFloaterReg::getTypedInstance<LLFloaterBuyCurrencyHTML>("buy_currency_html");
     if (floater)
     {
         floater->setFallbackContext(message, sum);

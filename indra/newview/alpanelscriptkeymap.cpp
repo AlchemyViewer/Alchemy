@@ -210,11 +210,11 @@ void ALPanelScriptKeymap::onChange()
     ALKeyCapture::show(
         mList, words, two_keys,
         [handle](const ALKeyChord& chord) {
-            const ALPanelScriptKeymap* panel = dynamic_cast<const ALPanelScriptKeymap*>(handle.get());
+            const ALPanelScriptKeymap* panel = ALViewType::as<ALPanelScriptKeymap>(handle.get());
             return panel ? panel->aboutKeys(chord) : std::string();
         },
         [handle](const ALKeyChord& chord) {
-            if (ALPanelScriptKeymap* panel = dynamic_cast<ALPanelScriptKeymap*>(handle.get()))
+            if (ALPanelScriptKeymap* panel = ALViewType::as<ALPanelScriptKeymap>(handle.get()))
             {
                 panel->setKeys(chord);
             }
@@ -306,14 +306,14 @@ namespace
                 {
                     return;
                 }
-                if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(child))
+                if (LLMenuItemBranchGL* branch = child->as<LLMenuItemBranchGL>())
                 {
                     if (LLMenuGL* under = branch->getBranch())
                     {
                         walk(under);
                     }
                 }
-                else if (LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child);
+                else if (LLMenuItemGL* item = child->as<LLMenuItemGL>();
                          item && item->getAcceleratorKey() == key && (item->getAcceleratorMask() & MASK_MODIFIERS) == mask)
                 {
                     found = item->getLabel();
