@@ -397,32 +397,37 @@ namespace tut
     template<> template<>
     void random_object_t::test<16>()
     {
-        set_test_name("the generator's F64 draw rounds to the nearest F32, which wraps to 0 at 1, and its top 32 bits are the U32");
+        set_test_name("a draw's top 53 bits are the F64, its top 24 the F32 and its top 32 the U32, each exact");
         using namespace ALRandMap;
-        ensure_equals("an F64 draw passes through", unitF64(1.0 - 0x1p-48), 1.0 - 0x1p-48);
+        const U64 all = ~U64(0);
 
-        ensure_equals("0", unitF32(0.0), 0.f);
-        ensure_equals("a half", unitF32(0.5), 0.5f);
-        ensure_equals("the top F32", unitF32(1.0 - 0x1p-24), 1.f - 0x1p-24f);
-        // Halfway between the top F32 and 1.0, which ties to even: up.
-        ensure_equals("half a step under 1 rounds up, and wraps", unitF32(1.0 - 0x1p-25), 0.f);
-        ensure_equals("the generator's top draw rounds up, and wraps", unitF32(1.0 - 0x1p-48), 0.f);
+        ensure_equals("0", unitF64(0), 0.0);
+        ensure_equals("a half", unitF64(U64(1) << 63), 0.5);
+        ensure_equals("the top", unitF64(all), 1.0 - 0x1p-53);
+        ensure_equals("the low 11 bits are passed over", unitF64(0x7FF), 0.0);
+        ensure_equals("the lowest bit used", unitF64(0x800), 0x1p-53);
 
-        ensure_equals("the bits of 0", bitsU32(0.0), 0u);
-        ensure_equals("the bits of a half", bitsU32(0.5), 0x80000000u);
-        ensure_equals("the bits of the top", bitsU32(1.0 - 0x1p-48), 0xFFFFFFFFu);
+        ensure_equals("0", unitF32(0), 0.f);
+        ensure_equals("a half", unitF32(U64(1) << 63), 0.5f);
+        ensure_equals("the top, which does not round up to 1", unitF32(all), 1.f - 0x1p-24f);
+        ensure_equals("the low 40 bits are passed over", unitF32((U64(1) << 40) - 1), 0.f);
+        ensure_equals("the lowest bit used", unitF32(U64(1) << 40), 0x1p-24f);
+
+        ensure_equals("the bits of 0", bitsU32(0), 0u);
+        ensure_equals("the top 32 bits", bitsU32(0x123456789ABCDEF0), 0x12345678u);
+        ensure_equals("the bits of the top", bitsU32(all), 0xFFFFFFFFu);
     }
 
     template<> template<>
     void random_object_t::test<17>()
     {
-        set_test_name("seed 42 draws what boost's lagged_fibonacci2281 does");
-        const F64 drand[] = { 0x1.bc4c888fcbeep-1, 0x1.93af8e7d6fd4p-1, 0x1.0033f8776e2p-4,  0x1.80c622f58564p-2,
-                              0x1.21b74972ad12p-1, 0x1.8ce3188cbbp-1,   0x1.469aeb825dacp-2, 0x1.b16e57874466p-1 };
-        const F32 frand[] = { 0x1.bc4c88p-1f, 0x1.93af8ep-1f, 0x1.0033f8p-4f, 0x1.80c622p-2f,
-                              0x1.21b74ap-1f, 0x1.8ce318p-1f, 0x1.469aecp-2f, 0x1.b16e58p-1f };
-        const S32 rand100[] = { 86, 78, 6, 37, 56, 77, 31, 84 };
-        const U32 u32[] = { 0xde264447, 0xc9d7c73e, 0x10033f87, 0x603188bd, 0x90dba4b9, 0xc6718c46, 0x51a6bae0, 0xd8b72bc3 };
+        set_test_name("seed 42 draws what std::mt19937_64 does, from every standard library");
+        const F64 drand[] = { 0x1.82a3befaddcbcp-1, 0x1.472f1f73724ap-1,  0x1.81192cfe1cbcfp-1, 0x1.171621fc50d68p-3,
+                              0x1.ce79451c9a6c3p-1, 0x1.814dc629c7f48p-4, 0x1.262e1432cba84p-1, 0x1.7dd645e8fadeep-2 };
+        const F32 frand[] = { 0x1.82a3bep-1f, 0x1.472f1ep-1f, 0x1.81192cp-1f, 0x1.17162p-3f,
+                              0x1.ce7944p-1f, 0x1.814dcp-4f,  0x1.262e14p-1f, 0x1.7dd644p-2f };
+        const S32 rand100[] = { 75, 63, 75, 13, 90, 9, 57, 37 };
+        const U32 u32[] = { 0xc151df7d, 0xa3978fb9, 0xc08c967f, 0x22e2c43f, 0xe73ca28e, 0x1814dc62, 0x93170a19, 0x5f75917a };
 
         ll_rand_seed(42);
         for (S32 ii = 0; ii < 8; ++ii)
@@ -449,16 +454,21 @@ namespace tut
     template<> template<>
     void random_object_t::test<18>()
     {
-        set_test_name("drand() draws to 48 bits, and uses all of them");
+        set_test_name("drand() draws to 53 bits and frand() to 24, and each uses all of its bits");
         ll_rand_seed(18);
-        bool used_last_bit = false;
+        bool drand_last_bit = false;
+        bool frand_last_bit = false;
         for (S32 ii = 0; ii < 100000; ++ii)
         {
-            const F64 drawn = ll_drand();
-            const F64 bits  = std::ldexp(drawn, 48);
-            ensure(stringize("drand ", ii, " is a multiple of 2^-48"), bits == std::floor(bits));
-            used_last_bit = used_last_bit || std::fmod(bits, 2.0) != 0.0;
+            const F64 drawn = std::ldexp(ll_drand(), 53);
+            ensure(stringize("drand ", ii, " is a multiple of 2^-53"), drawn == std::floor(drawn));
+            drand_last_bit = drand_last_bit || std::fmod(drawn, 2.0) != 0.0;
+
+            const F64 drawn_f = std::ldexp(F64(ll_frand()), 24);
+            ensure(stringize("frand ", ii, " is a multiple of 2^-24"), drawn_f == std::floor(drawn_f));
+            frand_last_bit = frand_last_bit || std::fmod(drawn_f, 2.0) != 0.0;
         }
-        ensure("some draw sets the 48th bit", used_last_bit);
+        ensure("some drand sets the 53rd bit", drand_last_bit);
+        ensure("some frand sets the 24th bit", frand_last_bit);
     }
 }

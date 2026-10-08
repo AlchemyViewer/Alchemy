@@ -29,77 +29,94 @@
 #include "llrand.h"
 #include "alrandmap.h"
 
+#include <array>
+#include <chrono>
+#include <cstdint>
+#include <exception>
+#include <functional>
 #include <random>
+#include <thread>
 
-// pRandomGenerator is a stateful static object, which is therefore not
-// inherently thread-safe.
-//We use a pointer to not construct a huge object in the TLS space, sadly this is necessary
-// due to libcef.so on Linux being compiled with TLS model initial-exec (resulting in
-// FLAG STATIC_TLS, see readelf libcef.so). CEFs own TLS objects + LLRandLagFib2281 then will exhaust the
-// available TLS space, causing media failure.
+namespace
+{
+    // std::mt19937_64: the standard fixes the sequence it draws from a seed,
+    // so a seed draws the same on every platform, and each draw is 64 bits,
+    // enough for any one result.
+    using Generator = std::mt19937_64;
 
-static thread_local std::unique_ptr< LLRandLagFib2281 > pRandomGenerator = nullptr;
+    // Each thread draws from a generator of its own, so drawing takes no
+    // lock. It is on the heap, behind a pointer, because libcef.so on Linux
+    // is built with the initial-exec TLS model (FLAG STATIC_TLS, see readelf
+    // libcef.so), and CEF's own TLS objects beside a generator's 2.5 KB in
+    // every thread's static TLS would exhaust it, causing media failure.
+    thread_local std::unique_ptr<Generator> sGenerator;
 
-namespace {
-    F64 ll_internal_get_rand()
+    // A generator seeded with 256 bits from the system's entropy source.
+    std::unique_ptr<Generator> seededGenerator()
     {
-        if( !pRandomGenerator )
+        std::array<U32, 8> entropy{};
+        try
         {
-            std::random_device rd;
-            pRandomGenerator.reset(new LLRandLagFib2281(rd()));
+            std::random_device device;
+            for (U32& word : entropy)
+            {
+                word = device();
+            }
         }
+        catch (const std::exception&)
+        {
+            // No entropy source: the clock, this thread and where its stack
+            // is, which differ between threads and between runs.
+            const U64 now    = static_cast<U64>(std::chrono::steady_clock::now().time_since_epoch().count());
+            const U64 thread = static_cast<U64>(std::hash<std::thread::id>()(std::this_thread::get_id()));
+            const U64 stack  = static_cast<U64>(reinterpret_cast<uintptr_t>(&entropy));
+            entropy          = { U32(now), U32(now >> 32), U32(thread), U32(thread >> 32), U32(stack), U32(stack >> 32), 0, 0 };
+        }
+        std::seed_seq seeds(entropy.begin(), entropy.end());
+        return std::make_unique<Generator>(seeds);
+    }
 
-        return(*pRandomGenerator)();
+    U64 draw()
+    {
+        if (!sGenerator)
+        {
+            sGenerator = seededGenerator();
+        }
+        return (*sGenerator)();
     }
 }
 
 void ll_rand_seed(U64 seed)
 {
-    // The generator takes a 32-bit seed, so the halves are folded together
-    // rather than the high one dropped.
-    pRandomGenerator.reset(new LLRandLagFib2281(static_cast<U32>(seed ^ (seed >> 32))));
-}
-
-/*------------------------------ F64 aliases -------------------------------*/
-inline F64 ll_internal_random_double()
-{
-    return ALRandMap::unitF64(ll_internal_get_rand());
+    sGenerator = std::make_unique<Generator>(seed);
 }
 
 F64 ll_drand()
 {
-    return ll_internal_random_double();
-}
-
-/*------------------------------ F32 aliases -------------------------------*/
-inline F32 ll_internal_random_float()
-{
-    return ALRandMap::unitF32(ll_internal_get_rand());
+    return ALRandMap::unitF64(draw());
 }
 
 F32 ll_frand()
 {
-    return ll_internal_random_float();
+    return ALRandMap::unitF32(draw());
 }
 
-/*-------------------------- clamped random range --------------------------*/
 S32 ll_rand(S32 val)
 {
-    return ALRandMap::extentS32(ll_internal_random_double(), val);
+    return ALRandMap::extentS32(ALRandMap::unitF64(draw()), val);
 }
 
 F32 ll_frand(F32 val)
 {
-    return ALRandMap::extentReal<F32>(ll_internal_random_float(), val);
+    return ALRandMap::extentReal<F32>(ALRandMap::unitF32(draw()), val);
 }
 
 F64 ll_drand(F64 val)
 {
-    return ALRandMap::extentReal<F64>(ll_internal_random_double(), val);
+    return ALRandMap::extentReal<F64>(ALRandMap::unitF64(draw()), val);
 }
 
-/*------------------------------- raw bits ---------------------------------*/
 U32 ll_rand_u32()
 {
-    return ALRandMap::bitsU32(ll_internal_random_double());
+    return ALRandMap::bitsU32(draw());
 }

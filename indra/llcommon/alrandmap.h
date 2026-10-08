@@ -26,12 +26,16 @@
 
 #include "stdtypes.h"
 
-#include <cmath>
-
 /**
- * Pure functions from a draw to a result, apart from the generator so a test
- * can hand them the values at the edges of their ranges, which a generator
- * gives too seldom to test by drawing.
+ * Pure functions from a generator's 64-bit draw to each of llrand's results,
+ * apart from the generator so a test can hand them the values at the edges
+ * of their ranges, which a generator draws too seldom to test by drawing.
+ *
+ * They are llrand's own rather than std::uniform_real_distribution and its
+ * kind, whose way of turning an engine's output into a value each standard
+ * library chooses for itself: from one seed, MSVC, libstdc++ and libc++ would
+ * each draw something else. And uniform_real_distribution<float> can round up
+ * to the bound it excludes.
  *
  * Through analysis, we have decided that we want to take values which
  * are close enough to 1.0 to map back to 0.0.  We came to this
@@ -59,38 +63,25 @@
  * [0.0,g) we have determined that for values of g < 0.5, then
  * rand*g=g, which is not the desired result. As above, we clamp to 0
  * to restore uniform distribution.
+ *
+ * (Under IEEE rounding, a unit value below 1 times an integer or a normal
+ * extent rounds to below the extent, so of the clamps only the REAL one
+ * still fires, for a subnormal extent.)
  */
 namespace ALRandMap
 {
-    /// The generator's draw as a value in [0, 1).
-    inline F64 unitF64(F64 draw)
+    /// A draw's top 53 bits as an F64 in [0, 1), each value a multiple of
+    /// 2^-53. Exact, so never 1.
+    inline F64 unitF64(U64 draw)
     {
-        // *HACK: Through experimentation, we have found that dual core
-        // CPUs (or at least multi-threaded processes) seem to
-        // occasionally give an obviously incorrect random number -- like
-        // 5^15 or something. Sooooo, clamp it as described above.
-        if (!((draw >= 0.0) && (draw < 1.0)))
-        {
-            return fmod(draw, 1.0);
-        }
-        return draw;
+        return F64(draw >> 11) * 0x1p-53;
     }
 
-    /// The generator's draw as a value in [0, 1), rounded to the nearest F32.
-    /// A draw within half an F32 step of 1.0 rounds up to 1.0f, and is
-    /// wrapped to 0.
-    inline F32 unitF32(F64 draw)
+    /// A draw's top 24 bits as an F32 in [0, 1), each value a multiple of
+    /// 2^-24. Exact, so never 1.
+    inline F32 unitF32(U64 draw)
     {
-        // *HACK: clamp the result as described above.
-        // Per Monty, it's important to clamp using the correct fmodf() rather
-        // than expanding to F64 for fmod() and then truncating back to F32. Prior
-        // to this change, we were getting sporadic ll_frand() == 1.0 results.
-        F32 rv{ narrow<F64>(draw) };
-        if (!((rv >= 0.0f) && (rv < 1.0f)))
-        {
-            return fmodf(rv, 1.0f);
-        }
-        return rv;
+        return F32(draw >> 40) * 0x1p-24f;
     }
 
     /// A unit value in [0, 1) as an S32 in [0, val) or (val, 0], truncated
@@ -129,11 +120,9 @@ namespace ALRandMap
         return rv;
     }
 
-    /// A unit value in [0, 1) as the top 32 bits of its fraction.
-    inline U32 bitsU32(F64 unit)
+    /// A draw's top 32 bits.
+    inline U32 bitsU32(U64 draw)
     {
-        // Scaling by a power of two is exact, so a unit below 1 stays below
-        // 2^32.
-        return (U32)(unit * 4294967296.0);
+        return static_cast<U32>(draw >> 32);
     }
 }
