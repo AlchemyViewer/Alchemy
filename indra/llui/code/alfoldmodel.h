@@ -50,8 +50,10 @@
 //
 // Each line is read once, until its text changes or, with syntax, its
 // tokens do, which it is told of rather than asks every line; the blocks
-// are found again from what was read, in one pass, when the text changes.
-// The folds slide with its edits, and one whose block is gone goes.
+// are found again from what was read when the text changes -- by syntax,
+// walked again only from before the lines that changed until the walk is
+// where it was, by indentation in one pass. The folds slide with its
+// edits, and one whose block is gone goes.
 //
 // Worked out over a document alone -- one document's, whose version says
 // when its blocks are found again -- the editor hides the lines a fold
@@ -103,7 +105,14 @@ public:
     // document has changed since, or `invalidate` said so. Tabs are as
     // wide as `tab_width` says.
     const std::vector<Region>& regions(const ALTextDocument& doc, S32 tab_width);
-    void                       invalidate() { mValid = false; }
+    void                       invalidate()
+    {
+        mValid    = false;
+        mWalkKept = false;
+    }
+    // How many lines the last finding of the blocks by syntax walked: for a
+    // test that says an edit walks only as far as it must.
+    S32                        lastWalked() const { return mLastWalked; }
     // The blocks as last found, not found again: what a view draws while
     // the syntax they are found by is still being worked out down the
     // text, which finding them now would work out all at once.
@@ -193,12 +202,59 @@ private:
     {
         S32  line  = 0;
         bool first = false;
+
+        bool operator==(const Opened& other) const { return line == other.line && first == other.first; }
     };
     std::vector<S32>    mEndOf;
     std::vector<Opened> mOpen;
     std::vector<Region> mAlone;
     std::vector<S32>    mMarked;
     std::vector<S32>    mIndents;
+
+    // The walk by syntax kept from one finding to the next, so that after
+    // an edit it is walked again only from before the lines that changed
+    // until it is where it was before them: each block it closed, with the
+    // line that closed it -- one opened on a line of its own apart, as it
+    // goes to its header after -- in the order it closed them; and every
+    // so many lines, what was open there, how many it had closed before,
+    // and how far down what was open the lines from there to the next such
+    // place reached -- what they closed of it -- so that where only what
+    // is under that differs, as under a brace put in above, those lines
+    // close what they closed before and are not walked again.
+    struct Closed
+    {
+        S32  line  = 0;
+        S32  start = 0;
+        S32  end   = 0;
+        bool alone = false;
+    };
+    struct Walked
+    {
+        S32                 line   = 0;
+        size_t              closed = 0;
+        std::vector<Opened> open;
+        std::vector<S32>    marked;
+        size_t              openLow   = 0;
+        size_t              markedLow = 0;
+    };
+    static constexpr S32 WALK_STEP = 128;
+    // The walk, again from before the lines changed or whole; and one line
+    // of it, which closes what it closes of what was open before it, and
+    // takes the low marks down to as little as it leaves open.
+    void walkSyntax(const ALTextDocument& doc);
+    void walkLine(const Line& line, S32 at, std::vector<Opened>& open, std::vector<S32>& marked, std::vector<Closed>& closed, size_t& open_low,
+                  size_t& marked_low) const;
+    std::vector<Closed> mClosed;
+    std::vector<Walked> mWalked;
+    // The lines changed since the walk -- edited, or lexed anew -- none
+    // where the first is past the last; the lines the text had, as the
+    // edits said, which a count that differs makes walked whole; whether
+    // what is kept is any use; and how many lines the last finding walked.
+    S32  mDirtyFirst = 0;
+    S32  mDirtyLast  = -1;
+    S32  mWalkLines  = 0;
+    bool mWalkKept   = false;
+    S32  mLastWalked = 0;
     U32                 mVersion  = 0;
     // Tabs are measured by it where a line mixes them with spaces.
     S32                 mTabWidth = 0;

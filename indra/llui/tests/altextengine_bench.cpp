@@ -682,6 +682,12 @@ int main(int, char**)
         editAtTop(e, "x");
         g_sink = g_sink + e.foldRegions().size();
     });
+    both("a line broken at the top and joined, then the editor's fold regions", subjects, 1, [&](Subject&, ALCodeEditor& e) {
+        e.setCaret(ALTextPos(0, 0));
+        e.insertText("\n");
+        e.deleteRange(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
+        g_sink = g_sink + e.foldRegions().size();
+    });
 
     std::printf("\nLaying out every line\n");
     const S32 tab   = subjects[0].editor->layout().tabWidth();
