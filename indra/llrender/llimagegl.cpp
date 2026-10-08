@@ -3003,6 +3003,15 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         return false;
     }
 
+    // Not while the LLImageGL thread is building this image's next texture. It is writing
+    // the members this reads and replaces (the discard level, the storage state), and its
+    // syncTexName would then install its own texture under the discard level set here.
+    // Asked again next frame if it still applies.
+    if (mUploadInFlight)
+    {
+        return false;
+    }
+
     desired_discard = llmin(desired_discard, mMaxDiscardLevel);
 
     if (desired_discard <= mCurrentDiscardLevel)

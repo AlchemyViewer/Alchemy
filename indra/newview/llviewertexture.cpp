@@ -1287,7 +1287,9 @@ void LLViewerFetchedTexture::setForSculpt()
         (S32)LLGLTexture::BOOST_SCULPTED));
 
     mForSculpt = true;
-    if(isForSculptOnly() && hasGLTexture() && !getBoundRecently())
+    // Not while a texture is being created for it: on the LLImageGL thread that would
+    // publish its texture after this destroyed the old one. destroyTexture holds off too.
+    if(isForSculptOnly() && hasGLTexture() && !getBoundRecently() && !mNeedsCreateTexture)
     {
         destroyGLTexture(); //sculpt image does not need gl texture.
         mTextureState = ACTIVE;

@@ -490,6 +490,34 @@ namespace tut
         ensure("luminance and alpha both survive the copy", match);
     }
 
+    // scaleDown waits out an upload in flight: the LLImageGL thread is writing the
+    // discard level and storage state it reads and replaces, and that upload's
+    // publish would then install its texture under the discard level set here.
+    template<> template<>
+    void llimagegl_object::test<12>()
+    {
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/true);
+        ensure("createGLTexture succeeded",
+               img->createGLTexture(0, makeRaw(16, 16, 4, 0x80).get()));
+        const U32 name = img->getTexName();
+
+        // The PBO copy needs no framebuffer of its own.
+        const U32 method = gGLManager.mDownScaleMethod;
+        gGLManager.mDownScaleMethod = 1;
+
+        img->beginUpload();
+        const bool during = img->scaleDown(1);
+        const U32 name_during = img->getTexName();
+        img->endUpload();
+        const bool after = img->scaleDown(1);
+
+        gGLManager.mDownScaleMethod = method;
+
+        ensure("refused while an upload is in flight", !during);
+        ensure_equals("texture untouched meanwhile", (S32)name_during, (S32)name);
+        ensure("done once the upload has ended", after);
+    }
+
     // While an upload is in flight the members describe the texture being built.
     // readBackRaw paired the getters' published size with the members' discard
     // level, so it read the old texture's level 0 at the new texture's size.
