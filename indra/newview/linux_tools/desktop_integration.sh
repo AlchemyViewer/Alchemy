@@ -45,17 +45,27 @@ app_id=$(basename -- "$template" .desktop)
 user_data=${XDG_DATA_HOME:-$HOME/.local/share}
 schemes=(x-scheme-handler/secondlife x-scheme-handler/x-grid-location-info)
 
-# A path as the Exec key quotes an argument, then as a string value escapes
-# a backslash. A field code's % is doubled.
+# A path as the Exec key writes it. It is quoted only when it holds a
+# character the desktop entry spec reserves: xdg-utils' generic lookup,
+# which xdg-open uses on sway, i3 and any desktop it doesn't know, takes
+# the first word with its quotes and finds no program by that name. Quoting
+# escapes an argument's ", `, $ and \, then as a string value a \ and a
+# tab. A field code's % is doubled either way.
 exec_quote()
 {
     local s=$1
+    local reserved=$' \t\n"\'\\><~|&;$*?#()`'
+    if [[ $s != *["$reserved"]* ]]; then
+        printf '%s' "${s//%/%%}"
+        return
+    fi
     s=${s//\\/\\\\}
     s=${s//\"/\\\"}
     s=${s//\`/\\\`}
     s=${s//\$/\\\$}
     s=${s//%/%%}
     s=${s//\\/\\\\}
+    s=${s//$'\t'/\\t}
     printf '"%s"' "$s"
 }
 
