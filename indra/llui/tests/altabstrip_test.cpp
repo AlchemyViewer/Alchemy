@@ -732,4 +732,25 @@ namespace tut
         check("renamed");
         strip->die();
     }
+
+    // A name cut to fit is cut between characters as a reader sees them: a
+    // letter kept before the extension keeps the mark on it, and the
+    // ellipsis goes before the two rather than between them.
+    template<> template<>
+    void altabstrip_object::test<16>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        const LLFontGL*   font = LLFontGL::getFontSansSerifSmall();
+        // An e with a combining dot below and a combining acute, two
+        // letters before .lsl.
+        const std::string name = "a_very_long_name_that_wants_a_great_deal_of_room_xe\xCC\xA3\xCC\x81yz.lsl";
+        const std::string cut  = ALTabStrip::shortened(font, name, font->getWidth(name) / 2);
+        ensure("cut, with an ellipsis: " + cut, cut.size() < name.size() && cut.find("\xE2\x80\xA6") != std::string::npos);
+        ensure("the extension kept: " + cut, cut.compare(cut.size() - 4, 4, ".lsl") == 0);
+        ensure("no mark after the ellipsis, parted from its e: " + cut, cut.find("\xE2\x80\xA6\xCC") == std::string::npos);
+        ensure("the e kept with both its marks: " + cut, cut.find("e\xCC\xA3\xCC\x81") != std::string::npos);
+    }
 }

@@ -34,6 +34,7 @@
 #include "lllocalcliprect.h"
 #include "llrender.h"
 #include "llrender2dutils.h"
+#include "llstring.h"
 #include "lltooltip.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
@@ -379,16 +380,13 @@ std::string ALTabStrip::shortened(const LLFontGL* font, const std::string& label
     }
     static const std::string ELLIPSIS = "\xE2\x80\xA6";
     // The end: the extension where the name has one near its end, with
-    // three letters before it; else the last four letters.
+    // three letters before it; else the last four letters. A letter is one
+    // as a reader sees it, with the marks on it or what joins it.
     const size_t dot  = label.rfind('.');
     size_t       tail = dot != std::string::npos && label.size() - dot <= 6 ? dot : label.size();
     for (S32 letters = 0; letters < (dot != std::string::npos && tail == dot ? 3 : 4) && tail > 0; ++letters)
     {
-        --tail;
-        while (tail > 0 && (static_cast<unsigned char>(label[tail]) & 0xC0) == 0x80)
-        {
-            --tail;
-        }
+        tail = utf8str_step_grapheme_backward(label, tail);
     }
     const std::string end   = label.substr(tail);
     const S32         fixed = font->getWidth(ELLIPSIS + end);
@@ -399,14 +397,7 @@ std::string ALTabStrip::shortened(const LLFontGL* font, const std::string& label
     // The start: as many whole characters as fit before the ellipsis,
     // found by halving over the character boundaries, since a longer
     // start is never narrower.
-    std::vector<size_t> bounds;
-    for (size_t at = 0; at < tail; ++at)
-    {
-        if ((static_cast<unsigned char>(label[at]) & 0xC0) != 0x80)
-        {
-            bounds.push_back(at);
-        }
-    }
+    std::vector<size_t> bounds = utf8str_grapheme_starts(label, tail);
     bounds.push_back(tail);
     // bounds[fits] is the longest start that fits; bounds[0] is nothing.
     size_t fits = 0;
