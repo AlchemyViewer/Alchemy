@@ -1017,7 +1017,7 @@ void ALFloaterLightBox::endColorSession(bool escaped)
     if (mRecordedKeys.count(key) && !llsd_equals(picked, mColorOriginal))
     {
         ScopedHistoryGroup group(mHistory);
-        mHistory.record(key, mColorOriginal, picked, (F32)LLTimer::getUptimeSeconds().value());
+        mHistory.record(key, mColorOriginal, picked, LLTimer::getUptimeSeconds().value());
     }
 }
 
@@ -1693,7 +1693,7 @@ void ALFloaterLightBox::onGradeSettingChanged(const std::string& name, const LLS
     // A monotonic clock is all the history wants: it compares two of these to
     // decide whether one drag is still in progress, and never reads the value
     // on its own.
-    mHistory.record(name, before, after, (F32)LLTimer::getUptimeSeconds().value());
+    mHistory.record(name, before, after, LLTimer::getUptimeSeconds().value());
 }
 
 bool ALFloaterLightBox::applyHistory(bool redo_direction)

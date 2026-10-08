@@ -112,13 +112,13 @@ public:
     class Paragraph
     {
         public:
-            Paragraph (std::string str, const LLColor4 &color, F32 add_time, const LLFontGL* font, F32 screen_width);
+            Paragraph (std::string str, const LLColor4 &color, F64 add_time, const LLFontGL* font, F32 screen_width);
             void makeParagraphColorSegments ( const LLColor4 &color);
             void updateLines ( F32 screen_width,  const LLFontGL* font, bool force_resize=false );
         public:
             std::string mParagraphText; //The entire text of the paragraph
             paragraph_color_segments_t  mParagraphColorSegments;
-            F32 mAddTime;               //Time this paragraph was added to the display.
+            F64 mAddTime;               //Time this paragraph was added to the display, on the console's mTimer.
             F32 mMaxWidth;              //Width of the widest line of text in this paragraph.
             lines_t mLines;
 

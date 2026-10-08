@@ -361,7 +361,7 @@ private:
     LLFrameTimer    mFidgetTimer;
     LLFrameTimer    mFocusObjectFadeTimer;
     LLFrameTimer    mMoveTimer;
-    F32             mNextFidgetTime;
+    F64             mNextFidgetTime;    // on mFidgetTimer, which runs all session
     S32             mCurrentFidget;
 
     //--------------------------------------------------------------------

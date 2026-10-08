@@ -100,7 +100,7 @@ public:
     /// discards the redo tail, as every undo stack does -- except a write of
     /// the value already there, which is not a change and leaves the stack
     /// exactly as it was.
-    void record(const std::string& name, const LLSD& before, const LLSD& after, F32 now);
+    void record(const std::string& name, const LLSD& before, const LLSD& after, F64 now);
 
     /// @name Grouping
     /// Everything recorded between these becomes a single step, whatever the

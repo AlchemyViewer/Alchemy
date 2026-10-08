@@ -4875,7 +4875,7 @@ void LLAgent::fidget()
 {
     if (!getAFK())
     {
-        F32 curTime = mFidgetTimer.getElapsedTimeF32();
+        const F64 curTime = mFidgetTimer.getElapsedTimeF64();
         if (curTime > mNextFidgetTime)
         {
             // pick a random fidget anim here
