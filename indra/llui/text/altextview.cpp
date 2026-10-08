@@ -4008,8 +4008,10 @@ bool ALTextView::stepGap(bool down)
     if (const S32 gap = caretGap(); gap >= 0)
     {
         // On out of it: down to the line under it, up to the last row of
-        // the line over it; nowhere, where there is none.
-        const S32 line = down ? (gap < count ? gap : -1) : mLayout.visibleFrom(gap - 1, -1);
+        // the line over it, found over the run folded away above the stop
+        // through the heights, not one by one; nowhere, where there is
+        // none.
+        const S32 line = down ? (gap < count ? gap : -1) : mLayout.visibleBefore(gap);
         if (line >= 0)
         {
             const S32       row = down ? 0 : mLayout.rowCount(line) - 1;
@@ -4034,8 +4036,9 @@ bool ALTextView::stepGap(bool down)
         {
             return false;
         }
-        const S32 next = mLayout.visibleFrom(mCaret.line + 1, 1);
-        gap            = next >= 0 ? next : count;
+        // Above the next line in sight, over any run folded away below the
+        // caret's through the heights; below the text, where there is none.
+        gap = mLayout.visibleAfter(mCaret.line);
     }
     else if (row == 0)
     {
