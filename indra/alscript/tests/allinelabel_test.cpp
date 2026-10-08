@@ -157,9 +157,9 @@ namespace tut
                       std::string("Util 'v2'"));
         ensure_equals("one named no other way", label.of(fileOf("lib", "lib"), false), std::string("lib"));
         ensure_equals("a call", label(fileOf("util.luau", "disk:/home/me/proj/lib/util.luau"), false), std::string("lib/util.luau"));
-        for (const std::string& path : { "disk:/home/me/proj/lib/util.luau", "disk:/home/me/shared/util.luau", "disk:/opt/x.luau" })
+        for (const char* path : { "disk:/home/me/proj/lib/util.luau", "disk:/home/me/shared/util.luau", "disk:/opt/x.luau" })
         {
-            ensure("never from a root: " + path, !fromRoot(label.of(fileOf("x", path), false)));
+            ensure("never from a root: " + std::string(path), !fromRoot(label.of(fileOf("x", path), false)));
         }
     }
 

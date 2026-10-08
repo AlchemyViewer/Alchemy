@@ -2894,12 +2894,19 @@ namespace
                     break;
                 }
                 case Takes::Csv:
-                    for (std::string_view piece : *whitelistPieces(*textWritten(v)))
+                {
+                    // Held here: a loop over what the optional holds would
+                    // otherwise outlive the optional, which only C++23's
+                    // rule for a loop's range keeps alive, and not every
+                    // compiler has that rule.
+                    const std::optional<std::vector<std::string_view>> pieces = whitelistPieces(*textWritten(v));
+                    for (std::string_view piece : *pieces)
                     {
                         text += (text.empty() ? "{ " : ", ") + luaString(piece);
                     }
                     text += " }";
                     break;
+                }
                 case Takes::Headers:
                 case Takes::Each:
                 {
