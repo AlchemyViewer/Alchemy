@@ -340,13 +340,15 @@ void LLDrawPoolWLSky::renderAuroraDeferred(const LLVector3& camPosLocal, F32 cam
 
     gDeferredAuroraProgram.bind();
 
-    static F32 s_aurora_time = 0.0f;
+    // Accumulated in F64: an F32 near the wrap holds the time only to 8 ms, so adding a frame's
+    // dt to it rounds each step to whole multiples of that, and the aurora moves unevenly.
+    static F64 s_aurora_time = 0.0;
     F32 dt = (F32)gFrameIntervalSeconds.value();
     if (dt > 0.1f) dt = 0.1f;
-    s_aurora_time = (F32)fmod(s_aurora_time + dt, 86400.0);
+    s_aurora_time = fmod(s_aurora_time + dt, 86400.0);
 
     gDeferredAuroraProgram.uniform1f(LLShaderMgr::AURORA_INTENSITY, intensity);
-    gDeferredAuroraProgram.uniform1f(LLShaderMgr::AURORA_TIME, s_aurora_time);
+    gDeferredAuroraProgram.uniform1f(LLShaderMgr::AURORA_TIME, (F32)s_aurora_time);
 
     // Re-use the WL sky dome mesh — a ready-made hemisphere. Aurora shader
     // discards the zenith cap and below-horizon region.
