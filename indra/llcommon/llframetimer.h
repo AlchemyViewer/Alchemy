@@ -72,6 +72,9 @@ public:
 
     static F32  getFrameDeltaTimeF32();
 
+    // The same interval in microseconds, as getTotalTime() counts them
+    static U64  getFrameDeltaTime()                 { return sFrameDeltaTime; }
+
     // Return seconds since the current frame started
     static F32  getCurrentFrameTime();
 

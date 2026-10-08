@@ -441,8 +441,8 @@ extern LLPumpIO* gServicePump;
 extern U64MicrosecondsImplicit   gFrameTime;                    // Microseconds since the epoch, as totalTime()
 extern F64SecondsImplicit       gFrameTimeSeconds;          // Seconds since startup, as LLFrameTimer::getUptimeSeconds()
 extern F32SecondsImplicit       gFrameIntervalSeconds;      // This frame's length, as LLFrameTimer::getFrameDeltaTimeF32()
-extern F32      gFPSClamped;                // Frames per second, smoothed, weighted toward last frame
-extern F32      gFrameDTClamped;
+extern F32      gFPSClamped;                // Frames per second, smoothed, weighted toward last frame: a rate to show or test, not a dt
+extern F32      gFrameDTClamped;            // gFrameIntervalSeconds clamped to 0.1 ms..1 s: the dt for anything that integrates a rate
 
 extern LLTimer gRenderStartTime;
 extern LLFrameTimer gForegroundTime;
