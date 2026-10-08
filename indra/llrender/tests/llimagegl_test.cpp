@@ -362,4 +362,36 @@ namespace tut
                                   (size_t)W * H * C),
                       0);
     }
+
+    // gGL is thread_local and outlives a context, as it does across these tests,
+    // and init left the slots' bind caches as the last context had them. A fresh
+    // context hands out the same first names, so its first texture read as bound
+    // already on a slot that had held its namesake, and the bind was skipped.
+    template<> template<>
+    void llimagegl_object::test<19>()
+    {
+        {
+            LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+            ensure("createGLTexture succeeded",
+                   img->createGLTexture(0, makeRaw(16, 16, 4, 0x80).get()));
+            gGL.getTextureSlot(2)->bind(img.get());
+        }
+
+        // A new context on the same thread.
+        gl.reset();
+        gl = std::make_unique<ll_test::HeadlessGL>();
+
+        ensure_equals("unit 2's cache starts empty",
+                      gGL.getTextureSlot(2)->getCurrTexture(), 0u);
+        ensure_equals("and unit 0 is the active one",
+                      gGL.getCurrentTexUnitIndex(), 0u);
+
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        ensure("createGLTexture succeeded in the new context",
+               img->createGLTexture(0, makeRaw(16, 16, 4, 0x40).get()));
+        gGL.getTextureSlot(2)->bind(img.get());
+        GLint bound = 0;
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound);
+        ensure_equals("the bind reached GL", (U32)bound, img->getTexName());
+    }
 }

@@ -365,6 +365,19 @@ bool LLRender::init(bool needs_vertex_buffer)
     mLightsUBOBound   = false;
     mMatricesUBOBound = false;
 
+    // Nor on any texture unit, and unit 0 is the active one. gGL is thread_local and outlives
+    // a context -- the GL tests make one per test -- and a fresh context hands out the same
+    // first texture names as the last one did, so a slot still caching its namesake would
+    // take the new texture for bound already and skip the bind; an active-unit index left at
+    // 3 would skip the glActiveTexture a slot-3 bind needs, and bind on unit 0 instead.
+    for (ALTextureSlot& slot : mTextureSlots)
+    {
+        slot.mCurrTexture = 0;
+        slot.mCurrTexType = ALTextureSlot::TT_NONE;
+        slot.mCurrSampler = 0;
+    }
+    mCurrTextureUnitIndex = 0;
+
     // Build this context's sampler objects before anything can ask for one.
     mSamplerCache.warmup();
 
