@@ -4677,7 +4677,8 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             // A row of the display at a time, by the layout's rows, at
             // the x the caret is drawn at. Out of rows before the count's:
             // as far as there are, and a failure all the same, as vim's
-            // gj and gk are, an operator's with them.
+            // gj and gk are, an operator's with them. A fold's lines are
+            // passed over through the layout's heights, not one by one.
             ALTextLayout& layout  = view.layout();
             S32           row     = 0;
             const F32     x       = layout.xOf(from.line, from.column, &row);
@@ -4691,7 +4692,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                     {
                         ++row;
                     }
-                    else if (const S32 below = layout.visibleFrom(line + 1, 1); below >= 0)
+                    else if (const S32 below = layout.visibleAfter(line); below < layout.lineCount())
                     {
                         line = below;
                         row  = 0;
@@ -4707,7 +4708,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                     {
                         --row;
                     }
-                    else if (const S32 above = layout.visibleFrom(line - 1, -1); above >= 0)
+                    else if (const S32 above = layout.visibleBefore(line); above >= 0)
                     {
                         line = above;
                         row  = layout.rowCount(line) - 1;
@@ -4747,7 +4748,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                 {
                     ++row;
                 }
-                else if (const S32 below = layout.visibleFrom(line + 1, 1); below >= 0)
+                else if (const S32 below = layout.visibleAfter(line); below < layout.lineCount())
                 {
                     line = below;
                     row  = 0;
