@@ -213,7 +213,8 @@ void LLVOGrass::initClass()
     {
         if (1)   //(i%2 == 0)           Uncomment for X blading
         {
-            F32 u = sqrt(-2.0f * log(ll_frand()));
+            // Box-Muller, over (0, 1]: log(0) would put the blade at infinity.
+            F32 u = sqrt(-2.0f * log(1.f - ll_frand()));
             F32 v = 2.0f * F_PI * ll_frand();
 
             x = u * sin(v) * GRASS_DISTRIBUTION_SD;
