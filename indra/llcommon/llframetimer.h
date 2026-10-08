@@ -81,6 +81,8 @@ public:
     // Call this method once, and only once, per frame to update the current frame count.
     static void updateFrameCount()                  { sFrameCount++; }
 
+    // Frames of the main loop's idle(), drawn or not. The viewer's gFrameCount counts the frames
+    // drawn; a wait for a rendered frame uses that one.
     static U32  getFrameCount()                     { LL_FRAME_CLOCK_ON_MAIN_THREAD(); return sFrameCount; }
 
     static F32  getFrameDeltaTimeF32();

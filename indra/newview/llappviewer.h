@@ -431,6 +431,8 @@ extern LLUUID gLastAgentSessionId; // will be set if agent logged in
 
 extern const char* gPlatform;
 
+// Frames drawn: display() counts them. LLFrameTimer::getFrameCount() counts frames of
+// idle(), which go on while nothing is drawn; a wait for a rendered frame uses this one.
 extern U32 gFrameCount;
 extern U32 gForegroundFrameCount;
 

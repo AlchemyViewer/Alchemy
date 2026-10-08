@@ -31,6 +31,7 @@
 
 #include "llagent.h"
 #include "llagentui.h"
+#include "llappviewer.h"
 #include "llbase64.h"
 #include "llcallbacklist.h"
 #include "lldate.h"
@@ -399,9 +400,11 @@ void LLFloater360Capture::encodeAndSave(LLPointer<LLImageRaw> raw_image, const s
 // the renderer a chance to update the UI if it is needed
 void LLFloater360Capture::suspendForAFrame()
 {
+    // gFrameCount, the frames display() drew: LLFrameTimer counts idle() frames, which go
+    // on when nothing is drawn.
     const U32 frame_count_delta = 1;
-    U32 curr_frame_count = LLFrameTimer::getFrameCount();
-    while (LLFrameTimer::getFrameCount() <= curr_frame_count + frame_count_delta)
+    U32 curr_frame_count = gFrameCount;
+    while (gFrameCount <= curr_frame_count + frame_count_delta)
     {
         llcoro::suspendUntilNextFrame();
     }
