@@ -78,7 +78,8 @@ void LLProgressBar::draw()
 
     if (mImageFill)
     {
-        alpha *= 0.5f + 0.5f*0.5f*(1.f + (F32)sin(3.f*timer.getElapsedTimeF32()));
+        // The pulse's phase in F64: the timer is static and runs all session.
+        alpha *= 0.5f + 0.5f*0.5f*(1.f + (F32)sin(3.0*timer.getElapsedTimeF64().value()));
         LLColor4 bar_color = mColorBar.get();
         bar_color.mV[VALPHA] *= alpha; // modulate alpha
         LLRect progress_rect = getLocalRect();
