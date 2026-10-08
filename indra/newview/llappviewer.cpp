@@ -6231,7 +6231,7 @@ void LLAppViewer::createCrashMarker(eLastExecEvent error_code) const
     WriteFile(file, code, static_cast<DWORD>(code_length), &written, nullptr);
     CloseHandle(file);
 #else
-    const int file = open(mCrashMarkerPath.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0666);
+    const int file = open(mCrashMarkerPath.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
     if (file < 0)
     {
         return;
