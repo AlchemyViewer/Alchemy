@@ -333,4 +333,30 @@ namespace tut
         ensure_equals("an unclosed one a [", found("x[ab b", ALVimPattern::of("\\V\\[ab", std::string(), plain)), std::string("[ab"));
         ensure_equals("magic's the characters", found("abc a.c", ALVimPattern::of("a\\.c", std::string(), plain)), std::string("a.c"));
     }
+
+    template<> template<>
+    void alvimpattern_object::test<15>()
+    {
+        set_test_name("\\& has each concat but a branch's last match where the last does, and the last is the match");
+        ensure_equals("looked ahead at", regexOf("foobar\\&foo"), std::string("(?=foobar)foo"));
+        ensure_equals("the last concat's match", found("foobar foobaz", ALVimPattern::of("foobar\\&foo", std::string(), plain)), std::string("foo"));
+        ensure_equals("both in a line", found("Bob and Peter", ALVimPattern::of(".*Peter\\&.*Bob", std::string(), plain)), std::string("Bob"));
+        ensure_equals("or none", found("Bob and Paul", ALVimPattern::of(".*Peter\\&.*Bob", std::string(), plain)), std::string());
+        ensure_equals("three", found("xabcabc", ALVimPattern::of("...\\&a..\\&..c", std::string(), plain)), std::string("abc|abc"));
+        ensure_equals("in a branch after \\|", found("foobar xyz", ALVimPattern::of("xyz\\|foobar\\&foo", std::string(), plain)), std::string("foo|xyz"));
+        ensure_equals("in each branch", found("foobar baz", ALVimPattern::of("foobar\\&foo\\|baz\\&b", std::string(), plain)), std::string("foo|b"));
+        ensure_equals("in a group", found("foobar foofoo", ALVimPattern::of("\\(foobar\\&foo\\)bar", std::string(), plain)), std::string("foobar"));
+        ensure_equals("in a group's branch", found("foo bazoo", ALVimPattern::of("\\(foo\\&f\\|baz\\)oo", std::string(), plain)),
+                      std::string("foo|bazoo"));
+        ensure_equals("an empty one before it matching anywhere", found("foo", ALVimPattern::of("\\&foo", std::string(), plain)), std::string("foo"));
+        ensure_equals("a ^ after it the line's start", found("a ba", ALVimPattern::of("a\\&^a", std::string(), plain)), std::string("a"));
+        ensure_equals("a \\zs before it counts for nothing", found("foo", ALVimPattern::of("f\\zsoo\\&foo", std::string(), plain)), std::string("foo"));
+        ensure_equals("one after it does", found("foo", ALVimPattern::of("foo\\&f\\zsoo", std::string(), plain)), std::string("oo"));
+        ensure_equals("a \\ze before it counts for nothing", found("foo", ALVimPattern::of("fo\\zeo\\&foo", std::string(), plain)), std::string("foo"));
+        ensure_equals("one after it does", found("foo", ALVimPattern::of("foo\\&fo\\zeo", std::string(), plain)), std::string("fo"));
+        ensure_equals("the groups before it kept", replacedIn("foo", ALVimPattern::of("\\(f\\)oo\\&f\\(o\\)o", std::string(), plain), "[\\1|\\2|&]"),
+                      std::string("[f|o|foo]"));
+        ensure_equals("very magic's &", found("foobar baz", ALVimPattern::of("\\vfoobar&foo|baz", std::string(), plain)), std::string("foo|baz"));
+        ensure_equals("and its \\& the character", found("a&b ab", ALVimPattern::of("\\va\\&b", std::string(), plain)), std::string("a&b"));
+    }
 }

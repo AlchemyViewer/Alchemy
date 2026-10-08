@@ -176,13 +176,14 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // are magic's . * ~ [ -- a bare ^ and $ themselves and \^ \$ a line's
     // start and end anywhere; \M nomagic, the same but for magic's ^ and
     // $. \zs is \K; \ze looks ahead at the rest of its branch, or is a
-    // group at which the match is cut; \@= \@! \@<= \@<! and \@> look
-    // round the atom before them; \{-} is *?; the classes \a \l \u \x \o
-    // \h \i \k are brackets; \c and \C say how case is matched, and \Z
-    // that composing characters are passed over; a bracket expression is
-    // copied through as it stands. A magic ^ is a line's start only first
-    // in a branch, a $ its end only last in one, and either is itself
-    // anywhere else.
+    // group at which the match is cut; \& looks ahead at the concat
+    // before it from where the next begins; \@= \@! \@<= \@<! and \@>
+    // look round the atom before them; \{-} is *?; the classes \a \l \u
+    // \x \o \h \i \k are brackets; \c and \C say how case is matched, and
+    // \Z that composing characters are passed over; a bracket expression
+    // is copied through as it stands. A magic ^ is a line's start only
+    // first in a branch, a $ its end only last in one, and either is
+    // itself anywhere else.
     ALVimPattern        out;
     std::optional<bool> case_in_pattern;
     enum class Magic : U8
@@ -347,6 +348,10 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // none -- a multi, a group's opening, a \c -- and a group's closing is
     // the group's atom.
     std::vector<size_t> open_at;
+    // Where the concat being read began in the expression, at each depth
+    // the innermost last: the pattern's start, a group's opening, a \| or
+    // a \&.
+    std::vector<size_t> concats     = { 0 };
     size_t              atom_at     = std::string::npos;
     size_t              token_at    = std::string::npos;
     bool                token_atom  = false;
@@ -420,6 +425,33 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         out.regex += ')';
         return k;
     };
+    // \& and very magic's &: the concat before it must match where the
+    // next does, and is looked ahead at from there, the branch's last
+    // concat alone the match. A \zs or a \ze in one looked ahead at counts
+    // for nothing, as in vim.
+    auto endConcat = [&]() {
+        closeLooks();
+        const size_t from = concats.back();
+        while (!k_at.empty() && k_at.back() >= from)
+        {
+            out.regex.erase(k_at.back(), 2);
+            k_at.pop_back();
+        }
+        zs_seen = !k_at.empty();
+        std::erase_if(cuts, [from](const std::pair<size_t, S32>& cut) { return cut.first >= from; });
+        // An empty one matches anywhere, and the engine takes no empty
+        // look ahead.
+        if (out.regex.size() > from)
+        {
+            out.regex.insert(from, "(?=");
+            out.regex += ')';
+        }
+        concats.back() = out.regex.size();
+        ze_in_branch   = ze_in_branch && depth > 0;
+        at_start       = true;
+        atom_at        = std::string::npos;
+        token_atom     = false;
+    };
     for (size_t i = 0; i < vim.size(); ++i)
     {
         const char c          = vim[i];
@@ -470,6 +502,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     }
                     open_at.push_back(out.regex.size());
                     out.regex += "(";
+                    concats.push_back(out.regex.size());
                     vim_groups.push_back(++groups);
                     ++depth;
                     at_start   = true;
@@ -485,6 +518,10 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     closeLooks();
                     out.regex += ")";
                     --depth;
+                    if (concats.size() > 1)
+                    {
+                        concats.pop_back();
+                    }
                     // The group whole, from where it opened.
                     token_atom  = !open_at.empty();
                     token_group = true;
@@ -502,10 +539,19 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     }
                     closeLooks();
                     out.regex += "|";
-                    ze_in_branch = ze_in_branch && depth > 0;
-                    at_start     = true;
-                    atom_at      = std::string::npos;
-                    token_atom   = false;
+                    concats.back() = out.regex.size();
+                    ze_in_branch   = ze_in_branch && depth > 0;
+                    at_start       = true;
+                    atom_at        = std::string::npos;
+                    token_atom     = false;
+                    continue;
+                case '&':
+                    if (magic == Magic::Very)
+                    {
+                        out.regex += "\\&";
+                        continue;
+                    }
+                    endConcat();
                     continue;
                 case '@':
                 {
@@ -625,6 +671,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     {
                         open_at.push_back(out.regex.size());
                         out.regex += "(?:";
+                        concats.push_back(out.regex.size());
                         ++depth;
                         ++i;
                         at_start   = true;
@@ -806,12 +853,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     out.acrossLines |= n == 'n';
                     out.regex += '\\';
                     out.regex += n;
-                    at_start = n == 'n' || (n == '&' && magic != Magic::Very);
-                    if (n == '&' && magic != Magic::Very)
-                    {
-                        atom_at    = std::string::npos;
-                        token_atom = false;
-                    }
+                    at_start = n == 'n';
                     continue;
             }
         }
@@ -855,6 +897,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         {
                             open_at.push_back(out.regex.size());
                             out.regex += "(?:";
+                            concats.push_back(out.regex.size());
                             ++depth;
                             ++i;
                             at_start   = true;
@@ -905,6 +948,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     case '(':
                         open_at.push_back(out.regex.size());
                         out.regex += c;
+                        concats.push_back(out.regex.size());
                         vim_groups.push_back(++groups);
                         ++depth;
                         at_start   = true;
@@ -915,6 +959,10 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         closeLooks();
                         out.regex += c;
                         --depth;
+                        if (concats.size() > 1)
+                        {
+                            concats.pop_back();
+                        }
                         token_atom  = !open_at.empty();
                         token_group = true;
                         if (token_atom)
@@ -924,17 +972,15 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         }
                         break;
                     case '|':
-                    case '&':
-                        if (c == '|')
-                        {
-                            closeLooks();
-                            ze_in_branch = ze_in_branch && depth > 0;
-                        }
+                        closeLooks();
                         out.regex += c;
-                        at_start   = true;
-                        atom_at    = std::string::npos;
-                        token_atom = false;
+                        concats.back() = out.regex.size();
+                        ze_in_branch   = ze_in_branch && depth > 0;
+                        at_start       = true;
+                        atom_at        = std::string::npos;
+                        token_atom     = false;
                         break;
+                    case '&': endConcat(); break;
                     default: out.regex += c; break;
                 }
                 break;
