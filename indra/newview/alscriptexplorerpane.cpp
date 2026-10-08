@@ -62,6 +62,7 @@
 #include "roles_constants.h"
 
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -590,13 +591,13 @@ void ALScriptExplorerPane::fill()
                     if (reserved->hasMemory())
                     {
                         LLStringUtil::format_map_t size;
-                        size["[RESERVED]"] = llformat("%f", (F64)reserved->memory / 1024.0);
+                        size["[RESERVED]"] = fmt::format("{:f}", (F64)reserved->memory / 1024.0);
                         said               = mServices->words("ExplorerReserved", size);
                     }
                     if (reserved->hasTime())
                     {
                         LLStringUtil::format_map_t time;
-                        time["[TIME]"] = llformat("%.3f", reserved->time);
+                        time["[TIME]"] = fmt::format("{:.3f}", reserved->time);
                         said += (said.empty() ? "" : ", ") + mServices->words("ExplorerTime", time);
                     }
                     if (!said.empty())

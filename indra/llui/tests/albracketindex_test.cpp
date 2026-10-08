@@ -48,14 +48,20 @@ namespace tut
             return out;
         }
 
-        // Line and block comments, strings, and brackets as punctuation.
-        static std::shared_ptr<const ALSyntaxGrammar> grammar()
+        // Line and block comments, strings, and brackets as punctuation;
+        // and with `paths`, a string one word long with a dot or a slash in
+        // it a path, as LSL's grammar has it.
+        static std::shared_ptr<const ALSyntaxGrammar> grammar(bool paths = false)
         {
             LLSD description;
             description["name"] = "brackets";
             LLSD main;
             main.append(rule({ { "match", "//" }, { "kind", "comment" }, { "push", "line_comment" } }));
             main.append(rule({ { "span", "/*" }, { "end", "*/" }, { "kind", "comment" } }));
+            if (paths)
+            {
+                main.append(rule({ { "regex", R"re("[^"\s\\]*[./][^"\s\\]*")re" }, { "kind", "path" } }));
+            }
             main.append(rule({ { "span", "\"" }, { "end", "\"" }, { "escape", "\\" }, { "kind", "string" }, { "multiline", false } }));
             main.append(rule({ { "chars", "()[]{}" }, { "max", 1 }, { "kind", "punctuation" } }));
             description["states"]["main"] = main;
@@ -73,10 +79,10 @@ namespace tut
         ALSyntaxHighlighter highlighter;
         ALBracketIndex      index{ &highlighter };
 
-        void make(const char* text)
+        void make(const char* text, bool paths = false)
         {
             doc.setText(text);
-            highlighter.setGrammar(grammar());
+            highlighter.setGrammar(grammar(paths));
             highlighter.attach(&doc);
             index.attach(&doc);
         }
@@ -161,5 +167,16 @@ namespace tut
         ensure_equals("open again", index.depthBefore(1), 1);
         doc.replace(ALTextRange(ALTextPos(1, 1), ALTextPos(1, 2)), "]");
         ensure_equals("a bracket of another kind in its place pairs with nothing", matched(0, 0), std::string("none"));
+    }
+
+    template<> template<>
+    void albracketindex_object::test<5>()
+    {
+        set_test_name("a bracket in a path, drawn as the string it is, is none: the brackets around it pair as though it were not there");
+        make("f(\"v1.0)\", g(x));\n{\n}\n", /*paths*/ true);
+        ensure_equals("the call's opener pairs with its own closer, not the path's", matched(0, 1), std::string("0:15"));
+        ensure_equals("in a path: none", matched(0, 7), std::string("none"));
+        ensure_equals("nothing open after the line", index.depthBefore(1), 0);
+        ensure_equals("nor inside the block below", index.depthBefore(2), 1);
     }
 }

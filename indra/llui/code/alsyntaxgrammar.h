@@ -31,6 +31,7 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
+#include <algorithm>
 #include <map>
 #include <memory>
 #include <optional>
@@ -80,6 +81,25 @@ enum class ALSyntaxKind : U8
     COUNT
 };
 
+// What a string or a comment is made of -- its text, an escape in it, an
+// attribute's value, a path, which is drawn as a string -- where a bracket
+// is no bracket and a name no name, and what is typed is prose.
+inline bool alSyntaxKindIsQuiet(ALSyntaxKind kind)
+{
+    switch (kind)
+    {
+        case ALSyntaxKind::String:
+        case ALSyntaxKind::Comment:
+        case ALSyntaxKind::DocComment:
+        case ALSyntaxKind::Escape:
+        case ALSyntaxKind::AttributeValue:
+        case ALSyntaxKind::Path:
+            return true;
+        default:
+            return false;
+    }
+}
+
 const char*                  alSyntaxKindName(ALSyntaxKind kind);
 std::optional<ALSyntaxKind>  alSyntaxKindFromName(std::string_view name);
 
@@ -96,6 +116,15 @@ struct ALSyntaxToken
     }
     friend bool operator!=(const ALSyntaxToken& a, const ALSyntaxToken& b) { return !(a == b); }
 };
+
+// The token of a line a column is in, or none past the line's end: found
+// by a search, a grammar's tokens covering their line in order without a
+// gap.
+inline const ALSyntaxToken* alSyntaxTokenAt(const std::vector<ALSyntaxToken>& tokens, S32 column)
+{
+    const auto it = std::partition_point(tokens.begin(), tokens.end(), [column](const ALSyntaxToken& token) { return token.end <= column; });
+    return it != tokens.end() && it->begin <= column ? &*it : nullptr;
+}
 
 // Where a line starts, as the grammar sees it: the stack of states entered
 // and not yet left, each with whatever the rule that entered it captured
@@ -131,9 +160,20 @@ public:
     void clear();
     bool has(std::string_view table, std::string_view word) const;
     bool empty() const { return mTables.empty(); }
-    // Every word beginning with the prefix, case aside, as the word and
-    // its table: what completion offers.
-    void collect(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const;
+    // Every word and its table, each handed to `visit` as it stands rather
+    // than copied: what completion narrows by its own match, keeping only
+    // the words that match.
+    template <typename Visit>
+    void forEach(Visit&& visit) const
+    {
+        for (const auto& [table, words] : mTables)
+        {
+            for (const std::string& word : words)
+            {
+                visit(word, table);
+            }
+        }
+    }
 
     // Every table a word is in, as a bit each, in one look: what a word
     // rule asks, instead of asking each of its tables in turn. A table's
@@ -240,9 +280,8 @@ public:
         std::vector<std::string> joined;
     };
     const FoldWords&   foldWords() const;
-    // The words the grammar itself declares that begin with the prefix,
-    // as the word and its table.
-    void collectWords(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const;
+    // The words the grammar itself declares, by table.
+    const ALSyntaxWords& declaredWords() const;
 
     ALSyntaxState initialState() const;
 

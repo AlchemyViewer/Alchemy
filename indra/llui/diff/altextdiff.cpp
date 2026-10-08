@@ -33,6 +33,8 @@
 #include "alstructuraldiff.h"
 #include "alworddiff.h"
 
+#include <boost/container_hash/hash.hpp>
+
 #include <algorithm>
 #include <span>
 
@@ -40,6 +42,9 @@ namespace
 {
     typedef ALTextDiff::Run  Run;
     typedef ALTextDiff::Kind Kind;
+
+    // A test's hook, of the thread that hashed.
+    thread_local U64 sHashed = 0;
 }
 
 const char* ALTextDiff::algorithmName(Algorithm algorithm)
@@ -128,6 +133,24 @@ namespace
             out.resize(end);
         }
     }
+}
+
+size_t ALTextDiff::hashOf(const regions_t& regions)
+{
+    ++sHashed;
+    size_t hash = regions.size();
+    for (const Piece& piece : regions)
+    {
+        boost::hash_combine(hash, piece.begin);
+        boost::hash_combine(hash, piece.end);
+        boost::hash_combine(hash, static_cast<U8>(piece.region));
+    }
+    return hash;
+}
+
+U64 ALTextDiff::hashed()
+{
+    return sHashed;
 }
 
 std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like, const regions_t* regions)
@@ -266,10 +289,29 @@ namespace
         {
             const S32 to_left  = i < kept.size() ? kept[i].first : n;
             const S32 to_right = i < kept.size() ? kept[i].second : m;
-            // The stretch before the pair, on its own.
-            for (const Run& run : stretch(a, b, left, right, l, to_left, r, to_right, algorithm))
+            // The stretch before the pair, on its own: one of no lines on a
+            // side, or of a line each, as it is without looking -- a
+            // conversion's anchors leave mostly those between them.
+            if (l == to_left || r == to_right)
             {
-                push(run);
+                push(Run{ Kind::Removed, l, r, to_left - l });
+                push(Run{ Kind::Added, to_left, r, to_right - r });
+            }
+            else if (to_left - l == 1 && to_right - r == 1 && a[static_cast<size_t>(l)] == b[static_cast<size_t>(r)])
+            {
+                push(Run{ Kind::Same, l, r, 1 });
+            }
+            else if (to_left - l == 1 && to_right - r == 1)
+            {
+                push(Run{ Kind::Removed, l, r, 1 });
+                push(Run{ Kind::Added, to_left, r, 1 });
+            }
+            else
+            {
+                for (const Run& run : stretch(a, b, left, right, l, to_left, r, to_right, algorithm))
+                {
+                    push(run);
+                }
             }
             if (i == kept.size())
             {
@@ -359,20 +401,30 @@ std::vector<ALTextDiff::Run> ALTextDiff::linesBy(Algorithm algorithm, const std:
 {
     if (algorithm == Algorithm::Structural)
     {
-        const std::vector<regions_t>* left_regions  = options.lexer ? &options.lexer(left) : nullptr;
-        const std::vector<regions_t>* right_regions = options.lexer ? &options.lexer(right) : nullptr;
-        return ALStructuralDiff::compare(left, right, options, left_regions, right_regions).runs;
+        const both_regions_t regions = lexed(options, left, right, true);
+        return ALStructuralDiff::compare(left, right, options, regions.first, regions.second).runs;
     }
     // Each line's regions, where a grammar says where comments and strings
     // are and that changes how lines are told the same.
-    std::span<const regions_t> left_regions;
-    std::span<const regions_t> right_regions;
-    if (options.like.byRegions() && options.lexer)
+    const both_regions_t regions = lexed(options, left, right, options.like.byRegions());
+    const auto           spanOf  = [](const std::vector<regions_t>* text) { return text ? std::span<const regions_t>(*text) : std::span<const regions_t>(); };
+    return byLines(algorithm, left, right, options, spanOf(regions.first), spanOf(regions.second));
+}
+
+ALTextDiff::both_regions_t ALTextDiff::lexed(const Options& options, const std::vector<std::string>& left, const std::vector<std::string>& right,
+                                             bool needed)
+{
+    if (!needed || !options.lexer)
     {
-        left_regions  = options.lexer(left);
-        right_regions = options.lexer(right);
+        return both_regions_t(nullptr, nullptr);
     }
-    return byLines(algorithm, left, right, options, left_regions, right_regions);
+    const std::vector<regions_t>* left_regions  = &options.lexer(left);
+    const std::vector<regions_t>* right_regions = &options.lexer(right);
+    if (left_regions->size() != left.size() || right_regions->size() != right.size())
+    {
+        return both_regions_t(nullptr, nullptr);
+    }
+    return both_regions_t(left_regions, right_regions);
 }
 
 size_t ALTextDiff::changeAt(const std::vector<Run>& runs, size_t from, std::vector<S32>& gone, std::vector<S32>& made)

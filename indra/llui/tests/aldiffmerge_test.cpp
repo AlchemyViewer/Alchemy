@@ -28,6 +28,7 @@
 
 #include "aldiffedit.h"
 #include "aldifflexer.h"
+#include "aldiffsplice.h"
 #include "alsyntaxgrammar.h"
 
 #include "../test/lltut.h"
@@ -363,5 +364,44 @@ namespace tut
         // Merged so, no conflict, as a merge letting blanks go finds.
         begin(b, begun, t, loose);
         ensure_equals("none", merge->conflictCount(), 0);
+    }
+
+    template<> template<>
+    void aldiffmerge_object::test<11>()
+    {
+        set_test_name("ours made anew between its edges: compared with the base again only about each edit, the merge found as with ours given whole, edit after edit");
+        // Theirs changed lines 10 and 100, ours lines 50 and 150.
+        lines_t base_lines;
+        for (S32 n = 0; n < 200; ++n)
+        {
+            base_lines.push_back("line " + std::to_string(n));
+        }
+        lines_t theirs_lines = base_lines;
+        theirs_lines[10]     = "theirs 10";
+        theirs_lines[100]    = "theirs 100";
+        lines_t ours_lines   = base_lines;
+        ours_lines[50]       = "mine 50";
+        ours_lines[150]      = "mine 150";
+        ALDiffMerge spliced(base_lines, theirs_lines);
+        ALDiffMerge whole(base_lines, theirs_lines);
+        spliced.setOurs(ours_lines);
+        whole.setOurs(ours_lines);
+        const auto edit = [&](const auto& made, const std::string& where, S32 conflicts) {
+            lines_t now = ours_lines;
+            made(now);
+            spliced.setOurs(now, ALDiffEdit::edgesOf(ours_lines, now));
+            ensure(where + ": compared again only about the edit", ALDiffSplice::lastCompared() > 0 && ALDiffSplice::lastCompared() <= 6);
+            whole.setOurs(now);
+            ensure(where + ": as with ours whole", spliced.hunks() == whole.hunks());
+            ensure_equals(where + ": conflicts", spliced.conflictCount(), conflicts);
+            ours_lines = std::move(now);
+        };
+        edit([](lines_t& lines) { lines[120] = "mine 120"; }, "a line typed into", 0);
+        edit([](lines_t& lines) { lines.insert(lines.begin() + 30, "put in"); }, "a line put in", 0);
+        edit([](lines_t& lines) { lines.erase(lines.begin() + 181); }, "a line taken out", 0);
+        // The base's line 100 is ours's 101 now.
+        edit([](lines_t& lines) { lines[101] = "mine 100"; }, "theirs's line changed otherwise", 1);
+        edit([](lines_t& lines) { lines[101] = "line 100"; }, "and back", 0);
+        ensure("the base as it was", spliced.base() == base_lines);
     }
 }

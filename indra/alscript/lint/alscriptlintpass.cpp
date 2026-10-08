@@ -39,6 +39,7 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <cmath>
@@ -2636,7 +2637,7 @@ namespace
             }
             const bool        repeated = often(node->location);
             const std::string function = std::string(from) + "." + std::string(callee->index.value);
-            const std::string seconds  = llformat("%g", row->monoSleep);
+            const std::string seconds  = fmt::format("{:g}", row->monoSleep);
             if (!call->fast)
             {
                 problem(node->location, repeated ? "LuauLintSlSleepingTextureOften" : "LuauLintSlSleepingTexture",

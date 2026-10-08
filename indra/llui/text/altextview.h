@@ -255,6 +255,11 @@ public:
     // held to it: a text put in whole, an undo and a redo are not.
     void            setMaxBytes(size_t bytes) { mMaxBytes = bytes; }
     size_t          maxBytes() const { return mMaxBytes; }
+    // Whether stretches replaced at once would keep the text under
+    // maxBytes, measured as replaceAll measures them -- in the text without
+    // a composition standing in it -- for whoever must know before making
+    // them. Asked, it says nothing.
+    bool            wouldFit(const std::vector<std::pair<ALTextRange, std::string>>& edits) const;
     // How the text is indented -- by tabs or by spaces, and how wide a
     // tab or a level is -- and where that was said: the defaults the view
     // was given; the text itself, as it was put in whole, where the view
@@ -324,9 +329,9 @@ public:
     const std::string& colorPrefix() const { return mColorPrefix; }
     // The colour a kind is drawn in here.
     const LLColor4& colorForKind(ALSyntaxKind kind) const;
-    // The colour table's name for a kind's colour under a prefix:
-    // "SyntaxComment", "ScriptComment". Text has none, being the view's
-    // own text colour.
+    // The colour table's name for a kind's colour under a prefix, its name
+    // in a grammar in camel case: "SyntaxComment", "ScriptDocComment".
+    // Text has none, being the view's own text colour.
     static std::string kindColorName(std::string_view prefix, ALSyntaxKind kind);
     // Whether the text has changed since it was set or saved.
     bool            isDirty() const override { return !mUndo.isPristine(); }
@@ -664,7 +669,8 @@ public:
     // moved meanwhile, which drops it.
     bool goToMisspelling(bool forward);
     // A change worked out over the document (ALTextEditing) made, as one
-    // step to undo, and the selection it says after.
+    // step to undo, and the selection it says after; told of as a change
+    // only where the text changed.
     void apply(const ALTextEditing::Change& change);
     // --- the change list --------------------------------------------------------
 
@@ -896,7 +902,7 @@ public:
     // nothing. For a stretch, its span on the row it begins on, or the
     // whole of that row where it shows nothing there. What a list, a card
     // or a tip is put beside.
-    LLRect anchorOf(const ALTextPos& at);
+    LLRect anchorOf(const ALTextPos& at) const;
     LLRect anchorOf(const ALTextRange& range);
     // A drag of the mouse under way -- from its press, or a shift-press
     // from the anchor -- and the characters under its two ends: what a
@@ -935,6 +941,10 @@ protected:
     // and a see-through child that only holds others is over the text only
     // where one of those is.
     LLView*      overlayAt(S32 x, S32 y);
+    // Whether a point is on the bars, which take a press to scroll by: the
+    // ruler or the map down the side, or the bar along the bottom where
+    // it shows.
+    bool         barsAt(S32 x, S32 y);
     // An edit command done -- typed, replaced, undone -- before the caret
     // is brought into sight: whatever a subclass left for after its edits,
     // done once rather than at each.
@@ -947,8 +957,14 @@ protected:
     // A row's glyph colours, after the kinds have coloured them, for a
     // subclass with colours of its own for some glyphs.
     virtual void tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors) {}
-    // A line's row drawn at a place, coloured as it is in the text: what
-    // a header pinned at the top is drawn with.
+    // Each kind's colour as a glyph is drawn in it at an alpha: made again
+    // only when the alpha or the colour table changes, since a frame's
+    // glyphs ask for a few kinds thousands of times.
+    typedef std::array<LLColor4U, static_cast<size_t>(ALSyntaxKind::COUNT)> kind_inks_t;
+    const kind_inks_t& kindInks(F32 alpha);
+    // A line's row drawn at a place, coloured as it is in the text, as much
+    // of it as is in sight across the text scrolled as it is: what a header
+    // pinned at the top is drawn with.
     void drawRowAt(S32 line, S32 row, F32 left, S32 screen_top, F32 alpha);
     // Whether a click lands where the last one did, which is what makes
     // it the next of a run; and the run armed for a third click, once a
@@ -985,13 +1001,76 @@ protected:
     static S32 squiggleMiddle(S32 text_top, S32 ascent);
     // The screen y of the top of a line's row -- the row's own top; a row
     // a box made taller than the font's line holds its text at its
-    // bottom -- and every row on screen in turn, for a subclass drawing
-    // beside them.
-    S32  screenTopOf(const LLRect& text, S32 line, S32 row);
-    void forEachVisibleRow(const LLRect& text, const std::function<void(S32 line, S32 row, S32 screen_top)>& visit);
+    // bottom -- and every row on screen in turn, each line laid out as it
+    // is reached, for what draws the rows and a subclass drawing beside
+    // them: told the line, the row and the row's top on the screen, by
+    // whatever is callable so, as it is rather than wrapped.
+    S32 screenTopOf(const LLRect& text, S32 line, S32 row) const;
+    template <typename Visit>
+    void forEachVisibleRow(const LLRect& text, Visit&& visit)
+    {
+        if (mLayout.rowHeight() <= 0)
+        {
+            return;
+        }
+        const S32 count    = mDocument.lineCount();
+        const S32 bottom_y = mScrollY + text.getHeight();
+        for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
+        {
+            if (mLayout.hidden(line))
+            {
+                continue;
+            }
+            const ALTextLayout::Line& laid = mLayout.line(line);
+            const S32                 top  = mLayout.lineTop(line);
+            if (top >= bottom_y)
+            {
+                break;
+            }
+            for (size_t r = 0; r < laid.rows.size(); ++r)
+            {
+                const S32 row_top = top + laid.rows[r].top;
+                if (row_top + laid.rows[r].height <= mScrollY)
+                {
+                    continue;
+                }
+                if (row_top >= bottom_y)
+                {
+                    break;
+                }
+                visit(line, static_cast<S32>(r), text.mTop - (row_top - mScrollY));
+            }
+        }
+    }
     // Every gap on screen: the line it is above (one past the last for
     // the gap below the text), its top on the screen and its height.
-    void forEachVisibleGap(const LLRect& text, const std::function<void(S32 line, S32 screen_top, S32 height)>& visit);
+    template <typename Visit>
+    void forEachVisibleGap(const LLRect& text, Visit&& visit)
+    {
+        if (!mAnyGap || mLayout.rowHeight() <= 0)
+        {
+            return;
+        }
+        const S32  count    = mDocument.lineCount();
+        const S32  bottom_y = mScrollY + text.getHeight();
+        const auto shown    = [&](S32 line) {
+            const S32 top    = mLayout.gapTop(line);
+            const S32 height = mLayout.gapHeight(line);
+            if (height > 0 && top < bottom_y && top + height > mScrollY)
+            {
+                visit(line, text.mTop - (top - mScrollY), height);
+            }
+            return top < bottom_y;
+        };
+        for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
+        {
+            if (!mLayout.hidden(line) && !shown(line))
+            {
+                return;
+            }
+        }
+        shown(count);
+    }
     // Every change goes through here: the document, the journal, the
     // caret, and whoever is listening.
     ALTextDocument::Edit edit(const ALTextRange& range, std::string_view text);
@@ -1007,8 +1086,8 @@ protected:
     // What of a text fits in place of a stretch under maxBytes: all of
     // it, or as much as fits, cut at a character, the view full.
     std::string_view     fitting(const ALTextRange& over, std::string_view text);
-    // Whether stretches replaced at once keep under maxBytes; the view
-    // full where they would not.
+    // Whether stretches replaced at once keep under maxBytes (wouldFit);
+    // the view full where they would not.
     bool                 fits(const std::vector<std::pair<ALTextRange, std::string>>& edits);
     // A beep, and whoever listens told: a change was cut short or not made.
     void                 full();
@@ -1185,6 +1264,10 @@ private:
     void   drawBars(F32 alpha);
     void drawRows(const LLRect& text);
     void placeFindBar();
+    // The find bar, where it is shown, in the view's colours as they stand
+    // -- a theme chosen while it is open, the keyboard come or gone, the
+    // text made read-only -- coloured only where they changed.
+    void colorFindBar();
     // The bar's query looked for through the text again: at once, or once
     // edits stop coming for a moment, the matches sliding with the text
     // until then; and at once where they are about to be used.
@@ -1408,8 +1491,17 @@ private:
     LLHandle<LLContextMenu> mUrlMenuHandle;
 
     ALFindBar*               mFindBar = nullptr;
-    // The colour table's generation the find bar was last coloured at.
-    U32                      mFindBarColors = 0;
+    // What the find bar was last coloured in -- the view's ground and ink,
+    // and the colour table's generation, which the bar's own shades of
+    // them come from -- and none until it is.
+    struct FindBarColors
+    {
+        bool     set        = false;
+        U32      generation = 0;
+        LLColor4 paper;
+        LLColor4 ink;
+    };
+    FindBarColors            mFindBarColors;
     // What the bar's query found, kept in step with the text.
     ALTextFind               mFind;
     LLUIColor                mFindMatchColor;
@@ -1420,6 +1512,15 @@ private:
     bool             mScrollMapLeft    = false;
 
     std::vector<LLColor4U> mColorScratch;
+    // What kindInks made, at the alpha and the colour table's generation it
+    // made them at.
+    struct KindInks
+    {
+        F32         alpha  = -1.f;
+        U32         colors = 0;
+        kind_inks_t inks;
+    };
+    KindInks               mKindInks;
     // A frame's rows in sight, and their glyphs as one call's runs with the
     // colours they are drawn in: kept from frame to frame rather than made
     // for each.
@@ -1440,13 +1541,15 @@ private:
     std::vector<Box>                mTintBoxes;
     std::vector<Box>                mCaretBoxes;
     // What the band under the text shows and where its pieces go, as the
-    // keymap had it at its generation in this font: read and measured
-    // again only when the keymap has moved on.
+    // keymap had it at its generation in this font, as the fonts were then
+    // loaded: read and measured again only when the keymap has moved on, or
+    // the font, or the fonts were loaded again under it.
     struct BandShown
     {
         const ALModalKeymap*     keymap     = nullptr;
         U32                      generation = 0;
         const LLFontGL*          font       = nullptr;
+        S32                      fonts      = -1;
         bool                     typing     = false;
         bool                     error      = false;
         bool                     status     = false;

@@ -70,6 +70,11 @@ public:
     // that was not. Empty without a grammar or a document.
     const std::vector<ALSyntaxToken>& tokens(S32 line);
     U32                               revision(S32 line);
+    // The state a line starts in, lexed to it if need be: where a line that
+    // stands for it elsewhere -- what a fix would make of it, previewed --
+    // is lexed from. The grammar's first state past the text, or with
+    // nothing lexed.
+    ALSyntaxState                     startState(S32 line);
 
     // For whoever wants every line's tokens and asks every frame -- the
     // blocks a gutter draws: the lines that want lexing lexed on from the
@@ -96,7 +101,13 @@ private:
         U32                        end      = 0;
         std::vector<ALSyntaxToken> tokens;
         U32                        revision = 0;
+        // Whether the tokens are as the line lexes now: from the state it
+        // starts in, by the grammar and the words there are.
         bool                       valid    = false;
+        // Whether the tokens are of the line's text, as it lexes now or
+        // not: what it lexes to next is held against them, and the
+        // revision moves only where the two differ.
+        bool                       lexed    = false;
     };
     struct StateHash
     {
@@ -111,7 +122,7 @@ private:
     void lex(S32 line, S32 most);
     // A state's number, kept once whoever starts or ends in it; and the
     // states kept cut back to those lines are in, past a number of them.
-    U32  intern(ALSyntaxState state);
+    U32  intern(const ALSyntaxState& state);
     void compactStates();
 
     ALTextDocument*                        mDocument = nullptr;
@@ -127,6 +138,10 @@ private:
     std::vector<ALSyntaxState>                                 mStates;
     boost::unordered_flat_map<ALSyntaxState, U32, StateHash>   mStateIds;
     U32                                                        mInitialState = 0;
+    // The state a line is lexed through, from the one it starts in to the
+    // one it ends in: one kept, whose room each line lexed uses again,
+    // rather than a copy made and freed for every line.
+    ALSyntaxState                                              mLexing;
     S32                                    mFirstDirty = 0;
     S32                                    mLastLexed  = 0;
 };

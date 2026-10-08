@@ -27,11 +27,23 @@
 #include "alsyntaxgrammar.h"
 
 #include "albigscript.h"
+#include "altextview.h"
 
 #include "../test/lltut.h"
 
+#include <set>
 #include <string>
 #include <vector>
+
+// llui reaches the viewer for this one, and linking ALTextView, whose colour
+// names are tested here, pulls the object that calls it. Nothing under test
+// goes near it.
+class LLAvatarName;
+const std::string gSyntaxGrammarsTestAnonName("Anon");
+const std::string& rlvGetAnonym(const LLAvatarName& av_name)
+{
+    return gSyntaxGrammarsTestAnonName;
+}
 
 namespace tut
 {
@@ -131,7 +143,7 @@ namespace tut
     {
         set_test_name("SLua");
         ALSyntaxWords words;
-        words.set("function", { "Say" });
+        words.set("function", { "ll.Say" });
         words.set("type", { "number" });
         ALSyntaxState state;
         ensure_equals("comment", lexed("slua", "-- comment", state, words), std::string("comment:-- comment"));
@@ -411,6 +423,25 @@ namespace tut
         compare("slua", slua);
         compare("slua", "--[==[\n" + slua + "\n]==]");
         compare("slua", "x = [[\n" + slua + "\n]]");
+
+        // One long line of many strings, as a minified file is: some with an
+        // escaped quote, which is where their end is first found, and one
+        // of many escapes whose end is far along.
+        std::string minified = "[";
+        for (S32 i = 0; i < 300; ++i)
+        {
+            minified += "{\"k" + std::to_string(i) + "\": \"v" + std::to_string(i) + (i % 3 == 0 ? "\\\"\\n" : "") + "\", \"n\": " + std::to_string(i) + "}, ";
+        }
+        minified += "\"";
+        for (S32 i = 0; i < 200; ++i)
+        {
+            minified += "\\t";
+        }
+        minified += std::string(300, 'x') + "\"]";
+        for (const char* grammar_name : { "json", "lsl", "slua", "config" })
+        {
+            compare(grammar_name, minified);
+        }
     }
 
     template<> template<>
@@ -428,6 +459,13 @@ namespace tut
                       std::string("property:url|punctuation: =|text: |string:\"http://x\"|text: at |number:10|text::|number:30"));
         ensure_equals("the next line a key again", lexed("config", "name = Door", state, words), std::string("property:name|punctuation: =|text: Door"));
         ensure_equals("a line with no key, text", lexed("config", "just words here", state, words), std::string("text:just words here"));
+        ensure_equals("and after it, a key again", lexed("config", "name = Door", state, words), std::string("property:name|punctuation: =|text: Door"));
+        ensure_equals("a comment after words with no key", lexed("config", "just words # here", state, words),
+                      std::string("text:just words|comment: # here"));
+        ensure_equals("a section and a comment after it", lexed("config", "[Door] ; the door", state, words),
+                      std::string("type:[Door]|comment: ; the door"));
+        ensure_equals("a key after a section", lexed("config", "[Door] name = x", state, words),
+                      std::string("type:[Door]|text: |property:name|punctuation: =|text: x"));
     }
     template<> template<>
     void alsyntaxgrammars_object::test<14>()
@@ -443,5 +481,131 @@ namespace tut
                       std::string("text:print|punctuation:(|string:`|punctuation:{|number:5i|punctuation:}|string:`|punctuation:)"));
         ensure_equals("not a fraction's, which Luau calls malformed", lexed("slua", "x = 1.5i", state, words),
                       std::string("text:x |operator:=|text: |number:1.5|text:i"));
+    }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<20>()
+    {
+        set_test_name("a comment right after an operator opens: the operator takes none of it, in LSL or SLua, and operators side by side are still one");
+        ALSyntaxWords words;
+        ALSyntaxState state;
+        ensure_equals("LSL, a block comment", lexed("lsl", "x = y +/* note */ 1;", state, words),
+                      std::string("text:x |operator:=|text: y |operator:+|comment:/* note */|text: |number:1|punctuation:;"));
+        ensure("closed on its line", state.frames.size() == 1);
+        ensure_equals("a line comment", lexed("lsl", "x =// the x", state, words), std::string("text:x |operator:=|comment:// the x"));
+        ensure_equals("operators together", lexed("lsl", "x += y != z", state, words),
+                      std::string("text:x |operator:+=|text: y |operator:!=|text: z"));
+        ALSyntaxState slua;
+        ensure_equals("SLua, a long comment", lexed("slua", "local n = 1 +--[[ off ]] 2", slua, words),
+                      std::string("control:local|text: n |operator:=|text: |number:1|text: |operator:+|comment:--[[ off ]]|text: |number:2"));
+        ensure_equals("a line comment", lexed("slua", "n = n *-- twice", slua, words), std::string("text:n |operator:=|text: n |operator:*|comment:-- twice"));
+        ensure_equals("operators together", lexed("slua", "n //= 2 ~= 3", slua, words),
+                      std::string("text:n |operator://=|text: |number:2|text: |operator:~=|text: |number:3"));
+    }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<15>()
+    {
+        set_test_name("SLua: a concatenation is two dots before a number as anywhere, and a number may still begin with its point");
+        ALSyntaxWords words;
+        words.set("function", { "print" });
+        ALSyntaxState state;
+        ensure_equals("a concatenation, then a number", lexed("slua", "print(\"n=\"..5)", state, words),
+                      std::string("function:print|punctuation:(|string:\"n=\"|punctuation:..|number:5|punctuation:)"));
+        ensure_equals("a concatenation of a fraction", lexed("slua", "s = s.. .5", state, words),
+                      std::string("text:s |operator:=|text: s|punctuation:..|text: |number:.5"));
+        ensure_equals("a number that begins with its point", lexed("slua", "x = .5 + 1.", state, words),
+                      std::string("text:x |operator:=|text: |number:.5|text: |operator:+|text: |number:1."));
+        ensure_equals("the varargs", lexed("slua", "f(...)", state, words), std::string("text:f|punctuation:(...)"));
+    }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<16>()
+    {
+        set_test_name("SLua: a string whose line ends in a backslash goes on onto the next, as Luau reads it, and one whose line ends in an escaped backslash ends with it");
+        ALSyntaxWords words;
+        ALSyntaxState state;
+        ensure_equals("a backslash at the end", lexed("slua", "local s = \"one\\", state, words),
+                      std::string("control:local|text: s |operator:=|text: |string:\"one|escape:\\"));
+        ensure("still in the string", state.frames.size() == 2);
+        ensure_equals("which the next line closes", lexed("slua", "two\" .. x", state, words), std::string("string:two\"|text: |punctuation:..|text: x"));
+        ensure("and code after it", state.frames.size() == 1);
+        ensure_equals("in single quotes", lexed("slua", "s = 'one\\", state, words), std::string("text:s |operator:=|text: |string:'one|escape:\\"));
+        ensure_equals("goes on too", lexed("slua", "two'", state, words), std::string("string:two'"));
+        ensure_equals("an escaped backslash", lexed("slua", "s = 'a\\\\", state, words), std::string("text:s |operator:=|text: |string:'a|escape:\\\\"));
+        ensure("ends with its line", state.frames.size() == 1);
+        ensure_equals("so the next is code", lexed("slua", "y = 1", state, words), std::string("text:y |operator:=|text: |number:1"));
+        ensure_equals("and so does an escape of a blank", lexed("slua", "s = 'a\\ ", state, words), std::string("text:s |operator:=|text: |string:'a|escape:\\ "));
+        ensure("ended", state.frames.size() == 1);
+        ensure_equals("an interpolated string with a backslash at the end", lexed("slua", "s = `one\\", state, words),
+                      std::string("text:s |operator:=|text: |string:`one\\"));
+        ensure_equals("goes on", lexed("slua", "two` y", state, words), std::string("string:two`|text: y"));
+        ensure("and ends", state.frames.size() == 1);
+        ensure_equals("one with an escaped backslash", lexed("slua", "s = `a\\\\", state, words), std::string("text:s |operator:=|text: |string:`a|escape:\\\\"));
+        ensure("ends with its line", state.frames.size() == 1);
+    }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<17>()
+    {
+        set_test_name("an include's name or a macro's string left open ends with its line, and the lines below are code; a backslash still carries a macro's string on");
+        ALSyntaxWords words;
+        ALSyntaxState state;
+        ensure_equals("LSL, a bracket left open", lexed("lsl", "#include <lib", state, words), std::string("preprocessor:#include |path:<lib"));
+        ensure("ends with its line", state.frames.size() == 1);
+        ensure_equals("so the next line is code", lexed("lsl", "integer x;", state, words), std::string("type:integer|text: x|punctuation:;"));
+        ensure_equals("a quote left open", lexed("lsl", "#include \"lib", state, words), std::string("preprocessor:#include |path:\"lib"));
+        ensure("ends with its line too", state.frames.size() == 1);
+        ensure_equals("and the next line is code", lexed("lsl", "x = \"a\";", state, words), std::string("text:x |operator:=|text: |string:\"a\"|punctuation:;"));
+        ensure_equals("a macro's string left open", lexed("lsl", "#define X \"abc", state, words), std::string("preprocessor:#define X |string:\"abc"));
+        ensure("ends with its line, and the directive with it", state.frames.size() == 1);
+        ensure_equals("code below it", lexed("lsl", "integer y;", state, words), std::string("type:integer|text: y|punctuation:;"));
+        ensure_equals("a macro's string continued", lexed("lsl", "#define GREETING \"hello \\", state, words),
+                      std::string("preprocessor:#define GREETING |string:\"hello |escape:\\"));
+        ensure_equals("goes on onto the next line", lexed("lsl", "world\"", state, words), std::string("string:world\""));
+        ensure("and the directive ends with that line", state.frames.size() == 1);
+        ALSyntaxState slua;
+        ensure_equals("SLua, a quote left open", lexed("slua", "--#include \"lib", slua, words), std::string("preprocessor:--#include |path:\"lib"));
+        ensure("ends with its line", slua.frames.size() == 1);
+        ensure_equals("so the next line is code", lexed("slua", "local x = 1", slua, words), std::string("control:local|text: x |operator:=|text: |number:1"));
+        ensure_equals("a macro's string left open", lexed("slua", "--#define X \"abc", slua, words), std::string("preprocessor:--#define X |string:\"abc"));
+        ensure("ends with its line", slua.frames.size() == 1);
+    }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<18>()
+    {
+        set_test_name("SLua: a member is looked up by its head's name for it and no other: one named as a global is not that global, as its hover says");
+        ALSyntaxWords words;
+        words.set("function", { "type", "next", "print", "ll.Say" });
+        ALSyntaxState state;
+        ensure_equals("a field called type", lexed("slua", "if item.type == x then", state, words),
+                      std::string("control:if|text: item|punctuation:.|text:type |operator:==|text: x |control:then"));
+        ensure_equals("one called next", lexed("slua", "node = node.next", state, words), std::string("text:node |operator:=|text: node|punctuation:.|text:next"));
+        ensure_equals("the global itself", lexed("slua", "next(t)", state, words), std::string("function:next|punctuation:(|text:t|punctuation:)"));
+        ensure_equals("after a concatenation, the global still", lexed("slua", "s = s..type(x)", state, words),
+                      std::string("text:s |operator:=|text: s|punctuation:..|function:type|punctuation:(|text:x|punctuation:)"));
+        ensure_equals("a member its head names", lexed("slua", "ll.Say(0)", state, words),
+                      std::string("text:ll|punctuation:.|function:Say|punctuation:(|number:0|punctuation:)"));
+    }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<19>()
+    {
+        set_test_name("every kind has a name of its own in a grammar, which names it back, and its colour in a colour table is named after it");
+        std::set<std::string> names;
+        for (size_t i = 0; i < static_cast<size_t>(ALSyntaxKind::COUNT); ++i)
+        {
+            const ALSyntaxKind kind = static_cast<ALSyntaxKind>(i);
+            const std::string  name = alSyntaxKindName(kind);
+            ensure("named once: " + name, names.insert(name).second);
+            ensure("and named back: " + name, alSyntaxKindFromName(name) == kind);
+            ensure("a colour named, but for text's: " + name, ALTextView::kindColorName("Script", kind).empty() == (kind == ALSyntaxKind::Text));
+        }
+        ensure_equals("a comment's colour", ALTextView::kindColorName("Script", ALSyntaxKind::Comment), std::string("ScriptComment"));
+        ensure_equals("a doc comment's", ALTextView::kindColorName("Syntax", ALSyntaxKind::DocComment), std::string("SyntaxDocComment"));
+        ensure_equals("an attribute value's", ALTextView::kindColorName("Syntax", ALSyntaxKind::AttributeValue), std::string("SyntaxAttributeValue"));
+        ensure_equals("a global variable's", ALTextView::kindColorName("Script", ALSyntaxKind::GlobalVariable), std::string("ScriptGlobalVariable"));
+        ensure_equals("a path's", ALTextView::kindColorName("Script", ALSyntaxKind::Path), std::string("ScriptPath"));
     }
 }

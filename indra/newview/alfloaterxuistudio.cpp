@@ -28,6 +28,7 @@
 
 #include "alpanelist.h"
 
+#include "allinebreaks.h"
 #include "alwatchedfile.h"
 #include "alxmldocument.h"
 #include "alxmllayermerge.h"
@@ -2100,16 +2101,8 @@ LLSD ALFloaterXUIStudio::row(const LLSD& id, std::initializer_list<std::pair<con
     S32 i = 0;
     for (const auto& [column, value] : cells)
     {
-        std::string oneLine = value;
-        for (char& c : oneLine)
-        {
-            if (c == '\n' || c == '\r' || c == '\t')
-            {
-                c = ' ';
-            }
-        }
         r["columns"][i]["column"] = column;
-        r["columns"][i]["value"] = oneLine;
+        r["columns"][i]["value"] = ALLineBreaks::oneLine(value);
         ++i;
     }
     return r;

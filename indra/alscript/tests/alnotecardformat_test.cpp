@@ -137,4 +137,18 @@ namespace tut
         ensure("the second", read[1].line == 2 && read[1].column == 54);
         ensure("none of another", ALNotecardFormat::readersOf(script, "missing").empty());
     }
+
+    template<> template<>
+    void alnotecardformat_object::test<6>()
+    {
+        set_test_name("a notecard's readers by the lines a document makes of the script: a lone CR a break as LF is, CRLF one");
+        const std::string script = "default {\r"
+                                   "  state_entry() { llGetNotecardLine(\"config\", 0); }\r\n"
+                                   "  touch_start(integer n) { llGetNumberOfNotecardLines(\"config\"); }\n"
+                                   "}\r";
+        const std::vector<ALScriptSpan> read = ALNotecardFormat::readersOf(script, "config");
+        ensure_equals("both", read.size(), size_t(2));
+        ensure("the first on the second line", read[0].line == 1 && read[0].column == 36 && read[0].endColumn == 44);
+        ensure("the second on the third", read[1].line == 2 && read[1].column == 54);
+    }
 }

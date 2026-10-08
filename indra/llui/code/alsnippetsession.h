@@ -53,7 +53,9 @@ public:
     // placeholders, in order of their numbers -- one inside another's text
     // as well, `${1:a ${2:b}}` -- and `$0`, or `${0:text}`, where the caret
     // lands past the last. A number that comes again is a mirror of the
-    // first, written as it holds. `$$` or `\$` a dollar, `\}` a brace.
+    // first, written as it holds; a first written with no default holds
+    // the first one its number is given after it, `$1 = ${1:value}` as
+    // `value = value`. `$$` or `\$` a dollar, `\}` a brace.
     struct Expansion
     {
         // The text as it will stand.
@@ -105,31 +107,28 @@ public:
 
     // An edit heard: the stop being typed over becomes what was typed, the
     // others move with the text, and one the edit cut into goes, with its
-    // mirrors; the mirror being brought up is what the edit put in. With no
-    // stop left, or none being typed over, it is over.
+    // mirrors; the mirror being brought up is what the edit put in, and a
+    // stop it is inside of, or is, grows with it. With no stop left, or
+    // none being typed over, it is over.
     void slide(const ALTextDocument::Edit& edit);
     // Whether a line is one the session is still being filled in on: from
     // the first stop's line to where the call or the snippet ends.
     bool reaches(S32 line) const;
-    // The mirrors of a stop that no longer read as it does, the last in
-    // the text first, so that bringing each up moves none still to do; and
+    // The mirrors of a stop that no longer read as it does, by index; and
     // what the stop holds.
     std::vector<S32> staleMirrors(S32 index, const ALTextDocument& text, std::string& wanted) const;
-    // The mirror being brought up, which the edit that does it puts in
-    // whole; -1 for none.
-    void syncing(S32 mirror) { mSyncing = mirror; }
-    // Every mirror being made again at once, as one batch (ALTextView::
-    // editMany): each a stretch replaced is grows to what went in.
-    void syncingAll() { mSyncing = SYNCING_ALL; }
-    bool syncing() const { return mSyncing != -1; }
-    static constexpr S32 SYNCING_ALL = -2;
+    // Whether the mirrors are being made again, all at once, as one batch
+    // (ALTextView::editMany): while they are, each mirror a stretch the
+    // batch replaced is becomes what went in.
+    void setSyncing(bool syncing) { mSyncing = syncing; }
+    bool syncing() const { return mSyncing; }
 
 private:
     std::vector<ALTextRange> mStops;
     S32                      mAt = -1;
     ALTextPos                mAfter;
     std::vector<Mirror>      mMirrors;
-    S32                      mSyncing = -1;
+    bool                     mSyncing = false;
     // How long the text `${0:text}` put where the caret lands is, to be
     // chosen as it lands; nothing for a bare $0.
     S32                      mLanding = 0;

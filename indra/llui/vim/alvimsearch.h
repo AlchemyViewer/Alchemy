@@ -60,18 +60,23 @@ public:
     // A search line's pattern and offset: split at the first unescaped
     // `kind` after the pattern.
     static void splitOffset(const std::string& line, llwchar kind, std::string& pattern, std::string& offset_text);
+    // A pattern typed after ? as vim reads it: \? there is the ? itself,
+    // since a ? would end the pattern, outside a [] collection; the rest as
+    // it was typed.
+    static std::string backwardPattern(const std::string& typed);
     static bool parseOffset(const std::string& text, Offset& out);
     ALTextPos   offsetFrom(const ALTextDocument& d, const ALTextRange& match, const Offset& offset) const;
     // Searching, with the last pattern kept for n and N, and its offset:
     // the caret to where it goes (target).
-    bool search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset = Offset(),
+    bool search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool no_smartcase, const Offset& offset = Offset(),
                 std::optional<ALTextPos> search_from = std::nullopt);
     // Where a search goes from the caret -- or from `search_from`, as * and
     // # look from the start of the word under the caret -- the count's
     // match on, round past the ends, the offset taken from it; its matches
     // lit and the match kept for n, the caret left where it is: an
     // operator's motion. Nothing where there is no match, which is said.
-    std::optional<ALTextPos> target(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset = Offset(),
+    // `no_smartcase`: its case as ignorecase alone says, as for * and #.
+    std::optional<ALTextPos> target(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool no_smartcase, const Offset& offset = Offset(),
                                     std::optional<ALTextPos> search_from = std::nullopt);
     // What is typed on the search line so far, lit and brought into sight;
     // and that let go of, the caret's place in sight again.
@@ -84,6 +89,10 @@ public:
     // the caret, and the last visual area.
     typedef ALVimPattern Pattern;
     Pattern              patternOf(const std::string& vim, std::optional<bool> force_case = std::nullopt) const;
+    // The case a pattern matched without smartcase is matched by, where it
+    // says nothing of its own: as ignorecase alone says. Nothing for one
+    // matched with it, which patternOf works out.
+    std::optional<bool>  caseWithoutSmartCase(bool no_smartcase) const;
     ALVimPattern::Places placesOf(const ALTextView& view) const;
     // The pattern's matches within a scope, the places applied, with
     // where each whole match began.
@@ -114,13 +123,16 @@ public:
     // it, round past the ends: what gn and gN take.
     std::optional<ALTextRange> matchNear(ALTextView& view, bool forward);
 
-    // The search, for n and N; :s sets it too, and * and # as a whole word.
-    // How case is matched is in the keymap's shared state: sensitive
-    // unless :set ignorecase says, as vim's own default is.
+    // The search, for n and N; :s and :g set it too, and * and # -- a whole
+    // word as \<word\>, as vim's are spelt -- whose case goes by
+    // ignorecase alone, smartcase let be, for their n and N as well, and
+    // for :s and :g that use it again, as vim's does. How case is matched
+    // is in the keymap's shared state: sensitive unless :set ignorecase
+    // says, as vim's own default is.
     std::string pattern;
     Offset      offset{};
-    bool        forward   = true;
-    bool        wholeWord = false;
+    bool        forward     = true;
+    bool        noSmartCase = false;
     // The last match a search went to, which n from where an offset left
     // the caret goes on from.
     ALTextRange lastMatch;

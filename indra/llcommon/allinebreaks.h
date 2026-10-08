@@ -31,10 +31,12 @@
 #include <vector>
 
 // A text's lines whatever its line endings -- CRLF and a lone CR read as
-// LF -- and lines joined by LF: what a document (ALTextDocument) and a
-// comparison of texts (ALTextDiff) both read and write lines by, so that a
-// line of one is a line of the other. Header only: a comparison's parts
-// are built and tested without the document.
+// LF -- and lines joined by LF: what a document (ALTextDocument), a
+// comparison of texts (ALTextDiff) and the script preprocessor's lexer all
+// read and write lines by, so that a line of one is a line of the others;
+// and a text made one line, for a row that is one. Header only: a
+// comparison's parts are built and tested without the document, and the
+// preprocessor without the UI.
 namespace ALLineBreaks
 {
     // The lines as views into the text, which must outlive them: what is
@@ -109,14 +111,12 @@ namespace ALLineBreaks
         return out;
     }
 
-    // Text with its line endings as LF; the same lines.
-    inline std::string withLineFeeds(std::string_view text)
+    // Text with its line endings as LF, the same lines, into a string the
+    // text is not in, whose room is used again: a lexer run over file after
+    // file keeps one.
+    inline void withLineFeeds(std::string_view text, std::string& out)
     {
-        if (text.find('\r') == std::string_view::npos)
-        {
-            return std::string(text);
-        }
-        std::string out;
+        out.clear();
         out.reserve(text.size());
         for (size_t i = 0; i < text.size(); ++i)
         {
@@ -131,7 +131,26 @@ namespace ALLineBreaks
                 ++i;
             }
         }
+    }
+
+    // Text with its line endings as LF; the same lines.
+    inline std::string withLineFeeds(std::string_view text)
+    {
+        if (text.find('\r') == std::string_view::npos)
+        {
+            return std::string(text);
+        }
+        std::string out;
+        withLineFeeds(text, out);
         return out;
+    }
+
+    // Text on one line, for a row or a table's cell that is one: every
+    // break and tab a space, byte for byte -- CRLF two.
+    inline std::string oneLine(std::string text)
+    {
+        std::replace_if(text.begin(), text.end(), [](char c) { return c == '\n' || c == '\r' || c == '\t'; }, ' ');
+        return text;
     }
 }
 

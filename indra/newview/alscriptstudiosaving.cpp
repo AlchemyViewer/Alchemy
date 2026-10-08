@@ -40,6 +40,8 @@
 #include "alscriptstudioweighing.h"
 #include "lldate.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 
 ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, ALScriptStudioRecovery& recovery, ALScriptStudioFiles& files, ALScriptStudioOrphans& orphans, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mExternal(external), mWeighing(weighing), mRecovery(recovery), mFiles(files), mOrphans(orphans), mWindow(window)
@@ -901,7 +903,7 @@ void ALScriptStudioSaving::reportOverWeight(const Doc& doc, const ALScriptWeight
 {
     LLStringUtil::format_map_t args;
     args["[NAME]"]   = doc.name;
-    args["[SIZE]"]   = llformat("%f", (F64)weight.total / 1024.0);
+    args["[SIZE]"]   = fmt::format("{:f}", (F64)weight.total / 1024.0);
     args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
     args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
     mServices.report(mServices.words(weight.estimate ? "SaveOverWeightEstimate" : "SaveOverWeight", args), true, &doc);

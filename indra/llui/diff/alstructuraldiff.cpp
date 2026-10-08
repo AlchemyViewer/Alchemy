@@ -55,15 +55,15 @@ namespace
     };
 
     void tokensOf(const std::vector<std::string>& lines, const std::vector<S32>& which, const std::vector<ALTextDiff::regions_t>* regions,
-                  const ALTextDiff::Options& options, ALDiffIds& ids, Tokens& out)
+                  const ALTextDiff::Options& options, const ALDiffSame* same, ALDiffIds& ids, Tokens& out)
     {
         ALDiffTokens::tokens_t words;
         std::vector<S32>       line_ids;
         for (const S32 n : which)
         {
             const std::string& text = lines[static_cast<size_t>(n)];
-            ALDiffSame::idsOf(text, regions && regions->size() == lines.size() ? &(*regions)[static_cast<size_t>(n)] : nullptr, options.same.get(),
-                              options.like, true, ids, words, line_ids);
+            ALDiffSame::idsOf(text, regions && regions->size() == lines.size() ? &(*regions)[static_cast<size_t>(n)] : nullptr, same, options.like,
+                              true, ids, words, line_ids);
             out.line.insert(out.line.end(), words.size(), n);
             out.token.insert(out.token.end(), words.begin(), words.end());
             out.id.insert(out.id.end(), line_ids.begin(), line_ids.end());
@@ -100,18 +100,19 @@ namespace
     }
 
 
-    // A change's lines read as tokens into a result the texts' size: those
-    // not kept marked, each said to be read so. False, and nothing said,
-    // where it has too many tokens to read.
+    // A change's lines read as tokens into a result the texts' size, its
+    // words that mean the same by `same`: those not kept marked, each said
+    // to be read so. False, and nothing said, where it has too many tokens
+    // to read.
     bool readChange(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<S32>& gone, const std::vector<S32>& made,
-                    const ALTextDiff::Options& options, const std::vector<ALTextDiff::regions_t>* left_regions,
+                    const ALTextDiff::Options& options, const ALDiffSame* same, const std::vector<ALTextDiff::regions_t>* left_regions,
                     const std::vector<ALTextDiff::regions_t>* right_regions, ALStructuralDiff::Result& result)
     {
         ALDiffIds ids;
         Tokens    a;
         Tokens    b;
-        tokensOf(left, gone, left_regions, options, ids, a);
-        tokensOf(right, made, right_regions, options, ids, b);
+        tokensOf(left, gone, left_regions, options, same, ids, a);
+        tokensOf(right, made, right_regions, options, same, ids, b);
         if (static_cast<S32>(a.id.size()) > ALStructuralDiff::MOST_TOKENS || static_cast<S32>(b.id.size()) > ALStructuralDiff::MOST_TOKENS)
         {
             return false;
@@ -208,29 +209,17 @@ namespace
         return out;
     }
 
+    // A change's words that mean the same: by where it begins on each
+    // side, where that is asked; else the options' own.
+    ALTextDiff::same_t sameOf(const ALStructuralDiff::same_at_t& same_at, const ALTextDiff::Options& options, const Extent& extent)
+    {
+        return same_at ? same_at(extent.from[0], extent.from[1]) : options.same;
+    }
+
     // Whether a side's lines from..to lie wholly before or after the lines
     // edited there, [head, end): a place with no lines strictly so, since
     // one at the edit's edge could be on either side of it.
     bool clearOf(S32 from, S32 to, S32 head, S32 end) { return from < to ? (to <= head || from >= end) : (from < head || from > end); }
-
-    // A list kept a line each, the lines edited replaced: [head, was_end)
-    // now [head, now_end), those after moved along, and the lines edited
-    // said nothing of.
-    template <typename List>
-    void replaceEdited(List& list, S32 head, S32 was_end, S32 now_end)
-    {
-        using T = typename List::value_type;
-        const auto at = [&list](S32 line) { return list.begin() + static_cast<std::ptrdiff_t>(line); };
-        if (now_end < was_end)
-        {
-            list.erase(at(now_end), at(was_end));
-        }
-        else if (now_end > was_end)
-        {
-            list.insert(at(was_end), static_cast<size_t>(now_end - was_end), T());
-        }
-        std::fill(at(head), at(now_end), T());
-    }
 }
 
 ALStructuralDiff::Result ALStructuralDiff::compare(const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Options& options,
@@ -242,7 +231,7 @@ ALStructuralDiff::Result ALStructuralDiff::compare(const std::vector<std::string
 
 ALStructuralDiff::Result ALStructuralDiff::read(const std::vector<std::string>& left, const std::vector<std::string>& right, std::vector<ALTextDiff::Run> runs,
                                                 const ALTextDiff::Options& options, const std::vector<ALTextDiff::regions_t>* left_regions,
-                                                const std::vector<ALTextDiff::regions_t>* right_regions)
+                                                const std::vector<ALTextDiff::regions_t>* right_regions, const same_at_t& same_at)
 {
     sLastRead = 0;
     Result result;
@@ -262,9 +251,11 @@ ALStructuralDiff::Result ALStructuralDiff::read(const std::vector<std::string>& 
         }
         std::vector<S32> gone;
         std::vector<S32> made;
-        i = ALTextDiff::changeAt(result.runs, i, gone, made);
+        const size_t     at = i;
+        i                   = ALTextDiff::changeAt(result.runs, i, gone, made);
         ++sLastRead;
-        if (!readChange(left, right, gone, made, options, left_regions, right_regions, result))
+        const ALTextDiff::same_t same = sameOf(same_at, options, extentOf(result.runs, at, gone, made));
+        if (!readChange(left, right, gone, made, options, same.get(), left_regions, right_regions, result))
         {
             result.tooLarge = true;
         }
@@ -275,7 +266,7 @@ ALStructuralDiff::Result ALStructuralDiff::read(const std::vector<std::string>& 
 void ALStructuralDiff::readAgain(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<Run>& was,
                                  const std::vector<Run>& runs, const Edited& edited, const ALTextDiff::Options& options,
                                  const std::vector<ALTextDiff::regions_t>* left_regions, const std::vector<ALTextDiff::regions_t>* right_regions,
-                                 Result& result)
+                                 Result& result, const same_at_t& same_at)
 {
     result.tooLarge = false;
     // Each side's lines edited, as they were and as they are; what was said
@@ -291,8 +282,8 @@ void ALStructuralDiff::readAgain(const std::vector<std::string>& left, const std
         was_end[s]    = edited.was[s] - edited.edges[s].tail;
         now_end[s]    = now - edited.edges[s].tail;
         shift[s]      = now - edited.was[s];
-        replaceEdited(s ? result.rightMarks : result.leftMarks, head[s], was_end[s], now_end[s]);
-        replaceEdited(s ? result.rightByTokens : result.leftByTokens, head[s], was_end[s], now_end[s]);
+        ALDiffEdit::replaceEdited(s ? result.rightMarks : result.leftMarks, head[s], was_end[s], now_end[s]);
+        ALDiffEdit::replaceEdited(s ? result.rightByTokens : result.leftByTokens, head[s], was_end[s], now_end[s]);
     }
     const auto wipe = [&result](const Extent& extent) {
         for (S32 line = extent.from[0]; line < extent.to[0]; ++line)
@@ -377,7 +368,8 @@ void ALStructuralDiff::readAgain(const std::vector<std::string>& left, const std
     {
         wipe(extent);
         ALTextDiff::changeAt(runs, at, gone, made);
-        if (!readChange(left, right, gone, made, options, left_regions, right_regions, result))
+        const ALTextDiff::same_t same = sameOf(same_at, options, extent);
+        if (!readChange(left, right, gone, made, options, same.get(), left_regions, right_regions, result))
         {
             result.tooLarge = true;
         }

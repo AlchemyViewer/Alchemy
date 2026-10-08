@@ -31,6 +31,7 @@
 #include "alvimexcommands.h"
 #include "alvimkeymap.h"
 #include "alvimtext.h"
+#include "llstring.h"
 
 #include <algorithm>
 
@@ -43,22 +44,11 @@ std::vector<std::string>& ALVimCommandLine::historyOf(llwchar which)
 
 bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
 {
-    // The cursor moves by whole characters.
-    auto back = [this](size_t at) {
-        while (at > 0 && (static_cast<unsigned char>(line[--at]) & 0xC0) == 0x80) {}
-        return at;
-    };
-    auto forward = [this](size_t at) {
-        if (at < line.size())
-        {
-            ++at;
-            while (at < line.size() && (static_cast<unsigned char>(line[at]) & 0xC0) == 0x80)
-            {
-                ++at;
-            }
-        }
-        return at;
-    };
+    // The cursor moves by whole characters as a reader sees them, as the
+    // text's caret does: a letter with the marks on it, an emoji with what
+    // joins it.
+    auto back    = [this](size_t at) { return utf8str_step_grapheme_backward(line, at); };
+    auto forward = [this](size_t at) { return utf8str_step_grapheme_forward(line, at); };
     cursor = llmin(cursor, line.size());
     // Tab walks the completions; anything else keeps what it put on the
     // line and lets the rest go -- but Escape with them up only lets
@@ -245,7 +235,8 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                 remember(which, entered);
                 if (which == ':')
                 {
-                    mVim.mEx->runCommand(view, entered);
+                    // Typed where the Enter that ends it was.
+                    mVim.mEx->runEntered(view, entered, mVim.keyTyped());
                 }
                 else
                 {
@@ -264,9 +255,10 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                     }
                     if (!pattern.empty())
                     {
-                        mVim.mSearch.pattern   = pattern;
-                        mVim.mSearch.wholeWord = false;
-                        mVim.mSearch.offset    = offset;
+                        // After ?, \? is the ? itself, as vim reads it.
+                        mVim.mSearch.pattern     = which == '?' ? ALVimSearch::backwardPattern(pattern) : pattern;
+                        mVim.mSearch.noSmartCase = false;
+                        mVim.mSearch.offset      = offset;
                     }
                     else if (has_offset)
                     {
@@ -283,7 +275,7 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                     {
                         // A count typed before the line is the match that
                         // many on: 3/foo goes to the third.
-                        mVim.mSearch.search(view, mVim.mSearch.pattern, mVim.mSearch.forward, countOr(mVim.mCount), mVim.mSearch.wholeWord, mVim.mSearch.offset);
+                        mVim.mSearch.search(view, mVim.mSearch.pattern, mVim.mSearch.forward, countOr(mVim.mCount), mVim.mSearch.noSmartCase, mVim.mSearch.offset);
                     }
                 }
                 if (mVim.mMode == ALVimKeymap::Mode::Normal)
@@ -362,7 +354,10 @@ void ALVimCommandLine::complete(ALTextView& view, bool forward)
         if (cursor <= name_end)
         {
             // The name itself: the keymap's own, the long forms, and the
-            // host's.
+            // host's. The cursor back in the range is where a name would
+            // begin, as vim takes it: what is before it is the range, and
+            // what is after it stays.
+            word_start = std::min(name_start, cursor);
             static const char* OWN[] = { "center",   "changes",  "cmap",     "cnoremap", "cunmap",   "delete",   "display",  "global",
                                          "imap",     "inoremap", "iunmap",   "join",     "left",     "let",      "map",      "mapclear",
                                          "mark",     "marks",    "nmap",     "nnoremap", "nohlsearch", "noremap", "normal",  "nunmap",
@@ -441,7 +436,7 @@ void ALVimCommandLine::complete(ALTextView& view, bool forward)
     mVim.bump();
 }
 
-void ALVimCommandLine::remember(llwchar kind, const std::string& line)
+void ALVimCommandLine::remember(llwchar kind, const std::string& line, bool typed)
 {
     const size_t MOST = 50;
     if (line.empty())
@@ -449,10 +444,37 @@ void ALVimCommandLine::remember(llwchar kind, const std::string& line)
         return;
     }
     std::vector<std::string>& history = historyOf(kind);
-    history.erase(std::remove(history.begin(), history.end(), line), history.end());
+    // What ended each search line, beside it; a line nobody said of ended
+    // with /.
+    std::vector<char>* ends = kind == ':' ? nullptr : &mVim.mShared->searchEnds;
+    const char         end  = typed ? static_cast<char>(kind) : '\0';
+    if (ends)
+    {
+        ends->resize(history.size(), '/');
+    }
+    for (size_t i = history.size(); i-- > 0;)
+    {
+        if (history[i] == line && (!ends || (*ends)[i] == end))
+        {
+            history.erase(history.begin() + static_cast<std::ptrdiff_t>(i));
+            if (ends)
+            {
+                ends->erase(ends->begin() + static_cast<std::ptrdiff_t>(i));
+            }
+        }
+    }
     history.push_back(line);
+    if (ends)
+    {
+        ends->push_back(end);
+    }
     if (history.size() > MOST)
     {
-        history.erase(history.begin(), history.begin() + static_cast<std::ptrdiff_t>(history.size() - MOST));
+        const std::ptrdiff_t over = static_cast<std::ptrdiff_t>(history.size() - MOST);
+        history.erase(history.begin(), history.begin() + over);
+        if (ends)
+        {
+            ends->erase(ends->begin(), ends->begin() + over);
+        }
     }
 }

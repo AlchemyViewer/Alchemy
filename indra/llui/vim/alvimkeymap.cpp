@@ -37,10 +37,13 @@
 #include "llclipboard.h"
 #include "llstring.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 #include <optional>
 
 using namespace ALVimText;
@@ -100,6 +103,19 @@ std::string ALVimKeymap::matchesSaid(S32 count, S32 lines)
 {
     const std::string on = alSaidCount("VimOnLines", lines, "on 1 line", "on [COUNT] lines");
     return alSaidCount("VimMatches", count, "1 match [ON_LINES]", "[COUNT] matches [ON_LINES]", { { "[ON_LINES]", on } });
+}
+
+// static
+std::string ALVimKeymap::yankedSaid(S32 lines, bool block, char name)
+{
+    if (!name)
+    {
+        return block ? alSaidCount("VimBlockYanked", lines, "block of 1 line yanked", "block of [COUNT] lines yanked")
+                     : alSaidCount("VimLinesYanked", lines, "1 line yanked", "[COUNT] lines yanked");
+    }
+    const LLStringUtil::format_map_t into = { { "[REGISTER]", std::string(1, name) } };
+    return block ? alSaidCount("VimBlockYankedInto", lines, "block of 1 line yanked into \"[REGISTER]", "block of [COUNT] lines yanked into \"[REGISTER]", into)
+                 : alSaidCount("VimLinesYankedInto", lines, "1 line yanked into \"[REGISTER]", "[COUNT] lines yanked into \"[REGISTER]", into);
 }
 
 bool ALVimKeymap::inserting() const
@@ -321,9 +337,11 @@ namespace
     // the last without a key of their own fed between, before the chain
     // is taken to be a loop: vim's maxmapdepth.
     constexpr S32 MAX_MAP_DEPTH = 1000;
-    // How many keys one draining may feed, however they came: a mapping
-    // that feeds itself a key at a time, each doing something and none
-    // failing, never trips the depth, which a key fed puts back to none.
+    // How many keys mappings may feed for one key drained that no mapping
+    // put there -- one typed, or one of a macro's: a mapping that feeds
+    // itself a key at a time, each doing something and none failing,
+    // never trips the depth, which a key fed puts back to none. A macro's
+    // own keys, however many, are none of them.
     constexpr S32 MAX_DRAINED = 10000;
 }
 
@@ -406,9 +424,16 @@ void ALVimKeymap::drain(ALTextView& view, std::deque<Held>& queue, bool final, b
             }
             // What it stands for in place of its keys: not mapped again
             // where it was made with :noremap, nor its first key where it
-            // starts with the keys themselves, as vim has it.
+            // starts with the keys themselves, as vim has it. Keys of its
+            // own that no mapping put there begin the count of what
+            // mappings feed afresh.
             const ALVimMappings::Mapping mapping = *match.full;
-            queue.erase(queue.begin(), queue.begin() + static_cast<std::ptrdiff_t>(mapping.from.size()));
+            const auto                   end_of  = queue.begin() + static_cast<std::ptrdiff_t>(mapping.from.size());
+            if (std::any_of(queue.begin(), end_of, [](const Held& held) { return !held.mapped; }))
+            {
+                fed = 0;
+            }
+            queue.erase(queue.begin(), end_of);
             bool starts_with_itself = mapping.to.size() >= mapping.from.size();
             for (size_t i = 0; starts_with_itself && i < mapping.from.size(); ++i)
             {
@@ -417,16 +442,21 @@ void ALVimKeymap::drain(ALTextView& view, std::deque<Held>& queue, bool final, b
             for (size_t i = mapping.to.size(); i-- > 0;)
             {
                 Held held;
-                held.input = mapping.to[i];
-                held.remap = !mapping.noremap && !(i == 0 && starts_with_itself);
+                held.input  = mapping.to[i];
+                held.remap  = !mapping.noremap && !(i == 0 && starts_with_itself);
+                held.mapped = true;
                 queue.push_front(held);
             }
             continue;
         }
         // No mapping: the first key as it is, and what follows it looked
-        // at again.
-        depth              = 0;
-        if (++fed > MAX_DRAINED)
+        // at again. One no mapping put there begins the count afresh.
+        depth = 0;
+        if (!queue.front().mapped)
+        {
+            fed = 0;
+        }
+        else if (++fed > MAX_DRAINED)
         {
             queue.clear();
             say(said("VimRecursiveMapping", "E223: Recursive mapping"), true);
@@ -627,9 +657,10 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
         mCommandInputs.pop_back();
     }
     // A command done that was no vertical move forgets the wanted
-    // column; one still being typed -- a count, an operator -- keeps
-    // it, and so does a key nobody took, whose character is to come.
-    if (taken && (mMode == Mode::Normal || isVisual()) && !mVerticalMove && mCount == 0 && !mOperator && !mPending)
+    // column; one still being typed -- a count, a register's name, an
+    // operator -- keeps it, and so does a key nobody took, whose
+    // character is to come.
+    if (taken && (mMode == Mode::Normal || isVisual()) && !mVerticalMove && mCount == 0 && !mRegister && !mOperator && !mPending)
     {
         // A block taken to every line's end with $ no longer reaches
         // them, and is lit again as it is.
@@ -1118,7 +1149,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
     // A count.
     if (isDigit(ch) && !(ch == '0' && mCount == 0))
     {
-        mCount = llmin(mCount * 10 + static_cast<S32>(ch - '0'), MAX_COUNT);
+        mCount = countTyped(mCount, ch);
         return true;
     }
     if (ch == '"' && !mOperator)
@@ -1280,7 +1311,7 @@ bool ALVimKeymap::afterRecord(ALTextView& view, llwchar pending, llwchar ch)
             // meanwhile, and both are looked for again.
             const LLHandle<LLUICtrl> handle = view.getHandle();
             mHooks.historyWindow(view, kind, history, [handle, kind](const std::string& line, bool run) {
-                ALTextView*  again = dynamic_cast<ALTextView*>(handle.get());
+                ALTextView*  again = ALViewType::as<ALTextView>(handle.get());
                 ALVimKeymap* vim   = again ? dynamic_cast<ALVimKeymap*>(again->modalKeymap()) : nullptr;
                 if (vim)
                 {
@@ -1689,11 +1720,12 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
             return true;
         }
         case '&':
-            // The last :s again on every line, with its flags.
+            // The last :s again on every line, with its flags: a line typed
+            // where the g& was, as vim's runs it.
             clearPending();
             if (editing)
             {
-                mEx->runCommand(view, "%s//~/&");
+                mEx->runEntered(view, "%s//~/&", keyTyped());
             }
             return true;
         case 'v':
@@ -1714,8 +1746,9 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
                 }
                 mVisualAnchor = d.clamp(mVisualLastAnchor);
                 mVisualCaret  = d.clamp(mVisualLastCaret);
-                // To every line's end as the block was taken, not as the
-                // caret last went.
+                // To the end as the area was taken -- a block's every line's,
+                // characters' last line's, for `.` -- not as the caret last
+                // went.
                 mWantColumn = mVisualLastToEnd ? S32_MAX : -1;
                 setMode(view, mVisualLast);
                 // A line's break taken as visual mode's operator takes it:
@@ -1742,8 +1775,8 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
             {
                 mVisualAnchor = mVisualLastAnchor;
                 mVisualCaret  = mVisualLastCaret;
-                // A block taken with $ to every line's end again, kept past
-                // this command as $ keeps it.
+                // An area taken with $ to the end again -- a block to every
+                // line's -- kept past this command as $ keeps it.
                 mWantColumn   = mVisualLastToEnd ? S32_MAX : -1;
                 mVerticalMove = mVerticalMove || mVisualLastToEnd;
                 setMode(view, mVisualLast);
@@ -1943,7 +1976,7 @@ namespace
                                          WordsFrom words_from = WordsFrom::Under)
     {
         ALTextPos  p   = from;
-        const auto cls = [&d, &p, big] { return classOf(at(d, p), big); };
+        const auto cls = [&d, &p, big] { return classAt(d, p, big); };
         // A character on, as vim's inc() steps: 0 along the line, 2 onto its
         // end, 1 onto the next line's start; -1 at the end of the text, where
         // it stays.
@@ -2169,7 +2202,7 @@ namespace
         {
             // Back to the start of the word or the blanks under the caret.
             const S32 under = cls();
-            while (p.column > 0 && classOf(at(d, d.prevCluster(p)), big) == under)
+            while (p.column > 0 && classAt(d, d.prevCluster(p), big) == under)
             {
                 p = d.prevCluster(p);
             }
@@ -2236,8 +2269,8 @@ namespace
         if (include_white && (cls() != 0 || (p.column == 0 && !inclusive)) && start.column > 0)
         {
             ALTextPos before       = d.prevCluster(start);
-            const S32 before_class = classOf(at(d, before), big);
-            while (before.column > 0 && classOf(at(d, d.prevCluster(before)), big) == before_class)
+            const S32 before_class = classAt(d, before, big);
+            while (before.column > 0 && classAt(d, d.prevCluster(before), big) == before_class)
             {
                 before = d.prevCluster(before);
             }
@@ -2247,6 +2280,99 @@ namespace
             }
         }
         return WordObject{ start, p, inclusive };
+    }
+
+    // vim's startPS() for a paragraph: a line that begins one with no blank
+    // line before it -- a formfeed at its start, or after a dot one of the
+    // nroff macros of the default 'paragraphs' and 'sections', a blank in
+    // them matching a blank or the line's end.
+    bool startsParagraph(const ALTextDocument& d, S32 line)
+    {
+        static constexpr std::string_view MACROS("IPLPPPQPP TPHPLIPpLpItpplpipbpSHNHH HUnhsh");
+        const std::string&                text = d.line(line);
+        if (!text.empty() && text[0] == '\f')
+        {
+            return true;
+        }
+        if (text.empty() || text[0] != '.')
+        {
+            return false;
+        }
+        const char first  = text.size() > 1 ? text[1] : '\0';
+        const char second = text.size() > 2 ? text[2] : '\0';
+        for (size_t i = 0; i + 1 < MACROS.size(); i += 2)
+        {
+            if ((MACROS[i] == first || (MACROS[i] == ' ' && (first == '\0' || first == ' '))) &&
+                (MACROS[i + 1] == second || (MACROS[i + 1] == ' ' && (first == '\0' || second == '\0' || second == ' '))))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // vim's current_par() over a line, nothing selected: back to the start of
+    // the paragraph or of the blank lines the line is in, then on by the
+    // count's -- ip counting a paragraph or a run of blank lines as one, the
+    // run the line is in among them; ap a paragraph with the blank lines after
+    // it, or blank lines with the paragraph after them. An ap that ends on no
+    // blank line takes the blank lines before it instead. A paragraph ends
+    // where another begins with no blank line between (startsParagraph). The
+    // first and the last lines; false where the count runs past the text's
+    // end.
+    bool paragraphObject(const ALTextDocument& d, S32 line, bool around, S32 count, S32& first, S32& last)
+    {
+        const S32  lines          = d.lineCount();
+        const bool white_in_front = lineBlank(d, line);
+        S32        start          = line;
+        while (start > 0 && lineBlank(d, start - 1) == white_in_front && (white_in_front || !startsParagraph(d, start)))
+        {
+            --start;
+        }
+        S32 end = start;
+        while (end < lines && lineBlank(d, end))
+        {
+            ++end;
+        }
+        --end;
+        S32 i = !around && white_in_front ? count - 1 : count;
+        while (i-- > 0)
+        {
+            if (end == lines - 1)
+            {
+                return false;
+            }
+            const bool do_white = !around && lineBlank(d, end + 1);
+            if (around || !do_white)
+            {
+                ++end;
+                while (end < lines - 1 && !lineBlank(d, end + 1) && !startsParagraph(d, end + 1))
+                {
+                    ++end;
+                }
+            }
+            if (i == 0 && white_in_front && around)
+            {
+                break;
+            }
+            if (around || do_white)
+            {
+                while (end < lines - 1 && lineBlank(d, end + 1))
+                {
+                    ++end;
+                }
+            }
+        }
+        if (!white_in_front && !lineBlank(d, end) && around)
+        {
+            while (start > 0 && lineBlank(d, start - 1))
+            {
+                --start;
+            }
+        }
+        first = start;
+        last  = end;
+        return true;
     }
 
     // The opening bracket a bracket object names: ( ) b, [ ], { } B or < >.
@@ -2273,44 +2399,73 @@ namespace
         }
     }
 
-    // The opener of a kind left open around a place, then as many more out
-    // as counted, or as many as there are: through the view's bracket index
-    // where there is one, as % goes, else -- an angle bracket -- by the text
-    // alone, nesting counted. An opener at the place itself is the first
-    // where `here` says, as it is under the caret; a visual selection's
-    // start looks for the one before it, as vim's does. False where there is
-    // none.
-    bool openerAround(const ALTextDocument& d, ALBracketIndex* index, char opener, const ALTextPos& from, bool here, S32 count, ALTextPos& open)
+    // A position stepped as vim's inc() steps one: a character on, 0 along
+    // the line, 2 onto its end, 1 onto the next line's start; -1 at the end
+    // of the text, where it stays. incl() goes past the end of a line that is
+    // not empty as well.
+    S32 incPos(const ALTextDocument& d, ALTextPos& p)
     {
-        open = from;
+        if (!atLineEnd(d, p))
+        {
+            p = d.nextCluster(p);
+            return atLineEnd(d, p) ? 2 : 0;
+        }
+        if (p.line + 1 >= d.lineCount())
+        {
+            return -1;
+        }
+        p = ALTextPos(p.line + 1, 0);
+        return 1;
+    }
+    S32 inclPos(const ALTextDocument& d, ALTextPos& p)
+    {
+        const S32 r = incPos(d, p);
+        return r >= 1 && p.column > 0 ? incPos(d, p) : r;
+    }
+    // And back, as dec() and decl(): 0 along the line, 1 onto the end of the
+    // line before -- for decl(), onto its last character, where it has one;
+    // -1 at the start of the text.
+    S32 decPos(const ALTextDocument& d, ALTextPos& p)
+    {
+        if (p.column > 0)
+        {
+            p = d.prevCluster(p);
+            return 0;
+        }
+        if (p.line <= 0)
+        {
+            return -1;
+        }
+        p = d.lineEnd(p.line - 1);
+        return 1;
+    }
+    S32 declPos(const ALTextDocument& d, ALTextPos& p)
+    {
+        const S32 r = decPos(d, p);
+        return r == 1 && p.column > 0 ? decPos(d, p) : r;
+    }
+    // vim's inindent(): whether a place is in its line's indent, `extra`
+    // columns on from it as well.
+    bool inIndent(const ALTextDocument& d, const ALTextPos& p, S32 extra)
+    {
+        return firstNonBlankColumn(d, p.line) >= p.column + extra;
+    }
+
+    // The opener of a kind left open before a place, the place itself not
+    // counted, as vim's findmatch() looks back for one: through the view's
+    // bracket index where there is one, as % goes, else -- an angle bracket
+    // -- by the text alone, nesting counted. False where there is none.
+    bool openerBefore(const ALTextDocument& d, ALBracketIndex* index, char opener, const ALTextPos& from, ALTextPos& open)
+    {
         if (index)
         {
-            ALTextPos paired;
-            if (!(here && at(d, from) == opener && index->match(from, paired, ALBracketIndex::ANYWHERE)) &&
-                !index->enclosing(from, opener, 1, open, ALBracketIndex::ANYWHERE))
-            {
-                return false;
-            }
-            for (S32 n = 1; n < count; ++n)
-            {
-                ALTextPos outer;
-                if (!index->enclosing(open, opener, 1, outer, ALBracketIndex::ANYWHERE))
-                {
-                    break;
-                }
-                open = outer;
-            }
-            return true;
+            return index->enclosing(from, opener, 1, open, ALBracketIndex::ANYWHERE);
         }
         const char closer = partnerOf(opener);
         S32        depth  = 0;
-        bool       found  = here && at(d, open) == opener;
-        while (!found)
+        open              = from;
+        while (stepBack(d, open))
         {
-            if (!stepBack(d, open))
-            {
-                return false;
-            }
             const char c = at(d, open);
             if (c == closer)
             {
@@ -2320,43 +2475,516 @@ namespace
             {
                 if (depth == 0)
                 {
-                    found = true;
+                    return true;
                 }
-                else
+                --depth;
+            }
+        }
+        return false;
+    }
+    // And the first after it that no closer before it leaves unmatched, as
+    // findmatch() looks forward for one, across lines: in x ) (a) there is
+    // none.
+    bool openerAfter(const ALTextDocument& d, ALBracketIndex* index, char opener, const ALTextPos& from, ALTextPos& open)
+    {
+        const char closer = partnerOf(opener);
+        S32        depth  = 0;
+        const auto take   = [&depth, &open, opener, closer](char c, const ALTextPos& p) {
+            if (c == closer)
+            {
+                ++depth;
+            }
+            else if (c == opener)
+            {
+                if (depth == 0)
                 {
-                    --depth;
+                    open = p;
+                    return true;
+                }
+                --depth;
+            }
+            return false;
+        };
+        if (index)
+        {
+            for (S32 line = from.line; line < d.lineCount(); ++line)
+            {
+                for (const auto& [column, c] : index->bracketsOn(line))
+                {
+                    if ((line > from.line || column > from.column) && take(c, ALTextPos(line, column)))
+                    {
+                        return true;
+                    }
                 }
             }
+            return false;
+        }
+        ALTextPos p = from;
+        while (stepOn(d, p))
+        {
+            if (take(at(d, p), p))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // vim's current_block(): the block of a kind a bracket object takes, as
+    // its two ends -- the opener and its closer, or, inside, the first and
+    // the last characters between them. From the caret, past the opener
+    // under it -- and for { past an indent before one: the opener left open
+    // before it, the count of them out; or, where none is, the count's
+    // opener after it. A count past the blocks there are is none. Inside
+    // starts the next line where the opener ends its line, and ends on the
+    // line before where only an indent comes before the closer, `sol` -- the
+    // line's break the block's as well; where the brackets hold nothing,
+    // `end` is before `start`. A selection of more than one character,
+    // `anchor` to `caret`, is looked from its start; and over one of any size,
+    // `visual`, where what the block holds is no more than the selection does,
+    // the next block out is taken instead, and brackets that hold nothing are
+    // none.
+    struct BlockObject
+    {
+        ALTextPos start;
+        ALTextPos end;
+        bool      sol = false;
+    };
+    std::optional<BlockObject> blockObject(const ALTextDocument& d, ALBracketIndex* index, char opener, bool around, S32 count, const ALTextPos& anchor,
+                                           const ALTextPos& caret, bool visual)
+    {
+        const auto match = [&d, index](const ALTextPos& open, ALTextPos& close) {
+            return index ? index->match(open, close, ALBracketIndex::ANYWHERE) : matchBracket(d, open, close);
+        };
+        ALTextPos from      = caret;
+        ALTextPos old_start = caret;
+        ALTextPos old_end   = caret;
+        if (anchor == caret)
+        {
+            if (opener == '{')
+            {
+                while (inIndent(d, from, 1) && incPos(d, from) == 0)
+                {
+                }
+            }
+            if (at(d, from) == opener)
+            {
+                from = d.nextCluster(from);
+            }
+        }
+        else if (anchor < caret)
+        {
+            old_start = anchor;
+            from      = anchor;
+        }
+        else
+        {
+            old_end = anchor;
+        }
+        ALTextPos  open;
+        const bool back = openerBefore(d, index, opener, from, open);
+        if (!back && !openerAfter(d, index, opener, from, open))
+        {
+            return std::nullopt;
         }
         for (S32 n = 1; n < count; ++n)
         {
-            ALTextPos outer = open;
-            depth           = 0;
-            bool more       = false;
-            while (stepBack(d, outer))
+            ALTextPos next;
+            if (!(back ? openerBefore(d, index, opener, open, next) : openerAfter(d, index, opener, open, next)))
             {
-                const char c = at(d, outer);
-                if (c == closer)
+                return std::nullopt;
+            }
+            open = next;
+        }
+        BlockObject block;
+        block.start = open;
+        if (!match(open, block.end))
+        {
+            return std::nullopt;
+        }
+        while (!around)
+        {
+            const ALTextPos closer = block.end;
+            inclPos(d, block.start);
+            block.sol = block.end.column == 0;
+            declPos(d, block.end);
+            while (inIndent(d, block.end, 1))
+            {
+                block.sol = true;
+                if (declPos(d, block.end) != 0)
                 {
-                    ++depth;
-                }
-                else if (c == opener)
-                {
-                    if (depth == 0)
-                    {
-                        more = true;
-                        break;
-                    }
-                    --depth;
+                    break;
                 }
             }
-            if (!more)
+            // Brackets that hold nothing are nothing to select.
+            if (visual && block.start == closer)
+            {
+                return std::nullopt;
+            }
+            if (!visual || block.start < old_start || old_end < block.end || block.start == block.end)
             {
                 break;
             }
-            open = outer;
+            ALTextPos before = old_start;
+            declPos(d, before);
+            if (!openerBefore(d, index, opener, before, block.start) || !match(block.start, block.end))
+            {
+                return std::nullopt;
+            }
         }
-        return true;
+        return block;
+    }
+
+    // --- sentences, as vim's findsent() and current_sent() have them --------------------
+
+    // A blank of a sentence's: a space or a tab, never a line's end.
+    bool sentenceBlank(const ALTextDocument& d, const ALTextPos& p)
+    {
+        const char c = at(d, p);
+        return c == ' ' || c == '\t';
+    }
+    // A character of a set, which a line's end is not.
+    bool oneOf(std::string_view set, char c)
+    {
+        return c != '\0' && set.find(c) != std::string_view::npos;
+    }
+
+    // vim's findsent(): the start of the count's sentence on from a place,
+    // or back. A sentence ends at a . ! or ? that a blank or a line's end
+    // follows, past any ) ] " or ' after it; an empty line, and a line a
+    // paragraph begins with (startsParagraph), is a sentence of its own. The
+    // blanks after one are passed over. None where the text runs out before
+    // the count does; the last sentence's end, where it runs out with it.
+    std::optional<ALTextPos> findSentence(const ALTextDocument& d, ALTextPos pos, bool forward, S32 count)
+    {
+        const auto step     = [&d, forward](ALTextPos& p) { return forward ? inclPos(d, p) : declPos(d, p); };
+        const auto boundary = [&d](S32 line) { return d.lineLength(line) == 0 || startsParagraph(d, line); };
+        bool       noskip   = false;
+        while (count-- > 0)
+        {
+            const ALTextPos prev  = pos;
+            bool            found = false;
+            if (at(d, pos) == '\0')
+            {
+                // Off the empty lines, which going on is a sentence's start.
+                do
+                {
+                    if (step(pos) == -1)
+                    {
+                        break;
+                    }
+                } while (at(d, pos) == '\0');
+                found = forward;
+            }
+            else if (forward && pos.column == 0 && boundary(pos.line))
+            {
+                if (pos.line + 1 >= d.lineCount())
+                {
+                    return std::nullopt;
+                }
+                pos   = ALTextPos(pos.line + 1, 0);
+                found = true;
+            }
+            else if (!forward)
+            {
+                declPos(d, pos);
+            }
+            if (!found)
+            {
+                // Back over the blanks and the closing marks before the place
+                // to the sentence they end, but over no more than one . ! or ?.
+                bool found_dot = false;
+                for (char c = at(d, pos); c == ' ' || c == '\t' || oneOf(".!?)]\"'", c); c = at(d, pos))
+                {
+                    ALTextPos before = pos;
+                    if (declPos(d, before) == -1 || (d.lineLength(before.line) == 0 && forward) || found_dot)
+                    {
+                        break;
+                    }
+                    found_dot = oneOf(".!?", c);
+                    if (oneOf(")]\"'", c) && !oneOf(".!?)]\"'", at(d, before)))
+                    {
+                        break;
+                    }
+                    declPos(d, pos);
+                }
+                // Then to the end of a sentence, going the way asked.
+                const S32 start_line = pos.line;
+                while (true)
+                {
+                    const char c = at(d, pos);
+                    if (c == '\0' || (pos.column == 0 && boundary(pos.line)))
+                    {
+                        if (!forward && pos.line != start_line)
+                        {
+                            pos = ALTextPos(pos.line + 1, 0);
+                        }
+                        break;
+                    }
+                    if (oneOf(".!?", c))
+                    {
+                        ALTextPos after = pos;
+                        S32       r     = 0;
+                        char      next  = '\0';
+                        do
+                        {
+                            r    = incPos(d, after);
+                            next = at(d, after);
+                        } while (r != -1 && oneOf(")]\"'", next));
+                        if (r == -1 || next == ' ' || next == '\t' || next == '\0')
+                        {
+                            pos = after;
+                            if (at(d, pos) == '\0')
+                            {
+                                incPos(d, pos);
+                            }
+                            break;
+                        }
+                    }
+                    if (step(pos) == -1)
+                    {
+                        if (count > 0)
+                        {
+                            return std::nullopt;
+                        }
+                        noskip = true;
+                        break;
+                    }
+                }
+            }
+            while (!noskip && sentenceBlank(d, pos))
+            {
+                if (inclPos(d, pos) == -1)
+                {
+                    break;
+                }
+            }
+            // Where that did not move, once more from a step on.
+            if (pos == prev)
+            {
+                if (step(pos) == -1)
+                {
+                    if (count > 0)
+                    {
+                        return std::nullopt;
+                    }
+                    break;
+                }
+                ++count;
+            }
+        }
+        return pos;
+    }
+
+    // A sentence's start found from a place, the place left where none is.
+    void toSentence(const ALTextDocument& d, ALTextPos& p, bool forward)
+    {
+        if (const std::optional<ALTextPos> to = findSentence(d, p, forward, 1))
+        {
+            p = *to;
+        }
+    }
+    // vim's find_first_blank(): back over the blanks before a place, to the
+    // first of them.
+    void firstBlank(const ALTextDocument& d, ALTextPos& p)
+    {
+        while (declPos(d, p) != -1)
+        {
+            if (!sentenceBlank(d, p))
+            {
+                inclPos(d, p);
+                break;
+            }
+        }
+    }
+    // vim's findsent_forward(): on by the count's sentences and the blanks
+    // between them, a sentence and its blanks two, to the last character.
+    void sentencesOn(const ALTextDocument& d, ALTextPos& p, S32 count, bool at_start_sent)
+    {
+        while (count-- > 0)
+        {
+            toSentence(d, p, true);
+            if (at_start_sent)
+            {
+                firstBlank(d, p);
+            }
+            if (count == 0 || at_start_sent)
+            {
+                declPos(d, p);
+            }
+            at_start_sent = !at_start_sent;
+        }
+    }
+
+    // vim's current_sent(): the sentence objects -- is the count's sentences
+    // or runs of blanks between them, each one; as each sentence with the
+    // blanks after it, or where none follow, those before. `start` and `end`
+    // are an operator's, through the end where `inclusive`, else up to it;
+    // over a visual selection, the anchor and the caret: chosen `afresh` from
+    // a selection of one character -- whose mode becomes characters -- or
+    // else the selection taken on, its anchor as it was and the caret on by
+    // the count's sentences, or back where it is before the anchor.
+    struct SentenceObject
+    {
+        ALTextPos start;
+        ALTextPos end;
+        bool      inclusive = false;
+        bool      afresh    = false;
+    };
+    SentenceObject sentenceTakenOn(const ALTextDocument& d, const ALTextPos& anchor, const ALTextPos& start_pos, ALTextPos pos, ALTextPos cur,
+                                   S32 count, bool around)
+    {
+        bool at_start_sent = true;
+        if (start_pos < anchor)
+        {
+            // The caret at the selection's start: in the blanks before a
+            // sentence, in one, or at its start.
+            declPos(d, pos);
+            while (pos < cur)
+            {
+                if (!sentenceBlank(d, pos))
+                {
+                    at_start_sent = false;
+                    break;
+                }
+                inclPos(d, pos);
+            }
+            if (!at_start_sent)
+            {
+                toSentence(d, cur, false);
+                if (cur == start_pos)
+                {
+                    at_start_sent = true;
+                }
+                else
+                {
+                    toSentence(d, cur, true);
+                }
+            }
+            if (around)
+            {
+                count *= 2;
+            }
+            while (count-- > 0)
+            {
+                if (at_start_sent)
+                {
+                    firstBlank(d, cur);
+                }
+                if (!at_start_sent || (!around && !sentenceBlank(d, cur)))
+                {
+                    toSentence(d, cur, false);
+                }
+                at_start_sent = !at_start_sent;
+            }
+        }
+        else
+        {
+            // The caret at its end: just before a sentence, in the blanks
+            // before one, or in one.
+            inclPos(d, pos);
+            if (pos != cur)
+            {
+                at_start_sent = false;
+                while (pos < cur)
+                {
+                    if (!sentenceBlank(d, pos))
+                    {
+                        at_start_sent = true;
+                        break;
+                    }
+                    inclPos(d, pos);
+                }
+                if (at_start_sent)
+                {
+                    toSentence(d, cur, false);
+                }
+                else
+                {
+                    cur = start_pos;
+                }
+            }
+            if (around)
+            {
+                count *= 2;
+            }
+            sentencesOn(d, cur, count, at_start_sent);
+        }
+        SentenceObject taken;
+        taken.start = anchor;
+        taken.end   = cur;
+        return taken;
+    }
+    SentenceObject sentenceObject(const ALTextDocument& d, const ALTextPos& caret, S32 count, bool around, const ALTextPos* anchor)
+    {
+        ALTextPos start_pos = caret;
+        ALTextPos pos       = caret;
+        ALTextPos cur       = caret;
+        toSentence(d, cur, true);
+        if (anchor && start_pos != *anchor)
+        {
+            return sentenceTakenOn(d, *anchor, start_pos, pos, cur, count, around);
+        }
+        // From blanks just before the next sentence, those blanks; else the
+        // sentence the place is in.
+        while (sentenceBlank(d, pos))
+        {
+            inclPos(d, pos);
+        }
+        const bool start_blank = pos == cur;
+        if (start_blank)
+        {
+            firstBlank(d, start_pos);
+        }
+        else
+        {
+            toSentence(d, cur, false);
+            start_pos = cur;
+        }
+        const S32 ncount = around ? count * 2 : start_blank ? count - 1 : count;
+        if (ncount > 0)
+        {
+            sentencesOn(d, cur, ncount, true);
+        }
+        else
+        {
+            declPos(d, cur);
+        }
+        if (around)
+        {
+            // Where the blanks before it were taken, none after it; where it
+            // ends on none, the blanks before it.
+            if (start_blank)
+            {
+                firstBlank(d, cur);
+                if (sentenceBlank(d, cur))
+                {
+                    declPos(d, cur);
+                }
+            }
+            else if (!sentenceBlank(d, cur))
+            {
+                firstBlank(d, start_pos);
+            }
+        }
+        SentenceObject taken;
+        taken.start = start_pos;
+        taken.end   = cur;
+        if (anchor)
+        {
+            // A blank alone before a sentence taken on, so that is again does
+            // not stay where it is.
+            if (start_pos == cur)
+            {
+                return sentenceTakenOn(d, *anchor, start_pos, pos, cur, count, around);
+            }
+            taken.afresh = true;
+            return taken;
+        }
+        // Up to the character after it -- the next line's start, after a
+        // line's last -- or at the text's end through it.
+        taken.inclusive = inclPos(d, taken.end) == -1;
+        return taken;
     }
 
     // A tag and the one that closes it, as offsets into the text: where
@@ -2365,13 +2993,43 @@ namespace
     {
         size_t openBegin, openEnd, closeBegin, closeEnd;
     };
+    // Where a tag that opens at `lt` ends, at its >: one inside a quoted
+    // attribute value -- title="a>b" -- is passed over, and a quote that
+    // closes nowhere is a character like any other.
+    size_t tagEnd(const std::string& text, size_t lt)
+    {
+        for (size_t i = lt + 1; i < text.size(); ++i)
+        {
+            if (text[i] == '"' || text[i] == '\'')
+            {
+                const size_t close = text.find(text[i], i + 1);
+                if (close != std::string::npos)
+                {
+                    i = close;
+                }
+            }
+            else if (text[i] == '>')
+            {
+                return i;
+            }
+        }
+        return std::string::npos;
+    }
     // Every tag in a text paired with its closing one by nesting, so that an
     // inner tag of the same name is not taken for the closing of the outer.
     // Self-closing tags, comments and declarations are no tags.
     std::vector<TagPair> tagPairs(const std::string& text)
     {
-        std::vector<TagPair>                        pairs;
-        std::vector<std::pair<std::string, size_t>> open;
+        // A tag opened and not yet closed: its name, where it begins, and its
+        // > (tagEnd).
+        struct OpenTag
+        {
+            std::string name;
+            size_t      begin = 0;
+            size_t      end   = 0;
+        };
+        std::vector<TagPair> pairs;
+        std::vector<OpenTag> open;
         auto nameAt = [&](size_t at, size_t& end) {
             end = at;
             while (end < text.size() && (isWordByte(text[end]) || text[end] == '-' || text[end] == ':' || text[end] == '.'))
@@ -2401,10 +3059,9 @@ namespace
                 // opened after it were left unclosed.
                 for (size_t i = open.size(); i-- > 0;)
                 {
-                    if (open[i].first == name)
+                    if (open[i].name == name)
                     {
-                        const size_t open_begin = open[i].second;
-                        pairs.push_back(TagPair{ open_begin, text.find('>', open_begin) + 1, lt, gt + 1 });
+                        pairs.push_back(TagPair{ open[i].begin, open[i].end + 1, lt, gt + 1 });
                         open.resize(i);
                         break;
                     }
@@ -2414,10 +3071,17 @@ namespace
             {
                 size_t            name_end;
                 const std::string name = nameAt(lt + 1, name_end);
-                if (!name.empty() && text[gt - 1] != '/')
+                const size_t      end  = tagEnd(text, lt);
+                if (end == std::string::npos)
                 {
-                    open.emplace_back(name, lt);
+                    break;
                 }
+                if (!name.empty() && text[end - 1] != '/')
+                {
+                    open.push_back(OpenTag{ name, lt, end });
+                }
+                lt = end;
+                continue;
             }
             lt = gt;
         }
@@ -2741,12 +3405,16 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
     {
         // A word object selected as vim's selects one: the anchor at its
         // start, the caret where vim's cursor is left (wordObject), which
-        // may be the next line's first character.
+        // may be the next line's first character. Lines become characters,
+        // and a block stays one.
         if (const std::optional<WordObject> word = wordObject(d, cursor(view), pending == 'a', ch == 'W', count))
         {
             mVisualAnchor = word->start;
             mVisualCaret  = word->end;
-            setMode(view, Mode::Visual);
+            if (mMode == Mode::VisualLine)
+            {
+                setMode(view, Mode::Visual);
+            }
             showVisual(view);
         }
         else
@@ -2762,9 +3430,13 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
     {
         if (visual)
         {
-            mVisualAnchor = span.range.begin;
-            mVisualCaret  = span.linewise ? span.range.end : d.prevCluster(span.range.end);
-            setMode(view, span.linewise ? Mode::VisualLine : Mode::Visual);
+            // Lines for a paragraph, the caret at the last one's start, else
+            // characters -- but a quote object over a block keeps the block,
+            // as vim's does.
+            const bool quote = ch == '"' || ch == '\'' || ch == '`';
+            mVisualAnchor    = span.range.begin;
+            mVisualCaret     = span.linewise ? d.lineStart(span.range.end.line) : d.prevCluster(span.range.end);
+            setMode(view, span.linewise ? Mode::VisualLine : quote && mMode == Mode::VisualBlock ? Mode::VisualBlock : Mode::Visual);
             showVisual(view);
             clearPending();
             return true;
@@ -2866,17 +3538,27 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     }
     // The operator doubled -- dd, yy, cc, >>, <<, == -- is the line, and
     // the count more: a motion from the caret, as vim's is, to the first
-    // non-blank of the last of them. gUU leaves the caret at its start, on
-    // the line's first non-blank or before it, and 2gUU where it was.
+    // non-blank of the last of them, as many as there are -- but a count
+    // past one from the last line fails, as vim's motion down fails there.
+    // gUU leaves the caret at its start, on the line's first non-blank or
+    // before it, and 2gUU where it was. yy's goes down without going
+    // across, as vim's does, so its start is the caret.
     if (ch == op || (op == '~' && ch == '~') || (op == 'u' && ch == 'u') || (op == 'U' && ch == 'U') ||
         (op == COMMENT_OPERATOR && ch == 'c'))
     {
         const S32       lines = countTimes(countOr(mOperatorCount), count);
+        const ALTextPos from  = cursor(view);
+        if (lines > 1 && from.line + 1 >= d.lineCount())
+        {
+            mFailed = true;
+            clearPending();
+            return true;
+        }
         Span            span;
         span.linewise         = true;
-        const ALTextPos from  = cursor(view);
         const S32       last  = llmin(d.lineCount() - 1, from.line + lines - 1);
-        span.range            = ALTextRange(from, ALTextPos(last, firstNonBlankColumn(d, last))).normalised();
+        const ALTextPos to    = op == 'y' ? d.clamp(ALTextPos(last, from.column)) : ALTextPos(last, firstNonBlankColumn(d, last));
+        span.range            = ALTextRange(from, to).normalised();
         applyOperator(view, op, span, 1);
         finishCommand(op != 'y');
         return true;
@@ -2919,10 +3601,10 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     S32             times = countTimes(countOr(mOperatorCount), count);
     const ALTextPos here  = cursor(view);
     const bool      big   = ch == 'W';
-    if (op == 'c' && (ch == 'w' || ch == 'W') && classOf(at(d, here), big) != 0)
+    if (op == 'c' && (ch == 'w' || ch == 'W') && classAt(d, here, big) != 0)
     {
         m_ch = big ? 'E' : 'e';
-        if (classOf(at(d, d.nextCluster(here)), big) != classOf(at(d, here), big))
+        if (classAt(d, d.nextCluster(here), big) != classAt(d, here, big))
         {
             --times;
         }
@@ -2938,11 +3620,22 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
         m.to        = here;
         m.inclusive = true;
     }
-    if (!m.ok || !m.moved)
+    // h and l, and the word motions w W e E, that cannot move -- l or cw
+    // on an empty line, h at a line's start, w on the last line's end --
+    // leave the operator the empty stretch where they stay, as vim's do: c
+    // inserts there, y yanks nothing, d takes nothing, and none fails.
+    const bool stays = m.ok && (m_ch == 'h' || m_ch == 'l' || m_ch == ' ' || m_ch == 'w' || m_ch == 'W' || m_ch == 'e' || m_ch == 'E');
+    if (!m.ok || (!m.moved && !stays))
     {
         // A key that is no motion, or one that could not move: the
         // operator fails, and the key is taken all the same -- never left
-        // for the view to type into the text.
+        // for the view to type into the text. gj, gk or g$ out of rows went
+        // partway before it failed, and leaves the caret where it got to,
+        // as vim's does; any other is where it began.
+        if (m.ok && (m_ch == DISPLAY_DOWN || m_ch == DISPLAY_UP || m_ch == DISPLAY_END) && m.to != here)
+        {
+            moveTo(view, m.to);
+        }
         mFailed = true;
         clearPending();
         return true;
@@ -2952,10 +3645,16 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     span.range           = ALTextRange(from, m.to).normalised();
     span.linewise        = m.linewise;
     span.inclusive       = m.inclusive || m_ch == '$';
-    span.registerOne     = m_ch == '%' || m_ch == '{' || m_ch == '}';
+    span.registerOne     = m_ch == '%' || m_ch == '{' || m_ch == '}' || m_ch == '(' || m_ch == ')';
+    // The character an inclusive motion ends on taken with it; none where
+    // the stretch ends at a line's end -- g_ on an empty line, ge from
+    // one -- whose break is no character of the stretch's.
     if (m.inclusive)
     {
-        span.range.end = d.nextCluster(span.range.end);
+        if (!atLineEnd(d, span.range.end))
+        {
+            span.range.end = d.nextCluster(span.range.end);
+        }
     }
     else if (m_ch != '$')
     {
@@ -2984,7 +3683,7 @@ bool ALVimKeymap::searchMotion(ALTextView& view, bool forward, std::optional<ALT
     }
     const ALTextPos                from   = cursor(view);
     const ALVimSearch::Offset      offset = mSearch.offset;
-    const std::optional<ALTextPos> to     = mSearch.target(view, mSearch.pattern, forward, count, mSearch.wholeWord, offset, search_from);
+    const std::optional<ALTextPos> to     = mSearch.target(view, mSearch.pattern, forward, count, mSearch.noSmartCase, offset, search_from);
     if (!to)
     {
         // Said already: the operator fails, and nothing is changed.
@@ -3012,74 +3711,82 @@ bool ALVimKeymap::searchMotion(ALTextView& view, bool forward, std::optional<ALT
 bool ALVimKeymap::starSearch(ALTextView& view, bool forward, bool whole)
 {
     const ALTextDocument& d     = view.document();
-    const ALTextPos       from  = cursor(view);
-    const std::string&    text  = d.line(from.line);
-    const S32             size  = static_cast<S32>(text.size());
-    const S32             caret = llclamp(from.column, 0, size);
+    const ALTextPos       caret = d.clamp(cursor(view));
     // What vim's find_ident_under_cursor() takes, by vim's classes: the word
-    // under the caret, or the first after it on the line -- so on a blank,
-    // the word after it; and where no word follows, the other characters
-    // under the caret or after it, back to where their run begins and on
-    // to the next blank. Nothing but blanks to the line's end is nothing.
-    const auto cls   = [&text](S32 i) { return classOf(text[static_cast<size_t>(i)], false); };
-    S32        begin = caret;
-    while (begin < size && cls(begin) != 1)
+    // under the caret, or the first after it on the line -- a word any class
+    // but a blank's and punctuation's, so on a blank, the word after it; and
+    // where no word follows, the other characters under the caret or after
+    // it, back to where their run begins and on to the next blank. Nothing
+    // but blanks to the line's end is nothing.
+    const auto cls   = [&d](const ALTextPos& p) { return classAt(d, p, false); };
+    ALTextPos  begin = caret;
+    while (!atLineEnd(d, begin) && cls(begin) < 2)
     {
-        ++begin;
+        begin = d.nextCluster(begin);
     }
-    const bool keyword = begin < size;
+    const bool keyword = !atLineEnd(d, begin);
     if (!keyword)
     {
         begin = caret;
-        while (begin < size && cls(begin) == 0)
+        while (!atLineEnd(d, begin) && cls(begin) == 0)
         {
-            ++begin;
+            begin = d.nextCluster(begin);
         }
     }
-    if (begin >= size)
+    if (atLineEnd(d, begin))
     {
         mFailed = true;
         clearPending();
         return true;
     }
     const S32 kind = cls(begin);
-    while (begin > 0 && cls(begin - 1) == kind)
+    while (begin.column > 0 && cls(d.prevCluster(begin)) == kind)
     {
-        --begin;
+        begin = d.prevCluster(begin);
     }
-    S32 end = begin;
-    while (end < size && (keyword ? cls(end) == kind : cls(end) != 0))
+    ALTextPos end = begin;
+    while (!atLineEnd(d, end) && (keyword ? cls(end) == kind : cls(end) != 0))
     {
-        ++end;
+        end = d.nextCluster(end);
     }
-    const ALTextRange word(ALTextPos(from.line, begin), ALTextPos(from.line, end));
-    // A word is looked for whole, or anywhere for g* and g#; other
-    // characters anywhere, as themselves: a backslash before each that a
-    // pattern reads as more, as vim's * puts one. A word has none of them.
+    const ALTextRange word(begin, end);
+    // A word is looked for whole, as \<word\>, or anywhere for g* and g#;
+    // other characters anywhere, as themselves: a backslash before each
+    // that a pattern reads as more, as vim's * puts one -- for # and g#
+    // before a ? as well, which would end what ? types. A word has none
+    // of them. Into the search history so, and kept as the last pattern as
+    // ? reads it (backwardPattern), for what takes it up -- n, :s//, :g//
+    // -- to look for the same, its case as ignorecase alone says.
     static constexpr std::string_view SPECIAL("/.*~[^$\\");
+    static constexpr std::string_view SPECIAL_BACKWARD("/?.*~[^$\\");
     std::string                       pattern;
     for (const char c : d.text(word))
     {
-        if (SPECIAL.find(c) != std::string_view::npos)
+        if ((forward ? SPECIAL : SPECIAL_BACKWARD).find(c) != std::string_view::npos)
         {
             pattern += '\\';
         }
         pattern += c;
     }
-    mSearch.pattern   = pattern;
-    mSearch.forward   = forward;
-    mSearch.wholeWord = whole && keyword;
-    mSearch.offset    = ALVimSearch::Offset();
-    // Into the search history as vim's * puts it there, a word looked for
-    // whole as \<word\>, for the search line to find again.
-    mCommandLine.remember('/', mSearch.wholeWord ? "\\<" + pattern + "\\>" : pattern);
+    if (whole && keyword)
+    {
+        pattern = "\\<" + pattern + "\\>";
+    }
+    // Into the search history as vim's * puts it there, for the search
+    // line to find again: as a line not typed, which a typed one the same
+    // is not.
+    mCommandLine.remember('/', pattern, false);
+    mSearch.pattern     = forward ? pattern : ALVimSearch::backwardPattern(pattern);
+    mSearch.forward     = forward;
+    mSearch.noSmartCase = true;
+    mSearch.offset      = ALVimSearch::Offset();
     // Looked for from the word's start, as vim puts the caret there first:
     // # from inside a word goes to the one before it, not to its own start.
     if (mOperator)
     {
         return searchMotion(view, forward, word.begin);
     }
-    mSearch.search(view, mSearch.pattern, forward, countOr(mCount), mSearch.wholeWord, mSearch.offset, word.begin);
+    mSearch.search(view, mSearch.pattern, forward, countOr(mCount), mSearch.noSmartCase, mSearch.offset, word.begin);
     clearPending();
     return true;
 }
@@ -3157,39 +3864,32 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
             }
             if (ch == 'p' || ch == 'P')
             {
-                // The selection replaced by the register. Lines are
-                // replaced by its text, its lines taking theirs; lines put
-                // into less than a line go on lines of their own, the line
-                // broken round them. What a block holds of each line is
-                // replaced by a register of one line, as vim's blockwise
-                // put has it; by anything else it is taken out, and the
-                // register put at the block's corner -- lines under the
-                // block for p, over it for P. What p replaced goes where a
-                // delete puts what it takes -- the unnamed register, and 1
-                // or - -- once the register is put, whichever was named,
-                // so a further p puts that; P leaves every register as it
-                // was, for a further P to put the same again.
+                // The selection replaced by the register, the count's
+                // copies of it. Lines are replaced by its text, its lines
+                // taking theirs, a copy a line or more; lines put into less
+                // than a line go on lines of their own, the line broken
+                // round them; characters go in straight on. What a block
+                // holds of each line is replaced by a register of one line,
+                // its copies side by side, as vim's blockwise put has it; by
+                // anything else it is taken out, and the register put at
+                // the block's corner -- lines under the block for p, over
+                // it for P. What p replaced goes where a delete puts what
+                // it takes -- the unnamed register, and 1 or - -- once the
+                // register is put, whichever was named, so a further p puts
+                // that; P leaves every register as it was, for a further P
+                // to put the same again.
                 const Register                 put_this = fetch(mRegister);
                 const std::vector<ALTextRange> pieces   = span.block ? blockPieces(view, span) : std::vector<ALTextRange>();
-                std::string                    taken;
-                if (span.block)
-                {
-                    for (size_t i = 0; i < pieces.size(); ++i)
-                    {
-                        if (i > 0)
-                        {
-                            taken += '\n';
-                        }
-                        taken += d.text(pieces[i]);
-                    }
-                }
-                else
-                {
-                    taken = d.text(span.range);
-                }
+                std::string                    taken    = span.block ? blockText(d, pieces, span.left, span.right, span.toEnd, view.getTabWidth()) : d.text(span.range);
                 leaveVisual(view);
                 if (!editing)
                 {
+                    clearPending();
+                    return true;
+                }
+                if (count > 1 && put_this.text.size() * static_cast<size_t>(count) > MAX_COUNT_TEXT)
+                {
+                    tooMuch(put_this.text.size() * static_cast<size_t>(count));
                     clearPending();
                     return true;
                 }
@@ -3197,15 +3897,23 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                 if (span.block)
                 {
                     const bool one_line = !put_this.linewise && !put_this.block && put_this.text.find('\n') == std::string::npos;
+                    std::string copies;
+                    for (S32 n = 0; one_line && n < count; ++n)
+                    {
+                        copies += put_this.text;
+                    }
                     std::vector<std::pair<ALTextRange, std::string>> edits;
-                    for (const ALTextRange& piece : pieces)
+                    bool                                             put_first = false;
+                    for (size_t i = 0; i < pieces.size(); ++i)
                     {
                         // A line that stops short of the block left as it
                         // is, as vim's blockwise put leaves it; one that
                         // reaches the block's first column has the text
                         // added at its end.
-                        const bool  short_of = piece.empty() && !padTo(d, piece.begin.line, span.left, view.getTabWidth()).empty();
-                        std::string with     = one_line && !short_of ? put_this.text : std::string();
+                        const ALTextRange& piece    = pieces[i];
+                        const bool         short_of = piece.empty() && !padTo(d, piece.begin.line, span.left, view.getTabWidth()).empty();
+                        std::string        with     = one_line && !short_of ? copies : std::string();
+                        put_first                   = put_first || (i == 0 && !with.empty());
                         if (!piece.empty() || !with.empty())
                         {
                             edits.emplace_back(piece, std::move(with));
@@ -3218,29 +3926,48 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                     const ALTextPos corner = d.clamp(pieces.front().begin);
                     if (one_line)
                     {
-                        moveTo(view, corner);
+                        // On the last character put on the block's first
+                        // line, as vim leaves it; at the corner where none
+                        // went there.
+                        moveTo(view, put_first ? d.prevCluster(ALTextPos(corner.line, corner.column + static_cast<S32>(copies.size()))) : corner);
                     }
                     else
                     {
                         const bool below = put_this.linewise && ch == 'p';
                         view.setCaret(below ? d.lineStart(pieces.back().begin.line) : corner);
-                        put(view, mRegister, below, 1);
+                        put(view, mRegister, below, count);
                     }
                 }
                 else
                 {
-                    const bool split = put_this.linewise && !span.linewise;
+                    // As lines -- a register's lines, or anything into lines
+                    // -- each copy a line or more of its own, the caret on the
+                    // first line put; characters into characters straight
+                    // on, the caret on the last put, or where they begin
+                    // where they go over more than one line, as put() leaves
+                    // it.
+                    const bool  lines = put_this.linewise || span.linewise;
+                    const bool  split = put_this.linewise && !span.linewise;
+                    std::string text;
+                    for (S32 n = 0; n < count; ++n)
+                    {
+                        if (lines && n > 0)
+                        {
+                            text += '\n';
+                        }
+                        text += put_this.text;
+                    }
                     view.deleteRange(span.range);
                     view.setCaret(span.range.begin);
-                    view.insertText(split ? "\n" + put_this.text + "\n" : put_this.text);
-                    if (put_this.linewise)
+                    view.insertText(split ? "\n" + text + "\n" : text);
+                    if (lines)
                     {
                         const S32 line = span.range.begin.line + (split ? 1 : 0);
                         moveTo(view, ALTextPos(line, firstNonBlankColumn(d, line)));
                     }
                     else
                     {
-                        moveTo(view, put_this.text.empty() ? view.caret() : d.prevCluster(view.caret()));
+                        moveTo(view, text.empty() ? view.caret() : text.find('\n') != std::string::npos ? span.range.begin : d.prevCluster(view.caret()));
                     }
                 }
                 view.undoJournal().endGroup();
@@ -3554,10 +4281,19 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             Span span;
             if (ch == 'Y')
             {
+                // yy: a count past one from the last line fails it, as
+                // the operator doubled fails (operatorKey).
                 const S32 first = view.caret().line;
+                if (count > 1 && first + 1 >= d.lineCount())
+                {
+                    mFailed = true;
+                    clearPending();
+                    return true;
+                }
                 const S32 last  = llmin(d.lineCount() - 1, first + count - 1);
                 span.linewise   = true;
-                span.range      = ALTextRange(d.lineStart(first), d.lineEnd(last));
+                // From the caret, which the yank leaves where it is.
+                span.range      = ALTextRange(view.caret(), d.lineEnd(last));
             }
             else
             {
@@ -3577,8 +4313,16 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 clearPending();
                 return true;
             }
+            // cc: a count past one from the last line fails it, as the
+            // operator doubled fails (operatorKey).
             Span      span;
             const S32 first = view.caret().line;
+            if (count > 1 && first + 1 >= d.lineCount())
+            {
+                mFailed = true;
+                clearPending();
+                return true;
+            }
             const S32 last  = llmin(d.lineCount() - 1, first + count - 1);
             span.linewise   = true;
             span.range      = ALTextRange(d.lineStart(first), d.lineEnd(last));
@@ -3605,9 +4349,12 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 clearPending();
                 return true;
             }
-            // Lines joined with one space, their leading blanks gone.
+            // Lines joined with one space, their leading blanks gone: as many
+            // as the count says, read as typed, as vim's J reads it, and no
+            // more than there are. A visual J hands its lines on as the
+            // count, however many it has.
             const S32 first = view.caret().line;
-            const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(d, first, first + llmax(1, count - 1), false);
+            const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(d, first, first + llmax(1, mCount - 1), false);
             if (!join)
             {
                 clearPending();
@@ -3684,14 +4431,21 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             else if (given > 0)
             {
                 // The count given takes the place of the ones recorded,
-                // before a register's name and after it.
+                // before a register's name and after it, and after the
+                // operator: vim keeps an operator's count and its motion's
+                // as one count of the command's. A count begins with a
+                // digit other than 0, which is a motion: d0 keeps its 0.
                 const auto past_count = [&change](size_t at) {
-                    while (at < change.size() && change[at].isChar && isDigit(change[at].ch))
+                    if (at < change.size() && change[at].isChar && isDigit(change[at].ch) && change[at].ch != '0')
                     {
-                        ++at;
+                        while (at < change.size() && change[at].isChar && isDigit(change[at].ch))
+                        {
+                            ++at;
+                        }
                     }
                     return at;
                 };
+                const auto is_char = [&change](size_t at, llwchar key) { return at < change.size() && change[at].isChar && change[at].ch == key; };
                 from = past_count(from);
                 for (const char digit : std::to_string(given))
                 {
@@ -3700,11 +4454,30 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                     in.ch     = static_cast<llwchar>(digit);
                     feed(view, in);
                 }
-                while (from + 1 < change.size() && change[from].isChar && change[from].ch == '"')
+                while (from + 1 < change.size() && is_char(from, '"'))
                 {
                     feed(view, change[from]);
                     feed(view, change[from + 1]);
                     from = past_count(from + 2);
+                }
+                // The operator -- d c y > < =, ys, or g~ gu gU gc -- and
+                // past the count typed after it.
+                size_t op_end = from;
+                if (is_char(from, 'd') || is_char(from, 'c') || is_char(from, 'y') || is_char(from, '>') || is_char(from, '<') || is_char(from, '='))
+                {
+                    op_end = is_char(from, 'y') && is_char(from + 1, 's') ? from + 2 : from + 1;
+                }
+                else if (is_char(from, 'g') && (is_char(from + 1, '~') || is_char(from + 1, 'u') || is_char(from + 1, 'U') || is_char(from + 1, 'c')))
+                {
+                    op_end = from + 2;
+                }
+                if (op_end > from)
+                {
+                    for (; from < op_end; ++from)
+                    {
+                        feed(view, change[from]);
+                    }
+                    from = past_count(from);
                 }
             }
             for (size_t i = from; i < change.size(); ++i)
@@ -3792,7 +4565,7 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             }
             else
             {
-                mSearch.search(view, mSearch.pattern, ch == 'n' ? mSearch.forward : !mSearch.forward, count, mSearch.wholeWord, mSearch.offset);
+                mSearch.search(view, mSearch.pattern, ch == 'n' ? mSearch.forward : !mSearch.forward, count, mSearch.noSmartCase, mSearch.offset);
             }
             clearPending();
             return true;
@@ -3911,7 +4684,9 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             else
             {
-                m.to = ALTextPos(line, firstNonBlankColumn(d, line));
+                // + and - to the line's first non-blank; with no line to go
+                // to, nowhere, as vim's fail without moving.
+                m.to = m.moved ? ALTextPos(line, firstNonBlankColumn(d, line)) : from;
             }
             return m;
         }
@@ -3919,12 +4694,16 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
         case DISPLAY_UP:
         {
             // A row of the display at a time, by the layout's rows, at
-            // the x the caret is drawn at.
-            ALTextLayout& layout = view.layout();
-            S32           row    = 0;
-            const F32     x      = layout.xOf(from.line, from.column, &row);
-            S32           line   = from.line;
-            for (S32 n = 0; n < count; ++n)
+            // the x the caret is drawn at. Out of rows before the count's:
+            // as far as there are, and a failure all the same, as vim's
+            // gj and gk are, an operator's with them. A fold's lines are
+            // passed over through the layout's heights, not one by one.
+            ALTextLayout& layout  = view.layout();
+            S32           row     = 0;
+            const F32     x       = layout.xOf(from.line, from.column, &row);
+            S32           line    = from.line;
+            bool          ran_out = false;
+            for (S32 n = 0; n < count && !ran_out; ++n)
             {
                 if (ch == DISPLAY_DOWN)
                 {
@@ -3932,14 +4711,14 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                     {
                         ++row;
                     }
-                    else if (const S32 below = layout.visibleFrom(line + 1, 1); below >= 0)
+                    else if (const S32 below = layout.visibleAfter(line); below < layout.lineCount())
                     {
                         line = below;
                         row  = 0;
                     }
                     else
                     {
-                        break;
+                        ran_out = true;
                     }
                 }
                 else
@@ -3948,19 +4727,19 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                     {
                         --row;
                     }
-                    else if (const S32 above = layout.visibleFrom(line - 1, -1); above >= 0)
+                    else if (const S32 above = layout.visibleBefore(line); above >= 0)
                     {
                         line = above;
                         row  = layout.rowCount(line) - 1;
                     }
                     else
                     {
-                        break;
+                        ran_out = true;
                     }
                 }
             }
             m.to    = d.clamp(ALTextPos(line, layout.columnAt(line, row, x, true)));
-            m.moved = m.to != from;
+            m.moved = m.to != from && !ran_out;
             return m;
         }
         case DISPLAY_START:
@@ -3988,7 +4767,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                 {
                     ++row;
                 }
-                else if (const S32 below = layout.visibleFrom(line + 1, 1); below >= 0)
+                else if (const S32 below = layout.visibleAfter(line); below < layout.lineCount())
                 {
                     line = below;
                     row  = 0;
@@ -4017,6 +4796,15 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             // An empty line has no character to take.
             m.inclusive = ch == DISPLAY_END && !atLineEnd(d, m.to);
+            // A count's g$ over wrapped rows wants every line's end from here
+            // on for j and k, as $ does and vim's curswant has it, whether or
+            // not it ran out of rows; one row's wants its own column, as does
+            // one an operator took.
+            if (ch == DISPLAY_END && wrapped && count > 1 && !mOperator)
+            {
+                mWantColumn   = S32_MAX;
+                mVerticalMove = true;
+            }
             return m;
         }
         case LINE_MIDDLE:
@@ -4037,8 +4825,12 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
         {
             // go: the count's byte of the text, the first without one, each
             // line's break a byte; on the character it is part of, the one
-            // before a break, and the last past the end. Exclusive.
-            m.to = d.clamp(d.posAt(static_cast<size_t>(llmax(0, count - 1))));
+            // before a break, and the last past the end. Exclusive. The
+            // counts as typed, the operator's times the motion's, not held to
+            // what a count does: a byte of a long text may be past it.
+            const S64 typed = static_cast<S64>(llmax(1, mOperatorCount)) * static_cast<S64>(llmax(1, mCount));
+            const S64 byte  = llmin(typed, static_cast<S64>(MAX_COUNT_TYPED));
+            m.to = d.clamp(d.posAt(static_cast<size_t>(byte - 1)));
             if (atLineEnd(d, m.to))
             {
                 m.to = lastCharOf(d, m.to.line);
@@ -4060,13 +4852,18 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             // operator reaches the end, the caret sits on the last -- a
             // visual one past it, on the line's break, which the selection
             // takes, as vim's does. And every line's end from here on, for
-            // j and k.
+            // j and k -- but not once an operator has taken it, which
+            // forgets the column as vim's does, so that j after d$ keeps
+            // the caret's.
             if (!mOperator && !isVisual() && m.to.column > 0)
             {
                 m.to = d.prevCluster(m.to);
             }
-            mWantColumn   = S32_MAX;
-            mVerticalMove = true;
+            if (!mOperator)
+            {
+                mWantColumn   = S32_MAX;
+                mVerticalMove = true;
+            }
             return m;
         }
         case '|':
@@ -4085,10 +4882,10 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                 // end -- an empty line's -- takes the break.
                 const bool      last  = mOperator != 0 && n + 1 == count;
                 const ALTextPos start = m.to;
-                const S32       cls   = classOf(at(d, m.to), big);
+                const S32       cls   = classAt(d, m.to, big);
                 if (cls != 0)
                 {
-                    while (!atLineEnd(d, m.to) && classOf(at(d, m.to), big) == cls)
+                    while (!atLineEnd(d, m.to) && classAt(d, m.to, big) == cls)
                     {
                         m.to = d.nextCluster(m.to);
                     }
@@ -4110,7 +4907,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                         }
                         continue;
                     }
-                    if (classOf(at(d, m.to), big) != 0)
+                    if (classAt(d, m.to, big) != 0)
                     {
                         break;
                     }
@@ -4130,10 +4927,10 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                 {
                     break;
                 }
-                while (classOf(at(d, m.to), big) == 0 && stepOn(d, m.to)) {}
-                const S32 cls = classOf(at(d, m.to), big);
+                while (classAt(d, m.to, big) == 0 && stepOn(d, m.to)) {}
+                const S32 cls = classAt(d, m.to, big);
                 ALTextPos next = m.to;
-                while (!atLineEnd(d, next) && classOf(at(d, next), big) == cls)
+                while (!atLineEnd(d, next) && classAt(d, next, big) == cls)
                 {
                     m.to = next;
                     next = d.nextCluster(next);
@@ -4163,16 +4960,16 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             const bool big = ch == BIG_WORD_END_BACK;
             for (S32 n = 0; n < count; ++n)
             {
-                const S32 cls = classOf(at(d, m.to), big);
+                const S32 cls = classAt(d, m.to, big);
                 if (!stepBack(d, m.to))
                 {
                     break;
                 }
                 if (cls != 0)
                 {
-                    while (classOf(at(d, m.to), big) == cls && stepBack(d, m.to)) {}
+                    while (classAt(d, m.to, big) == cls && stepBack(d, m.to)) {}
                 }
-                while (classOf(at(d, m.to), big) == 0 && stepBack(d, m.to)) {}
+                while (classAt(d, m.to, big) == 0 && stepBack(d, m.to)) {}
             }
             m.inclusive = true;
             m.moved     = m.to != from;
@@ -4188,9 +4985,9 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                 {
                     break;
                 }
-                while (classOf(at(d, m.to), big) == 0 && stepBack(d, m.to)) {}
-                const S32 cls = classOf(at(d, m.to), big);
-                while (m.to.column > 0 && classOf(at(d, d.prevCluster(m.to)), big) == cls)
+                while (classAt(d, m.to, big) == 0 && stepBack(d, m.to)) {}
+                const S32 cls = classAt(d, m.to, big);
+                while (m.to.column > 0 && classAt(d, d.prevCluster(m.to), big) == cls)
                 {
                     m.to = d.prevCluster(m.to);
                 }
@@ -4221,6 +5018,26 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             m.to    = lineBlank(d, line) ? d.lineStart(line) : (ch == '}' ? d.lineEnd(line) : d.lineStart(line));
             m.moved = m.to != from;
+            return m;
+        }
+        case '(':
+        case ')':
+        {
+            // The count's sentence on, or back (findSentence), exclusive; one
+            // past the text's sentences fails. Outside a visual mode never
+            // left past a line's last character, but on it, which it takes.
+            const std::optional<ALTextPos> to = findSentence(d, from, ch == ')', count);
+            if (!to)
+            {
+                m.moved = false;
+                return m;
+            }
+            m.to = *to;
+            if (!isVisual() && m.to.column > 0 && atLineEnd(d, m.to))
+            {
+                m.to        = d.prevCluster(m.to);
+                m.inclusive = true;
+            }
             return m;
         }
         case '%':
@@ -4270,7 +5087,12 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             const std::string needle = utf8Of(want);
             const std::string& line  = d.line(from.line);
+            const S32          size  = static_cast<S32>(line.size());
             S32                col   = from.column;
+            // A character on or back along the line, however many bytes it
+            // takes, and never off the line.
+            const auto after  = [&](S32 at) { return at < size ? d.nextCluster(ALTextPos(from.line, at)).column : size; };
+            const auto before = [&](S32 at) { return at > 0 ? d.prevCluster(ALTextPos(from.line, at)).column : 0; };
             // A t or T typed to the character beside the caret stops where it
             // is, so an operator takes the character under it. Said again by
             // ; or , it goes past that character instead, as vim's does
@@ -4281,13 +5103,24 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                 size_t found;
                 if (forward)
                 {
-                    const S32 start = col + 1 + ((past_beside && n == 0) ? 1 : 0);
-                    found           = start < static_cast<S32>(line.size()) ? line.find(needle, start) : std::string::npos;
+                    // From the character after the caret's, or after the one
+                    // after it.
+                    S32 start = after(col);
+                    if (past_beside && n == 0)
+                    {
+                        start = after(start);
+                    }
+                    found = start < size ? line.find(needle, static_cast<size_t>(start)) : std::string::npos;
                 }
                 else
                 {
-                    const S32 start = col - 1 - ((past_beside && n == 0) ? 1 : 0);
-                    found           = start >= 0 ? line.rfind(needle, start) : std::string::npos;
+                    // Before the caret's character, or before the one before.
+                    S32 end = col;
+                    if (past_beside && n == 0)
+                    {
+                        end = before(end);
+                    }
+                    found = end > 0 ? line.rfind(needle, static_cast<size_t>(end - 1)) : std::string::npos;
                 }
                 if (found == std::string::npos)
                 {
@@ -4298,7 +5131,8 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             if (till)
             {
-                col += forward ? -1 : static_cast<S32>(needle.size());
+                // Beside it: on the character before it, or after it.
+                col = forward ? before(col) : after(col);
             }
             m.to        = ALTextPos(from.line, col);
             m.inclusive = forward;
@@ -4379,58 +5213,80 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         case '\'':
         case '`':
         {
-            const std::string& line  = d.line(from.line);
-            const char         quote = static_cast<char>(what);
-            // The pair around the caret: the first quote before or at it
-            // that opens, and its close after.
-            S32 open = -1;
-            S32 close = -1;
-            S32 col   = 0;
-            while (col < static_cast<S32>(line.size()))
+            // vim's current_quote() with nothing selected, on the caret's line:
+            // on a quote, the pair it is one of, counted from the line's start;
+            // else from the last quote before the caret -- which may be the one
+            // that closes the quoted text before it, so that between two of
+            // them it is what lies between -- or, with none before, from the
+            // first after it, to the next quote. A quote after a backslash
+            // closes nothing, as 'quoteescape' has it. i" is inside the quotes,
+            // and a count of two or more takes them as well; a" takes them and
+            // the blanks after, or where none follow, the blanks before.
+            const std::string& line      = d.line(from.line);
+            const char         quote     = static_cast<char>(what);
+            const S32          size      = static_cast<S32>(line.size());
+            S32                col_start = llmin(from.column, size);
+            S32                col_end   = -1;
+            if (col_start < size && line[col_start] == quote)
             {
-                if (line[col] == quote)
+                const S32 first = col_start;
+                col_start       = 0;
+                while (true)
                 {
-                    const size_t next = line.find(quote, col + 1);
-                    if (next == std::string::npos)
+                    col_start = nextQuote(line, col_start, quote, false);
+                    if (col_start < 0 || col_start > first)
+                    {
+                        return false;
+                    }
+                    col_end = nextQuote(line, col_start + 1, quote, true);
+                    if (col_end < 0)
+                    {
+                        return false;
+                    }
+                    if (first <= col_end)
                     {
                         break;
                     }
-                    if (from.column >= col && from.column <= static_cast<S32>(next))
-                    {
-                        open  = col;
-                        close = static_cast<S32>(next);
-                        break;
-                    }
-                    col = static_cast<S32>(next) + 1;
-                    continue;
+                    col_start = col_end + 1;
                 }
-                ++col;
-            }
-            if (open < 0)
-            {
-                // The first pair after the caret, as vim allows.
-                const size_t first = line.find(quote, from.column);
-                const size_t next  = first == std::string::npos ? std::string::npos : line.find(quote, first + 1);
-                if (next == std::string::npos)
-                {
-                    return false;
-                }
-                open  = static_cast<S32>(first);
-                close = static_cast<S32>(next);
-            }
-            if (around)
-            {
-                S32 end = close + 1;
-                while (end < static_cast<S32>(line.size()) && isSpace(line[end]))
-                {
-                    ++end;
-                }
-                out.range = ALTextRange(ALTextPos(from.line, open), ALTextPos(from.line, end));
             }
             else
             {
-                out.range = ALTextRange(ALTextPos(from.line, open + 1), ALTextPos(from.line, close));
+                col_start = prevQuote(line, col_start, quote, true);
+                if (col_start >= size || line[col_start] != quote)
+                {
+                    col_start = nextQuote(line, col_start, quote, false);
+                    if (col_start < 0)
+                    {
+                        return false;
+                    }
+                }
+                col_end = nextQuote(line, col_start + 1, quote, true);
+                if (col_end < 0)
+                {
+                    return false;
+                }
             }
+            if (around)
+            {
+                const auto blank = [&line, size](S32 col) { return col >= 0 && col < size && (line[col] == ' ' || line[col] == '\t'); };
+                if (blank(col_end + 1))
+                {
+                    while (blank(col_end + 1))
+                    {
+                        ++col_end;
+                    }
+                }
+                else
+                {
+                    while (col_start > 0 && blank(col_start - 1))
+                    {
+                        --col_start;
+                    }
+                }
+            }
+            const bool quotes = around || count > 1;
+            out.range         = ALTextRange(ALTextPos(from.line, quotes ? col_start : col_start + 1), ALTextPos(from.line, quotes ? col_end + 1 : col_end));
             return true;
         }
         case '(':
@@ -4444,26 +5300,32 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         case '<':
         case '>':
         {
-            // The opener under the caret where it is code, else the one left
-            // open before it, and as many more out as counted (openerAround).
-            const char opener = objectOpener(what);
-            ALTextPos  open;
-            if (!openerAround(d, opener != '<' ? &bracketsOf(view) : nullptr, opener, from, true, count, open))
+            // The block around the caret, or after it (blockObject): a( its
+            // brackets and what they hold. i( through the character before
+            // the closer; where the closer is alone on its line, up to that
+            // line's start, as an exclusive motion goes there -- the lines
+            // between whole where the block starts a line; nothing where the
+            // brackets hold nothing.
+            const char                       opener = objectOpener(what);
+            const std::optional<BlockObject> block  = blockObject(d, opener != '<' ? &bracketsOf(view) : nullptr, opener, around, count, from, from, false);
+            if (!block)
             {
                 return false;
             }
-            ALTextPos close;
-            if (!matchBracketIn(view, open, close))
+            ALTextPos end = block->end;
+            if (block->sol && !around)
             {
-                return false;
+                inclPos(d, end);
+                out.range = ALTextRange(block->start, std::max(block->start, end));
+                adjustExclusiveEnd(d, out.range, out.linewise);
             }
-            if (around)
+            else if (block->start <= end)
             {
-                out.range = ALTextRange(open, d.nextCluster(close));
+                out.range = ALTextRange(block->start, atLineEnd(d, end) ? end : d.nextCluster(end));
             }
             else
             {
-                out.range = ALTextRange(d.nextCluster(open), close);
+                out.range = ALTextRange(block->start, block->start);
             }
             return true;
         }
@@ -4495,35 +5357,44 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
             out.range          = around ? ALTextRange(d.posAt(tag.openBegin), d.posAt(tag.closeEnd)) : ALTextRange(d.posAt(tag.openEnd), d.posAt(tag.closeBegin));
             return true;
         }
+        case 's':
+        {
+            // The sentences or the blanks between them from the caret's, the
+            // count of them (sentenceObject): through the last character, or
+            // up to the line's break after it as an exclusive motion goes
+            // there, which takes the lines whole where they start a line. An
+            // end past a line's last character is put back onto it, as vim's
+            // cursor is after an object, and the stretch runs from the earlier
+            // end to the later, through the later where inclusive: so on the
+            // ] of a last line's .] the object, which starts past the ], takes
+            // the ] alone.
+            const SentenceObject sentence = sentenceObject(d, from, count, around, nullptr);
+            ALTextPos            end      = sentence.end;
+            if (end.column > 0 && atLineEnd(d, end))
+            {
+                end = d.prevCluster(end);
+            }
+            out.range = ALTextRange(sentence.start, end).normalised();
+            if (sentence.inclusive && !atLineEnd(d, out.range.end))
+            {
+                out.range.end = d.nextCluster(out.range.end);
+            }
+            out.inclusive = sentence.inclusive;
+            if (!sentence.inclusive)
+            {
+                adjustExclusiveEnd(d, out.range, out.linewise);
+            }
+            return true;
+        }
         case 'p':
         {
-            // The paragraph: the lines around this one up to the blank
-            // ones, and with them for `ap`.
-            S32 first = from.line;
-            S32 last  = from.line;
-            const bool blank = lineBlank(d, from.line);
-            while (first > 0 && lineBlank(d, first - 1) == blank)
+            // The paragraph or the blank lines the caret is on, the count of
+            // them on (paragraphObject), lines whole.
+            S32 first = 0;
+            S32 last  = 0;
+            if (!paragraphObject(d, from.line, around, count, first, last))
             {
-                --first;
-            }
-            while (last + 1 < d.lineCount() && lineBlank(d, last + 1) == blank)
-            {
-                ++last;
-            }
-            for (S32 n = 1; n < count && last + 1 < d.lineCount(); ++n)
-            {
-                const bool next_blank = lineBlank(d, last + 1);
-                while (last + 1 < d.lineCount() && lineBlank(d, last + 1) == next_blank)
-                {
-                    ++last;
-                }
-            }
-            if (around && !blank)
-            {
-                while (last + 1 < d.lineCount() && lineBlank(d, last + 1))
-                {
-                    ++last;
-                }
+                return false;
             }
             out.linewise = true;
             out.range    = ALTextRange(d.lineStart(first), d.lineEnd(last));
@@ -4639,51 +5510,23 @@ std::optional<bool> ALVimKeymap::visualObject(ALTextView& view, llwchar kind, ll
         case '<':
         case '>':
         {
-            if (anchor == caret)
-            {
-                return std::nullopt;
-            }
-            // The block around the selection's start, the count of them out,
-            // looked for from before it (openerAround).
-            const char      opener = objectOpener(what);
-            ALBracketIndex* index  = opener != '<' ? &bracketsOf(view) : nullptr;
-            ALTextPos       open;
-            ALTextPos       close;
-            if (!openerAround(d, index, opener, low, false, count, open) || !matchBracketIn(view, open, close))
+            // The block around the selection, from its start, or the next
+            // block out where it holds no more than the selection does -- of
+            // one character, too, so that i( on () fails (blockObject). Where
+            // the closer is alone on its line, the selection takes the break
+            // after the last character as well.
+            const char                       opener = objectOpener(what);
+            const std::optional<BlockObject> block  = blockObject(d, opener != '<' ? &bracketsOf(view) : nullptr, opener, around, count, anchor, caret, true);
+            if (!block)
             {
                 return false;
             }
-            ALTextPos first = open;
-            ALTextPos last  = close;
-            // Inside it, which must hold something; where it holds no more
-            // than the selection does, inside the block around that one.
-            while (!around)
+            ALTextPos last = block->end;
+            if (block->sol && !atLineEnd(d, last))
             {
-                first = d.nextCluster(open);
-                last  = d.prevCluster(close);
-                if (first == close)
-                {
-                    return false;
-                }
-                if (first < low || high < last || first == last)
-                {
-                    break;
-                }
-                // From the character before the selection, a line's end
-                // passed over.
-                ALTextPos before = low;
-                stepBack(d, before);
-                if (atLineEnd(d, before) && before.column > 0)
-                {
-                    stepBack(d, before);
-                }
-                const ALTextPos inner = open;
-                if (!openerAround(d, index, opener, before, false, 1, open) || !(open < inner) || !matchBracketIn(view, open, close))
-                {
-                    return false;
-                }
+                incPos(d, last);
             }
-            mVisualAnchor = first;
+            mVisualAnchor = block->start;
             mVisualCaret  = last;
             setMode(view, Mode::Visual);
             break;
@@ -4737,13 +5580,22 @@ std::optional<bool> ALVimKeymap::visualObject(ALTextView& view, llwchar kind, ll
         }
         case 'p':
         {
-            // A selection of one line is a paragraph afresh -- but by lines
-            // where the caret is on the first of its paragraph or blank
-            // lines, which vim takes on from there.
+            // A selection of one line is a paragraph afresh (paragraphObject)
+            // -- but by lines, where that would start at the caret's line,
+            // vim takes it on from there instead.
             S32 line = caret.line;
-            if (anchor.line == caret.line && (mMode != Mode::VisualLine || (line > 0 && lineBlank(d, line - 1) == lineBlank(d, line))))
+            if (anchor.line == caret.line)
             {
-                return std::nullopt;
+                S32 first = 0;
+                S32 last  = 0;
+                if (!paragraphObject(d, line, around, count, first, last))
+                {
+                    return false;
+                }
+                if (mMode != Mode::VisualLine || first != line)
+                {
+                    return std::nullopt;
+                }
             }
             // On from the caret's line, or back where it is above the
             // anchor's, by the count's paragraphs or runs of blank lines --
@@ -4769,7 +5621,9 @@ std::optional<bool> ALVimKeymap::visualObject(ALTextView& view, llwchar kind, ll
                         line -= step;
                         break;
                     }
-                    while (line != edge && (lineBlank(d, line + step) ? 1 : 0) == blank)
+                    // A paragraph also ends where another begins with no blank
+                    // line between (startsParagraph).
+                    while (line != edge && (lineBlank(d, line + step) ? 1 : 0) == blank && (blank || !startsParagraph(d, step > 0 ? line + 1 : line)))
                     {
                         line += step;
                     }
@@ -4783,6 +5637,20 @@ std::optional<bool> ALVimKeymap::visualObject(ALTextView& view, llwchar kind, ll
             mVisualCaret = ALTextPos(line, 0);
             showVisual(view);
             return ok;
+        }
+        case 's':
+        {
+            // The sentence object over a selection of any size
+            // (sentenceObject): chosen afresh from one character, which makes
+            // the mode characters, else the selection taken on.
+            const SentenceObject sentence = sentenceObject(d, caret, count, around, &anchor);
+            mVisualAnchor                 = sentence.start;
+            mVisualCaret                  = sentence.end;
+            if (sentence.afresh)
+            {
+                setMode(view, Mode::Visual);
+            }
+            break;
         }
         default:
             return std::nullopt;
@@ -4853,27 +5721,29 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
     {
         pieces.push_back(span.range);
     }
-    std::string text;
-    for (size_t i = 0; i < pieces.size(); ++i)
-    {
-        if (i > 0)
-        {
-            text += '\n';
-        }
-        text += d.text(pieces[i]);
-    }
+    // A block's a line each, a line short of it as blanks (blockText).
+    std::string text = span.block ? blockText(d, pieces, span.left, span.right, span.toEnd, view.getTabWidth()) : d.text(pieces.front());
 
     switch (op)
     {
         case 'y':
             store(mRegister, text, span.linewise, span.block, true);
-            if (span.linewise)
+            // How many lines the yank was over, said for more than vim's
+            // report -- whole lines, a block's, or the lines characters
+            // reach, a last line's break reaching the line after it -- with
+            // the register named, as vim's says it; nothing for _.
+            if (last - first + 1 > REPORT_THRESHOLD && mRegister != '_')
             {
-                if (pieces.size() == 1 && last > first)
-                {
-                    say(alSaidCount("VimLinesYanked", last - first + 1, "1 line yanked", "[COUNT] lines yanked"));
-                }
-                moveTo(view, ALTextPos(first, view.caret().line == first ? view.caret().column : firstNonBlankColumn(d, first)));
+                say(yankedSaid(last - first + 1, span.block, mRegister));
+            }
+            // The caret at the stretch's start, as vim's cursor is left: where
+            // its motion or object began it -- the column k kept, the line's
+            // start for ip -- which for yy and Y, going down, is the caret;
+            // over lines selected, at the start of the line the selection
+            // began on, or at the caret where it went above that.
+            if (span.linewise && span.visual)
+            {
+                moveTo(view, std::min(ALTextPos(d.clamp(mVisualAnchor).line, 0), d.clamp(mVisualCaret)));
             }
             else
             {
@@ -4889,13 +5759,16 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             }
             // Nothing to take out -- D or d$ on an empty line, s on one --
             // puts nothing in a register either, as vim's delete has it:
-            // what the registers and the clipboard hold stays. c still
+            // what the registers and the clipboard hold stays, and the
+            // caret goes where the stretch is, as vim's cursor goes to an
+            // object that holds nothing -- di" between two quotes. c still
             // goes on to insert over its empty stretch, as vim's change
             // does, and keeps an empty line's end it took inclusively --
             // C, c$ or ciw there -- as an empty register.
             const bool nothing = !span.linewise && !span.block && span.range.empty();
             if (nothing && op == 'd')
             {
+                moveTo(view, span.range.begin);
                 return;
             }
             if (!nothing || span.inclusive)
@@ -4952,7 +5825,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                     view.deleteRange(whole);
                     const S32 line = llmin(first, d.lineCount() - 1);
                     view.setCaret(ALTextPos(line, firstNonBlankColumn(d, line)));
-                    if (last > first)
+                    if (last - first + 1 > REPORT_THRESHOLD)
                     {
                         say(alSaidCount("VimFewerLines", last - first + 1, "1 fewer line", "[COUNT] fewer lines"));
                     }
@@ -4996,6 +5869,23 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             ALTextIndent::Options options;
             options.tabWidth                   = llmax(1, view.getTabWidth());
             options.softTabs                   = view.getSoftTabs();
+            if (op == '>' && count > 1)
+            {
+                // The count's levels on each line are text the count makes,
+                // held to the most a count may make, as a put's are.
+                size_t lines = 0;
+                for (S32 l = first; l <= last && l < d.lineCount(); ++l)
+                {
+                    lines += d.line(l).empty() ? 0u : 1u;
+                }
+                const size_t level = options.softTabs ? static_cast<size_t>(options.tabWidth) : static_cast<size_t>(1);
+                const size_t bytes = lines * static_cast<size_t>(count) * level;
+                if (bytes > MAX_COUNT_TEXT)
+                {
+                    tooMuch(bytes);
+                    return;
+                }
+            }
             const ALTextEditing::Change shifted = ALTextIndent::shiftLines(d, first, last, llmax(1, count), op == '>', options);
             std::vector<std::pair<ALTextRange, std::string>> edits;
             edits.reserve(shifted.replacements.size());
@@ -5019,7 +5909,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                 view.replaceAll(std::move(edits));
             }
             moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
-            if (last > first)
+            if (last - first + 1 > REPORT_THRESHOLD)
             {
                 say(alSaidCount(op == '>' ? "VimLinesShiftedRight" : "VimLinesShiftedLeft", last - first + 1, op == '>' ? "1 line >ed 1 time" : "1 line <ed 1 time",
                                 op == '>' ? "[COUNT] lines >ed 1 time" : "[COUNT] lines <ed 1 time"));
@@ -5032,6 +5922,12 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                 mHooks.format(view, first, last);
             }
             moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
+            // The lines handed over to be put right, said for more than
+            // vim's report.
+            if (mHooks.format && last - first + 1 > REPORT_THRESHOLD)
+            {
+                say(alSaidCount("VimLinesIndented", last - first + 1, "1 line indented", "[COUNT] lines indented"));
+            }
             return;
         case '~':
         case 'u':
@@ -5048,6 +5944,11 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             }
             view.replaceAll(std::move(edits));
             moveTo(view, span.range.begin);
+            // The lines changed, said for more than vim's report.
+            if (last - first + 1 > REPORT_THRESHOLD)
+            {
+                say(alSaidCount("VimLinesChanged", last - first + 1, "1 line changed", "[COUNT] lines changed"));
+            }
             return;
         }
         default:
@@ -5069,22 +5970,36 @@ ALVimKeymap::Register ALVimKeymap::fetch(char name) const
 
 void ALVimKeymap::tooMuch(size_t bytes)
 {
-    say(said("VimCountTooLarge", "Too large a count: it would put in [SIZE,number,1] MB", { { "[SIZE]", llformat("%f", (F64)bytes / (1024.0 * 1024.0)) } }), true);
+    say(said("VimCountTooLarge", "Too large a count: it would put in [SIZE,number,1] MB", { { "[SIZE]", fmt::format("{:f}", static_cast<F64>(bytes) / (1024.0 * 1024.0)) } }),
+        true);
+}
+
+void ALVimKeymap::sayMoreLines(S32 lines)
+{
+    if (lines > REPORT_THRESHOLD)
+    {
+        say(alSaidCount("VimMoreLines", lines, "1 more line", "[COUNT] more lines"));
+    }
 }
 
 void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool past)
 {
     const ALTextDocument& d   = view.document();
     const Register        reg = fetch(name);
-    // Nothing is a register never set, or set to no text: a line is
-    // something however empty, as yy on an empty line keeps one. What _
-    // gives back is no text, put as nothing and said nothing of.
-    if (reg.text.empty() && !reg.linewise)
+    // Nothing is a register never set. One set to no text -- yiw on an
+    // empty line keeps one -- puts nothing and says nothing, as vim's does,
+    // where a line is something however empty, as yy on an empty line keeps
+    // one. What _ gives back is no text, put as nothing and said nothing of.
+    if (!reg.held)
     {
         if (name != '_')
         {
             say(said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, name ? name : '"') } }), true);
         }
+        return;
+    }
+    if (reg.text.empty() && !reg.linewise)
+    {
         return;
     }
     if (count > 1 && reg.text.size() * static_cast<size_t>(count) > MAX_COUNT_TEXT)
@@ -5115,6 +6030,7 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
         const S32 column = after && !atLineEnd(d, from) ? d.displayColumn(d.nextCluster(from), tab) : d.displayColumn(from, tab);
         std::vector<std::pair<ALTextRange, std::string>> edits;
         std::string                                       tail;
+        S32                                               added = 0;
         for (size_t i = 0; i < lines.size(); ++i)
         {
             const S32 line = from.line + static_cast<S32>(i);
@@ -5131,6 +6047,7 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
             else
             {
                 tail += "\n" + std::string(static_cast<size_t>(column), ' ') + piece;
+                ++added;
             }
         }
         if (!tail.empty())
@@ -5139,6 +6056,8 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
         }
         view.replaceAll(std::move(edits));
         moveTo(view, d.posAtDisplayColumn(from.line, column, tab));
+        // The lines added past the last, as vim counts a block's.
+        sayMoreLines(added);
         return;
     }
     std::string text;
@@ -5151,6 +6070,9 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
         }
         text += reg.text;
     }
+    // The lines a put adds, said where they are more than vim's report: a
+    // line for each break it puts in, and the one lines are put on.
+    const S32 breaks = static_cast<S32>(std::count(text.begin(), text.end(), '\n'));
     if (reg.linewise)
     {
         if (after)
@@ -5163,11 +6085,12 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
             view.setCaret(d.lineStart(from.line));
             view.insertText(text + "\n");
         }
+        sayMoreLines(breaks + 1);
         const S32 line = after ? from.line + 1 : from.line;
         if (past)
         {
             // The line after the last one put.
-            const S32 below = llmin(line + static_cast<S32>(std::count(text.begin(), text.end(), '\n')) + 1, d.lineCount() - 1);
+            const S32 below = llmin(line + breaks + 1, d.lineCount() - 1);
             moveTo(view, ALTextPos(below, 0));
             return;
         }
@@ -5181,6 +6104,7 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
     }
     view.setCaret(where);
     view.insertText(text);
+    sayMoreLines(breaks);
     // On the last character put, as vim leaves it; gp just after it.
     moveTo(view, past ? view.caret() : text.find('\n') == std::string::npos ? d.prevCluster(view.caret()) : where);
 }
@@ -5206,7 +6130,7 @@ void ALVimKeymap::setMode(ALTextView& view, Mode to, bool grouped)
         mVisualLast       = held;
         mVisualLastAnchor = mVisualAnchor;
         mVisualLastCaret  = mVisualCaret;
-        mVisualLastToEnd  = held == Mode::VisualBlock && mWantColumn == S32_MAX;
+        mVisualLastToEnd  = mWantColumn == S32_MAX;
     }
     if (held == Mode::VisualBlock && kept != Mode::VisualBlock)
     {
@@ -5446,32 +6370,28 @@ bool ALVimKeymap::insertControl(ALTextView& view, const Input& input)
         case 'D':
         {
             // The line a step further in, or a step back, as > and < step
-            // it, the caret staying on the character it was on.
-            const ALTextPos    caret = view.caret();
-            const S32          width = llmax(1, view.getTabWidth());
-            const std::string& text  = d.line(caret.line);
-            ALTextRange        range(d.lineStart(caret.line), d.lineStart(caret.line));
-            std::string        with;
+            // it, the caret staying on the character it was on. In goes an
+            // empty line too, as vim's Ctrl-T puts one in where o opened it;
+            // out is <'s own step (ALTextIndent::shiftLines).
+            const ALTextPos caret = view.caret();
+            const S32       width = llmax(1, view.getTabWidth());
+            ALTextRange     range(d.lineStart(caret.line), d.lineStart(caret.line));
+            std::string     with;
             if (input.key == 'T')
             {
                 with = view.getSoftTabs() ? std::string(width, ' ') : std::string("\t");
             }
             else
             {
-                S32 cut = 0;
-                if (!text.empty() && text[0] == '\t')
-                {
-                    cut = 1;
-                }
-                while (cut < width && cut < static_cast<S32>(text.size()) && text[cut] == ' ' && text[0] == ' ')
-                {
-                    ++cut;
-                }
-                if (cut == 0)
+                ALTextIndent::Options options;
+                options.tabWidth                   = width;
+                options.softTabs                   = view.getSoftTabs();
+                const ALTextEditing::Change shifted = ALTextIndent::shiftLines(d, caret.line, caret.line, 1, false, options);
+                if (shifted.replacements.empty())
                 {
                     return true;
                 }
-                range.end = ALTextPos(caret.line, cut);
+                range = shifted.replacements.front().range;
             }
             const S32 moved = static_cast<S32>(with.size()) - (range.end.column - range.begin.column);
             view.replaceAll({ { range, with } });
@@ -6275,7 +7195,7 @@ void ALVimKeymap::suggest(ALTextView& view, S32 given)
         std::string list;
         for (size_t i = 0; i < items.size(); ++i)
         {
-            list += llformat("%s%d \"%s\"", i ? "  " : "", static_cast<int>(i + 1), items[i].c_str());
+            fmt::format_to(std::back_inserter(list), "{}{} \"{}\"", i ? "  " : "", i + 1, items[i]);
         }
         say(list);
         return;
@@ -6284,7 +7204,7 @@ void ALVimKeymap::suggest(ALTextView& view, S32 given)
     // again at the caret.
     const LLHandle<LLUICtrl> handle = view.getHandle();
     mHooks.pick(view, view.document().text(word), items, [handle](size_t index) {
-        ALTextView* again = dynamic_cast<ALTextView*>(handle.get());
+        ALTextView* again = ALViewType::as<ALTextView>(handle.get());
         if (again && again->misspelledAt(again->caret()))
         {
             again->refreshSuggestions();

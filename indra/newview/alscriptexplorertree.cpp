@@ -366,7 +366,7 @@ LLFolderViewItem* ALScriptExplorerTree::itemAt(S32 x, S32 y) const
     localPointToOtherView(x, y, &lx, &ly, mFolderView);
     for (LLView* view = mFolderView->childFromPoint(lx, ly, true); view && view != mFolderView; view = view->getParent())
     {
-        if (LLFolderViewItem* item = dynamic_cast<LLFolderViewItem*>(view))
+        if (LLFolderViewItem* item = view->as<LLFolderViewItem>())
         {
             // A folder's own row, not the room its open children take.
             S32 ix = 0, iy = 0;

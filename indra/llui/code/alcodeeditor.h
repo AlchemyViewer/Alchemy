@@ -27,6 +27,7 @@
 #include "alanchoredranges.h"
 #include "alchangessincesaved.h"
 #include "alcodecards.h"
+#include "alcodeliterals.h"
 #include "albracketindex.h"
 #include "alcompletionmodel.h"
 #include "alfixlistmodel.h"
@@ -334,8 +335,11 @@ public:
     bool lineChanged(S32 line) const;
     // The text's changes since it was saved, exactly, with the lines of
     // both (ALChangesSinceSaved): worked out again only where the text or
-    // its history moved; none where nothing says what was saved.
-    std::shared_ptr<const ALChangesSinceSaved::Known> changesSinceSaved() { return mSinceSaved.of(document(), undoJournal()); }
+    // its history moved; none where nothing says what was saved. As they
+    // are worked out the bars become theirs -- a line a Return only pushed,
+    // or typed on and put back as it was saved, loses its bar -- so that
+    // the bars, a peek and ]c agree on what has changed.
+    std::shared_ptr<const ALChangesSinceSaved::Known> changesSinceSaved();
     // A peek at the change since the text was saved that a line is in
     // (ALChangePeek): its lines as they were, in a gap under them, with
     // the change taken back and the steps to the others. What a press on
@@ -575,27 +579,16 @@ public:
     // Whether what is typed at a position completes all the same, where
     // the grammar says (ALSyntaxGrammar::completesIn).
     bool        completesInProse(const ALTextPos& at);
-    // The whole string literal a position is in, quotes and all: the run
-    // of string and escape tokens around it, carried across lines while
-    // one begins or ends inside a string, so that a long string is one
-    // literal rather than a line of one. Empty where the position is not
-    // in a string.
-    ALTextRange stringAt(const ALTextPos& pos) const;
-    // What a string that names a file holds -- between its quotes, or to
-    // the line's end where it is not closed; empty where it holds nothing
-    // yet -- where a position is in it or at its end: a string the grammar
-    // says names one, by what comes before its opening quote
-    // (ALSyntaxGrammar::pathString). None anywhere else.
-    std::optional<ALTextRange> pathAt(const ALTextPos& pos);
-    // The same of any string or path on its line, the grammar not asked:
-    // what it holds, the byte that opens it -- a quote, or an include's
-    // `<` -- and whether it is closed on its line.
-    std::optional<ALTextRange> quotedAt(const ALTextPos& pos, char* opener = nullptr, bool* closed = nullptr);
-    // What to say about one: its size, which is what a scripter wants of
-    // a string and what the type alone never says -- the bytes it comes
-    // to, the characters where they are not the same number, and what it
-    // is written as where the escapes make that longer.
-    std::string stringSize(const ALTextRange& literal) const;
+    // The string literal a position is in, what a string that names a
+    // file holds, what any string or path on its line holds, and what a
+    // string comes to (ALCodeLiterals).
+    ALTextRange                stringAt(const ALTextPos& pos) const { return mLiterals.stringAt(pos); }
+    std::optional<ALTextRange> pathAt(const ALTextPos& pos) const { return mLiterals.pathAt(pos); }
+    std::optional<ALTextRange> quotedAt(const ALTextPos& pos, char* opener = nullptr, bool* closed = nullptr) const
+    {
+        return mLiterals.quotedAt(pos, opener, closed);
+    }
+    std::string stringSize(const ALTextRange& literal) const { return mLiterals.stringSize(literal); }
 
     // --- placeholders ----------------------------------------------------------------
 
@@ -614,11 +607,11 @@ public:
     void                            dropTyping();
 
     // Every place of a text changed at once, each a selection of its own.
-    // Select Next Occurrence takes the name at the caret, then adds the
-    // next place after the main selection, going round, which becomes the
-    // main one; Change All selects every place at once, the main one kept
-    // main and the others it had let go. A name taken so matches whole
-    // names only.
+    // Select Next Occurrence takes the name at the caret -- in prose, the
+    // word -- then adds the next place after the main selection, going
+    // round, which becomes the main one; Change All selects every place at
+    // once, the main one kept main and the others it had let go. A name
+    // taken so matches whole names only, and a word whole words.
     bool                            selectNextOccurrence();
     bool                            changeAllOccurrences();
     // The names of a signature's parameters, and where their list opens
@@ -828,6 +821,7 @@ protected:
     S32  hostHiddenBeside(S32 line) const;
     bool mapMark(S32 line, LLColor4& color) const override;
     U32  marksRevision() const override { return mMarksRevision; }
+    void markedLines(std::vector<S32>& out) const override;
     bool closerOpenedAt(const ALTextPos& closer, ALTextPos& opener) override;
     // The features' commands, by what they are about: folding; the code's
     // structure, the functions a host knows of and a bracket's partner;
@@ -973,6 +967,13 @@ private:
     std::optional<ALTextRange> pairAround(const ALTextPos& at);
     // The problems squiggled under a position, and the stretch they span.
     std::vector<CardProblem> problemsUnder(const ALTextPos& at, ALTextRange& about) const;
+    // A line of another view styled as code, as styleAsCode styles one:
+    // `source`, as it would stand in this editor's text, lexed on from
+    // `state`, which it leaves where the line after it starts, and styled
+    // on the view's line `line` from column `at`, its first `skip` bytes
+    // left out of the view.
+    void styleSource(S32 line, std::string_view source, S32 skip, S32 at, ALSyntaxState& state, std::vector<ALTextView::Style>& styles,
+                     std::string_view name = std::string_view(), ALSyntaxKind kind = ALSyntaxKind::Text);
     void vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out);
 
     // The colours as drawn now: a skin's where it gave one, else mixed
@@ -1032,6 +1033,8 @@ private:
     bool      mBracketColorsSet    = false;
     // Where the brackets pair up, and how deep each line starts.
     ALBracketIndex   mBracketIndex;
+    // The text's string and path literals, by the highlighter's tokens.
+    ALCodeLiterals   mLiterals{ document(), highlighter() };
     // The depth at each bracket of the last line drawn, by column, for the
     // rest of its rows: under the text and the grammar they were found in.
     struct BracketDepths
@@ -1049,6 +1052,18 @@ private:
     std::vector<LLColor4U>          mNumberColours;
     std::vector<LLFontGL::GlyphRun> mNumberRuns;
     std::vector<Blank>              mBlankScratch;
+    // Where a row's no-break spaces are, their rings drawn once its other
+    // blank marks are.
+    std::vector<S32>                mRingScratch;
+    // The words drawn beside the text -- an inlay's, a folded block's
+    // count, a line's note -- placed as the rows are drawn and drawn
+    // together after them, in one call rather than one for each; placed
+    // from x on a baseline, and drawn and let go of.
+    std::vector<LLFontGL::Placed>   mWordGlyphs;
+    std::vector<LLColor4U>          mWordColours;
+    std::vector<LLFontGL::GlyphRun> mWordRuns;
+    void                            queueWords(std::string_view words, F32 x, F32 baseline, const LLColor4& colour);
+    void                            drawWords();
     // The signature card's pieces as last measured, for as long as the
     // signature, its active parameter and the font hold.
     struct SignatureShown
@@ -1096,10 +1111,20 @@ private:
     boost::signals2::scoped_connection mEditConnection;
     boost::signals2::scoped_connection mChangedConnection;
     ALLineTable<Mark>                  mMarks;
-    // Moves on as marks are set or cleared, for the ruler's list of them.
+    // Moves on as marks are set or cleared, or moved or taken by an edit,
+    // for the ruler's list of them.
     U32                                mMarksRevision = 0;
-    // One per line: changed since the last save.
+    // One per line: changed since the last save -- every line an edit
+    // touched at once, which may be more than it changed, and the lines of
+    // the changes since the save once those are worked out, for a peek, ]c
+    // or a bar pressed, or as the edits rest; whether that is still to do,
+    // and since when the edits have rested.
     ALLineTable<U8>                    mChanged;
+    bool                               mBarsDue = false;
+    LLFrameTimer                       mBarsRest;
+    // The bars as the text's changes since it was saved have them, where
+    // the journal knows what was saved; left as they are where it does not.
+    void                               settleBars();
     // The mouse over the gutter, and the line it is on there: the fold
     // markers of open blocks show while it is, and the block under it
     // shows its extent.
@@ -1131,7 +1156,7 @@ private:
     };
     ALLineTable<Aside>                 mAsides;
     bool                               mHeatShown = false;
-    void slideAsides(const std::vector<ALTextDocument::Edit::LineSpan>& spans);
+    void slideAsides(const ALTextDocument::Edit& edit);
     // What the layout is told about a line's inlays.
     void provideInlays(S32 line, std::vector<ALTextLayout::Inlay>& out) const;
     // The hint a line's glyph stands for, by the id provideInlays gave it,
@@ -1169,6 +1194,17 @@ private:
     // The bracket the call shown opens with, or none: the signature stays
     // while the caret is inside the call, across its lines.
     ALTextPos               mSignatureOpen{ -1, -1 };
+    // Where that call closes, as last found -- for which bracket and which
+    // text, and whether it closes nearby at all -- which every frame holds
+    // the caret against while the signature is up.
+    struct SignatureClose
+    {
+        ALTextPos open{ -1, -1 };
+        U32       version = 0;
+        bool      found   = false;
+        ALTextPos at;
+    };
+    mutable SignatureClose  mSignatureClose;
     symbol_request_t        mSymbolRequest;
     link_request_t          mLinkRequest;
     // The icons the completions wear, by name (iconOf).
@@ -1203,6 +1239,10 @@ private:
     // Each placeholder's mirrors made what it holds, as one step of its
     // own.
     void                     syncMirrors(S32 index);
+    // A snippet's body read to go in at a place (ALSnippetSession::expand):
+    // indented as the line it goes into, its own levels in that line's
+    // blank, or as tabs are typed here.
+    ALSnippetSession::Expansion expandSnippet(std::string_view body, const ALTextPos& at) const;
     // The selections folding has hidden, the main one among them, each a
     // caret at the end of the fold's line.
     void                     caretsOutOfFolds();
@@ -1211,6 +1251,11 @@ private:
     // there are; at most `most` of them.
     std::vector<ALTextRange> placesOf(const std::string& wanted, bool whole, const ALTextPos& from, size_t most,
                                       const std::vector<ALTextRange>& taken) const;
+    // Whether a name taken at the caret is one as code spells it -- the
+    // grammar is code -- or a word, as prose and a text with no grammar
+    // have it; and the one there is at the caret, or at its end.
+    bool                     namesAsCode() const;
+    ALTextRange              occurrenceAtCaret() const;
     // The name Select Next Occurrence took at the caret, whose places are
     // whole names only: the main selection while it is one of them.
     ALTextRange              mOccurrenceName;

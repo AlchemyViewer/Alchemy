@@ -26,6 +26,7 @@
 
 #include "altextdocument.h"
 
+#include <atomic>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -53,6 +54,20 @@ struct ALTextSearchOptions
     bool acrossLines   = false;
     // At most so many matches, the first in the text; none for no end.
     size_t limit       = 0;
+    // Looked at after each match and each line: once it is set, nothing
+    // more is looked for, and what was found so far is what is found. What
+    // a search on a worker that nobody waits for any more is stopped by.
+    const std::atomic<bool>* stop = nullptr;
+    // Of the matches that begin on a line, the first alone: those after it
+    // there are passed over as they are found, nothing made of what would
+    // replace them -- what vim's :s without g asks for.
+    bool firstPerLine  = false;
+    // The groups of the pattern, a bit each, that end a match where they
+    // stand: a match is cut where the last of them that took part begins,
+    // though never before it starts, and the next is looked for from
+    // there, the pattern having gone on past it -- what vim's \ze inside
+    // a group asks for.
+    U64  cutGroups     = 0;
 };
 
 // Finding in a document: every place a query stands, plain or as a

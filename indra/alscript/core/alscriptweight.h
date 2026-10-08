@@ -188,6 +188,12 @@ namespace ALScriptWeigh
     constexpr int SLUA_OPTIMIZATION_LEVEL = 1;
     constexpr int SLUA_DEBUG_LEVEL        = 1;
 
+    // A string as a row names it -- a heavy constant's part, a string of
+    // the table -- quoted, on one line, a break, a tab and a return written
+    // \n, \t and \r: its first `shown` bytes, never cut inside a character,
+    // and an ellipsis where it goes on.
+    std::string quoted(std::string_view text, size_t shown);
+
     // SLua compiled as the server compiles it, and the bytecode read back
     // for what each function, each line and each string comes to.
     ALScriptWeight slua(std::string_view source);

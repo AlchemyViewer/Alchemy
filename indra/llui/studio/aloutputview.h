@@ -134,7 +134,9 @@ public:
 
     // An entry at the end of the log; the same as the last -- the same
     // lane, source, kind, words, links, key and value -- the last said
-    // once more instead, at the new one's time.
+    // once more instead, at the new one's time. Its words are kept with
+    // their breaks as the document reads them, CRLF and a lone CR made
+    // LF, which is what a link's line counts.
     void                     append(Entry entry);
     void                     clearEntries();
     const std::deque<Entry>& entries() const { return mEntries; }

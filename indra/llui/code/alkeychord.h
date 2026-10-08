@@ -77,9 +77,10 @@ namespace ALKeyChords
     bool waiting();
     void stop();
     // A key pressed, to whoever waits for it: false where nobody does, or
-    // it is a modifier on its own. The first key again, held down, is
-    // taken and changes nothing. A key that types takes its character
-    // with it: the next one, where it comes the same frame (takeChar).
+    // it is a modifier or Caps Lock on its own. The first key again, held
+    // down, is taken and changes nothing. A key that types takes its
+    // character with it: the next one, where it comes the same frame
+    // (takeChar).
     bool takeKey(KEY key, MASK mask);
     bool takeChar(llwchar uni_char);
     // Shift-F10, or the Menu key: what opens the menu a right click would,

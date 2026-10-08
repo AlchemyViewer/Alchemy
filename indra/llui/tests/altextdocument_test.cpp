@@ -242,16 +242,12 @@ namespace tut
     template<> template<>
     void altextdocument_object::test<12>()
     {
-        set_test_name("a log: text arrives at the end and the oldest lines go");
+        set_test_name("a log: text arrives at the end");
         ALTextDocument doc;
         doc.append("one\ntwo");
         doc.append("\nthree");
         ensure_equals("three lines", doc.lineCount(), 3);
-        ALTextDocument::Edit gone = doc.removeFirstLines(2);
-        ensure_equals("one left", doc.text(), std::string("three"));
-        ensure_equals("what went", gone.removed, std::string("one\ntwo\n"));
-        ensure("everything can go", doc.removeFirstLines(5).removed == "three" && doc.empty());
-        ensure("nothing to go", doc.removeFirstLines(0).nothing());
+        ensure_equals("in the order it came", doc.text(), std::string("one\ntwo\nthree"));
     }
 
     template<> template<>
@@ -421,7 +417,7 @@ namespace tut
     template<> template<>
     void altextdocument_object::test<19>()
     {
-        set_test_name("a character stepped over forward and back, at every place of a line, is the cluster ICU says, ASCII taken the quick way");
+        set_test_name("a character stepped over forward and back, at every place of a line, is the cluster ICU says, and a byte of a line clamped is the boundary it says, ASCII taken the quick way");
         const std::vector<std::string> lines = {
             "plain ascii, all of it",
             "e\xCC\x81 an accent joined to the e before it",
@@ -457,6 +453,11 @@ namespace tut
                     ensure_equals("back in \"" + line + "\" at " + std::to_string(c), d.prevCluster(ALTextPos(l, static_cast<S32>(c))).column,
                                   static_cast<S32>(utf8str_step_grapheme_backward(line, c)));
                 }
+            }
+            for (size_t c = 0; c <= line.size(); ++c)
+            {
+                ensure_equals("clamped in \"" + line + "\" at " + std::to_string(c), d.clamp(ALTextPos(l, static_cast<S32>(c))).column,
+                              static_cast<S32>(utf8str_grapheme_align_backward(line, c)));
             }
         }
         ensure("off a line's end to the next", d.nextCluster(ALTextPos(0, static_cast<S32>(lines[0].size()))) == ALTextPos(1, 0));
@@ -544,5 +545,50 @@ namespace tut
             replaced.setText(text);
             ensure_equals("the same put in over another", replaced.text(), doc.text());
         }
+    }
+
+    template<> template<>
+    void altextdocument_object::test<22>()
+    {
+        set_test_name("the bytes of the text, and of a stretch of it, as every kind of edit leaves them");
+        ALTextDocument doc("one\r\ntwo\rthree");
+        const auto agrees = [&doc](const std::string& what) {
+            ensure_equals(what + ": the whole", doc.byteCount(), doc.text().size());
+            const S32         last     = doc.lineCount() - 1;
+            const ALTextRange ranges[] = { ALTextRange(doc.start(), doc.end()), ALTextRange(ALTextPos(0, 1), ALTextPos(0, 2)),
+                                           ALTextRange(ALTextPos(0, 2), ALTextPos(last, 1)), ALTextRange(doc.end(), ALTextPos(0, 1)),
+                                           ALTextRange(ALTextPos(-3, 9), ALTextPos(99, 99)) };
+            for (const ALTextRange& range : ranges)
+            {
+                ensure_equals(what + ": a stretch", doc.byteCount(range), doc.text(range).size());
+            }
+        };
+        agrees("as read");
+        doc.insert(ALTextPos(1, 1), "X\r\nY");
+        agrees("a break put in");
+        doc.replace(ALTextRange(ALTextPos(0, 1), ALTextPos(2, 1)), "z");
+        agrees("lines taken out");
+        doc.replaceMany({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)), "ab\ncd" }, { ALTextRange(doc.end(), doc.end()), "\r\n\n" } });
+        agrees("a batch");
+        doc.remove(ALTextRange(doc.start(), doc.end()));
+        agrees("everything gone");
+        doc.setText("again\nand again");
+        agrees("a text put in whole");
+    }
+
+    template<> template<>
+    void altextdocument_object::test<23>()
+    {
+        set_test_name("words as code reads them never stop inside a character: a keycap's mark goes with what joins it, and so does a blank a mark is put on");
+        // x, a blank, # with U+FE0F and U+20E3 on it, a blank, y.
+        const ALTextDocument keycap("x #\xEF\xB8\x8F\xE2\x83\xA3 y");
+        ensure("from the mark, past the keycap and the blank after it", keycap.nextCodeWord(ALTextPos(0, 2)) == ALTextPos(0, 10));
+        ensure("back over it whole", keycap.prevCodeWord(ALTextPos(0, 10)) == ALTextPos(0, 2));
+        ensure("up to it as before", keycap.nextCodeWord(ALTextPos(0, 0)) == ALTextPos(0, 2));
+        // a, a blank with a combining acute on it, z.
+        const ALTextDocument accent("a \xCC\x81z");
+        ensure("forward past the blank and its mark", accent.nextCodeWord(ALTextPos(0, 0)) == ALTextPos(0, 4));
+        ensure("and from the blank itself", accent.nextCodeWord(ALTextPos(0, 1)) == ALTextPos(0, 4));
+        ensure("back to the blank the mark is on", accent.prevCodeWord(ALTextPos(0, 4)) == ALTextPos(0, 1));
     }
 }

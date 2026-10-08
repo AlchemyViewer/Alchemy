@@ -91,6 +91,26 @@ namespace
         return out;
     }
 
+    // A keymap that is always typing the same line, and counts how often
+    // the view asks it what the line is.
+    struct TypingKeymap : public ALModalKeymap
+    {
+        S32* asked = nullptr;
+
+        bool        handleKey(ALTextView&, KEY, MASK) override { return false; }
+        bool        handleChar(ALTextView&, llwchar) override { return false; }
+        bool        inserting() const override { return false; }
+        std::string status() const override { return "NORMAL"; }
+        U32         generation() const override { return 1; }
+        bool        typingLine(std::string& line, S32& caret) const override
+        {
+            ++*asked;
+            line  = ":set number";
+            caret = 4;
+            return true;
+        }
+    };
+
     // A view that is a white box: an atom's view, to see where it is drawn.
     struct WhiteBox : public LLView
     {
@@ -1048,6 +1068,308 @@ namespace tut
                changed_in(second, second_from, second_to) * 4 >= (second_to - second_from) * 3);
         ensure("nothing on the second row past where it ends",
                changed_in(second, 0, second_from) == 0 && changed_in(second, second_to, W) == 0);
+        view->die();
+    }
+
+    // The preview of the lines under the mouse on the map numbers them as
+    // the view does, from its first line's number: a notecard's from 0, an
+    // expansion's from past its envelope.
+    template<> template<>
+    void altextview_gl_object::test<15>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::string text;
+        for (S32 i = 0; i < 200; ++i)
+        {
+            text += "word word word word\n";
+        }
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name               = "editor";
+        p.rect               = LLRect(0, H, W, 0);
+        p.default_text       = text;
+        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        editor->setFont(LLFontGL::getFontMonospace());
+        // No gutter, so that only the preview says a line's number; read
+        // only, so that no caret blinks between frames.
+        editor->setShowLineNumbers(false);
+        editor->setShowFoldMarkers(false);
+        editor->setReadOnly(true);
+        editor->setScrollMap(true);
+        editor->setScrollMapWidth(60);
+        editor->setBackgroundColor(LLColor4(0.1f, 0.1f, 0.12f, 1.f));
+        editor->setTextColor(LLColor4(0.9f, 0.9f, 0.9f, 1.f));
+        ALTextRuler* map = editor->findChild<ALTextRuler>("ruler");
+        ensure("a map", map != nullptr);
+        const auto drawn = [&]() {
+            gl().clearFramebuffer();
+            glEnable(GL_BLEND);
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
+            editor->draw();
+            gGL.flush();
+            glDisable(GL_BLEND);
+            glFinish();
+            return ll_test::readFramebufferRGBA(W, H);
+        };
+        // How many pixels left of the map, where the preview is, differ
+        // between two frames.
+        const auto changed = [&](const std::vector<U8>& a, const std::vector<U8>& b) {
+            S32 count = 0;
+            for (S32 y = 0; y < H; ++y)
+            {
+                for (S32 x = 0; x < W - 60; ++x)
+                {
+                    const size_t at = (static_cast<size_t>(y) * W + x) * 4;
+                    count += a[at] != b[at] || a[at + 1] != b[at + 1] || a[at + 2] != b[at + 2];
+                }
+            }
+            return count;
+        };
+        drawn();
+        map->handleHover(30, H / 2, MASK_NONE);
+        const std::vector<U8> from_one = drawn();
+        editor->setLineNumberBase(1000);
+        const std::vector<U8> from_base = drawn();
+        ensure("numbered past a thousand, the preview says so: " + std::to_string(changed(from_one, from_base)), changed(from_one, from_base) > 0);
+        editor->setLineNumberBase(0);
+        ensure("and from one again as before", changed(from_one, drawn()) == 0);
+        editor->die();
+    }
+
+    // A gap put between the lines moves the map's rows below it down, each
+    // line drawn with its own runs of text: the map is the one a view with
+    // that gap from the start draws, though the text, and so the lines in
+    // sight, are as they were. A text with no grammar, whose lines' tokens
+    // never change.
+    template<> template<>
+    void altextview_gl_object::test<16>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        // Lines of many lengths, so that one drawn with another's runs is
+        // seen to be.
+        std::string text;
+        for (S32 i = 0; i < 200; ++i)
+        {
+            text += std::string(static_cast<size_t>(i % 9 + 1) * 4, 'x') + "\n";
+        }
+        std::vector<ALTextView::LineAnnotation> gapped(200);
+        gapped[1].gap = 2;
+        const auto make = [&]() {
+            ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+            p.name           = "view";
+            p.rect           = LLRect(0, H, W, 0);
+            p.default_text   = text;
+            ALTextView* made = LLUICtrlFactory::create<ALTextView>(p);
+            made->setFont(LLFontGL::getFontMonospace());
+            made->setScrollMap(true);
+            made->setScrollMapWidth(60);
+            made->setBackgroundColor(LLColor4(0.1f, 0.1f, 0.12f, 1.f));
+            made->setTextColor(LLColor4(0.9f, 0.9f, 0.9f, 1.f));
+            return made;
+        };
+        // The map's columns of a frame of a view, drawn twice so that its
+        // layout has settled.
+        const auto map_of = [&](ALTextView* view) {
+            std::vector<U8> map;
+            for (S32 pass = 0; pass < 2; ++pass)
+            {
+                gl().clearFramebuffer();
+                glEnable(GL_BLEND);
+                gGL.setSceneBlendType(LLRender::BT_ALPHA);
+                view->draw();
+                gGL.flush();
+                glDisable(GL_BLEND);
+                glFinish();
+                const std::vector<U8> rgba = ll_test::readFramebufferRGBA(W, H);
+                map.clear();
+                for (S32 y = 0; y < H; ++y)
+                {
+                    for (S32 x = W - 60; x < W; ++x)
+                    {
+                        const size_t at = (static_cast<size_t>(y) * W + x) * 4;
+                        map.insert(map.end(), rgba.begin() + static_cast<std::ptrdiff_t>(at), rgba.begin() + static_cast<std::ptrdiff_t>(at + 3));
+                    }
+                }
+            }
+            return map;
+        };
+        ALTextView* drawn_first = make();
+        const std::vector<U8> before = map_of(drawn_first);
+        drawn_first->setLineAnnotations(gapped);
+        const std::vector<U8> after = map_of(drawn_first);
+        ensure("the gap moved the map", after != before);
+        ALTextView* gapped_first = make();
+        gapped_first->setLineAnnotations(gapped);
+        ensure("as a view with the gap from the start draws it", after == map_of(gapped_first));
+        drawn_first->die();
+        gapped_first->die();
+    }
+
+    // The code editor's words beside the text -- an inlay's in its pill, a
+    // line's note -- and the arrows for its tabs cost what one line's do,
+    // however many lines have them: a script with a name before every
+    // argument has a hint on most rows.
+    template<> template<>
+    void altextview_gl_object::test<17>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name   = "editor";
+        p.rect   = LLRect(0, H, W, 0);
+        p.syntax = "lsl";
+        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        editor->setFont(LLFontGL::getFontMonospace());
+        // Read-only, so that no caret blinks between frames.
+        editor->setReadOnly(true);
+        editor->setShowWhitespace(ALCodeEditor::Whitespace::All);
+        // A frame's draws, laid out by a frame before it.
+        const auto draws = [&]() {
+            editor->draw();
+            gGL.flush();
+            std::list<LLVertexBufferData> capture;
+            gGL.beginList(&capture);
+            editor->draw();
+            gGL.flush();
+            gGL.endList();
+            glFinish();
+            return capture.size();
+        };
+        // Twelve calls, the first so many of them tabbed in, each of those
+        // with a name before both its arguments and a note after it; the
+        // words short, so that all of them are one batch of glyphs.
+        const auto fill = [&](S32 tabbed) {
+            std::string text;
+            for (S32 line = 0; line < 12; ++line)
+            {
+                text += std::string(line < tabbed ? "\t" : "") + "f(0, v);\n";
+            }
+            editor->setText(text);
+            std::vector<ALCodeEditor::InlayHint> hints;
+            std::vector<ALCodeEditor::LineNote>  notes;
+            for (S32 line = 0; line < tabbed; ++line)
+            {
+                ALCodeEditor::InlayHint first;
+                first.at   = ALTextPos(line, 3);
+                first.text = "c:";
+                ALCodeEditor::InlayHint second;
+                second.at   = ALTextPos(line, 6);
+                second.text = "m:";
+                hints.push_back(first);
+                hints.push_back(second);
+                notes.push_back({ line, "9b", "" });
+            }
+            editor->setInlayHints(hints);
+            editor->setLineNotes(notes);
+        };
+        fill(1);
+        const size_t one = draws();
+        fill(12);
+        const size_t every = draws();
+        ensure("hints, notes and tabs on every line cost what one line's do: " + std::to_string(every) + " against " + std::to_string(one),
+               every == one);
+        editor->die();
+    }
+
+    // A selection that goes on past a line's end is drawn a little past the
+    // line's last glyph, as a match that does is: as far however far in the
+    // text's first line starts.
+    template<> template<>
+    void altextview_gl_object::test<18>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "view";
+        p.rect         = LLRect(0, H, W, 0);
+        p.default_text = "MMMM\nMMMM\nMMMM";
+        // The skin's colours are not loaded here: the text's is given, on
+        // black.
+        p.text_color   = LLUIColor(LLColor4::white);
+        p.bg_visible   = false;
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        view->setSelectionColor(LLUIColor(LLColor4(0.f, 0.f, 1.f, 1.f)));
+        // The first line in from the edge, as a log's are.
+        view->layout().setIndentProvider([](S32 line) {
+            ALTextLayout::Indent indent;
+            indent.first = line == 0 ? 60.f : 0.f;
+            return indent;
+        });
+        view->setSelection(ALTextRange(ALTextPos(1, 2), ALTextPos(2, 0)));
+        gl().clearFramebuffer();
+        glEnable(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+        view->draw();
+        gGL.flush();
+        glDisable(GL_BLEND);
+        glFinish();
+        const std::vector<U8> rgba = ll_test::readFramebufferRGBA(W, H);
+        // Across the middle of the second line's row, from its last glyph
+        // on: how many columns the band reaches.
+        const LLRect text = view->textRect();
+        const S32    y    = text.mTop - (view->layout().lineTop(1) - view->scrollY()) - view->layout().rowHeight() / 2;
+        const S32    end  = text.mLeft + static_cast<S32>(std::ceil(view->layout().line(1).width));
+        S32          past = 0;
+        for (S32 x = end; x < W; ++x)
+        {
+            past += rgba[(static_cast<size_t>(y) * W + x) * 4 + 2] > 128 ? 1 : 0;
+        }
+        ensure("drawn past the line's end: " + std::to_string(past), past > 0);
+        ensure("a little, not as far again as the first line is in: " + std::to_string(past), past <= 10);
+        view->die();
+    }
+
+    // The band a modal keymap has under the text is read and measured once
+    // while nothing moves, and again once the fonts are loaded again under
+    // the same font: its caret and its choices are measured in the faces
+    // its text is drawn in.
+    template<> template<>
+    void altextview_gl_object::test<19>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name           = "view";
+        p.rect           = LLRect(0, H, W, 0);
+        p.default_text   = "text";
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        S32  asked  = 0;
+        auto keymap = std::make_unique<TypingKeymap>();
+        keymap->asked = &asked;
+        view->setModalKeymap(std::move(keymap));
+        const auto frame = [&]() {
+            gl().clearFramebuffer();
+            view->draw();
+            gGL.flush();
+            glFinish();
+        };
+        frame();
+        const S32 once = asked;
+        ensure("read for the first frame", once > 0);
+        frame();
+        ensure_equals("not again while nothing moved", asked, once);
+        // What a font reload does: the faces swapped under the same font.
+        ++LLFontGL::sResolutionGeneration;
+        frame();
+        ensure("read again once the fonts were loaded again", asked > once);
         view->die();
     }
 }

@@ -31,6 +31,7 @@
 #include "altextchars.h"
 #include "altextfeatures.h"
 #include "altextruler.h"
+#include "allinebreaks.h"
 #include "alsurface.h"
 #include "alviewtype.h"
 #include "llclipboard.h"
@@ -77,17 +78,9 @@ namespace
 
     const S32 H_MARGIN              = 16;
     const F32 CARET_MARGIN          = 8.f;
-
-    // What each kind's colour is called in the colour table, after the
-    // prefix; Text is the view's own text colour.
-    const char* const KIND_COLOR_SUFFIXES[] = {
-        "",           "Comment",     "DocComment",   "String",    "Escape",         "Number",    "Keyword",
-        "Control",    "Type",        "Constant",     "Function",  "Event",          "Label",     "Operator",
-        "Punctuation", "Preprocessor", "Tag",        "Attribute", "AttributeValue", "Entity",    "Variable",
-        "Parameter",  "Property",    "Deprecated",   "Invalid",     "Namespace",      "State",     "GlobalVariable",
-        "Path",
-    };
-    static_assert(sizeof(KIND_COLOR_SUFFIXES) / sizeof(KIND_COLOR_SUFFIXES[0]) == static_cast<size_t>(ALSyntaxKind::COUNT), "every kind has a colour");
+    // How far past a line's last glyph a stretch that goes on past its end
+    // is drawn: the line's break, selected or found.
+    const F32 LINE_END_WIDTH        = 6.f;
 
     // Whether a command changes the text, which a read-only view refuses.
     // Every command is named, with no default, so that one added to the
@@ -195,6 +188,20 @@ namespace
     S32       atomId(size_t index) { return ATOM_ID_BASE + static_cast<S32>(index); }
     bool      isAtomId(S32 id) { return id >= ATOM_ID_BASE; }
 
+    // Of things in the order they begin, none over another -- matches,
+    // selections, misspellings, styles -- those that may touch the places
+    // from `from` to `to`, a row's: from the first that ends at or past
+    // `from`, while they begin at or before `to`. Each found by a search,
+    // not by asking every one on the line of every row it wraps into; and
+    // each still asked whether it does touch the row.
+    template <typename It, typename RangeOf>
+    std::pair<It, It> touching(It first, It last, const ALTextPos& from, const ALTextPos& to, RangeOf range_of)
+    {
+        first = std::partition_point(first, last, [&](const auto& item) { return range_of(item).end < from; });
+        last  = std::partition_point(first, last, [&](const auto& item) { return !(to < range_of(item).begin); });
+        return { first, last };
+    }
+
     // How long the word at the caret is left unmarked after it was typed.
     const F32 SPELL_SETTLE_SECONDS = 1.5f;
     // A squiggle: a wave a pixel high either way and six pixels long,
@@ -237,21 +244,34 @@ namespace
         LLPointer<LLImageRaw> raw    = new LLImageRaw(static_cast<U16>(width), static_cast<U16>(height), 4);
         U8*                   data   = raw->getData();
         const F32             step   = 2.f * F_PI / static_cast<F32>(SQUIGGLE_WAVE);
+        // The wave sampled once, finely enough that the fade is smooth, over
+        // a wave and as far either side of it as the line and its fade
+        // reach: no texel is covered by the wave further from it than that,
+        // so that is all of the wave any texel looks along -- a few hundred
+        // samples each, not the sines of two whole waves.
+        constexpr F32    REACH   = SQUIGGLE_HALF + SQUIGGLE_FEATHER;
+        constexpr F32    SAMPLE  = 0.01f;
+        const S32        samples = static_cast<S32>(ceilf((static_cast<F32>(SQUIGGLE_WAVE) + 2.f * REACH) / SAMPLE)) + 1;
+        std::vector<F32> wave(static_cast<size_t>(samples));
+        for (S32 i = 0; i < samples; ++i)
+        {
+            wave[static_cast<size_t>(i)] = SQUIGGLE_AMPLITUDE * sinf((static_cast<F32>(i) * SAMPLE - REACH) * step);
+        }
         for (S32 row = 0; row < height; ++row)
         {
             for (S32 column = 0; column < width; ++column)
             {
                 // The texel's middle, in points from the wave's start and
-                // its middle, and how near the wave comes to it: looked
-                // for along a wave either side, finely enough that the
-                // fade is smooth.
-                const F32 x    = (static_cast<F32>(column) + 0.5f) / static_cast<F32>(scale);
-                const F32 y    = (static_cast<F32>(row) + 0.5f) / static_cast<F32>(scale) - 0.5f * static_cast<F32>(SQUIGGLE_HEIGHT);
+                // its middle, and how near the wave within reach comes to it.
+                const F32 x       = (static_cast<F32>(column) + 0.5f) / static_cast<F32>(scale);
+                const F32 y       = (static_cast<F32>(row) + 0.5f) / static_cast<F32>(scale) - 0.5f * static_cast<F32>(SQUIGGLE_HEIGHT);
+                const S32 from    = llmax(0, static_cast<S32>(floorf(x / SAMPLE)));
+                const S32 to      = llmin(samples - 1, static_cast<S32>(ceilf((x + 2.f * REACH) / SAMPLE)));
                 F32       nearest = F32_MAX;
-                for (F32 along = x - static_cast<F32>(SQUIGGLE_WAVE); along <= x + static_cast<F32>(SQUIGGLE_WAVE); along += 0.01f)
+                for (S32 i = from; i <= to; ++i)
                 {
-                    const F32 dx = x - along;
-                    const F32 dy = y - SQUIGGLE_AMPLITUDE * sinf(along * step);
+                    const F32 dx = x - (static_cast<F32>(i) * SAMPLE - REACH);
+                    const F32 dy = y - wave[static_cast<size_t>(i)];
                     nearest      = llmin(nearest, dx * dx + dy * dy);
                 }
                 const F32 cover = llclamp((SQUIGGLE_HALF + SQUIGGLE_FEATHER - sqrtf(nearest)) / SQUIGGLE_FEATHER, 0.f, 1.f);
@@ -688,6 +708,16 @@ LLView* ALTextView::overlayAt(S32 x, S32 y)
 bool ALTextView::rulerAt(S32 x, S32 y)
 {
     return mRuler->getVisible() && mRuler->getRect().pointInRect(x, y) && !overlayAt(x, y);
+}
+
+bool ALTextView::barsAt(S32 x, S32 y)
+{
+    if (rulerAt(x, y))
+    {
+        return true;
+    }
+    const LLRect bar = hBarRect();
+    return bar.notEmpty() && bar.pointInRect(x, y) && barAlpha() > 0.f;
 }
 
 LLRect ALTextView::textRect() const
@@ -1225,7 +1255,9 @@ bool ALTextView::stepRow(S32& line, S32& row, S32 direction)
             --row;
             return true;
         }
-        const S32 above = mLayout.visibleFrom(line - 1, -1);
+        // Over the lines folded away through the heights, not one by one:
+        // a fold may hide thousands.
+        const S32 above = mLayout.visibleBefore(line);
         if (above < 0)
         {
             return false;
@@ -1239,8 +1271,8 @@ bool ALTextView::stepRow(S32& line, S32& row, S32 direction)
         ++row;
         return true;
     }
-    const S32 below = mLayout.visibleFrom(line + 1, 1);
-    if (below < 0)
+    const S32 below = mLayout.visibleAfter(line);
+    if (below >= mLayout.lineCount())
     {
         return false;
     }
@@ -1396,27 +1428,19 @@ void ALTextView::addSubstitution(Substitution substitution)
     {
         return;
     }
-    const auto at = std::lower_bound(mSubstitutions.begin(), mSubstitutions.end(), substitution.range.begin,
-                                     [](const Substitution& s, const ALTextPos& p) { return s.range.begin < p; });
-    if ((at != mSubstitutions.end() && at->range.begin < substitution.range.end) || (at != mSubstitutions.begin() && substitution.range.begin < (at - 1)->range.end))
+    const S32 line = substitution.range.begin.line;
+    if (!mSubstitutions.insertDisjoint(std::move(substitution)))
     {
         return;
     }
-    mLayout.invalidateLine(substitution.range.begin.line);
-    mSubstitutions.insert(at, std::move(substitution));
+    mLayout.invalidateLine(line);
     mHoverLink   = -1;
     mPressedLink = -1;
 }
 
 const ALTextView::Substitution* ALTextView::substitutionAt(const ALTextPos& pos) const
 {
-    auto after = std::upper_bound(mSubstitutions.begin(), mSubstitutions.end(), pos, [](const ALTextPos& p, const Substitution& s) { return p < s.range.begin; });
-    if (after == mSubstitutions.begin())
-    {
-        return nullptr;
-    }
-    const Substitution& sub = *(after - 1);
-    return pos < sub.range.end ? &sub : nullptr;
+    return mSubstitutions.containing(pos);
 }
 
 bool ALTextView::relabel(const ALTextRange& range, const std::string& shown)
@@ -1563,16 +1587,15 @@ void ALTextView::addStyle(Style style)
     {
         return;
     }
-    const auto at = std::lower_bound(mStyles.begin(), mStyles.end(), style.range.begin, [](const Style& s, const ALTextPos& p) { return s.range.begin < p; });
-    if ((at != mStyles.end() && at->range.begin < style.range.end) || (at != mStyles.begin() && style.range.begin < (at - 1)->range.end))
+    const ALTextRange range = style.range;
+    if (!mStyles.insertDisjoint(std::move(style)))
     {
         return;
     }
-    for (S32 line = style.range.begin.line; line <= style.range.end.line; ++line)
+    for (S32 line = range.begin.line; line <= range.end.line; ++line)
     {
         mLayout.invalidateLine(line);
     }
-    mStyles.insert(at, std::move(style));
 }
 
 std::vector<ALTextView::Style>::const_iterator ALTextView::firstStyleOn(S32 line) const
@@ -1656,39 +1679,33 @@ void ALTextView::setAtoms(std::vector<Atom> atoms)
 
 void ALTextView::addAtom(Atom atom)
 {
-    atom.length   = llmax(1, atom.length);
-    const auto at = std::lower_bound(mAtoms.begin(), mAtoms.end(), atom.at, [](const Atom& a, const ALTextPos& p) { return a.at < p; });
-    if ((at != mAtoms.end() && at->at < atomRange(atom).end) || (at != mAtoms.begin() && atom.at < atomRange(*(at - 1)).end))
+    atom.length        = llmax(1, atom.length);
+    LLView* const view = atom.view;
+    const S32     line = atom.at.line;
+    if (!mAtoms.insertDisjoint(std::move(atom)))
     {
-        if (atom.view && atom.view->getParent() != mAtomLayer)
+        if (view && view->getParent() != mAtomLayer)
         {
-            atom.view->die();
+            view->die();
         }
         return;
     }
-    if (atom.view && atom.view->getParent() != mAtomLayer)
+    if (view && view->getParent() != mAtomLayer)
     {
-        mAtomLayer->addChild(atom.view);
+        mAtomLayer->addChild(view);
     }
-    if (atom.view)
+    if (view)
     {
-        atom.view->setVisible(false);
+        view->setVisible(false);
     }
-    mLayout.invalidateLine(atom.at.line);
-    mAtoms.insert(at, std::move(atom));
+    mLayout.invalidateLine(line);
     mHoverAtom   = -1;
     mPressedAtom = -1;
 }
 
 const ALTextView::Atom* ALTextView::atomAt(const ALTextPos& pos) const
 {
-    auto after = std::upper_bound(mAtoms.begin(), mAtoms.end(), pos, [](const ALTextPos& p, const Atom& a) { return p < a.at; });
-    if (after == mAtoms.begin())
-    {
-        return nullptr;
-    }
-    const Atom& atom = *(after - 1);
-    return pos < atomRange(atom).end ? &atom : nullptr;
+    return mAtoms.containing(pos);
 }
 
 void ALTextView::provideSubstitutions(S32 line, std::vector<ALTextLayout::Substitution>& out) const
@@ -1742,10 +1759,12 @@ void ALTextView::placeAtomViews()
         // layout put the gap on the row.
         bool placed = false;
         // Its line first, before its row is measured: an atom on a line
-        // scrolled away has no box, and there may be hundreds of them.
+        // scrolled away has no box, and there may be hundreds of them. The
+        // line's bottom is the top of the next line's gap, read from the
+        // heights, which lays no line out.
         const bool line_in_sight = row_h > 0 && atom.at.line < mDocument.lineCount() && !mLayout.hidden(atom.at.line) &&
                                    mLayout.lineTop(atom.at.line) < mScrollY + text.getHeight() &&
-                                   mLayout.lineTop(atom.at.line) + mLayout.lineHeight(atom.at.line) > mScrollY;
+                                   mLayout.gapTop(atom.at.line + 1) > mScrollY;
         S32 row = -1;
         F32 x0  = 0.f;
         F32 x1  = 0.f;
@@ -1846,7 +1865,7 @@ bool ALTextView::focusAtomView(bool forward)
         placeAtomViews();
         // A control takes it, or the first control in it; a plain view is
         // passed over.
-        LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(view);
+        LLUICtrl* ctrl = view->as<LLUICtrl>();
         if (!ctrl || !ctrl->getEnabled())
         {
             continue;
@@ -2250,8 +2269,8 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
                         }
                     }
                 }
-                slid = slid || span.made != span.last - span.first + 1;
-                moved += span.made - (span.last - span.first + 1);
+                slid  = slid || span.made != span.last - span.first + 1;
+                moved = span.shiftAfter;
             }
         }
         mAnnotations.applySpans(edit.lineSpans(), mDocument.lineCount(), LineAnnotation(), LineAnnotation());
@@ -2306,7 +2325,24 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
         mHoverLink   = -1;
         mPressedLink = -1;
     }
-    mStyles.apply(edit);
+    // A style in a font of its own that the edit cut through has every
+    // line it was on laid out again without it: the layout lays out again
+    // only the lines the edit touched, and those it did not would keep
+    // the style's face after its colour and its underline went.
+    mStyles.apply(
+        edit, [](Style& style, const ALTextDocument::Edit& e) { return e.slide(style.range); },
+        [this, &edit](Style& style) {
+            if (!style.font)
+            {
+                return;
+            }
+            const ALTextRange range = style.range.normalised();
+            const S32         last  = edit.placed(range.end).line;
+            for (S32 line = edit.placed(range.begin).line; line <= last; ++line)
+            {
+                mLayout.invalidateLine(line);
+            }
+        });
     if (!mAtoms.empty())
     {
         // An atom cut through takes its view with it.
@@ -2444,13 +2480,8 @@ ALTextRange ALTextView::moved(ALEditorCommand command, const ALTextRange& select
         {
             // To the first thing on the line, or to the line's start from
             // there.
-            const std::string& line   = mDocument.line(caret.line);
-            S32                indent = 0;
-            while (indent < static_cast<S32>(line.size()) && (line[indent] == ' ' || line[indent] == '\t'))
-            {
-                ++indent;
-            }
-            to = ALTextPos(caret.line, caret.column == indent ? 0 : indent);
+            const S32 indent = static_cast<S32>(alLeadingBlankBytes(mDocument.line(caret.line)));
+            to               = ALTextPos(caret.line, caret.column == indent ? 0 : indent);
             break;
         }
         case C::MoveLineEnd:
@@ -2561,38 +2592,55 @@ std::string_view ALTextView::fitting(const ALTextRange& over, std::string_view t
     {
         return text;
     }
-    const ALTextRange range = over.normalised();
-    const size_t      taken = mDocument.offsetOf(range.end) - mDocument.offsetOf(range.begin);
-    const size_t      left  = mDocument.byteCount() - taken;
+    const size_t taken = mDocument.byteCount(over);
+    const size_t left  = mDocument.byteCount() - taken;
     if (text.size() <= taken || left + text.size() <= mMaxBytes)
     {
         return text;
     }
     // As much as there is room for, cut where a character starts -- a
     // notecard's item is one character too, and goes whole or not at all.
-    size_t room = mMaxBytes > left ? mMaxBytes - left : 0;
-    while (room > 0 && room < text.size() && (static_cast<unsigned char>(text[room]) & 0xC0) == 0x80)
-    {
-        --room;
-    }
+    const size_t room = mMaxBytes > left ? mMaxBytes - left : 0;
     full();
-    return text.substr(0, room);
+    return text.substr(0, utf8str_truncate(text, static_cast<S32>(room)).size());
 }
 
-bool ALTextView::fits(const std::vector<std::pair<ALTextRange, std::string>>& edits)
+bool ALTextView::wouldFit(const std::vector<std::pair<ALTextRange, std::string>>& edits) const
 {
     if (mMaxBytes == 0)
     {
         return true;
     }
+    // In bytes of the text without a composition standing in it, which is
+    // the text the edit is made to, each stretch counted over its own
+    // lines: a place inside one at its start, as withoutComposition puts
+    // it, and a stretch from before it to past it short by what it added --
+    // what it wrote over put back.
+    const bool      composing   = hasPreedit();
+    const size_t    composed    = composing ? static_cast<size_t>(mPreeditLength) : 0;
+    const size_t    overwritten = composing ? mPreeditOverwritten.size() : 0;
+    const ALTextPos composed_end(mPreeditBegin.line, mPreeditBegin.column + mPreeditLength);
+    const auto      past    = [composing, composed_end](const ALTextPos& pos) { return composing && pos >= composed_end; };
+    const auto      outside = [this, composing, composed_end](const ALTextPos& pos) {
+        return composing && pos > mPreeditBegin && pos < composed_end ? mPreeditBegin : pos;
+    };
     size_t taken = 0, put = 0;
     for (const auto& [over, text] : edits)
     {
         const ALTextRange range = over.normalised();
-        taken += mDocument.offsetOf(range.end) - mDocument.offsetOf(range.begin);
+        taken += mDocument.byteCount(ALTextRange(outside(range.begin), outside(range.end)));
+        if (past(range.end) && !past(range.begin))
+        {
+            taken = taken + overwritten - composed;
+        }
         put += text.size();
     }
-    if (put <= taken || mDocument.byteCount() - taken + put <= mMaxBytes)
+    return put <= taken || mDocument.byteCount() - composed + overwritten - taken + put <= mMaxBytes;
+}
+
+bool ALTextView::fits(const std::vector<std::pair<ALTextRange, std::string>>& edits)
+{
+    if (wouldFit(edits))
     {
         return true;
     }
@@ -2794,7 +2842,7 @@ void ALTextView::apply(const ALTextEditing::Change& change)
         return;
     }
     mUndo.beginGroup();
-    editMany(std::move(edits), change.caret);
+    const bool changed = !editMany(std::move(edits), change.caret).nothing();
     mUndo.endGroup();
     if (change.selects)
     {
@@ -2803,6 +2851,14 @@ void ALTextView::apply(const ALTextEditing::Change& change)
     else
     {
         placeCaret(change.caret, false);
+    }
+    if (!changed)
+    {
+        // Nothing changed, and nothing said of a change: the selection put
+        // where the command puts it, as at several (applyGroups).
+        mDesiredX = -1.f;
+        scrollToCaret();
+        return;
     }
     afterEdit();
 }
@@ -2818,14 +2874,9 @@ bool ALTextView::commentBefore(const ALTextPos& at)
     {
         return false;
     }
-    for (const ALSyntaxToken& token : mHighlighter.tokens(at.line))
-    {
-        if (token.begin < at.column && at.column <= token.end)
-        {
-            return token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment;
-        }
-    }
-    return false;
+    // The token of the byte before it.
+    const ALSyntaxToken* token = alSyntaxTokenAt(mHighlighter.tokens(at.line), at.column - 1);
+    return token && (token->kind == ALSyntaxKind::Comment || token->kind == ALSyntaxKind::DocComment);
 }
 
 // --- at every selection ------------------------------------------------------------
@@ -2902,11 +2953,6 @@ bool ALTextView::applyGroups(const std::vector<ALTextRange>& selections, size_t 
         {
             placed[i] = done.nothing() ? selections[i] : ALTextCarets::slid(selections[i], done);
         }
-    }
-    if (!edits.empty() && done.nothing())
-    {
-        // Nothing changed: each where it was.
-        return false;
     }
     placeSelections(placed, main);
     if (done.nothing())
@@ -3397,17 +3443,9 @@ bool ALTextView::toggleComment()
     {
         return false;
     }
-    if (hasOtherSelections())
-    {
-        // In or out the same way at every selection.
-        const std::string token = mHighlighter.grammar()->lineComment();
-        editGroups([this, &token](const std::vector<ALTextRange>& all) { return ALTextEditing::toggleComment(mDocument, all, token); });
-        return true;
-    }
-    if (const std::optional<ALTextEditing::Change> change = ALTextEditing::toggleComment(mDocument, mAnchor, mCaret, mHighlighter.grammar()->lineComment()))
-    {
-        apply(*change);
-    }
+    // In or out the same way at every selection, however many.
+    const std::string token = mHighlighter.grammar()->lineComment();
+    editGroups([this, &token](const std::vector<ALTextRange>& all) { return ALTextEditing::toggleComment(mDocument, all, token); });
     return true;
 }
 
@@ -3536,20 +3574,22 @@ bool ALTextView::perform(ALEditorCommand command)
             newLine();
             return true;
         case C::Indent:
-            // A selection, however small, indents its lines; a caret
-            // alone puts a tab in.
+            // A selection, however small, indents its lines, as at several;
+            // a caret alone puts a tab in.
             if (hasSelection())
             {
-                apply(ALTextIndent::indentLines(mDocument, mAnchor, mCaret, true, editingOptions()));
+                return performAtEach(command).value_or(false);
             }
-            else
-            {
-                insertText(tabText(mCaret));
-            }
+            insertText(tabText(mCaret));
             return true;
         case C::Unindent:
-            apply(ALTextIndent::indentLines(mDocument, mAnchor, mCaret, false, editingOptions()));
-            return true;
+        case C::DuplicateLine:
+        case C::MoveLineUp:
+        case C::MoveLineDown:
+        case C::DeleteLine:
+        case C::JoinLines:
+            // Over whole lines: done at the one selection as at several.
+            return performAtEach(command).value_or(false);
         case C::Undo:
             undo();
             return true;
@@ -3570,19 +3610,6 @@ bool ALTextView::perform(ALEditorCommand command)
             return true;
         case C::ToggleComment:
             return toggleComment();
-        case C::DuplicateLine:
-            apply(ALTextEditing::duplicateLines(mDocument, mAnchor, mCaret));
-            return true;
-        case C::MoveLineUp:
-        case C::MoveLineDown:
-            if (const std::optional<ALTextEditing::Change> change = ALTextEditing::moveLines(mDocument, mAnchor, mCaret, command == C::MoveLineUp ? -1 : 1))
-            {
-                apply(*change);
-            }
-            return true;
-        case C::DeleteLine:
-            apply(ALTextEditing::deleteLines(mDocument, mAnchor, mCaret));
-            return true;
         case C::PreviousChange:
         case C::NextChange:
             return goToChange(command == C::PreviousChange ? -1 : 1);
@@ -3595,17 +3622,6 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::SelectNextOccurrence:
         case C::ChangeAllOccurrences:
             return mFeatures && mFeatures->performFeature(command);
-        case C::JoinLines:
-        {
-            // The lines selected, or the caret's and the next.
-            const auto [first, last] = ALTextEditing::selectedLines(ALTextRange(mAnchor, mCaret).normalised());
-            if (const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(mDocument, first, llmax(last, first + 1), false))
-            {
-                apply(*join);
-                return true;
-            }
-            return false;
-        }
         case C::InsertLineBelow:
             // As Return at the line's end would make it.
             placeCaret(mDocument.lineEnd(mCaret.line), false);
@@ -3737,19 +3753,19 @@ bool ALTextView::canPerform(ALEditorCommand command) const
     }
 }
 
-S32 ALTextView::screenTopOf(const LLRect& text, S32 line, S32 row)
+S32 ALTextView::screenTopOf(const LLRect& text, S32 line, S32 row) const
 {
-    return text.mTop - (mLayout.lineTop(line) + mLayout.rowTop(line, row) - mScrollY);
+    return text.mTop - (lay().lineTop(line) + lay().rowTop(line, row) - mScrollY);
 }
 
-LLRect ALTextView::anchorOf(const ALTextPos& at)
+LLRect ALTextView::anchorOf(const ALTextPos& at) const
 {
     const LLRect text = textRect();
     S32          row;
-    const F32    x    = mLayout.xOf(at.line, at.column, &row);
+    const F32    x    = lay().xOf(at.line, at.column, &row);
     const S32    top  = screenTopOf(text, at.line, row);
     const S32    left = static_cast<S32>(static_cast<F32>(text.mLeft) - mScrollX + x);
-    return LLRect(left, top, left, top - mLayout.rowHeightOf(at.line, row));
+    return LLRect(left, top, left, top - lay().rowHeightOf(at.line, row));
 }
 
 LLRect ALTextView::anchorOf(const ALTextRange& range)
@@ -3767,70 +3783,6 @@ LLRect ALTextView::anchorOf(const ALTextRange& range)
         anchor.mRight  = static_cast<S32>(left + x1);
     }
     return anchor;
-}
-
-void ALTextView::forEachVisibleRow(const LLRect& text, const std::function<void(S32, S32, S32)>& visit)
-{
-    const S32 row_h = mLayout.rowHeight();
-    if (row_h <= 0)
-    {
-        return;
-    }
-    const S32 count    = mDocument.lineCount();
-    const S32 bottom_y = mScrollY + text.getHeight();
-    for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
-    {
-        if (mLayout.hidden(line))
-        {
-            continue;
-        }
-        const ALTextLayout::Line& laid = mLayout.line(line);
-        const S32                 top  = mLayout.lineTop(line);
-        if (top >= bottom_y)
-        {
-            break;
-        }
-        for (size_t r = 0; r < laid.rows.size(); ++r)
-        {
-            const S32 row_top = top + laid.rows[r].top;
-            if (row_top + laid.rows[r].height <= mScrollY)
-            {
-                continue;
-            }
-            if (row_top >= bottom_y)
-            {
-                break;
-            }
-            visit(line, static_cast<S32>(r), text.mTop - (row_top - mScrollY));
-        }
-    }
-}
-
-void ALTextView::forEachVisibleGap(const LLRect& text, const std::function<void(S32, S32, S32)>& visit)
-{
-    if (!mAnyGap || mLayout.rowHeight() <= 0)
-    {
-        return;
-    }
-    const S32 count    = mDocument.lineCount();
-    const S32 bottom_y = mScrollY + text.getHeight();
-    const auto shown   = [&](S32 line) {
-        const S32 top    = mLayout.gapTop(line);
-        const S32 height = mLayout.gapHeight(line);
-        if (height > 0 && top < bottom_y && top + height > mScrollY)
-        {
-            visit(line, text.mTop - (top - mScrollY), height);
-        }
-        return top < bottom_y;
-    };
-    for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
-    {
-        if (!mLayout.hidden(line) && !shown(line))
-        {
-            return;
-        }
-    }
-    shown(count);
 }
 
 // --- LLEditMenuHandler ---------------------------------------------------------
@@ -3884,24 +3836,17 @@ void ALTextView::cut()
         return;
     }
     copy();
-    if (hasOtherSelections())
+    if (hasOtherSelections() && anySelected())
     {
-        // What each selected; or where none selected anything, each caret's
-        // line whole.
-        if (anySelected())
-        {
-            deleteSelectedEach();
-        }
-        else
-        {
-            editGroups([this](const std::vector<ALTextRange>& all) { return ALTextEditing::deleteLines(mDocument, all); });
-        }
+        // What each selected.
+        deleteSelectedEach();
         return;
     }
-    if (!hasSelection())
+    if (!anySelected())
     {
-        // The whole line, the caret on the one that takes its place.
-        apply(ALTextEditing::deleteLines(mDocument, mCaret, mCaret));
+        // Where none selected anything, each caret's line whole, the caret
+        // on the one that takes its place.
+        editGroups([this](const std::vector<ALTextRange>& all) { return ALTextEditing::deleteLines(mDocument, all); });
         return;
     }
     deleteRange(selection());
@@ -4063,8 +4008,10 @@ bool ALTextView::stepGap(bool down)
     if (const S32 gap = caretGap(); gap >= 0)
     {
         // On out of it: down to the line under it, up to the last row of
-        // the line over it; nowhere, where there is none.
-        const S32 line = down ? (gap < count ? gap : -1) : mLayout.visibleFrom(gap - 1, -1);
+        // the line over it, found over the run folded away above the stop
+        // through the heights, not one by one; nowhere, where there is
+        // none.
+        const S32 line = down ? (gap < count ? gap : -1) : mLayout.visibleBefore(gap);
         if (line >= 0)
         {
             const S32       row = down ? 0 : mLayout.rowCount(line) - 1;
@@ -4089,8 +4036,9 @@ bool ALTextView::stepGap(bool down)
         {
             return false;
         }
-        const S32 next = mLayout.visibleFrom(mCaret.line + 1, 1);
-        gap            = next >= 0 ? next : count;
+        // Above the next line in sight, over any run folded away below the
+        // caret's through the heights; below the text, where there is none.
+        gap = mLayout.visibleAfter(mCaret.line);
     }
     else if (row == 0)
     {
@@ -4148,20 +4096,10 @@ void ALTextView::paste()
     }
     if (hasOtherSelections())
     {
-        // Its lines, as the text will have them.
-        LLStringUtil::replaceString(text, "\r\n", "\n");
-        LLStringUtil::replaceChar(text, '\r', '\n');
-        std::vector<std::string> lines;
-        for (size_t from = 0;;)
-        {
-            const size_t end = text.find('\n', from);
-            lines.push_back(text.substr(from, end == std::string::npos ? std::string::npos : end - from));
-            if (end == std::string::npos)
-            {
-                break;
-            }
-            from = end + 1;
-        }
+        // Its lines, as the text will have them; and the whole with its
+        // line endings as the text's, for where it goes in whole.
+        text                           = ALLineBreaks::withLineFeeds(text);
+        std::vector<std::string> lines = ALLineBreaks::split(text);
         // One line to each selection where there is a line for each -- a
         // break after the last not counted -- and the whole to each
         // otherwise.
@@ -4310,9 +4248,10 @@ void ALTextView::updatePreedit(std::string_view preedit_string, const segment_le
     }
     resetPreedit();
 
-    // A composition is one line of text; a newline in one would put the
-    // rest of it where this cannot count it.
-    std::string composed(preedit_string);
+    // A composition is one line of text; a line break in one -- whatever
+    // the document reads as one, CRLF and a lone CR as LF -- would put the
+    // rest of it where this cannot count it, and is a space instead.
+    std::string composed = ALLineBreaks::withLineFeeds(preedit_string);
     std::replace(composed.begin(), composed.end(), '\n', ' ');
 
     const ALTextPos at = mCaret;
@@ -4439,9 +4378,10 @@ bool ALTextView::getPreeditLocation(S32 query_offset, LLCoordGL* coord, LLRect* 
     {
         return false;
     }
-    S32       row;
-    const F32 qx  = lay().xOf(query.line, query.column, &row);
-    const S32 top = text.mTop - (lay().lineTop(query.line) + lay().rowTop(query.line, row) + (lay().rowHeightOf(query.line, row) - row_h) - mScrollY);
+    // The row's text band: a row a box made taller holds its text at its
+    // bottom, a font's line high.
+    const LLRect at  = anchorOf(query);
+    const S32    top = at.mBottom + row_h;
     if (top > text.mTop || top - row_h < text.mBottom)
     {
         return false;
@@ -4450,7 +4390,7 @@ bool ALTextView::getPreeditLocation(S32 query_offset, LLCoordGL* coord, LLRect* 
     if (coord)
     {
         S32 sx, sy;
-        localPointToScreen(static_cast<S32>(left + qx), top - row_h / 2, &sx, &sy);
+        localPointToScreen(at.mLeft, top - row_h / 2, &sx, &sy);
         LLUI::getInstance()->screenPointToGL(sx, sy, &coord->mX, &coord->mY);
     }
     if (bounds)
@@ -4525,7 +4465,7 @@ void ALTextView::showContextMenu(S32 x, S32 y)
     // the person's own, where they changed them.
     for (LLView* child : *menu->getChildList())
     {
-        LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child);
+        LLMenuItemGL* item = child->as<LLMenuItemGL>();
         const std::optional<ALEditorCommand> command = item ? alEditorCommandFromName(item->getName()) : std::nullopt;
         if (!command)
         {
@@ -4559,48 +4499,11 @@ void ALTextView::showContextMenu(S32 x, S32 y)
 
 bool ALTextView::showUrlMenu(S32 x, S32 y, const std::string& url)
 {
-    LLUrlMatch match;
-    if (!LLMenuGL::sMenuContainer || !LLUrlRegistry::instance().findUrl(url, match) || match.getMenuName().empty())
-    {
-        return false;
-    }
-    // The actions the registry's menus name, each over this URL -- by
-    // value, the menu outliving whoever asked for it.
-    LLUICtrl::CommitCallbackRegistry::ScopedRegistrar registrar;
-    registrar.add("Url.Open", [url](LLUICtrl*, const LLSD&) { LLUrlAction::openURL(url); });
-    registrar.add("Url.OpenInternal", [url](LLUICtrl*, const LLSD&) { LLUrlAction::openURLInternal(url); });
-    registrar.add("Url.OpenExternal", [url](LLUICtrl*, const LLSD&) { LLUrlAction::openURLExternal(url); });
-    registrar.add("Url.Execute", [url](LLUICtrl*, const LLSD&) { LLUrlAction::executeSLURL(url, true); });
-    registrar.add("Url.Block", [url](LLUICtrl*, const LLSD&) { LLUrlAction::blockObject(url); });
-    registrar.add("Url.Unblock", [url](LLUICtrl*, const LLSD&) { LLUrlAction::unblockObject(url); });
-    registrar.add("Url.Teleport", [url](LLUICtrl*, const LLSD&) { LLUrlAction::teleportToLocation(url); });
-    registrar.add("Url.ShowProfile", [url](LLUICtrl*, const LLSD&) { LLUrlAction::showProfile(url); });
-    registrar.add("Url.AddFriend", [url](LLUICtrl*, const LLSD&) { LLUrlAction::addFriend(url); });
-    registrar.add("Url.RemoveFriend", [url](LLUICtrl*, const LLSD&) { LLUrlAction::removeFriend(url); });
-    registrar.add("Url.ReportAbuse", [url](LLUICtrl*, const LLSD&) { LLUrlAction::reportAbuse(url); });
-    registrar.add("Url.ReportAbuseObj", [url](LLUICtrl*, const LLSD&) { LLUrlAction::reportAbuseObj(url); });
-    registrar.add("Url.SendIM", [url](LLUICtrl*, const LLSD&) { LLUrlAction::sendIM(url); });
-    registrar.add("Url.ZoomInObject", [url](LLUICtrl*, const LLSD&) { LLUrlAction::zoomInObject(url); });
-    registrar.add("Url.ShowOnMap", [url](LLUICtrl*, const LLSD&) { LLUrlAction::showLocationOnMap(url); });
-    registrar.add("Url.ShowParcelOnMap", [url](LLUICtrl*, const LLSD&) { LLUrlAction::showParcelOnMap(url); });
-    registrar.add("Url.CopyLabel", [url](LLUICtrl*, const LLSD&) { LLUrlAction::copyLabelToClipboard(url); });
-    registrar.add("Url.CopyUrl", [url](LLUICtrl*, const LLSD&) { LLUrlAction::copyURLToClipboard(url); });
-    registrar.add("Url.CopyUUID", [url](LLUICtrl*, const LLSD&) { LLUrlAction::copyUUIDToClipboard(url); });
-    if (LLContextMenu* old = mUrlMenuHandle.get())
-    {
-        old->die();
-        mUrlMenuHandle.markDead();
-    }
-    LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>(match.getMenuName(), LLMenuGL::sMenuContainer,
-                                                                          LLMenuHolderGL::child_registry_t::instance());
+    LLContextMenu* menu = LLUrlAction::createMenu(url, mUrlMenuHandle);
     if (!menu)
     {
         return false;
     }
-    mUrlMenuHandle = menu->getHandle();
-    // Whether the agent is a friend, the object blocked or near: what
-    // the viewer installed says.
-    LLUrlAction::adjustMenu(menu, url);
     S32 screen_x, screen_y;
     localPointToScreen(x, y, &screen_x, &screen_y);
     menu->show(screen_x, screen_y, this);
@@ -4669,7 +4572,7 @@ void ALTextView::showFind(bool with_replace)
             std::string escaped;
             for (const char c : seed)
             {
-                if (strchr("\\^$.|?*+()[]{}", c))
+                if (alRegexSpecial(c))
                 {
                     escaped += '\\';
                 }
@@ -4716,16 +4619,36 @@ void ALTextView::placeFindBar()
     const S32    height = mFindBar->wantedHeight();
     const S32    right  = text.mRight - 6;
     mFindBar->setShape(LLRect(right - width, local.mTop - 4, right, local.mTop - 4 - height));
-    mFindBar->setColors(backgroundColor(), textColor());
+}
+
+void ALTextView::colorFindBar()
+{
+    if (!findShown())
+    {
+        return;
+    }
+    const LLColor4& paper      = backgroundColor();
+    const LLColor4& ink        = textColor();
+    const U32       generation = LLUIColorTable::instance().generation();
+    FindBarColors&  colored    = mFindBarColors;
+    if (colored.set && colored.generation == generation && colored.paper == paper && colored.ink == ink)
+    {
+        return;
+    }
+    colored.set        = true;
+    colored.generation = generation;
+    colored.paper      = paper;
+    colored.ink        = ink;
+    mFindBar->setColors(paper, ink);
 }
 
 void ALTextView::queryChanged()
 {
     // A text of a script's size looked through at once, as the query is
-    // typed; a longer one once the query has stopped changing for a
-    // moment, as it is after an edit, not at every key.
-    constexpr size_t AT_ONCE = 256 * 1024;
-    if (mDocument.byteCount() > AT_ONCE)
+    // typed; one long enough to be looked through on a worker once the
+    // query has stopped changing for a moment, as it is after an edit,
+    // not at every key.
+    if (mDocument.byteCount() > ALTextFind::ON_A_WORKER)
     {
         mFind.stale();
         return;
@@ -4769,15 +4692,25 @@ bool ALTextView::findNext(bool forward)
     }
     const ALTextRange sel  = selection().normalised();
     const ALTextPos   from = hasSelection() ? (forward ? sel.end : sel.begin) : mCaret;
-    const S32         index = mFind.nearest(from, forward);
+    S32               index = mFind.nearest(from, forward);
     if (index < 0)
     {
         return false;
     }
+    // An empty match selects nothing, the caret left on it, where the next
+    // one on would be found from: on from the current one, when the caret
+    // is on that, is the one after it.
+    const ALTextRange& nearest = mFind.matches()[static_cast<size_t>(index)];
+    const bool         past    = forward && index == mFind.current() && !hasSelection() && nearest.empty() && nearest.begin == mCaret;
+    if (past)
+    {
+        index = (index + 1) % static_cast<S32>(mFind.count());
+    }
     const ALTextRange& match = mFind.matches()[static_cast<size_t>(index)];
-    // Round the text's end: on to one before where it started, or back to
-    // one at or after it.
-    const S32 wrapped = forward ? (match.begin < from ? 1 : 0) : (match.begin < from ? 0 : -1);
+    // Round the text's end: on to one before where it started, or to the
+    // one stepped past where it is the only one; or back to one at or
+    // after it.
+    const S32 wrapped = forward ? ((match.begin < from || (past && match.begin == from)) ? 1 : 0) : (match.begin < from ? 0 : -1);
     mFind.setCurrent(index);
     // The match alone, the other carets let go, from the bar's buttons as
     // from the keys.
@@ -4965,7 +4898,7 @@ bool ALTextView::spanOnRow(S32 line, S32 row, const ALTextRange& range_in, F32& 
         return false;
     }
     x0 = mLayout.xOf(line, lo);
-    x1 = hi > length ? r.width + 6.f : (hi >= r.end && !last_row ? r.width : mLayout.xOf(line, hi));
+    x1 = hi > length ? r.width + LINE_END_WIDTH : (hi >= r.end && !last_row ? r.width : mLayout.xOf(line, hi));
     if (x1 <= x0)
     {
         x1 = x0 + 4.f;
@@ -4978,15 +4911,46 @@ const LLColor4& ALTextView::colorForKind(ALSyntaxKind kind) const
     return mKindColors[static_cast<size_t>(kind)].get();
 }
 
+const ALTextView::kind_inks_t& ALTextView::kindInks(F32 alpha)
+{
+    // The kinds' colours are the colour table's, or set once as the view
+    // was made: the table's generation says when any of them changed.
+    const U32 colors = LLUIColorTable::instance().generation();
+    if (mKindInks.alpha != alpha || mKindInks.colors != colors)
+    {
+        mKindInks.alpha  = alpha;
+        mKindInks.colors = colors;
+        for (size_t kind = 0; kind < mKindInks.inks.size(); ++kind)
+        {
+            mKindInks.inks[kind] = LLColor4U(mKindColors[kind].get() % alpha);
+        }
+    }
+    return mKindInks.inks;
+}
+
 // static
 std::string ALTextView::kindColorName(std::string_view prefix, ALSyntaxKind kind)
 {
-    const size_t index = static_cast<size_t>(kind);
-    if (index == 0 || index >= static_cast<size_t>(ALSyntaxKind::COUNT))
+    // Text is the view's own text colour.
+    if (kind == ALSyntaxKind::Text || static_cast<size_t>(kind) >= static_cast<size_t>(ALSyntaxKind::COUNT))
     {
         return std::string();
     }
-    return std::string(prefix) + KIND_COLOR_SUFFIXES[index];
+    // The kind's name in a grammar, in camel case after the prefix:
+    // doc_comment, ScriptDocComment.
+    std::string name(prefix);
+    bool        upper = true;
+    for (const char* c = alSyntaxKindName(kind); *c; ++c)
+    {
+        if (*c == '_')
+        {
+            upper = true;
+            continue;
+        }
+        name += (upper && *c >= 'a' && *c <= 'z') ? static_cast<char>(*c - 'a' + 'A') : *c;
+        upper = false;
+    }
+    return name;
 }
 
 const LLColor4& ALTextView::backgroundColor() const
@@ -5010,22 +4974,27 @@ void ALTextView::drawRowAt(S32 line, S32 r, F32 left, S32 screen_top, F32 alpha)
     {
         return;
     }
+    // As much of it as is in sight across the text, as a row of the text
+    // draws of itself: a minified script's header may be a line of tens of
+    // thousands of glyphs.
     const ALTextLayout::Row& row         = laid.rows[static_cast<size_t>(r)];
-    const size_t             glyph_count = row.glyphEnd - row.glyphBegin;
+    const ALTextLayout::Row  in_sight    = rowInSight(laid, row, textRect());
+    const size_t             glyph_count = in_sight.glyphEnd - in_sight.glyphBegin;
     if (!glyph_count)
     {
         return;
     }
-    colorRow(line, laid, row, alpha);
-    tintRow(line, laid, row, alpha, mColorScratch);
-    mFont->renderGlyphs(&laid.placed[row.glyphBegin], mColorScratch.data(), glyph_count, left - row.xStart, static_cast<F32>(screen_top - row.ascent));
+    colorRow(line, laid, in_sight, alpha);
+    tintRow(line, laid, in_sight, alpha, mColorScratch);
+    mFont->renderGlyphs(&laid.placed[in_sight.glyphBegin], mColorScratch.data(), glyph_count, left - row.xStart, static_cast<F32>(screen_top - row.ascent));
 }
 
 void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha)
 {
     const size_t count = row.glyphEnd - row.glyphBegin;
     mColorScratch.resize(count);
-    const LLColor4                    base   = textColor() % alpha;
+    const LLColor4U                   base   = LLColor4U(textColor() % alpha);
+    const kind_inks_t&                inks   = kindInks(alpha);
     const std::vector<ALSyntaxToken>& tokens = mHighlighter.tokens(line);
     // From the first token that reaches the row, where the glyphs go
     // forward through the line: a long line wraps into many rows.
@@ -5040,32 +5009,54 @@ void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALText
         }
         if (t < tokens.size() && tokens[t].begin <= cluster && tokens[t].kind != ALSyntaxKind::Text)
         {
-            mColorScratch[k] = LLColor4U(colorForKind(tokens[t].kind) % alpha);
+            mColorScratch[k] = inks[static_cast<size_t>(tokens[t].kind)];
         }
         else
         {
-            mColorScratch[k] = LLColor4U(base);
+            mColorScratch[k] = base;
         }
     }
-    // A style's colour over the grammar's.
-    for (auto it = firstStyleOn(line); it != mStyles.end() && it->range.begin.line <= line; ++it)
-    {
-        const Style& style = *it;
-        if (!style.color)
+    // The row's glyphs whose clusters are from one column to another in an
+    // ink: found by a search where the glyphs go forward through the line,
+    // so that many stretches on a long row cost each its own glyphs, else
+    // every glyph asked.
+    const auto paint = [&](S32 from, S32 to, const LLColor4U& ink) {
+        size_t k = 0;
+        if (laid.ordered)
         {
-            continue;
+            const auto first = laid.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphBegin);
+            const auto end   = laid.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphEnd);
+            k = static_cast<size_t>(std::partition_point(first, end, [from](const ALTextLayout::Glyph& g) { return g.cluster < from; }) - first);
         }
-        const LLColor4U ink(*style.color % alpha);
-        const S32       from = style.range.begin.line == line ? style.range.begin.column : 0;
-        const S32       to   = style.range.end.line == line ? style.range.end.column : S32_MAX;
-        for (size_t k = 0; k < count; ++k)
+        for (; k < count; ++k)
         {
             const S32 cluster = laid.glyphs[row.glyphBegin + k].cluster;
             if (cluster >= from && cluster < to)
             {
                 mColorScratch[k] = ink;
             }
+            else if (laid.ordered && cluster >= to)
+            {
+                break;
+            }
         }
+    };
+    // A style's colour over the grammar's: of the styles on the line, those
+    // that may touch the row, where its glyphs go forward.
+    std::pair<std::vector<Style>::const_iterator, std::vector<Style>::const_iterator> styled(firstStyleOn(line), mStyles.items().end());
+    if (laid.ordered)
+    {
+        styled = touching(styled.first, styled.second, ALTextPos(line, row.begin), ALTextPos(line, row.end), [](const Style& s) { return s.range; });
+    }
+    for (auto it = styled.first; it != styled.second && it->range.begin.line <= line; ++it)
+    {
+        const Style& style = *it;
+        if (!style.color)
+        {
+            continue;
+        }
+        paint(style.range.begin.line == line ? style.range.begin.column : 0, style.range.end.line == line ? style.range.end.column : S32_MAX,
+              LLColor4U(*style.color % alpha));
     }
     // A link in its own colour, over whatever the grammar made of it.
     if (!mSubstitutions.empty())
@@ -5075,17 +5066,9 @@ void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALText
                                               [](const Substitution& s, const ALTextPos& p) { return s.range.end <= p; });
         for (; it != mSubstitutions.end() && it->range.begin.line == line && it->range.begin.column < row.end; ++it)
         {
-            if (!it->link)
+            if (it->link)
             {
-                continue;
-            }
-            for (size_t k = 0; k < count; ++k)
-            {
-                const S32 cluster = laid.glyphs[row.glyphBegin + k].cluster;
-                if (cluster >= it->range.begin.column && cluster < it->range.end.column)
-                {
-                    mColorScratch[k] = link;
-                }
+                paint(it->range.begin.column, it->range.end.column, link);
             }
         }
     }
@@ -5107,8 +5090,14 @@ void ALTextView::drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, cons
 
 void ALTextView::drawSquiggles(const Squiggle* squiggles, size_t count)
 {
+    // The texture made the first time there is a squiggle to draw, not the
+    // first time a view draws its rows.
+    if (count == 0)
+    {
+        return;
+    }
     LLImageGL* wave = squiggleTexture();
-    if (count == 0 || !wave || !wave->getHasGLTexture())
+    if (!wave || !wave->getHasGLTexture())
     {
         return;
     }
@@ -5189,8 +5178,12 @@ void ALTextView::drawUnderlines(S32 line, const ALTextLayout::Line& laid, S32 r,
             }
         }
     }
-    // The styles that underline, in the style's colour or the text's.
-    for (auto it = firstStyleOn(line); it != mStyles.end() && it->range.begin.line <= line; ++it)
+    // The styles that underline, in the style's colour or the text's: those
+    // that may touch the row, and on past the line's end on its last.
+    const ALTextPos from(line, row.begin);
+    const ALTextPos to(line, static_cast<size_t>(r) + 1 == laid.rows.size() ? S32_MAX : row.end);
+    const auto      styled = touching(mStyles.begin(), mStyles.end(), from, to, [](const Style& s) { return s.range; });
+    for (auto it = styled.first; it != styled.second; ++it)
     {
         const Style& style = *it;
         if (!(style.flags & LLFontGL::UNDERLINE))
@@ -5246,9 +5239,18 @@ void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, con
     // left alone for a moment.
     if (getSpellCheck())
     {
-        const bool settling = keyboardOnText() && mSpellTimer.getElapsedTimeF32() < SPELL_SETTLE_SECONDS;
-        for (const auto& [begin, end] : misspellings(line))
+        // Those that may touch the row, and on past the line's end on its
+        // last.
+        const bool      settling = keyboardOnText() && mSpellTimer.getElapsedTimeF32() < SPELL_SETTLE_SECONDS;
+        const ALTextPos from(line, row.begin);
+        const ALTextPos to(line, static_cast<size_t>(r) + 1 == laid.rows.size() ? S32_MAX : row.end);
+        const auto&     words = misspellings(line);
+        const auto      found = touching(words.begin(), words.end(), from, to, [line](const std::pair<S32, S32>& w) {
+            return ALTextRange(ALTextPos(line, w.first), ALTextPos(line, w.second));
+        });
+        for (auto it = found.first; it != found.second; ++it)
         {
+            const auto& [begin, end] = *it;
             if (settling && mCaret.line == line && begin <= mCaret.column && mCaret.column <= end)
             {
                 continue;
@@ -5296,15 +5298,11 @@ void ALTextView::drawRows(const LLRect& text)
         return;
     }
     const F32  alpha       = getDrawContext().mAlpha;
-    const S32  count       = mDocument.lineCount();
-    const S32  bottom_y    = mScrollY + text.getHeight();
     const bool show_caret  = keyboardOnText() && gFocusMgr.getAppHasFocus() && !mReadOnly;
     const F32  blink       = mBlink.getElapsedTimeF32();
     const bool caret_on    = show_caret && (!mCaretBlink || blink < BLINK_DELAY || (static_cast<S32>(blink * 2.f) & 1));
     const S32  in_gap      = caretGap();
     const ALTextRange sel  = selection().normalised();
-    const F32  space       = mLayout.xOf(0, 0) + 6.f;  // what a selected line end is drawn as
-
     const F32  left        = static_cast<F32>(text.mLeft) - mScrollX;
 
     // The rows in sight, walked in three passes -- what is behind the
@@ -5313,36 +5311,12 @@ void ALTextView::drawRows(const LLRect& text)
     // things over the text lie over the next row's text, where they reach
     // it, rather than under.
     mRowsSeen.clear();
-    for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
-    {
-        if (mLayout.hidden(line))
-        {
-            continue;
-        }
-        const ALTextLayout::Line& laid = mLayout.line(line);
-        const S32                 top  = mLayout.lineTop(line);
-        if (top >= bottom_y)
-        {
-            break;
-        }
-        for (size_t r = 0; r < laid.rows.size(); ++r)
-        {
-            const ALTextLayout::Row& row     = laid.rows[r];
-            const S32                row_top = top + row.top;
-            if (row_top + row.height <= mScrollY)
-            {
-                continue;
-            }
-            if (row_top >= bottom_y)
-            {
-                break;
-            }
-            // The row's top on the screen, and the top of its text's band,
-            // which is the row's bottom part where a box made it taller.
-            const S32 row_screen_top = text.mTop - (row_top - mScrollY);
-            mRowsSeen.push_back(RowSeen{ line, static_cast<S32>(r), row_screen_top, row_screen_top - row.textTop() });
-        }
-    }
+    forEachVisibleRow(text, [&](S32 line, S32 r, S32 row_screen_top) {
+        // And the top of its text's band, which is the row's bottom part
+        // where a box made it taller.
+        const ALTextLayout::Row& row = mLayout.line(line).rows[static_cast<size_t>(r)];
+        mRowsSeen.push_back(RowSeen{ line, r, row_screen_top, row_screen_top - row.textTop() });
+    });
 
     // Behind the text: the selections and what the find bar found.
     const std::vector<ALTextRange>& matches   = mFind.matches();
@@ -5351,47 +5325,39 @@ void ALTextView::drawRows(const LLRect& text)
     gGL.begin(LLRender::TRIANGLES);
     for (const RowSeen& seen : mRowsSeen)
     {
-        const S32                 line   = seen.line;
-        const ALTextLayout::Line& laid   = mLayout.line(line);
-        const ALTextLayout::Row&  row    = laid.rows[static_cast<size_t>(seen.row)];
-        const S32                 length = mDocument.lineLength(line);
-        // A selection's band on the row, in order, from its start or the
-        // row's to its end or the row's; past the line's end where it goes
-        // on to the next.
+        const S32                 line = seen.line;
+        const ALTextLayout::Line& laid = mLayout.line(line);
+        const ALTextLayout::Row&  row  = laid.rows[static_cast<size_t>(seen.row)];
+        // The places on the row, and on past the line's end on its last:
+        // what of the selections and the matches on a long wrapped line
+        // may touch it.
+        const ALTextPos from(line, row.begin);
+        const ALTextPos to(line, static_cast<size_t>(seen.row) + 1 == laid.rows.size() ? S32_MAX : row.end);
+        // A selection's band on the row: its span there, as a match's is,
+        // past the line's end where it goes on to the next.
         const auto band = [&](const ALTextRange& range) {
-            if (range.empty() || line < range.begin.line || range.end.line < line)
+            F32 x0, x1;
+            if (!range.empty() && spanOnRow(line, seen.row, range, x0, x1))
             {
-                return;
-            }
-            const S32  sel_begin = range.begin.line < line ? 0 : range.begin.column;
-            const S32  sel_end   = range.end.line > line ? length + 1 : range.end.column;
-            const S32  lo        = llmax(sel_begin, row.begin);
-            const bool last_row  = (static_cast<size_t>(seen.row) + 1 == laid.rows.size());
-            const S32  hi        = llmin(sel_end, last_row ? length + 1 : row.end);
-            if (lo < hi)
-            {
-                const F32 x0 = mLayout.xOf(line, lo);
-                const F32 x1 = hi > length ? row.width + space : (hi >= row.end && !last_row ? row.width : mLayout.xOf(line, hi));
                 gl_rect_2d_in_batch(static_cast<S32>(left + x0), seen.rowScreenTop, static_cast<S32>(left + x1), seen.rowScreenTop - row.height,
                                     sel_color);
             }
         };
         band(sel);
-        for (auto [it, end] = mCarets.onLine(line); it != end; ++it)
+        const auto on_line = mCarets.onLine(line);
+        const auto carets  = touching(on_line.first, on_line.second, from, to, [](const ALTextRange& s) { return s.normalised(); });
+        for (auto it = carets.first; it != carets.second; ++it)
         {
             band(it->normalised());
         }
-        if (!matches.empty())
+        const auto found = touching(matches.begin(), matches.end(), from, to, [](const ALTextRange& m) { return m.normalised(); });
+        for (auto it = found.first; it != found.second; ++it)
         {
-            auto first = std::lower_bound(matches.begin(), matches.end(), line, [](const ALTextRange& m, S32 l) { return m.end.line < l; });
-            for (auto it = first; it != matches.end() && it->begin.line <= line; ++it)
+            F32 x0, x1;
+            if (spanOnRow(line, seen.row, *it, x0, x1))
             {
-                F32 x0, x1;
-                if (spanOnRow(line, seen.row, *it, x0, x1))
-                {
-                    gl_rect_2d_in_batch(static_cast<S32>(left + x0), seen.rowScreenTop, static_cast<S32>(left + x1), seen.rowScreenTop - row.height,
-                                        mFindMatchColor.get() % alpha);
-                }
+                gl_rect_2d_in_batch(static_cast<S32>(left + x0), seen.rowScreenTop, static_cast<S32>(left + x1), seen.rowScreenTop - row.height,
+                                    mFindMatchColor.get() % alpha);
             }
         }
     }
@@ -5501,7 +5467,18 @@ void ALTextView::drawRows(const LLRect& text)
             {
                 caret(mCaret);
             }
-            for (auto [it, end] = mCarets.onLine(line); it != end; ++it)
+            // Those besides it whose caret may be on the row: found by a
+            // search where the line's clusters, and so its rows' columns,
+            // are in order, rather than asked of at every row, else all
+            // asked.
+            auto carets = mCarets.onLine(line);
+            if (laid.ordered)
+            {
+                const ALTextPos from(line, r == 0 ? 0 : row.begin);
+                const ALTextPos to(line, r + 1 == laid.rows.size() ? S32_MAX : row.end);
+                carets = touching(carets.first, carets.second, from, to, [](const ALTextRange& s) { return ALTextRange(s.end, s.end); });
+            }
+            for (auto it = carets.first; it != carets.second; ++it)
             {
                 caret(it->end);
             }
@@ -5605,13 +5582,7 @@ void ALTextView::pump()
             dragSelectTo(mDragX, mDragY);
         }
     }
-    // The find bar in the view's colours as they are now: a theme chosen
-    // while it is open recolours it, as it does the text.
-    if (mFindBar && mFindBar->getVisible() && mFindBarColors != LLUIColorTable::instance().generation())
-    {
-        mFindBarColors = LLUIColorTable::instance().generation();
-        mFindBar->setColors(backgroundColor(), textColor());
-    }
+    colorFindBar();
     // The find bar's query looked for through the text again once edits
     // have stopped coming for a moment, not at every keystroke; and a
     // worker's matches taken as they come in.
@@ -5726,11 +5697,13 @@ void ALTextView::drawBand(F32 alpha)
     // What to show, read from the keymap and measured only when it has
     // moved on since.
     BandShown& band_shown = mBandShown;
-    if (band_shown.keymap != mModal.get() || band_shown.generation != mModal->generation() || band_shown.font != font)
+    if (band_shown.keymap != mModal.get() || band_shown.generation != mModal->generation() || band_shown.font != font ||
+        band_shown.fonts != LLFontGL::sResolutionGeneration)
     {
         band_shown.keymap     = mModal.get();
         band_shown.generation = mModal->generation();
         band_shown.font       = font;
+        band_shown.fonts      = LLFontGL::sResolutionGeneration;
         std::string line;
         S32         caret     = 0;
         band_shown.typing     = mModal->typingLine(line, caret);
@@ -5819,7 +5792,7 @@ void ALTextView::drawBand(F32 alpha)
 
 bool ALTextView::handleKey(KEY key, MASK mask, bool called_from_parent)
 {
-    LLUICtrl* const focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl* const focus = gFocusMgr.getKeyboardFocusCtrl();
     if (called_from_parent || !focus || focus == this || !focus->acceptsTextInput() || !focus->hasAncestor(this))
     {
         return LLUICtrl::handleKey(key, mask, called_from_parent);
@@ -5847,11 +5820,9 @@ bool ALTextView::handleKeyHere(KEY key, MASK mask)
         scrollToCaret();
         const LLRect text  = textRect();
         const S32    row_h = llmax(1, mLayout.rowHeight());
-        S32          row   = 0;
-        const F32    cx    = lay().xOf(mCaret.line, mCaret.column, &row);
-        const S32    top   = text.mTop - (lay().lineTop(mCaret.line) + lay().rowTop(mCaret.line, row) - mScrollY);
-        const S32    x     = llclamp(text.mLeft + static_cast<S32>(cx - mScrollX), text.mLeft, text.mRight - 1);
-        const S32    y     = llclamp(top - row_h, text.mBottom, text.mTop - 1);
+        const LLRect at    = anchorOf(mCaret);
+        const S32    x     = llclamp(at.mLeft, text.mLeft, text.mRight - 1);
+        const S32    y     = llclamp(at.mTop - row_h, text.mBottom, text.mTop - 1);
         refreshSuggestions();
         showContextMenu(x, y);
         return true;
@@ -6268,7 +6239,10 @@ bool ALTextView::handleDoubleClick(S32 x, S32 y, MASK mask)
         // Quick, but somewhere else: a click, and the start of a drag.
         return handleMouseDown(x, y, mask);
     }
-    setFocus(true);
+    if (mTakesFocus)
+    {
+        setFocus(true);
+    }
     const ALTextRange word = mDocument.wordAt(posAtLocal(x, y, false));
     placeSelection(word.begin, word.end);
     mDesiredX       = -1.f;

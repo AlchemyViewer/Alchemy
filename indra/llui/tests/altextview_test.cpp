@@ -144,7 +144,7 @@ namespace tut
 
     // More than TUT's fifty a group holds by default, which runs the first
     // fifty and says nothing of the rest: keep this above the highest test.
-    typedef test_group<altextview_data, 100> altextview_group;
+    typedef test_group<altextview_data, 150> altextview_group;
     typedef altextview_group::object    altextview_object;
     altextview_group                    altextview_instance("altextview");
 
@@ -3052,5 +3052,171 @@ namespace tut
         v.document().append("\none");
         ensure_equals("added to at its end", v.findMatches().size(), size_t(6));
         ensure_equals("and said", v.findBar()->countSaid(), std::string("6"));
+    }
+
+    template<> template<>
+    void altextview_object::test<97>()
+    {
+        set_test_name("a composition with a line break in it -- a lone CR or CRLF as well as LF -- stays on its line, the break a space, and goes whole");
+        ALTextView& v = make("xy");
+        v.setCaret(ALTextPos(0, 1));
+        LLPreeditor& ime = v.preeditor();
+        for (const char* composing : { "ab\rcd", "ab\r\ncd", "ab\ncd" })
+        {
+            ime.updatePreedit(composing, { 5 }, { false }, 5);
+            ensure_equals("on its line, the break a space", v.text(), std::string("xab cdy"));
+            ime.resetPreedit();
+            ensure_equals("gone, all of it", v.text(), std::string("xy"));
+            ensure("the caret where it began", v.caret() == ALTextPos(0, 1));
+        }
+        ensure("none of it an edit", !v.isDirty());
+    }
+
+    template<> template<>
+    void altextview_object::test<98>()
+    {
+        set_test_name("Next over matches that are empty -- ^ at each line's start -- goes on from the current one at the caret, round the end; one the caret was put on is found first");
+#if LL_DARWIN
+        constexpr MASK toggle = MASK_CONTROL | MASK_ALT;
+#else
+        constexpr MASK toggle = MASK_ALT;
+#endif
+        ALTextView& v = make("one\ntwo\nthree");
+        v.showFind(false);
+        ensure("patterns on", v.findBar()->handleKeyHere('R', toggle) && v.findBar()->options().regex);
+        v.findBar()->setQuery("^");
+        ensure_equals("one at each line's start", v.findMatches().size(), size_t(3));
+        ensure_equals("the one at the caret current", v.findCurrent(), 0);
+        ensure("found", v.findNext(true));
+        ensure("on to the second line's", v.caret() == ALTextPos(1, 0) && !v.hasSelection());
+        ensure("found", v.findNext(true));
+        ensure("on to the third's", v.caret() == ALTextPos(2, 0));
+        ensure("found", v.findNext(true));
+        ensure("round to the first", v.caret() == ALTextPos(0, 0) && v.findCurrent() == 0);
+        ensure("found back", v.findNext(false));
+        ensure("back round to the last", v.caret() == ALTextPos(2, 0));
+        v.setCaret(ALTextPos(1, 0));
+        ensure("found", v.findNext(true));
+        ensure("the one the caret was put on, first", v.caret() == ALTextPos(1, 0) && v.findCurrent() == 1);
+        ensure("found", v.findNext(true));
+        ensure("then on from it", v.caret() == ALTextPos(2, 0));
+    }
+
+    template<> template<>
+    void altextview_object::test<99>()
+    {
+        set_test_name("a view that takes no focus -- a card over an editor -- selects a word double-clicked in it and leaves the keyboard where it was");
+        ALTextView& editor = make("the editor");
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "card";
+        p.rect         = LLRect(0, 100, 400, 0);
+        p.default_text = "hello world";
+        p.takes_focus  = false;
+        ALTextView* card = LLUICtrlFactory::create<ALTextView>(p);
+        card->setFont(LLFontGL::getFontMonospace());
+        const LLRect text = card->textRect();
+        const S32    x    = text.mLeft + static_cast<S32>(card->layout().xOf(0, 8)) + 1;
+        const S32    y    = text.mTop - card->layout().lineTop(0) - card->layout().rowHeight() / 2;
+        card->handleMouseDown(x, y, MASK_NONE);
+        card->handleMouseUp(x, y, MASK_NONE);
+        ensure("a click leaves the keyboard with the editor", editor.hasFocus() && !card->hasFocus());
+        ensure("double", card->handleDoubleClick(x, y, MASK_NONE));
+        ensure_equals("the word", card->selectedText(), std::string("world"));
+        ensure("and so does a double click", editor.hasFocus() && !card->hasFocus());
+        card->die();
+    }
+
+    template<> template<>
+    void altextview_object::test<100>()
+    {
+        set_test_name("a command over whole lines that changes nothing tells of no change, at one caret as at several; and one that does is told once");
+        ALTextView& v    = make("abc\n\n\ndef");
+        U32         told = 0;
+        boost::signals2::scoped_connection heard = v.onTextChanged([&told]() { ++told; });
+        v.setCaret(ALTextPos(0, 1));
+        ensure("Unindent with nothing to take", v.perform(ALEditorCommand::Unindent));
+        ensure_equals("the text as it was", v.text(), std::string("abc\n\n\ndef"));
+        ensure_equals("nothing told", told, U32(0));
+        ensure("nothing to take back", !v.canPerform(ALEditorCommand::Undo));
+        v.setSelection(ALTextRange(ALTextPos(1, 0), ALTextPos(3, 0)));
+        ensure("Indent over empty lines", v.perform(ALEditorCommand::Indent));
+        ensure_equals("nothing put in", v.text(), std::string("abc\n\n\ndef"));
+        ensure_equals("nothing told of that either", told, U32(0));
+        ensure("the selection where it was", v.selection() == ALTextRange(ALTextPos(1, 0), ALTextPos(3, 0)));
+
+        v.setCaret(ALTextPos(0, 1));
+        v.addSelection(ALTextRange(ALTextPos(3, 1), ALTextPos(3, 1)));
+        ensure("at several carets", v.perform(ALEditorCommand::Unindent));
+        ensure_equals("still nothing told", told, U32(0));
+
+        v.goTo(ALTextPos(0, 1));
+        ensure("one caret again", !v.hasOtherSelections());
+        ensure("Duplicate Line", v.perform(ALEditorCommand::DuplicateLine));
+        ensure_equals("the line again", v.text(), std::string("abc\nabc\n\n\ndef"));
+        ensure_equals("told once", told, U32(1));
+        ensure("the caret on the copy", v.caret() == ALTextPos(1, 1));
+    }
+
+    template<> template<>
+    void altextview_object::test<101>()
+    {
+        set_test_name("a style in a font of its own over several lines, cut through by an edit on one, leaves none of its lines in its font");
+        ALTextView&     v    = make("first line\nsecond line\nthird line\n");
+        const LLFontGL* face = LLFontGL::getFontSansSerif();
+        if (!face || !face->getFontFreetype() || face == v.getFont())
+        {
+            skip("no other face to style in");
+        }
+        ALTextView::Style style;
+        style.range = ALTextRange(ALTextPos(0, 0), ALTextPos(2, 5));
+        style.font  = face;
+        v.setStyles({ style });
+        const auto shaped_in = [&](S32 line, const LLFontGL* font) {
+            const ALTextLayout::Line& laid = v.layout().line(line);
+            return !laid.placed.empty() && laid.placed.front().face == font->getFontFreetype();
+        };
+        ensure("its first and last lines in its font", shaped_in(0, face) && shaped_in(2, face));
+        v.document().insert(ALTextPos(1, 3), "x");
+        ensure("cut through: gone", v.styles().empty());
+        ensure("the line typed in, in the view's font", shaped_in(1, v.getFont()));
+        ensure("the first line too, which the edit did not touch", shaped_in(0, v.getFont()));
+        ensure("and the last", shaped_in(2, v.getFont()));
+    }
+
+    template<> template<>
+    void altextview_object::test<102>()
+    {
+        set_test_name("the views of atoms on lines scrolled away above are hidden without those lines laid out");
+        std::string text;
+        for (S32 line = 0; line < 400; ++line)
+        {
+            text += "line " + ALTextView::atomPlaceholder() + "\n";
+        }
+        ALTextView&                   v = make(text.c_str(), 400, 100);
+        std::vector<LLButton*>        buttons;
+        std::vector<ALTextView::Atom> atoms;
+        for (S32 line = 0; line < 100; ++line)
+        {
+            LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
+            bp.name  = "item";
+            bp.label = "item";
+            bp.rect  = LLRect(0, 16, 40, 0);
+            buttons.push_back(LLUICtrlFactory::create<LLButton>(bp));
+            ALTextView::Atom atom;
+            atom.at    = ALTextPos(line, 5);
+            atom.width = 40;
+            atom.view  = buttons.back();
+            atoms.push_back(atom);
+        }
+        v.setAtoms(atoms);
+        // At the bottom, every line let go of but those in sight, as the
+        // layout lets go of lines far from what is in sight.
+        v.setScrollY(v.layout().totalHeight());
+        v.placeAtomViews();
+        v.layout().trim(v.firstVisibleLine(), v.lastVisibleLine());
+        const U32 laid = v.layout().linesLaidOut();
+        v.placeAtomViews();
+        ensure_equals("no line above laid out", v.layout().linesLaidOut(), laid);
+        ensure("every view hidden", std::none_of(buttons.begin(), buttons.end(), [](LLButton* button) { return button->getVisible(); }));
     }
 }

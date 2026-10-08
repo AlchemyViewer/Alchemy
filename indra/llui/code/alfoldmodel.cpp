@@ -119,7 +119,7 @@ const ALFoldModel::Line& ALFoldModel::lineAt(const ALTextDocument& doc, S32 line
     return entry;
 }
 
-S32 ALFoldModel::indentOf(const ALTextDocument& doc, S32 tab_width, S32 line, S32 reach)
+void ALFoldModel::setTabWidth(S32 tab_width)
 {
     if (tab_width != mTabWidth)
     {
@@ -127,6 +127,28 @@ S32 ALFoldModel::indentOf(const ALTextDocument& doc, S32 tab_width, S32 line, S3
         mLines.clear();
         mValid = false;
     }
+}
+
+// static
+void ALFoldModel::pairMarker(S8 marker, S32 line, std::vector<S32>& open, std::vector<S32>& end_of)
+{
+    if (marker > 0)
+    {
+        open.push_back(line);
+    }
+    else if (marker < 0 && !open.empty())
+    {
+        if (line > open.back())
+        {
+            end_of[static_cast<size_t>(open.back())] = llmax(end_of[static_cast<size_t>(open.back())], line);
+        }
+        open.pop_back();
+    }
+}
+
+S32 ALFoldModel::indentOf(const ALTextDocument& doc, S32 tab_width, S32 line, S32 reach)
+{
+    setTabWidth(tab_width);
     const S32 count = doc.lineCount();
     for (S32 l = line; l < count && l < line + reach; ++l)
     {
@@ -141,12 +163,7 @@ S32 ALFoldModel::indentOf(const ALTextDocument& doc, S32 tab_width, S32 line, S3
 
 const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocument& doc, S32 tab_width)
 {
-    if (tab_width != mTabWidth)
-    {
-        mTabWidth = tab_width;
-        mLines.clear();
-        mValid = false;
-    }
+    setTabWidth(tab_width);
     if (mValid && mVersion == doc.version())
     {
         return mRegions;
@@ -154,42 +171,24 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
     const S32 count = doc.lineCount();
     // Each block's last line by its first, the widest where several start
     // on a line; then in order, with no sort.
-    std::vector<S32> end_of(static_cast<size_t>(count), -1);
-    const auto       found = [&end_of](S32 start, S32 end) {
-        if (end > start && start >= 0)
-        {
-            end_of[static_cast<size_t>(start)] = llmax(end_of[static_cast<size_t>(start)], end);
-        }
-    };
+    std::vector<S32>& end_of = mEndOf;
+    end_of.assign(static_cast<size_t>(count), -1);
     if (mBlocks)
     {
         bySyntax(doc, end_of);
     }
     else
     {
-        mRegions.clear();
-        byIndent(doc, mRegions);
-        for (const Region& region : mRegions)
+        byIndent(doc, end_of);
+        // And the regions the text marks, as the comment says: after the
+        // blocks by indentation, which give a brace alone to its header
+        // without them; the syntax pass pairs them as it goes.
+        if (!mLineComment.empty())
         {
-            found(region.start, region.end);
-        }
-    }
-    // And the regions the text marks, as the comment says: by the syntax
-    // pass as it went, else here.
-    if (!mLineComment.empty() && !mBlocks)
-    {
-        std::vector<S32> open;
-        for (S32 l = 0; l < count; ++l)
-        {
-            const S8 marker = lineAt(doc, l).marker;
-            if (marker > 0)
+            mMarked.clear();
+            for (S32 l = 0; l < count; ++l)
             {
-                open.push_back(l);
-            }
-            else if (marker < 0 && !open.empty())
-            {
-                found(open.back(), l);
-                open.pop_back();
+                pairMarker(lineAt(doc, l).marker, l, mMarked, end_of);
             }
         }
     }
@@ -208,33 +207,20 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
 
 void ALFoldModel::bySyntax(const ALTextDocument& doc, std::vector<S32>& end_of)
 {
+    const S32 count = doc.lineCount();
     // What is open, each where it opened and whether it opened its line.
-    struct Opened
-    {
-        S32  line;
-        bool first;
-    };
-    const S32           count = doc.lineCount();
-    std::vector<Opened> open;
+    std::vector<Opened>& open = mOpen;
+    open.clear();
     // The blocks, as they close; those opened on a line of their own go
     // with their headers after.
-    std::vector<Region> alone;
-    std::vector<S32>    marked;
+    std::vector<Region>& alone = mAlone;
+    alone.clear();
+    std::vector<S32>& marked = mMarked;
+    marked.clear();
     for (S32 l = 0; l < count; ++l)
     {
         const Line& line = lineAt(doc, l);
-        if (line.marker > 0)
-        {
-            marked.push_back(l);
-        }
-        else if (line.marker < 0 && !marked.empty())
-        {
-            if (l > marked.back())
-            {
-                end_of[static_cast<size_t>(marked.back())] = llmax(end_of[static_cast<size_t>(marked.back())], l);
-            }
-            marked.pop_back();
-        }
+        pairMarker(line.marker, l, marked, end_of);
         for (size_t i = 0; i < line.blocks.size(); ++i)
         {
             const Block& block = line.blocks[i];
@@ -307,20 +293,12 @@ std::vector<S32> ALFoldModel::openAt(const ALTextDocument& doc, S32 tab_width, S
         }
         return out;
     }
-    if (tab_width != mTabWidth)
-    {
-        mTabWidth = tab_width;
-        mLines.clear();
-        mValid = false;
-    }
-    // Back from the line, innermost first: what opens with nothing after
-    // it closing it is open there.
-    S32 closes = 0;
-    for (S32 l = llmin(line, doc.lineCount()) - 1; l >= 0 && l >= line - reach && out.size() < most; --l)
-    {
-        const Line& entry = lineAt(doc, l);
-        bool        opens = false;
-        bool        first = false;
+    setTabWidth(tab_width);
+    // Whether a line opens what nothing after it closes, walked back to with
+    // `closes` closers after it still to be matched, which it matches; and
+    // whether the outermost it leaves open opened the line.
+    const auto opensOn = [](const Line& entry, S32& closes, bool& first) {
+        bool opens = false;
         for (auto it = entry.blocks.rbegin(); it != entry.blocks.rend(); ++it)
         {
             if (it->event != Event::Close)
@@ -340,11 +318,22 @@ std::vector<S32> ALFoldModel::openAt(const ALTextDocument& doc, S32 tab_width, S
                 ++closes;
             }
         }
-        if (!opens)
+        return opens;
+    };
+    // Back from the line, innermost first: what opens with nothing after
+    // it closing it is open there.
+    S32 closes = 0;
+    for (S32 l = llmin(line, doc.lineCount()) - 1; l >= 0 && l >= line - reach && out.size() < most; --l)
+    {
+        bool first = false;
+        if (!opensOn(lineAt(doc, l), closes, first))
         {
             continue;
         }
-        // Opened on a line of its own: its header's line.
+        // Opened on a line of its own: its header's line, where that opens
+        // nothing of its own, as the blocks have it (bySyntax); else its
+        // own, the header's block the next one out. Only blank lines are
+        // between them, which close nothing.
         S32 start = l;
         if (first)
         {
@@ -353,17 +342,23 @@ std::vector<S32> ALFoldModel::openAt(const ALTextDocument& doc, S32 tab_width, S
             {
                 --header;
             }
-            start = header >= 0 ? header : l;
+            S32  after_header = closes;
+            bool header_first = false;
+            if (header >= 0 && !opensOn(lineAt(doc, header), after_header, header_first))
+            {
+                start = header;
+            }
         }
         out.insert(out.begin(), start);
     }
     return out;
 }
 
-void ALFoldModel::byIndent(const ALTextDocument& doc, std::vector<Region>& out)
+void ALFoldModel::byIndent(const ALTextDocument& doc, std::vector<S32>& end_of)
 {
-    const S32        count = doc.lineCount();
-    std::vector<S32> indent(static_cast<size_t>(count), -1);
+    const S32         count  = doc.lineCount();
+    std::vector<S32>& indent = mIndents;
+    indent.assign(static_cast<size_t>(count), -1);
     for (S32 l = 0; l < count; ++l)
     {
         indent[static_cast<size_t>(l)] = lineAt(doc, l).indent;
@@ -371,7 +366,6 @@ void ALFoldModel::byIndent(const ALTextDocument& doc, std::vector<Region>& out)
     // A block is a line and the deeper lines after it, with a line of
     // nothing going with whichever side keeps the block whole, and the
     // closer on the line after -- a brace, an `end` -- taken as part of it.
-    std::vector<S32> end_of(static_cast<size_t>(count), -1);
     for (S32 l = 0; l < count; ++l)
     {
         if (indent[static_cast<size_t>(l)] < 0)
@@ -422,13 +416,6 @@ void ALFoldModel::byIndent(const ALTextDocument& doc, std::vector<Region>& out)
         {
             end_of[static_cast<size_t>(header)] = end_of[static_cast<size_t>(l)];
             end_of[static_cast<size_t>(l)]      = -1;
-        }
-    }
-    for (S32 l = 0; l < count; ++l)
-    {
-        if (end_of[static_cast<size_t>(l)] > l)
-        {
-            out.push_back(Region{ l, end_of[static_cast<size_t>(l)] });
         }
     }
 }
@@ -572,7 +559,7 @@ void ALFoldModel::edited(const ALTextDocument::Edit& edit, S32 lines)
             }
             if (start > span.last || (start == span.last && span.lastKept))
             {
-                shift += span.made - (span.last - span.first + 1);
+                shift = span.shiftAfter;
                 continue;
             }
             break;

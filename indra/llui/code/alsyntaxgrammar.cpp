@@ -26,8 +26,6 @@
 
 #include "alsyntaxgrammar.h"
 
-#include "alstringmatch.h"
-
 #include "alregex.h"
 #include "altextchars.h"
 #include "lldir.h"
@@ -42,13 +40,58 @@
 
 namespace
 {
-    const char* const KIND_NAMES[] = {
-        "text",     "comment",  "doc_comment", "string",       "escape",       "number",   "keyword",   "control",
-        "type",     "constant", "function",    "event",        "label",        "operator", "punctuation", "preprocessor",
-        "tag",      "attribute", "attribute_value", "entity",   "variable",     "parameter", "property", "deprecated", "invalid",
-        "namespace", "state",   "global_variable", "path",
+    // Each kind and its name in a grammar's file, in the kinds' order,
+    // which is checked: the one table of kinds' names, which a colour
+    // table's names are made from too (ALTextView::kindColorName).
+    struct KindName
+    {
+        ALSyntaxKind kind;
+        const char*  name;
     };
-    static_assert(sizeof(KIND_NAMES) / sizeof(KIND_NAMES[0]) == static_cast<size_t>(ALSyntaxKind::COUNT), "every kind has a name");
+    constexpr KindName KIND_NAMES[] = {
+        { ALSyntaxKind::Text, "text" },
+        { ALSyntaxKind::Comment, "comment" },
+        { ALSyntaxKind::DocComment, "doc_comment" },
+        { ALSyntaxKind::String, "string" },
+        { ALSyntaxKind::Escape, "escape" },
+        { ALSyntaxKind::Number, "number" },
+        { ALSyntaxKind::Keyword, "keyword" },
+        { ALSyntaxKind::Control, "control" },
+        { ALSyntaxKind::Type, "type" },
+        { ALSyntaxKind::Constant, "constant" },
+        { ALSyntaxKind::Function, "function" },
+        { ALSyntaxKind::Event, "event" },
+        { ALSyntaxKind::Label, "label" },
+        { ALSyntaxKind::Operator, "operator" },
+        { ALSyntaxKind::Punctuation, "punctuation" },
+        { ALSyntaxKind::Preprocessor, "preprocessor" },
+        { ALSyntaxKind::Tag, "tag" },
+        { ALSyntaxKind::Attribute, "attribute" },
+        { ALSyntaxKind::AttributeValue, "attribute_value" },
+        { ALSyntaxKind::Entity, "entity" },
+        { ALSyntaxKind::Variable, "variable" },
+        { ALSyntaxKind::Parameter, "parameter" },
+        { ALSyntaxKind::Property, "property" },
+        { ALSyntaxKind::Deprecated, "deprecated" },
+        { ALSyntaxKind::Invalid, "invalid" },
+        { ALSyntaxKind::Namespace, "namespace" },
+        { ALSyntaxKind::State, "state" },
+        { ALSyntaxKind::GlobalVariable, "global_variable" },
+        { ALSyntaxKind::Path, "path" },
+    };
+    constexpr bool kindNamesInOrder()
+    {
+        for (size_t i = 0; i < std::size(KIND_NAMES); ++i)
+        {
+            if (KIND_NAMES[i].kind != static_cast<ALSyntaxKind>(i))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    static_assert(std::size(KIND_NAMES) == static_cast<size_t>(ALSyntaxKind::COUNT) && kindNamesInOrder(),
+                  "every kind has a name, in the order of the kinds");
 
     // What a character class rule matches: a set of ASCII bytes, and
     // whether every byte beyond ASCII is in it too.
@@ -115,16 +158,16 @@ namespace
 const char* alSyntaxKindName(ALSyntaxKind kind)
 {
     const size_t index = static_cast<size_t>(kind);
-    return index < static_cast<size_t>(ALSyntaxKind::COUNT) ? KIND_NAMES[index] : "text";
+    return index < std::size(KIND_NAMES) ? KIND_NAMES[index].name : "text";
 }
 
 std::optional<ALSyntaxKind> alSyntaxKindFromName(std::string_view name)
 {
-    for (size_t i = 0; i < static_cast<size_t>(ALSyntaxKind::COUNT); ++i)
+    for (const KindName& known : KIND_NAMES)
     {
-        if (name == KIND_NAMES[i])
+        if (name == known.name)
         {
-            return static_cast<ALSyntaxKind>(i);
+            return known.kind;
         }
     }
     return std::nullopt;
@@ -194,20 +237,6 @@ bool ALSyntaxWords::has(std::string_view table, std::string_view word) const
     return it != mTables.end() && it->second.contains(word);
 }
 
-void ALSyntaxWords::collect(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const
-{
-    for (const auto& [table, words] : mTables)
-    {
-        for (const std::string& word : words)
-        {
-            if (ALStringMatch::startsWithNoCase(word, prefix))
-            {
-                out.emplace_back(word, table);
-            }
-        }
-    }
-}
-
 // --- the grammar -------------------------------------------------------------
 
 struct ALSyntaxGrammar::Impl
@@ -241,8 +270,8 @@ struct ALSyntaxGrammar::Impl
         Then         then      = Then::Stay;
         U16          target    = 0;
         bool         wholeWord = false;
-        // Word: a word right after `head.` is looked up as `head.word`
-        // first, which is how SLua's tables name `ll.Say`.
+        // Word: a word right after `head.` is looked up as `head.word`,
+        // which is how SLua's tables name `ll.Say`, and by no other name.
         bool         qualified = false;
         // Literal and SpanEscape: the text; Span: the opening; SpanEnd: the
         // end, a regex where endRegex says so, with \1 standing for the
@@ -423,6 +452,53 @@ namespace
         return true;
     }
 
+    // The kinds of rule, by what they match, as a bit each: what a key a
+    // rule says is for.
+    constexpr U8 RULE_MATCH = 0x01;
+    constexpr U8 RULE_CHARS = 0x02;
+    constexpr U8 RULE_WORD  = 0x04;
+    constexpr U8 RULE_REGEX = 0x08;
+    constexpr U8 RULE_EOL   = 0x10;
+    constexpr U8 RULE_SPAN  = 0x20;
+    // A rule that goes somewhere when it matches: every one but a span,
+    // which goes into itself and out at its end.
+    constexpr U8 RULE_GOES  = static_cast<U8>(RULE_MATCH | RULE_CHARS | RULE_WORD | RULE_REGEX | RULE_EOL);
+
+    // Every key a rule may say, and the rules it is for; a matcher is what
+    // makes a rule the kind it is, one to a rule.
+    struct RuleKey
+    {
+        const char* name;
+        U8          rules;
+        bool        matcher;
+    };
+    constexpr RuleKey RULE_KEYS[] = {
+        { "match", RULE_MATCH, true },
+        { "chars", RULE_CHARS, true },
+        { "word", RULE_WORD, true },
+        { "regex", RULE_REGEX, true },
+        { "eol", RULE_EOL, true },
+        { "span", RULE_SPAN, true },
+        { "span_regex", RULE_SPAN, true },
+        { "kind", static_cast<U8>(RULE_GOES | RULE_SPAN), false },
+        { "push", RULE_GOES, false },
+        { "next", RULE_GOES, false },
+        { "pop", RULE_GOES, false },
+        { "whole_word", RULE_MATCH, false },
+        { "unicode", RULE_CHARS, false },
+        { "min", RULE_CHARS, false },
+        { "max", RULE_CHARS, false },
+        { "qualified", RULE_WORD, false },
+        { "tables", RULE_WORD, false },
+        { "not_after_chars", RULE_REGEX, false },
+        { "consume", RULE_REGEX, false },
+        { "unless_after", static_cast<U8>(RULE_EOL | RULE_SPAN), false },
+        { "end", RULE_SPAN, false },
+        { "end_regex", RULE_SPAN, false },
+        { "escape", RULE_SPAN, false },
+        { "multiline", RULE_SPAN, false },
+    };
+
     // The end regex a span's capture makes of its pattern.
     std::string endPattern(const std::string& text, const std::string& payload)
     {
@@ -539,6 +615,50 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
         error = where + "not a map";
         return false;
     }
+    // What it matches, one thing, which says what else it may say: a key
+    // no rule says, or one for another kind of rule -- a span's end on a
+    // literal, a push on a span -- is a mistake, not something to pass
+    // over.
+    S32         matchers = 0;
+    U8          matched  = 0;
+    const char* matcher  = "";
+    for (const RuleKey& key : RULE_KEYS)
+    {
+        if (key.matcher && in.has(key.name))
+        {
+            ++matchers;
+            matched = key.rules;
+            matcher = key.name;
+        }
+    }
+    if (matchers != 1)
+    {
+        error = where + "a rule matches one thing: match, chars, word, regex, span, span_regex or eol";
+        return false;
+    }
+    for (LLSD::map_const_iterator it = in.beginMap(); it != in.endMap(); ++it)
+    {
+        const RuleKey* said = nullptr;
+        for (const RuleKey& key : RULE_KEYS)
+        {
+            if (it->first == key.name)
+            {
+                said = &key;
+                break;
+            }
+        }
+        if (!said)
+        {
+            error = where + "no rule says '" + it->first + "'";
+            return false;
+        }
+        if (!(said->rules & matched))
+        {
+            error = where + matcher + " does not take '" + it->first + "'";
+            return false;
+        }
+    }
+
     const S32 state_index = stateIndex(state_name);
     State&    state       = states[state_index];
     state.rules.emplace_back();
@@ -556,17 +676,9 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
         rule.kind = *kind;
     }
     rule.wholeWord = in["whole_word"].asBoolean();
-    if ((in.has("not_after_chars") || in.has("consume")) && !in.has("regex"))
-    {
-        error = where + "not_after_chars and consume are for a regex";
-        return false;
-    }
 
-    // What it matches.
-    S32 matchers = 0;
     if (in.has("match"))
     {
-        ++matchers;
         rule.match = Rule::Match::Literal;
         rule.text  = in["match"].asString();
         if (rule.text.empty())
@@ -577,7 +689,6 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     }
     if (in.has("chars"))
     {
-        ++matchers;
         rule.match = Rule::Match::Chars;
         std::string bad;
         if (!parseCharClass(in["chars"].asStringRef(), rule.chars, bad))
@@ -596,7 +707,6 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     }
     if (in.has("word"))
     {
-        ++matchers;
         rule.match     = Rule::Match::Word;
         rule.qualified = in["qualified"].asBoolean();
         const LLSD& tables = in["tables"];
@@ -619,7 +729,6 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     }
     if (in.has("regex"))
     {
-        ++matchers;
         rule.match = Rule::Match::Regex;
         if (!compileRegex(in["regex"].asString(), rule.regex, error))
         {
@@ -652,7 +761,6 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     }
     if (in.has("eol"))
     {
-        ++matchers;
         rule.match = Rule::Match::Eol;
         // What, ending a line, carries the state on to the next rather
         // than letting the line's end end it: a C directive's backslash.
@@ -660,7 +768,6 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     }
     if (in.has("span") || in.has("span_regex"))
     {
-        ++matchers;
         rule.match = Rule::Match::Span;
         if (in.has("span"))
         {
@@ -696,6 +803,12 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
             escape.match = Rule::Match::SpanEscape;
             escape.text  = in["escape"].asString();
             escape.kind  = ALSyntaxKind::Escape;
+            if (escape.text.empty())
+            {
+                // Found everywhere, it would keep the span from ever ending.
+                error = where + "the escape of a span is empty";
+                return false;
+            }
             inside.rules.push_back(std::move(escape));
         }
         Rule end;
@@ -711,11 +824,20 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
         }
         end.endTemplate = end.endRegex && endTemplate(end.text, end.endPrefix, end.endSuffix);
         inside.rules.push_back(std::move(end));
-        if (in.has("multiline") && !in["multiline"].asBoolean())
+        const bool multiline = !in.has("multiline") || in["multiline"].asBoolean();
+        if (multiline && in.has("unless_after"))
+        {
+            error = where + "unless_after is for a span its line's end closes";
+            return false;
+        }
+        if (!multiline)
         {
             Rule eol;
             eol.match = Rule::Match::Eol;
             eol.then  = Rule::Then::Pop;
+            // What, ending a line, keeps the span open over it, as an eol
+            // rule's does: Luau's backslash before a line break.
+            eol.text  = in["unless_after"].asString();
             inside.rules.push_back(std::move(eol));
         }
         // The rule pushes the state; the state is added after the rules
@@ -724,11 +846,6 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
         targets.push_back(Target{ state_index, rule_index, inside.name });
         states.push_back(std::move(inside));
         return true;
-    }
-    if (matchers != 1)
-    {
-        error = where + "a rule matches one thing: match, chars, word, regex, span or eol";
-        return false;
     }
 
     // Where it goes.
@@ -803,7 +920,9 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
                 ++end;
             }
             const std::string_view word = line.substr(pos, end - pos);
-            // `head.word`, where the rule qualifies and there is a head.
+            // `head.word`, where the rule qualifies and there is a head: a
+            // member, which is found by that name or not at all, and is no
+            // global of its own name -- `item.type` is no `type`.
             if (rule.qualified && pos >= 2 && line[pos - 1] == '.')
             {
                 size_t head = pos - 1;
@@ -837,6 +956,7 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
                             }
                         }
                     }
+                    return end;
                 }
             }
             // Every table the word is in, in one look at the grammar's words
@@ -1248,9 +1368,9 @@ const std::vector<std::string>& ALSyntaxGrammar::wordTables() const
     return mImpl->wordTables;
 }
 
-void ALSyntaxGrammar::collectWords(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const
+const ALSyntaxWords& ALSyntaxGrammar::declaredWords() const
 {
-    mImpl->words.collect(prefix, out);
+    return mImpl->words;
 }
 
 const std::string& ALSyntaxGrammar::lineComment() const
@@ -1367,10 +1487,20 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
     }
     const size_t len = line.size();
 
-    auto emit = [&tokens](size_t begin, size_t end, ALSyntaxKind kind) {
+    // The last escape made, as it was made rather than as it ran together
+    // with its neighbours: whether the line ends in a character an escape
+    // kept.
+    size_t escape_begin = 0;
+    size_t escape_end   = 0;
+    auto emit = [&tokens, &escape_begin, &escape_end](size_t begin, size_t end, ALSyntaxKind kind) {
         if (end <= begin)
         {
             return;
+        }
+        if (kind == ALSyntaxKind::Escape)
+        {
+            escape_begin = begin;
+            escape_end   = end;
         }
         if (!tokens.empty() && tokens.back().kind == kind && tokens.back().end == static_cast<S32>(begin))
         {
@@ -1428,6 +1558,13 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
         return end_regexes.back().second.ok() ? &end_regexes.back().second : nullptr;
     };
     std::string span_end;
+    // The end looked for last, and where it was found from a place before
+    // the lexer: still the first of it while it lies ahead, and nowhere
+    // ahead where it was nowhere then. Looked for again only once it is
+    // passed or another end is wanted, so that a span's end is found once
+    // rather than again after every escape on the way to it.
+    std::string found_end;
+    size_t      found_at = std::string_view::npos;
 
     size_t pos = 0;
     while (pos < len)
@@ -1446,11 +1583,26 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
                 span_end += frame.payload;
                 span_end += end_rule.endSuffix;
             }
-            const size_t end_at = span_end.empty() ? std::string_view::npos : line.find(span_end, pos);
-            size_t       esc_at = std::string_view::npos;
+            size_t end_at = std::string_view::npos;
+            if (!span_end.empty())
+            {
+                if (span_end != found_end || (found_at != std::string_view::npos && found_at < pos))
+                {
+                    found_end = span_end;
+                    found_at  = line.find(span_end, pos);
+                }
+                end_at = found_at;
+            }
+            size_t esc_at = std::string_view::npos;
             if (current.spanEscape >= 0)
             {
-                esc_at = line.find(current.rules[current.spanEscape].text, pos);
+                // Only as far as the end: an escape past it is no business
+                // of this span's, and the rest of the line is not read for
+                // one each time a span opens.
+                const std::string&     escape_text = current.rules[current.spanEscape].text;
+                const std::string_view to_end =
+                    end_at == std::string_view::npos ? line : line.substr(0, std::min(len, end_at + escape_text.size()));
+                esc_at = to_end.find(escape_text, pos);
             }
             if (esc_at != std::string_view::npos && esc_at <= end_at)
             {
@@ -1475,6 +1627,15 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
                 pos = after;
                 continue;
             }
+            emit(pos, len, current.defaultKind);
+            pos = len;
+            continue;
+        }
+        if (!sPlainLexing && current.all.empty())
+        {
+            // A state no rule of which begins anywhere -- a line comment,
+            // plain text -- holds the rest of the line, all at once rather
+            // than a character at a time.
             emit(pos, len, current.defaultKind);
             pos = len;
             continue;
@@ -1536,7 +1697,16 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
             }
             if (kept.size() >= eol->text.size() && kept.compare(kept.size() - eol->text.size(), eol->text.size(), eol->text) == 0)
             {
-                break;
+                // Unless it is the character an escape kept, or keeps one
+                // itself: `\\` carries nothing on to the next line, and
+                // neither does `\ `. An escape that is the text alone, with
+                // nothing after it to keep, keeps the line's end.
+                const size_t at      = kept.size() - eol->text.size();
+                const bool   escaped = escape_end > at && escape_begin < kept.size() && (escape_begin != at || escape_end != kept.size());
+                if (!escaped)
+                {
+                    break;
+                }
             }
         }
         go(*eol, std::string());

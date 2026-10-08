@@ -888,7 +888,7 @@ T* LLChicletPanel::findChiclet(const LLUUID& im_session_id)
         if (!chiclet) continue;
         if(chiclet->getSessionId() == im_session_id)
         {
-            T* result = dynamic_cast<T*>(chiclet);
+            T* result = chiclet->as<T>();
             if(!result)
             {
                 LL_WARNS() << "Found chiclet but of wrong type " << LL_ENDL;
@@ -908,7 +908,7 @@ template<class T> T* LLChicletPanel::getChiclet(S32 index)
     }
 
     LLChiclet* chiclet = mChicletList[index];
-    T*result = dynamic_cast<T*>(chiclet);
+    T*result = ALViewType::as<T>(chiclet);
     if(!result && chiclet)
     {
         LL_WARNS() << "Found chiclet but of wrong type " << LL_ENDL;

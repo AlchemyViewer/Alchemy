@@ -147,11 +147,11 @@ bool ALPaneFolds::inSight(const LLView* view)
     // views: neither is drawn.
     for (const LLView* up = view; up; up = up->getParent())
     {
-        if (const LLLayoutPanel* panel = dynamic_cast<const LLLayoutPanel*>(up); panel && panel->isCollapsed())
+        if (const LLLayoutPanel* panel = up->as<LLLayoutPanel>(); panel && panel->isCollapsed())
         {
             return false;
         }
-        if (const LLFloater* window = dynamic_cast<const LLFloater*>(up))
+        if (const LLFloater* window = up->as<LLFloater>())
         {
             return !window->isMinimized();
         }

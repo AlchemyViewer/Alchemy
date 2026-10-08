@@ -99,6 +99,20 @@ std::string ALFixListModel::fixedLines(const ALTextDocument& text, const ALCodeF
 // static
 std::string ALFixListModel::previewOf(const ALTextDocument& text, const ALCodeFix& fix, std::vector<char>& kinds)
 {
+    std::vector<PreviewLine> lines;
+    size_t                   cut  = 0;
+    std::string              says = previewOf(text, fix, lines, cut);
+    kinds.clear();
+    kinds.reserve(lines.size());
+    for (const PreviewLine& line : lines)
+    {
+        kinds.push_back(line.kind);
+    }
+    return says;
+}
+
+std::string ALFixListModel::previewOf(const ALTextDocument& text, const ALCodeFix& fix, std::vector<PreviewLine>& shown, size_t& cut)
+{
     // The lines it touches as they read and as they would, as a diff has
     // them: what goes in the error colour, what comes coloured as code. A
     // stretch for each place it changes, edits a few lines apart or less
@@ -125,41 +139,44 @@ std::string ALFixListModel::previewOf(const ALTextDocument& text, const ALCodeFi
     // Each line with its kind, the lines' indentation in common taken off
     // once they are all in: a fix deep in a block reads at the left, not
     // past the box's edge.
-    std::vector<std::pair<char, std::string>> shown;
-    const auto add = [&shown](char kind, const std::string& line) { shown.emplace_back(kind, line); };
+    shown.clear();
+    const auto add = [&shown](char kind, const std::string& line, S32 from) { shown.push_back(PreviewLine{ kind, line, from }); };
     for (size_t k = 0; k < stretches.size(); ++k)
     {
         if (k > 0)
         {
-            add(' ', "\u2026");
+            add(' ', "\u2026", -1);
         }
         S32               first = 0, last = 0;
         const std::string after = fixedLines(text, stretches[k], first, last);
         for (S32 line = first; line <= last && line < text.lineCount(); ++line)
         {
-            add('-', text.line(line));
+            add('-', text.line(line), -1);
         }
+        // What it makes starts where its first line does.
         std::string_view rest = after;
+        S32              from = first;
         while (true)
         {
-            const size_t cut = rest.find('\n');
-            add('+', std::string(rest.substr(0, cut)));
-            if (cut == std::string_view::npos)
+            const size_t at = rest.find('\n');
+            add('+', std::string(rest.substr(0, at)), from);
+            from = -1;
+            if (at == std::string_view::npos)
             {
                 break;
             }
-            rest.remove_prefix(cut + 1);
+            rest.remove_prefix(at + 1);
         }
     }
     std::optional<std::string_view> common;
-    for (const auto& [kind, line] : shown)
+    for (const PreviewLine& line : shown)
     {
-        const size_t lead = line.find_first_not_of(" \t");
-        if (kind == ' ' || lead == std::string::npos)
+        const size_t lead = line.source.find_first_not_of(" \t");
+        if (line.kind == ' ' || lead == std::string::npos)
         {
             continue;
         }
-        const std::string_view indent(line.data(), lead);
+        const std::string_view indent(line.source.data(), lead);
         if (!common)
         {
             common = indent;
@@ -170,14 +187,12 @@ std::string ALFixListModel::previewOf(const ALTextDocument& text, const ALCodeFi
             common            = common->substr(0, same);
         }
     }
-    const size_t cut = common ? common->size() : 0;
-    std::string  says;
-    kinds.clear();
-    for (const auto& [kind, line] : shown)
+    cut = common ? common->size() : 0;
+    std::string says;
+    for (const PreviewLine& line : shown)
     {
-        const std::string text = kind != ' ' && line.size() >= cut ? line.substr(cut) : line;
-        says += (says.empty() ? "" : "\n") + (kind == ' ' ? text : std::string(1, kind) + " " + text);
-        kinds.push_back(kind);
+        const std::string text = line.kind != ' ' && line.source.size() >= cut ? line.source.substr(cut) : line.source;
+        says += (says.empty() ? "" : "\n") + (line.kind == ' ' ? text : std::string(1, line.kind) + " " + text);
     }
     return says;
 }

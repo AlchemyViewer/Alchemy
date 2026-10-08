@@ -31,6 +31,7 @@
 #include "alluauservice.h"
 #include "alluausharedstart.h"
 #include "alsourcemap.h"
+#include "llstring.h"
 
 #include "Luau/Ast.h"
 #include "Luau/Bytecode.h"
@@ -495,20 +496,7 @@ namespace
     // one line.
     std::string constantName(std::string_view text)
     {
-        constexpr size_t SHOWN = 32;
-        // Cut never inside a character: where one is cut, before it.
-        size_t cut = std::min(text.size(), SHOWN);
-        while (cut > 0 && cut < text.size() && (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80)
-        {
-            --cut;
-        }
-        std::string out = "\"";
-        for (size_t i = 0; i < cut; ++i)
-        {
-            const char c = text[i];
-            out += c == '\n' ? std::string("\\n") : c == '\t' ? std::string("\\t") : std::string(1, c);
-        }
-        return out + (cut < text.size() ? "\xE2\x80\xA6\"" : "\"");
+        return ALScriptWeigh::quoted(text, 32);
     }
 
     ALScriptWeight::Part heavyConstant(std::string_view text, size_t bytes, S32 line)
@@ -596,6 +584,18 @@ namespace
 
 namespace ALScriptWeigh
 {
+    std::string quoted(std::string_view text, size_t shown)
+    {
+        // Cut never inside a character: where one is cut, before it.
+        const std::string kept = utf8str_truncate(text, static_cast<S32>(std::min(text.size(), shown)));
+        std::string       out  = "\"";
+        for (const char c : kept)
+        {
+            out += c == '\n' ? std::string("\\n") : c == '\t' ? std::string("\\t") : c == '\r' ? std::string("\\r") : std::string(1, c);
+        }
+        return out + (kept.size() < text.size() ? "\xE2\x80\xA6\"" : "\"");
+    }
+
     ALScriptWeight slua(std::string_view source)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;

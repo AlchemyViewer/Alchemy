@@ -138,4 +138,29 @@ namespace tut
         const ALVimRegisters::Register back = registers.fetch(0, true);
         ensure("read back through the clipboard as the line it was", back.text.empty() && back.linewise);
     }
+
+    template<> template<>
+    void alvimregisters_object::test<6>()
+    {
+        set_test_name("a delete of a line or more into a named register goes in 1 as well, the rest moved along, and so does one over a search; a smaller one and a yank leave 1 alone");
+        registers.store(0, "older", true, false, false, false);
+        registers.store('a', "one", true, false, false, false);
+        ensure_equals("the line in a", registers.fetch('a', false).text, std::string("one"));
+        ensure_equals("and in 1", registers.fetch('1', false).text, std::string("one"));
+        ensure_equals("the one before moved along to 2", registers.fetch('2', false).text, std::string("older"));
+        registers.store('A', "two", true, false, false, false);
+        ensure_equals("A adds to a", registers.fetch('a', false).text, std::string("one\ntwo"));
+        ensure_equals("1 the line taken, alone", registers.fetch('1', false).text, std::string("two"));
+        ensure_equals("\"\" what a holds", registers.fetch('"', false).text, std::string("one\ntwo"));
+        registers.store('b', "two\nlines", false, false, false, false);
+        ensure_equals("characters over two lines are a line or more", registers.fetch('1', false).text, std::string("two\nlines"));
+        registers.store('c', "word ", false, false, false, false, true);
+        ensure_equals("a smaller one over a search in 1 too", registers.fetch('1', false).text, std::string("word "));
+        ensure("but not in -", registers.fetch('-', false).text.empty());
+        registers.store('d', "small", false, false, false, false);
+        ensure_equals("a smaller one: 1 as it was", registers.fetch('1', false).text, std::string("word "));
+        registers.store('e', "yanked\nlines", true, false, true, false);
+        ensure_equals("a yank: 1 as it was", registers.fetch('1', false).text, std::string("word "));
+        ensure("and 0 never set", registers.fetch('0', false).text.empty());
+    }
 }

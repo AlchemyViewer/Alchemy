@@ -52,9 +52,12 @@ public:
     // walks. Any other key keeps what is on the line and drops the rest.
     void complete(ALTextView& view, bool forward);
     void dropCompletion();
-    // The history of a line kind, and the line entered into it.
+    // The history of a line kind, and the line entered into it, moved last
+    // where it was there already: a search line only where it ended the
+    // same way, typed after / or ?, or put there by * and # -- `typed`
+    // false -- as vim's history keeps the two apart.
     std::vector<std::string>& historyOf(llwchar kind);
-    void                      remember(llwchar kind, const std::string& line);
+    void                      remember(llwchar kind, const std::string& line, bool typed = true);
 
     // The : or / line being typed, and which; where Up has walked to in
     // its history, with what was typed before it was pressed, which Down

@@ -412,4 +412,22 @@ namespace tut
         e.handleMouseUp(e.leftEdge() + 1, y, MASK_NONE);
         ensure("no peek", !e.changePeek() || !e.changePeek()->isOpen());
     }
+
+    template<> template<>
+    void alchangepeek_object::test<13>()
+    {
+        set_test_name("a line typed on and put back as it was saved loses its bar once the changes are worked out, so the bars, the peek and ]c agree");
+        ALCodeEditor& e = make("a\nb\nc", "a\nbx\nC");
+        // The x taken out again: the line is the saved one, though the
+        // history is two steps off the save.
+        e.goTo(ALTextPos(1, 2));
+        ensure("put back", e.handleKeyHere(KEY_BACKSPACE, MASK_NONE) && e.document().text() == "a\nb\nC");
+        ensure("still unsaved, every line barred", e.isDirty() && e.lineChanged(0) && e.lineChanged(1) && e.lineChanged(2));
+        ensure("no change on it to peek at", !e.peekChange(1));
+        ensure("its bar gone, and the first line's", !e.lineChanged(1) && !e.lineChanged(0));
+        ensure("the changed line's kept", e.lineChanged(2) && e.peekChange(2));
+        e.changePeek()->close();
+        e.goTo(ALTextPos(0, 0));
+        ensure("]c goes to the barred line", e.stepChange(true) && e.caret().line == 2);
+    }
 }

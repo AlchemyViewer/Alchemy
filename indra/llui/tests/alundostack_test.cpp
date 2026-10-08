@@ -326,5 +326,16 @@ namespace tut
         stack.putForward(std::move(forward));
         std::optional<Step> next = stack.takeRedo();
         ensure("put back in their order", next && next->mNames.front() == "cc");
+
+        // What they weigh together as a caller keeps it, moved down by
+        // what each forgotten weighed.
+        ALUndoStack<Step> kept(std::numeric_limits<size_t>::max());
+        kept.note({ { "aaaa" } }, "", 0.0, 1.0, join);
+        kept.note({ { "bbb" } }, "", 5.0, 1.0, join);
+        kept.note({ { "cc" } }, "", 10.0, 1.0, join);
+        size_t held = 9;
+        ensure_equals("from what the caller keeps: the oldest until within", kept.forgetOverBudget(5, weight, held), size_t(1));
+        ensure_equals("and that less what went", held, size_t(5));
+        ensure("the newer kept", kept.inForce() == 2 && kept.undone().front().mNames.front() == "bbb");
     }
 }

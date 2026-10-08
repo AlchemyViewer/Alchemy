@@ -85,19 +85,25 @@ namespace tut
     template<> template<>
     void alsnippetsession_object::test<3>()
     {
-        set_test_name("mirrors: those that no longer read as their stop, the last first; the one being brought up is what the edit put in");
+        set_test_name("mirrors: those that no longer read as their stop; brought up as one batch, as the editor does, each is what the batch put in its place");
         ALTextDocument doc("i = i + i;\n");
         session.start({ range(0, 0, 1) }, ALTextPos(0, 10), { { 0, range(0, 4, 5) }, { 0, range(0, 8, 9) } });
         session.slide(doc.replace(range(0, 0, 1), "count"));
         std::string            wanted;
         const std::vector<S32> stale = session.staleMirrors(0, doc, wanted);
         ensure_equals("what the stop holds", wanted, std::string("count"));
-        ensure("both, the last in the text first", stale.size() == 2 && stale[0] == 1 && stale[1] == 0);
-        session.syncing(1);
-        session.slide(doc.replace(session.mirrors()[1].range, wanted));
-        session.syncing(-1);
-        ensure("brought up whole", doc.text(session.mirrors()[1].range) == "count");
-        ensure("one left", session.staleMirrors(0, doc, wanted).size() == 1);
+        ensure("both", stale == std::vector<S32>({ 0, 1 }));
+        std::vector<std::pair<ALTextRange, std::string>> edits;
+        for (const S32 k : stale)
+        {
+            edits.emplace_back(session.mirrors()[static_cast<size_t>(k)].range, wanted);
+        }
+        session.setSyncing(true);
+        session.slide(doc.replaceMany(std::move(edits)));
+        session.setSyncing(false);
+        ensure("each brought up whole", doc.text(session.mirrors()[0].range) == "count" && doc.text(session.mirrors()[1].range) == "count");
+        ensure_equals("the line", doc.line(0), std::string("count = count + count;"));
+        ensure("none left", session.staleMirrors(0, doc, wanted).empty());
         ensure("none for another stop", session.staleMirrors(3, doc, wanted).empty());
     }
 
@@ -126,5 +132,62 @@ namespace tut
         ensure("$0 where its level is now", two.landing == range(1, 2, 2));
         const ALSnippetSession::Expansion same = ALSnippetSession::expand("    lead\n    x", ALTextPos(0, 0), "");
         ensure_equals("no unit: as written", same.text, std::string("    lead\n    x"));
+    }
+
+    template<> template<>
+    void alsnippetsession_object::test<6>()
+    {
+        set_test_name("a mirror that is a later stop, or inside one, made again as the batch the editor makes: the stop holds what went in, and is still there to go to");
+        // Every stale mirror of a stop made again at once, as the editor does
+        // on leaving it.
+        const auto sync = [this](ALTextDocument& doc, S32 stop) {
+            std::string                                      wanted;
+            std::vector<std::pair<ALTextRange, std::string>> edits;
+            for (const S32 k : session.staleMirrors(stop, doc, wanted))
+            {
+                edits.emplace_back(session.mirrors()[static_cast<size_t>(k)].range, wanted);
+            }
+            session.setSyncing(true);
+            session.slide(doc.replaceMany(std::move(edits)));
+            session.setSyncing(false);
+        };
+
+        const ALSnippetSession::Expansion whole = ALSnippetSession::expand("local ${1:name} = require(\"${2:$1}\")", ALTextPos(0, 0), "");
+        ALTextDocument                    doc(whole.text);
+        ensure("the second stop the first's mirror", whole.stops.size() == 2 && whole.mirrors.size() == 1 && whole.stops[1] == whole.mirrors[0].range);
+        session.start(whole.stops, whole.landing.begin, whole.mirrors);
+        session.slide(doc.replace(session.stops()[0], "json"));
+        sync(doc, 0);
+        ensure_equals("brought up", doc.text(), std::string("local json = require(\"json\")"));
+        ensure("both stops kept", session.stops().size() == 2 && session.at() == 0);
+        ensure_equals("the second over what its mirror holds now", doc.text(session.stops()[1]), std::string("json"));
+
+        const ALSnippetSession::Expansion around = ALSnippetSession::expand("${1:x} ${2:the $1 thing}", ALTextPos(0, 0), "");
+        ALTextDocument                    text(around.text);
+        session.start(around.stops, around.landing.begin, around.mirrors);
+        session.slide(text.replace(session.stops()[0], "abc"));
+        sync(text, 0);
+        ensure_equals("brought up inside", text.text(), std::string("abc the abc thing"));
+        ensure("the stop around it kept", session.stops().size() == 2);
+        ensure_equals("grown with it", text.text(session.stops()[1]), std::string("the abc thing"));
+    }
+
+    template<> template<>
+    void alsnippetsession_object::test<7>()
+    {
+        set_test_name("a number's first place written bare, its default given after: every place shows the default, and leaving the stop takes nothing from its mirror");
+        const ALSnippetSession::Expansion x = ALSnippetSession::expand("$1 = ${1:value};", ALTextPos(0, 0), "");
+        ensure_equals("the default where it is first", x.text, std::string("value = value;"));
+        ensure("the stop the first place, holding it", x.stops.size() == 1 && x.stops[0] == range(0, 0, 5));
+        ensure("its mirror the second", x.mirrors.size() == 1 && x.mirrors[0].of == 0 && x.mirrors[0].range == range(0, 8, 13));
+        const ALTextDocument doc(x.text);
+        session.start(x.stops, x.landing.begin, x.mirrors);
+        std::string wanted;
+        ensure("nothing to bring up as the stop is left", session.staleMirrors(0, doc, wanted).empty() && wanted == "value");
+
+        const ALSnippetSession::Expansion braced = ALSnippetSession::expand("${1} + $1 + ${1:n}", ALTextPos(0, 0), "");
+        ensure_equals("braced without one, and a mirror between, the same", braced.text, std::string("n + n + n"));
+        const ALSnippetSession::Expansion empty = ALSnippetSession::expand("${1:} + ${1:n}", ALTextPos(0, 0), "");
+        ensure_equals("a first given an empty default keeps it", empty.text, std::string(" + n"));
     }
 }

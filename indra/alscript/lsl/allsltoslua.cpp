@@ -39,6 +39,7 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <cctype>
@@ -47,6 +48,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <functional>
+#include <iterator>
 #include <optional>
 #include <string_view>
 
@@ -269,7 +271,7 @@ namespace
                 default:
                     if (u < 0x20 || u == 0x7f)
                     {
-                        out += llformat("\\%03d", u);
+                        fmt::format_to(std::back_inserter(out), "\\{:03}", u);
                     }
                     else
                     {

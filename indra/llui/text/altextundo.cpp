@@ -128,7 +128,13 @@ namespace
             }
             change.stretches.clear();
         }
-        change.edit = edit;
+        // Its texts and its places, not the line spans its listeners had
+        // worked out, which a step put back works out afresh.
+        change.edit.range    = edit.range;
+        change.edit.removed  = edit.removed;
+        change.edit.inserted = edit.inserted;
+        change.edit.parts    = edit.parts;
+        change.edit.keepEnd(edit.endAfter());
         return change;
     }
 
@@ -329,10 +335,7 @@ namespace
             // Deleted forward: what it took stood right after what the first
             // took, and ends where both, laid from the start, reach.
             first.removed += next.removed;
-            ALTextDocument::Edit reach;
-            reach.range    = ALTextRange(first.range.begin, first.range.begin);
-            reach.inserted = first.removed;
-            first.range    = ALTextRange(first.range.begin, reach.endAfter());
+            first.range = ALTextRange(first.range.begin, alTextEnd(first.range.begin, first.removed));
             first.keepEnd(first.range.begin);
             return true;
         }
@@ -518,7 +521,7 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
         if (!mTypingNoted)
         {
             mTypingNoted                    = true;
-            const std::vector<Step>& undone = mSteps.undone();
+            const auto&              undone = mSteps.undone();
             const bool               on     = !past && !undone.empty() && undone.back().typed && mTypingAt.begin == mTypingAt.end &&
                                               (mTypingAt.end == undone.back().caretAfter ||
                                                (!undone.back().edits.empty() && mTypingAt.end == undone.back().edits.back().edit.endAfter()));
@@ -565,11 +568,12 @@ void ALTextUndo::forgetOverBudget()
     {
         return;
     }
-    for (size_t forgot = mSteps.forgetOverBudget(BUDGET, weigh); forgot > 0; --forgot)
+    // From what the steps back weigh as it is kept, less what each forgotten
+    // weighed: nothing summed again.
+    for (size_t forgot = mSteps.forgetOverBudget(BUDGET, weigh, mUndoneBytes); forgot > 0; --forgot)
     {
         forgotOldest();
     }
-    mUndoneBytes = undoneBytes();
 }
 
 size_t ALTextUndo::undoneBytes() const
@@ -771,8 +775,8 @@ namespace
 
 ALTextUndo::Written ALTextUndo::writtenWithin(size_t budget) const
 {
-    const std::vector<Step>& undone = mSteps.undone();
-    const std::vector<Step>& redone = mSteps.redone();
+    const auto&              undone = mSteps.undone();
+    const auto&              redone = mSteps.redone();
     Written                  out;
     // The steps forward, all or none: part of them would lead nowhere the
     // text was.
@@ -816,7 +820,7 @@ ALTextUndo::Written ALTextUndo::writtenWithin(size_t budget) const
 LLSD ALTextUndo::asLLSD(size_t budget) const
 {
     const Written            within = writtenWithin(budget);
-    const std::vector<Step>& undone = mSteps.undone();
+    const auto&              undone = mSteps.undone();
     LLSD                     out;
     out["version"] = HISTORY_VERSION;
     out["undo"]    = LLSD::emptyArray();
@@ -851,7 +855,7 @@ std::string ALTextUndo::asNotation(size_t budget) const
         return step.written;
     };
     const Written            within = writtenWithin(budget);
-    const std::vector<Step>& undone = mSteps.undone();
+    const auto&              undone = mSteps.undone();
     std::string              out    = "{'version':i" + std::to_string(HISTORY_VERSION) + ",'undo':[";
     for (size_t i = within.first; i < undone.size(); ++i)
     {
@@ -992,8 +996,8 @@ std::optional<std::string> ALTextUndo::savedText() const
     }
     // Stepped to on a copy, back or forward from the text as it stands.
     ALTextDocument           text(mDocument.text());
-    const std::vector<Step>& undone = mSteps.undone();
-    const std::vector<Step>& redone = mSteps.redone();
+    const auto&              undone = mSteps.undone();
+    const auto&              redone = mSteps.redone();
     if (mSavedInForce <= undone.size())
     {
         for (size_t i = undone.size(); i > mSavedInForce; --i)
@@ -1050,7 +1054,7 @@ void ALTextUndo::markSaved(const SavePoint& point)
         mSavedInForce = point.era == mEra ? 0 : NOWHERE;
         return;
     }
-    const std::vector<Step>& undone = mSteps.undone();
+    const auto&              undone = mSteps.undone();
     for (size_t i = 0; i < undone.size(); ++i)
     {
         if (undone[i].serial == point.serial)
@@ -1060,7 +1064,7 @@ void ALTextUndo::markSaved(const SavePoint& point)
         }
     }
     // Among the steps forward, the next of which is the last.
-    const std::vector<Step>& redone = mSteps.redone();
+    const auto&              redone = mSteps.redone();
     for (size_t i = 0; i < redone.size(); ++i)
     {
         if (redone[i].serial == point.serial)

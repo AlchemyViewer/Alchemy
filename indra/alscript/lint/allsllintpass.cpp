@@ -32,6 +32,7 @@
 #include "alscriptlexicon.h"
 #include "alscriptlintpass.h"
 
+#include <fmt/format.h>
 #include <tailslide/tailslide.hh>
 
 #include <algorithm>
@@ -315,7 +316,7 @@ namespace
                         (up->getNodeType() == NODE_EVENT_HANDLER &&
                          std::string_view(static_cast<LSLEventHandler*>(up)->getIdentifier()->getName()) == "timer");
             }
-            const std::string   seconds  = llformat("%g", row->monoSleep);
+            const std::string   seconds  = fmt::format("{:g}", row->monoSleep);
             const auto          severity = often ? ALScriptProblem::Severity::Warning : ALScriptProblem::Severity::Note;
             if (!sleepless->fast)
             {
@@ -549,7 +550,7 @@ namespace
                 problem(node, "LSLSlFastTimer",
                         "A timer every [1] s, under a tenth of a second, fires every few of the region's 45 frames a second, and the "
                         "time it takes is time other scripts there wait for",
-                        { llformat("%g", *every) }, "SlFastTimer", out);
+                        { fmt::format("{:g}", *every) }, "SlFastTimer", out);
             }
             const std::optional<double> rate = name == "llSensorRepeat" && args.size() == 6 ? number(args[5]) : std::nullopt;
             if (rate && *rate > 0 && *rate < 1)
@@ -557,7 +558,7 @@ namespace
                 problem(node, "LSLSlFastSensor",
                         "A sensor sweeping every [1] s, under a second, searches round the object that often: once a second or less "
                         "is plenty for most",
-                        { llformat("%g", *rate) }, "SlFastSensor", out);
+                        { fmt::format("{:g}", *rate) }, "SlFastSensor", out);
             }
         });
     }

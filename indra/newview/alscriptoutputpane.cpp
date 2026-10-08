@@ -26,6 +26,7 @@
 
 #include "alscriptoutputpane.h"
 
+#include "allinebreaks.h"
 #include "alscriptmessages.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudiopane.h"
@@ -214,8 +215,10 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptRuntimeEvent& 
                  : event.channel == Channel::SaidTo   ? mServices->words("KindSaidTo")
                  : event.channel == Channel::Instant  ? mServices->words("KindInstant")
                                                       : std::string();
-    entry.text   = event.isError && !event.error.empty() ? event.error : event.message;
-    while (!entry.text.empty() && (entry.text.back() == '\n' || entry.text.back() == '\r'))
+    // Its breaks as the log reads them, so that the frames' links below
+    // count the lines the log shows.
+    entry.text   = ALLineBreaks::withLineFeeds(event.isError && !event.error.empty() ? event.error : event.message);
+    while (!entry.text.empty() && entry.text.back() == '\n')
     {
         entry.text.pop_back();
     }
@@ -261,7 +264,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptRuntimeEvent& 
             {
                 continue;
             }
-            entry.text += "\n" + line;
+            entry.text += "\n" + ALLineBreaks::withLineFeeds(line);
             ALScriptMessages::Frame frame;
             if (event.item.notNull() && ALScriptMessages::readStackFrame(line, frame) &&
                 (frame.chunk == chunk || frame.chunk == event.scriptName || frame.chunk == "lua_script" || frame.chunk == "lsl_script"))
@@ -288,7 +291,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptRuntimeEvent& 
     {
         LLStringUtil::format_map_t args;
         args["[NAME]"] = event.scriptName;
-        args["[LINE]"] = llformat("%d", at.line + 1);
+        args["[LINE]"] = std::to_string(at.line + 1);
         entry.link     = true;
         entry.tooltip  = mServices->words(event.isError && at.line >= 0 ? "OutputOpenAtLine" : "OutputOpen", args);
         entry.value    = link_value(at);
@@ -310,7 +313,9 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
     ALOutputView::Entry entry;
     entry.time        = clockOf(LLDate::now().secondsSinceEpoch());
     entry.source      = mServices->words("OutputSourceStudio");
-    entry.text        = text;
+    // Its breaks as the log reads them, so that the links below count the
+    // lines the log shows.
+    entry.text        = ALLineBreaks::withLineFeeds(text);
     entry.key["kind"] = "studio";
     entry.lane        = 1;
     if (failure)
@@ -318,12 +323,12 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
         entry.color = alarm.get();
     }
     // The script's name where the words say it, a link to its tab.
-    const size_t at = doc && !doc->name.empty() ? text.find(doc->name) : std::string::npos;
+    const size_t at = doc && !doc->name.empty() ? entry.text.find(doc->name) : std::string::npos;
     if (at != std::string::npos)
     {
-        const size_t              line_start = text.rfind('\n', at);
+        const size_t              line_start = entry.text.rfind('\n', at);
         ALOutputView::Entry::Link link;
-        link.line  = static_cast<S32>(std::count(text.begin(), text.begin() + at, '\n'));
+        link.line  = static_cast<S32>(std::count(entry.text.begin(), entry.text.begin() + at, '\n'));
         link.begin = static_cast<S32>(line_start == std::string::npos ? at : at - line_start - 1);
         link.end   = link.begin + static_cast<S32>(doc->name.size());
         LLStringUtil::format_map_t args;

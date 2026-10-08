@@ -101,7 +101,7 @@ bool ALXUIDocuments::close(std::string_view path)
     // An action naming a document that has gone cannot be put back, and an
     // action half put back is worse than none: the history goes with it.
     // One that no action names takes nothing with it.
-    const auto names = [path](const std::vector<Taken>& actions)
+    const auto names = [path](const auto& actions)
     {
         for (const Taken& taken : actions)
         {
@@ -333,8 +333,8 @@ bool ALXUIDocuments::redo()
 
 std::vector<ALXUIDocuments::Entry> ALXUIDocuments::history() const
 {
-    const std::vector<Taken>& done = mActions.undone();
-    const std::vector<Taken>& undone = mActions.redone();
+    const auto& done = mActions.undone();
+    const auto& undone = mActions.redone();
     std::vector<Entry> all;
     all.reserve(done.size() + undone.size());
 

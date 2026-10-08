@@ -61,6 +61,7 @@
 #include "alscriptlexicon.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <limits>
@@ -358,7 +359,7 @@ namespace
                 name = "timer " + on;
                 if (Luau::AstExprConstantNumber* every = first->as<Luau::AstExprConstantNumber>())
                 {
-                    name += " " + llformat("%g", every->value);
+                    name += " " + fmt::format("{:g}", every->value);
                 }
             }
             entry(name, first->location, call->location, ALScriptSymbolKind::Event, typeAt(handler));
@@ -991,10 +992,10 @@ bool ALLuauService::loadDefinitions(std::string_view source, std::string& error)
         if (!loaded.parseResult.errors.empty())
         {
             const Luau::ParseError& first = loaded.parseResult.errors.front();
-            error = llformat("%u:%u: %s",
-                             first.getLocation().begin.line + 1,
-                             first.getLocation().begin.column + 1,
-                             first.getMessage().c_str());
+            error = fmt::format("{}:{}: {}",
+                                first.getLocation().begin.line + 1,
+                                first.getLocation().begin.column + 1,
+                                first.getMessage());
         }
         else if (loaded.module && !loaded.module->errors.empty())
         {
@@ -1333,7 +1334,7 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     {
         // Past the time limit: what was found before it, and that there
         // may be more.
-        const std::vector<std::string> args{ llformat("%g", front.timeLimit) };
+        const std::vector<std::string> args{ fmt::format("{:g}", front.timeLimit) };
         problems.push_back(problemAt(Luau::Location(Luau::Position(0, 0), Luau::Position(0, 0)), ALScriptProblem::Severity::Warning,
                                      ALScriptProblem::Source::Types, std::string(),
                                      ALScriptProblem::fill("Type checking stopped after [1] seconds; what it found before then is shown", args)));

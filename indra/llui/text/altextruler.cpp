@@ -126,29 +126,31 @@ void ALTextRuler::drawRuler(F32 alpha)
     const auto yAt    = [&](S32 doc_y) { return ruler.mTop - static_cast<S32>(static_cast<F32>(doc_y) / static_cast<F32>(total) * static_cast<F32>(track_h)); };
     const auto yOf    = [&](S32 line) { return yAt(layout.lineTop(line)); };
     const S32 middle  = ruler.mLeft + WIDTH / 2;
-    // The lines with a mark, found again only where the text or the
-    // marks have changed; their colours asked every frame, which a
-    // change of theme may change.
+    // The lines with a mark, found again only where the marks or what the
+    // host says of the lines have changed, each of which moves on as an
+    // edit moves them: not at every edit within a line. Their colours
+    // asked every frame, which a change of theme may change.
     const U32 marks_revision = features ? features->marksRevision() : 0;
-    if (mMarksVersion != document.version() || mMarksRevision != marks_revision || mAnnotationsRevision != mView.annotationsRevision() ||
-        !mMarksValid)
+    if (mMarksRevision != marks_revision || mAnnotationsRevision != mView.annotationsRevision() || !mMarksValid)
     {
         mMarkLines.clear();
         mGapMarkLines.clear();
         LLColor4   unused;
-        // A text with neither -- a log -- not read through at all; one
-        // pass for both lists, the gap below the text the last of it.
+        // A text with neither -- a log -- not read through at all; where
+        // the host says something of the lines, one pass for both lists,
+        // the gap below the text the last of it; else the features' own
+        // list of the lines they mark, rather than every line of the text
+        // asked about.
         const bool annotated = mView.annotated();
         const S32  count     = document.lineCount();
-        const S32  end       = annotated ? count + 1 : features ? count : 0;
-        for (S32 line = 0; line < end; ++line)
+        if (annotated)
         {
-            if (line < count && markOf(line, unused))
+            for (S32 line = 0; line <= count; ++line)
             {
-                mMarkLines.push_back(line);
-            }
-            if (annotated)
-            {
+                if (line < count && markOf(line, unused))
+                {
+                    mMarkLines.push_back(line);
+                }
                 const ALTextView::LineAnnotation& said = mView.lineAnnotation(line);
                 if (said.gap > 0 && said.gapRulerTint.mV[VALPHA] > 0.f)
                 {
@@ -156,7 +158,10 @@ void ALTextRuler::drawRuler(F32 alpha)
                 }
             }
         }
-        mMarksVersion        = document.version();
+        else if (features)
+        {
+            features->markedLines(mMarkLines);
+        }
         mMarksRevision       = marks_revision;
         mAnnotationsRevision = mView.annotationsRevision();
         mMarksValid          = true;
@@ -338,8 +343,10 @@ void ALTextRuler::drawPreview(F32 alpha)
     const LLColor4  wash  = ALSurface::shade(bg, ink, 0.14f) % alpha;
     ALSurface::draw(box, bg, ink, alpha);
     LLLocalClipRect clip(LLRect(box.mLeft + 1, box.mTop - 1, box.mRight - 1, box.mBottom + 1));
-    // The numbers take the room the widest needs.
-    const std::string widest    = std::to_string(last + 1);
+    // The numbers the view shows, as its gutter counts them, in the room
+    // the widest needs.
+    const S32         base      = mView.lineNumberBase();
+    const std::string widest    = std::to_string(last + 1 + base);
     const S32         numbers   = static_cast<S32>(font->getWidth(widest)) + GUTTER;
     const S32         tab_width = mView.getTabWidth();
     S32               y         = box.mTop - PAD;
@@ -350,7 +357,7 @@ void ALTextRuler::drawPreview(F32 alpha)
             gl_rect_2d(LLRect(box.mLeft + 1, y, box.mRight - 1, y - row_h), wash, true);
         }
         const S32 baseline = y - row_h + static_cast<S32>(font->getDescenderHeight()) + 1;
-        font->renderUTF8(std::to_string(l + 1), 0, static_cast<F32>(box.mLeft + PAD + numbers - GUTTER), static_cast<F32>(baseline),
+        font->renderUTF8(std::to_string(l + 1 + base), 0, static_cast<F32>(box.mLeft + PAD + numbers - GUTTER), static_cast<F32>(baseline),
                          faint, LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
         // The line in its colours, token by token, tabs as spaces.
         const std::string&                text   = document.line(l);
@@ -492,7 +499,8 @@ void ALTextRuler::drawMap(F32 alpha)
     const S32 columns = llmax(0, (inner_right - inner_left) / MAP_CHAR_W);
     MapRuns&  runs    = mMapRuns;
     bool      fresh   = runs.version == mView.document().version() && runs.grammar == highlighter.grammar().get() && runs.tabWidth == tab_width &&
-                 runs.columns == columns && runs.first == first && runs.last == last && runs.hidden == layout.hiddenRevision();
+                 runs.columns == columns && runs.first == first && runs.last == last && runs.hidden == layout.hiddenRevision() &&
+                 runs.gaps == mMapLinesGaps;
     // A gap's row has no text, and no runs.
     const auto revisionOf = [&](S32 o) { return mMapGaps[static_cast<size_t>(o)] ? 0 : highlighter.revision(mMapLines[o]); };
     for (S32 o = first; fresh && o <= last; ++o)
@@ -508,6 +516,7 @@ void ALTextRuler::drawMap(F32 alpha)
         runs.first    = first;
         runs.last     = last;
         runs.hidden   = layout.hiddenRevision();
+        runs.gaps     = mMapLinesGaps;
         runs.starts.clear();
         runs.revisions.clear();
         runs.runs.clear();

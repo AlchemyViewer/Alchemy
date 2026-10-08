@@ -81,6 +81,8 @@ namespace ALTextMerge
     };
     typedef std::vector<Change> changes_t;
     changes_t changesOf(const std::vector<std::string>& base, const std::vector<std::string>& text, const ALTextDiff::Options& options);
+    // Of the runs between the base and a text, found already.
+    changes_t changesOf(const std::vector<ALTextDiff::Run>& runs);
     // Merged from each side's changes of the base, found apart: what one
     // side made, which stays as the other is worked on, found once.
     hunks_t   merge(S32 base_lines, const changes_t& ours_changes, const changes_t& theirs_changes, const std::vector<std::string>& ours,

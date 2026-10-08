@@ -132,7 +132,7 @@ void ALKeyCapture::listen()
 {
     const LLHandle<LLPanel> handle = getHandle();
     ALKeyChords::wait(this, KEY_NONE, MASK_NONE, [handle](KEY key, MASK mask) {
-        if (ALKeyCapture* capture = dynamic_cast<ALKeyCapture*>(handle.get()))
+        if (ALKeyCapture* capture = ALViewType::as<ALKeyCapture>(handle.get()))
         {
             capture->press(key, mask);
             if (!capture->isDead() && capture->getVisible() && capture->hasFocus())

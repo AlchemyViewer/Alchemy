@@ -30,7 +30,6 @@
 
 #include <algorithm>
 #include <iterator>
-#include <type_traits>
 
 namespace
 {
@@ -60,6 +59,24 @@ ALDiffLexer::ALDiffLexer(std::shared_ptr<const ALSyntaxGrammar> grammar)
 ALTextDiff::lexer_t ALDiffLexer::lexerOf(std::shared_ptr<ALDiffLexer> lexer)
 {
     return [lexer](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& { return lexer->regions(lines); };
+}
+
+ALTextDiff::Reread ALDiffLexer::reread(const std::vector<ALTextDiff::regions_t>& regions) const
+{
+    for (const Text& text : mTexts)
+    {
+        if (&text.regions == &regions)
+        {
+            return ALTextDiff::Reread{ text.number, text.was, text.same };
+        }
+    }
+    return ALTextDiff::Reread();
+}
+
+// static
+ALTextDiff::reread_t ALDiffLexer::rereadOf(std::shared_ptr<ALDiffLexer> lexer)
+{
+    return [lexer](const std::vector<ALTextDiff::regions_t>& regions) { return lexer->reread(regions); };
 }
 
 S32 ALDiffLexer::Source::find(const std::string& line, const ALSyntaxState& state)
@@ -157,17 +174,7 @@ void ALDiffLexer::readAgain(Text& text, const std::vector<std::string>& lines, c
     const size_t old_size = text.lines.size();
     const size_t old_end  = old_size - tail;
     const size_t new_end  = lines.size() - tail;
-    const auto   resize   = [&](auto& list) {
-        using T = typename std::decay_t<decltype(list)>::value_type;
-        if (new_end < old_end)
-        {
-            list.erase(list.begin() + static_cast<std::ptrdiff_t>(new_end), list.begin() + static_cast<std::ptrdiff_t>(old_end));
-        }
-        else if (new_end > old_end)
-        {
-            list.insert(list.begin() + static_cast<std::ptrdiff_t>(old_end), new_end - old_end, T());
-        }
-    };
+    const auto   resize   = [&](auto& list) { ALDiffEdit::resizeEdited(list, static_cast<S32>(old_end), static_cast<S32>(new_end)); };
     ALSyntaxState state = text.starts[head];
     // What it held between its edges set aside, to take lines from.
     Text middle;
@@ -182,6 +189,11 @@ void ALDiffLexer::readAgain(Text& text, const std::vector<std::string>& lines, c
     resize(text.starts);
     std::copy(lines.begin() + static_cast<std::ptrdiff_t>(head), lines.begin() + static_cast<std::ptrdiff_t>(new_end),
               text.lines.begin() + static_cast<std::ptrdiff_t>(head));
+    // Numbered anew, from the one it was; the lines after the edit as they
+    // read until one read again reads otherwise.
+    text.was    = text.number;
+    text.number = ++mNumbered;
+    text.same   = static_cast<S32>(new_end);
     for (size_t line = head; line < lines.size(); ++line)
     {
         if (line >= new_end && text.starts[line] == state)
@@ -196,7 +208,13 @@ void ALDiffLexer::readAgain(Text& text, const std::vector<std::string>& lines, c
         }
         else
         {
-            read(lines[line], state, text.regions[line]);
+            // After the edit, its regions kept where they are as they were.
+            read(lines[line], state, mAgain);
+            if (mAgain != text.regions[line])
+            {
+                text.regions[line].swap(mAgain);
+                text.same = static_cast<S32>(line) + 1;
+            }
         }
     }
     text.starts[lines.size()] = std::move(state);
@@ -206,6 +224,7 @@ void ALDiffLexer::readWhole(Text& text, const std::vector<std::string>& lines, c
 {
     const Text was = std::move(text);
     text           = Text();
+    text.number    = ++mNumbered;
     text.lines     = lines;
     text.regions.resize(lines.size());
     text.starts.resize(lines.size() + 1);

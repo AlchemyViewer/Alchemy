@@ -27,11 +27,15 @@
 #include "alvimmappings.h"
 
 #include "alsaid.h"
+#include "alvimtext.h"
 #include "llstring.h"
+
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <cctype>
 #include <cstring>
+#include <iterator>
 
 namespace
 {
@@ -118,12 +122,6 @@ namespace
         { "cmapc", "cmapclear", ALVimMappings::COMMAND_LINE, Kind::Clear },
         { "smapc", "smapclear", 0, Kind::Clear },
     };
-
-    // `name` is `whole` cut no shorter than `least`.
-    bool abbreviates(std::string_view name, std::string_view least, std::string_view whole)
-    {
-        return name.size() >= least.size() && name.size() <= whole.size() && whole.compare(0, name.size(), name) == 0;
-    }
 
     std::string lowered(std::string text)
     {
@@ -404,7 +402,7 @@ bool ALVimMappings::command(const std::string& name_in, const std::string& args_
     const Family* family   = nullptr;
     for (const Family& each : FAMILY)
     {
-        if (abbreviates(name, each.least, each.whole))
+        if (ALVimText::abbreviates(name, each.least, each.whole))
         {
             family = &each;
             break;
@@ -569,8 +567,10 @@ std::string ALVimMappings::list(U8 modes, const std::vector<ALVimInput>& from) c
         {
             out += '\n';
         }
-        const std::string keys = shown(each.from);
-        out += llformat("%-3s%-12s %c %s", modesShown(each.modes).c_str(), keys.c_str(), each.noremap ? '*' : ' ', shown(each.to).c_str());
+        // As vim's :map lists one: the modes three columns wide, the keys
+        // twelve by the columns they take and a blank after them however
+        // long, the star of a noremap, and what they stand for.
+        fmt::format_to(std::back_inserter(out), "{:<3}{:<11} {} {}", modesShown(each.modes), shown(each.from), each.noremap ? '*' : ' ', shown(each.to));
     }
     return out.empty() ? alSaid("VimNoMappingFound", "No mapping found") : out;
 }

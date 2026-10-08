@@ -36,8 +36,10 @@
 // expression; how case is matched; the places its matches must stand
 // (\%23l, \%V and the like), which no expression says; the group that is
 // the match where \zs split it; the expression without its \K, whose
-// matches say where each match's whole begins; and whether a match may
-// cross a line. Worked out, and the matches found, over a document alone.
+// matches say where each match's whole begins; whether a match may cross
+// a line; and the groups a \ze put in, at which a match is cut, with how
+// the engine numbers vim's groups where those come between them. Worked
+// out, and the matches found, over a document alone.
 struct ALVimPattern
 {
     std::string regex;
@@ -67,6 +69,11 @@ struct ALVimPattern
     std::vector<Where> where;
     std::string        wholeRegex;
     bool               acrossLines = false;
+    // By bit, as ALTextSearchOptions::cutGroups has them.
+    U64                cutGroups = 0;
+    // The engine's number for each of vim's groups, in order; empty where
+    // the two count alike.
+    std::vector<S32>   groupNumbers;
 
     bool operator==(const ALVimPattern&) const = default;
     // Whether where its matches may stand depends on the caret or the last

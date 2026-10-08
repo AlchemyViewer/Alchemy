@@ -48,9 +48,26 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
     reg.text     = std::move(text);
     reg.linewise = linewise;
     reg.block    = block;
+    reg.held     = true;
     if (name == '_')
     {
         return;
+    }
+    // A delete of a line or more, or a smaller one `register_one` says is
+    // kept here, goes in 1 whichever register is named, as vim's does: the
+    // last nine kept, newest first, each moved down one rather than copied.
+    const bool lines = linewise || reg.text.find('\n') != std::string::npos;
+    if (!yanked && (lines || register_one))
+    {
+        for (char n = '9'; n > '1'; --n)
+        {
+            const auto older = mRegisters.find(static_cast<char>(n - 1));
+            if (older != mRegisters.end())
+            {
+                mRegisters[n] = std::move(older->second);
+            }
+        }
+        mRegisters['1'] = reg;
     }
     // A register named keeps it, and "" says it; the clipboard is not
     // touched, as vim's clipboard=unnamed leaves a named one alone.
@@ -67,7 +84,8 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
         {
             into.text += reg.text;
         }
-        mUnnamed = into;
+        into.held = true;
+        mUnnamed  = into;
         return;
     }
     if (name >= 'a' && name <= 'z')
@@ -87,29 +105,10 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
     {
         mRegisters['0'] = reg;
     }
-    else
+    else if (!lines)
     {
-        const bool lines = linewise || reg.text.find('\n') != std::string::npos;
-        if (lines || register_one)
-        {
-            // A delete of a line or more, or a smaller one `register_one`
-            // says is kept here: the last nine kept, newest first, each
-            // moved down one rather than copied.
-            for (char n = '9'; n > '1'; --n)
-            {
-                const auto older = mRegisters.find(static_cast<char>(n - 1));
-                if (older != mRegisters.end())
-                {
-                    mRegisters[n] = std::move(older->second);
-                }
-            }
-            mRegisters['1'] = reg;
-        }
-        if (!lines)
-        {
-            // A smaller delete.
-            mRegisters['-'] = reg;
-        }
+        // A smaller delete.
+        mRegisters['-'] = reg;
     }
     // The unnamed register: the clipboard, which the world shares, where
     // the setting says so; the editor's own otherwise.
@@ -152,16 +151,18 @@ ALVimRegisters::Register ALVimRegisters::fetch(char name, bool unnamed_clipboard
     if (mPaste(text))
     {
         reg.text = text;
+        reg.held = true;
         if (text == mUnnamed.text)
         {
             reg.linewise = mUnnamed.linewise;
             reg.block    = mUnnamed.block;
         }
     }
-    else if (mUnnamed.linewise && mUnnamed.text.empty())
+    else if (mUnnamed.held && mUnnamed.text.empty())
     {
-        // An empty line of ours leaves the clipboard empty, which may then
-        // say it holds nothing at all.
+        // An empty one of ours -- a line, or what yiw takes on an empty
+        // line -- leaves the clipboard empty, which may then say it holds
+        // nothing at all.
         reg = mUnnamed;
     }
     return reg;
@@ -174,4 +175,5 @@ void ALVimRegisters::record(char name, const std::string& keys)
     reg.text          = append ? reg.text + keys : keys;
     reg.linewise      = false;
     reg.block         = false;
+    reg.held          = true;
 }

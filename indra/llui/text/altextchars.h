@@ -81,8 +81,18 @@ inline bool alNamePartAt(std::string_view name, size_t at)
     return upper(c) && upper(prev) && at + 1 < name.size() && lower(name[at + 1]);
 }
 
+// A byte a pattern in Perl's syntax, as the find bar and vim's search
+// compile one, reads as itself only with a backslash before it. Not every
+// byte that is not a word's: a backslash makes `<` and `'` anchors.
+inline bool alRegexSpecial(char c)
+{
+    constexpr std::string_view specials("\\^$.|?*+()[]{}");
+    return specials.find(c) != std::string_view::npos;
+}
+
 // The end of a match of the needle at `at` in the hay, or npos. Without
-// regard to case it compares codepoint by codepoint.
+// regard to case it compares codepoint by codepoint: two ASCII bytes as
+// they are, a character each, and past ASCII decoded.
 inline size_t alMatchAt(std::string_view hay, size_t at, std::string_view needle, bool case_insensitive)
 {
     if (!case_insensitive)
@@ -100,6 +110,18 @@ inline size_t alMatchAt(std::string_view hay, size_t at, std::string_view needle
         if (h >= hay.size())
         {
             return std::string_view::npos;
+        }
+        const unsigned char hb = static_cast<unsigned char>(hay[h]);
+        const unsigned char nb = static_cast<unsigned char>(needle[n]);
+        if (hb < 0x80 && nb < 0x80)
+        {
+            if (hb != nb && LLStringOps::toLower(static_cast<char>(hb)) != LLStringOps::toLower(static_cast<char>(nb)))
+            {
+                return std::string_view::npos;
+            }
+            ++h;
+            ++n;
+            continue;
         }
         const LLCodepointAt hc = utf8str_decode_at(hay, h);
         const LLCodepointAt nc = utf8str_decode_at(needle, n);
@@ -129,13 +151,41 @@ inline T alNextTabStop(T at, T tab_width)
     }
 }
 
+// A blank, as a line's indentation and its end count one: a space or a
+// tab.
+inline bool alBlankByte(char c)
+{
+    return c == ' ' || c == '\t';
+}
+
+// How many bytes the blanks a text begins with are.
+inline size_t alLeadingBlankBytes(std::string_view text)
+{
+    size_t at = 0;
+    while (at < text.size() && alBlankByte(text[at]))
+    {
+        ++at;
+    }
+    return at;
+}
+
+// The text without the blanks it ends with.
+inline std::string_view alTrimmedEnd(std::string_view text)
+{
+    while (!text.empty() && alBlankByte(text.back()))
+    {
+        text.remove_suffix(1);
+    }
+    return text;
+}
+
 // How wide the blanks a text begins with are drawn, in display columns,
 // each tab to its next stop; and how many bytes they are.
 inline S32 alBlanksWidth(std::string_view text, S32 tab_width, size_t* bytes = nullptr)
 {
     S32    width = 0;
     size_t at    = 0;
-    for (; at < text.size() && (text[at] == ' ' || text[at] == '\t'); ++at)
+    for (; at < text.size() && alBlankByte(text[at]); ++at)
     {
         width = text[at] == '\t' ? alNextTabStop(width, tab_width) : width + 1;
     }

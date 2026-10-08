@@ -342,6 +342,18 @@ namespace tut
         m.setFoldOpen(0, true);
         m.setSwapped(true);
         ensure("swapped, open still", m.foldCount() == 1 && m.foldOpen(0));
+
+        // Two lines put in before the run: it hides the left's lines from 3
+        // and the right's from 5, and is open still whichever side each is
+        // shown on.
+        m.setSwapped(false);
+        m.setTexts(lines(30).c_str(), ("new 0\nnew 1\n" + lines(30, { { 27, "line 27 changed" } })).c_str());
+        ensure("the run's first lines the left's 3 and the right's 5", m.foldCount() == 1 && m.foldFirstLine(Column::Left, 0) == 3 && m.foldFirstLine(Column::Right, 0) == 5);
+        m.setFoldOpen(0, true);
+        m.setSwapped(true);
+        ensure("lines put in before it: swapped, open still", m.foldCount() == 1 && m.foldOpen(0));
+        m.setSwapped(false);
+        ensure("and swapped back", m.foldCount() == 1 && m.foldOpen(0));
     }
 
     template<> template<>
@@ -1694,7 +1706,7 @@ namespace tut
         ensure("ours: no edit", settling && !settling->edits);
         merged->clear();
         m.settled(*settling);
-        ensure("settled: found again by its own", has_base(*merged) && compared->empty());
+        ensure("settled: found again by its own, from ours's runs of the base as they were, so the base not read again", !merged->empty() && !has_base(*merged) && compared->empty());
         ensure_equals("none left", m.conflictCount(), 0);
 
         // Typed in: the comparison's asked for what it compares, never the
@@ -1776,5 +1788,371 @@ namespace tut
         };
         as_afresh(broken, 4, "the opener broken");
         as_afresh(typed, 2, "mended");
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<41>()
+    {
+        set_test_name("the left of another version: a run opened stays open where it hides the same first line of the right, compared afresh or again in part, ranges let go of or none");
+        // Two runs: the right's lines 6 to 16, and 24 to 33.
+        const std::string right = lines(40, { { 2, "2" }, { 20, "20" }, { 37, "37" } });
+        m.setTexts(lines(40, { { 2, "two" }, { 20, "twenty" }, { 37, "thirty-seven" } }), right);
+        ensure_equals("two runs", m.foldCount(), 2);
+        m.setFoldOpen(1, true);
+        // Changed near both ends: more than half of each to compare again,
+        // so all of it.
+        m.setLeftText(lines(40, { { 2, "TWO" }, { 20, "twenty" }, { 37, "THIRTY-SEVEN" } }));
+        ensure("compared afresh: the second open still, the first folded", m.foldCount() == 2 && !m.foldOpen(0) && m.foldOpen(1));
+        // Changed between the runs: compared again there alone.
+        m.setLeftText(lines(40, { { 2, "TWO" }, { 20, "TWENTY" }, { 37, "THIRTY-SEVEN" } }));
+        ensure("compared again in part: the same", m.foldCount() == 2 && !m.foldOpen(0) && m.foldOpen(1));
+
+        // Ranges, which the left of another version lets go of.
+        m.setTexts(lines(40, { { 2, "two" }, { 20, "twenty" }, { 37, "thirty-seven" } }), right, { { 0, 0, 0, 0 } });
+        ensure_equals("two runs, lined up by the range", m.foldCount(), 2);
+        m.setFoldOpen(0, true);
+        m.setLeftText(lines(40, { { 2, "two" }, { 20, "twenty!" }, { 37, "thirty-seven" } }));
+        ensure("ranges let go of: the first open still, the second folded", m.ranges().empty() && m.foldCount() == 2 && m.foldOpen(0) && !m.foldOpen(1));
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<42>()
+    {
+        set_test_name("pairs that line the texts up otherwise: a run opened stays open where it hides the same first line of the right, though there are fewer runs now, and more again after");
+        // Twenty lines the same, then ten that went from before thirty more
+        // to after them: by lines the thirty kept, the ten taken out and put
+        // in; paired, the ten kept, the thirty taken out and put in.
+        const auto block = [](const char* said, S32 count) {
+            std::string out;
+            for (S32 n = 0; n < count; ++n)
+            {
+                out += said + std::to_string(n) + "\n";
+            }
+            return out;
+        };
+        const std::string same  = block("same ", 20);
+        const std::string moved = block("moved ", 10);
+        const std::string rest  = block("rest ", 30);
+        m.setTexts(same + moved + rest + "end", same + rest + moved + "end");
+        ensure_equals("by lines: the twenty folded, and the thirty", m.foldCount(), 2);
+        m.setFoldOpen(0, true);
+        ensure("paired: laid out again", m.setPairs({ { 20, 29, 50, 59 } }));
+        ensure("the thirty a change now, the ten too few to fold: the twenty alone, open still", m.foldCount() == 1 && m.foldOpen(0));
+        ensure("unpaired: laid out again", m.setPairs({}));
+        ensure("two runs again: the twenty open still, the thirty folded", m.foldCount() == 2 && m.foldOpen(0) && !m.foldOpen(1));
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<43>()
+    {
+        set_test_name("comments let go of: a block whose one end is a change of comments alone, shown as the same, is no block moved; its other end signed as its own, with no step to an end not shown");
+        // A line a comment where it starts //, the rest code.
+        auto said = std::make_shared<std::deque<std::vector<ALTextDiff::regions_t>>>();
+        m.setLexer([said](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            if (said->size() > 4)
+            {
+                said->pop_front();
+            }
+            std::vector<ALTextDiff::regions_t>& out = said->emplace_back();
+            for (const std::string& line : lines)
+            {
+                const ALTextDiff::Region region = line.rfind("//", 0) == 0 ? ALTextDiff::Region::Comment : ALTextDiff::Region::Code;
+                out.push_back({ ALTextDiff::Piece{ 0, static_cast<S32>(line.size()), region } });
+            }
+            return out;
+        });
+        ALTextDiff::Likeness like;
+        like.ignoreComments = true;
+        m.setLikeness(like);
+        // Two lines of comment taken from the top and put in at the end,
+        // after a line of code put in there.
+        const std::string comment  = "// a block of comment lines\n// moved down as one";
+        const std::string code     = lines(10);
+        const std::string at_top   = comment + "\n" + code + "\ntail";
+        const std::string at_end   = code + "\nput in\n" + comment + "\ntail";
+        const std::string ten_same(10, '\0');
+        m.setTexts(at_top, at_end);
+        ensure_equals("the comments taken out no change: the line put in alone", m.changeCount(), 1);
+        ensure_equals("no block moved", m.moveCount(), 0);
+        ensure("the comments put in signed as put in", signsOf(Column::Right) == ten_same + "+++" + std::string(1, '\0'));
+        ensure("no other end, side by side or inline", m.moveOtherEnd(Column::Right, 11).second == -1 && m.moveOtherEnd(Column::Inline, 12).second == -1);
+
+        // The other way: put in at the top, a change of comments alone, and
+        // taken out from beside code.
+        m.setTexts(at_end, at_top);
+        ensure_equals("the comments put in no change: the line taken out alone", m.changeCount(), 1);
+        ensure_equals("no block moved either", m.moveCount(), 0);
+        ensure("the comments taken out signed as taken out", signsOf(Column::Left) == ten_same + "---" + std::string(1, '\0'));
+        ensure("no other end, side by side or inline", m.moveOtherEnd(Column::Left, 12).second == -1 && m.moveOtherEnd(Column::Inline, 14).second == -1);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<44>()
+    {
+        set_test_name("blocks moved told by their lines' regions where case is let go of, as the lines are: a string's case changed in one parts it there; a block comment opened above it on one side keys its lines again, as afresh");
+        // Strings in quotes, a comment from a line opening one with /* to a
+        // line holding */, the rest code.
+        auto                      said  = std::make_shared<std::deque<std::vector<ALTextDiff::regions_t>>>();
+        const ALTextDiff::lexer_t lexer = [said](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            std::vector<ALTextDiff::regions_t>& out     = said->emplace_back();
+            bool                                comment = false;
+            for (const std::string& line : lines)
+            {
+                comment                   = comment || line.rfind("/*", 0) == 0;
+                const size_t          open  = line.find('"');
+                const size_t          close = open == std::string::npos ? std::string::npos : line.find('"', open + 1);
+                ALTextDiff::regions_t one;
+                if (comment)
+                {
+                    one.push_back({ 0, static_cast<S32>(line.size()), ALTextDiff::Region::Comment });
+                }
+                else if (close != std::string::npos)
+                {
+                    one.push_back({ 0, static_cast<S32>(open), ALTextDiff::Region::Code });
+                    one.push_back({ static_cast<S32>(open), static_cast<S32>(close) + 1, ALTextDiff::Region::String });
+                    one.push_back({ static_cast<S32>(close) + 1, static_cast<S32>(line.size()), ALTextDiff::Region::Code });
+                }
+                else
+                {
+                    one.push_back({ 0, static_cast<S32>(line.size()), ALTextDiff::Region::Code });
+                }
+                out.push_back(std::move(one));
+                comment = comment && line.find("*/") == std::string::npos;
+            }
+            return out;
+        };
+        // Six lines saying something moved from near the top to near the
+        // end, the third's string in another case.
+        std::vector<std::string> left;
+        for (S32 n = 0; n < 100; ++n)
+        {
+            left.push_back(n >= 10 && n < 16 ? "    llOwnerSay(\"Block line " + std::to_string(n) + "\");" : "    statement number " + std::to_string(n) + " goes here;");
+        }
+        std::vector<std::string> right = left;
+        std::vector<std::string> block(right.begin() + 10, right.begin() + 16);
+        right.erase(right.begin() + 10, right.begin() + 16);
+        block[2] = "    llOwnerSay(\"block line 12\");";
+        right.insert(right.begin() + 80, block.begin(), block.end());
+        const auto joined = [](const std::vector<std::string>& lines) {
+            std::string out;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                out += (i ? "\n" : "") + lines[i];
+            }
+            return out;
+        };
+        ALDiffModel kept;
+        ALDiffModel whole;
+        whole.setKeepsLayout(false);
+        const auto both = [&](const std::function<void(ALDiffModel&)>& done, const std::string& where) {
+            done(kept);
+            done(whole);
+            aldiffmodel_data::sameLayout(kept, whole, where);
+        };
+        ALTextDiff::Likeness cased;
+        cased.ignoreCase = true;
+        both(
+            [&](ALDiffModel& m) {
+                m.setLexer(lexer);
+                m.setLikeness(cased);
+                m.setTexts(joined(left), joined(right));
+            },
+            "moved");
+        ensure_equals("parted at the line whose string's case changed: two moves", kept.moveCount(), 2);
+        ensure("that line in neither", kept.line(Column::Left, 12).sign != '>' && kept.line(Column::Left, 11).sign == '>' && kept.line(Column::Left, 13).sign == '>');
+        both([&](ALDiffModel& m) { m.setSwapped(true); }, "swapped");
+        ensure_equals("swapped: two moves", kept.moveCount(), 2);
+        both([&](ALDiffModel& m) { m.setSwapped(false); }, "not swapped");
+
+        // A block comment opened above the block on the right and never
+        // closed: its strings a comment's, their case let go of, and so
+        // none of its lines the left's.
+        std::vector<std::string> opened = right;
+        opened[70]                      = "/* opened";
+        both([&](ALDiffModel& m) { m.setRightText(joined(opened)); }, "a comment opened");
+        ensure_equals("the block in a comment: no move", kept.moveCount(), 0);
+        both([&](ALDiffModel& m) { m.setRightText(joined(right)); }, "the comment taken out");
+        ensure_equals("two moves again", kept.moveCount(), 2);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<45>()
+    {
+        set_test_name("by structure, LSL beside its SLua with the converter's table in each range: a line written otherwise no change, one that says more marked only there; read again as typed in, the same");
+        const ALTextDiff::same_t table = ALDiffSame::make({ { "llSay", "ll.Say" } }, { ";" });
+        std::string              lsl;
+        std::string              slua;
+        ALTextDiff::ranges_t     ranges;
+        const auto               said = [](S32 n, S32 number) { return "ll.Say(0, " + std::to_string(number) + ")" + (n < 19 ? "\n" : ""); };
+        for (S32 n = 0; n < 20; ++n)
+        {
+            lsl += "llSay(0, " + std::to_string(n) + ");" + (n < 19 ? "\n" : "");
+            slua += said(n, n == 7 ? 70 : n);
+            ranges.push_back({ n, n, n, n, table });
+        }
+        m.setAlgorithm(ALTextDiff::Algorithm::Structural);
+        m.setTexts(lsl, slua, ranges);
+        ensure("not too large", !m.fellBack());
+        ensure_equals("the calls written otherwise no change; the one that says more one", m.changeCount(), 1);
+        ensure("marked only where it says more", m.line(Column::Left, 7).words == ALTextDiff::spans_t{ { 9, 10 } } &&
+                                                     m.line(Column::Right, 7).words == ALTextDiff::spans_t{ { 10, 12 } });
+        // Another typed in: its change read again, by its range's table.
+        std::string typed;
+        for (S32 n = 0; n < 20; ++n)
+        {
+            typed += said(n, n == 7 ? 70 : n == 12 ? 120 : n);
+        }
+        m.setRightText(typed);
+        ensure_equals("typed in: two", m.changeCount(), 2);
+        ensure("the one typed marked only where it says more", m.line(Column::Left, 12).words == ALTextDiff::spans_t{ { 9, 11 } } &&
+                                                                   m.line(Column::Right, 12).words == ALTextDiff::spans_t{ { 10, 13 } });
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<46>()
+    {
+        set_test_name("the LSL grammar's lexer saying what it read again: a keystroke reading no line after it otherwise hashes no line's regions to know so, blanks let go of or not; a block comment's opener broken and mended compares again and lays out again as far as the regions hashed say, and as afresh");
+        std::string                                  error;
+        const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+        ensure("the LSL grammar", lsl != nullptr);
+        // A string differing only by its blanks inside a block comment on
+        // both sides, a line below it typed in, and a change far below.
+        const auto script = [](const char* opener, const char* said, const char* thirty, const char* below) {
+            return aldiffmodel_data::lines(200, { { 10, opener }, { 14, said }, { 16, "*/" }, { 30, thirty }, { 150, below } });
+        };
+        const std::string left   = script("/* note", "llSay(0, \"a b\");", "line 30", "fifty");
+        const std::string right  = script("/* note", "llSay(0, \"a  b\");", "line 30", "FIFTY");
+        const std::string typed  = script("/* note", "llSay(0, \"a  b\");", "line 30 typed", "FIFTY");
+        const std::string broken = script("/ note", "llSay(0, \"a  b\");", "line 30 typed", "FIFTY");
+        const auto sameRelaid = [](const ALDiffModel::Relaid& a, const ALDiffModel::Relaid& b) {
+            bool same = a.whole == b.whole;
+            for (size_t c = 0; c < 3; ++c)
+            {
+                same = same && a.first[c] == b.first[c] && a.was[c] == b.was[c] && a.now[c] == b.now[c] && a.numbered[c] == b.numbered[c];
+            }
+            return same;
+        };
+        for (const bool blanks : { true, false })
+        {
+            const std::string    where = blanks ? "blanks let go of" : "blanks kept";
+            ALTextDiff::Likeness like;
+            like.ignoreWhitespace = blanks;
+            // Told by the lexer what it read again, as a view is; and by the
+            // regions hashed before the side is read again and after.
+            ALDiffModel told;
+            const auto  lexer = std::make_shared<ALDiffLexer>(lsl);
+            told.setLexer(ALDiffLexer::lexerOf(lexer), ALTextDiff::lexer_t(), ALDiffLexer::rereadOf(lexer));
+            ALDiffModel hashing;
+            hashing.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+            for (ALDiffModel* each : { &told, &hashing })
+            {
+                each->setLikeness(like);
+                each->setTexts(left, right);
+            }
+
+            // Typed in below the comment, reading no line after it
+            // otherwise: no line's regions hashed but by the search for
+            // blocks moved, which keys by them, of the lines of the two
+            // changes at most.
+            const U64 hashed = ALTextDiff::hashed();
+            told.setRightText(typed);
+            const U64 cost = ALTextDiff::hashed() - hashed;
+            ensure(where + ": typed in, no line after it hashed: " + std::to_string(cost), cost <= (blanks ? 4u : 0u));
+            hashing.setRightText(typed);
+            aldiffmodel_data::sameLayout(told, hashing, where + ": typed in");
+
+            // The comment's opener broken, and mended: the lines down to its
+            // close read otherwise, compared again and laid out again as far
+            // as the regions hashed say.
+            const auto as_hashed = [&](const std::string& text, const std::string& step) {
+                told.setRightText(text);
+                const S32                 told_compared = ALDiffSplice::lastCompared();
+                const ALDiffModel::Relaid told_relaid   = told.relaid();
+                hashing.setRightText(text);
+                ensure_equals(step + ": compared again as far", told_compared, ALDiffSplice::lastCompared());
+                ensure(step + ": laid out again as far", sameRelaid(told_relaid, hashing.relaid()));
+                aldiffmodel_data::sameLayout(told, hashing, step);
+                ALDiffModel fresh;
+                fresh.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+                fresh.setLikeness(like);
+                fresh.setTexts(left, text);
+                aldiffmodel_data::sameLayout(told, fresh, step + ", as afresh");
+            };
+            as_hashed(broken, where + ": the opener broken");
+            as_hashed(typed, where + ": mended");
+        }
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<47>()
+    {
+        set_test_name("the LSL grammar's lexer saying what it read again, case let go of: a keystroke makes a number of the regions of only the lines the search for blocks moved keys, not every changed line's; a block comment opened above a block moved, and taken out, keys its lines again, as afresh");
+        std::string                                  error;
+        const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+        ensure("the LSL grammar", lsl != nullptr);
+        // Forty lines saying something moved from near the top to near the
+        // end, the third's string in another case.
+        std::vector<std::string> left;
+        for (S32 n = 0; n < 200; ++n)
+        {
+            left.push_back(n >= 10 && n < 50 ? "    llOwnerSay(\"Block line " + std::to_string(n) + "\");" : "    statement number " + std::to_string(n) + " goes here;");
+        }
+        std::vector<std::string> right = left;
+        std::vector<std::string> block(right.begin() + 10, right.begin() + 50);
+        right.erase(right.begin() + 10, right.begin() + 50);
+        block[2] = "    llOwnerSay(\"block line 12\");";
+        right.insert(right.begin() + 140, block.begin(), block.end());
+        const auto joined = [](const std::vector<std::string>& lines) {
+            std::string out;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                out += (i ? "\n" : "") + lines[i];
+            }
+            return out;
+        };
+        // Told by the lexer what it read again, as a view is; and every line
+        // keyed afresh each search.
+        ALDiffModel kept;
+        const auto  lexer = std::make_shared<ALDiffLexer>(lsl);
+        kept.setLexer(ALDiffLexer::lexerOf(lexer), ALTextDiff::lexer_t(), ALDiffLexer::rereadOf(lexer));
+        ALDiffModel whole;
+        whole.setKeepsLayout(false);
+        whole.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+        const auto both = [&](const std::function<void(ALDiffModel&)>& done, const std::string& where) {
+            done(kept);
+            done(whole);
+            aldiffmodel_data::sameLayout(kept, whole, where);
+        };
+        ALTextDiff::Likeness cased;
+        cased.ignoreCase = true;
+        both(
+            [&](ALDiffModel& model) {
+                model.setLikeness(cased);
+                model.setTexts(joined(left), joined(right));
+            },
+            "moved");
+        ensure_equals("parted at the line whose string's case changed: two moves", kept.moveCount(), 2);
+
+        // Typed in between the block's two places: the line typed and its
+        // other keyed, and no line of the block made a number again.
+        std::vector<std::string> typed = right;
+        typed[100] += " // typed";
+        const U64 hashed = ALTextDiff::hashed();
+        kept.setRightText(joined(typed));
+        const U64 cost = ALTextDiff::hashed() - hashed;
+        ensure("typed in: the lines keyed alone made a number: " + std::to_string(cost), cost <= 4u);
+        whole.setRightText(joined(typed));
+        aldiffmodel_data::sameLayout(kept, whole, "typed in");
+        ensure_equals("two moves still", kept.moveCount(), 2);
+
+        // A block comment opened above the block on the right and never
+        // closed: its strings a comment's, their case let go of, and so none
+        // of its lines the left's; and taken out, the two moves again.
+        std::vector<std::string> opened = typed;
+        opened[130]                     = "/* opened";
+        both([&](ALDiffModel& model) { model.setRightText(joined(opened)); }, "a comment opened");
+        ensure_equals("the block in a comment: no move", kept.moveCount(), 0);
+        both([&](ALDiffModel& model) { model.setRightText(joined(typed)); }, "the comment taken out");
+        ensure_equals("two moves again", kept.moveCount(), 2);
     }
 }

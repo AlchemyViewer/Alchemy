@@ -92,7 +92,9 @@ namespace ALKeyChords
 
     bool takeKey(KEY pressed, MASK mask)
     {
-        if (!live() || pressed == KEY_SHIFT || pressed == KEY_CONTROL || pressed == KEY_ALT)
+        // A modifier, or Caps Lock pressed to type capitals, is no second
+        // key: the wait goes on to the key it is held or toggled for.
+        if (!live() || pressed == KEY_SHIFT || pressed == KEY_CONTROL || pressed == KEY_ALT || pressed == KEY_CAPSLOCK)
         {
             return false;
         }

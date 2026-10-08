@@ -43,8 +43,7 @@ bool ll::prefs::SearchableItem::hightlightAndHide( std::string_view aFilter )
     if( mCtrl->getHighlighted() )
         return true;
 
-    LLView const *pView = dynamic_cast< LLView const* >( mCtrl );
-    if( pView && !pView->getVisible() )
+    if( mView && !mView->getVisible() )
         return false;
 
     if( aFilter.empty() )

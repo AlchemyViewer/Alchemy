@@ -1516,4 +1516,104 @@ namespace tut
         ensure("the line the same: anchored", told_same(runs, 25));
         ensure("as the whole would find them: anchored", runs == ALTextDiff::lines(l_lines, r_typed, anchored));
     }
+
+    template<> template<>
+    void altextdiff_object::test<31>()
+    {
+        set_test_name("a word changed into one like it, case let go of: marked by what differs but for case; a string's case its own");
+        typedef ALTextDiff::spans_t S;
+        S                    left, right;
+        ALTextDiff::Likeness cased;
+        cased.ignoreCase = true;
+        ALTextDiff::words("x = getValue;", "x = GETVALUES;", left, right);
+        ensure("as they are: the whole of each", left == S{ { 4, 12 } } && right == S{ { 4, 13 } });
+        ALTextDiff::words("x = getValue;", "x = GETVALUES;", left, right, as(cased));
+        ensure("case let go of: the letter put on alone", left.empty() && right == S{ { 12, 13 } });
+        const std::string was     = "say(\"getValue\");";
+        const std::string now     = "say(\"GETVALUES\");";
+        const auto        was_reg = quoted(was);
+        const auto        now_reg = quoted(now);
+        ALTextDiff::words(was, now, left, right, as(cased), &was_reg, &now_reg);
+        ensure("in a string: the whole of each", left == S{ { 5, 13 } } && right == S{ { 5, 14 } });
+    }
+
+    template<> template<>
+    void altextdiff_object::test<32>()
+    {
+        set_test_name("a word changed into one like it marked at the edges of characters as they are read: a letter with the mark on it, an emoji of several joined");
+        typedef ALTextDiff::spans_t S;
+        S left, right;
+        // An e and a combining acute, against an e alone.
+        ALTextDiff::words("x = cafe\xCC\x81s;", "x = cafes;", left, right);
+        ensure("the letter with its mark, not the mark alone", left == S{ { 7, 10 } } && right == S{ { 7, 8 } });
+        // A family of three joined, its last another.
+        ALTextDiff::words("x = \xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x91\xA7;",
+                          "x = \xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x91\xA6;", left, right);
+        ensure("the emoji whole, not the last of it", left == S{ { 4, 22 } } && right == S{ { 4, 22 } });
+    }
+
+    template<> template<>
+    void altextdiff_object::test<33>()
+    {
+        set_test_name("blocks moved told by their lines' regions, as the lines are: a string's case changed in one parts it where case is let go of; a comment changed in one does not where comments are");
+        typedef ALDiffMoves::moves_t M;
+        typedef ALTextDiff::Region   R;
+        const auto fn = [](const std::string& name, const std::string& said, const std::string& note) {
+            return std::vector<std::string>{ "integer " + name + "(integer a)", "{", "    llOwnerSay(\"" + said + "\");", "    return a * 2; // " + note, "}", "" };
+        };
+        const auto join = [](std::initializer_list<std::vector<std::string>> parts) {
+            std::vector<std::string> out;
+            for (const auto& part : parts)
+            {
+                out.insert(out.end(), part.begin(), part.end());
+            }
+            return out;
+        };
+        const std::vector<std::string> abc = join({ fn("alpha", "alpha called", "doubled"), fn("beta", "beta called", "doubled"), fn("gamma", "gamma called", "doubled") });
+
+        // By a grammar of quoted strings, case let go of: alpha moved, the
+        // case of its string changed.
+        auto                said     = std::make_shared<std::deque<std::vector<ALTextDiff::regions_t>>>();
+        ALTextDiff::Options by_quotes;
+        by_quotes.like.ignoreCase = true;
+        by_quotes.lexer           = [said](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            std::vector<ALTextDiff::regions_t>& out = said->emplace_back();
+            for (const std::string& line : lines)
+            {
+                out.push_back(altextdiff_data::quoted(line));
+            }
+            return out;
+        };
+        const std::vector<std::string> recased = join({ fn("beta", "beta called", "doubled"), fn("gamma", "gamma called", "doubled"),
+                                                        fn("alpha", "Alpha called", "doubled") });
+        const M parted = ALDiffMoves::find(abc, recased, ALTextDiff::lines(abc, recased, by_quotes), by_quotes);
+        ensure("the string's line in no block: alpha's head alone moved", parted == M{ { 0, 12, 2 } });
+
+        // By a grammar of comments from //, comments let go of: alpha
+        // moved, its comment reworded.
+        ALTextDiff::Options by_comments;
+        by_comments.like.ignoreComments = true;
+        by_comments.lexer               = [said](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            std::vector<ALTextDiff::regions_t>& out = said->emplace_back();
+            for (const std::string& line : lines)
+            {
+                const size_t          at = line.find("//");
+                ALTextDiff::regions_t one;
+                if (at != 0)
+                {
+                    one.push_back({ 0, static_cast<S32>(at == std::string::npos ? line.size() : at), R::Code });
+                }
+                if (at != std::string::npos)
+                {
+                    one.push_back({ static_cast<S32>(at), static_cast<S32>(line.size()), R::Comment });
+                }
+                out.push_back(one);
+            }
+            return out;
+        };
+        const std::vector<std::string> renoted = join({ fn("beta", "beta called", "doubled"), fn("gamma", "gamma called", "doubled"),
+                                                        fn("alpha", "alpha called", "twice") });
+        const M whole = ALDiffMoves::find(abc, renoted, ALTextDiff::lines(abc, renoted, by_comments), by_comments);
+        ensure("the comment let go of: all of alpha one block", whole == M{ { 0, 12, 6 } });
+    }
 }

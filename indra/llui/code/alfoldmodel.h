@@ -169,10 +169,32 @@ private:
         std::vector<Block> blocks;
     };
     const Line& lineAt(const ALTextDocument& doc, S32 line);
+    // Tabs as wide as this from now, every line read again where they were
+    // another width.
+    void        setTabWidth(S32 tab_width);
+    // Each block's last line by its first, into `end_of`, one a line, -1
+    // where none starts.
     void        bySyntax(const ALTextDocument& doc, std::vector<S32>& end_of);
-    void        byIndent(const ALTextDocument& doc, std::vector<Region>& out);
+    void        byIndent(const ALTextDocument& doc, std::vector<S32>& end_of);
+    // A `#region` or an `#endregion` met as the lines are walked in order:
+    // one opened, or the innermost still open ended there.
+    static void pairMarker(S8 marker, S32 line, std::vector<S32>& open, std::vector<S32>& end_of);
 
     std::vector<Region> mRegions;
+    // What finding the blocks works with, kept from one finding to the
+    // next rather than made again after every edit: each line's block end,
+    // what is open as the syntax is walked, the blocks opened on a line of
+    // their own, the region markers open, and each line's indentation.
+    struct Opened
+    {
+        S32  line  = 0;
+        bool first = false;
+    };
+    std::vector<S32>    mEndOf;
+    std::vector<Opened> mOpen;
+    std::vector<Region> mAlone;
+    std::vector<S32>    mMarked;
+    std::vector<S32>    mIndents;
     U32                 mVersion  = 0;
     // Tabs are measured by it where a line mixes them with spaces.
     S32                 mTabWidth = 0;

@@ -171,6 +171,7 @@ target_sources(
     studio/alstudiofloater.cpp
     base/alsurface.cpp
     code/alcodecards.cpp
+    code/alcodeliterals.cpp
     code/alchangepeek.cpp
     code/alchangessincesaved.cpp
     code/alcodeeditor.cpp
@@ -383,7 +384,6 @@ target_sources(
         diff/aldiffsplice.h
         diff/aldifftokens.h
         diff/aldiffview.h
-        text/allinebreaks.h
         diff/allinediff.h
         diff/allinepairs.h
         diff/alstructuraldiff.h
@@ -412,6 +412,7 @@ target_sources(
         base/alundostack.h
         base/alstringmatch.h
         code/alcodecards.h
+        code/alcodeliterals.h
         code/alchangepeek.h
         code/alchangessincesaved.h
         code/alcodeeditor.h

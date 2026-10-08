@@ -1089,4 +1089,20 @@ namespace tut
         }
         ensure("not its name among the strings", !looked_up);
     }
+
+    // A heavy string is named on one line as a string of the table is, a
+    // return in it written out as a break and a tab are.
+    template<> template<>
+    void alscriptweight_object::test<20>()
+    {
+        const ALScriptWeight weight = ALScriptWeigh::slua("local s = \"a\\rb\\tc" + std::string(300, 'x') + "\"\nprint(s)\n");
+        ensure("compiled: " + weight.error, weight.compiled);
+        const ALScriptWeight::Part* found = nullptr;
+        for (const ALScriptWeight::Part& one : weight.parts)
+        {
+            found = one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings" ? &one : found;
+        }
+        ensure("a part of its own:" + listed(weight), found != nullptr);
+        ensure("named on one line: " + found->name, found->name.rfind("\"a\\rb\\tc", 0) == 0 && found->name.find('\r') == std::string::npos);
+    }
 }

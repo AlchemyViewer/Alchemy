@@ -535,4 +535,24 @@ namespace tut
         }
         window->closeFloater();
     }
+
+    template<> template<>
+    void alstudiofloater_object::test<13>()
+    {
+        set_test_name("Caps Lock between the two keys is no second key: the wait goes on, and the key after it runs the two's command");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        TestStudio* window = studio();
+        S32         saved  = 0;
+        window->addCommand({ "save_all", 'S', MASK_NONE, true, 'K', MASK_CONTROL }, [&]() { ++saved; return true; });
+        LLLineEditor* typing = field(window, "text");
+        ensure("the first taken", typing->handleKey('K', MASK_CONTROL, false));
+        ensure("Caps Lock on its own is no second key", !ALKeyChords::takeKey(KEY_CAPSLOCK, MASK_NONE) && ALKeyChords::waiting());
+        ensure("the key after it the second", ALKeyChords::takeKey('S', MASK_NONE) && saved == 1 && !ALKeyChords::waiting());
+        ensure("its character taken with it", ALKeyChords::takeChar('S'));
+        ensure_equals("nothing typed", typing->getText(), std::string("text"));
+        window->closeFloater();
+    }
 }

@@ -140,4 +140,16 @@ namespace tut
         ensure_equals("never past its end", ALCodeCards::labelShift(300.f, 900.f, 150.f), 150.f);
         ensure_equals("nor before its start", ALCodeCards::labelShift(300.f, 20.f, 150.f), 0.f);
     }
+
+    template<> template<>
+    void alcodecards_object::test<6>()
+    {
+        set_test_name("a card of fixes and what the word is, with no problems above them: the first fix the first line, the head under the blank line");
+        const std::string              says = "integer x\n" + ALCodeCards::deprecatedNote();
+        const ALCodeCards::Composition card = ALCodeCards::compose({}, { fix("Declare 'x'", "declare") }, says, {});
+        ensure_equals("no blank line above the fix", card.text, "Fix: Declare 'x'\n\ninteger x\n" + ALCodeCards::deprecatedNote());
+        ensure("the fix on the first line", card.fixLines.size() == 1 && card.fixLines[0].first == 0);
+        ensure_equals("the head after the blank line", card.headLine, 2);
+        ensure("the deprecation on the line it is on", card.deprecatedLines == std::vector<S32>{ 3 });
+    }
 }

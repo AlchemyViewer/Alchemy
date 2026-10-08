@@ -109,8 +109,11 @@ namespace ALDiffSplice
     // The lines before the first changed and after the last as they were,
     // those between compared.
     LineMap lineMap(const std::vector<std::string>& was, const std::vector<std::string>& now);
-    // Where they differ known already: only the lines between read.
+    // Where they differ known already: only the lines between read. Or
+    // given those alone, the lines before and after them the text's as it
+    // was: what a text made anew is known by before its lines are made.
     LineMap lineMap(const std::vector<std::string>& was, const std::vector<std::string>& now, const ALDiffEdit::Edges& edges);
+    LineMap lineMapBetween(const std::vector<std::string>& was, const std::vector<std::string>& between, const ALDiffEdit::Edges& edges);
 }
 
 #endif // AL_ALDIFFSPLICE_H

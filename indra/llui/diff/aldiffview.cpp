@@ -107,7 +107,7 @@ ALDiffView::ALDiffView(const Params& p)
         takeBack(changeAtCaret());
         side->setFocus(true);
     });
-    mBar->setCopies({ [this]() { return !mModel.changeText(changeAtCaret(), frontShowsLeft()).empty(); }, [this]() { copyChange(changeAtCaret()); },
+    mBar->setCopies({ [this]() { return canCopyChange(); }, [this]() { copyChange(changeAtCaret()); },
                       [this]() { return changeCount() > 0; }, [this]() { copyUnifiedDiff(); } });
     mBar->onVersion([this](S32 version) {
         if (mVersionChosen)
@@ -181,6 +181,9 @@ ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::
     ALCodeEditor* made       = LLUICtrlFactory::create<ALCodeEditor>(p);
     addChild(made);
     made->setFoldable(false);
+    // And so would a header pinned over one side's top and not the other's,
+    // which a scroll to a line keeps clear of on that side alone.
+    made->setStickyHeaders(false);
     mConnections.emplace_back(made->onCaretMoved([this]() { refreshBar(); }));
     // The bar is of the side the keyboard is in.
     mConnections.emplace_back(made->setFocusChangedCallback([this](LLFocusableElement*) { refreshBar(); }));
@@ -316,9 +319,13 @@ void ALDiffView::compareBy(const std::shared_ptr<const ALSyntaxGrammar>& grammar
     mLexedBy = code;
     // Without one, comments are let go of no longer (ALDiffModel::setLexer).
     // A merge reads by a lexer of its own: the comparison's holds the texts
-    // it compares.
-    const auto lexer = [&code]() { return code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t(); };
-    const auto lex   = [this, &lexer]() { mModel.setLexer(lexer(), lexer()); };
+    // it compares, and says what it read again of them.
+    const auto lex = [this, &code]() {
+        const std::shared_ptr<ALDiffLexer> compared = code ? std::make_shared<ALDiffLexer>(code) : nullptr;
+        mModel.setLexer(compared ? ALDiffLexer::lexerOf(compared) : ALTextDiff::lexer_t(),
+                        code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t(),
+                        compared ? ALDiffLexer::rereadOf(compared) : ALTextDiff::reread_t());
+    };
     if (mModel.leftText().empty() && mModel.rightText().empty())
     {
         lex();
@@ -597,12 +604,25 @@ void ALDiffView::setNotes(std::vector<ALDiffModel::Note> notes)
 
 void ALDiffView::applyNotes(ALCodeEditor* side)
 {
+    // Not again where the side has them already: a right typed in leaves
+    // the left's notes, which are a converted script's hundreds, where they
+    // were, and the right has none to clear.
+    std::vector<ALDiffModel::Note> notes = mModel.notesIn(columnOf(side));
+    NotesGiven&                    given = mNotesGiven[static_cast<size_t>(columnOf(side))];
+    const U32                      now   = side->document().version();
+    if (given.version && given.notes == notes && (notes.empty() || *given.version == now))
+    {
+        return;
+    }
     std::vector<ALCodeEditor::LineNote> said;
-    for (const ALDiffModel::Note& note : mModel.notesIn(columnOf(side)))
+    said.reserve(notes.size());
+    for (const ALDiffModel::Note& note : notes)
     {
         said.push_back(ALCodeEditor::LineNote{ note.line, note.text, note.tip });
     }
     side->setLineNotes(said);
+    given.version = now;
+    given.notes   = std::move(notes);
 }
 
 void ALDiffView::refreshLinked()
@@ -1158,33 +1178,58 @@ void ALDiffView::drawRanges()
     const auto [right_from, right_end] = rowsInSight(mRight);
     const S32  from = llmin(left_from, right_from);
     const S32  end  = llmax(left_end, right_end);
-    const auto past = std::partition_point(mBandReach.begin(), mBandReach.end(), [from](const std::pair<S32, S32>& band) { return band.second <= from; });
-    for (size_t i = static_cast<size_t>(past - mBandReach.begin()); i < mBands.size() && mBandReach[i].first < end; ++i)
-    {
-        const S32 n = mBands[i];
-        // The one the caret is in, as its rows are, brighter.
-        const bool     linked = n == mLinked;
-        const LLColor4 band   = linked ? mLinkedColor % (0.2f * alpha) : mRight->textColor() % (0.08f * alpha);
-        const LLColor4 edge   = linked ? mLinkedColor % (0.8f * alpha) : mRight->textColor() % (0.35f * alpha);
-        const auto [lf, le] = mModel.rangeRows(n, Column::Left);
-        const auto [rf, re] = mModel.rangeRows(n, Column::Right);
-        const S32 lt = rowY(mLeft, lf);
-        const S32 lb = rowY(mLeft, le);
-        const S32 rt = rowY(mRight, rf);
-        const S32 rb = rowY(mRight, re);
-        if ((lb > top && rb > top) || (lt < bottom && rt < bottom) || (lt == lb && rt == rb))
+    const auto past        = std::partition_point(mBandReach.begin(), mBandReach.end(), [from](const std::pair<S32, S32>& band) { return band.second <= from; });
+    const auto eachInSight = [&](const auto& drawn) {
+        for (size_t i = static_cast<size_t>(past - mBandReach.begin()); i < mBands.size() && mBandReach[i].first < end; ++i)
         {
-            continue;
+            const S32 n = mBands[i];
+            const auto [lf, le] = mModel.rangeRows(n, Column::Left);
+            const auto [rf, re] = mModel.rangeRows(n, Column::Right);
+            const S32 lt = rowY(mLeft, lf);
+            const S32 lb = rowY(mLeft, le);
+            const S32 rt = rowY(mRight, rf);
+            const S32 rb = rowY(mRight, re);
+            if ((lb > top && rb > top) || (lt < bottom && rt < bottom) || (lt == lb && rt == rb))
+            {
+                continue;
+            }
+            drawn(n == mLinked, lt, lb, rt, rb);
         }
-        // The band, and its edges: a bracket on each side over its rows,
-        // the two joined top and bottom.
-        gl_triangle_2d(x0, lt, x1, rt, x1, rb, band, true);
-        gl_triangle_2d(x0, lt, x1, rb, x0, lb, band, true);
-        gl_line_2d(x0, lt, x1, rt, edge);
-        gl_line_2d(x0, lb, x1, rb, edge);
-        gl_line_2d(x0, lt, x0, lb, edge);
-        gl_line_2d(x1, rt, x1, rb, edge);
-    }
+    };
+    // The one the caret is in, as its rows are, brighter.
+    const LLColor4 band        = mRight->textColor() % (0.08f * alpha);
+    const LLColor4 edge        = mRight->textColor() % (0.35f * alpha);
+    const LLColor4 linked_band = mLinkedColor % (0.2f * alpha);
+    const LLColor4 linked_edge = mLinkedColor % (0.8f * alpha);
+    // Each band, then its edges: a bracket on each side over its rows, the
+    // two joined top and bottom. Every band in one batch, each in its own
+    // colour, and every edge in another: a band drawn apiece is two draws,
+    // and a conversion brackets nearly every statement.
+    gGL.getTextureSlot(0)->unbind();
+    gGL.begin(LLRender::TRIANGLES);
+    eachInSight([&](bool linked, S32 lt, S32 lb, S32 rt, S32 rb) {
+        gGL.color4fv((linked ? linked_band : band).mV);
+        gGL.vertex2i(x0, lt);
+        gGL.vertex2i(x1, rt);
+        gGL.vertex2i(x1, rb);
+        gGL.vertex2i(x0, lt);
+        gGL.vertex2i(x1, rb);
+        gGL.vertex2i(x0, lb);
+    });
+    gGL.end();
+    gGL.begin(LLRender::LINES);
+    eachInSight([&](bool linked, S32 lt, S32 lb, S32 rt, S32 rb) {
+        gGL.color4fv((linked ? linked_edge : edge).mV);
+        gGL.vertex2i(x0, lt);
+        gGL.vertex2i(x1, rt);
+        gGL.vertex2i(x0, lb);
+        gGL.vertex2i(x1, rb);
+        gGL.vertex2i(x0, lt);
+        gGL.vertex2i(x0, lb);
+        gGL.vertex2i(x1, rt);
+        gGL.vertex2i(x1, rb);
+    });
+    gGL.end();
 }
 
 bool ALDiffView::takeBack(S32 change)
@@ -1206,6 +1251,18 @@ bool ALDiffView::copyChange(S32 change)
 {
     const std::string text = mModel.changeText(change, frontShowsLeft());
     return !text.empty() && LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
+}
+
+bool ALDiffView::canCopyChange() const
+{
+    // By its counts: the lines themselves are not needed to say so.
+    const S32 change = changeAtCaret();
+    if (change < 0 || change >= changeCount())
+    {
+        return false;
+    }
+    const ALDiffModel::ChangeLines& lines = mModel.changeLines(change);
+    return (frontShowsLeft() ? lines.leftCount : lines.rightCount) > 0;
 }
 
 bool ALDiffView::frontShowsLeft() const
@@ -1436,7 +1493,7 @@ void ALDiffView::refreshBar()
     mBar->setTakeBackEnabled(mTakeBack && change >= 0);
     if (mModel.merging())
     {
-        mBar->setConflicts(mModel.conflictCount(), mTakeBack && mModel.changeConflicts(change));
+        mBar->setConflicts(mModel.conflictCount(), canSettleAtCaret());
     }
     mBar->setSteps(mModel.changeStep(column, line, false) >= 0, mModel.changeStep(column, line, true) >= 0);
 }

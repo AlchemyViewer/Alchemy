@@ -421,9 +421,7 @@ void LLIMWellWindow::closeAllImpl()
              iter_end = values.end();
          iter != iter_end; ++iter)
     {
-        LLPanel* panel = mMessageList->getItemByValue(*iter);
-
-        ObjectRowPanel* obj_panel = dynamic_cast <ObjectRowPanel*> (panel);
+        ObjectRowPanel* obj_panel = mMessageList->getTypedItemByValue<ObjectRowPanel>(*iter);
         if (obj_panel)
         {
             LLScriptFloaterManager::instance().removeNotification(*iter);

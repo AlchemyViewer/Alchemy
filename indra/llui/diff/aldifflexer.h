@@ -46,7 +46,9 @@
 // The last two texts it read are kept, with the state each line starts
 // in: a text read again after an edit -- a live comparison's right as it
 // is typed in -- is read again only from the edit until a line starts as
-// it did, and the rest kept, as the highlighter does.
+// it did, and the rest kept, as the highlighter does. What it read again
+// is said of each (ALTextDiff::Reread): how far after the edit the lines'
+// regions changed, which a comparison compares again, and no further.
 class ALDiffLexer
 {
 public:
@@ -56,6 +58,13 @@ public:
     const std::vector<ALTextDiff::regions_t>& regions(const std::vector<std::string>& lines);
     // A lexer_t over this, kept alive by what holds it.
     static ALTextDiff::lexer_t lexerOf(std::shared_ptr<ALDiffLexer> lexer);
+
+    // What it says of the text it holds whose regions it answered as
+    // `regions` (ALTextDiff::Reread); nothing of one it does not hold.
+    ALTextDiff::Reread          reread(const std::vector<ALTextDiff::regions_t>& regions) const;
+    // A reread_t over this, kept alive by what holds it: given beside a
+    // lexer_t over the same.
+    static ALTextDiff::reread_t rereadOf(std::shared_ptr<ALDiffLexer> lexer);
 
     // How many lines the last text asked for was read again: what a test
     // holds an edit's cost to.
@@ -69,6 +78,12 @@ private:
         std::vector<ALSyntaxState>         starts;
         std::vector<ALTextDiff::regions_t> regions;
         U64                                used = 0;
+        // Its number, and where it was read again in place of the text
+        // held before, that one's and the first line from which every line
+        // reads as it did there (ALTextDiff::Reread).
+        U64                                number = 0;
+        U64                                was    = 0;
+        S32                                same   = 0;
     };
 
     // Lines read already -- a text held, or what one held between where a
@@ -96,7 +111,8 @@ private:
     // A text mostly the one a slot held -- a keystroke's -- read again in
     // place: only from where the two first differ until a line after the
     // last starts as it did, what lies between taken from what it held
-    // where it can.
+    // where it can; each line after it read again compared with the
+    // regions it had.
     void readAgain(Text& text, const std::vector<std::string>& lines, const ALDiffEdit::Edges& edges);
     // A text read whole, each line taken from what either text held where
     // it can: the second of a comparison's texts read after the first.
@@ -110,8 +126,12 @@ private:
     std::shared_ptr<const ALSyntaxGrammar> mGrammar;
     ALSyntaxWords                          mWords;
     std::vector<ALSyntaxToken>             mTokens;
+    // A line after an edit as it is read again, beside the regions it had.
+    ALTextDiff::regions_t                  mAgain;
     Text                                   mTexts[2];
     U64                                    mClock    = 0;
+    // How many texts it has read, which numbers each.
+    U64                                    mNumbered = 0;
     S32                                    mLastRead = 0;
 };
 

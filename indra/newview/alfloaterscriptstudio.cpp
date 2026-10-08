@@ -132,6 +132,8 @@
 #include "rlvlocks.h"
 // [/RLVa:KB]
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <ctime>
 #include <filesystem>
@@ -250,7 +252,6 @@ using ALScriptFileIO::readWholeFile;
 using ALScriptFileIO::StudioLiveFile;
 using ALScriptPlaces::declaredOf;
 using ALScriptPlaces::isIdentifier;
-using ALScriptPlaces::lineOf;
 using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::outlineEntryOf;
 using ALScriptPlaces::outlineValue;
@@ -302,20 +303,6 @@ namespace
         }
         return item ? item->getAssetUUID() : LLUUID::null;
     }
-
-    // A message as one row reads it.
-    std::string oneLine(std::string text)
-    {
-        for (char& c : text)
-        {
-            if (c == '\n' || c == '\r' || c == '\t')
-            {
-                c = ' ';
-            }
-        }
-        return text;
-    }
-
 
     // Whether an item of a type is of the kind an argument names.
     bool itemOfKind(ALLSLTraits::Item kind, LLAssetType::EType type)
@@ -689,14 +676,14 @@ void ALFloaterScriptStudio::buildMenus()
     const std::function<void(LLView*)> resolve = [&](LLView* menu) {
         for (LLView* child : *menu->getChildList())
         {
-            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(child))
+            if (LLMenuItemBranchGL* branch = child->as<LLMenuItemBranchGL>())
             {
                 if (LLMenuGL* under = branch->getBranch())
                 {
                     resolve(under);
                 }
             }
-            else if (LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child); item && !dynamic_cast<LLMenuItemSeparatorGL*>(item))
+            else if (LLMenuItemGL* item = child->as<LLMenuItemGL>(); item && !item->as<LLMenuItemSeparatorGL>())
             {
                 mMenuItems.emplace(item->getName(), item);
             }
@@ -2059,7 +2046,7 @@ void ALFloaterScriptStudio::zoomText(S32 steps)
     ALScriptStudio::refreshAll();
     if (base > 0.f)
     {
-        setStatus(getString("TextSize", LLStringUtil::format_map_t{ { "[POINTS]", llformat("%g", base + static_cast<F32>(zoom)) } }));
+        setStatus(getString("TextSize", LLStringUtil::format_map_t{ { "[POINTS]", fmt::format("{:g}", base + static_cast<F32>(zoom)) } }));
     }
 }
 
@@ -3281,21 +3268,16 @@ void ALFloaterScriptStudio::findNotecardReaders(const Doc& doc)
     const std::string name = doc.name;
     auto read = [gather, name](const ALScriptRef& ref, const std::string& script, const std::string& text) {
         const std::vector<ALScriptSpan> spans = ALNotecardFormat::readersOf(text, name);
-        size_t                          from  = 0;
-        S32                             line  = 0;
+        // The lines they are on, for the list to show, split as readersOf
+        // splits them.
+        const ALScriptPlaces::Lines lines(text);
         for (const ALScriptSpan& span : spans)
         {
-            // The line it is on, for the list to show.
-            for (; line < span.line && from != std::string::npos; ++line)
-            {
-                from = text.find('\n', from);
-                from = from == std::string::npos ? from : from + 1;
-            }
             Doc::Place place;
             place.span     = span;
             place.file     = ALScriptPreprocessor::pathOf(ref);
             place.fileName = script;
-            place.text     = from == std::string::npos ? std::string() : text.substr(from, text.find('\n', from) - from);
+            place.text     = lines.line(span.line);
             place.at       = span.column + 1;
             gather->found.places.push_back(std::move(place));
         }
@@ -5253,7 +5235,7 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteCommands()
     std::function<void(LLView*, const std::string&)> collect = [&](LLView* menu, const std::string& path) {
         for (LLView* child : *menu->getChildList())
         {
-            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(child))
+            if (LLMenuItemBranchGL* branch = child->as<LLMenuItemBranchGL>())
             {
                 if (LLMenuGL* under = branch->getBranch())
                 {
@@ -5261,8 +5243,8 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteCommands()
                 }
                 continue;
             }
-            LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child);
-            if (!item || dynamic_cast<LLMenuItemSeparatorGL*>(item) || item->getLabel().empty() || item->getName() == "command_palette" ||
+            LLMenuItemGL* item = child->as<LLMenuItemGL>();
+            if (!item || item->as<LLMenuItemSeparatorGL>() || item->getLabel().empty() || item->getName() == "command_palette" ||
                 item->getName() == "quick_open")
             {
                 continue;
@@ -5279,7 +5261,7 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteCommands()
             one.value  = "cmd:" + item->getName();
             // A toggle says which way it is set, before its keys: the menu
             // shows a mark, and a row here has none.
-            if (dynamic_cast<LLMenuItemCheckGL*>(item))
+            if (item->as<LLMenuItemCheckGL>())
             {
                 const std::string state = getString(mCommands.checked(item->getName()) ? "PaletteOn" : "PaletteOff");
                 one.detail              = one.detail.empty() ? state : state + "   " + one.detail;
@@ -5819,7 +5801,7 @@ void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)
     if (list)
     {
         list->setFocus(true);
-        if (LLScrollListCtrl* rows = dynamic_cast<LLScrollListCtrl*>(list); rows && !rows->getFirstSelected())
+        if (LLScrollListCtrl* rows = list->as<LLScrollListCtrl>(); rows && !rows->getFirstSelected())
         {
             // Somewhere to start from: the first row there is to choose,
             // in the order shown.
@@ -7789,7 +7771,7 @@ ALScriptStudioDoc::RuntimeProblem ALFloaterScriptStudio::runtimeProblemOf(const 
     Doc::RuntimeProblem problem;
     problem.line    = event.line;
     problem.column  = event.column;
-    problem.message = event.error.empty() ? oneLine(event.message) : event.error;
+    problem.message = event.error.empty() ? ALLineBreaks::oneLine(event.message) : event.error;
     return problem;
 }
 
@@ -9565,7 +9547,7 @@ void ALFloaterScriptStudio::addViewCommands()
         },
         [this]() {
             const Doc* doc = active();
-            return doc && doc->shownView() == Doc::View::Compare && doc->compareView->changeAtCaret() >= 0;
+            return doc && doc->shownView() == Doc::View::Compare && doc->compareView->canCopyChange();
         });
     mCommands.add(
         "compare_copy_diff",

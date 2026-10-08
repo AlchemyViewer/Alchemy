@@ -127,8 +127,9 @@ private:
     U32               mMapLinesGaps        = 0;
     // The map's runs of text for the lines in sight, by column, as last
     // read: kept while the text, its grammar and each line's tokens, the
-    // tab width, the map's width and the lines in sight hold, so that an
-    // idle frame does not read every line again.
+    // tab width, the map's width, the lines in sight and the rows they are
+    // on -- which the hidden lines and the gaps between them say -- hold,
+    // so that an idle frame does not read every line again.
     struct MapRuns
     {
         U32                 version  = 0;
@@ -138,6 +139,7 @@ private:
         S32                 first    = -1;
         S32                 last     = -1;
         U32                 hidden   = 0;
+        U32                 gaps     = 0;
         // For each line in sight, where its runs start, and its tokens'
         // revision; the runs of the last end where the list does.
         std::vector<size_t> starts;
@@ -149,12 +151,10 @@ private:
     // host says of the line (ALTextView::LineAnnotation::rulerTint).
     bool markOf(S32 line, LLColor4& color) const;
     // The ruler's lines with a mark, and those with a gap with one, as of
-    // the text's version, the marks' revision and what the host says of
-    // each line.
+    // the marks' revision and what the host says of each line.
     std::vector<S32> mMarkLines;
     std::vector<S32> mGapMarkLines;
     bool             mMarksValid          = false;
-    U32              mMarksVersion        = 0;
     U32              mMarksRevision       = 0;
     U32              mAnnotationsRevision = 0;
     // Each pixel row of the ruler's track with a match on it, as last found:

@@ -76,10 +76,17 @@ struct ALTextRange
         const ALTextRange ordered = normalised();
         return ordered.begin <= pos && pos < ordered.end;
     }
+    // Whether the two lie over each other, both in order: two that only
+    // meet do not.
+    bool overlaps(const ALTextRange& other) const { return begin < other.end && other.begin < end; }
 
     friend bool operator==(const ALTextRange& a, const ALTextRange& b) { return a.begin == b.begin && a.end == b.end; }
     friend bool operator!=(const ALTextRange& a, const ALTextRange& b) { return !(a == b); }
 };
+
+// Where a text put in at a place ends, its line endings LF: past its last
+// line break, or along the place's own line.
+ALTextPos alTextEnd(const ALTextPos& at, std::string_view text);
 
 // The text behind a text view: lines of UTF-8 without their line endings,
 // and a version that moves on every change. Every edit is one replacement
@@ -222,8 +229,10 @@ public:
     {
         return index >= 0 && index < lineCount() ? static_cast<S32>(mLines[static_cast<size_t>(index)].size()) : 0;
     }
-    // The bytes of text(), line endings counted.
-    size_t             byteCount() const;
+    // The bytes of text(), line endings counted, kept as each edit changes
+    // them; and of text(range), counted over its own lines.
+    size_t             byteCount() const { return mBytes; }
+    size_t             byteCount(const ALTextRange& range) const;
     bool               empty() const { return mLines.size() == 1 && mLines.front().empty(); }
     U32                version() const { return mVersion; }
 
@@ -246,10 +255,8 @@ public:
     Edit insert(const ALTextPos& at, std::string_view text) { return replace(ALTextRange(at, at), text); }
     Edit remove(const ALTextRange& range) { return replace(range, std::string_view()); }
 
-    // A log or a chat history: text arriving at the end, and the oldest
-    // lines let go of from the front.
+    // A log or a chat history: text arriving at the end.
     Edit append(std::string_view text);
-    Edit removeFirstLines(S32 count);
 
     boost::signals2::connection onChanged(const changed_signal_t::slot_type& slot) { return mChanged.connect(slot); }
 
@@ -277,8 +284,9 @@ public:
     // A word along as code reads one: past a run of a name's characters,
     // or of other marks, and the blanks after it, going forward; back over
     // blanks and the run before them. `ll.Say` is three. With `parts`, a
-    // name's parts too -- `Set` and `Pos` in `llSetPos`. Across a line end
-    // as the words above.
+    // name's parts too -- `Set` and `Pos` in `llSetPos`. Never inside a
+    // character: a mark or a blank that what follows joins -- a keycap's
+    // `#` -- goes with it. Across a line end as the words above.
     ALTextPos   nextCodeWord(ALTextPos pos, bool parts = false) const;
     ALTextPos   prevCodeWord(ALTextPos pos, bool parts = false) const;
 
@@ -298,8 +306,15 @@ private:
     // Into the text, byte for byte, with no regard for graphemes.
     ALTextPos   clampBytes(ALTextPos pos) const;
     ALTextRange clampBytes(const ALTextRange& range) const;
+    // The lines a range is in made again with what goes in its place, its
+    // line endings LF already: the lines alone, nobody told.
+    void        spliceLines(const ALTextRange& range, std::string_view put);
+    // An edit made: the byte count, the version and the whole text kept
+    // moved on with it, and whoever listens told.
+    void        announce(const Edit& edit);
 
     ALLineTable<std::string> mLines;
+    size_t                   mBytes   = 0;
     U32                      mVersion = 0;
     changed_signal_t         mChanged;
     // The whole text and its line starts as of a version; good while

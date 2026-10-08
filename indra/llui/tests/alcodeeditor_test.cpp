@@ -31,6 +31,7 @@
 #include "alchoicepopup.h"
 #include "alfindbar.h"
 #include "alsurface.h"
+#include "altextruler.h"
 #include "../llclipboard.h"
 
 #include "../llfocusmgr.h"
@@ -118,7 +119,7 @@ namespace tut
 
     // More than TUT's fifty a group holds by default, which runs the first
     // fifty and says nothing of the rest: keep this above the highest test.
-    typedef test_group<alcodeeditor_data, 100> alcodeeditor_group;
+    typedef test_group<alcodeeditor_data, 120> alcodeeditor_group;
     typedef alcodeeditor_group::object    alcodeeditor_object;
     alcodeeditor_group                    alcodeeditor_instance("alcodeeditor");
 
@@ -2293,6 +2294,13 @@ namespace tut
         ensure_equals("with the brackets", grown(), std::string("(0, \"hi there\")"));
         e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
         ensure("moved by hand: nothing to go back through", !e.canPerform(ALEditorCommand::ShrinkSelection));
+
+        // Selected by hand from inside a pair to past where it closes: the
+        // pair around all of it, not the line.
+        e.setText("f((a) + b)");
+        e.setSelection(ALTextRange(ALTextPos(0, 3), ALTextPos(0, 9)));
+        ensure_equals("past the pair it crosses, the inside of the one around it", grown(), std::string("(a) + b"));
+        ensure_equals("then with its brackets", grown(), std::string("((a) + b)"));
     }
 
     template<> template<>
@@ -3425,5 +3433,234 @@ namespace tut
         ensure_equals("the caret on the line made", f.caret().line, 1);
         ensure("the block opened", !f.isFolded(0));
         ensure("the caret's line in sight, and the rest of the block", !f.layout().hidden(1) && !f.layout().anyHidden());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<92>()
+    {
+        set_test_name("the marks' revision, which the ruler's list of marked lines is kept by, moves on where an edit moves a mark or takes one, "
+                      "and not for one within a line without");
+        ALCodeEditor& e = make("one\ntwo\nthree");
+        e.setMark(2, ALCodeEditor::Mark::Error);
+        const ALTextFeatures* features = e.features();
+        ensure("the editor's own", features != nullptr);
+        U32 was = features->marksRevision();
+        e.document().insert(ALTextPos(0, 3), "!");
+        ensure_equals("typed within a line without a mark: the same", features->marksRevision(), was);
+        e.document().insert(ALTextPos(0, 0), "zero\n");
+        ensure("the mark gone down with its line", e.markAt(3) == ALCodeEditor::Mark::Error && e.markAt(2) == ALCodeEditor::Mark::None);
+        ensure("a line made above it: moved on", features->marksRevision() != was);
+        was = features->marksRevision();
+        e.document().insert(ALTextPos(3, 0), "x");
+        ensure("its own line edited, the mark gone with what it said", e.markAt(3) == ALCodeEditor::Mark::None);
+        ensure("and moved on", features->marksRevision() != was);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<93>()
+    {
+        set_test_name("with nobody to ask, a word from a table named for any kind is offered as that kind");
+        ALCodeEditor& e = make("", "lsl");
+        e.highlighter().ownWords().set("namespace", { "Vehicles" });
+        type("Vehi");
+        key(' ', MASK_CONTROL);
+        const ALCodeEditor::Completion* found = nullptr;
+        for (const ALCodeEditor::Completion& c : e.completions())
+        {
+            found = c.text == "Vehicles" ? &c : found;
+        }
+        ensure("offered", e.completionOpen() && found);
+        ensure("as a namespace", found->kind == ALSyntaxKind::Namespace);
+        ensure_equals("and said to be one", found->detail, std::string("namespace"));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<94>()
+    {
+        set_test_name("in prose the occurrences of the word at the caret are taken, whole words as Whole Word finds them; in code whole names, "
+                      "or every place a selection reads, none over another");
+        // Größe, then Gr alone, at the start of Grün, and alone again.
+        const std::string grosse = "Gr\xC3\xB6\xC3\x9F" "e";
+        ALCodeEditor&     e      = make((grosse + " Gr Gr\xC3\xBC" "n Gr").c_str(), "text");
+        e.setCaret(ALTextPos(0, 1));
+        ensure("a word taken", e.selectNextOccurrence());
+        ensure_equals("the whole of it", e.selectedText(), grosse);
+        e.setCaret(ALTextPos(0, 9));
+        ensure("a word standing alone", e.selectNextOccurrence() && e.selection().normalised() == ALTextRange(ALTextPos(0, 8), ALTextPos(0, 10)));
+        ensure("its next place", e.selectNextOccurrence());
+        ensure("the next whole word, not the start of another",
+               e.selection().normalised() == ALTextRange(ALTextPos(0, 17), ALTextPos(0, 19)) && e.otherSelections().size() == 1);
+        e.goTo(ALTextPos(0, 9));
+        ensure("every place", e.changeAllOccurrences());
+        ensure("the one other whole word only", e.otherSelections().size() == 1 && e.otherSelections().front().normalised() ==
+                                                                                     ALTextRange(ALTextPos(0, 17), ALTextPos(0, 19)));
+
+        ALCodeEditor& c = make("integer aa = aaaa + aa;");
+        c.setCaret(ALTextPos(0, 9));
+        ensure("in code, every place", c.changeAllOccurrences());
+        ensure("of the whole name", c.otherSelections().size() == 1 && c.otherSelections().front().normalised() ==
+                                                                          ALTextRange(ALTextPos(0, 20), ALTextPos(0, 22)));
+        c.setSelection(ALTextRange(ALTextPos(0, 8), ALTextPos(0, 10)));
+        ensure("chosen by hand, every place it reads", c.changeAllOccurrences());
+        const std::vector<ALTextRange>& places = c.otherSelections();
+        ensure_equals("in and out of names, none over another", places.size(), size_t(3));
+        ensure("where they are", places[0].normalised() == ALTextRange(ALTextPos(0, 13), ALTextPos(0, 15)) &&
+                                   places[1].normalised() == ALTextRange(ALTextPos(0, 15), ALTextPos(0, 17)) &&
+                                   places[2].normalised() == ALTextRange(ALTextPos(0, 20), ALTextPos(0, 22)));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<95>()
+    {
+        set_test_name("what a string says is not code to the lit occurrences and the call's arguments: an attribute's value, an escape");
+        ALCodeEditor& x = make("<button name=\"button\"/>\n<button/>", "xml");
+        x.setCaret(ALTextPos(0, 3));
+        x.lightOccurrences();
+        const std::vector<ALTextRange>& lit = x.highlights(ALCodeEditor::Highlight::Occurrences);
+        ensure_equals("the tags' names lit", lit.size(), size_t(2));
+        ensure("and not the attribute's value", lit[0] == ALTextRange(ALTextPos(0, 1), ALTextPos(0, 7)) && lit[1] == ALTextRange(ALTextPos(1, 1), ALTextPos(1, 7)));
+
+        ALCodeEditor& e = make("f(\"a\\,b\", c);");
+        ensure_equals("the comma a string's escape holds is not the call's", e.argumentAt(ALTextPos(0, 1), ALTextPos(0, 10)), 1);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<96>()
+    {
+        set_test_name("a line's note and heat go where an edit took the whole of it, and are not carried onto what was put in its place");
+        ALCodeEditor& e = make("a\nb\nc");
+        e.setLineNotes({ { 2, "28 bytes", "c: 28 bytes" } });
+        e.setLineHeat({ { 2, 1.f, "c's" } });
+        e.setText("x\ny");
+        ensure("no note on the new text", e.noteAt(0).empty() && e.noteAt(1).empty());
+        ensure("nor heat", e.heatAt(0) == 0.f && e.heatAt(1) == 0.f);
+
+        // Lines chosen to the end of the last, and typed over.
+        ALCodeEditor& f = make("a\nb\nc\nd\ne");
+        f.setLineNotes({ { 4, "e's", "" } });
+        f.document().replace(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 1)), "z");
+        ensure_equals("the lines gone", f.document().line(2), std::string("z"));
+        ensure("what was typed in their place has none", f.noteAt(2).empty());
+        // Typed in at a line's start, the line is all still there.
+        f.setLineNotes({ { 1, "b's", "" } });
+        f.document().replace(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)), "q");
+        ensure_equals("kept by the line typed in", f.noteAt(1), std::string("b's"));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<97>()
+    {
+        set_test_name("Escape making a snippet's mirrors what the first holds leaves the caret where it was in the text, past the mirrors before it");
+        ALCodeEditor& e = make("", "lsl");
+        e.setAutoComplete(false);
+        e.insertSnippet("for (${1:i} = 0; $1 < n; ++$1)");
+        ensure_equals("the mirrors show what the first holds", e.document().line(0), std::string("for (i = 0; i < n; ++i)"));
+        type("idx");
+        key(KEY_END);
+        ensure("at the line's end, the stops still there", e.caret() == ALTextPos(0, 25) && !e.placeholders().empty());
+        key(KEY_ESCAPE);
+        ensure_equals("the mirrors made what it holds", e.document().line(0), std::string("for (idx = 0; idx < n; ++idx)"));
+        ensure("the caret still at the line's end: " + std::to_string(e.caret().column), e.caret() == ALTextPos(0, 29));
+        ensure("the stops let go", e.placeholders().empty());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<98>()
+    {
+        set_test_name("a press on the ruler scrolls the text and leaves a call's stops to Tab through");
+        std::string text;
+        for (int i = 0; i < 80; ++i)
+        {
+            text += "llOwnerSay(\"line " + std::to_string(i) + "\");\n";
+        }
+        ALCodeEditor& e = make("");
+        e.setText(text);
+        e.setCaret(ALTextPos(0, 0));
+        e.insertSnippet("f(${1:a}, ${2:b})");
+        ensure_equals("the stops", e.placeholders().size(), size_t(2));
+        ALTextRuler* ruler = e.findChild<ALTextRuler>("ruler");
+        ensure("a ruler down the side", ruler && ruler->getVisible());
+        const LLRect bar = ruler->getRect();
+        ensure("the press taken", e.handleMouseDown(bar.mLeft + bar.getWidth() / 2, bar.mBottom + 4, MASK_NONE));
+        gFocusMgr.setMouseCapture(nullptr);
+        ensure("the text scrolled", e.scrollY() > 0);
+        ensure_equals("the stops still there", e.placeholders().size(), size_t(2));
+        key(KEY_TAB);
+        ensure_equals("Tab goes on to the next", e.selectedText(), std::string("b"));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<99>()
+    {
+        set_test_name("the change bars come to the changes since the save: a line a Return only pushed, or one put back as it was, has none to "
+                      "press or be told of");
+        // The middle of a line's row in the change bar.
+        const auto bar = [](ALCodeEditor& ed, S32 line) {
+            const LLRect text = ed.textRect();
+            return ed.changeBarAt(ed.leftEdge() + 1, text.mTop - (ed.layout().lineTop(line) - ed.scrollY()) - ed.layout().lineHeight(line) / 2);
+        };
+        ALCodeEditor& e = make("one\ntwo\nthree\nfour\nfive");
+        e.resetDirty();
+        e.setCaret(e.document().lineEnd(3));
+        key(KEY_RETURN);
+        ensure_equals("a line put in", e.document().line(4), std::string());
+        ensure_equals("no bar on the line it only pushed", bar(e, 3), -1);
+        ensure_equals("one on the line put in", bar(e, 4), 4);
+        ensure("barred as the change is", !e.lineChanged(3) && e.lineChanged(4) && !e.lineChanged(5));
+
+        ALCodeEditor& f = make("a\nb\nc\nd\ne");
+        f.resetDirty();
+        ensure("the first line changed", f.replaceAll({ { ALTextRange(ALTextPos(0, 1), ALTextPos(0, 1)), "x" } }));
+        ensure("and the last", f.replaceAll({ { ALTextRange(ALTextPos(4, 1), ALTextPos(4, 1)), "y" } }));
+        f.undo();
+        ensure("the last as saved again, the text still changed", f.document().line(4) == "e" && f.isDirty());
+        ensure_equals("no bar on the line put back", bar(f, 4), -1);
+        ensure("barred as the change is", f.lineChanged(0) && !f.lineChanged(4));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<100>()
+    {
+        set_test_name("a fix previewed inside a block comment colours what it makes as the comment it is in, not as code");
+        // The skin's colours for the kinds, told before the editor reads
+        // them: nothing loads a skin's colours in a test.
+        LLUIColorTable& table = LLUIColorTable::instance();
+        table.setColor("SyntaxComment", LLColor4(0.f, 0.5f, 0.f, 1.f));
+        table.setColor("SyntaxNumber", LLColor4(0.f, 0.f, 0.8f, 1.f));
+        table.setColor("SyntaxOperator", LLColor4(0.6f, 0.f, 0.f, 1.f));
+        ALCodeEditor& e = make("/* note\n   x = 1 */\nfoo();\n");
+        e.setFixProvider([](S32 line, std::vector<ALCodeEditor::Fix>& out) {
+            if (line != 1)
+            {
+                return;
+            }
+            ALCodeEditor::Fix two;
+            two.title = "Say two";
+            two.value = "two";
+            two.edits.emplace_back(ALTextRange(ALTextPos(1, 7), ALTextPos(1, 8)), "2");
+            out = { two };
+        });
+        e.setFixHandler([](const LLSD&) {});
+        e.setCaret(ALTextPos(1, 0));
+        ensure("listed", e.openFixes(1));
+        const ALTextView* box = e.findChild<ALTextView>("fix_preview");
+        ensure("previewed", box && box->getVisible());
+        ensure_equals("as a diff", box->text(), std::string("- x = 1 */\n+ x = 2 */"));
+        const LLColor4 comment = e.colorForKind(ALSyntaxKind::Comment);
+        ensure("a comment's colour told apart from a number's and an operator's",
+               comment != e.colorForKind(ALSyntaxKind::Number) && comment != e.colorForKind(ALSyntaxKind::Operator));
+        // The colour the preview gives a column of its second line.
+        const auto colour_at = [box](S32 column) {
+            for (const ALTextView::Style& style : box->styles())
+            {
+                if (style.range.begin.line == 1 && style.range.begin.column <= column && column < style.range.end.column && style.color)
+                {
+                    return *style.color;
+                }
+            }
+            return LLColor4::transparent;
+        };
+        ensure("the 2 it makes in the comment's colour", colour_at(6) == comment);
+        ensure("and the = before it", colour_at(4) == comment);
     }
 }

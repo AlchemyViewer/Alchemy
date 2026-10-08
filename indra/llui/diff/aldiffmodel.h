@@ -133,8 +133,9 @@ public:
     // right each hides. Where each of its lines went.
     LineMap setRightText(std::string_view right);
     // The left made another -- another version of it -- and compared again
-    // as the right made anew is: what stood for what, what was said of the
-    // left and a merge with it, which were the other's, let go of.
+    // as the right made anew is, the runs as open as they were: what stood
+    // for what, what was said of the left and a merge with it, which were
+    // the other's, let go of.
     void    setLeftText(std::string_view left);
     // Stretches of the texts as given that stand for each other by what
     // they are -- a function, an event or a state of the same name on each
@@ -190,8 +191,10 @@ public:
     // let go of. And the merge's, a lexer of its own over the same grammar
     // (mergeOptions): a lexer holds the last two texts it read, which are
     // the comparison's, and a merge reads three. Without it, the merge
-    // reads by the comparison's.
-    void    setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging = ALTextDiff::lexer_t());
+    // reads by the comparison's. And what the comparison's says it read
+    // again of a text (ALTextDiff::reread_t), where it says.
+    void    setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging = ALTextDiff::lexer_t(),
+                     ALTextDiff::reread_t reread = ALTextDiff::reread_t());
 
     // The texts as given, their line endings LF as an editor reads them.
     const std::string&           leftText() const { return mLeftText; }
@@ -313,11 +316,13 @@ public:
 
     // Blocks of lines taken out in one place and put in at another, the
     // same (ALDiffMoves): each line of one signed '>', not paired with
-    // another, and its move's.
+    // another, and its move's. None with a line in a change that is none,
+    // as lines are told the same, which is shown as lines the same.
     S32                    moveCount() const { return static_cast<S32>(mMoves.size()); }
     // The line at the other end of the move a line of a column is in --
     // side by side in the other column, inline in its own -- and that
-    // column; -1 for the line where it is in none.
+    // column; -1 for the line where it is in none, or that end is not
+    // shown.
     std::pair<Column, S32> moveOtherEnd(Column column, S32 line) const;
 
     // --- ranges ------------------------------------------------------------------
@@ -350,6 +355,8 @@ public:
         S32         line = 0;
         std::string text;
         std::string tip;
+
+        bool operator==(const Note& other) const = default;
     };
     void                     setNotes(std::vector<Note> notes);
     const std::vector<Note>& notes() const { return mNotes; }
@@ -370,7 +377,6 @@ public:
     S32               foldedCount() const;
     bool              foldOpen(S32 fold) const;
     void              setFoldOpen(S32 fold, bool open);
-    std::vector<bool> foldsOpen() const;
     // How many lines it hides.
     S32               foldLines(S32 fold) const;
     // Its first row, and its own row, after the lines it hides.
@@ -445,16 +451,21 @@ private:
     // What a layout made again after a splice may keep of the one before:
     // the runs it was made from; how far the lines after the change moved,
     // each side as shown; and the side changed, as shown, its lines from
-    // `head` to all but its last `tail` changed, of `lines` before.
+    // `head` to all but its last `tail` changed, of `lines` before. And
+    // whether, where lines are told the same by their regions, the lexer
+    // said what it read again of the side: every line's regions as they
+    // were but those edited and those read otherwise, which the moves'
+    // search is told of as edited (ALDiffMoves::Finder::find's `kept`).
     struct Relayout
     {
         std::vector<ALTextDiff::Run> runs;
-        S32                          left  = 0;
-        S32                          right = 0;
-        size_t                       side  = 0;
-        S32                          head  = 0;
-        S32                          tail  = 0;
-        S32                          lines = 0;
+        S32                          left   = 0;
+        S32                          right  = 0;
+        size_t                       side   = 0;
+        S32                          head   = 0;
+        S32                          tail   = 0;
+        S32                          lines  = 0;
+        bool                         reread = false;
     };
     // Where each group of runs -- a run the same, or the runs of a change --
     // began to be laid out, and where the last ended: the rows of each
@@ -488,17 +499,21 @@ private:
     // were, outside the change. Nothing where all of it is to be laid out
     // again.
     std::optional<Reuse> reusable(const Relayout& again, const ALDiffMoves::moves_t& moves, size_t last_change) const;
-    // Compared again and made again from the texts; the runs as open as
-    // given, where there are as many as there were. And made again from
-    // the runs as they are, by the options shown (worked out once a
-    // rebuild): after a splice, only where it must be.
-    void              build(const std::vector<bool>& open = {});
-    void              layout(const ALTextDiff::Options& options, const std::vector<bool>& open = {}, const Relayout* again = nullptr);
-    // A side's lines made anew, its text already so: compared again only
-    // where it changed (ALDiffSplice) where that is enough, and laid out
-    // again only there -- there taking in the lines after it that now read
-    // otherwise by its grammar, as far as the last of them.
-    void              resplice(bool given_left, std::vector<std::string> lines, const ALDiffEdit::Edges& edges);
+    // Compared again and made again from the texts, the runs folded as
+    // foldsSame() says; or with the runs the reader opened open again,
+    // where they hide the same first line of the right (openedLines). And
+    // made again from the runs as they are, by the options shown (worked
+    // out once a rebuild): after a splice, only where it must be.
+    void              build();
+    void              rebuild();
+    void              layout(const ALTextDiff::Options& options, const Relayout* again = nullptr);
+    // A side's lines made anew, its text already so, by the lines between
+    // its edges, those before and after being the lines it has: compared
+    // again only where it changed (ALDiffSplice) where that is enough, and
+    // laid out again only there -- there taking in the lines after it that
+    // now read otherwise by its grammar, as far as the last of them. What
+    // is read of the side as it was is read before the lines are put in.
+    void              resplice(bool given_left, std::vector<std::string> between, const ALDiffEdit::Edges& edges);
     // The rows' lines of the right's text: side by side the column showing
     // it, inline the right's as shown, or swapped the left's.
     const std::vector<S32>& rightRows(Layout layout) const { return layout == Layout::Sides ? of(rightColumn()).lineOf : mInlineRows[mSwapped ? 0 : 1]; }
@@ -513,6 +528,12 @@ private:
     // and where lines are told the same by their regions, which of them
     // are the same.
     std::vector<std::pair<S32, size_t>> readFrom(size_t side, S32 from, bool every = false) const;
+    // Of a side's lines from `from` to `to`, as it now is, those of its
+    // changes by the runs before an edit that moved them along by `moved`:
+    // one past the last of them, -1 for none. What a lexer's lines read
+    // again after an edit reach, where only a change's are read by their
+    // regions.
+    S32 changesTo(size_t side, S32 from, S32 to, S32 moved) const;
     // Each pair's or range's lines on one side, where they now are: those
     // of a pair or range whose first line went taken back.
     static ALTextDiff::ranges_t carried(const ALTextDiff::ranges_t& ranges, bool left, S32 was, const LineMap& map);
@@ -557,8 +578,10 @@ private:
     std::vector<S32>      mRangeOrder[2];
     std::vector<S32>      mRangeReach[2];
     ALTextDiff::Options   mOptions;
-    // The lexer a merge reads by, where it has one of its own.
+    // The lexer a merge reads by, where it has one of its own; and what the
+    // comparison's says it read again, where it says.
     ALTextDiff::lexer_t   mMergeLexer;
+    ALTextDiff::reread_t  mReread;
     bool                  mSwapped  = false;
     bool                  mFoldSame = true;
     ColumnData            mColumns[3];

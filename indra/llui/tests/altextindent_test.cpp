@@ -74,6 +74,21 @@ namespace tut
             doc.replace(one.range, one.text);
             return doc.text();
         }
+        // A command at one selection, as its groups make it: the text left,
+        // and where the selection goes, where its group places it.
+        static std::string applied(const std::string& text, const std::vector<ALTextEditing::Group>& groups, std::optional<ALTextRange>& placed)
+        {
+            const ALTextEditing::Combined                    combined = ALTextEditing::combine(groups, 1);
+            ALTextDocument                                   doc(text);
+            std::vector<std::pair<ALTextRange, std::string>> edits;
+            for (const Replacement& one : combined.replacements)
+            {
+                edits.emplace_back(one.range, one.text);
+            }
+            doc.replaceMany(std::move(edits));
+            placed = combined.selections.front();
+            return doc.text();
+        }
 
         // Nothing matches brackets: the rules fall back on the line above.
         static opener_t none()
@@ -109,19 +124,20 @@ namespace tut
         set_test_name("lines indented and outdented, the empty left, the caret and the anchor moved with their lines' starts");
         const std::string text = "a\n\nb\n  c";
         const ALTextDocument doc(text);
-        const Change in = indentLines(doc, ALTextPos(0, 1), ALTextPos(3, 3), true, spaces);
-        ensure_equals("each line with anything on it a level in", applied(text, in), std::string("    a\n\n    b\n      c"));
-        ensure("a selection still", in.selects);
-        ensure("the anchor moved with its line", in.anchor == ALTextPos(0, 5));
-        ensure("the caret too", in.caret == ALTextPos(3, 7));
-        const Change tabbed = indentLines(doc, ALTextPos(0, 0), ALTextPos(0, 0), true, tabs);
-        ensure_equals("a tab where tabs are typed", applied(text, tabbed), std::string("\ta\n\nb\n  c"));
+        std::optional<ALTextRange> placed;
+        ensure_equals("each line with anything on it a level in",
+                      applied(text, indentLines(doc, { ALTextRange(ALTextPos(0, 1), ALTextPos(3, 3)) }, true, spaces), placed),
+                      std::string("    a\n\n    b\n      c"));
+        ensure("the anchor moved with its line, and the caret too", placed == ALTextRange(ALTextPos(0, 5), ALTextPos(3, 7)));
+        ensure_equals("a tab where tabs are typed", applied(text, indentLines(doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)) }, true, tabs), placed),
+                      std::string("\ta\n\nb\n  c"));
 
         const std::string   deep = "\tx\n      y\n  z";
         const ALTextDocument deep_doc(deep);
-        const Change out = indentLines(deep_doc, ALTextPos(0, 0), ALTextPos(2, 1), false, spaces);
-        ensure_equals("a tab, or up to a level of spaces, out", applied(deep, out), std::string("x\n  y\nz"));
-        ensure("the caret never before its line's start", out.caret == ALTextPos(2, 0));
+        ensure_equals("a tab, or up to a level of spaces, out",
+                      applied(deep, indentLines(deep_doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(2, 1)) }, false, spaces), placed),
+                      std::string("x\n  y\nz"));
+        ensure("the caret never before its line's start", placed && placed->end == ALTextPos(2, 0));
     }
 
     template<> template<>
@@ -455,5 +471,29 @@ namespace tut
         ensure_equals("each selection moved with its lines", placed, std::string("0:4-1:5 1:5-1:4 3:9-3:8 "));
         ensure_equals("and out", made(text, indentLines(doc, selections, false, spaces), placed), std::string("a\nb\nc\nd"));
         ensure_equals("those with nothing to take left to slide; the other moved", placed, std::string("- - 3:1-3:0 "));
+    }
+
+    template<> template<>
+    void altextindent_object::test<14>()
+    {
+        set_test_name("lines shifted out by how wide their blanks are drawn: spaces before a tab go with it, and the caret stays on its character");
+        const std::string    text = "  \tfoo\n \t\tbar\n\t  baz\n      qux";
+        const ALTextDocument doc(text);
+        ALTextIndent::Options hard;
+        hard.tabWidth = 4;
+        const Change one = ALTextIndent::shiftLines(doc, 0, 3, 1, false, hard);
+        ensure_equals("each a tab's width out", applied(text, one), std::string("foo\n\tbar\n  baz\n  qux"));
+        bool taken_from_the_front = one.replacements.size() == 4;
+        for (const Replacement& replacement : one.replacements)
+        {
+            taken_from_the_front = taken_from_the_front && replacement.range.begin.column == 0 && replacement.text.empty();
+        }
+        ensure("each taken from the line's front", taken_from_the_front);
+        ensure_equals("two levels", applied(text, ALTextIndent::shiftLines(doc, 0, 3, 2, false, hard)), std::string("foo\nbar\nbaz\nqux"));
+
+        // The caret on the f of foo, past the spaces and the tab.
+        const std::vector<ALTextEditing::Group> groups = indentLines(doc, { ALTextRange(ALTextPos(0, 3), ALTextPos(0, 3)) }, false, hard);
+        ensure("one group", groups.size() == 1 && groups[0].placed.size() == 1);
+        ensure("the caret still on the f", groups[0].placed[0].second == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)));
     }
 }

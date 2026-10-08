@@ -34,7 +34,6 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
-#include <limits>
 
 // static
 S32 ALCompletionModel::tierOf(const ALFuzzyMatch::Match& match)
@@ -125,57 +124,102 @@ const char* ALCompletionModel::badgeOf(const ALCompletion& completion)
     }
 }
 
-// static
-void ALCompletionModel::documentWords(const ALTextDocument& text, const ALTextPos& at, std::string_view prefix, std::vector<ALCompletion>& out,
-                                      size_t most)
+namespace
 {
-    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> seen;
-    for (const ALCompletion& c : out)
+    // Each of the document's words that match what was typed, once: not the
+    // one being typed, one that starts with a digit, one no longer than what
+    // was typed, nor one `seen` holds -- which every word looked at joins,
+    // whether it matched or not, so that a name the text has a thousand
+    // times is matched once. Each told to `found` as a view into its line,
+    // until `found` says that is enough.
+    template <typename Found>
+    void eachDocumentWord(const ALTextDocument& text, const ALTextPos& at, std::string_view prefix, boost::unordered_flat_set<std::string_view>& seen,
+                          Found&& found)
     {
-        seen.insert(c.text);
-    }
-    const S32 count = text.lineCount();
-    for (S32 l = 0; l < count && out.size() < most; ++l)
-    {
-        const std::string& line = text.line(l);
-        size_t             i    = 0;
-        while (i < line.size())
+        const S32 count = text.lineCount();
+        for (S32 l = 0; l < count; ++l)
         {
-            if (!alIdentifierByte(line[i]))
+            const std::string& line = text.line(l);
+            size_t             i    = 0;
+            while (i < line.size())
             {
-                ++i;
-                continue;
-            }
-            size_t j = i;
-            while (j < line.size() && alIdentifierByte(line[j]))
-            {
-                ++j;
-            }
-            const bool typing = (l == at.line && static_cast<S32>(j) == at.column);
-            if (!typing && (line[i] < '0' || line[i] > '9'))
-            {
-                std::string_view word(line.data() + i, j - i);
-                if (word.size() > prefix.size() && matchTier(word, prefix) >= 0 && seen.insert(std::string(word)).second)
+                if (!alIdentifierByte(line[i]))
                 {
-                    ALCompletion c;
-                    c.text = std::string(word);
-                    out.push_back(std::move(c));
+                    ++i;
+                    continue;
                 }
+                size_t j = i;
+                while (j < line.size() && alIdentifierByte(line[j]))
+                {
+                    ++j;
+                }
+                // The identifier the caret is in, or at either end of: the
+                // one being typed, whose own text is no completion of it.
+                const bool             typing = l == at.line && static_cast<S32>(i) <= at.column && at.column <= static_cast<S32>(j);
+                const std::string_view word(line.data() + i, j - i);
+                if (!typing && (line[i] < '0' || line[i] > '9') && word.size() > prefix.size() && seen.insert(word).second &&
+                    ALCompletionModel::matchTier(word, prefix) >= 0 && !found(word))
+                {
+                    return;
+                }
+                i = j;
             }
-            i = j;
         }
     }
 }
 
 // static
-void ALCompletionModel::rank(std::vector<ALCompletion>& list, std::string_view prefix)
+void ALCompletionModel::documentWords(const ALTextDocument& text, const ALTextPos& at, std::string_view prefix, std::vector<ALCompletion>& out,
+                                      size_t most)
 {
-    const auto kindRank = [](const ALCompletion& c) {
-        if (c.deprecated || c.kind == ALSyntaxKind::Deprecated)
+    if (out.size() >= most)
+    {
+        return;
+    }
+    boost::unordered_flat_set<std::string_view> seen;
+    seen.reserve(out.size());
+    for (const ALCompletion& c : out)
+    {
+        seen.insert(std::string_view(c.text));
+    }
+    // Gathered as views into the text's lines, which hold still while it is
+    // read, and put in `out` after: `out` grown meanwhile would move the
+    // texts `seen` looks at.
+    std::vector<std::string_view> found;
+    eachDocumentWord(text, at, prefix, seen, [&](std::string_view word) {
+        found.push_back(word);
+        return out.size() + found.size() < most;
+    });
+    out.reserve(out.size() + found.size());
+    for (const std::string_view word : found)
+    {
+        ALCompletion c;
+        c.text = std::string(word);
+        out.push_back(std::move(c));
+    }
+}
+
+namespace
+{
+    // Where a completion comes among the others (ALCompletionModel::rank):
+    // how well it matches, whether it fits, what it is, its name; and where
+    // it was found, which keeps equals in the order they came.
+    struct Ranked
+    {
+        S32              tier;
+        S32              fit;
+        S32              rank;
+        std::string_view text;
+        size_t           index;
+    };
+
+    S32 kindRank(ALSyntaxKind kind, bool deprecated)
+    {
+        if (deprecated || kind == ALSyntaxKind::Deprecated)
         {
             return 3;
         }
-        switch (c.kind)
+        switch (kind)
         {
             case ALSyntaxKind::Parameter:
             case ALSyntaxKind::Variable:
@@ -189,48 +233,110 @@ void ALCompletionModel::rank(std::vector<ALCompletion>& list, std::string_view p
             default:
                 return 1;
         }
-    };
-    struct Sorted
+    }
+
+    Ranked rankedAs(S32 tier, bool fits, ALSyntaxKind kind, bool deprecated, std::string_view text, size_t index)
     {
-        S32 tier;
-        S32 fit;
-        S32 rank;
-    };
-    // Ranked by index, and only as far as the cap sorted: a pool of a
+        return Ranked{ tier < 0 ? 9 : tier, fits ? 0 : 1, kindRank(kind, deprecated), text, index };
+    }
+
+    bool rankedBefore(const Ranked& a, const Ranked& b)
+    {
+        if (a.tier != b.tier)
+        {
+            return a.tier < b.tier;
+        }
+        if (a.fit != b.fit)
+        {
+            return a.fit < b.fit;
+        }
+        if (a.rank != b.rank)
+        {
+            return a.rank < b.rank;
+        }
+        if (a.text != b.text)
+        {
+            return a.text < b.text;
+        }
+        return a.index < b.index;
+    }
+
+    // The best of them first, in order, as many as the cap keeps, and how
+    // many that is: sorted only as far as the cap, so that a pool of a
     // thousand words is ordered to its best two hundred, not whole.
-    std::vector<std::pair<Sorted, size_t>> sorted;
+    size_t bestFirst(std::vector<Ranked>& sorted)
+    {
+        const size_t kept = std::min(sorted.size(), ALCompletionModel::CAP);
+        std::partial_sort(sorted.begin(), sorted.begin() + static_cast<std::ptrdiff_t>(kept), sorted.end(), rankedBefore);
+        return kept;
+    }
+
+    // What a list is made of before the best of it is copied out: an entry
+    // of the pool, of what was answered later or of the document's words,
+    // by its index there, with what it is ranked by -- a later answer for
+    // the same name merged in.
+    struct Listed
+    {
+        enum class From : U8
+        {
+            Pool,
+            Supplied,
+            Word
+        };
+        From         from;
+        size_t       index;
+        S32          tier;
+        ALSyntaxKind kind;
+        bool         deprecated;
+        bool         fits;
+        // No detail yet, which a later answer fills, its kind with it.
+        bool         bare;
+    };
+
+    // A later answer for what is listed already, merged into it: what was
+    // known keeps its place, and what is new about it fills what was empty.
+    void mergeAnswer(ALCompletion& have, const ALCompletion& c)
+    {
+        if (have.detail.empty())
+        {
+            have.detail = c.detail;
+            have.kind   = c.kind;
+        }
+        if (!have.documentation)
+        {
+            have.documentation = c.documentation;
+        }
+        // What only the later answer knows: whether it fits there, and
+        // where its brackets go.
+        have.fits = have.fits || c.fits;
+        if (have.brackets == ALCompletion::Brackets::Guess)
+        {
+            have.brackets = c.brackets;
+        }
+        if (have.path.empty())
+        {
+            have.path = c.path;
+        }
+        have.folder = have.folder || c.folder;
+    }
+}
+
+// static
+void ALCompletionModel::rank(std::vector<ALCompletion>& list, std::string_view prefix)
+{
+    std::vector<Ranked> sorted;
     sorted.reserve(list.size());
     for (size_t i = 0; i < list.size(); ++i)
     {
-        const S32 tier = prefix.empty() ? 0 : matchTier(list[i].text, prefix);
-        sorted.push_back({ { tier < 0 ? 9 : tier, list[i].fits ? 0 : 1, kindRank(list[i]) }, i });
+        const ALCompletion& c = list[i];
+        sorted.push_back(rankedAs(prefix.empty() ? 0 : matchTier(c.text, prefix), c.fits, c.kind, c.deprecated, c.text, i));
     }
-    const auto before = [&list](const auto& a, const auto& b) {
-        if (a.first.tier != b.first.tier)
-        {
-            return a.first.tier < b.first.tier;
-        }
-        if (a.first.fit != b.first.fit)
-        {
-            return a.first.fit < b.first.fit;
-        }
-        if (a.first.rank != b.first.rank)
-        {
-            return a.first.rank < b.first.rank;
-        }
-        if (list[a.second].text != list[b.second].text)
-        {
-            return list[a.second].text < list[b.second].text;
-        }
-        return a.second < b.second;
-    };
-    const size_t kept = std::min(sorted.size(), CAP);
-    std::partial_sort(sorted.begin(), sorted.begin() + static_cast<std::ptrdiff_t>(kept), sorted.end(), before);
+    const size_t              kept = bestFirst(sorted);
     std::vector<ALCompletion> out;
     out.reserve(kept);
     for (size_t i = 0; i < kept; ++i)
     {
-        out.push_back(std::move(list[sorted[i].second]));
+        out.push_back(std::move(list[sorted[i].index]));
     }
     list.swap(out);
 }
@@ -277,15 +383,17 @@ void ALCompletionModel::pool(const ALTextPos& start, const ALTextPos& at, std::s
     }
     // The document's words, all of them that match now, for as long as
     // the identifier is typed: each is offered while it is longer than
-    // what is typed.
-    std::vector<ALCompletion> words(mPool);
-    const size_t              answered_count = words.size();
-    documentWords(text, at, prefix, words, std::numeric_limits<size_t>::max());
-    mPoolWords.reserve(words.size() - answered_count);
-    for (size_t i = answered_count; i < words.size(); ++i)
+    // what is typed. Those answered are not words of it again.
+    boost::unordered_flat_set<std::string_view> seen;
+    seen.reserve(mPool.size());
+    for (const ALCompletion& c : mPool)
     {
-        mPoolWords.push_back(ALFuzzyMatch::prepare(words[i].text));
+        seen.insert(std::string_view(c.text));
     }
+    eachDocumentWord(text, at, prefix, seen, [this](std::string_view word) {
+        mPoolWords.push_back(ALFuzzyMatch::prepare(word));
+        return true;
+    });
 }
 
 bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std::string_view prefix, const std::string& head,
@@ -304,75 +412,113 @@ bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std:
         mSupplied.clear();
         mWords = true;
     }
+    // Listed by where each is found, and ranked, before any is copied: only
+    // the best are. Each found by its name -- a view into the pool, the
+    // answer or the words, which hold still while the list is made -- not
+    // by a walk of the list for each answer.
+    std::vector<Listed> listed;
+    listed.reserve(mPool.size() + mSupplied.size());
+    boost::unordered_flat_map<std::string_view, size_t> named;
+    named.reserve(mPool.size() + mSupplied.size());
     // The pool narrowed to what is typed now.
-    mList.clear();
     for (size_t i = 0; i < mPool.size(); ++i)
     {
-        if (prefix.empty() || tierOf(ALFuzzyMatch::match(mPoolTargets[i], prefix, ALFuzzyMatch::Tier::Parts)) >= 0)
+        const S32 tier = prefix.empty() ? 0 : tierOf(ALFuzzyMatch::match(mPoolTargets[i], prefix, ALFuzzyMatch::Tier::Parts));
+        if (tier >= 0)
         {
-            mList.push_back(mPool[i]);
+            const ALCompletion& c = mPool[i];
+            named.emplace(std::string_view(c.text), listed.size());
+            listed.push_back(Listed{ Listed::From::Pool, i, tier, c.kind, c.deprecated, c.fits, c.detail.empty() });
         }
     }
     // What was answered later about this identifier, narrowed to the
     // prefix as typed now; what was known already keeps its place, and
-    // what is new about it fills what was empty. Each found by its name,
-    // not by a walk of the list for each answer.
-    boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> listed;
-    listed.reserve(mList.size() + mSupplied.size());
-    for (size_t i = 0; i < mList.size(); ++i)
+    // what is new about it fills what was empty (mergeAnswer), each in
+    // turn once the best are copied out.
+    std::vector<std::pair<size_t, size_t>> merged;
+    for (size_t i = 0; i < mSupplied.size(); ++i)
     {
-        listed.emplace(mList[i].text, i);
-    }
-    for (const ALCompletion& c : mSupplied)
-    {
-        if (!prefix.empty() && matchTier(c.text, prefix) < 0)
+        const ALCompletion& c    = mSupplied[i];
+        const S32           tier = prefix.empty() ? 0 : matchTier(c.text, prefix);
+        if (tier < 0)
         {
             continue;
         }
-        if (const auto known = listed.find(c.text); known != listed.end())
+        if (const auto known = named.find(std::string_view(c.text)); known != named.end())
         {
-            ALCompletion& have = mList[known->second];
-            if (have.detail.empty())
+            Listed& have = listed[known->second];
+            if (have.bare)
             {
-                have.detail = c.detail;
-                have.kind   = c.kind;
+                have.kind = c.kind;
+                have.bare = c.detail.empty();
             }
-            if (!have.documentation)
-            {
-                have.documentation = c.documentation;
-            }
-            // What only the later answer knows: whether it fits there, and
-            // where its brackets go.
             have.fits = have.fits || c.fits;
-            if (have.brackets == ALCompletion::Brackets::Guess)
-            {
-                have.brackets = c.brackets;
-            }
-            if (have.path.empty())
-            {
-                have.path = c.path;
-            }
-            have.folder = have.folder || c.folder;
+            merged.emplace_back(known->second, i);
             continue;
         }
-        listed.emplace(c.text, mList.size());
-        mList.push_back(c);
+        named.emplace(std::string_view(c.text), listed.size());
+        listed.push_back(Listed{ Listed::From::Supplied, i, tier, c.kind, c.deprecated, c.fits, c.detail.empty() });
     }
     // Then the document's own, but those named already and those no
     // longer than what is typed; and none where the answer said so.
     for (size_t i = 0; mWords && i < mPoolWords.size(); ++i)
     {
         const ALFuzzyMatch::Target& word = mPoolWords[i];
-        if (word.text.size() > prefix.size() && tierOf(ALFuzzyMatch::match(word, prefix, ALFuzzyMatch::Tier::Parts)) >= 0 &&
-            !listed.contains(word.text))
+        if (word.text.size() <= prefix.size())
         {
-            ALCompletion c;
-            c.text = word.text;
-            listed.emplace(word.text, mList.size());
-            mList.push_back(std::move(c));
+            continue;
+        }
+        const S32 tier = tierOf(ALFuzzyMatch::match(word, prefix, ALFuzzyMatch::Tier::Parts));
+        if (tier >= 0 && named.emplace(std::string_view(word.text), listed.size()).second)
+        {
+            listed.push_back(Listed{ Listed::From::Word, i, prefix.empty() ? 0 : tier, ALSyntaxKind::Text, false, false, true });
         }
     }
-    rank(mList, prefix);
+    const auto textOf = [this](const Listed& one) -> const std::string& {
+        if (one.from == Listed::From::Pool)
+        {
+            return mPool[one.index].text;
+        }
+        return one.from == Listed::From::Supplied ? mSupplied[one.index].text : mPoolWords[one.index].text;
+    };
+    std::vector<Ranked> sorted;
+    sorted.reserve(listed.size());
+    for (size_t i = 0; i < listed.size(); ++i)
+    {
+        const Listed& one = listed[i];
+        sorted.push_back(rankedAs(one.tier, one.fits, one.kind, one.deprecated, textOf(one), i));
+    }
+    const size_t kept = bestFirst(sorted);
+    // The best copied out, and the later answers merged into those kept,
+    // each where it went in the list.
+    mList.clear();
+    mList.reserve(kept);
+    std::vector<S32> placed(merged.empty() ? 0 : listed.size(), -1);
+    for (size_t i = 0; i < kept; ++i)
+    {
+        const Listed& one = listed[sorted[i].index];
+        if (one.from == Listed::From::Word)
+        {
+            ALCompletion c;
+            c.text = mPoolWords[one.index].text;
+            mList.push_back(std::move(c));
+        }
+        else
+        {
+            mList.push_back(one.from == Listed::From::Pool ? mPool[one.index] : mSupplied[one.index]);
+        }
+        if (!placed.empty())
+        {
+            placed[sorted[i].index] = static_cast<S32>(i);
+        }
+    }
+    for (const auto& [to, from] : merged)
+    {
+        if (placed[to] >= 0)
+        {
+            mergeAnswer(mList[static_cast<size_t>(placed[to])], mSupplied[from]);
+        }
+    }
     // From where it starts, not as long as the prefix: a string's text is
     // matched as its escapes read, shorter than it is written.
     if (!mList.empty())

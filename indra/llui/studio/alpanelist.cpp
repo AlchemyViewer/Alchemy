@@ -29,12 +29,14 @@
 
 #include "alemptystate.h"
 
+#include "allinebreaks.h"
 #include "llclipboard.h"
 #include "llmenugl.h"
 #include "llscrolllistcell.h"
 #include "llscrolllistcolumn.h"
 #include "llscrolllistitem.h"
 #include "llsdutil.h"
+#include "llstring.h"
 #include "lltooltip.h"
 #include "llui.h"
 #include "lluictrlfactory.h"
@@ -74,26 +76,7 @@ namespace
     // near enough for a table read in a fixed face.
     S32 displayWidth(const std::string& text)
     {
-        S32 count = 0;
-        for (const char c : text)
-        {
-            count += ((U8)c & 0xC0) != 0x80;
-        }
-        return count;
-    }
-
-    // A cell with a newline or a tab in it would break the table it is
-    // being written into.
-    std::string oneLine(std::string text)
-    {
-        for (char& c : text)
-        {
-            if (c == '\n' || c == '\r' || c == '\t')
-            {
-                c = ' ';
-            }
-        }
-        return text;
+        return static_cast<S32>(utf8str_codepoint_count(text));
     }
 }
 
@@ -539,7 +522,9 @@ std::string ALPaneList::asText(const std::vector<LLScrollListItem*>& all)
             {
                 continue;
             }
-            line[i] = oneLine(cell->getValue().asString());
+            // A cell with a newline or a tab in it would break the table it
+            // is being written into.
+            line[i] = ALLineBreaks::oneLine(cell->getValue().asString());
             used[i] = used[i] || !line[i].empty();
         }
         cells.push_back(std::move(line));

@@ -95,23 +95,24 @@ void ALSyntaxHighlighter::attach(ALTextDocument* document)
     {
         mConnection = mDocument->onChanged([this](const ALTextDocument::Edit& edit) { onEdit(edit); });
     }
+    // Another text: no line's tokens are of its lines, whatever they come
+    // to, so every revision moves on.
+    for (Line& line : mLines)
+    {
+        line.lexed = false;
+    }
     reset();
 }
 
 void ALSyntaxHighlighter::reset()
 {
-    // Revisions survive a reset: a line that lexes to the same tokens
-    // afterwards keeps its number, and one that does not moves on.
-    std::vector<U32> revisions;
-    revisions.reserve(mLines.size());
-    for (const Line& line : mLines)
+    // Every line lexed again, its tokens and its revision kept until then:
+    // a line that lexes to the same tokens afterwards keeps its number,
+    // and one that does not moves on.
+    mLines.resize(mDocument ? static_cast<size_t>(mDocument->lineCount()) : 0);
+    for (Line& line : mLines)
     {
-        revisions.push_back(line.revision);
-    }
-    mLines.assign(mDocument ? mDocument->lineCount() : 0, Line());
-    for (size_t i = 0; i < mLines.size() && i < revisions.size(); ++i)
-    {
-        mLines[i].revision = revisions[i];
+        line.valid = false;
     }
     mFirstDirty = 0;
     mStates.clear();
@@ -130,16 +131,17 @@ size_t ALSyntaxHighlighter::StateHash::operator()(const ALSyntaxState& state) co
     return hash;
 }
 
-U32 ALSyntaxHighlighter::intern(ALSyntaxState state)
+U32 ALSyntaxHighlighter::intern(const ALSyntaxState& state)
 {
     const auto found = mStateIds.find(state);
     if (found != mStateIds.end())
     {
         return found->second;
     }
+    // A state no line was in before, which is rare: copied only then.
     const U32 id = static_cast<U32>(mStates.size());
     mStateIds.emplace(state, id);
-    mStates.push_back(std::move(state));
+    mStates.push_back(state);
     return id;
 }
 
@@ -204,7 +206,6 @@ bool ALSyntaxHighlighter::lexSome(S32 most)
 
 void ALSyntaxHighlighter::lex(S32 line, S32 most)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     mLastLexed = 0;
     if (!mDocument || !mGrammar || mLines.empty())
     {
@@ -215,12 +216,15 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
     {
         return;
     }
+    // A zone only where there are lines to look at: most requests -- a row
+    // drawn, the map's revisions, the folds' -- find them lexed already.
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     compactStates();
     std::vector<ALSyntaxToken> fresh;
-    // Each line starts in the state the one before ends in, by number: a
-    // copy of it only for a line lexed anew. A line that lexes as it did
-    // costs nothing against `most`: the stop is at the first that would
-    // be lexed past it.
+    // Each line starts in the state the one before ends in, by number,
+    // copied into the one kept for lexing only for a line lexed anew. A
+    // line that lexes as it did costs nothing against `most`: the stop is
+    // at the first that would be lexed past it.
     S32 i = mFirstDirty;
     for (; i <= line; ++i)
     {
@@ -235,17 +239,18 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
         {
             break;
         }
-        ALSyntaxState state = mStates[start];
-        mGrammar->lexLine(mDocument->line(i), state, fresh, *mWords);
+        mLexing = mStates[start];
+        mGrammar->lexLine(mDocument->line(i), mLexing, fresh, *mWords);
         ++mLastLexed;
-        if (!entry.valid || fresh != entry.tokens)
+        if (!entry.lexed || fresh != entry.tokens)
         {
             entry.tokens.swap(fresh);
             ++entry.revision;
         }
         entry.start = start;
-        entry.end   = intern(std::move(state));
+        entry.end   = intern(mLexing);
         entry.valid = true;
+        entry.lexed = true;
     }
     mFirstDirty = i;
 }
@@ -253,7 +258,9 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
 const std::vector<ALSyntaxToken>& ALSyntaxHighlighter::tokens(S32 line)
 {
     ensure(line);
-    if (line < 0 || line >= static_cast<S32>(mLines.size()))
+    // A line not lexed now -- there is no grammar, or no document -- has
+    // none, whatever it was lexed to before.
+    if (line < 0 || line >= static_cast<S32>(mLines.size()) || !mLines[line].valid)
     {
         return NO_TOKENS;
     }
@@ -268,4 +275,14 @@ U32 ALSyntaxHighlighter::revision(S32 line)
         return 0;
     }
     return mLines[line].revision;
+}
+
+ALSyntaxState ALSyntaxHighlighter::startState(S32 line)
+{
+    ensure(line);
+    if (!mGrammar || line < 0 || line >= static_cast<S32>(mLines.size()) || !mLines[line].valid || mLines[line].start >= mStates.size())
+    {
+        return mGrammar ? mGrammar->initialState() : ALSyntaxState();
+    }
+    return mStates[mLines[line].start];
 }

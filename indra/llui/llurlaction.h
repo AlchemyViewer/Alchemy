@@ -28,10 +28,13 @@
 #ifndef LL_LLURLACTION_H
 #define LL_LLURLACTION_H
 
+#include "llhandle.h"
+
 #include <functional>
 #include <optional>
 #include <string>
 
+class LLContextMenu;
 class LLUUID;
 class LLView;
 
@@ -131,6 +134,14 @@ public:
     // enabled by whether it is near. Each only where asked and known;
     // a widget with an answer of its own leaves that one out.
     static void adjustMenu(LLView* menu, const std::string& url, bool friends = true, bool blocked = true, bool reachable = true);
+
+    // The menu the registry names for a URL, each of its Url.* items
+    // acting on the URL and the menu put right by what is known
+    // (adjustMenu), made in place of the one `held` holds, which goes.
+    // Null where the URL has no menu, or there is no menu container to
+    // hold one, the old menu left as it was; null too where the file
+    // makes none. Where it opens is the caller's.
+    static LLContextMenu* createMenu(const std::string& url, LLHandle<LLContextMenu>& held);
 
 private:
     // callbacks for operations we can perform on Urls

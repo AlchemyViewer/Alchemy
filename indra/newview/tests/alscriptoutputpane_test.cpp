@@ -515,4 +515,31 @@ namespace tut
         ensure("in order, apart", apart(narrow, 420));
         ensure("the box still there", narrow[2].getWidth() >= 60);
     }
+
+    template<> template<>
+    void alscriptoutputpane_object::test<11>()
+    {
+        set_test_name("an error that says a lone CR runs to a line more, and a frame under it links from the line the log shows it on; the studio's own words' links likewise");
+        ALScriptOutputPane& out    = make();
+        const LLUUID        object = fresh();
+        const LLUUID        item   = fresh();
+        Event               error  = failed(object, item, "Counter", "bad\rvalue", -1);
+        error.stack                = { "lua_script:8: bad\rvalue", "lua_script:3 function helper" };
+        out.heard(error);
+        const ALOutputView::Entry& entry = last();
+        ensure_equals("its breaks as the log reads them", entry.text, std::string("bad\nvalue\nlua_script:3 function helper"));
+        ensure_equals("a link for the frame", entry.links.size(), size_t(1));
+        ensure_equals("on the frame's line", entry.links[0].line, 2);
+        const ALTextDocument& shown_text = out.view()->document();
+        ensure_equals("the line the log shows it on", shown_text.line(shown_text.lineCount() - 1), std::string("lua_script:3 function helper"));
+
+        // The studio's own words likewise: a name after a lone CR linked on
+        // the line it is shown on, and what to do after it.
+        ALScriptStudioDoc& doc = services.addDoc("door-script", ALScriptRef(fresh(), fresh()), "door.lsl");
+        out.said("Could not save\rdoor.lsl.", true, &doc, { "retry" });
+        const ALOutputView::Entry& studio_said = last();
+        ensure_equals("the name and what to do", studio_said.links.size(), size_t(2));
+        ensure("the name at the start of the second line", studio_said.links[0].line == 1 && studio_said.links[0].begin == 0 && studio_said.links[0].end == 8);
+        ensure("what to do on it too", studio_said.links[1].line == 1 && studio_said.links[1].begin == 12);
+    }
 }

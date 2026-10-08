@@ -46,10 +46,16 @@
 // a worker over a copy of it, so that a slow one holds nothing up: the
 // matches there were stand until the worker's come in (collect); one of a
 // text changed since is looked for again. Whatever acts on the matches
-// waits for them (settle), so that it acts on the text as it is.
+// waits for them (settle), so that it acts on the text as it is. The one
+// worker every find shares, a search at a time: one given up on -- a newer
+// asked for, the find put away -- is passed over where it has not begun,
+// and stops where it has.
 class ALTextFind
 {
 public:
+    ALTextFind() = default;
+    ~ALTextFind();
+
     // The text looked through now, for the query as the options say, in
     // the whole text or -- asked for -- the selection, kept to from the
     // first time it is asked for until it is not. The current match is
@@ -64,7 +70,8 @@ public:
     bool searching() const { return mWorking != nullptr; }
     // Past this many bytes, a text is looked through on a worker.
     static constexpr size_t ON_A_WORKER = 256 * 1024;
-    // Nothing found, and nothing to look through again: the find put away.
+    // Nothing found, and nothing to look through again: the find put away,
+    // and with it the stretch a find in a selection kept to.
     void clear();
     // An edit of the text: the matches after it slide, those it cut
     // through go, and a selection kept to grows or shrinks with what is
@@ -119,5 +126,7 @@ private:
     // found, which it hands over through the lock.
     struct Working;
     std::shared_ptr<Working>      mWorking;
+    // The worker's search let go of: what it finds, nobody takes.
+    void                          letGo();
     void                          take(const ALTextDocument& doc, std::vector<ALTextRange> found, const std::string& error, const ALTextRange& selection);
 };

@@ -219,7 +219,7 @@ namespace tut
         ensure("told", model.supply(start, { word("number", ALSyntaxKind::Type) }, /*words*/ false));
         model.narrow(start, ALTextPos(1, 11), "nu", std::string(), {}, text);
         ensure_equals("the type alone", joined(model.list()), std::string("number"));
-        model.narrow(ALTextPos(0, 6), ALTextPos(0, 8), "nu", std::string(), {}, text);
+        model.narrow(ALTextPos(1, 6), ALTextPos(1, 7), "n", std::string(), {}, text);
         ensure("another identifier has them again", joined(model.list()).find("number_of") != std::string::npos);
     }
 
@@ -236,5 +236,21 @@ namespace tut
         model.narrow(start, ALTextPos(0, 19), "Say \"");
         ensure_equals("matched as it reads", joined(model.list()), std::string("Say \"hi\""));
         ensure("all the string holds up to the caret replaced", model.range() == ALTextRange(start, ALTextPos(0, 19)));
+    }
+
+    template<> template<>
+    void alcompletionmodel_object::test<10>()
+    {
+        set_test_name("the identifier the caret is inside is not offered as its own completion, which Return would take and double its tail");
+        const ALTextDocument text("x = foobar;\nfoobaz = 1\n");
+        // `foo` typed with the caret inside `foobar`.
+        std::vector<ALCompletion> out;
+        ALCompletionModel::documentWords(text, ALTextPos(0, 7), "foo", out);
+        ensure_equals("another word that matches, not the one the caret is in", joined(out), std::string("foobaz"));
+        model.narrow(ALTextPos(0, 4), ALTextPos(0, 7), "foo", std::string(), {}, text);
+        ensure_equals("nor on the list", joined(model.list()), std::string("foobaz"));
+        out.clear();
+        ALCompletionModel::documentWords(text, ALTextPos(1, 3), "foo", out);
+        ensure_equals("offered where the caret is in another", joined(out), std::string("foobar"));
     }
 }

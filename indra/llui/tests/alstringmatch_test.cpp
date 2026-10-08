@@ -57,4 +57,17 @@ namespace tut
         ensure("nor another of the same length", !ALStringMatch::equalsNoCase("follows_left", "follows_rght"));
         ensure("nothing is nothing", ALStringMatch::equalsNoCase("", ""));
     }
+
+    template<> template<>
+    void alstringmatch_object::test<2>()
+    {
+        set_test_name("past ASCII as the find bar has it: a letter in either case by its codepoint, and no part of one taken for another");
+        ensure("in", ALStringMatch::containsNoCase("Script \xC3\x89lan", "\xC3\xA9lan"));
+        ensure("not another letter", !ALStringMatch::containsNoCase("\xC3\x88lan", "\xC3\xA9lan"));
+        ensure("nor the half of one", !ALStringMatch::containsNoCase("\xC3\xA9", "\xA9"));
+        ensure("begins", ALStringMatch::startsWithNoCase("\xC3\x89lan vital", "\xC3\xA9LAN"));
+        ensure("is", ALStringMatch::equalsNoCase("\xC3\x89LAN", "\xC3\xA9lan"));
+        ensure("the Kelvin sign is a k, though longer", ALStringMatch::equalsNoCase("\xE2\x84\xAA", "k"));
+        ensure("and begins kelvin", ALStringMatch::startsWithNoCase("kelvin", "\xE2\x84\xAA"));
+    }
 }

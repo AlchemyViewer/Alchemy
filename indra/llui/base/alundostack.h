@@ -26,6 +26,8 @@
 
 #include "stdtypes.h"
 
+#include <deque>
+#include <iterator>
 #include <optional>
 #include <utility>
 #include <string>
@@ -238,15 +240,12 @@ public:
     // The oldest steps back forgotten while what they weigh together --
     // `weigh(step)` each -- is past a budget, the newest always kept: a
     // stack of whole texts capped by the bytes it holds rather than by how
-    // many. How many were forgotten.
+    // many. How many were forgotten. Given what they weigh together as a
+    // caller keeps it, that is moved down by what was forgotten, and only
+    // the steps forgotten are weighed.
     template <typename Weigh>
-    size_t forgetOverBudget(size_t budget, Weigh&& weigh)
+    size_t forgetOverBudget(size_t budget, Weigh&& weigh, size_t& held)
     {
-        size_t held = 0;
-        for (const Step& step : mUndo)
-        {
-            held += weigh(step);
-        }
         size_t forgot = 0;
         while (forgot + 1 < mUndo.size() && held > budget)
         {
@@ -256,12 +255,23 @@ public:
         mUndo.erase(mUndo.begin(), mUndo.begin() + static_cast<std::ptrdiff_t>(forgot));
         return forgot;
     }
+    template <typename Weigh>
+    size_t forgetOverBudget(size_t budget, Weigh&& weigh)
+    {
+        size_t held = 0;
+        for (const Step& step : mUndo)
+        {
+            held += weigh(step);
+        }
+        return forgetOverBudget(budget, weigh, held);
+    }
 
     // Everything done, and how many are in force: the steps back, oldest
-    // first, the last the next to be taken back; and the steps forward,
-    // likewise the last the next to be taken -- the reverse of the order
-    // they would be taken in.
-    const std::vector<Step>& undone() const { return mUndo; }
+    // first, the last the next to be taken back -- the oldest let go of
+    // from the front, which moves none of the rest -- and the steps
+    // forward, likewise the last the next to be taken: the reverse of the
+    // order they would be taken in.
+    const std::deque<Step>&  undone() const { return mUndo; }
     // The newest step back, for its caller to say more about it; there
     // must be one.
     Step&                    newest() { return mUndo.back(); }
@@ -290,13 +300,8 @@ public:
     size_t restore(std::vector<Step> undo, std::vector<Step> redo)
     {
         clear();
-        size_t dropped = 0;
-        if (undo.size() > mDepth)
-        {
-            dropped = undo.size() - mDepth;
-            undo.erase(undo.begin(), undo.begin() + static_cast<std::ptrdiff_t>(dropped));
-        }
-        mUndo = std::move(undo);
+        const size_t dropped = undo.size() > mDepth ? undo.size() - mDepth : 0;
+        mUndo.assign(std::make_move_iterator(undo.begin() + static_cast<std::ptrdiff_t>(dropped)), std::make_move_iterator(undo.end()));
         mRedo = std::move(redo);
         return dropped;
     }
@@ -326,7 +331,7 @@ private:
         return over;
     }
 
-    std::vector<Step>   mUndo;
+    std::deque<Step>    mUndo;
     std::vector<Step>   mRedo;
     size_t              mDepth;
     bool                mLabelPending = false;

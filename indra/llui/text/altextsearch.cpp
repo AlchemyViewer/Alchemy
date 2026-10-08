@@ -31,6 +31,7 @@
 #include <boost/regex/icu.hpp>
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <iterator>
 #include <memory>
@@ -138,9 +139,10 @@ namespace
 
     // The pattern's first match from `first`, a character at a time up to
     // `last`, looking back as far as `base`; said in bytes, as Boost's own
-    // search of UTF-8 says it.
+    // search of UTF-8 says it; cut where the groups `cuts` names say
+    // (ALTextSearchOptions::cutGroups).
     bool searchAt(const char* first, const char* last, const char* base, const boost::u32regex& re, boost::match_flag_type flags,
-                  boost::cmatch& found)
+                  boost::cmatch& found, U64 cuts)
     {
         boost::match_results<Characters> by_character;
         if (!boost::regex_search(Characters(first, base, last), Characters(last, base, last), by_character, re, flags, Characters(base, base, last)))
@@ -148,6 +150,21 @@ namespace
             return false;
         }
         boost::BOOST_REGEX_DETAIL_NS::copy_results(found, by_character, re.get_named_subs());
+        const char* cut = nullptr;
+        for (size_t group = 1; cuts != 0 && group < found.size() && group < 64; ++group)
+        {
+            if (((cuts >> group) & 1) != 0 && found[group].matched && (!cut || found[group].first > cut))
+            {
+                cut = found[group].first;
+            }
+        }
+        if (cut)
+        {
+            // The whole match, and what is after it, from the cut: what
+            // a format's $& and $' are made of, and where the search
+            // goes on from.
+            found.set_second(std::max(cut, found[0].first));
+        }
         return true;
     }
 
@@ -254,10 +271,30 @@ namespace
         }
         static const boost::u32regex NONE;
         const boost::u32regex&       re     = compiled ? *compiled : NONE;
-        // As many as were asked for, and no more looked for.
-        const auto full = [&out, &options]() { return options.limit > 0 && out.size() >= options.limit; };
+        // As many as were asked for, and no more looked for; nor any more
+        // once the search is stopped.
+        const auto full = [&out, &options]() {
+            return (options.limit > 0 && out.size() >= options.limit) || (options.stop && options.stop->load(std::memory_order_relaxed));
+        };
+        // Whether a match begins on the line the last one kept began on: one
+        // passed over, where the first of each line alone is asked for.
+        const auto sameLine = [&out](const ALTextPos& at) { return !out.empty() && out.back().begin.line == at.line; };
         const ALTextRange   within = scope ? scope->normalised() : ALTextRange(doc.start(), doc.end());
         const std::string_view needle = query;
+        // The lines searched as one text, or each on its own.
+        const bool across = options.acrossLines && (options.regex || query.find('\n') != std::string_view::npos);
+        // Without regard to case, the ASCII bytes a plain match may begin
+        // at: those that lower as the query's first character does. Any
+        // other is passed over without a character decoded or compared.
+        std::array<bool, 0x80> begins_at{};
+        if (!options.regex && !options.caseSensitive)
+        {
+            const llwchar first = LLStringOps::toLower(utf8str_decode_at(needle, 0).cp);
+            for (size_t b = 0; b < begins_at.size(); ++b)
+            {
+                begins_at[b] = LLStringOps::toLower(static_cast<llwchar>(b)) == first;
+            }
+        }
 
         // One stretch of text searched from `from` to `to`, each match's
         // offsets turned into places by `posOf`. The text is a line, or the
@@ -300,7 +337,7 @@ namespace
                     {
                         // From the text's start as the base, so that a look
                         // behind sees past where this search began.
-                        if (!searchAt(start, end, base, re, flags, found) || found[0].first > limit)
+                        if (!searchAt(start, end, base, re, flags, found, options.cutGroups) || found[0].first > limit)
                         {
                             break;
                         }
@@ -328,7 +365,8 @@ namespace
                     const auto& part   = grouped ? found[static_cast<size_t>(options.matchGroup)] : found[0];
                     const S32   begin  = static_cast<S32>(part.first - base);
                     const S32   finish = static_cast<S32>(part.second - base);
-                    if (found[0].second <= limit && (!options.wholeWord || wholeWord(text, begin, finish)))
+                    const bool  kept   = found[0].second <= limit && (!options.wholeWord || wholeWord(text, begin, finish));
+                    if (kept && !(options.firstPerLine && sameLine(posOf(begin))))
                     {
                         out.emplace_back(posOf(begin), posOf(finish));
                         if (whole_begins)
@@ -342,7 +380,9 @@ namespace
                             std::string made = found.format(format, boost::format_perl);
                             replaced->push_back(options.preserveCase ? alInCaseOf(std::string(part.first, part.second), made) : std::move(made));
                         }
-                        if (full())
+                        // A line searched on its own is done with its first,
+                        // where that is all that is asked of it.
+                        if (full() || (options.firstPerLine && !across))
                         {
                             break;
                         }
@@ -367,8 +407,8 @@ namespace
             else
             {
                 // As it is by find; without regard to case codepoint by
-                // codepoint at each character, nothing lowered and nothing
-                // allocated.
+                // codepoint at each character a match may begin at, nothing
+                // lowered and nothing allocated.
                 size_t at = static_cast<size_t>(from);
                 while (at < static_cast<size_t>(to))
                 {
@@ -381,8 +421,22 @@ namespace
                             break;
                         }
                     }
+                    else
+                    {
+                        // An ASCII byte is a character of its own.
+                        while (begin < static_cast<size_t>(to) && static_cast<unsigned char>(text[begin]) < 0x80 &&
+                               !begins_at[static_cast<unsigned char>(text[begin])])
+                        {
+                            ++begin;
+                        }
+                        if (begin >= static_cast<size_t>(to))
+                        {
+                            break;
+                        }
+                    }
                     const size_t finish = alMatchAt(text, begin, needle, !options.caseSensitive);
-                    if (finish != std::string_view::npos && finish <= static_cast<size_t>(to) && (!options.wholeWord || wholeWord(text, static_cast<S32>(begin), static_cast<S32>(finish))))
+                    if (finish != std::string_view::npos && finish <= static_cast<size_t>(to) && (!options.wholeWord || wholeWord(text, static_cast<S32>(begin), static_cast<S32>(finish))) &&
+                        !(options.firstPerLine && sameLine(posOf(static_cast<S32>(begin)))))
                     {
                         out.emplace_back(posOf(static_cast<S32>(begin)), posOf(static_cast<S32>(finish)));
                         if (whole_begins)
@@ -393,10 +447,14 @@ namespace
                         {
                             replaced->push_back(options.preserveCase ? alInCaseOf(text.substr(begin, finish - begin), format) : format);
                         }
-                        if (full())
+                        if (full() || (options.firstPerLine && !across))
                         {
                             break;
                         }
+                        // On from its end, as a pattern goes on: no match
+                        // overlaps the one before it.
+                        at = finish;
+                        continue;
                     }
                     at = options.caseSensitive ? begin + 1 : utf8str_decode_at(text, begin).next;
                 }
@@ -406,7 +464,7 @@ namespace
 
         const S32 first = llmax(0, within.begin.line);
         const S32 last  = llmin(within.end.line, doc.lineCount() - 1);
-        if (options.acrossLines && (options.regex || query.find('\n') != std::string_view::npos))
+        if (across)
         {
             // The whole text, which the document keeps between edits, searched
             // between the scope's ends; a line's start is a start, and what
@@ -519,13 +577,14 @@ std::string ALTextSearch::replacement(const ALTextDocument& doc, const ALTextRan
             try
             {
                 boost::cmatch found;
-                bool matched = searchAt(base + from, base + hay.size(), base, *re, flags, found) && found[0].second == base + to;
+                const U64     cuts    = options.cutGroups;
+                bool          matched = searchAt(base + from, base + hay.size(), base, *re, flags, found, cuts) && found[0].second == base + to;
                 if (!matched)
                 {
-                    matched = searchAt(base + from, base + to, base, *re, flags, found) && found[0].second == base + to;
+                    matched = searchAt(base + from, base + to, base, *re, flags, found, cuts) && found[0].second == base + to;
                 }
                 const char* own = text.data();
-                if (matched || searchAt(own, own + text.size(), own, *re, boost::match_default | boost::match_not_dot_newline, found))
+                if (matched || searchAt(own, own + text.size(), own, *re, boost::match_default | boost::match_not_dot_newline, found, cuts))
                 {
                     out = found.format(std::string(with), boost::format_perl);
                 }

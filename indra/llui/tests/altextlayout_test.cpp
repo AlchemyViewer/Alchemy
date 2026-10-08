@@ -94,13 +94,16 @@ namespace tut
             }
             // A row the line wraps after ends at the next row's start, which
             // is not a place on it: on or past its last cluster is that one.
+            // An inlay is a cell of its own beside the character that shares
+            // its column.
             const bool wraps_after = row.glyphEnd < line.glyphs.size();
             S32        cluster     = row.begin;
             F32        left        = 0.f;
             for (size_t k = row.glyphBegin; k <= row.glyphEnd; ++k)
             {
                 const bool at_end     = (k == row.glyphEnd);
-                const bool starts_one = at_end || k == row.glyphBegin || line.glyphs[k].cluster != line.glyphs[k - 1].cluster;
+                const bool starts_one = at_end || k == row.glyphBegin || line.glyphs[k].cluster != line.glyphs[k - 1].cluster ||
+                                        (line.glyphs[k].inlay >= 0) != (line.glyphs[k - 1].inlay >= 0);
                 if (!starts_one)
                 {
                     continue;
@@ -258,7 +261,7 @@ namespace tut
         ensure_equals("four lines", layout.lineCount(), 4);
         ensure_equals("the new line lays out", layout.line(1).glyphs.size(), size_t(3));
         ensure_equals("tops follow", layout.lineTop(3), 3 * layout.rowHeight());
-        doc.removeFirstLines(3);
+        doc.remove(ALTextRange(doc.start(), ALTextPos(3, 0)));
         ensure_equals("one left", layout.lineCount(), 1);
         ensure_equals("which is the last", layout.line(0).glyphs.size(), size_t(5));
     }
@@ -885,5 +888,130 @@ namespace tut
         const S32 down = layout.columnAt(0, layout.rowOf(0, again) + 1, kept, true);
         ensure_equals("down onto the short row, not past it", layout.rowOf(0, down), 1);
         ensure_equals("down again to the line's end", layout.columnAt(0, layout.rowOf(0, down) + 1, kept, true), 30);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<23>()
+    {
+        set_test_name("a line let go of and then changed counts for the widest by the text it has, not by what it measured before");
+        std::string text;
+        for (S32 i = 0; i < 20; ++i)
+        {
+            text += i == 12 ? "a line far longer than every other line of the text\n" : "line\n";
+        }
+        ready(text.c_str());
+        for (S32 l = 0; l < layout.lineCount(); ++l)
+        {
+            layout.line(l);
+        }
+        const F32 long_width = layout.line(12).width;
+        const F32 space      = layout.columnWidth();
+        ensure("the long line the widest", close_to(layout.contentWidth(), long_width));
+        // Let go of, far from what is in sight, then changed there: a
+        // short line made long, as Replace All makes one.
+        layout.trim(0, 3);
+        doc.replace(ALTextRange(ALTextPos(8, 0), ALTextPos(8, 4)), std::string(400, 'x'));
+        ensure("the line made long counts as long: " + std::to_string(layout.contentWidth()), layout.contentWidth() >= 399.f * space);
+        // And the long lines made short.
+        doc.replace(ALTextRange(ALTextPos(12, 0), ALTextPos(12, doc.lineLength(12))), "x");
+        doc.replace(ALTextRange(ALTextPos(8, 0), ALTextPos(8, 400)), "y");
+        ensure("the long lines made short count as short: " + std::to_string(layout.contentWidth()), layout.contentWidth() < long_width * 0.5f);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<24>()
+    {
+        set_test_name("the widest line is kept up through edits as a count of every line finds it: a line typed wider, the widest cut short, lines made and taken away");
+        ready("aa\nbbbbbb\ncc\nd");
+        const auto check = [&](const std::string& what) {
+            F32 widest = 0.f;
+            for (S32 l = 0; l < layout.lineCount(); ++l)
+            {
+                widest = llmax(widest, layout.line(l).width);
+            }
+            ensure_equals(what, layout.contentWidth(), widest);
+        };
+        check("laid out");
+        doc.insert(ALTextPos(2, 2), "cccccccccc");
+        check("a line typed wider than the widest");
+        doc.remove(ALTextRange(ALTextPos(2, 2), ALTextPos(2, 12)));
+        check("the widest cut short");
+        doc.insert(ALTextPos(0, 0), "dddddddddddddddd\n\n");
+        check("lines made, one of them the widest");
+        doc.remove(ALTextRange(ALTextPos(0, 0), ALTextPos(2, 0)));
+        check("lines taken away with the widest");
+        doc.insert(ALTextPos(3, 1), "\neeeeeeeeeeeeeeeeeeee");
+        check("a line made below, wider than the rest");
+        layout.invalidateLine(4);
+        check("that line laid out again");
+    }
+
+    template<> template<>
+    void altextlayout_object::test<25>()
+    {
+        set_test_name("the line at a y past a run hidden to the end is the last in sight, and the last in sight before a line is found over a run, gaps or none");
+        std::string many = "first\nsecond";
+        for (S32 n = 0; n < 5000; ++n)
+        {
+            many += "\nhidden";
+        }
+        ready(many.c_str());
+        const S32 row  = layout.rowHeight();
+        const S32 last = layout.lineCount() - 1;
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 2, last, true);
+        ensure_equals("past everything in sight: the last line in sight", layout.lineAtY(10 * row), 1);
+        ensure_equals("on it, itself", layout.lineAtY(row), 1);
+        ensure_equals("before the run, from past it", layout.visibleBefore(last + 1), 1);
+        ensure_equals("from inside it", layout.visibleBefore(2500), 1);
+        ensure_equals("before a line in sight, the one above it", layout.visibleBefore(1), 0);
+        ensure_equals("none before the first", layout.visibleBefore(0), -1);
+        std::vector<S32> gaps(static_cast<size_t>(last + 2), 0);
+        gaps[1] = 2;
+        layout.setGapProvider([&gaps](S32 line) { return gaps[static_cast<size_t>(line)]; });
+        ensure_equals("a gap over the last in sight: still it", layout.visibleBefore(last + 1), 1);
+        ensure_equals("and past everything, it", layout.lineAtY(20 * row), 1);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 1, 1, true);
+        ensure_equals("the run from the second line: the first", layout.visibleBefore(last + 1), 0);
+        ensure_equals("past everything, the first", layout.lineAtY(20 * row), 0);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 0, 0, true);
+        ensure_equals("everything hidden: none", layout.visibleBefore(last + 1), -1);
+        layout.setGapProvider(nullptr);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<26>()
+    {
+        set_test_name("an inlay is a cell of its own: a click on the half of the character beside it nearer it is before the character, and a click on it is its column");
+        ready("f(a, b)");
+        layout.setInlayProvider([](S32 line, std::vector<ALTextLayout::Inlay>& out) {
+            out.push_back(ALTextLayout::Inlay{ 2, 40.f, true, 0 });
+            out.push_back(ALTextLayout::Inlay{ 5, 40.f, false, 1 });
+        });
+        // An argument's name before 'a', which the caret at a's column
+        // stands after.
+        const F32 a_left  = layout.xOf(0, 2);
+        const F32 a_right = layout.xOf(0, 3);
+        ensure("the name before a", a_left >= 40.f && a_right > a_left);
+        ensure_equals("a's near half: before a", layout.columnAt(0, 0, a_left + (a_right - a_left) * 0.25f, true), 2);
+        ensure_equals("a's far half: after it", layout.columnAt(0, 0, a_left + (a_right - a_left) * 0.75f, true), 3);
+        ensure_equals("the name's near half: a's column", layout.columnAt(0, 0, a_left - 30.f, true), 2);
+        ensure_equals("its far half too", layout.columnAt(0, 0, a_left - 5.f, true), 2);
+        // A word after the text before 'b', which the caret at b's column
+        // stands before.
+        const ALTextLayout::Line& line   = layout.line(0);
+        F32                       b_left = -1.f;
+        for (const ALTextLayout::Glyph& glyph : line.glyphs)
+        {
+            if (glyph.cluster == 5 && glyph.inlay < 0)
+            {
+                b_left = glyph.pen - line.rows[0].xStart;
+                break;
+            }
+        }
+        const F32 b_right = layout.xOf(0, 6);
+        ensure("the word before b", b_left >= layout.xOf(0, 5) + 39.f && b_right > b_left);
+        ensure_equals("b's near half: before b", layout.columnAt(0, 0, b_left + (b_right - b_left) * 0.25f, true), 5);
+        ensure_equals("the word's far half: b's column", layout.columnAt(0, 0, b_left - 5.f, true), 5);
+        searchedAsWalked(0);
     }
 }

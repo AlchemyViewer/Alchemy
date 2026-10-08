@@ -27,6 +27,8 @@
 
 #include "alnotecardformat.h"
 
+#include "allinebreaks.h"
+
 #include <algorithm>
 #include <optional>
 
@@ -201,16 +203,12 @@ std::optional<Named> namedAt(std::string_view line, S32 column)
 std::vector<ALScriptSpan> readersOf(std::string_view text, std::string_view name)
 {
     std::vector<ALScriptSpan> out;
-    S32                       line_no = 0;
-    size_t                    from    = 0;
-    while (from <= text.size())
+    // By the lines a document makes of the text, so that each place is on
+    // the line the script's tab shows it on, whatever its line endings.
+    const std::vector<std::string_view> lines = ALLineBreaks::views(text);
+    for (size_t line_no = 0; line_no < lines.size(); ++line_no)
     {
-        size_t end = text.find('\n', from);
-        if (end == std::string_view::npos)
-        {
-            end = text.size();
-        }
-        const std::string_view line = text.substr(from, end - from);
+        const std::string_view line = lines[line_no];
         for (size_t i = 0; i < line.size(); ++i)
         {
             if (line[i] != '"' && line[i] != '\'')
@@ -225,15 +223,13 @@ std::vector<ALScriptSpan> readersOf(std::string_view text, std::string_view name
             if (string->second == name && readerBefore(line, i))
             {
                 ALScriptSpan span;
-                span.line = span.endLine = line_no;
+                span.line = span.endLine = static_cast<S32>(line_no);
                 span.column              = static_cast<S32>(i);
                 span.endColumn           = static_cast<S32>(string->first);
                 out.push_back(span);
             }
             i = string->first - 1;
         }
-        from = end + 1;
-        ++line_no;
     }
     return out;
 }

@@ -28,6 +28,7 @@
 #include "aldiffedit.h"
 #include "altextdiff.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -62,15 +63,23 @@ namespace ALStructuralDiff
         bool tooLarge = false;
     };
 
+    // The words that mean the same in a change (ALDiffSame), by where it
+    // begins in each text -- its first line, or where it has none there,
+    // the place it stands: a range's own, where the change is in one,
+    // rather than only the whole comparison's.
+    typedef std::function<ALTextDiff::same_t(S32 left, S32 right)> same_at_t;
+
     // Each text's lines' regions, where a grammar gives them, cut its
     // tokens (ALDiffTokens).
     Result compare(const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Options& options,
                    const std::vector<ALTextDiff::regions_t>* left_regions = nullptr, const std::vector<ALTextDiff::regions_t>* right_regions = nullptr);
     // As compare(), from the lines' runs as they already are -- spliced
-    // where a text changed (ALDiffSplice) -- the changes read as tokens.
+    // where a text changed (ALDiffSplice) -- the changes read as tokens;
+    // each change's words that mean the same by `same_at` where it is
+    // given, else the options'.
     Result read(const std::vector<std::string>& left, const std::vector<std::string>& right, std::vector<ALTextDiff::Run> runs,
                 const ALTextDiff::Options& options, const std::vector<ALTextDiff::regions_t>* left_regions = nullptr,
-                const std::vector<ALTextDiff::regions_t>* right_regions = nullptr);
+                const std::vector<ALTextDiff::regions_t>* right_regions = nullptr, const same_at_t& same_at = same_at_t());
 
     // Where each text was edited: the lines the same at its start and at
     // its end (ALDiffEdit::Edges), as far as the edit changed how lines
@@ -85,10 +94,12 @@ namespace ALStructuralDiff
     // with the texts, and of the changes now, only those that are not a
     // change there was, outside the lines edited, read again -- a keystroke
     // reads the change it is in, not every change. Its runs are left as
-    // they are; it is too large where one read again is.
+    // they are; it is too large where one read again is. Words that mean
+    // the same as read() has them.
     void readAgain(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<ALTextDiff::Run>& was,
                    const std::vector<ALTextDiff::Run>& runs, const Edited& edited, const ALTextDiff::Options& options,
-                   const std::vector<ALTextDiff::regions_t>* left_regions, const std::vector<ALTextDiff::regions_t>* right_regions, Result& result);
+                   const std::vector<ALTextDiff::regions_t>* left_regions, const std::vector<ALTextDiff::regions_t>* right_regions, Result& result,
+                   const same_at_t& same_at = same_at_t());
     // How many changes the last read() or readAgain() read as tokens: what
     // a test holds an edit's cost to.
     S32 lastRead();

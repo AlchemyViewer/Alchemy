@@ -35,11 +35,11 @@
 #include <algorithm>
 #include <cstdlib>
 
-bool ALVimSearch::search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset,
+bool ALVimSearch::search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool no_smartcase, const Offset& offset,
                          std::optional<ALTextPos> search_from)
 {
     const ALTextPos                start = mVim.cursor(view);
-    const std::optional<ALTextPos> to    = target(view, pattern, forward, count, whole_word, offset, search_from);
+    const std::optional<ALTextPos> to    = target(view, pattern, forward, count, no_smartcase, offset, search_from);
     if (!to)
     {
         return false;
@@ -52,16 +52,15 @@ bool ALVimSearch::search(ALTextView& view, const std::string& pattern, bool forw
     return true;
 }
 
-std::optional<ALTextPos> ALVimSearch::target(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset,
+std::optional<ALTextPos> ALVimSearch::target(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool no_smartcase, const Offset& offset,
                                              std::optional<ALTextPos> search_from)
 {
     const ALTextDocument& d = view.document();
     ALTextSearchOptions   options;
-    options.regex     = !whole_word;
-    options.wholeWord = whole_word;
-    // A whole word -- * and # -- is looked for as it is, its case as
-    // ignorecase alone says; a pattern in vim's spelling.
-    const Pattern pattern_in = whole_word ? Pattern{ pattern, !mVim.mShared->ignoreCase } : patternOf(pattern);
+    options.regex = true;
+    // A pattern in vim's spelling; what * and # look for in its case as
+    // ignorecase alone says.
+    const Pattern pattern_in = patternOf(pattern, caseWithoutSmartCase(no_smartcase));
     options.caseSensitive    = pattern_in.caseSensitive;
     const Found&                    found_now = found(view, pattern_in, options);
     const std::vector<ALTextRange>& matches   = found_now.matches;
@@ -109,6 +108,11 @@ ALVimSearch::Pattern ALVimSearch::patternOf(const std::string& vim, std::optiona
     return ALVimPattern::of(vim, mVim.mEx->lastReplacement, { mVim.mShared->ignoreCase, mVim.mShared->smartCase }, force_case);
 }
 
+std::optional<bool> ALVimSearch::caseWithoutSmartCase(bool no_smartcase) const
+{
+    return no_smartcase ? std::optional<bool>(!mVim.mShared->ignoreCase) : std::nullopt;
+}
+
 ALVimPattern::Places ALVimSearch::placesOf(const ALTextView& view) const
 {
     // The last visual area, as a range: whole lines for a line-wise one,
@@ -148,7 +152,8 @@ const ALVimSearch::Found& ALVimSearch::found(ALTextView& view, const Pattern& pa
     const ALTextSearchOptions& kept = mFound.options;
     const bool same = mFound.doc == &d && mFound.version == d.version() && mFound.pattern == pattern && kept.caseSensitive == options.caseSensitive &&
                       kept.wholeWord == options.wholeWord && kept.regex == options.regex && kept.preserveCase == options.preserveCase &&
-                      kept.matchGroup == options.matchGroup && kept.acrossLines == options.acrossLines && kept.limit == options.limit;
+                      kept.matchGroup == options.matchGroup && kept.acrossLines == options.acrossLines && kept.limit == options.limit &&
+                      kept.firstPerLine == options.firstPerLine;
     if (same)
     {
         return mFound;
@@ -183,9 +188,8 @@ std::optional<ALTextRange> ALVimSearch::matchNear(ALTextView& view, bool forward
         return std::nullopt;
     }
     ALTextSearchOptions options;
-    options.regex         = !wholeWord;
-    options.wholeWord     = wholeWord;
-    const Pattern parsed  = wholeWord ? Pattern{ pattern, !mVim.mShared->ignoreCase } : patternOf(pattern);
+    options.regex         = true;
+    const Pattern parsed  = patternOf(pattern, caseWithoutSmartCase(noSmartCase));
     options.caseSensitive = parsed.caseSensitive;
     const Found&                    found_now = found(view, parsed, options);
     const std::vector<ALTextRange>& matches   = found_now.matches;
@@ -239,6 +243,87 @@ void ALVimSearch::splitOffset(const std::string& line, llwchar kind, std::string
     }
     pattern = line;
     offset_text.clear();
+}
+
+// static
+std::string ALVimSearch::backwardPattern(const std::string& typed)
+{
+    // As vim's skip_regexp() reads one: a [] collection -- \[ one under \V
+    // -- passed over to its ], as skip_anyof() finds it; elsewhere \? made
+    // a ?, and every other backslash kept with what follows it.
+    const size_t size         = typed.size();
+    const auto   collectionAt = [&typed, size](size_t p) {
+        if (p < size && typed[p] == '^')
+        {
+            ++p;
+        }
+        if (p < size && (typed[p] == ']' || typed[p] == '-'))
+        {
+            ++p;
+        }
+        static constexpr std::string_view ESCAPED("]^-n\\rtebdoxuU");
+        while (p < size && typed[p] != ']')
+        {
+            if (typed[p] == '-')
+            {
+                ++p;
+                if (p < size && typed[p] != ']')
+                {
+                    ++p;
+                }
+            }
+            else if (typed[p] == '\\' && p + 1 < size && ESCAPED.find(typed[p + 1]) != std::string_view::npos)
+            {
+                p += 2;
+            }
+            else if (typed[p] == '[' && p + 1 < size && (typed[p + 1] == ':' || typed[p + 1] == '=' || typed[p + 1] == '.'))
+            {
+                // [:alpha:] and the like, to their own close.
+                const char   kind  = typed[p + 1];
+                const size_t close = typed.find(std::string{ kind, ']' }, p + 2);
+                p                  = close == std::string::npos ? p + 1 : close + 2;
+            }
+            else
+            {
+                ++p;
+            }
+        }
+        return p;
+    };
+    std::string out;
+    out.reserve(size);
+    bool nomagic = false;
+    for (size_t i = 0; i < size; ++i)
+    {
+        const bool bracket = typed[i] == '[' && !nomagic;
+        if (bracket || (typed[i] == '\\' && i + 1 < size && typed[i + 1] == '[' && nomagic))
+        {
+            const size_t end = collectionAt(bracket ? i + 1 : i + 2);
+            out.append(typed, i, end < size ? end + 1 - i : std::string::npos);
+            if (end >= size)
+            {
+                break;
+            }
+            i = end;
+            continue;
+        }
+        if (typed[i] == '\\' && i + 1 < size)
+        {
+            const char next = typed[++i];
+            if (next != '?')
+            {
+                out += '\\';
+            }
+            out += next;
+            if (next == 'v' || next == 'V')
+            {
+                nomagic = next == 'V';
+            }
+            continue;
+        }
+        out += typed[i];
+    }
+    return out;
 }
 
 // static
@@ -319,10 +404,11 @@ void ALVimSearch::incrementalSearch(ALTextView& view)
         view.scrollToCaret();
         return;
     }
-    // What is typed so far may not be a pattern yet: nothing lit then.
+    // What is typed so far may not be a pattern yet: nothing lit then. After
+    // ?, \? is the ? itself (backwardPattern).
     ALTextSearchOptions options;
     options.regex                            = true;
-    const Pattern parsed                     = patternOf(pattern);
+    const Pattern parsed                     = patternOf(mVim.mCommandLine.kind == '?' ? backwardPattern(pattern) : pattern);
     options.caseSensitive                    = parsed.caseSensitive;
     const Found&                    found_now = found(view, parsed, options);
     const std::vector<ALTextRange>& matches   = found_now.matches;

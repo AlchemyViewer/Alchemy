@@ -34,6 +34,7 @@
 #include "alscriptlexicon.h"
 #include "alscriptweight.h"
 
+#include "allinebreaks.h"
 #include "llstl.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -298,19 +299,7 @@ namespace
             // joins nothing and its CR is a blank.
             if (!mVerbatim && text.find('\r') != std::string_view::npos)
             {
-                mUnixText.clear();
-                mUnixText.reserve(text.size());
-                for (size_t i = 0; i < text.size(); ++i)
-                {
-                    if (text[i] != '\r')
-                    {
-                        mUnixText += text[i];
-                    }
-                    else if (i + 1 >= text.size() || text[i + 1] != '\n')
-                    {
-                        mUnixText += '\n';
-                    }
-                }
+                ALLineBreaks::withLineFeeds(text, mUnixText);
                 text = mUnixText;
             }
             mText   = text;

@@ -30,8 +30,12 @@
 
 ALTextMerge::changes_t ALTextMerge::changesOf(const std::vector<std::string>& base, const std::vector<std::string>& text, const ALTextDiff::Options& options)
 {
-    const std::vector<ALTextDiff::Run> runs = ALTextDiff::lines(base, text, options);
-    changes_t                          out;
+    return changesOf(ALTextDiff::lines(base, text, options));
+}
+
+ALTextMerge::changes_t ALTextMerge::changesOf(const std::vector<ALTextDiff::Run>& runs)
+{
+    changes_t out;
     for (size_t i = 0; i < runs.size();)
     {
         if (runs[i].kind == ALTextDiff::Kind::Same)
@@ -82,18 +86,9 @@ ALTextMerge::hunks_t ALTextMerge::merge(S32 base_lines, const changes_t& mine, c
     // Each side's regions, where a grammar says where comments and strings
     // are and that changes how lines are told the same: what two sides are
     // read by to be found alike.
-    const std::vector<ALTextDiff::regions_t>* ours_regions   = nullptr;
-    const std::vector<ALTextDiff::regions_t>* theirs_regions = nullptr;
-    if (options.like.byRegions() && options.lexer)
-    {
-        ours_regions   = &options.lexer(ours);
-        theirs_regions = &options.lexer(theirs);
-        if (ours_regions->size() != ours.size() || theirs_regions->size() != theirs.size())
-        {
-            ours_regions   = nullptr;
-            theirs_regions = nullptr;
-        }
-    }
+    const ALTextDiff::both_regions_t          regions        = ALTextDiff::lexed(options, ours, theirs, options.like.byRegions());
+    const std::vector<ALTextDiff::regions_t>* ours_regions   = regions.first;
+    const std::vector<ALTextDiff::regions_t>* theirs_regions = regions.second;
     while (i < mine.size() || j < other.size())
     {
         // The first change, and every change of either that overlaps or

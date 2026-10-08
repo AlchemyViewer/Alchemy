@@ -27,9 +27,143 @@
 #include "alvimpattern.h"
 #include "alvimtext.h"
 
+#include "altextchars.h"
 #include "llstring.h"
 
+#include <unicode/uchar.h>
+
 #include <algorithm>
+
+namespace
+{
+    // Each backslash item in a pattern outside its bracket expressions,
+    // the character after the backslash handed to `item`, as vim walks a
+    // pattern for what it says of itself (skip_regexp): what opens a
+    // bracket expression goes by the last \v or \V before it.
+    template <typename Item>
+    void eachItem(const std::string& vim, Item&& item)
+    {
+        bool very_nomagic = false;
+        for (size_t i = 0; i < vim.size(); ++i)
+        {
+            if ((vim[i] == '[' && !very_nomagic) || (vim[i] == '\\' && i + 1 < vim.size() && vim[i + 1] == '[' && very_nomagic))
+            {
+                // Through to the bracket's close; an unclosed one runs on to
+                // the end.
+                size_t j = vim[i] == '[' ? i + 1 : i + 2;
+                if (j < vim.size() && vim[j] == '^')
+                {
+                    ++j;
+                }
+                if (j < vim.size() && vim[j] == ']')
+                {
+                    ++j;
+                }
+                while (j < vim.size() && vim[j] != ']')
+                {
+                    j += (vim[j] == '\\' && j + 1 < vim.size()) ? 2u : 1u;
+                }
+                i = j;
+            }
+            else if (vim[i] == '\\' && i + 1 < vim.size())
+            {
+                ++i;
+                very_nomagic = vim[i] == 'V' || (vim[i] != 'v' && very_nomagic);
+                item(vim[i]);
+            }
+        }
+    }
+
+    // Whether a pattern has a capital in it, as vim's smartcase asks
+    // (pat_has_uppercase): one after a backslash is no capital -- \S, \V,
+    // and \_S and \%V with the character after their _ or % -- nor in a
+    // very magic pattern one after a bare % or _, where a backslash is no
+    // more than itself. How magic the pattern is goes by the last \v or \V
+    // in it outside a bracket expression, as vim measures it for this.
+    bool hasCapital(const std::string& vim)
+    {
+        enum class Magic : U8
+        {
+            On,
+            Very,
+            None
+        };
+        Magic magic = Magic::On;
+        eachItem(vim, [&magic](char item) { magic = item == 'v' ? Magic::Very : item == 'V' ? Magic::None : magic; });
+        for (size_t i = 0; i < vim.size();)
+        {
+            const unsigned char c = static_cast<unsigned char>(vim[i]);
+            if (c >= 0x80)
+            {
+                const LLCodepointAt cp = utf8str_decode_at(vim, i);
+                if (cp.next > i + 1 && LLStringOps::isUpper(cp.cp))
+                {
+                    return true;
+                }
+                i = llmax(cp.next, i + 1);
+            }
+            else if (c == '\\' && magic != Magic::Very)
+            {
+                const bool two = i + 2 < vim.size() && (vim[i + 1] == '_' || vim[i + 1] == '%');
+                i += two ? 3u : (i + 1 < vim.size() ? 2u : 1u);
+            }
+            else if ((c == '%' || c == '_') && magic == Magic::Very)
+            {
+                i += i + 1 < vim.size() ? 2u : 1u;
+            }
+            else if (c >= 'A' && c <= 'Z')
+            {
+                return true;
+            }
+            else
+            {
+                ++i;
+            }
+        }
+        return false;
+    }
+
+    // Whether a pattern has a \Z in it, which has vim ignore composing
+    // characters throughout.
+    bool ignoresMarks(const std::string& vim)
+    {
+        bool found = false;
+        eachItem(vim, [&found](char item) { found = found || item == 'Z'; });
+        return found;
+    }
+
+    // A format of the engine's with vim's groups in it, $1 to $9, each by
+    // the engine's number for it (`numbers`, in vim's order); one vim does
+    // not have is nothing, as vim makes it.
+    std::string groupsAsCounted(std::string_view format, const std::vector<S32>& numbers)
+    {
+        std::string out;
+        out.reserve(format.size() + 8);
+        for (size_t i = 0; i < format.size(); ++i)
+        {
+            const char c = format[i];
+            if (c == '$' && i + 1 < format.size() && format[i + 1] >= '1' && format[i + 1] <= '9')
+            {
+                const size_t vim_group = static_cast<size_t>(format[++i] - '1');
+                if (vim_group < numbers.size())
+                {
+                    out += "${" + std::to_string(numbers[vim_group]) + "}";
+                }
+            }
+            else if ((c == '\\' || c == '$') && i + 1 < format.size())
+            {
+                // An escape, or $$ $& and the like, as it stands.
+                out += c;
+                out += format[++i];
+            }
+            else
+            {
+                out += c;
+            }
+        }
+        return out;
+    }
+}
 
 // static
 ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_replacement, const Case& case_rules, std::optional<bool> force_case)
@@ -38,26 +172,33 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // < > are the engine's own ( ) | + ? ? { } \b \b, and without one
     // they are themselves; \v makes what follows very magic, where they
     // are the engine's own bare and themselves with a backslash; \V very
-    // nomagic, where only ^ $ and the backslash items are special. \zs
-    // is \K; \ze looks ahead at the rest; \{-} is *?; the classes \a \l
-    // \u \x \o \h \i \k are brackets; \c and \C say how case is matched;
-    // a bracket expression is copied through as it stands.
+    // nomagic, where only the backslash items are special, a bare ^ and $
+    // themselves and \^ \$ a line's start and end anywhere; \M nomagic,
+    // the same but for magic's ^ and $. \zs is \K; \ze looks ahead at the
+    // rest of its branch, or is a group at which the match is cut; \@= \@!
+    // \@<= \@<! and \@> look round the atom before them; \{-} is *?; the
+    // classes \a \l \u \x \o \h \i \k are brackets; \c and \C say how case
+    // is matched, and \Z that composing characters are passed over; a
+    // bracket expression is copied through as it stands. A magic ^ is a
+    // line's start only first in a branch, a $ its end only last in one,
+    // and either is itself anywhere else.
     ALVimPattern        out;
     std::optional<bool> case_in_pattern;
     enum class Magic : U8
     {
         Magic,
         Very,
+        // \M, nomagic.
+        Off,
+        // \V, very nomagic.
         None
     };
     Magic magic    = Magic::Magic;
-    bool  looking  = false;
     bool  zs_seen  = false;
     // Where each \K was put, for the pattern without them.
     std::vector<size_t> k_at;
     auto  literal  = [&](char c) {
-        static const std::string specials("\\^$.|?*+()[]{}");
-        if (specials.find(c) != std::string::npos)
+        if (alRegexSpecial(c))
         {
             out.regex += '\\';
         }
@@ -92,37 +233,264 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         }
         return close;
     };
-    // How deep in the engine's brackets the output is, so that a \zs at
-    // the top can split the pattern into groups.
+    // What a count's braces hold as the engine's repeat: n,m, n and n, as
+    // they are; ,m from none, which the engine would take for the braces
+    // themselves; nothing, or a comma alone, any number, as *.
+    auto repeatOf = [](const std::string& body) {
+        if (body.empty() || body == ",")
+        {
+            return std::string("*");
+        }
+        return body[0] == ',' ? "{0" + body + "}" : "{" + body + "}";
+    };
+    // Whether a magic or nomagic ^ read now is the line's start, as vim
+    // has it: at the pattern's start, and after \( \%( \| \& or \n, a \c,
+    // a \v and the like between them putting in nothing; anywhere else it
+    // is itself.
+    bool at_start = true;
+    // Whether a magic or nomagic $ before `k` is the line's end, as vim
+    // has it: at the pattern's end, and before \| \) \& or \n -- or very
+    // magic's | ) and & where a \v comes between -- a \c, a \v and the like
+    // between them putting in nothing; anywhere else it is itself.
+    auto endsAt = [&vim](size_t k) {
+        constexpr std::string_view SWITCHES("cCmMvVZ");
+        constexpr std::string_view ENDS("|&)");
+        bool                       very = false;
+        while (k + 1 < vim.size() && vim[k] == '\\' && SWITCHES.find(vim[k + 1]) != std::string_view::npos)
+        {
+            if (vim[k + 1] == 'v')
+            {
+                very = true;
+            }
+            else if (vim[k + 1] == 'm' || vim[k + 1] == 'M' || vim[k + 1] == 'V')
+            {
+                very = false;
+            }
+            k += 2;
+        }
+        if (k >= vim.size())
+        {
+            return true;
+        }
+        if (vim[k] == '\\')
+        {
+            return k + 1 < vim.size() && (ENDS.find(vim[k + 1]) != std::string_view::npos || vim[k + 1] == 'n');
+        }
+        return very && ENDS.find(vim[k]) != std::string_view::npos;
+    };
+    // How deep in the engine's brackets the output is, so that a \ze at
+    // the top can look ahead to its branch's end.
     S32   depth    = 0;
+    // The look aheads \ze opened, by the depth each was opened at: each
+    // runs to the end of its branch -- a \| at that depth, the \) that
+    // closes its group, or the pattern's end.
+    std::vector<S32> looking;
+    auto             closeLooks = [&]() {
+        while (!looking.empty() && looking.back() == depth)
+        {
+            out.regex += ')';
+            looking.pop_back();
+        }
+    };
+    // Only the first \ze of a branch at the top looks ahead. Any other --
+    // in a group, where what follows the group must still match past it,
+    // or after another, where the last crossed is the one that counts --
+    // is an empty group of the engine's at which the match is cut, the
+    // pattern matched on past it (cutGroups). Each with where it went,
+    // since one a look round takes in counts for nothing, as in vim; and
+    // whether a \ze has come in the branch at the top so far.
+    std::vector<std::pair<size_t, S32>> cuts;
+    bool                                ze_in_branch = false;
+    // The engine's groups as they open, vim's and the cuts among them;
+    // the engine's number for each of vim's.
+    S32              groups = 0;
+    std::vector<S32> vim_groups;
+    // Where each group still open began in the expression, and where the
+    // last atom did, which a \@ looks around: none at the start of a
+    // branch. Each token read is taken for an atom until it says it is
+    // none -- a multi, a group's opening, a \c -- and a group's closing is
+    // the group's atom.
+    std::vector<size_t> open_at;
+    size_t              atom_at     = std::string::npos;
+    size_t              token_at    = std::string::npos;
+    bool                token_atom  = false;
+    bool                token_group = false;
+    // A \Z anywhere has composing characters ignored: each atom that is a
+    // character takes the marks after it in the text with it, in a group
+    // of its own so that a multi after it repeats both, and a mark in the
+    // pattern is none. The last token so taken, where it was such an atom;
+    // not a group, whose characters took their own, nor a line's or a
+    // word's edge, which is none.
+    const bool ignore_marks = ignoresMarks(vim);
+    auto       withMarks    = [&]() {
+        if (!ignore_marks || !token_atom || token_group || token_at >= out.regex.size())
+        {
+            return;
+        }
+        const std::string_view put = std::string_view(out.regex).substr(token_at);
+        if (put != "^" && put != "$" && put != "\\b")
+        {
+            out.regex.insert(token_at, "(?:");
+            out.regex += "\\p{Mark}*)";
+        }
+    };
+    // \@= \@! \@<= \@<! \@>, and \@123<= with how far back it may look,
+    // which the engine needs no telling: the last atom looked ahead at or
+    // behind it, or taken whole and never given back, as the engine's (?=
+    // (?! (?<= (?<! (?>. `at` is past the @; the index of the last
+    // character taken comes back, or npos where what follows is none of
+    // these or no atom comes before.
+    auto lookAround = [&](size_t at) {
+        size_t k = at;
+        while (k < vim.size() && vim[k] >= '0' && vim[k] <= '9')
+        {
+            ++k;
+        }
+        std::string_view open;
+        if (k + 1 < vim.size() && vim[k] == '<' && (vim[k + 1] == '=' || vim[k + 1] == '!'))
+        {
+            open = vim[k + 1] == '=' ? "(?<=" : "(?<!";
+            ++k;
+        }
+        else if (k == at && k < vim.size() && (vim[k] == '=' || vim[k] == '!' || vim[k] == '>'))
+        {
+            open = vim[k] == '=' ? "(?=" : vim[k] == '!' ? "(?!" : "(?>";
+        }
+        if (open.empty() || atom_at == std::string::npos)
+        {
+            return std::string::npos;
+        }
+        out.regex.insert(atom_at, open.data(), open.size());
+        for (size_t& put_at : k_at)
+        {
+            if (put_at >= atom_at)
+            {
+                put_at += open.size();
+            }
+        }
+        // A cut in what is looked ahead at or behind is none; one in what
+        // is taken whole still is.
+        if (open != "(?>")
+        {
+            std::erase_if(cuts, [&](const std::pair<size_t, S32>& cut) { return cut.first >= atom_at; });
+        }
+        for (std::pair<size_t, S32>& cut : cuts)
+        {
+            if (cut.first >= atom_at)
+            {
+                cut.first += open.size();
+            }
+        }
+        out.regex += ')';
+        return k;
+    };
     for (size_t i = 0; i < vim.size(); ++i)
     {
-        const char c = vim[i];
+        const char c          = vim[i];
+        const bool start_here = at_start;
+        at_start              = false;
+        // The token before this one is the last atom where it was one; the
+        // later bytes of a character are its first's.
+        if ((static_cast<unsigned char>(c) & 0xC0) != 0x80)
+        {
+            withMarks();
+            if (token_atom)
+            {
+                atom_at = token_at;
+            }
+            token_at    = out.regex.size();
+            token_atom  = true;
+            token_group = false;
+            if (ignore_marks && static_cast<unsigned char>(c) >= 0xC0)
+            {
+                const LLCodepointAt mark = utf8str_decode_at(vim, i);
+                if (mark.next > i + 1 && (U_GET_GC_MASK(static_cast<UChar32>(mark.cp)) & U_GC_M_MASK) != 0)
+                {
+                    i          = mark.next - 1;
+                    at_start   = start_here;
+                    token_atom = false;
+                    continue;
+                }
+            }
+        }
         if (c == '\\' && i + 1 < vim.size())
         {
             const char n = vim[++i];
             switch (n)
             {
-                case 'v': magic = Magic::Very; continue;
-                case 'm': magic = Magic::Magic; continue;
-                case 'M':
-                case 'V': magic = Magic::None; continue;
-                case 'c': case_in_pattern = false; continue;
-                case 'C': case_in_pattern = true; continue;
+                case 'v': magic = Magic::Very; at_start = start_here; token_atom = false; continue;
+                case 'm': magic = Magic::Magic; at_start = start_here; token_atom = false; continue;
+                case 'M': magic = Magic::Off; at_start = start_here; token_atom = false; continue;
+                case 'V': magic = Magic::None; at_start = start_here; token_atom = false; continue;
+                case 'c': case_in_pattern = false; at_start = start_here; token_atom = false; continue;
+                case 'C': case_in_pattern = true; at_start = start_here; token_atom = false; continue;
+                case 'Z': at_start = start_here; token_atom = false; continue;
                 case '(':
-                    out.regex += magic == Magic::Very ? "\\(" : "(";
-                    depth += magic == Magic::Very ? 0 : 1;
+                    if (magic == Magic::Very)
+                    {
+                        out.regex += "\\(";
+                        continue;
+                    }
+                    open_at.push_back(out.regex.size());
+                    out.regex += "(";
+                    vim_groups.push_back(++groups);
+                    ++depth;
+                    at_start   = true;
+                    atom_at    = std::string::npos;
+                    token_atom = false;
                     continue;
                 case ')':
-                    out.regex += magic == Magic::Very ? "\\)" : ")";
-                    depth -= magic == Magic::Very ? 0 : 1;
+                    if (magic == Magic::Very)
+                    {
+                        out.regex += "\\)";
+                        continue;
+                    }
+                    closeLooks();
+                    out.regex += ")";
+                    --depth;
+                    // The group whole, from where it opened.
+                    token_atom  = !open_at.empty();
+                    token_group = true;
+                    if (token_atom)
+                    {
+                        token_at = open_at.back();
+                        open_at.pop_back();
+                    }
                     continue;
-                case '|': out.regex += magic == Magic::Very ? "\\|" : "|"; continue;
-                case '+': out.regex += magic == Magic::Very ? "\\+" : "+"; continue;
+                case '|':
+                    if (magic == Magic::Very)
+                    {
+                        out.regex += "\\|";
+                        continue;
+                    }
+                    closeLooks();
+                    out.regex += "|";
+                    ze_in_branch = ze_in_branch && depth > 0;
+                    at_start     = true;
+                    atom_at      = std::string::npos;
+                    token_atom   = false;
+                    continue;
+                case '@':
+                {
+                    const size_t to = magic == Magic::Very ? std::string::npos : lookAround(i + 1);
+                    if (to == std::string::npos)
+                    {
+                        out.regex += "\\@";
+                        continue;
+                    }
+                    i          = to;
+                    token_atom = false;
+                    continue;
+                }
+                case '+': out.regex += magic == Magic::Very ? "\\+" : "+"; token_atom = magic == Magic::Very; continue;
                 case '?':
-                case '=': out.regex += magic == Magic::Very ? std::string(1, n) : "?"; continue;
+                case '=': out.regex += magic == Magic::Very ? std::string(1, n) : "?"; token_atom = magic == Magic::Very; continue;
                 case '<':
                 case '>': out.regex += magic == Magic::Very ? std::string(1, n) : "\\b"; continue;
+                // Very nomagic's line's start and end, anywhere; elsewhere
+                // the characters.
+                case '^':
+                case '$': out.regex += magic == Magic::None ? std::string(1, n) : "\\" + std::string(1, n); continue;
                 case '{':
                 {
                     if (magic == Magic::Very)
@@ -138,6 +506,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         out.regex += "\\{";
                         continue;
                     }
+                    token_atom = false;
                     std::string body = vim.substr(i + 1, close - i - 1);
                     if (!body.empty() && body.back() == '\\')
                     {
@@ -148,18 +517,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     {
                         body.erase(0, 1);
                     }
-                    if (body.empty())
-                    {
-                        out.regex += "*";
-                    }
-                    else if (body == ",")
-                    {
-                        out.regex += "*";
-                    }
-                    else
-                    {
-                        out.regex += "{" + body + "}";
-                    }
+                    out.regex += repeatOf(body);
                     if (lazy)
                     {
                         out.regex += "?";
@@ -178,13 +536,24 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         out.regex += "\\K";
                         zs_seen = true;
                         ++i;
+                        token_atom = false;
                         continue;
                     }
                     if (i + 1 < vim.size() && vim[i + 1] == 'e')
                     {
-                        out.regex += "(?=";
-                        looking = true;
+                        if (depth == 0 && !ze_in_branch)
+                        {
+                            out.regex += "(?=";
+                            looking.push_back(depth);
+                        }
+                        else
+                        {
+                            cuts.emplace_back(out.regex.size(), ++groups);
+                            out.regex += "()";
+                        }
+                        ze_in_branch = true;
                         ++i;
+                        token_atom = false;
                         continue;
                     }
                     literal('z');
@@ -193,9 +562,13 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                 {
                     if (i + 1 < vim.size() && vim[i + 1] == '(')
                     {
+                        open_at.push_back(out.regex.size());
                         out.regex += "(?:";
                         ++depth;
                         ++i;
+                        at_start   = true;
+                        atom_at    = std::string::npos;
+                        token_atom = false;
                         continue;
                     }
                     if (i + 1 < vim.size() && vim[i + 1] == '[')
@@ -252,6 +625,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         place.afterStart = zs_seen;
                         out.where.push_back(place);
                         ++i;
+                        token_atom = false;
                         continue;
                     }
                     // The places: \%V \%# \%23l \%<23l \%>23l \%23c \%23v.
@@ -288,7 +662,8 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         {
                             place.afterStart = zs_seen;
                             out.where.push_back(place);
-                            i = k;
+                            i          = k;
+                            token_atom = false;
                             continue;
                         }
                     }
@@ -296,6 +671,13 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     continue;
                 }
                 case '_':
+                    // \_^ and \_$: a line's start and end wherever they
+                    // stand, crossing none.
+                    if (i + 1 < vim.size() && (vim[i + 1] == '^' || vim[i + 1] == '$'))
+                    {
+                        out.regex += vim[++i];
+                        continue;
+                    }
                     // \_s and the like: the class with a line break in it,
                     // which the search must then be let cross.
                     if (i + 1 < vim.size())
@@ -347,6 +729,15 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                 case 'K': out.regex += "[A-Za-z_]"; continue;
                 case 'e': out.regex += "\\x1b"; continue;
                 default:
+                    // A back reference to one of vim's groups that a cut
+                    // before it has the engine count otherwise, by the
+                    // engine's number.
+                    if (n >= '1' && n <= '9' && static_cast<size_t>(n - '0') <= vim_groups.size() &&
+                        vim_groups[static_cast<size_t>(n - '1')] != n - '0')
+                    {
+                        out.regex += "\\g{" + std::to_string(vim_groups[static_cast<size_t>(n - '1')]) + "}";
+                        continue;
+                    }
                     // \s \S \d \D \w \W \n \t \r \b \. \* \[ \] \/ and the
                     // rest: as they are, a backslash before a letter or a
                     // symbol the engine reads the same way; \n is a line's
@@ -354,10 +745,16 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     out.acrossLines |= n == 'n';
                     out.regex += '\\';
                     out.regex += n;
+                    at_start = n == 'n' || (n == '&' && magic != Magic::Very);
+                    if (n == '&' && magic != Magic::Very)
+                    {
+                        atom_at    = std::string::npos;
+                        token_atom = false;
+                    }
                     continue;
             }
         }
-        if (c == '[' && magic != Magic::None)
+        if (c == '[' && (magic == Magic::Magic || magic == Magic::Very))
         {
             // A bracket expression through to its close, as it stands; an
             // unclosed [ is itself.
@@ -397,13 +794,32 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                 {
                     case '<':
                     case '>': out.regex += "\\b"; break;
-                    case '=': out.regex += "?"; break;
+                    case '=': out.regex += "?"; token_atom = false; break;
+                    case '+':
+                    case '?':
+                    case '*': out.regex += c; token_atom = false; break;
+                    case '@':
+                    {
+                        const size_t to = lookAround(i + 1);
+                        if (to == std::string::npos)
+                        {
+                            out.regex += c;
+                            break;
+                        }
+                        i          = to;
+                        token_atom = false;
+                        break;
+                    }
                     case '%':
                         if (i + 1 < vim.size() && vim[i + 1] == '(')
                         {
+                            open_at.push_back(out.regex.size());
                             out.regex += "(?:";
                             ++depth;
                             ++i;
+                            at_start   = true;
+                            atom_at    = std::string::npos;
+                            token_atom = false;
                         }
                         else if (i + 1 < vim.size() && vim[i + 1] == '[')
                         {
@@ -436,12 +852,13 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         {
                             body.erase(0, 1);
                         }
-                        out.regex += body.empty() || body == "," ? std::string("*") : "{" + body + "}";
+                        out.regex += repeatOf(body);
                         if (lazy)
                         {
                             out.regex += "?";
                         }
-                        i = close;
+                        i          = close;
+                        token_atom = false;
                         break;
                     }
                     case '~':
@@ -450,18 +867,49 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                             literal(r);
                         }
                         break;
-                    case '(': out.regex += c; ++depth; break;
-                    case ')': out.regex += c; --depth; break;
+                    case '(':
+                        open_at.push_back(out.regex.size());
+                        out.regex += c;
+                        vim_groups.push_back(++groups);
+                        ++depth;
+                        at_start   = true;
+                        atom_at    = std::string::npos;
+                        token_atom = false;
+                        break;
+                    case ')':
+                        closeLooks();
+                        out.regex += c;
+                        --depth;
+                        token_atom  = !open_at.empty();
+                        token_group = true;
+                        if (token_atom)
+                        {
+                            token_at = open_at.back();
+                            open_at.pop_back();
+                        }
+                        break;
+                    case '|':
+                    case '&':
+                        if (c == '|')
+                        {
+                            closeLooks();
+                            ze_in_branch = ze_in_branch && depth > 0;
+                        }
+                        out.regex += c;
+                        at_start   = true;
+                        atom_at    = std::string::npos;
+                        token_atom = false;
+                        break;
                     default: out.regex += c; break;
                 }
                 break;
             case Magic::Magic:
                 switch (c)
                 {
-                    case '^':
-                    case '$':
-                    case '.':
-                    case '*': out.regex += c; break;
+                    case '^': out.regex += start_here ? "^" : "\\^"; break;
+                    case '$': out.regex += endsAt(i + 1) ? "$" : "\\$"; break;
+                    case '.': out.regex += c; break;
+                    case '*': out.regex += c; token_atom = false; break;
                     case '~':
                         // The last replacement, as the text it is.
                         for (const char r : last_replacement)
@@ -472,21 +920,37 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     default: literal(c); break;
                 }
                 break;
-            case Magic::None:
+            case Magic::Off:
+                // Magic's ^ and $, and every other character itself.
                 switch (c)
                 {
-                    // At the pattern's start -- nothing put in yet, \V and \c
-                    // putting in nothing -- the line's start; elsewhere itself.
-                    case '^': out.regex += out.regex.empty() ? "^" : "\\^"; break;
-                    case '$': out.regex += i + 1 == vim.size() ? "$" : "\\$"; break;
+                    case '^': out.regex += start_here ? "^" : "\\^"; break;
+                    case '$': out.regex += endsAt(i + 1) ? "$" : "\\$"; break;
                     default: literal(c); break;
                 }
                 break;
+            case Magic::None:
+                // Every character itself, ^ and $ too.
+                literal(c);
+                break;
         }
     }
-    if (looking)
+    withMarks();
+    out.regex.append(looking.size(), ')');
+    for (const std::pair<size_t, S32>& cut : cuts)
     {
-        out.regex += ")";
+        if (cut.second < 64)
+        {
+            out.cutGroups |= U64(1) << cut.second;
+        }
+    }
+    for (size_t k = 0; k < vim_groups.size(); ++k)
+    {
+        if (vim_groups[k] != static_cast<S32>(k + 1))
+        {
+            out.groupNumbers = vim_groups;
+            break;
+        }
     }
     if (!k_at.empty() && !out.where.empty())
     {
@@ -506,7 +970,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     }
     else if (case_rules.ignore)
     {
-        out.caseSensitive = case_rules.smart && std::any_of(vim.begin(), vim.end(), [](char c) { return c >= 'A' && c <= 'Z'; });
+        out.caseSensitive = case_rules.smart && hasCapital(vim);
     }
     else
     {
@@ -520,6 +984,15 @@ std::vector<ALTextRange> ALVimPattern::matchesIn(const ALTextDocument& d, ALText
                                                  std::vector<std::string>* replaced) const
 {
     options.acrossLines     = acrossLines;
+    options.cutGroups       = cutGroups;
+    // The format's groups by vim's numbers, where the engine counts the
+    // same groups otherwise.
+    std::string renumbered;
+    if (replaced && !groupNumbers.empty())
+    {
+        renumbered = groupsAsCounted(with, groupNumbers);
+        with       = renumbered;
+    }
     std::vector<ALTextRange> matches = replaced ? ALTextSearch::matches(d, regex, options, scope, &error, &wholes, with, *replaced)
                                                 : ALTextSearch::matches(d, regex, options, scope, &error, &wholes);
     if (error.empty() && !wholeRegex.empty())

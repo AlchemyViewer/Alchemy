@@ -32,11 +32,15 @@
 #include "alscriptstudiosaves.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiotabs.h"
+#include "alvimtext.h"
 #include "fsyspath.h"
+
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
+#include <iterator>
 #include <string_view>
 
 namespace
@@ -48,13 +52,9 @@ namespace
                                               "open_file", "fold_all", "unfold_all", "go_to_line", "quick_fix", "fix_all", "weights",
                                               "back",      "forward",  "reference", "go_to_symbol" };
 
-    // Whether a command's name is one of vim's, as vim reads its names: any
-    // of it from the least it may be shortened to, `least`, to the whole.
-    bool abbreviates(const std::string& name, const char* least, const char* whole)
-    {
-        const size_t shortest = strlen(least);
-        return name.size() >= shortest && name.size() <= strlen(whole) && std::string_view(whole).substr(0, name.size()) == name;
-    }
+    // Whether a command's name is one of vim's, as vim reads its names: the
+    // keymap's own rule.
+    using ALVimText::abbreviates;
 
     // The vim every studio window shares, made with the first and kept for
     // the session: a register yanked into in one window is put from in
@@ -417,7 +417,7 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
             entry.text = std::string(kind) + " history:";
             for (size_t i = 0; i < lines.size(); ++i)
             {
-                entry.text += llformat("\n%3d  %s", static_cast<int>(i + 1), lines[i].c_str());
+                fmt::format_to(std::back_inserter(entry.text), "\n{:3}  {}", i + 1, lines[i]);
             }
             mWindow.output(entry);
         };
@@ -867,10 +867,10 @@ void ALScriptStudioVim::listTabs()
     for (const Doc* doc : mServices.openDocs())
     {
         const char  mark = doc == front ? '%' : doc == alternate ? '#' : ' ';
-        std::string row  = llformat("%3d %c%c%c%c \"%s\"", ++number, mark, doc == front ? 'a' : 'h', doc->modifiable ? ' ' : '-',
-                                    doc->unsaved() ? '+' : ' ', doc->name.c_str());
+        std::string row  = fmt::format("{:3} {}{}{}{} \"{}\"", ++number, mark, doc == front ? 'a' : 'h', doc->modifiable ? ' ' : '-',
+                                       doc->unsaved() ? '+' : ' ', doc->name);
         row.resize(std::max<size_t>(row.size() + 1, 40), ' ');
-        entry.text += "\n" + row + llformat("line %d", doc->editor ? doc->editor->caret().line + 1 : 0);
+        entry.text += "\n" + row + fmt::format("line {}", doc->editor ? doc->editor->caret().line + 1 : 0);
     }
     mWindow.output(entry);
     mWindow.showOutput();

@@ -1123,4 +1123,22 @@ namespace tut
         std::error_code ec;
         fs::remove_all(root, ec);
     }
+
+    template<> template<>
+    void alscriptlookup_object::test<21>()
+    {
+        set_test_name("a text's lines held apart are the lines its tab would have: a lone CR a break, CRLF one");
+        const std::string           text = "one\rtwo\r\nthree\n\rfive";
+        const ALScriptPlaces::Lines held(std::make_shared<const std::string>(text));
+        const ALTextDocument        open(text);
+        const ALScriptPlaces::Lines tab(&open);
+        ensure("as many as the tab's", held.has(4) && !held.has(5) && tab.has(4) && !tab.has(5));
+        for (S32 line = 0; line < 5; ++line)
+        {
+            ensure_equals("line " + std::to_string(line) + " the tab's", held.line(line), tab.line(line));
+        }
+        ensure("each as it is", held.line(1) == "two" && held.line(3).empty() && held.line(4) == "five");
+        const ALScriptPlaces::Lines here(text);
+        ensure("read where it is, the same", here.line(2) == "three" && here.has(4) && !here.has(5));
+    }
 }

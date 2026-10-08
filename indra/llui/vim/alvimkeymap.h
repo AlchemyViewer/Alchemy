@@ -48,12 +48,12 @@ class ALVimExCommands;
 // Vim over the text view, as a keymap with state: normal, insert, replace,
 // visual, visual-line and visual-block modes; counts; the operators d c y
 // > < = and g~ gu gU, composed with the motions h j k l w W b B e E 0 ^ $
-// gg G { } % f F t T ; , H M L n N * # ` ' | and with the text objects iw
-// aw iW aW i" a" i' a' i` a` i( a( i[ a[ i{ a{ i< a< it at ip ap; x X s S
-// C D Y p P J gJ r ~ o O i a I A u Ctrl-R and . to do the last change
-// again; in insert mode Ctrl-W Ctrl-U Ctrl-H Ctrl-T Ctrl-D Ctrl-N Ctrl-P
-// Ctrl-A Ctrl-R Ctrl-E Ctrl-Y, and Ctrl-J Ctrl-M Ctrl-I for Return and
-// Tab; registers, shared by the keymaps that share their state, the
+// gg G ( ) { } % f F t T ; , H M L n N * # ` ' | and with the text objects
+// iw aw iW aW is as i" a" i' a' i` a` i( a( i[ a[ i{ a{ i< a< it at ip ap;
+// x X s S C D Y p P J gJ r ~ o O i a I A u Ctrl-R and . to do the last
+// change again; in insert mode Ctrl-W Ctrl-U Ctrl-H Ctrl-T Ctrl-D Ctrl-N
+// Ctrl-P Ctrl-A Ctrl-R Ctrl-E Ctrl-Y, and Ctrl-J Ctrl-M Ctrl-I for Return
+// and Tab; registers, shared by the keymaps that share their state, the
 // unnamed one vim's own unless clipboard is unnamed, with 0 for the last
 // yank and a-z by name (A-Z to add), and "+ and "* the system
 // clipboard; marks a-z, ` and '; a
@@ -177,6 +177,9 @@ public:
         ALVimRegisters           registers;
         std::vector<std::string> command;
         std::vector<std::string> search;
+        // Beside each search line, what ended it, as vim's history keeps:
+        // / or ? where it was typed, nothing where * or # put it there.
+        std::vector<char>        searchEnds;
         bool                     ignoreCase       = false;
         bool                     smartCase        = false;
         bool                     unnamedClipboard = false;
@@ -270,8 +273,8 @@ private:
         // s or c0 there, keeps nothing.
         bool        inclusive = false;
         // Over one of the motions whose delete vim keeps in register 1
-        // however little it takes: a search, n and N, * and #, %, { and },
-        // and ` to a mark.
+        // however little it takes: a search, n and N, * and #, %, ( and ),
+        // { and }, and ` to a mark.
         bool        registerOne = false;
     };
 
@@ -282,13 +285,15 @@ private:
     // is waiting, held with the rest until they make one or cannot.
     bool typeThrough(ALTextView& view, const Input& input);
     // A key held or to be fed: whether it may be mapped, which what a
-    // :noremap mapping stands for may not; and whether it is the one just
-    // typed, which the view is told of.
+    // :noremap mapping stands for may not; whether it is the one just
+    // typed, which the view is told of; and whether a mapping put it there
+    // in place of its own keys.
     struct Held
     {
         Input input;
-        bool  remap = true;
-        bool  typed = false;
+        bool  remap  = true;
+        bool  typed  = false;
+        bool  mapped = false;
     };
     // The keys at the front of a queue fed, those that make a mapping
     // replaced by what it stands for first, until the queue is empty or
@@ -309,6 +314,9 @@ private:
     // for the text, as the view hears of a paste, not one a character.
     bool holds(const Input& input) const;
     void flushHeld(ALTextView& view);
+    // Whether the key being fed came from the keyboard, as vim's KeyTyped
+    // has it: not from `.`, a macro, :normal or a mapping.
+    bool keyTyped() const { return !mReplaying && mPlaying == 0 && mMapped == 0; }
     // The mapping mode keys are looked up in now: none while a command
     // waits for a character of its own -- f's, r's, the second of g's.
     U8   mapMode() const;
@@ -415,9 +423,12 @@ private:
     // on rather than choose afresh: words on from the caret, or back where it
     // is before the anchor; the brackets, the tag or the quotes around the
     // selection, the next ones out where what they hold is no more than it
-    // holds; paragraphs on from the caret's line, or back. Nothing where the
-    // selection is no more, and the object is chosen afresh (textObject);
-    // false where there is nothing more to take.
+    // holds -- the brackets over a selection of one character as well;
+    // paragraphs on from the caret's line, or back; sentences on from the
+    // caret, or back, and over one character chosen as vim's current_sent()
+    // chooses them. Nothing where the selection is no more, and the object
+    // is chosen afresh (textObject); false where there is nothing more to
+    // take.
     std::optional<bool> visualObject(ALTextView& view, llwchar kind, llwchar what, S32 count);
     void   applyOperator(ALTextView& view, llwchar op, const Span& span, S32 count);
     void   moveTo(ALTextView& view, const ALTextPos& to);
@@ -467,6 +478,9 @@ private:
     void     put(ALTextView& view, char name, bool after, S32 count, bool past = false);
     // Says a count would make more text than it may, and how much.
     void     tooMuch(size_t bytes);
+    // Says how many lines a put or a copy added, where they are more than
+    // vim's report.
+    void     sayMoreLines(S32 lines);
 
     // Vim's spelling of a pattern as the search engine's (ALVimSearch).
     typedef ALVimPattern Pattern;
@@ -525,6 +539,9 @@ private:
     static std::string said(const char* key, const std::string& english, const LLStringUtil::format_map_t& args = {});
     static std::string substitutionsSaid(S32 count, S32 lines);
     static std::string matchesSaid(S32 count, S32 lines);
+    // How many lines a yank took, a block's or not, and into the register
+    // named where one was, as vim says it.
+    static std::string yankedSaid(S32 lines, bool block, char name);
     void bump() { ++mGeneration; }
 
     Mode  mMode = Mode::Normal;
@@ -590,8 +607,9 @@ private:
 
     // Visual mode: where it started and where its caret is -- on a
     // character, which the view's selection reaches past -- and the last
-    // visual selection for gv, with whether a block of it was taken to
-    // every line's end with $, as vim keeps its curswant.
+    // visual selection for gv, with whether it was taken with $ -- a block
+    // to every line's end, characters to the last line's -- as vim keeps its
+    // curswant for every mode.
     ALTextPos mVisualAnchor;
     ALTextPos mVisualCaret;
     Mode      mVisualLast = Mode::Normal;

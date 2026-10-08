@@ -203,6 +203,7 @@ void ALTextLayout::invalidateAll()
     }
     heightsMoved();
     mContentWidth = -1.f;
+    mWidestLine   = -1;
 }
 
 void ALTextLayout::heightsMoved()
@@ -235,18 +236,38 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
     }
     if (moved)
     {
+        // The widest line moves with the lines, unless the edit replaced
+        // it; the lines it made count by their bytes, in the widest too.
+        const S32 widest = mWidestLine >= 0 ? edit.lineAfter(mWidestLine) : -1;
         mLines.applySpans(spans, line_count, Entry());
+        if (mWidestLine >= 0 && widest < 0)
+        {
+            mContentWidth = -1.f;
+        }
+        mWidestLine = widest;
+        S32 shift   = 0;
+        for (const ALTextDocument::Edit::LineSpan& span : spans)
+        {
+            for (S32 made = 0; made < span.made; ++made)
+            {
+                widthChanged(span.first + shift + made);
+            }
+            shift = span.shiftAfter;
+        }
     }
     else
     {
         // As many lines as before: each the edit touched is laid out again
         // when next asked for, and keeps its height until then, so that
-        // the lines below keep their tops.
+        // the lines below keep their tops -- but not its width, which was
+        // the width of the text it had, let go of or not.
         for (const ALTextDocument::Edit::LineSpan& span : spans)
         {
             for (S32 l = llmax(span.first, 0); l <= span.last && l < lineCount(); ++l)
             {
-                mLines[l].valid = false;
+                mLines[l].valid   = false;
+                mLines[l].trimmed = false;
+                widthChanged(l);
             }
         }
     }
@@ -263,7 +284,6 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
     {
         heightsMoved();
     }
-    mContentWidth = -1.f;
 }
 
 F32 ALTextLayout::contentWidth()
@@ -271,18 +291,50 @@ F32 ALTextLayout::contentWidth()
     refreshIfFontsChanged();
     if (mContentWidth < 0.f)
     {
-        F32       widest  = 0.f;
         const F32 per_byte = spaceAdvance() / mScaleX;
-        for (size_t i = 0; i < mLines.size(); ++i)
+        mContentWidth      = 0.f;
+        mWidestLine        = -1;
+        for (S32 i = 0; i < lineCount(); ++i)
         {
-            const F32 width = mLines[i].valid || mLines[i].trimmed
-                                  ? mLines[i].width
-                                  : (mDocument ? static_cast<F32>(mDocument->lineLength(static_cast<S32>(i))) * per_byte : 0.f);
-            widest = llmax(widest, width);
+            const F32 width = countedWidth(i, per_byte);
+            if (width > mContentWidth)
+            {
+                mContentWidth = width;
+                mWidestLine   = i;
+            }
         }
-        mContentWidth = widest;
     }
     return mContentWidth;
+}
+
+F32 ALTextLayout::countedWidth(S32 index, F32 per_byte) const
+{
+    const Entry& entry = mLines[static_cast<size_t>(index)];
+    if (entry.valid || entry.trimmed)
+    {
+        return entry.width;
+    }
+    return mDocument ? static_cast<F32>(mDocument->lineLength(index)) * per_byte : 0.f;
+}
+
+void ALTextLayout::widthChanged(S32 index)
+{
+    if (mContentWidth < 0.f || index < 0 || index >= lineCount())
+    {
+        return;
+    }
+    if (index == mWidestLine)
+    {
+        // It may have narrowed, and another line be the widest.
+        mContentWidth = -1.f;
+        return;
+    }
+    const F32 width = countedWidth(index, spaceAdvance() / mScaleX);
+    if (width > mContentWidth)
+    {
+        mContentWidth = width;
+        mWidestLine   = index;
+    }
 }
 
 // --- hidden lines --------------------------------------------------------------
@@ -342,6 +394,24 @@ S32 ALTextLayout::visibleAfter(S32 index)
     // A hidden line takes no height and one in sight always some, so the
     // line the top of the hidden run falls in is the first in sight after it.
     return llmin(static_cast<S32>(mHeights.reach(mHeights.before(static_cast<size_t>(next)))), count);
+}
+
+S32 ALTextLayout::visibleBefore(S32 index)
+{
+    const S32 prev = llmin(index, lineCount()) - 1;
+    if (prev < 0 || !hidden(prev))
+    {
+        return llmax(prev, -1);
+    }
+    ensureHeights();
+    if (rowHeight() <= 0)
+    {
+        return visibleFrom(prev, -1);
+    }
+    // And the line the last pixel above the hidden run falls in is the
+    // last in sight before it; with nothing above the run, there is none.
+    const S32 above = mHeights.before(static_cast<size_t>(prev));
+    return above > 0 ? static_cast<S32>(mHeights.reach(above - 1)) : -1;
 }
 
 F32 ALTextLayout::spaceAdvance()
@@ -405,7 +475,7 @@ void ALTextLayout::invalidateLine(S32 index)
     // Laid out again when next asked for, keeping its height until then.
     mLines[index].valid   = false;
     mLines[index].trimmed = false;
-    mContentWidth         = -1.f;
+    widthChanged(index);
 }
 
 void ALTextLayout::layoutLine(S32 index, Line& out)
@@ -637,10 +707,19 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     {
         out.ordered = out.glyphs[k].cluster >= out.glyphs[k - 1].cluster;
     }
-    // The widest line, kept up in the UI's pixels as the width is.
-    if (mContentWidth >= 0.f && out.width > mContentWidth)
+    // The widest line, kept up in the UI's pixels as the width is: wider,
+    // or found again where this line was the widest and has narrowed.
+    if (mContentWidth >= 0.f)
     {
-        mContentWidth = out.width;
+        if (index == mWidestLine && out.width < mContentWidth)
+        {
+            mContentWidth = -1.f;
+        }
+        else if (out.width > mContentWidth)
+        {
+            mContentWidth = out.width;
+            mWidestLine   = index;
+        }
     }
     wrapLine(index, out);
 }
@@ -1004,17 +1083,19 @@ S32 ALTextLayout::lineAtY(S32 y)
     // The last line whose top is at or above y. Hidden lines share a top
     // with the line after them, so the last of a run is the one in sight
     // -- unless the run reaches the end, where the nearest in sight is
-    // above it.
+    // above it: found through the heights, not by stepping back over the
+    // run, which a comparison folding all after its last change has in
+    // sight whenever what it shows fits the view.
     const S32 line = llclamp(static_cast<S32>(mHeights.reach(y)), 0, lineCount() - 1);
     if (mHidden[line])
     {
-        const S32 above = visibleFrom(line, -1);
+        const S32 above = visibleBefore(line + 1);
         if (above >= 0)
         {
             return above;
         }
-        const S32 below = visibleFrom(line, 1);
-        if (below >= 0)
+        const S32 below = visibleAfter(line);
+        if (below < lineCount())
         {
             return below;
         }
@@ -1125,12 +1206,18 @@ S32 ALTextLayout::columnAt(S32 index, S32 r, F32 x, bool round)
     // and the one that begins the cluster before it: x lies between their
     // left edges. The pens go forward whichever way the text is written,
     // so both are found by a search, and a step or two over the glyphs of
-    // one cluster.
+    // one cluster. An inlay is a cell of its own, though it shares its
+    // column with the character beside it: a point on it is its column,
+    // and the character rounds by its own middle, not by the middle of
+    // the two together.
     if (row.glyphBegin >= row.glyphEnd)
     {
         return row.end;
     }
-    const auto starts_one = [&](size_t k) { return k == row.glyphBegin || entry.glyphs[k].cluster != entry.glyphs[k - 1].cluster; };
+    const auto starts_one = [&](size_t k) {
+        return k == row.glyphBegin || entry.glyphs[k].cluster != entry.glyphs[k - 1].cluster ||
+               (entry.glyphs[k].inlay >= 0) != (entry.glyphs[k - 1].inlay >= 0);
+    };
     const auto first      = entry.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphBegin);
     const auto end        = entry.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphEnd);
     size_t     k = static_cast<size_t>(std::partition_point(first + 1, end, [&](const Glyph& g) { return g.pen - row.xStart <= x; }) - entry.glyphs.begin());

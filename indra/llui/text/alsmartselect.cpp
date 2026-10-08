@@ -92,16 +92,25 @@ std::optional<ALTextRange> grow(const ALTextDocument& doc, ALSyntaxHighlighter& 
             }
         }
     }
-    // Each kind's pair around it: its inside, then the pair.
+    // Each kind's pair around it: its inside, then the pair -- the nearest
+    // left open before it that closes at or past its end, out past any it
+    // crosses, which close inside it.
     for (const char opener : { '(', '[', '{' })
     {
         ALTextPos open;
         ALTextPos close;
-        if (brackets.enclosing(s.begin, opener, 1, open, ALBracketIndex::NEARBY) && brackets.match(open, close, ALBracketIndex::NEARBY) &&
-            !(close < s.end))
+        for (ALTextPos from = s.begin; brackets.enclosing(from, opener, 1, open, ALBracketIndex::NEARBY); from = open)
         {
-            around.emplace_back(ALTextPos(open.line, open.column + 1), close);
-            around.emplace_back(open, ALTextPos(close.line, close.column + 1));
+            if (!brackets.match(open, close, ALBracketIndex::NEARBY))
+            {
+                break;
+            }
+            if (!(close < s.end))
+            {
+                around.emplace_back(ALTextPos(open.line, open.column + 1), close);
+                around.emplace_back(open, ALTextPos(close.line, close.column + 1));
+                break;
+            }
         }
     }
     around.emplace_back(doc.lineStart(s.begin.line), doc.lineEnd(s.end.line));

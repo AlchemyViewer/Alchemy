@@ -28,14 +28,17 @@
 
 #include "alscriptfixes.h"
 #include "alscriptlexicon.h"
+#include "llstring.h"
 
 #include "Luau/Ast.h"
 #include "Luau/Lexer.h"
 #include "Luau/Parser.h"
 
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <fmt/format.h>
 
 #include <algorithm>
+#include <iterator>
 
 namespace
 {
@@ -404,39 +407,8 @@ namespace
     // nought where it does not.
     size_t characterAt(std::string_view text, size_t at)
     {
-        const unsigned char lead   = static_cast<unsigned char>(text[at]);
-        size_t              length = 0;
-        unsigned char       low    = 0x80;
-        unsigned char       high   = 0xBF;
-        if (lead >= 0xC2 && lead <= 0xDF)
-        {
-            length = 2;
-        }
-        else if (lead >= 0xE0 && lead <= 0xEF)
-        {
-            length = 3;
-            low    = lead == 0xE0 ? 0xA0 : 0x80;
-            high   = lead == 0xED ? 0x9F : 0xBF;
-        }
-        else if (lead >= 0xF0 && lead <= 0xF4)
-        {
-            length = 4;
-            low    = lead == 0xF0 ? 0x90 : 0x80;
-            high   = lead == 0xF4 ? 0x8F : 0xBF;
-        }
-        if (length == 0 || at + length > text.size())
-        {
-            return 0;
-        }
-        for (size_t i = 1; i < length; ++i)
-        {
-            const unsigned char next = static_cast<unsigned char>(text[at + i]);
-            if (next < (i == 1 ? low : 0x80) || next > (i == 1 ? high : 0xBF))
-            {
-                return 0;
-            }
-        }
-        return length;
+        const size_t length = utf8str_decode_at(text, at).next - at;
+        return length > 1 ? length : 0;
     }
 }
 
@@ -461,7 +433,7 @@ namespace ALLuauSharedStart
                     {
                         // Three digits, so that a digit after it is not
                         // read as part of it.
-                        out += llformat("\\%03u", byte);
+                        fmt::format_to(std::back_inserter(out), "\\{:03}", byte);
                     }
                     else if (byte >= 0x80)
                     {
@@ -474,7 +446,7 @@ namespace ALLuauSharedStart
                         }
                         else
                         {
-                            out += llformat("\\x%02X", byte);
+                            fmt::format_to(std::back_inserter(out), "\\x{:02X}", byte);
                         }
                     }
                     else

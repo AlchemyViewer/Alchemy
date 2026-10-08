@@ -27,6 +27,7 @@
 #include "alunifieddiff.h"
 
 #include <algorithm>
+#include <optional>
 #include <vector>
 
 namespace
@@ -91,21 +92,14 @@ std::string ALUnifiedDiff::write(std::string_view left, std::string_view right, 
     const std::vector<ALTextDiff::Run> runs     = ALTextDiff::lines(l.lines, r.lines, by_lines);
     // Each side's regions, asked for once a change could be of comments
     // alone.
-    const bool                                by_comments   = by_lines.like.ignoreComments && by_lines.lexer;
-    const std::vector<ALTextDiff::regions_t>* left_regions  = nullptr;
-    const std::vector<ALTextDiff::regions_t>* right_regions = nullptr;
-    const auto                                regionsOf     = [&](bool of_left, S32 line) -> const ALTextDiff::regions_t* {
-        if (!by_comments)
+    std::optional<ALTextDiff::both_regions_t> regions;
+    const auto                                regionsOf = [&](bool of_left, S32 line) -> const ALTextDiff::regions_t* {
+        if (!regions)
         {
-            return nullptr;
+            regions = ALTextDiff::lexed(by_lines, l.lines, r.lines, by_lines.like.ignoreComments);
         }
-        if (!left_regions)
-        {
-            left_regions  = &by_lines.lexer(l.lines);
-            right_regions = &by_lines.lexer(r.lines);
-        }
-        const std::vector<ALTextDiff::regions_t>* regions = of_left ? left_regions : right_regions;
-        return line < static_cast<S32>(regions->size()) ? &(*regions)[static_cast<size_t>(line)] : nullptr;
+        const std::vector<ALTextDiff::regions_t>* text = of_left ? regions->first : regions->second;
+        return text ? &(*text)[static_cast<size_t>(line)] : nullptr;
     };
 
     // Each line of the diff, a change's taken out before its put in; and

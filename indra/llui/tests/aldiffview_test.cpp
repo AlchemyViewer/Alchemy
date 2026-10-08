@@ -1681,4 +1681,62 @@ namespace tut
                                                    kept.right()->layout().gapRows(model.foldGapLine(Column::Right, 1)) == 0);
         sameShown(kept, whole, "every run opened inline");
     }
+
+    template<> template<>
+    void aldiffview_object::test<43>()
+    {
+        set_test_name("the converter's notes beside the left's line whichever side shows it, swapped and back, inline where it is after each edit of the right; let go of with a left of another version");
+        ALDiffView& d = make("a\nb\nc\nd", "a\nB\nc\nd");
+        d.setNotes({ { 2, "about c", "the tip" } });
+        ensure("on the left", d.left()->noteAt(2) == "about c" && d.right()->noteAt(2).empty());
+        d.setSwapped(true);
+        ensure("swapped: on the right, none on the left", d.right()->noteAt(2) == "about c" && d.left()->noteAt(2).empty());
+        d.setSwapped(false);
+        ensure("and back", d.left()->noteAt(2) == "about c" && d.right()->noteAt(2).empty());
+        d.setRightText("a\nB\nput in\nc\nd");
+        ensure("the right made anew: the left's as it was", d.left()->noteAt(2) == "about c");
+        d.setInline(true);
+        const S32 at = d.model().lineShowing(ALDiffModel::Column::Inline, true, 2);
+        ensure("inline, beside where the line is", at >= 0 && d.inlined()->noteAt(at) == "about c");
+        d.setRightText("a\nB\nput in\nmore\nc\nd");
+        const S32 now = d.model().lineShowing(ALDiffModel::Column::Inline, true, 2);
+        ensure("and where it is after another edit, nowhere else", now == at + 1 && d.inlined()->noteAt(now) == "about c" && d.inlined()->noteAt(at).empty());
+        d.setLeftText("a\nb\nc\nd!");
+        ensure("a left of another version: let go of", d.inlined()->noteAt(d.model().lineShowing(ALDiffModel::Column::Inline, true, 2)).empty());
+    }
+
+    template<> template<>
+    void aldiffview_object::test<44>()
+    {
+        set_test_name("a change can be copied from the side in front only where that side has lines of it: not from the left under the gap of lines put in, though the caret is in the change, nor inline, which copies what was taken out");
+        ALDiffView& d = make("one\ntwo\nthree", "one\nnew\ntwo\nthree");
+        d.left()->setFocus(true);
+        d.left()->goTo(ALTextPos(1, 0));
+        ensure_equals("the left's line under the gap: in the change", d.changeAtCaret(), 0);
+        ensure("nothing of it on the left to copy", !d.canCopyChange() && !d.copyChange(d.changeAtCaret()));
+        d.right()->setFocus(true);
+        d.right()->goTo(ALTextPos(1, 0));
+        ensure("on the right, its line", d.changeAtCaret() == 0 && d.canCopyChange());
+        d.right()->goTo(ALTextPos(2, 0));
+        ensure("in no change, nothing", d.changeAtCaret() == -1 && !d.canCopyChange());
+        d.setSwapped(true);
+        d.left()->setFocus(true);
+        d.left()->goTo(ALTextPos(1, 0));
+        ensure("swapped: the right's line on the left", d.changeAtCaret() == 0 && d.canCopyChange());
+        d.setSwapped(false);
+        d.setInline(true);
+        d.inlined()->goTo(ALTextPos(1, 0));
+        ensure("inline, nothing taken out to copy", d.changeAtCaret() == 0 && !d.canCopyChange() && !d.copyChange(0));
+    }
+
+    template<> template<>
+    void aldiffview_object::test<45>()
+    {
+        set_test_name("a comparison's sides pin no headers over their tops: their rows are lined up by the comparison, and numbered by it");
+        ALDiffView& d = make("default\n{\n    state_entry()\n    {\n    }\n}\n", "default\n{\n    state_entry()\n    {\n        x();\n    }\n}\n");
+        for (ALCodeEditor* side : { d.left(), d.right(), d.inlined() })
+        {
+            ensure("no headers pinned on the " + side->getName() + " side", !side->getStickyHeaders());
+        }
+    }
 }

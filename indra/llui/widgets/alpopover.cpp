@@ -180,7 +180,7 @@ void ALPopover::openAt(LLRect where)
     {
         gFloaterView->adjustToFitScreen(this, false);
     }
-    if (LLView* keys = dynamic_cast<LLView*>(gFocusMgr.getKeyboardFocus()); keys && keys != this && !keys->hasAncestor(this))
+    if (LLView* keys = gFocusMgr.getKeyboardFocusView(); keys && keys != this && !keys->hasAncestor(this))
     {
         mKeysBefore = keys->getHandle();
     }

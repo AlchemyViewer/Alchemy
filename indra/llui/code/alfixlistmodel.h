@@ -75,6 +75,19 @@ public:
     // a few lines apart or less in one stretch, and an ellipsis between
     // stretches; `kinds` says each line's -- '-', '+' or ' '.
     static std::string previewOf(const ALTextDocument& text, const ALCodeFix& fix, std::vector<char>& kinds);
+    // The same with each line as it was made: its kind; the line as it
+    // reads, or would read, in the text, before the indentation the lines
+    // have in common -- `cut` bytes, off every line long enough -- is taken
+    // off; and for the first line a stretch makes, the line of the text the
+    // stretch begins at, which what it makes reads on from as the text
+    // would read it, -1 for the rest.
+    struct PreviewLine
+    {
+        char        kind = ' ';
+        std::string source;
+        S32         from = -1;
+    };
+    static std::string previewOf(const ALTextDocument& text, const ALCodeFix& fix, std::vector<PreviewLine>& lines, size_t& cut);
 
     // Listed: the fixes of a line, ranked. Which showing of the list this
     // is, counted from one.

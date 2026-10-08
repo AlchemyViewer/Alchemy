@@ -122,6 +122,7 @@ target_sources(
     FILE_SET HEADERS
       FILES
         alfilewrite.h
+        allinebreaks.h
         alserialworker.h
         alparamtype.h
         alrecoverystore.h

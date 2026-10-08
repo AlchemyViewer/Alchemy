@@ -6,14 +6,17 @@
   matches one of: match (a literal; whole_word to refuse it inside a word),
   chars (a class, with min and max; unicode for everything beyond ASCII),
   word (an identifier, looked up in `tables`, each a table and the kind a
-  word found there is; `qualified` looks `head.word` up first, for tables
-  that name `ll.Say`), span (an opening with an end, an escape, and
-  multiline), span_regex with end_regex (where \1 stands for the opening's
-  first capture), regex (anchored where it is tried; not_after_chars, a
-  class the character before it may not be in, and consume, the group that
-  is the token, the rest of the match only read), or eol (the line's end;
-  unless_after names what, ending a line, carries the state on to the
-  next). It names the kind it makes and where it goes: push, pop or next.
+  word found there is; `qualified` looks a word after `head.` up as
+  `head.word` and by no other name, for tables that name `ll.Say`), span
+  (an opening with an end, an escape, and multiline; one that is not ends
+  with its line, but for a line that ends in its unless_after, as an
+  eol's), span_regex with end_regex (where \1
+  stands for the opening's first capture), regex (anchored where it is
+  tried; not_after_chars, a class the character before it may not be in,
+  and consume, the group that is the token, the rest of the match only
+  read), or eol (the line's end; unless_after names what, ending a line,
+  carries the state on to the next, unless it is part of a longer escape).
+  It names the kind it makes and where it goes: push, pop or next.
   What nothing matches is one character of the state's default kind.
   Patterns are RE2's, which has no lookaround and no backreference:
   not_after_chars, consume and an opener's unless stand in for them.
@@ -228,6 +231,8 @@
           <key>kind</key>
           <string>path</string>
         </map>
+        <!-- A quoted string ends with its line, but for a line it ends
+             with a backslash, which goes on onto the next. -->
         <map>
           <key>span</key>
           <string>"</string>
@@ -239,6 +244,8 @@
           <string>string</string>
           <key>multiline</key>
           <boolean>0</boolean>
+          <key>unless_after</key>
+          <string>\</string>
         </map>
         <map>
           <key>span</key>
@@ -251,6 +258,8 @@
           <string>string</string>
           <key>multiline</key>
           <boolean>0</boolean>
+          <key>unless_after</key>
+          <string>\</string>
         </map>
         <map>
           <key>match</key>
@@ -271,6 +280,19 @@
           <string>0[bB][01_]+i?</string>
           <key>kind</key>
           <string>number</string>
+        </map>
+        <!-- Two dots or three, a concatenation or the varargs, ahead of a
+             number that begins with its point: the second dot of ..5 is
+             not the start of .5. -->
+        <map>
+          <key>chars</key>
+          <string>.</string>
+          <key>min</key>
+          <integer>2</integer>
+          <key>max</key>
+          <integer>3</integer>
+          <key>kind</key>
+          <string>punctuation</string>
         </map>
         <map>
           <key>regex</key>
@@ -371,9 +393,14 @@
             </map>
           </array>
         </map>
+        <!-- One character at a time, which run together as one operator
+             all the same: a run taken whole would take the dashes of a
+             comment right after it, a plus and then a long comment. -->
         <map>
           <key>chars</key>
           <string>+\-*/%^#=~&lt;&gt;&amp;|?</string>
+          <key>max</key>
+          <integer>1</integer>
           <key>kind</key>
           <string>operator</string>
         </map>
@@ -458,6 +485,8 @@
             <key>kind</key>
             <string>path</string>
           </map>
+          <!-- A macro's string ends with its line, which a backslash
+               carries on onto the next as it carries the directive. -->
           <map>
             <key>span</key>
             <string>"</string>
@@ -467,6 +496,10 @@
             <string>\</string>
             <key>kind</key>
             <string>string</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+            <key>unless_after</key>
+            <string>\</string>
           </map>
           <map>
             <key>eol</key>
@@ -492,6 +525,8 @@
             <key>push</key>
             <string>line_comment</string>
           </map>
+          <!-- A file's name, which ends with its line: one left open is
+               no reason for the lines below to be names. -->
           <map>
             <key>span</key>
             <string>"</string>
@@ -499,6 +534,8 @@
             <string>"</string>
             <key>kind</key>
             <string>path</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
           </map>
           <map>
             <key>span</key>
@@ -507,6 +544,8 @@
             <string>&gt;</string>
             <key>kind</key>
             <string>path</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
           </map>
           <map>
             <key>eol</key>
@@ -561,6 +600,8 @@
           <map>
             <key>eol</key>
             <boolean>1</boolean>
+            <key>unless_after</key>
+            <string>\</string>
             <key>pop</key>
             <boolean>1</boolean>
           </map>

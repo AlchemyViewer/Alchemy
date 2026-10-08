@@ -43,6 +43,8 @@
 #include "lltimer.h"
 #include "lluictrlfactory.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 
 namespace
@@ -499,8 +501,8 @@ void ALScriptSearchPane::addRows(size_t index)
         row["columns"][0]["column"] = "where";
         row["columns"][0]["value"]  = found.where;
         row["columns"][1]["column"] = "line";
-        row["columns"][1]["value"]  = llformat("%d:%d", mServices->shownLine(match.begin.line, found.notecard && found.file.empty() && !found.ref.isNull()),
-                                               match.begin.column + 1);
+        row["columns"][1]["value"]  = fmt::format("{}:{}", mServices->shownLine(match.begin.line, found.notecard && found.file.empty() && !found.ref.isNull()),
+                                                  match.begin.column + 1);
         row["columns"][2]["column"] = "text";
         row["columns"][2]["value"]  = found.lines[i];
         LLScrollListItem* item      = mResults->addElement(row);
@@ -678,8 +680,8 @@ bool ALScriptSearchPane::refreshRows(size_t index)
         {
             return false;
         }
-        line->setValue(llformat("%d:%d", mServices->shownLine(match.begin.line, found.notecard && found.file.empty() && !found.ref.isNull()),
-                                match.begin.column + 1));
+        line->setValue(fmt::format("{}:{}", mServices->shownLine(match.begin.line, found.notecard && found.file.empty() && !found.ref.isNull()),
+                                   match.begin.column + 1));
         text->setValue(found.lines[place]);
         const S32 at     = found.at[place];
         const S32 length = at < 0 || at >= static_cast<S32>(found.lines[place].size())

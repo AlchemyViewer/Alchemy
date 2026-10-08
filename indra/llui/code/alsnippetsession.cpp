@@ -31,6 +31,7 @@
 #include "llstl.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -235,6 +236,11 @@ ALSnippetSession::Expansion ALSnippetSession::expand(std::string_view body, cons
     std::string&                                text = out.text;
     std::vector<Place>                          places;
     boost::unordered_flat_map<S32, std::string> held;
+    // The numbers given a default so far; and each one's first default
+    // where a place of it before that had none -- `$1 = ${1:value}` --
+    // which the body is read again to show there too.
+    boost::unordered_flat_set<S32>              defaulted;
+    boost::unordered_flat_map<S32, std::string> backfill;
     std::optional<ALTextRange>                  end;
     ALTextPos                                   pos = at;
     auto                                        put = [&](char ch) {
@@ -315,7 +321,8 @@ ALSnippetSession::Expansion ALSnippetSession::expand(std::string_view body, cons
             const S32       number = atoi(std::string(body.substr(digits, past - digits)).c_str());
             const ALTextPos from   = pos;
             const size_t    began  = text.size();
-            if (braced && body[past] == ':')
+            const bool      given  = braced && body[past] == ':';
+            if (given)
             {
                 read(past + 1, close);
             }
@@ -344,12 +351,27 @@ ALSnippetSession::Expansion ALSnippetSession::expand(std::string_view body, cons
             else
             {
                 places.push_back(Place{ number, ALTextRange(from, pos) });
-                held.emplace(number, text.substr(began));
+                const bool first_place = held.emplace(number, text.substr(began)).second;
+                if (given && defaulted.insert(number).second && !first_place)
+                {
+                    backfill.emplace(number, text.substr(began));
+                }
             }
             i = braced ? close + 1 : past;
         }
     };
     read(0, body.size());
+    if (!backfill.empty())
+    {
+        // Read again, each place before its number's first default showing
+        // that, as a mirror after it would.
+        text.clear();
+        places.clear();
+        end.reset();
+        pos  = at;
+        held = backfill;
+        read(0, body.size());
+    }
     // Each number's first place the stop, the rest its mirrors; the stops
     // in the order of their numbers.
     std::stable_sort(places.begin(), places.end(), [](const Place& a, const Place& b) { return a.number < b.number; });
@@ -373,7 +395,7 @@ void ALSnippetSession::start(std::vector<ALTextRange> stops, const ALTextPos& af
     mAt      = mStops.empty() ? -1 : 0;
     mMirrors = std::move(mirrors);
     mLanding = landing;
-    mSyncing = -1;
+    mSyncing = false;
 }
 
 void ALSnippetSession::clear()
@@ -401,16 +423,23 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
                                            [](const ALTextDocument::Edit::Part& p, const ALTextPos& at) { return p.before.begin < at; });
         return part != edit.parts.end() && part->before == range ? std::optional<ALTextRange>(part->after) : std::nullopt;
     };
-    for (S32 k = 0; k < static_cast<S32>(mMirrors.size());)
+    // Whether every stretch the edit replaced that reaches into a range lies
+    // whole inside it: a stop a mirror being made again is inside of, or is,
+    // which holds what goes in its place.
+    const auto holds = [&edit, &removed](const ALTextRange& range) {
+        const ALTextRange r      = range.normalised();
+        const auto        inside = [&r](const ALTextRange& stretch) {
+            return !(r.begin < stretch.end && stretch.begin < r.end) || (r.begin <= stretch.begin && stretch.end <= r.end);
+        };
+        return edit.parts.empty() ? inside(removed)
+                                  : std::all_of(edit.parts.begin(), edit.parts.end(),
+                                                [&inside](const ALTextDocument::Edit::Part& part) { return inside(part.before); });
+    };
+    for (size_t k = 0; k < mMirrors.size();)
     {
-        Mirror&                          mirror = mMirrors[static_cast<size_t>(k)];
-        const std::optional<ALTextRange> made   = mSyncing == SYNCING_ALL ? replaced(mirror.range) : std::nullopt;
-        if (k == mSyncing)
-        {
-            mirror.range = edit.rangeAfter();
-            ++k;
-        }
-        else if (made)
+        Mirror&                          mirror = mMirrors[k];
+        const std::optional<ALTextRange> made   = mSyncing ? replaced(mirror.range) : std::nullopt;
+        if (made)
         {
             mirror.range = *made;
             ++k;
@@ -421,11 +450,7 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
         }
         else
         {
-            mMirrors.erase(mMirrors.begin() + k);
-            if (mSyncing > k)
-            {
-                --mSyncing;
-            }
+            mMirrors.erase(mMirrors.begin() + static_cast<std::ptrdiff_t>(k));
         }
     }
     for (S32 i = 0; i < static_cast<S32>(mStops.size());)
@@ -440,6 +465,13 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
         }
         else if (edit.slide(r))
         {
+            ++i;
+        }
+        else if (mSyncing && holds(r))
+        {
+            // A mirror inside it made again, or the whole of it: it grows
+            // and shrinks with what went in, rather than going.
+            r = edit.stretched(r);
             ++i;
         }
         else
@@ -463,16 +495,9 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
             }
         }
     }
-    if (!edit.parts.empty())
+    if (!edit.parts.empty() || removed.end <= mAfter)
     {
         mAfter = edit.slidPast(mAfter);
-    }
-    else if (mAfter.line == removed.end.line || mAfter.line > removed.end.line)
-    {
-        if (removed.end <= mAfter)
-        {
-            mAfter = edit.slidPast(mAfter);
-        }
     }
     if (mStops.empty() || mAt < 0)
     {
@@ -495,19 +520,18 @@ bool ALSnippetSession::reaches(S32 line) const
 
 std::vector<S32> ALSnippetSession::staleMirrors(S32 index, const ALTextDocument& text, std::string& wanted) const
 {
-    std::vector<S32> order;
+    std::vector<S32> stale;
     if (index < 0 || index >= static_cast<S32>(mStops.size()) || mMirrors.empty())
     {
-        return order;
+        return stale;
     }
     wanted = text.text(mStops[static_cast<size_t>(index)]);
     for (S32 k = 0; k < static_cast<S32>(mMirrors.size()); ++k)
     {
         if (mMirrors[static_cast<size_t>(k)].of == index && text.text(mMirrors[static_cast<size_t>(k)].range) != wanted)
         {
-            order.push_back(k);
+            stale.push_back(k);
         }
     }
-    std::sort(order.begin(), order.end(), [this](S32 a, S32 b) { return mMirrors[static_cast<size_t>(b)].range.begin < mMirrors[static_cast<size_t>(a)].range.begin; });
-    return order;
+    return stale;
 }

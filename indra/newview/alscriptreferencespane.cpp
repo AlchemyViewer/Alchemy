@@ -38,6 +38,8 @@
 #include "llscrolllistitem.h"
 #include "lltextbox.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <set>
 
@@ -328,7 +330,7 @@ void ALScriptReferencesPane::fill()
         row.key   = std::to_string(place.id);
         row.value = static_cast<S32>(place.id);
         row.cells = { cell("where", place.file.empty() ? mFound.fromName : place.fileName),
-                      cell("line", llformat("%d:%d", place.span.line + 1, place.span.column + 1)),
+                      cell("line", fmt::format("{}:{}", place.span.line + 1, place.span.column + 1)),
                       previewing() ? cell("role", LLSD(!left), "checkbox") : cell("role", declaration ? declared : std::string()),
                       cell("text", renamed ? place.text.substr(0, place.at) + mNewName + place.text.substr(place.at + mFound.name.size()) : place.text) };
         rows.push_back(std::move(row));

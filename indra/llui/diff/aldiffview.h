@@ -243,8 +243,11 @@ public:
     // A change's lines on the side in front -- inline, those taken out --
     // copied to the clipboard, each ended by a line break: what a side
     // that cannot be taken back from is taken from by hand. False where
-    // the change has none there.
+    // the change has none there. And whether the change the caret is in
+    // has any there: what the bar's Copy Change, and whoever shows it,
+    // offer it by.
     bool        copyChange(S32 change);
+    bool        canCopyChange() const;
     // The comparison as a unified diff (ALUnifiedDiff), from the left as
     // shown to the right, under their titles; and copied. False where the
     // two are the same.
@@ -444,6 +447,16 @@ private:
     // filled again.
     std::optional<U32>        mFilledAt[2];
     bool                      mFoldsStale[2] = { false, false };
+    // The notes each editor was last given -- the left's, the right's and
+    // the one inline's -- and the version its text was then: given again
+    // only where they are others, or there are some and the text has been
+    // edited since, which slides them with its lines.
+    struct NotesGiven
+    {
+        std::optional<U32>             version;
+        std::vector<ALDiffModel::Note> notes;
+    };
+    NotesGiven                mNotesGiven[3];
     // The grammar words are cut by: none for prose.
     std::shared_ptr<const ALSyntaxGrammar> mLexedBy;
     // Whether letting case go is offered.
