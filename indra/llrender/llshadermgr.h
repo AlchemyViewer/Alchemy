@@ -692,7 +692,7 @@ public:
     {
         GLsizei mBinaryLength = 0;
         GLenum mBinaryFormat = 0;
-        F32 mLastUsedTime = 0.0;
+        F64 mLastUsedTime = 0.0;    // calendar seconds, kept across sessions
     };
     std::map<LLUUID, ProgramBinaryData> mShaderBinaryCache;
     LLUUID mShaderCacheVersion;
