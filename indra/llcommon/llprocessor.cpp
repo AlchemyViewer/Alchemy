@@ -1150,13 +1150,19 @@ private:
 
             // /proc/cpuinfo on Linux looks like:
             // name\t*: value
-            const size_t tab = line.find('\t');
-            const size_t colon = line.find(':', tab);
-            if (tab == std::string::npos || colon == std::string::npos)
+            // though arm64 writes "CPU architecture: 8" with no tab, so the
+            // name is what comes before the colon, less the space after it.
+            const size_t colon = line.find(':');
+            if (colon == std::string::npos || colon == 0)
             {
                 continue;
             }
-            std::string name = line.substr(0, tab);
+            const size_t name_end = line.find_last_not_of(" \t", colon - 1);
+            if (name_end == std::string::npos)
+            {
+                continue;
+            }
+            std::string name = line.substr(0, name_end + 1);
             LLStringUtil::toLower(name);
             const size_t value = line.find_first_not_of(' ', colon + 1);
             cpuinfo[name] = value == std::string::npos ? std::string() : line.substr(value);
