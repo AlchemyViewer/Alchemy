@@ -1677,6 +1677,10 @@ void LLEnvironment::updateCloudScroll()
         {
             LLVector2 cloud_delta = static_cast<F32>(delta_t) * (mCurrentEnvironment->getSky()->getCloudScrollRate()) / 100.0;
             mCloudScrollDelta += cloud_delta;
+            // It offsets coordinates the noise repeats over every whole unit, so only its
+            // fraction shows; kept to that, it does not lose the frame's step to its own size.
+            mCloudScrollDelta.mV[VX] -= floorf(mCloudScrollDelta.mV[VX]);
+            mCloudScrollDelta.mV[VY] -= floorf(mCloudScrollDelta.mV[VY]);
         }
     }
 
