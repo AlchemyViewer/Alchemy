@@ -297,4 +297,20 @@ namespace tut
         ensure_equals("and a group after it by vim's number", replacedIn("abcc", ALVimPattern::of("\\(a\\zeb\\)\\(c\\)\\2", std::string(), plain), "<\\1|\\2|&>"),
                       std::string("<ab|c|a>"));
     }
+
+    template<> template<>
+    void alvimpattern_object::test<13>()
+    {
+        set_test_name("\\Z anywhere has composing characters passed over: each character takes the marks after it, and the pattern's own count for nothing");
+        ensure_equals("no end of the text", found("foo bar", ALVimPattern::of("foo\\Z", std::string(), plain)), std::string("foo"));
+        ensure_equals("a mark between two letters", found("a\xCC\x81" "b", ALVimPattern::of("\\Zab", std::string(), plain)), std::string("a\xCC\x81" "b"));
+        ensure_equals("the match takes the mark", found("a\xCC\x81", ALVimPattern::of("\\Za", std::string(), plain)), std::string("a\xCC\x81"));
+        ensure_equals("the pattern's mark is none", found("a a\xCC\x80", ALVimPattern::of("\\Za\xCC\x81", std::string(), plain)),
+                      std::string("a|a\xCC\x80"));
+        ensure_equals("a multi repeats both", found("a\xCC\x81" "a\xCC\x81" "b", ALVimPattern::of("\\Za\\+", std::string(), plain)),
+                      std::string("a\xCC\x81" "a\xCC\x81"));
+        ensure_equals("a group's characters take theirs", found("a\xCC\x81" "b", ALVimPattern::of("\\Z\\(a\\)b", std::string(), plain)),
+                      std::string("a\xCC\x81" "b"));
+        ensure_equals("a line's ends none", found("a\xCC\x81" "b", ALVimPattern::of("\\Z^ab$", std::string(), plain)), std::string("a\xCC\x81" "b"));
+    }
 }

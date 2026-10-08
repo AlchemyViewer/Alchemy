@@ -30,28 +30,23 @@
 #include "altextchars.h"
 #include "llstring.h"
 
+#include <unicode/uchar.h>
+
 #include <algorithm>
 
 namespace
 {
-    // Whether a pattern has a capital in it, as vim's smartcase asks
-    // (pat_has_uppercase): one after a backslash is no capital -- \S, \V,
-    // and \_S and \%V with the character after their _ or % -- nor in a
-    // very magic pattern one after a bare % or _, where a backslash is no
-    // more than itself. How magic the pattern is goes by the last \v or \V
-    // in it outside a bracket expression, as vim measures it for this.
-    bool hasCapital(const std::string& vim)
+    // Each backslash item in a pattern outside its bracket expressions,
+    // the character after the backslash handed to `item`, as vim walks a
+    // pattern for what it says of itself (skip_regexp): what opens a
+    // bracket expression goes by the last \v or \V before it.
+    template <typename Item>
+    void eachItem(const std::string& vim, Item&& item)
     {
-        enum class Magic : U8
-        {
-            On,
-            Very,
-            None
-        };
-        Magic magic = Magic::On;
+        bool very_nomagic = false;
         for (size_t i = 0; i < vim.size(); ++i)
         {
-            if ((vim[i] == '[' && magic != Magic::None) || (vim[i] == '\\' && i + 1 < vim.size() && vim[i + 1] == '[' && magic == Magic::None))
+            if ((vim[i] == '[' && !very_nomagic) || (vim[i] == '\\' && i + 1 < vim.size() && vim[i + 1] == '[' && very_nomagic))
             {
                 // Through to the bracket's close; an unclosed one runs on to
                 // the end.
@@ -73,9 +68,28 @@ namespace
             else if (vim[i] == '\\' && i + 1 < vim.size())
             {
                 ++i;
-                magic = vim[i] == 'v' ? Magic::Very : vim[i] == 'V' ? Magic::None : magic;
+                very_nomagic = vim[i] == 'V' || (vim[i] != 'v' && very_nomagic);
+                item(vim[i]);
             }
         }
+    }
+
+    // Whether a pattern has a capital in it, as vim's smartcase asks
+    // (pat_has_uppercase): one after a backslash is no capital -- \S, \V,
+    // and \_S and \%V with the character after their _ or % -- nor in a
+    // very magic pattern one after a bare % or _, where a backslash is no
+    // more than itself. How magic the pattern is goes by the last \v or \V
+    // in it outside a bracket expression, as vim measures it for this.
+    bool hasCapital(const std::string& vim)
+    {
+        enum class Magic : U8
+        {
+            On,
+            Very,
+            None
+        };
+        Magic magic = Magic::On;
+        eachItem(vim, [&magic](char item) { magic = item == 'v' ? Magic::Very : item == 'V' ? Magic::None : magic; });
         for (size_t i = 0; i < vim.size();)
         {
             const unsigned char c = static_cast<unsigned char>(vim[i]);
@@ -107,6 +121,15 @@ namespace
             }
         }
         return false;
+    }
+
+    // Whether a pattern has a \Z in it, which has vim ignore composing
+    // characters throughout.
+    bool ignoresMarks(const std::string& vim)
+    {
+        bool found = false;
+        eachItem(vim, [&found](char item) { found = found || item == 'Z'; });
+        return found;
     }
 
     // A format of the engine's with vim's groups in it, $1 to $9, each by
@@ -155,9 +178,10 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // rest of its branch, or is a group at which the match is cut; \@= \@!
     // \@<= \@<! and \@> look round the atom before them; \{-} is *?; the
     // classes \a \l \u \x \o \h \i \k are brackets; \c and \C say how case
-    // is matched; a bracket expression is copied through as it stands. A
-    // magic ^ is a line's start only first in a branch, a $ its end only
-    // last in one, and either is itself anywhere else.
+    // is matched, and \Z that composing characters are passed over; a
+    // bracket expression is copied through as it stands. A magic ^ is a
+    // line's start only first in a branch, a $ its end only last in one,
+    // and either is itself anywhere else.
     ALVimPattern        out;
     std::optional<bool> case_in_pattern;
     enum class Magic : U8
@@ -287,9 +311,29 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // none -- a multi, a group's opening, a \c -- and a group's closing is
     // the group's atom.
     std::vector<size_t> open_at;
-    size_t              atom_at    = std::string::npos;
-    size_t              token_at   = std::string::npos;
-    bool                token_atom = false;
+    size_t              atom_at     = std::string::npos;
+    size_t              token_at    = std::string::npos;
+    bool                token_atom  = false;
+    bool                token_group = false;
+    // A \Z anywhere has composing characters ignored: each atom that is a
+    // character takes the marks after it in the text with it, in a group
+    // of its own so that a multi after it repeats both, and a mark in the
+    // pattern is none. The last token so taken, where it was such an atom;
+    // not a group, whose characters took their own, nor a line's or a
+    // word's edge, which is none.
+    const bool ignore_marks = ignoresMarks(vim);
+    auto       withMarks    = [&]() {
+        if (!ignore_marks || !token_atom || token_group || token_at >= out.regex.size())
+        {
+            return;
+        }
+        const std::string_view put = std::string_view(out.regex).substr(token_at);
+        if (put != "^" && put != "$" && put != "\\b")
+        {
+            out.regex.insert(token_at, "(?:");
+            out.regex += "\\p{Mark}*)";
+        }
+    };
     // \@= \@! \@<= \@<! \@>, and \@123<= with how far back it may look,
     // which the engine needs no telling: the last atom looked ahead at or
     // behind it, or taken whole and never given back, as the engine's (?=
@@ -349,12 +393,25 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         // later bytes of a character are its first's.
         if ((static_cast<unsigned char>(c) & 0xC0) != 0x80)
         {
+            withMarks();
             if (token_atom)
             {
                 atom_at = token_at;
             }
-            token_at   = out.regex.size();
-            token_atom = true;
+            token_at    = out.regex.size();
+            token_atom  = true;
+            token_group = false;
+            if (ignore_marks && static_cast<unsigned char>(c) >= 0xC0)
+            {
+                const LLCodepointAt mark = utf8str_decode_at(vim, i);
+                if (mark.next > i + 1 && (U_GET_GC_MASK(static_cast<UChar32>(mark.cp)) & U_GC_M_MASK) != 0)
+                {
+                    i          = mark.next - 1;
+                    at_start   = start_here;
+                    token_atom = false;
+                    continue;
+                }
+            }
         }
         if (c == '\\' && i + 1 < vim.size())
         {
@@ -367,6 +424,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                 case 'V': magic = Magic::None; at_start = start_here; token_atom = false; continue;
                 case 'c': case_in_pattern = false; at_start = start_here; token_atom = false; continue;
                 case 'C': case_in_pattern = true; at_start = start_here; token_atom = false; continue;
+                case 'Z': at_start = start_here; token_atom = false; continue;
                 case '(':
                     if (magic == Magic::Very)
                     {
@@ -391,7 +449,8 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     out.regex += ")";
                     --depth;
                     // The group whole, from where it opened.
-                    token_atom = !open_at.empty();
+                    token_atom  = !open_at.empty();
+                    token_group = true;
                     if (token_atom)
                     {
                         token_at = open_at.back();
@@ -821,7 +880,8 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         closeLooks();
                         out.regex += c;
                         --depth;
-                        token_atom = !open_at.empty();
+                        token_atom  = !open_at.empty();
+                        token_group = true;
                         if (token_atom)
                         {
                             token_at = open_at.back();
@@ -875,6 +935,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                 break;
         }
     }
+    withMarks();
     out.regex.append(looking.size(), ')');
     for (const std::pair<size_t, S32>& cut : cuts)
     {
