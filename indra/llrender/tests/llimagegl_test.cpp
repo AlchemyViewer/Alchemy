@@ -42,7 +42,10 @@
 
 #include "../test/lltut.h"
 
+#include <atomic>
+#include <chrono>
 #include <cstring>
+#include <thread>
 #include <vector>
 
 namespace tut
@@ -783,5 +786,72 @@ namespace tut
         ensure("a buffer is bound", bound != 0);
         ensure("and it is one this context made", glIsBuffer((GLuint)bound) == GL_TRUE);
         LLVertexBuffer::unbind();
+    }
+
+    // An upload on the LLImageGL thread, end to end. The thread no longer waits
+    // out the GPU: it fences, hands over, and moves on, and the main thread
+    // publishes the texture once the fence has signalled. Until then the image
+    // goes on showing the texture it had, and the caller's completion waits.
+    template<> template<>
+    void llimagegl_object::test<22>()
+    {
+        // The queue the upload thread hands its results back on, as the viewer's.
+        // It has to exist before the image, which looks it up when built.
+        LL::WorkQueue mainloop("mainloop");
+        LLImageGLThread::createInstance(gl->window());
+
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        ensure("createGLTexture succeeded",
+               img->createGLTexture(0, makeRaw(16, 16, 4, 0x11).get()));
+        const U32 old_name = img->getTexName();
+
+        LLPointer<LLImageRaw> raw = makeRaw(32, 32, 4, 0x55);
+        std::atomic<bool> worker_done{ false };
+        std::atomic<bool> worker_ok{ false };
+
+        img->beginUpload();
+        LLImageGLThread::instance().post(
+            [img, raw, &worker_done, &worker_ok]()
+            {
+                worker_ok = img->createGLTexture(0, raw.get());
+                worker_done = true;
+            });
+
+        // Bounded waits: a hang here should fail the test, not stall the suite.
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        while (!worker_done && std::chrono::steady_clock::now() < deadline)
+        {
+            mainloop.runPending();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        // The handover was posted before worker_done was raised.
+        mainloop.runPending();
+        ensure("the worker finished", worker_done.load());
+        ensure("and its createGLTexture succeeded", worker_ok.load());
+
+        bool completed = false;
+        U32 name_at_completion = 0;
+        img->afterPublish([&]()
+        {
+            completed = true;
+            name_at_completion = img->getTexName();
+        });
+
+        ensure("not published before its fence is seen", !completed);
+        ensure_equals("the texture on screen is the old one", img->getTexName(), old_name);
+        ensure_equals("at its own size", img->getWidth(), 16);
+
+        while (LLImageGL::publishUploads() > 0 && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
+        LLImageGLThread::deleteSingleton();
+
+        ensure("the completion ran", completed);
+        ensure("after the new texture published", name_at_completion != old_name);
+        ensure_equals("which is what the image names", img->getTexName(), name_at_completion);
+        ensure_equals("at its new size", img->getWidth(), 32);
+        ensure_equals("holding the upload", readTexelRGBA(img, 5, 5), 0x55555555u);
     }
 }

@@ -3135,11 +3135,16 @@ void LLViewerMediaImpl::update()
 #if LL_IMAGEGL_THREAD_CHECK
                     media_tex->getGLTexture()->mActiveThread = LLThread::currentID();
 #endif
-                    // A no-op when syncTexName already published the frame.
-                    gl_image->endUpload();
-                    mTextureUpdatePending = false;
-                    media_tex->unref();
-                    unref();
+                    // The frame publishes once the GPU has finished with it; the next
+                    // update must not start before then.
+                    gl_image->afterPublish([=, this]()
+                    {
+                        // A no-op when syncTexName published the frame.
+                        gl_image->endUpload();
+                        mTextureUpdatePending = false;
+                        media_tex->unref();
+                        unref();
+                    });
                 });
         }
         else

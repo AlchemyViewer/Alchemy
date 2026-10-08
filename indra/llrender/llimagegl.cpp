@@ -66,6 +66,19 @@ static std::vector<U32> sFreeList[DELETE_DELAY+1];
 // thread can empty the others'.
 static std::atomic<U32> sTextureNameGeneration{ 1 };
 
+namespace
+{
+    // An off-thread upload handed to the main thread and waiting for its fence, oldest
+    // first. Main thread only; see LLImageGL::syncToMainThread and publishUploads.
+    struct PendingPublish
+    {
+        LLPointer<LLImageGL> mImage;
+        GLsync               mFence = nullptr;
+        LLGLuint             mName  = 0;
+    };
+    std::vector<PendingPublish> sPendingPublishes;
+}
+
 // Number of mip levels in a full pyramid for the given level-0 dimensions, counting
 // level 0 itself: 256x256 -> 9 (256,128,...,1). This is a COUNT. Note llvertexbuffer's
 // wpo2() returns log2, i.e. the highest mip *index*, which is one less -- it used to be
@@ -308,6 +321,24 @@ void LLImageGL::cleanupClass()
     // starts afresh.
     sTextureNameGeneration.fetch_add(1, std::memory_order_relaxed);
 
+    const bool gl_alive = gGLManager.mInited;
+
+    // Uploads handed over and never published. Their thread is gone, and so by now is
+    // whatever was waiting to finish them, so their fences and textures go too; the
+    // textures into the ring drained below.
+    for (PendingPublish& pending : sPendingPublishes)
+    {
+        if (gl_alive)
+        {
+            glDeleteSync(pending.mFence);
+        }
+        pending.mImage->mOnPublished.clear();
+        pending.mImage->mPublishesPending = 0;
+        pending.mImage->endUpload();
+        deleteTextures(1, &pending.mName);
+    }
+    sPendingPublishes.clear();
+
     if (sScratchPBO != 0)
     {
         glDeleteBuffers(1, &sScratchPBO);
@@ -319,7 +350,6 @@ void LLImageGL::cleanupClass()
     // in sTextureAllocs across re-init (the test fixture calls cleanupClass
     // between tests). Always clear the C++ bookkeeping; only issue
     // glDeleteTextures if GL is still around.
-    const bool gl_alive = gGLManager.mInited;
     for (S32 i = 0; i < DELETE_DELAY + 1; ++i)
     {
         if (!sFreeList[i].empty())
@@ -1537,6 +1567,8 @@ void LLImageGL::updateClass()
         glDeleteTextures((GLsizei)sFreeList[idx].size(), sFreeList[idx].data());
         sFreeList[idx].resize(0);
     }
+
+    publishUploads();
 }
 
 // static
@@ -1990,53 +2022,117 @@ void LLImageGL::syncToMainThread(LLGLuint new_tex_name)
         glFlush();
     }
 
-    // Block here until the upload has completed, then let the main thread swap the name
-    // in. This costs this thread its throughput -- it waits out the GPU on every texture
-    // -- and it is not what the spec asks for. GL 4.6 section 5.3.1 names a FenceSync
-    // followed by a WaitSync in the consuming context as a way to know that another
-    // context's changes have completed, and the main thread's first bind of the new name
-    // is the re-attach section 5.3.3 requires before it can see them.
+    // Not waited on here. This thread used to block until the GPU had finished each upload,
+    // one texture at a time, so a backlog of decoded textures sat waiting for GL creation
+    // while it did. The main thread polls the fence instead (publishUploads) and publishes
+    // the texture once it has signalled.
     //
-    // A WaitSync posted to the main thread was the original implementation everywhere
-    // but NVIDIA, which got this CPU-side wait instead (SL-17284); the wait was then made
-    // uniform. The geometry consumers pair with mTexName does not depend on it: until
-    // syncTexName publishes, they read the snapshot beginUpload took (see getWidth).
-    {
-        LL_PROFILE_ZONE_NAMED("cglt - wait sync");
-        // One second per iteration so we actually block in the driver rather than
-        // spinning. Note FENCE_WAIT_TIME_NANOSECONDS is 1000ns despite its "1 ms"
-        // comment, which would busy-wait.
-        constexpr U64 WAIT_SLICE_NS = 1000000000ull;
-        GLenum res = glClientWaitSync(sync, 0, WAIT_SLICE_NS);
-        while (res == GL_TIMEOUT_EXPIRED)
-        {
-            res = glClientWaitSync(sync, 0, WAIT_SLICE_NS);
-        }
-        if (res == GL_WAIT_FAILED)
-        {
-            // Not a valid sync object -- we have no completion guarantee to offer, so
-            // say so rather than silently handing over a texture that may not be ready.
-            LL_WARNS_ONCE() << "glClientWaitSync failed waiting on a texture upload fence." << LL_ENDL;
-        }
-        glDeleteSync(sync);
-    }
-
+    // That is what the spec asks for. GL 4.6 section 5.3.1 has another context's changes
+    // complete once its fence is seen signalled, and polling with glClientWaitSync on the
+    // main thread is a CPU-side sync point in the context that goes on to use the texture
+    // -- the guarantee NVIDIA needed where a GPU-side glWaitSync did not give it (SL-17284).
+    // The main thread's first bind of the new name is then the re-attach section 5.3.3
+    // requires. Meanwhile consumers read the snapshot beginUpload took (see getWidth).
     ref();
     if (!LL::WorkQueue::postMaybe(
             mMainQueue,
             [=, this]()
             {
-                LL_PROFILE_ZONE_NAMED("cglt - delete callback");
-                syncTexName(new_tex_name);
+                LL_PROFILE_ZONE_NAMED("cglt - queue publish");
+                queuePublish(new_tex_name, sync);
                 unref();
             }))
     {
         // main queue is gone (shutdown); nothing will run the lambda, so don't strand
-        // the reference we just took
+        // the reference we just took, or the fence
+        glDeleteSync(sync);
         unref();
     }
 
     LL_PROFILER_GPU_COLLECT;
+}
+
+void LLImageGL::queuePublish(LLGLuint name, GLsync fence)
+{
+    llassert(on_main_thread());
+    ++mPublishesPending;
+    sPendingPublishes.push_back({ LLPointer<LLImageGL>(this), fence, name });
+}
+
+void LLImageGL::finishPublish(LLGLuint name)
+{
+    syncTexName(name);
+
+    llassert(mPublishesPending > 0);
+    if (--mPublishesPending == 0 && !mOnPublished.empty())
+    {
+        // Moved out first: a callback may ask for another one.
+        std::vector<std::function<void()>> callbacks;
+        callbacks.swap(mOnPublished);
+        for (std::function<void()>& callback : callbacks)
+        {
+            callback();
+        }
+    }
+}
+
+void LLImageGL::afterPublish(std::function<void()> fn)
+{
+    llassert(on_main_thread());
+    if (mPublishesPending == 0)
+    {
+        fn();
+        return;
+    }
+    mOnPublished.push_back(std::move(fn));
+}
+
+// static
+U32 LLImageGL::publishUploads()
+{
+    if (sPendingPublishes.empty())
+    {
+        return 0;
+    }
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    llassert(on_main_thread());
+
+    // Fences of one context signal in the order they were issued, so walking oldest first
+    // publishes an image's uploads in order. The ready ones are taken out before any is
+    // published: publishing runs the callers' callbacks, which must find the list settled.
+    std::vector<PendingPublish> ready;
+    size_t kept = 0;
+    for (size_t i = 0; i < sPendingPublishes.size(); ++i)
+    {
+        PendingPublish& pending = sPendingPublishes[i];
+        const GLenum res = glClientWaitSync(pending.mFence, 0, 0);
+        if (res == GL_TIMEOUT_EXPIRED)
+        {
+            if (kept != i)
+            {
+                sPendingPublishes[kept] = std::move(pending);
+            }
+            ++kept;
+            continue;
+        }
+        if (res == GL_WAIT_FAILED)
+        {
+            // Not a valid sync object: there is no completion guarantee to offer, so say so
+            // rather than hand over a texture that may not be ready without a word.
+            LL_WARNS_ONCE("LLImageGL") << "glClientWaitSync failed on a texture upload fence." << LL_ENDL;
+        }
+        glDeleteSync(pending.mFence);
+        ready.push_back(std::move(pending));
+    }
+    sPendingPublishes.erase(sPendingPublishes.begin() + kept, sPendingPublishes.end());
+
+    for (PendingPublish& pending : ready)
+    {
+        pending.mImage->finishPublish(pending.mName);
+    }
+
+    return (U32)sPendingPublishes.size();
 }
 
 

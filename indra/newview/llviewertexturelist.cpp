@@ -1428,6 +1428,8 @@ void LLViewerTextureList::decodeAllImages(F32 max_time)
         {
             main_queue->runFor(std::chrono::milliseconds(1));
             fetch_pending += main_queue->size();
+            // Uploads still waiting on the GPU are not done either.
+            fetch_pending += LLImageGL::publishUploads();
         }
 
         if (fetch_pending == 0 || timer.getElapsedTimeF32() > max_time)

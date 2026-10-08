@@ -1669,11 +1669,18 @@ void LLViewerFetchedTexture::scheduleCreateTexture()
                         [this, gl_image]()
                         {
 #endif
-                        // A no-op when syncTexName already published the new texture.
-                        gl_image->endUpload();
-                        //finalize on main thread
-                        postCreateTexture();
-                        unref();
+                        // The worker is done, but its texture publishes only once the GPU
+                        // has finished with it, which nothing waits for. Finish then: ending
+                        // the snapshot, or clearing mNeedsCreateTexture and so letting the
+                        // next upload start, must not run ahead of it.
+                        gl_image->afterPublish([this, gl_image]()
+                        {
+                            // A no-op when syncTexName published the new texture.
+                            gl_image->endUpload();
+                            //finalize on main thread
+                            postCreateTexture();
+                            unref();
+                        });
                     });
             }
             else

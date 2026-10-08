@@ -40,6 +40,8 @@
 #include "threadpool.h"
 #include "workqueue.h"
 #include <boost/unordered_set.hpp>
+#include <functional>
+#include <vector>
 
 #define LL_IMAGEGL_THREAD_CHECK 0 //set to 1 to enable thread debugging for ImageGL
 
@@ -73,6 +75,11 @@ public:
 
     // call once per frame
     static void updateClass();
+
+    // Main thread: publish every off-thread upload whose fence has signalled (syncTexName,
+    // then its afterPublish callbacks). Returns how many are still waiting on the GPU.
+    // updateClass does this; a loop waiting on texture creation can call it too.
+    static U32 publishUploads();
 
     // Get an estimate of how many bytes have been allocated in vram for
     // textures. Allocations recorded via alloc_tex_image with has_mips=true
@@ -218,9 +225,16 @@ public:
     bool setSubImage(const U8* datap, S32 data_width, S32 data_height, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update = false, LLGLuint use_name = 0, bool skip_unbind = false);
     bool setSubImageFromFrameBuffer(S32 fb_x, S32 fb_y, S32 x_pos, S32 y_pos, S32 width, S32 height);
 
-    // Wait for this thread's GL commands to finish, then post syncTexName(new_tex_name) to
-    // the main thread to publish the new texture in place of mTexName.
+    // Off the main thread: fence this thread's upload of new_tex_name and hand it to the main
+    // thread, which publishes it in place of mTexName once the fence has signalled (see
+    // publishUploads). Does not wait for the GPU.
     void syncToMainThread(LLGLuint new_tex_name);
+
+    // Main thread: run fn once the upload handed over by syncToMainThread has published, or
+    // now if none is waiting. A caller finishing an off-thread upload goes through this, so
+    // what it does next -- ending the snapshot, letting another upload start -- follows the
+    // texture onto the screen rather than racing it.
+    void afterPublish(std::function<void()> fn);
 
     // Read back a raw image for this discard level, if it exists
     bool readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compressed_ok) const;
@@ -386,6 +400,13 @@ private:
         bool mHasIsMask      = false;
     };
     PendingAlpha mPendingAlpha;
+
+    // Off-thread uploads of this image handed to the main thread and not yet published, and
+    // what is to run once none are. Main thread only; see syncToMainThread / afterPublish.
+    void queuePublish(LLGLuint name, GLsync fence);
+    void finishPublish(LLGLuint name);
+    U32 mPublishesPending = 0;
+    std::vector<std::function<void()>> mOnPublished;
 
     // Geometry of the texture mTexName currently names, captured when an off-thread
     // upload begins overwriting the members with the *next* texture's geometry.
