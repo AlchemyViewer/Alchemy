@@ -41,6 +41,7 @@
 #include "../test/lltut.h"
 
 #include <cstring>
+#include <vector>
 
 namespace tut
 {
@@ -57,6 +58,34 @@ namespace tut
             std::memset(raw->getData(), fill,
                         static_cast<size_t>(w) * h * components);
             return raw;
+        }
+
+        // Bind img's texture on unit 0 through the slot, so gGL's bind cache stays
+        // truthful for what the test does next. The unbind is what makes unit 0 the
+        // ACTIVE unit: a bind that finds the texture already cached does not.
+        static void bindForRead(const LLImageGL* img)
+        {
+            gGL.getTextureSlot(0)->unbind();
+            gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, img->getTexName());
+        }
+
+        // Read one level of img's texture straight from GL.
+        static void readTexture(const LLImageGL* img, GLenum format, GLenum type, void* out, S32 level = 0)
+        {
+            bindForRead(img);
+            glGetTexImage(GL_TEXTURE_2D, level, format, type, out);
+        }
+
+        // The texel at (x, y) of level 0 of an RGBA8 texture.
+        static U32 readTexelRGBA(const LLImageGL* img, S32 x, S32 y)
+        {
+            const S32 w = img->getWidth();
+            const S32 h = img->getHeight();
+            std::vector<U8> px(static_cast<size_t>(w) * h * 4);
+            readTexture(img, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+            U32 texel = 0;
+            std::memcpy(&texel, px.data() + (static_cast<size_t>(y) * w + x) * 4, 4);
+            return texel;
         }
     };
 
@@ -361,6 +390,37 @@ namespace tut
                       std::memcmp(src->getData(), dst->getData(),
                                   (size_t)W * H * C),
                       0);
+    }
+
+    // An edit writes through the ACTIVE unit, and a bind that finds the texture
+    // already cached on slot 0 skips activating it. With another unit left active
+    // the write went to whatever that unit held. The glyph atlas does exactly this:
+    // still on slot 0 from the text being drawn when a new glyph arrives.
+    template<> template<>
+    void llimagegl_object::test<15>()
+    {
+        constexpr U16 W = 32, H = 32;
+        LLPointer<LLImageGL> a = new LLImageGL(/*usemipmaps=*/false);
+        LLPointer<LLImageGL> b = new LLImageGL(/*usemipmaps=*/false);
+        ensure("create a", a->createGLTexture(0, makeRaw(W, H, 4, 0x10).get()));
+        ensure("create b", b->createGLTexture(0, makeRaw(W, H, 4, 0x20).get()));
+
+        // Partial update, as the glyph atlas does it. Forcing the slot 1 bind is what
+        // leaves unit 1 active, cached or not.
+        gGL.getTextureSlot(0)->bind(a.get());
+        gGL.getTextureSlot(1)->bind(b.get(), false, /*forceBind=*/true);
+        ensure("setSubImage succeeded",
+               a->setSubImage(makeRaw(W, H, 4, 0xFF).get(), 4, 4, 8, 8,
+                              /*force_fast_update=*/true));
+        ensure_equals("the update reached a", readTexelRGBA(a, 5, 5), 0xFFFFFFFFu);
+        ensure_equals("and not b", readTexelRGBA(b, 5, 5), 0x20202020u);
+
+        // Re-upload in place, through setImage.
+        gGL.getTextureSlot(0)->bind(a.get());
+        gGL.getTextureSlot(1)->bind(b.get(), false, /*forceBind=*/true);
+        ensure("re-upload succeeded", a->createGLTexture(0, makeRaw(W, H, 4, 0x77).get()));
+        ensure_equals("the re-upload reached a", readTexelRGBA(a, 5, 5), 0x77777777u);
+        ensure_equals("and not b", readTexelRGBA(b, 5, 5), 0x20202020u);
     }
 
     // gGL is thread_local and outlives a context, as it does across these tests,

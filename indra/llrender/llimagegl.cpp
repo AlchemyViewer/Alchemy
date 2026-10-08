@@ -933,19 +933,11 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
 
     const bool is_compressed = isCompressed();
 
-    if (mUseMipMaps)
-    {
-        //set has mip maps to true before binding image so tex parameters get set properly
-        gGL.getTextureSlot(0)->unbind();
+    mHasMipMaps = mUseMipMaps;
 
-        mHasMipMaps = true;
-    }
-    else
-    {
-        mHasMipMaps = false;
-    }
-
-    gGL.getTextureSlot(0)->bind(this, false, false, usename);
+    // Forced, because everything below writes through the ACTIVE unit and a bind that
+    // finds this texture already on slot 0 does not activate it.
+    gGL.getTextureSlot(0)->bind(this, false, true, usename);
 
     // Allocate the whole texture up front, so every write below is a sub-image.
     // glTexStorage2D must be called exactly once for the object and needs the level count
@@ -1407,8 +1399,11 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
         }
 
         const U8* sub_datap = datap + (y_pos * data_width + x_pos) * getComponents();
-        // Update the GL texture
-        bool res = gGL.getTextureSlot(0)->bindManual(mBindTarget, tex_name);
+        // Forced: the write goes to whichever unit is ACTIVE, and a bind that finds the
+        // texture already on slot 0 skips activating it. The glyph atlas is the usual case
+        // -- it is still on slot 0 from the text being drawn when a new glyph arrives, and
+        // a draw in between can have left another unit active.
+        bool res = gGL.getTextureSlot(0)->bind(this, false, true, tex_name);
         if (!res) LL_ERRS() << "LLImageGL::setSubImage(): bindTexture failed" << LL_ENDL;
         stop_glerror();
 
@@ -1888,7 +1883,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
         LLImageGL::generateTextures(1, &new_texname);
         mStorageAllocated = false; // brand-new name, no storage allocated yet
         {
-            gGL.getTextureSlot(0)->bind(this, false, false, new_texname);
+            gGL.getTextureSlot(0)->bind(this, false, true, new_texname);
             glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_BASE_LEVEL, 0);
             glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_MAX_LEVEL, mMaxDiscardLevel - discard_level);
             // Apply the swizzle mask once if resolveDeprecatedFormat saved
