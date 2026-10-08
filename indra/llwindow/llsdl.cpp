@@ -468,15 +468,25 @@ void* sdl_create_shared_context()
             if (egl_bindapi) egl_bindapi(EGL_OPENGL_API);
             // Must request the version explicitly — an empty attrib list defaults
             // to GL 1.0, which can't drive the modern texture/VBO uploads the
-            // worker shares with the main context. (EGL 1.5 tokens.) The main
-            // context's reset strategy follows, as EGL requires of a context
+            // worker shares with the main context. (EGL 1.5 tokens.) The
+            // profile and the debug flag are the main context's, as on WGL:
+            // EGL's default profile is core, whatever the main context is.
+            // Its reset strategy follows too, as EGL requires of a context
             // that shares with it.
-            int ctx_attribs[4 + std::size(sResetAttribs)] =
+            int ctx_attribs[8 + std::size(sResetAttribs)] =
             {
                 EGL_CONTEXT_MAJOR_VERSION, ver_major,
                 EGL_CONTEXT_MINOR_VERSION, ver_minor,
+                EGL_CONTEXT_OPENGL_PROFILE_MASK,
+                LLRender::sGLCoreProfile ? EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT : EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
             };
-            std::copy(std::begin(sResetAttribs), std::end(sResetAttribs), ctx_attribs + 4);
+            int attr = 6;
+            if (gDebugGL)
+            {
+                ctx_attribs[attr++] = EGL_CONTEXT_OPENGL_DEBUG;
+                ctx_attribs[attr++] = EGL_TRUE;
+            }
+            std::copy(std::begin(sResetAttribs), std::end(sResetAttribs), ctx_attribs + attr);
             void* ctx = egl_createctx(dpy, cfg, share, ctx_attribs);
             if (ctx && ctx != EGL_NO_CONTEXT)
             {
