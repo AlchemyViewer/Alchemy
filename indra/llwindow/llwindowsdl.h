@@ -455,8 +455,6 @@ private:
     // just-the-commits from SDL3.
     LLPreeditor* mPreeditor = nullptr;
 
-    void tryFindFullscreenSize(int &aWidth, int &aHeight);
-
     enum EServerProtocol{ X11, Wayland, Unknown };
     EServerProtocol mServerProtocol = Unknown;
 

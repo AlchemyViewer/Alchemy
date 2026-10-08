@@ -208,58 +208,6 @@ void LLWindowSDL::setTitle(const std::string title)
     SDL_SetWindowTitle( mWindow, title.c_str() );
 }
 
-void LLWindowSDL::tryFindFullscreenSize( int &width, int &height )
-{
-    LL_INFOS() << "createContext: setting up fullscreen " << width << "x" << height << LL_ENDL;
-
-    // If the requested width or height is 0, find the best default for the monitor.
-    if(width == 0 || height == 0)
-    {
-        // Scan through the list of modes, looking for one which has:
-        //      height between 700 and 800
-        //      aspect ratio closest to the user's original mode
-        S32 resolutionCount = 0;
-        LLWindowResolution *resolutionList = getSupportedResolutions(resolutionCount);
-
-        if(resolutionList != nullptr)
-        {
-            F32 closestAspect = 0;
-            U32 closestHeight = 0;
-            U32 closestWidth = 0;
-
-            LL_INFOS() << "createContext: searching for a display mode, original aspect is " << mNativeAspectRatio << LL_ENDL;
-
-            for(S32 i=0; i < resolutionCount; i++)
-            {
-                F32 aspect = (F32)resolutionList[i].mWidth / (F32)resolutionList[i].mHeight;
-
-                LL_INFOS() << "createContext: width " << resolutionList[i].mWidth << " height " << resolutionList[i].mHeight << " aspect " << aspect << LL_ENDL;
-
-                if( (resolutionList[i].mHeight >= 700) && (resolutionList[i].mHeight <= 800) &&
-                    (fabs(aspect - mNativeAspectRatio) < fabs(closestAspect - mNativeAspectRatio)))
-                {
-                    LL_INFOS() << " (new closest mode) " << LL_ENDL;
-
-                    // This is the closest mode we've seen yet.
-                    closestWidth = resolutionList[i].mWidth;
-                    closestHeight = resolutionList[i].mHeight;
-                    closestAspect = aspect;
-                }
-            }
-
-            width = closestWidth;
-            height = closestHeight;
-        }
-    }
-
-    if(width == 0 || height == 0)
-    {
-        // Mode search failed for some reason.  Use the old-school default.
-        width = 1024;
-        height = 768;
-    }
-}
-
 bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, bool fullscreen, bool enable_vsync)
 {
     LL_INFOS() << "createContext, fullscreen=" << fullscreen << " size=" << width << "x" << height << LL_ENDL;
@@ -335,11 +283,6 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, context_flags);
     SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
 
-    if(mFullscreen)
-    {
-        tryFindFullscreenSize(width, height);
-    }
-
     SDL_PropertiesID props = SDL_CreateProperties();
     SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, mWindowTitle.c_str());
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, x);
@@ -348,6 +291,11 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
+    // Fullscreen is SDL's borderless desktop fullscreen, at the desktop's own
+    // mode, as on Windows. width/height are the windowed size, not a
+    // resolution anyone chose: an exclusive mode picked from them would
+    // change the monitor's mode under X11, and under Wayland SDL would scale
+    // an emulated one up to the output (SDL_HINT_VIDEO_WAYLAND_MODE_EMULATION).
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_FULLSCREEN_BOOLEAN, mFullscreen);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, gHiDPISupport);
 
@@ -420,56 +368,7 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         return false;
     }
 
-    // If the caller requested fullscreen at a specific resolution, switch
-    // from SDL3's default borderless-desktop-fullscreen mode to an
-    // exclusive fullscreen mode at that resolution. width/height come from
-    // either the user's saved-window-size setting or from tryFindFullscreenSize
-    // above (which scans the display's supported modes); either way they are
-    // a deliberate resolution request, not "whatever the desktop is."
-    //
-    // On Wayland compositors that don't allow client-driven mode changes
-    // (most of them), SDL_SetWindowFullscreenMode quietly fails and we keep
-    // the borderless default. On X11 + KMS this actually changes the
-    // physical display mode.
-    if (mFullscreen && width > 0 && height > 0)
-    {
-        SDL_DisplayMode mode = {};
-        const SDL_DisplayID display = SDL_GetDisplayForWindow(mWindow);
-        if (SDL_GetClosestFullscreenDisplayMode(display, width, height, 0.f,
-                                                /*include_high_density_modes=*/false,
-                                                &mode))
-        {
-            if (SDL_SetWindowFullscreenMode(mWindow, &mode))
-            {
-                LL_INFOS() << "Exclusive fullscreen mode: "
-                           << mode.w << "x" << mode.h
-                           << " @ " << mode.refresh_rate << "Hz" << LL_ENDL;
-            }
-            else
-            {
-                LL_WARNS() << "SDL_SetWindowFullscreenMode " << mode.w << "x" << mode.h
-                           << " @ " << mode.refresh_rate << "Hz failed: "
-                           << SDL_GetError() << " — staying at borderless desktop." << LL_ENDL;
-            }
-        }
-        else
-        {
-            LL_INFOS() << "No fullscreen mode matches " << width << "x" << height
-                       << " on display " << display
-                       << " — using borderless desktop fullscreen." << LL_ENDL;
-        }
-    }
-
-    // Prefer the window's actually-applied fullscreen mode (which reflects
-    // any exclusive mode we just set) over the desktop's current mode. When
-    // the window is borderless-desktop or windowed, SDL_GetWindowFullscreenMode
-    // returns nullptr and we fall back to SDL_GetCurrentDisplayMode — the
-    // pre-exclusive-mode-support behaviour.
-    const SDL_DisplayMode* displayMode = SDL_GetWindowFullscreenMode(mWindow);
-    if (!displayMode)
-    {
-        displayMode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(mWindow));
-    }
+    const SDL_DisplayMode* displayMode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(mWindow));
     if(displayMode)
     {
         mRefreshRate = ll_round(displayMode->refresh_rate);
@@ -1289,8 +1188,8 @@ F32 LLWindowSDL::getPixelAspectRatio()
 }
 
 
-// This is to support 'temporarily windowed' mode so that
-// dialogs are still usable in fullscreen.
+// Ready the window for an OS dialog: input ungrabbed and the cursor shown,
+// so the dialog is usable.
 void LLWindowSDL::beforeDialog()
 {
     LL_INFOS() << "LLWindowSDL::beforeDialog() depth=" << mDialogDepth << LL_ENDL;
@@ -1318,11 +1217,10 @@ void LLWindowSDL::beforeDialog()
             SDL_ShowCursor();
         }
 
-        if (SDLReallyCaptureInput(false)) // must ungrab input so popup works!
-        {
-            if (mFullscreen && mWindow )
-                SDL_SetWindowFullscreen( mWindow, 0 );
-        }
+        // Ungrab input so the popup works. Fullscreen is left as it is: it
+        // is borderless desktop fullscreen, which a dialog parented to the
+        // window stacks above, and it holds no mode to give the desktop back.
+        SDLReallyCaptureInput(false);
     }
     ++mDialogDepth;
 }
@@ -1340,12 +1238,6 @@ void LLWindowSDL::afterDialog()
         // Nested afterDialog: still inside an outer dialog scope, nothing
         // to restore yet.
         return;
-    }
-
-    if (mFullscreen && mWindow)
-    {
-        // Restore fullscreen state that beforeDialog() left so dialogs could draw above us.
-        SDL_SetWindowFullscreen(mWindow, true);
     }
 
     // Restore pointer-lock if we dropped it for the dialog AND the viewer is
@@ -1495,7 +1387,12 @@ LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_reso
         mSupportedResolutions = new LLWindowResolution[MAX_NUM_RESOLUTIONS];
         mNumSupportedResolutions = 0;
 
-        SDL_DisplayID display = SDL_GetPrimaryDisplay();
+        // The modes of the display the window is on, not the primary one.
+        SDL_DisplayID display = mWindow ? SDL_GetDisplayForWindow(mWindow) : 0;
+        if (!display)
+        {
+            display = SDL_GetPrimaryDisplay();
+        }
         int num_modes = 0;
         SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(display, &num_modes);
         num_modes = llclamp(num_modes, 0, MAX_NUM_RESOLUTIONS);
@@ -1558,7 +1455,7 @@ void LLWindowSDL::exitDialog()
         return;
     }
 
-    // afterDialog() restores fullscreen and mouselook; the file dialog also needs
+    // afterDialog() restores mouselook; the file dialog also needs
     // key-window focus back once the last one closes. SDL's dialog sheet leaves no
     // key window, so without this keystrokes hit no responder and AppKit beeps.
 #if LL_DARWIN
@@ -2525,6 +2422,10 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
                 mRefreshRate = ll_round(displayMode->refresh_rate);
                 mNativeAspectRatio = ((F32)displayMode->w) / ((F32)displayMode->h);
             }
+            // The resolution list is the window's display's; build it afresh.
+            delete[] mSupportedResolutions;
+            mSupportedResolutions = nullptr;
+            mNumSupportedResolutions = 0;
             // Pixel density may have changed; refresh the pixel-unit min-size
             // shadow so setSizeImpl(LLCoordWindow)'s re-clamp stays unit-correct.
             refreshMinSizePixelShadow();
