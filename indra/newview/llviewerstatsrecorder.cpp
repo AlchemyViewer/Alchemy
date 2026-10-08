@@ -297,8 +297,7 @@ void LLViewerStatsRecorder::makeStatsFileName()
     std::string stats_file_name("slviewerstats-");
 #endif
 
-    F64         now      = LLFrameTimer::getTotalSeconds();
-    std::string date_str = LLDate(now).asString();
+    std::string date_str = LLDate::now().asString();
     std::replace(date_str.begin(), date_str.end(), ':', '-');  // Make it valid for a filename
     stats_file_name.append(date_str);
     stats_file_name.append(".csv");
