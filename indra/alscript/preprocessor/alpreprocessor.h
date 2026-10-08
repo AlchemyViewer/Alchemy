@@ -201,9 +201,18 @@ public:
         // find where it is -- a module's first, the script's own after the
         // modules, the first of an include and the first after it, one
         // past lines a condition left out -- saying the line it is of the
-        // file of that name. A name, never a path. LSL's optimizer and
-        // compression keep no comments, these included.
+        // file of that name: its `__SHORTFILE__`, or what `lineLabel`
+        // calls it. LSL's optimizer and compression keep no comments,
+        // these included.
         bool lineComments = false;
+        // What the `@line` comments call each file of the source map,
+        // asked once for each, `script` for the first, the script itself:
+        // ALLineLabel's, which names a file on disk by its path from the
+        // script's own folder, so that two modules of one name read apart.
+        // Asked on whatever thread the run is on, so it holds what it
+        // needs as copies. Made quotable whatever it gives
+        // (ALLineLabel::quotable). Unset, each file's name, as before.
+        std::function<std::string(const ALSourceMap::File& file, bool script)> lineLabel;
     };
 
     struct Result

@@ -256,6 +256,14 @@ ALWatchedFile::ALWatchedFile(std::string path, changed_t changed)
     mLooked = mSeen;
 }
 
+ALWatchedFile::ALWatchedFile(std::string path, const ALFileStamp& seen, changed_t changed)
+    : mPath(std::move(path)),
+      mChanged(std::move(changed)),
+      mSeen(seen),
+      mLooked(seen)
+{
+}
+
 ALWatchedFile::~ALWatchedFile()
 {
     if (mWatcher)

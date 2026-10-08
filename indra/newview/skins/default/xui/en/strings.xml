@@ -639,6 +639,36 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocIncludeNotFetched">include file '[1]' could not be fetched, and the script is not sent without it</string>
 	<string name="CompileQueueSkippedSaving">Skipped "[SCRIPT_NAME]": a save of it is on its way, which a recompile would land over.</string>
 	<string name="CompileQueueUnsavedInStudio">Script Studio has unsaved changes to "[SCRIPT_NAME]"; the recompile uses the version saved on the server, without them.</string>
+	<string name="ScriptMasterGone">its file is no longer there</string>
+	<string name="ScriptMasterUnreadable">its file could not be read</string>
+	<string name="ScriptMasterOutOfReach">its object is out of reach</string>
+	<string name="ScriptMasterNoContents">the region did not say in time what its object holds</string>
+	<string name="ScriptMasterRlvHeld">RLVa keeps what its object holds from being seen or changed</string>
+	<string name="ScriptMasterItemGone">it is gone from where it was</string>
+	<string name="ScriptMasterNotSLua">its file is SLua, and the script is no longer</string>
+	<string name="ScriptMasterNotLSL">its file is LSL, and the script is no longer</string>
+	<string name="ScriptMasterNotNotecard">it is no longer a notecard</string>
+	<string name="ScriptMasterNotScript">it is no longer a script</string>
+	<string name="ScriptMasterNotecardCarries">it carries items in the world, which a file cannot hold</string>
+	<string name="ScriptMasterExpandFailed">the preprocessor found errors in it, listed among its file's problems</string>
+	<string name="ScriptMasterWorldUnread">what it holds in-world could not be read, to keep it in History first</string>
+	<string name="ScriptMasterToastFailed">[FILE] was not sent to [NAME]: [WHY].</string>
+	<string name="ScriptMasterToastNotCompiled">[NAME] went up from [FILE], and did not compile.</string>
+	<string name="ScriptMasterToastHeld">[NAME] was changed in-world since [FILE] was last sent to it, so it was not sent.</string>
+	<string name="ScriptMasterToastDiffering">[NAME] was changed in-world: it no longer holds [FILE].</string>
+	<string name="ScriptMasterToastSuspended">[NAME]'s link to [FILE] is held: [WHY].</string>
+	<string name="ScriptMasterToastOrphaned">[NAME] is gone from where it was; its link to [FILE] is kept a while, should it come back.</string>
+	<string name="ScriptMasterToastPending">[FILE] was not sent to [NAME]: [WHY].</string>
+	<string name="ScriptMasterToastMore">And [COUNT] more.</string>
+	<string name="ScriptMasterToastOpen">Script Studio's Output has them.</string>
+	<string name="ScriptMasterFilesA">[FILE]</string>
+	<string name="ScriptMasterFilesTwo">[FILE] and one other file</string>
+	<string name="ScriptMasterFilesB">[FILE] and [COUNT] other files</string>
+	<string name="ScriptMasterPlacesA">all in one place</string>
+	<string name="ScriptMasterPlacesB">across [COUNT] places</string>
+	<string name="ScriptMasterNotSentA">One script that includes [FILES] was not sent; Send from Files sends it.</string>
+	<string name="ScriptMasterNotSentB">[COUNT] scripts that include [FILES] were not sent; Send from Files sends them.</string>
+	<string name="BridgeNotSaved">Not saved: [REASON]</string>
 	<string name="BridgeSentCompiledAsIs">The compiled half was changed and its source was not, so it went up as it is rather than as its source expands.</string>
 	<string name="PreprocIncludeSentWithout">include file '[1]' could not be fetched, and the script went up without it</string>
 	<string name="PreprocObjectUnanswered">the object this script is in did not say what it holds -- it did not answer in time, or is out of view -- so no include was looked for in it; save again once it answers</string>
@@ -983,6 +1013,18 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlCompoundAssign">Luau's [2]= says this once: [1] [2]= ...</string>
 	<string name="LuauLintSlNumberTruth">[1] is a number, and Luau counts every number true, 0 too: [1] ~= 0 asks whether it is not 0</string>
 	<string name="LuauLintSlNumberTruthNot">not [1] is always false: [1] is a number, and Luau counts every number true, 0 too. [1] == 0 asks whether it is 0</string>
+	<string name="LuauLintSlIntegerTruth">[1] is an integer, and SLua counts every integer true, 0i too: [2] asks whether it is not 0</string>
+	<string name="LuauLintSlIntegerTruthNot">not [1] is always false: [1] is an integer, and SLua counts every integer true, 0i too. [2] asks whether it is 0</string>
+	<string name="LuauLintSlStringTruth">[1] is a string, and SLua counts every string true, "" too: [2] asks whether it is not empty</string>
+	<string name="LuauLintSlStringTruthNot">not [1] is always false: [1] is a string, and SLua counts every string true, "" too. [2] asks whether it is empty</string>
+	<string name="LuauLintSlUuidTruth">[1] is a uuid, and SLua counts every uuid true, NULL_KEY too: [2] asks whether it is not NULL_KEY</string>
+	<string name="LuauLintSlUuidTruthNot">not [1] is always false: [1] is a uuid, and SLua counts every uuid true, NULL_KEY too. [2] asks whether it is NULL_KEY</string>
+	<string name="LuauLintSlVectorTruth">[1] is a vector, and SLua counts every vector true, ZERO_VECTOR too: [2] asks whether it is not zero</string>
+	<string name="LuauLintSlVectorTruthNot">not [1] is always false: [1] is a vector, and SLua counts every vector true, ZERO_VECTOR too. [2] asks whether it is zero</string>
+	<string name="LuauLintSlQuaternionTruth">[1] is a quaternion, and SLua counts every quaternion true, ZERO_ROTATION too: [2] asks whether it is not ZERO_ROTATION</string>
+	<string name="LuauLintSlQuaternionTruthNot">not [1] is always false: [1] is a quaternion, and SLua counts every quaternion true, ZERO_ROTATION too. [2] asks whether it is ZERO_ROTATION</string>
+	<string name="LuauLintSlListTruth">[1] is a list, and SLua counts every table true, an empty one too: [2] asks whether it has anything in it</string>
+	<string name="LuauLintSlListTruthNot">not [1] is always false: [1] is a list, and SLua counts every table true, an empty one too. [2] asks whether it is empty</string>
 	<string name="LuauLintSlNilSentinel">[1] == [4] never holds: [2] answers [3] where it finds nothing, not [4]. [1] == [3] asks whether it found nothing</string>
 	<string name="LuauLintSlNilSentinelAlways">[1] ~= [4] always holds: [2] answers [3] where it finds nothing, not [4]. [1] ~= [3] asks whether it found something</string>
 	<string name="LuauLintSlNilSentinelOrder">Comparing [1] with a number is an error where [2] finds nothing: it answers nil there, not -1. [1] [5] asks the same</string>
@@ -1011,7 +1053,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlEmptyBlock">This [1]'s block is empty: it does nothing</string>
 	<string name="LuauLintSlIndexDivision">[1] may be a fraction, which a list has nothing at: Luau's / divides as floats do, where LSL's integers divided whole. [2] rounds down</string>
 	<string name="LuauLintSlVectorProduct">[1] multiplies each part of two vectors, and gives a vector: LSL's * of two vectors was their dot product, a number. vector.dot([2], [3]) is LSL's</string>
-	<string name="LuauLintSlVectorCross">[1] is each part's remainder in SLua: LSL's % of two vectors was their cross product. vector.cross([2], [3]) is LSL's</string>
+	<string name="LuauLintSlVectorCross">[1] is the cross product of two vectors, as LSL's % was. vector.cross([2], [3]) says so plainly</string>
 	<string name="LuauLintSlSleepingCall">[1] makes the script sleep [2] s each call; [3] does the same without the sleep</string>
 	<string name="LuauLintSlSleepingCallOften">[1] makes the script sleep [2] s each time it runs here, in a loop or a timer; [3] does the same without the sleep</string>
 	<string name="LuauLintSlSleepingTexture">[1] makes the script sleep [2] s each call; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
@@ -1083,10 +1125,13 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaSharedReturned">returned by a function</string>
 	<string name="SluaSharedKept">passed to a function of the script's that keeps it</string>
 	<string name="SluaKeyText">LSL's keys held any text; SLua's uuid() stops the script on text that is no UUID, as it would here, where only a uuid will do.</string>
+	<string name="SluaKeyEmpty">SLua's uuid of no text is NULL_KEY: it equals NULL_KEY and reads as NULL_KEY's text, where LSL's key of no text did neither.</string>
+	<string name="SluaKeyCase">SLua's uuid writes a key's letters small, and finds it the same key as one written small, where LSL's key kept its capitals and was compared as text.</string>
 	<string name="SluaVectorText">ll.DumpList2String writes a vector's or a rotation's parts as LSL did, with five places; SLua's tostring writes as few as each needs, &lt;1, 2, 3&gt;, which tovector reads back the same.</string>
 	<string name="SluaUuidText">uuid() stops the script on text that is no UUID, where LSL's keys held any text; touuid() answers nil instead.</string>
 	<string name="SluaDetectedTable">detected[n] is what LSL read with llDetected*(n - 1): SLua counts it from 1, and one past its end is an error, where LSL answered nothing.</string>
 	<string name="SluaMathDomain">math.sqrt, math.log and math.log10 answer nan or -inf out of their range, where LSL answered 0 or stopped with a math error.</string>
+	<string name="SluaBase64Decode">llbase64.decode keeps every byte it decodes, a NUL and what is not UTF-8 among them, where LSL's llBase64ToString cut the string at a NUL and made what was not UTF-8 '?'.</string>
 	<string name="SluaAbsent">SLua has no [1], in ll or in llcompat: it is left out.</string>
 	<string name="SluaUse">SLua would use [1] for [2].</string>
 	<string name="SluaCompatOnlyTimer">SLua's ll has no SetTimerEvent; llcompat's is LSL's. SLua's own timers are LLTimers:every(seconds, callback) and LLTimers:once, several at a time.</string>
@@ -1096,17 +1141,18 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaDeprecatedFor">SLua deprecates ll.[1], for [2].</string>
 	<string name="SluaDeprecatedWhy">SLua deprecates ll.[1]: [2]</string>
 	<string name="SluaDeprecated">SLua deprecates ll.[1].</string>
+	<string name="SluaXorBase64Wrong">SLua deprecates ll.XorBase64Strings, for ll.XorBase64, which XORs correctly where this did not, and so answers otherwise: llcompat's is LSL's.</string>
+	<string name="SluaXorBase64Nul">SLua deprecates ll.XorBase64StringsCorrect, for ll.XorBase64, which answers otherwise where the second string holds a NUL, which ended it here: llcompat's is LSL's.</string>
 	<string name="SluaIndexFound">llcompat.[1] counts from 0 and says -1 for none, as LSL did; ll.[1] counts from 1 and says nil.</string>
 	<string name="SluaIndex">llcompat.[1] takes indexes from 0, as LSL did; ll.[1] takes them from 1.</string>
 	<string name="SluaBool">llcompat.[1] answers 1 or 0, as LSL did; ll.[1] answers true or false.</string>
 	<string name="SluaBoolList">llcompat.[1]'s list has 1 or 0 where LSL's did; ll.[1]'s has true or false there.</string>
 	<string name="SluaRightFirst">LSL ran the right side of this before the left, and Luau runs the left first: one side changes what the other reads.</string>
-	<string name="SluaIntegerDivision">// rounds down, and LSL's integer / rounded toward zero: they differ where the answer is negative.</string>
 	<string name="SluaBit32Signed">bit32 answers 0 to 4294967295, where LSL's integers were signed: bit32.s32 makes the answer LSL's where it could pass 2147483647 and is read as a number.</string>
 	<string name="SluaHexSign">SLua reads [1] as [2], where LSL wrapped it to [3]: bit32 takes either the same, so it stays as written where only bit32 reads it, and is [3] where it is read as a number.</string>
 	<string name="SluaIntegerPast32Bits">LSL reads [1] as -1: past 0xFFFFFFFF, the most its 32 bits hold, a number stops there.</string>
-	<string name="SluaModulo">Luau's % takes the divisor's sign, and LSL's took the dividend's: they differ where one is negative.</string>
 	<string name="SluaListCompare">LSL compares lists by their lengths alone, and != answers the difference of them.</string>
+	<string name="SluaHeaderOrder">SLua passes ll.HTTPRequest a custom_header table's headers sorted by name, where LSL's list passed them in the order written; nothing else differs.</string>
 	<string name="SluaShortCircuit">[1] leaves its right side unrun once the left decides it; LSL ran both sides, the right one first.</string>
 	<string name="SluaUuid">SLua's uuid holds a key; LSL's key could hold any text.</string>
 	<string name="SluaAssignInExpression">SLua's assignments are statements: this one is made by a function called where it stood.</string>

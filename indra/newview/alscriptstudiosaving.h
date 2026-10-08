@@ -70,8 +70,10 @@ public:
         // An LSL expansion sent compressed: what one too large is told
         // would shrink it.
         bool        compress = false;
-        // The viewer's channel and version, which the envelope says.
-        std::string program;
+        // The viewer's channel and version, which the envelope says; and
+        // whether it carries an upload header, and who it names.
+        std::string             program;
+        ALScriptStudioDoc::Header header;
     };
 
     // What saving asks of the window itself, beyond what it is given.

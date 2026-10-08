@@ -27,12 +27,14 @@
 #include "../alscriptstudiodoc.h"
 
 #include "../alnotecardembedded.h"
+#include "aluploadheader.h"
 #include "aldiffview.h"
 
 #include "alscriptstudio_fixture.h"
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <string>
 
 namespace
@@ -322,5 +324,43 @@ namespace tut
         ensure("a comparison of texts of no tab's: its side's, which has none", doc.undoText() == doc.compareView->shown());
         doc.compareTitles = Doc::CompareTitles{ "Saved", "Now" };
         ensure("one that follows the tab: the tab's", doc.undoText() == doc.editor);
+    }
+
+    template<> template<>
+    void alscriptstudiodoc_object::test<10>()
+    {
+        set_test_name("a save's envelope carries an upload header where one is asked for -- what the save hashes to, when and who, "
+                      "between the target line and the code, which it moves down by its lines -- and none where not");
+        al_studio_test::StudioWindow window;
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name = "editor";
+        p.rect = LLRect(0, 200, 400, 0);
+        Doc doc;
+        doc.editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        window.floater->addChild(doc.editor);
+        doc.language.compileTarget = "mono";
+        doc.editor->setText("#define N 1\ndefault { state_entry() { llOwnerSay((string)N); } }\n");
+        const std::string expanded = "default { state_entry() { llOwnerSay((string)1); } }\n";
+
+        const ALScriptEnvelope plain = doc.envelopeFor(expanded, "Test 1.0");
+        ensure("none unasked", plain.header.empty());
+
+        ALScriptHeaderOptions asked;
+        asked.on      = true;
+        asked.creator = "Some One";
+        const ALScriptEnvelope              with = doc.envelopeFor(expanded, "Test 1.0", asked);
+        const std::optional<ALUploadHeader> said = ALUploadHeader::parse(with.header, false);
+        ensure("ours, read back: " + with.header, said.has_value() && said->ours);
+        ensure_equals("its hash", said->hash, ALUploadHeader::hashOf("mono", doc.editor->text(), expanded));
+        ensure_equals("who", said->creator, std::string("Some One"));
+        ensure("no file: a tab has no link", said->file.empty());
+        const int lines = static_cast<int>(std::count(with.header.begin(), with.header.end(), '\n'));
+        ensure_equals("the code its lines down", with.codeLine(), plain.codeLine() + lines);
+        const std::optional<ALScriptEnvelope> back = ALScriptEnvelope::parse(with.wrap());
+        ensure("parsed back with it", back.has_value() && back->header == with.header && back->expanded == expanded);
     }
 }

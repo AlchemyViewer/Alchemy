@@ -82,6 +82,7 @@ namespace
         "ALScriptPreprocLazyLists",  "ALScriptPreprocCompress",    "ALScriptPreprocOptimizer",
         "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings",
         "ALScriptPreprocOptimizerInlining",     "ALScriptPreprocExtensions", "ALScriptPreprocLineComments",
+        "ALScriptUploadHeader",      "ALScriptUploadHeaderCreator",
         "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder", "ALScriptPreprocWorldIncludes",
         "ALScriptSLuaAliases",
         "ALScriptStudioTabWidth",    "ALScriptStudioInsertSpaces", "ALScriptStudioDetectIndentation", "ALScriptStudioReindentOnPaste",
@@ -258,7 +259,7 @@ bool ALFloaterScriptPreferences::postBuild()
     {
         mEnableWatches.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) { refreshIncludeOrder(); }));
     }
-    for (const char* setting : { "ALScriptPreprocOptimizer", "ALScriptPreprocDiskIncludes", "ALScriptStudioAutoComplete", "ALScriptStudioHoverCards",
+    for (const char* setting : { "ALScriptPreprocOptimizer", "ALScriptUploadHeader", "ALScriptPreprocDiskIncludes", "ALScriptStudioAutoComplete", "ALScriptStudioHoverCards",
                                  "ALScriptPreprocDiskIncludeFolder", "ALScriptTemplateLSL", "ALScriptTemplateSLua", "ALScriptPreprocDefines" })
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
@@ -384,6 +385,7 @@ void ALFloaterScriptPreferences::refreshEnabled()
     {
         getChildView(name)->setEnabled(optimize);
     }
+    getChildView("preproc_upload_creator")->setEnabled(gSavedSettings.getBOOL("ALScriptUploadHeader"));
     const bool disk = gSavedSettings.getBOOL("ALScriptPreprocDiskIncludes");
     for (const char* name : { "include_folders", "add_folder" })
     {

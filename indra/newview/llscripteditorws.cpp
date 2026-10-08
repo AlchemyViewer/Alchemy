@@ -53,7 +53,6 @@
 #include "llnotecard.h"
 #include "llnotificationsutil.h"
 #include "llprocess.h"
-#include "alregex.h"
 #include "llmd5.h"
 #include "llsdjson.h"
 #include "llselectmgr.h"
@@ -101,12 +100,6 @@ namespace
     // answers in a moment; past these, a connection more is closed before
     // it is sent a challenge, and nothing is written for it.
     constexpr size_t MAX_UNAUTHENTICATED = 4;
-
-    static const ALRegex LUAU_LOCATION_PATTERN(
-        R"(^([^:]*):([0-9]+):\s*(.*)$)");
-
-    static const ALRegex LSL_LOCATION_PATTERN(
-        R"(\((\d+), (\d+)\) : ([^:]+) : (.+))");
 
     // Creates a uniquely-named LLEventMailDrop under "<prefix>.<uuid>", passes
     // its name to kickoff (which arranges for one post to that pump), then
@@ -607,10 +600,12 @@ size_t LLScriptEditorWSServer::unauthenticatedConnectionCount() const
 
 bool LLScriptEditorWSServer::update()
 {
-    // A server nobody is connected to stops after a while, so that a
+    // A server nobody is connected to may stop after a while, so that a
     // port is not held for a client that has gone; it starts again the
-    // next time an editor asks for it. Zero keeps it up for the session.
-    static LLCachedControl<S32> idle_timeout(gSavedSettings, "ExternalWebsocketSyncIdleTimeout", 600);
+    // next time an editor asks for it. Zero, as it is unless set, keeps it
+    // up for the session: an editor started later finds nothing to connect
+    // to once it has stopped.
+    static LLCachedControl<S32> idle_timeout(gSavedSettings, "ExternalWebsocketSyncIdleTimeout", 0);
     const F64                   since = mIdleSince.load();
     if (since > 0.0 && idle_timeout > 0 && LLTimer::getTotalSeconds().value() - since >= static_cast<F64>(idle_timeout) && getConnectionCount() == 0)
     {
@@ -1892,6 +1887,8 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     const bool  lua = compile_target == "luau";
     std::string text = content;
     std::vector<ALScriptDiagnostic> preprocessed;
+    std::shared_ptr<const ALSourceMap> prepared_map;
+    S32                                prepared_code_line = 0;
     bool        as_is = false;
     const std::optional<ALScriptEnvelope> was = ALScriptEnvelope::parse(content);
     if (was && item_asset.notNull())
@@ -1915,8 +1912,10 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
                     },
                     true);
             });
-        text         = prepared->text;
-        preprocessed = prepared->errors;
+        text               = prepared->text;
+        preprocessed       = prepared->errors;
+        prepared_map       = prepared->map;
+        prepared_code_line = prepared->codeLine;
     }
 
     // Through the workspace, which every save goes through: it refuses what
@@ -1927,6 +1926,11 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     options.compileTarget = compile_target;
     options.running       = is_running;
     options.sender        = ALScriptSender(ALScriptOrigin::Bridge);
+    if (prepared_map)
+    {
+        options.sourceMap = prepared_map;
+        options.codeLine  = prepared_code_line;
+    }
     auto        answer    = std::make_shared<ALScriptCompileResult>();
     std::string refused;
     const LLSD  landed = await_async_result(
@@ -1952,79 +1956,34 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     if (!answer->error.empty())
         throw LLJSONRPCConnection::InternalError("Upload failed: " + answer->error);
 
-    LLSD cb_result;
-    cb_result["compiled"]     = answer->success;
-    cb_result["new_asset_id"] = answer->newAssetId;
-    for (const std::string& message : answer->messages)
-    {
-        cb_result["errors"].append(message);
-    }
-
+    // What the compiler said, as places in the text the client sent: where
+    // that went up expanded, through the expansion's map to the source,
+    // which stands in the client's text from its second line where the
+    // client sent an envelope of its own. Only where it did not compile,
+    // as the protocol has it.
     LLSD response;
     response["success"]  = true;
     response["prim_id"]  = prim_id;
     response["item_id"]  = item_id;
-    response["compiled"] = cb_result["compiled"];
-    if (!cb_result["compiled"].asBoolean() && cb_result.has("errors"))
+    response["compiled"] = answer->success;
+    const S32 source_line = was ? 1 : 0;
+    const bool is_lua     = compile_target == "luau" || compile_target == "lsl-luau";
+    if (!answer->success)
     {
         response["diagnostics"] = LLSD::emptyArray();
-
-        const bool is_lua =
-            compile_target == "luau" ||
-            compile_target == "lsl-luau";
-
-        for (const auto& error : llsd::inArray(cb_result["errors"]))
+        for (const ALScriptDiagnostic& said : answer->inSource(source_line))
         {
-            // The match views the text, so the text is kept for as long.
-            const std::string text = error.asString();
-            ALRegexMatch match;
-            LLSD diagnostic;
-            diagnostic["level"] = "ERROR";
-            S32 line_number = 0;
-            S32 col_number = 0;
-
-            if (is_lua &&
-                LUAU_LOCATION_PATTERN.match(text, &match) &&
-                LLStringUtil::convertToS32(match.str(2), line_number))
-            {
-                diagnostic["row"] = line_number;
-                diagnostic["column"] = 0;
-                diagnostic["message"] = match.str(3);
-            }
-            else if (!is_lua &&
-                     LSL_LOCATION_PATTERN.match(text, &match) &&
-                     LLStringUtil::convertToS32(match.str(1), line_number) &&
-                     LLStringUtil::convertToS32(match.str(2), col_number) &&
-                     line_number < S32_MAX &&
-                     col_number < S32_MAX)
-            {
-                diagnostic["row"] = line_number + 1;
-                diagnostic["column"] = col_number + 1;
-                diagnostic["level"] = match.str(3);
-                diagnostic["message"] = match.str(4);
-                diagnostic["format"] = "lsl";
-            }
-            else
-            {
-                diagnostic["row"] = 0;
-                diagnostic["column"] = 0;
-                diagnostic["message"] = text;
-            }
-
-            response["diagnostics"].append(diagnostic);
+            response["diagnostics"].append(diagnosticEntry(said, is_lua));
         }
     }
 
-    // What the preprocessor found, which the script went up with; and a
-    // compiled half that went up as it was edited.
-    for (const ALScriptDiagnostic& found : preprocessed)
+    // What the preprocessor found, which the script went up with, at the
+    // source's lines; and a compiled half that went up as it was edited.
+    for (ALScriptDiagnostic found : preprocessed)
     {
-        LLSD diagnostic;
-        diagnostic["level"]   = found.level;
-        diagnostic["row"]     = found.line + 1;
-        diagnostic["column"]  = found.hasColumn ? found.column + 1 : 0;
-        diagnostic["message"] = found.message;
-        response["diagnostics"].append(diagnostic);
+        found.line += source_line;
+        found.hasColumn = found.hasColumn && source_line == 0;
+        response["diagnostics"].append(diagnosticEntry(found, is_lua));
     }
     if (as_is)
     {
@@ -2455,20 +2414,26 @@ LLSD LLScriptEditorWSServer::compiledMessage(const std::string& script_id, bool 
     params["diagnostics"] = LLSD::emptyArray();
     for (const ALScriptDiagnostic& diagnostic : diagnostics)
     {
-        // The protocol counts from one, and says zero for a place the
-        // compiler did not name.
-        LLSD entry;
-        entry["row"]     = diagnostic.line + 1;
-        entry["column"]  = diagnostic.hasColumn ? diagnostic.column + 1 : 0;
-        entry["level"]   = diagnostic.level.empty() ? std::string("ERROR") : diagnostic.level;
-        entry["message"] = diagnostic.message;
-        if (!lua)
-        {
-            entry["format"] = "lsl";
-        }
-        params["diagnostics"].append(entry);
+        params["diagnostics"].append(diagnosticEntry(diagnostic, lua));
     }
     return params;
+}
+
+// static
+LLSD LLScriptEditorWSServer::diagnosticEntry(const ALScriptDiagnostic& diagnostic, bool lua)
+{
+    // The protocol counts from one, and says zero for a place the
+    // compiler did not name.
+    LLSD entry;
+    entry["row"]     = diagnostic.hasLine ? diagnostic.line + 1 : 0;
+    entry["column"]  = diagnostic.hasLine && diagnostic.hasColumn ? diagnostic.column + 1 : 0;
+    entry["level"]   = diagnostic.level.empty() ? std::string("ERROR") : diagnostic.level;
+    entry["message"] = diagnostic.message;
+    if (!lua)
+    {
+        entry["format"] = "lsl";
+    }
+    return entry;
 }
 
 namespace
@@ -2480,13 +2445,23 @@ namespace
     }
 }
 
+bool LLScriptEditorWSServer::holds(const ALScriptRef& ref) const
+{
+    if (mSubscriptions.find(buildScriptSubscriptionId(ref.object, ref.item)) != mSubscriptions.end())
+    {
+        return true;
+    }
+    LLViewerObject* prim = ref.inInventory() ? nullptr : gObjectList.findObject(ref.object);
+    const LLViewerObject* root = prim && prim->getRootEdit() ? prim->getRootEdit() : prim;
+    return root && isObjectPublished(root->getID());
+}
+
 void LLScriptEditorWSServer::sendCompiled(const ALScriptCompileResult& result)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    // Nothing compiled: a notecard, or an upload that failed. Nor one this
-    // bridge sent, which its client is answered about as the save's reply.
-    if (result.kind == ALScriptKind::Notecard || !result.error.empty() || result.ref.item.isNull() ||
-        result.sender.origin == ALScriptOrigin::Bridge)
+    // Nothing compiled: a notecard. Nor one this bridge sent, which its
+    // client is answered about as the save's reply.
+    if (result.kind == ALScriptKind::Notecard || result.ref.item.isNull() || result.sender.origin == ALScriptOrigin::Bridge)
     {
         return;
     }
@@ -2507,7 +2482,21 @@ void LLScriptEditorWSServer::sendCompiled(const ALScriptCompileResult& result)
     const LLInventoryItem* item = result.ref.inInventory() ? gInventory.getItem(result.ref.item) : prim ? prim->getInventoryItem(result.ref.item) : nullptr;
     const bool             lua  = subscribed != mSubscriptions.end() ? subscribed->second.mLua : isLuaItem(item);
 
-    LLSD message = compiledMessage(script_id, result.success, result.running, result.diagnostics, lua);
+    // Of the source, which is what the client has: a save from the studio
+    // went up in its envelope, expanded. An upload that failed compiled
+    // nothing, and says why at no line.
+    std::vector<ALScriptDiagnostic> said = result.inSource();
+    if (!result.error.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[REASON]"] = result.error;
+        ALScriptDiagnostic failed;
+        failed.hasLine = false;
+        failed.level   = "ERROR";
+        failed.message = LLTrans::getString("BridgeNotSaved", args);
+        said           = { failed };
+    }
+    LLSD message = compiledMessage(script_id, result.success && result.error.empty(), result.running, said, lua);
     if (prim)
     {
         message["object_id"] = root_id;

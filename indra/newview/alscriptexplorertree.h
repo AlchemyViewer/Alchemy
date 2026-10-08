@@ -87,6 +87,9 @@ public:
         std::string icon;
         // Drawn over the icon: a mark beside what the row is, such as a pin.
         std::string overlay;
+        // Said as the pointer rests on the row, in place of its name alone:
+        // what a mark after the name means. Empty for the name.
+        std::string tip;
     };
 
     // Built by the skin (class="script_studio_explorer_tree").
@@ -96,6 +99,9 @@ public:
     void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override { return false; }
     bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    // A row's own tip, where its look gives one; else the folder view's,
+    // which is the row's name.
+    bool handleToolTip(S32 x, S32 y, MASK mask) override;
     // The menu a right click on the row chosen would open, or on the space
     // below the rows where none is: Shift-F10 and the Menu key's.
     void showMenuAtChoice();

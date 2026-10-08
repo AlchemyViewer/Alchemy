@@ -102,7 +102,7 @@
     <floater.string name="LintLuauComparisonPrecedence">not a == b, and similar comparisons</floater.string>
     <floater.string name="LintLuauRedundantNativeAttribute">A redundant @native attribute</floater.string>
     <floater.string name="LintLuauSlCompoundAssign">x = x + 1, where Luau has x += 1 (the studio's own)</floater.string>
-    <floater.string name="LintLuauSlNumberTruth">A number read as true or false, which Luau counts true even at 0 (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlNumberTruth">A number, string, uuid, vector, quaternion or list read as true or false, which SLua counts true even at 0, empty, zero or NULL_KEY (the studio's own)</floater.string>
     <floater.string name="LintLuauSlNilSentinel">A find compared with -1 where it answers nil, or llcompat's with nil where it answers -1 (the studio's own)</floater.string>
     <floater.string name="LintLuauSlTableCompare">A table compared with one built there, {}, which it can never equal (the studio's own)</floater.string>
     <floater.string name="LintLuauSlZeroIndex">A list, a string or ll counted from 0, as LSL counted (the studio's own)</floater.string>
@@ -1053,9 +1053,31 @@ end</floater.string>
              layout="topleft"
              left="412"
              name="preproc_line_comments"
-             tool_tip="Writes an @line comment wherever the preprocessed code moves to another file or skips lines, with the line and the file's name, as the VS Code plugin does. Never a folder path. Compressed or optimized LSL drops them"
+             tool_tip="Writes an @line comment wherever the preprocessed code moves to another file or skips lines, with the line and the file, as the VS Code plugin does. A file on disk is named by its path from the script's folder, never from the root of the disk. Compressed or optimized LSL drops them"
              top_pad="4"
              width="370" />
+            <check_box
+             control_name="ALScriptUploadHeader"
+             follows="left|top"
+             height="20"
+             label="Say in what is saved when, and what it hashes to"
+             layout="topleft"
+             left="412"
+             name="preproc_upload_header"
+             tool_tip="A script saved preprocessed carries a few comment lines at the top of its compiled half: when it was saved, and a hash of its source and what that expanded to. A script saved as written carries none"
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptUploadHeaderCreator"
+             follows="left|top"
+             height="20"
+             label="And who saved it"
+             layout="topleft"
+             left="432"
+             name="preproc_upload_creator"
+             tool_tip="The header also names you, as the one who saved the script"
+             top_pad="4"
+             width="350" />
             <check_box
              control_name="ALScriptPreprocOptimizer"
              follows="left|top"

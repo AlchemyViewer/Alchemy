@@ -27,6 +27,7 @@
 
 #include "alpreprocessor.h"
 
+#include "allinelabel.h"
 #include "almessagemap.h"
 
 #include "alscriptfixes.h"
@@ -4961,10 +4962,21 @@ namespace
     // last comment would put it, one saying where it is. A line that
     // begins inside a long comment or string, or with what no file made,
     // is not one a comment can go before, and what comes of no file leaves
-    // the reader nowhere, so that the next line of a file is said.
-    Tokens withLineComments(const Tokens& in, const ALSourceMap& map, bool lua)
+    // the reader nowhere, so that the next line of a file is said. Each
+    // file called what Options::lineLabel calls it, where that is set, and
+    // by its name where not.
+    Tokens withLineComments(const Tokens& in, const ALSourceMap& map, const ALPreprocessor::Options& options)
     {
-        Tokens out;
+        const bool               lua = options.lua;
+        std::vector<std::string> labels;
+        labels.reserve(map.files().size());
+        for (size_t i = 0; i < map.files().size(); ++i)
+        {
+            const ALSourceMap::File& f = map.files()[i];
+            labels.push_back(literalOf(options.lineLabel ? ALLineLabel::quotable(options.lineLabel(f, i == 0)) : f.name));
+        }
+        const std::string none = literalOf(std::string_view());
+        Tokens            out;
         out.reserve(in.size() + 64);
         S32    file  = 0;
         S32    line  = 0;
@@ -4981,14 +4993,14 @@ namespace
                 }
                 else if (t.file != file || t.line != line)
                 {
-                    const std::string& name = t.file < S32(map.files().size()) ? map.files()[t.file].name : std::string();
+                    const std::string& label = t.file < S32(labels.size()) ? labels[t.file] : none;
                     Token              site;
                     site.verbatim = false;
                     site.file     = -1;
                     // Ahead of the line's indent, all there is of it yet.
                     Tokens indent(std::make_move_iterator(out.begin() + start), std::make_move_iterator(out.end()));
                     out.resize(start);
-                    out.push_back(synth(Kind::Comment, std::string(lua ? "--" : "//") + " @line " + std::to_string(t.line + 1) + " " + literalOf(name), site));
+                    out.push_back(synth(Kind::Comment, std::string(lua ? "--" : "//") + " @line " + std::to_string(t.line + 1) + " " + label, site));
                     out.push_back(synth(Kind::Newline, "\n", site));
                     append(out, std::move(indent));
                     file = t.file;
@@ -5332,7 +5344,7 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
     }
     if (options.lineComments)
     {
-        tokens = withLineComments(tokens, result.map, options.lua);
+        tokens = withLineComments(tokens, result.map, options);
     }
     assemble(tokens, result, options.lua);
     if (result.overran)

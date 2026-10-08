@@ -59,25 +59,31 @@ namespace ALScriptMessages
         LLStringUtil::stripNonprintable(line);
         Place        place;
         ALRegexMatch found;
-        if (lua && LUAU_LOCATION.match(line, &found))
+        // Each compiler's form, the language's first: an LSL script the grid
+        // compiles for Luau's VM may be answered in either.
+        for (const bool luau : { lua, !lua })
         {
-            place.line    = llmax(0, std::atoi(found.str(2).c_str()) - 1);
-            place.level   = "ERROR";
-            place.message = found.str(3);
+            if (luau && LUAU_LOCATION.match(line, &found))
+            {
+                place.line    = llmax(0, std::atoi(found.str(2).c_str()) - 1);
+                place.hasLine = true;
+                place.level   = "ERROR";
+                place.message = found.str(3);
+                return place;
+            }
+            if (!luau && LSL_LOCATION.search(line, &found))
+            {
+                place.line      = std::atoi(found.str(1).c_str());
+                place.column    = std::atoi(found.str(2).c_str());
+                place.hasColumn = true;
+                place.hasLine   = true;
+                place.level     = found.str(3);
+                place.message   = found.str(4);
+                return place;
+            }
         }
-        else if (!lua && LSL_LOCATION.search(line, &found))
-        {
-            place.line      = std::atoi(found.str(1).c_str());
-            place.column    = std::atoi(found.str(2).c_str());
-            place.hasColumn = true;
-            place.level     = found.str(3);
-            place.message   = found.str(4);
-        }
-        else
-        {
-            place.level   = "ERROR";
-            place.message = line;
-        }
+        place.level   = "ERROR";
+        place.message = line;
         return place;
     }
 

@@ -41,11 +41,11 @@
 // or lacks the function, so that what the script does stays what it did.
 //
 // Where the two languages mean different things and the text cannot say the
-// same -- integer division rounding down, a jump SLua has no goto for,
-// LSL's lists compared by their lengths -- the place is noted rather than
-// guessed: a `-- LSL:` comment over the line, and a note of the same words
-// at the LSL's place. Where SLua has a way of its own -- LLTimers, the
-// detected table, indexing -- the note says so too.
+// same -- a key of no text, which SLua makes NULL_KEY, a jump SLua has no
+// goto for, LSL's lists compared by their lengths -- the place is noted
+// rather than guessed: a `-- LSL:` comment over the line, and a note of the
+// same words at the LSL's place. Where SLua has a way of its own --
+// LLTimers, the detected table, indexing -- the note says so too.
 class ALLSLToSLua
 {
 public:
@@ -74,10 +74,12 @@ public:
         bool detectedTable = true;
         // SLua's ll rather than llcompat where it means the same: a boolean
         // answer, a constant index moved on by one, a find's answer read
-        // against nil.
+        // against nil, and the script's time, where it resets it, read
+        // from a clock of its own.
         bool sluaCalls = true;
         // What SLua has in a call's stead where it means the same: math,
-        // vector and quaternion's functions, ^, print, os.time, table.find.
+        // vector and quaternion's functions, ^, print, os.time, table.find,
+        // and the tables ll's particle, media and HTTP calls take for rules.
         bool idioms = true;
         // Luau types on locals, parameters and what functions return, from
         // LSL's types.

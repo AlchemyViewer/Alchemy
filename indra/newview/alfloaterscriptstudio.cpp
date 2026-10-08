@@ -49,6 +49,7 @@
 #include "alnotecarditems.h"
 #include "alrecovery.h"
 #include "alscriptinventoryindex.h"
+#include "alscriptlinkbadges.h"
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptregionusage.h"
@@ -76,6 +77,7 @@
 #include "altextsearch.h"
 #include "alvimkeymap.h"
 #include "llagent.h"
+#include "llagentui.h"
 #include "llappviewer.h"
 #include "lldate.h"
 #include "lltimer.h"
@@ -672,6 +674,8 @@ bool ALFloaterScriptStudio::postBuild()
     listenToSettings();
     listenToWorld();
     openAsLeft();
+    // What files on disk sent while no window was there to say it.
+    mMasters.sayUnheard();
     return true;
 }
 
@@ -770,6 +774,9 @@ void ALFloaterScriptStudio::findPanes()
     mWeightsStrings = mWeightsPane->stringsList();
     mInspectorPane = getChild<ALScriptInspectorPane>("inspector_pane");
     mExplorerPane  = getChild<ALScriptExplorerPane>("explorer_pane");
+    // Out of the way until the Explorer asks for it.
+    mLinkPane      = getChild<ALScriptLinkPane>("link_tab");
+    mBottomTabs->setTabVisibility(mLinkPane, false);
     mCompileTarget = getChild<LLComboBox>("compile_target");
     mRunning       = getChild<LLCheckBoxCtrl>("running");
     mExperience    = getChild<LLComboBox>("experience");
@@ -881,10 +888,16 @@ void ALFloaterScriptStudio::listenToWorkspace()
     mRunningConnection = ALScriptWorkspace::instance().onRunningState([this](const ALScriptRunningState& state) { runningState(state); });
     mCompiledConnection =
         ALScriptWorkspace::instance().onCompiled([this](const ALScriptCompileResult& result) { mSaving.compiled(result); });
-    mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptSaved& saved) { mSaving.savedElsewhere(saved); });
+    mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptSaved& saved) {
+        mSaving.savedElsewhere(saved);
+        mMasters.saved(saved);
+    });
     // What the region said an object reserves: the Weights tab says it
     // again, with what came.
     mRegionUsageConnection = ALScriptWorkspace::instance().regionUsage().onHeard([this]() { mWeighing.stale(); });
+    // A file's tab says how many scripts it is the master of, which links
+    // made and let go of change.
+    mLinkBadgesConnection = ALScriptLinkBadges::instance().onChanged([this]() { fillTabs(); });
     // New definitions from the region: the analyzers reload, the words
     // are rebuilt, and every script is checked again.
     mDefinitionsConnection = LLSyntaxDefCache::instance().addSyntaxIDCallback([this]() {
@@ -1445,7 +1458,87 @@ ALScriptStudioSaving::Options ALFloaterScriptStudio::saveOptions() const
     options.holdOnErrors = hold;
     options.compress     = gSavedSettings.getBOOL("ALScriptPreprocCompress");
     options.program      = LLVersionInfo::instance().getChannelAndVersion();
+    options.header       = uploadHeader();
     return options;
+}
+
+void ALFloaterScriptStudio::pickMasterFile(std::function<void(const std::string& path)> chosen)
+{
+    pickFilesToOpen(false, [chosen](const std::vector<std::string>& files) {
+        if (!files.empty())
+        {
+            chosen(files.front());
+        }
+    });
+}
+
+void ALFloaterScriptStudio::openMasterFile(const std::string& path, bool lua)
+{
+    openFile(path, lua, -1, -1, 0);
+}
+
+void ALFloaterScriptStudio::closeTab(Doc& doc)
+{
+    letGoOf(doc);
+}
+
+void ALFloaterScriptStudio::askLinkUnsaved(const Doc& doc, const std::string& path, std::function<void(ALScriptStudioMasters::Unsaved answer)> answered)
+{
+    typedef ALScriptStudioMasters::Unsaved Unsaved;
+    LLSD question;
+    question["NAME"]                 = doc.name;
+    question["FILE"]                 = path;
+    const LLHandle<LLFloater> handle = getHandle();
+    LLNotificationsUtil::add("ScriptStudioLinkUnsaved", question, LLSD(), [handle, answered](const LLSD& notification, const LLSD& response) {
+        if (!handle.get())
+        {
+            return;
+        }
+        switch (LLNotificationsUtil::getSelectedOption(notification, response))
+        {
+            case 0: answered(Unsaved::Write); break;
+            case 1: answered(Unsaved::Discard); break;
+            default: answered(Unsaved::Cancel); break;
+        }
+    });
+}
+
+void ALFloaterScriptStudio::editMasterFile(const std::string& path, bool lua)
+{
+    // Its tab, here or in the window that has it, given to the editor from
+    // there, as Edit Externally on it is.
+    openFile(path, lua, -1, -1, 0);
+    if (ALFloaterScriptStudio* holder = holderOf(ALScriptRef(), path))
+    {
+        if (const size_t index = holder->indexOf("disk:" + path); index != NONE)
+        {
+            holder->mExternal.edit(*holder->mDocs[index]);
+        }
+    }
+}
+
+bool ALFloaterScriptStudio::heldByBridge(const ALScriptRef& ref)
+{
+    LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer();
+    return server && server->holds(ref);
+}
+
+void ALFloaterScriptStudio::loadWorldText(const ALScriptRef& ref, std::function<void(const ALScriptLoaded& loaded)> loaded)
+{
+    ALScriptWorkspace::instance().load(ref, std::move(loaded));
+}
+
+ALScriptStudioDoc::Header ALFloaterScriptStudio::uploadHeader() const
+{
+    static LLCachedControl<bool> header(gSavedSettings, "ALScriptUploadHeader", false);
+    static LLCachedControl<bool> creator(gSavedSettings, "ALScriptUploadHeaderCreator", false);
+    ALScriptStudioDoc::Header said;
+    said.on = header;
+    if (said.on && creator)
+    {
+        LLAgentUI::buildFullname(said.creator);
+    }
+    return said;
 }
 
 void ALFloaterScriptStudio::tidy(Doc& doc, bool fix, bool format_it, bool trim)
@@ -2112,6 +2205,12 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
         renameDoc(*mDocs[already], name);
         return;
     }
+    // A script whose master is a file on disk is changed through the file:
+    // its tab opened in the script's place.
+    if (!carried && mMasters.openMaster(ref, name))
+    {
+        return;
+    }
     const bool preview = mNavigation.openingPreview();
     if (preview)
     {
@@ -2221,6 +2320,9 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
         {
             refreshNotice();
         }
+        // A tab kept as its script was linked, made clean again by an undo,
+        // or typed in again.
+        mMasters.textChanged(*raw);
     });
     // Typing stopped short, a notecard being full: said why. The editor
     // goes with the tab, and the connection with it.
@@ -2424,6 +2526,8 @@ void ALFloaterScriptStudio::loaded(const ALScriptLoaded& answer)
             doc.save.letAllPast(doc.editor->document().version());
             mSaving.save(doc);
         }
+        // A file the script names as its own, offered.
+        mMasters.loaded(doc);
     }
     fillTabs();
     if (index == mActive)
@@ -2663,7 +2767,8 @@ void ALFloaterScriptStudio::showExpanded(Doc& doc, const std::string& text)
     // of the envelope a save sends it in, which a runtime error's line
     // counts too; from one where it goes up plain.
     const bool plain = doc.uploaded.valid && doc.uploaded.disabled;
-    doc.expandedEditor->setLineNumberBase(plain ? 0 : doc.envelopeFor(text, saveOptions().program).codeLine());
+    const ALScriptStudioSaving::Options options = saveOptions();
+    doc.expandedEditor->setLineNumberBase(plain ? 0 : doc.envelopeFor(text, options.program, options.header).codeLine());
     // A comparison with the source that waited on this.
     mExpandedCompare.expanded(doc);
     if (&doc != active())
@@ -3547,6 +3652,13 @@ ALTabStrip::Tab ALFloaterScriptStudio::tabOf(const Doc& doc, const TabFacts& fac
     {
         tab.toolTip += "\n" + mTabTips.readOnly;
     }
+    // A file that is the master of scripts in the world says so after its
+    // name, quietly, and how many in its tip.
+    if (facts.masters > 0)
+    {
+        tab.detail = counted("TabMastersDetail", facts.masters);
+        tab.toolTip += "\n" + counted("TabMastersTip", facts.masters);
+    }
     return tab;
 }
 
@@ -3559,6 +3671,7 @@ ALFloaterScriptStudio::TabFacts ALFloaterScriptStudio::tabFactsOf(const Doc& doc
     facts.preview  = doc.preview;
     facts.readOnly = doc.loaded && !doc.modifiable;
     facts.image    = ALScriptStudioWords::imageNameOf(doc);
+    facts.masters  = doc.file.empty() ? 0 : ALScriptLinkBadges::instance().masteredBy(doc.file);
     problemCounts(doc, facts.errors, facts.warnings);
     return facts;
 }
@@ -4813,8 +4926,9 @@ void ALFloaterScriptStudio::askReload(const Doc& doc, std::function<void(bool re
     });
 }
 
-void ALFloaterScriptStudio::fileWritten(const std::string& path)
+void ALFloaterScriptStudio::fileWritten(Doc& doc)
 {
+    const std::string& path = doc.file;
     for (bool lua : { false, true })
     {
         if (path == ALScriptSnippets::path(lua))
@@ -4826,6 +4940,12 @@ void ALFloaterScriptStudio::fileWritten(const std::string& path)
     {
         ALScriptStudioVimrc::instance().check(true);
     }
+    // The scripts it is the master of sent, and those that include it sent
+    // again: a write of the studio's own, which the masters' watch takes
+    // for no save from outside. A file read back in from disk -- changed
+    // outside, or reverted -- is settled and not written: what it masters is
+    // the watch's to send.
+    mMasters.fileSaved(doc);
 }
 
 void ALFloaterScriptStudio::becomeFile(Doc& doc, const std::string& path)
@@ -5694,6 +5814,7 @@ void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)
                      : name == "references_tab" ? static_cast<LLUICtrl*>(mReferencesPane->list())
                      : name == "output_tab"     ? static_cast<LLUICtrl*>(mOutputPane->view())
                      : name == "weights_tab"    ? static_cast<LLUICtrl*>(mWeightsParts)
+                     : name == "link_tab"       ? static_cast<LLUICtrl*>(mLinkPane->list())
                                                 : nullptr;
     if (list)
     {
@@ -6058,6 +6179,22 @@ void ALFloaterScriptStudio::objectChecked(const ALScriptObjectCheck::Done& done)
         said = sentences(said, counted("LookupUnread", static_cast<S32>(done.unread.size()), { { "[NAMES]", listed(done.unread) } }));
     }
     report(said, mCheckedErrors > 0 || done.unlisted > 0 || !done.unread.empty());
+}
+
+void ALFloaterScriptStudio::linkScripts(std::vector<ALScriptLinkScripts::Prim> prims)
+{
+    mBottomTabs->setTabVisibility(mLinkPane, true);
+    showBottom("link_tab", true);
+    mLinkPane->gather(std::move(prims));
+}
+
+void ALFloaterScriptStudio::linkPaneDone(bool linked)
+{
+    mBottomTabs->setTabVisibility(mLinkPane, false);
+    if (linked)
+    {
+        showBottom("output_tab");
+    }
 }
 
 void ALFloaterScriptStudio::recompileScripts(std::vector<ALScriptRecompile::One> scripts, std::vector<std::pair<LLUUID, std::string>> prims,
@@ -7800,6 +7937,10 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
         // As View > Show Comparison brings it back.
         showView(doc, Doc::View::Compare, true);
     }
+    else if (action.rfind("master_", 0) == 0)
+    {
+        mMasters.offer(doc, action);
+    }
 }
 
 void ALFloaterScriptStudio::outputShowDoc(Doc& doc, bool problems)
@@ -8593,7 +8734,8 @@ void ALFloaterScriptStudio::addFileCommands()
     mCommands.add(
         "external_editor",
         [this]() {
-            if (Doc* doc = active())
+            // A linked script's file, where it is, in place of a copy.
+            if (Doc* doc = active(); doc && !mMasters.editMaster(*doc))
             {
                 mExternal.edit(*doc);
             }
@@ -8602,6 +8744,34 @@ void ALFloaterScriptStudio::addFileCommands()
             Doc* doc = active();
             return doc && doc->loaded && doc->modifiable && !doc->notecard;
         });
+    // A script's master on disk: linked to a file, sent from it, let go of.
+    mCommands.add(
+        "link_file",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                mMasters.linkToFile(*doc);
+            }
+        },
+        [this]() { return mMasters.canLink(active()); });
+    mCommands.add(
+        "send_file",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                mMasters.sendFromFile(*doc);
+            }
+        },
+        [this]() { return mMasters.mastersAny(active()); });
+    mCommands.add(
+        "unlink_file",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                mMasters.unlink(*doc);
+            }
+        },
+        [this]() { return mMasters.mastersAny(active()); });
     mCommands.add("preferences", []() { LLFloaterReg::showInstance("script_studio_prefs"); });
     // The region asked for its language definitions again, whatever is
     // kept of them: for a script checked against functions the region has
@@ -10050,7 +10220,8 @@ void ALFloaterScriptStudio::writeSharedState(LLSD& state) const
     {
         mSearchPane->saveState(state);
     }
-    if (mBottomTabs && mBottomTabs->getCurrentPanel())
+    // Not the Link tab, which is hidden again as the window opens.
+    if (mBottomTabs && mBottomTabs->getCurrentPanel() && mBottomTabs->getCurrentPanel() != mLinkPane)
     {
         state["bottom_tab"] = mBottomTabs->getCurrentPanel()->getName();
     }

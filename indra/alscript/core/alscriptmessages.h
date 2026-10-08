@@ -45,6 +45,8 @@ namespace ALScriptMessages
         S32         line      = 0;
         S32         column    = 0;
         bool        hasColumn = false;
+        // A line named at all: not by what matched neither compiler's form.
+        bool        hasLine   = false;
         // The compiler's own word: ERROR or WARNING.
         std::string level;
         std::string message;
@@ -53,7 +55,7 @@ namespace ALScriptMessages
     // One line of what a compiler said. Luau names the chunk and a
     // one-based line; LSL gives a zero-based line and column in
     // brackets with its level between colons; anything else is an error
-    // with no place.
+    // with no place. The language's form is tried first, then the other's.
     Place readDiagnostic(const std::string& line, bool lua);
     // Every line of them.
     std::vector<Place> readDiagnostics(const LLSD& errors, bool lua);

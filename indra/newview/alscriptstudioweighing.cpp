@@ -462,7 +462,8 @@ void ALScriptStudioWeighing::measureAsset(Doc& doc)
         // modules: what a save sends.
         const std::string& sent = doc.expanded.bundle ? *doc.expanded.bundle : *doc.expanded.text;
         doc.weighing->assetBytes = ALScriptEnvelope::wrappedSize(doc.language.lua, text, sent, doc.language.compileTarget,
-                                                                mWindow.programVersion(), LLDate::now().asString());
+                                                                mWindow.programVersion(), LLDate::now().asString(),
+                                                                doc.headerFor(sent, mWindow.uploadHeader()));
     }
 }
 

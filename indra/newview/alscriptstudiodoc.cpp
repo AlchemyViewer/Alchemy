@@ -35,12 +35,14 @@
 #include "alscriptlookup.h"
 #include "alscriptstudiocaret.h"
 #include "alscriptstudiochecking.h"
+#include "alscriptstudiomasters.h"
 #include "alscriptstudiocomparepairs.h"
 #include "alscriptstudioorphans.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudioweighing.h"
+#include "aluploadheader.h"
 #include "lldate.h"
 #include "llfocusmgr.h"
 
@@ -234,7 +236,58 @@ void ALScriptStudioDoc::placeHeldRuntime()
     }
 }
 
-ALScriptEnvelope ALScriptStudioDoc::envelopeFor(const std::string& expanded_text, const std::string& program) const
+// static
+std::vector<ALScriptStudioDoc::Compiled> ALScriptStudioDoc::compiledOf(const std::vector<ALScriptDiagnostic>& said, const ALSourceMap* map,
+                                                                       S32 under)
+{
+    std::vector<Compiled> out;
+    for (const ALScriptDiagnostic& each : said)
+    {
+        Compiled one;
+        one.line      = each.line;
+        one.column    = each.column;
+        one.hasColumn = each.hasColumn;
+        one.level     = each.level;
+        one.message   = each.message;
+        if (map)
+        {
+            const ALSourceMap::Loc loc = map->toSource(each.line - under, each.column);
+            if (loc.found())
+            {
+                one.line   = loc.line;
+                one.column = loc.column;
+                if (loc.file > 0)
+                {
+                    one.file = map->files()[loc.file].path;
+                }
+            }
+            else
+            {
+                // In code the preprocessor made, at the expansion's line.
+                one.line = llmax(0, each.line - under);
+                one.file = GENERATED;
+            }
+        }
+        out.push_back(std::move(one));
+    }
+    return out;
+}
+
+std::string ALScriptStudioDoc::headerFor(const std::string& expanded_text, const Header& header) const
+{
+    if (!header.on)
+    {
+        return std::string();
+    }
+    // No @file: that is a link's, and a tab has none.
+    ALUploadHeader said;
+    said.hash    = ALUploadHeader::hashOf(language.compileTarget, editor ? editor->text() : std::string(), expanded_text);
+    said.date    = ALUploadHeader::dateOf(LLDate::now());
+    said.creator = header.creator;
+    return said.write(language.lua);
+}
+
+ALScriptEnvelope ALScriptStudioDoc::envelopeFor(const std::string& expanded_text, const std::string& program, const Header& header) const
 {
     // Every field its own: the last envelope's texts are not copied in only
     // to be written over.
@@ -245,6 +298,7 @@ ALScriptEnvelope ALScriptStudioDoc::envelopeFor(const std::string& expanded_text
     out.compileTarget    = language.compileTarget;
     out.programVersion   = program;
     out.lastCompiled     = LLDate::now().asString();
+    out.header           = headerFor(expanded_text, header);
     return out;
 }
 

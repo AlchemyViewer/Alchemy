@@ -26,6 +26,7 @@
 
 #include "alscripttypes.h"
 
+#include "alsourcemap.h"
 #include "llmd5.h"
 #include "llsd.h"
 
@@ -55,4 +56,35 @@ ALScriptRef ALScriptRef::fromKey(const LLSD& key)
         return ALScriptRef(key["taskid"].asUUID(), key["itemid"].asUUID());
     }
     return ALScriptRef(LLUUID::null, key.asUUID());
+}
+
+std::vector<ALScriptDiagnostic> ALScriptCompileResult::inSource(S32 source_line) const
+{
+    std::vector<ALScriptDiagnostic> out = diagnostics;
+    for (ALScriptDiagnostic& said : out)
+    {
+        if (!said.hasLine || !sourceMap)
+        {
+            continue;
+        }
+        if (const ALSourceMap::Loc loc = sourceMap->toSource(said.line - codeLine, said.hasColumn ? said.column : 0); loc.file == 0)
+        {
+            said.line   = loc.line;
+            said.column = loc.column;
+        }
+        else
+        {
+            if (loc.found())
+            {
+                const ALSourceMap::File& file = sourceMap->files()[loc.file];
+                said.message = (file.path.empty() ? file.name : file.path) + ":" + std::to_string(loc.line + 1) + ": " + said.message;
+            }
+            said.hasLine   = false;
+            said.hasColumn = false;
+            continue;
+        }
+        said.line += source_line;
+        said.hasColumn = said.hasColumn && source_line == 0;
+    }
+    return out;
 }

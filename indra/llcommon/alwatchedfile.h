@@ -74,8 +74,16 @@ class LL_COMMON_API ALWatchedFile
 public:
     typedef std::function<void(const std::string& path)> changed_t;
 
-    // Watched from as it is now: what is there already is seen.
+    // Watched from as it is now: what is there already is seen. The look
+    // that finds it is made here, on this thread.
     ALWatchedFile(std::string path, changed_t changed);
+    // Watched from as a look already made found it, on whatever thread it
+    // was made: what that look found is seen, and nothing is asked of the
+    // disk here. What changed since that look is heard at the next ones, as
+    // any change is, so that whoever makes many watches at once -- a
+    // session's links, at login -- looks at them all on a thread of its own
+    // first, and makes the watches on this one from what it found.
+    ALWatchedFile(std::string path, const ALFileStamp& seen, changed_t changed);
     virtual ~ALWatchedFile();
     ALWatchedFile(const ALWatchedFile&)            = delete;
     ALWatchedFile& operator=(const ALWatchedFile&) = delete;
@@ -90,8 +98,10 @@ public:
     bool check();
     // What is there now taken as seen: a write of the owner's own.
     void seen();
-    // Whether the file was there at the last look, or as last seen.
-    bool there() const { return mLooked.exists; }
+    // Whether the file was there at the last look, or as last seen; and
+    // what that look found.
+    bool               there() const { return mLooked.exists; }
+    const ALFileStamp& stamp() const { return mLooked; }
 
 private:
     class Watcher;

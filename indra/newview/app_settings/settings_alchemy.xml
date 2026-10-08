@@ -357,7 +357,73 @@
         <key>ALScriptPreprocLineComments</key>
         <map>
             <key>Comment</key>
-            <string>The preprocessor writes an @line comment wherever its text moves to another file or skips lines, saying the line and the file's name, as Linden Lab's VS Code plugin does.</string>
+            <string>The preprocessor writes an @line comment wherever its text moves to another file or skips lines, saying the line and the file -- one on disk by its path from the script's folder, never from the root -- as Linden Lab's VS Code plugin does.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptMastersAskOver</key>
+        <map>
+            <key>Comment</key>
+            <string>A save of a file on disk that scripts in the world include sends those scripts again. Where more than this many would change, or they are in more than one object, Script Studio asks first.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>8</integer>
+        </map>
+        <key>ALScriptMastersEnabled</key>
+        <map>
+            <key>Comment</key>
+            <string>Files on disk linked as the masters of scripts in the world, and the files they include, are watched while you are logged in, and a save made outside Script Studio sends the scripts. A save in Script Studio sends them either way.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptMastersQuiet</key>
+        <map>
+            <key>Comment</key>
+            <string>Seconds that files linked to scripts in the world must go unchanged, after a save made outside Script Studio, before the scripts are sent: a checkout of many files sends each script once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>ALScriptMastersSkipUnchanged</key>
+        <map>
+            <key>Comment</key>
+            <string>A send Script Studio makes of its own from a file on disk -- an include's users, Send from Files -- is skipped where what would go up is what the script already holds. A save of the file itself always goes up.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptUploadHeader</key>
+        <map>
+            <key>Comment</key>
+            <string>A script saved preprocessed carries a header at the top of its compiled half, after the target line: what the save hashes to (XXH128 of the target, the source and the expansion) and when. A script saved as written carries none.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptUploadHeaderCreator</key>
+        <map>
+            <key>Comment</key>
+            <string>The upload header (ALScriptUploadHeader) also names who saved the script.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -4608,7 +4674,7 @@
             <key>Type</key>
             <string>S32</string>
             <key>Value</key>
-            <integer>600</integer>
+            <integer>0</integer>
         </map>
         <key>FindLandSort</key>
         <map>

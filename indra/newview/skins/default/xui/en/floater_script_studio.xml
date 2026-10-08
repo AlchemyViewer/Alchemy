@@ -637,6 +637,143 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="RecompileUnsaved">[NAME] has unsaved changes; the recompile uses the version saved on the server, without them.</floater.string>
     <floater.string name="SavedByEditor">another editor</floater.string>
     <floater.string name="SavedByQueue">a recompile</floater.string>
+    <floater.string name="SavedByFile">its file on disk</floater.string>
+    <floater.string name="SavedByStudio">Script Studio</floater.string>
+    <floater.string name="MasterNotSLuaFile">[FILE] is not an SLua file, and [NAME] is SLua.</floater.string>
+    <floater.string name="MasterNotLSLFile">[FILE] is not an LSL file, and [NAME] is LSL.</floater.string>
+    <floater.string name="MasterNotNotecardFile">[FILE] is not a notecard's file: a notecard is linked to a .txt, .notecard or .json file.</floater.string>
+    <floater.string name="MasterNotecardCarries">[NAME] carries items, which a file on disk cannot hold, so it cannot be linked to one.</floater.string>
+    <floater.string name="MasterLinked">[NAME] is linked to [FILE]: from now on it is changed through the file, and saving the file sends it.</floater.string>
+    <floater.string name="MasterLinkedBridge">VS Code holds [NAME] too: whichever saves it last is what it holds.</floater.string>
+    <floater.string name="MasterLinkDiffers">[FILE] is not what [NAME] holds now: the next save of the file sends it, and keeps what [NAME] had in History.</floater.string>
+    <floater.string name="MasterUnlinked">[NAME] is no longer linked to [FILE].</floater.string>
+    <floater.string name="MasterSaveFileFirst">Save [NAME] before sending it: what goes up is the file on disk.</floater.string>
+    <floater.string name="MasterSendingA">Sending [NAME] to its script.</floater.string>
+    <floater.string name="MasterSendingB">Sending [NAME] to its [COUNT] scripts.</floater.string>
+    <floater.string name="MasterOpened">[NAME] is linked to [FILE]: its file opened in its place.</floater.string>
+    <floater.string name="MasterHinted">[NAME] names [FILE] as its file.</floater.string>
+    <floater.string name="MasterHintUnsaved">Save or revert [NAME] before linking it to [FILE], the file it names: what was typed here is in neither the script nor the file.</floater.string>
+    <floater.string name="MasterSent">Saved [NAME] from [FILE].</floater.string>
+    <floater.string name="MasterNotCompiled">[NAME] went up from [FILE], and did not compile.</floater.string>
+    <floater.string name="MasterKeptTheirs">What it held in-world, which was not the file, is in History.</floater.string>
+    <floater.string name="MasterSendFailed">[FILE] was not sent to [NAME]: [WHY].</floater.string>
+    <floater.string name="MasterSkipped">[NAME] already holds [FILE].</floater.string>
+    <floater.string name="MasterHeld">[NAME] was changed in-world since [FILE] was last sent to it, so it was not sent.</floater.string>
+    <floater.string name="MasterDiffering">[NAME] was changed in-world by [WHO]: it no longer holds [FILE].</floater.string>
+    <floater.string name="MasterSuspended">[NAME]'s link to [FILE] is held: [WHY].</floater.string>
+    <floater.string name="MasterOrphaned">[NAME] is gone from where it was; its link to [FILE] is kept a while, should it come back.</floater.string>
+    <floater.string name="MasterPending">[FILE] was not sent to [NAME]: [WHY]. It waits to be sent by hand.</floater.string>
+    <floater.string name="MasterRelinked">[NAME] is linked to [FILE] again.</floater.string>
+    <floater.string name="MasterNotWritten">[FILE] could not be written, so [NAME] is not linked to it; what was typed is still here.</floater.string>
+    <floater.string name="MasterGaveWay">[NAME] is linked to [FILE] now: its tab gave way to the file's, where it is changed from here on.</floater.string>
+    <floater.string name="MasterLinkedUnsaved">[NAME] is linked to [FILE] now, and what was typed here is not in the file: copy it into the file to keep it, or Unlink to save it from here.</floater.string>
+    <floater.string name="MasterLinkedClean">[NAME] is linked to [FILE] now, and nothing unsaved is left here: switch to the file to change it there, or Unlink to save it from here.</floater.string>
+    <floater.string name="MasterEditedOutside">[NAME] is linked to [FILE]: the file is opened in the external editor in its place.</floater.string>
+    <floater.string name="MasterNotRead">[FILE] could not be read to compare with [NAME].</floater.string>
+    <floater.string name="LinkHeadListing">Asking what [OBJECTS] holds...</floater.string>
+    <floater.string name="LinkHeadReading">Reading the scripts of [OBJECTS]: [DONE] of [COUNT]...</floater.string>
+    <floater.string name="LinkHeadMatchingA">Looking on disk for the file of 1 script...</floater.string>
+    <floater.string name="LinkHeadMatchingB">Looking on disk for the files of [COUNT] scripts...</floater.string>
+    <floater.string name="LinkHeadNone">No script of [OBJECTS] is left to link</floater.string>
+    <floater.string name="LinkHeadFoundA">1 script of [OBJECTS]</floater.string>
+    <floater.string name="LinkHeadFoundB">[COUNT] scripts of [OBJECTS]</floater.string>
+    <floater.string name="LinkHeadAlreadyA">1 linked already</floater.string>
+    <floater.string name="LinkHeadAlreadyB">[COUNT] linked already</floater.string>
+    <floater.string name="LinkHeadUnreadA">1 you cannot read</floater.string>
+    <floater.string name="LinkHeadUnreadB">[COUNT] you cannot read</floater.string>
+    <floater.string name="LinkHeadUnlistedA">1 prim did not say what it holds</floater.string>
+    <floater.string name="LinkHeadUnlistedB">[COUNT] prims did not say what they hold</floater.string>
+    <floater.string name="LinkHeadChecking">checking which differ in-world</floater.string>
+    <floater.string name="LinkFileNone">None found: choose a file</floater.string>
+    <floater.string name="LinkFileChooseA">Choose the file...</floater.string>
+    <floater.string name="LinkFileChooseB">Choose one of [COUNT] files...</floater.string>
+    <floater.string name="LinkHowHint">its @file</floater.string>
+    <floater.string name="LinkHowNamed">named by the script</floater.string>
+    <floater.string name="LinkHowRecord">an earlier link</floater.string>
+    <floater.string name="LinkHowOwnRecord">its own link</floater.string>
+    <floater.string name="LinkHowName">its name</floater.string>
+    <floater.string name="LinkHowPicked">picked</floater.string>
+    <floater.string name="LinkWorldAsking">checking...</floater.string>
+    <floater.string name="LinkWorldSame">same</floater.string>
+    <floater.string name="LinkWorldDiffers">differs</floater.string>
+    <floater.string name="LinkWorldUnknown">can't tell</floater.string>
+    <floater.string name="LinkTipHint">It names [HINT] as its file.</floater.string>
+    <floater.string name="LinkTipHintWhy">It names [HINT] as its file, which is not used: [WHY].</floater.string>
+    <floater.string name="LinkTipNamed">The script names this file, which is not called [NAME]: be sure it is the file you mean before you link it.</floater.string>
+    <floater.string name="LinkTipRecord">A script called [NAME] was linked to this file before it was taken; this may be it, rezzed again.</floater.string>
+    <floater.string name="LinkTipOwnRecord">[NAME] was linked to this file, and its link was held as gone though the script is still here: linking it puts the link back.</floater.string>
+    <floater.string name="LinkTipChoicesA">1 file could be its: choose it.</floater.string>
+    <floater.string name="LinkTipChoicesB">[COUNT] files could be its: choose one.</floater.string>
+    <floater.string name="LinkTipRecordsA">1 earlier link could be its: choose it.</floater.string>
+    <floater.string name="LinkTipRecordsB">[COUNT] earlier links of scripts called [NAME] had different files: choose one.</floater.string>
+    <floater.string name="LinkTipUnknown">Whether it is what the script holds in-world can't be told: its text in-world could not be read.</floater.string>
+    <floater.string name="LinkTipUnknownWhy">Whether it is what the script holds in-world can't be told: [WHY].</floater.string>
+    <floater.string name="LinkTipNotOwned">Not your object, so it is not ticked: tick it to link it.</floater.string>
+    <floater.string name="LinkTipMissed">[FILE] does not expand cleanly -- an include not found, say -- so it is not sent from here; saving the file sends it all the same.</floater.string>
+    <floater.string name="LinkChooseTitle">The file for [NAME]</floater.string>
+    <floater.string name="LinkChoosePlaceholder">Type to find a file</floater.string>
+    <floater.string name="LinkChoosePick">Another file...</floater.string>
+    <floater.string name="LinkChoosePickDetail">Pick any file on disk</floater.string>
+    <floater.string name="LinkedOne">[NAME] to [FILE]</floater.string>
+    <floater.string name="LinkedScriptsA">Linked [LIST].</floater.string>
+    <floater.string name="LinkedScriptsB">Linked [COUNT] scripts to their files: [LIST].</floater.string>
+    <floater.string name="LinkedSendingA">Sending the 1 that differs.</floater.string>
+    <floater.string name="LinkedSendingB">Sending the [COUNT] that differ.</floater.string>
+    <floater.string name="LinkedUnexpandedA">1 that differs was not sent, as its file does not expand cleanly: saving the file sends it.</floater.string>
+    <floater.string name="LinkedUnexpandedB">[COUNT] that differ were not sent, as their files do not expand cleanly: saving each file sends it.</floater.string>
+    <floater.string name="ExplorerSendingFromFilesA">Sending 1 script from its file.</floater.string>
+    <floater.string name="ExplorerSendingFromFilesB">Sending [COUNT] scripts from their files.</floater.string>
+    <floater.string name="ExplorerSendUnsavedA">1 was not sent: its file has unsaved changes in a tab.</floater.string>
+    <floater.string name="ExplorerSendUnsavedB">[COUNT] were not sent: their files have unsaved changes in tabs.</floater.string>
+    <floater.string name="LinkBadgeLinked">linked</floater.string>
+    <floater.string name="LinkBadgeLinkedTip">Linked to [FILE]: saving the file sends it.</floater.string>
+    <floater.string name="LinkBadgeUnsent">file not sent</floater.string>
+    <floater.string name="LinkBadgeUnsentTip">Linked to [FILE], which has not been sent to it yet: Send from Files sends it.</floater.string>
+    <floater.string name="LinkBadgeNewer">file changed</floater.string>
+    <floater.string name="LinkBadgeNewerTip">Linked to [FILE], which has changed since it was last sent: Send from Files sends it.</floater.string>
+    <floater.string name="LinkBadgePending">send waiting</floater.string>
+    <floater.string name="LinkBadgePendingTip">Linked to [FILE]; the last send did not go, and waits for Send from Files.</floater.string>
+    <floater.string name="LinkBadgeDiffering">changed in-world</floater.string>
+    <floater.string name="LinkBadgeDifferingTip">Linked to [FILE], and changed in-world since it was last sent: a Send from Files is held; saving the file sends it, keeping what it had in History.</floater.string>
+    <floater.string name="LinkBadgeSuspended">file missing</floater.string>
+    <floater.string name="LinkBadgeSuspendedTip">Linked to [FILE], which is not there: nothing is sent until it is found again.</floater.string>
+    <floater.string name="TabMastersDetailA">linked</floater.string>
+    <floater.string name="TabMastersDetailB">linked to [COUNT]</floater.string>
+    <floater.string name="TabMastersTipA">The master of 1 script in-world: saving it sends it.</floater.string>
+    <floater.string name="TabMastersTipB">The master of [COUNT] scripts in-world: saving it sends them.</floater.string>
+    <floater.string name="CompareMasterFile">File</floater.string>
+    <floater.string name="CompareMasterWorld">[NAME] in-world</floater.string>
+    <floater.string name="CompareMasterOnDisk">[FILE] on disk</floater.string>
+    <floater.string name="NoticeMasterLink">Link</floater.string>
+    <floater.string name="NoticeMasterLinkTip">Link this script to the file it names: from then on it is changed through the file</floater.string>
+    <floater.string name="NoticeMasterSend">Send File</floater.string>
+    <floater.string name="NoticeMasterSendTip">Send the file on disk to the script now, keeping what the script holds in History</floater.string>
+    <floater.string name="NoticeMasterUnlink">Unlink</floater.string>
+    <floater.string name="NoticeMasterUnlinkTip">Let the script go from this file; neither is changed</floater.string>
+    <floater.string name="NoticeMasterGiveWay">Switch to File</floater.string>
+    <floater.string name="NoticeMasterGiveWayTip">Close this tab and open the file's in its place, where the script is changed from now on</floater.string>
+    <floater.string name="NoticeMasterCompareFile">Compare with File</floater.string>
+    <floater.string name="NoticeMasterCompareFileTip">Show the file on disk beside what was typed here, with changes marked</floater.string>
+    <floater.string name="NoticeMasterOpenFile">Open File</floater.string>
+    <floater.string name="NoticeMasterOpenFileTip">Open the file in a tab of its own, keeping this one, to copy what was typed here into it</floater.string>
+    <floater.string name="NoticeMasterFind">Find File...</floater.string>
+    <floater.string name="NoticeMasterFindTip">Pick where the file is now, keeping the link</floater.string>
+    <floater.string name="ActionMasterLink">Link</floater.string>
+    <floater.string name="ActionMasterLinkTip">Link [NAME] to the file it names</floater.string>
+    <floater.string name="ActionMasterSend">Send file</floater.string>
+    <floater.string name="ActionMasterSendTip">Send the file on disk to the script now</floater.string>
+    <floater.string name="ActionMasterCompare">Compare</floater.string>
+    <floater.string name="ActionMasterCompareTip">Compare [NAME] with what the script holds in-world</floater.string>
+    <floater.string name="ActionMasterGiveWay">Switch to file</floater.string>
+    <floater.string name="ActionMasterGiveWayTip">Close [NAME]'s tab and open its file's in its place</floater.string>
+    <floater.string name="ActionMasterCompareFile">Compare with file</floater.string>
+    <floater.string name="ActionMasterCompareFileTip">Compare what was typed in [NAME] with its file on disk</floater.string>
+    <floater.string name="ActionMasterOpenFile">Open file</floater.string>
+    <floater.string name="ActionMasterOpenFileTip">Open the file [NAME] is linked to, keeping its tab</floater.string>
+    <floater.string name="ActionMasterUnlink">Unlink</floater.string>
+    <floater.string name="ActionMasterUnlinkTip">Let the script go from [NAME]</floater.string>
+    <floater.string name="ActionMasterFind">Find file</floater.string>
+    <floater.string name="ActionMasterFindTip">Pick where the file is now, keeping the link</floater.string>
     <floater.string name="CompareSavedThere">Saved elsewhere</floater.string>
     <floater.string name="SaveAskingWorld">Checking whether [NAME] was saved elsewhere...</floater.string>
     <floater.string name="SaveWorldMoved">[NAME] was saved elsewhere (by a co-owner or in another viewer) after you opened it here. Saving would replace that version.</floater.string>
@@ -884,6 +1021,18 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
             <menu_item_call label="Edit in External Editor" layout="topleft" name="external_editor">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="external_editor" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="external_editor" />
+            </menu_item_call>
+            <menu_item_call label="Link to File on Disk..." layout="topleft" name="link_file">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="link_file" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="link_file" />
+            </menu_item_call>
+            <menu_item_call label="Send File to Its Scripts" layout="topleft" name="send_file">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="send_file" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="send_file" />
+            </menu_item_call>
+            <menu_item_call label="Unlink File from Its Scripts" layout="topleft" name="unlink_file">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="unlink_file" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unlink_file" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Move to New Window" layout="topleft" name="pop_out">
@@ -2739,6 +2888,15 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                                 </layout_panel>
                             </layout_stack>
                         </panel>
+                        <panel
+                         class="script_studio_link"
+                         filename="panel_script_studio_link.xml"
+                         follows="all"
+                         height="168"
+                         label="Link to Files"
+                         layout="topleft"
+                         name="link_tab"
+                         width="574" />
                     </tab_container>
                 </layout_panel>
             </layout_stack>

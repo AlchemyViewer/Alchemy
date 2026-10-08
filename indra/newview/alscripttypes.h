@@ -134,7 +134,9 @@ enum class ALScriptOrigin : U8
     Bridge,
     Editor,
     Queue,
-    Recompile
+    Recompile,
+    // A file on disk that is the master of the script (ALScriptDiskMasters).
+    Disk
 };
 struct ALScriptSender
 {
@@ -152,6 +154,9 @@ struct ALScriptDiagnostic
     std::string message;
     // The server gave a column: LSL's compiler does, Luau's does not.
     bool        hasColumn = false;
+    // It names a line at all: a line the compiler said nothing of the
+    // place of does not, nor an include that never came.
+    bool        hasLine = true;
 };
 
 struct ALScriptCompileResult
@@ -175,12 +180,22 @@ struct ALScriptCompileResult
     // Task scripts: the experience it was sent to run under -- the
     // null one for none -- which it runs under now.
     std::optional<LLUUID> experience;
-    // A recompile's, where it went up expanded: the expansion's map,
-    // which the diagnostics are of once the envelope's lines above the
-    // code -- `codeLine` of them -- are taken off. Nothing on a save's:
-    // its sender has the expansion.
+    // Where it went up expanded, as its sender said (ALScriptSaveOptions):
+    // the expansion's map, which the diagnostics are of once the
+    // envelope's lines above the code -- `codeLine` of them -- are taken
+    // off.
     std::shared_ptr<const ALSourceMap> sourceMap;
     S32                                codeLine = 0;
+
+    // The diagnostics as places in the script's source, which stands from
+    // `source_line` on in the text they are for: nought where that text is
+    // the source, one where it is the envelope itself, whose source begins
+    // on its second line -- and whose escaping moves the columns, which
+    // are then dropped. Through the map where there is one; all as said
+    // where there is none, the text having gone up as it was. A place in an
+    // include, or in what the preprocessor made, is none in the source: it
+    // names no line, and an include's name and line go before its message.
+    std::vector<ALScriptDiagnostic> inSource(S32 source_line = 0) const;
 };
 typedef std::function<void(const ALScriptCompileResult&)> ALScriptCompileCallback;
 
@@ -197,6 +212,12 @@ struct ALScriptSaveOptions
     std::optional<bool>   running;
     std::optional<LLUUID> experience;
     ALScriptSender        sender;
+    // Where the text is an expansion in its envelope: the expansion's map,
+    // and the line its code begins on, which the result carries to
+    // everyone who hears of it, so that each can read the compiler's lines
+    // back to the source.
+    std::shared_ptr<const ALSourceMap> sourceMap;
+    S32                                codeLine = 0;
 };
 
 // Something's text saved, whoever sent it: the text as it went up, its

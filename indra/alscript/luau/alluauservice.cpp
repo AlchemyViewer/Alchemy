@@ -45,6 +45,7 @@
 
 #include "Luau/AstQuery.h"
 #include "Luau/BuiltinDefinitions.h"
+#include "Luau/LSLBuiltins.h"
 #include "Luau/Cancellation.h"
 #include "Luau/Error.h"
 #include "Luau/Frontend.h"
@@ -61,6 +62,7 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
+#include <algorithm>
 #include <limits>
 #include <mutex>
 #include <set>
@@ -71,6 +73,56 @@ namespace
     // way, and secondlife.docs.json keys its entries "@sl-slua/global/...",
     // so the two line up when hover documentation arrives.
     const char* const DEFINITIONS_PACKAGE = "@sl-slua";
+
+    // The constants the grid's VM sets that the definitions leave out. The
+    // VM makes a global of every constant in builtins.txt but TRUE and
+    // FALSE, which SLua says as true and false (luaSL_set_constant_globals,
+    // over the table setUpProcess loads); lsl-definitions writes into
+    // secondlife.d.luau none of those it marks private, such as
+    // PRIM_MATERIAL_DENSITY and REZ_TORQUE. A script may use them, and the
+    // converter writes them as LSL has them, so they are declared beside the
+    // definitions, by the type the VM gives each -- and each only where the
+    // definitions do not declare it already, so that a region's definitions
+    // that come to declare one are believed over the table.
+    const char* undocumentedType(Luau::SLConstantType type)
+    {
+        switch (type)
+        {
+            case Luau::SLConstantType::Integer:
+            case Luau::SLConstantType::Float: return "number";
+            case Luau::SLConstantType::String: return "string";
+            case Luau::SLConstantType::Key: return "uuid";
+            case Luau::SLConstantType::Vector: return "vector";
+            case Luau::SLConstantType::Quaternion: return "quaternion";
+            default: return nullptr;
+        }
+    }
+
+    // Those the definitions just loaded into these globals do not declare,
+    // declared there under a package of their own, by name so that the
+    // text is the same each time; false where they did not load, which only
+    // a type the definitions lack could cause.
+    bool declareUndocumented(Luau::Frontend& frontend, Luau::GlobalTypes& globals, bool for_autocomplete)
+    {
+        std::vector<std::pair<std::string_view, const char*>> missing;
+        for (const auto& [name, constant] : Luau::luauSL_constants())
+        {
+            const char* type = undocumentedType(constant.type);
+            if (type && !Luau::tryGetGlobalBinding(globals, name))
+            {
+                missing.emplace_back(name, type);
+            }
+        }
+        std::sort(missing.begin(), missing.end());
+        std::string declared;
+        for (const auto& [name, type] : missing)
+        {
+            declared += "declare " + std::string(name) + ": " + type + "\n";
+        }
+        return declared.empty() ||
+               frontend.loadDefinitionFile(globals, globals.globalScope, declared, ALLuauFrontend::UNDOCUMENTED_PACKAGE,
+                                           /*captureComments*/ false, for_autocomplete).success;
+    }
 
     // What Luau's require says of a module that returns other than one
     // value, as the run stops there: said where it is required.
@@ -910,6 +962,9 @@ void ALLuauService::setUpProcess()
         // integer type and library among them, which the grid's
         // definitions name.
         Luau::setRequiredSLuaFlags();
+        // The LSL constants the grid's compiler folds, as its own harness
+        // loads them: SLua's embedded builtins, of the same commit.
+        luauSL_init_global_builtins(nullptr);
         // A type in a message is a glance, not a listing: `ll` has
         // hundreds of fields, and an error naming it must not print them
         // all.
@@ -957,6 +1012,12 @@ bool ALLuauService::loadDefinitions(std::string_view source, std::string& error)
     if (!for_autocomplete.success)
     {
         error = "the definitions did not load for autocomplete";
+        return false;
+    }
+    if (!declareUndocumented(*frontend, frontend->globals, false) ||
+        !declareUndocumented(*frontend, frontend->globalsForAutocomplete, true))
+    {
+        error = "the constants the definitions leave out did not load";
         return false;
     }
     Luau::freeze(frontend->globals.globalTypes);
@@ -1952,6 +2013,53 @@ namespace
         return parent ? fieldSymbolOf(*parent, std::string(index->index.value)) : std::nullopt;
     }
 
+    // Whether the strings a call writes out fit a form's parameters, where
+    // a parameter takes only certain strings: LLEvents:on's event's name,
+    // which says whether its handler is given the detected table. What is
+    // no string written out fits whatever it is given to.
+    bool stringsFit(const Luau::FunctionType& function, const Luau::AstExprCall* call)
+    {
+        const auto [arg_types, tail] = Luau::flatten(function.argTypes);
+        const size_t skip            = call->self && !arg_types.empty() ? 1 : 0;
+        for (size_t i = 0; i < call->args.size && i + skip < arg_types.size(); ++i)
+        {
+            const auto* text = call->args.data[i]->as<Luau::AstExprConstantString>();
+            if (!text)
+            {
+                continue;
+            }
+            const std::string_view    value(text->value.data, text->value.size);
+            const Luau::TypeId        wanted = Luau::follow(arg_types[i + skip]);
+            std::vector<Luau::TypeId> options;
+            if (const Luau::UnionType* any = Luau::get<Luau::UnionType>(wanted))
+            {
+                options.assign(any->options.begin(), any->options.end());
+            }
+            else
+            {
+                options.push_back(wanted);
+            }
+            bool only_strings = true;
+            bool among        = false;
+            for (Luau::TypeId option : options)
+            {
+                const Luau::SingletonType*   single = Luau::get<Luau::SingletonType>(Luau::follow(option));
+                const Luau::StringSingleton* string = single ? Luau::get<Luau::StringSingleton>(single) : nullptr;
+                if (!string)
+                {
+                    only_strings = false;
+                    break;
+                }
+                among = among || string->value == value;
+            }
+            if (only_strings && !among)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     // What `call` takes, `at` in its brackets, read from `module`'s types:
     // the whole script's, or a fragment's, whose source is none.
     ALScriptSignature signatureOf(const ALLuauFrontend& front, const Luau::Module& module, const Luau::AstExprCall* call,
@@ -2035,17 +2143,22 @@ namespace
             }
             return more || out.parameters.size() >= call->args.size;
         };
-        S32 fits = -1;
+        // The first form that takes as many arguments and whose strings the
+        // call's written out fit; else the first that takes as many.
+        S32 fits    = -1;
+        S32 counted = -1;
         for (const Luau::FunctionType* form : forms)
         {
             ALScriptSignature::Overload one;
-            if (describe(*form, one) && fits < 0)
+            if (describe(*form, one))
             {
-                fits = static_cast<S32>(answer.overloads.size());
+                const S32 here = static_cast<S32>(answer.overloads.size());
+                counted        = counted < 0 ? here : counted;
+                fits           = fits < 0 && stringsFit(*form, call) ? here : fits;
             }
             answer.overloads.push_back(std::move(one));
         }
-        answer.overload   = llmax(0, fits);
+        answer.overload   = llmax(0, fits >= 0 ? fits : counted);
         answer.label      = answer.overloads[static_cast<size_t>(answer.overload)].label;
         answer.parameters = answer.overloads[static_cast<size_t>(answer.overload)].parameters;
         if (answer.overloads.size() < 2)

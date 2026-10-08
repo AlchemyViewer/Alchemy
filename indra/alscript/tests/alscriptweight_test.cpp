@@ -1071,4 +1071,22 @@ namespace tut
         ensure_equals("all the script's: kept", bundled.inSource(mapped(0)).sharedStarts.size(), size_t(1));
         ensure_equals("two a module's: nothing", bundled.inSource(mapped(3)).sharedStarts.size(), size_t(0));
     }
+
+    // LSL's constants are folded as the grid's compiler folds them: a
+    // constant read is its value in the bytecode, as if written out, and
+    // not a global looked up by its name.
+    template<> template<>
+    void alscriptweight_object::test<19>()
+    {
+        const ALScriptWeight named   = ALScriptWeigh::slua("local x = PRIM_SIZE\nprint(x)\n");
+        const ALScriptWeight written = ALScriptWeigh::slua("local x = 7\nprint(x)\n");
+        ensure("both compiled", named.compiled && written.compiled);
+        ensure_equals("the same as its value written out", named.total, written.total);
+        bool looked_up = false;
+        for (const ALScriptWeight::String& one : named.strings)
+        {
+            looked_up = looked_up || one.text == "PRIM_SIZE";
+        }
+        ensure("not its name among the strings", !looked_up);
+    }
 }

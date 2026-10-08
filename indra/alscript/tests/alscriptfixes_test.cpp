@@ -1281,4 +1281,73 @@ namespace tut
 
         ensure("a module named by an expression: nothing to name", removal("local name = 'util'\nlocal util = require(name)\n") == nullptr);
     }
+
+    template<> template<>
+    void object::test<44>()
+    {
+        set_test_name("a deprecated call whose replacement takes other arguments is written as a call that works -- ll.VecDist's "
+                      "vector.magnitude(a - b), ll.Round's half up, ll.SetPrimitiveParams' link, table.getn's # -- an argument "
+                      "bracketed where it does not bind as one; none where the event's table is wanted, the call does not close "
+                      "on its line or is not made; vector.normalize not preferred; LSL's llParticleSystem not put for llMakeFire");
+        ensure("definitions: " + error, luauLoaded);
+        // The fixture's statics named by its class: MSVC finds none of them
+        // from a lambda, even one holding `this`.
+        const auto deprecated = [this](const std::string& script) -> const ALScriptProblem* {
+            static ALScriptProblems problems;
+            problems = check(script, true);
+            for (const ALScriptProblem& problem : problems)
+            {
+                if (problem.key.rfind("LuauLintDeprecated", 0) == 0)
+                {
+                    return &problem;
+                }
+            }
+            ensure("said: " + alscriptfixes_data::said(problems), false);
+            return nullptr;
+        };
+        const auto written = [&](const std::string& script) {
+            const ALScriptProblem* problem = deprecated(script);
+            ensure("a fix: " + script, !problem->fixes.empty());
+            const ALScriptFix& fix = problem->fixes.front();
+            ensure("preferred, not safe: " + fix.title, fix.preferred && !fix.safe);
+            const std::string made = ALScriptFixes::apply(script, fix).value_or("(not made)");
+            const ALScriptProblems after = check(made, true);
+            for (const ALScriptProblem& each : after)
+            {
+                ensure("no longer deprecated:\n" + made, each.key.rfind("LuauLintDeprecated", 0) != 0);
+            }
+            ensure_equals("no errors:\n" + made + "\n" + alscriptfixes_data::said(after), alscriptfixes_data::errors(after), static_cast<size_t>(0));
+            return fix.title + "\n" + made;
+        };
+        const std::string vectors = "local a, b = vector(1, 0, 0), vector(0, 1, 0)\n";
+        ensure_equals("a distance", written(vectors + "print(ll.VecDist(a, ll.GetPos()))\n"),
+                      "Write it vector.magnitude(a - ll.GetPos())\n" + vectors + "print(vector.magnitude(a - ll.GetPos()))\n");
+        ensure_equals("bracketed", written(vectors + "print(ll.VecDist(a + b, b))\n"),
+                      "Write it vector.magnitude((a + b) - b)\n" + vectors + "print(vector.magnitude((a + b) - b))\n");
+        ensure_equals("half up", written("local n = 2\nprint(ll.Round(n * 0.25))\n"),
+                      std::string("Write it math.floor((n * 0.25) + 0.5)\nlocal n = 2\nprint(math.floor((n * 0.25) + 0.5))\n"));
+        ensure_equals("a link first", written("ll.SetPrimitiveParams({PRIM_SIZE, vector(1, 1, 1)})\n"),
+                      std::string("Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_SIZE, vector(1, 1, 1)})\n"
+                                  "ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_SIZE, vector(1, 1, 1)})\n"));
+        ensure_equals("a length", written("local t = {1, 2}\nprint(table.getn(t))\n"),
+                      std::string("Write it #t\nlocal t = {1, 2}\nprint(#t)\n"));
+        ensure_equals("a name", written("print(ll.Abs(-1))\n"), std::string("Use 'math.abs' instead of 'll.Abs'\nprint(math.abs(-1))\n"));
+
+        const ALScriptProblem* norm = deprecated("print(ll.VecNorm(vector(0, 0, 0)))\n");
+        ensure("normalize offered: " + alscriptfixes_data::said({ *norm }), !norm->fixes.empty() && norm->fixes.front().title == "Use 'vector.normalize' instead of 'll.VecNorm'");
+        ensure("not preferred, NaN at zero", !norm->fixes.front().preferred);
+        for (const char* script : { "LLEvents:on(\"touch_start\", function(detected) print(ll.DetectedKey(0)) end)\n",
+                                    "local a = vector(1, 0, 0)\nprint(ll.VecDist(a,\n    a))\n", "local f = ll.VecDist\nprint(f)\n",
+                                    "print(ll.GetListEntryType({1}, 0))\n" })
+        {
+            const ALScriptProblem* problem = deprecated(script);
+            ensure("no fix: " + std::string(script) + alscriptfixes_data::said({ *problem }), problem->fixes.empty());
+        }
+
+        ensure("builtins: " + error, lslLoaded);
+        const ALScriptProblems lsl = check("default\n{\n    state_entry()\n    {\n        llMakeFire(1, 1.0, 1.0, 1.0, 1.0, \"\", ZERO_VECTOR);\n    }\n}\n", false);
+        const ALScriptProblem* fire = alscriptfixes_data::keyed(lsl, "LSLDeprecatedWithReplacement");
+        ensure("said: " + alscriptfixes_data::said(lsl), fire != nullptr);
+        ensure("no llParticleSystem by name: " + alscriptfixes_data::said(lsl), fire->fixes.empty());
+    }
 }

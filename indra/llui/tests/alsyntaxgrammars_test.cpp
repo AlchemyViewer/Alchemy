@@ -429,4 +429,19 @@ namespace tut
         ensure_equals("the next line a key again", lexed("config", "name = Door", state, words), std::string("property:name|punctuation: =|text: Door"));
         ensure_equals("a line with no key, text", lexed("config", "just words here", state, words), std::string("text:just words here"));
     }
+    template<> template<>
+    void alsyntaxgrammars_object::test<14>()
+    {
+        set_test_name("SLua's integers, written with an i after them, decimal, hexadecimal or binary, are numbers whole, in a "
+                      "template's {} too; a fraction or an exponent takes no i, as Luau's lexer says");
+        ALSyntaxWords words;
+        ALSyntaxState state;
+        ensure_equals("each", lexed("slua", "local n = 5i + 0x1Fi + 0b101i + 1_000i", state, words),
+                      std::string("control:local|text: n |operator:=|text: |number:5i|text: |operator:+|text: |number:0x1Fi|text: "
+                                  "|operator:+|text: |number:0b101i|text: |operator:+|text: |number:1_000i"));
+        ensure_equals("in a template", lexed("slua", "print(`{5i}`)", state, words),
+                      std::string("text:print|punctuation:(|string:`|punctuation:{|number:5i|punctuation:}|string:`|punctuation:)"));
+        ensure_equals("not a fraction's, which Luau calls malformed", lexed("slua", "x = 1.5i", state, words),
+                      std::string("text:x |operator:=|text: |number:1.5|text:i"));
+    }
 }

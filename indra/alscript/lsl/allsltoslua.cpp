@@ -223,8 +223,8 @@ namespace
             "torotation", "touuid", "ipairs", "pairs", "next", "select", "error", "assert", "pcall", "xpcall", "unpack",
             "rawget", "rawset", "rawequal", "rawlen", "setmetatable", "getmetatable", "require", "lljson", "llbase64",
             // What the text written here defines of its own.
-            "states", "currentState", "setState", "joinLists", "lslInteger", "lslFloat", "detected", "setTimer", "timerHandle",
-            "timerHandler",
+            "states", "currentState", "setState", "lslInteger", "lslFloat", "vecNorm", "detected", "setTimer", "timerHandle",
+            "timerHandler", "timeBase", "getAndResetTime",
         };
         return RESERVED.contains(name);
     }
@@ -404,6 +404,10 @@ namespace
         void note(LSLASTNode* at, const char* key, const char* english, std::vector<std::string> args = {});
         // The same, once in the script for its key and words.
         void noteOnce(LSLASTNode* at, const char* key, const char* english, std::vector<std::string> args = {});
+        // Text written out made a key, said where SLua's uuid makes another
+        // key of it than LSL's held: no text, which is NULL_KEY, and a key
+        // with capitals, which it writes small. Whether it said either.
+        bool keyText(LSLExpression* at, std::string_view text);
         // Why a list is shared, as SluaListCopy says it.
         std::string sharedWords(Shared why) const;
 
@@ -437,6 +441,8 @@ namespace
             // A blank line over it in the LSL, which it keeps.
             bool        apart   = false;
             bool        written = false;
+            // A toggle's closer, //*/, which is about the code over it.
+            bool        closer  = false;
         };
         // Each comment in the LSL, given to the node it is written over --
         // a global, a function, a state, a handler, a statement -- or to
@@ -473,6 +479,13 @@ namespace
         // text, a line's break.
         std::string trailing(const std::vector<size_t>& given, bool* takes_line = nullptr);
         void        putTrailing(size_t end, const std::string& after);
+        // A toggle's brackets -- ---[[ over code and --]] under it, and a
+        // block comment ending in a --]] -- are written with a byte the
+        // script has none of between them, where their level goes; nought
+        // where it has every one. Once the text is whole, each pair at the
+        // level nothing between its first opener and its closer closes.
+        char        mToggleMark = 0;
+        std::string leveled(const std::string& text) const;
 
         // Declarations on lines one after another that the LSL lined up --
         // each one line, given a value, and their = at one column, or the
@@ -559,12 +572,22 @@ namespace
         // The arguments, each as its parameter's type -- but those SLua takes
         // either text or a uuid for (`text`, a bit for each by its place),
         // as they are.
-        std::string args(LSLASTNode* list, LSLParamList* params, U16 text = 0);
+        // One may be given written already: its place, and its text.
+        std::string args(LSLASTNode* list, LSLParamList* params, U16 text = 0, int put = -1, const std::string& put_text = {});
         // What SLua has in a library call's stead, where it means the same;
         // nothing where it has nothing.
         std::optional<Expr> idiom(LSLFunctionExpression* e, const std::string& lsl, std::string& called);
+        // A rule list written out for the particle, media and HTTP calls, as
+        // the table SLua's ll takes in its stead, where the table does just
+        // what the list did; nothing elsewhere.
+        std::optional<Expr> ruleTable(LSLFunctionExpression* e, const std::string& lsl, std::string& called);
         // What was detected, from the handler's own table.
         std::optional<Expr> detected(LSLFunctionExpression* e, const std::string& lsl);
+        // LSL's script time where the script resets it: read from the
+        // script's own clock (mTimeBase), or from llcompat's alone
+        // (mCompatTime); nothing for any other call, or where the script
+        // resets nothing and ll.GetTime is LSL's llGetTime.
+        std::optional<Expr> scriptTime(const std::string& lsl, std::string& called);
         // A call to a function answering an index or -1, which ll answers
         // from one or nil, read against nil where it is only asked whether
         // it found: `found` says whether the test is of finding.
@@ -631,8 +654,13 @@ namespace
         bool steadyWhole(LSLExpression* e, int& v) const;
         // Whether an expression reads the same on every turn of a loop:
         // nothing it reads is set in the loop, and it calls only what the
-        // definitions call pure.
-        bool steadyIn(LSLExpression* e, LSLASTNode* loop) const;
+        // definitions call pure. Where kept is given, what the loop sets of
+        // it is known to change nothing the expression reads of it.
+        bool steadyIn(LSLExpression* e, LSLASTNode* loop, LSLSymbol* kept = nullptr) const;
+        // i < llGetListLength(l), where all the loop does to l is put one
+        // item in place of another at i: below the length, i is always one
+        // of its places, so the length is the same on every turn.
+        bool lengthKept(const Counting& c, LSLForStatement* f) const;
         // Before a function's or a handler's body is written: its for
         // loops that Luau's numeric for says exactly, and the variables
         // that only such loops use, whose declarations go.
@@ -695,18 +723,30 @@ namespace
         // to a list, a local list no other holds, or a call to a function of
         // the script's own that only ever returns one of those.
         bool fresh(LSLExpression* e) const;
+        // A list made where it is read: written out, or a library call's,
+        // but not another +'s. What a table function is given with it,
+        // Luau's old solver would hold to the type of its first item, so it
+        // is said to hold any value, as LSL's lists did.
+        bool        madeHere(LSLExpression* e) const;
+        std::string anyItems(LSLExpression* e, const Expr& written) const;
+        // The one item of a list written out, or null where it has more or
+        // fewer; and an item written as the list holds it.
+        LSLASTNode* soleItem(LSLExpression* e) const;
+        std::string itemText(LSLASTNode* item);
         // Why a read of a list hands the list itself on, or null where it
         // does not.
         Shared handedOn(LSLASTNode* read) const;
         // l += x, l += [x, y], l += other, l = l + x and l = x + l written
-        // as table.insert or table.move on l; false where it is none of
+        // as table.insert or table.extend on l; false where it is none of
         // them, l is held elsewhere -- noted, with why -- or what is added
         // could change l.
         bool grow(LSLLValueExpression* target, const std::string& name, LSLOperator op, LSLExpression* rhs);
         // l = llDeleteSubList(l, 0, 0) or (l, -1, -1), l =
-        // llListInsertList(l, [x], 0), on a list no other holds, as
-        // table.remove and table.insert on it: at its front or its back,
-        // which no index can fall past.
+        // llListInsertList(l, [x], 0) or (l, [x], llGetListLength(l)), on a
+        // list no other holds, as table.remove and table.insert on it: at
+        // its front or its back, which no index can fall past. And l =
+        // llListReplaceList(l, [x], i, i) at a counter within the list, as
+        // l[i + 1] = x.
         bool editInPlace(LSLSymbol* var, const std::string& name, LSLExpression* rhs);
 
         // --- strings built in loops -------------------------------------------------
@@ -805,6 +845,11 @@ namespace
         // before anything that could set it.
         void statesPreamble();
         void timersPreamble();
+        // Whether every state has a timer handler that turns the timer off
+        // before it does anything else: what makes the timer a one-shot
+        // each time it is set, wherever the script is when it runs. A state
+        // with none would let LSL's go on running, for the next state's.
+        bool oneShotTimer() const;
         std::string handlerParams(LSLEventHandler* handler, std::vector<std::string>& lead);
         void handlerBody(LSLEventHandler* handler);
         void helpers(std::string& out);
@@ -848,15 +893,28 @@ namespace
         // nought; and declared any whole number, by what it is.
         boost::unordered_flat_set<LSLSymbol*>      mSteadyNonNegative;
         boost::unordered_flat_map<LSLSymbol*, int> mSteadyWhole;
-        bool mJoinLists  = false;
         bool mLslInteger = false;
         bool mLslFloat   = false;
+        bool mVecNorm    = false;
         bool mManyStates = false;
-        // llSetTimerEvent's timer on LLTimers, where the script sets one.
-        bool mTimers = false;
+        // llSetTimerEvent's timer on LLTimers, where the script sets one;
+        // on LLTimers:once, where it is a one-shot (oneShotTimer).
+        bool mTimers  = false;
+        bool mOneShot = false;
+        // Where the script resets its time: a clock of its own, timeBase,
+        // that ll.GetTime is read from and each reset sets again, as SLua's
+        // ll has no ResetTime and llcompat's may not move the clock ll and
+        // LLTimers share; or, where SLua's ll is not asked for, llcompat's
+        // GetTime beside its resets. And the helper llGetAndResetTime is
+        // read through, where one is.
+        bool mTimeBase        = false;
+        bool mCompatTime      = false;
+        bool mGetAndResetTime = false;
         // Inside a handler of an event SLua hands what was detected, where
-        // the detected table is read.
+        // the detected table is read; and inside on_damage's, whose table
+        // alone can adjust the damage.
         bool mInDetected = false;
+        bool mOnDamage   = false;
         // The loops being written, innermost last: a for's steps, which a
         // jump to its end runs before `continue`.
         std::vector<LSLASTNode*> mLoops;
@@ -1110,6 +1168,20 @@ namespace
                 ++at.column;
             }
         };
+        // The byte a toggle's level is marked with: one the script has none
+        // of, so nothing written of it has one either.
+        for (char c = 1; c < ' ' && !mToggleMark; ++c)
+        {
+            if (c != '\t' && c != '\n' && c != '\r' && src.find(c) == std::string_view::npos)
+            {
+                mToggleMark = c;
+            }
+        }
+        const std::string mark = mToggleMark ? std::string(1, mToggleMark) : std::string();
+        // The openers since the last closer, by the comment and what follows
+        // the star; and each opener with the closer it was paired with.
+        std::vector<std::pair<size_t, std::string>> pending;
+        std::vector<std::pair<size_t, size_t>>      pairs;
         for (size_t i = 0; i < src.size();)
         {
             const char c = src[i];
@@ -1138,6 +1210,13 @@ namespace
             Comment k;
             k.at = at;
             size_t end;
+            // //* over code and //*/ under it, which a / taken out of the
+            // first makes a block comment: ---[[ and --]], which a - taken
+            // out of the first makes one. A closer is one whatever is before
+            // it, and so is a block comment that ends in one, the toggle
+            // turned off; an opener is one where something after it closes
+            // it, and a comment that begins with a star where nothing does.
+            bool closes = false;
             if (src[i + 1] == '/')
             {
                 end              = std::min(src.find('\n', i), src.size());
@@ -1152,12 +1231,27 @@ namespace
                     body = " " + body;
                 }
                 k.text = "--" + body;
-                if (body == "*" || body == "*/")
+                if (body.compare(0, 2, "*/") == 0)
                 {
-                    // //* over code and //*/ under it, which a / taken out of
-                    // the first makes a block comment: ---[[ and --]], which a
-                    // - taken out of the first makes one.
-                    k.text = body == "*" ? "---[[" : "--]]";
+                    // What follows it is the LSL's code once the toggle is
+                    // off, and a comment there SLua's.
+                    std::string  rest = body.substr(2);
+                    const size_t own  = rest.find_first_not_of(" \t");
+                    if (own != std::string::npos && rest.compare(own, 2, "//") == 0)
+                    {
+                        const std::string said = rest.substr(own + 2);
+                        rest                   = rest.substr(0, own) + "--" + (!said.empty() && said[0] == '[' ? " " : "") + said;
+                    }
+                    k.text   = "--]" + mark + "]" + rest;
+                    k.closer = true;
+                    closes   = true;
+                }
+                else if (!body.empty() && body[0] == '*' && (body.size() == 1 || (body[1] != '*' && body[1] != '/')) &&
+                         body.find("*/") == std::string::npos)
+                {
+                    // A word after the star or not, but no rule of stars, nor
+                    // a block comment closed on its line once a / is out.
+                    pending.emplace_back(mComments.size(), body.substr(1));
                 }
                 else if (!body.empty() && body[0] == '/')
                 {
@@ -1189,7 +1283,11 @@ namespace
                 {
                     body += " ";
                 }
-                k.text = "--[" + level + "[" + body + (toggled ? "--" : "") + "]" + level + "]";
+                // A toggle's, marked: its level is what nothing from the
+                // first opener over it closes.
+                const std::string bracket = toggled && !mark.empty() ? mark : level;
+                k.text                    = "--[" + bracket + "[" + body + (toggled ? "--" : "") + "]" + bracket + "]";
+                closes                    = toggled;
                 if (body.size() > 1 && body.front() == '*' && body.back() == '*' && body.find('\n') == std::string::npos)
                 {
                     // A rule of stars on its line, a heading in it or not: of
@@ -1208,6 +1306,15 @@ namespace
                 step(src[i++]);
             }
             k.endLine = at.line;
+            if (closes)
+            {
+                for (const auto& [opener, rest] : pending)
+                {
+                    mComments[opener].text = "---[" + mark + "[" + rest;
+                    pairs.emplace_back(opener, mComments.size());
+                }
+                pending.clear();
+            }
             mComments.push_back(std::move(k));
         }
         // Whether a line of the LSL, from one, is blank.
@@ -1259,6 +1366,16 @@ namespace
         {
             --about;
             next = mComments[about].at.line;
+        }
+        // Not from a toggle's opener whose closer is further on: what is
+        // written between the top and the code, the helpers, would be in it.
+        for (const auto& [opener, closer] : pairs)
+        {
+            if (opener < about && closer >= about)
+            {
+                about = opener;
+                break;
+            }
         }
         for (size_t k = 0; k < mComments.size(); ++k)
         {
@@ -1460,7 +1577,15 @@ namespace
             return;
         }
         c.written = true;
-        if (c.apart && !mText.empty() && mText.compare(mText.size() - std::min<size_t>(mText.size(), 2), 2, "\n\n") != 0)
+        const bool blank_over = mText.size() >= 2 && mText.compare(mText.size() - 2, 2, "\n\n") == 0;
+        if (c.closer && !c.apart && blank_over)
+        {
+            // Under the code it closes, over the blank line written after
+            // that, which the LSL did not have.
+            putTrailing(mText.size() - 1, indent() + c.text + "\n");
+            return;
+        }
+        if (c.apart && !mText.empty() && !blank_over)
         {
             mText += "\n";
         }
@@ -1556,12 +1681,13 @@ namespace
             c.written = true;
             after += " " + c.text;
             // A line's comment, which takes the rest of its line: not a long
-            // one, `--[[ ]]` or `--[==[ ]==]`, which closes where it is.
+            // one, `--[[ ]]` or `--[==[ ]==]`, which closes where it is, nor
+            // a toggle's, its level marked.
             size_t level = 2;
             if (level < c.text.size() && c.text[level] == '[')
             {
                 ++level;
-                while (level < c.text.size() && c.text[level] == '=')
+                while (level < c.text.size() && (c.text[level] == '=' || (mToggleMark && c.text[level] == mToggleMark)))
                 {
                     ++level;
                 }
@@ -2045,6 +2171,26 @@ namespace
         return Expr{ "`" + body + "`" };
     }
 
+    bool Writer::keyText(LSLExpression* at, std::string_view text)
+    {
+        if (text.empty())
+        {
+            noteOnce(at, "SluaKeyEmpty",
+                     "SLua's uuid of no text is NULL_KEY: it equals NULL_KEY and reads as NULL_KEY's text, where LSL's key of no text did "
+                     "neither.");
+            return true;
+        }
+        const bool capitals = std::any_of(text.begin(), text.end(), [](char c) { return std::isupper(static_cast<unsigned char>(c)) != 0; });
+        if (capitals && ALLSLTraits::isUuid(text))
+        {
+            noteOnce(at, "SluaKeyCase",
+                     "SLua's uuid writes a key's letters small, and finds it the same key as one written small, where LSL's key kept its "
+                     "capitals and was compared as text.");
+            return true;
+        }
+        return false;
+    }
+
     Expr Writer::coerced(LSLExpression* e, LSLIType to)
     {
         Expr           out  = value(e);
@@ -2059,7 +2205,7 @@ namespace
             if (constant && inner->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
             {
                 const std::string_view text = static_cast<LSLStringConstant*>(inner->getChild(0))->getValue();
-                if (!text.empty() && !ALLSLTraits::isUuid(text))
+                if (!keyText(e, text) && !ALLSLTraits::isUuid(text))
                 {
                     noteOnce(e, "SluaKeyText", "LSL's keys held any text; SLua's uuid() stops the script on text that is no UUID, as it "
                                                "would here, where only a uuid will do.");
@@ -2077,7 +2223,7 @@ namespace
         return out;
     }
 
-    std::string Writer::args(LSLASTNode* list, LSLParamList* params, U16 text)
+    std::string Writer::args(LSLASTNode* list, LSLParamList* params, U16 text, int put, const std::string& put_text)
     {
         std::string out;
         LSLASTNode* param = params ? params->getChild(0) : nullptr;
@@ -2092,7 +2238,7 @@ namespace
                 to = slType(given);
             }
             // A parameter the script only reads as a truth is given one.
-            out += (out.empty() ? "" : ", ") + (boolean(taken) ? truthOf(given) : coerced(given, to).text);
+            out += (out.empty() ? "" : ", ") + (at == put ? put_text : boolean(taken) ? truthOf(given) : coerced(given, to).text);
             param = param ? param->getNext() : nullptr;
         }
         return out;
@@ -2207,6 +2353,49 @@ namespace
             return true;
         }
         return false;
+    }
+
+    // A number written out, an integer or a float, and whether it is
+    // nought; or one with a minus before it.
+    bool numberWritten(LSLExpression* e, bool& nought)
+    {
+        e = unbracketed(e);
+        if (e && e->getNodeSubType() == NODE_UNARY_EXPRESSION && e->getOperation() == OP_MINUS)
+        {
+            return numberWritten(static_cast<LSLUnaryExpression*>(e)->getChildExpr(), nought);
+        }
+        LSLASTNode* const c = e && e->getNodeSubType() == NODE_CONSTANT_EXPRESSION ? e->getChild(0) : nullptr;
+        if (c && c->getNodeSubType() == NODE_INTEGER_CONSTANT)
+        {
+            nought = static_cast<LSLIntegerConstant*>(c)->getValue() == 0;
+            return true;
+        }
+        if (c && c->getNodeSubType() == NODE_FLOAT_CONSTANT)
+        {
+            nought = static_cast<LSLFloatConstant*>(c)->getValue() == 0.0;
+            return true;
+        }
+        return false;
+    }
+
+    // A vector written out, each of its parts a number, not all of them
+    // nought; or one whose value Tailslide knows, which is not nought.
+    bool nonZeroVector(LSLExpression* e)
+    {
+        e = unbracketed(e);
+        if (e && e->getNodeSubType() == NODE_VECTOR_EXPRESSION)
+        {
+            auto* v = static_cast<LSLVectorExpression*>(e);
+            bool  x = false, y = false, z = false;
+            return numberWritten(v->getX(), x) && numberWritten(v->getY(), y) && numberWritten(v->getZ(), z) && !(x && y && z);
+        }
+        LSLConstant* const c = e ? e->getConstantValue() : nullptr;
+        if (!c || c->getNodeSubType() != NODE_VECTOR_CONSTANT)
+        {
+            return false;
+        }
+        const Vector3* v = static_cast<LSLVectorConstant*>(c)->getValue();
+        return v && (v->x != 0.0f || v->y != 0.0f || v->z != 0.0f);
     }
 
     LSLExpression* argumentAt(LSLFunctionExpression* e, int at)
@@ -2331,7 +2520,13 @@ namespace
         };
         const auto found = METHODS.find(lsl);
         LSLExpression* index = argumentAt(e, 0);
-        if (found == METHODS.end() || !index)
+        // And llAdjustDamage, the damage set on what was detected, in
+        // on_damage: the one event whose table SLua lets adjust it, as LSL's
+        // call worked in it alone. Elsewhere LSL said an error on the debug
+        // channel and went on, where adjustDamage would stop the handler:
+        // llcompat's there.
+        const bool damage = lsl == "llAdjustDamage" && mOnDamage;
+        if ((found == METHODS.end() && !damage) || !index)
         {
             return std::nullopt;
         }
@@ -2339,7 +2534,422 @@ namespace
                                          "end is an error, where LSL answered nothing.");
         int v = 0;
         const std::string at = wholeNumber(index, v) ? std::to_string(v + 1) : bracketed(value(index), ADD + 1) + " + 1";
+        if (damage)
+        {
+            return Expr{ "detected[" + at + "]:adjustDamage(" + coerced(argumentAt(e, 1), LST_FLOATINGPOINT).text + ")" };
+        }
         return Expr{ "detected[" + at + "]:" + std::string(found->second) + "()", PRIMARY, found->second == "getGroup" };
+    }
+
+    std::optional<Expr> Writer::scriptTime(const std::string& lsl, std::string& called)
+    {
+        // llcompat's GetTime beside llcompat's resets, which are LSL's
+        // together; the resets themselves go llcompat's way, and are noted.
+        if (mCompatTime)
+        {
+            if (lsl != "llGetTime")
+            {
+                return std::nullopt;
+            }
+            called = "llcompat.GetTime";
+            return Expr{ "llcompat.GetTime()" };
+        }
+        if (!mTimeBase)
+        {
+            return std::nullopt;
+        }
+        // The time since the last reset, as LSL counted it; a reset, a
+        // statement; and both, through the helper (helpers).
+        if (lsl == "llGetTime")
+        {
+            called = "ll.GetTime";
+            return Expr{ "ll.GetTime() - timeBase", ADD };
+        }
+        if (lsl == "llResetTime")
+        {
+            called = "timeBase";
+            return Expr{ "timeBase = ll.GetTime()" };
+        }
+        if (lsl == "llGetAndResetTime")
+        {
+            called           = "getAndResetTime";
+            mGetAndResetTime = true;
+            return Expr{ "getAndResetTime()" };
+        }
+        return std::nullopt;
+    }
+
+    // --- rule lists as tables -----------------------------------------------------------
+
+    // What a rule's value is to the key SLua's table names it by: as the
+    // definitions' ParticleParams, MediaParams and HttpRequestParams type
+    // it, and as the grid's serializer makes LSL's list of it again.
+    enum class Takes : U8
+    {
+        Number,  // an integer or a float, as it is
+        Vector,  // a vector, as it is
+        Text,    // a string, as it is
+        Asset,   // a string or a key, as it is
+        Truth,   // a boolean, which it makes 1 or 0
+        Flags,   // a number, and a boolean of each of its masks, ORed in
+        Csv,     // a {string}, which it joins with commas, escaping \ and ,
+        Headers, // a {[string]: string}, a rule of each, sorted by name
+        Each     // a {string}, a rule of each, in order
+    };
+
+    struct TableRule
+    {
+        const char* constant;
+        const char* key;
+        Takes       takes;
+    };
+
+    // Each constant a member of the table's enum in the definitions' YAML,
+    // under its pretty-name, or its name without the prefix and the filler
+    // words (part, src; http), as they build the type.
+    const TableRule PARTICLE_RULES[] = {
+        { "PSYS_PART_FLAGS", "flags", Takes::Flags },
+        { "PSYS_PART_START_COLOR", "color_begin", Takes::Vector },
+        { "PSYS_PART_START_ALPHA", "alpha_begin", Takes::Number },
+        { "PSYS_PART_END_COLOR", "color_end", Takes::Vector },
+        { "PSYS_PART_END_ALPHA", "alpha_end", Takes::Number },
+        { "PSYS_PART_START_SCALE", "scale_begin", Takes::Vector },
+        { "PSYS_PART_END_SCALE", "scale_end", Takes::Vector },
+        { "PSYS_PART_MAX_AGE", "part_max_age", Takes::Number },
+        { "PSYS_SRC_ACCEL", "accel", Takes::Vector },
+        { "PSYS_SRC_PATTERN", "pattern", Takes::Number },
+        { "PSYS_SRC_INNERANGLE", "angle_inner", Takes::Number },
+        { "PSYS_SRC_OUTERANGLE", "angle_outer", Takes::Number },
+        { "PSYS_SRC_TEXTURE", "texture", Takes::Asset },
+        { "PSYS_SRC_BURST_RATE", "burst_rate", Takes::Number },
+        { "PSYS_SRC_BURST_PART_COUNT", "burst_count", Takes::Number },
+        { "PSYS_SRC_BURST_RADIUS", "burst_radius", Takes::Number },
+        { "PSYS_SRC_BURST_SPEED_MIN", "burst_speed_min", Takes::Number },
+        { "PSYS_SRC_BURST_SPEED_MAX", "burst_speed_max", Takes::Number },
+        { "PSYS_SRC_MAX_AGE", "src_max_age", Takes::Number },
+        { "PSYS_SRC_TARGET_KEY", "target_key", Takes::Asset },
+        { "PSYS_SRC_OMEGA", "omega", Takes::Vector },
+        { "PSYS_SRC_ANGLE_BEGIN", "angle_begin", Takes::Number },
+        { "PSYS_SRC_ANGLE_END", "angle_end", Takes::Number },
+        { "PSYS_PART_BLEND_FUNC_SOURCE", "blend_func_source", Takes::Number },
+        { "PSYS_PART_BLEND_FUNC_DEST", "blend_func_dest", Takes::Number },
+        { "PSYS_PART_START_GLOW", "glow_begin", Takes::Number },
+        { "PSYS_PART_END_GLOW", "glow_end", Takes::Number },
+    };
+    // PSYS_PART_FLAGS' masks, the flag enum's members, each a boolean of
+    // its own, its name without the prefix and _MASK.
+    const std::pair<const char*, const char*> PARTICLE_FLAGS[] = {
+        { "PSYS_PART_INTERP_COLOR_MASK", "color_interp" }, { "PSYS_PART_INTERP_SCALE_MASK", "scale_interp" },
+        { "PSYS_PART_BOUNCE_MASK", "bounce" },             { "PSYS_PART_WIND_MASK", "wind" },
+        { "PSYS_PART_FOLLOW_SRC_MASK", "follow" },         { "PSYS_PART_FOLLOW_VELOCITY_MASK", "follow_velocity" },
+        { "PSYS_PART_TARGET_POS_MASK", "target_pos" },     { "PSYS_PART_TARGET_LINEAR_MASK", "target_linear" },
+        { "PSYS_PART_EMISSIVE_MASK", "emissive" },         { "PSYS_PART_RIBBON_MASK", "ribbon" },
+    };
+    const TableRule MEDIA_RULES[] = {
+        { "PRIM_MEDIA_ALT_IMAGE_ENABLE", "alt_image_enable", Takes::Truth },
+        { "PRIM_MEDIA_CONTROLS", "controls", Takes::Number },
+        { "PRIM_MEDIA_CURRENT_URL", "current_url", Takes::Text },
+        { "PRIM_MEDIA_HOME_URL", "home_url", Takes::Text },
+        { "PRIM_MEDIA_AUTO_LOOP", "auto_loop", Takes::Truth },
+        { "PRIM_MEDIA_AUTO_PLAY", "auto_play", Takes::Truth },
+        { "PRIM_MEDIA_AUTO_SCALE", "auto_scale", Takes::Truth },
+        { "PRIM_MEDIA_AUTO_ZOOM", "auto_zoom", Takes::Truth },
+        { "PRIM_MEDIA_FIRST_CLICK_INTERACT", "first_click_interact", Takes::Truth },
+        { "PRIM_MEDIA_WIDTH_PIXELS", "width", Takes::Number },
+        { "PRIM_MEDIA_HEIGHT_PIXELS", "height", Takes::Number },
+        { "PRIM_MEDIA_WHITELIST_ENABLE", "whitelist_enable", Takes::Truth },
+        { "PRIM_MEDIA_WHITELIST", "whitelist", Takes::Csv },
+        { "PRIM_MEDIA_PERMS_INTERACT", "perms_interact", Takes::Number },
+        { "PRIM_MEDIA_PERMS_CONTROL", "perms_control", Takes::Number },
+    };
+    const TableRule HTTP_RULES[] = {
+        { "HTTP_METHOD", "method", Takes::Text },
+        { "HTTP_MIMETYPE", "mimetype", Takes::Text },
+        { "HTTP_BODY_MAXLENGTH", "max_body_length", Takes::Number },
+        { "HTTP_VERIFY_CERT", "verify_cert", Takes::Truth },
+        { "HTTP_VERBOSE_THROTTLE", "verbose_throttle", Takes::Truth },
+        { "HTTP_CUSTOM_HEADER", "custom_header", Takes::Headers },
+        { "HTTP_PRAGMA_NO_CACHE", "pragma_no_cache", Takes::Truth },
+        { "HTTP_USER_AGENT", "user_agent", Takes::Text },
+        { "HTTP_ACCEPT", "accept", Takes::Each },
+        { "HTTP_EXTENDED_ERROR", "extended_error", Takes::Truth },
+    };
+
+    // The name of the LSL constant an expression is, as it is.
+    const char* constantName(LSLExpression* e)
+    {
+        e = unbracketed(e);
+        if (!e || e->getNodeSubType() != NODE_LVALUE_EXPRESSION)
+        {
+            return nullptr;
+        }
+        auto*      read   = static_cast<LSLLValueExpression*>(e);
+        LSLSymbol* symbol = read->getIdentifier()->getSymbol();
+        return symbol && symbol->getSubType() == SYM_BUILTIN && isNull(read->getMember()) ? read->getIdentifier()->getName() : nullptr;
+    }
+
+    // Text written out, as it is.
+    std::optional<std::string_view> textWritten(LSLExpression* e)
+    {
+        e = unbracketed(e);
+        if (e && e->getNodeSubType() == NODE_CONSTANT_EXPRESSION && e->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
+        {
+            return std::string_view(static_cast<LSLStringConstant*>(e->getChild(0))->getValue());
+        }
+        return std::nullopt;
+    }
+
+    // TRUE or FALSE, or 1 or 0, written out: which.
+    std::optional<bool> truthWritten(LSLExpression* e)
+    {
+        int               n    = -1;
+        const char* const name = constantName(e);
+        if (wholeNumber(e, n) && (n == 0 || n == 1))
+        {
+            return n == 1;
+        }
+        if (name && (std::string_view(name) == "TRUE" || std::string_view(name) == "FALSE"))
+        {
+            return std::string_view(name) == "TRUE";
+        }
+        return std::nullopt;
+    }
+
+    // An | of PSYS_PART_FLAGS' masks, each once: each mask and its key, in
+    // the order written.
+    bool flagKeys(LSLExpression* e, std::vector<std::pair<const char*, const char*>>& keys)
+    {
+        e = unbracketed(e);
+        if (e && e->getNodeSubType() == NODE_BINARY_EXPRESSION && e->getOperation() == OP_BIT_OR)
+        {
+            auto* both = static_cast<LSLBinaryExpression*>(e);
+            return flagKeys(both->getLHS(), keys) && flagKeys(both->getRHS(), keys);
+        }
+        const char* const name = constantName(e);
+        for (const auto& flag : PARTICLE_FLAGS)
+        {
+            if (name && std::string_view(name) == flag.first)
+            {
+                const bool again = std::find(keys.begin(), keys.end(), flag) != keys.end();
+                keys.push_back(flag);
+                return !again;
+            }
+        }
+        return false;
+    }
+
+    // A whitelist's text as the {string} the serializer joins back into the
+    // same text: its pieces between commas. Only where the join gives it
+    // back as it was: text with no \ to escape, and neither none nor a
+    // first piece of none, which the join leaves out.
+    std::optional<std::vector<std::string_view>> whitelistPieces(std::string_view text)
+    {
+        if (text.empty() || text.front() == ',' || text.find('\\') != std::string_view::npos)
+        {
+            return std::nullopt;
+        }
+        std::vector<std::string_view> pieces;
+        for (size_t from = 0;;)
+        {
+            const size_t comma = text.find(',', from);
+            pieces.push_back(text.substr(from, comma == std::string_view::npos ? std::string_view::npos : comma - from));
+            if (comma == std::string_view::npos)
+            {
+                return pieces;
+            }
+            from = comma + 1;
+        }
+    }
+
+    std::optional<Expr> Writer::ruleTable(LSLFunctionExpression* e, const std::string& lsl, std::string& called)
+    {
+        // Each call, the argument its rules are, and the table's rules.
+        struct Call
+        {
+            const char*      lsl;
+            int              at;
+            const TableRule* rules;
+            size_t           count;
+        };
+        static const Call CALLS[] = {
+            { "llParticleSystem", 0, PARTICLE_RULES, std::size(PARTICLE_RULES) },
+            { "llLinkParticleSystem", 1, PARTICLE_RULES, std::size(PARTICLE_RULES) },
+            { "llSetPrimMediaParams", 1, MEDIA_RULES, std::size(MEDIA_RULES) },
+            { "llSetLinkMedia", 2, MEDIA_RULES, std::size(MEDIA_RULES) },
+            { "llHTTPRequest", 1, HTTP_RULES, std::size(HTTP_RULES) },
+        };
+        const auto call = std::find_if(std::begin(CALLS), std::end(CALLS), [&](const Call& c) { return lsl == c.lsl; });
+        LSLExpression* list = call != std::end(CALLS) ? unbracketed(argumentAt(e, call->at)) : nullptr;
+        if (!list || list->getNodeSubType() != NODE_LIST_EXPRESSION)
+        {
+            return std::nullopt;
+        }
+        std::vector<LSLExpression*> items;
+        for (LSLASTNode* item = list->getChild(0); item; item = item->getNext())
+        {
+            items.push_back(static_cast<LSLExpression*>(item));
+        }
+        // Each rule a constant the table has a key for, with what that key
+        // takes after it, and each key once -- but a header of each name,
+        // and the accepts, which gather. Anything else stays a list.
+        struct Rule
+        {
+            const TableRule* rule;
+            size_t           at;
+        };
+        std::vector<Rule>             rules;
+        std::vector<std::string_view> keys;
+        std::vector<std::string_view> headers;
+        bool                          moved = false;
+        for (size_t i = 0; i < items.size();)
+        {
+            const char* const name = constantName(items[i]);
+            const TableRule*  rule = nullptr;
+            for (size_t r = 0; name && r < call->count; ++r)
+            {
+                rule = std::string_view(name) == call->rules[r].constant ? &call->rules[r] : rule;
+            }
+            const size_t taken = rule && rule->takes == Takes::Headers ? 2 : 1;
+            if (!rule || i + taken >= items.size())
+            {
+                return std::nullopt;
+            }
+            LSLExpression* v    = items[i + 1];
+            const LSLIType type = v->getIType();
+            bool           fits = false;
+            switch (rule->takes)
+            {
+                case Takes::Number: fits = type == LST_INTEGER || type == LST_FLOATINGPOINT; break;
+                case Takes::Vector: fits = type == LST_VECTOR; break;
+                case Takes::Text: fits = type == LST_STRING; break;
+                case Takes::Asset: fits = type == LST_STRING || type == LST_KEY; break;
+                case Takes::Truth: fits = truthWritten(v).has_value(); break;
+                case Takes::Flags: fits = type == LST_INTEGER; break;
+                case Takes::Csv: fits = textWritten(v) && whitelistPieces(*textWritten(v)); break;
+                case Takes::Headers:
+                {
+                    // A name written out, each once.
+                    const std::optional<std::string_view> header = textWritten(v);
+                    fits = header && std::find(headers.begin(), headers.end(), *header) == headers.end() &&
+                           items[i + 2]->getIType() == LST_STRING;
+                    if (fits)
+                    {
+                        headers.push_back(*header);
+                    }
+                    break;
+                }
+                case Takes::Each: fits = type == LST_STRING; break;
+            }
+            const bool gathers = rule->takes == Takes::Headers || rule->takes == Takes::Each;
+            const bool again   = std::find(keys.begin(), keys.end(), rule->key) != keys.end();
+            if (!fits || (again && !gathers))
+            {
+                return std::nullopt;
+            }
+            moved |= again && rules.back().rule != rule;
+            keys.push_back(rule->key);
+            rules.push_back({ rule, i });
+            i += 1 + taken;
+        }
+        // A header or an accept after the first of its kind goes up into
+        // the first one's table, run before what stood between: only where
+        // nothing in the list changes anything, so that the order cannot
+        // show.
+        const auto still = [](LSLExpression* item) { return ALLSLTraits::changesNothing(item); };
+        if (rules.empty() || (moved && !std::all_of(items.begin(), items.end(), still)))
+        {
+            return std::nullopt;
+        }
+        // Each key in the order written, a gathering one where it first is,
+        // each value as the list would have had it.
+        struct Gathered
+        {
+            const char* key;
+            size_t      at;
+            std::string all;
+        };
+        std::vector<std::string> fields;
+        std::vector<Gathered>    gathered;
+        for (const Rule& each : rules)
+        {
+            const TableRule* rule = each.rule;
+            LSLExpression*   v    = items[each.at + 1];
+            std::string      text;
+            switch (rule->takes)
+            {
+                case Takes::Truth: text = *truthWritten(v) ? "true" : "false"; break;
+                case Takes::Flags:
+                {
+                    std::vector<std::pair<const char*, const char*>> flags;
+                    if (flagKeys(v, flags))
+                    {
+                        for (const auto& [mask, key] : flags)
+                        {
+                            sameAs(mask, key);
+                            fields.push_back(std::string(key) + " = true");
+                        }
+                        continue;
+                    }
+                    text = coerced(v, LST_INTEGER).text;
+                    break;
+                }
+                case Takes::Csv:
+                {
+                    // Held here: a loop over what the optional holds would
+                    // otherwise outlive the optional, which only C++23's
+                    // rule for a loop's range keeps alive, and not every
+                    // compiler has that rule.
+                    const std::optional<std::vector<std::string_view>> pieces = whitelistPieces(*textWritten(v));
+                    for (std::string_view piece : *pieces)
+                    {
+                        text += (text.empty() ? "{ " : ", ") + luaString(piece);
+                    }
+                    text += " }";
+                    break;
+                }
+                case Takes::Headers:
+                case Takes::Each:
+                {
+                    const std::string one   = rule->takes == Takes::Headers
+                                                  ? "[" + luaString(*textWritten(v)) + "] = " + coerced(items[each.at + 2], LST_STRING).text
+                                                  : coerced(v, LST_STRING).text;
+                    const auto        found = std::find_if(gathered.begin(), gathered.end(), [&](const Gathered& g) { return g.key == rule->key; });
+                    if (found != gathered.end())
+                    {
+                        found->all += ", " + one;
+                        continue;
+                    }
+                    gathered.push_back({ rule->key, fields.size(), one });
+                    break;
+                }
+                default: text = coerced(v, v->getIType()).text; break;
+            }
+            sameAs(rule->constant, rule->key);
+            fields.push_back(std::string(rule->key) + " = " + text);
+        }
+        for (const Gathered& g : gathered)
+        {
+            fields[g.at] += "{ " + g.all + " }";
+        }
+        // The serializer sends headers sorted by name: said where that is
+        // not the order they were written in.
+        if (!std::is_sorted(headers.begin(), headers.end()))
+        {
+            note(e, "SluaHeaderOrder",
+                 "SLua passes ll.HTTPRequest a custom_header table's headers sorted by name, where LSL's list passed them in the order "
+                 "written; nothing else differs.");
+        }
+        // A key to a line where the LSL's list had more than one.
+        const bool  lines = list->getLoc()->first_line != list->getLoc()->last_line;
+        std::string table = lines ? "{\n" : "{ ";
+        for (size_t i = 0; i < fields.size(); ++i)
+        {
+            table += lines ? indent() + "    " + fields[i] + ",\n" : (i ? ", " : "") + fields[i];
+        }
+        table += lines ? indent() + "}" : " }";
+        called = "ll." + lsl.substr(2);
+        LSLParamList* params = e->getIdentifier()->getSymbol()->getFunctionDecl();
+        return Expr{ called + "(" + args(e->getArguments(), params, 0, call->at, table) + ")" };
     }
 
     std::optional<Expr> Writer::idiom(LSLFunctionExpression* e, const std::string& lsl, std::string& called)
@@ -2352,14 +2962,70 @@ namespace
                 return item;
             }
         }
+        if (std::optional<Expr> table = ruleTable(e, lsl, called))
+        {
+            return table;
+        }
+        // One thing looked for in a list, its place: table.find's, counted
+        // from 0, or -1 where it is not there, as LSL's.
+        if (lsl == "llListFindList")
+        {
+            if (LSLASTNode* sought = soleItem(argumentAt(e, 1)))
+            {
+                called = "table.find";
+                return Expr{ "(table.find(" + anyItems(argumentAt(e, 0), arg(0)) + ", " + itemText(sought) + ") or 0) - 1", ADD };
+            }
+        }
+        // A part of a list between two places written out, from its start
+        // on: table.move's copy of it into a new list, which copies nothing
+        // past the list's end, as LSL's stops there; and all of it, a clone.
+        // Not a place counted from the end, which a short list could have
+        // its start past, nor a start after the end, which LSL reads as the
+        // part to leave out; nor an end past what a script's 64 KiB could
+        // hold, which the copy would count up to.
+        if (lsl == "llList2List")
+        {
+            int from = 0;
+            int to   = 0;
+            if (wholeNumber(argumentAt(e, 1), from) && wholeNumber(argumentAt(e, 2), to))
+            {
+                if (from == 0 && to == -1)
+                {
+                    called = "table.clone";
+                    return Expr{ "table.clone(" + arg(0).text + ")" };
+                }
+                if (from >= 0 && from <= to && to < 65536)
+                {
+                    called = "table.move";
+                    return Expr{ "table.move(" + arg(0).text + ", " + std::to_string(from + 1) + ", " + std::to_string(to + 1) + ", 1, {})" };
+                }
+            }
+        }
+        // A list of text and whole numbers joined: table.concat, which writes
+        // a whole number as LSL wrote an integer, where ll.DumpList2String
+        // writes it as a float, 5.000000, since SLua's numbers are all floats
+        // to it.
+        if (lsl == "llDumpList2String" && (itemTypes(argumentAt(e, 0)) & ~(ItemString | ItemInteger)) == 0)
+        {
+            called = "table.concat";
+            return Expr{ "table.concat(" + arg(0).text + ", " + coerced(argumentAt(e, 1), LST_STRING).text + ")" };
+        }
         if (lsl == "llPow")
         {
             // Luau's ^ binds tighter than a minus before it.
             return Expr{ bracketed(arg(0), POWER + 1) + " ^ " + bracketed(arg(1), UNARY), POWER };
         }
-        if (lsl == "llVecMag" || lsl == "llVecNorm")
+        if (lsl == "llVecMag")
         {
-            called = lsl == "llVecMag" ? "vector.magnitude" : "vector.normalize";
+            called = "vector.magnitude";
+            return Expr{ called + "(" + arg(0).text + ")" };
+        }
+        // LSL keeps a zero vector zero, which vector.normalize makes NaN of:
+        // vecNorm guards it, but for a vector known to be something else.
+        if (lsl == "llVecNorm")
+        {
+            called = nonZeroVector(argumentAt(e, 0)) ? "vector.normalize" : "vecNorm";
+            mVecNorm |= called == "vecNorm";
             return Expr{ called + "(" + arg(0).text + ")" };
         }
         if (lsl == "llVecDist")
@@ -2381,6 +3047,22 @@ namespace
         {
             called = "print";
             return Expr{ "print(" + coerced(argumentAt(e, 0), LST_STRING).text + ")" };
+        }
+        // Base64 of the string's bytes, its UTF-8, as LSL's was: both are
+        // APR's, padded and on one line.
+        if (lsl == "llStringToBase64")
+        {
+            called = "llbase64.encode";
+            return Expr{ "llbase64.encode(" + coerced(argumentAt(e, 0), LST_STRING).text + ")" };
+        }
+        // The bytes decoded, every one: LSL's string could hold neither a
+        // NUL nor what is not UTF-8.
+        if (lsl == "llBase64ToString")
+        {
+            noteOnce(e, "SluaBase64Decode", "llbase64.decode keeps every byte it decodes, a NUL and what is not UTF-8 among them, where "
+                                            "LSL's llBase64ToString cut the string at a NUL and made what was not UTF-8 '?'.");
+            called = "llbase64.decode";
+            return Expr{ "llbase64.decode(" + coerced(argumentAt(e, 0), LST_STRING).text + ")" };
         }
         // Half up, as LSL rounds, where math.round rounds a half away from
         // nought.
@@ -2449,15 +3131,22 @@ namespace
         {
             return std::nullopt;
         }
-        const std::string lsl   = call->getIdentifier()->getName();
-        LSLExpression*    among = argumentAt(call, 1);
+        const std::string lsl = call->getIdentifier()->getName();
         std::string       asked;
         // One thing looked for in a list: table.find, which answers as
         // ll.ListFindList does.
-        if (mOptions.idioms && lsl == "llListFindList" && among && among->getNodeSubType() == NODE_LIST_EXPRESSION && among->getChild(0) &&
-            !among->getChild(0)->getNext())
+        LSLASTNode* sought = mOptions.idioms && lsl == "llListFindList" ? soleItem(argumentAt(call, 1)) : nullptr;
+        if (sought)
         {
-            asked = "table.find(" + value(argumentAt(call, 0)).text + ", " + value(static_cast<LSLExpression*>(among->getChild(0))).text + ")";
+            asked = "table.find(" + anyItems(argumentAt(call, 0), value(argumentAt(call, 0))) + ", " + itemText(sought) + ")";
+        }
+        // Text in other text: string.find's plain search from the start,
+        // which finds it where LSL's did -- the empty text anywhere, as
+        // LSL's found it at 0 -- and asks nothing of where in characters.
+        else if (mOptions.idioms && lsl == "llSubStringIndex")
+        {
+            asked = "string.find(" + coerced(argumentAt(call, 0), LST_STRING).text + ", " + coerced(argumentAt(call, 1), LST_STRING).text +
+                    ", 1, true)";
         }
         else
         {
@@ -2499,6 +3188,10 @@ namespace
         {
             called = "setTimer";
             return { "setTimer(" + args(e->getArguments(), params) + ")" };
+        }
+        if (std::optional<Expr> time = scriptTime(lsl, called))
+        {
+            return *time;
         }
         if (mOptions.detectedTable && mInDetected)
         {
@@ -2574,7 +3267,22 @@ namespace
         {
             // SLua's word on it, what it would use and why: which says more
             // than how its indexes count. The why is the definitions' own.
-            if (trait->sluaUse && trait->sluaReason)
+            // But the two XorBase64Strings: SLua names ll.XorBase64 for both,
+            // with no why, and it answers otherwise than either -- said how,
+            // since llcompat's is kept.
+            if (lsl == "llXorBase64Strings")
+            {
+                noteOnce(e, "SluaXorBase64Wrong",
+                         "SLua deprecates ll.XorBase64Strings, for ll.XorBase64, which XORs correctly where this did not, and so answers "
+                         "otherwise: llcompat's is LSL's.");
+            }
+            else if (lsl == "llXorBase64StringsCorrect")
+            {
+                noteOnce(e, "SluaXorBase64Nul",
+                         "SLua deprecates ll.XorBase64StringsCorrect, for ll.XorBase64, which answers otherwise where the second string "
+                         "holds a NUL, which ended it here: llcompat's is LSL's.");
+            }
+            else if (trait->sluaUse && trait->sluaReason)
             {
                 noteOnce(e, "SluaDeprecatedForWhy", "SLua deprecates ll.[1], for [2]: [3]", { bare, trait->sluaUse, trait->sluaReason });
             }
@@ -2755,10 +3463,27 @@ namespace
             case OP_PLUS:
                 if (lt == LST_LIST || rt == LST_LIST)
                 {
-                    mJoinLists = true;
-                    const Expr a = value(lhs);
-                    const Expr b = value(rhs);
-                    return { "joinLists(" + (lt == LST_LIST ? a.text : "{" + a.text + "}") + ", " + (rt == LST_LIST ? b.text : "{" + b.text + "}") + ")" };
+                    // A new list of both, the left's then the right's:
+                    // table.extend puts the right's on the end of the left
+                    // and answers it. The left is copied first where
+                    // something else may hold it. A new one -- written out,
+                    // or a library call's -- needs no copy, and is said to
+                    // hold any value, as LSL's lists did: Luau's old solver
+                    // would otherwise hold every item of both to the type of
+                    // the left's first. Another +'s answer already is one.
+                    const Expr     a     = value(lhs);
+                    const Expr     b     = value(rhs);
+                    LSLExpression* left  = unbracketed(lhs);
+                    std::string    first = madeHere(lhs) ? anyItems(lhs, a) : "table.clone(" + a.text + ")";
+                    if (lt != LST_LIST)
+                    {
+                        first = "{" + a.text + "} :: { any }";
+                    }
+                    else if (left->getNodeSubType() == NODE_BINARY_EXPRESSION && left->getOperation() == OP_PLUS)
+                    {
+                        first = a.text;
+                    }
+                    return { "table.extend(" + first + ", " + (rt == LST_LIST ? b.text : "{" + b.text + "}") + ")" };
                 }
                 if (lt == LST_STRING || lt == LST_KEY || rt == LST_STRING || rt == LST_KEY)
                 {
@@ -2788,8 +3513,18 @@ namespace
             case OP_DIV:
                 if (lt == LST_INTEGER && rt == LST_INTEGER)
                 {
-                    note(e, "SluaIntegerDivision", "// rounds down, and LSL's integer / rounded toward zero: they differ where the answer is negative.");
-                    return infix("//", MUL);
+                    // LSL's integers divide toward nought, and Luau's // rounds
+                    // down: the same where neither side is below nought.
+                    if (notBelowZero(lhs) && notBelowZero(rhs))
+                    {
+                        return infix("//", MUL);
+                    }
+                    // Elsewhere the quotient as a double, cut toward nought by
+                    // bit32.s32: for two 32-bit integers a double's quotient is
+                    // never so far out that the cut misses LSL's. math.modf
+                    // would cut it too, but leave a -0 that tostring writes,
+                    // and -2147483648 / -1 unwrapped, where LSO wraps it.
+                    return { "bit32.s32(" + infix("/", MUL).text + ")" };
                 }
                 return infix("/", MUL);
             case OP_MOD:
@@ -2797,8 +3532,15 @@ namespace
                 {
                     return { "vector.cross(" + value(lhs).text + ", " + value(rhs).text + ")" };
                 }
-                note(e, "SluaModulo", "Luau's % takes the divisor's sign, and LSL's took the dividend's: they differ where one is negative.");
-                return infix("%", MUL);
+                // LSL's remainder takes the dividend's sign, as math.fmod's
+                // does, and Luau's % the divisor's: the same where neither
+                // side is below nought. Only text tells fmod's from LSL's:
+                // a dividend below nought that divides whole leaves -0.
+                if (notBelowZero(lhs) && notBelowZero(rhs))
+                {
+                    return infix("%", MUL);
+                }
+                return { "math.fmod(" + value(lhs).text + ", " + value(rhs).text + ")" };
             case OP_EQ:
             case OP_NEQ:
             {
@@ -2965,7 +3707,14 @@ namespace
                 switch (from)
                 {
                     case LST_FLOATINGPOINT: return { "string.format(\"%.6f\", " + v.text + ")" };
-                    case LST_LIST: return { "ll.DumpList2String(" + v.text + ", \"\")" };
+                    case LST_LIST:
+                        // Text and whole numbers joined as LSL wrote them
+                        // (Writer::idiom).
+                        if (mOptions.idioms && (itemTypes(child) & ~(ItemString | ItemInteger)) == 0)
+                        {
+                            return { "table.concat(" + v.text + ")" };
+                        }
+                        return { "ll.DumpList2String(" + v.text + ", \"\")" };
                     case LST_VECTOR:
                     case LST_QUATERNION:
                         // LSL writes each part with five places, as ll's
@@ -2978,8 +3727,18 @@ namespace
                     default: return { "tostring(" + v.text + ")" };
                 }
             case LST_KEY:
-                note(e, "SluaUuid", "SLua's uuid holds a key; LSL's key could hold any text.");
+            {
+                // Text written out, said for what uuid makes of it where that
+                // is another key than LSL's: (key)"" is NULL_KEY.
+                LSLExpression* inner   = unbracketed(child);
+                const bool     written = inner && inner->getNodeSubType() == NODE_CONSTANT_EXPRESSION &&
+                                         inner->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT;
+                if (!written || !keyText(e, static_cast<LSLStringConstant*>(inner->getChild(0))->getValue()))
+                {
+                    note(e, "SluaUuid", "SLua's uuid holds a key; LSL's key could hold any text.");
+                }
                 return { "uuid(" + v.text + ")" };
+            }
             // Text that is no vector or rotation is LSL's zero one; bracketed
             // only where an operator around it binds more tightly than or.
             case LST_VECTOR: return { "tovector(" + v.text + ") or ZERO_VECTOR", OR };
@@ -3109,8 +3868,8 @@ namespace
                     }
                     if (t == LST_LIST)
                     {
-                        mJoinLists = true;
-                        return "joinLists(" + old + ", " + (rhs && rhs->getIType() == LST_LIST ? v.text : "{" + v.text + "}") + ")";
+                        // Something else may hold the list: a new one.
+                        return "table.extend(table.clone(" + old + "), " + (rhs && rhs->getIType() == LST_LIST ? v.text : "{" + v.text + "}") + ")";
                     }
                     return old + " + " + bracketed(v, ADD + 1);
                 case OP_SUB_ASSIGN:
@@ -3118,11 +3877,10 @@ namespace
                 case OP_POST_DECR: return old + " - " + bracketed(v, ADD + 1);
                 case OP_MUL_ASSIGN: return old + " * " + bracketed(v, MUL + 1);
                 case OP_DIV_ASSIGN:
+                    // An integer toward nought, as / of two is written.
                     if (t == LST_INTEGER && rhs && rhs->getIType() == LST_INTEGER)
                     {
-                        note(rhs, "SluaIntegerDivision",
-                             "// rounds down, and LSL's integer / rounded toward zero: they differ where the answer is negative.");
-                        return old + " // " + bracketed(v, MUL + 1);
+                        return "bit32.s32(" + old + " / " + bracketed(v, MUL + 1) + ")";
                     }
                     return old + " / " + bracketed(v, MUL + 1);
                 case OP_MOD_ASSIGN:
@@ -3131,8 +3889,7 @@ namespace
                     {
                         return "vector.cross(" + old + ", " + v.text + ")";
                     }
-                    note(rhs, "SluaModulo", "Luau's % takes the divisor's sign, and LSL's took the dividend's: they differ where one is negative.");
-                    return old + " % " + bracketed(v, MUL + 1);
+                    return "math.fmod(" + old + ", " + v.text + ")";
                 default: return v.text;
             }
         };
@@ -3242,12 +3999,13 @@ namespace
                 case OP_POST_DECR: line(name + " -= 1"); return;
                 case OP_SUB_ASSIGN: line(name + " -= " + v.text); return;
                 case OP_MUL_ASSIGN: line(name + " *= " + v.text); return;
+                // An integer's / and % as they are of two: Luau's //= rounds
+                // down and its %= takes the divisor's sign, and nothing knows
+                // a variable it assigns is not below nought.
                 case OP_DIV_ASSIGN:
                     if (type == LST_INTEGER && rhs && rhs->getIType() == LST_INTEGER)
                     {
-                        note(rhs, "SluaIntegerDivision",
-                             "// rounds down, and LSL's integer / rounded toward zero: they differ where the answer is negative.");
-                        line(name + " //= " + v.text);
+                        line(name + " = bit32.s32(" + name + " / " + bracketed(v, MUL + 1) + ")");
                         return;
                     }
                     line(name + " /= " + v.text);
@@ -3255,9 +4013,7 @@ namespace
                 case OP_MOD_ASSIGN:
                     if (type == LST_INTEGER)
                     {
-                        note(rhs, "SluaModulo",
-                             "Luau's % takes the divisor's sign, and LSL's took the dividend's: they differ where one is negative.");
-                        line(name + " %= " + v.text);
+                        line(name + " = math.fmod(" + name + ", " + v.text + ")");
                         return;
                     }
                     break;
@@ -3318,6 +4074,17 @@ namespace
             }
             case NODE_FUNCTION_EXPRESSION:
             {
+                // The script's own clock reset where nothing takes the time
+                // it read, the reset alone; and read for nothing, the call
+                // alone, as a difference is no statement.
+                const std::string_view name = static_cast<LSLFunctionExpression*>(e)->getIdentifier()->getName();
+                if (mTimeBase && (name == "llGetAndResetTime" || name == "llGetTime"))
+                {
+                    const bool reset = name == "llGetAndResetTime";
+                    sameAs(name, reset ? "timeBase" : "ll.GetTime");
+                    line(reset ? "timeBase = ll.GetTime()" : "ll.GetTime()");
+                    return;
+                }
                 // One SLua has nowhere, over a line of its own.
                 const ALLSLTraits::Trait* trait = ALLSLTraits::of(static_cast<LSLFunctionExpression*>(e)->getIdentifier()->getName());
                 if (trait && (trait->slua & ALLSLTraits::SluaAbsent))
@@ -3957,11 +4724,43 @@ namespace
         // and where it starts are read once, as Luau reads them.
         bool setInBody = false;
         walk(f->getBody(), [&](LSLASTNode* node) { setInBody = setInBody || setBy(node) == c.var; });
-        if (setInBody || !steadyIn(c.limit, f))
+        if (setInBody || !(steadyIn(c.limit, f) || lengthKept(c, f)))
         {
             return std::nullopt;
         }
         return c;
+    }
+
+    bool Writer::lengthKept(const Counting& c, LSLForStatement* f) const
+    {
+        LSLExpression* limit = unwrapped(c.limit);
+        if (!limit || limit->getNodeSubType() != NODE_FUNCTION_EXPRESSION ||
+            std::string_view(static_cast<LSLFunctionExpression*>(limit)->getIdentifier()->getName()) != "llGetListLength")
+        {
+            return false;
+        }
+        LSLSymbol* list = wholeVariable(argumentAt(static_cast<LSLFunctionExpression*>(limit), 0));
+        if (!list)
+        {
+            return false;
+        }
+        // Each time the loop sets l: l = llListReplaceList(l, [x], i, i), x
+        // changing nothing of l's.
+        bool kept = true;
+        walk(f, [&](LSLASTNode* node) {
+            if (!kept || setBy(node) != list)
+            {
+                return;
+            }
+            LSLExpression* rhs = node->getNodeSubType() == NODE_BINARY_EXPRESSION && static_cast<LSLExpression*>(node)->getOperation() == OP_ASSIGN
+                                     ? unwrapped(static_cast<LSLBinaryExpression*>(node)->getRHS())
+                                     : nullptr;
+            auto*          call = rhs && rhs->getNodeSubType() == NODE_FUNCTION_EXPRESSION ? static_cast<LSLFunctionExpression*>(rhs) : nullptr;
+            kept = call && std::string_view(call->getIdentifier()->getName()) == "llListReplaceList" &&
+                   wholeVariable(argumentAt(call, 0)) == list && soleItem(argumentAt(call, 1)) && !mEffects.of(argumentAt(call, 1)).writes(list) &&
+                   wholeVariable(argumentAt(call, 2)) == c.var && wholeVariable(argumentAt(call, 3)) == c.var;
+        });
+        return kept && steadyIn(c.limit, f, list);
     }
 
     bool Writer::steadyWhole(LSLExpression* e, int& v) const
@@ -3990,7 +4789,7 @@ namespace
         return false;
     }
 
-    bool Writer::steadyIn(LSLExpression* e, LSLASTNode* loop) const
+    bool Writer::steadyIn(LSLExpression* e, LSLASTNode* loop, LSLSymbol* kept) const
     {
         // What the loop sets, and whether it calls anything of the script's
         // own, which could set a global.
@@ -4015,7 +4814,7 @@ namespace
                 {
                     LSLSymbol* var = static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol();
                     steady = steady && var && (var->getSubType() == SYM_BUILTIN ||
-                                               (!set.contains(var) && (var->getSubType() != SYM_GLOBAL || !calls)));
+                                               ((var == kept || !set.contains(var)) && (var->getSubType() != SYM_GLOBAL || !calls)));
                     break;
                 }
                 case NODE_FUNCTION_EXPRESSION:
@@ -4809,6 +5608,44 @@ namespace
         }
     }
 
+    bool Writer::madeHere(LSLExpression* e) const
+    {
+        LSLExpression* m = unwrapped(e);
+        return m && m->getNodeSubType() != NODE_LVALUE_EXPRESSION && !(m->getNodeSubType() == NODE_BINARY_EXPRESSION && m->getOperation() == OP_PLUS) &&
+               fresh(m);
+    }
+
+    std::string Writer::anyItems(LSLExpression* e, const Expr& written) const
+    {
+        return madeHere(e) ? bracketed(written, PRIMARY) + " :: { any }" : written.text;
+    }
+
+    LSLASTNode* Writer::soleItem(LSLExpression* e) const
+    {
+        e = unwrapped(e);
+        LSLASTNode* item = nullptr;
+        if (e && e->getNodeSubType() == NODE_LIST_EXPRESSION)
+        {
+            item = e->getChild(0);
+        }
+        else if (e && e->getNodeSubType() == NODE_CONSTANT_EXPRESSION && e->getChild(0)->getNodeSubType() == NODE_LIST_CONSTANT)
+        {
+            item = static_cast<LSLListConstant*>(e->getChild(0))->getValue();
+        }
+        return !isNull(item) && isNull(item->getNext()) ? item : nullptr;
+    }
+
+    std::string Writer::itemText(LSLASTNode* item)
+    {
+        // As LSL typed it: NULL_KEY in a list is LSL's string.
+        if (item->getNodeType() == NODE_CONSTANT)
+        {
+            return constant(static_cast<LSLConstant*>(item)).text;
+        }
+        auto* e = static_cast<LSLExpression*>(item);
+        return coerced(e, e->getIType()).text;
+    }
+
     Shared Writer::handedOn(LSLASTNode* read) const
     {
         // Up through brackets, and casts to what it already is.
@@ -5007,14 +5844,33 @@ namespace
             line(from == 0 ? "table.remove(" + name + ", 1)" : "table.remove(" + name + ")");
             return true;
         }
-        LSLExpression* added = unwrapped(argumentAt(call, 1));
-        if (lsl == "llListInsertList" && wholeNumber(argumentAt(call, 2), from) && from == 0 && added &&
-            added->getNodeSubType() == NODE_LIST_EXPRESSION && added->getChild(0) && !added->getChild(0)->getNext() &&
-            !mEffects.of(added).writes(var))
+        // One item, changing nothing of l's: put in at the front, or on the
+        // end, at the list's length; or in place of another, at a counter
+        // within the list (mWithin), which is always one of its places.
+        LSLExpression* added = argumentAt(call, 1);
+        LSLASTNode*    item  = soleItem(added);
+        if (!item || mEffects.of(added).writes(var))
         {
-            auto* item = static_cast<LSLExpression*>(added->getChild(0));
-            line("table.insert(" + name + ", 1, " + coerced(item, item->getIType()).text + ")");
+            return false;
+        }
+        LSLExpression* at     = unwrapped(argumentAt(call, 2));
+        const bool     length = at && at->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
+                            std::string_view(static_cast<LSLFunctionExpression*>(at)->getIdentifier()->getName()) == "llGetListLength" &&
+                            wholeVariable(argumentAt(static_cast<LSLFunctionExpression*>(at), 0)) == var;
+        if (lsl == "llListInsertList" && ((wholeNumber(at, from) && from == 0) || length))
+        {
+            line("table.insert(" + name + (length ? ", " : ", 1, ") + itemText(item) + ")");
             return true;
+        }
+        LSLSymbol* counter = wholeVariable(at);
+        const auto within  = counter ? mWithin.find(counter) : mWithin.end();
+        if (lsl == "llListReplaceList" && within != mWithin.end() && within->second == var && wholeVariable(argumentAt(call, 3)) == counter)
+        {
+            if (std::optional<std::string> place = llIndex(at))
+            {
+                line(name + "[" + *place + "] = " + itemText(item));
+                return true;
+            }
         }
         return false;
     }
@@ -5143,7 +5999,7 @@ namespace
         // of them all, which has each before it adds any, as a list written
         // out had -- and of several parts, each runs apart -- but one alone,
         // which table.insert, a builtin of Luau's, adds faster; and more than
-        // a call takes well, a table of them moved on.
+        // a call takes well, a table of them put on the end.
         std::vector<std::string> values;
         const auto               append = [&]() {
             std::string all;
@@ -5157,7 +6013,7 @@ namespace
             }
             else if (values.size() > 32)
             {
-                line("table.move({" + all + "}, 1, " + std::to_string(values.size()) + ", #" + name + " + 1, " + name + ")");
+                line("table.extend(" + name + ", {" + all + "})");
             }
             else if (!values.empty())
             {
@@ -5197,22 +6053,12 @@ namespace
                     }
                     break;
                 case Kind::Named:
-                {
-                    // Which may be l itself: table.move copies as memmove.
-                    const std::string other = expr(unwrapped(part.e)).text;
-                    line("table.move(" + other + ", 1, #" + other + ", #" + name + " + 1, " + name + ")");
-                    break;
-                }
                 case Kind::Other:
-                {
-                    const std::string each = name == "item" ? "value" : "item";
-                    line("for _, " + each + " in " + expr(part.e).text + " do");
-                    ++mDepth;
-                    line("table.insert(" + name + ", " + each + ")");
-                    --mDepth;
-                    line("end");
+                    // Another list's items, put on the end by table.extend,
+                    // which runs what it is given once; it may be l itself,
+                    // which it copies as memmove.
+                    line("table.extend(" + name + ", " + expr(part.e).text + ")");
                     break;
-                }
             }
         }
         append();
@@ -6069,8 +6915,10 @@ namespace
     {
         prepareBody(handler->getStatements());
         mInDetected = detectedEvent(handler->getIdentifier()->getName());
+        mOnDamage   = std::string_view(handler->getIdentifier()->getName()) == "on_damage";
         block(handler->getStatements());
         mInDetected = false;
+        mOnDamage   = false;
     }
 
     void Writer::singleState(LSLState* state)
@@ -6183,12 +7031,61 @@ namespace
                  "end\n\n";
     }
 
+    bool Writer::oneShotTimer() const
+    {
+        LSLASTNode* first = mScript->getStates()->getChild(0);
+        for (LSLASTNode* s = first; s; s = s->getNext())
+        {
+            LSLEventHandler* timer = nullptr;
+            for (LSLASTNode* h = static_cast<LSLState*>(s)->getEventHandlers()->getChild(0); h; h = h->getNext())
+            {
+                if (std::string_view(static_cast<LSLEventHandler*>(h)->getIdentifier()->getName()) == "timer")
+                {
+                    timer = static_cast<LSLEventHandler*>(h);
+                }
+            }
+            // Its first statement llSetTimerEvent of nought: written out, or
+            // LSL's FALSE.
+            LSLASTNode* statement = timer && timer->getStatements() ? timer->getStatements()->getChild(0) : nullptr;
+            if (!statement || statement->getNodeSubType() != NODE_EXPRESSION_STATEMENT)
+            {
+                return false;
+            }
+            LSLExpression* e = unbracketed(static_cast<LSLExpressionStatement*>(statement)->getExpr());
+            if (!e || e->getNodeSubType() != NODE_FUNCTION_EXPRESSION ||
+                std::string_view(static_cast<LSLFunctionExpression*>(e)->getIdentifier()->getName()) != "llSetTimerEvent")
+            {
+                return false;
+            }
+            LSLExpression* seconds = unbracketed(argumentAt(static_cast<LSLFunctionExpression*>(e), 0));
+            bool           nought  = false;
+            if (!numberWritten(seconds, nought))
+            {
+                LSLSymbol* named = seconds && seconds->getNodeSubType() == NODE_LVALUE_EXPRESSION
+                                       ? static_cast<LSLLValueExpression*>(seconds)->getIdentifier()->getSymbol()
+                                       : nullptr;
+                nought = named && named->getSubType() == SYM_BUILTIN && std::string_view(named->getName()) == "FALSE";
+            }
+            if (!nought)
+            {
+                return false;
+            }
+        }
+        return first != nullptr;
+    }
+
     void Writer::timersPreamble()
     {
         // llSetTimerEvent's one timer, on LLTimers: set going again, or
         // stopped, by each setTimer, calling the timer handler of the state
-        // the script is in.
-        line("-- llSetTimerEvent's timer, on LLTimers: one at a time, as LSL had it.");
+        // the script is in. Where every timer handler turns it off first,
+        // LLTimers:once, which runs it as often: once each time it is set.
+        line(mOneShot ? "-- llSetTimerEvent's timer, on LLTimers: one at a time, as LSL had it, and once each"
+                      : "-- llSetTimerEvent's timer, on LLTimers: one at a time, as LSL had it.");
+        if (mOneShot)
+        {
+            line("-- time it is set, as its handler turns it off before anything else.");
+        }
         noteOnce(nullptr, "SluaTimers", "SLua's LLTimers can run several timers at once: LLTimers:every(seconds, callback), "
                                         "LLTimers:once(seconds, callback) and LLTimers:off(timer).");
         if (!mManyStates)
@@ -6202,8 +7099,8 @@ namespace
                  "        LLTimers:off(timerHandle)\n"
                  "        timerHandle = nil\n"
                  "    end\n"
-                 "    if seconds > 0 then\n"
-                 "        timerHandle = LLTimers:every(seconds, function()\n";
+                 "    if seconds > 0 then\n";
+        mText += mOneShot ? "        timerHandle = LLTimers:once(seconds, function()\n" : "        timerHandle = LLTimers:every(seconds, function()\n";
         mText += mManyStates ? "            local handler = currentState and states[currentState].timer\n"
                                "            if handler then\n"
                                "                handler()\n"
@@ -6272,13 +7169,34 @@ namespace
 
     void Writer::helpers(std::string& out)
     {
-        if (mJoinLists)
+        if (mVecNorm)
         {
-            out += R"LUA(-- LSL's + on lists: a new list of both, the left's then the right's.
-local function joinLists(a: { any }, b: { any }): { any }
-    local out = table.clone(a)
-    table.move(b, 1, #b, #out + 1, out)
-    return out
+            out += R"LUA(-- LSL's llVecNorm: a vector one long the same way; a zero vector stays
+-- zero, which vector.normalize makes NaN of.
+local function vecNorm(v: vector): vector
+    return if v == ZERO_VECTOR then v else vector.normalize(v)
+end
+
+)LUA";
+        }
+        // The script's own clock, from where it was last reset: a
+        // script-wide local, which a state change leaves as it left LSL's.
+        if (mTimeBase)
+        {
+            out += R"LUA(-- LSL's script time, which llResetTime set back to nought: SLua's ll has
+-- no ResetTime, so the script keeps a clock of its own, read as
+-- ll.GetTime() - timeBase.
+local timeBase = ll.GetTime()
+
+)LUA";
+        }
+        if (mGetAndResetTime)
+        {
+            out += R"LUA(-- LSL's llGetAndResetTime: the time since the last reset, and a reset.
+local function getAndResetTime(): number
+    local was = timeBase
+    timeBase = ll.GetTime()
+    return timeBase - was
 end
 
 )LUA";
@@ -6324,13 +7242,23 @@ end
         // What the script sets going: a timer on LLTimers where it sets one.
         LSLASTNode* first = mScript->getStates()->getChild(0);
         mManyStates       = first && first->getNext();
+        // And where it resets its time, the clock it is read from.
+        bool resets = false;
         walk(mScript, [&](LSLASTNode* node) {
-            if (mOptions.llTimers && node->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
-                std::string_view(static_cast<LSLFunctionExpression*>(node)->getIdentifier()->getName()) == "llSetTimerEvent")
+            if (node->getNodeSubType() != NODE_FUNCTION_EXPRESSION)
+            {
+                return;
+            }
+            const std::string_view name = static_cast<LSLFunctionExpression*>(node)->getIdentifier()->getName();
+            if (mOptions.llTimers && name == "llSetTimerEvent")
             {
                 mTimers = true;
             }
+            resets |= name == "llResetTime" || name == "llGetAndResetTime";
         });
+        mOneShot    = mTimers && oneShotTimer();
+        mTimeBase   = resets && mOptions.sluaCalls;
+        mCompatTime = resets && !mOptions.sluaCalls;
         forgetMemoryHacks();
         findTextKeys();
         findListTypes();
@@ -6409,7 +7337,61 @@ end
             span.sluaFirst += above;
             span.sluaLast += above;
         }
-        return out + mText;
+        return leveled(out + mText);
+    }
+
+    std::string Writer::leveled(const std::string& text) const
+    {
+        if (!mToggleMark || text.find(mToggleMark) == std::string::npos)
+        {
+            return text;
+        }
+        // Each mark, an opener's after its [ and a closer's after its ]: the
+        // openers since one closer the next one's, all at the level of the
+        // fewest =s that nothing from the first of them to it closes, which
+        // is what a - taken out of any of them comments out.
+        std::vector<std::pair<size_t, size_t>> levels;
+        std::vector<size_t>                    opens;
+        for (size_t at = text.find(mToggleMark); at != std::string::npos; at = text.find(mToggleMark, at + 1))
+        {
+            if (at > 0 && text[at - 1] == '[')
+            {
+                opens.push_back(at);
+                continue;
+            }
+            std::string held;
+            if (!opens.empty())
+            {
+                held = text.substr(opens.front() + 2, at - 1 - (opens.front() + 2));
+                std::erase(held, mToggleMark);
+            }
+            std::string level;
+            while (held.find("]" + level + "]") != std::string::npos)
+            {
+                level += "=";
+            }
+            for (size_t opener : opens)
+            {
+                levels.emplace_back(opener, level.size());
+            }
+            levels.emplace_back(at, level.size());
+            opens.clear();
+        }
+        // Any written after their closer, as they stand.
+        for (size_t opener : opens)
+        {
+            levels.emplace_back(opener, 0);
+        }
+        std::string out;
+        size_t      from = 0;
+        for (const auto& [at, n] : levels)
+        {
+            out.append(text, from, at - from);
+            out.append(n, '=');
+            from = at + 1;
+        }
+        out.append(text, from, std::string::npos);
+        return out;
     }
 
     void Writer::endSpans()

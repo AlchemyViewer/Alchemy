@@ -352,6 +352,14 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
                                   : action == "show_compare"  ? "ActionShowCompare"
                                   : action == "apply_fixes"   ? "ActionApplyFixes"
                                   : action == "make_strict"   ? "ActionMakeStrict"
+                                  : action == "master_link_hint"    ? "ActionMasterLink"
+                                  : action == "master_send"         ? "ActionMasterSend"
+                                  : action == "master_compare"      ? "ActionMasterCompare"
+                                  : action == "master_compare_file" ? "ActionMasterCompareFile"
+                                  : action == "master_give_way"     ? "ActionMasterGiveWay"
+                                  : action == "master_open_file"    ? "ActionMasterOpenFile"
+                                  : action == "master_unlink"       ? "ActionMasterUnlink"
+                                  : action == "master_find"         ? "ActionMasterFind"
                                                               : "ActionExport";
         const std::string label = mServices->words(key);
         const size_t      last  = entry.text.rfind('\n');

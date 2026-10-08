@@ -27,6 +27,7 @@
 #ifndef LL_LLPREVIEWNOTECARD_H
 #define LL_LLPREVIEWNOTECARD_H
 
+#include "almasterlinks.h"
 #include "alquickask.h"
 #include "alrecoverykeeper.h"
 #include "alsavehistory.h"
@@ -108,6 +109,14 @@ private:
     // --- saving ------------------------------------------------------------------------
 
     bool saveIfNeeded();
+    // A notecard whose master is a file on disk (ALScriptDiskMasters): the
+    // link, where it is one to save through; said over the text as it
+    // loads, with Unlink; and a save here written to the file, whose write
+    // sends it, as any save of the file does. A file holds text alone, so
+    // one carrying items is not saved through it.
+    std::optional<ALMasterLink> masterLink() const;
+    void                        showLinked();
+    bool                        saveThroughFile(const ALMasterLink& link);
     // A save of ours answered.
     void savedHere(const ALScriptCompileResult& result);
     // A save of this notecard heard from anywhere else: taken, marked
@@ -163,6 +172,10 @@ private:
     // --- the external editor ------------------------------------------------------------
 
     void        openInExternalEditor();
+    // The copy an editor outside is given, written and watched; and that
+    // editor started on a file, what went wrong said.
+    std::string writeEditorCopy();
+    void        runExternalEditor(const std::string& filename);
     bool        onExternalChange(const std::string& filename);
     bool        loadNotecardText(const std::string& filename);
     bool        writeToFile(const std::string& filename);

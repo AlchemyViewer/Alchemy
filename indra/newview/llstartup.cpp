@@ -213,6 +213,7 @@
 #include "llpanelgroupnotices.h"
 #include "llparcel.h"
 #include "llpreview.h"
+#include "alscriptdiskmasters.h"
 #include "alscriptstudio.h"
 #include "alscripttempfiles.h"
 #include "alscriptworkspace.h"
@@ -2760,6 +2761,10 @@ bool idle_startup()
         // a session gave an editor outside, taken out of the temp folder.
         ALScriptStudio::offerRecovery();
         ALScriptWorkspace::instance().tempFiles().sweep();
+        // Scripts whose master is a file on disk: live while logged in, a
+        // save of the file made outside the studio sending them, whether or
+        // not a studio window is open.
+        ALScriptDiskMasters::instance().start();
 
         LLAgentPicksInfo::getInstance()->requestNumberOfPicks();
 

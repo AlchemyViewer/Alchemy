@@ -175,10 +175,11 @@ void ALScriptStudioFiles::write(Doc& doc)
         doc.watch->seen();
     }
     mServices.report(mServices.words("SavedToFile", args), false, &doc);
-    mWindow.fileSettled(doc);
     // The scripter's snippets, offered as saved from here on; the vimrc
-    // read again at once.
-    mWindow.fileWritten(doc.file);
+    // read again at once; what it masters sent. Before it is settled,
+    // which may close it.
+    mWindow.fileWritten(doc);
+    mWindow.fileSettled(doc);
 }
 
 // --- the File menu -----------------------------------------------------------------------
@@ -328,6 +329,7 @@ void ALScriptStudioFiles::chosenToSaveAs(const std::string& id, const std::vecto
     watch(*doc);
     noteFile(path);
     mServices.report(mServices.words("SavedToFile", args), false, doc);
+    mWindow.fileWritten(*doc);
     mWindow.fileSettled(*doc);
     mAnalysis.scheduleAnalysis(*doc, true);
 }

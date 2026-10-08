@@ -257,6 +257,10 @@ public:
     bool publishObject(const LLUUID& object_id);
     void unpublishObject(const LLUUID& object_id, const std::string& reason = "");
     bool isObjectPublished(const LLUUID& object_id) const;
+    // Whether a client holds a script: subscribed to it, or its object
+    // published to one -- where saving it from elsewhere gives it two
+    // masters.
+    bool holds(const ALScriptRef& ref) const;
 
     // The world's way in to the publishing, which the manager does.
     void onPrimInventoryReady(const LLUUID& object_id, const LLUUID& prim_id);
@@ -357,9 +361,14 @@ private:
     // the prim's inventory fetched again, so that the object.update
     // that follows carries the item's new revision.
     void sendCompiled(const ALScriptCompileResult& result);
-    // The script.compiled message for a result, in the protocol's terms.
+    // The script.compiled message for a result, in the protocol's terms:
+    // its diagnostics are places in the text the client has
+    // (ALScriptCompileResult::inSource).
     static LLSD compiledMessage(const std::string& script_id, bool success, bool running,
                                 const std::vector<ALScriptDiagnostic>& diagnostics, bool lua);
+    // One diagnostic in the protocol's terms: its row and column counted
+    // from one, and nought for a place not named.
+    static LLSD diagnosticEntry(const ALScriptDiagnostic& diagnostic, bool lua);
 
     struct EditorSubscription
     {

@@ -329,4 +329,39 @@ namespace tut
         ensure("a folder is no file", !ALFileStamp::of(folder).exists);
         ensure("nothing is nothing", !ALFileStamp::of(file + ".gone").exists);
     }
+
+    template<> template<>
+    void alwatchedfile_object::test<11>()
+    {
+        set_test_name("a watch made from a look made before takes what that look found, and asks the disk nothing itself");
+        put("print(1)\n", 100);
+        const ALFileStamp before = ALFileStamp::of(file);
+        // Written after the look and before the watch is made: heard, since
+        // the watch is from the look, not from the file as it is now.
+        put("print(2)\n", 200);
+        ALWatchedFile watched(file, before, hear());
+        ensure("as the look found it", watched.stamp() == before);
+        ensure("what came after it heard", looked(watched));
+        ensure_equals("once", heard.size(), size_t(1));
+        ensure_equals("as it is now", held.at(0), std::string("print(2)\n"));
+
+        // From a look that found the file as it is: nothing to hear.
+        ALWatchedFile current(file, ALFileStamp::of(file), hear());
+        ensure("nothing", !looked(current));
+
+        // From a look that found nothing there -- the stamp of no file,
+        // which a look of its own here would not have found: the file there
+        // now is heard, which shows the watch took the look it was given.
+        ALWatchedFile none(file, ALFileStamp(), hear());
+        ensure("nothing there at the look", !none.there());
+        ensure("the file there now heard", looked(none));
+        ensure_equals("twice in all", heard.size(), size_t(2));
+
+        // And seen() takes the file as it is, whatever look it began from.
+        put("print(3)\n", 300);
+        ALWatchedFile owned(file, before, hear());
+        owned.seen();
+        ensure("the owner's own is no change", !looked(owned));
+        ensure_equals("still twice", heard.size(), size_t(2));
+    }
 }

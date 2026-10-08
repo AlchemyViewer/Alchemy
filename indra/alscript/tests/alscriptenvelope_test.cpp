@@ -25,9 +25,11 @@
 #include "linden_common.h"
 
 #include "../preprocessor/alscriptenvelope.h"
+#include "../preprocessor/aluploadheader.h"
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -49,6 +51,42 @@ namespace tut
             }
             ++body;
             return asset.find("]" + std::string(level, '=') + "]", body);
+        }
+
+        // An envelope as a save makes one, with or without a header.
+        static ALScriptEnvelope made(bool lua, bool header)
+        {
+            ALScriptEnvelope envelope;
+            envelope.lua            = lua;
+            envelope.source         = lua ? "local n = 1\nprint(n)" : "integer n = 1;\ndefault { state_entry() { llSay(0, (string)n); } }";
+            envelope.expanded       = lua ? "local n = 1\nprint(n)\n" : "integer n = 1;\ndefault { state_entry() { llSay(0, (string)n); } }\n";
+            envelope.compileTarget  = lua ? "luau" : "mono";
+            envelope.programVersion = "Alchemy";
+            envelope.lastCompiled   = "today";
+            if (header)
+            {
+                ALUploadHeader fields;
+                fields.file     = lua ? "net/door.luau" : "net/door.lsl";
+                fields.hash     = ALUploadHeader::hashOf(envelope.compileTarget, envelope.source, envelope.expanded);
+                fields.date     = "2026-10-07 14:03:11";
+                envelope.header = fields.write(lua);
+            }
+            return envelope;
+        }
+
+        static std::vector<std::string> linesOf(const std::string& asset)
+        {
+            std::vector<std::string> lines;
+            for (size_t from = 0;;)
+            {
+                const size_t nl = asset.find('\n', from);
+                lines.push_back(asset.substr(from, nl == std::string::npos ? std::string::npos : nl - from));
+                if (nl == std::string::npos)
+                {
+                    return lines;
+                }
+                from = nl + 1;
+            }
         }
     };
 
@@ -292,6 +330,132 @@ namespace tut
                                   envelope.wrap().size());
                 }
             }
+        }
+    }
+
+    template<> template<>
+    void alscriptenvelope_object::test<10>()
+    {
+        set_test_name("a header goes between the target line and the code, and comes back out of it, the code alone left");
+        const ALScriptEnvelope lsl   = alscriptenvelope_data::made(false, true);
+        const std::string      asset = lsl.wrap();
+        ensure_equals("byte for byte",
+                      asset,
+                      std::string("//start_unprocessed_text\n/*") + ALScriptEnvelope::encodeSource(lsl.source) +
+                          "*/\n//end_unprocessed_text\n//nfo_preprocessor_version 0\n//program_version Alchemy\n//last_compiled today\n//mono\n" +
+                          lsl.header + lsl.expanded);
+        for (const bool lua : { false, true })
+        {
+            const std::string               name    = lua ? "SLua: " : "LSL: ";
+            const ALScriptEnvelope          written = alscriptenvelope_data::made(lua, true);
+            std::optional<ALScriptEnvelope> back    = ALScriptEnvelope::parse(written.wrap());
+            ensure(name + "reads back", back.has_value());
+            ensure_equals(name + "the header", back->header, written.header);
+            ensure_equals(name + "the code alone", back->expanded, written.expanded);
+            ensure_equals(name + "the source", back->source, written.source);
+            ensure_equals(name + "the target", back->compileTarget, written.compileTarget);
+            ensure_equals(name + "written again, the same", back->wrap(), written.wrap());
+            ensure_equals(name + "its size worked out", written.wrappedSize(), written.wrap().size());
+            ensure_equals(name + "and from the fields",
+                          ALScriptEnvelope::wrappedSize(lua, written.source, written.expanded, written.compileTarget, written.programVersion,
+                                                        written.lastCompiled, written.header),
+                          written.wrap().size());
+
+            // Without one, as it was: nothing taken, and Firestorm's bytes
+            // with nothing added.
+            const ALScriptEnvelope plain = alscriptenvelope_data::made(lua, false);
+            back                         = ALScriptEnvelope::parse(plain.wrap());
+            ensure(name + "none: reads back", back.has_value());
+            ensure_equals(name + "none: no header", back->header, std::string());
+            ensure_equals(name + "none: the code", back->expanded, plain.expanded);
+            ensure_equals(name + "none: the header's bytes and no more", plain.wrap().size() + written.header.size(), written.wrap().size());
+        }
+
+        // A header that does not end its line gets a newline of its own.
+        ALScriptEnvelope unended = alscriptenvelope_data::made(false, true);
+        unended.header.pop_back();
+        ensure("a newline after it", unended.wrap() == alscriptenvelope_data::made(false, true).wrap());
+        ensure_equals("and counted", unended.wrappedSize(), unended.wrap().size());
+
+        // With no target line, it follows the date.
+        ALScriptEnvelope untargeted = alscriptenvelope_data::made(false, true);
+        untargeted.compileTarget.clear();
+        std::optional<ALScriptEnvelope> back = ALScriptEnvelope::parse(untargeted.wrap());
+        ensure("untargeted: the header taken", back && back->header == untargeted.header && back->expanded == untargeted.expanded);
+
+        // The plugin's banner, should one stand there, is taken out too.
+        ALScriptEnvelope theirs = alscriptenvelope_data::made(false, false);
+        theirs.header           = "// ================ sl-vscode-plugin meta ================\n// @file a.lsl\n"
+                                  "// =======================================================\n";
+        back = ALScriptEnvelope::parse(theirs.wrap());
+        ensure("the plugin's taken", back && back->header == theirs.header && back->expanded == theirs.expanded);
+
+        // Only the first: a second, which the author's code begins with, is
+        // the code's.
+        ALScriptEnvelope twice = alscriptenvelope_data::made(false, true);
+        twice.expanded         = twice.header + twice.expanded;
+        back                   = ALScriptEnvelope::parse(twice.wrap());
+        ensure("one header taken", back && back->header == twice.header && back->expanded == twice.expanded);
+    }
+
+    template<> template<>
+    void alscriptenvelope_object::test<11>()
+    {
+        set_test_name("a header moves the line the code begins on by its own lines, and nothing else");
+        for (const bool lua : { false, true })
+        {
+            const std::string      name    = lua ? "SLua: " : "LSL: ";
+            const ALScriptEnvelope without = alscriptenvelope_data::made(lua, false);
+            const ALScriptEnvelope with    = alscriptenvelope_data::made(lua, true);
+            const int              lines   = static_cast<int>(std::count(with.header.begin(), with.header.end(), '\n'));
+            ensure_equals(name + "the header's lines", lines, 5);
+            ensure_equals(name + "the code begins that much later", with.codeLine(), without.codeLine() + lines);
+
+            // The asset's line codeLine() + n is the code's line n either
+            // way, and the code's lines are the ones the source map is of.
+            const std::vector<std::string> plain  = alscriptenvelope_data::linesOf(without.wrap());
+            const std::vector<std::string> headed = alscriptenvelope_data::linesOf(with.wrap());
+            const std::vector<std::string> code   = alscriptenvelope_data::linesOf(with.expanded);
+            for (size_t i = 0; i < code.size(); ++i)
+            {
+                ensure_equals(name + "code line " + std::to_string(i) + " without", plain[static_cast<size_t>(without.codeLine()) + i], code[i]);
+                ensure_equals(name + "code line " + std::to_string(i) + " with", headed[static_cast<size_t>(with.codeLine()) + i], code[i]);
+            }
+            // And read back from the asset, as a save hears of it.
+            const std::optional<ALScriptEnvelope> back = ALScriptEnvelope::parse(with.wrap());
+            ensure(name + "reads back", back.has_value());
+            ensure_equals(name + "read back, the same line", back->codeLine(), with.codeLine());
+        }
+    }
+
+    template<> template<>
+    void alscriptenvelope_object::test<12>()
+    {
+        set_test_name("a header fools neither compiledFrom nor the check that the code was edited");
+        for (const bool lua : { false, true })
+        {
+            const std::string      name  = lua ? "SLua: " : "LSL: ";
+            const ALScriptEnvelope sent  = alscriptenvelope_data::made(lua, true);
+            ALScriptEnvelope       later = alscriptenvelope_data::made(lua, true);
+            ALUploadHeader         again = *ALUploadHeader::parse(later.header, lua);
+            again.date                   = "2026-10-08 09:00:00";
+            later.header                 = again.write(lua);
+
+            const std::optional<ALScriptEnvelope> held = ALScriptEnvelope::parse(sent.wrap());
+            const std::optional<ALScriptEnvelope> came = ALScriptEnvelope::parse(later.wrap());
+            ensure(name + "both read", held && came);
+            ensure(name + "the headers apart", held->header != came->header);
+            // What the bridge holds up to tell an edit of the compiled half:
+            // the code the same, whenever it went up.
+            ensure(name + "the code the same", held->expanded == came->expanded);
+            ensure(name + "compiled from the expansion", ALScriptEnvelope::compiledFrom(sent.expanded, came->expanded, lua));
+            // Even left in, a header is comments, which it passes over.
+            ensure(name + "a header in the code passed over", ALScriptEnvelope::compiledFrom(sent.expanded, sent.header + sent.expanded, lua));
+            ensure(name + "the source told as it was", ALScriptEnvelope::comparable(came->source, lua, true, false));
+            // The hash is of what was sent, the header aside: worked out
+            // again from the halves read back, it is what the header says.
+            ensure_equals(name + "the hash again", ALUploadHeader::hashOf(came->compileTarget, came->source, came->expanded),
+                          ALUploadHeader::parse(came->header, lua)->hash);
         }
     }
 }

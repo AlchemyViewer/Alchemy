@@ -56,7 +56,9 @@ namespace
         { "SlCompoundAssign", Rule::SLua, Severity::Note, true, true, nullptr, true },
         // LSL: llGetListLength(l) in a loop's check, l unchanged in it.
         { "SlLoopInvariantCall", Rule::LSL, Severity::Note, true, true, nullptr },
-        // if n then, where n is a number: true at 0 as at anything.
+        // if n then, where n is a number: true at 0 as at anything. So too
+        // a string, a uuid, a vector, a quaternion, a list and an integer,
+        // which LSL counted false when empty, NULL_KEY or zero.
         { "SlNumberTruth", Rule::SLua, Severity::Warning, true, true, nullptr, true },
         // ll.ListFindList(l, x) == -1, where it answers nil; llcompat's
         // against nil, where it answers -1.
@@ -88,7 +90,7 @@ namespace
         // t[n / 2]: Luau's / makes a fraction, which a list has nothing at.
         { "SlIndexDivision", Rule::SLua, Severity::Warning, true, true, nullptr, true },
         // a * b of vectors where a number is wanted, LSL's dot product; a % b,
-        // LSL's cross product.
+        // the cross product as in LSL, a note naming vector.cross.
         { "SlVectorProduct", Rule::SLua, Severity::Warning, true, true, nullptr, true },
         // llSetPos, llSetPrimitiveParams: a call that sleeps, which a Fast
         // one does without. A warning in a loop or a timer.
@@ -189,7 +191,10 @@ namespace
     // What Luau's library, and SLua's, answer without changing anything: a
     // global function, or a library's -- all of math's but its random
     // numbers, and of string's, table's and the rest those that only
-    // answer.
+    // answer. SLua's types made by calling their names, vector(1, 2, 3)
+    // and uuid(s), among the globals; all of integer's, whose answers are
+    // new integers; and of buffer's those that read it or make one, not
+    // those that write, copy into or fill one.
     bool onlyAnswers(std::string_view library, std::string_view name)
     {
         using Names = std::initializer_list<std::string_view>;
@@ -197,13 +202,14 @@ namespace
         if (library.empty())
         {
             return among({ "tostring", "tonumber", "type", "typeof", "rawequal", "rawlen", "rawget", "select", "touuid", "tovector", "toquaternion",
-                           "torotation" });
+                           "torotation", "vector", "quaternion", "rotation", "uuid" });
         }
         if (library == "math")
         {
             return name != "random" && name != "randomseed";
         }
-        if (library == "vector" || library == "quaternion" || library == "bit32" || library == "utf8" || library == "llbase64")
+        if (library == "vector" || library == "quaternion" || library == "rotation" || library == "uuid" || library == "integer" ||
+            library == "bit32" || library == "utf8" || library == "llbase64")
         {
             return true;
         }
@@ -214,7 +220,11 @@ namespace
         }
         if (library == "table")
         {
-            return among({ "concat", "find", "clone", "pack", "unpack" });
+            return among({ "concat", "find", "clone", "pack", "unpack", "create", "maxn", "isfrozen" });
+        }
+        if (library == "buffer")
+        {
+            return name.substr(0, 4) == "read" || among({ "create", "fromstring", "tostring", "len" });
         }
         return library == "lljson" && among({ "encode", "decode", "slencode", "sldecode" });
     }
@@ -620,16 +630,19 @@ namespace
         }
     };
 
-    // What the pass asks the check an expression is.
+    // What the pass asks the check an expression is. An integer is SLua's
+    // own, written 5i, and no number.
     enum class Kind : U8
     {
         Number,
+        Integer,
         String,
         Boolean,
         Table,
         List,
         Vector,
         Quaternion,
+        Uuid,
     };
 
     class Pass final : public Luau::AstVisitor
@@ -1105,14 +1118,7 @@ namespace
             {
                 return true;
             }
-            if (number(node->expr))
-            {
-                const std::string text = this->text(node->expr->location);
-                problem(node->location, "LuauLintSlNumberTruthNot",
-                        "not [1] is always false: [1] is a number, and Luau counts every number true, 0 too. [1] == 0 asks whether it is 0",
-                        { text }, "SlNumberTruth");
-            }
-            else
+            if (!alwaysFalse(node))
             {
                 truth(node->expr);
             }
@@ -1257,7 +1263,7 @@ namespace
         // The kind an expression is, of those an answer may be given back as.
         std::optional<Kind> kindOf(Luau::AstExpr* e)
         {
-            for (Kind kind : { Kind::Number, Kind::String, Kind::Boolean, Kind::List, Kind::Table, Kind::Vector, Kind::Quaternion })
+            for (Kind kind : { Kind::Number, Kind::Integer, Kind::String, Kind::Boolean, Kind::List, Kind::Table, Kind::Vector, Kind::Quaternion, Kind::Uuid })
             {
                 if (is(e, kind))
                 {
@@ -1298,7 +1304,7 @@ namespace
                 const bool  text   = own && std::find(TEXT.begin(), TEXT.end(), std::string_view(callee->index.value)) != TEXT.end();
                 return text ? std::optional<Kind>(Kind::String) : std::nullopt;
             }
-            for (Kind kind : { Kind::Number, Kind::String, Kind::Boolean, Kind::List, Kind::Table, Kind::Vector, Kind::Quaternion })
+            for (Kind kind : { Kind::Number, Kind::Integer, Kind::String, Kind::Boolean, Kind::List, Kind::Table, Kind::Vector, Kind::Quaternion, Kind::Uuid })
             {
                 if (of(*answer, kind))
                 {
@@ -1375,6 +1381,7 @@ namespace
             if (const auto* prim = Luau::get<Luau::PrimitiveType>(followed))
             {
                 return (want == Kind::Number && prim->type == Luau::PrimitiveType::Number) ||
+                       (want == Kind::Integer && prim->type == Luau::PrimitiveType::Integer) ||
                        (want == Kind::String && prim->type == Luau::PrimitiveType::String) ||
                        (want == Kind::Boolean && prim->type == Luau::PrimitiveType::Boolean);
             }
@@ -1389,7 +1396,8 @@ namespace
                        (want == Kind::List && table->props.empty() && table->indexer && of(table->indexer->indexType, Kind::Number));
             }
             const auto* extern_type = Luau::get<Luau::ExternType>(followed);
-            return extern_type && ((want == Kind::Vector && extern_type->name == "vector") || (want == Kind::Quaternion && extern_type->name == "quaternion"));
+            return extern_type && ((want == Kind::Vector && extern_type->name == "vector") || (want == Kind::Quaternion && extern_type->name == "quaternion") ||
+                                   (want == Kind::Uuid && extern_type->name == "uuid"));
         }
 
         // Whether the check found an expression of a kind. A local the
@@ -2468,7 +2476,8 @@ namespace
 
         // A product of two vectors where the other side of an operator is a
         // number, which a vector can be neither compared with nor added to;
-        // and a % b of two vectors, LSL's cross product.
+        // and a % b of two vectors, the cross product in SLua as in LSL (the
+        // VM's __mod), which vector.cross says plainly: a note.
         void vectorProducts(Luau::AstExprBinary* node)
         {
             using Op = Luau::AstExprBinary::Op;
@@ -2478,9 +2487,9 @@ namespace
                 const std::string b    = text(node->right->location);
                 const std::string now  = "vector.cross(" + a + ", " + b + ")";
                 ALScriptProblem&  said = problem(node->location, "LuauLintSlVectorCross",
-                                                 "[1] is each part's remainder in SLua: LSL's % of two vectors was their cross product. "
-                                                 "vector.cross([2], [3]) is LSL's",
-                                                 { text(node->location), a, b }, "SlVectorProduct");
+                                                 "[1] is the cross product of two vectors, as LSL's % was. vector.cross([2], [3]) says so "
+                                                 "plainly",
+                                                 { text(node->location), a, b }, "SlVectorProduct", Severity::Note);
                 offer(said, now, { edit(node->location, now) }, false);
                 return;
             }
@@ -2736,8 +2745,65 @@ namespace
             }
         }
 
+        // The kind of an expression SLua counts true whatever it holds,
+        // where LSL counted it false at nought, empty or zero: a number, a
+        // string, a key, a vector, a rotation or a list -- and SLua's own
+        // integer. None where it may be nil though its type says not. A
+        // local inside brackets as itself, which nonstrict mode types any.
+        std::optional<Kind> alwaysTrue(Luau::AstExpr* e)
+        {
+            for (Kind kind : { Kind::Number, Kind::Integer, Kind::String, Kind::Uuid, Kind::Vector, Kind::Quaternion, Kind::List })
+            {
+                if (is(unbracketed(e), kind))
+                {
+                    return unsure(e) ? std::nullopt : std::optional<Kind>(kind);
+                }
+            }
+            return std::nullopt;
+        }
+
+        // Whether what an expression reads may be nil though its type says
+        // not: a table read by a key -- t[k], or t.k where t has no field k
+        // but takes any key -- which the check types as the table's values
+        // though a key with none reads nil; a local declared with no value;
+        // or a local given either. if t[k] then asks whether k has one.
+        bool unsure(Luau::AstExpr* e)
+        {
+            e = unbracketed(e);
+            if (e->is<Luau::AstExprIndexExpr>())
+            {
+                return true;
+            }
+            if (const auto* field = e->as<Luau::AstExprIndexName>())
+            {
+                const Luau::TypeId*    type  = mChecked ? mChecked->astTypes.find(field->expr) : nullptr;
+                const Luau::TableType* table = type ? Luau::get<Luau::TableType>(Luau::follow(*type)) : nullptr;
+                return table && table->indexer && table->props.find(field->index.value) == table->props.end();
+            }
+            auto* local = e->as<Luau::AstExprLocal>();
+            if (!local)
+            {
+                return false;
+            }
+            if (const auto known = mUnsure.find(local->local); known != mUnsure.end())
+            {
+                return known->second;
+            }
+            // Taken as sure while its own are asked about, as localIs does.
+            mUnsure[local->local] = false;
+            bool       yes   = mLocals.bare.contains(local->local);
+            const auto given = mLocals.given.find(local->local);
+            for (size_t i = 0; !yes && given != mLocals.given.end() && i < given->second.size(); ++i)
+            {
+                yes = unsure(given->second[i]);
+            }
+            mUnsure[local->local] = yes;
+            return yes;
+        }
+
         // What a condition asks the truth of: itself, or each side of an
-        // and or an or, inside brackets or not.
+        // and or an or, inside brackets or not. Each kind is fixed as LSL
+        // asked it, which is what the converter writes.
         void truth(Luau::AstExpr* e)
         {
             if (!on("SlNumberTruth"))
@@ -2756,14 +2822,136 @@ namespace
                 truth(both->right);
                 return;
             }
-            if (number(e))
+            const std::optional<Kind> kind = alwaysTrue(e);
+            if (!kind)
             {
-                // An if-then-else inside brackets, the comparison binding
-                // tighter.
-                problem(e->location, "LuauLintSlNumberTruth",
-                        "[1] is a number, and Luau counts every number true, 0 too: [1] ~= 0 asks whether it is not 0",
-                        { text(e->location), e->is<Luau::AstExprIfElse>() ? "(" : "" }, "SlNumberTruth");
+                return;
             }
+            // An if-then-else inside brackets, the comparison binding
+            // tighter.
+            const std::string was  = text(e->location);
+            const std::string side = e->is<Luau::AstExprIfElse>() ? "(" + was + ")" : was;
+            ALScriptProblem*  said = nullptr;
+            std::string       now;
+            switch (*kind)
+            {
+                case Kind::Number:
+                    // Fixed by its key, as before the rest were said.
+                    problem(e->location, "LuauLintSlNumberTruth",
+                            "[1] is a number, and Luau counts every number true, 0 too: [1] ~= 0 asks whether it is not 0",
+                            { was, e->is<Luau::AstExprIfElse>() ? "(" : "" }, "SlNumberTruth");
+                    return;
+                case Kind::Integer:
+                    now  = side + " ~= 0i";
+                    said = &problem(e->location, "LuauLintSlIntegerTruth",
+                                    "[1] is an integer, and SLua counts every integer true, 0i too: [2] asks whether it is not 0", { was, now },
+                                    "SlNumberTruth");
+                    break;
+                case Kind::String:
+                    now  = side + " ~= \"\"";
+                    said = &problem(e->location, "LuauLintSlStringTruth",
+                                    "[1] is a string, and SLua counts every string true, \"\" too: [2] asks whether it is not empty", { was, now },
+                                    "SlNumberTruth");
+                    break;
+                case Kind::Uuid:
+                    now  = bracketed(e) + ".istruthy";
+                    said = &problem(e->location, "LuauLintSlUuidTruth",
+                                    "[1] is a uuid, and SLua counts every uuid true, NULL_KEY too: [2] asks whether it is not NULL_KEY",
+                                    { was, now }, "SlNumberTruth");
+                    break;
+                case Kind::Vector:
+                    now  = side + " ~= ZERO_VECTOR";
+                    said = &problem(e->location, "LuauLintSlVectorTruth",
+                                    "[1] is a vector, and SLua counts every vector true, ZERO_VECTOR too: [2] asks whether it is not zero",
+                                    { was, now }, "SlNumberTruth");
+                    break;
+                case Kind::Quaternion:
+                    now  = side + " ~= ZERO_ROTATION";
+                    said = &problem(e->location, "LuauLintSlQuaternionTruth",
+                                    "[1] is a quaternion, and SLua counts every quaternion true, ZERO_ROTATION too: [2] asks whether it is "
+                                    "not ZERO_ROTATION",
+                                    { was, now }, "SlNumberTruth");
+                    break;
+                case Kind::List:
+                    now  = "#" + bracketed(e) + " > 0";
+                    said = &problem(e->location, "LuauLintSlListTruth",
+                                    "[1] is a list, and SLua counts every table true, an empty one too: [2] asks whether it has anything in it",
+                                    { was, now }, "SlNumberTruth");
+                    break;
+                default: return;
+            }
+            // Not safe: the script did otherwise, whatever it meant.
+            offer(*said, now, { edit(e->location, now) }, false);
+        }
+
+        // not x, where SLua counts x true whatever it holds: always false.
+        // Fixed as LSL's !x asked. Whether it was said.
+        bool alwaysFalse(Luau::AstExprUnary* node)
+        {
+            Luau::AstExpr*            inner = node->expr;
+            const std::optional<Kind> kind  = alwaysTrue(inner);
+            if (!kind)
+            {
+                return false;
+            }
+            const std::string was  = text(inner->location);
+            const std::string side = inner->is<Luau::AstExprIfElse>() ? "(" + was + ")" : was;
+            ALScriptProblem*  said = nullptr;
+            std::string       now;
+            switch (*kind)
+            {
+                case Kind::Number:
+                    // Fixed by its key, as before the rest were said.
+                    problem(node->location, "LuauLintSlNumberTruthNot",
+                            "not [1] is always false: [1] is a number, and Luau counts every number true, 0 too. [1] == 0 asks whether it is 0",
+                            { was }, "SlNumberTruth");
+                    return true;
+                case Kind::Integer:
+                    now  = side + " == 0i";
+                    said = &problem(node->location, "LuauLintSlIntegerTruthNot",
+                                    "not [1] is always false: [1] is an integer, and SLua counts every integer true, 0i too. [2] asks whether "
+                                    "it is 0",
+                                    { was, now }, "SlNumberTruth");
+                    break;
+                case Kind::String:
+                    now  = side + " == \"\"";
+                    said = &problem(node->location, "LuauLintSlStringTruthNot",
+                                    "not [1] is always false: [1] is a string, and SLua counts every string true, \"\" too. [2] asks whether "
+                                    "it is empty",
+                                    { was, now }, "SlNumberTruth");
+                    break;
+                case Kind::Uuid:
+                    now  = "not " + bracketed(inner) + ".istruthy";
+                    said = &problem(node->location, "LuauLintSlUuidTruthNot",
+                                    "not [1] is always false: [1] is a uuid, and SLua counts every uuid true, NULL_KEY too. [2] asks whether "
+                                    "it is NULL_KEY",
+                                    { was, now }, "SlNumberTruth");
+                    break;
+                case Kind::Vector:
+                    now  = side + " == ZERO_VECTOR";
+                    said = &problem(node->location, "LuauLintSlVectorTruthNot",
+                                    "not [1] is always false: [1] is a vector, and SLua counts every vector true, ZERO_VECTOR too. [2] asks "
+                                    "whether it is zero",
+                                    { was, now }, "SlNumberTruth");
+                    break;
+                case Kind::Quaternion:
+                    now  = side + " == ZERO_ROTATION";
+                    said = &problem(node->location, "LuauLintSlQuaternionTruthNot",
+                                    "not [1] is always false: [1] is a quaternion, and SLua counts every quaternion true, ZERO_ROTATION too. "
+                                    "[2] asks whether it is ZERO_ROTATION",
+                                    { was, now }, "SlNumberTruth");
+                    break;
+                case Kind::List:
+                    now  = "#" + bracketed(inner) + " == 0";
+                    said = &problem(node->location, "LuauLintSlListTruthNot",
+                                    "not [1] is always false: [1] is a list, and SLua counts every table true, an empty one too. [2] asks "
+                                    "whether it is empty",
+                                    { was, now }, "SlNumberTruth");
+                    break;
+                default: return false;
+            }
+            offer(*said, now, { edit(node->location, now) }, false);
+            return true;
         }
 
         std::optional<size_t> offsetOf(const Luau::Position& p) const
@@ -2849,6 +3037,7 @@ namespace
         boost::unordered_flat_set<std::string>                            mGiven;
         boost::unordered_flat_set<std::string>                            mTopMade;
         boost::unordered_flat_map<std::pair<Luau::AstLocal*, Kind>, bool> mLocalKinds;
+        boost::unordered_flat_map<Luau::AstLocal*, bool>                  mUnsure;
         boost::unordered_flat_map<Luau::AstLocal*, std::optional<Find>>   mFindLocals;
         boost::unordered_flat_set<const Luau::AstExprCall*>               mStatements;
         // Loops' bodies, and timers' functions: where a call runs often.

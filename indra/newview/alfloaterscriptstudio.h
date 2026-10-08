@@ -26,6 +26,7 @@
 
 #include "alcodeeditor.h"
 #include "alscriptexplorerpane.h"
+#include "alscriptlinkpane.h"
 #include "alnotecardembedded.h"
 #include "alscriptoutputpane.h"
 #include "alscriptproblemspane.h"
@@ -38,6 +39,8 @@
 #include "alscriptstudiocomparewith.h"
 #include "alscriptstudioexpandedcompare.h"
 #include "alscriptstudiohistory.h"
+#include "alscriptstudiodiskmasters.h"
+#include "alscriptstudiomasters.h"
 #include "alscriptstudiomerging.h"
 #include "alscriptstudioselections.h"
 #include "alscriptstudiorecovery.h"
@@ -138,7 +141,8 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptObjectCheck::Window, public ALScriptRecompile::Window, public ALScriptStudioHistory::Window,
                                     public ALScriptStudioCompareWith::Window, public ALScriptStudioMerging::Window,
                                     public ALScriptStudioSelections::Window, public ALScriptStudioExpandedCompare::Window,
-                                    public ALScriptStudioComparePairs::Window
+                                    public ALScriptStudioComparePairs::Window, public ALScriptStudioMasters::Window,
+                                    public ALScriptLinkPane::Window
 {
     friend class LLFloaterReg;
 
@@ -780,6 +784,15 @@ private:
     void                                  askWeights(Doc& doc) override { askAnalyzer(doc, ALScriptAnalysis::Kind::Weigh, ALTextPos()); }
     bool optimizing() const override;
     std::string programVersion() const override;
+    ALScriptStudioDoc::Header uploadHeader() const override;
+    // ALScriptStudioMasters::Window
+    void pickMasterFile(std::function<void(const std::string& path)> chosen) override;
+    void openMasterFile(const std::string& path, bool lua) override;
+    void closeTab(Doc& doc) override;
+    void askLinkUnsaved(const Doc& doc, const std::string& path, std::function<void(ALScriptStudioMasters::Unsaved answer)> answered) override;
+    void editMasterFile(const std::string& path, bool lua) override;
+    bool heldByBridge(const ALScriptRef& ref) override;
+    void loadWorldText(const ALScriptRef& ref, std::function<void(const ALScriptLoaded& loaded)> loaded) override;
     bool        weightNotes() const override { return mWeightNotes; }
     bool        weightHeat() const override { return mWeightHeat; }
     ALScriptWeightsPane* weightsPane() override { return mWeightsPane; }
@@ -809,7 +822,7 @@ private:
     void                          pickFilesToOpen(bool several, std::function<void(const std::vector<std::string>& files)> chosen) override;
     void pickFileToSave(const std::string& name, std::function<void(const std::vector<std::string>& files)> chosen) override;
     void askReload(const Doc& doc, std::function<void(bool reload)> answered) override;
-    void fileWritten(const std::string& path) override;
+    void fileWritten(Doc& doc) override;
     // A file of a tab changed on disk, or went: what is in reach looked at.
     void reachChanged() override { mOrphansDirty = true; }
     void becomeFile(Doc& doc, const std::string& path) override;
@@ -989,6 +1002,11 @@ private:
     void showExplorer() override;
     void explorerPinsChanged() override { saveState(); }
     void checkScripts(const LLUUID& root) override { checkObject(root); }
+    // The Link tab shown, listing the scripts of the prims with a file
+    // proposed for each; and hidden again once it is done with
+    // (ALScriptLinkPane::Window), Output shown where it said what it linked.
+    void linkScripts(std::vector<ALScriptLinkScripts::Prim> prims) override;
+    void linkPaneDone(bool linked) override;
     void itemRenamed(const ALScriptRef& ref, const std::string& name) override;
     void itemDeleted(const ALScriptRef& ref) override;
     bool unsavedAnywhere(const ALScriptRef& ref) const override;
@@ -1058,10 +1076,12 @@ private:
         S32         errors = 0;
         S32         warnings = 0;
         const char* image  = nullptr;
+        // How many scripts in the world a file's tab is the master of.
+        S32         masters = 0;
         friend bool operator==(const TabFacts& a, const TabFacts& b)
         {
             return a.id == b.id && a.name == b.name && a.dirty == b.dirty && a.preview == b.preview && a.readOnly == b.readOnly && a.errors == b.errors &&
-                   a.warnings == b.warnings && a.image == b.image;
+                   a.warnings == b.warnings && a.image == b.image && a.masters == b.masters;
         }
         friend bool operator!=(const TabFacts& a, const TabFacts& b) { return !(a == b); }
     };
@@ -1326,6 +1346,8 @@ private:
     ALPaneList*                        mWeightsParts      = nullptr;
     ALPaneList*                        mWeightsStrings    = nullptr;
     ALScriptExplorerPane*              mExplorerPane  = nullptr;
+    // The Link tab, hidden but while there is something to link.
+    ALScriptLinkPane*                  mLinkPane      = nullptr;
     // What each of the menus' items does, whether it can, and whether it
     // is on, by the item's name.
     ALScriptStudioCommands             mCommands;
@@ -1365,6 +1387,8 @@ private:
     ALScriptObjectCheck                mObjectCheck{ *this, *this, *this };
     // Recompiles from the Explorer.
     ALScriptRecompile                  mRecompile{ *this, *this };
+    // Its scripts whose master is a file on disk.
+    ALScriptStudioMasters              mMasters{ *this, *this, *this, ALScriptStudioDiskMasters::get() };
     std::string                        mCheckingWhere;
     S32                                mCheckedErrors   = 0;
     S32                                mCheckedWarnings = 0;
@@ -1411,4 +1435,7 @@ private:
     std::vector<boost::signals2::scoped_connection> mSettingConnections;
     boost::signals2::scoped_connection mRuntimeConnection;
     boost::signals2::scoped_connection mRunningConnection;
+    // A file's links made or let go of: its tab says how many scripts it
+    // is the master of.
+    boost::signals2::scoped_connection mLinkBadgesConnection;
 };

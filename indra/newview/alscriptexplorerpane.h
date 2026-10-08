@@ -26,6 +26,7 @@
 
 #include "alquickopen.h"
 #include "alscriptexplorermodel.h"
+#include "alscriptlinkscripts.h"
 #include "alscriptrecompile.h"
 #include "almenuslot.h"
 #include "llui.h"
@@ -94,6 +95,10 @@ public:
         // a closed one's problems listed (ALScriptRecompile).
         virtual void recompileScripts(std::vector<ALScriptRecompile::One> scripts, std::vector<std::pair<LLUUID, std::string>> prims,
                                       const std::string& target) = 0;
+        // Every script of the prims, each with a file on disk proposed as
+        // its master, listed for the scripter to link them all at once
+        // (ALScriptLinkPane).
+        virtual void linkScripts(std::vector<ALScriptLinkScripts::Prim> prims) = 0;
 
     protected:
         ~Window() = default;
@@ -196,6 +201,12 @@ private:
     // Start, stop, reset or restart over the rows, asked about first where
     // it reaches more than one script.
     void run(const std::string& action, const std::vector<Choice>& rows);
+    // Every script of the objects and prims chosen offered a file on disk
+    // to be linked to; and every linked script among the rows, and of
+    // their prims, sent from its file as the studio's own send, which a
+    // change in the world since holds.
+    void linkScripts(const std::vector<Choice>& rows);
+    void sendFromFiles(const std::vector<Choice>& rows);
 
     // What is chosen of what a prim holds, dragged out with the viewer's
     // drag tool -- to the inventory, as the build floater's contents are --
@@ -252,4 +263,5 @@ private:
     boost::signals2::scoped_connection mHeardConnection;
     boost::signals2::scoped_connection mRegionUsageConnection;
     boost::signals2::scoped_connection mPresenceConnection;
+    boost::signals2::scoped_connection mBadgesConnection;
 };

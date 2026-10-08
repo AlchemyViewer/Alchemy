@@ -234,7 +234,8 @@ void ALScriptStudioSaving::sendPreprocessed(Doc& doc, const Doc::Expanded& sent)
     }
     // In the envelope, with the source as written, so Firestorm opens
     // what we save; the lines that say who wrote it and when are ours.
-    const ALScriptEnvelope envelope = doc.envelopeFor(*sent.text, mWindow.saveOptions().program);
+    const Options          options  = mWindow.saveOptions();
+    const ALScriptEnvelope envelope = doc.envelopeFor(*sent.text, options.program, options.header);
     doc.envelope                    = envelope;
     upload(doc, envelope.wrap(), &sent.map);
 }
@@ -533,6 +534,13 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
         options.experience = doc.experience;
     }
     options.sender = ALScriptSender(ALScriptOrigin::Studio, mWindow.newRequest());
+    // How the compiler's lines read back, for whoever else hears of it:
+    // the bridge's client among them.
+    if (map && doc.envelope)
+    {
+        options.sourceMap = std::make_shared<const ALSourceMap>(*map);
+        options.codeLine  = doc.envelope->codeLine();
+    }
     std::string error;
     // Where the journal stands as the text goes, taken before anything
     // can be typed after it.
@@ -619,6 +627,7 @@ void ALScriptStudioSaving::savedElsewhere(const ALScriptSaved& saved)
             args["[NAME]"] = doc.name;
             args["[WHO]"]  = mServices.words(saved.sender.origin == ALScriptOrigin::Bridge   ? "SavedByBridge"
                                              : saved.sender.origin == ALScriptOrigin::Editor ? "SavedByEditor"
+                                             : saved.sender.origin == ALScriptOrigin::Disk   ? "SavedByFile"
                                                                                                     : "SavedByQueue");
             mServices.report(mServices.words("SavedElsewhereConflict", args), true, &doc, { "take_saved", "keep_saved", "merge_saved", "compare_saved" });
             return;
@@ -789,39 +798,8 @@ void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
         }
         return;
     }
-    doc.problems.clear();
     // The region's lines count the envelope's; the map is of the code under it.
-    const ALSourceMap* read  = doc.runningMap();
-    const S32          under = doc.runningCodeLine();
-    for (const ALScriptDiagnostic& said : result.diagnostics)
-    {
-        Doc::Compiled one;
-        one.line      = said.line;
-        one.column    = said.column;
-        one.hasColumn = said.hasColumn;
-        one.level     = said.level;
-        one.message   = said.message;
-        if (read)
-        {
-            const ALSourceMap::Loc loc = read->toSource(said.line - under, said.column);
-            if (loc.found())
-            {
-                one.line   = loc.line;
-                one.column = loc.column;
-                if (loc.file > 0)
-                {
-                    one.file = read->files()[loc.file].path;
-                }
-            }
-            else
-            {
-                // In code the preprocessor made, at the expansion's line.
-                one.line = llmax(0, said.line - under);
-                one.file = Doc::GENERATED;
-            }
-        }
-        doc.problems.push_back(std::move(one));
-    }
+    doc.problems = Doc::compiledOf(result.diagnostics, doc.runningMap(), doc.runningCodeLine());
     if (result.success)
     {
         // A new script runs from here; what the old one said is past.

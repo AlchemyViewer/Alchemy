@@ -184,6 +184,7 @@ if(AL_BUILD_VIEWER)
     alscriptanalyzers.cpp
     alscriptcontentsindex.cpp
     alscriptcrumbsbar.cpp
+    alscriptdiskmasters.cpp
     alscriptexplorermodel.cpp
     alscriptexplorerpane.cpp
     alscriptexplorertree.cpp
@@ -196,7 +197,14 @@ if(AL_BUILD_VIEWER)
     alscriptkeypresets.cpp
     alpanelscriptaliases.cpp
     alpanelscriptkeymap.cpp
+    alscriptlinkbadges.cpp
+    alscriptlinkpane.cpp
+    alscriptlinkscripts.cpp
     alscriptlookup.cpp
+    alscriptmasteradopt.cpp
+    alscriptmasterfanout.cpp
+    alscriptmastertoasts.cpp
+    alscriptmasterupload.cpp
     alscriptobjectcheck.cpp
     alscriptrecompile.cpp
     alscriptnavigation.cpp
@@ -222,6 +230,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocomparepairs.cpp
     alscriptstudiocomparewith.cpp
     alscriptstudioexpandedcompare.cpp
+    alscriptstudiodiskmasters.cpp
     alscriptstudiodoc.cpp
     alscriptstudiofileio.cpp
     alscriptstudioglue.cpp
@@ -229,6 +238,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudioorphans.cpp
     alscriptstudioplaces.cpp
     alscriptstudiohistory.cpp
+    alscriptstudiomasters.cpp
     alscriptstudiomerging.cpp
     alscriptstudiorecovery.cpp
     alscriptstudioselections.cpp
@@ -1035,6 +1045,7 @@ if(AL_BUILD_VIEWER)
     alscriptanalyzers.h
     alscriptcontentsindex.h
     alscriptcrumbsbar.h
+    alscriptdiskmasters.h
     alscriptexplorermodel.h
     alscriptexplorerpane.h
     alscriptexplorertree.h
@@ -1048,6 +1059,9 @@ if(AL_BUILD_VIEWER)
     alscriptkeypresets.h
     alpanelscriptaliases.h
     alpanelscriptkeymap.h
+    alscriptlinkbadges.h
+    alscriptlinkpane.h
+    alscriptlinkscripts.h
     alscriptlookup.h
     alscriptobjectcheck.h
     alscriptrecompile.h
@@ -1084,6 +1098,12 @@ if(AL_BUILD_VIEWER)
     alscriptstudioplaces.h
     alscriptstudiohistory.h
     alscriptstudiomerging.h
+    alscriptmasteradopt.h
+    alscriptmasterfanout.h
+    alscriptmastertoasts.h
+    alscriptmasterupload.h
+    alscriptstudiodiskmasters.h
+    alscriptstudiomasters.h
     alscriptstudiorecovery.h
     alscriptstudioselections.h
     alrecovery.h
@@ -2747,6 +2767,18 @@ if(AL_BUILD_TESTS)
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
+  # A Script Studio window's side of scripts mastered by files on disk, over
+  # the window's side faked and the account's links held in memory: what may
+  # be linked, a tab linked and what was typed in it, and a tab giving way
+  # to its file.
+  al_add_test(
+    alscriptstudiomasters
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
   # What of Script Studio's state is an account's own, kept apart from the
   # shared and put back over it.
   al_add_test(alscriptstudioaccount UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
@@ -2865,6 +2897,10 @@ if(AL_BUILD_TESTS)
     SOURCES alscriptstudiochecking.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
+
+  # A compile's result read back to the source it was of: under the
+  # envelope's lines, through the expansion's map.
+  al_add_test(alscripttypes UNIT PROJECT ${test_project} LIBRARIES alscript ${test_libs})
 
   # A recompile from the Explorer, the window and the world faked: scripts
   # and prims walked a few at a time, each said, a closed one's problems

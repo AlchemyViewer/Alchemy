@@ -86,9 +86,10 @@ public:
         // weights and recovery told, the scripts that include it expanded
         // again, a close that waited on it done.
         virtual void fileSettled(Doc& doc) = 0;
-        // A file written that the studio reads something from: the
-        // snippets, the vimrc.
-        virtual void fileWritten(const std::string& path) = 0;
+        // A tab's file written by the studio, before it is settled: what the
+        // studio reads from such a file read again -- the snippets, the
+        // vimrc -- and the scripts it is the master of sent.
+        virtual void fileWritten(Doc& doc) = 0;
         // A tab's file changed on disk, or went: what is in reach of the
         // tabs to be looked at again (ALScriptStudioOrphans).
         virtual void reachChanged() = 0;

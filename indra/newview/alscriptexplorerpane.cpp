@@ -30,7 +30,9 @@
 
 #include "alobjectproperties.h"
 #include "alpanefolds.h"
+#include "alscriptdiskmasters.h"
 #include "alscriptexplorertree.h"
+#include "alscriptlinkbadges.h"
 #include "alscriptregionusage.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudiopane.h"
@@ -58,6 +60,8 @@
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
 #include "roles_constants.h"
+
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
 #include <cstdlib>
@@ -284,6 +288,9 @@ bool ALScriptExplorerPane::postBuild()
             mPresenceAt = LLTimer::getTotalSeconds() + EXPLORER_PRESENCE;
         }
     });
+    // A script linked to a file, let go of, or come to stand otherwise:
+    // its mark after its name.
+    mBadgesConnection = ALScriptLinkBadges::instance().onChanged([this]() { fillSoon(); });
     return true;
 }
 
@@ -427,6 +434,9 @@ void ALScriptExplorerPane::relist(bool refetch, bool from_region)
     {
         mModel.doneAskingRegion();
     }
+    // The masters of the linked scripts looked at again, off the main
+    // thread: a file saved outside since is marked as changed.
+    ALScriptLinkBadges::instance().refresh();
 }
 
 void ALScriptExplorerPane::contentsHeard(const ALScriptContents& contents)
@@ -523,6 +533,27 @@ void ALScriptExplorerPane::fill()
     const std::string running_no  = said("RunningNo");
     const std::string no_modify   = said("NoModifyMark");
     const std::string no_copy     = said("NoCopyMark");
+    // What a script linked to a file says after its name, by how it
+    // stands, and what its tip says of it (ALScriptLinkBadges).
+    typedef ALScriptLinkBadges::Badge Badge;
+    const ALScriptLinkBadges& badges     = ALScriptLinkBadges::instance();
+    const auto                badge_word = [](Badge badge) {
+        switch (badge)
+        {
+            case Badge::Linked: return "LinkBadgeLinked";
+            case Badge::Unsent: return "LinkBadgeUnsent";
+            case Badge::Newer: return "LinkBadgeNewer";
+            case Badge::Pending: return "LinkBadgePending";
+            case Badge::Differing: return "LinkBadgeDiffering";
+            case Badge::Suspended: break;
+        }
+        return "LinkBadgeSuspended";
+    };
+    std::string badge_said[6];
+    for (const Badge badge : { Badge::Linked, Badge::Unsent, Badge::Newer, Badge::Pending, Badge::Differing, Badge::Suspended })
+    {
+        badge_said[static_cast<size_t>(badge)] = said(badge_word(badge));
+    }
     // What the region reserves for each object in sight, asked for as it
     // is listed -- once a minute at most -- and said once it has answered.
     ALScriptRegionUsage& usage = ALScriptWorkspace::instance().regionUsage();
@@ -609,6 +640,14 @@ void ALScriptExplorerPane::fill()
                 if (row.noCopy)
                 {
                     out.suffix += no_copy;
+                }
+                // Linked to a file on disk, a script or a notecard, and how
+                // that stands, from what was last looked at: nothing asked
+                // of the disk here.
+                if (const std::optional<ALScriptLinkBadges::Mark> mark = badges.markOf(row.ref))
+                {
+                    out.suffix += badge_said[static_cast<size_t>(mark->badge)];
+                    out.tip = row.name + "\n" + mServices->words(std::string(badge_word(mark->badge)) + "Tip", { { "[FILE]", mark->master } });
                 }
                 out.icon = row.script ? (row.lua ? "Inv_Script_Luau" : "Inv_Script")
                            : row.name == ".luaurc" || row.name == ".lslrc" ? "Studio_Config"
@@ -867,6 +906,30 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
     {
         return !rows.empty();
     }
+    if (action == "link_scripts")
+    {
+        // An object or a prim, in sight, which may be changed.
+        return any([&](const Choice& row) { return !row.isItem() && present(row) && changeable(row); });
+    }
+    if (action == "send_from_files")
+    {
+        // A script or a notecard linked to a file, or an object or a prim
+        // holding one: as the marks say, which is nothing asked of the
+        // disk.
+        const ALScriptLinkBadges& badges = ALScriptLinkBadges::instance();
+        return any([&](const Choice& row) {
+            if (!present(row))
+            {
+                return false;
+            }
+            if (row.isItem())
+            {
+                return badges.markOf(row.ref()).has_value();
+            }
+            const std::vector<std::pair<LLUUID, std::string>> prims = mModel.containerPrims({ row });
+            return std::any_of(prims.begin(), prims.end(), [&badges](const auto& prim) { return badges.linkedIn(prim.first) > 0; });
+        });
+    }
     if (action == "compare")
     {
         const auto pair = Model::comparing(rows);
@@ -1063,6 +1126,89 @@ void ALScriptExplorerPane::act(const std::string& action)
     {
         mWindow->checkScripts(rows.front().root);
     }
+    else if (action == "link_scripts")
+    {
+        linkScripts(rows);
+    }
+    else if (action == "send_from_files")
+    {
+        sendFromFiles(rows);
+    }
+}
+
+void ALScriptExplorerPane::linkScripts(const std::vector<Choice>& rows)
+{
+    // Every prim of each object chosen, and each prim chosen, once, with
+    // what its object is called and where it is in words.
+    std::vector<ALScriptLinkScripts::Prim> prims;
+    boost::unordered_flat_set<LLUUID>     taken;
+    for (const Choice& row : rows)
+    {
+        if (row.isItem())
+        {
+            continue;
+        }
+        for (const auto& [prim, name] : mModel.containerPrims({ row }))
+        {
+            if (taken.insert(prim).second)
+            {
+                Choice at;
+                at.root = row.root;
+                at.prim = prim;
+                prims.push_back({ prim, row.root, mModel.nameOf(row.root), mModel.placeOf(at) });
+            }
+        }
+    }
+    if (!prims.empty())
+    {
+        mWindow->linkScripts(std::move(prims));
+    }
+}
+
+void ALScriptExplorerPane::sendFromFiles(const std::vector<Choice>& rows)
+{
+    // Each linked script or notecard chosen, and every link of each prim
+    // and object chosen, once.
+    ALScriptDiskMasters&                   masters = ALScriptDiskMasters::instance();
+    std::vector<ALMasterLink>              links;
+    boost::unordered_flat_set<ALScriptRef> taken;
+    const auto                             take = [&](const ALMasterLink& link) {
+        if (link.state != ALMasterLink::State::Orphaned && taken.insert(ALScriptRef(link.object, link.item)).second)
+        {
+            links.push_back(link);
+        }
+    };
+    for (const auto& [prim, name] : mModel.containerPrims(rows))
+    {
+        for (const ALMasterLink& link : masters.linksIn(prim))
+        {
+            take(link);
+        }
+    }
+    for (const Choice& row : rows)
+    {
+        if (const std::optional<ALMasterLink> link = row.isItem() ? masters.linkOf(row.ref()) : std::nullopt)
+        {
+            take(*link);
+        }
+    }
+    // What goes up is the file on disk: one whose tab holds changes not
+    // saved yet is left, and said, rather than send what was not meant.
+    S32 sent    = 0;
+    S32 unsaved = 0;
+    for (const ALMasterLink& link : links)
+    {
+        if (const ALScriptStudioDoc* tab = mServices->findDoc("disk:" + link.master); tab && tab->unsaved())
+        {
+            ++unsaved;
+            continue;
+        }
+        masters.send(ALScriptRef(link.object, link.item), ALMasterPlan::Send::Derived);
+        ++sent;
+    }
+    const std::string going = sent > 0 || unsaved == 0 ? mServices->counted("ExplorerSendingFromFiles", sent) : std::string();
+    const std::string left  = unsaved > 0 ? mServices->counted("ExplorerSendUnsaved", unsaved) : std::string();
+    mServices->setStatus(mServices->sentences(going, left), unsaved > 0);
 }
 
 void ALScriptExplorerPane::run(const std::string& action, const std::vector<Choice>& rows)

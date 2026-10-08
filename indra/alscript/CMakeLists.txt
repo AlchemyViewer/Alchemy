@@ -14,6 +14,10 @@ add_library(alscript STATIC)
 #   lsl/           the LSL analyzer over Tailslide, and what reads LSL;
 #   lsl/optimizer/ the LSL optimizer, a pass a file;
 #   luau/          the SLua analyzer over Second Life's fork of Luau;
+#   masters/       files on disk as the masters of scripts in the world:
+#                  the links and the file they are kept in, finding a
+#                  master, what a send does, the files watched and their
+#                  changes gathered over a burst, and the sends underway;
 #   preprocessor/  the preprocessor, its includes and what it keeps.
 target_sources(
   alscript
@@ -67,10 +71,19 @@ target_sources(
     luau/alluausharedstart.cpp
     luau/alluautaskpool.cpp
     luau/alluautypes.cpp
+    masters/almasterburst.cpp
+    masters/almasterclock.cpp
+    masters/almasterindex.cpp
+    masters/almasterlinks.cpp
+    masters/almastermatch.cpp
+    masters/almasterplan.cpp
+    masters/almasterqueue.cpp
+    masters/almasterwatch.cpp
     preprocessor/aldiskcache.cpp
     preprocessor/aldiskincludes.cpp
     preprocessor/alincludeidentity.cpp
     preprocessor/alincludesearch.cpp
+    preprocessor/allinelabel.cpp
     preprocessor/almodulelook.cpp
     preprocessor/alpreprocessor.cpp
     preprocessor/alrequirenavigation.cpp
@@ -78,6 +91,7 @@ target_sources(
     preprocessor/alscriptsnapshot.cpp
     preprocessor/alscripttextcache.cpp
     preprocessor/alsourcemap.cpp
+    preprocessor/aluploadheader.cpp
 )
 
 target_sources(
@@ -142,10 +156,19 @@ target_sources(
         luau/alluausharedstart.h
         luau/alluautaskpool.h
         luau/alluautypes.h
+        masters/almasterburst.h
+        masters/almasterclock.h
+        masters/almasterindex.h
+        masters/almasterlinks.h
+        masters/almastermatch.h
+        masters/almasterplan.h
+        masters/almasterqueue.h
+        masters/almasterwatch.h
         preprocessor/aldiskcache.h
         preprocessor/aldiskincludes.h
         preprocessor/alincludeidentity.h
         preprocessor/alincludesearch.h
+        preprocessor/allinelabel.h
         preprocessor/almodulelook.h
         preprocessor/alpreprocessor.h
         preprocessor/alrequirenavigation.h
@@ -154,11 +177,12 @@ target_sources(
         preprocessor/alscriptsnapshot.h
         preprocessor/alscripttextcache.h
         preprocessor/alsourcemap.h
+        preprocessor/aluploadheader.h
 )
 
 target_include_directories(
   alscript
-  PUBLIC core lint lsl lsl/optimizer luau preprocessor
+  PUBLIC core lint lsl lsl/optimizer luau masters preprocessor
 )
 
 target_link_libraries(alscript PRIVATE al::flags ll::slua ll::tailslide llmath PUBLIC llcommon)
@@ -294,6 +318,7 @@ if(AL_BUILD_TESTS)
   al_add_test(aldiskcache PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alincludeidentity PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alincludesearch PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(allinelabel PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almodulelook PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alsourcemap PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptjoblane PROJECT alscript LIBRARIES alscript llcommon)
@@ -303,6 +328,7 @@ if(AL_BUILD_TESTS)
   al_add_test(alscripttextcache PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptstack PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptenvelope PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(aluploadheader PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almessagemap PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alluauconfig PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptformatter PROJECT alscript LIBRARIES alscript llcommon)
@@ -310,6 +336,17 @@ if(AL_BUILD_TESTS)
   al_add_test(alscriptmessages PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alnotecardformat PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscripttempfiles PROJECT alscript LIBRARIES alscript llcommon)
+  # Disk masters: the changes gathered over a burst, the links and their
+  # index, the index kept in a file, a master found from what a script says
+  # or its name, what a send does, the sends underway, and the files watched
+  # for saves made outside.
+  al_add_test(almasterburst PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(almasterindex PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(almasterlinks PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(almastermatch PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(almasterplan PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(almasterqueue PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(almasterwatch PROJECT alscript LIBRARIES alscript llcommon)
   # The preprocessor against C11's 6.10, clause by clause.
   al_add_test(alpreprocessorc11 PROJECT alscript LIBRARIES alscript llcommon)
   # What LSL may change and the order it runs in, over scripts parsed with
@@ -345,11 +382,12 @@ if(AL_BUILD_TESTS)
   )
   # LSL written again as SLua, each result checked as SLua against the
   # grid's definitions; and Tailslide's own test scripts under
-  # tests/tailslide/, for their breadth.
+  # tests/tailslide/, for their breadth. The comments a toggle makes, as
+  # Luau's own lexer reads them.
   al_add_test(
     allsltoslua
     PROJECT alscript
-    LIBRARIES alscript llcommon
+    LIBRARIES alscript llcommon ll::slua
     DEFINES ${definitions_defines} "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
   )
   # The golden files under tests/preprocessor/: every test_*.lsl beside
