@@ -1764,8 +1764,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("exclusionTex");
     mReservedUniforms.push_back("eyeVec");
     mReservedUniforms.push_back("time");
-    mReservedUniforms.push_back("waveDir1");
-    mReservedUniforms.push_back("waveDir2");
+    mReservedUniforms.push_back("bigWaveScroll");
+    mReservedUniforms.push_back("littleWaveScroll");
     mReservedUniforms.push_back("lightDir");
     mReservedUniforms.push_back("specular");
     mReservedUniforms.push_back("lightExp");
