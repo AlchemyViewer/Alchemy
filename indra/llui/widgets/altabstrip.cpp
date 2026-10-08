@@ -382,9 +382,11 @@ std::string ALTabStrip::shortened(const LLFontGL* font, const std::string& label
     // The end: the extension where the name has one near its end, with
     // three letters before it; else the last four letters. A letter is one
     // as a reader sees it, with the marks on it or what joins it.
-    const size_t dot  = label.rfind('.');
-    size_t       tail = dot != std::string::npos && label.size() - dot <= 6 ? dot : label.size();
-    for (S32 letters = 0; letters < (dot != std::string::npos && tail == dot ? 3 : 4) && tail > 0; ++letters)
+    const size_t dot       = label.rfind('.');
+    const bool   extension = dot != std::string::npos && label.size() - dot <= 6;
+    const S32    keep      = extension ? 3 : 4;
+    size_t       tail      = extension ? dot : label.size();
+    for (S32 letters = 0; letters < keep && tail > 0; ++letters)
     {
         tail = utf8str_step_grapheme_backward(label, tail);
     }

@@ -753,4 +753,25 @@ namespace tut
         ensure("no mark after the ellipsis, parted from its e: " + cut, cut.find("\xE2\x80\xA6\xCC") == std::string::npos);
         ensure("the e kept with both its marks: " + cut, cut.find("e\xCC\xA3\xCC\x81") != std::string::npos);
     }
+
+    // What a cut name keeps after its ellipsis: the extension and three
+    // letters before it, or, where there is no extension, its last four
+    // letters.
+    template<> template<>
+    void altabstrip_object::test<17>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        const LLFontGL*   font     = LLFontGL::getFontSansSerifSmall();
+        const std::string ellipsis = "\xE2\x80\xA6";
+        const auto        kept     = [&](const std::string& name) {
+            const std::string cut = ALTabStrip::shortened(font, name, font->getWidth(name) / 2);
+            const size_t      at  = cut.rfind(ellipsis);
+            return at == std::string::npos ? std::string() : cut.substr(at + ellipsis.size());
+        };
+        ensure_equals("three letters and the extension", kept("a_very_long_name_that_wants_a_great_deal_of_room.lsl"), std::string("oom.lsl"));
+        ensure_equals("four letters, with no extension", kept("a_very_long_name_that_wants_a_great_deal_of_room"), std::string("room"));
+    }
 }
