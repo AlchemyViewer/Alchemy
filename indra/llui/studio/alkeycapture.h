@@ -44,6 +44,8 @@ class LLTextBox;
 class ALKeyCapture : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALKeyCapture, LLPanel);
+
     // What the owner says of keys pressed -- whose they are now, what they
     // would put out of reach -- or nothing.
     typedef std::function<std::string(const ALKeyChord&)> about_t;
