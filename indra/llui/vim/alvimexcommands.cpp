@@ -854,10 +854,13 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
     }
     if (!bang && is("y", "yank"))
     {
+        // The caret left where it is, as vim's :yank leaves it.
+        const ALTextPos   caret = view.caret();
         ALVimKeymap::Span span;
         span.linewise = true;
         span.range    = ALTextRange(d.lineStart(first), d.lineEnd(last));
         mVim.applyOperator(view, 'y', span, 1);
+        mVim.moveTo(view, caret);
         return;
     }
     if (name == ">" || name == "<")

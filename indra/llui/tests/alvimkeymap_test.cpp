@@ -5878,4 +5878,62 @@ namespace tut
         keys("u@q");
         ensure_equals("from a macro over two lines", vim->message(), std::string("4 substitutions on 2 lines"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<204>()
+    {
+        set_test_name("a yank of lines leaves the caret at their start as its motion or object began it -- where it was for yy, Y and :y, the column k kept, the line's start for ip and for lines selected from it -- and a delete over an object that holds nothing leaves it at the object");
+        ALCodeEditor& e = make("  alpha beta\n  gamma delta\n  epsilon zeta\n\n  eta theta\n  iota kappa");
+        const auto yank_from = [&](S32 line, S32 column, const char* sequence) {
+            e.setCaret(ALTextPos(line, column));
+            keys(sequence);
+            return caretText();
+        };
+        ensure_equals("yy", yank_from(1, 5, "yy"), std::string("1:5"));
+        ensure_equals("2yy", yank_from(1, 5, "2yy"), std::string("1:5"));
+        ensure_equals("Y", yank_from(1, 5, "Y"), std::string("1:5"));
+        ensure_equals("yj", yank_from(1, 5, "yj"), std::string("1:5"));
+        ensure_equals("yk: where k went", yank_from(1, 5, "yk"), std::string("0:5"));
+        ensure_equals("y-: where - went", yank_from(1, 5, "y-"), std::string("0:2"));
+        ensure_equals("ygg", yank_from(1, 5, "ygg"), std::string("0:2"));
+        ensure_equals("yip: the paragraph's start", yank_from(1, 5, "yip"), std::string("0:0"));
+        ensure_equals("yip on its first line", yank_from(0, 5, "yip"), std::string("0:0"));
+        ensure_equals("Vy: the line's start", yank_from(1, 5, "Vy"), std::string("1:0"));
+        ensure_equals("Vjy: the first line's", yank_from(1, 5, "Vjy"), std::string("1:0"));
+        ensure_equals("Vky: the caret, above the lines selected from", yank_from(1, 5, "Vky"), std::string("0:5"));
+        ensure_equals("vjY", yank_from(1, 5, "vjY"), std::string("1:0"));
+        ensure_equals("vkY", yank_from(1, 5, "vkY"), std::string("0:5"));
+        e.setCaret(ALTextPos(0, 5));
+        ex("2,4y");
+        ensure_equals(":2,4y leaves the caret", caretText(), std::string("0:5"));
+
+        make("ab\nabcdefgh");
+        editor->setCaret(ALTextPos(1, 6));
+        keys("yk");
+        ensure_equals("yk onto a shorter line: its last character", caretText(), std::string("0:1"));
+
+        make("Hello world.\nnext");
+        editor->setCaret(ALTextPos(0, 3));
+        keys("yis");
+        ensure_equals("yis over the line: its start", caretText(), std::string("0:0"));
+
+        make("x \"\" y");
+        editor->setCaret(ALTextPos(0, 2));
+        keys("di\"");
+        ensure_equals("di\" between two quotes takes nothing", flat(editor->text()), std::string("x \"\" y"));
+        ensure_equals("and leaves the caret between them", caretText(), std::string("0:3"));
+        editor->setCaret(ALTextPos(0, 0));
+        keys("di\"iX<Esc>");
+        ensure_equals("from before them too, and does not fail", flat(editor->text()), std::string("x \"X\" y"));
+
+        make("f() y");
+        editor->setCaret(ALTextPos(0, 1));
+        keys("di(");
+        ensure_equals("di( on () at the closer", caretText(), std::string("0:2"));
+
+        make("<a></a> x");
+        editor->setCaret(ALTextPos(0, 1));
+        keys("dit");
+        ensure_equals("dit on an empty tag between its tags", caretText(), std::string("0:3"));
+    }
 }

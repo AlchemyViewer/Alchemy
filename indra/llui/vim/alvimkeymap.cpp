@@ -3541,7 +3541,8 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     // non-blank of the last of them, as many as there are -- but a count
     // past one from the last line fails, as vim's motion down fails there.
     // gUU leaves the caret at its start, on the line's first non-blank or
-    // before it, and 2gUU where it was.
+    // before it, and 2gUU where it was. yy's goes down without going
+    // across, as vim's does, so its start is the caret.
     if (ch == op || (op == '~' && ch == '~') || (op == 'u' && ch == 'u') || (op == 'U' && ch == 'U') ||
         (op == COMMENT_OPERATOR && ch == 'c'))
     {
@@ -3556,7 +3557,8 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
         Span            span;
         span.linewise         = true;
         const S32       last  = llmin(d.lineCount() - 1, from.line + lines - 1);
-        span.range            = ALTextRange(from, ALTextPos(last, firstNonBlankColumn(d, last))).normalised();
+        const ALTextPos to    = op == 'y' ? d.clamp(ALTextPos(last, from.column)) : ALTextPos(last, firstNonBlankColumn(d, last));
+        span.range            = ALTextRange(from, to).normalised();
         applyOperator(view, op, span, 1);
         finishCommand(op != 'y');
         return true;
@@ -4290,7 +4292,8 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 }
                 const S32 last  = llmin(d.lineCount() - 1, first + count - 1);
                 span.linewise   = true;
-                span.range      = ALTextRange(d.lineStart(first), d.lineEnd(last));
+                // From the caret, which the yank leaves where it is.
+                span.range      = ALTextRange(view.caret(), d.lineEnd(last));
             }
             else
             {
@@ -5733,9 +5736,14 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             {
                 say(yankedSaid(last - first + 1, span.block, mRegister));
             }
-            if (span.linewise)
+            // The caret at the stretch's start, as vim's cursor is left: where
+            // its motion or object began it -- the column k kept, the line's
+            // start for ip -- which for yy and Y, going down, is the caret;
+            // over lines selected, at the start of the line the selection
+            // began on, or at the caret where it went above that.
+            if (span.linewise && span.visual)
             {
-                moveTo(view, ALTextPos(first, view.caret().line == first ? view.caret().column : firstNonBlankColumn(d, first)));
+                moveTo(view, std::min(ALTextPos(d.clamp(mVisualAnchor).line, 0), d.clamp(mVisualCaret)));
             }
             else
             {
@@ -5751,13 +5759,16 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             }
             // Nothing to take out -- D or d$ on an empty line, s on one --
             // puts nothing in a register either, as vim's delete has it:
-            // what the registers and the clipboard hold stays. c still
+            // what the registers and the clipboard hold stays, and the
+            // caret goes where the stretch is, as vim's cursor goes to an
+            // object that holds nothing -- di" between two quotes. c still
             // goes on to insert over its empty stretch, as vim's change
             // does, and keeps an empty line's end it took inclusively --
             // C, c$ or ciw there -- as an empty register.
             const bool nothing = !span.linewise && !span.block && span.range.empty();
             if (nothing && op == 'd')
             {
+                moveTo(view, span.range.begin);
                 return;
             }
             if (!nothing || span.inclusive)
