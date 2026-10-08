@@ -524,14 +524,20 @@ bool idle_startup()
 
     LLMortician::updateClass();
 
-    const std::string delims (" ");
     std::string system;
+#if LL_LINUX
+    // The simple OS string names the distribution, whose first word is no
+    // key of language_settings.xml
+    system = "Linux";
+#else
+    const std::string delims (" ");
     size_t begIdx, endIdx;
     std::string osString = LLOSInfo::instance().getOSStringSimple();
 
     begIdx = osString.find_first_not_of (delims);
     endIdx = osString.find_first_of (delims, begIdx);
     system = osString.substr (begIdx, endIdx - begIdx);
+#endif
     system += "Locale";
 
     std::string locale = LLTrans::getString(system);
