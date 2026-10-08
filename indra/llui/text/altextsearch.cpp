@@ -359,10 +359,7 @@ namespace
                         }
                         return false;
                     }
-                    // The group asked for where it took part, else the whole.
-                    const bool grouped = options.matchGroup > 0 && options.matchGroup < static_cast<S32>(found.size()) &&
-                                         found[static_cast<size_t>(options.matchGroup)].matched;
-                    const auto& part   = grouped ? found[static_cast<size_t>(options.matchGroup)] : found[0];
+                    const auto& part   = found[0];
                     const S32   begin  = static_cast<S32>(part.first - base);
                     const S32   finish = static_cast<S32>(part.second - base);
                     const bool  kept   = found[0].second <= limit && (!options.wholeWord || wholeWord(text, begin, finish));
