@@ -128,4 +128,23 @@ namespace tut
         ALCrashReporter::recordConsent(sentinel, false);
         ensure("withdrawing twice is quiet", !ALCrashReporter::consentRecorded(sentinel));
     }
+
+    template<> template<>
+    void object::test<8>()
+    {
+        set_test_name("a location written into a buffer is the same, or cut to fit");
+        const LLVector3 position(128.4f, -63.6f, 22.5f);
+        char buffer[64];
+        size_t length = ALCrashReporter::locationTag(buffer, sizeof(buffer), "Hippotropolis", position);
+        ensure_equals("whole", std::string(buffer, length), "Hippotropolis/128/-64/23");
+        ensure_equals("terminated", buffer[length], '\0');
+
+        char small[12];
+        length = ALCrashReporter::locationTag(small, sizeof(small), "Hippotropolis", position);
+        ensure_equals("cut", std::string(small, length), "Hippotropol");
+        ensure_equals("cut and terminated", small[length], '\0');
+
+        length = ALCrashReporter::locationTag(small, sizeof(small), "Ahern", position);
+        ensure_equals("cut in the numbers", std::string(small, length), "Ahern/128/-");
+    }
 }

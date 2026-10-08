@@ -229,6 +229,9 @@ public:
 
     F32 getMainloopTimeoutSec() const;
     std::string getMainloopWatchdogState() const;
+    // The same in its two parts, "Expired at " or "Paused at " and the
+    // state, which a crash handler can copy out without allocating.
+    std::pair<std::string_view, std::string_view> getMainloopWatchdogStateParts() const;
 
     // Handle the 'login completed' event.
     // *NOTE:Mani Fix this for login abstraction!!
@@ -272,6 +275,11 @@ public:
     // Writes an error code into the error_marker file for use on next startup.
     void createErrorMarker(eLastExecEvent error_code) const;
     bool errorMarkerExists() const;
+    // The error marker a crash handler leaves, unless one is there already.
+    // Async-signal-safe: it opens, writes and closes a file whose path and
+    // contents prepareCrashMarker() composed while the viewer ran.
+    void prepareCrashMarker();
+    void createCrashMarker(eLastExecEvent error_code) const;
 
     void createCloseRequestMarker() const;
     void removeCloseRequestMarker() const;
@@ -359,6 +367,14 @@ private:
 
     std::string mLogoutMarkerFileName;
     LLFile mLogoutMarkerFile; // A file created to indicate the app is running.
+
+    // Where createCrashMarker() writes, and the version line it starts with.
+#if LL_WINDOWS
+    std::wstring mCrashMarkerPath;
+#else
+    std::string mCrashMarkerPath;
+#endif
+    std::string mCrashMarkerVersion;
 
     bool mReportedCrash;
 

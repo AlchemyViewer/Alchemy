@@ -45,8 +45,12 @@
 #include "llversioninfo.h"
 #include "llviewerregion.h"
 
+#include <algorithm>
+#include <atomic>
+#include <charconv>
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
 
 namespace
 {
@@ -131,7 +135,7 @@ namespace
 #endif
     }
 
-    void set_event_tag(sentry_value_t event, const char* key, const std::string& value)
+    void set_event_tag(sentry_value_t event, const char* key, std::string_view value)
     {
         sentry_value_t tags = sentry_value_get_by_key(event, "tags");
         if (sentry_value_is_null(tags))
@@ -139,43 +143,80 @@ namespace
             tags = sentry_value_new_object();
             sentry_value_set_by_key(event, "tags", tags);
         }
-        sentry_value_set_by_key(tags, key, sentry_value_new_string(value.c_str()));
+        sentry_value_set_by_key(tags, key, sentry_value_new_string_n(value.data(), value.size()));
+    }
+
+    void set_event_tag(sentry_value_t event, const char* key, U64 value)
+    {
+        char digits[24];
+        const char* end = std::to_chars(digits, digits + sizeof(digits), value).ptr;
+        set_event_tag(event, key, std::string_view(digits, end - digits));
+    }
+
+    // The name of the agent's region, for the location a crash report
+    // carries, kept where the crash callback can read it without following
+    // a pointer into the scene. The main thread writes the half the callback
+    // is not reading, then publishes it.
+    char sRegionNames[2][256] = {};
+    std::atomic<U32> sRegionNameHalf{ 0 };
+
+    void remember_region()
+    {
+        const LLViewerRegion* region = gAgent.getRegion();
+        const std::string_view name = region ? std::string_view(region->getName()) : std::string_view();
+        const U32 half = sRegionNameHalf.load(std::memory_order_relaxed) ^ 1;
+        const size_t length = std::min(name.size(), sizeof(sRegionNames[half]) - 1);
+        memcpy(sRegionNames[half], name.data(), length);
+        sRegionNames[half][length] = '\0';
+        sRegionNameHalf.store(half, std::memory_order_release);
     }
 
     // Runs in the crashing process under crashpad, once the scope is on the
     // event: what is only known now goes on the event itself, and the marker
-    // the next launch reads is written here.
+    // the next launch reads is written here. On Linux this is crashpad's
+    // signal handler, on the crashing thread and a small alternate stack; on
+    // Windows an exception filter. The crash may have interrupted whatever
+    // held the heap or a lock, so nothing here allocates or locks: the
+    // region's name and the marker were set aside while the viewer ran, the
+    // buffers are static, and the values made are sentry's, which on Linux
+    // come from an allocator of its own once crashed.
     sentry_value_t on_crash(const sentry_ucontext_t*, sentry_value_t event, sentry_hint_t*, void*)
     {
         LLAppViewer* app = LLAppViewer::instance();
 
-        if (LLViewerRegion* region = gAgent.getRegion())
+        if (gAgent.getRegion())
         {
-            set_event_tag(event, "location",
-                          ALCrashReporter::locationTag(region->getName(), gAgent.getPositionAgent()));
+            // Where the agent was last placed, at most a frame ago.
+            static char location[sizeof(sRegionNames[0]) + 64];
+            const char* region = sRegionNames[sRegionNameHalf.load(std::memory_order_acquire)];
+            const size_t length = ALCrashReporter::locationTag(location, sizeof(location), region,
+                                                               gAgent.getFrameAgent().getOrigin());
+            set_event_tag(event, "location", std::string_view(location, length));
         }
 
-        std::string watchdog = app->getMainloopWatchdogState();
-        if (!watchdog.empty())
+        const auto [prefix, state] = app->getMainloopWatchdogStateParts();
+        if (!prefix.empty() || !state.empty())
         {
-            set_event_tag(event, "watchdog_state", watchdog);
+            static char watchdog[256];
+            const size_t prefix_length = std::min(prefix.size(), sizeof(watchdog));
+            const size_t state_length = std::min(state.size(), sizeof(watchdog) - prefix_length);
+            memcpy(watchdog, prefix.data(), prefix_length);
+            memcpy(watchdog + prefix_length, state.data(), state_length);
+            set_event_tag(event, "watchdog_state", std::string_view(watchdog, prefix_length + state_length));
         }
 
         const U32 available_kb = LLMemory::getAvailableMemKB().value();
         if (available_kb != U32_MAX)
         {
-            set_event_tag(event, "mem_allocated_kb", std::to_string(LLMemory::getAllocatedMemKB().value()));
-            set_event_tag(event, "mem_available_kb", std::to_string(available_kb));
-            set_event_tag(event, "mem_max_physical_kb", std::to_string(LLMemory::getMaxMemKB().value()));
+            set_event_tag(event, "mem_allocated_kb", LLMemory::getAllocatedMemKB().value());
+            set_event_tag(event, "mem_available_kb", available_kb);
+            set_event_tag(event, "mem_max_physical_kb", LLMemory::getMaxMemKB().value());
 #if LL_WINDOWS
-            set_event_tag(event, "mem_available_commit_mb", std::to_string(LLMemory::getAvailableCommitMemMB().value()));
+            set_event_tag(event, "mem_available_commit_mb", LLMemory::getAvailableCommitMemMB().value());
 #endif
         }
 
-        if (!app->isSecondInstance() && !app->errorMarkerExists())
-        {
-            app->createErrorMarker(app->logoutRequestSent() ? LAST_EXEC_LOGOUT_CRASH : LAST_EXEC_OTHER_CRASH);
-        }
+        app->createCrashMarker(app->logoutRequestSent() ? LAST_EXEC_LOGOUT_CRASH : LAST_EXEC_OTHER_CRASH);
 
         return event;
     }
@@ -214,6 +255,16 @@ namespace
         sentry_set_tag("os", LLOSInfo::instance().getOSStringSimple().c_str());
         sentry_set_tag("second_instance", app->isSecondInstance() ? "true" : "false");
         sentry_set_tag("app_state", LLStartUp::getStartupStateString().c_str());
+
+        // The region's name follows the agent, and the region's own renames.
+        static bool following_region = false;
+        if (!following_region)
+        {
+            following_region = true;
+            gAgent.addRegionChangedCallback(&remember_region);
+            LLViewerRegion::setRegionInfoChangedCallback([](LLViewerRegion*) { remember_region(); });
+        }
+        remember_region();
 
         LL_INFOS("CrashReporter") << "Sentry engaged for " << version.getChannelAndVersion() << LL_ENDL;
         return true;

@@ -40,9 +40,12 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <cerrno>
+#include <charconv>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 
 std::string ALCrashReporter::releaseName(S32 major, S32 minor, S32 patch, U64 build)
 {
@@ -51,10 +54,36 @@ std::string ALCrashReporter::releaseName(S32 major, S32 minor, S32 patch, U64 bu
 
 std::string ALCrashReporter::locationTag(std::string_view region, const LLVector3& position)
 {
-    return fmt::format("{}/{}/{}/{}", region,
-                       std::lround(position.mV[VX]),
-                       std::lround(position.mV[VY]),
-                       std::lround(position.mV[VZ]));
+    // Room for the region and three signed 64-bit integers after slashes.
+    std::string tag(region.size() + 3 * 21 + 1, '\0');
+    tag.resize(locationTag(tag.data(), tag.size(), region, position));
+    return tag;
+}
+
+size_t ALCrashReporter::locationTag(char* buffer, size_t size, std::string_view region, const LLVector3& position)
+{
+    if (size == 0)
+    {
+        return 0;
+    }
+    char* out = buffer;
+    char* const end = buffer + size - 1;
+    auto append = [&](const char* text, size_t length)
+    {
+        length = std::min(length, static_cast<size_t>(end - out));
+        memcpy(out, text, length);
+        out += length;
+    };
+
+    append(region.data(), region.size());
+    for (S32 axis : { VX, VY, VZ })
+    {
+        char metres[24] = { '/' };
+        const auto result = std::to_chars(metres + 1, metres + sizeof(metres), std::lround(position.mV[axis]));
+        append(metres, result.ptr - metres);
+    }
+    *out = '\0';
+    return out - buffer;
 }
 
 const std::string& ALCrashReporter::runId()
