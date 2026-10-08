@@ -828,6 +828,14 @@ void LLWindowSDL::restore()
 {
     if (mWindow)
     {
+        // A Wayland window that is only suspended (mOccluded, which
+        // getMinimized() counts) has nothing SDL can restore: xdg-shell can't
+        // unminimise, and SDL_RestoreWindow would unmaximise it. Bringing it
+        // forward is bringToFront()'s.
+        if (mOccluded && !(SDL_GetWindowFlags(mWindow) & SDL_WINDOW_MINIMIZED))
+        {
+            return;
+        }
         SDL_RestoreWindow(mWindow);
     }
 }
