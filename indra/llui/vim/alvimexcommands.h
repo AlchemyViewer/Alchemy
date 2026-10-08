@@ -45,7 +45,8 @@ class ALVimExCommands
 public:
     explicit ALVimExCommands(ALVimKeymap& vim) : mVim(vim) {}
 
-    // The : line.
+    // The : line: its commands in turn, each to the | that ends it, as
+    // vim's :bar has them, an error ending the line there.
     void runCommand(ALTextView& view, const std::string& line);
     // The : line run as one entered on it, by a key from the keyboard or
     // not -- a macro's, :normal's, a mapping's -- as vim's KeyTyped has it:
@@ -85,6 +86,9 @@ public:
         // its edits here and asks nothing; the asking starts, over the
         // lot in order, once the :g is through.
         bool                                             gathering = false;
+        // What follows the asking :s on its : line, after a |: run once
+        // the asking is done, as vim runs it after.
+        std::string                                      then;
     };
     Confirming confirming;
     bool       confirmKey(ALTextView& view, const ALVimInput& input);
@@ -140,6 +144,9 @@ public:
     std::string lastSubstituteFlags;
 
 private:
+    // One command of a : line, no | ending it.
+    void runOneCommand(ALTextView& view, const std::string& line);
+
     ALVimKeymap& mVim;
     // Whether a :g is running its command over lines, which another :g
     // may not do, as vim has it (E147).

@@ -6251,4 +6251,81 @@ namespace tut
         keys("<C-v>jly2jllvlp");
         ensure_equals("a short line under it padded", flat(editor->text()), std::string("abcd|efgh|ijabmn|o ef"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<211>()
+    {
+        set_test_name("a | on the : line ends one command and begins the next, but in :s's pattern and replacement, after :g and :normal, and as \\|; an error ends the line");
+        make("a c\na c");
+        keys(":s/a/b/ | s/c/d/<CR>");
+        ensure_equals("both, on the line", flat(editor->text()), std::string("b d|a c"));
+
+        make("a c");
+        keys(":s/zzz/y/ | s/c/d/<CR>");
+        ensure_equals("an error ends it", flat(editor->text()), std::string("a c"));
+        ensure_equals("said", vim->message(), std::string("E486: Pattern not found: zzz"));
+
+        make("a|b c");
+        keys(":s/a|b/X/|s/c/d/<CR>");
+        ensure_equals("in the pattern its own", flat(editor->text()), std::string("X d"));
+        make("a c");
+        keys(":s/a/x|y/|s/c/d/<CR>");
+        ensure_equals("in the replacement too", flat(editor->text()), std::string("x|y d"));
+        make("a|c");
+        keys(":s/a|c/z<CR>");
+        ensure_equals("and to the end where nothing closes it", flat(editor->text()), std::string("z"));
+
+        make("a\nb\nc");
+        keys(":3|d<CR>");
+        ensure_equals("after a range alone", flat(editor->text()), std::string("a|b"));
+        make("a\nb\nc");
+        keys(":1d|d<CR>");
+        ensure_equals("each its own range, or the caret's line", flat(editor->text()), std::string("c"));
+        make("a\nb\nc");
+        keys(":1d | 2d<CR>");
+        ensure_equals("a range after it", flat(editor->text()), std::string("b"));
+        make("a\nb");
+        keys(":1d|<CR>");
+        ensure_equals("nothing after it", flat(editor->text()), std::string("b"));
+
+        make("a\nb\na");
+        keys(":g/a/s/a/x/|s/x/y/<CR>");
+        ensure_equals(":g's command, each line", flat(editor->text()), std::string("y|b|y"));
+        make("a\nb");
+        keys(":normal Ax|y<CR>");
+        ensure_equals(":normal's keys", flat(editor->text()), std::string("ax|y|b"));
+
+        make("ab");
+        keys(":nnoremap Q x|s/b/c/<CR>");
+        ensure_equals("a mapping, then the next", flat(editor->text()), std::string("ac"));
+        keys("Q");
+        ensure_equals("the mapping to the |", flat(editor->text()), std::string("c"));
+        make("ab");
+        keys(":nnoremap Q ax\\|y<CR>Q<Esc>");
+        ensure_equals("\\| a | in it", flat(editor->text()), std::string("ax|yb"));
+
+        make("a c");
+        keys(":s/a/b/c|s/c/d/<CR>");
+        ensure_equals("after an asking :s, nothing while it asks", flat(editor->text()), std::string("a c"));
+        keys("y");
+        ensure_equals("the rest once it is done", flat(editor->text()), std::string("b d"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<212>()
+    {
+        set_test_name("a vimrc's line runs each command to its | in turn, the rest of the line not after one that fails, and a comment to its end");
+        ALVimKeymap::Shared      shared;
+        std::vector<std::string> errors;
+        const auto               host = [](const std::string&) { return false; };
+        ALVimKeymap::source(shared, "nnoremap Q x | nnoremap W ia\\|b<Esc>\nset nosuchthing | nnoremap E z\n\" a | comment\n", host, errors);
+        const ALVimMappings& maps = shared.mappings;
+        const ALVimMappings::Match q = maps.match(ALVimMappings::NORMAL, maps.keysOf("Q"), true);
+        ensure("the first", q.full && ALVimMappings::shown(q.full->to) == "x");
+        const ALVimMappings::Match w = maps.match(ALVimMappings::NORMAL, maps.keysOf("W"), true);
+        ensure("the second, its \\| a |", w.full && ALVimMappings::shown(w.full->to) == "ia<Bar>b<Esc>");
+        ensure("none after one that fails", maps.match(ALVimMappings::NORMAL, maps.keysOf("E"), true).full == nullptr);
+        ensure_equals("the one said", errors.size(), size_t(1));
+        ensure("by its line", errors[0].find("line 2:") == 0 && errors[0].find("E518") != std::string::npos);
+    }
 }

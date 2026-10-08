@@ -359,6 +359,132 @@ namespace
         }
         return true;
     }
+
+    // Where a : line's first command ends at a | that begins the next, as
+    // vim's :bar has it, or npos where it runs to the line's end. A \| is
+    // no end, and is left for the command to read as its own, as a
+    // mapping's and :s's do. A range's patterns are passed over, and so
+    // are :s's pattern and replacement, as far as the separator after
+    // each, and a string of :let's; :g, :v and :normal take the rest of
+    // the line as theirs, and a line begun with " is a comment.
+    size_t commandEnd(const std::string& line)
+    {
+        const size_t n = line.size();
+        size_t       i = line.find_first_not_of(" \t:");
+        if (i == std::string::npos || line[i] == '"')
+        {
+            return std::string::npos;
+        }
+        // silent!, which is the next command's.
+        for (const std::string_view prefix : { "silent!", "sil!", "silent ", "sil " })
+        {
+            if (line.compare(i, prefix.size(), prefix) == 0)
+            {
+                i = line.find_first_not_of(" \t", i + prefix.size());
+                i = i == std::string::npos ? n : i;
+                break;
+            }
+        }
+        // The range: line numbers, marks, ., $ and %, the offsets and the
+        // separators between them, and patterns through the delimiter that
+        // closes them.
+        while (i < n)
+        {
+            const char c = line[i];
+            if (std::string_view(" \t0123456789.$%,;+-").find(c) != std::string_view::npos)
+            {
+                ++i;
+            }
+            else if (c == '\'' && i + 1 < n)
+            {
+                i += 2;
+            }
+            else if (c == '\\' && i + 1 < n && (line[i + 1] == '/' || line[i + 1] == '?' || line[i + 1] == '&'))
+            {
+                i += 2;
+            }
+            else if (c == '/' || c == '?')
+            {
+                size_t k = i + 1;
+                while (k < n && line[k] != c)
+                {
+                    k += line[k] == '\\' && k + 1 < n ? 2u : 1u;
+                }
+                if (k >= n)
+                {
+                    return std::string::npos;
+                }
+                i = k + 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+        // The name as runCommand reads it -- letters, or one symbol -- and
+        // where the arguments begin.
+        size_t at = i;
+        while (at < n && (isNameChar(line[at]) || (at > i && line[at] == '_')))
+        {
+            ++at;
+        }
+        const std::string_view name = std::string_view(line).substr(i, at - i);
+        if (name.empty() && at < n && line[at] != '|')
+        {
+            ++at;
+        }
+        if (abbreviates(name, "g", "global") || abbreviates(name, "v", "vglobal") || abbreviates(name, "norm", "normal"))
+        {
+            return std::string::npos;
+        }
+        if (abbreviates(name, "s", "substitute"))
+        {
+            // The separator is what follows s, as substitute reads it, but
+            // for a | that ends it bare, or & for the last one again.
+            size_t k = line.find_first_not_of(" \t", at);
+            if (k != std::string::npos && line[k] != '|' && line[k] != '&')
+            {
+                const char sep = line[k];
+                for (S32 part = 0; part < 2; ++part)
+                {
+                    ++k;
+                    while (k < n && line[k] != sep)
+                    {
+                        k += line[k] == '\\' && k + 1 < n && line[k + 1] == sep ? 2u : 1u;
+                    }
+                    if (k >= n)
+                    {
+                        return std::string::npos;
+                    }
+                }
+                at = k + 1;
+            }
+        }
+        const bool strings = name == "let";
+        for (size_t k = at; k < n; ++k)
+        {
+            const char c = line[k];
+            if (strings && (c == '"' || c == '\''))
+            {
+                // Through to the quote that closes it: a backslash takes
+                // the next character in a "string", '' is a ' in a 'one'.
+                ++k;
+                while (k < n && !(line[k] == c && !(c == '\'' && k + 1 < n && line[k + 1] == '\'')))
+                {
+                    k += (c == '"' && line[k] == '\\') || (c == '\'' && line[k] == '\'') ? 2u : 1u;
+                }
+            }
+            else if (c == '\\' && k + 1 < n && line[k + 1] == '|')
+            {
+                ++k;
+            }
+            else if (c == '|')
+            {
+                return k;
+            }
+        }
+        return std::string::npos;
+    }
 }
 
 void ALVimExCommands::askNext(ALTextView& view)
@@ -525,14 +651,19 @@ void ALVimExCommands::endConfirming(ALTextView& view)
     {
         mVim.say(ALVimKeymap::substitutionsSaid(confirming.made, confirming.lines));
     }
-    const bool changed = confirming.made > 0;
-    confirming        = Confirming();
+    const bool        changed = confirming.made > 0;
+    const std::string then    = std::move(confirming.then);
+    confirming                = Confirming();
     if (ALVimHost* host = view.vimHost())
     {
         host->clearLayer(ALVimHost::Layer::Confirm);
     }
     mVim.finishCommand(changed);
     mVim.bump();
+    if (!then.empty())
+    {
+        runCommand(view, then);
+    }
 }
 
 bool ALVimExCommands::lineAddress(ALTextView& view, const std::string& line, size_t& at_, S32& out, bool* before_first) const
@@ -696,8 +827,31 @@ void ALVimExCommands::source(ALVimKeymap::Shared& shared, std::string_view text,
             lines.emplace_back(number, std::move(line));
         }
     }
-    for (auto& [line_number, line] : lines)
+    // Each line's commands in turn, each to the | that ends it, as a :
+    // line has them (commandEnd).
+    std::vector<std::pair<S32, std::string>> commands;
+    for (const auto& [line_number, line] : lines)
     {
+        std::string rest = line;
+        for (;;)
+        {
+            const size_t bar = commandEnd(rest);
+            commands.emplace_back(line_number, rest.substr(0, bar));
+            if (bar == std::string::npos)
+            {
+                break;
+            }
+            rest.erase(0, bar + 1);
+        }
+    }
+    // A line's commands after one that failed are not run, as in vim.
+    S32 failed = 0;
+    for (auto& [line_number, line] : commands)
+    {
+        if (line_number == failed)
+        {
+            continue;
+        }
         LLStringUtil::trim(line);
         while (!line.empty() && (line[0] == ':' || line[0] == ' ' || line[0] == '\t'))
         {
@@ -779,6 +933,7 @@ void ALVimExCommands::source(ALVimKeymap::Shared& shared, std::string_view text,
         {
             errors.push_back(
                 ALVimKeymap::said("VimrcLine", "line [NUMBER]: [ERROR]", { { "[NUMBER]", std::to_string(line_number) }, { "[ERROR]", error } }));
+            failed = line_number;
         }
     }
 }
@@ -793,7 +948,27 @@ void ALVimExCommands::runEntered(ALTextView& view, const std::string& line, bool
     mLineTyped = was;
 }
 
-void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
+void ALVimExCommands::runCommand(ALTextView& view, const std::string& line)
+{
+    std::string rest = line;
+    for (;;)
+    {
+        const size_t bar = commandEnd(rest);
+        runOneCommand(view, rest.substr(0, bar));
+        if (bar == std::string::npos || mVim.mMessageError)
+        {
+            return;
+        }
+        rest.erase(0, bar + 1);
+        if (mVim.mMode == ALVimKeymap::Mode::Confirm)
+        {
+            confirming.then = std::move(rest);
+            return;
+        }
+    }
+}
+
+void ALVimExCommands::runOneCommand(ALTextView& view, const std::string& line_in)
 {
     const ALTextDocument& d       = view.document();
     const bool            editing = !view.isReadOnly();
@@ -1464,8 +1639,9 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
 bool ALVimExCommands::globalBatches(const std::string& command)
 {
     // No lines of its own -- no address before it, no count after it --
-    // and it changes only the line it is put on.
-    if (command.empty())
+    // and it changes only the line it is put on; one command, which a |
+    // after it would make no longer so, the next reading what it made.
+    if (command.empty() || commandEnd(command) != std::string::npos)
     {
         return false;
     }
