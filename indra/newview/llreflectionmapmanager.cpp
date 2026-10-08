@@ -217,7 +217,7 @@ struct CompareProbeDistance
 
 static F32 update_score(LLReflectionMap* p)
 {
-    return gFrameTimeSeconds - p->mLastUpdateTime  - p->mDistance*0.1f;
+    return (F32)(gFrameTimeSeconds - p->mLastUpdateTime) - p->mDistance*0.1f;
 }
 
 // return true if a is higher priority for an update than b
@@ -1599,7 +1599,7 @@ void LLReflectionMapManager::updateUniforms()
             LLViewerObject* vobj = probe->mViewerObject;
             if (vobj)
             {
-                F32 time = (F32)gFrameTimeSeconds - probe->mLastUpdateTime;
+                F32 time = (F32)(gFrameTimeSeconds - probe->mLastUpdateTime);
                 vobj->setDebugText(llformat("%d/%d/%d/%.1f - %.1f/%.1f", probe->mCubeIndex, probe->mProbeIndex, (U32) probe->mNeighbors.size(), probe->mMinDepth, probe->mMaxDepth, time), time > 1.f ? LLColor4::white : LLColor4::green);
             }
         }

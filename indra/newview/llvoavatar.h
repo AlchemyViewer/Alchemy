@@ -561,7 +561,7 @@ public:
 
     U32         renderRigid();
     U32         renderSkinned();
-    F32         getLastSkinTime() { return mLastSkinTime; }
+    F64         getLastSkinTime() { return mLastSkinTime; }
     U32         renderTransparent(bool first_pass);
     void        renderCollisionVolumes();
     void        renderBones(const std::string &selected_joint = std::string());
@@ -580,7 +580,7 @@ private:
     bool        shouldAlphaMask();
 
     bool        mNeedsSkin; // avatar has been animated and verts have not been updated
-    F32         mLastSkinTime; //value of gFrameTimeSeconds at last skin update
+    F64         mLastSkinTime; //value of gFrameTimeSeconds at last skin update
 
     S32         mUpdatePeriod;
     // An avatar wearing animesh is asked both of these once for itself and
@@ -756,7 +756,7 @@ public:
 // [/RLVa:KB]
 //  bool        mNeedsImpostorUpdate;
     S32         mLastImpostorUpdateReason;
-    F32SecondsImplicit mLastImpostorUpdateFrameTime;
+    F64SecondsImplicit mLastImpostorUpdateFrameTime;
     const LLVector3*  getLastAnimExtents() const { return mLastAnimExtents; }
     void        setNeedsExtentUpdate(bool val) { mNeedsExtentUpdate = val; }
 
@@ -1355,9 +1355,9 @@ public:
     void                dumpAvatarTEs(const std::string& context) const;
 
     static F32          sUnbakedTime; // Total seconds with >=1 unbaked avatars
-    static F32          sUnbakedUpdateTime; // Last time stats were updated (to prevent multiple updates per frame)
+    static F64          sUnbakedUpdateTime; // Last time stats were updated (to prevent multiple updates per frame)
     static F32          sGreyTime; // Total seconds with >=1 grey avatars
-    static F32          sGreyUpdateTime; // Last time stats were updated (to prevent multiple updates per frame)
+    static F64          sGreyUpdateTime; // Last time stats were updated (to prevent multiple updates per frame)
 protected:
     S32                 getUnbakedPixelAreaRank();
     bool                mHasGrey = false;

@@ -190,7 +190,7 @@ U32 LLImageGL::sUniqueCount             = 0;
 U32 LLImageGL::sBindCount               = 0;
 S32 LLImageGL::sCount                   = 0;
 
-F32 LLImageGL::sLastFrameTime           = 0.f;
+F64 LLImageGL::sLastFrameTime           = 0.0;
 LLImageGL* LLImageGL::sDefaultGLTexture = NULL ;
 boost::unordered_set<LLImageGL*> LLImageGL::sImageList;
 
@@ -620,7 +620,7 @@ S32 LLImageGL::dataFormatComponents(S32 dataformat)
 //----------------------------------------------------------------------------
 
 // static
-void LLImageGL::updateStats(F32 current_time)
+void LLImageGL::updateStats(F64 current_time)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     sLastFrameTime = current_time;
@@ -929,7 +929,7 @@ bool LLImageGL::updateBindStats() const
 
 F32 LLImageGL::getTimePassedSinceLastBound()
 {
-    return sLastFrameTime - mLastBindTime ;
+    return (F32)(sLastFrameTime - mLastBindTime);
 }
 
 void LLImageGL::setExplicitFormat( LLGLint internal_format, LLGLenum primary_format, LLGLenum type_format, bool swap_bytes )

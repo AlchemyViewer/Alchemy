@@ -501,7 +501,7 @@ public:
         static LLCachedControl<bool> debug_show_time(gSavedSettings, "DebugShowTime", false);
         if (debug_show_time())
         {
-            F32 time = gFrameTimeSeconds;
+            F64 time = gFrameTimeSeconds;
             S32 hours = (S32)(time / (60*60));
             S32 mins = (S32)((time - hours*(60*60)) / 60);
             S32 secs = (S32)((time - hours*(60*60) - mins*60));

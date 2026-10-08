@@ -733,7 +733,7 @@ F32 LLSpatialGroup::getUpdateUrgency() const
     }
     else
     {
-        F32 time = gFrameTimeSeconds-mLastUpdateTime+4.f;
+        F32 time = (F32)(gFrameTimeSeconds-mLastUpdateTime)+4.f;
         return time + (mObjectBounds[1].dot3(mObjectBounds[1]).getF32()+1.f)/mDistance;
     }
 }
@@ -1980,7 +1980,7 @@ void renderBoundingBox(LLDrawable* drawable, bool set_color = true)
     LLViewerObject* vobj = drawable->getVObj();
     if (vobj && vobj->onActiveList())
     {
-        gGL.setLineWidth(llmax(4.f*sinf(gFrameTimeSeconds*2.f)+1.f, 1.f));
+        gGL.setLineWidth(llmax(4.f*sinf((F32)fmod(gFrameTimeSeconds.value()*2.0, (F64)F_TWO_PI))+1.f, 1.f));
         //gGL.setLineWidth(4.f*(sinf(gFrameTimeSeconds*2.f)*0.25f+0.75f));
         stop_glerror();
         drawBoxOutline(pos,size);

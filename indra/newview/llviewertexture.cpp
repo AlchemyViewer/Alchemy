@@ -98,7 +98,7 @@ constexpr S32 DEFAULT_THUMBNAIL_DIMENSIONS = 256;
 U32 LLViewerTexture::sMinLargeImageSize = 65536; //256 * 256.
 U32 LLViewerTexture::sMaxSmallImageSize = MAX_CACHED_RAW_IMAGE_AREA;
 bool LLViewerTexture::sFreezeImageUpdates = false;
-F32 LLViewerTexture::sCurrentTime = 0.0f;
+F64 LLViewerTexture::sCurrentTime = 0.0;
 
 constexpr F32 MEMORY_CHECK_WAIT_TIME = 1.0f;
 constexpr F32 MIN_VRAM_BUDGET = 768.f;
@@ -3005,7 +3005,7 @@ bool LLViewerFetchedTexture::hasSavedRawImage() const
 
 F32 LLViewerFetchedTexture::getElapsedLastReferencedSavedRawImageTime() const
 {
-    return sCurrentTime - mLastReferencedSavedRawImageTime;
+    return (F32)(sCurrentTime - mLastReferencedSavedRawImageTime);
 }
 
 LLUUID LLViewerFetchedTexture::getUploader()

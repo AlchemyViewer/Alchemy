@@ -74,7 +74,7 @@ protected:
     landmark_uuid_list_t mBadList;
     landmark_uuid_list_t mRetryList;
 
-    typedef std::map<LLUUID,F32> landmark_requested_list_t;
+    typedef std::map<LLUUID,F64> landmark_requested_list_t;
     landmark_requested_list_t mRequestedList;
 
     // *TODO: make the callback multimap a template class and make use of it

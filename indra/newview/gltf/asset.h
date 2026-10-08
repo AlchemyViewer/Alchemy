@@ -36,7 +36,7 @@
 #include "../llviewertexture.h"
 #include "llglslshader.h"
 
-extern F32SecondsImplicit       gFrameTimeSeconds;
+extern F64SecondsImplicit       gFrameTimeSeconds;
 
 // wingdi defines OPAQUE, which conflicts with our enum
 #if defined(OPAQUE)
@@ -359,7 +359,7 @@ namespace LL
             std::string mFilename;
 
             // the last time update() was called according to gFrameTimeSeconds
-            F32 mLastUpdateTime = gFrameTimeSeconds;
+            F64 mLastUpdateTime = gFrameTimeSeconds;
 
             // UBO for storing node transforms
             ALUniformBuffer mNodesUBO;

@@ -239,7 +239,7 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
     gGL.pushMatrix();
     gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], camPosLocal.mV[2]);
     // Subtle rotation so fixed patterns drift over long time scales.
-    gGL.rotatef(gFrameTimeSeconds * 0.01f, 0.f, 0.f, 1.f);
+    gGL.rotatef((F32)fmod(gFrameTimeSeconds * 0.01, 360.0), 0.f, 0.f, 1.f);
 
     gDeferredStarProgram.uniform1f(LLShaderMgr::CUSTOM_ALPHA, star_alpha);
 

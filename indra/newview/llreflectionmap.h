@@ -117,7 +117,7 @@ public:
     F32 mRadius = 16.f;
 
     // last time this probe was updated (or when its update timer got reset)
-    F32 mLastUpdateTime = 0.f;
+    F64 mLastUpdateTime = 0.0;
 
     // cube map used to sample this environment map
     LLPointer<LLCubeMapArray> mCubeArray;

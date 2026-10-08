@@ -351,7 +351,7 @@ U32 gForegroundFrameCount = 0; // number of frames that app window was in foregr
 LLPumpIO* gServicePump = NULL;
 
 U64MicrosecondsImplicit gFrameTime = 0;
-F32SecondsImplicit gFrameTimeSeconds = 0.f;
+F64SecondsImplicit gFrameTimeSeconds = 0.0;
 F32SecondsImplicit gFrameIntervalSeconds = 0.f;
 F32 gFPSClamped = 10.f;                     // Pretend we start at target rate.
 F32 gFrameDTClamped = 0.f;                  // Time between adjacent checks to network for packets
