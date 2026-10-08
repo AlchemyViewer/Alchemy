@@ -637,6 +637,9 @@ bool MediaPluginGStreamer10::stop()
 
 bool MediaPluginGStreamer10::play()
 {
+    if (!mDoneInit || !mPlaybin)
+        return false;
+
     if (mAtEnd)
     {
         // From the beginning, as a player does after the end: at once, as
