@@ -2018,7 +2018,7 @@ std::vector<ALScriptRuntimeEvent> ALScriptWorkspace::runtimeErrorsOf(const LLUUI
     const auto                since = mRuntimeSince.find(item);
     for (const ALScriptRuntimeEvent& event : mRecent)
     {
-        if (event.isError && event.prim == prim && event.item == item && (since == mRuntimeSince.end() || event.time > since->second))
+        if (event.isError && event.prim == prim && event.item == item && (since == mRuntimeSince.end() || event.heardAt > since->second))
         {
             errors.push_back(event);
         }
@@ -2030,7 +2030,7 @@ void ALScriptWorkspace::forgetRuntime(const LLUUID& item)
 {
     if (item.notNull())
     {
-        mRuntimeSince[item] = LLDate::now().secondsSinceEpoch();
+        mRuntimeSince[item] = LLFrameTimer::getTotalSeconds();
     }
 }
 
@@ -2389,6 +2389,7 @@ void ALScriptWorkspace::deliverRuntime(const Burst& burst)
 
     ALScriptRuntimeEvent event;
     event.time       = LLDate::now().secondsSinceEpoch();
+    event.heardAt    = LLFrameTimer::getTotalSeconds();
     event.prim       = burst.fromId;
     event.root       = root ? root->getID() : burst.fromId;
     event.objectName = burst.fromName;

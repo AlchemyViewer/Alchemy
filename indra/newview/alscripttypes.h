@@ -381,8 +381,12 @@ struct ALScriptRuntimeEvent
         SaidTo,
         Instant
     };
-    // Seconds since the epoch, as LLDate counts them.
+    // Seconds since the epoch, as LLDate counts them: for showing.
     F64         time = 0.0;
+    // When it was heard, as LLFrameTimer::getTotalSeconds() counts: for
+    // ordering it against other moments in this session, which a clock
+    // set back would scramble on the calendar.
+    F64         heardAt = 0.0;
     LLUUID      root;
     LLUUID      prim;
     // The script, where the message named one the prim holds.

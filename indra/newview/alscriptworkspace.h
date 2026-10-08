@@ -354,7 +354,8 @@ private:
     LLEventTimer*                 mBurstTimer = nullptr;
     std::deque<ALScriptRuntimeEvent> mRecent;
     runtime_signal_t              mRuntime;
-    // When each script's errors were last let go of, by its item.
+    // When each script's errors were last let go of, by its item, as an
+    // event's heardAt counts.
     boost::unordered_flat_map<LLUUID, F64> mRuntimeSince;
     // The one in front is under way; the rest wait for it to end.
     std::vector<std::shared_ptr<Transfer>> mTransfers;
