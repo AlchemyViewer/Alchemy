@@ -3532,8 +3532,9 @@ void LLVOAvatar::idleUpdateWindEffect()
     if (LLPipeline::RenderAvatarCloth)
     {
         F32 hover_strength = 0.f;
-        F32 time_delta = mRippleTimer.getElapsedTimeF32() - mRippleTimeLast;
-        mRippleTimeLast = mRippleTimer.getElapsedTimeF32();
+        const F64 ripple_time = mRippleTimer.getElapsedTimeF64();
+        F32 time_delta = (F32)(ripple_time - mRippleTimeLast);
+        mRippleTimeLast = ripple_time;
         LLVector3 velocity = getVelocity();
         F32 speed = velocity.length();
         //RN: velocity varies too much frame to frame for this to work

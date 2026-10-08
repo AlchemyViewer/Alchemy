@@ -795,7 +795,7 @@ public:
 private:
     F32         mWindFreq;
     LLFrameTimer mRippleTimer;
-    F32         mRippleTimeLast;
+    F64         mRippleTimeLast;    // mRippleTimer's elapsed time, which runs as long as the avatar
     LLVector3   mRippleAccel;
     LLVector3   mLastVel;
 
