@@ -87,6 +87,21 @@ F64 LL_COMMON_API ll_drand();
 F64 LL_COMMON_API ll_drand(F64 val);
 
 /**
+ *@brief Generate a U32 with all 32 bits random.
+ */
+U32 LL_COMMON_API ll_rand_u32();
+
+/**
+ *@brief Reseed the calling thread's generator, so what it draws next can be
+ * drawn again.
+ *
+ * Each thread draws from a generator of its own, seeded from
+ * std::random_device the first time it draws. This replaces that seed on the
+ * calling thread alone, for a test or to reproduce what a seed drew.
+ */
+void LL_COMMON_API ll_rand_seed(U64 seed);
+
+/**
  * @brief typedefs for good boost lagged fibonacci.
  * @see boost::lagged_fibonacci
  *
