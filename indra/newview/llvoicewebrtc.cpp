@@ -2569,7 +2569,7 @@ LLVoiceWebRTCConnection::LLVoiceWebRTCConnection(const LLUUID &regionID, const s
 
     // retries wait a short period...randomize it so
     // all clients don't try to reconnect at once.
-    mRetryWaitSecs = (F32)((F32) rand() / F32(RAND_MAX)) + 0.5f;
+    mRetryWaitSecs = ll_frand() + 0.5f;
 
     mWebRTCPeerConnectionInterface = llwebrtc::newPeerConnection();
     mWebRTCPeerConnectionInterface->setSignalingObserver(this);
@@ -3194,7 +3194,7 @@ bool LLVoiceWebRTCConnection::connectionStateMachine()
         case VOICE_STATE_SESSION_UP:
         {
             mRetryWaitPeriod = 0;
-            mRetryWaitSecs = (F32)((F32)rand() / F32(RAND_MAX)) + 0.5f;
+            mRetryWaitSecs = ll_frand() + 0.5f;
 
             // we'll stay here as long as the session remains up.
             if (mShutDown)
@@ -3239,7 +3239,7 @@ bool LLVoiceWebRTCConnection::connectionStateMachine()
                 {
                     // back off the retry period, and do it by a small random
                     // bit so all clients don't reconnect at once.
-                    mRetryWaitSecs += (F32)((F32) rand() / F32(RAND_MAX)) + 0.5f;
+                    mRetryWaitSecs += ll_frand() + 0.5f;
                     mRetryWaitPeriod = 0;
                 }
             }
