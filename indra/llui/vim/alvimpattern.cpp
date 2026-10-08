@@ -132,9 +132,10 @@ namespace
         return found;
     }
 
-    // A format of the engine's with vim's groups in it, $1 to $9, each by
-    // the engine's number for it (`numbers`, in vim's order); one vim does
-    // not have is nothing, as vim makes it.
+    // A format of the engine's with vim's groups in it, ${1} to ${9} as
+    // ALVimPattern::replacementOf writes them, each by the engine's number
+    // for it (`numbers`, in vim's order); one vim does not have is
+    // nothing, as vim makes it.
     std::string groupsAsCounted(std::string_view format, const std::vector<S32>& numbers)
     {
         std::string out;
@@ -142,13 +143,14 @@ namespace
         for (size_t i = 0; i < format.size(); ++i)
         {
             const char c = format[i];
-            if (c == '$' && i + 1 < format.size() && format[i + 1] >= '1' && format[i + 1] <= '9')
+            if (c == '$' && i + 3 < format.size() && format[i + 1] == '{' && format[i + 2] >= '1' && format[i + 2] <= '9' && format[i + 3] == '}')
             {
-                const size_t vim_group = static_cast<size_t>(format[++i] - '1');
+                const size_t vim_group = static_cast<size_t>(format[i + 2] - '1');
                 if (vim_group < numbers.size())
                 {
                     out += "${" + std::to_string(numbers[vim_group]) + "}";
                 }
+                i += 3;
             }
             else if ((c == '\\' || c == '$') && i + 1 < format.size())
             {
@@ -1223,9 +1225,11 @@ void ALVimPattern::constrain(const ALTextDocument& d, const Places& places, std:
 std::string ALVimPattern::replacementOf(const std::string& with)
 {
     // Vim's spelling to the search engine's: & and \0 are the whole
-    // match, \1 to \9 the groups, \r and \n a line break, \t a tab;
-    // \& \~ and \\ are themselves; \u \U \l \L \e \E change case as the
-    // engine has them; a $ is only a $. The ~ was put in before this.
+    // match, \1 to \9 the groups, each of one digit and in braces for the
+    // engine, which would read a digit after it as more of the number;
+    // \r and \n a line break, \t a tab; \& \~ and \\ are themselves; \u
+    // \U \l \L \e \E change case as the engine has them; a $ is only a $.
+    // The ~ was put in before this.
     std::string out;
     out.reserve(with.size() + 8);
     for (size_t i = 0; i < with.size(); ++i)
@@ -1251,8 +1255,9 @@ std::string ALVimPattern::replacementOf(const std::string& with)
                 default:
                     if (n >= '0' && n <= '9')
                     {
-                        out += '$';
+                        out += "${";
                         out += n;
+                        out += '}';
                     }
                     else
                     {

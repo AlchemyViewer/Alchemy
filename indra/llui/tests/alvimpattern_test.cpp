@@ -164,11 +164,11 @@ namespace tut
     {
         set_test_name("a replacement: & and \\0 the match, \\1 a group, a $ only a $, \\r a line break, and the case changes kept");
         ensure_equals("the match", ALVimPattern::replacementOf("[&]"), std::string("[$&]"));
-        ensure_equals("a group", ALVimPattern::replacementOf("\\1-\\2"), std::string("$1-$2"));
+        ensure_equals("a group", ALVimPattern::replacementOf("\\1-\\2"), std::string("${1}-${2}"));
         ensure_equals("a dollar", ALVimPattern::replacementOf("$5"), std::string("$$5"));
         ensure_equals("a line break", ALVimPattern::replacementOf("a\\rb"), std::string("a\nb"));
         ensure_equals("themselves", ALVimPattern::replacementOf("\\&\\~\\\\"), std::string("&~\\\\"));
-        ensure_equals("case", ALVimPattern::replacementOf("\\u\\1\\e"), std::string("\\u$1\\E"));
+        ensure_equals("case", ALVimPattern::replacementOf("\\u\\1\\e"), std::string("\\u${1}\\E"));
     }
 
     template<> template<>
@@ -358,5 +358,20 @@ namespace tut
                       std::string("[f|o|foo]"));
         ensure_equals("very magic's &", found("foobar baz", ALVimPattern::of("\\vfoobar&foo|baz", std::string(), plain)), std::string("foo|baz"));
         ensure_equals("and its \\& the character", found("a&b ab", ALVimPattern::of("\\va\\&b", std::string(), plain)), std::string("a&b"));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<16>()
+    {
+        set_test_name("a group in a replacement is the one digit after the backslash, and a digit after it the digit");
+        ensure_equals("a group and a 0", replacedIn("a", ALVimPattern::of("\\(a\\)", std::string(), plain), "\\10"), std::string("a0"));
+        ensure_equals("the match and a 1", replacedIn("a", ALVimPattern::of("a", std::string(), plain), "\\01"), std::string("a1"));
+        ensure_equals("and after &", replacedIn("a", ALVimPattern::of("a", std::string(), plain), "&1"), std::string("a1"));
+        ensure_equals("two groups each with a digit", replacedIn("ab", ALVimPattern::of("\\(a\\)\\(b\\)", std::string(), plain), "\\21\\12"),
+                      std::string("b1a2"));
+        ensure_equals("and changed in case", replacedIn("a", ALVimPattern::of("\\(a\\)", std::string(), plain), "\\u\\10"), std::string("A0"));
+        ensure_equals("by vim's numbers where a cut comes between", replacedIn("abcc", ALVimPattern::of("\\(a\\zeb\\)\\(c\\)\\2", std::string(), plain),
+                                                                               "<\\21|\\10|\\01>"),
+                      std::string("<c1|ab0|a1>"));
     }
 }
