@@ -565,9 +565,32 @@ void sdl_destroy_shared_context(void* handle)
 #else // LL_LINUX
     if (s->egl_ctx)
     {
+        typedef void* (*fn_getctx)(void);
+        typedef unsigned int (*fn_makecur)(void*, void*, void*, void*);
         typedef unsigned int (*fn_destroyctx)(void*, void*);
-        auto egl_destroyctx = (fn_destroyctx)SDL_EGL_GetProcAddress("eglDestroyContext");
+        typedef unsigned int (*fn_releasethread)(void);
+        auto egl_getctx        = (fn_getctx)SDL_EGL_GetProcAddress("eglGetCurrentContext");
+        auto egl_makecur       = (fn_makecur)SDL_EGL_GetProcAddress("eglMakeCurrent");
+        auto egl_destroyctx    = (fn_destroyctx)SDL_EGL_GetProcAddress("eglDestroyContext");
+        auto egl_releasethread = (fn_releasethread)SDL_EGL_GetProcAddress("eglReleaseThread");
+
+        // A worker destroys its context on its own thread, where it is
+        // current, and eglDestroyContext only marks a current context for
+        // destruction when it stops being current. The worker then ends with
+        // it current, so it never stops being, and it holds the display past
+        // SDL_Quit: SDL's next display, on a wl_display at the old one's
+        // address, is the stale one, and creating a window on it fails. So it
+        // is released first, and the thread's EGL state with it.
+        const bool current_here = egl_getctx && egl_getctx() == s->egl_ctx;
+        if (current_here && egl_makecur)
+        {
+            egl_makecur(s->egl_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+        }
         if (egl_destroyctx) egl_destroyctx(s->egl_dpy, s->egl_ctx);
+        if (current_here && egl_releasethread)
+        {
+            egl_releasethread();
+        }
     }
 #endif
     delete s;
