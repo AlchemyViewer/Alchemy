@@ -66,6 +66,7 @@
 #endif
 
 #if LL_LINUX
+#include <filesystem>       // /sys/class/drm, for the GPU on a hybrid machine
 #include <sys/prctl.h>      // PR_SET_PDEATHSIG for the GPU benchmark child
 #endif
 
@@ -619,6 +620,245 @@ bool LLAppViewerSDL::init()
 
     return success;
 }
+
+#if LL_LINUX
+namespace
+{
+    constexpr U32 PCI_VENDOR_AMD    = 0x1002;
+    constexpr U32 PCI_VENDOR_NVIDIA = 0x10de;
+    constexpr U32 PCI_VENDOR_INTEL  = 0x8086;
+
+    // A GPU as /sys/class/drm has it: a PCI device under a DRM driver.
+    struct DrmGpu
+    {
+        std::string card;           // "card1"
+        std::string slot;           // PCI address, "0000:01:00.0"
+        std::string driver;         // kernel driver, "amdgpu"
+        U32         vendor = 0;
+        bool        boot_vga = false;   // the one the firmware lit the display with
+        bool        render_node = false;
+    };
+
+    std::string describe(const DrmGpu& gpu)
+    {
+        return llformat("%s (%s, vendor 0x%04x, %s)", gpu.card.c_str(), gpu.slot.c_str(), gpu.vendor,
+                        gpu.driver.empty() ? "no driver" : gpu.driver.c_str());
+    }
+
+    std::vector<DrmGpu> list_drm_gpus()
+    {
+        namespace fs = std::filesystem;
+        std::vector<DrmGpu> gpus;
+        std::error_code ec;
+        for (const fs::directory_entry& entry : fs::directory_iterator("/sys/class/drm", ec))
+        {
+            // card1, not its connectors (card1-DP-1).
+            const std::string name = entry.path().filename().string();
+            if (name.size() <= 4 || name.compare(0, 4, "card") != 0
+                || name.find_first_not_of("0123456789", 4) != std::string::npos)
+            {
+                continue;
+            }
+
+            DrmGpu gpu;
+            gpu.card = name;
+            const fs::path device = entry.path() / "device";
+            llifstream uevent(device / "uevent");
+            std::string line;
+            while (std::getline(uevent, line))
+            {
+                if (line.starts_with("DRIVER="))
+                {
+                    gpu.driver = line.substr(7);
+                }
+                else if (line.starts_with("PCI_SLOT_NAME="))
+                {
+                    gpu.slot = line.substr(14);
+                }
+                else if (line.starts_with("PCI_ID="))
+                {
+                    gpu.vendor = (U32)strtoul(line.c_str() + 7, nullptr, 16);
+                }
+            }
+            if (gpu.slot.empty())
+            {
+                continue; // not a PCI device: simpledrm, a virtual display
+            }
+
+            // A 3D controller, as many laptops' NVIDIA GPUs are, has no
+            // boot_vga at all: it never drives the console.
+            llifstream boot_vga(device / "boot_vga");
+            int boot = 0;
+            gpu.boot_vga = (boot_vga >> boot) && boot == 1;
+
+            std::error_code node_ec;
+            for (const fs::directory_entry& node : fs::directory_iterator(device / "drm", node_ec))
+            {
+                gpu.render_node = gpu.render_node || node.path().filename().string().starts_with("renderD");
+            }
+            gpus.push_back(gpu);
+        }
+        std::sort(gpus.begin(), gpus.end(), [](const DrmGpu& a, const DrmGpu& b)
+        {
+            return a.card.size() != b.card.size() ? a.card.size() < b.card.size() : a.card < b.card;
+        });
+        return gpus;
+    }
+
+    // Whether a GPU is the one built into the CPU. Intel's always sits at
+    // 00:02.0, where no discrete Intel card does; amdgpu gives an APU's
+    // sensors a northbridge voltage, vddnb, and a discrete card none. Any
+    // other is not known to be integrated.
+    bool is_integrated(const DrmGpu& gpu)
+    {
+        namespace fs = std::filesystem;
+        if (gpu.vendor == PCI_VENDOR_INTEL)
+        {
+            return gpu.slot == "0000:00:02.0";
+        }
+        if (gpu.vendor == PCI_VENDOR_AMD)
+        {
+            std::error_code ec;
+            const fs::path hwmon = fs::path("/sys/class/drm") / gpu.card / "device" / "hwmon";
+            for (const fs::directory_entry& sensor : fs::directory_iterator(hwmon, ec))
+            {
+                llifstream label(sensor.path() / "in1_label");
+                std::string text;
+                if (std::getline(label, text) && text == "vddnb")
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // NVIDIA's PCI GPUs are all discrete; an AMD or Intel one is when it is
+    // not the CPU's.
+    bool is_discrete(const DrmGpu& gpu)
+    {
+        return gpu.vendor == PCI_VENDOR_NVIDIA
+            || ((gpu.vendor == PCI_VENDOR_AMD || gpu.vendor == PCI_VENDOR_INTEL) && !is_integrated(gpu));
+    }
+
+    // Whether glvnd can load NVIDIA's EGL: the driver's user-space half,
+    // which a machine can lack with the kernel module loaded.
+    bool has_nvidia_egl()
+    {
+        namespace fs = std::filesystem;
+        const char* dirs = getenv("__EGL_VENDOR_LIBRARY_DIRS");
+        std::istringstream search(dirs ? dirs : "/etc/glvnd/egl_vendor.d:/usr/share/glvnd/egl_vendor.d");
+        std::string dir;
+        while (std::getline(search, dir, ':'))
+        {
+            std::error_code ec;
+            for (const fs::directory_entry& vendor : fs::directory_iterator(dir, ec))
+            {
+                if (vendor.path().filename().string().find("nvidia") != std::string::npos)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Renders on the discrete GPU of a hybrid-graphics machine, as Windows'
+    // NvOptimusEnablement and AmdPowerXpressRequestHighPerformance ask for
+    // there. The desktop entry's PrefersNonDefaultGPU does the same only for
+    // a shell that honours it; this serves every other launch.
+    void prefer_discrete_gpu()
+    {
+        // The user's choice, or a launcher's: a shell that honours
+        // PrefersNonDefaultGPU sets these from switcheroo-control.
+        for (const char* name : { "DRI_PRIME", "__NV_PRIME_RENDER_OFFLOAD", "__GLX_VENDOR_LIBRARY_NAME",
+                                  "__EGL_VENDOR_LIBRARY_FILENAMES", "__VK_LAYER_NV_optimus" })
+        {
+            if (const char* value = getenv(name))
+            {
+                LL_INFOS("RenderInit") << "GPU left to the environment, which sets " << name << "=" << value << LL_ENDL;
+                return;
+            }
+        }
+
+        const std::vector<DrmGpu> gpus = list_drm_gpus();
+        if (gpus.size() < 2)
+        {
+            return;
+        }
+
+        // A hybrid machine drives its display from the integrated GPU, which
+        // the firmware lit at boot. A desktop's card that did is left alone.
+        auto boot = std::find_if(gpus.begin(), gpus.end(), [](const DrmGpu& gpu) { return gpu.boot_vga; });
+        if (boot == gpus.end())
+        {
+            LL_INFOS("RenderInit") << gpus.size() << " GPUs, none the boot display; GPU left to the system" << LL_ENDL;
+            return;
+        }
+        if (!is_integrated(*boot))
+        {
+            LL_INFOS("RenderInit") << "The boot display's " << describe(*boot)
+                                   << " is not an integrated GPU; GPU left to the system" << LL_ENDL;
+            return;
+        }
+
+        auto discrete = std::find_if(gpus.begin(), gpus.end(), [](const DrmGpu& gpu)
+        {
+            return !gpu.boot_vga && gpu.render_node && is_discrete(gpu);
+        });
+        if (discrete == gpus.end())
+        {
+            LL_INFOS("RenderInit") << "No discrete GPU beside the integrated " << describe(*boot) << LL_ENDL;
+            return;
+        }
+
+        if (discrete->driver == "nvidia")
+        {
+            // NVIDIA's PRIME render offload: EGL needs only the switch, and
+            // glvnd keeps Mesa to fall back on if NVIDIA's declines the
+            // display. GLX, for the plugins, needs the vendor named.
+            if (!has_nvidia_egl())
+            {
+                LL_INFOS("RenderInit") << "Discrete " << describe(*discrete)
+                                       << " has no NVIDIA EGL for glvnd to load; GPU left to the system" << LL_ENDL;
+                return;
+            }
+            setenv("__NV_PRIME_RENDER_OFFLOAD", "1", 0);
+            setenv("__GLX_VENDOR_LIBRARY_NAME", "nvidia", 0);
+            LL_INFOS("RenderInit") << "Rendering on the discrete " << describe(*discrete) << " rather than the integrated "
+                                   << describe(*boot) << ": __NV_PRIME_RENDER_OFFLOAD=1" << LL_ENDL;
+        }
+        else if (discrete->driver == "amdgpu" || discrete->driver == "radeon" || discrete->driver == "nouveau"
+                 || discrete->driver == "i915" || discrete->driver == "xe")
+        {
+            // Mesa takes the device's ID_PATH_TAG. DRI_PRIME=1 says only
+            // "not the default", which beside a third GPU can be the wrong one.
+            std::string tag = "pci-" + discrete->slot;
+            std::replace(tag.begin(), tag.end(), ':', '_');
+            std::replace(tag.begin(), tag.end(), '.', '_');
+            setenv("DRI_PRIME", tag.c_str(), 0);
+            LL_INFOS("RenderInit") << "Rendering on the discrete " << describe(*discrete) << " rather than the integrated "
+                                   << describe(*boot) << ": DRI_PRIME=" << tag << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS("RenderInit") << "Discrete " << describe(*discrete)
+                                   << " is under neither Mesa nor NVIDIA's driver; GPU left to the system" << LL_ENDL;
+        }
+    }
+}
+
+bool LLAppViewerSDL::initHardwareTest()
+{
+    // Before the window loads EGL: Mesa reads DRI_PRIME, and NVIDIA's EGL its
+    // offload switch, when the display is opened.
+    if (gSavedSettings.getBOOL("RenderPreferDiscreteGPU"))
+    {
+        prefer_discrete_gpu();
+    }
+    return true;
+}
+#endif // LL_LINUX
 
 bool LLAppViewerSDL::restoreErrorTrap()
 {

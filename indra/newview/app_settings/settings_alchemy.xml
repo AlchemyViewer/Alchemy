@@ -3955,6 +3955,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>RenderPreferDiscreteGPU</key>
+        <map>
+            <key>Comment</key>
+            <string>Linux: on a hybrid-graphics machine, whose integrated GPU drives the display, render on the discrete GPU, unless DRI_PRIME or NVIDIA's offload variables already choose one. Read at startup. Windows always asks for the discrete GPU.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>RenderTonemapACESWhite</key>
         <map>
             <key>Comment</key>
