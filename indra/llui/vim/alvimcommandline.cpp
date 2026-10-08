@@ -31,6 +31,7 @@
 #include "alvimexcommands.h"
 #include "alvimkeymap.h"
 #include "alvimtext.h"
+#include "llstring.h"
 
 #include <algorithm>
 
@@ -43,22 +44,11 @@ std::vector<std::string>& ALVimCommandLine::historyOf(llwchar which)
 
 bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
 {
-    // The cursor moves by whole characters.
-    auto back = [this](size_t at) {
-        while (at > 0 && (static_cast<unsigned char>(line[--at]) & 0xC0) == 0x80) {}
-        return at;
-    };
-    auto forward = [this](size_t at) {
-        if (at < line.size())
-        {
-            ++at;
-            while (at < line.size() && (static_cast<unsigned char>(line[at]) & 0xC0) == 0x80)
-            {
-                ++at;
-            }
-        }
-        return at;
-    };
+    // The cursor moves by whole characters as a reader sees them, as the
+    // text's caret does: a letter with the marks on it, an emoji with what
+    // joins it.
+    auto back    = [this](size_t at) { return utf8str_step_grapheme_backward(line, at); };
+    auto forward = [this](size_t at) { return utf8str_step_grapheme_forward(line, at); };
     cursor = llmin(cursor, line.size());
     // Tab walks the completions; anything else keeps what it put on the
     // line and lets the rest go -- but Escape with them up only lets

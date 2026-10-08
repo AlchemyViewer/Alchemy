@@ -5652,4 +5652,36 @@ namespace tut
         ensure_equals("das on the ] of a last line's .] takes the ] alone", flat(editor->text()), std::string("."));
         ensure_equals("which it took", vim->registerText('"'), std::string("]"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<198>()
+    {
+        set_test_name("on the : and / lines Backspace, Delete, Left and Right go by characters as the text's caret does: a letter with its marks, an emoji with what joins it");
+        make("x\n");
+        keys(":e");
+        editor->handleUnicodeCharHere(static_cast<llwchar>(0x301));
+        ensure_equals("the mark typed onto the letter", vim->commandLine(), std::string("e\xCC\x81"));
+        keys("<BS>");
+        ensure_equals("Backspace takes the letter with its mark", vim->commandLine(), std::string());
+
+        keys("ae");
+        editor->handleUnicodeCharHere(static_cast<llwchar>(0x301));
+        keys("b<Left><Left><Delete>");
+        ensure_equals("Left past the b and the marked letter, and Delete takes that whole", vim->commandLine(), std::string("ab"));
+
+        keys("<Esc>:e");
+        editor->handleUnicodeCharHere(static_cast<llwchar>(0x301));
+        keys("b<Home><Right><BS>");
+        ensure_equals("Right past the letter and its mark, and Backspace there takes both", vim->commandLine(), std::string("b"));
+
+        // A man, a zero width joiner and a woman: one emoji.
+        keys("<Esc>/");
+        editor->handleUnicodeCharHere(static_cast<llwchar>(0x1F468));
+        editor->handleUnicodeCharHere(static_cast<llwchar>(0x200D));
+        editor->handleUnicodeCharHere(static_cast<llwchar>(0x1F469));
+        ensure_equals("the three typed", vim->commandLine(), std::string("\xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9"));
+        keys("<BS>");
+        ensure_equals("Backspace takes the joined emoji whole", vim->commandLine(), std::string());
+        keys("<Esc>");
+    }
 }
