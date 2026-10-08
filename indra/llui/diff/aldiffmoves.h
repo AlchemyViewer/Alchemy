@@ -90,10 +90,16 @@ namespace ALDiffMoves
         // told otherwise, where a text is not as long as it was told, and
         // where they have come to many more than the texts' lines; a line's
         // again where its regions are not those it was keyed by -- a block
-        // comment opened above it -- though its text is.
+        // comment opened above it -- though its text is. With `kept`, the
+        // regions are known to be those each line was keyed by but for the
+        // lines told edited since, which the lines that read otherwise are
+        // told as -- what a lexer that says what it read again knows: none
+        // of the others is made a number to be known so. Without it, where
+        // regions count, a line neither keyed nor known so here lets its id
+        // go, as one edited does.
         moves_t find(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<ALTextDiff::Run>& runs,
                      const ALTextDiff::Options& options, bool swapped = false, const std::vector<ALTextDiff::regions_t>* left_regions = nullptr,
-                     const std::vector<ALTextDiff::regions_t>* right_regions = nullptr);
+                     const std::vector<ALTextDiff::regions_t>* right_regions = nullptr, bool kept = false);
         // How many lines the last search keyed: what a test holds an
         // edit's cost to.
         S32     lastKeyed() const { return mLastKeyed; }

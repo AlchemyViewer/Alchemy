@@ -62,7 +62,7 @@ void ALDiffMoves::Finder::forget()
 ALDiffMoves::moves_t ALDiffMoves::Finder::find(const std::vector<std::string>& given_left, const std::vector<std::string>& given_right,
                                                const std::vector<ALTextDiff::Run>& runs, const ALTextDiff::Options& options, bool swapped,
                                                const std::vector<ALTextDiff::regions_t>* left_regions,
-                                               const std::vector<ALTextDiff::regions_t>* right_regions)
+                                               const std::vector<ALTextDiff::regions_t>* right_regions, bool kept)
 {
     // Lines told the same by their regions where those change how, and
     // every line of both texts has them.
@@ -113,21 +113,41 @@ ALDiffMoves::moves_t ALDiffMoves::Finder::find(const std::vector<std::string>& g
             }
         }
     }
-    if (!any_gone || !any_made)
+    // Where regions count and are not known kept, a line this search does
+    // not key, nor know its regions as they were, may read otherwise unseen
+    // before the next: its id let go of, keyed again when it is changed.
+    const bool keys = any_gone && any_made;
+    if (regioned && !kept)
+    {
+        for (size_t i = 0; i < left.size(); ++i)
+        {
+            a[i] = keys && gone[i] ? a[i] : -1;
+        }
+        for (size_t j = 0; j < right.size(); ++j)
+        {
+            b[j] = keys && made[j] ? b[j] : -1;
+        }
+    }
+    if (!keys)
     {
         return out;
     }
     // Only the lines changed are keyed, and each once: as they are, or as
     // told the same where something is let go of, by their regions where
     // those change how, the key kept with its id; again where its regions
-    // are not those it was keyed by. A line put in like none taken out has
-    // an id none taken out has, and is in no block.
+    // are not those it was keyed by, which where they are known kept they
+    // are not. A line put in like none taken out has an id none taken out
+    // has, and is in no block.
     const bool as_told = options.like.any();
     const auto keyed   = [&](std::vector<S32>& ids, std::vector<size_t>& by, const std::vector<ALTextDiff::regions_t>* regions, const std::string& line,
                            size_t at) {
-        const ALTextDiff::regions_t* own  = regions ? &(*regions)[at] : nullptr;
-        const size_t                 read = own ? ALTextDiff::hashOf(*own) : 0;
-        if (ids[at] < 0 || (own && by[at] != read))
+        const ALTextDiff::regions_t* own = regions ? &(*regions)[at] : nullptr;
+        if (ids[at] >= 0 && (!own || kept))
+        {
+            return;
+        }
+        const size_t read = own ? ALTextDiff::hashOf(*own) : 0;
+        if (ids[at] < 0 || by[at] != read)
         {
             ids[at] = mIds.idOfMade(as_told ? ALTextDiff::likenessOf(line, options.like, own) : line);
             if (own)

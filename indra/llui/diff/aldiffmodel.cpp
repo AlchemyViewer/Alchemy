@@ -271,6 +271,14 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> between, co
                         : by_regions     ? (read.same > end ? read.same : -1)
                                          : changesTo(shown, end, read.same, moved);
             }
+            // Where lines are told the same by their regions and it said,
+            // the moves' search keys again the lines read otherwise, as
+            // edited, and knows every other line's as it was keyed.
+            again.reread = by_regions && (read.text == held || read.was == held);
+            if (again.reread && reach > end)
+            {
+                mMoveFinder.edited(given_left, end, reach, reach);
+            }
         }
         for (auto it = read_before.rbegin(); reach < 0 && it != read_before.rend(); ++it)
         {
@@ -705,16 +713,16 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const Relayout* aga
         }
     }
     // The blocks moved, lines told the same as the runs' are, by the
-    // regions of the texts as given; and which each line of either side
-    // is in: none with a line in a change that is none, whose lines are
-    // shown as the same, so that each block is signed and found at both
-    // its ends.
+    // regions of the texts as given, known as they were keyed where the
+    // lexer said what it read again; and which each line of either side is
+    // in: none with a line in a change that is none, whose lines are shown
+    // as the same, so that each block is signed and found at both its ends.
     if (!mKeepsLayout)
     {
         mMoveFinder.forget();
     }
-    ALDiffMoves::moves_t moves =
-        mMoveFinder.find(mLeftLines, mRightLines, runs, options, mSwapped, mSwapped ? right_regions : left_regions, mSwapped ? left_regions : right_regions);
+    ALDiffMoves::moves_t moves = mMoveFinder.find(mLeftLines, mRightLines, runs, options, mSwapped, mSwapped ? right_regions : left_regions,
+                                                  mSwapped ? left_regions : right_regions, again && again->reread);
     if (!moves.empty() && std::find(ignored.begin(), ignored.end(), true) != ignored.end())
     {
         std::vector<bool> left_none(left.size(), false);

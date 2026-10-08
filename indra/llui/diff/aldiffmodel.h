@@ -451,16 +451,21 @@ private:
     // What a layout made again after a splice may keep of the one before:
     // the runs it was made from; how far the lines after the change moved,
     // each side as shown; and the side changed, as shown, its lines from
-    // `head` to all but its last `tail` changed, of `lines` before.
+    // `head` to all but its last `tail` changed, of `lines` before. And
+    // whether, where lines are told the same by their regions, the lexer
+    // said what it read again of the side: every line's regions as they
+    // were but those edited and those read otherwise, which the moves'
+    // search is told of as edited (ALDiffMoves::Finder::find's `kept`).
     struct Relayout
     {
         std::vector<ALTextDiff::Run> runs;
-        S32                          left  = 0;
-        S32                          right = 0;
-        size_t                       side  = 0;
-        S32                          head  = 0;
-        S32                          tail  = 0;
-        S32                          lines = 0;
+        S32                          left   = 0;
+        S32                          right  = 0;
+        size_t                       side   = 0;
+        S32                          head   = 0;
+        S32                          tail   = 0;
+        S32                          lines  = 0;
+        bool                         reread = false;
     };
     // Where each group of runs -- a run the same, or the runs of a change --
     // began to be laid out, and where the last ended: the rows of each

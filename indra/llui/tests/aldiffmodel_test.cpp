@@ -2082,4 +2082,77 @@ namespace tut
             as_hashed(typed, where + ": mended");
         }
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<47>()
+    {
+        set_test_name("the LSL grammar's lexer saying what it read again, case let go of: a keystroke makes a number of the regions of only the lines the search for blocks moved keys, not every changed line's; a block comment opened above a block moved, and taken out, keys its lines again, as afresh");
+        std::string                                  error;
+        const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+        ensure("the LSL grammar", lsl != nullptr);
+        // Forty lines saying something moved from near the top to near the
+        // end, the third's string in another case.
+        std::vector<std::string> left;
+        for (S32 n = 0; n < 200; ++n)
+        {
+            left.push_back(n >= 10 && n < 50 ? "    llOwnerSay(\"Block line " + std::to_string(n) + "\");" : "    statement number " + std::to_string(n) + " goes here;");
+        }
+        std::vector<std::string> right = left;
+        std::vector<std::string> block(right.begin() + 10, right.begin() + 50);
+        right.erase(right.begin() + 10, right.begin() + 50);
+        block[2] = "    llOwnerSay(\"block line 12\");";
+        right.insert(right.begin() + 140, block.begin(), block.end());
+        const auto joined = [](const std::vector<std::string>& lines) {
+            std::string out;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                out += (i ? "\n" : "") + lines[i];
+            }
+            return out;
+        };
+        // Told by the lexer what it read again, as a view is; and every line
+        // keyed afresh each search.
+        ALDiffModel kept;
+        const auto  lexer = std::make_shared<ALDiffLexer>(lsl);
+        kept.setLexer(ALDiffLexer::lexerOf(lexer), ALTextDiff::lexer_t(), ALDiffLexer::rereadOf(lexer));
+        ALDiffModel whole;
+        whole.setKeepsLayout(false);
+        whole.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+        const auto both = [&](const std::function<void(ALDiffModel&)>& done, const std::string& where) {
+            done(kept);
+            done(whole);
+            aldiffmodel_data::sameLayout(kept, whole, where);
+        };
+        ALTextDiff::Likeness cased;
+        cased.ignoreCase = true;
+        both(
+            [&](ALDiffModel& model) {
+                model.setLikeness(cased);
+                model.setTexts(joined(left), joined(right));
+            },
+            "moved");
+        ensure_equals("parted at the line whose string's case changed: two moves", kept.moveCount(), 2);
+
+        // Typed in between the block's two places: the line typed and its
+        // other keyed, and no line of the block made a number again.
+        std::vector<std::string> typed = right;
+        typed[100] += " // typed";
+        const U64 hashed = ALTextDiff::hashed();
+        kept.setRightText(joined(typed));
+        const U64 cost = ALTextDiff::hashed() - hashed;
+        ensure("typed in: the lines keyed alone made a number: " + std::to_string(cost), cost <= 4u);
+        whole.setRightText(joined(typed));
+        aldiffmodel_data::sameLayout(kept, whole, "typed in");
+        ensure_equals("two moves still", kept.moveCount(), 2);
+
+        // A block comment opened above the block on the right and never
+        // closed: its strings a comment's, their case let go of, and so none
+        // of its lines the left's; and taken out, the two moves again.
+        std::vector<std::string> opened = typed;
+        opened[130]                     = "/* opened";
+        both([&](ALDiffModel& model) { model.setRightText(joined(opened)); }, "a comment opened");
+        ensure_equals("the block in a comment: no move", kept.moveCount(), 0);
+        both([&](ALDiffModel& model) { model.setRightText(joined(typed)); }, "the comment taken out");
+        ensure_equals("two moves again", kept.moveCount(), 2);
+    }
 }
