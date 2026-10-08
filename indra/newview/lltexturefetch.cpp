@@ -555,8 +555,10 @@ private:
     S32 mRequestedDiscard;
     S32 mLoadedDiscard;
     S32 mDecodedDiscard;
-    LLFrameTimer mRequestedDeltaTimer;
-    LLFrameTimer mFetchDeltaTimer;
+    // LLTimer, not LLFrameTimer: the fetch thread resets them, and the frame clock is the
+    // main thread's.
+    LLTimer mRequestedDeltaTimer;
+    LLTimer mFetchDeltaTimer;
     LLTimer mCacheReadTimer;
     LLTimer mDecodeTimer;
     LLTimer mCacheWriteTimer;
