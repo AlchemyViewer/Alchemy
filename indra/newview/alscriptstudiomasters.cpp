@@ -194,7 +194,7 @@ bool ALScriptStudioMasters::ofItsLanguage(const Doc& doc, const std::string& pat
     return false;
 }
 
-void ALScriptStudioMasters::linkTo(Doc& doc, const std::string& path, ALMasterLink::Made made, bool written)
+void ALScriptStudioMasters::linkTo(Doc& doc, std::string path, ALMasterLink::Made made, bool written)
 {
     if (!ofItsLanguage(doc, path) || carriesItems(doc))
     {

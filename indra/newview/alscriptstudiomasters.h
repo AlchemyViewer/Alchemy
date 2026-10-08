@@ -201,7 +201,10 @@ private:
     bool ofItsLanguage(const Doc& doc, const std::string& path);
     // `written`: what was typed in the tab has just been written to the
     // file, so the file is not what the world holds.
-    void linkTo(Doc& doc, const std::string& path, ALMasterLink::Made made, bool written = false);
+    // The path by value: the tab gives way to the file's, and is gone
+    // before the file is opened -- and the path may be the tab's own, the
+    // file its script names (Mastered::hinted).
+    void linkTo(Doc& doc, std::string path, ALMasterLink::Made made, bool written = false);
     // The file a script names, as the disk's thread found it, back to its
     // tab found again by its id: offered where the tab is still the script
     // that named it, and may still be linked.
