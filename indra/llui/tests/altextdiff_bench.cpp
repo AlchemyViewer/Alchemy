@@ -187,7 +187,7 @@ namespace
 
     void row(const char* name, double small, double big)
     {
-        std::printf("  %-52s %10.3f %10.3f\n", name, small, big);
+        std::printf("  %-54s %10.3f %10.3f\n", name, small, big);
     }
 
     // What a comparison says, laid out: its changes, the lines marked on
@@ -239,7 +239,7 @@ int main(int, char**)
     const std::string              big1kt   = joined(big1k);
 
     std::printf("altextdiff_bench: comparing generated LSL scripts (ms per operation)\n");
-    std::printf("\n  %-52s %10s %10s\n", "", "5,000", "50,000");
+    std::printf("\n  %-54s %10s %10s\n", "", "5,000", "50,000");
 
     std::printf("\nLines (ALTextDiff::lines)\n");
     const auto lines = [&](const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Options& options) {
@@ -292,10 +292,10 @@ int main(int, char**)
     // A live comparison, the right typed in: a character put in a line
     // near the middle and compared again, then taken out and compared
     // again; per keystroke. Blanks let go of where asked, which a grammar's
-    // strings keep.
+    // strings keep, or comments, which a grammar says where they are.
     const auto typed = [&](const std::string& left, const std::string& right, bool grammar = false,
                            ALTextDiff::Algorithm algorithm = ALTextDiff::Algorithm::Histogram, const ALTextDiff::ranges_t& ranges = {},
-                           bool blanks = false) {
+                           bool blanks = false, bool comments = false) {
         ALDiffModel model;
         if (grammar)
         {
@@ -303,6 +303,7 @@ int main(int, char**)
         }
         ALTextDiff::Likeness like;
         like.ignoreWhitespace = blanks;
+        like.ignoreComments   = comments;
         model.setLikeness(like);
         model.setAlgorithm(algorithm);
         model.setTexts(left, right, ranges);
@@ -320,6 +321,8 @@ int main(int, char**)
     row("a keystroke, a thousand edits, LSL's grammar", typed(small_t, small1kt, true), typed(big_t, big1kt, true));
     row("a keystroke, a thousand edits, LSL's, blanks let go", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Histogram, {}, true),
         typed(big_t, big1kt, true, ALTextDiff::Algorithm::Histogram, {}, true));
+    row("a keystroke, a thousand edits, LSL's, comments let go", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Histogram, {}, false, true),
+        typed(big_t, big1kt, true, ALTextDiff::Algorithm::Histogram, {}, false, true));
     row("a keystroke, a thousand edits, by structure", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Structural),
         typed(big_t, big1kt, true, ALTextDiff::Algorithm::Structural));
     {
@@ -359,6 +362,9 @@ int main(int, char**)
             typed(big_t, big_c, false, ALTextDiff::Algorithm::Histogram, big_ranges));
         row("a keystroke, converted, LSL's, blanks let go", typed(small_t, small_c, true, ALTextDiff::Algorithm::Histogram, small_ranges, true),
             typed(big_t, big_c, true, ALTextDiff::Algorithm::Histogram, big_ranges, true));
+        row("a keystroke, converted, LSL's, comments let go",
+            typed(small_t, small_c, true, ALTextDiff::Algorithm::Histogram, small_ranges, false, true),
+            typed(big_t, big_c, true, ALTextDiff::Algorithm::Histogram, big_ranges, false, true));
     }
 
     std::printf("\nWhat it says (5,000 lines)\n");
