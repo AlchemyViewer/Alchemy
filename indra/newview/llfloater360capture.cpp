@@ -575,9 +575,9 @@ void LLFloater360Capture::capture360Images()
                                       mSourceImageSize, mSourceImageSize, num_render_passes);
 
         // encode each image and write to disk while saving how long it took to do so
-        auto t_start = std::chrono::high_resolution_clock::now();
+        auto t_start = std::chrono::steady_clock::now();
         encodeAndSave(mRawImages[i], cubemap_js_full_path, prefixes[i]);
-        auto t_end = std::chrono::high_resolution_clock::now();
+        auto t_end = std::chrono::steady_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(t_end - t_start);
         encode_time_total += duration.count();
 
