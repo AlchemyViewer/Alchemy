@@ -244,4 +244,15 @@ namespace tut
         ensure_equals("its ^ first in a group", found("ab", ALVimPattern::of("\\M\\(^ab\\)", std::string(), plain)), std::string("ab"));
         ensure_equals("and either itself elsewhere", found("a^b$c", ALVimPattern::of("\\Ma^b$c", std::string(), plain)), std::string("a^b$c"));
     }
+
+    template<> template<>
+    void alvimpattern_object::test<11>()
+    {
+        set_test_name("\\_^ and \\_$ are a line's start and end wherever they stand, and never the characters");
+        ensure_equals("the engine's own", regexOf("\\_^a\\_$"), std::string("^a$"));
+        ensure_equals("no ^ in the text", found("x^ab", ALVimPattern::of("\\_^ab", std::string(), plain)), std::string());
+        ensure_equals("but the line's start", found("ab x", ALVimPattern::of("\\_^ab", std::string(), plain)), std::string("ab"));
+        ensure_equals("nor a $, but the line's end", found("ab$x ab", ALVimPattern::of("ab\\_$", std::string(), plain)), std::string("ab"));
+        ensure_equals("after a line break", found("xa\nb", ALVimPattern::of("a\\n\\_^b", std::string(), plain)), std::string("a\nb"));
+    }
 }

@@ -543,6 +543,13 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     continue;
                 }
                 case '_':
+                    // \_^ and \_$: a line's start and end wherever they
+                    // stand, crossing none.
+                    if (i + 1 < vim.size() && (vim[i + 1] == '^' || vim[i + 1] == '$'))
+                    {
+                        out.regex += vim[++i];
+                        continue;
+                    }
                     // \_s and the like: the class with a line break in it,
                     // which the search must then be let cross.
                     if (i + 1 < vim.size())
