@@ -77,11 +77,27 @@ void LL::ThreadPoolBase::start()
     for (size_t i = 0; i < mThreadCount; ++i)
     {
         std::string tname{ stringize(mName, ':', (i+1), '/', mThreadCount) };
-        mThreads.emplace_back(tname, [this, tname]()
+        // Linux keeps fifteen bytes of a thread's name, and set_thread_name
+        // cuts macOS's to as many, which left every pool thread
+        // "ThreadPool:Gene" or the like in top -H, gdb, perf and a crash
+        // report. The OS name drops the prefix and shortens the pool's name
+        // instead, so the index survives; a pool of one needs none. Windows'
+        // SetThreadDescription takes the whole name, and Tracy and the log
+        // keep it everywhere.
+#if LL_WINDOWS
+        std::string os_name{ tname };
+#else
+        constexpr size_t OS_NAME_MAX = 15;
+        std::string os_name{ mThreadCount > 1 ? stringize(':', (i+1)) : std::string() };
+        os_name.insert(0, getKey().substr(0, OS_NAME_MAX - os_name.size()));
+#endif
+        mThreads.emplace_back(tname, [this, tname, os_name]()
             {
-                set_thread_name(tname.c_str());
-                set_thread_fp_mode();
+                // Tracy names the OS thread too, cut to the same fifteen
+                // bytes, so it goes first and the short name is the one left
                 LL_PROFILER_SET_THREAD_NAME(tname.c_str());
+                set_thread_name(os_name.c_str());
+                set_thread_fp_mode();
                 run(tname);
             });
     }
