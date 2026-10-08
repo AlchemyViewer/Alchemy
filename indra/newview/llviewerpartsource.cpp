@@ -140,12 +140,12 @@ void LLViewerPartSourceScript::update(const F32 dt)
         return;
     }
 
-    F32 old_update_time = mLastUpdateTime;
+    const F64 old_update_time = mLastUpdateTime;
     mLastUpdateTime += dt;
 
     F32 ref_rate_travelspeed = llmin(LLViewerPartSim::getInstance()->getRefRate(), 1.f);
 
-    F32 dt_update = mLastUpdateTime - mLastPartTime;
+    F32 dt_update = (F32)(mLastUpdateTime - mLastPartTime);
 
     // Update this for objects which have the follow flag set...
     if (!mSourceObjectp.isNull())
@@ -625,7 +625,7 @@ void LLViewerPartSourceSpiral::update(const F32 dt)
 
     mLastUpdateTime += dt;
 
-    F32 dt_update = mLastUpdateTime - mLastPartTime;
+    F32 dt_update = (F32)(mLastUpdateTime - mLastPartTime);
     F32 max_time = llmax(1.f, 10.f*RATE);
     dt_update = llmin(max_time, dt_update);
 
@@ -773,7 +773,7 @@ void LLViewerPartSourceBeam::update(const F32 dt)
         mTargetPosAgent = gAgent.getPosAgentFromGlobal(mLKGTargetPosGlobal);
     }
 
-    F32 dt_update = mLastUpdateTime - mLastPartTime;
+    F32 dt_update = (F32)(mLastUpdateTime - mLastPartTime);
     F32 max_time = llmax(1.f, 10.f*RATE);
     dt_update = llmin(max_time, dt_update);
 
@@ -890,7 +890,7 @@ void LLViewerPartSourceChat::update(const F32 dt)
         return;
     }
 
-    F32 dt_update = mLastUpdateTime - mLastPartTime;
+    F32 dt_update = (F32)(mLastUpdateTime - mLastPartTime);
 
     // Clamp us to generating at most one second's worth of particles on a frame.
     F32 max_time = llmax(1.f, 10.f*RATE);

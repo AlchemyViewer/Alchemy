@@ -83,8 +83,10 @@ protected:
     U32         mType;
     bool        mIsDead;
     bool        mIsSuspended;
-    F32         mLastUpdateTime;
-    F32         mLastPartTime;
+    // The source's age and when it last emitted, in F64: a source can run for hours, and an
+    // F32 age that large rounds a frame's dt away, which stops it emitting.
+    F64         mLastUpdateTime;
+    F64         mLastPartTime;
     LLUUID      mOwnerUUID;
     LLPointer<LLVOAvatar> mOwnerAvatarp;
     LLPointer<LLViewerTexture>  mImagep;
