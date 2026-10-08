@@ -883,4 +883,24 @@ namespace tut
         glGetIntegerv(GL_PATCH_VERTICES, &patch);
         ensure_equals("and the patch size", (S32)patch, 4);
     }
+
+    // Which vertex attribute arrays are enabled is vertex-array-object state, and
+    // a fresh context's VAO has none. LLVertexBuffer's cache of them outlived the
+    // context, so the next context's first draw skipped enabling the arrays it read.
+    template<> template<>
+    void llimagegl_object::test<24>()
+    {
+        LLVertexBuffer::setupClientArrays(LLVertexBuffer::MAP_VERTEX);
+
+        // A new context on the same thread.
+        gl.reset();
+        gl = std::make_unique<ll_test::HeadlessGL>();
+
+        LLVertexBuffer::setupClientArrays(LLVertexBuffer::MAP_VERTEX);
+        GLint enabled = GL_FALSE;
+        glGetVertexAttribiv(LLVertexBuffer::TYPE_VERTEX, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled);
+        LLVertexBuffer::setupClientArrays(0);
+
+        ensure("the position array is enabled on the new context", enabled == GL_TRUE);
+    }
 }

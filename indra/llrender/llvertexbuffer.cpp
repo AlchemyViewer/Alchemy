@@ -1028,6 +1028,11 @@ void LLVertexBuffer::cleanupClass()
 {
     unbind();
 
+    // Which attribute arrays are enabled is vertex-array-object state, and the next
+    // context's VAO starts with none. Left as it was, setupClientArrays would take its first
+    // draw's arrays for enabled already and skip the glEnableVertexAttribArray they need.
+    sLastMask = 0;
+
     delete sVBOPool;
     sVBOPool = nullptr;
 
