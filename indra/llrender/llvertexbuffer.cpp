@@ -273,7 +273,10 @@ static GLuint gen_buffer()
     GLuint ret = 0;
     constexpr U32 pool_size = 4096;
 
-    thread_local static GLuint sNamePool[pool_size];
+    // On the heap: as a thread_local array the pool was 16 KB of static TLS,
+    // which glibc takes out of the stack of every thread, those that never
+    // make a buffer too.
+    thread_local static std::unique_ptr<GLuint[]> sNamePool;
     thread_local static U32 sIndex = 0;
     thread_local static U32 sNameGeneration = 0;
 
@@ -287,18 +290,22 @@ static GLuint gen_buffer()
     if (sIndex == 0)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("gen buffer");
+        if (!sNamePool)
+        {
+            sNamePool = std::make_unique<GLuint[]>(pool_size);
+        }
         sIndex = pool_size;
 #if !LL_DARWIN
         if (!gGLManager.mIsAMD)
         {
-            glGenBuffers(pool_size, sNamePool);
+            glGenBuffers(pool_size, sNamePool.get());
         }
         else
 #endif
         { // work around for AMD driver bug
             for (U32 i = 0; i < pool_size; ++i)
             {
-                glGenBuffers(1, sNamePool + i);
+                glGenBuffers(1, sNamePool.get() + i);
             }
         }
     }
