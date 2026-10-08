@@ -4667,7 +4667,9 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             else
             {
-                m.to = ALTextPos(line, firstNonBlankColumn(d, line));
+                // + and - to the line's first non-blank; with no line to go
+                // to, nowhere, as vim's fail without moving.
+                m.to = m.moved ? ALTextPos(line, firstNonBlankColumn(d, line)) : from;
             }
             return m;
         }

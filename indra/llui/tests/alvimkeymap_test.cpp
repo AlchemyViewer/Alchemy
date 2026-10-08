@@ -219,7 +219,7 @@ namespace tut
 
     // More than TUT's fifty a group holds by default, which runs the first
     // fifty and says nothing of the rest: keep this above the highest test.
-    typedef test_group<alvimkeymap_data, 200> alvimkeymap_group;
+    typedef test_group<alvimkeymap_data, 210> alvimkeymap_group;
     typedef alvimkeymap_group::object    alvimkeymap_object;
     alvimkeymap_group                    alvimkeymap_group_instance("alvimkeymap");
 
@@ -5683,5 +5683,36 @@ namespace tut
         keys("<BS>");
         ensure_equals("Backspace takes the joined emoji whole", vim->commandLine(), std::string());
         keys("<Esc>");
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<199>()
+    {
+        set_test_name("+, Return and Ctrl-M on the last line and - on the first fail where the caret is, an operator with them; a count past the end goes as far as there are lines");
+        make("  a f\n  bcd\n   e f");
+        editor->setCaret(ALTextPos(2, 5));
+        keys("+");
+        ensure_equals("+ on the last line stays", caretText(), std::string("2:5"));
+        keys("<CR>");
+        ensure_equals("and so does Return", caretText(), std::string("2:5"));
+        keys("<C-m>");
+        ensure_equals("and Ctrl-M", caretText(), std::string("2:5"));
+        keys("d+");
+        ensure_equals("d+ there takes nothing", flat(editor->text()), std::string("  a f|  bcd|   e f"));
+        ensure_equals("and leaves the caret", caretText(), std::string("2:5"));
+        editor->setCaret(ALTextPos(0, 4));
+        keys("-");
+        ensure_equals("- on the first line stays", caretText(), std::string("0:4"));
+        keys("d-");
+        ensure_equals("d- there takes nothing", flat(editor->text()), std::string("  a f|  bcd|   e f"));
+        ensure_equals("and leaves the caret", caretText(), std::string("0:4"));
+
+        make("  a\n  bcd\n   e f\nx");
+        editor->setCaret(ALTextPos(1, 3));
+        keys("5+");
+        ensure_equals("5+ with two lines below to the last", caretText(), std::string("3:0"));
+        editor->setCaret(ALTextPos(2, 3));
+        keys("5-");
+        ensure_equals("5- with two lines above to the first's first non-blank", caretText(), std::string("0:2"));
     }
 }
