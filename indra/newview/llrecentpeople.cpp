@@ -121,7 +121,7 @@ void LLRecentPeople::updateAvatarsArrivalTime(uuid_vec_t& uuids)
         }
         else
         {
-            mAvatarsArrivalTime[*id_it] = LLDate::now().secondsSinceEpoch();
+            mAvatarsArrivalTime[*id_it] = LLFrameTimer::getTotalSeconds();
         }
     }
 }
@@ -134,7 +134,7 @@ F64 LLRecentPeople::getArrivalTimeByID(const LLUUID& id)
     {
         return it->second;
     }
-    return LLDate::now().secondsSinceEpoch();
+    return LLFrameTimer::getTotalSeconds();
 }
 
 bool LLRecentPeople::save() const
