@@ -392,6 +392,55 @@ namespace tut
                       0);
     }
 
+    // A packed pixel type is one value a pixel, whatever the format's component
+    // count. GStreamer hands its frames over as GL_BGRA /
+    // GL_UNSIGNED_INT_8_8_8_8_REV, and the upload that slices by scanline -- on the
+    // main thread on Windows off Intel, on Linux with NVIDIA, on macOS with AMD --
+    // stepped through rows by component count times a per-type width that had no
+    // entry for it, and died. Where the slicing is off this passes either way.
+    template<> template<>
+    void llimagegl_object::test<10>()
+    {
+        // 64 rows, a multiple of 32: the full upload takes the batched slices.
+        constexpr U16 W = 64, H = 64;
+        LLPointer<LLImageRaw> src = new LLImageRaw(W, H, 4);
+        U8* sd = src->getData();
+        for (size_t i = 0; i < (size_t)W * H * 4; ++i)
+            sd[i] = (U8)(i & 0xFF);
+
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        img->setExplicitFormat(GL_RGBA8, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
+        ensure("createGLTexture succeeded", img->createGLTexture(0, src.get()));
+
+        std::vector<U8> got((size_t)W * H * 4);
+        readTexture(img, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, got.data());
+        ensure_equals("full upload reads back",
+                      std::memcmp(got.data(), sd, got.size()), 0);
+
+        // A partial-width update, which slices one row at a time.
+        LLPointer<LLImageRaw> patch = new LLImageRaw(W, H, 4);
+        U8* pd = patch->getData();
+        for (size_t i = 0; i < (size_t)W * H * 4; ++i)
+            pd[i] = (U8)(0xFF - (i & 0xFF));
+        ensure("setSubImage succeeded",
+               img->setSubImage(patch.get(), /*x_pos=*/8, /*y_pos=*/4,
+                                /*width=*/16, /*height=*/8,
+                                /*force_fast_update=*/true));
+
+        readTexture(img, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, got.data());
+        bool match = true;
+        for (U32 y = 0; y < H && match; ++y)
+        {
+            for (U32 x = 0; x < W && match; ++x)
+            {
+                const bool in_patch = x >= 8 && x < 24 && y >= 4 && y < 12;
+                const size_t at = ((size_t)y * W + x) * 4;
+                match = std::memcmp(got.data() + at, (in_patch ? pd : sd) + at, 4) == 0;
+            }
+        }
+        ensure("the update lands where it was asked and nowhere else", match);
+    }
+
     // An edit writes through the ACTIVE unit, and a bind that finds the texture
     // already cached on slot 0 skips activating it. With another unit left active
     // the write went to whatever that unit held. The glyph atlas does exactly this:

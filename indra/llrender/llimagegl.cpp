@@ -1220,29 +1220,51 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
     return true;
 }
 
-U32 type_width_from_pixtype(U32 pixtype)
+// Bytes one pixel of client data occupies, for stepping through it a row at a time.
+//
+// A packed type holds the whole pixel in one value, whatever the format's component
+// count: GStreamer hands its frames over as GL_BGRA / GL_UNSIGNED_INT_8_8_8_8_REV, which
+// is four bytes a pixel, not four components of four bytes each.
+static U32 pixel_bytes(U32 pixformat, U32 pixtype)
 {
-    U32 type_width = 0;
+    switch (pixtype)
+    {
+    case GL_UNSIGNED_INT_8_8_8_8:
+    case GL_UNSIGNED_INT_8_8_8_8_REV:
+    case GL_UNSIGNED_INT_10_10_10_2:
+    case GL_UNSIGNED_INT_2_10_10_10_REV:
+    case GL_UNSIGNED_INT_10F_11F_11F_REV:
+    case GL_UNSIGNED_INT_5_9_9_9_REV:
+        return 4;
+    case GL_UNSIGNED_SHORT_5_6_5:
+    case GL_UNSIGNED_SHORT_5_6_5_REV:
+    case GL_UNSIGNED_SHORT_4_4_4_4:
+    case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+    case GL_UNSIGNED_SHORT_5_5_5_1:
+    case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+        return 2;
+    default:
+        break;
+    }
+
+    const U32 components = LLImageGL::dataFormatComponents(pixformat);
     switch (pixtype)
     {
     case GL_UNSIGNED_BYTE:
     case GL_BYTE:
-        type_width = 1;
-        break;
+        return components;
     case GL_UNSIGNED_SHORT:
     case GL_SHORT:
     case GL_HALF_FLOAT:
-        type_width = 2;
-        break;
+        return components * 2;
     case GL_UNSIGNED_INT:
     case GL_INT:
     case GL_FLOAT:
-        type_width = 4;
-        break;
+        return components * 4;
     default:
         LL_ERRS() << "Unknown type: " << pixtype << LL_ENDL;
+        return 0;
     }
-    return type_width;
 }
 
 // Whether to break an upload into sub_image_lines slices. This is latency smoothing,
@@ -1256,7 +1278,7 @@ U32 type_width_from_pixtype(U32 pixtype)
 // guard would still be required without it.) setSubImage can pass a genuinely
 // block-compressed texture; the allocation paths always pass false, since driver-side
 // generic compression is gone.
-bool should_stagger_image_set(bool compressed)
+static bool should_stagger_image_set(bool compressed)
 {
 #if LL_LINUX
     return !compressed && on_main_thread() && gGLManager.mIsNVIDIA;
@@ -1270,17 +1292,14 @@ bool should_stagger_image_set(bool compressed)
 
 // Equivalent to calling glSetSubImage2D(target, miplevel, x_offset, y_offset, width, height, pixformat, pixtype, src), assuming the total width of the image is data_width
 // However, instead there are multiple calls to glSetSubImage2D on smaller slices of the image
-void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset, S32 width, S32 height, U32 pixformat, U32 pixtype, const U8* src, S32 data_width)
+static void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset, S32 width, S32 height, U32 pixformat, U32 pixtype, const U8* src, S32 data_width)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
     LL_PROFILE_ZONE_NUM(width);
     LL_PROFILE_ZONE_NUM(height);
 
-    U32 components = LLImageGL::dataFormatComponents(pixformat);
-    U32 type_width = type_width_from_pixtype(pixtype);
-
-    const U32 line_width = data_width * components * type_width;
+    const U32 line_width = data_width * pixel_bytes(pixformat, pixtype);
     const U32 y_offset_end = y_offset + height;
 
     if (width == data_width && height % 32 == 0)
@@ -1398,7 +1417,7 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
             stop_glerror();
         }
 
-        const U8* sub_datap = datap + (y_pos * data_width + x_pos) * getComponents();
+        const U8* sub_datap = datap + (y_pos * data_width + x_pos) * pixel_bytes(mFormatPrimary, mFormatType);
         // Forced: the write goes to whichever unit is ACTIVE, and a bind that finds the
         // texture already on slot 0 skips activating it. The glyph atlas is the usual case
         // -- it is still on slot 0 from the text being drawn when a new glyph arrives, and
