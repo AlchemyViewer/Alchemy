@@ -302,6 +302,8 @@ namespace tut
         // so we need to specify how much error is ok
         F32 allowable_relative_error = 0.00001f;
         S32 number_of_tests = 100;
+        // A fixed seed, so a failure draws the same lines when run again.
+        ll_rand_seed(296);
         for (S32 test = 0; test < number_of_tests; ++test)
         {
             // generate some random point to be on the line
@@ -511,6 +513,8 @@ namespace tut
         // next some random tests
         F32 allowable_relative_error = 0.0001f;
         S32 number_of_tests = 20;
+        // A fixed seed, so a failure draws the same planes when run again.
+        ll_rand_seed(469);
         for (S32 test = 0; test < number_of_tests; ++test)
         {
             // generate the known line
