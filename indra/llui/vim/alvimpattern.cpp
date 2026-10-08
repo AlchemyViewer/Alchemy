@@ -320,15 +320,27 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // How deep in the engine's brackets the output is, so that a \ze at
     // the top can look ahead to its branch's end.
     S32   depth    = 0;
-    // The look aheads \ze opened, by the depth each was opened at: each
-    // runs to the end of its branch -- a \| at that depth, the \) that
-    // closes its group, or the pattern's end.
-    std::vector<S32> looking;
-    auto             closeLooks = [&]() {
-        while (!looking.empty() && looking.back() == depth)
+    // The look aheads \ze opened, by the depth each was opened at and
+    // where in the expression: each runs to the end of its branch -- a \|
+    // at that depth, the \) that closes its group, or the pattern's end.
+    // One with nothing in it matches anywhere, and the engine takes no
+    // empty look ahead, so it goes.
+    std::vector<std::pair<S32, size_t>> looking;
+    auto                                closeLook = [&]() {
+        if (out.regex.size() == looking.back().second + 3)
+        {
+            out.regex.resize(looking.back().second);
+        }
+        else
         {
             out.regex += ')';
-            looking.pop_back();
+        }
+        looking.pop_back();
+    };
+    auto closeLooks = [&]() {
+        while (!looking.empty() && looking.back().first == depth)
+        {
+            closeLook();
         }
     };
     // Only the first \ze of a branch at the top looks ahead. Any other --
@@ -409,6 +421,13 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
             if (put_at >= atom_at)
             {
                 put_at += open.size();
+            }
+        }
+        for (std::pair<S32, size_t>& look : looking)
+        {
+            if (look.second >= atom_at)
+            {
+                look.second += open.size();
             }
         }
         // A cut in what is looked ahead at or behind is none; one in what
@@ -652,8 +671,8 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     {
                         if (depth == 0 && !ze_in_branch)
                         {
+                            looking.emplace_back(depth, out.regex.size());
                             out.regex += "(?=";
-                            looking.push_back(depth);
                         }
                         else
                         {
@@ -1013,7 +1032,10 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         }
     }
     withMarks();
-    out.regex.append(looking.size(), ')');
+    while (!looking.empty())
+    {
+        closeLook();
+    }
     for (const std::pair<size_t, S32>& cut : cuts)
     {
         if (cut.second < 64)

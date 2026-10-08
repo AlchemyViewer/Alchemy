@@ -374,4 +374,17 @@ namespace tut
                                                                                "<\\21|\\10|\\01>"),
                       std::string("<c1|ab0|a1>"));
     }
+
+    template<> template<>
+    void alvimpattern_object::test<17>()
+    {
+        set_test_name("a \\ze with nothing after it in its branch ends the match there and looks ahead at nothing");
+        ensure_equals("no look ahead", regexOf("foo\\ze"), std::string("foo"));
+        ensure_equals("the match", found("foobar", ALVimPattern::of("foo\\ze", std::string(), plain)), std::string("foo"));
+        ensure_equals("before a \\|", found("foobar foo", ALVimPattern::of("foo\\ze\\|bar", std::string(), plain)), std::string("foo|bar|foo"));
+        ensure_equals("before a \\c", found("FOO", ALVimPattern::of("foo\\ze\\c", std::string(), plain)), std::string("FOO"));
+        ensure_equals("one with something after it still looks", found("foobar foobaz", ALVimPattern::of("foo\\zeba\\|x", std::string(), plain)),
+                      std::string("foo|foo"));
+    }
+
 }
