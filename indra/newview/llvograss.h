@@ -106,7 +106,7 @@ public:
 
     LLSurfacePatch           *mPatch;           //  Stores the land patch where the grass is centered
 
-    U64 mLastPatchUpdateTime;
+    U32 mLastPatchUpdateCount;  // mPatch's getUpdateCount() when the blades were last built
 
     LLVector3                 mGrassBend;       // Accumulated wind (used for blowing trees)
     LLVector3                 mGrassVel;

@@ -40,7 +40,6 @@
 #include "lldrawpool.h"
 #include "noise.h"
 
-extern U64MicrosecondsImplicit gFrameTime;
 extern LLPipeline gPipeline;
 
 LLSurfacePatch::LLSurfacePatch()
@@ -64,7 +63,7 @@ LLSurfacePatch::LLSurfacePatch()
     // This flag is used to communicate between adjacent surfaces and is
     // set to non-zero values by higher classes.
     mConnectedEdge(NO_EDGE),
-    mLastUpdateTime(0),
+    mUpdateCount(0),
     mSurfacep(NULL)
 {
     S32 i;
@@ -495,13 +494,7 @@ void LLSurfacePatch::dirtyZ()
     }
 
     dirty();
-    mLastUpdateTime = gFrameTime;
-}
-
-
-const U64 &LLSurfacePatch::getLastUpdateTime() const
-{
-    return mLastUpdateTime;
+    ++mUpdateCount;
 }
 
 F32 LLSurfacePatch::getMaxZ() const

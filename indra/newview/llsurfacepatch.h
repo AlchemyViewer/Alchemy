@@ -81,7 +81,7 @@ public:
     F32 getMinComposition() const;
     F32 getMaxComposition() const;
     const LLVector3 &getCenterRegion() const;
-    const U64 &getLastUpdateTime() const;
+    U32 getUpdateCount() const              { return mUpdateCount; }
     LLSurface *getSurface() const { return mSurfacep; }
     LLVector3 getPointAgent(const U32 x, const U32 y) const; // get the point at the offset.
     LLVector2 getTexCoords(const U32 x, const U32 y) const;
@@ -151,7 +151,8 @@ protected:
 
     U8 mConnectedEdge;      // This flag is non-zero iff patch is on at least one edge
                             // of LLSurface that is "connected" to another LLSurface
-    U64 mLastUpdateTime;    // Time patch was last updated
+    U32 mUpdateCount;       // Counts dirtyZ() calls: a reader holding an older count knows the
+                            // heights changed, however many changes one frame brings
 
     LLSurface *mSurfacep; // Pointer to "parent" surface
 };
