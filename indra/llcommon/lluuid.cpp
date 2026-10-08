@@ -815,14 +815,15 @@ void LLUUID::generate()
             /*
              * Set multicast bit, to prevent conflicts
              * with IEEE 802 addresses obtained from
-             * network cards
+             * network cards: the least significant bit
+             * of the first octet (RFC 4122, 4.5).
              */
-            node_id[0] |= 0x80;
+            node_id[0] |= 0x01;
         }
 
         getCurrentTime(&time_last);
 
-        clock_seq = (U16)ll_rand(65536);
+        clock_seq = (U16)ll_rand(0x4000);
     }
 
     // get current time
