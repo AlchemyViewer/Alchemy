@@ -707,6 +707,17 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const Relayout* aga
     };
     if (like.ignoreBlankLines || like.ignoreComments || by_tokens)
     {
+        // After a splice, a change's answer as it was where it is a change
+        // there was -- its runs as they were before the edit or moved along
+        // after it, between runs the same then too -- and none of its lines
+        // on the side edited is among those edited or read otherwise: its
+        // lines, their regions and the tokens of them kept are as they were.
+        const bool                          keeps        = again && mKeepsLayout && mIgnored.size() == again->runs.size();
+        const std::vector<ALTextDiff::Run>* was          = keeps ? &again->runs : nullptr;
+        const std::pair<size_t, size_t>     kept_runs    = keeps ? runsKept(*again, runs) : std::pair<size_t, size_t>(0, 0);
+        const S32                           delta        = keeps ? static_cast<S32>(runs.size()) - static_cast<S32>(was->size()) : 0;
+        const size_t                        edited       = keeps ? again->side : 0;
+        const S32                           edited_lines = static_cast<S32>((edited ? right : left).size());
         for (size_t i = 0; i < runs.size();)
         {
             if (runs[i].kind == Kind::Same)
@@ -714,17 +725,47 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const Relayout* aga
                 ++i;
                 continue;
             }
-            bool   none = true;
-            size_t j    = i;
-            for (; j < runs.size() && runs[j].kind != Kind::Same; ++j)
+            size_t j = i;
+            while (j < runs.size() && runs[j].kind != Kind::Same)
             {
-                const bool out = runs[j].kind == Kind::Removed;
-                for (S32 n = 0; n < runs[j].count && none; ++n)
+                ++j;
+            }
+            // Its lines on the side edited: from where it starts to where
+            // the run after it does.
+            const S32 from = edited ? runs[i].right : runs[i].left;
+            const S32 to   = j < runs.size() ? (edited ? runs[j].right : runs[j].left) : edited_lines;
+            // Where it was: as it is, its runs among those as they were and
+            // the one after it the same then, or the end then; else moved
+            // along, its runs among those moved along and the one before it
+            // the same then, or the start then.
+            bool   was_one = false;
+            size_t at      = i;
+            if (keeps && j <= kept_runs.first && to <= again->head)
+            {
+                was_one = j < runs.size() ? (j < was->size() && (*was)[j].kind == Kind::Same) : j == was->size();
+            }
+            else if (keeps && i + kept_runs.second >= runs.size() && from >= edited_lines - again->tail)
+            {
+                at      = static_cast<size_t>(static_cast<S32>(i) - delta);
+                was_one = i == 0 ? at == 0 : (at > 0 && (*was)[at - 1].kind == Kind::Same);
+            }
+            bool none = true;
+            if (was_one)
+            {
+                none = mIgnored[at];
+            }
+            else
+            {
+                for (size_t k = i; k < j && none; ++k)
                 {
-                    const S32 line = (out ? runs[j].left : runs[j].right) + n;
-                    none = (tokened(out, line) && marksOf(out, line).empty()) ||
-                           ALTextDiff::ignorable(out ? left[static_cast<size_t>(line)] : right[static_cast<size_t>(line)], like,
-                                                 regionsOf(out ? left_regions : right_regions, line));
+                    const bool out = runs[k].kind == Kind::Removed;
+                    for (S32 n = 0; n < runs[k].count && none; ++n)
+                    {
+                        const S32 line = (out ? runs[k].left : runs[k].right) + n;
+                        none = (tokened(out, line) && marksOf(out, line).empty()) ||
+                               ALTextDiff::ignorable(out ? left[static_cast<size_t>(line)] : right[static_cast<size_t>(line)], like,
+                                                     regionsOf(out ? left_regions : right_regions, line));
+                    }
                 }
             }
             for (; i < j; ++i)
@@ -1220,6 +1261,7 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const Relayout* aga
     }
     mark(runs.size());
     mLastChange = last_change;
+    mIgnored    = std::move(ignored);
     for (ColumnData& c : mColumns)
     {
         c.endPadding = c.pending;
@@ -1254,26 +1296,12 @@ std::optional<ALDiffModel::Reuse> ALDiffModel::reusable(const Relayout& again, c
         return std::nullopt;
     }
     // The runs before the change as they were, and those after it moved
-    // along by as many lines as each side gained or lost: where an edit
-    // inside a change left every run as it was, both all of them, the lines
-    // changed parting what is kept from what is moved.
-    size_t before = 0;
-    while (before < was.size() && before < now.size() && was[before] == now[before])
-    {
-        ++before;
-    }
-    size_t after = 0;
-    while (after < was.size() && after < now.size())
-    {
-        ALTextDiff::Run run = was[was.size() - 1 - after];
-        run.left += again.left;
-        run.right += again.right;
-        if (!(run == now[now.size() - 1 - after]))
-        {
-            break;
-        }
-        ++after;
-    }
+    // along: where an edit inside a change left every run as it was, both
+    // all of them, the lines changed parting what is kept from what is
+    // moved.
+    const std::pair<size_t, size_t> kept_runs = runsKept(again, now);
+    const size_t                    before    = kept_runs.first;
+    const size_t                    after     = kept_runs.second;
     // The groups wholly before the change; and the first wholly after it,
     // at a group's edge in the runs as they now are too: a change after
     // the change begins a group only after a run the same...
@@ -1370,6 +1398,31 @@ std::optional<ALDiffModel::Reuse> ALDiffModel::reusable(const Relayout& again, c
         }
     }
     return Reuse{ kept, moved, from, to };
+}
+
+// static
+std::pair<size_t, size_t> ALDiffModel::runsKept(const Relayout& again, const std::vector<ALTextDiff::Run>& now)
+{
+    // Those after moved along by as many lines as each side gained or lost.
+    const std::vector<ALTextDiff::Run>& was    = again.runs;
+    size_t                              before = 0;
+    while (before < was.size() && before < now.size() && was[before] == now[before])
+    {
+        ++before;
+    }
+    size_t after = 0;
+    while (after < was.size() && after < now.size())
+    {
+        ALTextDiff::Run run = was[was.size() - 1 - after];
+        run.left += again.left;
+        run.right += again.right;
+        if (!(run == now[now.size() - 1 - after]))
+        {
+            break;
+        }
+        ++after;
+    }
+    return { before, after };
 }
 
 // --- a column's lines ----------------------------------------------------------

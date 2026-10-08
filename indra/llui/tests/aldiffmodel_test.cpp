@@ -187,7 +187,9 @@ namespace tut
         }
 
     };
-    typedef test_group<aldiffmodel_data> aldiffmodel_group;
+    // More than TUT's fifty a group holds by default, which runs the first
+    // fifty and says nothing of the rest: keep this above the highest test.
+    typedef test_group<aldiffmodel_data, 60> aldiffmodel_group;
     typedef aldiffmodel_group::object    aldiffmodel_object;
     aldiffmodel_group                    aldiffmodel_instance("aldiffmodel");
 
@@ -2337,5 +2339,87 @@ namespace tut
         left[80] += " // older";
         step(true, "the left another version");
         ensure_equals("no change", told.changeCount(), 1);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<50>()
+    {
+        set_test_name("comments or blank lines let go of: a keystroke asks whether lines are no change only of the change it compared again, every other change's answer as it was; laid out as one laying out every row, and as afresh");
+        std::string                                  error;
+        const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+        ensure("the LSL grammar", lsl != nullptr);
+        const auto joined = [](const std::vector<std::string>& lines) {
+            std::string out;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                out += (i ? "\n" : "") + lines[i];
+            }
+            return out;
+        };
+        // A line changed every ten, a line of comment put in every twenty
+        // and a blank line every twenty: forty changes, a line of each asked
+        // about laid out afresh.
+        const std::vector<std::string> left = ALTextDiff::split(lines(200));
+        std::vector<std::string>       right;
+        for (S32 n = 0; n < 200; ++n)
+        {
+            right.push_back("line " + std::to_string(n) + (n % 10 == 5 ? " changed" : ""));
+            if (n % 20 == 8)
+            {
+                right.push_back("// a note");
+            }
+            if (n % 20 == 18)
+            {
+                right.push_back("");
+            }
+        }
+        // Where a line of a text is.
+        const auto at = [](const std::vector<std::string>& text, const char* line) {
+            return std::find(text.begin(), text.end(), std::string(line)) - text.begin();
+        };
+        for (const S32 way : { 0, 1, 2 })
+        {
+            ALTextDiff::Likeness like;
+            like.ignoreComments   = way != 1;
+            like.ignoreBlankLines = way != 0;
+            const std::string where = way == 0 ? "comments" : way == 1 ? "blank lines" : "both";
+            // One that keeps what it can of its layout, as a view's does, and
+            // one that lays out every row; each with a lexer as a view's.
+            ALDiffModel kept;
+            ALDiffModel whole;
+            whole.setKeepsLayout(false);
+            for (ALDiffModel* each : { &kept, &whole })
+            {
+                const auto lexer = std::make_shared<ALDiffLexer>(lsl);
+                each->setLexer(ALDiffLexer::lexerOf(lexer), ALTextDiff::lexer_t(), ALDiffLexer::rereadOf(lexer), ALDiffLexer::toldOf(lexer));
+                each->setLikeness(like);
+                each->setTexts(joined(left), joined(right));
+            }
+            std::vector<std::string> typed = right;
+            const auto               step  = [&](const std::string& what) {
+                const U64 asked = ALTextDiff::askedIgnorable();
+                kept.setRightText(joined(typed));
+                const U64 cost = ALTextDiff::askedIgnorable() - asked;
+                whole.setRightText(joined(typed));
+                const std::string here = where + ", " + what;
+                ensure(here + ": only the change compared again asked about: " + std::to_string(cost), cost <= 3u);
+                aldiffmodel_data::sameLayout(kept, whole, here);
+                ALDiffModel fresh;
+                fresh.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+                fresh.setLikeness(like);
+                fresh.setTexts(joined(left), joined(typed));
+                aldiffmodel_data::sameLayout(kept, fresh, here + ", as afresh");
+            };
+            typed[static_cast<size_t>(at(typed, "line 101"))] += " typed";
+            step("a line the same typed in");
+            typed[static_cast<size_t>(at(typed, "line 105 changed"))] += "!";
+            step("a line changed typed in");
+            typed.insert(typed.begin() + at(typed, "line 121") + 1, "// typed");
+            step("a line of comment put in");
+            typed.erase(typed.begin() + at(typed, "line 121") + 1);
+            step("and taken out");
+            typed.erase(typed.begin() + at(typed, "line 138") + 1);
+            step("a blank line taken out");
+        }
     }
 }

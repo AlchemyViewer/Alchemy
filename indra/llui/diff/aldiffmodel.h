@@ -504,6 +504,9 @@ private:
     // were, outside the change. Nothing where all of it is to be laid out
     // again.
     std::optional<Reuse> reusable(const Relayout& again, const ALDiffMoves::moves_t& moves, size_t last_change) const;
+    // Of the runs after a splice, how many at the start are as they were
+    // before it, and how many at the end as they were moved along.
+    static std::pair<size_t, size_t> runsKept(const Relayout& again, const std::vector<ALTextDiff::Run>& now);
     // Compared again and made again from the texts, the runs folded as
     // foldsSame() says; or with the runs the reader opened open again,
     // where they hide the same first line of the right (openedLines). And
@@ -607,6 +610,9 @@ private:
     std::vector<Mark>     mGroups;
     size_t                mLastChange = 0;
     Relaid                mRelaid;
+    // Whether each run of the last layout is of a change that is none, as
+    // lines are told the same.
+    std::vector<bool>     mIgnored;
     U32                   mLayouts = 0;
     bool                  mKeepsLayout = true;
     std::vector<Note>     mNotes;

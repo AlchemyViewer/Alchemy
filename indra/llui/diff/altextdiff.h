@@ -297,6 +297,9 @@ namespace ALTextDiff
     // blanks, where comments are. A change of nothing but such lines is
     // none.
     bool        ignorable(std::string_view line, const Likeness& like, const regions_t* regions = nullptr);
+    // How many lines have been asked so, on the thread that asks, since it
+    // began: what a test holds a layout's cost to.
+    U64         askedIgnorable();
 }
 
 #endif // AL_ALTEXTDIFF_H
