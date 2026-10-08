@@ -36,6 +36,7 @@
 #include "llsys.h"
 #include "llgl.h"
 
+#include "alcrashreporter.h"
 #include "llappviewer.h"
 #include "llbufferstream.h"
 #include "llnotificationsutil.h"
@@ -56,6 +57,8 @@
 
 #if LL_WINDOWS
 #include "lldxhardware.h"
+#elif LL_LINUX
+#include <unistd.h>     // write(), _exit() for the GPU benchmark subprocess
 #endif
 
 #if LL_DARWIN
@@ -374,18 +377,26 @@ bool LLFeatureManager::parseFeatureTable(std::string filename)
 
 F32 gpu_benchmark();
 
-#if LL_WINDOWS
+#if LL_WINDOWS || LL_LINUX
 
 bool gGPUBenchmarkMode = false;
 
-// Runs gpu_benchmark() in a subprocess (exe with --gpubenchmark).
-static F32 subprocess_gpu_benchmark()
+// Runs gpu_benchmark() in a subprocess (exe with --gpubenchmark). Nothing
+// when the subprocess could not be started, so the caller can run it itself.
+static std::optional<F32> subprocess_gpu_benchmark()
 {
     LLProcess::Params params;
     params.executable = gDirUtilp->getExecutablePathAndName();
     params.args.add("--gpubenchmark");
+    // A viewer with no desktop has nowhere to show the child's window either.
+    if (gHeadlessClient)
+    {
+        params.args.add("--set");
+        params.args.add("HeadlessClient");
+        params.args.add("1");
+    }
     params.desc       = "GPU benchmark";
-    params.autokill   = true;   // killed via job object if parent crashes
+    params.autokill   = true;   // killed via job object if parent crashes (Linux: the child's PR_SET_PDEATHSIG)
     params.attached   = true;   // killed on LLProcessPtr destruction (timeout)
     params.files.add(LLProcess::FileParam());                    // stdin:  default
     params.files.add(LLProcess::FileParam().type("pipe"));       // stdout: pipe
@@ -400,13 +411,13 @@ static F32 subprocess_gpu_benchmark()
     {
         LL_WARNS("RenderInit") << "subprocess_gpu_benchmark: failed to launch: "
                                << e.what() << LL_ENDL;
-        return -1.f;
+        return std::nullopt;
     }
 
     if (!child)
     {
         LL_WARNS("RenderInit") << "subprocess_gpu_benchmark: LLProcess::create returned null." << LL_ENDL;
-        return -1.f;
+        return std::nullopt;
     }
 
     LLProcess::ReadPipe& out = child->getReadPipe(LLProcess::STDOUT);
@@ -424,8 +435,8 @@ static F32 subprocess_gpu_benchmark()
         if (out.contains('\n'))
         {
             std::string line = out.getline();
-            float parsed = 0.f;
-            if (sscanf_s(line.c_str(), "%f", &parsed) == 1 && parsed > 0.f)
+            F32 parsed = 0.f;
+            if (LLStringUtil::convertToF32(line, parsed) && parsed > 0.f)
             {
                 LL_INFOS("RenderInit") << "subprocess_gpu_benchmark: result = "
                                        << parsed << " GB/sec" << LL_ENDL;
@@ -453,6 +464,7 @@ static F32 subprocess_gpu_benchmark()
     return -1.f;
 }
 
+#if LL_WINDOWS
 F32 logExceptionBenchmark()
 {
     // FIXME: gpu_benchmark uses many C++ classes on the stack to control state.
@@ -475,6 +487,20 @@ F32 logExceptionBenchmark()
         throw std::exception(integer_string);
     }
     return gbps;
+}
+#endif
+
+// The benchmark in this process: the subprocess's own run, and the fallback
+// for a viewer that could not start one.
+static F32 in_process_gpu_benchmark()
+{
+#if LL_WINDOWS
+    // logExceptionBenchmark wraps with SEH so structured exceptions
+    // (e.g. access violations inside the driver) are still caught.
+    return logExceptionBenchmark();
+#else
+    return gpu_benchmark();
+#endif
 }
 #endif
 
@@ -621,7 +647,7 @@ bool LLFeatureManager::loadGPUClass()
             && benchmark["bandwidth"].isReal()
             && std::isfinite(gbps)
             && (gbps > 0.f || gbps == -1.f);
-#if LL_WINDOWS
+#if LL_WINDOWS || LL_LINUX
         // An explicitly launched benchmark child must measure and report a result.
         use_cached_result = use_cached_result && !gGPUBenchmarkMode;
 #endif
@@ -634,19 +660,22 @@ bool LLFeatureManager::loadGPUClass()
         {
             try
             {
-#if LL_WINDOWS
+#if LL_WINDOWS || LL_LINUX
                 if (gGPUBenchmarkMode)
                 {
                     // We ARE the benchmark subprocess; run directly in-process.
-                    // logExceptionBenchmark wraps with SEH so structured exceptions
-                    // (e.g. access violations inside the driver) are still caught.
-                    gbps = logExceptionBenchmark();
+                    gbps = in_process_gpu_benchmark();
                 }
-                else
+                else if (std::optional<F32> child_gbps = subprocess_gpu_benchmark())
                 {
                     // Normal path: run benchmark in an isolated subprocess so a
                     // driver hang can be killed without freezing the main viewer.
-                    gbps = subprocess_gpu_benchmark();
+                    gbps = *child_gbps;
+                }
+                else
+                {
+                    // No subprocess could be started: measure here, as before.
+                    gbps = in_process_gpu_benchmark();
                 }
 #else
                 gbps = gpu_benchmark();
@@ -663,18 +692,29 @@ bool LLFeatureManager::loadGPUClass()
                 gbps = -1.f;
             }
 
-#if LL_WINDOWS
+#if LL_WINDOWS || LL_LINUX
             // If we are the benchmark subprocess, write the raw result to stdout
             // so the parent process can read it, then exit immediately.
             if (gGPUBenchmarkMode)
             {
                 LL_WARNS("RenderInit") << "Passing " << gbps << " to parent" << LL_ENDL;
+                // Close the crash reporter before the parent has its answer
+                // and kills this process: a session left open is reported
+                // as an abnormal exit on the next launch.
+                ALCrashReporter::shutdown();
                 char buf[64];
                 int len = snprintf(buf, sizeof(buf), "%.6f\n", gbps);
+#if LL_WINDOWS
                 DWORD written = 0;
                 WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), buf, (DWORD)len, &written, NULL);
                 FlushFileBuffers(GetStdHandle(STD_OUTPUT_HANDLE));
                 ExitProcess(0);
+#else
+                // Straight out: no exit handlers or destructors run over a
+                // viewer stopped halfway through its init, and nothing is saved.
+                [[maybe_unused]] ssize_t written = write(STDOUT_FILENO, buf, len);
+                _exit(0);
+#endif
             }
 #endif
 

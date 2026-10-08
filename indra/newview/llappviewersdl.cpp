@@ -65,6 +65,10 @@
 #include "llvelopack.h"
 #endif
 
+#if LL_LINUX
+#include <sys/prctl.h>      // PR_SET_PDEATHSIG for the GPU benchmark child
+#endif
+
 #if LL_DARWIN
 #include <sys/types.h>
 #include <unistd.h>
@@ -112,6 +116,15 @@ static_assert(sizeof(VIEWERAPI_SERVICE) - 1 <= 255, "A D-Bus name is at most 255
 // *FIX:Mani It would be nice to provide a clean interface to get the
 // default_unix_signal_handler for the LLApp class.
 extern void default_unix_signal_handler(int, siginfo_t *, void *);
+#endif
+
+// Whether this process is the child a viewer started with --gpubenchmark to
+// run the GPU benchmark (LLFeatureManager::loadGPUClass). macOS runs it in
+// the viewer itself.
+#if LL_WINDOWS || LL_LINUX
+extern bool gGPUBenchmarkMode;
+#else
+static constexpr bool gGPUBenchmarkMode = false;
 #endif
 
 namespace
@@ -362,13 +375,34 @@ finally:
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
+#if LL_WINDOWS || LL_LINUX
+    // The GPU benchmark child learns it is one first: it leaves Velopack, and
+    // more after it, to the viewer that started it.
+    for (int i = 1; i < argc; ++i)
+    {
+        if (argv[i] && strcmp(argv[i], "--gpubenchmark") == 0)
+        {
+            gGPUBenchmarkMode = true;
+        }
+    }
+#endif
+#if LL_LINUX
+    if (gGPUBenchmarkMode)
+    {
+        // The parent kills a child that overruns the benchmark. This kills one
+        // whose parent dies first, rather than leave it hung in a driver.
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+    }
+#endif
+
 #if LL_VELOPACK
     // Velopack MUST be initialized first - it may handle install/uninstall
     // commands and exit the process before we do anything else, and it
     // finishes an update the last run applied. Every platform's viewer
     // starts here but Windows' native one (llappviewerwin32.cpp); on Linux
     // there are no hooks to run, and it finds the AppImage it updates, if any.
-    if (!velopack_initialize())
+    // The GPU benchmark child has none of this to do: its parent did it.
+    if (!gGPUBenchmarkMode && !velopack_initialize())
     {
         // Velopack handled the invocation (install/uninstall hook); exit
         // cleanly without ever constructing the app. Mirrors WINMAIN's
@@ -421,7 +455,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
 #if LL_WINDOWS
     // Set a debug info flag to indicate if multiple instances are running.
-    bool found_other_instance = !create_app_mutex();
+    bool found_other_instance = gGPUBenchmarkMode || !create_app_mutex();
     gDebugInfo["FoundOtherInstanceAtStartup"] = LLSD::Boolean(found_other_instance);
 #elif LL_LINUX
     // macOS injects via DYLD_INSERT_LIBRARIES, not LD_PRELOAD, so this is a
@@ -508,8 +542,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     // gViewerAppPtr is null when SDL_AppInit bailed before constructing the
-    // app (e.g. the Windows velopack install-hook path).
-    if (gViewerAppPtr && !LLApp::isError())
+    // app (e.g. the Windows velopack install-hook path). A GPU benchmark child
+    // only gets here having failed before it measured anything, and the
+    // settings it would save are its parent's.
+    if (gViewerAppPtr && !LLApp::isError() && !gGPUBenchmarkMode)
     {
         //
         // We don't want to do cleanup here if the error handler got called -

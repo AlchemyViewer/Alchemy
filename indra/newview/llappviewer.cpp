@@ -311,11 +311,11 @@ extern bool gDebugGL;
 extern bool gHiDPISupport;
 #endif
 
-#if LL_WINDOWS
+#if LL_WINDOWS || LL_LINUX
 extern bool gGPUBenchmarkMode;
 #else
 static constexpr bool gGPUBenchmarkMode = false;
-#endif // LL_WINDOWS
+#endif // LL_WINDOWS || LL_LINUX
 
 
 ////////////////////////////////////////////////////////////
@@ -1025,8 +1025,12 @@ bool LLAppViewer::init()
     // Find partition serial number (Windows) or hardware serial (Mac)
     mSerialNumber = generateSerialNumber();
 
-    // do any necessary set-up for accepting incoming SLURLs from apps
-    initSLURLHandler();
+    // do any necessary set-up for accepting incoming SLURLs from apps. The
+    // GPU benchmark child takes none: the D-Bus name is its parent's.
+    if (!gGPUBenchmarkMode)
+    {
+        initSLURLHandler();
+    }
 
     if (!initHardwareTest())
     {
