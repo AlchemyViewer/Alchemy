@@ -35,6 +35,8 @@
 #include "alscriptweightspane.h"
 #include "lldate.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -250,7 +252,7 @@ void ALScriptStudioWeighing::showInEditor(Doc& doc)
     args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
     args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
     const auto share = [this, &weight](size_t bytes) {
-        return weight.limit ? mServices.words("Percent", { { "[VALUE]", llformat("%f", (F64)bytes * 100.0 / (F64)weight.limit) } }) : std::string();
+        return weight.limit ? mServices.words("Percent", { { "[VALUE]", fmt::format("{:f}", (F64)bytes * 100.0 / (F64)weight.limit) } }) : std::string();
     };
     // Said as measured before the optimizer, where it was.
     const std::string before = doc.weighing->exact ? std::string() : mServices.words("WeightsHeadBefore");

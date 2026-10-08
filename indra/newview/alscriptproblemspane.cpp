@@ -46,6 +46,8 @@
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 
 ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALScriptStudioServices& services, const Making& making)
@@ -235,9 +237,9 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
     {
         const ALScriptWeight&      weight = *doc.weighing->weight;
         LLStringUtil::format_map_t args;
-        args["[SIZE]"]   = llformat("%f", (F64)weight.total / 1024.0);
+        args["[SIZE]"]   = fmt::format("{:f}", (F64)weight.total / 1024.0);
         args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
-        args["[LEFT]"]   = nearing ? llformat("%f", (F64)(weight.limit - weight.total) / 1024.0) : std::string();
+        args["[LEFT]"]   = nearing ? fmt::format("{:f}", (F64)(weight.limit - weight.total) / 1024.0) : std::string();
         args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
         Doc::Shown row;
         row.level   = Doc::Level::Warning;
@@ -933,7 +935,7 @@ std::string ALScriptProblemsPane::whereOf(const Doc* doc, const Doc::Shown& prob
                                      : problem.column;
     // The line as the tab's gutter counts it: a notecard's may be from 0.
     const S32 line = mServices->shownLine(problem.line, doc && doc->itemNotecard() && problem.file.empty());
-    return problem.hasColumn ? llformat("%d:%d", line, column + 1) : llformat("%d", line);
+    return problem.hasColumn ? fmt::format("{}:{}", line, column + 1) : std::to_string(line);
 }
 
 const ALScriptProblemsPane::Doc::Shown* ALScriptProblemsPane::shownOf(const LLSD& value) const
@@ -1181,7 +1183,7 @@ void ALScriptProblemsPane::act(const std::string& action)
     const auto as_text = [this](const Doc& whose, const Doc::Shown& one) {
         const std::string name  = !one.fileName.empty() ? one.fileName : whose.name;
         const S32         line  = mServices->shownLine(one.line, whose.itemNotecard() && one.file.empty());
-        const std::string where = one.hasColumn ? llformat("%s:%d:%d", name.c_str(), line, one.column + 1) : llformat("%s:%d", name.c_str(), line);
+        const std::string where = one.hasColumn ? fmt::format("{}:{}:{}", name, line, one.column + 1) : fmt::format("{}:{}", name, line);
         const std::string level = one.level == Doc::Level::Error ? "error" : one.level == Doc::Level::Warning ? "warning" : "note";
         return where + ": " + level + ": " + one.message + " [" + one.origin + "]";
     };

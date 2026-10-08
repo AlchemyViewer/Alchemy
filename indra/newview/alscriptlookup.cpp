@@ -45,6 +45,7 @@
 #include "workqueue.h"
 
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -161,7 +162,7 @@ std::vector<ALScriptLookup::Candidate> ALScriptLookup::folderCandidates(const st
 // static
 void ALScriptLookup::addPlace(Doc::Lookup& lookup, Doc::Place place)
 {
-    const std::string key = place.file + llformat(":%d:%d", place.span.line, place.span.column);
+    const std::string key = fmt::format("{}:{}:{}", place.file, place.span.line, place.span.column);
     if (lookup.seen.insert(key).second)
     {
         lookup.places.push_back(std::move(place));

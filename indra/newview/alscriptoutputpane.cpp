@@ -291,7 +291,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptRuntimeEvent& 
     {
         LLStringUtil::format_map_t args;
         args["[NAME]"] = event.scriptName;
-        args["[LINE]"] = llformat("%d", at.line + 1);
+        args["[LINE]"] = std::to_string(at.line + 1);
         entry.link     = true;
         entry.tooltip  = mServices->words(event.isError && at.line >= 0 ? "OutputOpenAtLine" : "OutputOpen", args);
         entry.value    = link_value(at);

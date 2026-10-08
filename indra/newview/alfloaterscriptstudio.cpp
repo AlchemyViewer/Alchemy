@@ -132,6 +132,8 @@
 #include "rlvlocks.h"
 // [/RLVa:KB]
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <ctime>
 #include <filesystem>
@@ -2044,7 +2046,7 @@ void ALFloaterScriptStudio::zoomText(S32 steps)
     ALScriptStudio::refreshAll();
     if (base > 0.f)
     {
-        setStatus(getString("TextSize", LLStringUtil::format_map_t{ { "[POINTS]", llformat("%g", base + static_cast<F32>(zoom)) } }));
+        setStatus(getString("TextSize", LLStringUtil::format_map_t{ { "[POINTS]", fmt::format("{:g}", base + static_cast<F32>(zoom)) } }));
     }
 }
 

@@ -36,6 +36,7 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <fmt/format.h>
 
 #include <map>
 #include <numeric>
@@ -225,7 +226,7 @@ const ALScriptWeight* ALScriptWeightsPane::savedFor(ALScriptWeight::Target targe
 std::string ALScriptWeightsPane::share(size_t bytes, size_t limit) const
 {
     // As a percentage, as the viewer's language writes one.
-    return limit ? mStrings->getString("Percent", { { "[VALUE]", llformat("%f", (F64)bytes * 100.0 / (F64)limit) } }) : std::string();
+    return limit ? mStrings->getString("Percent", { { "[VALUE]", fmt::format("{:f}", (F64)bytes * 100.0 / (F64)limit) } }) : std::string();
 }
 
 std::string ALScriptWeightsPane::kilobytes(size_t bytes, bool estimate) const
@@ -233,7 +234,7 @@ std::string ALScriptWeightsPane::kilobytes(size_t bytes, bool estimate) const
     // The number unrounded: the words round it, as the viewer's language
     // writes a number.
     LLStringUtil::format_map_t args;
-    args["[SIZE]"] = llformat("%f", (F64)bytes / 1024.0);
+    args["[SIZE]"] = fmt::format("{:f}", (F64)bytes / 1024.0);
     return mStrings->getString(estimate ? "WeightsKilobytesEstimate" : "WeightsKilobytes", args);
 }
 
@@ -247,7 +248,7 @@ std::string ALScriptWeightsPane::changeText(const std::optional<S64>& change, bo
     {
         return std::string();
     }
-    return llformat(*change > 0 ? "+%lld" : "%lld", static_cast<long long>(*change));
+    return fmt::format("{:+}", *change);
 }
 
 void ALScriptWeightsPane::fillTargets()
@@ -324,7 +325,7 @@ void ALScriptWeightsPane::fillParts()
     LLStringUtil::format_map_t args;
     args["[NAME]"]   = mShown.name;
     args["[TARGET]"] = ALScriptWeight::nameOf(weight->target);
-    args["[SIZE]"]   = llformat("%f", (F64)weight->total / 1024.0);
+    args["[SIZE]"]   = fmt::format("{:f}", (F64)weight->total / 1024.0);
     args["[LIMIT]"]  = std::to_string(weight->limit / 1024);
     args["[SHARE]"]  = share(weight->total, weight->limit);
     args["[ERROR]"]  = weight->error;
@@ -345,7 +346,7 @@ void ALScriptWeightsPane::fillParts()
         const bool own = !mShown.weights.empty() && weight->target == mShown.weights.front().target;
         if (own && mShown.sent)
         {
-            args["[SENT]"] = llformat("%f", (F64)*mShown.sent / 1024.0);
+            args["[SENT]"] = fmt::format("{:f}", (F64)*mShown.sent / 1024.0);
             head += " " + mStrings->getString("WeightsHeadSent", args);
         }
         else
@@ -355,7 +356,7 @@ void ALScriptWeightsPane::fillParts()
     }
     if (mShown.region && mShown.region->hasMemory())
     {
-        args["[RESERVED]"] = llformat("%f", (F64)mShown.region->memory / 1024.0);
+        args["[RESERVED]"] = fmt::format("{:f}", (F64)mShown.region->memory / 1024.0);
         args["[URLS]"]     = std::to_string(mShown.region->urls);
         args["[WHEN]"]     = ALRecoveryEntry::sayWhen(mShown.region->when);
         head += " " + mStrings->getString(mShown.region->urls > 0 ? "WeightsHeadRegionUrls" : "WeightsHeadRegion", args);
@@ -364,7 +365,7 @@ void ALScriptWeightsPane::fillParts()
     // manager.
     if (mShown.region && mShown.region->hasTime())
     {
-        args["[TIME]"] = llformat("%.3f", mShown.region->time);
+        args["[TIME]"] = fmt::format("{:.3f}", mShown.region->time);
         args["[WHEN]"] = ALRecoveryEntry::sayWhen(mShown.region->timeWhen);
         head += " " + mStrings->getString("WeightsHeadRegionTime", args);
     }
@@ -523,7 +524,7 @@ std::string ALScriptWeightsPane::whereAt(const std::string& file, S32 line) cons
         return std::to_string(line + 1);
     }
     const auto named = mShown.fileNames.find(file);
-    return llformat("%s:%d", named != mShown.fileNames.end() ? named->second.c_str() : file.c_str(), line + 1);
+    return fmt::format("{}:{}", named != mShown.fileNames.end() ? named->second : file, line + 1);
 }
 
 std::optional<ALScriptWeightsPane::Place> ALScriptWeightsPane::chosenPlace(const ALPaneList* list) const
