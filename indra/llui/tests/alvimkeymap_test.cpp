@@ -6215,4 +6215,40 @@ namespace tut
         keys("@:");
         ensure_equals("and that line is never the : register", flat(editor->text()), std::string("b b b"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<210>()
+    {
+        set_test_name("a block put into characters takes them out and goes in as a block where they began, after the line's last where they ran to its end");
+        const char* text = "abcd\nefgh\nijklmn\nopqrst";
+        make(text);
+        keys("<C-v>jly3jlvlp");
+        ensure_equals("vp: past the last line, a line of blanks to the column", flat(editor->text()), std::string("abcd|efgh|ijklmn|oabrst| ef"));
+        ensure_equals("the caret at its corner", caretText(), std::string("3:1"));
+        const ALVimRegisters::Register taken = vim->shared().registers.fetch('"', false);
+        ensure("what it took in the unnamed register, as characters", taken.text == "pq" && !taken.block && !taken.linewise);
+
+        make(text);
+        keys("<C-v>jly3jlvlP");
+        ensure_equals("vP the same", flat(editor->text()), std::string("abcd|efgh|ijklmn|oabrst| ef"));
+        ensure("the block kept", vim->shared().registers.fetch('"', false).block);
+
+        make(text);
+        keys("<C-v>jly2jlvjp");
+        ensure_equals("characters over lines", flat(editor->text()), std::string("abcd|efgh|iabqrst| ef"));
+        ensure_equals("there", caretText(), std::string("2:1"));
+
+        make(text);
+        keys("<C-v>jly3jlvl2p");
+        ensure_equals("a count side by side", flat(editor->text()), std::string("abcd|efgh|ijklmn|oababrst| efef"));
+
+        make("abcd\nefgh\nijklmn\nop");
+        keys("<C-v>jly2j$vp");
+        ensure_equals("to the line's end: after its last", flat(editor->text()), std::string("abcd|efgh|ijklmab|op   ef"));
+        ensure_equals("and there", caretText(), std::string("2:5"));
+
+        make("abcd\nefgh\nijklmn\no");
+        keys("<C-v>jly2jllvlp");
+        ensure_equals("a short line under it padded", flat(editor->text()), std::string("abcd|efgh|ijabmn|o ef"));
+    }
 }

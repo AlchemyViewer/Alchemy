@@ -3870,7 +3870,9 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                 // copies of it. Lines are replaced by its text, its lines
                 // taking theirs, a copy a line or more; lines put into less
                 // than a line go on lines of their own, the line broken
-                // round them; characters go in straight on. What a block
+                // round them; characters go in straight on; a block put
+                // into characters goes in as a block where they were, as
+                // vim's put of one at the caret has it. What a block
                 // holds of each line is replaced by a register of one line,
                 // its copies side by side, as vim's blockwise put has it; by
                 // anything else it is taken out, and the register put at
@@ -3939,6 +3941,18 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                         view.setCaret(below ? d.lineStart(pieces.back().begin.line) : corner);
                         put(view, mRegister, below, count);
                     }
+                }
+                else if (put_this.block && !span.linewise)
+                {
+                    // The characters taken out and the block put where they
+                    // began, before what follows them -- after the line's
+                    // last character where they ran to its end -- the caret
+                    // at its corner, as vim's visual put has it.
+                    view.deleteRange(span.range);
+                    const ALTextPos at       = d.clamp(span.range.begin);
+                    const bool      past_end = at.column > 0 && at == d.lineEnd(at.line);
+                    view.setCaret(past_end ? d.prevCluster(at) : at);
+                    put(view, mRegister, past_end, count);
                 }
                 else
                 {
