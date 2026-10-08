@@ -93,6 +93,18 @@ const S32 DEFAULT_REFRESH_RATE = 60;
 // be only one object of this class at any time.  Currently this is true.
 static LLWindowSDL *gWindowImplementation = nullptr;
 
+#if LL_LINUX
+// What glGetGraphicsResetStatus returns for a context lost to a purge of video
+// memory, with EGL_NV_robustness_video_memory_purge (see llsdl.cpp).
+#ifndef GL_PURGED_CONTEXT_RESET_NV
+#define GL_PURGED_CONTEXT_RESET_NV 0x92BB
+#endif
+
+// glGetGraphicsResetStatus while the main context reports a GPU reset, which
+// checkGraphicsReset polls each frame; null otherwise.
+static PFNGLGETGRAPHICSRESETSTATUSPROC sGetGraphicsResetStatus = nullptr;
+#endif
+
 LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
                          const std::string& title, const std::string& name, S32 x, S32 y, S32 width,
                          S32 height, U32 flags,
@@ -166,6 +178,15 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
         LLDXHardware::updateVRAMBudgetFromDXGI();
 #endif
 
+        // Tracy's GPU context makes GL calls, so it waits for initGL to load
+        // the entry points, as on Win32.
+        {
+            LL_PROFILER_GPU_CONTEXT;
+        }
+#if LL_LINUX
+        armGraphicsResetCheck();
+#endif
+
         //start with arrow cursor
         initCursors();
         setCursor( UI_CURSOR_ARROW );
@@ -202,58 +223,6 @@ void LLWindowSDL::setTitle(const std::string title)
     SDL_SetWindowTitle( mWindow, title.c_str() );
 }
 
-void LLWindowSDL::tryFindFullscreenSize( int &width, int &height )
-{
-    LL_INFOS() << "createContext: setting up fullscreen " << width << "x" << height << LL_ENDL;
-
-    // If the requested width or height is 0, find the best default for the monitor.
-    if(width == 0 || height == 0)
-    {
-        // Scan through the list of modes, looking for one which has:
-        //      height between 700 and 800
-        //      aspect ratio closest to the user's original mode
-        S32 resolutionCount = 0;
-        LLWindowResolution *resolutionList = getSupportedResolutions(resolutionCount);
-
-        if(resolutionList != nullptr)
-        {
-            F32 closestAspect = 0;
-            U32 closestHeight = 0;
-            U32 closestWidth = 0;
-
-            LL_INFOS() << "createContext: searching for a display mode, original aspect is " << mNativeAspectRatio << LL_ENDL;
-
-            for(S32 i=0; i < resolutionCount; i++)
-            {
-                F32 aspect = (F32)resolutionList[i].mWidth / (F32)resolutionList[i].mHeight;
-
-                LL_INFOS() << "createContext: width " << resolutionList[i].mWidth << " height " << resolutionList[i].mHeight << " aspect " << aspect << LL_ENDL;
-
-                if( (resolutionList[i].mHeight >= 700) && (resolutionList[i].mHeight <= 800) &&
-                    (fabs(aspect - mNativeAspectRatio) < fabs(closestAspect - mNativeAspectRatio)))
-                {
-                    LL_INFOS() << " (new closest mode) " << LL_ENDL;
-
-                    // This is the closest mode we've seen yet.
-                    closestWidth = resolutionList[i].mWidth;
-                    closestHeight = resolutionList[i].mHeight;
-                    closestAspect = aspect;
-                }
-            }
-
-            width = closestWidth;
-            height = closestHeight;
-        }
-    }
-
-    if(width == 0 || height == 0)
-    {
-        // Mode search failed for some reason.  Use the old-school default.
-        width = 1024;
-        height = 768;
-    }
-}
-
 bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, bool fullscreen, bool enable_vsync)
 {
     LL_INFOS() << "createContext, fullscreen=" << fullscreen << " size=" << width << "x" << height << LL_ENDL;
@@ -272,8 +241,14 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
 
     mFullscreen = fullscreen;
 
-    // Setup default backing colors
-    GLint redBits{8}, greenBits{8}, blueBits{8}, alphaBits{8};
+    // Setup default backing colors. RenderGLContext10bitSDR asks for a 10-bit
+    // back buffer, which the final blit then dithers for. Its two bits of
+    // alpha don't make the window translucent: SDL presents a Wayland surface
+    // opaque (EGL_EXT_present_opaque), and on X11 the config takes a
+    // depth-30 visual, which has no alpha.
+    const GLint channelBits = LLRender::s10bitBackBuffer ? 10 : 8;
+    GLint redBits{channelBits}, greenBits{channelBits}, blueBits{channelBits};
+    GLint alphaBits{LLRender::s10bitBackBuffer ? 2 : 8};
     GLint depthBits{ 24 };
 
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE,   redBits);
@@ -323,11 +298,6 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, context_flags);
     SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
 
-    if(mFullscreen)
-    {
-        tryFindFullscreenSize(width, height);
-    }
-
     SDL_PropertiesID props = SDL_CreateProperties();
     SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, mWindowTitle.c_str());
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, x);
@@ -336,10 +306,26 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
+    // Fullscreen is SDL's borderless desktop fullscreen, at the desktop's own
+    // mode, as on Windows. width/height are the windowed size, not a
+    // resolution anyone chose: an exclusive mode picked from them would
+    // change the monitor's mode under X11, and under Wayland SDL would scale
+    // an emulated one up to the output (SDL_HINT_VIDEO_WAYLAND_MODE_EMULATION).
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_FULLSCREEN_BOOLEAN, mFullscreen);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, gHiDPISupport);
 
     mWindow = SDL_CreateWindowWithProperties(props);
+    if (mWindow == nullptr && LLRender::s10bitBackBuffer)
+    {
+        // EGL chooses the window's config as the window is made, so a 10-bit
+        // back buffer that can't be had fails here: an X server at depth 24
+        // has no visual for one. Make it again at 8 bits, as Win32 does.
+        LL_WARNS() << "No window with a 10-bit back buffer, falling back to 8 bits. SDL: "
+                   << SDL_GetError() << LL_ENDL;
+        SDL_DestroyProperties(props);
+        LLRender::s10bitBackBuffer = false;
+        return createContext(x, y, width, height, bits, fullscreen, enable_vsync);
+    }
     if (mWindow == nullptr)
     {
         LL_WARNS() << "Window creation failure. SDL: " << SDL_GetError() << LL_ENDL;
@@ -353,7 +339,23 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     // (set above); the exact 4.6 request fails on drivers that cap lower, so
     // step the requested version down until creation succeeds, mirroring the
     // WGL path in createSharedContext().
-    mContext = SDL_GL_CreateContext(mWindow);
+    auto create_context = [this]() -> SDL_GLContext
+    {
+#if LL_LINUX
+        // At each version, first a context that reports a GPU reset (see
+        // checkGraphicsReset), which only NVIDIA's EGL is asked for. Should
+        // the driver refuse it, the context is asked for again without.
+        sdl_set_gl_reset_notification(true);
+        SDL_GLContext context = SDL_GL_CreateContext(mWindow);
+        if (context || !sdl_gl_reset_notification())
+        {
+            return context;
+        }
+        sdl_set_gl_reset_notification(false);
+#endif
+        return SDL_GL_CreateContext(mWindow);
+    };
+    mContext = create_context();
 #if !LL_DARWIN
     if (!mContext && LLRender::sGLCoreProfile)
     {
@@ -365,7 +367,7 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
             else                { break; }                // gave up at 3.0
             SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major);
             SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
-            mContext = SDL_GL_CreateContext(mWindow);
+            mContext = create_context();
         }
         if (mContext)
         {
@@ -374,6 +376,15 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         }
     }
 #endif
+    if (!mContext && LLRender::s10bitBackBuffer)
+    {
+        LL_WARNS() << "No GL context on a 10-bit back buffer, falling back to 8 bits. SDL: "
+                   << SDL_GetError() << LL_ENDL;
+        SDL_DestroyWindow(mWindow);
+        mWindow = nullptr;
+        LLRender::s10bitBackBuffer = false;
+        return createContext(x, y, width, height, bits, fullscreen, enable_vsync);
+    }
     if(!mContext)
     {
         LL_WARNS() << "Cannot create GL context " << SDL_GetError() << LL_ENDL;
@@ -388,56 +399,7 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         return false;
     }
 
-    // If the caller requested fullscreen at a specific resolution, switch
-    // from SDL3's default borderless-desktop-fullscreen mode to an
-    // exclusive fullscreen mode at that resolution. width/height come from
-    // either the user's saved-window-size setting or from tryFindFullscreenSize
-    // above (which scans the display's supported modes); either way they are
-    // a deliberate resolution request, not "whatever the desktop is."
-    //
-    // On Wayland compositors that don't allow client-driven mode changes
-    // (most of them), SDL_SetWindowFullscreenMode quietly fails and we keep
-    // the borderless default. On X11 + KMS this actually changes the
-    // physical display mode.
-    if (mFullscreen && width > 0 && height > 0)
-    {
-        SDL_DisplayMode mode = {};
-        const SDL_DisplayID display = SDL_GetDisplayForWindow(mWindow);
-        if (SDL_GetClosestFullscreenDisplayMode(display, width, height, 0.f,
-                                                /*include_high_density_modes=*/false,
-                                                &mode))
-        {
-            if (SDL_SetWindowFullscreenMode(mWindow, &mode))
-            {
-                LL_INFOS() << "Exclusive fullscreen mode: "
-                           << mode.w << "x" << mode.h
-                           << " @ " << mode.refresh_rate << "Hz" << LL_ENDL;
-            }
-            else
-            {
-                LL_WARNS() << "SDL_SetWindowFullscreenMode " << mode.w << "x" << mode.h
-                           << " @ " << mode.refresh_rate << "Hz failed: "
-                           << SDL_GetError() << " — staying at borderless desktop." << LL_ENDL;
-            }
-        }
-        else
-        {
-            LL_INFOS() << "No fullscreen mode matches " << width << "x" << height
-                       << " on display " << display
-                       << " — using borderless desktop fullscreen." << LL_ENDL;
-        }
-    }
-
-    // Prefer the window's actually-applied fullscreen mode (which reflects
-    // any exclusive mode we just set) over the desktop's current mode. When
-    // the window is borderless-desktop or windowed, SDL_GetWindowFullscreenMode
-    // returns nullptr and we fall back to SDL_GetCurrentDisplayMode — the
-    // pre-exclusive-mode-support behaviour.
-    const SDL_DisplayMode* displayMode = SDL_GetWindowFullscreenMode(mWindow);
-    if (!displayMode)
-    {
-        displayMode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(mWindow));
-    }
+    const SDL_DisplayMode* displayMode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(mWindow));
     if(displayMode)
     {
         mRefreshRate = ll_round(displayMode->refresh_rate);
@@ -510,6 +472,14 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     LL_INFOS() << "  Alpha Bits " << S32(alphaBits) << LL_ENDL;
     LL_INFOS() << "  Depth Bits " << S32(depthBits) << LL_ENDL;
 
+    // The final blit dithers for the depth asked for, so a back buffer
+    // granted shallower than that would band.
+    if (LLRender::s10bitBackBuffer && (redBits < 10 || greenBits < 10 || blueBits < 10))
+    {
+        LL_INFOS() << "Asked for a 10-bit back buffer and was given less; dithering for 8 bits." << LL_ENDL;
+        LLRender::s10bitBackBuffer = false;
+    }
+
     GLint colorBits = redBits + greenBits + blueBits + alphaBits;
     if (colorBits < 32)
     {
@@ -523,8 +493,6 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
                 OSMB_OK);
         return false;
     }
-
-    LL_PROFILER_GPU_CONTEXT;
 
     // Enable vertical sync
     toggleVSync(enable_vsync);
@@ -668,6 +636,12 @@ bool LLWindowSDL::switchContext(bool fullscreen, const LLCoordScreen &size, bool
 #if LL_WINDOWS
             LLDXHardware::updateVRAMBudgetFromDXGI();
 #endif
+            {
+                LL_PROFILER_GPU_CONTEXT;
+            }
+#if LL_LINUX
+            armGraphicsResetCheck();
+#endif
 
             //start with arrow cursor
             initCursors();
@@ -724,6 +698,11 @@ void LLWindowSDL::destroyContext()
     // the screensaver inhibit doesn't outlive the viewer's window.
     SDL_EnableScreenSaver();
 
+#if LL_LINUX
+    // The reset check calls into the context going away.
+    sGetGraphicsResetStatus = nullptr;
+#endif
+
     // Clean up remaining GL state before blowing away window
     LL_INFOS() << "shutdownGL begins" << LL_ENDL;
     gGLManager.shutdownGL();
@@ -766,6 +745,7 @@ void LLWindowSDL::destroyContext()
     mHasDeferredCursorWarp = false;
     mAbsoluteCursorPosition = false;
     mRelativeMouseMode = false;
+    mOccluded = false;
     mDialogDepth = 0;
     mDialogSavedRelativeMode = false;
     mPendingDropFiles.clear();
@@ -827,6 +807,14 @@ void LLWindowSDL::restore()
 {
     if (mWindow)
     {
+        // A Wayland window that is only suspended (mOccluded, which
+        // getMinimized() counts) has nothing SDL can restore: xdg-shell can't
+        // unminimise, and SDL_RestoreWindow would unmaximise it. Bringing it
+        // forward is bringToFront()'s.
+        if (mOccluded && !(SDL_GetWindowFlags(mWindow) & SDL_WINDOW_MINIMIZED))
+        {
+            return;
+        }
         SDL_RestoreWindow(mWindow);
     }
 }
@@ -872,7 +860,10 @@ bool LLWindowSDL::getMinimized()
             result = true;
         }
     }
-    return result;
+    // A Wayland window is never told it was minimised, only suspended; see
+    // mOccluded. Occlusion isn't counted elsewhere: on X11 it only comes with
+    // a minimise, and on macOS it means covered or on another Space.
+    return result || mOccluded;
 }
 
 bool LLWindowSDL::getMaximized()
@@ -998,7 +989,79 @@ void LLWindowSDL::swapBuffers()
         SDL_GL_SwapWindow(mWindow);
     }
     LL_PROFILER_GPU_COLLECT;
+#if LL_LINUX
+    checkGraphicsReset();
+#endif
 }
+
+#if LL_LINUX
+// Once initGL has loaded GL: poll for a GPU reset if createContext got a
+// context that reports one, which only NVIDIA's EGL is asked for; elsewhere
+// nothing is polled. Below GL 4.5, which initGL loads the call for,
+// ARB_robustness names it with a suffix.
+void LLWindowSDL::armGraphicsResetCheck()
+{
+    sGetGraphicsResetStatus = nullptr;
+    mGraphicsResetSeen = false;
+    if (sdl_gl_reset_notification())
+    {
+        GLint strategy = 0;
+        glGetIntegerv(GL_RESET_NOTIFICATION_STRATEGY, &strategy);
+        if (strategy == GL_LOSE_CONTEXT_ON_RESET)
+        {
+            sGetGraphicsResetStatus = glGetGraphicsResetStatus
+                ? glGetGraphicsResetStatus
+                : (PFNGLGETGRAPHICSRESETSTATUSPROC)SDL_GL_GetProcAddress("glGetGraphicsResetStatusARB");
+        }
+    }
+    LL_INFOS("Window") << "GL context " << (sGetGraphicsResetStatus ? "reports" : "does not report")
+                       << " GPU resets" << LL_ENDL;
+}
+
+// Once a frame, on the main thread, where the context reports a reset. SDL's
+// renderer device-lost events come only from its D3D and Vulkan renderers,
+// never for a GL window, so this is how the viewer learns of NVIDIA purging
+// video memory over a suspend, or of a GPU reset there.
+void LLWindowSDL::checkGraphicsReset()
+{
+    if (!sGetGraphicsResetStatus || mGraphicsResetSeen)
+    {
+        return;
+    }
+    const GLenum status = sGetGraphicsResetStatus();
+    if (status == GL_NO_ERROR)
+    {
+        return;
+    }
+    mGraphicsResetSeen = true;
+
+    // The context is lost, and with it every texture, buffer, shader and
+    // framebuffer; GL calls on it now do nothing. Rebuilding them all is a
+    // job across LLPipeline, LLViewerTextureList, the reflection probes, the
+    // shaders and the UI, and isn't attempted: rather than draw garbage or
+    // nothing, the viewer says why and exits.
+    const char* cause = (status == GL_GUILTY_CONTEXT_RESET)    ? "the viewer's own rendering"
+                      : (status == GL_INNOCENT_CONTEXT_RESET)  ? "another program's rendering"
+                      : (status == GL_PURGED_CONTEXT_RESET_NV) ? "a purge of video memory"
+                                                               : "an unknown cause";
+    LL_WARNS("Window") << "GL context lost (reset status 0x" << std::hex << status << std::dec
+                       << ", " << cause << ")" << LL_ENDL;
+
+    OSMessageBoxSDL(
+        "The graphics driver reports that the viewer's OpenGL context was "
+        "lost, as happens when the GPU is reset. Alchemy can't continue "
+        "rendering and will now exit.\n\n"
+        "This usually follows sleep/wake or hibernation, or a GPU driver crash "
+        "or restart. Please relaunch the viewer to resume.",
+        "OpenGL context lost",
+        OSMB_OK);
+
+    if (mCallbacks)
+    {
+        mCallbacks->handleQuit(this);
+    }
+}
+#endif
 
 U32 LLWindowSDL::getFSAASamples()
 {
@@ -1236,8 +1299,8 @@ F32 LLWindowSDL::getPixelAspectRatio()
 }
 
 
-// This is to support 'temporarily windowed' mode so that
-// dialogs are still usable in fullscreen.
+// Ready the window for an OS dialog: input ungrabbed and the cursor shown,
+// so the dialog is usable.
 void LLWindowSDL::beforeDialog()
 {
     LL_INFOS() << "LLWindowSDL::beforeDialog() depth=" << mDialogDepth << LL_ENDL;
@@ -1265,11 +1328,10 @@ void LLWindowSDL::beforeDialog()
             SDL_ShowCursor();
         }
 
-        if (SDLReallyCaptureInput(false)) // must ungrab input so popup works!
-        {
-            if (mFullscreen && mWindow )
-                SDL_SetWindowFullscreen( mWindow, 0 );
-        }
+        // Ungrab input so the popup works. Fullscreen is left as it is: it
+        // is borderless desktop fullscreen, which a dialog parented to the
+        // window stacks above, and it holds no mode to give the desktop back.
+        SDLReallyCaptureInput(false);
     }
     ++mDialogDepth;
 }
@@ -1287,12 +1349,6 @@ void LLWindowSDL::afterDialog()
         // Nested afterDialog: still inside an outer dialog scope, nothing
         // to restore yet.
         return;
-    }
-
-    if (mFullscreen && mWindow)
-    {
-        // Restore fullscreen state that beforeDialog() left so dialogs could draw above us.
-        SDL_SetWindowFullscreen(mWindow, true);
     }
 
     // Restore pointer-lock if we dropped it for the dialog AND the viewer is
@@ -1334,7 +1390,11 @@ void LLWindowSDL::maybeStopFlashIcon()
     if (mFlashing && mFlashTimer.hasExpired())
     {
         mFlashing = false;
-        if (mWindow)
+        // SDL's Wayland backend ignores the operation and sends every flash
+        // as an xdg-activation request, so a cancel there would ask for
+        // attention a second time. The compositor drops the request itself
+        // once the window is focused.
+        if (mWindow && mServerProtocol != Wayland)
             SDL_FlashWindow( mWindow, SDL_FLASH_CANCEL );
     }
 }
@@ -1438,7 +1498,12 @@ LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_reso
         mSupportedResolutions = new LLWindowResolution[MAX_NUM_RESOLUTIONS];
         mNumSupportedResolutions = 0;
 
-        SDL_DisplayID display = SDL_GetPrimaryDisplay();
+        // The modes of the display the window is on, not the primary one.
+        SDL_DisplayID display = mWindow ? SDL_GetDisplayForWindow(mWindow) : 0;
+        if (!display)
+        {
+            display = SDL_GetPrimaryDisplay();
+        }
         int num_modes = 0;
         SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(display, &num_modes);
         num_modes = llclamp(num_modes, 0, MAX_NUM_RESOLUTIONS);
@@ -1501,7 +1566,7 @@ void LLWindowSDL::exitDialog()
         return;
     }
 
-    // afterDialog() restores fullscreen and mouselook; the file dialog also needs
+    // afterDialog() restores mouselook; the file dialog also needs
     // key-window focus back once the last one closes. SDL's dialog sheet leaves no
     // key window, so without this keystrokes hit no responder and AppKit beeps.
 #if LL_DARWIN
@@ -1810,12 +1875,7 @@ void LLWindowSDL::gatherInput()
 
     // This is a good time to stop flashing the icon if our mFlashTimer has
     // expired.
-    if (mFlashing && mFlashTimer.hasExpired())
-    {
-        if (mWindow)
-            SDL_FlashWindow(mWindow, SDL_FLASH_CANCEL);
-        mFlashing = false;
-    }
+    maybeStopFlashIcon();
 }
 
 SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
@@ -1882,8 +1942,21 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // down); negate it on the way into the accumulator so the
             // viewer's "-dy pitches the camera up" math behaves the same
             // on both backends. X is Y-RIGHT-positive on both, no flip.
-            mMouseDeltaAccumX += event.motion.xrel * scale;
-            mMouseDeltaAccumY -= event.motion.yrel * scale;
+            //
+            // Emulated motion, touch and pen's included, is a difference of
+            // screen coordinates and scales to pixels like the position. A
+            // mouse's relative-mode motion on Wayland, X11 and Windows is the
+            // device's own unaccelerated counts, as Win32's raw input is,
+            // which no density applies to: scaled, it made mouselook twice as
+            // fast at 200%. Cocoa's is NSEvent's deltaX/Y, in points like the
+            // cursor, so macOS still scales it.
+#if LL_DARWIN
+            const float delta_scale = scale;
+#else
+            const float delta_scale = (mRelativeMouseMode && !from_absolute_device) ? 1.f : scale;
+#endif
+            mMouseDeltaAccumX += event.motion.xrel * delta_scale;
+            mMouseDeltaAccumY -= event.motion.yrel * delta_scale;
 
             // When relative mode is on, motion.x/y is undefined (SDL parks
             // the cursor) and we're in mouselook — UI hover/hit-testing
@@ -2320,6 +2393,15 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 
         case SDL_EVENT_WINDOW_EXPOSED:
         {
+            // A Wayland window leaving the suspended state is exposed, and that
+            // is its restore. A size change while still suspended also exposes
+            // it, but SDL occludes it again in the same breath, so the flag
+            // already says occluded by the time the event is read here.
+            if (mOccluded && !(SDL_GetWindowFlags(mWindow) & SDL_WINDOW_OCCLUDED))
+            {
+                mOccluded = false;
+                mCallbacks->handleActivate(this, true);
+            }
             mCallbacks->handlePaint(this, 0, 0, 0, 0);
             break;
         }
@@ -2434,6 +2516,14 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
         case SDL_EVENT_WINDOW_MINIMIZED:
             mCallbacks->handleActivate(this, false);
             break;
+        case SDL_EVENT_WINDOW_OCCLUDED:
+            // Wayland's minimise; see mOccluded.
+            if (mServerProtocol == Wayland && !mOccluded)
+            {
+                mOccluded = true;
+                mCallbacks->handleActivate(this, false);
+            }
+            break;
         case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
         {
             // Update refresh rate when changing monitors
@@ -2443,6 +2533,10 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
                 mRefreshRate = ll_round(displayMode->refresh_rate);
                 mNativeAspectRatio = ((F32)displayMode->w) / ((F32)displayMode->h);
             }
+            // The resolution list is the window's display's; build it afresh.
+            delete[] mSupportedResolutions;
+            mSupportedResolutions = nullptr;
+            mNumSupportedResolutions = 0;
             // Pixel density may have changed; refresh the pixel-unit min-size
             // shadow so setSizeImpl(LLCoordWindow)'s re-clamp stays unit-correct.
             refreshMinSizePixelShadow();
@@ -2561,50 +2655,6 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
                 // Get the app to initiate cleanup.
                 mCallbacks->handleQuit(this);
                 // The app is responsible for calling destroyWindow when done with GL
-            }
-            break;
-        }
-        case SDL_EVENT_RENDER_DEVICE_RESET:
-        case SDL_EVENT_RENDER_DEVICE_LOST:
-        case SDL_EVENT_RENDER_TARGETS_RESET:
-        {
-            // The GL device underneath us has been reset, lost, or had its
-            // render targets invalidated — display sleep/wake, GPU driver
-            // restart, VT switch on some Mesa stacks. Every texture, VBO,
-            // shader program, framebuffer object, and reflection probe is
-            // now in an undefined state and subsequent GL calls will either
-            // silently no-op or crash. The pre-relative-mode viewer simply
-            // crashed; this gives the user a visible cause-of-death and a
-            // proper log line for support before we tear down.
-            //
-            // True recovery — destroying every GL resource and rebuilding
-            // it from scratch — is a substantial cross-subsystem effort
-            // (LLPipeline, LLViewerTextureList, LLReflectionMapManager,
-            // every loaded shader, the UI atlas) and is deliberately not
-            // attempted here. The viewer exits cleanly so the user knows
-            // to restart instead of staring at a black or corrupted window.
-            const char* kind = (event.type == SDL_EVENT_RENDER_DEVICE_RESET)
-                                   ? "device reset"
-                                   : (event.type == SDL_EVENT_RENDER_DEVICE_LOST)
-                                         ? "device lost"
-                                         : "render targets reset";
-            LL_WARNS("Window") << "GL " << kind
-                               << " detected via SDL3 event. SDL error: "
-                               << SDL_GetError() << LL_ENDL;
-
-            OSMessageBoxSDL(
-                "The graphics driver reported an OpenGL device "
-                + std::string(kind)
-                + ". Alchemy can't continue rendering and will now exit.\n\n"
-                  "This usually follows display sleep/wake, a GPU driver "
-                  "restart, or a virtual-terminal switch. Please relaunch "
-                  "the viewer to resume.",
-                "OpenGL device lost",
-                OSMB_OK);
-
-            if (mCallbacks)
-            {
-                mCallbacks->handleQuit(this);
             }
             break;
         }
@@ -3622,11 +3672,16 @@ LLSD LLWindowSDL::getNativeKeyData()
 // Must begin with protocol identifier.
 void LLWindowSDL::spawnWebBrowser(const std::string& escaped_url, bool async)
 {
+    // The scheme has to lead the URL: found anywhere in it, "smb://host/x?http:"
+    // would pass and SDL_OpenURL would hand it to the desktop's smb handler.
+    // A scheme's case doesn't matter (RFC 3986 3.1), so "HTTPS:" is "https:".
+    const std::string_view url(escaped_url);
     bool found = false;
     S32 i;
     for (i = 0; i < gURLProtocolWhitelistCount; i++)
     {
-        if (escaped_url.find(gURLProtocolWhitelist[i]) != std::string::npos)
+        const std::string& scheme = gURLProtocolWhitelist[i];
+        if (LLStringUtil::isEqualInsensitiveASCII(url.substr(0, scheme.size()), scheme))
         {
             found = true;
             break;
@@ -3784,6 +3839,185 @@ void LLWindowSDL::bringToFront()
     {
         SDL_RaiseWindow(mWindow);
     }
+}
+
+#if LL_LINUX
+namespace
+{
+    // xdg-activation by hand. SDL's Wayland backend spends XDG_ACTIVATION_TOKEN
+    // only on showing a window, and SDL_RaiseWindow asks the compositor for a
+    // token of its own, which GNOME and KDE honour for a window out of focus
+    // only as a request for attention. A token handed over from another
+    // process has to reach xdg_activation_v1.activate some other way. The
+    // viewer builds against no Wayland header (UI.cmake), so the little this
+    // takes is mirrored from wayland-util.h, wayland-client-core.h and
+    // xdg-activation-v1.xml, and libwayland-client, which SDL has loaded, is
+    // resolved at run time.
+    struct ALWlInterface;
+
+    struct ALWlMessage
+    {
+        const char* name;
+        const char* signature;
+        const ALWlInterface** types;
+    };
+
+    struct ALWlInterface
+    {
+        const char* name;
+        int version;
+        int method_count;
+        const ALWlMessage* methods;
+        int event_count;
+        const ALWlMessage* events;
+    };
+
+    // A request is sent by its index. Its types matter only to a new object,
+    // which of these only get_activation_token makes, and it is never sent.
+    const ALWlInterface* NO_TYPES[] = { nullptr, nullptr };
+    const ALWlMessage XDG_ACTIVATION_REQUESTS[] = {
+        { "destroy", "", NO_TYPES },
+        { "get_activation_token", "n", NO_TYPES },
+        { "activate", "so", NO_TYPES },
+    };
+    const ALWlInterface XDG_ACTIVATION_V1 = { "xdg_activation_v1", 1, 3, XDG_ACTIVATION_REQUESTS, 0, nullptr };
+
+    enum : uint32_t
+    {
+        DISPLAY_GET_REGISTRY = 1,
+        REGISTRY_BIND = 0,
+        ACTIVATION_DESTROY = 0,
+        ACTIVATION_ACTIVATE = 2,
+        MARSHAL_FLAG_DESTROY = 1, // WL_MARSHAL_FLAG_DESTROY
+    };
+
+    struct ALWaylandClient
+    {
+        void* (*display_create_queue)(void* display);
+        void (*event_queue_destroy)(void* queue);
+        void* (*proxy_create_wrapper)(void* proxy);
+        void (*proxy_wrapper_destroy)(void* wrapper);
+        void (*proxy_set_queue)(void* proxy, void* queue);
+        int (*proxy_add_listener)(void* proxy, void (**listener)(void), void* data);
+        void* (*proxy_marshal_flags)(void* proxy, uint32_t opcode, const ALWlInterface* interface,
+                                     uint32_t version, uint32_t flags, ...);
+        uint32_t (*proxy_get_version)(void* proxy);
+        void (*proxy_destroy)(void* proxy);
+        int (*display_roundtrip_queue)(void* display, void* queue);
+        int (*display_flush)(void* display);
+        const ALWlInterface* registry_interface;
+    };
+
+    template <typename T>
+    bool loadSymbol(SDL_SharedObject* library, const char* symbol, T& slot)
+    {
+        slot = reinterpret_cast<T>(SDL_LoadFunction(library, symbol));
+        return slot != nullptr;
+    }
+
+    bool loadWaylandClient(SDL_SharedObject* library, ALWaylandClient& wl)
+    {
+        return loadSymbol(library, "wl_display_create_queue", wl.display_create_queue)
+            && loadSymbol(library, "wl_event_queue_destroy", wl.event_queue_destroy)
+            && loadSymbol(library, "wl_proxy_create_wrapper", wl.proxy_create_wrapper)
+            && loadSymbol(library, "wl_proxy_wrapper_destroy", wl.proxy_wrapper_destroy)
+            && loadSymbol(library, "wl_proxy_set_queue", wl.proxy_set_queue)
+            && loadSymbol(library, "wl_proxy_add_listener", wl.proxy_add_listener)
+            && loadSymbol(library, "wl_proxy_marshal_flags", wl.proxy_marshal_flags)
+            && loadSymbol(library, "wl_proxy_get_version", wl.proxy_get_version)
+            && loadSymbol(library, "wl_proxy_destroy", wl.proxy_destroy)
+            && loadSymbol(library, "wl_display_roundtrip_queue", wl.display_roundtrip_queue)
+            && loadSymbol(library, "wl_display_flush", wl.display_flush)
+            && loadSymbol(library, "wl_registry_interface", wl.registry_interface);
+    }
+
+    // wl_registry's global and global_remove events, in that order.
+    void onRegistryGlobal(void* data, void*, uint32_t name, const char* interface, uint32_t)
+    {
+        if (strcmp(interface, XDG_ACTIVATION_V1.name) == 0)
+        {
+            *static_cast<uint32_t*>(data) = name;
+        }
+    }
+
+    void onRegistryGlobalRemove(void*, void*, uint32_t) {}
+
+    void (*const REGISTRY_LISTENER[])(void) = {
+        reinterpret_cast<void (*)(void)>(&onRegistryGlobal),
+        reinterpret_cast<void (*)(void)>(&onRegistryGlobalRemove),
+    };
+
+    // Binds xdg_activation_v1 on a queue of its own, so that nothing of SDL's
+    // is dispatched here, and activates the surface with the token. False
+    // when there is no libwayland-client or no xdg_activation_v1.
+    bool activateWaylandSurface(void* display, void* surface, const char* token)
+    {
+        SDL_SharedObject* library = SDL_LoadObject("libwayland-client.so.0");
+        if (!library)
+        {
+            return false;
+        }
+
+        ALWaylandClient wl{};
+        void* queue = loadWaylandClient(library, wl) ? wl.display_create_queue(display) : nullptr;
+        void* wrapper = queue ? wl.proxy_create_wrapper(display) : nullptr;
+        void* registry = nullptr;
+        if (wrapper)
+        {
+            // The registry takes the wrapper's queue, and its events with it.
+            wl.proxy_set_queue(wrapper, queue);
+            registry = wl.proxy_marshal_flags(wrapper, DISPLAY_GET_REGISTRY, wl.registry_interface,
+                                              wl.proxy_get_version(wrapper), 0, nullptr);
+            wl.proxy_wrapper_destroy(wrapper);
+        }
+
+        bool activated = false;
+        if (registry)
+        {
+            uint32_t name = 0;
+            wl.proxy_add_listener(registry, const_cast<void (**)(void)>(REGISTRY_LISTENER), &name);
+            void* activation = nullptr;
+            if (wl.display_roundtrip_queue(display, queue) >= 0 && name != 0)
+            {
+                activation = wl.proxy_marshal_flags(registry, REGISTRY_BIND, &XDG_ACTIVATION_V1, 1, 0,
+                                                    name, XDG_ACTIVATION_V1.name, 1u, nullptr);
+            }
+            if (activation)
+            {
+                wl.proxy_marshal_flags(activation, ACTIVATION_ACTIVATE, nullptr, 1, 0, token, surface);
+                wl.proxy_marshal_flags(activation, ACTIVATION_DESTROY, nullptr, 1, MARSHAL_FLAG_DESTROY);
+                wl.display_flush(display);
+                activated = true;
+            }
+            wl.proxy_destroy(registry);
+        }
+        if (queue)
+        {
+            wl.event_queue_destroy(queue);
+        }
+
+        SDL_UnloadObject(library);
+        return activated;
+    }
+}
+#endif // LL_LINUX
+
+void LLWindowSDL::bringToFront(const std::string& activation_token)
+{
+#if LL_LINUX
+    if (mWindow && mServerProtocol == Wayland && !activation_token.empty())
+    {
+        SDL_PropertiesID props = SDL_GetWindowProperties(mWindow);
+        void* display = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, nullptr);
+        void* surface = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, nullptr);
+        if (display && surface && activateWaylandSurface(display, surface, activation_token.c_str()))
+        {
+            LL_INFOS() << "bringToFront with an activation token" << LL_ENDL;
+            return;
+        }
+    }
+#endif
+    bringToFront();
 }
 
 //static

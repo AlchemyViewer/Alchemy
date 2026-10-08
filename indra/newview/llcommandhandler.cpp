@@ -140,6 +140,16 @@ bool LLCommandHandlerRegistry::dispatch(const std::string& cmd,
             {
                 return true;
             }
+            // So too a link another instance hands over before login: these
+            // commands open in-world floaters, which need an agent (the world
+            // map draws a region that isn't there), and a cold launch drops
+            // its link the same way.
+            if (nav_type == LLCommandHandler::NAV_TYPE_EXTERNAL
+                && LLStartUp::getStartupState() < STATE_STARTED)
+            {
+                LL_INFOS("SLURL") << "Skipped SLURL command " << cmd << " from outside before login" << LL_ENDL;
+                return true;
+            }
             if (!info.mHandler->canHandleUntrusted(params, query_map, web, nav_type))
             {
                 LL_WARNS_ONCE("SLURL") << "Blocked SLURL command from untrusted browser" << LL_ENDL;

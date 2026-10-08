@@ -10,7 +10,9 @@
 #export AL_NO_DESKTOP_INTEGRATION=1
 
 ## GL Driver Options
-export mesa_glthread=true
+## - Mesa's threaded GL dispatch, on unless mesa_glthread is set already:
+##   mesa_glthread=false in the environment turns it off.
+export mesa_glthread="${mesa_glthread:-true}"
 
 ## Everything below this line is just for advanced troubleshooters.
 ##-------------------------------------------------------------------

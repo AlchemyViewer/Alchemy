@@ -16465,7 +16465,7 @@
     <key>GPUBenchmarkResult</key>
     <map>
       <key>Comment</key>
-      <string>Cached GPU benchmark bandwidth in GB/sec (-1 for failure), with the GPU vendor, raw renderer and full OpenGL driver version. Reset to rerun the benchmark.</string>
+      <string>Cached GPU benchmark bandwidth in GB/sec (-1 for failure), with the GPU vendor, the renderer without the kernel release, and the full OpenGL driver version. Reset to rerun the benchmark.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>

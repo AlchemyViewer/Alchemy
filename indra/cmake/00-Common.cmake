@@ -51,6 +51,17 @@ set(CMAKE_OPTIMIZE_DEPENDENCIES ON) # static libraries do not wait on their depe
 set(CMAKE_COLOR_DIAGNOSTICS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# The property alone compiles an executable's sources with -fPIE; CMake links
+# it with -pie only once check_pie_supported() has cached that the linker
+# takes it (policy CMP0083). Without that, a toolchain that does not default
+# to PIE links the executable at a fixed address, where address space layout
+# randomisation cannot move it. macOS links every executable
+# position-independent already.
+if(LINUX)
+  include(CheckPIESupported)
+  check_pie_supported()
+endif()
+
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
@@ -246,11 +257,46 @@ foreach(tier baseline v2 v3 v4)
   )
 endforeach()
 
-# Hardening.
+# Hardening, in the optimised configurations: a stack canary in every
+# function with a local array or an address-taken local; probes that keep a
+# large stack allocation from stepping over the guard page; and each
+# architecture's control-flow protection, landing pads for indirect branches
+# and protected returns (shadow-stack compatibility on x86, signed return
+# addresses on arm64).
 if(LINUX)
-  target_compile_options(al_flags INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fstack-protector>)
+  target_compile_options(
+    al_flags
+    INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fstack-protector-strong>
+  )
+  # Clang before 18 has no stack clash probes on arm64, and leaves the option
+  # unused with a warning that -Werror makes fatal.
+  if(
+    NOT (COMPILER_IS_CLANG AND BUILD_TARGET_IS_ARM64 AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18)
+  )
+    target_compile_options(
+      al_flags
+      INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fstack-clash-protection>
+    )
+  endif()
+  if(BUILD_TARGET_IS_X86_64)
+    target_compile_options(al_flags INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fcf-protection>)
+  elseif(BUILD_TARGET_IS_ARM64)
+    target_compile_options(
+      al_flags
+      INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-mbranch-protection=standard>
+    )
+  endif()
+  # Fortified libc calls, at level 3, which also checks sizes known only at
+  # run time. Options, not a definition: definitions come before options on
+  # the command line, and the -U has to come first, so a _FORTIFY_SOURCE the
+  # toolchain defines itself is replaced rather than redefined.
   if(NOT AL_SANITIZING)
-    target_compile_definitions(al_flags INTERFACE $<$<CONFIG:Release>:_FORTIFY_SOURCE=2>)
+    target_compile_options(
+      al_flags
+      INTERFACE
+        $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-U_FORTIFY_SOURCE>
+        $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-D_FORTIFY_SOURCE=3>
+    )
   endif()
 endif()
 

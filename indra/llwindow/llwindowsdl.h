@@ -89,18 +89,24 @@ public:
     // touch/pen branch still needs to disable warp.
     bool isWrapMouse() const override { return !mAbsoluteCursorPosition; }
 
-    // On Linux/X11 and Wayland AltGr is delivered as Right-Alt alone (no
-    // Ctrl prefix). LLKeyboardSDL folds RALT into MASK_ALT, so a chat-bar
-    // user typing AltGr+E (€ on German layout) would otherwise see the
-    // in-world "Alt+E" binding fire alongside the € insert. We detect the
-    // RAlt-without-LAlt-and-without-Ctrl signature here so handleKey can
-    // short-circuit before the binding dispatch — mirrors the AltGr block
-    // in LLWindowWin32 / LLViewerWindow::handleKey.
+    // Asked by LLViewerWindow::handleKey so an AltGr-composed character
+    // (AltGr+E for € on a German layout) doesn't also fire the in-world
+    // "Alt+E" binding — mirrors the AltGr block for LLWindowWin32 there.
+    // On X11 and Wayland AltGr is xkb's ISO_Level3_Shift, which SDL reports
+    // as SDL_KMOD_MODE and never as an Alt, and Level5_Shift (Neo and the
+    // like) as SDL_KMOD_LEVEL5; a Right-Alt there is a plain Alt, as on US
+    // layouts. Cocoa reports Option, the Mac's composing key, as an Alt, and
+    // SDL's Windows backend reports AltGr as Right-Alt with Windows' extra
+    // Ctrl dropped, so there Right-Alt alone is the signature.
     bool isAltGrPressed() const override
     {
+#if LL_LINUX
+        return (mKeyModifiers & (SDL_KMOD_MODE | SDL_KMOD_LEVEL5)) != 0;
+#else
         return (mKeyModifiers & SDL_KMOD_RALT)
             && !(mKeyModifiers & SDL_KMOD_LALT)
             && !(mKeyModifiers & SDL_KMOD_CTRL);
+#endif
     }
 
     // Pen / stylus and touchscreen metadata sourced from SDL_EVENT_PEN_AXIS
@@ -183,6 +189,10 @@ public:
     std::string getDisplayServer() const override;
 
     void bringToFront() override;
+    // bringToFront() with the xdg-activation token another process was
+    // launched with and handed over, which on Wayland is what lets a window
+    // out of focus take it. Without a token, or on X11, it is bringToFront().
+    void bringToFront(const std::string& activation_token);
 
     void setLanguageTextInput(const LLCoordGL& pos) override;
     void allowLanguageTextInput(LLPreeditor* preeditor, bool b) override;
@@ -286,6 +296,16 @@ protected:
     // or density can change (resize / DPI / monitor).
     void refreshPixelMetrics();
 
+#if LL_LINUX
+    // GPU reset detection, on NVIDIA's EGL: armGraphicsResetCheck once GL is
+    // loaded, to poll when createContext got a context that reports a reset,
+    // then checkGraphicsReset each frame from swapBuffers. A reset found is
+    // said once and the viewer quits, as nothing the GPU held survives it.
+    void armGraphicsResetCheck();
+    void checkGraphicsReset();
+    bool mGraphicsResetSeen = false;
+#endif
+
     //
     // Platform specific variables
     //
@@ -314,8 +334,9 @@ private:
     U32 mKeyRawScanCode = 0;
 
     // Per-frame mouse-motion accumulator. SDL_EVENT_MOUSE_MOTION delivers
-    // event.motion.xrel/yrel (relative motion since the last event in
-    // screen-coord units); we scale by pixel density and sum into this
+    // event.motion.xrel/yrel (relative motion since the last event, in
+    // screen-coord units unless relative mode gives device counts); we
+    // scale the screen-coord kind by pixel density and sum into this
     // member so getCursorDelta() — queried once per frame from
     // LLViewerWindow::updateMouseDelta — sees every motion event, not
     // just the last-position-minus-first-position which truncates to zero
@@ -444,10 +465,14 @@ private:
     // just-the-commits from SDL3.
     LLPreeditor* mPreeditor = nullptr;
 
-    void tryFindFullscreenSize(int &aWidth, int &aHeight);
-
     enum EServerProtocol{ X11, Wayland, Unknown };
     EServerProtocol mServerProtocol = Unknown;
+
+    // Wayland only: set from SDL_EVENT_WINDOW_OCCLUDED until the EXPOSED that
+    // follows the window's return. xdg-shell never tells a client it was
+    // minimised; the toplevel's "suspended" state, which SDL reports as
+    // occlusion, is what arrives instead. getMinimized() counts it.
+    bool mOccluded = false;
 
 #if LL_WINDOWS
     // Install/remove a WndProc subclass on the SDL window's HWND so we can

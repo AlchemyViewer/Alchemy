@@ -53,6 +53,10 @@ protected:
 
     bool restoreErrorTrap() override;
 
+#if LL_LINUX
+    bool initHardwareTest() override; // Chooses the GPU before the window loads EGL.
+#endif
+
     bool initParseCommandLine(LLCommandLineParser& clp) override;
 
     bool initSLURLHandler() override;

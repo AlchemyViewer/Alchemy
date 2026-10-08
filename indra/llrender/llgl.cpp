@@ -62,6 +62,10 @@
 #include "lldxhardware.h"
 #endif
 
+#if LL_LINUX
+#include <sys/utsname.h>
+#endif
+
 #ifdef _DEBUG
 //#define GL_STATE_VERIFY
 #endif
@@ -1551,6 +1555,169 @@ void LLGLManager::initEGL()
 #endif
 }
 
+#if LL_LINUX
+namespace
+{
+    // radeonsi and r600 put the kernel's DRM interface version and release in GL_RENDERER:
+    // "(radeonsi, navi31, ACO, DRM 3.64, 7.2.4-200.fc44.x86_64)", in older Mesa
+    // "(POLARIS10, DRM 3.42.0, 5.15.0-58-generic, LLVM 13.0.1)", and r600
+    // "(DRM 2.50.0 / 6.1.0-13-amd64, LLVM 15.0.6)". Both move with the kernel, not the driver.
+    std::string strip_kernel_from_renderer(std::string renderer)
+    {
+        // With what joins it on, so that a release like "6.1.0" is not found in "LLVM 16.1.0".
+        struct utsname uts;
+        const std::string release = uname(&uts) == 0 ? uts.release : "";
+        for (const std::string separator : { ", ", " / " })
+        {
+            if (size_t pos = renderer.find(separator + release); !release.empty() && pos != std::string::npos)
+            {
+                renderer.erase(pos, separator.size() + release.size());
+                break;
+            }
+        }
+
+        if (size_t pos = renderer.find("DRM "); pos != std::string::npos
+            && pos + 4 < renderer.size() && isdigit((unsigned char)renderer[pos + 4]))
+        {
+            size_t end = pos + 4;
+            while (end < renderer.size() && (isdigit((unsigned char)renderer[end]) || renderer[end] == '.'))
+            {
+                ++end;
+            }
+            if (pos >= 2 && renderer.compare(pos - 2, 2, ", ") == 0)
+            {
+                pos -= 2;   // "navi31, DRM 3.64"
+            }
+            else if (renderer.compare(end, 2, ", ") == 0)
+            {
+                end += 2;   // "(DRM 2.50.0, LLVM"
+            }
+            renderer.erase(pos, end - pos);
+        }
+        return renderer;
+    }
+
+    // Whole names only: EGL_EXT_device_drm is a prefix of EGL_EXT_device_drm_render_node.
+    bool has_egl_extension(const char* extensions, const std::string& name)
+    {
+        return (" " + ll_safe_string(extensions) + " ").find(" " + name + " ") != std::string::npos;
+    }
+
+    // The DRM node of the EGL device behind the current display, e.g. /dev/dri/renderD128,
+    // through EGL_EXT_device_query. Empty when the EGL cannot say, and for a software device,
+    // which has none.
+    std::string egl_device_drm_node()
+    {
+        EGLDisplay display = (EGLDisplay)SDL_EGL_GetCurrentDisplay();
+        PFNEGLQUERYSTRINGPROC query_string = (PFNEGLQUERYSTRINGPROC)SDL_EGL_GetProcAddress("eglQueryString");
+        if (!display || !query_string)
+        {
+            return {};
+        }
+
+        // Client extensions, so asked of no display.
+        const char* client_extensions = query_string(EGL_NO_DISPLAY, EGL_EXTENSIONS);
+        if (!has_egl_extension(client_extensions, "EGL_EXT_device_query")
+            && !has_egl_extension(client_extensions, "EGL_EXT_device_base"))
+        {
+            return {};
+        }
+
+        PFNEGLQUERYDISPLAYATTRIBEXTPROC query_display_attrib =
+            (PFNEGLQUERYDISPLAYATTRIBEXTPROC)SDL_EGL_GetProcAddress("eglQueryDisplayAttribEXT");
+        PFNEGLQUERYDEVICESTRINGEXTPROC query_device_string =
+            (PFNEGLQUERYDEVICESTRINGEXTPROC)SDL_EGL_GetProcAddress("eglQueryDeviceStringEXT");
+        EGLAttrib device = 0;
+        if (!query_display_attrib || !query_device_string
+            || !query_display_attrib(display, EGL_DEVICE_EXT, &device) || !device)
+        {
+            return {};
+        }
+
+        const char* device_extensions = query_device_string((EGLDeviceEXT)device, EGL_EXTENSIONS);
+        const char* node = nullptr;
+        if (has_egl_extension(device_extensions, "EGL_EXT_device_drm_render_node"))
+        {
+            node = query_device_string((EGLDeviceEXT)device, EGL_DRM_RENDER_NODE_FILE_EXT);
+        }
+        if (!node && has_egl_extension(device_extensions, "EGL_EXT_device_drm"))
+        {
+            node = query_device_string((EGLDeviceEXT)device, EGL_DRM_DEVICE_FILE_EXT);
+        }
+        return ll_safe_string(node);
+    }
+
+    // The sysfs directory of the device GL draws with: the one EGL names, else the first
+    // render node of GL's vendor. Empty when neither finds one.
+    std::string drm_device_sysfs_dir(const std::string& vendor_short)
+    {
+        const std::string node = egl_device_drm_node();
+        if (!node.empty())
+        {
+            // /dev/dri/renderD128 -> /sys/class/drm/renderD128/device
+            return "/sys/class/drm/" + node.substr(node.rfind('/') + 1) + "/device";
+        }
+
+        const char* vendor_id = vendor_short == "AMD"    ? "0x1002"
+                              : vendor_short == "INTEL"  ? "0x8086"
+                              : vendor_short == "NVIDIA" ? "0x10de"
+                              : nullptr;
+        // Render nodes are numbered from 128.
+        for (S32 minor = 128; vendor_id && minor < 192; ++minor)
+        {
+            const std::string dir = "/sys/class/drm/renderD" + std::to_string(minor) + "/device";
+            llifstream file(dir + "/vendor");
+            std::string id;
+            if (file >> id && id == vendor_id)
+            {
+                return dir;
+            }
+        }
+        return {};
+    }
+
+    // A size sysfs gives in bytes, in MB. 0 when the attribute is missing.
+    U32 read_sysfs_mb(const std::string& path)
+    {
+        llifstream file(path);
+        U64 bytes = 0;
+        file >> bytes;
+        return (U32)(bytes >> 20);
+    }
+
+    // VRAM for a GPU GL has no real figure for. amdgpu publishes its memory in sysfs. Memory
+    // a GPU shares with the system -- Intel's, a software renderer's -- is a quarter of RAM,
+    // which is what LLDXHardware allows Intel on Windows.
+    U32 fallback_vram_mb(const std::string& vendor_short, bool shares_system_memory, std::string& source)
+    {
+        const U32 ram_share_mb = U32Megabytes(gSysMemory.getPhysicalMemoryKB()).value() / 4;
+
+        const std::string device_dir = drm_device_sysfs_dir(vendor_short);
+        const U32 vram_mb = device_dir.empty() ? 0 : read_sysfs_mb(device_dir + "/mem_info_vram_total");
+        if (vram_mb >= 1024)
+        {
+            // A card's own memory, or a carve-out big enough to stand for it.
+            source = "amdgpu VRAM";
+            return vram_mb;
+        }
+        if (vram_mb > 0)
+        {
+            // An APU: its VRAM is the BIOS carve-out, and the rest it draws from system memory
+            // through the GTT. The carve-out is not counted in system memory, so it comes on
+            // top of the quarter, which the GTT's size bounds.
+            source = "amdgpu carve-out and GTT";
+            return vram_mb + llmin(read_sysfs_mb(device_dir + "/mem_info_gtt_total"), ram_share_mb);
+        }
+        if (shares_system_memory)
+        {
+            source = "system memory";
+            return ram_share_mb;
+        }
+        return 0;
+    }
+}
+#endif
+
 
 // return false if unable (or unwilling due to old drivers) to init GL
 bool LLGLManager::initGL()
@@ -1645,6 +1812,14 @@ bool LLGLManager::initGL()
 
     mGLVersion = mDriverVersionMajor + mDriverVersionMinor * .1f;
 
+    {
+        std::string renderer = ll_safe_string((const char *)glGetString(GL_RENDERER));
+#if LL_LINUX
+        renderer = strip_kernel_from_renderer(renderer);
+#endif
+        mGLIdentity = ll_safe_string((const char *)glGetString(GL_VENDOR)) + " " + renderer + " " + mGLVersionString;
+    }
+
     // Every Mesa driver stamps "Mesa" into the GL_VERSION string
     // (e.g. "4.6 (Core Profile) Mesa 26.1.4"), regardless of the underlying
     // hardware backend. Detect it here so driver-specific workarounds can key
@@ -1655,6 +1830,24 @@ bool LLGLManager::initGL()
         mIsMesa = ver_upper.find("MESA") != std::string::npos;
     }
     mIsD3D12 = mIsMesa && mGLRenderer.rfind("D3D12", 0) == 0;
+
+#if LL_LINUX
+    // When the hardware driver does not load -- NVIDIA's without its EGL platform library,
+    // a missing Mesa driver, a VM or container without the GPU -- Mesa draws on the CPU
+    // instead, offering GL 4.6 and every extension the viewer asks for, so nothing else
+    // would tell. GL_RENDERER names what actually draws, and keeps the name when zink runs
+    // over lavapipe or virgl over a host's llvmpipe.
+    mIsSoftwareRenderer = false;
+    for (const char* software : { "LLVMPIPE", "SOFTPIPE", "SWRAST", "SOFTWARE RASTERIZER",
+                                  "MICROSOFT BASIC RENDER DRIVER" })
+    {
+        mIsSoftwareRenderer = mIsSoftwareRenderer || mGLRenderer.find(software) != std::string::npos;
+    }
+    if (mIsSoftwareRenderer)
+    {
+        LL_WARNS("RenderInit") << "GL renderer " << mGLRenderer << " draws on the CPU" << LL_ENDL;
+    }
+#endif
 
     if (mGLVersion >= 2.f)
     {
@@ -1773,6 +1966,22 @@ bool LLGLManager::initGL()
 
             mVRAM = meminfo[0] / 1024;
             LL_INFOS("RenderInit") << "VRAM Detected (ATIMemInfo):" << mVRAM << LL_ENDL;
+        }
+    }
+#endif
+
+#if LL_LINUX
+    // Neither extension counts memory a GPU shares with the system: Intel's and a software
+    // renderer's report none, an APU's only its BIOS carve-out, often 512 MB -- so an AMD
+    // figure under 1 GB is checked too. Windows asks DXGI instead.
+    if (mVRAM < 256 || (mIsAMD && mVRAM < 1024))
+    {
+        std::string source;
+        const U32 fallback_mb = fallback_vram_mb(mGLVendorShort, mIsIntel || mIsSoftwareRenderer, source);
+        if (fallback_mb > mVRAM)
+        {
+            mVRAM = fallback_mb;
+            LL_INFOS("RenderInit") << "VRAM Detected (" << source << "):" << mVRAM << LL_ENDL;
         }
     }
 #endif

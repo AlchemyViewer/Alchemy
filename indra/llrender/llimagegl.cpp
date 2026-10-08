@@ -1267,6 +1267,11 @@ U32 type_width_from_pixtype(U32 pixtype)
 bool should_stagger_image_set(bool compressed)
 {
 #if LL_LINUX
+    // Only NVIDIA's own driver slices. AMD and Intel were taken out on purpose
+    // (2dcb7ae22c, March 2025), and the drivers that report neither -- nouveau, zink
+    // on NVK, llvmpipe -- have not sliced since 1727c4d264. featuretable_linux.txt
+    // gives all of those threaded texture uploads instead, so a large upload leaves
+    // the main thread rather than stalling it.
     return !compressed && on_main_thread() && gGLManager.mIsNVIDIA;
 #elif LL_DARWIN
     return !compressed && on_main_thread() && gGLManager.mIsAMD;

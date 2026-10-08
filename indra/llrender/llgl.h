@@ -160,6 +160,10 @@ public:
     // True for Mesa's d3d12 driver: GLOn12, Microsoft's GL over D3D12 and the only GL on
     // Windows on Arm. Detected from its "D3D12 (<adapter>)" GL_RENDERER.
     bool mIsD3D12 = false;
+    // True when GL draws on the CPU: Mesa's llvmpipe, softpipe or swrast, or WARP behind
+    // WSL's d3d12. What Mesa falls back to when the hardware driver does not load.
+    // Detected from GL_RENDERER, on Linux only.
+    bool mIsSoftwareRenderer = false;
 
     // hints to the render pipe
     U32 mDownScaleMethod = 0; // see settings.xml RenderDownScaleMethod
@@ -190,6 +194,11 @@ public:
 
     // In ALL CAPS
     std::string mGLRenderer;
+
+    // GL_VENDOR, GL_RENDERER and GL_VERSION as reported, less the kernel's DRM version and
+    // release radeonsi and r600 put in the renderer on Linux. Keys what a driver update must
+    // invalidate and a kernel update must not: the benchmark result and program binaries.
+    std::string mGLIdentity;
 
     // GL Extension String
     std::set<std::string> mGLExtensions;
