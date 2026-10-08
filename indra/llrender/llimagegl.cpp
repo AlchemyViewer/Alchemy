@@ -133,7 +133,7 @@ void LLImageGLMemory::free_tex_image(U32 texName)
 {
     sTexMemMutex.lock();
     auto iter = sTextureAllocs.find(texName);
-    if (iter != sTextureAllocs.end()) // sometimes a texName will be "freed" before allocated (e.g. first call to setManualImage for a given texName)
+    if (iter != sTextureAllocs.end()) // sometimes a texName will be "freed" before allocated (e.g. the first allocation on a given texName)
     {
         llassert(iter->second <= sTextureBytes); // sTextureBytes MUST NOT go below zero
 
@@ -1438,10 +1438,6 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
         const bool use_sub_image = should_stagger_image_set(isCompressed());
         if (!use_sub_image)
         {
-            // *TODO: Why does this work here, in setSubImage, but not in
-            // setManualImage? Maybe because it only gets called with the
-            // dimensions of the full image?  Or because the image is never
-            // compressed?
             glTexSubImage2D(mTarget, 0, x_pos, y_pos, width, height, mFormatPrimary, mFormatType, sub_datap);
         }
         else
@@ -1571,8 +1567,8 @@ void LLImageGL::resolveUploadFormat(S32& intformat, U32& pixformat, U32& pixtype
     // whose resolveDeprecatedFormat ran and applied a specific mask in createGLTexture,
     // or any caller that set up its own swizzle before this call). The format rewrite
     // here still happens so the allocation gets the right backing storage; applying the
-    // swizzle is the caller's responsibility. LLImageGL's createGLTexture path handles it
-    // via mSwizzleMask. Direct callers that pass GL_ALPHA / GL_LUMINANCE /
+    // swizzle is the caller's responsibility. LLImageGL applies it to every name it creates,
+    // from mDeprecatedSourceFormat. Direct callers that pass GL_ALPHA / GL_LUMINANCE /
     // GL_LUMINANCE_ALPHA must apply the matching swizzle themselves before uploading.
     if (pixformat == GL_ALPHA)
     { //GL_ALPHA → R8; caller-set {0,0,0,R} swizzle is required for {0,0,0,A} sample semantics
@@ -1790,17 +1786,16 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
         switch (mComponents)
         {
         case 1:
-            // Single-channel — used by font glyph maps, but the path
-            // is generic for any 1-component upload. setManualImage
-            // swizzles LUMINANCE → R8 with a gray-replicate mask on
-            // core profile.
+            // Single-channel -- used by font glyph maps, but the path is generic for
+            // any 1-component upload. resolveDeprecatedFormat below stores it as R8,
+            // read back through a gray-replicate swizzle.
             mFormatInternal = GL_LUMINANCE8;
             mFormatPrimary = GL_LUMINANCE;
             mFormatType = GL_UNSIGNED_BYTE;
             break;
         case 2:
-            // Two-channel (luminance + alpha). Same swizzle remap
-            // happens in setManualImage on core profile.
+            // Two-channel (luminance + alpha): RG8 under the matching swizzle, the
+            // same way.
             mFormatInternal = GL_LUMINANCE8_ALPHA8;
             mFormatPrimary = GL_LUMINANCE_ALPHA;
             mFormatType = GL_UNSIGNED_BYTE;
@@ -1995,22 +1990,17 @@ void LLImageGL::syncToMainThread(LLGLuint new_tex_name)
         glFlush();
     }
 
-    // Block here until the upload has actually completed, then let the main thread swap
-    // the name in. This costs this thread's throughput, but publishing mTexName must not
-    // outrun the metadata that createGLTexture already wrote (mWidth/mHeight/mComponents
-    // via setSize, mCurrentDiscardLevel, the format fields) -- consumers read those
-    // through LLGLTexture::getWidth()/getDiscardLevel() and pair them with mTexName.
-    // Deferring the name publish past this point widens that mismatch into something
-    // sculpt reproducibly trips over (LLVOVolume::sculpt reads back from GL at the new
-    // dimensions and gets the old texture).
+    // Block here until the upload has completed, then let the main thread swap the name
+    // in. This costs this thread its throughput -- it waits out the GPU on every texture
+    // -- and it is not what the spec asks for. GL 4.6 section 5.3.1 names a FenceSync
+    // followed by a WaitSync in the consuming context as a way to know that another
+    // context's changes have completed, and the main thread's first bind of the new name
+    // is the re-attach section 5.3.3 requires before it can see them.
     //
-    // Do NOT be tempted to turn this into a glWaitSync on the main thread: that is a
-    // GPU-timeline wait only and gives the main thread's context no CPU-side sync point,
-    // so the driver is not obliged to have observed this context's changes to the shared
-    // texture by the time the main thread binds it. That was the original implementation
-    // and it had to be special-cased for NVIDIA (SL-17284). glClientWaitSync *is* a
-    // CPU-side sync point in whichever context calls it, which is the guarantee we need,
-    // and it is now taken uniformly on every vendor.
+    // A WaitSync posted to the main thread was the original implementation everywhere
+    // but NVIDIA, which got this CPU-side wait instead (SL-17284); the wait was then made
+    // uniform. The geometry consumers pair with mTexName does not depend on it: until
+    // syncTexName publishes, they read the snapshot beginUpload took (see getWidth).
     {
         LL_PROFILE_ZONE_NAMED("cglt - wait sync");
         // One second per iteration so we actually block in the driver rather than
@@ -2599,15 +2589,13 @@ void LLImageGL::applySwizzleForDeprecatedFormat(ALTextureSlot::eTextureType type
 
 void LLImageGL::resolveDeprecatedFormat()
 {
-    // setManualImage rewrites the deprecated source/internal formats locally
-    // (so glTexImage2D allocates the right backing storage), but its
-    // rewrites don't propagate to LLImageGL's mFormatPrimary / mFormatInternal
-    // members. Subsequent setSubImage / readBackRaw / scaleDown that read
-    // those members would hand the deprecated enums to GL — invalid in core
-    // profile, divergent from the actual GL texture state on compat. Rewrite
-    // here at format-resolution time so members stay consistent with what
-    // the texture will hold, and remember the original format so
-    // createGLTexture can apply the matching swizzle once via
+    // resolveUploadFormat rewrites the deprecated source/internal formats locally (so the
+    // allocation gets the right backing storage), but its rewrites don't propagate to
+    // LLImageGL's mFormatPrimary / mFormatInternal members. Subsequent setSubImage /
+    // readBackRaw / scaleDown that read those members would hand the deprecated enums to
+    // GL -- invalid in core profile. Rewrite here at format-resolution time so members
+    // stay consistent with what the texture will hold, and remember the original format
+    // so every new texture name gets the matching swizzle via
     // applySwizzleForDeprecatedFormat.
     //
     switch (mFormatPrimary)
@@ -3015,13 +3003,6 @@ void LLImageGL::resetCurTexSizebar()
     sCurTexPickSize = -1 ;
 }
 
-// Allocate backing storage for the currently-bound texture at the given level-0 size,
-// and record the VRAM accounting for it. Callers replacing an existing texture are
-// responsible for releasing the old accounting (free_tex_image) themselves.
-//
-// Single place so the upcoming switch to immutable storage (glTexStorage2D, which also
-// needs mMipLevels and a sized internal format) lands in one spot rather than at every
-// allocation site.
 // The internal format glTexStorage* should be handed. Block-compressed textures carry
 // their (sized) compressed format in mFormatPrimary rather than mFormatInternal, which is
 // the convention the glCompressedTexImage2D calls already follow.
@@ -3030,6 +3011,9 @@ S32 LLImageGL::getStorageInternalFormat() const
     return isCompressed() ? mFormatPrimary : mFormatInternal;
 }
 
+// Allocate backing storage for the currently-bound texture at the given level-0 size,
+// and record the VRAM accounting for it. Callers replacing an existing texture are
+// responsible for releasing the old accounting (free_tex_image) themselves.
 void LLImageGL::allocateTextureStorage(S32 width, S32 height, bool has_mips)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
@@ -3249,7 +3233,6 @@ LLImageGLThread::LLImageGLThread(LLWindow* window)
     , mWindow(window)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    mFinished = false;
 
     mContext = mWindow->createSharedContext();
     LL::ThreadPool::start();

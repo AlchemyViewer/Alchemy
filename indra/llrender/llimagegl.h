@@ -138,13 +138,8 @@ public:
     LLImageGL(U32 width, U32 height, U8 components, bool usemipmaps = true);
     LLImageGL(const LLImageRaw* imageraw, bool usemipmaps = true);
 
-    // For wrapping textures created via GL elsewhere with our API only. Use with caution.
-    // The trailing address mode is accepted and ignored: sampling is named at the bind now.
-    // Kept in the signature so the several call sites that pass one still compile; drop it
-    // when they are cleaned up.
-    // Wrap a texture object this LLImageGL does not own. No address-mode parameter: it took
-    // one, the body never read it, and callers were still passing sampling state to a class
-    // that stopped carrying any.
+    // Wrap a texture object this LLImageGL does not own, created via GL elsewhere. Use
+    // with caution: nothing here deletes it.
     LLImageGL(LLGLuint mTexName, U32 components, LLGLenum target, LLGLint  formatInternal, LLGLenum formatPrimary, LLGLenum formatType);
 
 protected:
@@ -223,8 +218,8 @@ public:
     bool setSubImage(const U8* datap, S32 data_width, S32 data_height, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update = false, LLGLuint use_name = 0, bool skip_unbind = false);
     bool setSubImageFromFrameBuffer(S32 fb_x, S32 fb_y, S32 x_pos, S32 y_pos, S32 width, S32 height);
 
-    // wait for gl commands to finish on current thread and push
-    // a lambda to main thread to swap mNewTexName and mTexName
+    // Wait for this thread's GL commands to finish, then post syncTexName(new_tex_name) to
+    // the main thread to publish the new texture in place of mTexName.
     void syncToMainThread(LLGLuint new_tex_name);
 
     // Read back a raw image for this discard level, if it exists
@@ -293,7 +288,6 @@ public:
 
     void checkTexSize(bool forced = false) const ;
 
-    // Sets the addressing mode used to sample the texture
     // NO sampling state here, and none coming back.
     //
     // A texture carries data plus facts about itself (dimensions, format, swizzle, whether it
@@ -582,7 +576,6 @@ public:
 private:
     LLWindow* mWindow;
     void* mContext = nullptr;
-    LLAtomicBool mFinished;
 };
 
 #endif // LL_LLIMAGEGL_H

@@ -5,7 +5,9 @@
  * A GL test: the shared fixture (llheadlessgl_fixture.h) provides
  * the GL context plus LLImageGL/LLFontManager init. Tests cover the
  * core texture lifecycle, the setSubImage bind-preservation
- * invariant, and the deprecated-format resolution path.
+ * invariant, the deprecated-format resolution path, downscaling,
+ * the published view of an upload in flight, and the bind state
+ * edits rely on.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -93,9 +95,9 @@ namespace tut
     typedef llimagegl_test::object     llimagegl_object;
     tut::llimagegl_test llimagegl_testcase("LLImageGL");
 
-    // createGLTexture(LLImageRaw) goes through setManualImage →
-    // glTexImage2D under a fresh GL name. After it succeeds the
-    // instance reports getHasGLTexture() and a non-zero texname.
+    // createGLTexture(LLImageRaw) allocates immutable storage under a
+    // fresh GL name. After it succeeds the instance reports
+    // getHasGLTexture() and a non-zero texname.
     template<> template<>
     void llimagegl_object::test<1>()
     {
