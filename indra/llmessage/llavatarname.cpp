@@ -163,7 +163,7 @@ void LLAvatarName::fromString(const std::string& full_name)
 
 void LLAvatarName::setExpires(F64 expires)
 {
-    mExpires = LLFrameTimer::getTotalSeconds() + expires;
+    mExpires = LLDate::now().secondsSinceEpoch() + expires;
 }
 
 std::string LLAvatarName::getCompleteName(bool use_parentheses, bool force_use_complete_name) const
@@ -263,7 +263,7 @@ void LLAvatarName::dump() const
     LL_DEBUGS("AvNameCache") << "LLAvatarName: "
                              << "user '" << mUsername << "' "
                              << "display '" << mDisplayName << "' "
-                             << "expires in " << mExpires - LLFrameTimer::getTotalSeconds() << " seconds"
+                             << "expires in " << mExpires - LLDate::now().secondsSinceEpoch() << " seconds"
                              << LL_ENDL;
 }
 
