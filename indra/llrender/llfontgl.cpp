@@ -86,6 +86,28 @@ const F32 DROP_SHADOW_SOFT_STRENGTH = 0.3f;
 
 namespace
 {
+    // A batch of glyph quads on its way to the GL. A drawing thread keeps
+    // one on the heap: as thread_local arrays a batch was 20 KB of static
+    // TLS, which glibc takes out of the stack of every thread, those that
+    // never draw a glyph too, and FMOD's mixer was left too little to run.
+    template<S32 VERTICES>
+    struct GlyphBatch
+    {
+        LLVector4a vertices[VERTICES];
+        LLVector2  uvs[VERTICES];
+        LLColor4U  colors[VERTICES];
+    };
+
+    template<S32 VERTICES>
+    GlyphBatch<VERTICES>& thread_glyph_batch(std::unique_ptr<GlyphBatch<VERTICES>>& batch)
+    {
+        if (!batch)
+        {
+            batch = std::make_unique<GlyphBatch<VERTICES>>();
+        }
+        return *batch;
+    }
+
     // Slice-local result of itemizing + shaping a measurement window. Every
     // position here is a byte offset. Each
     // pair in `ranges` is [first, second) within `slice`; `glyphs[i]` points
@@ -665,9 +687,11 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     // single-glyph path) and at 720 vertices per batch fills GL submit
     // payloads that 30 was leaving on the table.
     static constexpr S32 GLYPH_BATCH_SIZE = 120;
-    static thread_local LLVector4a vertices[GLYPH_BATCH_SIZE * 6];
-    static thread_local LLVector2 uvs[GLYPH_BATCH_SIZE * 6];
-    static thread_local LLColor4U colors[GLYPH_BATCH_SIZE * 6];
+    static thread_local std::unique_ptr<GlyphBatch<GLYPH_BATCH_SIZE * 6>> glyph_batch;
+    auto& batch = thread_glyph_batch(glyph_batch);
+    LLVector4a* const vertices = batch.vertices;
+    LLVector2* const uvs = batch.uvs;
+    LLColor4U* const colors = batch.colors;
 
     // Italic slant_offset depends only on style; hoist it out of the per-glyph
     // path so drawGlyphShadow/drawGlyphForeground don't recompute it.
@@ -1157,9 +1181,11 @@ void LLFontGL::renderGlyphRuns(const GlyphRun* runs, size_t run_count, U8 style)
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
     static constexpr S32           GLYPH_BATCH_SIZE = 120;
-    static thread_local LLVector4a vertices[GLYPH_BATCH_SIZE * 6];
-    static thread_local LLVector2  uvs[GLYPH_BATCH_SIZE * 6];
-    static thread_local LLColor4U  batch_colors[GLYPH_BATCH_SIZE * 6];
+    static thread_local std::unique_ptr<GlyphBatch<GLYPH_BATCH_SIZE * 6>> glyph_batch;
+    auto&                          batch        = thread_glyph_batch(glyph_batch);
+    LLVector4a* const              vertices     = batch.vertices;
+    LLVector2* const               uvs          = batch.uvs;
+    LLColor4U* const               batch_colors = batch.colors;
     S32                            glyph_count = 0;
 
     // The atlas the pending quads were built against, re-bound at every

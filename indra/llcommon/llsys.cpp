@@ -93,6 +93,73 @@ static const F32 MEM_INFO_THROTTLE = 20;
 // dropped below the login framerate, we'd have very little additional data.
 static const F32 MEM_INFO_WINDOW = 10*60;
 
+#if LL_LINUX
+namespace
+{
+    // An os-release value, which is a shell word: bare, in single quotes
+    // taken literally, or in double quotes, where a backslash escapes $, `, "
+    // and \ and is kept before anything else. The format does not join
+    // quoted strings, so whatever follows the closing quote is dropped.
+    std::string os_release_value(std::string_view raw)
+    {
+        if (!raw.empty() && raw.front() == '\'')
+        {
+            raw.remove_prefix(1);
+            return std::string(raw.substr(0, raw.find('\'')));
+        }
+
+        const bool quoted = !raw.empty() && raw.front() == '"';
+        if (quoted)
+        {
+            raw.remove_prefix(1);
+        }
+        std::string value;
+        for (size_t i = 0; i < raw.size(); ++i)
+        {
+            const char c = raw[i];
+            if (quoted ? c == '"' : (c == ' ' || c == '\t'))
+            {
+                break;
+            }
+            if (c == '\\' && i + 1 < raw.size()
+                && (!quoted || std::string_view("$`\"\\").find(raw[i + 1]) != std::string_view::npos))
+            {
+                value += raw[++i];
+                continue;
+            }
+            value += c;
+        }
+        return value;
+    }
+
+    // The KEY=value lines of an os-release file. False when it can't be
+    // opened, which the spec treats as its not being there.
+    bool read_os_release(const char* path, std::map<std::string, std::string>& fields)
+    {
+        llifstream file(path);
+        if (!file.is_open())
+        {
+            return false;
+        }
+        std::string line;
+        while (std::getline(file, line))
+        {
+            const size_t equals = line.find('=');
+            if (equals == 0 || equals == std::string::npos || line.front() == '#')
+            {
+                continue;
+            }
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t'))
+            {
+                line.pop_back();
+            }
+            fields[line.substr(0, equals)] = os_release_value(std::string_view(line).substr(equals + 1));
+        }
+        return true;
+    }
+}
+#endif
+
 LLOSInfo::LLOSInfo() :
     mMajorVer(0), mMinorVer(0), mBuild(0), mOSVersionString("")
 {
@@ -309,98 +376,91 @@ LLOSInfo::LLOSInfo() :
 
 #elif LL_LINUX
 
+    // The distribution names the system, from its os-release: the host's,
+    // which a Flatpak or other container shows at /run/host/os-release while
+    // its own /etc/os-release is the runtime's, else /etc/os-release, else
+    // /usr/lib/os-release, which the spec has /etc fall back to. A
+    // PRETTY_NAME without the version, as a rolling release's often is, gets
+    // VERSION_ID, or BUILD_ID where there is none.
+    std::map<std::string, std::string> os_release;
+    const char* os_release_path = nullptr;
+    for (const char* path : { "/run/host/os-release", "/etc/os-release", "/usr/lib/os-release" })
+    {
+        if (read_os_release(path, os_release))
+        {
+            os_release_path = path;
+            break;
+        }
+    }
+    std::string distro = os_release["PRETTY_NAME"];
+    if (distro.empty())
+    {
+        distro = !os_release["NAME"].empty() ? os_release["NAME"] : os_release["ID"];
+    }
+    const std::string& version = !os_release["VERSION_ID"].empty() ? os_release["VERSION_ID"] : os_release["BUILD_ID"];
+    if (!distro.empty() && !version.empty() && distro.find(version) == std::string::npos)
+    {
+        distro += " " + version;
+    }
+
+    // The kernel release follows it in the full string, the way Windows' build
+    // number does. Where no os-release names the distribution, the kernel's
+    // major and minor version are the simple string.
+    std::string kernel;
+    std::string kernel_simple;
     struct utsname un;
-    if(uname(&un) != -1)
+    if (uname(&un) != -1)
     {
-        mOSStringSimple.append(un.sysname);
-        mOSStringSimple.append(" ");
-        mOSStringSimple.append(un.release);
-
-        mOSString = mOSStringSimple;
-        mOSString.append(" ");
-        mOSString.append(un.version);
-        mOSString.append(" ");
-        mOSString.append(un.machine);
-
-        // Simplify 'Simple'
-        std::string ostype = mOSStringSimple.substr(0, mOSStringSimple.find_first_of(" ", 0));
-        if (ostype == "Linux")
+        kernel = llformat("%s %s", un.sysname, un.release);
+        // Fedora's release names the machine already, Debian's doesn't
+        if (!strstr(un.release, un.machine))
         {
-            // Only care about major and minor Linux versions, truncate at second '.'
-            std::string::size_type idx1 = mOSStringSimple.find_first_of(".", 0);
-            std::string::size_type idx2 = (idx1 != std::string::npos) ? mOSStringSimple.find_first_of(".", idx1+1) : std::string::npos;
-            std::string simple = mOSStringSimple.substr(0, idx2);
-            if (simple.length() > 0)
-                mOSStringSimple = simple;
+            kernel += llformat(" %s", un.machine);
         }
+        S32 kernel_major = 0;
+        S32 kernel_minor = 0;
+        sscanf(un.release, "%d.%d", &kernel_major, &kernel_minor);
+        kernel_simple = llformat("%s %d.%d", un.sysname, kernel_major, kernel_minor);
+    }
+
+    if (!distro.empty())
+    {
+        mOSStringSimple = distro;
+        mOSString = kernel.empty() ? distro : distro + " (" + kernel + ")";
+    }
+    else if (!kernel.empty())
+    {
+        mOSStringSimple = kernel_simple;
+        mOSString = kernel;
     }
     else
     {
-        mOSStringSimple.append("Unable to collect OS info");
+        mOSStringSimple = "Unable to collect OS info";
         mOSString = mOSStringSimple;
     }
 
-    const char OS_VERSION_MATCH_EXPRESSION[] = "([0-9]+)\\.([0-9]+)(\\.([0-9]+))?";
-    static const ALRegex os_version_parse(OS_VERSION_MATCH_EXPRESSION);
-    ALRegexMatch matched;
-
-    std::string glibc_version(gnu_get_libc_version());
-    if ( os_version_parse.match(glibc_version, &matched) )
+    if (!distro.empty())
     {
-        LL_INFOS("AppInit") << "Using glibc version '" << glibc_version << "' as OS version" << LL_ENDL;
-
-        std::string version_value;
-
-        if ( matched.matched(1) ) // Major version
-        {
-            version_value = matched.str(1);
-            if (sscanf(version_value.c_str(), "%d", &mMajorVer) != 1)
-            {
-              LL_WARNS("AppInit") << "failed to parse major version '" << version_value << "' as a number" << LL_ENDL;
-            }
-        }
-        else
-        {
-            LL_ERRS("AppInit")
-                << "OS version regex '" << OS_VERSION_MATCH_EXPRESSION
-                << "' returned true, but major version [1] did not match"
-                << LL_ENDL;
-        }
-
-        if ( matched.matched(2) ) // Minor version
-        {
-            version_value = matched.str(2);
-            if (sscanf(version_value.c_str(), "%d", &mMinorVer) != 1)
-            {
-              LL_ERRS("AppInit") << "failed to parse minor version '" << version_value << "' as a number" << LL_ENDL;
-            }
-        }
-        else
-        {
-            LL_ERRS("AppInit")
-                << "OS version regex '" << OS_VERSION_MATCH_EXPRESSION
-                << "' returned true, but minor version [1] did not match"
-                << LL_ENDL;
-        }
-
-        if ( matched.matched(4) ) // Build version (optional) - note that [3] includes the '.'
-        {
-            version_value = matched.str(4);
-            if (sscanf(version_value.c_str(), "%d", &mBuild) != 1)
-            {
-              LL_ERRS("AppInit") << "failed to parse build version '" << version_value << "' as a number" << LL_ENDL;
-            }
-        }
-        else
-        {
-            LL_INFOS("AppInit")
-                << "OS build version not provided; using zero"
-                << LL_ENDL;
-        }
+        LL_INFOS("AppInit") << "Distribution '" << distro << "', ID '" << os_release["ID"]
+                            << "', from " << os_release_path << LL_ENDL;
     }
     else
     {
-        LL_WARNS("AppInit") << "glibc version '" << glibc_version << "' cannot be parsed to three numbers; using all zeros" << LL_ENDL;
+        LL_WARNS("AppInit") << "No os-release names the distribution" << LL_ENDL;
+    }
+
+    // The numeric version stays glibc's, which decides whether a Linux build
+    // runs here. The login's platform_version and the update query send it,
+    // and their servers may compare it.
+    const char* glibc_version = gnu_get_libc_version();
+    if (sscanf(glibc_version, "%d.%d.%d", &mMajorVer, &mMinorVer, &mBuild) >= 2)
+    {
+        LL_INFOS("AppInit") << "Using glibc version '" << glibc_version << "' as the OS version for update checks" << LL_ENDL;
+    }
+    else
+    {
+        mMajorVer = mMinorVer = mBuild = 0;
+        LL_WARNS("AppInit") << "glibc version '" << glibc_version << "' cannot be parsed to numbers; using all zeros" << LL_ENDL;
     }
 
 #else

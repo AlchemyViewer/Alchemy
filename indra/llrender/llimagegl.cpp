@@ -1531,7 +1531,9 @@ void LLImageGL::generateTextures(S32 numTextures, U32 *textures)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     static constexpr U32 pool_size = 1024;
-    static thread_local U32 name_pool[pool_size]; // pool of texture names
+    // pool of texture names, on the heap: as a thread_local array it was 4 KB of static TLS, which
+    // glibc takes out of the stack of every thread, those that never make a texture too
+    static thread_local std::unique_ptr<U32[]> name_pool;
     static thread_local U32 name_count = 0; // number of available names in the pool
     static thread_local U32 name_generation = 0; // the context the pool was filled on
 
@@ -1545,14 +1547,18 @@ void LLImageGL::generateTextures(S32 numTextures, U32 *textures)
     {
         LL_PROFILE_ZONE_NAMED("iglgt - reup pool");
         // pool is emtpy, refill it
-        glGenTextures(pool_size, name_pool);
+        if (!name_pool)
+        {
+            name_pool = std::make_unique<U32[]>(pool_size);
+        }
+        glGenTextures(pool_size, name_pool.get());
         name_count = pool_size;
     }
 
     if ((U32)numTextures <= name_count)
     {
         //copy teture names off the end of the pool
-        memcpy(textures, name_pool + name_count - numTextures, sizeof(U32) * numTextures);
+        memcpy(textures, name_pool.get() + name_count - numTextures, sizeof(U32) * numTextures);
         name_count -= numTextures;
     }
     else

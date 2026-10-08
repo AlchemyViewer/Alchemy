@@ -178,8 +178,10 @@
 #if LL_WINDOWS
 #   include <share.h> // For _SH_DENYWR in processMarkerFiles
 #else
+#   include <fcntl.h> // For createCrashMarker
 #   include <sys/file.h> // For processMarkerFiles
 #endif
+#include <charconv>
 
 #include <boost/lexical_cast.hpp>
 
@@ -784,6 +786,10 @@ bool LLAppViewer::init()
     LL_PROFILE_ZONE_SCOPED;
 
     setupErrorHandling(mSecondInstance);
+
+    // The marker a crash leaves for the next launch, composed before there
+    // is a crash handler to write it.
+    prepareCrashMarker();
 
     // As early as consent can be read: before the settings, on the sentinel
     // they keep for it.
@@ -6185,6 +6191,74 @@ bool LLAppViewer::errorMarkerExists() const
     return LLFile::isfile(error_marker_file);
 }
 
+void LLAppViewer::prepareCrashMarker()
+{
+    if (mSecondInstance)
+    {
+        return;
+    }
+    const std::string path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, ERROR_MARKER_FILE_NAME);
+#if LL_WINDOWS
+    mCrashMarkerPath = ll_convert<std::wstring>(path);
+#else
+    mCrashMarkerPath = path;
+#endif
+    mCrashMarkerVersion = LLVersionInfo::instance().getChannelAndVersion() + "\n";
+}
+
+void LLAppViewer::createCrashMarker(eLastExecEvent error_code) const
+{
+    // A crash handler may have interrupted the code holding the heap or any
+    // lock: nothing here allocates, the file is opened, written and closed
+    // by the system's own calls, and only created if absent, since a marker
+    // already there says more.
+    if (mSecondInstance || mCrashMarkerPath.empty())
+    {
+        return;
+    }
+    char code[16];
+    const size_t code_length = std::to_chars(code, code + sizeof(code), (S32)error_code).ptr - code;
+
+#if LL_WINDOWS
+    HANDLE file = CreateFileW(mCrashMarkerPath.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                              CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE)
+    {
+        return;
+    }
+    DWORD written = 0;
+    WriteFile(file, mCrashMarkerVersion.data(), static_cast<DWORD>(mCrashMarkerVersion.size()), &written, nullptr);
+    WriteFile(file, code, static_cast<DWORD>(code_length), &written, nullptr);
+    CloseHandle(file);
+#else
+    const int file = open(mCrashMarkerPath.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    if (file < 0)
+    {
+        return;
+    }
+    auto write_all = [file](const char* data, size_t length)
+    {
+        while (length > 0)
+        {
+            const ssize_t written = write(file, data, length);
+            if (written < 0 && errno == EINTR)
+            {
+                continue;
+            }
+            if (written <= 0)
+            {
+                return;
+            }
+            data += written;
+            length -= written;
+        }
+    };
+    write_all(mCrashMarkerVersion.data(), mCrashMarkerVersion.size());
+    write_all(code, code_length);
+    close(file);
+#endif
+}
+
 void LLAppViewer::createCloseRequestMarker() const
 {
     // WINDOW THREAD! since we need this to act fast.
@@ -6784,28 +6858,32 @@ F32 LLAppViewer::getMainloopTimeoutSec() const
 
 std::string LLAppViewer::getMainloopWatchdogState() const
 {
+    const auto [prefix, state] = getMainloopWatchdogStateParts();
+    std::string text;
+    text.reserve(prefix.size() + state.size());
+    return text.append(prefix).append(state);
+}
+
+std::pair<std::string_view, std::string_view> LLAppViewer::getMainloopWatchdogStateParts() const
+{
     if (!mMainloopTimeout)
     {
-        return std::string();
+        return {};
     }
-    std::string state = mMainloopTimeout->getState();
+    const std::string& state = mMainloopTimeout->getState();
 
     if (mMainloopTimeout->hasExpired())
     {
-        return "Expired at " + state;
+        return { "Expired at ", state };
     }
 
     // Check if the watchdog is currently active (timer started)
     if (!mMainloopTimeout->isAlive())
     {
         // Timer is not running, meaning watchdog is paused/stopped
-        if (state.empty())
-        {
-            return "Paused";
-        }
-        return "Paused at " + state;
+        return { state.empty() ? "Paused" : "Paused at ", state };
     }
-    return state;
+    return { {}, state };
 }
 
 void LLAppViewer::handleLoginComplete()

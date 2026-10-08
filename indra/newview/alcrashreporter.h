@@ -54,6 +54,9 @@ namespace ALCrashReporter
 
     // Where the agent stood, "Region/128/64/22", in whole metres.
     std::string locationTag(std::string_view region, const LLVector3& position);
+    // The same into a buffer, cut to fit and terminated, allocating nothing:
+    // what a crash handler can call. Returns the length written.
+    size_t locationTag(char* buffer, size_t size, std::string_view region, const LLVector3& position);
 
     // One id per run, on every report this run sends and in its static debug
     // file, so a report filed on the next launch can be joined to the crash.

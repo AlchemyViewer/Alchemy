@@ -31,6 +31,7 @@
 #include "llerror.h"
 
 #include <iomanip>
+#include <set>
 //#include <memory>
 
 #if LL_WINDOWS
@@ -89,7 +90,10 @@ namespace
         eL2Associativity,
         eCacheSizeK,
         eFeatureBits,
-        eExtFeatureBits
+        eExtFeatureBits,
+        eMicrocode,
+        ePhysicalCores,
+        eLogicalProcessors
     };
 
     const char* cpu_config_names[] =
@@ -102,7 +106,10 @@ namespace
         "L2 Associativity",
         "Cache Size",
         "Feature Bits",
-        "Ext. Feature Bits"
+        "Ext. Feature Bits",
+        "Microcode",
+        "Physical Cores",
+        "Logical Processors"
     };
 
 
@@ -356,6 +363,7 @@ public:
         out << "Extended family:  " << getInfo(eExtendedFamily, 0) << std::endl;
         out << "Model:            " << getInfo(eModel, 0) << std::endl;
         out << "Extended model:   " << getInfo(eExtendedModel, 0) << std::endl;
+        out << "Stepping:         " << getInfo(eStepping, 0) << std::endl;
         out << "Type:             " << getInfo(eType, 0) << std::endl;
         out << "Brand ID:         " << getInfo(eBrandID, 0) << std::endl;
         out << std::endl;
@@ -1116,35 +1124,76 @@ private:
 
     void get_proc_cpuinfo()
     {
+        // Lines are read whole. A fixed buffer kept the first 254 bytes of
+        // an x86 flags line, which on a current part ends before pni, the
+        // SSE4s and AVX, and the rest of it went as lines of no name.
         std::map< std::string, std::string > cpuinfo;
-        LLFILE* cpuinfo_fp = LLFile::fopen(CPUINFO_FILE, LLFILE_MODE("rb"));
-        if(cpuinfo_fp)
+        std::vector<std::string> processors;
+        bool first_block = true;
+        llifstream cpuinfo_file{ CPUINFO_FILE };
+        std::string line;
+        while (std::getline(cpuinfo_file, line))
         {
-            char line[MAX_STRING];
-            memset(line, 0, MAX_STRING);
-            while(fgets(line, MAX_STRING, cpuinfo_fp))
+            // The first logical processor's block, up to the blank line
+            // that ends it
+            if (first_block)
             {
-                // /proc/cpuinfo on Linux looks like:
-                // name\t*: value\n
-                char* tabspot = strchr( line, '\t' );
-                if (tabspot == NULL)
-                    continue;
-                char* colspot = strchr( tabspot, ':' );
-                if (colspot == NULL)
-                    continue;
-                char* spacespot = strchr( colspot, ' ' );
-                if (spacespot == NULL)
-                    continue;
-                char* nlspot = strchr( line, '\n' );
-                if (nlspot == NULL)
-                    nlspot = line + strlen( line ); // Fallback to terminating NUL
-                std::string linename( line, tabspot );
-                std::string llinename(linename);
-                LLStringUtil::toLower(llinename);
-                std::string lineval( spacespot + 1, nlspot );
-                cpuinfo[ llinename ] = lineval;
+                if (line.empty())
+                {
+                    first_block = mFirstProcessor.empty();
+                }
+                else
+                {
+                    mFirstProcessor += line + "\n";
+                }
             }
-            fclose(cpuinfo_fp);
+
+            // /proc/cpuinfo on Linux looks like:
+            // name\t*: value
+            // though arm64 writes "CPU architecture: 8" with no tab, so the
+            // name is what comes before the colon, less the space after it.
+            const size_t colon = line.find(':');
+            if (colon == std::string::npos || colon == 0)
+            {
+                continue;
+            }
+            const size_t name_end = line.find_last_not_of(" \t", colon - 1);
+            if (name_end == std::string::npos)
+            {
+                continue;
+            }
+            std::string name = line.substr(0, name_end + 1);
+            LLStringUtil::toLower(name);
+            const size_t value = line.find_first_not_of(' ', colon + 1);
+            cpuinfo[name] = value == std::string::npos ? std::string() : line.substr(value);
+            if (name == "processor")
+            {
+                processors.push_back(cpuinfo[name]);
+            }
+        }
+
+        // Every logical processor has a block. The kernel gives each of a
+        // core's hardware threads the same list of them, so the distinct
+        // lists count the cores, a hybrid or arm64 part's as well.
+        if (!processors.empty())
+        {
+            setConfig(eLogicalProcessors, (S32)processors.size());
+            std::set<std::string> cores;
+            for (const std::string& processor : processors)
+            {
+                llifstream siblings{ "/sys/devices/system/cpu/cpu" + processor + "/topology/thread_siblings_list" };
+                std::string list;
+                if (!(siblings >> list))
+                {
+                    cores.clear();
+                    break;
+                }
+                cores.insert(list);
+            }
+            if (!cores.empty())
+            {
+                setConfig(ePhysicalCores, (S32)cores.size());
+            }
         }
 # if LL_X86
 
@@ -1176,6 +1225,13 @@ private:
         }
 
         setInfo(eFamilyName, compute_CPUFamilyName(cpuinfo["vendor_id"].c_str(), family, 0));
+
+        // The microcode revision, which some crashes turn on, as Raptor
+        // Lake's instability did
+        if (!cpuinfo["microcode"].empty())
+        {
+            setConfig(eMicrocode, cpuinfo["microcode"]);
+        }
 
         // setInfo(eExtendedModel, getSysctlInt("machdep.cpu.extmodel"));
         // setInfo(eBrandID, getSysctlInt("machdep.cpu.brand"));
@@ -1297,32 +1353,20 @@ private:
 # endif // LL_X86
     }
 
-    std::string getCPUFeatureDescription() const
+public:
+    // The summary the other platforms give. The whole of /proc/cpuinfo was
+    // here, a block for each logical processor, which on 28 threads was
+    // over half the log; the blocks repeat but for their IDs and momentary
+    // clock. The first one goes to the debug log, for the full flag and bug
+    // lists, cache and address widths.
+    std::string getCPUFeatureDescription() const override
     {
-        std::ostringstream s;
-
-        // *NOTE:Mani - This is for linux only.
-        LLFILE* cpuinfo = LLFile::fopen(CPUINFO_FILE, LLFILE_MODE("rb"));
-        if(cpuinfo)
-        {
-            char line[MAX_STRING];
-            memset(line, 0, MAX_STRING);
-            while(fgets(line, MAX_STRING, cpuinfo))
-            {
-                line[strlen(line)-1] = ' ';
-                s << line;
-                s << std::endl;
-            }
-            fclose(cpuinfo);
-            s << std::endl;
-        }
-        else
-        {
-            s << "Unable to collect processor information" << std::endl;
-        }
-        return s.str();
+        LL_DEBUGS("SystemInfo") << "First processor in " << CPUINFO_FILE << ":\n" << mFirstProcessor << LL_ENDL;
+        return LLProcessorInfoImpl::getCPUFeatureDescription();
     }
 
+private:
+    std::string mFirstProcessor;
 };
 
 

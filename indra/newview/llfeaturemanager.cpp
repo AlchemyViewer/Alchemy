@@ -59,6 +59,7 @@
 #include "lldxhardware.h"
 #elif LL_LINUX
 #include <unistd.h>     // write(), _exit() for the GPU benchmark subprocess
+#include <sys/utsname.h>
 #endif
 
 #if LL_DARWIN
@@ -551,12 +552,10 @@ bool extractGLDeviceModel(std::string& device_name)
 {
     const std::string gl_string = ll_safe_string((const char*)(glGetString(GL_RENDERER)));
 #if LL_LINUX
-    // Get the kernel version; essentially 'uname -r' on Linux
-    // TODO: *BSD
-    std::istringstream iss(LLOSInfo::instance().getOSString());
-    std::string first, second;
-    iss >> first >> second;
-    const std::string kernel_version = (first == "Linux") ? second : "";
+    // The kernel release, 'uname -r'. The OS string leads with the
+    // distribution's name.
+    struct utsname un;
+    const std::string kernel_version = uname(&un) != -1 ? un.release : "";
 
     if (!kernel_version.empty())
     {
