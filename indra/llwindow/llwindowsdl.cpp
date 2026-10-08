@@ -272,8 +272,14 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
 
     mFullscreen = fullscreen;
 
-    // Setup default backing colors
-    GLint redBits{8}, greenBits{8}, blueBits{8}, alphaBits{8};
+    // Setup default backing colors. RenderGLContext10bitSDR asks for a 10-bit
+    // back buffer, which the final blit then dithers for. Its two bits of
+    // alpha don't make the window translucent: SDL presents a Wayland surface
+    // opaque (EGL_EXT_present_opaque), and on X11 the config takes a
+    // depth-30 visual, which has no alpha.
+    const GLint channelBits = LLRender::s10bitBackBuffer ? 10 : 8;
+    GLint redBits{channelBits}, greenBits{channelBits}, blueBits{channelBits};
+    GLint alphaBits{LLRender::s10bitBackBuffer ? 2 : 8};
     GLint depthBits{ 24 };
 
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE,   redBits);
@@ -340,6 +346,17 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, gHiDPISupport);
 
     mWindow = SDL_CreateWindowWithProperties(props);
+    if (mWindow == nullptr && LLRender::s10bitBackBuffer)
+    {
+        // EGL chooses the window's config as the window is made, so a 10-bit
+        // back buffer that can't be had fails here: an X server at depth 24
+        // has no visual for one. Make it again at 8 bits, as Win32 does.
+        LL_WARNS() << "No window with a 10-bit back buffer, falling back to 8 bits. SDL: "
+                   << SDL_GetError() << LL_ENDL;
+        SDL_DestroyProperties(props);
+        LLRender::s10bitBackBuffer = false;
+        return createContext(x, y, width, height, bits, fullscreen, enable_vsync);
+    }
     if (mWindow == nullptr)
     {
         LL_WARNS() << "Window creation failure. SDL: " << SDL_GetError() << LL_ENDL;
@@ -374,6 +391,15 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         }
     }
 #endif
+    if (!mContext && LLRender::s10bitBackBuffer)
+    {
+        LL_WARNS() << "No GL context on a 10-bit back buffer, falling back to 8 bits. SDL: "
+                   << SDL_GetError() << LL_ENDL;
+        SDL_DestroyWindow(mWindow);
+        mWindow = nullptr;
+        LLRender::s10bitBackBuffer = false;
+        return createContext(x, y, width, height, bits, fullscreen, enable_vsync);
+    }
     if(!mContext)
     {
         LL_WARNS() << "Cannot create GL context " << SDL_GetError() << LL_ENDL;
@@ -509,6 +535,14 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     LL_INFOS() << "  Blue Bits " << S32(blueBits) << LL_ENDL;
     LL_INFOS() << "  Alpha Bits " << S32(alphaBits) << LL_ENDL;
     LL_INFOS() << "  Depth Bits " << S32(depthBits) << LL_ENDL;
+
+    // The final blit dithers for the depth asked for, so a back buffer
+    // granted shallower than that would band.
+    if (LLRender::s10bitBackBuffer && (redBits < 10 || greenBits < 10 || blueBits < 10))
+    {
+        LL_INFOS() << "Asked for a 10-bit back buffer and was given less; dithering for 8 bits." << LL_ENDL;
+        LLRender::s10bitBackBuffer = false;
+    }
 
     GLint colorBits = redBits + greenBits + blueBits + alphaBits;
     if (colorBits < 32)
