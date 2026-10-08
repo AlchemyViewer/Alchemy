@@ -105,6 +105,19 @@ std::string ALVimKeymap::matchesSaid(S32 count, S32 lines)
     return alSaidCount("VimMatches", count, "1 match [ON_LINES]", "[COUNT] matches [ON_LINES]", { { "[ON_LINES]", on } });
 }
 
+// static
+std::string ALVimKeymap::yankedSaid(S32 lines, bool block, char name)
+{
+    if (!name)
+    {
+        return block ? alSaidCount("VimBlockYanked", lines, "block of 1 line yanked", "block of [COUNT] lines yanked")
+                     : alSaidCount("VimLinesYanked", lines, "1 line yanked", "[COUNT] lines yanked");
+    }
+    const LLStringUtil::format_map_t into = { { "[REGISTER]", std::string(1, name) } };
+    return block ? alSaidCount("VimBlockYankedInto", lines, "block of 1 line yanked into \"[REGISTER]", "block of [COUNT] lines yanked into \"[REGISTER]", into)
+                 : alSaidCount("VimLinesYankedInto", lines, "1 line yanked into \"[REGISTER]", "[COUNT] lines yanked into \"[REGISTER]", into);
+}
+
 bool ALVimKeymap::inserting() const
 {
     return mMode == Mode::Insert || mMode == Mode::Replace;
@@ -5711,12 +5724,16 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
     {
         case 'y':
             store(mRegister, text, span.linewise, span.block, true);
+            // How many lines the yank was over, said for more than vim's
+            // report -- whole lines, a block's, or the lines characters
+            // reach, a last line's break reaching the line after it -- with
+            // the register named, as vim's says it; nothing for _.
+            if (last - first + 1 > REPORT_THRESHOLD && mRegister != '_')
+            {
+                say(yankedSaid(last - first + 1, span.block, mRegister));
+            }
             if (span.linewise)
             {
-                if (pieces.size() == 1 && last - first + 1 > REPORT_THRESHOLD)
-                {
-                    say(alSaidCount("VimLinesYanked", last - first + 1, "1 line yanked", "[COUNT] lines yanked"));
-                }
                 moveTo(view, ALTextPos(first, view.caret().line == first ? view.caret().column : firstNonBlankColumn(d, first)));
             }
             else

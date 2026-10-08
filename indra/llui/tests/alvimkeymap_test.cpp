@@ -5754,4 +5754,42 @@ namespace tut
         keys("j");
         ensure_equals("and on to the one after's", caretText(), std::string("2:9"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<201>()
+    {
+        set_test_name("a yank of more than two lines says so as vim's does: into the register named, a block's as a block, and characters over the lines they reach");
+        make("one\ntwo\nthree\nfour\nfive\nsix\n");
+        keys("\"a3yy");
+        ensure_equals("\"a3yy", vim->message(), std::string("3 lines yanked into \"a"));
+        keys("\"A3yy");
+        ensure_equals("\"A3yy", vim->message(), std::string("3 lines yanked into \"A"));
+        keys("\"\"3yy");
+        ensure_equals("\"\"3yy", vim->message(), std::string("3 lines yanked into \"\""));
+        keys("\"a2yy");
+        ensure("\"a2yy: nothing said: " + vim->message(), vim->message().empty());
+        keys("\"_3yy");
+        ensure("\"_3yy: nothing said: " + vim->message(), vim->message().empty());
+
+        keys("<C-v>2jy");
+        ensure_equals("a block of three lines", vim->message(), std::string("block of 3 lines yanked"));
+        keys("<C-v>2j\"by");
+        ensure_equals("into a register", vim->message(), std::string("block of 3 lines yanked into \"b"));
+        keys("<C-v>jy");
+        ensure("a block of two: nothing said: " + vim->message(), vim->message().empty());
+
+        editor->setCaret(ALTextPos(0, 1));
+        keys("v2jy");
+        ensure_equals("characters over three lines", vim->message(), std::string("3 lines yanked"));
+        keys("v2j\"ay");
+        ensure_equals("into a register", vim->message(), std::string("3 lines yanked into \"a"));
+        keys("vjy");
+        ensure("over two: nothing said: " + vim->message(), vim->message().empty());
+        keys("v$jjy");
+        ensure_equals("through the third line's break, the fourth counted", vim->message(), std::string("4 lines yanked"));
+        keys("y/four<CR>");
+        ensure_equals("y/four from the first line's second character: three lines", vim->message(), std::string("3 lines yanked"));
+        keys("y/three<CR>");
+        ensure("y/three: two, nothing said: " + vim->message(), vim->message().empty());
+    }
 }

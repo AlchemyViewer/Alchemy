@@ -561,6 +561,12 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	     a language that counts a third way adds a C (Russian: 2-4). -->
 	<string name="VimLinesYankedA">1 line yanked</string>
 	<string name="VimLinesYankedB">[COUNT] lines yanked</string>
+	<string name="VimLinesYankedIntoA">1 line yanked into "[REGISTER]</string>
+	<string name="VimLinesYankedIntoB">[COUNT] lines yanked into "[REGISTER]</string>
+	<string name="VimBlockYankedA">block of 1 line yanked</string>
+	<string name="VimBlockYankedB">block of [COUNT] lines yanked</string>
+	<string name="VimBlockYankedIntoA">block of 1 line yanked into "[REGISTER]</string>
+	<string name="VimBlockYankedIntoB">block of [COUNT] lines yanked into "[REGISTER]</string>
 	<string name="VimFewerLinesA">1 fewer line</string>
 	<string name="VimFewerLinesB">[COUNT] fewer lines</string>
 	<string name="VimLinesShiftedRightA">1 line >ed 1 time</string>

@@ -533,6 +533,9 @@ private:
     static std::string said(const char* key, const std::string& english, const LLStringUtil::format_map_t& args = {});
     static std::string substitutionsSaid(S32 count, S32 lines);
     static std::string matchesSaid(S32 count, S32 lines);
+    // How many lines a yank took, a block's or not, and into the register
+    // named where one was, as vim says it.
+    static std::string yankedSaid(S32 lines, bool block, char name);
     void bump() { ++mGeneration; }
 
     Mode  mMode = Mode::Normal;
