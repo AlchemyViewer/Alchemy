@@ -28,6 +28,7 @@
 #include <boost/algorithm/string.hpp>
 #include "fsposingmotion.h"
 #include "llcharacter.h"
+#include "llcriticaldamp.h"
 
 FSPosingMotion::FSPosingMotion(const LLUUID& id) : LLKeyframeMotion(id)
 {
@@ -83,6 +84,9 @@ bool FSPosingMotion::onUpdate(F32 time, U8* joint_mask)
     LLVector3 currentScale;
     LLVector3 targetScale;
 
+    // A fraction of the gap for the time this frame took, not for the frame itself.
+    const F32 interpolant = LLSmoothInterpolation::getInterpolant(mInterpolationHalfLife);
+
     for (FSJointPose& jointPose : mJointPoses)
     {
         LLJoint* joint = jointPose.getJointState()->getJoint();
@@ -98,19 +102,19 @@ bool FSPosingMotion::onUpdate(F32 time, U8* joint_mask)
 
         if (vectorsNotQuiteEqual(currentPosition, targetPosition))
         {
-            currentPosition = lerp(currentPosition, targetPosition, mInterpolationTime);
+            currentPosition = lerp(currentPosition, targetPosition, interpolant);
             jointPose.getJointState()->setPosition(currentPosition);
         }
 
         if (quatsNotQuiteEqual(currentRotation, targetRotation))
         {
-            currentRotation = slerp(mInterpolationTime, currentRotation, targetRotation);
+            currentRotation = slerp(interpolant, currentRotation, targetRotation);
             jointPose.getJointState()->setRotation(currentRotation);
         }
 
         if (vectorsNotQuiteEqual(currentScale, targetScale))
         {
-            currentScale = lerp(currentScale, targetScale, mInterpolationTime);
+            currentScale = lerp(currentScale, targetScale, interpolant);
             jointPose.getJointState()->setScale(currentScale);
         }
     }
