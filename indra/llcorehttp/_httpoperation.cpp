@@ -65,7 +65,6 @@ HttpOperation::HttpOperation():
     mTracing(HTTP_TRACE_OFF),
     mMyHandle(LLCORE_HTTP_HANDLE_INVALID)
 {
-    mMetricCreated = totalTime();
 }
 
 
