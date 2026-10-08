@@ -1656,6 +1656,24 @@ bool LLGLManager::initGL()
     }
     mIsD3D12 = mIsMesa && mGLRenderer.rfind("D3D12", 0) == 0;
 
+#if LL_LINUX
+    // When the hardware driver does not load -- NVIDIA's without its EGL platform library,
+    // a missing Mesa driver, a VM or container without the GPU -- Mesa draws on the CPU
+    // instead, offering GL 4.6 and every extension the viewer asks for, so nothing else
+    // would tell. GL_RENDERER names what actually draws, and keeps the name when zink runs
+    // over lavapipe or virgl over a host's llvmpipe.
+    mIsSoftwareRenderer = false;
+    for (const char* software : { "LLVMPIPE", "SOFTPIPE", "SWRAST", "SOFTWARE RASTERIZER",
+                                  "MICROSOFT BASIC RENDER DRIVER" })
+    {
+        mIsSoftwareRenderer = mIsSoftwareRenderer || mGLRenderer.find(software) != std::string::npos;
+    }
+    if (mIsSoftwareRenderer)
+    {
+        LL_WARNS("RenderInit") << "GL renderer " << mGLRenderer << " draws on the CPU" << LL_ENDL;
+    }
+#endif
+
     if (mGLVersion >= 2.f)
     {
         parse_glsl_version(mGLSLVersionMajor, mGLSLVersionMinor);

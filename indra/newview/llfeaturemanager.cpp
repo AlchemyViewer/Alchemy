@@ -585,7 +585,13 @@ bool LLFeatureManager::loadGPUClass()
         gSavedSettings.setBOOL("UseOcclusion", false);
     }
 
-    if (!gSavedSettings.getBOOL("SkipBenchmark"))
+    if (gGLManager.mIsSoftwareRenderer)
+    {
+        // The benchmark would measure the CPU, which no GPU class describes.
+        LL_WARNS("RenderInit") << "Rendering on the CPU; skipping the benchmark and defaulting to class 0" << LL_ENDL;
+        mGPUClass = GPU_CLASS_0;
+    }
+    else if (!gSavedSettings.getBOOL("SkipBenchmark"))
     {
         F32 class1_gbps = gSavedSettings.getF32("RenderClass1MemoryBandwidth");
         // Keep the raw renderer and full GL version: the display GPU string

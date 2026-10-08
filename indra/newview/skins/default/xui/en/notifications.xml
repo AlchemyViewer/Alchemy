@@ -2332,6 +2332,23 @@ This is often the case with new hardware that hasn&apos;t been tested yet with [
 
   <notification
    icon="alertmodal.tga"
+   name="SoftwareRenderer"
+   type="alertmodal">
+[APP_NAME] is drawing with [RENDERER], which renders on the CPU instead of the graphics card, so it will be very slow.
+
+This usually means the graphics driver did not load. Common causes:
+- NVIDIA&apos;s driver without its EGL platform library: egl-wayland on Wayland, egl-x11 on X11.
+- No Mesa driver installed for the graphics card, or no permission to open /dev/dri.
+- A virtual machine or container without access to the GPU, or WSL without its d3d12 driver.
+    <tag>fail</tag>
+    <usetemplate
+     ignoretext="Graphics are being drawn on the CPU"
+     name="okignore"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="DisplaySettingsNoShaders"
    type="alertmodal">
 [APP_NAME] crashed while initializing graphics drivers.

@@ -1194,6 +1194,15 @@ bool LLAppViewer::init()
         }
     }
 
+#if LL_LINUX
+    // Outside the once-only hardware alert above: a driver that did not load is something
+    // to fix, not a fact about the machine, so it is raised every session it happens.
+    if (gGLManager.mIsSoftwareRenderer)
+    {
+        LLNotificationsUtil::add("SoftwareRenderer", LLSD().with("RENDERER", gGLManager.getRawGLString()));
+    }
+#endif
+
     // Obsolete? mExpectedGLVersion is always zero
 #if LL_WINDOWS
     if (gGLManager.mGLVersion < LLFeatureManager::getInstance()->getExpectedGLVersion())
