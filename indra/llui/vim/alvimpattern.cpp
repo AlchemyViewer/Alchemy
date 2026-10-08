@@ -305,11 +305,12 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // group at which the match is cut; \& looks ahead at the concat
     // before it from where the next begins; \@= \@! \@<= \@<! and \@>
     // look round the atom before them; \{-} is *?; the classes \a \l \u
-    // \x \o \h \i \k are brackets; \c and \C say how case is matched, and
-    // \Z that composing characters are passed over; a bracket expression
-    // is read as vim reads one, its classes as what they hold. A magic ^
-    // is a line's start only first in a branch, a $ its end only last in
-    // one, and either is itself anywhere else.
+    // \x \o \h \i \k are brackets; \e and \b are an escape and a
+    // backspace; \c and \C say how case is matched, and \Z that composing
+    // characters are passed over; a bracket expression is read as vim
+    // reads one, its classes as what they hold. A magic ^ is a line's
+    // start only first in a branch, a $ its end only last in one, and
+    // either is itself anywhere else.
     ALVimPattern        out;
     std::optional<bool> case_in_pattern;
     enum class Magic : U8
@@ -978,6 +979,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                 case 'I':
                 case 'K': out.regex += "[A-Za-z_]"; continue;
                 case 'e': out.regex += "\\x1b"; continue;
+                case 'b': out.regex += "\\x08"; continue;
                 default:
                     // A back reference to one of vim's groups that a cut
                     // before it has the engine count otherwise, by the
@@ -988,7 +990,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         out.regex += "\\g{" + std::to_string(vim_groups[static_cast<size_t>(n - '1')]) + "}";
                         continue;
                     }
-                    // \s \S \d \D \w \W \n \t \r \b \] \/ and the rest: as
+                    // \s \S \d \D \w \W \n \t \r \] \/ and the rest: as
                     // they are, a backslash before a letter or a symbol the
                     // engine reads the same way; \n is a line's end, which
                     // the search must be let cross.

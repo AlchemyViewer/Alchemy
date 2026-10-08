@@ -418,4 +418,13 @@ namespace tut
         ensure_equals("nomagic's", found("axyxyb axyyb", ALVimPattern::of("\\Ma\\~\\+b", std::string("xy"), plain)), std::string("axyxyb"));
     }
 
+    template<> template<>
+    void alvimpattern_object::test<20>()
+    {
+        set_test_name("\\b is a backspace, as \\e is an escape");
+        ensure_equals("the engine's", regexOf("a\\bb"), std::string("a\\x08b"));
+        ensure_equals("the character", found("a\bb ab", ALVimPattern::of("a\\bb", std::string(), plain)), std::string("a\bb"));
+        ensure_equals("very magic's", found("a\bb ab", ALVimPattern::of("\\va\\bb", std::string(), plain)), std::string("a\bb"));
+    }
+
 }
