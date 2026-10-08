@@ -411,11 +411,11 @@ RenderDisableVintageMode           1   0
 RenderMaxTextureResolution         1   2048
 RenderReflectionProbeCount  0   0
 
+// Intel here is a Mesa driver (iris, crocus). The Windows list's
+// compatibility profile and main-thread media answer Intel's Windows
+// driver, and its AA and AF cuts date from GMA parts and MSAA; the GPU
+// class lists scale AA and AF to the hardware.
 list Intel
-RenderAnisotropicLevel			1	0
-RenderFSAAType  			1	0
-RenderFSAASamples			1	0
-RenderGLContextCoreProfile  1   0
 RenderDownScaleMethod       1   0
 
 // NVIDIA's own driver slices texture uploads on the main thread, as on
