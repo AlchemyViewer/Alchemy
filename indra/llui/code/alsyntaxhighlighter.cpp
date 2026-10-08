@@ -225,7 +225,9 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
     // copied into the one kept for lexing only for a line lexed anew. A
     // line that lexes as it did costs nothing against `most`: the stop is
     // at the first that would be lexed past it.
-    S32 i = mFirstDirty;
+    S32 i       = mFirstDirty;
+    S32 changed = -1;
+    S32 through = -1;
     for (; i <= line; ++i)
     {
         Line&     entry = mLines[i];
@@ -246,6 +248,8 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
         {
             entry.tokens.swap(fresh);
             ++entry.revision;
+            changed = changed < 0 ? i : changed;
+            through = i;
         }
         entry.start = start;
         entry.end   = intern(mLexing);
@@ -253,6 +257,10 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
         entry.lexed = true;
     }
     mFirstDirty = i;
+    if (changed >= 0)
+    {
+        mRelexed(changed, through);
+    }
 }
 
 const std::vector<ALSyntaxToken>& ALSyntaxHighlighter::tokens(S32 line)

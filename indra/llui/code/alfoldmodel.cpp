@@ -60,12 +60,22 @@ namespace
     }
 }
 
-void ALFoldModel::setSyntax(blocks_t blocks, revision_t revision)
+void ALFoldModel::setSyntax(blocks_t blocks, lex_t lex)
 {
-    mBlocks   = std::move(blocks);
-    mRevision = std::move(revision);
+    mBlocks = std::move(blocks);
+    mLex    = std::move(lex);
     mLines.clear();
     mValid = false;
+}
+
+void ALFoldModel::relexed(S32 first, S32 last)
+{
+    const S32 end = llmin(last, static_cast<S32>(mLines.size()) - 1);
+    for (S32 line = llmax(first, 0); line <= end; ++line)
+    {
+        mLines[static_cast<size_t>(line)].valid = false;
+    }
+    mValid = mValid && !mBlocks;
 }
 
 void ALFoldModel::setLineComment(std::string token)
@@ -84,15 +94,13 @@ const ALFoldModel::Line& ALFoldModel::lineAt(const ALTextDocument& doc, S32 line
     {
         mLines.resize(static_cast<size_t>(doc.lineCount()));
     }
-    Line&     entry    = mLines[static_cast<size_t>(line)];
-    const U32 revision = mRevision ? mRevision(line) : 0;
-    if (entry.valid && entry.revision == revision)
+    Line& entry = mLines[static_cast<size_t>(line)];
+    if (entry.valid)
     {
         return entry;
     }
-    entry          = Line();
-    entry.valid    = true;
-    entry.revision = revision;
+    entry       = Line();
+    entry.valid = true;
     const std::string&     text = doc.line(line);
     size_t                 lead = 0;
     const S32              n    = alBlanksWidth(text, mTabWidth, &lead);
@@ -169,6 +177,12 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
         return mRegions;
     }
     const S32 count = doc.lineCount();
+    // Lexed through to the end first, so that every line whose blocks
+    // changed has been said to (relexed) before any is read.
+    if (mLex && count > 0)
+    {
+        mLex(count - 1);
+    }
     // Each block's last line by its first, the widest where several start
     // on a line; then in order, with no sort.
     std::vector<S32>& end_of = mEndOf;
@@ -294,6 +308,12 @@ std::vector<S32> ALFoldModel::openAt(const ALTextDocument& doc, S32 tab_width, S
         return out;
     }
     setTabWidth(tab_width);
+    // Lexed through the line before it, so that every line read back from
+    // there has been said to where its blocks changed, and none below it.
+    if (mLex && line > 0)
+    {
+        mLex(llmin(line, doc.lineCount()) - 1);
+    }
     // Whether a line opens what nothing after it closes, walked back to with
     // `closes` closers after it still to be matched, which it matches; and
     // whether the outermost it leaves open opened the line.

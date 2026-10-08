@@ -1166,9 +1166,11 @@ private:
 
     // The blocks that fold, and which are folded: by the syntax the
     // grammar gives -- brackets that are code, and its block words -- and
-    // its line comment's regions, told again when the grammar changes.
-    ALFoldModel             mFolds;
-    const void*             mFoldGrammar = nullptr;
+    // its line comment's regions, told again when the grammar changes, and
+    // of the lines whose tokens the highlighter lexed anew.
+    ALFoldModel                        mFolds;
+    const void*                        mFoldGrammar = nullptr;
+    boost::signals2::scoped_connection mFoldsRelexed;
     ALFoldModel&            folds();
     void                    foldBlocksOn(S32 line, std::vector<ALFoldModel::Block>& out);
     // The sticky headers as last worked out: for which text, which top

@@ -167,7 +167,7 @@ namespace tut
                     }
                 }
             },
-            [](S32) { return 1u; });
+            nullptr);
         folds.setLineComment("//");
         std::string out;
         for (const ALFoldModel::Region& region : folds.regions(doc, 4))
@@ -198,7 +198,7 @@ namespace tut
                     out.push_back({ 0, ALFoldModel::Event::Close });
                 }
             },
-            [](S32) { return 1u; });
+            nullptr);
         out.clear();
         for (const ALFoldModel::Region& region : words.regions(lua, 4))
         {
@@ -266,7 +266,7 @@ namespace tut
                     }
                 }
             },
-            [](S32) { return 1u; });
+            nullptr);
         std::string out;
         for (const ALFoldModel::Region& region : folds.regions(doc, 4))
         {
@@ -275,5 +275,51 @@ namespace tut
         ensure_equals("the call's block from its line, the list's from its own", out, std::string("0-3 1-3"));
         ensure("both open inside them, each once", folds.openAt(doc, 4, 2, 8) == std::vector<S32>({ 0, 1 }));
         ensure("the innermost alone the list's", folds.openAt(doc, 4, 2, 1) == std::vector<S32>({ 1 }));
+    }
+
+    template<> template<>
+    void alfoldmodel_object::test<7>()
+    {
+        set_test_name("by syntax, a line's blocks are read once and again only where it is said to have been lexed anew, the text lexed through first");
+        const ALTextDocument doc("a {\n  b {\n  }\n}\nc {\n}\n");
+        ALFoldModel          folds;
+        // The lines whose braces lex as something other than code, as in a
+        // comment; and how often blocks were asked for, and through which
+        // line the text was lexed.
+        std::vector<bool> quiet(static_cast<size_t>(doc.lineCount()), false);
+        S32               asked   = 0;
+        S32               lexed   = -1;
+        folds.setSyntax(
+            [&](S32 line, std::vector<ALFoldModel::Block>& out) {
+                ++asked;
+                const std::string& text = doc.line(line);
+                for (S32 i = 0; !quiet[static_cast<size_t>(line)] && i < static_cast<S32>(text.size()); ++i)
+                {
+                    if (text[static_cast<size_t>(i)] == '{' || text[static_cast<size_t>(i)] == '}')
+                    {
+                        out.push_back({ i, text[static_cast<size_t>(i)] == '{' ? ALFoldModel::Event::Open : ALFoldModel::Event::Close });
+                    }
+                }
+            },
+            [&](S32 line) { lexed = line; });
+        const auto found = [&]() {
+            std::string out;
+            for (const ALFoldModel::Region& region : folds.regions(doc, 4))
+            {
+                out += (out.empty() ? "" : " ") + std::to_string(region.start) + "-" + std::to_string(region.end);
+            }
+            return out;
+        };
+        ensure_equals("the blocks", found(), std::string("0-3 1-2 4-5"));
+        ensure_equals("each line with anything on it asked once", asked, 6);
+        ensure_equals("the text lexed through its last line first", lexed, doc.lineCount() - 1);
+        folds.invalidate();
+        quiet[1] = quiet[2] = true;
+        ensure_equals("found again, none asked again", found(), std::string("0-3 1-2 4-5"));
+        ensure_equals("asked no more", asked, 6);
+        folds.relexed(1, 2);
+        ensure_equals("those said lexed anew read again", found(), std::string("0-3 4-5"));
+        ensure_equals("and they alone", asked, 8);
+        ensure("the sticky headers lex through the line before theirs", folds.openAt(doc, 4, 5, 3) == std::vector<S32>({ 4 }) && lexed == 4);
     }
 }

@@ -49,9 +49,9 @@
 // `#region` and its `#endregion` fold what is between them too.
 //
 // Each line is read once, until its text changes or, with syntax, its
-// tokens do; the blocks are found again from what was read, in one pass,
-// when the text changes. The folds slide with its edits, and one whose
-// block is gone goes.
+// tokens do, which it is told of rather than asks every line; the blocks
+// are found again from what was read, in one pass, when the text changes.
+// The folds slide with its edits, and one whose block is gone goes.
 //
 // Worked out over a document alone -- one document's, whose version says
 // when its blocks are found again -- the editor hides the lines a fold
@@ -84,12 +84,17 @@ public:
         bool  first  = false;
     };
     typedef std::function<void(S32 line, std::vector<Block>& out)> blocks_t;
-    typedef std::function<U32(S32 line)>                            revision_t;
-    // The syntax, where it is known: each line's blocks, and a number that
-    // moves when they may have -- its tokens' -- so that a line is asked
-    // again only then. None: blocks by indentation.
-    void setSyntax(blocks_t blocks, revision_t revision);
+    typedef std::function<void(S32 line)>                           lex_t;
+    // The syntax, where it is known: each line's blocks, and what lexes the
+    // text through a line, after which relexed() has been told of every
+    // line through it whose blocks may have changed -- whose tokens did --
+    // so that a line is asked again only then. None: blocks by
+    // indentation.
+    void setSyntax(blocks_t blocks, lex_t lex);
     bool hasSyntax() const { return static_cast<bool>(mBlocks); }
+    // The lines `first` through `last` lexed anew, their tokens changed:
+    // their blocks read again when next they are wanted.
+    void relexed(S32 first, S32 last);
     // The line comment the text is written with, whose `#region` and
     // `#endregion` fold what is between them.
     void setLineComment(std::string token);
@@ -157,11 +162,10 @@ public:
 private:
     // What a line was read as: how far in its text begins, or -1 for none;
     // whether it is a closer alone, a brace alone; a region's marker, +1
-    // or -1; and its syntax's blocks, as of its tokens' number.
+    // or -1; and its syntax's blocks.
     struct Line
     {
         bool               valid    = false;
-        U32                revision = 0;
         S32                indent   = -1;
         bool               closes   = false;
         bool               brace    = false;
@@ -202,6 +206,6 @@ private:
     std::vector<S32>    mFolded;
     ALLineTable<Line>   mLines;
     blocks_t            mBlocks;
-    revision_t          mRevision;
+    lex_t               mLex;
     std::string         mLineComment;
 };

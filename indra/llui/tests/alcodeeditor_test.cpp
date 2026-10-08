@@ -3851,4 +3851,38 @@ namespace tut
         }
         ensure("folded blocks to edit around on many of the steps: " + std::to_string(folded_steps), folded_steps > 50);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<103>()
+    {
+        set_test_name("a block comment opened above blocks takes their folds and closed gives them back, however much was lexed before the folds were asked for");
+        ALCodeEditor& e     = make("default\n{\n    state_entry()\n    {\n        x();\n    }\n}\n");
+        const auto    found = [this]() {
+            std::string out;
+            for (const ALCodeEditor::FoldRegion& region : editor->foldRegions())
+            {
+                out += (out.empty() ? "" : " ") + std::to_string(region.start) + "-" + std::to_string(region.end);
+            }
+            return out;
+        };
+        ensure_equals("both", found(), std::string("0-6 2-5"));
+        e.setCaret(ALTextPos(2, 0));
+        type("/*");
+        ensure_equals("opened: every brace after it in the comment", found(), std::string());
+        e.setCaret(ALTextPos(2, e.document().lineLength(2)));
+        type("*/");
+        ensure_equals("closed after the header: both again", found(), std::string("0-6 2-5"));
+        // Opened afresh, a little of it lexed -- as a frame lexes a slice --
+        // before the folds are asked for.
+        make("default\n{\n    state_entry()\n    {\n        x();\n    }\n}\n");
+        ensure_equals("both, once more", found(), std::string("0-6 2-5"));
+        editor->setCaret(ALTextPos(2, 0));
+        type("/*");
+        editor->highlighter().lexSome(2);
+        ensure_equals("the rest lexed for them", found(), std::string());
+        editor->setCaret(ALTextPos(4, 0));
+        type("*/");
+        editor->highlighter().lexSome(1);
+        ensure_equals("closed inside the event: the state's to the event's close", found(), std::string("0-5"));
+    }
 }

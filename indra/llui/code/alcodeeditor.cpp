@@ -2346,12 +2346,16 @@ ALFoldModel& ALCodeEditor::folds()
         mFolds.setLineComment(grammar ? grammar->lineComment() : std::string());
         if (grammar && !grammar->prose())
         {
+            // Each line's blocks, read again where the highlighter says its
+            // tokens changed.
             mFolds.setSyntax([this](S32 line, std::vector<ALFoldModel::Block>& out) { foldBlocksOn(line, out); },
-                             [this](S32 line) { return highlighter().revision(line); });
+                             [this](S32 line) { highlighter().revision(line); });
+            mFoldsRelexed = highlighter().onRelexed([this](S32 first, S32 last) { mFolds.relexed(first, last); });
         }
         else
         {
             mFolds.setSyntax(nullptr, nullptr);
+            mFoldsRelexed.disconnect();
         }
     }
     return mFolds;

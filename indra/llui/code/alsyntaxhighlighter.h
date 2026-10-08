@@ -86,6 +86,13 @@ public:
     static constexpr S32 SLICE = 256;
     bool                 lexSome(S32 most = SLICE);
 
+    // Told, as lines are lexed, of the lines whose tokens changed -- whose
+    // revisions moved -- first through last, after each request that lexed
+    // any: so that whoever keeps what it read of lines' tokens reads those
+    // again, and no other line need be asked.
+    typedef boost::signals2::signal<void(S32 first, S32 last)> relexed_signal_t;
+    boost::signals2::connection onRelexed(const relexed_signal_t::slot_type& slot) { return mRelexed.connect(slot); }
+
     // How many lines the last request had to lex, for a test that says an
     // edit re-lexes only what it must; and how many states are kept, for a
     // test that says they do not pile up.
@@ -144,4 +151,5 @@ private:
     ALSyntaxState                                              mLexing;
     S32                                    mFirstDirty = 0;
     S32                                    mLastLexed  = 0;
+    relexed_signal_t                       mRelexed;
 };
