@@ -83,6 +83,13 @@ bool Animation::prep(Asset& asset)
 void Animation::update(Asset& asset, F32 dt)
 {
     mTime += dt;
+    // apply() plays the time modulo the loop, so keeping it to one loop changes nothing it
+    // shows, and an F32 that grew for hours would round each frame's dt away.
+    const F32 loop_length = mMaxTime - mMinTime;
+    if (loop_length > 0.f)
+    {
+        mTime = fmodf(mTime, loop_length);
+    }
 
     apply(asset, mTime);
 }
