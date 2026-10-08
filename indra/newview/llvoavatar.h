@@ -1352,9 +1352,9 @@ public:
     void                dumpAvatarTEs(const std::string& context) const;
 
     static F32          sUnbakedTime; // Total seconds with >=1 unbaked avatars
-    static F64          sUnbakedUpdateTime; // Last time stats were updated (to prevent multiple updates per frame)
+    static U32          sUnbakedUpdateFrame; // LLFrameTimer::getFrameCount() the stats were last updated in (to prevent multiple updates per frame)
     static F32          sGreyTime; // Total seconds with >=1 grey avatars
-    static F64          sGreyUpdateTime; // Last time stats were updated (to prevent multiple updates per frame)
+    static U32          sGreyUpdateFrame; // LLFrameTimer::getFrameCount() the stats were last updated in (to prevent multiple updates per frame)
 protected:
     S32                 getUnbakedPixelAreaRank();
     bool                mHasGrey = false;

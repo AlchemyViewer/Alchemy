@@ -738,9 +738,9 @@ U32 LLVOAvatar::sBuddyListGeneration = 0;
 F32 LLVOAvatar::sLODFactor = 1.f;
 F32 LLVOAvatar::sPhysicsLODFactor = 1.f;
 F32 LLVOAvatar::sUnbakedTime = 0.f;
-F64 LLVOAvatar::sUnbakedUpdateTime = 0.0;
+U32 LLVOAvatar::sUnbakedUpdateFrame = 0;
 F32 LLVOAvatar::sGreyTime = 0.f;
-F64 LLVOAvatar::sGreyUpdateTime = 0.0;
+U32 LLVOAvatar::sGreyUpdateFrame = 0;
 LLPointer<LLViewerTexture> LLVOAvatar::sCloudTexture = NULL;
 std::vector<LLUUID> LLVOAvatar::sAVsIgnoringARTLimit;
 S32 LLVOAvatar::sAvatarsNearby = 0;
@@ -11418,16 +11418,19 @@ void LLVOAvatar::cullAvatarsByPixelArea()
     S32 grey_avatars = 0;
     if (!LLVOAvatar::areAllNearbyInstancesBaked(grey_avatars))
     {
-        if (gFrameTimeSeconds != sUnbakedUpdateTime) // only update once per frame
+        // only update once per frame, which the frame count says and a time compared for
+        // equality does not
+        const U32 frame = LLFrameTimer::getFrameCount();
+        if (frame != sUnbakedUpdateFrame)
         {
-            sUnbakedUpdateTime = gFrameTimeSeconds;
+            sUnbakedUpdateFrame = frame;
             sUnbakedTime += gFrameIntervalSeconds.value();
         }
         if (grey_avatars > 0)
         {
-            if (gFrameTimeSeconds != sGreyUpdateTime) // only update once per frame
+            if (frame != sGreyUpdateFrame)
             {
-                sGreyUpdateTime = gFrameTimeSeconds;
+                sGreyUpdateFrame = frame;
                 sGreyTime += gFrameIntervalSeconds.value();
             }
         }
