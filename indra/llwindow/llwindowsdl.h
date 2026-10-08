@@ -297,10 +297,10 @@ protected:
     void refreshPixelMetrics();
 
 #if LL_LINUX
-    // GPU reset detection: armGraphicsResetCheck once GL is loaded, to poll
-    // when createContext got a context that reports a reset, then
-    // checkGraphicsReset each frame from swapBuffers. A reset found is said
-    // once and the viewer quits, as nothing the GPU held survives it.
+    // GPU reset detection, on NVIDIA's EGL: armGraphicsResetCheck once GL is
+    // loaded, to poll when createContext got a context that reports a reset,
+    // then checkGraphicsReset each frame from swapBuffers. A reset found is
+    // said once and the viewer quits, as nothing the GPU held survives it.
     void armGraphicsResetCheck();
     void checkGraphicsReset();
     bool mGraphicsResetSeen = false;

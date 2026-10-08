@@ -343,9 +343,11 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     {
 #if LL_LINUX
         // At each version, first a context that reports a GPU reset (see
-        // checkGraphicsReset). A driver that can't report one refuses it.
+        // checkGraphicsReset), which only NVIDIA's EGL is asked for. Should
+        // the driver refuse it, the context is asked for again without.
         sdl_set_gl_reset_notification(true);
-        if (SDL_GLContext context = SDL_GL_CreateContext(mWindow))
+        SDL_GLContext context = SDL_GL_CreateContext(mWindow);
+        if (context || !sdl_gl_reset_notification())
         {
             return context;
         }
@@ -994,7 +996,8 @@ void LLWindowSDL::swapBuffers()
 
 #if LL_LINUX
 // Once initGL has loaded GL: poll for a GPU reset if createContext got a
-// context that reports one. Below GL 4.5, which initGL loads the call for,
+// context that reports one, which only NVIDIA's EGL is asked for; elsewhere
+// nothing is polled. Below GL 4.5, which initGL loads the call for,
 // ARB_robustness names it with a suffix.
 void LLWindowSDL::armGraphicsResetCheck()
 {
@@ -1015,10 +1018,10 @@ void LLWindowSDL::armGraphicsResetCheck()
                        << " GPU resets" << LL_ENDL;
 }
 
-// Once a frame, on the main thread. SDL's renderer device-lost events come
-// only from its D3D and Vulkan renderers, never for a GL window, so this is
-// how the viewer learns of a GPU reset, or of NVIDIA purging video memory
-// over a suspend.
+// Once a frame, on the main thread, where the context reports a reset. SDL's
+// renderer device-lost events come only from its D3D and Vulkan renderers,
+// never for a GL window, so this is how the viewer learns of NVIDIA purging
+// video memory over a suspend, or of a GPU reset there.
 void LLWindowSDL::checkGraphicsReset()
 {
     if (!sGetGraphicsResetStatus || mGraphicsResetSeen)

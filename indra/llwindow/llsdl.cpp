@@ -308,11 +308,9 @@ namespace
 #if LL_LINUX
 namespace
 {
-    bool sResetNotification = false;
-
     // What makes an EGL context report a GPU reset, as the main context was
-    // last asked for it, repeated for every worker. Just EGL_NONE while
-    // reset notification is off.
+    // last asked for it, repeated for every worker. Just EGL_NONE where it
+    // isn't asked for.
     EGLint sResetAttribs[5] = { EGL_NONE };
 
     bool egl_has_extension(const char* extensions, const char* name)
@@ -330,23 +328,28 @@ namespace
 
     // SDL_EGLIntArrayCallback: appended to the attributes SDL gives
     // eglCreateContext for the main context.
+    //
+    // Only NVIDIA's EGL is asked, known by EGL_NV_robustness_video_memory_purge.
+    // A suspend without NVreg_PreserveVideoMemoryAllocations purges video
+    // memory there and the frame goes on silently as garbage; asked, the
+    // driver reports that as a reset instead. Mesa's iris and radeonsi
+    // recover a context that doesn't ask, after a hang of its own or another
+    // program's, where one that asks is lost and the session with it, so
+    // Mesa is left to recover on its own.
     SDL_EGLint* SDLCALL egl_reset_context_attribs(void*, SDL_EGLDisplay display, SDL_EGLConfig)
     {
         int n = 0;
-        // Lost on a reset, which glGetGraphicsResetStatus then reports. This
-        // is EGL 1.5's token, and EGL_KHR_create_context's for desktop GL
-        // before it; robust buffer access, whose bounds checks cost, isn't
-        // asked for with it.
-        sResetAttribs[n++] = EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY;
-        sResetAttribs[n++] = EGL_LOSE_CONTEXT_ON_RESET;
-        // NVIDIA counts video memory purged, as a suspend without
-        // NVreg_PreserveVideoMemoryAllocations leaves it, as a reset only
-        // when asked to.
         typedef const char* (*fn_querystring)(void*, int);
         auto egl_querystring = (fn_querystring)SDL_EGL_GetProcAddress("eglQueryString");
         const char* extensions = egl_querystring ? egl_querystring(display, EGL_EXTENSIONS) : nullptr;
         if (extensions && egl_has_extension(extensions, "EGL_NV_robustness_video_memory_purge"))
         {
+            // Lost on a reset, which glGetGraphicsResetStatus then reports.
+            // This is EGL 1.5's token, and EGL_KHR_create_context's for
+            // desktop GL before it; robust buffer access, whose bounds checks
+            // cost, isn't asked for with it.
+            sResetAttribs[n++] = EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY;
+            sResetAttribs[n++] = EGL_LOSE_CONTEXT_ON_RESET;
             sResetAttribs[n++] = EGL_GENERATE_RESET_ON_VIDEO_MEMORY_PURGE_NV;
             sResetAttribs[n++] = EGL_TRUE;
         }
@@ -365,14 +368,13 @@ namespace
 
 void sdl_set_gl_reset_notification(bool enable)
 {
-    sResetNotification = enable;
     sResetAttribs[0] = EGL_NONE;
     SDL_EGL_SetAttributeCallbacks(nullptr, nullptr, enable ? egl_reset_context_attribs : nullptr, nullptr);
 }
 
 bool sdl_gl_reset_notification()
 {
-    return sResetNotification;
+    return sResetAttribs[0] != EGL_NONE;
 }
 #endif // LL_LINUX
 
