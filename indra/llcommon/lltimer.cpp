@@ -37,7 +37,10 @@
 #   include "llwin32headers.h"
 #elif LL_LINUX || LL_DARWIN
 #   include <errno.h>
-#   include <sys/time.h>
+#   include <time.h>
+#   if LL_DARWIN
+#       include <mach/mach_time.h>
+#   endif
 #else
 #   error "architecture not supported"
 #endif
@@ -234,19 +237,45 @@ F64 calc_clock_frequency()
 #endif // LL_WINDOWS
 
 
-#if LL_LINUX || LL_DARWIN
-// Both Linux and Mac use gettimeofday for accurate time
+#if LL_DARWIN
 F64 calc_clock_frequency()
 {
-    return 1000000.0; // microseconds, so 1 MHz.
+    // A mach tick is numer/denom nanoseconds: 125/3 on Apple silicon, whose
+    // counter runs at 24 MHz, and 1/1 on Intel.
+    static const F64 frequency = []
+    {
+        mach_timebase_info_data_t timebase;
+        mach_timebase_info(&timebase);
+        return 1000000000.0 * timebase.denom / timebase.numer;
+    }();
+    return frequency;
 }
 
 U64 get_clock_count()
 {
-    // Linux clocks are in microseconds
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec*SEC_TO_MICROSEC_U64 + tv.tv_usec;
+    // The counter itself, unconverted. It stops while the system sleeps, as
+    // CLOCK_MONOTONIC does on Linux, and it is the tick mach_wait_until and
+    // kqueue's NOTE_MACHTIME take. Not std::chrono::steady_clock: libc++ reads
+    // CLOCK_MONOTONIC_RAW for it, which counts on through sleep, so the two
+    // drift apart by however long the system has slept.
+    return mach_absolute_time();
+}
+#endif
+
+#if LL_LINUX
+F64 calc_clock_frequency()
+{
+    return 1000000000.0; // nanoseconds, so 1 GHz.
+}
+
+U64 get_clock_count()
+{
+    // Read directly rather than through std::chrono::steady_clock, whose now()
+    // lives in whichever C++ runtime is loaded. It stops while the system is
+    // suspended, and a change to the system clock never moves it.
+    timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (U64)now.tv_sec * 1000000000ULL + (U64)now.tv_nsec;
 }
 #endif
 
