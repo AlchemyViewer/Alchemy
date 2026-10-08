@@ -302,6 +302,63 @@ namespace
         }
         return out;
     }
+
+    // What follows :d, :y or :put, read as vim's do_one_cmd reads it: from a
+    // " on, a comment; a register's name -- for :d and :y, `counted`, one a
+    // delete or a yank writes, a digit being their count's; for :put any it
+    // reads -- then, for :d and :y, a count of lines, more than none; and
+    // nothing after. False where something is left over or the count is
+    // none, what vim says of it in `error`.
+    bool registerArgument(std::string args, bool counted, char& name, S32& count, std::string& error)
+    {
+        name  = 0;
+        count = 0;
+        if (const size_t comment = args.find('"'); comment != std::string::npos)
+        {
+            args.erase(comment);
+        }
+        LLStringUtil::trim(args);
+        size_t     at     = 0;
+        const auto blanks = [&args, &at]() {
+            while (at < args.size() && (args[at] == ' ' || args[at] == '\t'))
+            {
+                ++at;
+            }
+        };
+        if (!args.empty())
+        {
+            const char c       = args[0];
+            const bool written = isNameChar(c) || c == '-' || c == '_' || c == '+' || c == '*';
+            const bool read    = isDigit(c) || std::string_view(".:/%#~").find(c) != std::string_view::npos;
+            if (written || (!counted && read))
+            {
+                name = c;
+                at   = 1;
+                blanks();
+            }
+        }
+        if (counted && at < args.size() && isDigit(args[at]))
+        {
+            S64 lines = 0;
+            while (at < args.size() && isDigit(args[at]))
+            {
+                lines = llmin(lines * 10 + (args[at++] - '0'), static_cast<S64>(S32_MAX));
+            }
+            if (lines == 0)
+            {
+                error = alSaid("VimPositiveCount", "E939: Positive count required");
+                return false;
+            }
+            count = static_cast<S32>(lines);
+            blanks();
+        }
+        if (at < args.size())
+        {
+            error = alSaid("VimTrailingCharacters", "E488: Trailing characters: [TEXT]", { { "[TEXT]", args.substr(at) } });
+            return false;
+        }
+        return true;
+    }
 }
 
 void ALVimExCommands::askNext(ALTextView& view)
@@ -843,24 +900,45 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         mVim.finishCommand(true);
         return;
     }
-    if (!bang && is("d", "delete"))
+    if (!bang && (is("d", "delete") || is("y", "yank")))
     {
-        ALVimKeymap::Span span;
-        span.linewise = true;
-        span.range    = ALTextRange(d.lineStart(first), d.lineEnd(last));
-        mVim.applyOperator(view, 'd', span, 1);
-        mVim.finishCommand(true);
-        return;
-    }
-    if (!bang && is("y", "yank"))
-    {
-        // The caret left where it is, as vim's :yank leaves it.
+        // Into the register named after it, or the unnamed one -- not one
+        // named before the : -- and a count after that is how many lines
+        // from the range's last, as many as there are: the empty line after
+        // a final line break none of them, as $ leaves it out.
+        const bool  yank  = is("y", "yank");
+        char        named = 0;
+        S32         lines = 0;
+        std::string error;
+        if (!registerArgument(args, true, named, lines, error))
+        {
+            mVim.say(error, true);
+            return;
+        }
+        if (lines > 0)
+        {
+            S32 end = d.lineCount() - 1;
+            if (end > 0 && d.lineLength(end) == 0)
+            {
+                --end;
+            }
+            first = last;
+            last  = llmax(first, static_cast<S32>(llmin(static_cast<S64>(first) + lines - 1, static_cast<S64>(end))));
+        }
+        // The caret left where it is by :yank, as vim's leaves it.
         const ALTextPos   caret = view.caret();
         ALVimKeymap::Span span;
-        span.linewise = true;
-        span.range    = ALTextRange(d.lineStart(first), d.lineEnd(last));
-        mVim.applyOperator(view, 'y', span, 1);
-        mVim.moveTo(view, caret);
+        span.linewise  = true;
+        span.range     = ALTextRange(d.lineStart(first), d.lineEnd(last));
+        const char was = std::exchange(mVim.mRegister, named);
+        mVim.applyOperator(view, yank ? 'y' : 'd', span, 1);
+        mVim.mRegister = was;
+        if (yank)
+        {
+            mVim.moveTo(view, caret);
+            return;
+        }
+        mVim.finishCommand(true);
         return;
     }
     if (name == ">" || name == "<")
@@ -1136,13 +1214,21 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         // no text, as yiw on an empty line sets one, is an empty line to
         // put, as an empty line is, and so is an empty last line of
         // several. What _ gives back is no text, which as a line is an
-        // empty one.
+        // empty one. The register is the one named after it, as for :d
+        // and :y, or the unnamed one.
+        char        named = 0;
+        S32         lines = 0;
+        std::string error;
+        if (!registerArgument(args, false, named, lines, error))
+        {
+            mVim.say(error, true);
+            return;
+        }
         if (!editing)
         {
             return;
         }
-        const char                     named = args.empty() ? mVim.mRegister : args[0];
-        const ALVimRegisters::Register reg   = mVim.fetch(named);
+        const ALVimRegisters::Register reg = mVim.fetch(named);
         if (!reg.held && named != '_')
         {
             mVim.say(ALVimKeymap::said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, named ? named : '"') } }), true);
@@ -1363,7 +1449,12 @@ bool ALVimExCommands::globalBatches(const std::string& command)
     }
     if (abbreviates(name, "d", "delete"))
     {
-        return command.find_first_not_of(" \t", name_end) == std::string::npos;
+        // A register to put the line in, but no count, which would take
+        // lines after it.
+        char        named = 0;
+        S32         lines = 0;
+        std::string error;
+        return registerArgument(command.substr(name_end), true, named, lines, error) && lines == 0;
     }
     return false;
 }

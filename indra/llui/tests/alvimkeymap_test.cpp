@@ -6005,4 +6005,60 @@ namespace tut
         keys("d3$");
         ensure_equals("d3$ through it", flat(editor->text()), std::string("abc def|gh"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<206>()
+    {
+        set_test_name(":d and :y take a register and then a count after them as vim's do -- a capital adding to its register, a digit the count's, a \" the start of a comment -- and anything more after them, or after :put's register, is trailing characters");
+        const char* text = "one\ntwo\nthree\nfour\nfive\nsix";
+        make(text);
+        editor->setCaret(ALTextPos(1, 1));
+        ex("y a");
+        ensure_equals(":y a", vim->registerText('a'), std::string("two"));
+        ensure_equals("the caret left where it was", caretText(), std::string("1:1"));
+        ex("y A 3");
+        ensure_equals(":y A 3 adds three lines", vim->registerText('a'), std::string("two\ntwo\nthree\nfour"));
+        ensure_equals("and says so", vim->message(), std::string("3 lines yanked into \"A"));
+        ex("2,3y b 2");
+        ensure_equals(":2,3y b 2: two lines from the range's last", vim->registerText('b'), std::string("three\nfour"));
+        ex("y 3");
+        ensure_equals(":y 3: a count, not register 3", vim->registerText('0'), std::string("two\nthree\nfour"));
+        ensure_equals("said", vim->message(), std::string("3 lines yanked"));
+        ex("y \"x");
+        ensure_equals("a \" begins a comment", vim->registerText('0'), std::string("two"));
+        ensure_equals("and names no register", vim->registerText('x'), std::string());
+        ex("d x 3");
+        ensure_equals(":d x 3", flat(editor->text()), std::string("one|five|six"));
+        ensure_equals("into x", vim->registerText('x'), std::string("two\nthree\nfour"));
+        ensure_equals("said", vim->message(), std::string("3 fewer lines"));
+        ex("d 2");
+        ensure_equals(":d 2 from the caret's line", flat(editor->text()), std::string("one"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 1));
+        ex("d a b");
+        ensure("more after the register", vim->messageIsError() && vim->message() == "E488: Trailing characters: b");
+        ensure_equals("takes nothing", flat(editor->text()), std::string("one|two|three|four|five|six"));
+        ex("y a 3l");
+        ensure("more after the count", vim->messageIsError() && vim->message() == "E488: Trailing characters: l");
+        ensure_equals("yanks nothing", vim->registerText('a'), std::string());
+        ex("d 0");
+        ensure("a count of none", vim->messageIsError() && vim->message() == "E939: Positive count required");
+        ensure_equals("takes nothing either", flat(editor->text()), std::string("one|two|three|four|five|six"));
+        ex("pu a b");
+        ensure(":put's register with more after it", vim->messageIsError() && vim->message() == "E488: Trailing characters: b");
+        ensure_equals("puts nothing", flat(editor->text()), std::string("one|two|three|four|five|six"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 1));
+        keys("\"a:y<CR>");
+        ensure_equals("a register named before the : is none of :y's", vim->registerText('a'), std::string());
+        ensure_equals("which yanks into 0", vim->registerText('0'), std::string("two"));
+
+        make(text);
+        keys(":g/o/d A<CR>");
+        ensure_equals(":g/o/d A", flat(editor->text()), std::string("three|five|six"));
+        ensure_equals("each line added to a", vim->registerText('a'), std::string("one\ntwo\nfour"));
+        ensure_equals("and how many said once", vim->message(), std::string("3 fewer lines"));
+    }
 }
