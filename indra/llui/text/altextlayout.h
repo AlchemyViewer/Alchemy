@@ -32,6 +32,7 @@
 
 #include <boost/signals2.hpp>
 
+#include <array>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -259,9 +260,13 @@ public:
     bool hidden(S32 index) const { return index >= 0 && index < static_cast<S32>(mHidden.size()) && mHidden[index]; }
     bool hiddenBy(S32 index, HiddenBy by) const
     {
+        ++mHiddenByAsked;
         return index >= 0 && index < static_cast<S32>(mHidden.size()) && (mHidden[index] & static_cast<U8>(by)) != 0;
     }
     bool anyHidden() const { return mHiddenCount > 0; }
+    // How many lines an owner hides, kept as they are hidden, shown, made
+    // or taken away; Any, how many either hides.
+    S32  hiddenCount(HiddenBy by) const;
     // The nearest line not hidden, starting at this one and looking in
     // this direction (1 or -1); -1 where there is none.
     S32 visibleFrom(S32 index, S32 direction) const;
@@ -350,6 +355,10 @@ public:
     // How many lines have been laid out, for a test that says a layout is
     // not thrown away for nothing.
     U32 linesLaidOut() const { return mLinesLaidOut; }
+    // How many times a line has been asked who hides it (hiddenBy), for a
+    // test that says what an owner hides is set again without going over
+    // every line.
+    U32 hiddenByAsked() const { return mHiddenByAsked; }
 
     // --- memory --------------------------------------------------------------
 
@@ -366,6 +375,8 @@ public:
 private:
     void onEdit(const ALTextDocument::Edit& edit);
     void invalidateAll();
+    // A line's owners went from `was` to `now`: each one's count moved.
+    void ownersChanged(U8 was, U8 now);
     // Shaped and cut into rows; and cut into rows alone, for a line whose
     // glyphs are current at another wrap width.
     void layoutLine(S32 index, Line& out);
@@ -426,6 +437,8 @@ private:
     ALLineTable<Entry>                 mLines;
     ALLineTable<U8>                    mHidden;
     S32                                mHiddenCount = 0;
+    // And how many each owner hides, by its bit: the folds', the host's.
+    std::array<S32, 2>                 mHiddenByCount{};
     // Each line's height as it counts, summed so that one changing moves
     // the tops after it without adding them all up again.
     ALFenwickTree<S32>                 mHeights;
@@ -450,6 +463,7 @@ private:
     F32                                mScaleY         = 1.f;
     U32                                mHiddenRevision = 0;
     U32                                mLinesLaidOut   = 0;
+    mutable U32                        mHiddenByAsked  = 0;
     S32                                mLinesHeld      = 0;
     // Scratch a wrapping loop keeps rather than allocates per line.
     std::vector<size_t>                mBreaks;

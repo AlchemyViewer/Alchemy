@@ -1014,4 +1014,49 @@ namespace tut
         ensure_equals("the word's far half: b's column", layout.columnAt(0, 0, b_left - 5.f, true), 5);
         searchedAsWalked(0);
     }
+
+    template<> template<>
+    void altextlayout_object::test<27>()
+    {
+        set_test_name("how many lines each owner hides is kept through hiding, showing and edits, as the lines themselves say");
+        ready("0\n1\n2\n3\n4\n5\n6\n7\n8\n9");
+        typedef ALTextLayout::HiddenBy By;
+        // Each owner's lines, and anybody's, counted one by one.
+        const auto counted = [this](By by) {
+            S32 n = 0;
+            for (S32 l = 0; l < layout.lineCount(); ++l)
+            {
+                n += (by == By::Any ? layout.hidden(l) : layout.hiddenBy(l, by)) ? 1 : 0;
+            }
+            return n;
+        };
+        const auto as_counted = [&](const std::string& what) {
+            ensure_equals(what + ": the folds'", layout.hiddenCount(By::Folds), counted(By::Folds));
+            ensure_equals(what + ": the host's", layout.hiddenCount(By::Host), counted(By::Host));
+            ensure_equals(what + ": either's", layout.hiddenCount(By::Any), counted(By::Any));
+        };
+        ensure("none hidden", layout.hiddenCount(By::Folds) == 0 && layout.hiddenCount(By::Host) == 0 && layout.hiddenCount(By::Any) == 0);
+        layout.setHidden(By::Host, 2, 5, true);
+        layout.setHidden(By::Folds, 4, 7, true);
+        ensure("four each, six in all", layout.hiddenCount(By::Folds) == 4 && layout.hiddenCount(By::Host) == 4 && layout.hiddenCount(By::Any) == 6);
+        layout.setHidden(By::Folds, 4, 7, true);
+        ensure_equals("hidden again, the same four", layout.hiddenCount(By::Folds), 4);
+        const U32 asked = layout.hiddenByAsked();
+        as_counted("hidden");
+        ensure_equals("each line asked who hides it, once for each owner", layout.hiddenByAsked(), asked + 20);
+
+        // Lines 3 and 4 made one: 3 the host's, 4 both's, and the line made
+        // in sight.
+        doc.replace(ALTextRange(ALTextPos(3, 0), ALTextPos(4, 1)), "x");
+        ensure("the folds' other three left, a line up", layout.hiddenCount(By::Folds) == 3 && layout.hiddenBy(4, By::Folds) && layout.hiddenBy(6, By::Folds));
+        ensure_equals("the host's other two", layout.hiddenCount(By::Host), 2);
+        as_counted("an edit over hidden lines");
+        doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "new\n");
+        as_counted("a line made above");
+        layout.setHidden(By::Any, 5, 5, false);
+        ensure("one both hid shown", layout.hiddenCount(By::Folds) == 2 && layout.hiddenCount(By::Host) == 1);
+        as_counted("one both hid shown");
+        layout.setHidden(By::Any, 0, 20, false);
+        ensure("none hidden again", layout.hiddenCount(By::Folds) == 0 && layout.hiddenCount(By::Host) == 0 && layout.hiddenCount(By::Any) == 0);
+    }
 }
