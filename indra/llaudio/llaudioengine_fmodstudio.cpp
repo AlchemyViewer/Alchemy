@@ -46,6 +46,10 @@
 
 #include <cstdio>
 
+#if LL_LINUX
+#include <link.h>
+#endif
+
 // An LLVector3 as FMOD takes it. The two are laid out alike, but reading one
 // through a pointer to the other breaks strict aliasing, which GCC rejects.
 static FMOD_VECTOR to_fmod_vector(const LLVector3& v)
@@ -95,6 +99,55 @@ namespace
         }
         return FMOD_OK;
     }
+
+#if LL_LINUX
+    // glibc puts a thread's static TLS, the thread_locals of every module
+    // loaded with the process, at the top of the stack the thread asked for,
+    // so the thread runs on what is left. FMOD sizes its threads for itself,
+    // the mixer at 80 KB, and when the viewer's thread_locals came to 74 KB
+    // the mixer was left a few, and the wind callback's first random number,
+    // which seeds a generator on the stack, ran off the end.
+    // Each FMOD thread is asked for its own stack plus the TLS. Every module
+    // with TLS is counted, though one opened later has its TLS elsewhere, and
+    // the margin covers glibc's surplus and the thread descriptor.
+    void reserve_fmod_thread_stacks()
+    {
+        size_t tls = 0;
+        dl_iterate_phdr([](dl_phdr_info* info, size_t, void* data)
+        {
+            for (ElfW(Half) i = 0; i < info->dlpi_phnum; ++i)
+            {
+                const ElfW(Phdr)& phdr = info->dlpi_phdr[i];
+                if (phdr.p_type == PT_TLS)
+                {
+                    const size_t align = phdr.p_align ? phdr.p_align : 1;
+                    *static_cast<size_t*>(data) += (phdr.p_memsz + align - 1) / align * align;
+                }
+            }
+            return 0;
+        }, &tls);
+        const FMOD_THREAD_STACK_SIZE reserve = static_cast<FMOD_THREAD_STACK_SIZE>(tls + 16 * 1024);
+
+        constexpr std::pair<FMOD_THREAD_TYPE, FMOD_THREAD_STACK_SIZE> stacks[] = {
+            { FMOD_THREAD_TYPE_MIXER, FMOD_THREAD_STACK_SIZE_MIXER },
+            { FMOD_THREAD_TYPE_FEEDER, FMOD_THREAD_STACK_SIZE_FEEDER },
+            { FMOD_THREAD_TYPE_STREAM, FMOD_THREAD_STACK_SIZE_STREAM },
+            { FMOD_THREAD_TYPE_FILE, FMOD_THREAD_STACK_SIZE_FILE },
+            { FMOD_THREAD_TYPE_NONBLOCKING, FMOD_THREAD_STACK_SIZE_NONBLOCKING },
+            { FMOD_THREAD_TYPE_RECORD, FMOD_THREAD_STACK_SIZE_RECORD },
+            { FMOD_THREAD_TYPE_GEOMETRY, FMOD_THREAD_STACK_SIZE_GEOMETRY },
+            { FMOD_THREAD_TYPE_CONVOLUTION1, FMOD_THREAD_STACK_SIZE_CONVOLUTION1 },
+            { FMOD_THREAD_TYPE_CONVOLUTION2, FMOD_THREAD_STACK_SIZE_CONVOLUTION2 },
+        };
+        for (const auto& [type, stack] : stacks)
+        {
+            Check_FMOD_Error(FMOD::Thread_SetAttributes(type, FMOD_THREAD_AFFINITY_GROUP_DEFAULT,
+                                                        FMOD_THREAD_PRIORITY_DEFAULT, stack + reserve),
+                             "FMOD::Thread_SetAttributes");
+        }
+        LL_INFOS("AppInit") << "FMOD threads reserve " << reserve << " bytes of stack for static TLS" << LL_ENDL;
+    }
+#endif
 
     // Serialise an FMOD_GUID into the canonical Windows-style
     // "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" form. Used as the stable
@@ -190,6 +243,11 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
     FMOD_RESULT result;
 
     LL_DEBUGS("AppInit") << "LLAudioEngine_FMODSTUDIO::init() initializing FMOD" << LL_ENDL;
+
+#if LL_LINUX
+    // Before System_Create, which starts FMOD's threads.
+    reserve_fmod_thread_stacks();
+#endif
 
     result = FMOD::System_Create(&mSystem);
     if (Check_FMOD_Error(result, "FMOD::System_Create"))
