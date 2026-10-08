@@ -2007,4 +2007,79 @@ namespace tut
         ensure("the one typed marked only where it says more", m.line(Column::Left, 12).words == ALTextDiff::spans_t{ { 9, 11 } } &&
                                                                    m.line(Column::Right, 12).words == ALTextDiff::spans_t{ { 10, 13 } });
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<46>()
+    {
+        set_test_name("the LSL grammar's lexer saying what it read again: a keystroke reading no line after it otherwise hashes no line's regions to know so, blanks let go of or not; a block comment's opener broken and mended compares again and lays out again as far as the regions hashed say, and as afresh");
+        std::string                                  error;
+        const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+        ensure("the LSL grammar", lsl != nullptr);
+        // A string differing only by its blanks inside a block comment on
+        // both sides, a line below it typed in, and a change far below.
+        const auto script = [](const char* opener, const char* said, const char* thirty, const char* below) {
+            return aldiffmodel_data::lines(200, { { 10, opener }, { 14, said }, { 16, "*/" }, { 30, thirty }, { 150, below } });
+        };
+        const std::string left   = script("/* note", "llSay(0, \"a b\");", "line 30", "fifty");
+        const std::string right  = script("/* note", "llSay(0, \"a  b\");", "line 30", "FIFTY");
+        const std::string typed  = script("/* note", "llSay(0, \"a  b\");", "line 30 typed", "FIFTY");
+        const std::string broken = script("/ note", "llSay(0, \"a  b\");", "line 30 typed", "FIFTY");
+        const auto sameRelaid = [](const ALDiffModel::Relaid& a, const ALDiffModel::Relaid& b) {
+            bool same = a.whole == b.whole;
+            for (size_t c = 0; c < 3; ++c)
+            {
+                same = same && a.first[c] == b.first[c] && a.was[c] == b.was[c] && a.now[c] == b.now[c] && a.numbered[c] == b.numbered[c];
+            }
+            return same;
+        };
+        for (const bool blanks : { true, false })
+        {
+            const std::string    where = blanks ? "blanks let go of" : "blanks kept";
+            ALTextDiff::Likeness like;
+            like.ignoreWhitespace = blanks;
+            // Told by the lexer what it read again, as a view is; and by the
+            // regions hashed before the side is read again and after.
+            ALDiffModel told;
+            const auto  lexer = std::make_shared<ALDiffLexer>(lsl);
+            told.setLexer(ALDiffLexer::lexerOf(lexer), ALTextDiff::lexer_t(), ALDiffLexer::rereadOf(lexer));
+            ALDiffModel hashing;
+            hashing.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+            for (ALDiffModel* each : { &told, &hashing })
+            {
+                each->setLikeness(like);
+                each->setTexts(left, right);
+            }
+
+            // Typed in below the comment, reading no line after it
+            // otherwise: no line's regions hashed but by the search for
+            // blocks moved, which keys by them, of the lines of the two
+            // changes at most.
+            const U64 hashed = ALTextDiff::hashed();
+            told.setRightText(typed);
+            const U64 cost = ALTextDiff::hashed() - hashed;
+            ensure(where + ": typed in, no line after it hashed: " + std::to_string(cost), cost <= (blanks ? 4u : 0u));
+            hashing.setRightText(typed);
+            aldiffmodel_data::sameLayout(told, hashing, where + ": typed in");
+
+            // The comment's opener broken, and mended: the lines down to its
+            // close read otherwise, compared again and laid out again as far
+            // as the regions hashed say.
+            const auto as_hashed = [&](const std::string& text, const std::string& step) {
+                told.setRightText(text);
+                const S32                 told_compared = ALDiffSplice::lastCompared();
+                const ALDiffModel::Relaid told_relaid   = told.relaid();
+                hashing.setRightText(text);
+                ensure_equals(step + ": compared again as far", told_compared, ALDiffSplice::lastCompared());
+                ensure(step + ": laid out again as far", sameRelaid(told_relaid, hashing.relaid()));
+                aldiffmodel_data::sameLayout(told, hashing, step);
+                ALDiffModel fresh;
+                fresh.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+                fresh.setLikeness(like);
+                fresh.setTexts(left, text);
+                aldiffmodel_data::sameLayout(told, fresh, step + ", as afresh");
+            };
+            as_hashed(broken, where + ": the opener broken");
+            as_hashed(typed, where + ": mended");
+        }
+    }
 }

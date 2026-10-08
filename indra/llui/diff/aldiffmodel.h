@@ -523,6 +523,12 @@ private:
     // and where lines are told the same by their regions, which of them
     // are the same.
     std::vector<std::pair<S32, size_t>> readFrom(size_t side, S32 from, bool every = false) const;
+    // Of a side's lines from `from` to `to`, as it now is, those of its
+    // changes by the runs before an edit that moved them along by `moved`:
+    // one past the last of them, -1 for none. What a lexer's lines read
+    // again after an edit reach, where only a change's are read by their
+    // regions.
+    S32 changesTo(size_t side, S32 from, S32 to, S32 moved) const;
     // Each pair's or range's lines on one side, where they now are: those
     // of a pair or range whose first line went taken back.
     static ALTextDiff::ranges_t carried(const ALTextDiff::ranges_t& ranges, bool left, S32 was, const LineMap& map);

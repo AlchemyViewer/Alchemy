@@ -209,13 +209,19 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> between, co
     const S32                 moved      = lines - was;
     const bool                shown_left = given_left != mSwapped;
     const size_t              shown      = shown_left ? 0 : 1;
-    // Where a grammar says how lines read, the regions the lines of the
-    // changes after the edit were read in, before it reads the side again;
-    // every line's after it, where lines are told the same by them.
-    const bool                           regioned   = static_cast<bool>(mOptions.lexer);
-    const bool                           by_regions = regioned && mOptions.like.byRegions() && !mOptions.like.ignoreComments;
-    const bool                           had        = regioned && (shown ? shownRegions().second : shownRegions().first);
-    const std::vector<std::pair<S32, size_t>> read_before = had ? readFrom(shown, was - edges.tail, by_regions) : std::vector<std::pair<S32, size_t>>();
+    // Where a grammar says how lines read, what is known of the regions the
+    // lines after the edit were read in, before it reads the side again:
+    // the number of the text its lexer holds them as, where it says what it
+    // reads again and nothing else reads by it meanwhile -- a merge with no
+    // lexer of its own; else the lines of the changes after the edit, each
+    // with its regions as read -- every line's after it, where lines are
+    // told the same by them.
+    const bool           regioned   = static_cast<bool>(mOptions.lexer);
+    const bool           by_regions = regioned && mOptions.like.byRegions() && !mOptions.like.ignoreComments;
+    const line_regions_t before     = regioned ? (shown ? shownRegions().second : shownRegions().first) : nullptr;
+    const U64            held       = before && mReread && (!mMerge || mMergeLexer) ? mReread(*before).text : 0;
+    const std::vector<std::pair<S32, size_t>> read_before =
+        before && !held ? readFrom(shown, was - edges.tail, by_regions) : std::vector<std::pair<S32, size_t>>();
     // The moves' ids of the lines edited let go of, those after moved along.
     mMoveFinder.edited(given_left, edges.head, was - edges.tail, lines - edges.tail);
     putBetween(side, std::move(between), edges);
@@ -245,12 +251,27 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> between, co
     // the last of them, as the side now is. A change's words and tokens are
     // cut otherwise there, and a line told the same by its regions may be
     // the same as its other no longer, or a change none: compared again
-    // with the edit, as the whole would be.
+    // with the edit, as the whole would be. Where the lexer says what it
+    // read again, as it says: none, where it holds the side as it was;
+    // where it read the side again from it, those up to the first from
+    // which every line reads as it did -- of changes, where lines are not
+    // told the same by their regions; else every line.
     S32 reach = -1;
     if (regioned)
     {
         const line_regions_t now = shown_left ? left_regions : right_regions;
-        reach                    = had && now ? -1 : static_cast<S32>(side.size());
+        reach                    = before && now ? -1 : static_cast<S32>(side.size());
+        if (reach < 0 && held)
+        {
+            const ALTextDiff::Reread read = mReread(*now);
+            const S32                end  = lines - edges.tail;
+            if (read.text != held)
+            {
+                reach = read.was != held ? static_cast<S32>(side.size())
+                        : by_regions     ? (read.same > end ? read.same : -1)
+                                         : changesTo(shown, end, read.same, moved);
+            }
+        }
         for (auto it = read_before.rbegin(); reach < 0 && it != read_before.rend(); ++it)
         {
             if (ALTextDiff::hashOf((*now)[static_cast<size_t>(it->first + moved)]) != it->second)
@@ -316,6 +337,33 @@ std::vector<std::pair<S32, size_t>> ALDiffModel::readFrom(size_t side, S32 from,
         }
     }
     return out;
+}
+
+S32 ALDiffModel::changesTo(size_t side, S32 from, S32 to, S32 moved) const
+{
+    // Where the lines were, by the runs as they were: back from the last run
+    // starting before the stretch's end to the first of the side's own
+    // changes, whose lines in the stretch end it; none once a run starts
+    // before the stretch, as every change before it ends before it too.
+    const S32  first   = from - moved;
+    const S32  last    = to - moved;
+    const Kind own     = side ? Kind::Added : Kind::Removed;
+    const auto startOf = [side](const ALTextDiff::Run& run) { return side ? run.right : run.left; };
+    auto       it      = std::partition_point(mRuns.begin(), mRuns.end(), [&](const ALTextDiff::Run& run) { return startOf(run) < last; });
+    while (first < last && it != mRuns.begin())
+    {
+        --it;
+        if (it->kind == own && it->count > 0)
+        {
+            const S32 end = std::min(startOf(*it) + it->count, last);
+            return end > first ? end + moved : -1;
+        }
+        if (startOf(*it) < first)
+        {
+            return -1;
+        }
+    }
+    return -1;
 }
 
 std::vector<S32> ALDiffModel::openedLines(const LineMap* map) const
