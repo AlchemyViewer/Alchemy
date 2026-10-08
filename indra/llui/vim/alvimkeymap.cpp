@@ -4297,7 +4297,17 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             }
             else
             {
-                // d$ and c$, through the line's end as $ goes.
+                // d$ and c$, through the line's end as $ goes, and failing
+                // where a count's $ fails: from the last line, nothing taken
+                // and no insert, every line's end wanted after it (motion).
+                if (count > 1 && view.caret().line + 1 >= d.lineCount())
+                {
+                    mFailed       = true;
+                    mWantColumn   = S32_MAX;
+                    mVerticalMove = true;
+                    clearPending();
+                    return true;
+                }
                 const S32 last = llmin(d.lineCount() - 1, view.caret().line + count - 1);
                 span.range     = ALTextRange(view.caret(), d.lineEnd(last));
                 span.inclusive = true;
@@ -4845,21 +4855,29 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             return m;
         case '$':
         {
-            const S32 line = llmin(d.lineCount() - 1, from.line + count - 1);
-            m.to           = d.lineEnd(line);
-            m.inclusive    = false;
+            // The count's lines down first, as vim's cursor_down() goes
+            // them: as far as there are, but none from the last line, which
+            // fails the motion where the caret is -- d2$ there takes nothing.
+            const bool stuck = count > 1 && from.line + 1 >= d.lineCount();
+            m.moved          = !stuck;
+            m.inclusive      = false;
+            if (!stuck)
+            {
+                m.to = d.lineEnd(llmin(d.lineCount() - 1, from.line + count - 1));
+            }
             // To the line's end, taken with the last character: an
             // operator reaches the end, the caret sits on the last -- a
             // visual one past it, on the line's break, which the selection
             // takes, as vim's does. And every line's end from here on, for
             // j and k -- but not once an operator has taken it, which
             // forgets the column as vim's does, so that j after d$ keeps
-            // the caret's.
-            if (!mOperator && !isVisual() && m.to.column > 0)
+            // the caret's; one that failed wants them all the same, as
+            // vim's curswant is set before it moves.
+            if (!stuck && !mOperator && !isVisual() && m.to.column > 0)
             {
                 m.to = d.prevCluster(m.to);
             }
-            if (!mOperator)
+            if (!mOperator || stuck)
             {
                 mWantColumn   = S32_MAX;
                 mVerticalMove = true;
@@ -4943,7 +4961,16 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
         case LAST_NON_BLANK:
         {
             // The last character on the line that is not a blank, the count
-            // lines on; inclusive, as $ is.
+            // lines on; inclusive, as $ is, and failing from the last line
+            // as a count's $ fails there, every line's end wanted after it.
+            if (count > 1 && from.line + 1 >= d.lineCount())
+            {
+                m.moved       = false;
+                m.inclusive   = true;
+                mWantColumn   = S32_MAX;
+                mVerticalMove = true;
+                return m;
+            }
             const S32          line = llmin(d.lineCount() - 1, from.line + count - 1);
             const std::string& text = d.line(line);
             const size_t       last = text.find_last_not_of(" \t");

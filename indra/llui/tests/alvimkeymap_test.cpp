@@ -5936,4 +5936,73 @@ namespace tut
         keys("dit");
         ensure_equals("dit on an empty tag between its tags", caretText(), std::string("0:3"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<205>()
+    {
+        set_test_name("a count's $ from the last line fails where the caret is, as vim's cursor_down() does: d2$, y2$, c2$, 2D, 2C and 2g_ take nothing, and k after any wants the line's end; from a line above it goes as far as there are");
+        const char* text = "abcdefgh\nghi jkl";
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("2$");
+        ensure_equals("2$ on the last line stays", caretText(), std::string("1:2"));
+        keys("k");
+        ensure_equals("k after it to the line's end", caretText(), std::string("0:7"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("d2$");
+        ensure_equals("d2$ takes nothing", flat(editor->text()), std::string("abcdefgh|ghi jkl"));
+        ensure_equals("and leaves the caret", caretText(), std::string("1:2"));
+        keys("k");
+        ensure_equals("k after it to the line's end", caretText(), std::string("0:7"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("yly2$");
+        ensure_equals("y2$ yanks nothing", vim->registerText('"'), std::string("i"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("c2$");
+        ensure("c2$ inserts nothing", vim->mode() == ALVimKeymap::Mode::Normal);
+        keys("X");
+        ensure_equals("and the X after it is normal mode's", flat(editor->text()), std::string("abcdefgh|gi jkl"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("2D");
+        ensure_equals("2D takes nothing", flat(editor->text()), std::string("abcdefgh|ghi jkl"));
+        keys("k");
+        ensure_equals("k after it to the line's end", caretText(), std::string("0:7"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("2C");
+        ensure("2C inserts nothing", vim->mode() == ALVimKeymap::Mode::Normal);
+        ensure_equals("and takes nothing", flat(editor->text()), std::string("abcdefgh|ghi jkl"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("2g_");
+        ensure_equals("2g_ on the last line stays", caretText(), std::string("1:2"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("vl2$d");
+        ensure_equals("a visual 2$ leaves the selection as it was", flat(editor->text()), std::string("abcdefgh|ghjkl"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 1));
+        keys("<C-v>2$d");
+        ensure_equals("a block's to every line's end all the same", flat(editor->text()), std::string("abcdefgh|g"));
+
+        make("abc def\nghi jkl\nmno pqr");
+        editor->setCaret(ALTextPos(1, 2));
+        keys("3$");
+        ensure_equals("3$ with one line below to its end", caretText(), std::string("2:6"));
+        editor->setCaret(ALTextPos(1, 2));
+        keys("d3$");
+        ensure_equals("d3$ through it", flat(editor->text()), std::string("abc def|gh"));
+    }
 }
