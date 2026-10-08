@@ -929,5 +929,29 @@ namespace tut
             ensure("symlink still a symlink", fs::is_symlink(scratch.path(".app")));
         }
     }
+
+    template<> template<>
+    void LLDirTest_object_t::test<12>()
+    {
+        set_test_name("LLDirXDG::adoptCache()");
+        ScratchHome scratch;
+        std::vector<std::string> notes;
+        const std::string old_cache = scratch.path(".cache/App");
+        const std::string cache = scratch.path(".cache/app");
+
+        LLDirXDG::adoptCache(old_cache, cache, notes);
+        ensure("nothing to adopt", !scratch.exists(".cache"));
+
+        scratch.write(".cache/App/texturecache/t");
+        LLDirXDG::adoptCache(old_cache, cache, notes);
+        ensure("adopted", scratch.exists(".cache/app/texturecache/t"));
+        ensure("old name gone", !scratch.exists(".cache/App"));
+
+        scratch.write(".cache/App/texturecache/stale");
+        LLDirXDG::adoptCache(old_cache, cache, notes);
+        ensure("current cache kept", scratch.exists(".cache/app/texturecache/t"));
+        ensure("old cache left beside it", scratch.exists(".cache/App/texturecache/stale"));
+        ensure("old cache not merged in", !scratch.exists(".cache/app/texturecache/stale"));
+    }
 #endif // LL_LINUX
 }

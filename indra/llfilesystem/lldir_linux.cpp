@@ -233,6 +233,24 @@ namespace LLDirXDG
         notes.push_back("Moved " + legacy_root + " to the XDG directories");
         return Migration::MOVED;
     }
+
+    void adoptCache(const std::string& old_cache, const std::string& cache, std::vector<std::string>& notes)
+    {
+        struct stat st;
+        if (old_cache == cache || ::lstat(cache.c_str(), &st) == 0 || ::lstat(old_cache.c_str(), &st) != 0 ||
+            !S_ISDIR(st.st_mode))
+        {
+            return;
+        }
+        if (::rename(old_cache.c_str(), cache.c_str()) == 0)
+        {
+            notes.push_back("Moved the cache from " + old_cache + " to " + cache);
+        }
+        else
+        {
+            notes.push_back("Couldn't move the cache from " + old_cache + " to " + cache + ": " + errnoText(errno));
+        }
+    }
 }
 
 
@@ -388,6 +406,10 @@ void LLDir_Linux::initAppDirs(const std::string &app_name,
         // directories the first time this one runs.
         const std::string legacy_root = mOSUserDir + "/." + lower_app_name;
         dirs = LLDirXDG::layout(mOSUserDir, lower_app_name);
+        // Builds between the cache moving to XDG and the rest of the profile
+        // following it named the cache's directory as the app is cased.
+        LLDirXDG::adoptCache(LLDirXDG::baseDir("XDG_CACHE_HOME", mOSUserDir, ".cache") + "/" + app_name, dirs.cache,
+                             mInitNotes);
         if (LLDirXDG::migrate(legacy_root, dirs, mInitNotes) == LLDirXDG::Migration::FAILED)
         {
             dirs = LLDirXDG::legacyLayout(legacy_root);
@@ -408,26 +430,23 @@ void LLDir_Linux::initAppDirs(const std::string &app_name,
         mOSUserAppDir = mOSUserDir;
     }
 
-    mUserSettingsDir = dirs.config;
-    if (!LLDirXDG::makeDirs(mUserSettingsDir))
+    // An XDG directory that can't be made falls back to where it was before
+    // XDG, inside the user app dir.
+    auto settle = [this](const std::string& dir, const char* what, const char* fallback_name)
     {
-        LL_WARNS() << "Couldn't create LL_PATH_USER_SETTINGS dir " << mUserSettingsDir << LL_ENDL;
-    }
-
-    mLogsDir = dirs.state;
-    if (!LLDirXDG::makeDirs(mLogsDir))
-    {
-        LL_WARNS() << "Couldn't create LL_PATH_LOGS dir " << mLogsDir << LL_ENDL;
-    }
-
-    mDefaultCacheDir = dirs.cache;
-    if (!LLDirXDG::makeDirs(mDefaultCacheDir))
-    {
-        LL_WARNS() << "Couldn't create LL_PATH_CACHE dir " << mDefaultCacheDir << LL_ENDL;
-        mDefaultCacheDir = add(mOSUserAppDir, "cache");
-        LL_WARNS() << "Default to " << mDefaultCacheDir << LL_ENDL;
-        LLDirXDG::makeDirs(mDefaultCacheDir);
-    }
+        if (LLDirXDG::makeDirs(dir))
+        {
+            return dir;
+        }
+        const std::string fallback = add(mOSUserAppDir, fallback_name);
+        LL_WARNS() << "Couldn't create " << what << " dir " << dir << LL_ENDL;
+        LL_WARNS() << "Default to " << fallback << LL_ENDL;
+        LLDirXDG::makeDirs(fallback);
+        return fallback;
+    };
+    mUserSettingsDir = settle(dirs.config, "LL_PATH_USER_SETTINGS", "user_settings");
+    mLogsDir = settle(dirs.state, "LL_PATH_LOGS", "logs");
+    mDefaultCacheDir = settle(dirs.cache, "LL_PATH_CACHE", "cache");
 
     mCAFile = getExpandedFilename(LL_PATH_EXECUTABLE, "ca-bundle.crt");
 }

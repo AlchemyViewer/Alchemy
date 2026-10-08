@@ -74,6 +74,11 @@ namespace LLDirXDG
     // yet. A move that fails part way is put back. Anything worth logging is
     // added to notes.
     Migration migrate(const std::string& legacy_root, const Layout& to, std::vector<std::string>& notes);
+
+    // Renames the cache an earlier build kept at old_cache to cache, when
+    // cache does not exist yet. On a case-insensitive filesystem the two are
+    // one directory, which is left alone.
+    void adoptCache(const std::string& old_cache, const std::string& cache, std::vector<std::string>& notes);
 }
 
 class LLDir_Linux : public LLDir
