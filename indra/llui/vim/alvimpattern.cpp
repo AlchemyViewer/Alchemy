@@ -172,16 +172,17 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // < > are the engine's own ( ) | + ? ? { } \b \b, and without one
     // they are themselves; \v makes what follows very magic, where they
     // are the engine's own bare and themselves with a backslash; \V very
-    // nomagic, where only the backslash items are special, a bare ^ and $
-    // themselves and \^ \$ a line's start and end anywhere; \M nomagic,
-    // the same but for magic's ^ and $. \zs is \K; \ze looks ahead at the
-    // rest of its branch, or is a group at which the match is cut; \@= \@!
-    // \@<= \@<! and \@> look round the atom before them; \{-} is *?; the
-    // classes \a \l \u \x \o \h \i \k are brackets; \c and \C say how case
-    // is matched, and \Z that composing characters are passed over; a
-    // bracket expression is copied through as it stands. A magic ^ is a
-    // line's start only first in a branch, a $ its end only last in one,
-    // and either is itself anywhere else.
+    // nomagic, where only the backslash items are special -- \. \* \~ \[
+    // are magic's . * ~ [ -- a bare ^ and $ themselves and \^ \$ a line's
+    // start and end anywhere; \M nomagic, the same but for magic's ^ and
+    // $. \zs is \K; \ze looks ahead at the rest of its branch, or is a
+    // group at which the match is cut; \@= \@! \@<= \@<! and \@> look
+    // round the atom before them; \{-} is *?; the classes \a \l \u \x \o
+    // \h \i \k are brackets; \c and \C say how case is matched, and \Z
+    // that composing characters are passed over; a bracket expression is
+    // copied through as it stands. A magic ^ is a line's start only first
+    // in a branch, a $ its end only last in one, and either is itself
+    // anywhere else.
     ALVimPattern        out;
     std::optional<bool> case_in_pattern;
     enum class Magic : U8
@@ -203,6 +204,41 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
             out.regex += '\\';
         }
         out.regex += c;
+    };
+    // The last replacement made, as the text it is.
+    auto lastReplacement = [&]() {
+        for (const char r : last_replacement)
+        {
+            literal(r);
+        }
+    };
+    // A bracket expression through to its close, as it stands. `at` is
+    // the [; the index of the ] comes back, or npos where none closes it.
+    auto bracket = [&](size_t at) {
+        size_t j = at + 1;
+        if (j < vim.size() && vim[j] == '^')
+        {
+            ++j;
+        }
+        if (j < vim.size() && vim[j] == ']')
+        {
+            ++j;
+        }
+        while (j < vim.size() && vim[j] != ']')
+        {
+            if (vim[j] == '\\' && j + 1 < vim.size())
+            {
+                ++j;
+            }
+            ++j;
+        }
+        if (j >= vim.size())
+        {
+            return std::string::npos;
+        }
+        out.acrossLines |= vim.find("\\n", at) < j;
+        out.regex.append(vim, at, j - at + 1);
+        return j;
     };
     // %[abc]: a, ab or abc -- each item optional and the next only with
     // it. `at` is the [; the index of the ] comes back, or npos.
@@ -415,7 +451,8 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         }
         if (c == '\\' && i + 1 < vim.size())
         {
-            const char n = vim[++i];
+            const char n       = vim[++i];
+            const bool nomagic = magic == Magic::Off || magic == Magic::None;
             switch (n)
             {
                 case 'v': magic = Magic::Very; at_start = start_here; token_atom = false; continue;
@@ -491,6 +528,30 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                 // the characters.
                 case '^':
                 case '$': out.regex += magic == Magic::None ? std::string(1, n) : "\\" + std::string(1, n); continue;
+                // Nomagic's and very nomagic's any character, repeat, last
+                // replacement and bracket expression, which are magic's
+                // bare ones; elsewhere the characters.
+                case '.': out.regex += nomagic ? "." : "\\."; continue;
+                case '*': out.regex += nomagic ? "*" : "\\*"; token_atom = !nomagic; continue;
+                case '~':
+                    if (nomagic)
+                    {
+                        lastReplacement();
+                        continue;
+                    }
+                    out.regex += "\\~";
+                    continue;
+                case '[':
+                {
+                    const size_t close = nomagic ? bracket(i) : std::string::npos;
+                    if (close == std::string::npos)
+                    {
+                        out.regex += "\\[";
+                        continue;
+                    }
+                    i = close;
+                    continue;
+                }
                 case '{':
                 {
                     if (magic == Magic::Very)
@@ -738,10 +799,10 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         out.regex += "\\g{" + std::to_string(vim_groups[static_cast<size_t>(n - '1')]) + "}";
                         continue;
                     }
-                    // \s \S \d \D \w \W \n \t \r \b \. \* \[ \] \/ and the
-                    // rest: as they are, a backslash before a letter or a
-                    // symbol the engine reads the same way; \n is a line's
-                    // end, which the search must be let cross.
+                    // \s \S \d \D \w \W \n \t \r \b \] \/ and the rest: as
+                    // they are, a backslash before a letter or a symbol the
+                    // engine reads the same way; \n is a line's end, which
+                    // the search must be let cross.
                     out.acrossLines |= n == 'n';
                     out.regex += '\\';
                     out.regex += n;
@@ -756,35 +817,14 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         }
         if (c == '[' && (magic == Magic::Magic || magic == Magic::Very))
         {
-            // A bracket expression through to its close, as it stands; an
-            // unclosed [ is itself.
-            size_t j = i + 1;
-            if (j < vim.size() && vim[j] == '^')
-            {
-                ++j;
-            }
-            if (j < vim.size() && vim[j] == ']')
-            {
-                ++j;
-            }
-            while (j < vim.size() && vim[j] != ']')
-            {
-                if (vim[j] == '\\' && j + 1 < vim.size())
-                {
-                    ++j;
-                }
-                ++j;
-            }
-            if (j < vim.size())
-            {
-                out.acrossLines |= vim.find("\\n", i) < j;
-                out.regex.append(vim, i, j - i + 1);
-                i = j;
-            }
-            else
+            // A bracket expression; an unclosed [ is itself.
+            const size_t close = bracket(i);
+            if (close == std::string::npos)
             {
                 out.regex += "\\[";
+                continue;
             }
+            i = close;
             continue;
         }
         switch (magic)
@@ -861,12 +901,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         token_atom = false;
                         break;
                     }
-                    case '~':
-                        for (const char r : last_replacement)
-                        {
-                            literal(r);
-                        }
-                        break;
+                    case '~': lastReplacement(); break;
                     case '(':
                         open_at.push_back(out.regex.size());
                         out.regex += c;
@@ -910,13 +945,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     case '$': out.regex += endsAt(i + 1) ? "$" : "\\$"; break;
                     case '.': out.regex += c; break;
                     case '*': out.regex += c; token_atom = false; break;
-                    case '~':
-                        // The last replacement, as the text it is.
-                        for (const char r : last_replacement)
-                        {
-                            literal(r);
-                        }
-                        break;
+                    case '~': lastReplacement(); break;
                     default: literal(c); break;
                 }
                 break;

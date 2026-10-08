@@ -313,4 +313,24 @@ namespace tut
                       std::string("a\xCC\x81" "b"));
         ensure_equals("a line's ends none", found("a\xCC\x81" "b", ALVimPattern::of("\\Z^ab$", std::string(), plain)), std::string("a\xCC\x81" "b"));
     }
+
+    template<> template<>
+    void alvimpattern_object::test<14>()
+    {
+        set_test_name("very nomagic's and nomagic's \\. \\* \\~ \\[ are magic's . * ~ [, and their bare ones the characters");
+        ensure_equals("the engine's own", regexOf("\\M\\[ab]\\.\\*\\~", "x"), std::string("[ab].*x"));
+        ensure_equals("any character", found("abc a.c", ALVimPattern::of("\\Va\\.c", std::string(), plain)), std::string("abc|a.c"));
+        ensure_equals("a bare one a dot", found("abc a.c", ALVimPattern::of("\\Va.c", std::string(), plain)), std::string("a.c"));
+        ensure_equals("a repeat", found("xaaa x*", ALVimPattern::of("\\Mxa\\*", std::string(), plain)), std::string("xaaa|x"));
+        ensure_equals("very nomagic's", found("xaaa x*", ALVimPattern::of("\\Vxa\\*", std::string(), plain)), std::string("xaaa|x"));
+        ensure_equals("a bare one a star", found("aaa a*", ALVimPattern::of("\\Va*", std::string(), plain)), std::string("a*"));
+        ensure_equals("the last replacement", found("ayzb a~b", ALVimPattern::of("\\Ma\\~b", std::string("yz"), plain)), std::string("ayzb"));
+        ensure_equals("very nomagic's", found("ayzb a~b", ALVimPattern::of("\\Va\\~b", std::string("yz"), plain)), std::string("ayzb"));
+        ensure_equals("a bare one a tilde", found("ayzb a~b", ALVimPattern::of("\\Va~b", std::string("yz"), plain)), std::string("a~b"));
+        ensure_equals("a bracket expression", found("x[ab] b", ALVimPattern::of("\\V\\[ab]", std::string(), plain)), std::string("a|b|b"));
+        ensure_equals("nomagic's", found("x[ab] b", ALVimPattern::of("\\M\\[ab]", std::string(), plain)), std::string("a|b|b"));
+        ensure_equals("a bare one the characters", found("x[ab] b", ALVimPattern::of("\\M[ab]", std::string(), plain)), std::string("[ab]"));
+        ensure_equals("an unclosed one a [", found("x[ab b", ALVimPattern::of("\\V\\[ab", std::string(), plain)), std::string("[ab"));
+        ensure_equals("magic's the characters", found("abc a.c", ALVimPattern::of("a\\.c", std::string(), plain)), std::string("a.c"));
+    }
 }
