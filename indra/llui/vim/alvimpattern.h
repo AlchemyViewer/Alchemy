@@ -74,6 +74,10 @@ struct ALVimPattern
     // The engine's number for each of vim's groups, in order; empty where
     // the two count alike.
     std::vector<S32>   groupNumbers;
+    // What vim says of the pattern where it cannot be read -- a ~ with no
+    // last replacement to stand for -- said as it is, and no match looked
+    // for (matchesIn); empty where it reads.
+    std::string        readError;
 
     bool operator==(const ALVimPattern&) const = default;
     // Whether where its matches may stand depends on the caret or the last

@@ -6365,4 +6365,49 @@ namespace tut
         ensure_equals("a | after it", run(five, ":g/a/d|s/b/q/<CR>"), std::string("3 fewer lines"));
         ensure_equals("substitutions before lines", run("a\na\na\na", ":g/a/s/a/x/|d<CR>"), std::string("4 substitutions on 4 lines"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<214>()
+    {
+        set_test_name("the registers vim keeps itself named for p and P and after Control-R, as characters, . typed in again; nothing yanked or deleted into them, and a change into one types where it was");
+        make("one\ntwo");
+        keys(":s/o/0/<CR>\":p");
+        ensure_equals("\":p the last : line after the caret", flat(editor->text()), std::string("0s/o/0/ne|two"));
+        ensure_equals("on its last character", caretText(), std::string("0:6"));
+        make("one\ntwo");
+        keys(":s/o/0/<CR>\":P");
+        ensure_equals("\":P before it", flat(editor->text()), std::string("s/o/0/0ne|two"));
+        ensure_equals("there too", caretText(), std::string("0:5"));
+        make("one\ntwo");
+        keys(":s/o/0/<CR>2\":p");
+        ensure_equals("a count's copies", flat(editor->text()), std::string("0s/o/0/s/o/0/ne|two"));
+        make("one\ntwo");
+        keys("/tw<CR>\"/p");
+        ensure_equals("\"/p the last search", flat(editor->text()), std::string("one|ttwwo"));
+        ensure_equals("on its last", caretText(), std::string("1:2"));
+        make("one\ntwo");
+        keys("Axy<Esc>0\".p");
+        ensure_equals("\".p the last insert's text", flat(editor->text()), std::string("oxynexy|two"));
+        ensure_equals("and there", caretText(), std::string("0:2"));
+
+        make("one two");
+        keys(":s/o/0/<CR>\":yy");
+        ensure("\":yy: nothing yanked", !vim->shared().registers.fetch('0', false).held && !vim->shared().registers.fetch('"', false).held);
+        keys("\":dd\":x\":D");
+        ensure_equals("\":dd, \":x, \":D: nothing taken", flat(editor->text()), std::string("0ne two"));
+        keys("\":cwZZ<Esc>");
+        ensure_equals("\":cw: nothing taken, typed where it was", flat(editor->text()), std::string("ZZ0ne two"));
+        ensure_equals("on what was typed", caretText(), std::string("0:1"));
+
+        make("one\ntwo");
+        keys(":s/o/0/<CR>A<C-r>:<Esc>");
+        ensure_equals("Control-R : the last : line typed in", flat(editor->text()), std::string("0nes/o/0/|two"));
+        make("one\ntwo");
+        keys("/tw<CR>A<C-r>/<Esc>");
+        ensure_equals("Control-R / the last search", flat(editor->text()), std::string("one|twotw"));
+
+        make("aab");
+        keys("/a~*b<CR>");
+        ensure_equals("~ with no last replacement: vim's own error", vim->message(), std::string("E33: No previous substitute regular expression"));
+    }
 }

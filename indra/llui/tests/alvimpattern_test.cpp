@@ -443,4 +443,16 @@ namespace tut
         ensure_equals("after a ^ that is itself a multi", found("a^^b", ALVimPattern::of("a^*b", std::string(), plain)), std::string("a^^b"));
         ensure("after \\%( a multi, which follows nothing", found("*a", ALVimPattern::of("\\%(*a\\)", std::string(), plain)).rfind("error", 0) == 0);
     }
+
+    template<> template<>
+    void alvimpattern_object::test<22>()
+    {
+        set_test_name("a ~ with no last replacement, or only an empty one, reads as no pattern: vim's E33, and no match looked for");
+        const ALVimPattern none = ALVimPattern::of("a~*b", std::string(), plain);
+        ensure_equals("said", none.readError, std::string("E33: No previous substitute regular expression"));
+        ensure_equals("and nothing found", found("aab ab", none), std::string("error: E33: No previous substitute regular expression"));
+        ensure_equals("very magic's", ALVimPattern::of("\\va~+", std::string(), plain).readError, none.readError);
+        ensure("one to stand for", ALVimPattern::of("a~*b", std::string("x"), plain).readError.empty());
+        ensure("very nomagic's bare ~ itself", ALVimPattern::of("\\Va~b", std::string(), plain).readError.empty());
+    }
 }

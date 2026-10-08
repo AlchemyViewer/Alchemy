@@ -1266,8 +1266,10 @@ bool ALVimKeymap::afterSurroundPair(ALTextView& view, llwchar pending, llwchar c
 
 bool ALVimKeymap::afterRegisterName(ALTextView& view, llwchar pending, llwchar ch)
 {
+    // Those vim keeps itself -- . : / -- as well, to put, which nothing may
+    // write to (applyOperator).
     if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '"' || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '+' ||
-        ch == '*')
+        ch == '*' || ch == '.' || ch == ':' || ch == '/')
     {
         // A count typed before the name is kept, for the one typed after
         // it to multiply (takeRegisterCount).
@@ -5749,6 +5751,23 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
         moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
         return;
     }
+    // A register vim keeps itself -- . : / -- is read only: a yank or a
+    // delete into it takes nothing and fails, and a change takes nothing
+    // and types from the stretch's start, as vim's op_change goes on into
+    // insert mode once its delete has refused.
+    if ((op == 'd' || op == 'y' || op == 'c') && (mRegister == '.' || mRegister == ':' || mRegister == '/'))
+    {
+        if (op == 'c' && editing)
+        {
+            view.setCaret(span.range.begin);
+            view.undoJournal().beginGroup();
+            enterInsert(view, 1, true);
+            return;
+        }
+        mFailed = true;
+        clearPending();
+        return;
+    }
     // A delete of characters over more than one line with nothing but
     // blanks before it on its first line and after it on its last is those
     // lines whole, as vim's is: 2daw over a line's words and the next's,
@@ -6598,7 +6617,7 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
         {
             typeIn(view, mLastTyped);
         }
-        else if (isalnum(static_cast<unsigned char>(name)) || name == '"' || name == '-' || name == '+' || name == '*')
+        else if (isalnum(static_cast<unsigned char>(name)) || name == '"' || name == '-' || name == '+' || name == '*' || name == ':' || name == '/')
         {
             typeIn(view, fetch(name).text);
         }

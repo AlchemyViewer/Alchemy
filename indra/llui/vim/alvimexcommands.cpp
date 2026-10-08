@@ -1798,7 +1798,8 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
     std::vector<ALTextRange> matches = mVim.mSearch.matchesOf(view, pattern_in, options, &scope, error, wholes);
     if (!error.empty())
     {
-        mVim.say(ALVimKeymap::said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", error } }), true);
+        // vim's own error of the pattern as it is, the engine's as E486.
+        mVim.say(pattern_in.readError.empty() ? ALVimKeymap::said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", error } }) : error, true);
         return false;
     }
     // The matches are in order: the lines walked beside them.
@@ -2099,7 +2100,7 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
     std::vector<ALTextRange> matches = pattern_in.matchesIn(d, options, &scope, mVim.mSearch.placesOf(view), error, wholes, format, count_only ? nullptr : &replaced);
     if (!error.empty())
     {
-        mVim.say(ALVimKeymap::said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", error } }), true);
+        mVim.say(pattern_in.readError.empty() ? ALVimKeymap::said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", error } }) : error, true);
         return false;
     }
     if (matches.empty())

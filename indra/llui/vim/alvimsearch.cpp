@@ -66,7 +66,8 @@ std::optional<ALTextPos> ALVimSearch::target(ALTextView& view, const std::string
     const std::vector<ALTextRange>& matches   = found_now.matches;
     if (!found_now.error.empty())
     {
-        mVim.say(ALVimKeymap::said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", found_now.error } }), true);
+        mVim.say(pattern_in.readError.empty() ? ALVimKeymap::said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", found_now.error } }) : found_now.error,
+                 true);
         return std::nullopt;
     }
     if (matches.empty())

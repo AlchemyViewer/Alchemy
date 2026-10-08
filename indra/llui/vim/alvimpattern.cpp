@@ -27,6 +27,7 @@
 #include "alvimpattern.h"
 #include "alvimtext.h"
 
+#include "alsaid.h"
 #include "altextchars.h"
 #include "llstring.h"
 
@@ -335,8 +336,13 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         out.regex += c;
     };
     // The last replacement made, as the text it is: one atom, which a
-    // multi after it repeats whole.
+    // multi after it repeats whole. With none, or none but an empty one,
+    // vim reads no pattern.
     auto lastReplacement = [&]() {
+        if (last_replacement.empty() && out.readError.empty())
+        {
+            out.readError = alSaid("VimNoPreviousSubstitute", "E33: No previous substitute regular expression");
+        }
         const bool several = !last_replacement.empty() && utf8str_decode_at(last_replacement, 0).next < last_replacement.size();
         if (several)
         {
@@ -1239,6 +1245,11 @@ std::vector<ALTextRange> ALVimPattern::matchesIn(const ALTextDocument& d, ALText
                                                  std::string& error, std::vector<ALTextPos>& wholes, std::string_view with,
                                                  std::vector<std::string>* replaced) const
 {
+    if (!readError.empty())
+    {
+        error = readError;
+        return {};
+    }
     options.acrossLines     = acrossLines;
     options.cutGroups       = cutGroups;
     // The format's groups by vim's numbers, where the engine counts the
