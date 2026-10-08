@@ -108,6 +108,38 @@ namespace
         }
         return false;
     }
+
+    // A format of the engine's with vim's groups in it, $1 to $9, each by
+    // the engine's number for it (`numbers`, in vim's order); one vim does
+    // not have is nothing, as vim makes it.
+    std::string groupsAsCounted(std::string_view format, const std::vector<S32>& numbers)
+    {
+        std::string out;
+        out.reserve(format.size() + 8);
+        for (size_t i = 0; i < format.size(); ++i)
+        {
+            const char c = format[i];
+            if (c == '$' && i + 1 < format.size() && format[i + 1] >= '1' && format[i + 1] <= '9')
+            {
+                const size_t vim_group = static_cast<size_t>(format[++i] - '1');
+                if (vim_group < numbers.size())
+                {
+                    out += "${" + std::to_string(numbers[vim_group]) + "}";
+                }
+            }
+            else if ((c == '\\' || c == '$') && i + 1 < format.size())
+            {
+                // An escape, or $$ $& and the like, as it stands.
+                out += c;
+                out += format[++i];
+            }
+            else
+            {
+                out += c;
+            }
+        }
+        return out;
+    }
 }
 
 // static
@@ -120,12 +152,12 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // nomagic, where only the backslash items are special, a bare ^ and $
     // themselves and \^ \$ a line's start and end anywhere; \M nomagic,
     // the same but for magic's ^ and $. \zs is \K; \ze looks ahead at the
-    // rest of its branch; \@= \@! \@<= \@<! and \@> look round the atom
-    // before them; \{-} is *?; the classes \a \l \u \x \o \h \i \k are
-    // brackets; \c and \C say how case is matched; a bracket expression is
-    // copied through as it stands. A magic ^ is a line's start only first
-    // in a branch, a $ its end only last in one, and either is itself
-    // anywhere else.
+    // rest of its branch, or is a group at which the match is cut; \@= \@!
+    // \@<= \@<! and \@> look round the atom before them; \{-} is *?; the
+    // classes \a \l \u \x \o \h \i \k are brackets; \c and \C say how case
+    // is matched; a bracket expression is copied through as it stands. A
+    // magic ^ is a line's start only first in a branch, a $ its end only
+    // last in one, and either is itself anywhere else.
     ALVimPattern        out;
     std::optional<bool> case_in_pattern;
     enum class Magic : U8
@@ -222,8 +254,8 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         }
         return very && ENDS.find(vim[k]) != std::string_view::npos;
     };
-    // How deep in the engine's brackets the output is, so that a \zs at
-    // the top can split the pattern into groups.
+    // How deep in the engine's brackets the output is, so that a \ze at
+    // the top can look ahead to its branch's end.
     S32   depth    = 0;
     // The look aheads \ze opened, by the depth each was opened at: each
     // runs to the end of its branch -- a \| at that depth, the \) that
@@ -236,6 +268,19 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
             looking.pop_back();
         }
     };
+    // Only the first \ze of a branch at the top looks ahead. Any other --
+    // in a group, where what follows the group must still match past it,
+    // or after another, where the last crossed is the one that counts --
+    // is an empty group of the engine's at which the match is cut, the
+    // pattern matched on past it (cutGroups). Each with where it went,
+    // since one a look round takes in counts for nothing, as in vim; and
+    // whether a \ze has come in the branch at the top so far.
+    std::vector<std::pair<size_t, S32>> cuts;
+    bool                                ze_in_branch = false;
+    // The engine's groups as they open, vim's and the cuts among them;
+    // the engine's number for each of vim's.
+    S32              groups = 0;
+    std::vector<S32> vim_groups;
     // Where each group still open began in the expression, and where the
     // last atom did, which a \@ looks around: none at the start of a
     // branch. Each token read is taken for an atom until it says it is
@@ -279,6 +324,19 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                 put_at += open.size();
             }
         }
+        // A cut in what is looked ahead at or behind is none; one in what
+        // is taken whole still is.
+        if (open != "(?>")
+        {
+            std::erase_if(cuts, [&](const std::pair<size_t, S32>& cut) { return cut.first >= atom_at; });
+        }
+        for (std::pair<size_t, S32>& cut : cuts)
+        {
+            if (cut.first >= atom_at)
+            {
+                cut.first += open.size();
+            }
+        }
         out.regex += ')';
         return k;
     };
@@ -317,6 +375,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     }
                     open_at.push_back(out.regex.size());
                     out.regex += "(";
+                    vim_groups.push_back(++groups);
                     ++depth;
                     at_start   = true;
                     atom_at    = std::string::npos;
@@ -347,9 +406,10 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     }
                     closeLooks();
                     out.regex += "|";
-                    at_start   = true;
-                    atom_at    = std::string::npos;
-                    token_atom = false;
+                    ze_in_branch = ze_in_branch && depth > 0;
+                    at_start     = true;
+                    atom_at      = std::string::npos;
+                    token_atom   = false;
                     continue;
                 case '@':
                 {
@@ -422,8 +482,17 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     }
                     if (i + 1 < vim.size() && vim[i + 1] == 'e')
                     {
-                        out.regex += "(?=";
-                        looking.push_back(depth);
+                        if (depth == 0 && !ze_in_branch)
+                        {
+                            out.regex += "(?=";
+                            looking.push_back(depth);
+                        }
+                        else
+                        {
+                            cuts.emplace_back(out.regex.size(), ++groups);
+                            out.regex += "()";
+                        }
+                        ze_in_branch = true;
                         ++i;
                         token_atom = false;
                         continue;
@@ -601,6 +670,15 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                 case 'K': out.regex += "[A-Za-z_]"; continue;
                 case 'e': out.regex += "\\x1b"; continue;
                 default:
+                    // A back reference to one of vim's groups that a cut
+                    // before it has the engine count otherwise, by the
+                    // engine's number.
+                    if (n >= '1' && n <= '9' && static_cast<size_t>(n - '0') <= vim_groups.size() &&
+                        vim_groups[static_cast<size_t>(n - '1')] != n - '0')
+                    {
+                        out.regex += "\\g{" + std::to_string(vim_groups[static_cast<size_t>(n - '1')]) + "}";
+                        continue;
+                    }
                     // \s \S \d \D \w \W \n \t \r \b \. \* \[ \] \/ and the
                     // rest: as they are, a backslash before a letter or a
                     // symbol the engine reads the same way; \n is a line's
@@ -733,6 +811,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     case '(':
                         open_at.push_back(out.regex.size());
                         out.regex += c;
+                        vim_groups.push_back(++groups);
                         ++depth;
                         at_start   = true;
                         atom_at    = std::string::npos;
@@ -754,6 +833,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         if (c == '|')
                         {
                             closeLooks();
+                            ze_in_branch = ze_in_branch && depth > 0;
                         }
                         out.regex += c;
                         at_start   = true;
@@ -796,6 +876,21 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         }
     }
     out.regex.append(looking.size(), ')');
+    for (const std::pair<size_t, S32>& cut : cuts)
+    {
+        if (cut.second < 64)
+        {
+            out.cutGroups |= U64(1) << cut.second;
+        }
+    }
+    for (size_t k = 0; k < vim_groups.size(); ++k)
+    {
+        if (vim_groups[k] != static_cast<S32>(k + 1))
+        {
+            out.groupNumbers = vim_groups;
+            break;
+        }
+    }
     if (!k_at.empty() && !out.where.empty())
     {
         out.wholeRegex = out.regex;
@@ -828,6 +923,15 @@ std::vector<ALTextRange> ALVimPattern::matchesIn(const ALTextDocument& d, ALText
                                                  std::vector<std::string>* replaced) const
 {
     options.acrossLines     = acrossLines;
+    options.cutGroups       = cutGroups;
+    // The format's groups by vim's numbers, where the engine counts the
+    // same groups otherwise.
+    std::string renumbered;
+    if (replaced && !groupNumbers.empty())
+    {
+        renumbered = groupsAsCounted(with, groupNumbers);
+        with       = renumbered;
+    }
     std::vector<ALTextRange> matches = replaced ? ALTextSearch::matches(d, regex, options, scope, &error, &wholes, with, *replaced)
                                                 : ALTextSearch::matches(d, regex, options, scope, &error, &wholes);
     if (error.empty() && !wholeRegex.empty())

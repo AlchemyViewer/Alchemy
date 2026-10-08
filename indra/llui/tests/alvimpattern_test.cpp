@@ -55,6 +55,25 @@ namespace tut
             }
             return out;
         }
+        // What replaces each match of a pattern in a text, vim's
+        // replacement `with` made of it as :s makes it.
+        static std::string replacedIn(const std::string& text, const ALVimPattern& pattern, const std::string& with)
+        {
+            const ALTextDocument     doc(text);
+            ALTextSearchOptions      options;
+            options.regex         = true;
+            options.caseSensitive = pattern.caseSensitive;
+            std::string              error;
+            std::vector<ALTextPos>   wholes;
+            std::vector<std::string> replaced;
+            pattern.matchesIn(doc, options, nullptr, {}, error, wholes, ALVimPattern::replacementOf(with), &replaced);
+            std::string out = error.empty() ? std::string() : "error: " + error;
+            for (const std::string& one : replaced)
+            {
+                out += (out.empty() ? "" : "|") + one;
+            }
+            return out;
+        }
     };
 
     typedef test_group<alvimpattern_data> alvimpattern_group;
@@ -188,10 +207,10 @@ namespace tut
     template<> template<>
     void alvimpattern_object::test<8>()
     {
-        set_test_name("\\ze looks ahead to the end of its branch alone, and \\@= \\@! \\@<= \\@<! \\@> look round the atom before them");
+        set_test_name("\\ze at the top looks ahead to the end of its branch alone, and \\@= \\@! \\@<= \\@<! \\@> look round the atom before them");
         ensure_equals("closed at the \\|", regexOf("foo\\zebar\\|qux"), std::string("foo(?=bar)|qux"));
-        ensure_equals("and at its group's close", regexOf("\\(a\\zeb\\)"), std::string("(a(?=b))"));
-        ensure_equals("or at a \\| in the group", regexOf("\\(foo\\zebar\\|baz\\)"), std::string("(foo(?=bar)|baz)"));
+        ensure_equals("in a group, a group that cuts the match", regexOf("\\(a\\zeb\\)"), std::string("(a()b)"));
+        ensure_equals("and in a group's branch", regexOf("\\(foo\\zebar\\|baz\\)"), std::string("(foo()bar|baz)"));
         ensure_equals("very magic's too", regexOf("\\vfoo\\zebar|qux"), std::string("foo(?=bar)|qux"));
         ensure_equals("each branch as vim takes it", found("qux\nfooqux\nfoobar", ALVimPattern::of("foo\\zebar\\|qux", std::string(), plain)),
                       std::string("qux|qux|foo"));
@@ -254,5 +273,28 @@ namespace tut
         ensure_equals("but the line's start", found("ab x", ALVimPattern::of("\\_^ab", std::string(), plain)), std::string("ab"));
         ensure_equals("nor a $, but the line's end", found("ab$x ab", ALVimPattern::of("ab\\_$", std::string(), plain)), std::string("ab"));
         ensure_equals("after a line break", found("xa\nb", ALVimPattern::of("a\\n\\_^b", std::string(), plain)), std::string("a\nb"));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<12>()
+    {
+        set_test_name("\\ze in a group ends the match there while the rest of the pattern, the group's and what follows it, matches on past it");
+        ensure_equals("what follows the group", found("abc abx", ALVimPattern::of("\\(a\\zeb\\)c", std::string(), plain)), std::string("a"));
+        ensure_equals("a branch of the group without it whole", found("abc xc", ALVimPattern::of("\\(a\\zeb\\|x\\)c", std::string(), plain)),
+                      std::string("a|xc"));
+        ensure_equals("a group in a group", found("abcd", ALVimPattern::of("\\(\\(a\\zeb\\)c\\)d", std::string(), plain)), std::string("a"));
+        ensure_equals("the last crossed in a repeat", found("abababc", ALVimPattern::of("\\(a\\zeb\\)*c", std::string(), plain)),
+                      std::string("ababa|c"));
+        ensure_equals("and the last of two in a branch", found("abc", ALVimPattern::of("a\\zeb\\zec", std::string(), plain)), std::string("ab"));
+        ensure_equals("after a \\zs", found("xabc", ALVimPattern::of("x\\zs\\(a\\zeb\\)c", std::string(), plain)), std::string("a"));
+        ensure_equals("none in what is looked ahead at", found("ab", ALVimPattern::of("\\%(a\\zeb\\)\\@=ab", std::string(), plain)), std::string("ab"));
+        ensure_equals("a back reference to a group after it", found("abcc abcd", ALVimPattern::of("\\(a\\zeb\\)\\(c\\)\\2", std::string(), plain)),
+                      std::string("a"));
+        ensure_equals("each next match looked for from where the last was cut", found("aaaa", ALVimPattern::of("\\(a\\zea\\)", std::string(), plain)),
+                      std::string("a|a|a"));
+        ensure_equals("its group whole in a replacement, & the match", replacedIn("abcabc", ALVimPattern::of("\\(a\\zeb\\)c", std::string(), plain), "<\\1\\2&>"),
+                      std::string("<aba>|<aba>"));
+        ensure_equals("and a group after it by vim's number", replacedIn("abcc", ALVimPattern::of("\\(a\\zeb\\)\\(c\\)\\2", std::string(), plain), "<\\1|\\2|&>"),
+                      std::string("<ab|c|a>"));
     }
 }

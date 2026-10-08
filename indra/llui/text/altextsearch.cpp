@@ -139,9 +139,10 @@ namespace
 
     // The pattern's first match from `first`, a character at a time up to
     // `last`, looking back as far as `base`; said in bytes, as Boost's own
-    // search of UTF-8 says it.
+    // search of UTF-8 says it; cut where the groups `cuts` names say
+    // (ALTextSearchOptions::cutGroups).
     bool searchAt(const char* first, const char* last, const char* base, const boost::u32regex& re, boost::match_flag_type flags,
-                  boost::cmatch& found)
+                  boost::cmatch& found, U64 cuts)
     {
         boost::match_results<Characters> by_character;
         if (!boost::regex_search(Characters(first, base, last), Characters(last, base, last), by_character, re, flags, Characters(base, base, last)))
@@ -149,6 +150,21 @@ namespace
             return false;
         }
         boost::BOOST_REGEX_DETAIL_NS::copy_results(found, by_character, re.get_named_subs());
+        const char* cut = nullptr;
+        for (size_t group = 1; cuts != 0 && group < found.size() && group < 64; ++group)
+        {
+            if (((cuts >> group) & 1) != 0 && found[group].matched && (!cut || found[group].first > cut))
+            {
+                cut = found[group].first;
+            }
+        }
+        if (cut)
+        {
+            // The whole match, and what is after it, from the cut: what
+            // a format's $& and $' are made of, and where the search
+            // goes on from.
+            found.set_second(std::max(cut, found[0].first));
+        }
         return true;
     }
 
@@ -321,7 +337,7 @@ namespace
                     {
                         // From the text's start as the base, so that a look
                         // behind sees past where this search began.
-                        if (!searchAt(start, end, base, re, flags, found) || found[0].first > limit)
+                        if (!searchAt(start, end, base, re, flags, found, options.cutGroups) || found[0].first > limit)
                         {
                             break;
                         }
@@ -561,13 +577,14 @@ std::string ALTextSearch::replacement(const ALTextDocument& doc, const ALTextRan
             try
             {
                 boost::cmatch found;
-                bool matched = searchAt(base + from, base + hay.size(), base, *re, flags, found) && found[0].second == base + to;
+                const U64     cuts    = options.cutGroups;
+                bool          matched = searchAt(base + from, base + hay.size(), base, *re, flags, found, cuts) && found[0].second == base + to;
                 if (!matched)
                 {
-                    matched = searchAt(base + from, base + to, base, *re, flags, found) && found[0].second == base + to;
+                    matched = searchAt(base + from, base + to, base, *re, flags, found, cuts) && found[0].second == base + to;
                 }
                 const char* own = text.data();
-                if (matched || searchAt(own, own + text.size(), own, *re, boost::match_default | boost::match_not_dot_newline, found))
+                if (matched || searchAt(own, own + text.size(), own, *re, boost::match_default | boost::match_not_dot_newline, found, cuts))
                 {
                     out = found.format(std::string(with), boost::format_perl);
                 }

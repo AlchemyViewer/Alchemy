@@ -62,6 +62,12 @@ struct ALTextSearchOptions
     // there are passed over as they are found, nothing made of what would
     // replace them -- what vim's :s without g asks for.
     bool firstPerLine  = false;
+    // The groups of the pattern, a bit each, that end a match where they
+    // stand: a match is cut where the last of them that took part begins,
+    // though never before it starts, and the next is looked for from
+    // there, the pattern having gone on past it -- what vim's \ze inside
+    // a group asks for.
+    U64  cutGroups     = 0;
 };
 
 // Finding in a document: every place a query stands, plain or as a
