@@ -181,6 +181,20 @@ namespace ALTextDiff
         S32 same = 0;
     };
     typedef std::function<Reread(const std::vector<regions_t>& regions)> reread_t;
+    // What whoever made a text knows of it, asked of such a lexer: that it
+    // is the text the lexer numbered `text` with that one's lines from
+    // `head` to all but its last `tail` put in the place of others -- that
+    // one as it was, where `head` is all the lines of both; nothing where
+    // `text` is nought. And a lexer told so, which need not find where the
+    // two differ, answering as lexer_t does: given beside a lexer_t over the
+    // same, and asked as it would be.
+    struct Known
+    {
+        U64 text = 0;
+        S32 head = 0;
+        S32 tail = 0;
+    };
+    typedef std::function<const std::vector<regions_t>&(const std::vector<std::string>& lines, const Known& known)> told_t;
 
     // Words that mean the same in the two texts though written otherwise
     // (ALDiffSame): none, or a table made once and shared.

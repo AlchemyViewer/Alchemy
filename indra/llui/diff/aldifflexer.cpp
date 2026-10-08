@@ -61,6 +61,14 @@ ALTextDiff::lexer_t ALDiffLexer::lexerOf(std::shared_ptr<ALDiffLexer> lexer)
     return [lexer](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& { return lexer->regions(lines); };
 }
 
+// static
+ALTextDiff::told_t ALDiffLexer::toldOf(std::shared_ptr<ALDiffLexer> lexer)
+{
+    return [lexer](const std::vector<std::string>& lines, const ALTextDiff::Known& known) -> const std::vector<ALTextDiff::regions_t>& {
+        return lexer->regions(lines, known);
+    };
+}
+
 ALTextDiff::Reread ALDiffLexer::reread(const std::vector<ALTextDiff::regions_t>& regions) const
 {
     for (const Text& text : mTexts)
@@ -135,7 +143,7 @@ const std::vector<ALTextDiff::regions_t>& ALDiffLexer::regions(const std::vector
         {
             continue;
         }
-        edges[n] = ALDiffEdit::edgesOf(text.lines, lines);
+        edges[n] = edgesOf(text, lines);
         known[n] = true;
         if (edges[n].head == static_cast<S32>(lines.size()))
         {
@@ -145,13 +153,58 @@ const std::vector<ALTextDiff::regions_t>& ALDiffLexer::regions(const std::vector
     }
     // Else in the place of the one read longer ago, which leaves the last
     // answered as it was: a comparison asks for its two texts in turn and
-    // holds both. Read again in place where that is mostly this text; else
-    // whole, taking what either held where it can.
+    // holds both.
     const size_t older = mTexts[0].used <= mTexts[1].used ? 0 : 1;
-    Text&        text  = mTexts[older];
+    return readIn(older, lines, known[older] ? &edges[older] : nullptr);
+}
+
+const std::vector<ALTextDiff::regions_t>& ALDiffLexer::regions(const std::vector<std::string>& lines, const ALTextDiff::Known& known)
+{
+    mLastRead = 0;
+    // The text so numbered, where the edges said are within both: as it
+    // is where they are all of both, else read again in its place where it
+    // is the one read longer ago, as a text not known would be. The other
+    // held is not looked at.
+    const size_t older = mTexts[0].used <= mTexts[1].used ? 0 : 1;
+    for (size_t n = 0; known.text != 0 && n < 2; ++n)
+    {
+        Text&     text = mTexts[n];
+        const S32 most = static_cast<S32>(std::min(text.lines.size(), lines.size()));
+        if (text.number != known.text || text.starts.empty() || known.head < 0 || known.tail < 0 || known.head > most - known.tail)
+        {
+            continue;
+        }
+        if (known.head == most && text.lines.size() == lines.size())
+        {
+            text.used = ++mClock;
+            return text.regions;
+        }
+        if (n == older)
+        {
+            const ALDiffEdit::Edges edges{ known.head, known.tail };
+            return readIn(older, lines, &edges);
+        }
+        break;
+    }
+    return regions(lines);
+}
+
+ALDiffEdit::Edges ALDiffLexer::edgesOf(const Text& text, const std::vector<std::string>& lines)
+{
+    return ALDiffEdit::edgesBy(static_cast<S32>(text.lines.size()), static_cast<S32>(lines.size()), [&](S32 was, S32 now) {
+        ++mCompared;
+        return text.lines[static_cast<size_t>(was)] == lines[static_cast<size_t>(now)];
+    });
+}
+
+const std::vector<ALTextDiff::regions_t>& ALDiffLexer::readIn(size_t slot, const std::vector<std::string>& lines, const ALDiffEdit::Edges* edges)
+{
+    // Read again in place where that is mostly this text; else whole,
+    // taking what either held where it can.
+    Text& text = mTexts[slot];
     if (!text.starts.empty())
     {
-        const ALDiffEdit::Edges edged = known[older] ? edges[older] : ALDiffEdit::edgesOf(text.lines, lines);
+        const ALDiffEdit::Edges edged = edges ? *edges : edgesOf(text, lines);
         if (static_cast<size_t>(edged.head + edged.tail) * 2 >= lines.size())
         {
             readAgain(text, lines, edged);
@@ -159,7 +212,7 @@ const std::vector<ALTextDiff::regions_t>& ALDiffLexer::regions(const std::vector
             return text.regions;
         }
     }
-    readWhole(text, lines, mTexts[1 - older]);
+    readWhole(text, lines, mTexts[1 - slot]);
     text.used = ++mClock;
     return text.regions;
 }

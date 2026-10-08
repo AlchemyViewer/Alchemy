@@ -192,9 +192,12 @@ public:
     // (mergeOptions): a lexer holds the last two texts it read, which are
     // the comparison's, and a merge reads three. Without it, the merge
     // reads by the comparison's. And what the comparison's says it read
-    // again of a text (ALTextDiff::reread_t), where it says.
+    // again of a text (ALTextDiff::reread_t), where it says; and the
+    // comparison's told what an edit knows of the texts it asks for
+    // (ALTextDiff::told_t), where it can be, which beside what it says
+    // then need not compare them with those it holds.
     void    setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging = ALTextDiff::lexer_t(),
-                     ALTextDiff::reread_t reread = ALTextDiff::reread_t());
+                     ALTextDiff::reread_t reread = ALTextDiff::reread_t(), ALTextDiff::told_t told = ALTextDiff::told_t());
 
     // The texts as given, their line endings LF as an editor reads them.
     const std::string&           leftText() const { return mLeftText; }
@@ -438,9 +441,11 @@ private:
     // Each line's regions of the texts as shown, where a grammar cuts their
     // words and answers a line each; none else. Asked of the lexer once a
     // rebuild, which reads and lays out by them as many times as it needs:
-    // a text it holds is compared whole to be known again.
+    // a text it holds is compared whole to be known again -- but where it
+    // is told what is `known` of each as shown (ALTextDiff::told_t), the
+    // left's then the right's.
     typedef const std::vector<ALTextDiff::regions_t>* line_regions_t;
-    std::pair<line_regions_t, line_regions_t> shownRegions() const;
+    std::pair<line_regions_t, line_regions_t> shownRegions(const ALTextDiff::Known* known = nullptr) const;
     const ColumnData& of(Column column) const { return mColumns[static_cast<size_t>(column)]; }
     ColumnData&       of(Column column) { return mColumns[static_cast<size_t>(column)]; }
     // A line added to a column, a row of nothing that is a row of the gap
@@ -578,10 +583,12 @@ private:
     std::vector<S32>      mRangeOrder[2];
     std::vector<S32>      mRangeReach[2];
     ALTextDiff::Options   mOptions;
-    // The lexer a merge reads by, where it has one of its own; and what the
-    // comparison's says it read again, where it says.
+    // The lexer a merge reads by, where it has one of its own; what the
+    // comparison's says it read again, where it says; and it told what is
+    // known of a text, where it can be.
     ALTextDiff::lexer_t   mMergeLexer;
     ALTextDiff::reread_t  mReread;
+    ALTextDiff::told_t    mTold;
     bool                  mSwapped  = false;
     bool                  mFoldSame = true;
     ColumnData            mColumns[3];

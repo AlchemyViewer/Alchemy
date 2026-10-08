@@ -2155,4 +2155,98 @@ namespace tut
         both([&](ALDiffModel& model) { model.setRightText(joined(typed)); }, "the comment taken out");
         ensure_equals("two moves again", kept.moveCount(), 2);
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<48>()
+    {
+        set_test_name("the LSL grammar's lexer told what an edit knows, as a view gives it: a keystroke on either side compares no line with those it holds, blanks let go of or not, a block comment's opener broken and mended too; laid out as by a lexer not told, and as afresh; with a merge reading by it, told nothing");
+        std::string                                  error;
+        const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+        ensure("the LSL grammar", lsl != nullptr);
+        // A block comment near the top, a line below it typed in, and a
+        // change far below.
+        const auto script = [](const char* opener, const char* thirty, const char* below) {
+            return aldiffmodel_data::lines(200, { { 10, opener }, { 14, "llSay(0, \"a  b\");" }, { 16, "*/" }, { 30, thirty }, { 150, below } });
+        };
+        const std::string left   = script("/* note", "line 30", "fifty");
+        const std::string right  = script("/* note", "line 30", "FIFTY");
+        const std::string typed  = script("/* note", "line 30 typed", "FIFTY");
+        const std::string broken = script("/ note", "line 30 typed", "FIFTY");
+        const std::string older  = script("/* note", "line 30 older", "fifty");
+        const auto sameRelaid = [](const ALDiffModel::Relaid& a, const ALDiffModel::Relaid& b) {
+            bool same = a.whole == b.whole;
+            for (size_t c = 0; c < 3; ++c)
+            {
+                same = same && a.first[c] == b.first[c] && a.was[c] == b.was[c] && a.now[c] == b.now[c] && a.numbered[c] == b.numbered[c];
+            }
+            return same;
+        };
+        for (const bool blanks : { true, false })
+        {
+            const std::string    where = blanks ? "blanks let go of" : "blanks kept";
+            ALTextDiff::Likeness like;
+            like.ignoreWhitespace = blanks;
+            // Told what an edit knows, as a view's is; and said what it read
+            // again, but told nothing.
+            ALDiffModel told;
+            const auto  lexer = std::make_shared<ALDiffLexer>(lsl);
+            told.setLexer(ALDiffLexer::lexerOf(lexer), ALTextDiff::lexer_t(), ALDiffLexer::rereadOf(lexer), ALDiffLexer::toldOf(lexer));
+            ALDiffModel untold;
+            const auto  other = std::make_shared<ALDiffLexer>(lsl);
+            untold.setLexer(ALDiffLexer::lexerOf(other), ALTextDiff::lexer_t(), ALDiffLexer::rereadOf(other));
+            for (ALDiffModel* each : { &told, &untold })
+            {
+                each->setLikeness(like);
+                each->setTexts(left, right);
+            }
+            std::string left_now  = left;
+            std::string right_now = right;
+            const auto  step      = [&](bool on_left, const std::string& text, const std::string& what) {
+                (on_left ? left_now : right_now) = text;
+                const U64 told_was   = lexer->linesCompared();
+                const U64 untold_was = other->linesCompared();
+                for (ALDiffModel* each : { &told, &untold })
+                {
+                    if (on_left)
+                    {
+                        each->setLeftText(text);
+                    }
+                    else
+                    {
+                        each->setRightText(text);
+                    }
+                }
+                const std::string at = where + ", " + what;
+                ensure(at + ": laid out again in part", !told.relaid().whole);
+                ensure_equals(at + ": no line compared", lexer->linesCompared() - told_was, U64(0));
+                ensure(at + ": not told, both texts compared: " + std::to_string(other->linesCompared() - untold_was),
+                       other->linesCompared() - untold_was >= 200);
+                ensure(at + ": laid out again as far", sameRelaid(told.relaid(), untold.relaid()));
+                aldiffmodel_data::sameLayout(told, untold, at);
+                ALDiffModel fresh;
+                fresh.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+                fresh.setLikeness(like);
+                fresh.setTexts(left_now, right_now);
+                aldiffmodel_data::sameLayout(told, fresh, at + ", as afresh");
+            };
+            step(false, typed, "typed in on the right");
+            step(true, older, "another version on the left");
+            step(false, broken, "the opener broken");
+            step(false, typed, "mended");
+
+            // A merge reading by the comparison's lexer, which it then holds
+            // the merge's texts in: told nothing, and as afresh.
+            for (ALDiffModel* each : { &told, &untold })
+            {
+                each->setMergeBase(left);
+            }
+            right_now = script("/* note", "line 30 typed again", "FIFTY");
+            for (ALDiffModel* each : { &told, &untold })
+            {
+                each->setRightText(right_now);
+            }
+            aldiffmodel_data::sameLayout(told, untold, where + ", merging");
+            ensure_equals(where + ", merging: conflicts", told.conflictCount(), untold.conflictCount());
+        }
+    }
 }

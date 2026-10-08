@@ -268,11 +268,13 @@ int main(int, char**)
     std::string                            error;
     std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
     const auto lexer = [&lsl]() { return lsl ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)) : ALTextDiff::lexer_t(); };
-    // A model's lexer as a view gives it: saying what it read again.
+    // A model's lexer as a view gives it: saying what it read again, and
+    // told what an edit knows.
     const auto lexing = [&lsl](ALDiffModel& model) {
         const std::shared_ptr<ALDiffLexer> compared = lsl ? std::make_shared<ALDiffLexer>(lsl) : nullptr;
         model.setLexer(compared ? ALDiffLexer::lexerOf(compared) : ALTextDiff::lexer_t(), ALTextDiff::lexer_t(),
-                       compared ? ALDiffLexer::rereadOf(compared) : ALTextDiff::reread_t());
+                       compared ? ALDiffLexer::rereadOf(compared) : ALTextDiff::reread_t(),
+                       compared ? ALDiffLexer::toldOf(compared) : ALTextDiff::told_t());
     };
     const auto laid = [&](const std::string& left, const std::string& right, bool grammar) {
         return ms_per_item(1, [&] {
