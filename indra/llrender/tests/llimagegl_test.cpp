@@ -723,4 +723,37 @@ namespace tut
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound);
         ensure_equals("the bind reached GL", (U32)bound, img->getTexName());
     }
+
+    // The same for the blend and colour-mask caches. A context left blending
+    // BT_ALPHA made init's own setSceneBlendType(BT_ALPHA) look redundant, so the
+    // next context kept GL's ONE, ZERO while gGL believed it was alpha blending;
+    // and a mask left off read as still off on a context writing every channel.
+    template<> template<>
+    void llimagegl_object::test<20>()
+    {
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+        gGL.setColorMask(false, false);
+
+        // A new context on the same thread.
+        gl.reset();
+        gl = std::make_unique<ll_test::HeadlessGL>();
+
+        GLint src = 0;
+        GLint dst = 0;
+        glGetIntegerv(GL_BLEND_SRC_RGB, &src);
+        glGetIntegerv(GL_BLEND_DST_RGB, &dst);
+        ensure_equals("init's alpha blending reached GL: source",
+                      (S32)src, (S32)GL_SRC_ALPHA);
+        ensure_equals("init's alpha blending reached GL: destination",
+                      (S32)dst, (S32)GL_ONE_MINUS_SRC_ALPHA);
+
+        bool mask[4] = { false, false, false, false };
+        gGL.getColorMask(mask);
+        ensure("the colour mask cache says what GL starts with",
+               mask[0] && mask[1] && mask[2] && mask[3]);
+        GLboolean gl_mask[4] = { GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE };
+        glGetBooleanv(GL_COLOR_WRITEMASK, gl_mask);
+        ensure("and GL agrees",
+               gl_mask[0] && gl_mask[1] && gl_mask[2] && gl_mask[3]);
+    }
 }

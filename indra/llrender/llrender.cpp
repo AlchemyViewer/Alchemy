@@ -380,6 +380,19 @@ bool LLRender::init(bool needs_vertex_buffer)
     }
     mCurrTextureUnitIndex = 0;
 
+    // Nor is the last context's blending or colour mask: GL starts every context writing all
+    // four channels and blending ONE, ZERO. The mask cache takes that default. The blend
+    // factors go to unknown, so the BT_ALPHA below is issued rather than skipped for
+    // matching what the previous context was left with.
+    for (bool& write : mCurrColorMask)
+    {
+        write = true;
+    }
+    mCurrBlendColorSFactor = BF_UNDEF;
+    mCurrBlendAlphaSFactor = BF_UNDEF;
+    mCurrBlendColorDFactor = BF_UNDEF;
+    mCurrBlendAlphaDFactor = BF_UNDEF;
+
     // Build this context's sampler objects before anything can ask for one.
     mSamplerCache.warmup();
 
