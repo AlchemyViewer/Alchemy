@@ -37,6 +37,7 @@
 #include "llglslshader.h"
 #include "llmemory.h"
 
+#include <atomic>
 #include <boost/unordered_map.hpp>
 
 //Next Highest Power Of Two
@@ -258,6 +259,12 @@ static GLWorkQueue* sQueue = nullptr;
 //============================================================================
 // Pool of reusable VertexBuffer state
 
+// The GL context the names in a thread's pool were generated on, bumped by cleanupClass when
+// that context's buffers go. A name of the old context is nobody's on the next one -- a core
+// profile refuses to bind it -- and the pool is thread-local, so each thread empties its own
+// the next time it asks. LLImageGL's texture-name pool works the same way.
+static std::atomic<U32> sBufferNameGeneration{ 1 };
+
 // batch calls to glGenBuffers
 static GLuint gen_buffer()
 {
@@ -268,6 +275,14 @@ static GLuint gen_buffer()
 
     thread_local static GLuint sNamePool[pool_size];
     thread_local static U32 sIndex = 0;
+    thread_local static U32 sNameGeneration = 0;
+
+    const U32 generation = sBufferNameGeneration.load(std::memory_order_relaxed);
+    if (sNameGeneration != generation)
+    {
+        sIndex = 0;
+        sNameGeneration = generation;
+    }
 
     if (sIndex == 0)
     {
@@ -292,31 +307,50 @@ static GLuint gen_buffer()
     return ret;
 }
 
+// wait a few frames before actually deleting the buffers to avoid
+// synchronization issues with the GPU
+constexpr U32 BUFFER_FREE_BUCKETS = 4;
+static std::vector<GLuint> sBufferFreeList[BUFFER_FREE_BUCKETS];
+
 static void delete_buffers(S32 count, GLuint* buffers)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
-    // wait a few frames before actually deleting the buffers to avoid
-    // synchronization issues with the GPU
-    constexpr U32 BUCKET_COUNT = 4;
-    static std::vector<GLuint> sFreeList[BUCKET_COUNT];
 
     if (gGLManager.mInited)
     {
         // Move current frame to free list
-        U32 idx = LLImageGL::sFrameCount % BUCKET_COUNT;
+        U32 idx = LLImageGL::sFrameCount % BUFFER_FREE_BUCKETS;
 
         for (S32 i = 0; i < count; ++i)
         {
-            sFreeList[idx].push_back(buffers[i]);
+            sBufferFreeList[idx].push_back(buffers[i]);
         }
 
         // Clear frame -3 (equals +1), this idx will be written over on the next call
-        idx = (LLImageGL::sFrameCount + 1) % BUCKET_COUNT;
+        idx = (LLImageGL::sFrameCount + 1) % BUFFER_FREE_BUCKETS;
 
-        if (!sFreeList[idx].empty())
+        if (!sBufferFreeList[idx].empty())
         {
-            glDeleteBuffers((GLsizei)sFreeList[idx].size(), sFreeList[idx].data());
-            sFreeList[idx].resize(0);
+            glDeleteBuffers((GLsizei)sBufferFreeList[idx].size(), sBufferFreeList[idx].data());
+            sBufferFreeList[idx].resize(0);
+        }
+    }
+}
+
+// Delete everything still waiting out its frames, now, while its context is current. Left
+// for the next context, the names would be deleted there -- where the same numbers can
+// belong to buffers that context has since made.
+static void drain_deleted_buffers()
+{
+    for (std::vector<GLuint>& bucket : sBufferFreeList)
+    {
+        if (!bucket.empty())
+        {
+            if (gGLManager.mInited)
+            {
+                glDeleteBuffers((GLsizei)bucket.size(), bucket.data());
+            }
+            bucket.resize(0);
         }
     }
 }
@@ -1009,6 +1043,12 @@ void LLVertexBuffer::cleanupClass()
     delete sQueue;
     sQueue = nullptr;
 #endif
+
+    // Last: the pool's teardown above queued its buffers for deletion.
+    drain_deleted_buffers();
+
+    // What follows is a new context, whose names these were not.
+    sBufferNameGeneration.fetch_add(1, std::memory_order_relaxed);
 }
 
 //----------------------------------------------------------------------------

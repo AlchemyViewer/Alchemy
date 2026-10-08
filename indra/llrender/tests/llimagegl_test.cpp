@@ -756,4 +756,32 @@ namespace tut
         ensure("and GL agrees",
                gl_mask[0] && gl_mask[1] && gl_mask[2] && gl_mask[3]);
     }
+
+    // And for vertex buffer names, which LLVertexBuffer pools per thread as
+    // LLImageGL pools texture names. The pool was never emptied with its context,
+    // so the next context bound a name it had never generated -- which a core
+    // profile refuses -- and the buffer was never allocated.
+    template<> template<>
+    void llimagegl_object::test<21>()
+    {
+        {
+            // Fill this thread's pool from this context.
+            LLPointer<LLVertexBuffer> vb = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
+            ensure("allocateBuffer succeeded", vb->allocateBuffer(3, 0));
+        }
+
+        // A new context on the same thread.
+        gl.reset();
+        gl = std::make_unique<ll_test::HeadlessGL>();
+
+        // The pool binds a buffer it has just generated to give it storage, so what is
+        // bound now is the name this allocation drew from the pool.
+        LLPointer<LLVertexBuffer> vb = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
+        ensure("allocateBuffer succeeded in the new context", vb->allocateBuffer(3, 0));
+        GLint bound = 0;
+        glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &bound);
+        ensure("a buffer is bound", bound != 0);
+        ensure("and it is one this context made", glIsBuffer((GLuint)bound) == GL_TRUE);
+        LLVertexBuffer::unbind();
+    }
 }
