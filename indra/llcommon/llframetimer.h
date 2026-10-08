@@ -36,6 +36,16 @@
 
 #include "lltimer.h"
 
+// The frame clock is the main thread's: updateFrameTime() writes it there once a frame, and
+// another thread reading it sees a time that thread did not sample and cannot tell when it
+// moves. Anything timed off the main thread uses LLTimer. Debug builds check the statics.
+#if LL_DEBUG
+extern LL_COMMON_API bool on_main_thread();
+#define LL_FRAME_CLOCK_ON_MAIN_THREAD() llassert_msg(on_main_thread(), "the frame clock read off the main thread")
+#else
+#define LL_FRAME_CLOCK_ON_MAIN_THREAD()
+#endif
+
 class LL_COMMON_API LLFrameTimer
 {
 public:
@@ -46,18 +56,21 @@ public:
     // timer's elapsed time, which is getElapsedTimeF32().
     static F64SecondsImplicit getUptimeSeconds()
     {
+        LL_FRAME_CLOCK_ON_MAIN_THREAD();
         return sFrameTime;
     }
 
     // Return a low precision usec since epoch
     static U64 getTotalTime()
     {
+        LL_FRAME_CLOCK_ON_MAIN_THREAD();
         return sTotalTime ? U64MicrosecondsImplicit(sTotalTime) : totalTime();
     }
 
     // Return a low precision seconds since epoch
     static F64 getTotalSeconds()
     {
+        LL_FRAME_CLOCK_ON_MAIN_THREAD();
         return sTotalSeconds;
     }
 
@@ -68,12 +81,12 @@ public:
     // Call this method once, and only once, per frame to update the current frame count.
     static void updateFrameCount()                  { sFrameCount++; }
 
-    static U32  getFrameCount()                     { return sFrameCount; }
+    static U32  getFrameCount()                     { LL_FRAME_CLOCK_ON_MAIN_THREAD(); return sFrameCount; }
 
     static F32  getFrameDeltaTimeF32();
 
     // The same interval in microseconds, as getTotalTime() counts them
-    static U64  getFrameDeltaTime()                 { return sFrameDeltaTime; }
+    static U64  getFrameDeltaTime()                 { LL_FRAME_CLOCK_ON_MAIN_THREAD(); return sFrameDeltaTime; }
 
     // Return seconds since the current frame started
     static F32  getCurrentFrameTime();

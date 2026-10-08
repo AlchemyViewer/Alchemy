@@ -46,6 +46,7 @@ U64 LLFrameTimer::sFrameDeltaTime = 0;
 // static
 void LLFrameTimer::updateFrameTime()
 {
+    LL_FRAME_CLOCK_ON_MAIN_THREAD();
     U64 total_time = totalTime();
     sFrameDeltaTime = total_time - sTotalTime;
     sTotalTime = total_time;
@@ -139,6 +140,7 @@ bool LLFrameTimer::checkExpirationAndReset(F32 expiration)
 // static
 F32 LLFrameTimer::getFrameDeltaTimeF32()
 {
+    LL_FRAME_CLOCK_ON_MAIN_THREAD();
     return (F32)(U64_to_F64(sFrameDeltaTime) * USEC_TO_SEC_F64);
 }
 
@@ -147,6 +149,7 @@ F32 LLFrameTimer::getFrameDeltaTimeF32()
 // Return seconds since the current frame started
 F32  LLFrameTimer::getCurrentFrameTime()
 {
+    LL_FRAME_CLOCK_ON_MAIN_THREAD();
     U64 frame_time = totalTime() - sTotalTime;
     return (F32)(U64_to_F64(frame_time) * USEC_TO_SEC_F64);
 }
