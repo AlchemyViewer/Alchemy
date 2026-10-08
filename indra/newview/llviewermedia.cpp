@@ -3223,18 +3223,26 @@ void LLViewerMediaImpl::doMediaTexUpdate(LLViewerMediaTexture* media_tex, U8* da
         {
             LL_WARNS("Media") << "Failed to create media texture" << LL_ENDL;
         }
-
-        // copy just the subimage covered by the image raw to GL
-        media_tex->setSubImage(data, data_width, data_height, x_pos, y_pos, width, height, tex_name);
+        else
+        {
+            // copy just the subimage covered by the image raw to GL
+            media_tex->setSubImage(data, data_width, data_height, x_pos, y_pos, width, height, tex_name);
+        }
     }
 
-    if (sync)
+    // With no new texture there is nothing to upload into or publish. Given a tex_name of
+    // 0, setSubImage writes the texture on screen instead -- from the worker, while the
+    // main thread may be sampling it.
+    if (tex_name != 0)
     {
-        media_tex->getGLTexture()->syncToMainThread(tex_name);
-    }
-    else
-    {
-        media_tex->getGLTexture()->syncTexName(tex_name);
+        if (sync)
+        {
+            media_tex->getGLTexture()->syncToMainThread(tex_name);
+        }
+        else
+        {
+            media_tex->getGLTexture()->syncTexName(tex_name);
+        }
     }
 
     // release the data pointer before freeing raw so LLImageRaw destructor doesn't
