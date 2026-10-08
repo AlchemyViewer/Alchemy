@@ -189,6 +189,10 @@ public:
     std::string getDisplayServer() const override;
 
     void bringToFront() override;
+    // bringToFront() with the xdg-activation token another process was
+    // launched with and handed over, which on Wayland is what lets a window
+    // out of focus take it. Without a token, or on X11, it is bringToFront().
+    void bringToFront(const std::string& activation_token);
 
     void setLanguageTextInput(const LLCoordGL& pos) override;
     void allowLanguageTextInput(LLPreeditor* preeditor, bool b) override;

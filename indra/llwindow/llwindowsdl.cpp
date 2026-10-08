@@ -3824,6 +3824,185 @@ void LLWindowSDL::bringToFront()
     }
 }
 
+#if LL_LINUX
+namespace
+{
+    // xdg-activation by hand. SDL's Wayland backend spends XDG_ACTIVATION_TOKEN
+    // only on showing a window, and SDL_RaiseWindow asks the compositor for a
+    // token of its own, which GNOME and KDE honour for a window out of focus
+    // only as a request for attention. A token handed over from another
+    // process has to reach xdg_activation_v1.activate some other way. The
+    // viewer builds against no Wayland header (UI.cmake), so the little this
+    // takes is mirrored from wayland-util.h, wayland-client-core.h and
+    // xdg-activation-v1.xml, and libwayland-client, which SDL has loaded, is
+    // resolved at run time.
+    struct ALWlInterface;
+
+    struct ALWlMessage
+    {
+        const char* name;
+        const char* signature;
+        const ALWlInterface** types;
+    };
+
+    struct ALWlInterface
+    {
+        const char* name;
+        int version;
+        int method_count;
+        const ALWlMessage* methods;
+        int event_count;
+        const ALWlMessage* events;
+    };
+
+    // A request is sent by its index. Its types matter only to a new object,
+    // which of these only get_activation_token makes, and it is never sent.
+    const ALWlInterface* NO_TYPES[] = { nullptr, nullptr };
+    const ALWlMessage XDG_ACTIVATION_REQUESTS[] = {
+        { "destroy", "", NO_TYPES },
+        { "get_activation_token", "n", NO_TYPES },
+        { "activate", "so", NO_TYPES },
+    };
+    const ALWlInterface XDG_ACTIVATION_V1 = { "xdg_activation_v1", 1, 3, XDG_ACTIVATION_REQUESTS, 0, nullptr };
+
+    enum : uint32_t
+    {
+        DISPLAY_GET_REGISTRY = 1,
+        REGISTRY_BIND = 0,
+        ACTIVATION_DESTROY = 0,
+        ACTIVATION_ACTIVATE = 2,
+        MARSHAL_FLAG_DESTROY = 1, // WL_MARSHAL_FLAG_DESTROY
+    };
+
+    struct ALWaylandClient
+    {
+        void* (*display_create_queue)(void* display);
+        void (*event_queue_destroy)(void* queue);
+        void* (*proxy_create_wrapper)(void* proxy);
+        void (*proxy_wrapper_destroy)(void* wrapper);
+        void (*proxy_set_queue)(void* proxy, void* queue);
+        int (*proxy_add_listener)(void* proxy, void (**listener)(void), void* data);
+        void* (*proxy_marshal_flags)(void* proxy, uint32_t opcode, const ALWlInterface* interface,
+                                     uint32_t version, uint32_t flags, ...);
+        uint32_t (*proxy_get_version)(void* proxy);
+        void (*proxy_destroy)(void* proxy);
+        int (*display_roundtrip_queue)(void* display, void* queue);
+        int (*display_flush)(void* display);
+        const ALWlInterface* registry_interface;
+    };
+
+    template <typename T>
+    bool loadSymbol(SDL_SharedObject* library, const char* symbol, T& slot)
+    {
+        slot = reinterpret_cast<T>(SDL_LoadFunction(library, symbol));
+        return slot != nullptr;
+    }
+
+    bool loadWaylandClient(SDL_SharedObject* library, ALWaylandClient& wl)
+    {
+        return loadSymbol(library, "wl_display_create_queue", wl.display_create_queue)
+            && loadSymbol(library, "wl_event_queue_destroy", wl.event_queue_destroy)
+            && loadSymbol(library, "wl_proxy_create_wrapper", wl.proxy_create_wrapper)
+            && loadSymbol(library, "wl_proxy_wrapper_destroy", wl.proxy_wrapper_destroy)
+            && loadSymbol(library, "wl_proxy_set_queue", wl.proxy_set_queue)
+            && loadSymbol(library, "wl_proxy_add_listener", wl.proxy_add_listener)
+            && loadSymbol(library, "wl_proxy_marshal_flags", wl.proxy_marshal_flags)
+            && loadSymbol(library, "wl_proxy_get_version", wl.proxy_get_version)
+            && loadSymbol(library, "wl_proxy_destroy", wl.proxy_destroy)
+            && loadSymbol(library, "wl_display_roundtrip_queue", wl.display_roundtrip_queue)
+            && loadSymbol(library, "wl_display_flush", wl.display_flush)
+            && loadSymbol(library, "wl_registry_interface", wl.registry_interface);
+    }
+
+    // wl_registry's global and global_remove events, in that order.
+    void onRegistryGlobal(void* data, void*, uint32_t name, const char* interface, uint32_t)
+    {
+        if (strcmp(interface, XDG_ACTIVATION_V1.name) == 0)
+        {
+            *static_cast<uint32_t*>(data) = name;
+        }
+    }
+
+    void onRegistryGlobalRemove(void*, void*, uint32_t) {}
+
+    void (*const REGISTRY_LISTENER[])(void) = {
+        reinterpret_cast<void (*)(void)>(&onRegistryGlobal),
+        reinterpret_cast<void (*)(void)>(&onRegistryGlobalRemove),
+    };
+
+    // Binds xdg_activation_v1 on a queue of its own, so that nothing of SDL's
+    // is dispatched here, and activates the surface with the token. False
+    // when there is no libwayland-client or no xdg_activation_v1.
+    bool activateWaylandSurface(void* display, void* surface, const char* token)
+    {
+        SDL_SharedObject* library = SDL_LoadObject("libwayland-client.so.0");
+        if (!library)
+        {
+            return false;
+        }
+
+        ALWaylandClient wl{};
+        void* queue = loadWaylandClient(library, wl) ? wl.display_create_queue(display) : nullptr;
+        void* wrapper = queue ? wl.proxy_create_wrapper(display) : nullptr;
+        void* registry = nullptr;
+        if (wrapper)
+        {
+            // The registry takes the wrapper's queue, and its events with it.
+            wl.proxy_set_queue(wrapper, queue);
+            registry = wl.proxy_marshal_flags(wrapper, DISPLAY_GET_REGISTRY, wl.registry_interface,
+                                              wl.proxy_get_version(wrapper), 0, nullptr);
+            wl.proxy_wrapper_destroy(wrapper);
+        }
+
+        bool activated = false;
+        if (registry)
+        {
+            uint32_t name = 0;
+            wl.proxy_add_listener(registry, const_cast<void (**)(void)>(REGISTRY_LISTENER), &name);
+            void* activation = nullptr;
+            if (wl.display_roundtrip_queue(display, queue) >= 0 && name != 0)
+            {
+                activation = wl.proxy_marshal_flags(registry, REGISTRY_BIND, &XDG_ACTIVATION_V1, 1, 0,
+                                                    name, XDG_ACTIVATION_V1.name, 1u, nullptr);
+            }
+            if (activation)
+            {
+                wl.proxy_marshal_flags(activation, ACTIVATION_ACTIVATE, nullptr, 1, 0, token, surface);
+                wl.proxy_marshal_flags(activation, ACTIVATION_DESTROY, nullptr, 1, MARSHAL_FLAG_DESTROY);
+                wl.display_flush(display);
+                activated = true;
+            }
+            wl.proxy_destroy(registry);
+        }
+        if (queue)
+        {
+            wl.event_queue_destroy(queue);
+        }
+
+        SDL_UnloadObject(library);
+        return activated;
+    }
+}
+#endif // LL_LINUX
+
+void LLWindowSDL::bringToFront(const std::string& activation_token)
+{
+#if LL_LINUX
+    if (mWindow && mServerProtocol == Wayland && !activation_token.empty())
+    {
+        SDL_PropertiesID props = SDL_GetWindowProperties(mWindow);
+        void* display = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, nullptr);
+        void* surface = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, nullptr);
+        if (display && surface && activateWaylandSurface(display, surface, activation_token.c_str()))
+        {
+            LL_INFOS() << "bringToFront with an activation token" << LL_ENDL;
+            return;
+        }
+    }
+#endif
+    bringToFront();
+}
+
 //static
 std::vector<std::string> LLWindowSDL::getDynamicFallbackFontList()
 {

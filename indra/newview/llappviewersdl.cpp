@@ -533,6 +533,20 @@ bool LLAppViewerSDL::init()
 
     bool success = LLAppViewer::init();
 
+#if LL_LINUX
+    if (success)
+    {
+        // The launcher's startup notification was for this process's window,
+        // which is up: SDL's Wayland backend spends XDG_ACTIVATION_TOKEN on the
+        // first window it shows and clears it, and nothing spends either on
+        // X11. Left set, they would pass to whatever the viewer starts, a
+        // browser among them, which would present a spent token as its own.
+        // SDL's own copy of the environment is cleared with them.
+        SDL_unsetenv_unsafe("XDG_ACTIVATION_TOKEN");
+        SDL_unsetenv_unsafe("DESKTOP_STARTUP_ID");
+    }
+#endif
+
 #if LL_DARWIN
     if (success)
     {
@@ -635,7 +649,7 @@ if(act.sa_sigaction != old_act.sa_sigaction) ++reset_count;
 /////////////////////////////////////////
 #if LL_LINUX && LL_DBUS
 
-static void dispatchSLURL(const char* slurl)
+static void dispatchSLURL(const char* slurl, const std::string& activation_token)
 {
     LL_INFOS() << "Was asked to go to slurl: " << slurl << LL_ENDL;
 
@@ -649,11 +663,23 @@ static void dispatchSLURL(const char* slurl)
     if (LLURLDispatcher::dispatch(url, LLCommandHandler::NAV_TYPE_EXTERNAL, web, trusted_browser)
         && gViewerWindow)
     {
-        gViewerWindow->getWindow()->bringToFront();
+        // With the sender's activation token, which on Wayland is what lets
+        // the window take focus and ends the launcher's startup notification.
+        LLWindow* window = gViewerWindow->getWindow();
+        if (LLWindowSDL* sdl_window = dynamic_cast<LLWindowSDL*>(window))
+        {
+            sdl_window->bringToFront(activation_token);
+        }
+        else
+        {
+            window->bringToFront();
+        }
     }
 }
 
-// Handles method calls delivered to VIEWERAPI_PATH. We only implement GoSLURL.
+// Handles method calls delivered to VIEWERAPI_PATH. We only implement GoSLURL:
+// GoSLURL(s link), or from a viewer since this one GoSLURL(s link, s token)
+// with the activation token the sending process was launched with.
 static DBusHandlerResult onBusMessage(DBusConnection* connection, DBusMessage* message, void* user_data)
 {
     if (!dbus_message_is_method_call(message, VIEWERAPI_INTERFACE, "GoSLURL"))
@@ -665,9 +691,13 @@ static DBusHandlerResult onBusMessage(DBusConnection* connection, DBusMessage* m
     dbus_error_init(&err);
 
     const char* slurl = nullptr;
-    if (dbus_message_get_args(message, &err, DBUS_TYPE_STRING, &slurl, DBUS_TYPE_INVALID))
+    const char* token = nullptr;
+    const bool has_args = dbus_message_has_signature(message, "ss")
+        ? dbus_message_get_args(message, &err, DBUS_TYPE_STRING, &slurl, DBUS_TYPE_STRING, &token, DBUS_TYPE_INVALID)
+        : dbus_message_get_args(message, &err, DBUS_TYPE_STRING, &slurl, DBUS_TYPE_INVALID);
+    if (has_args)
     {
-        dispatchSLURL(slurl);
+        dispatchSLURL(slurl, token ? token : "");
 
         // Reply so a blocking caller (sendURLToOtherInstance) unblocks promptly.
         if (!dbus_message_get_no_reply(message))
@@ -772,6 +802,20 @@ bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
 
     const char* curl = url.c_str();
     dbus_message_append_args(message, DBUS_TYPE_STRING, &curl, DBUS_TYPE_INVALID);
+
+    // The launcher's activation token is for a window this process will never
+    // show, so it goes with the link: on Wayland the running viewer can take
+    // focus only with one. Older GIO put it in DESKTOP_STARTUP_ID alone, and
+    // sets both now.
+    const char* token = getenv("XDG_ACTIVATION_TOKEN");
+    if (!token || !*token)
+    {
+        token = getenv("DESKTOP_STARTUP_ID");
+    }
+    if (token && *token && dbus_validate_utf8(token, nullptr))
+    {
+        dbus_message_append_args(message, DBUS_TYPE_STRING, &token, DBUS_TYPE_INVALID);
+    }
 
     // Block for a reply. If no other instance owns the name this returns null
     // with an error set (ServiceUnknown) -> we are the primary instance ->
