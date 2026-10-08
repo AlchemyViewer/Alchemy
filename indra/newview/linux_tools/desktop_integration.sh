@@ -149,7 +149,18 @@ do_install()
 do_uninstall()
 {
     local data=$1
-    rm -f -- "$data/applications/$app_id.desktop"
+    local entry="$data/applications/$app_id.desktop"
+    # An entry the user wrote, or another tree's of the same channel, stays
+    # with its icons. One whose tree is gone goes, as it runs nothing.
+    if [[ -f $entry ]]; then
+        local installed
+        installed=$(entry_install "$entry")
+        if [[ -z $installed || ($installed != "$origin" && -e $installed) ]]; then
+            echo "Left $app_id on the desktop in $data: its entry is not this viewer's"
+            return 0
+        fi
+    fi
+    rm -f -- "$entry"
     rm -f -- "$data"/icons/hicolor/*/apps/"$app_id".png
     update_caches "$data"
     echo "Removed $app_id from the desktop in $data"
