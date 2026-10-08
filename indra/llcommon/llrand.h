@@ -57,11 +57,6 @@
  */
 
 /**
- *@brief Generate a float from [0, RAND_MAX).
- */
-S32 LL_COMMON_API ll_rand();
-
-/**
  *@brief Generate a float from [0, val) or (val, 0].
  */
 S32 LL_COMMON_API ll_rand(S32 val);

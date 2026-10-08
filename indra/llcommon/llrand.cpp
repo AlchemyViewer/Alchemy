@@ -83,11 +83,6 @@ F32 ll_frand()
 }
 
 /*-------------------------- clamped random range --------------------------*/
-S32 ll_rand()
-{
-    return ll_rand(RAND_MAX);
-}
-
 S32 ll_rand(S32 val)
 {
     return ALRandMap::extentS32(ll_internal_random_double(), val);
