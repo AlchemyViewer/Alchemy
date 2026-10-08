@@ -1137,8 +1137,7 @@ protected:
     bool            processSingleAnimationStateChange(const LLUUID &anim_id, bool start);
     void            resetAnimations();
 private:
-    LLTimer         mAnimTimer;
-    F32             mTimeLast;
+    F64             mTimeLast;  // LLFrameTimer::getUptimeSeconds() at the last root update, negative before the first
 
     //--------------------------------------------------------------------
     // Animation state data

@@ -860,7 +860,7 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
     mWasOnGroundLeft = false;
     mWasOnGroundRight = false;
 
-    mTimeLast = 0.0f;
+    mTimeLast = -1.0;
     mSpeedAccum = 0.0f;
 
     mRippleTimeLast = 0.f;
@@ -5069,8 +5069,11 @@ void LLVOAvatar::updateRootPositionAndRotation(LLAgent& agent, F32 speed, bool w
         // get timing info
         // handle initial condition case
         //--------------------------------------------------------------------
-        F32 animation_time = mAnimTimer.getElapsedTimeF32();
-        if (mTimeLast == 0.0f)
+        // The frame clock, in F64: every avatar updated in a frame steps to the same time, one
+        // updated every few frames steps over the frames it sat out, and a long session does
+        // not round the step.
+        const F64 animation_time = LLFrameTimer::getUptimeSeconds();
+        if (mTimeLast < 0.0)
         {
             mTimeLast = animation_time;
 
@@ -5083,7 +5086,7 @@ void LLVOAvatar::updateRootPositionAndRotation(LLAgent& agent, F32 speed, bool w
         //--------------------------------------------------------------------
         // dont' let dT get larger than 1/5th of a second
         //--------------------------------------------------------------------
-        F32 delta_time = animation_time - mTimeLast;
+        F32 delta_time = (F32)(animation_time - mTimeLast);
 
         // Only a ceiling. There used to be a 10 ms floor here as well, which meant that above
         // 100 fps every step was inflated to the floor: at 300 fps the pelvis closed a turn
