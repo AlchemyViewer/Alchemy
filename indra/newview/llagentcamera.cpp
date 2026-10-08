@@ -1327,13 +1327,13 @@ void LLAgentCamera::updateCamera()
     if (gAgentCamera.getOrbitUpKey() || gAgentCamera.getOrbitDownKey())
     {
         F32 input_rate = gAgentCamera.getOrbitUpKey() - gAgentCamera.getOrbitDownKey();
-        cameraOrbitOver( input_rate * ORBIT_OVER_RATE / gFPSClamped );
+        cameraOrbitOver( input_rate * ORBIT_OVER_RATE * gFrameDTClamped );
     }
 
     if (gAgentCamera.getOrbitLeftKey() || gAgentCamera.getOrbitRightKey())
     {
         F32 input_rate = gAgentCamera.getOrbitLeftKey() - gAgentCamera.getOrbitRightKey();
-        cameraOrbitAround(input_rate * ORBIT_AROUND_RATE / gFPSClamped);
+        cameraOrbitAround(input_rate * ORBIT_AROUND_RATE * gFrameDTClamped);
     }
 
     if (gAgentCamera.getOrbitInKey() || gAgentCamera.getOrbitOutKey())
@@ -1343,31 +1343,31 @@ void LLAgentCamera::updateCamera()
         LLVector3d to_focus = gAgent.getPosGlobalFromAgent(LLViewerCamera::getInstance()->getOrigin()) - calcFocusPositionTargetGlobal();
         F32 distance_to_focus = (F32)to_focus.magVec();
         // Move at distance (in meters) meters per second
-        cameraOrbitIn( input_rate * distance_to_focus / gFPSClamped );
+        cameraOrbitIn( input_rate * distance_to_focus * gFrameDTClamped );
     }
 
     if (gAgentCamera.getPanInKey() || gAgentCamera.getPanOutKey())
     {
         F32 input_rate = gAgentCamera.getPanInKey() - gAgentCamera.getPanOutKey();
-        cameraPanIn(input_rate * PAN_RATE / gFPSClamped);
+        cameraPanIn(input_rate * PAN_RATE * gFrameDTClamped);
     }
 
     if (gAgentCamera.getPanRightKey() || gAgentCamera.getPanLeftKey())
     {
         F32 input_rate = gAgentCamera.getPanRightKey() - gAgentCamera.getPanLeftKey();
-        cameraPanLeft(input_rate * -PAN_RATE / gFPSClamped );
+        cameraPanLeft(input_rate * -PAN_RATE * gFrameDTClamped );
     }
 
     if (gAgentCamera.getPanUpKey() || gAgentCamera.getPanDownKey())
     {
         F32 input_rate = gAgentCamera.getPanUpKey() - gAgentCamera.getPanDownKey();
-        cameraPanUp(input_rate * PAN_RATE / gFPSClamped );
+        cameraPanUp(input_rate * PAN_RATE * gFrameDTClamped );
     }
 
     if (getRollLeftKey() || getRollRightKey())
     {
         F32 input_rate = getRollRightKey() - getRollLeftKey();
-        cameraRollOver(input_rate * ROLL_RATE / gFPSClamped);
+        cameraRollOver(input_rate * ROLL_RATE * gFrameDTClamped);
     }
 
     // Clear camera keyboard keys.

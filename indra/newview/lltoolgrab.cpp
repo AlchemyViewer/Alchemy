@@ -697,7 +697,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 
             const S32 ROTATE_H_MARGIN = gViewerWindow->getWorldViewWidthScaled() / 20;
             const F32 ROTATE_ANGLE_PER_SECOND = 30.f * DEG_TO_RAD;
-            const F32 rotate_angle = ROTATE_ANGLE_PER_SECOND / gFPSClamped;
+            const F32 rotate_angle = ROTATE_ANGLE_PER_SECOND * gFrameDTClamped;
             // ...build mode moves camera about focus point
             if (grab_center_gl.mX < ROTATE_H_MARGIN)
             {

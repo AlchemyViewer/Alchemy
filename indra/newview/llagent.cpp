@@ -1992,7 +1992,7 @@ void LLAgent::autoPilot(F32 *delta_yaw)
             direction = mAutoPilotTargetFacing;
         }
 
-        yaw = 4.f * yaw / gFPSClamped;
+        yaw = 4.f * yaw * gFrameDTClamped;
 
         // figure out which direction to turn
         LLVector3 scratch(at % direction);

@@ -5467,7 +5467,7 @@ void LLVOAvatar::updateHeadOffset()
     }
     else
     {
-        F32 u = llmax(0.f, HEAD_MOVEMENT_AVG_TIME - (1.f / gFPSClamped));
+        F32 u = llmax(0.f, HEAD_MOVEMENT_AVG_TIME - gFrameDTClamped);
         mHeadOffset = lerp(midEyePt, mHeadOffset,  u);
     }
 }
