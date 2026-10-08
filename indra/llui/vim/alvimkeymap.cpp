@@ -4835,13 +4835,18 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             // operator reaches the end, the caret sits on the last -- a
             // visual one past it, on the line's break, which the selection
             // takes, as vim's does. And every line's end from here on, for
-            // j and k.
+            // j and k -- but not once an operator has taken it, which
+            // forgets the column as vim's does, so that j after d$ keeps
+            // the caret's.
             if (!mOperator && !isVisual() && m.to.column > 0)
             {
                 m.to = d.prevCluster(m.to);
             }
-            mWantColumn   = S32_MAX;
-            mVerticalMove = true;
+            if (!mOperator)
+            {
+                mWantColumn   = S32_MAX;
+                mVerticalMove = true;
+            }
             return m;
         }
         case '|':

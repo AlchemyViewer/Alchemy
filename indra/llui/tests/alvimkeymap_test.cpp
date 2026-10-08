@@ -5715,4 +5715,43 @@ namespace tut
         keys("5-");
         ensure_equals("5- with two lines above to the first's first non-blank", caretText(), std::string("0:2"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<200>()
+    {
+        set_test_name("j after an operator over $ keeps the caret's column, as vim forgets the line's end once the operator is done; after $ alone it goes on to every line's end");
+        const char* text = "abcdef\nghijklmnop\nqrstuvwxyz";
+        make(text);
+        editor->setCaret(ALTextPos(0, 2));
+        keys("d$j");
+        ensure_equals("d$ then j", caretText(), std::string("1:1"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 2));
+        keys("y$j");
+        ensure_equals("y$ then j", caretText(), std::string("1:2"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 2));
+        keys("d2$j");
+        ensure_equals("d2$ takes the line after", flat(editor->text()), std::string("ab|qrstuvwxyz"));
+        ensure_equals("and j after it keeps the column", caretText(), std::string("1:1"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 2));
+        keys("c$<Esc>j");
+        ensure_equals("c$ then j", caretText(), std::string("1:1"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 2));
+        keys("Dj");
+        ensure_equals("D then j", caretText(), std::string("1:1"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 2));
+        keys("$j");
+        ensure_equals("$ then j to the next line's end", caretText(), std::string("1:9"));
+        keys("j");
+        ensure_equals("and on to the one after's", caretText(), std::string("2:9"));
+    }
 }
