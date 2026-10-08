@@ -2335,10 +2335,12 @@ void ALCodeEditor::caretsOutOfFolds()
         {
             continue;
         }
+        // The lines in sight either side found through the heights, not by
+        // stepping over all a fold of thousands of lines hides.
         const S32 hidden = layout().hidden(range.begin.line) ? range.begin.line : range.end.line;
-        const S32 above  = layout().visibleFrom(hidden, -1);
-        const S32 below  = layout().visibleFrom(hidden, 1);
-        const ALTextPos to = above >= 0 ? document().lineEnd(above) : ALTextPos(below >= 0 ? below : 0, 0);
+        const S32 above  = layout().visibleBefore(hidden);
+        const S32 below  = layout().visibleAfter(hidden);
+        const ALTextPos to = above >= 0 ? document().lineEnd(above) : ALTextPos(below < layout().lineCount() ? below : 0, 0);
         all[i]             = ALTextRange(to, to);
         moved              = true;
     }
