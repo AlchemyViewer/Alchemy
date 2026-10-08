@@ -1048,6 +1048,14 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
 
                     {
                         LL_PROFILE_GPU_ZONE("generate mip map");
+                        // The whole pyramid is allocated and GL is about to fill it, so let
+                        // sampling reach all of it. createGLTexture caps MAX_LEVEL at the
+                        // discard levels, which is as far as levels uploaded by hand go, and
+                        // glGenerateMipmap stops at MAX_LEVEL as well: left there, the
+                        // smallest levels stay unwritten and a distant surface minifies no
+                        // further than 1/32 of the texture's size.
+                        glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_MAX_LEVEL, mMipLevels - 1);
+
                         // generateMipmaps clears the slot's sampler first, which matters
                         // now that storage can be sRGB: mip generation follows the slot's
                         // TEXTURE_SRGB_DECODE -- sampler first if one is bound, else the
@@ -1905,6 +1913,8 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
         {
             gGL.getTextureSlot(0)->bind(this, false, true, new_texname);
             glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_BASE_LEVEL, 0);
+            // As far as levels uploaded by hand go. setImage raises it to the whole
+            // pyramid when it generates the mips instead.
             glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_MAX_LEVEL, mMaxDiscardLevel - discard_level);
             // The swizzle that re-expresses a deprecated source format is texture-object
             // state, so every new name needs it -- scaleDown's included.

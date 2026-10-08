@@ -667,6 +667,29 @@ namespace tut
                       gGL.getTextureSlot(3)->getCurrTexture(), 0u);
     }
 
+    // Generated mips fill the whole pyramid the storage holds, and sampling can
+    // reach it. MAX_LEVEL stayed at the discard levels -- five below 256x256 -- so
+    // glGenerateMipmap stopped there and distant surfaces minified no further.
+    template<> template<>
+    void llimagegl_object::test<18>()
+    {
+        constexpr U16 W = 256, H = 256;
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/true);
+        ensure("createGLTexture succeeded",
+               img->createGLTexture(0, makeRaw(W, H, 4, 0x80).get()));
+
+        bindForRead(img);
+        GLint max_level = 0;
+        glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, &max_level);
+        const S32 last = LLImageGL::calcMipLevelCount(W, H) - 1;
+        ensure_equals("sampling reaches the 1x1 level", (S32)max_level, last);
+
+        U8 px[4] = { 0, 0, 0, 0 };
+        glGetTexImage(GL_TEXTURE_2D, last, GL_RGBA, GL_UNSIGNED_BYTE, px);
+        ensure("and the 1x1 level was generated",
+               px[0] == 0x80 && px[1] == 0x80 && px[2] == 0x80 && px[3] == 0x80);
+    }
+
     // gGL is thread_local and outlives a context, as it does across these tests,
     // and init left the slots' bind caches as the last context had them. A fresh
     // context hands out the same first names, so its first texture read as bound
