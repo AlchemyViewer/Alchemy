@@ -223,7 +223,7 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const std::vector<std::string>
     // A side passed as itself is not read. Each side's regions, where lines
     // are told the same by them, read whole by the lexer in turn, as a
     // comparison of the two reads them.
-    const ALTextDiff::both_regions_t regions = ALTextDiff::lexed(options, left, right, options.like.byRegions() && !options.like.ignoreComments);
+    const ALTextDiff::both_regions_t regions = ALTextDiff::lexed(options, left, right, options.like.byRegions());
     return splice(runs, Side{ left, static_cast<S32>(left_was.size()), ALDiffEdit::edgesOf(left_was, left), regions.first },
                   Side{ right, static_cast<S32>(right_was.size()), ALDiffEdit::edgesOf(right_was, right), regions.second }, options);
 }
@@ -231,10 +231,6 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const std::vector<std::string>
 bool ALDiffSplice::splice(std::vector<Run>& runs, const Side& left_side, const Side& right_side, const ALTextDiff::Options& options)
 {
     sLastCompared = 0;
-    if (options.like.ignoreComments)
-    {
-        return false;
-    }
     // The changed stretch is [head, size - tail) of each.
     const std::vector<std::string>& left  = left_side.lines;
     const std::vector<std::string>& right = right_side.lines;

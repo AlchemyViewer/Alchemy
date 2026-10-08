@@ -2249,4 +2249,93 @@ namespace tut
             ensure_equals(where + ", merging: conflicts", told.conflictCount(), untold.conflictCount());
         }
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<49>()
+    {
+        set_test_name("comments let go of with the LSL grammar: an edit compared again only about itself, past it as far as the lines it makes read otherwise -- a comment put at a line's end, a block comment opened and closed above lines and to the text's end, a line of comment put in, the left another version -- each as afresh, by a lexer told and saying what it read again or by the regions hashed");
+        std::string                                  error;
+        const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+        ensure("the LSL grammar", lsl != nullptr);
+        const auto joined = [](const std::vector<std::string>& lines) {
+            std::string out;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                out += (i ? "\n" : "") + lines[i];
+            }
+            return out;
+        };
+        // A comment's close below code on both sides, a line differing only
+        // by its comment, and a change far below.
+        std::vector<std::string> left  = ALTextDiff::split(lines(200, { { 60, "*/ x = 1;" }, { 90, "integer b = 2; // two" }, { 150, "fifty" } }));
+        std::vector<std::string> right = ALTextDiff::split(lines(200, { { 60, "*/ x = 1;" }, { 90, "integer b = 2; // three" }, { 150, "FIFTY" } }));
+        ALTextDiff::Likeness     like;
+        like.ignoreComments = true;
+        // Told what an edit knows and saying what it read again, as a view's
+        // lexer is; and a lexer that says neither, by whose regions hashed
+        // before an edit and after the lines read otherwise are found.
+        ALDiffModel told;
+        const auto  lexer = std::make_shared<ALDiffLexer>(lsl);
+        told.setLexer(ALDiffLexer::lexerOf(lexer), ALTextDiff::lexer_t(), ALDiffLexer::rereadOf(lexer), ALDiffLexer::toldOf(lexer));
+        ALDiffModel hashing;
+        hashing.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+        for (ALDiffModel* each : { &told, &hashing })
+        {
+            each->setLikeness(like);
+            each->setTexts(joined(left), joined(right));
+        }
+        ensure_equals("a comment reworded no change: the change far below alone", told.changeCount(), 1);
+        const auto step = [&](bool on_left, const std::string& what) {
+            for (ALDiffModel* each : { &told, &hashing })
+            {
+                if (on_left)
+                {
+                    each->setLeftText(joined(left));
+                }
+                else
+                {
+                    each->setRightText(joined(right));
+                }
+                const S32 compared = ALDiffSplice::lastCompared();
+                ensure(what + ": compared again only about the edit: " + std::to_string(compared), compared > 0 && compared <= 130);
+            }
+            aldiffmodel_data::sameLayout(told, hashing, what);
+            ALDiffModel fresh;
+            fresh.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+            fresh.setLikeness(like);
+            fresh.setTexts(joined(left), joined(right));
+            aldiffmodel_data::sameLayout(told, fresh, what + ", as afresh");
+        };
+
+        // A comment put at a line's end: no change, laid out again in part.
+        right[30] += " // noted";
+        step(false, "a comment put at a line's end");
+        ensure("no change, laid out again in part", told.changeCount() == 1 && !told.relaid().whole);
+
+        // A block comment opened above lines of code, which the close further
+        // down ends: each a change now, to the close; and mended.
+        right[20] = "/* opened";
+        step(false, "a block comment opened");
+        ensure_equals("the lines it takes in a change", told.changeCount(), 2);
+        right[20] = "line 20";
+        step(false, "and mended");
+        ensure_equals("none again", told.changeCount(), 1);
+
+        // A line of comment put in: a change of comments alone, none.
+        right.insert(right.begin() + 101, "// a note put in");
+        step(false, "a line of comment put in");
+        ensure_equals("no change", told.changeCount(), 1);
+
+        // A block comment opened that nothing closes: to the text's end,
+        // the change below taken in; and taken out.
+        right[140] = "/* to the end";
+        step(false, "a block comment opened to the end");
+        right[140] = "line 139";
+        step(false, "and taken out");
+
+        // The left another version, a comment at a line's end.
+        left[80] += " // older";
+        step(true, "the left another version");
+        ensure_equals("no change", told.changeCount(), 1);
+    }
 }

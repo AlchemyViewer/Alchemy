@@ -218,7 +218,7 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> between, co
     // told the same by them. And the number of the text it holds the other
     // side as, where it can be told so.
     const bool           regioned   = static_cast<bool>(mOptions.lexer);
-    const bool           by_regions = regioned && mOptions.like.byRegions() && !mOptions.like.ignoreComments;
+    const bool           by_regions = regioned && mOptions.like.byRegions();
     const std::pair<line_regions_t, line_regions_t> had = regioned ? shownRegions() : std::pair<line_regions_t, line_regions_t>();
     const line_regions_t before     = shown ? had.second : had.first;
     const line_regions_t other_had  = shown ? had.first : had.second;
