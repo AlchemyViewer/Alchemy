@@ -441,6 +441,55 @@ namespace tut
         ensure("the update lands where it was asked and nowhere else", match);
     }
 
+    // scaleDown builds a new texture object, and texture-object state does not
+    // come with it: a deprecated-format texture lost its swizzle, so luminance read
+    // back red and luminance-alpha opaque. The FBO method -- the default -- could
+    // not have kept the channels either, since it samples THROUGH the swizzle and
+    // copies back by position, so these take the PBO copy whatever the setting.
+    template<> template<>
+    void llimagegl_object::test<11>()
+    {
+        constexpr U16 W = 16, H = 16;
+        LLPointer<LLImageRaw> raw = new LLImageRaw(W, H, 2);
+        U8* d = raw->getData();
+        for (size_t i = 0; i < (size_t)W * H; ++i)
+        {
+            d[i * 2]     = 0x40; // luminance
+            d[i * 2 + 1] = 0xC0; // alpha
+        }
+
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/true);
+        ensure("createGLTexture succeeded", img->createGLTexture(0, raw.get()));
+
+        const U32 method = gGLManager.mDownScaleMethod;
+        gGLManager.mDownScaleMethod = 0;
+        const bool scaled = img->scaleDown(1);
+        gGLManager.mDownScaleMethod = method;
+        ensure("scaleDown succeeded", scaled);
+        ensure_equals("discard level follows", img->getDiscardLevel(), 1);
+
+        bindForRead(img);
+        GLint w = 0;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
+        ensure_equals("the new texture is half size", (S32)w, (S32)W / 2);
+
+        GLint mask[4] = { 0, 0, 0, 0 };
+        glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, mask);
+        ensure_equals("R swizzle == GL_RED",   (S32)mask[0], (S32)GL_RED);
+        ensure_equals("G swizzle == GL_RED",   (S32)mask[1], (S32)GL_RED);
+        ensure_equals("B swizzle == GL_RED",   (S32)mask[2], (S32)GL_RED);
+        ensure_equals("A swizzle == GL_GREEN", (S32)mask[3], (S32)GL_GREEN);
+
+        std::vector<U8> got((size_t)(W / 2) * (H / 2) * 2);
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RG, GL_UNSIGNED_BYTE, got.data());
+        bool match = true;
+        for (size_t i = 0; i < got.size() && match; i += 2)
+        {
+            match = got[i] == 0x40 && got[i + 1] == 0xC0;
+        }
+        ensure("luminance and alpha both survive the copy", match);
+    }
+
     // An edit writes through the ACTIVE unit, and a bind that finds the texture
     // already cached on slot 0 skips activating it. With another unit left active
     // the write went to whatever that unit held. The glyph atlas does exactly this:

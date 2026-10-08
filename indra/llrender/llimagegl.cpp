@@ -1906,9 +1906,8 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
             gGL.getTextureSlot(0)->bind(this, false, true, new_texname);
             glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_BASE_LEVEL, 0);
             glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_MAX_LEVEL, mMaxDiscardLevel - discard_level);
-            // Apply the swizzle mask once if resolveDeprecatedFormat saved
-            // an original format. Per-texture state persists across
-            // glTexImage2D / scaleDown reallocations, so we never re-set it.
+            // The swizzle that re-expresses a deprecated source format is texture-object
+            // state, so every new name needs it -- scaleDown's included.
             if (mDeprecatedSourceFormat != 0)
             {
                 applySwizzleForDeprecatedFormat(mBindTarget,
@@ -3011,7 +3010,13 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         return false;
     }
 
-    if (gGLManager.mDownScaleMethod == 0)
+    // A deprecated source format is held under a swizzle, and the FBO path cannot carry
+    // one: it samples the old texture THROUGH the swizzle and copies the result back by
+    // position, so luminance-alpha's alpha comes back as luminance and alpha-only loses
+    // its alpha entirely. The PBO path copies the stored channels as they are.
+    const bool use_fbo = gGLManager.mDownScaleMethod == 0 && mDeprecatedSourceFormat == 0;
+
+    if (use_fbo)
     { // use an FBO to downscale the texture
         glViewport(0, 0, desired_width, desired_height);
 
@@ -3081,6 +3086,8 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         gGL.getTextureSlot(0)->bindManual(mBindTarget, new_texname);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, sScratchPBO);
         allocateTextureStorage(desired_width, desired_height, mHasMipMaps);
+        // Texture-object state, so the new name starts without it.
+        applySwizzleForDeprecatedFormat(mBindTarget, mDeprecatedSourceFormat);
         glTexSubImage2D(mTarget, 0, 0, 0, desired_width, desired_height, mFormatPrimary, mFormatType, nullptr);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
