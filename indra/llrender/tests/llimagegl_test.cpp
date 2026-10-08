@@ -490,6 +490,39 @@ namespace tut
         ensure("luminance and alpha both survive the copy", match);
     }
 
+    // While an upload is in flight the members describe the texture being built.
+    // readBackRaw paired the getters' published size with the members' discard
+    // level, so it read the old texture's level 0 at the new texture's size.
+    // Asset 64x64, on screen at discard 2 (a 16x16 texture), the upload in flight
+    // building discard 0.
+    template<> template<>
+    void llimagegl_object::test<13>()
+    {
+        constexpr U16 W = 16, H = 16;
+        LLPointer<LLImageRaw> src = new LLImageRaw(W, H, 4);
+        U8* sd = src->getData();
+        for (size_t i = 0; i < (size_t)W * H * 4; ++i)
+            sd[i] = (U8)(i & 0xFF);
+
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        ensure("createGLTexture succeeded", img->createGLTexture(2, src.get()));
+        ensure_equals("on screen at 16 wide", img->getWidth(), 16);
+
+        img->beginUpload();
+        img->setDiscardLevel(0); // what the worker's createGLTexture writes first
+
+        LLPointer<LLImageRaw> dst = new LLImageRaw();
+        const bool read = img->readBackRaw(-1, dst.get(), /*compressed_ok=*/false);
+
+        img->setDiscardLevel(2);
+        img->endUpload();
+
+        ensure("readBackRaw succeeded", read);
+        ensure_equals("read at the size on screen", (S32)dst->getWidth(), (S32)W);
+        ensure_equals("and reads what is on screen",
+                      std::memcmp(dst->getData(), sd, (size_t)W * H * 4), 0);
+    }
+
     // An edit writes through the ACTIVE unit, and a bind that finds the texture
     // already cached on slot 0 skips activating it. With another unit left active
     // the write went to whatever that unit held. The glyph atlas does exactly this:

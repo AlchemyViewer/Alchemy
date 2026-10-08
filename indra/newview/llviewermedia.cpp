@@ -3116,6 +3116,11 @@ void LLViewerMediaImpl::update()
             mTextureUpdatePending = true;
             ref();  // protect texture from deletion while active on bg queue
             media_tex->ref();
+            // The texture reports the frame it shows until the worker's publishes: see
+            // LLImageGL::beginUpload, taken here on the main thread before the post and
+            // released in the callback.
+            LLPointer<LLImageGL> gl_image = media_tex->getGLTexture();
+            gl_image->beginUpload();
             main_queue->postTo(
                 mTexUpdateQueue, // Worker thread queue
                 [=, this]() // work done on update worker thread
@@ -3130,6 +3135,8 @@ void LLViewerMediaImpl::update()
 #if LL_IMAGEGL_THREAD_CHECK
                     media_tex->getGLTexture()->mActiveThread = LLThread::currentID();
 #endif
+                    // A no-op when syncTexName already published the frame.
+                    gl_image->endUpload();
                     mTextureUpdatePending = false;
                     media_tex->unref();
                     unref();

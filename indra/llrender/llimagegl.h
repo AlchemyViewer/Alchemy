@@ -345,6 +345,9 @@ private:
     void freePickMask();
     bool isCompressed() const;
 
+    // Warn when an upload runs off the main thread without the snapshot beginUpload takes.
+    void checkUploadBegun() const;
+
     LLPointer<LLImageRaw> mSaveData; // used for destroyGL/restoreGL
     LL::WorkQueue::weak_t mMainQueue;
     U8* mPickMask;  //downsampled bitmap approximation of alpha channel.  NULL if no alpha channel
@@ -369,6 +372,7 @@ private:
     // dimensions while still naming the old one for the whole upload, and anything
     // pairing the two -- sculpt reading back from GL at the advertised size -- gets
     // garbage. Only consulted while mUploadInFlight; the members are the truth otherwise.
+    // Both are written on the main thread only; see beginUpload.
     struct PublishedGeom
     {
         S32 mWidth = 0;
@@ -490,12 +494,12 @@ public:
     //similar to setTexName, but will call deleteTextures on mTexName if mTexName is not 0 or texname
     void syncTexName(LLGLuint texname);
 
-    // Snapshot the currently-published geometry before an off-thread upload starts
-    // overwriting it. Idempotent: both createGLTexture overloads call it, and the outer
-    // one delegates to the inner. endUpload() drops the snapshot once the members and
-    // mTexName agree again, or after a failed upload.
+    // Bracket an upload handed to the LLImageGL thread, on the MAIN thread: begin before
+    // posting the work, and end in its completion callback whatever the worker did
+    // (syncTexName has already ended it if the texture published). In between, the
+    // geometry getters answer for the texture mTexName still names.
     void beginUpload();
-    void endUpload() { mUploadInFlight = false; }
+    void endUpload();
 
     //for debug use: show texture size distribution
     //----------------------------------------

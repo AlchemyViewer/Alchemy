@@ -1754,18 +1754,13 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
 
     // Everything from setSize onward describes the texture being built, not the one
     // mTexName still names. Off-thread that gap lasts until syncTexName publishes on the
-    // main thread, so snapshot what consumers should keep seeing until then.
-    if (!on_main_thread())
-    {
-        beginUpload();
-    }
+    // main thread, which is why whoever posted this upload began a snapshot first.
+    checkUploadBegun();
 
-    // setSize may call destroyGLTexture if the size does not match
     if (!setSize(w, h, imageraw->getComponents(), discard_level))
     {
         LL_WARNS() << "Trying to create a texture with incorrect dimensions!" << LL_ENDL;
         mGLTextureCreated = false;
-        endUpload(); // nothing will publish; don't leave the getters on a stale snapshot
         return false;
     }
 
@@ -1835,7 +1830,6 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
         mCurrentDiscardLevel = discard_level;
         mLastBindTime = sLastFrameTime;
         mGLTextureCreated = false;
-        endUpload(); // no texture left to disagree with the members
         return true ;
     }
 
@@ -1853,11 +1847,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
 
     bool main_thread = on_main_thread();
 
-    if (!main_thread)
-    {
-        // No-op when the imageraw overload above already captured.
-        beginUpload();
-    }
+    checkUploadBegun();
 
     if (defer_copy)
     {
@@ -1932,7 +1922,6 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
         LL_PROFILE_ZONE_NAMED("cglt - late setImage");
         if (!setImage(data_in, data_hasmips, new_texname))
         {
-            endUpload(); // nothing will publish; don't leave the getters on a stale snapshot
             return false;
         }
     }
@@ -1955,7 +1944,6 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
                 LLImageGL::deleteTextures(1, &old_texname);
             }
             mTexName = new_texname;
-            endUpload();
         }
     }
 
@@ -2042,11 +2030,20 @@ void LLImageGL::syncToMainThread(LLGLuint new_tex_name)
 }
 
 
-// Capture what mTexName currently holds, before createGLTexture starts overwriting the
-// members with the geometry of the texture it is about to build. Idempotent, because the
-// imageraw overload calls it and then delegates to the data overload which calls it too.
+// Capture what mTexName currently holds, before an off-thread createGLTexture starts
+// overwriting the members with the geometry of the texture it is about to build.
+//
+// Main thread only, and both ends of it: whoever hands the upload to the LLImageGL thread
+// begins it before posting, syncTexName ends it when the new texture publishes, and the
+// poster's completion callback ends it whatever happened (a no-op after syncTexName).
+// That is what lets the main thread read mUploadInFlight and the snapshot with no
+// synchronisation -- the worker never writes them, and reads them only after the post
+// that ordered them. Were the worker to raise the flag itself, a getter could see it go
+// up before the snapshot behind it was written, or test it just before it went up and
+// then read members the worker had started to overwrite.
 void LLImageGL::beginUpload()
 {
+    llassert(on_main_thread());
     if (mUploadInFlight)
     {
         return;
@@ -2058,6 +2055,23 @@ void LLImageGL::beginUpload()
     mPublished.mCurrentDiscardLevel = mCurrentDiscardLevel;
     mPublished.mMaxDiscardLevel     = mMaxDiscardLevel;
     mUploadInFlight = true;
+}
+
+void LLImageGL::endUpload()
+{
+    llassert(on_main_thread());
+    mUploadInFlight = false;
+}
+
+void LLImageGL::checkUploadBegun() const
+{
+    if (!on_main_thread() && !mUploadInFlight)
+    {
+        LL_WARNS_ONCE("LLImageGL") << "Texture upload off the main thread with no beginUpload(): "
+                                   << "the image reports the new texture's size before that "
+                                   << "texture is published." << LL_ENDL;
+        llassert(false);
+    }
 }
 
 void LLImageGL::syncTexName(LLGLuint texname)
@@ -2079,17 +2093,23 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
+    // What mTexName holds, through the same published view as getWidth/getComponents
+    // below. While an upload is in flight the members describe the next texture, and
+    // mixing them with those getters reads the old texture's level 0 at the new size.
+    const S32 cur_discard = getDiscardLevel();
+    const S32 max_discard = getMaxDiscardLevel();
+
     if (discard_level < 0)
     {
-        discard_level = mCurrentDiscardLevel;
+        discard_level = cur_discard;
     }
 
-    if (mTexName == 0 || discard_level < mCurrentDiscardLevel || discard_level > mMaxDiscardLevel )
+    if (mTexName == 0 || discard_level < cur_discard || discard_level > max_discard)
     {
         return false;
     }
 
-    S32 gl_discard = discard_level - mCurrentDiscardLevel;
+    S32 gl_discard = discard_level - cur_discard;
 
     //explicitly unbind texture
     gGL.getTextureSlot(0)->unbind();
@@ -2124,7 +2144,7 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
     {
         LL_WARNS() << "texture size is smaller than it should be." << LL_ENDL ;
         LL_WARNS() << "width: " << width << " glwidth: " << glwidth << " mWidth: " << mWidth <<
-            " mCurrentDiscardLevel: " << (S32)mCurrentDiscardLevel << " discard_level: " << (S32)discard_level << LL_ENDL ;
+            " current discard: " << cur_discard << " discard_level: " << (S32)discard_level << LL_ENDL ;
         return false ;
     }
 

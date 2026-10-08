@@ -1622,6 +1622,12 @@ void LLViewerFetchedTexture::scheduleCreateTexture()
             auto mainq = LLImageGLThread::sEnabledTextures ? mMainQueue.lock() : nullptr;
             if (mainq)
             {
+                // Until the worker's texture publishes, the image goes on reporting the one
+                // it has. The snapshot that makes it so is taken here, on the main thread,
+                // before the post -- see LLImageGL::beginUpload -- and released in the
+                // callback below, whether or not a texture came of it.
+                LLPointer<LLImageGL> gl_image = mGLTexturep;
+                gl_image->beginUpload();
                 ref();
                 mainq->postTo(
                     mImageQueue,
@@ -1650,7 +1656,7 @@ void LLViewerFetchedTexture::scheduleCreateTexture()
                     },
                     // callback to be run on main thread
 #if LL_IMAGEGL_THREAD_CHECK
-                        [this, data, data_copy, size]()
+                        [this, gl_image, data, data_copy, size]()
                     {
                         mGLTexturep->mActiveThread = LLThread::currentID();
                         llassert(data == mRawImage->getData());
@@ -1658,9 +1664,11 @@ void LLViewerFetchedTexture::scheduleCreateTexture()
                         llassert(memcmp(data, data_copy, size) == 0);
                         delete[] data_copy;
 #else
-                        [this]()
+                        [this, gl_image]()
                         {
 #endif
+                        // A no-op when syncTexName already published the new texture.
+                        gl_image->endUpload();
                         //finalize on main thread
                         postCreateTexture();
                         unref();
