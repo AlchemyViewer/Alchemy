@@ -379,15 +379,18 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask)
+    virtual bool onUpdate(F64 time, U8* joint_mask)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+        // The noise lattice repeats every 256 units, so the coordinate is wrapped to that in
+        // F64: one taken in F32 after hours of activity moves in steps.
+        const F32 noise_pos = (F32)fmod(time * TORSO_NOISE_SPEED, 256.0);
         F32 nx[2];
-        nx[0]=time*TORSO_NOISE_SPEED;
+        nx[0]=noise_pos;
         nx[1]=0.0f;
         F32 ny[2];
         ny[0]=0.0f;
-        ny[1]=time*TORSO_NOISE_SPEED;
+        ny[1]=noise_pos;
         F32 noiseX = noise2(nx);
         F32 noiseY = noise2(ny);
 
@@ -500,12 +503,13 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask)
+    virtual bool onUpdate(F64 time, U8* joint_mask)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
         mBreatheRate = 1.f;
 
-        F32 breathe_amt = (sinf(mBreatheRate * time) * BREATHE_ROT_MOTION_STRENGTH);
+        // The phase in F64: breathing runs all session, and an F32 phase of hours steps.
+        F32 breathe_amt = (F32)sin(mBreatheRate * time) * BREATHE_ROT_MOTION_STRENGTH;
 
         mChestState->setRotation(LLQuaternion(breathe_amt, LLVector3(0.f, 1.f, 0.f)));
 
@@ -602,7 +606,7 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask)
+    virtual bool onUpdate(F64 time, U8* joint_mask)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
         mPelvisState->setPosition(LLVector3::zero);

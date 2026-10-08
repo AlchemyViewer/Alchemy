@@ -129,7 +129,7 @@ public:
 
         ~LLPhysicsMotion() {}
 
-        bool onUpdate(F32 time);
+        bool onUpdate(F64 time);
 
         LLPointer<LLJointState> getJointState()
         {
@@ -181,7 +181,7 @@ private:
         LLCharacter *mCharacter;
         bool mIsSelf;
 
-        F32 mLastTime;
+        F64 mLastTime;  // onUpdate()'s time: physics is active as long as the avatar is
 
         LLVisualParam* mParamCache[NUM_PARAMS];
 
@@ -473,7 +473,7 @@ F32 LLPhysicsMotion::calculateAcceleration_local(const F32 velocity_local, const
         return smoothed_acceleration_local;
 }
 
-bool LLPhysicsMotionController::onUpdate(F32 time, U8* joint_mask)
+bool LLPhysicsMotionController::onUpdate(F64 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     // Skip if disabled globally.
@@ -499,7 +499,7 @@ bool LLPhysicsMotionController::onUpdate(F32 time, U8* joint_mask)
 }
 
 // Return true if character has to update visual params.
-bool LLPhysicsMotion::onUpdate(F32 time)
+bool LLPhysicsMotion::onUpdate(F64 time)
 {
         // static FILE *mFileWrite = fopen("c:\\temp\\avatar_data.txt","w");
 
@@ -516,7 +516,7 @@ bool LLPhysicsMotion::onUpdate(F32 time)
         // Get all parameters and settings
         //
 
-        const F32 time_delta = time - mLastTime;
+        const F32 time_delta = (F32)(time - mLastTime);
 
     // If less than 1FPS, we don't want to be spending time updating physics at all.
         if (time_delta > 1.0)
@@ -667,7 +667,7 @@ bool LLPhysicsMotion::onUpdate(F32 time)
         // Temporary debugging setting to cause all avatars to move, for profiling purposes.
         if (physics_test)
         {
-            velocity_new_local = sin(time*4.0f);
+            velocity_new_local = (F32)sin(time*4.0);
         }
         // Calculate the new parameters, or remain unchanged if max speed is 0.
         F32 position_new_local = position_current_local + velocity_new_local*time_iteration_step;

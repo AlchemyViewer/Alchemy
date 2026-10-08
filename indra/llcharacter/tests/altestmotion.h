@@ -66,7 +66,7 @@ public:
         return true;
     }
 
-    bool onUpdate(F32 time, U8*) override
+    bool onUpdate(F64 time, U8*) override
     {
         ++mUpdateCount;
         mUpdateSerial = ++sUpdateSerial;
@@ -83,12 +83,12 @@ public:
 
     void onDeactivate() override { ++mDeactivateCount; }
 
-    void setStopTime(F32 time) override
+    void setStopTime(F64 time) override
     {
         ++mStopTimeCalls;
         LLMotion::setStopTime(time);
     }
-    F32 sendStopTimestamp() const { return mSendStopTimestamp; }
+    F64 sendStopTimestamp() const { return mSendStopTimestamp; }
 
     using LLMotion::addJointState;
 
@@ -121,7 +121,7 @@ public:
     S32 mStopTimeCalls = 0;
     LLCharacter* mCharacter = nullptr;
     LLUUID mStartOnUpdate;
-    F32 mLastUpdateTime = 0.f;
+    F64 mLastUpdateTime = 0.0;
 
     // Which onUpdate this was, across every test motion: the order the
     // controller visited them in.

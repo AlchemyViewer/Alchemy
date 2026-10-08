@@ -157,12 +157,12 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F64 time, U8* joint_mask);
 
     // called when a motion is deactivated
     virtual void onDeactivate();
 
-    virtual void setStopTime(F32 time);
+    virtual void setStopTime(F64 time);
 
     static void onLoadComplete(const LLUUID& asset_uuid,
                                LLAssetType::EType type,
@@ -423,7 +423,7 @@ protected:
     typedef std::list<JointConstraint*> constraint_list_t;
     constraint_list_t               mConstraints;
     U32                             mLastSkeletonSerialNum;
-    F32                             mLastUpdateTime;
+    F64                             mLastUpdateTime;    // onUpdate()'s time, since activation
     F32                             mLastLoopedTime;
     AssetStatus                     mAssetStatus;
 

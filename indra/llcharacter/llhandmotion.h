@@ -114,7 +114,7 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask);
+    virtual bool onUpdate(F64 time, U8* joint_mask);
 
     // called when a motion is deactivated
     virtual void onDeactivate();
@@ -131,7 +131,7 @@ public:
 
     LLCharacter         *mCharacter;
 
-    F32                 mLastTime;
+    F64                 mLastTime;      // onUpdate()'s time: the hands are active all session
     eHandPose           mCurrentPose;
     eHandPose           mNewPose;
 };

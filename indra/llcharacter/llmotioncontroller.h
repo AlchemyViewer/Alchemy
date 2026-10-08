@@ -176,7 +176,7 @@ public:
         F32  interp;    // how far through the current quantum real time is, [0,1)
         bool advanced;  // count differs from the last one handed in
     };
-    static QuantumStep computeQuantumStep(F32 continuous_time, F32 time_step, S32 last_count);
+    static QuantumStep computeQuantumStep(F64 continuous_time, F32 time_step, S32 last_count);
     // the fraction to lerp the pose by so that it tracks real time within a
     // quantum, given how far it was last moved
     static F32 quantumInterpolant(F32 interp, F32 last_interp);
@@ -184,7 +184,7 @@ public:
     void setTimeFactor(F32 time_factor);
     F32 getTimeFactor() const { return mTimeFactor; }
 
-    F32 getAnimTime() const { return mAnimTime; }
+    F64 getAnimTime() const { return mAnimTime; }
 
     // The motions playing, newest first, of one blend type. The update walks
     // the additive list and then the normal one, so nothing asks each motion
@@ -210,7 +210,7 @@ protected:
     // internal operations act on motion instances directly
     // as there can be duplicate motions per id during blending overlap
     void deleteAllMotions();
-    bool activateMotionInstance(LLMotion *motion, F32 time);
+    bool activateMotionInstance(LLMotion *motion, F64 time);
     bool deactivateMotionInstance(LLMotion *motion);
     void deprecateMotionInstance(LLMotion* motion);
     bool stopMotionInstance(LLMotion *motion, bool stop_imemdiate);
@@ -249,11 +249,14 @@ protected:
     motion_list_t       mActiveMotions[LLMotion::NUM_BLEND_TYPES];
     motion_set_t        mDeprecatedMotions;
 
+    // The clock is F64 throughout, as are the motions' timestamps: it runs as long as the
+    // character does, the whole session for one's own, and an F32 of hours holds it only
+    // to milliseconds, which every step and every motion's time would be rounded to.
     LLFrameTimer        mTimer;
-    F32                 mPrevTimerElapsed;
-    F32                 mContinuousTime;        // real animation time, the only accumulator
-    F32                 mAnimTime;              // what the motions see; quantized when mTimeStep is set
-    F32                 mLastTime;
+    F64                 mPrevTimerElapsed;
+    F64                 mContinuousTime;        // real animation time, the only accumulator
+    F64                 mAnimTime;              // what the motions see; quantized when mTimeStep is set
+    F64                 mLastTime;
     bool                mHasRunOnce;
     bool                mPaused;
     S32                 mPausedFrame;

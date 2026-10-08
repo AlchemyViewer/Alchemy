@@ -75,7 +75,7 @@ bool FSPosingMotion::onActivate()
     return true;
 }
 
-bool FSPosingMotion::onUpdate(F32 time, U8* joint_mask)
+bool FSPosingMotion::onUpdate(F64 time, U8* joint_mask)
 {
     LLQuaternion targetRotation;
     LLQuaternion currentRotation;

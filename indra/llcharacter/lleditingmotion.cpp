@@ -161,7 +161,7 @@ bool LLEditingMotion::onActivate()
 //-----------------------------------------------------------------------------
 // LLEditingMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLEditingMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLEditingMotion::onUpdate(F64 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     LLVector3 focus_pt;

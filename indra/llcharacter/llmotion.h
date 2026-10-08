@@ -88,9 +88,9 @@ public:
 
     F32 getFadeWeight() const { return mFadeWeight; }
 
-    F32 getStopTime() const { return mStopTimestamp; }
+    F64 getStopTime() const { return mStopTimestamp; }
 
-    virtual void setStopTime(F32 time);
+    virtual void setStopTime(F64 time);
 
     bool isStopped() const { return mStopped; }
 
@@ -108,7 +108,7 @@ protected:
     void deactivate();
     bool isActive() { return mActive; }
 public:
-    void activate(F32 time);
+    void activate(F64 time);
 
 public:
     //-------------------------------------------------------------------------
@@ -147,7 +147,10 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 activeTime, U8* joint_mask) = 0;
+    // activeTime is seconds since activation, in F64: a motion that never stops is active as
+    // long as its character is, and F32 seconds of hours are rounded to milliseconds. Take
+    // differences and phases from it in F64, and narrow only what comes out.
+    virtual bool onUpdate(F64 activeTime, U8* joint_mask) = 0;
 
     // called when a motion is deactivated
     virtual void onDeactivate() = 0;
@@ -180,9 +183,9 @@ protected:
     std::string     mName;          // instance name assigned by motion controller
     LLUUID          mID;
 
-    F32 mActivationTimestamp;   // time when motion was activated
-    F32 mStopTimestamp;         // time when motion was told to stop
-    F32 mSendStopTimestamp;     // time when simulator should be told to stop this motion
+    F64 mActivationTimestamp;   // time when motion was activated
+    F64 mStopTimestamp;         // time when motion was told to stop
+    F64 mSendStopTimestamp;     // time when simulator should be told to stop this motion
     F32 mResidualWeight;        // blend weight at beginning of stop motion phase
     F32 mFadeWeight;            // for fading in and out based on LOD
     U8  mJointSignature[3][LL_CHARACTER_MAX_ANIMATED_JOINTS];   // signature of which joints are animated at what priority
@@ -210,7 +213,7 @@ public:
 
     LLMotionInitStatus onInitialize(LLCharacter*) { LL_INFOS() << "LLTestMotion::onInitialize()" << LL_ENDL; return STATUS_SUCCESS; }
     bool onActivate() { LL_INFOS() << "LLTestMotion::onActivate()" << LL_ENDL; return true; }
-    bool onUpdate(F32 time, U8* joint_mask) { LL_INFOS() << "LLTestMotion::onUpdate(" << time << ")" << LL_ENDL; return true; }
+    bool onUpdate(F64 time, U8* joint_mask) { LL_INFOS() << "LLTestMotion::onUpdate(" << time << ")" << LL_ENDL; return true; }
     void onDeactivate() { LL_INFOS() << "LLTestMotion::onDeactivate()" << LL_ENDL; }
 };
 
@@ -259,7 +262,7 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    /*virtual*/ bool onUpdate(F32 activeTime, U8* joint_mask) { return true; }
+    /*virtual*/ bool onUpdate(F64 activeTime, U8* joint_mask) { return true; }
 
     // called when a motion is deactivated
     /*virtual*/ void onDeactivate() {}

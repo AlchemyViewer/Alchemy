@@ -119,11 +119,11 @@ bool LLKeyframeFallMotion::onActivate()
 //-----------------------------------------------------------------------------
 // LLKeyframeFallMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLKeyframeFallMotion::onUpdate(F32 activeTime, U8* joint_mask)
+bool LLKeyframeFallMotion::onUpdate(F64 activeTime, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     bool result = LLKeyframeMotion::onUpdate(activeTime, joint_mask);
-    F32  slerp_amt = clamp_rescale(activeTime / getDuration(), 0.5f, 0.75f, 0.f, 1.f);
+    F32  slerp_amt = clamp_rescale((F32)(activeTime / getDuration()), 0.5f, 0.75f, 0.f, 1.f);
 
     if (mPelvisState.notNull())
     {

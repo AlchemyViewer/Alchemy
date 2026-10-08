@@ -102,26 +102,26 @@ void LLKeyframeWalkMotion::onDeactivate()
 //-----------------------------------------------------------------------------
 // LLKeyframeWalkMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLKeyframeWalkMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLKeyframeWalkMotion::onUpdate(F64 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     // compute time since last update
-    F32 deltaTime = time - mRealTimeLast;
+    F64 deltaTime = time - mRealTimeLast;
 
     void* speed_ptr = mCharacter->getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED);
     F32 speed = (speed_ptr) ? *((F32 *)speed_ptr) : 1.f;
 
     // adjust the passage of time accordingly
-    F32 adjusted_time = mAdjTimeLast + (deltaTime * speed);
+    F64 adjusted_time = mAdjTimeLast + (deltaTime * speed);
 
     // save time for next update
     mRealTimeLast = time;
     mAdjTimeLast = adjusted_time;
 
     // handle wrap around
-    if (adjusted_time < 0.0f)
+    if (adjusted_time < 0.0)
     {
-        adjusted_time = getDuration() + fmod(adjusted_time, getDuration());
+        adjusted_time = getDuration() + fmod(adjusted_time, (F64)getDuration());
     }
 
     // let the base class update the cycle
@@ -238,11 +238,11 @@ F32 LLWalkAdjustMotion::speedMultiplier(F32 speed, F32 foot_speed, F32 min_multi
 //-----------------------------------------------------------------------------
 // LLWalkAdjustMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLWalkAdjustMotion::onUpdate(F64 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     // delta_time is guaranteed to be non zero
-    F32 delta_time = llclamp(time - mLastTime, TIME_EPSILON, MAX_TIME_DELTA);
+    F32 delta_time = llclamp((F32)(time - mLastTime), TIME_EPSILON, MAX_TIME_DELTA);
     mLastTime = time;
 
     // find the avatar motion vector in the XY plane
@@ -424,7 +424,7 @@ bool LLFlyAdjustMotion::onActivate()
 //-----------------------------------------------------------------------------
 // LLFlyAdjustMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLFlyAdjustMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLFlyAdjustMotion::onUpdate(F64 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     LLVector3 ang_vel = mCharacter->getCharacterAngularVelocity() * mCharacter->getTimeDilation();

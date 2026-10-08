@@ -173,7 +173,7 @@ bool LLHeadRotMotion::onActivate()
 //-----------------------------------------------------------------------------
 // LLHeadRotMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLHeadRotMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLHeadRotMotion::onUpdate(F64 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     LLQuaternion    targetHeadRotWorld;
@@ -473,7 +473,7 @@ void LLEyeMotion::setBlinkWeights(F32 left, F32 right)
 //-----------------------------------------------------------------------------
 // LLEyeMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLEyeMotion::onUpdate(F64 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     //calculate jitter

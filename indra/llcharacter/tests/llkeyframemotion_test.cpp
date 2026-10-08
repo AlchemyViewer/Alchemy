@@ -1466,4 +1466,26 @@ namespace tut
         ensure_equals("an equal priority motion asking later takes the request",
                       mCharacter.getHandPoseRequest(), (S32)LLHandMotion::HAND_POSE_PEACE_R);
     }
+
+    template<> template<>
+    void llkeyframemotion_object::test<25>()
+    {
+        // A loop that has been playing for a day still moves by the time a frame
+        // took. Its phase comes from the time since activation: a day of that in
+        // F32 is held only to 7.8 ms, so a 240 fps frame moved the loop by 7.8 ms
+        // or by nothing, never by the 4.2 ms that passed.
+        std::vector<U8> buffer(8192);
+        LLKeyframeMotion motion(LLUUID::generateNewID());
+        ensure("the animation is read", load(motion, two_joint_animation(), buffer.data(), (S32)buffer.size()));
+        motion.setStopped(false);
+
+        const F64 a_day = 86400.0;
+        const F64 frame = 1.0 / 240.0;
+        U8 mask[LL_CHARACTER_MAX_ANIMATED_JOINTS] = {};
+        motion.onUpdate(a_day, mask);
+        const F32 before = motion.getLastUpdateTime();
+        motion.onUpdate(a_day + frame, mask);
+        const F32 after = motion.getLastUpdateTime();
+        ensure_approximately_equals_range("the loop moves by the frame", after - before, (F32)frame, 1e-5f);
+    }
 }
