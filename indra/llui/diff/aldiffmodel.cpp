@@ -468,12 +468,15 @@ void ALDiffModel::setAlgorithm(ALTextDiff::Algorithm algorithm)
     }
 }
 
-void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging, ALTextDiff::reread_t reread, ALTextDiff::told_t told)
+void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging, ALTextDiff::reread_t reread, ALTextDiff::told_t told,
+                           ALTextDiff::reread_t merging_reread, ALTextDiff::told_t merging_told)
 {
     mOptions.lexer = std::move(lexer);
     mMergeLexer    = std::move(merging);
     mReread        = std::move(reread);
     mTold          = std::move(told);
+    mMergeReread   = std::move(merging_reread);
+    mMergeTold     = std::move(merging_told);
     if (!mOptions.lexer && mOptions.like.ignoreComments)
     {
         // Lines told the same otherwise now: as setLikeness.
@@ -490,8 +493,17 @@ void ALDiffModel::refreshMerge()
 {
     if (mMerge)
     {
+        mergeLexing();
         mMerge->setOptions(mergeOptions());
     }
+}
+
+void ALDiffModel::mergeLexing()
+{
+    // What the merge's own lexer says and is told. One reading by the
+    // comparison's is told nothing: reading ours again about an edit, it
+    // would have that lexer hold the base in the place of a text shown.
+    mMerge->setLexing(mMergeLexer ? mMergeReread : ALTextDiff::reread_t(), mMergeLexer ? mMergeTold : ALTextDiff::told_t());
 }
 
 // --- made --------------------------------------------------------------------------
@@ -1674,6 +1686,7 @@ void ALDiffModel::setMergeBase(std::optional<std::string_view> base)
     {
         // Theirs the left as given, ours the right.
         mMerge.emplace(ALTextDiff::split(*base), mLeftLines, mergeOptions());
+        mergeLexing();
         mMerge->setOurs(mRightLines);
         mergeRead();
     }

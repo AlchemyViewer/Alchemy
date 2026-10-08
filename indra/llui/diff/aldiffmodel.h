@@ -195,9 +195,11 @@ public:
     // again of a text (ALTextDiff::reread_t), where it says; and the
     // comparison's told what an edit knows of the texts it asks for
     // (ALTextDiff::told_t), where it can be, which beside what it says
-    // then need not compare them with those it holds.
+    // then need not compare them with those it holds. And the same of the
+    // merge's, which reads ours again only about an edit where they are.
     void    setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging = ALTextDiff::lexer_t(),
-                     ALTextDiff::reread_t reread = ALTextDiff::reread_t(), ALTextDiff::told_t told = ALTextDiff::told_t());
+                     ALTextDiff::reread_t reread = ALTextDiff::reread_t(), ALTextDiff::told_t told = ALTextDiff::told_t(),
+                     ALTextDiff::reread_t merging_reread = ALTextDiff::reread_t(), ALTextDiff::told_t merging_told = ALTextDiff::told_t());
 
     // The texts as given, their line endings LF as an editor reads them.
     const std::string&           leftText() const { return mLeftText; }
@@ -572,6 +574,8 @@ private:
     // are (mergeOptions): what lines are told the same by, how the lines
     // that stay are chosen, and the grammar, each as it is set.
     void              refreshMerge();
+    // The merge told what the lexer it reads by says and can be told.
+    void              mergeLexing();
 
     std::string           mLeftText;
     std::string           mRightText;
@@ -588,10 +592,12 @@ private:
     ALTextDiff::Options   mOptions;
     // The lexer a merge reads by, where it has one of its own; what the
     // comparison's says it read again, where it says; and it told what is
-    // known of a text, where it can be.
+    // known of a text, where it can be; the same of the merge's.
     ALTextDiff::lexer_t   mMergeLexer;
     ALTextDiff::reread_t  mReread;
     ALTextDiff::told_t    mTold;
+    ALTextDiff::reread_t  mMergeReread;
+    ALTextDiff::told_t    mMergeTold;
     bool                  mSwapped  = false;
     bool                  mFoldSame = true;
     ColumnData            mColumns[3];

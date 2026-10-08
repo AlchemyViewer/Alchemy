@@ -1711,11 +1711,14 @@ namespace tut
         ensure("settled: found again by its own, from ours's runs of the base as they were, so the base not read again", !merged->empty() && !has_base(*merged) && compared->empty());
         ensure_equals("none left", m.conflictCount(), 0);
 
-        // Typed in: the comparison's asked for what it compares, never the
-        // base.
+        // Typed in: the merge's asked for ours alone, the base's regions and
+        // theirs's kept from when it was begun; the comparison's asked for
+        // what it compares, never the base.
         merged->clear();
+        const std::vector<std::string> typed = ALTextDiff::split(lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 4, "mine 4" }, { 6, "mine 6" } }));
         m.setRightText(lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 4, "mine 4" }, { 6, "mine 6" } }));
-        ensure("typed in: found again by its own", has_base(*merged));
+        ensure("typed in: found again by its own, ours alone read", !merged->empty() && !has_base(*merged) &&
+                                                                     std::all_of(merged->begin(), merged->end(), [&typed](const auto& text) { return text == typed; }));
         ensure("the comparison's never asked for the base", !compared->empty() && !has_base(*compared));
         ensure_equals("settled still", m.conflictCount(), 0);
 

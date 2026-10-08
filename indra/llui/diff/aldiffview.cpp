@@ -320,13 +320,15 @@ void ALDiffView::compareBy(const std::shared_ptr<const ALSyntaxGrammar>& grammar
     // Without one, comments are let go of no longer (ALDiffModel::setLexer).
     // A merge reads by a lexer of its own: the comparison's holds the texts
     // it compares, says what it read again of them, and is told what an
-    // edit knows of them.
+    // edit knows of them, and the merge's likewise of ours.
     const auto lex = [this, &code]() {
         const std::shared_ptr<ALDiffLexer> compared = code ? std::make_shared<ALDiffLexer>(code) : nullptr;
-        mModel.setLexer(compared ? ALDiffLexer::lexerOf(compared) : ALTextDiff::lexer_t(),
-                        code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t(),
+        const std::shared_ptr<ALDiffLexer> merging  = code ? std::make_shared<ALDiffLexer>(code) : nullptr;
+        mModel.setLexer(compared ? ALDiffLexer::lexerOf(compared) : ALTextDiff::lexer_t(), merging ? ALDiffLexer::lexerOf(merging) : ALTextDiff::lexer_t(),
                         compared ? ALDiffLexer::rereadOf(compared) : ALTextDiff::reread_t(),
-                        compared ? ALDiffLexer::toldOf(compared) : ALTextDiff::told_t());
+                        compared ? ALDiffLexer::toldOf(compared) : ALTextDiff::told_t(),
+                        merging ? ALDiffLexer::rereadOf(merging) : ALTextDiff::reread_t(),
+                        merging ? ALDiffLexer::toldOf(merging) : ALTextDiff::told_t());
     };
     if (mModel.leftText().empty() && mModel.rightText().empty())
     {

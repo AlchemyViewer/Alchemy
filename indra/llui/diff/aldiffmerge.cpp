@@ -78,23 +78,69 @@ void ALDiffMerge::setOptions(const ALTextDiff::Options& options)
     find();
 }
 
+void ALDiffMerge::setLexing(ALTextDiff::reread_t reread, ALTextDiff::told_t told)
+{
+    mReread   = std::move(reread);
+    mTold     = std::move(told);
+    mOurText  = 0;
+    // The base's number, asked of the lexer that holds it as the merge
+    // began, so that no edit need find it.
+    mBaseText = mKeptRegions && mReread ? mReread(mOptions.lexer(mBase)).text : 0;
+}
+
 void ALDiffMerge::setOurs(lines_t ours)
 {
+    // Another text, which the lexer's number for ours as it was is not.
     mOurs         = std::move(ours);
     mOurRunsKnown = false;
+    mOurText      = 0;
     find();
+}
+
+ALTextDiff::Options ALDiffMerge::lexing()
+{
+    ALTextDiff::Options options = mOptions;
+    if (mKeptRegions)
+    {
+        options.lexer = [this](const lines_t& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            if (&lines == &mBase)
+            {
+                return mBaseRegions;
+            }
+            if (&lines == &mTheirs)
+            {
+                return mTheirRegions;
+            }
+            // Ours, told that it is the text last read where that is
+            // known, so that it is not compared with those the lexer holds
+            // to find it; its number kept for the next edit to say.
+            const bool                                ours = &lines == &mOurs;
+            const std::vector<ALTextDiff::regions_t>& read =
+                ours && mTold ? mTold(lines, ALTextDiff::Known{ mOurText, static_cast<S32>(lines.size()), 0 }) : mOptions.lexer(lines);
+            if (ours && mReread)
+            {
+                mOurText = mReread(read).text;
+            }
+            return read;
+        };
+    }
+    return options;
 }
 
 void ALDiffMerge::setOurs(const lines_t& ours, const ALDiffEdit::Edges& edges)
 {
     // The lines between the edges put in place of those there were, ours's
     // others the lines it had; then its runs of the base spliced there, the
-    // base the same throughout, or all of them found again. A grammar's
-    // regions are not given: where lines are told the same by them the
-    // splice declines, and the whole is compared, as it reads them.
-    const S32 was = static_cast<S32>(mOurs.size());
-    const S32 now = static_cast<S32>(ours.size());
-    if (!mOurRunsKnown || edges.head < 0 || edges.tail < 0 || edges.head + edges.tail > std::min(was, now))
+    // base the same throughout, or all of them found again. Where lines are
+    // told the same by a grammar's regions, ours is read again about the
+    // edit as the lexer is told, and compared again as far as it says the
+    // lines after it read otherwise; where it cannot be told or say, the
+    // whole is compared, as it reads them.
+    const S32  was     = static_cast<S32>(mOurs.size());
+    const S32  now     = static_cast<S32>(ours.size());
+    const bool regions = mOptions.like.byRegions() && mOptions.lexer;
+    if (!mOurRunsKnown || edges.head < 0 || edges.tail < 0 || edges.head + edges.tail > std::min(was, now) ||
+        (regions && (!mKeptRegions || !mReread || !mTold || !mOurText)))
     {
         setOurs(lines_t(ours));
         return;
@@ -112,9 +158,40 @@ void ALDiffMerge::setOurs(const lines_t& ours, const ALDiffEdit::Edges& edges)
     {
         mOurs.erase(mOurs.begin() + head + put, mOurs.begin() + head + gone);
     }
-    const S32                base_lines = static_cast<S32>(mBase.size());
-    const ALDiffSplice::Side same{ mBase, base_lines, ALDiffEdit::Edges{ base_lines, 0 }, nullptr };
-    const ALDiffSplice::Side changed{ mOurs, was, edges, nullptr };
+    const S32                                 base_lines = static_cast<S32>(mBase.size());
+    ALDiffEdit::Edges                         compared   = edges;
+    const std::vector<ALTextDiff::regions_t>* our_regions = nullptr;
+    if (regions)
+    {
+        // The base asked for first, told that it is as it was, so that ours
+        // is the text the lexer read longer ago, which is the one it reads
+        // again in place; and the base it holds the other. Then ours read
+        // again from the edit, and compared again as far as the lines after
+        // it read otherwise -- a block comment opened or closed -- or to
+        // the end, where it was read whole.
+        mBaseText = mReread(mTold(mBase, ALTextDiff::Known{ mBaseText, base_lines, 0 })).text;
+        const std::vector<ALTextDiff::regions_t>& read = mTold(mOurs, ALTextDiff::Known{ mOurText, edges.head, edges.tail });
+        const ALTextDiff::Reread                  said = mReread(read);
+        if (said.text != mOurText)
+        {
+            const S32 end   = now - edges.tail;
+            const S32 reach = said.was != mOurText ? now : said.same > end ? said.same : -1;
+            if (reach >= 0)
+            {
+                compared.tail = std::min(edges.tail, now - reach);
+            }
+        }
+        mOurText    = said.text;
+        our_regions = &read;
+        if (read.size() != mOurs.size())
+        {
+            mOurRunsKnown = false;
+            find();
+            return;
+        }
+    }
+    const ALDiffSplice::Side same{ mBase, base_lines, ALDiffEdit::Edges{ base_lines, 0 }, regions ? &mBaseRegions : nullptr };
+    const ALDiffSplice::Side changed{ mOurs, was, compared, our_regions };
     mOurRunsKnown = ALDiffSplice::splice(mOurRuns, same, changed, mOptions);
     find();
 }
@@ -130,17 +207,33 @@ void ALDiffMerge::settled(const Settling& settling)
 
 void ALDiffMerge::findTheirs()
 {
-    mTheirChanges = ALTextMerge::changesOf(mBase, mTheirs, mOptions);
+    // The base's regions and theirs's, where lines are told the same by
+    // them, read now and kept.
+    mKeptRegions = false;
+    mOurText     = 0;
+    mBaseText    = 0;
+    if (mOptions.like.byRegions() && mOptions.lexer)
+    {
+        // Theirs first: the lexer then holds the base, which ours is read
+        // in the place of the other of.
+        mTheirRegions = mOptions.lexer(mTheirs);
+        const std::vector<ALTextDiff::regions_t>& base = mOptions.lexer(mBase);
+        mBaseRegions                                   = base;
+        mBaseText                                      = mReread ? mReread(base).text : 0;
+        mKeptRegions = mBaseRegions.size() == mBase.size() && mTheirRegions.size() == mTheirs.size();
+    }
+    mTheirChanges = ALTextMerge::changesOf(mBase, mTheirs, lexing());
 }
 
 void ALDiffMerge::find()
 {
+    const ALTextDiff::Options options = lexing();
     if (!mOurRunsKnown)
     {
-        mOurRuns      = ALTextDiff::lines(mBase, mOurs, mOptions);
+        mOurRuns      = ALTextDiff::lines(mBase, mOurs, options);
         mOurRunsKnown = true;
     }
-    mHunks = ALTextMerge::merge(static_cast<S32>(mBase.size()), ALTextMerge::changesOf(mOurRuns), mTheirChanges, mOurs, mTheirs, mOptions);
+    mHunks = ALTextMerge::merge(static_cast<S32>(mBase.size()), ALTextMerge::changesOf(mOurRuns), mTheirChanges, mOurs, mTheirs, options);
     // A conflict settled is ours's own change, as the settling left it or
     // as it was edited after.
     mConflicts.clear();

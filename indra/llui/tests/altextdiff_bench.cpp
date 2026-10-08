@@ -269,12 +269,15 @@ int main(int, char**)
     std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
     const auto lexer = [&lsl]() { return lsl ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)) : ALTextDiff::lexer_t(); };
     // A model's lexer as a view gives it: saying what it read again, and
-    // told what an edit knows.
+    // told what an edit knows; and a merge's of its own, likewise.
     const auto lexing = [&lsl](ALDiffModel& model) {
         const std::shared_ptr<ALDiffLexer> compared = lsl ? std::make_shared<ALDiffLexer>(lsl) : nullptr;
-        model.setLexer(compared ? ALDiffLexer::lexerOf(compared) : ALTextDiff::lexer_t(), ALTextDiff::lexer_t(),
+        const std::shared_ptr<ALDiffLexer> merging  = lsl ? std::make_shared<ALDiffLexer>(lsl) : nullptr;
+        model.setLexer(compared ? ALDiffLexer::lexerOf(compared) : ALTextDiff::lexer_t(), merging ? ALDiffLexer::lexerOf(merging) : ALTextDiff::lexer_t(),
                        compared ? ALDiffLexer::rereadOf(compared) : ALTextDiff::reread_t(),
-                       compared ? ALDiffLexer::toldOf(compared) : ALTextDiff::told_t());
+                       compared ? ALDiffLexer::toldOf(compared) : ALTextDiff::told_t(),
+                       merging ? ALDiffLexer::rereadOf(merging) : ALTextDiff::reread_t(),
+                       merging ? ALDiffLexer::toldOf(merging) : ALTextDiff::told_t());
     };
     const auto laid = [&](const std::string& left, const std::string& right, bool grammar) {
         return ms_per_item(1, [&] {
@@ -327,6 +330,27 @@ int main(int, char**)
         typed(big_t, big1kt, true, ALTextDiff::Algorithm::Histogram, {}, false, true));
     row("a keystroke, a thousand edits, by structure", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Structural),
         typed(big_t, big1kt, true, ALTextDiff::Algorithm::Structural));
+    // The same keystroke in a merge: the text before both versions the
+    // base, theirs the left with ten edits, ours the right with a thousand.
+    const auto merged = [&](const std::string& base, const std::string& left, const std::string& right, bool comments) {
+        ALDiffModel model;
+        lexing(model);
+        ALTextDiff::Likeness like;
+        like.ignoreComments = comments;
+        model.setLikeness(like);
+        model.setTexts(left, right);
+        model.setMergeBase(base);
+        const size_t at   = right.find('\n', right.size() / 2);
+        std::string  with = right;
+        with.insert(at, "x");
+        return ms_per_item(2, [&] {
+            model.setRightText(with);
+            model.setRightText(right);
+            g_sink = g_sink + static_cast<size_t>(model.conflictCount());
+        });
+    };
+    row("a keystroke in a merge, LSL's grammar", merged(small_t, small10t, small1kt, false), merged(big_t, big10t, big1kt, false));
+    row("a keystroke in a merge, LSL's, comments let go", merged(small_t, small10t, small1kt, true), merged(big_t, big10t, big1kt, true));
     {
         // Another version on the left, as a slider over a script's saves
         // steps: a line apart from the one before.

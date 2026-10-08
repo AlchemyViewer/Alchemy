@@ -404,4 +404,91 @@ namespace tut
         edit([](lines_t& lines) { lines[101] = "line 100"; }, "and back", 0);
         ensure("the base as it was", spliced.base() == base_lines);
     }
+
+    template<> template<>
+    void aldiffmerge_object::test<12>()
+    {
+        set_test_name("with comments let go of, ours made anew is read again and compared with the base again only about each edit and as far after it as it made lines read otherwise, the merge found as with ours given whole");
+        std::string                                  error;
+        const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+        ensure("the LSL grammar", lsl != nullptr);
+        // Theirs changed lines 10 and 100, ours lines 50 and 150; theirs's
+        // and ours's comments on line 120 each their own, which comments
+        // let go of are not a conflict.
+        lines_t base_lines;
+        for (S32 n = 0; n < 200; ++n)
+        {
+            base_lines.push_back("x" + std::to_string(n) + " = " + std::to_string(n) + "; // line " + std::to_string(n));
+        }
+        lines_t theirs_lines = base_lines;
+        theirs_lines[10]     = "x10 = 1010;";
+        theirs_lines[100]    = "x100 = 1100;";
+        theirs_lines[120]    = "x120 = 120; // theirs";
+        lines_t ours_lines   = base_lines;
+        ours_lines[50]       = "x50 = 2050;";
+        ours_lines[150]      = "x150 = 2150;";
+        ours_lines[120]      = "x120 = 120; // ours";
+        // Each with a lexer of its own, as a comparison gives a merge one:
+        // the one made anew told what an edit knows.
+        ALTextDiff::Options commented;
+        commented.like.ignoreComments            = true;
+        const std::shared_ptr<ALDiffLexer> lexer = std::make_shared<ALDiffLexer>(lsl);
+        commented.lexer                          = ALDiffLexer::lexerOf(lexer);
+        ALDiffMerge spliced(base_lines, theirs_lines, commented);
+        spliced.setLexing(ALDiffLexer::rereadOf(lexer), ALDiffLexer::toldOf(lexer));
+        commented.lexer = ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl));
+        ALDiffMerge whole(base_lines, theirs_lines, commented);
+        spliced.setOurs(ours_lines);
+        whole.setOurs(ours_lines);
+        ensure_equals("comments let go of: no conflict", spliced.conflictCount(), 0);
+        const auto edit = [&](const auto& made, const std::string& where, S32 most, S32 conflicts) {
+            lines_t now = ours_lines;
+            made(now);
+            const U64 hashed = ALTextDiff::hashed();
+            const U64 looked = lexer->linesCompared();
+            spliced.setOurs(now, ALDiffEdit::edgesOf(ours_lines, now));
+            const U64 cost     = ALTextDiff::hashed() - hashed;
+            const S32 compared = ALDiffSplice::lastCompared();
+            ensure(where + ": ours read by what the edit knows, none of its lines compared with those the lexer holds", lexer->linesCompared() == looked);
+            // A most of none: more than half the text read otherwise, which
+            // is compared whole.
+            if (most >= 0)
+            {
+                ensure(where + ": compared again only about the edit, " + std::to_string(compared), compared > 0 && compared <= most);
+                ensure(where + ": as many lines' regions made a number, " + std::to_string(cost), cost <= static_cast<U64>(2 * most));
+            }
+            whole.setOurs(now);
+            ensure(where + ": as with ours whole", spliced.hunks() == whole.hunks());
+            ensure_equals(where + ": conflicts", spliced.conflictCount(), conflicts);
+            ours_lines = std::move(now);
+        };
+        edit([](lines_t& lines) { lines[130] = "x130 = 2130;"; }, "a line typed into", 6, 0);
+        edit([](lines_t& lines) { lines[130] = "x130 = 2130; // and said so"; }, "a comment typed", 6, 0);
+        edit([](lines_t& lines) { lines.insert(lines.begin() + 30, "y = 1;"); }, "a line put in", 6, 0);
+        edit([](lines_t& lines) { lines.erase(lines.begin() + 181); }, "a line taken out", 6, 0);
+        // The base's line 100 is ours's 101 now.
+        edit([](lines_t& lines) { lines[101] = "x100 = 2100;"; }, "theirs's line changed otherwise", 6, 1);
+        edit([&base_lines](lines_t& lines) { lines[101] = base_lines[100]; }, "and back", 6, 0);
+        // A block comment opened in the code of line 70 and closed on line
+        // 80: the lines after each read otherwise, and are compared again
+        // with the edit -- to the end once it is opened, as far as it went
+        // once it is closed. Theirs's line 100 commented out by ours is a
+        // conflict while it is.
+        const auto code = [](const std::string& line) { return line.substr(0, line.find(" //")); };
+        edit([&code](lines_t& lines) { lines[70] = code(lines[70]) + " /* opened"; }, "a comment opened", -1, 1);
+        edit([](lines_t& lines) { lines[80] = "closed */ " + lines[80]; }, "and closed", -1, 0);
+        // Inside the lines commented out, a change of the base's all: that
+        // change compared again, about it.
+        edit([](lines_t& lines) { lines[75] = "x75 = 2075;"; }, "a line in the comment changed", 24, 0);
+        // Given whole, closed further on: read as the text it is, not as the
+        // one the lexer last read for it.
+        lines_t moved = ours_lines;
+        moved[80]     = moved[80].substr(std::string("closed */ ").size());
+        moved[90]     = "closed */ " + moved[90];
+        spliced.setOurs(moved);
+        whole.setOurs(moved);
+        ensure("given whole: as with ours whole", spliced.hunks() == whole.hunks());
+        ensure("and the lines it closed over changes", spliced.hunks().size() > 3);
+        ensure("the base as it was", spliced.base() == base_lines);
+    }
 }
