@@ -1040,7 +1040,7 @@ F32 gpu_benchmark()
 
     for (U32 i = 0; i < res*res*4; ++i)
     {
-        pixels[i] = (U8) ll_rand(255);
+        pixels[i] = (U8) ll_rand(256);
     }
 
     gGL.setColorMask(true, true);
