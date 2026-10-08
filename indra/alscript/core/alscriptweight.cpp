@@ -31,6 +31,7 @@
 #include "alluauservice.h"
 #include "alluausharedstart.h"
 #include "alsourcemap.h"
+#include "llstring.h"
 
 #include "Luau/Ast.h"
 #include "Luau/Bytecode.h"
@@ -586,18 +587,13 @@ namespace ALScriptWeigh
     std::string quoted(std::string_view text, size_t shown)
     {
         // Cut never inside a character: where one is cut, before it.
-        size_t cut = std::min(text.size(), shown);
-        while (cut > 0 && cut < text.size() && (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80)
+        const std::string kept = utf8str_truncate(text, static_cast<S32>(std::min(text.size(), shown)));
+        std::string       out  = "\"";
+        for (const char c : kept)
         {
-            --cut;
-        }
-        std::string out = "\"";
-        for (size_t i = 0; i < cut; ++i)
-        {
-            const char c = text[i];
             out += c == '\n' ? std::string("\\n") : c == '\t' ? std::string("\\t") : c == '\r' ? std::string("\\r") : std::string(1, c);
         }
-        return out + (cut < text.size() ? "\xE2\x80\xA6\"" : "\"");
+        return out + (kept.size() < text.size() ? "\xE2\x80\xA6\"" : "\"");
     }
 
     ALScriptWeight slua(std::string_view source)
