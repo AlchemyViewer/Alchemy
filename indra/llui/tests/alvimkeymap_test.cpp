@@ -6061,4 +6061,66 @@ namespace tut
         ensure_equals("each line added to a", vim->registerText('a'), std::string("one\ntwo\nfour"));
         ensure_equals("and how many said once", vim->message(), std::string("3 fewer lines"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<207>()
+    {
+        set_test_name("a delete or a change of characters over lines says how many fewer there are, and a change of lines how many it took but the one it leaves, for more than two as vim's report has it; a block's says nothing");
+        const char* text = "one\ntwo\nthree\nfour\nfive\nsix";
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("d/five<CR>");
+        ensure_equals("d/five from the first line's second character", flat(editor->text()), std::string("o|five|six"));
+        ensure_equals("said", vim->message(), std::string("3 fewer lines"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("d/ive<CR>");
+        ensure_equals("d/ive into the fifth line", flat(editor->text()), std::string("oive|six"));
+        ensure_equals("said", vim->message(), std::string("4 fewer lines"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("d/hree<CR>");
+        ensure_equals("d/hree into the third", flat(editor->text()), std::string("ohree|four|five|six"));
+        ensure("two fewer: nothing said: " + vim->message(), vim->message().empty());
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("v3jx");
+        ensure_equals("v3jx", flat(editor->text()), std::string("our|five|six"));
+        ensure_equals("said", vim->message(), std::string("3 fewer lines"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("c/ive<CR>");
+        ensure("c/ive inserts", vim->mode() == ALVimKeymap::Mode::Insert);
+        ensure_equals("and says how many fewer", vim->message(), std::string("4 fewer lines"));
+        keys("X<Esc>");
+        ensure_equals("what it typed in their place", flat(editor->text()), std::string("oXive|six"));
+
+        make(text);
+        keys("4cc");
+        ensure("4cc inserts", vim->mode() == ALVimKeymap::Mode::Insert);
+        ensure_equals("the line it leaves not counted", vim->message(), std::string("3 fewer lines"));
+        keys("X<Esc>");
+        ensure_equals("4cc", flat(editor->text()), std::string("X|five|six"));
+
+        make(text);
+        keys("3cc");
+        ensure("3cc: two fewer, nothing said: " + vim->message(), vim->message().empty());
+        keys("<Esc>");
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("<C-v>3jd");
+        ensure_equals("a block over four lines", flat(editor->text()), std::string("oe|to|tree|fur|five|six"));
+        ensure("takes no line: nothing said: " + vim->message(), vim->message().empty());
+
+        make("a1\na2\na3\na4\n\nb");
+        editor->setCaret(ALTextPos(0, 1));
+        keys("d}");
+        ensure_equals("d} from the paragraph's second character", flat(editor->text()), std::string("a||b"));
+        ensure_equals("said", vim->message(), std::string("3 fewer lines"));
+    }
 }

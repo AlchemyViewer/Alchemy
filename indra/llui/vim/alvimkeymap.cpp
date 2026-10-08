@@ -5863,6 +5863,14 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                 view.deleteRange(span.range);
                 view.setCaret(span.range.begin);
             }
+            // The lines a change of lines took, but the one it leaves to type
+            // on, and those characters over lines took, the first and the
+            // last joined: said for more than vim's report, as a delete of
+            // lines says them.
+            if (!span.block && (op == 'c' || !span.linewise) && last - first > REPORT_THRESHOLD)
+            {
+                say(alSaidCount("VimFewerLines", last - first, "1 fewer line", "[COUNT] fewer lines"));
+            }
             if (op == 'c')
             {
                 if (span.block && last > first)
