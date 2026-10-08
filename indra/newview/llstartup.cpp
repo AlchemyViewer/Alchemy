@@ -1247,7 +1247,15 @@ bool idle_startup()
         }
         else
         {
-            gDirUtilp->setChatLogsDir(gSavedPerAccountSettings.getString("InstantMessageLogPath"));
+            // A path saved before the user dir moved follows it.
+            const std::string saved_path = gSavedPerAccountSettings.getString("InstantMessageLogPath");
+            const std::string log_path = gDirUtilp->relocateLegacyPath(saved_path);
+            if (log_path != saved_path)
+            {
+                LL_INFOS("AppInit") << "Chat logs moved from " << saved_path << " to " << log_path << LL_ENDL;
+                gSavedPerAccountSettings.setString("InstantMessageLogPath", log_path);
+            }
+            gDirUtilp->setChatLogsDir(log_path);
         }
         gDirUtilp->setPerAccountChatLogsDir(userid);
 
