@@ -71,3 +71,15 @@ void quit_sdl();
 void* sdl_create_shared_context();
 void  sdl_make_shared_context_current(void* handle);
 void  sdl_destroy_shared_context(void* handle);
+
+#if LL_LINUX
+// GPU reset notification for the main context and the workers that share it.
+// SDL's EGL backend ignores SDL_GL_CONTEXT_RESET_NOTIFICATION, so while this
+// is on, SDL_GL_CreateContext reaches eglCreateContext with the reset
+// strategy through SDL's context-attribute callback, and
+// sdl_create_shared_context asks for the same one: EGL won't share between
+// contexts whose strategies differ. Set it before the main context is made,
+// and turn it off if the driver refuses a context with it. Main thread only.
+void sdl_set_gl_reset_notification(bool enable);
+bool sdl_gl_reset_notification();
+#endif

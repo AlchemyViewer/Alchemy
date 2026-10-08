@@ -296,6 +296,16 @@ protected:
     // or density can change (resize / DPI / monitor).
     void refreshPixelMetrics();
 
+#if LL_LINUX
+    // GPU reset detection: armGraphicsResetCheck once GL is loaded, to poll
+    // when createContext got a context that reports a reset, then
+    // checkGraphicsReset each frame from swapBuffers. A reset found is said
+    // once and the viewer quits, as nothing the GPU held survives it.
+    void armGraphicsResetCheck();
+    void checkGraphicsReset();
+    bool mGraphicsResetSeen = false;
+#endif
+
     //
     // Platform specific variables
     //

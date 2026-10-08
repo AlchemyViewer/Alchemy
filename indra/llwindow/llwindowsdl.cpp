@@ -93,6 +93,18 @@ const S32 DEFAULT_REFRESH_RATE = 60;
 // be only one object of this class at any time.  Currently this is true.
 static LLWindowSDL *gWindowImplementation = nullptr;
 
+#if LL_LINUX
+// What glGetGraphicsResetStatus returns for a context lost to a purge of video
+// memory, with EGL_NV_robustness_video_memory_purge (see llsdl.cpp).
+#ifndef GL_PURGED_CONTEXT_RESET_NV
+#define GL_PURGED_CONTEXT_RESET_NV 0x92BB
+#endif
+
+// glGetGraphicsResetStatus while the main context reports a GPU reset, which
+// checkGraphicsReset polls each frame; null otherwise.
+static PFNGLGETGRAPHICSRESETSTATUSPROC sGetGraphicsResetStatus = nullptr;
+#endif
+
 LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
                          const std::string& title, const std::string& name, S32 x, S32 y, S32 width,
                          S32 height, U32 flags,
@@ -171,6 +183,9 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
         {
             LL_PROFILER_GPU_CONTEXT;
         }
+#if LL_LINUX
+        armGraphicsResetCheck();
+#endif
 
         //start with arrow cursor
         initCursors();
@@ -324,7 +339,21 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     // (set above); the exact 4.6 request fails on drivers that cap lower, so
     // step the requested version down until creation succeeds, mirroring the
     // WGL path in createSharedContext().
-    mContext = SDL_GL_CreateContext(mWindow);
+    auto create_context = [this]() -> SDL_GLContext
+    {
+#if LL_LINUX
+        // At each version, first a context that reports a GPU reset (see
+        // checkGraphicsReset). A driver that can't report one refuses it.
+        sdl_set_gl_reset_notification(true);
+        if (SDL_GLContext context = SDL_GL_CreateContext(mWindow))
+        {
+            return context;
+        }
+        sdl_set_gl_reset_notification(false);
+#endif
+        return SDL_GL_CreateContext(mWindow);
+    };
+    mContext = create_context();
 #if !LL_DARWIN
     if (!mContext && LLRender::sGLCoreProfile)
     {
@@ -336,7 +365,7 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
             else                { break; }                // gave up at 3.0
             SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major);
             SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
-            mContext = SDL_GL_CreateContext(mWindow);
+            mContext = create_context();
         }
         if (mContext)
         {
@@ -608,6 +637,9 @@ bool LLWindowSDL::switchContext(bool fullscreen, const LLCoordScreen &size, bool
             {
                 LL_PROFILER_GPU_CONTEXT;
             }
+#if LL_LINUX
+            armGraphicsResetCheck();
+#endif
 
             //start with arrow cursor
             initCursors();
@@ -663,6 +695,11 @@ void LLWindowSDL::destroyContext()
     // the framework owns the lifecycle (SDL_MAIN_USE_CALLBACKS) — make sure
     // the screensaver inhibit doesn't outlive the viewer's window.
     SDL_EnableScreenSaver();
+
+#if LL_LINUX
+    // The reset check calls into the context going away.
+    sGetGraphicsResetStatus = nullptr;
+#endif
 
     // Clean up remaining GL state before blowing away window
     LL_INFOS() << "shutdownGL begins" << LL_ENDL;
@@ -950,7 +987,78 @@ void LLWindowSDL::swapBuffers()
         SDL_GL_SwapWindow(mWindow);
     }
     LL_PROFILER_GPU_COLLECT;
+#if LL_LINUX
+    checkGraphicsReset();
+#endif
 }
+
+#if LL_LINUX
+// Once initGL has loaded GL: poll for a GPU reset if createContext got a
+// context that reports one. Below GL 4.5, which initGL loads the call for,
+// ARB_robustness names it with a suffix.
+void LLWindowSDL::armGraphicsResetCheck()
+{
+    sGetGraphicsResetStatus = nullptr;
+    mGraphicsResetSeen = false;
+    if (sdl_gl_reset_notification())
+    {
+        GLint strategy = 0;
+        glGetIntegerv(GL_RESET_NOTIFICATION_STRATEGY, &strategy);
+        if (strategy == GL_LOSE_CONTEXT_ON_RESET)
+        {
+            sGetGraphicsResetStatus = glGetGraphicsResetStatus
+                ? glGetGraphicsResetStatus
+                : (PFNGLGETGRAPHICSRESETSTATUSPROC)SDL_GL_GetProcAddress("glGetGraphicsResetStatusARB");
+        }
+    }
+    LL_INFOS("Window") << "GL context " << (sGetGraphicsResetStatus ? "reports" : "does not report")
+                       << " GPU resets" << LL_ENDL;
+}
+
+// Once a frame, on the main thread. SDL's renderer device-lost events come
+// only from its D3D and Vulkan renderers, never for a GL window, so this is
+// how the viewer learns of a GPU reset, or of NVIDIA purging video memory
+// over a suspend.
+void LLWindowSDL::checkGraphicsReset()
+{
+    if (!sGetGraphicsResetStatus || mGraphicsResetSeen)
+    {
+        return;
+    }
+    const GLenum status = sGetGraphicsResetStatus();
+    if (status == GL_NO_ERROR)
+    {
+        return;
+    }
+    mGraphicsResetSeen = true;
+
+    // The context is lost, and with it every texture, buffer, shader and
+    // framebuffer; GL calls on it now do nothing. Rebuilding them all is a
+    // job across LLPipeline, LLViewerTextureList, the reflection probes, the
+    // shaders and the UI, and isn't attempted: rather than draw garbage or
+    // nothing, the viewer says why and exits.
+    const char* cause = (status == GL_GUILTY_CONTEXT_RESET)    ? "the viewer's own rendering"
+                      : (status == GL_INNOCENT_CONTEXT_RESET)  ? "another program's rendering"
+                      : (status == GL_PURGED_CONTEXT_RESET_NV) ? "a purge of video memory"
+                                                               : "an unknown cause";
+    LL_WARNS("Window") << "GL context lost (reset status 0x" << std::hex << status << std::dec
+                       << ", " << cause << ")" << LL_ENDL;
+
+    OSMessageBoxSDL(
+        "The graphics driver reports that the viewer's OpenGL context was "
+        "lost, as happens when the GPU is reset. Alchemy can't continue "
+        "rendering and will now exit.\n\n"
+        "This usually follows sleep/wake or hibernation, or a GPU driver crash "
+        "or restart. Please relaunch the viewer to resume.",
+        "OpenGL context lost",
+        OSMB_OK);
+
+    if (mCallbacks)
+    {
+        mCallbacks->handleQuit(this);
+    }
+}
+#endif
 
 U32 LLWindowSDL::getFSAASamples()
 {
@@ -2544,50 +2652,6 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
                 // Get the app to initiate cleanup.
                 mCallbacks->handleQuit(this);
                 // The app is responsible for calling destroyWindow when done with GL
-            }
-            break;
-        }
-        case SDL_EVENT_RENDER_DEVICE_RESET:
-        case SDL_EVENT_RENDER_DEVICE_LOST:
-        case SDL_EVENT_RENDER_TARGETS_RESET:
-        {
-            // The GL device underneath us has been reset, lost, or had its
-            // render targets invalidated — display sleep/wake, GPU driver
-            // restart, VT switch on some Mesa stacks. Every texture, VBO,
-            // shader program, framebuffer object, and reflection probe is
-            // now in an undefined state and subsequent GL calls will either
-            // silently no-op or crash. The pre-relative-mode viewer simply
-            // crashed; this gives the user a visible cause-of-death and a
-            // proper log line for support before we tear down.
-            //
-            // True recovery — destroying every GL resource and rebuilding
-            // it from scratch — is a substantial cross-subsystem effort
-            // (LLPipeline, LLViewerTextureList, LLReflectionMapManager,
-            // every loaded shader, the UI atlas) and is deliberately not
-            // attempted here. The viewer exits cleanly so the user knows
-            // to restart instead of staring at a black or corrupted window.
-            const char* kind = (event.type == SDL_EVENT_RENDER_DEVICE_RESET)
-                                   ? "device reset"
-                                   : (event.type == SDL_EVENT_RENDER_DEVICE_LOST)
-                                         ? "device lost"
-                                         : "render targets reset";
-            LL_WARNS("Window") << "GL " << kind
-                               << " detected via SDL3 event. SDL error: "
-                               << SDL_GetError() << LL_ENDL;
-
-            OSMessageBoxSDL(
-                "The graphics driver reported an OpenGL device "
-                + std::string(kind)
-                + ". Alchemy can't continue rendering and will now exit.\n\n"
-                  "This usually follows display sleep/wake, a GPU driver "
-                  "restart, or a virtual-terminal switch. Please relaunch "
-                  "the viewer to resume.",
-                "OpenGL device lost",
-                OSMB_OK);
-
-            if (mCallbacks)
-            {
-                mCallbacks->handleQuit(this);
             }
             break;
         }

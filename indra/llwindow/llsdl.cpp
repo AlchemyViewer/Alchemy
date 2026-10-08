@@ -24,7 +24,9 @@
  * $/LicenseInfo$
  */
 
+#include <algorithm>
 #include <initializer_list>
+#include <iterator>
 #include <list>
 
 #include "llsdl.h"
@@ -43,6 +45,7 @@
 // are wanted here.
 #if LL_LINUX
 #include <EGL/egl.h>
+#include <EGL/eglext.h>
 #endif
 
 bool gSDLMainHandled = false;
@@ -302,6 +305,77 @@ namespace
     };
 }
 
+#if LL_LINUX
+namespace
+{
+    bool sResetNotification = false;
+
+    // What makes an EGL context report a GPU reset, as the main context was
+    // last asked for it, repeated for every worker. Just EGL_NONE while
+    // reset notification is off.
+    EGLint sResetAttribs[5] = { EGL_NONE };
+
+    bool egl_has_extension(const char* extensions, const char* name)
+    {
+        const size_t len = strlen(name);
+        for (const char* p = extensions; (p = strstr(p, name)) != nullptr; p += len)
+        {
+            if ((p == extensions || p[-1] == ' ') && (p[len] == ' ' || p[len] == '\0'))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // SDL_EGLIntArrayCallback: appended to the attributes SDL gives
+    // eglCreateContext for the main context.
+    SDL_EGLint* SDLCALL egl_reset_context_attribs(void*, SDL_EGLDisplay display, SDL_EGLConfig)
+    {
+        int n = 0;
+        // Lost on a reset, which glGetGraphicsResetStatus then reports. This
+        // is EGL 1.5's token, and EGL_KHR_create_context's for desktop GL
+        // before it; robust buffer access, whose bounds checks cost, isn't
+        // asked for with it.
+        sResetAttribs[n++] = EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY;
+        sResetAttribs[n++] = EGL_LOSE_CONTEXT_ON_RESET;
+        // NVIDIA counts video memory purged, as a suspend without
+        // NVreg_PreserveVideoMemoryAllocations leaves it, as a reset only
+        // when asked to.
+        typedef const char* (*fn_querystring)(void*, int);
+        auto egl_querystring = (fn_querystring)SDL_EGL_GetProcAddress("eglQueryString");
+        const char* extensions = egl_querystring ? egl_querystring(display, EGL_EXTENSIONS) : nullptr;
+        if (extensions && egl_has_extension(extensions, "EGL_NV_robustness_video_memory_purge"))
+        {
+            sResetAttribs[n++] = EGL_GENERATE_RESET_ON_VIDEO_MEMORY_PURGE_NV;
+            sResetAttribs[n++] = EGL_TRUE;
+        }
+        sResetAttribs[n] = EGL_NONE;
+
+        // SDL frees the copy. It mustn't be null short of memory running
+        // out: SDL takes that for a failure, and marks its GL library unloaded.
+        auto* attribs = (SDL_EGLint*)SDL_malloc(sizeof(sResetAttribs));
+        if (attribs)
+        {
+            SDL_memcpy(attribs, sResetAttribs, sizeof(sResetAttribs));
+        }
+        return attribs;
+    }
+}
+
+void sdl_set_gl_reset_notification(bool enable)
+{
+    sResetNotification = enable;
+    sResetAttribs[0] = EGL_NONE;
+    SDL_EGL_SetAttributeCallbacks(nullptr, nullptr, enable ? egl_reset_context_attribs : nullptr, nullptr);
+}
+
+bool sdl_gl_reset_notification()
+{
+    return sResetNotification;
+}
+#endif // LL_LINUX
+
 void* sdl_create_shared_context()
 {
     // A version request derived from the live main context, clamped to the
@@ -394,13 +468,15 @@ void* sdl_create_shared_context()
             if (egl_bindapi) egl_bindapi(EGL_OPENGL_API);
             // Must request the version explicitly — an empty attrib list defaults
             // to GL 1.0, which can't drive the modern texture/VBO uploads the
-            // worker shares with the main context. (EGL 1.5 tokens.)
-            const int ctx_attribs[] =
+            // worker shares with the main context. (EGL 1.5 tokens.) The main
+            // context's reset strategy follows, as EGL requires of a context
+            // that shares with it.
+            int ctx_attribs[4 + std::size(sResetAttribs)] =
             {
                 EGL_CONTEXT_MAJOR_VERSION, ver_major,
                 EGL_CONTEXT_MINOR_VERSION, ver_minor,
-                EGL_NONE
             };
+            std::copy(std::begin(sResetAttribs), std::end(sResetAttribs), ctx_attribs + 4);
             void* ctx = egl_createctx(dpy, cfg, share, ctx_attribs);
             if (ctx && ctx != EGL_NO_CONTEXT)
             {
