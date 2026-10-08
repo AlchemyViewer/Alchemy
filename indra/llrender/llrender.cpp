@@ -393,6 +393,13 @@ bool LLRender::init(bool needs_vertex_buffer)
     mCurrBlendColorDFactor = BF_UNDEF;
     mCurrBlendAlphaDFactor = BF_UNDEF;
 
+    // The same for the rest of what the setters cache, at GL's initial values: a line
+    // width of 1, no polygon offset, three vertices a patch.
+    mLineWidth           = 1.f;
+    mPolygonOffsetFactor = 0.f;
+    mPolygonOffsetUnits  = 0.f;
+    mPatchVertices       = 3;
+
     // Build this context's sampler objects before anything can ask for one.
     mSamplerCache.warmup();
 

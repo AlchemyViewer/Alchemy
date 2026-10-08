@@ -854,4 +854,33 @@ namespace tut
         ensure_equals("at its new size", img->getWidth(), 32);
         ensure_equals("holding the upload", readTexelRGBA(img, 5, 5), 0x55555555u);
     }
+
+    // And the rest of what LLRender's setters cache. A polygon offset or patch
+    // size the last context was left with made the same setting on the next one
+    // look redundant, so the fresh context kept GL's initial value instead.
+    template<> template<>
+    void llimagegl_object::test<23>()
+    {
+        gGL.setPolygonOffset(1.f, 2.f);
+        gGL.setPatchVertices(4);
+
+        // A new context on the same thread.
+        gl.reset();
+        gl = std::make_unique<ll_test::HeadlessGL>();
+
+        gGL.setPolygonOffset(1.f, 2.f);
+        gGL.setPatchVertices(4);
+
+        const F32 sign = LLRender::sReverseZ ? -1.f : 1.f;
+        GLfloat factor = 0.f;
+        GLfloat units = 0.f;
+        glGetFloatv(GL_POLYGON_OFFSET_FACTOR, &factor);
+        glGetFloatv(GL_POLYGON_OFFSET_UNITS, &units);
+        ensure_equals("the polygon offset reached the new context: factor", (F32)factor, sign * 1.f);
+        ensure_equals("the polygon offset reached the new context: units", (F32)units, sign * 2.f);
+
+        GLint patch = 0;
+        glGetIntegerv(GL_PATCH_VERTICES, &patch);
+        ensure_equals("and the patch size", (S32)patch, 4);
+    }
 }
