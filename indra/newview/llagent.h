@@ -412,6 +412,7 @@ protected:
     void            ageChat();              // Helper function to prematurely age chat when agent is moving
 private:
     LLFrameTimer    mChatTimer;
+    U32             mChatAgedFrame = 0;     // LLFrameTimer::getFrameCount() of the last ageChat(), which ages a frame once
     LLUUID          mLastChatterID;
     F32             mNearChatRadius;
 

@@ -684,10 +684,17 @@ void LLAgent::showLatestFeatureNotification(const std::string key)
 
 void LLAgent::ageChat()
 {
+    // Every movement key held this frame asks, and the frame is one dt however many there are.
+    if (mChatAgedFrame == LLFrameTimer::getFrameCount())
+    {
+        return;
+    }
+    mChatAgedFrame = LLFrameTimer::getFrameCount();
+
     if (isAgentAvatarValid())
     {
         // get amount of time since I last chatted
-        F64 elapsed_time = (F64)gAgentAvatarp->mChatTimer.getElapsedTimeF32();
+        F64 elapsed_time = gAgentAvatarp->mChatTimer.getElapsedTimeF64();
         // add in frame time * 3 (so it ages 4x)
         gAgentAvatarp->mChatTimer.setAge(elapsed_time + (F64)gFrameDTClamped * (CHAT_AGE_FAST_RATE - 1.0));
     }

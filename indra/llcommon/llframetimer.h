@@ -95,7 +95,8 @@ public:
     // ACCESSORS
     bool hasExpired() const                         { return (sFrameTime >= mExpiry); }
     F32  getTimeToExpireF32() const                 { return (F32)(mExpiry - sFrameTime); }
-    F32  getElapsedTimeF32() const                  { return mStarted ? (F32)(sFrameTime - mStartTime) : (F32)mStartTime; }
+    F32  getElapsedTimeF32() const                  { return (F32)getElapsedTimeF64(); }
+    F64  getElapsedTimeF64() const                  { return mStarted ? sFrameTime - mStartTime : mStartTime; }
     bool getStarted() const                         { return mStarted; }
 
     // return the seconds since epoch when this timer will expire.
