@@ -31,6 +31,12 @@
 #include "llappviewerwin32.h"
 #include <dbghelp.h>
 #endif
+#if LL_LINUX
+#include <pthread.h>
+#include <semaphore.h>
+#include <signal.h>
+#include <unistd.h>
+#endif
 #include <sentry.h>
 
 #include "llagent.h"
@@ -41,20 +47,28 @@
 #include "llstartup.h"
 #include "llstring.h"
 #include "llsys.h"
+#include "llthread.h"
 #include "lluuid.h"
 #include "llversioninfo.h"
 #include "llviewerregion.h"
 
 #include <algorithm>
 #include <atomic>
+#include <cerrno>
 #include <charconv>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
+#include <iterator>
 
 namespace
 {
     bool sEngaged = false;
+
+    // Raised while a signal handler of ours calls into the SDK, whose
+    // warnings would otherwise reach the log's locks from inside it.
+    std::atomic<bool> sSdkLogMuted{ false };
 
     // The SDK's own log, into ours: what it says about the handler, the
     // Windows Error Reporting module and the transport is otherwise unseen.
@@ -63,6 +77,10 @@ namespace
     // on) and go at INFO, so only its errors are ours.
     void sdk_log(sentry_level_t level, const char* message, va_list args, void*)
     {
+        if (sSdkLogMuted.load(std::memory_order_relaxed))
+        {
+            return;
+        }
         char line[1024];
         vsnprintf(line, sizeof(line), message, args);
         switch (level)
@@ -221,6 +239,127 @@ namespace
         return event;
     }
 
+#if LL_LINUX
+    // A freeze report's stack, where there is no minidump of a running
+    // process to send: the hung main thread is sent a real-time signal of
+    // its own, and the handler walks the stack from where the signal
+    // interrupted it, with the SDK's unwinder, into frames set aside for it,
+    // while the watchdog waits on the semaphore it posts.
+    constexpr size_t FROZEN_FRAMES_MAX = 128;
+    void* sFrozenFrames[FROZEN_FRAMES_MAX];
+    size_t sFrozenFrameCount = 0;
+    sem_t sFrozenWalked;
+    pthread_t sMainThread;
+    pid_t sMainThreadId = 0;
+    int sFrozenSignal = 0;
+
+    void walk_frozen_stack(int signum, siginfo_t* info, void* context)
+    {
+        const int saved_errno = errno;
+        sentry_ucontext_t uctx = {};
+        uctx.signum = signum;
+        uctx.siginfo = info;
+        uctx.user_context = static_cast<ucontext_t*>(context);
+        sSdkLogMuted.store(true);
+        sFrozenFrameCount = sentry_unwind_stack_from_ucontext(&uctx, sFrozenFrames, FROZEN_FRAMES_MAX);
+        sSdkLogMuted.store(false);
+        sem_post(&sFrozenWalked);
+        errno = saved_errno;
+    }
+
+    // From the main thread, once. The signal is the highest real-time one
+    // with no handler on it, passing over LLApp's smackdown and heartbeat
+    // and SIGRTMIN + 4, which the SDK's own app-hang tracking takes when on.
+    void prepare_frozen_walk()
+    {
+        if (sFrozenSignal || !on_main_thread())
+        {
+            return;
+        }
+
+        // The unwinder sets itself up and caches what it reads of the
+        // loaded objects on first use: here, rather than in the handler.
+        void* warm[8];
+        sentry_unwind_stack(nullptr, warm, std::size(warm));
+
+        for (int signum = SIGRTMAX; signum >= SIGRTMIN; --signum)
+        {
+            if (signum == LL_SMACKDOWN_SIGNAL || signum == LL_HEARTBEAT_SIGNAL || signum == SIGRTMIN + 4)
+            {
+                continue;
+            }
+            struct sigaction current = {};
+            if (sigaction(signum, nullptr, &current) != 0 || current.sa_handler != SIG_DFL)
+            {
+                continue;
+            }
+            if (sem_init(&sFrozenWalked, 0, 0) != 0)
+            {
+                return;
+            }
+            struct sigaction action = {};
+            action.sa_sigaction = walk_frozen_stack;
+            sigemptyset(&action.sa_mask);
+            action.sa_flags = SA_SIGINFO | SA_RESTART;
+            if (sigaction(signum, &action, nullptr) != 0)
+            {
+                sem_destroy(&sFrozenWalked);
+                return;
+            }
+            sMainThread = pthread_self();
+            sMainThreadId = gettid();
+            sFrozenSignal = signum;
+            return;
+        }
+        LL_WARNS("CrashReporter") << "No real-time signal free; freeze reports carry no stack" << LL_ENDL;
+    }
+
+    // The main thread's stack on the event, as the thread the report is
+    // about. A thread in an uninterruptible wait in the kernel, or with the
+    // signal blocked, never runs the handler, and the wait gives up.
+    bool add_frozen_thread(sentry_value_t event)
+    {
+        if (!sFrozenSignal)
+        {
+            return false;
+        }
+        // A handler installed over ours since would take the signal, or
+        // leave its default, which ends the process.
+        struct sigaction current = {};
+        if (sigaction(sFrozenSignal, nullptr, &current) != 0 || current.sa_sigaction != walk_frozen_stack)
+        {
+            return false;
+        }
+
+        while (sem_trywait(&sFrozenWalked) == 0)
+        {
+        }
+        if (pthread_kill(sMainThread, sFrozenSignal) != 0)
+        {
+            return false;
+        }
+        timespec deadline = {};
+        clock_gettime(CLOCK_REALTIME, &deadline);
+        deadline.tv_sec += 2;
+        int waited;
+        do
+        {
+            waited = sem_timedwait(&sFrozenWalked, &deadline);
+        } while (waited != 0 && errno == EINTR);
+        if (waited != 0 || sFrozenFrameCount == 0)
+        {
+            return false;
+        }
+
+        sentry_value_t thread = sentry_value_new_thread(sMainThreadId, "main");
+        sentry_value_set_by_key(thread, "crashed", sentry_value_new_bool(true));
+        sentry_value_set_by_key(thread, "main", sentry_value_new_bool(true));
+        sentry_value_set_stacktrace(thread, sFrozenFrames, sFrozenFrameCount);
+        sentry_event_add_thread(event, thread);
+        return true;
+    }
+#endif
+
     bool engage()
     {
         LLAppViewer* app = LLAppViewer::instance();
@@ -265,6 +404,9 @@ namespace
             LLViewerRegion::setRegionInfoChangedCallback([](LLViewerRegion*) { remember_region(); });
         }
         remember_region();
+#if LL_LINUX
+        prepare_frozen_walk();
+#endif
 
         LL_INFOS("CrashReporter") << "Sentry engaged for " << version.getChannelAndVersion() << LL_ENDL;
         return true;
@@ -425,12 +567,19 @@ bool ALCrashReporter::reportFreeze(const std::string& description)
     }
     LL_WARNS("CrashReporter") << "No minidump for the freeze; reporting the watchdog's own stack" << LL_ENDL;
 #endif
-    // Without a dump, the report is the watchdog's own stack and what it saw.
+    // Without a dump, the report is what the watchdog saw, and on Linux the
+    // main thread's stack, asked of it.
     sentry_value_t event = sentry_value_new_message_event(SENTRY_LEVEL_FATAL, "watchdog", description.c_str());
     set_event_tag(event, "watchdog_state", LLAppViewer::instance()->getMainloopWatchdogState());
     set_event_tag(event, "app_state", LLStartUp::getStartupStateString());
+#if LL_LINUX
+    const bool with_stack = add_frozen_thread(event);
+#else
+    const bool with_stack = false;
+#endif
     sentry_capture_event(event);
-    LL_INFOS("CrashReporter") << "Freeze reported as an event" << LL_ENDL;
+    LL_INFOS("CrashReporter") << (with_stack ? "Freeze reported with the main thread's stack"
+                                             : "Freeze reported as an event") << LL_ENDL;
     return true;
 }
 
