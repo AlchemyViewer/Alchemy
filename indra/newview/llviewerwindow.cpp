@@ -3046,7 +3046,9 @@ void LLViewerWindow::draw()
 
         gGL.loadIdentity();
 
-        microsecondsToTimecodeString(gFrameTime,text);
+        // From the session's start: from the epoch's, the hours run past
+        // the three digits the timecode has for them.
+        microsecondsToTimecodeString(U64Microseconds(gFrameTimeSeconds), text);
         const LLFontGL* font = LLFontGL::getFontSansSerif();
         font->renderUTF8(text, 0,
                         ll_round((getWindowWidthScaled()/2)-100.f),
