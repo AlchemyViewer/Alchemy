@@ -37,6 +37,15 @@
 #include "../test/namedtempfile.h"
 #include "stringize.h"
 
+#if LL_LINUX
+#include "../lldir_linux.h"
+#include <cstdlib>
+#include <fstream>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+#endif
+
 // For some tests, use a dummy LLDir that uses memory data instead of touching
 // the filesystem
 struct LLDir_Dummy: public LLDir
@@ -171,6 +180,94 @@ struct LLDir_Dummy: public LLDir
     std::set<std::string> mFilesystem;
     mutable std::set<std::string> mChecked;
 };
+
+// A dummy whose profile moved out of one legacy root into separate dirs.
+struct LLDir_Relocated: public LLDir_Dummy
+{
+    LLDir_Relocated()
+    {
+        mLegacyUserAppDir = "old";
+        mUserSettingsDir = "cfg";
+        mLogsDir = "state";
+        mDefaultCacheDir = "cachedir";
+    }
+};
+
+#if LL_LINUX
+namespace
+{
+    namespace fs = std::filesystem;
+
+    // A scratch home with every XDG variable pointed into it, so nothing a
+    // test does reaches the real profile. Puts the variables back after.
+    struct ScratchHome
+    {
+        ScratchHome()
+        {
+            std::string pattern = (fs::temp_directory_path() / "lldir_test_XXXXXX").string();
+            home = ::mkdtemp(pattern.data());
+            for (const char* var : VARS)
+            {
+                const char* value = ::getenv(var);
+                saved.emplace_back(value ? std::optional<std::string>(value) : std::nullopt);
+                ::unsetenv(var);
+            }
+        }
+
+        ~ScratchHome()
+        {
+            for (size_t i = 0; i < std::size(VARS); ++i)
+            {
+                if (saved[i])
+                {
+                    ::setenv(VARS[i], saved[i]->c_str(), 1);
+                }
+                else
+                {
+                    ::unsetenv(VARS[i]);
+                }
+            }
+            std::error_code ec;
+            fs::remove_all(home, ec);
+        }
+
+        std::string path(const std::string& rel) const { return home + "/" + rel; }
+
+        void write(const std::string& rel, const std::string& text = "x") const
+        {
+            fs::create_directories(fs::path(path(rel)).parent_path());
+            std::ofstream(path(rel)) << text;
+        }
+
+        bool exists(const std::string& rel) const
+        {
+            std::error_code ec;
+            return fs::exists(fs::symlink_status(path(rel), ec));
+        }
+
+        // a profile as older viewers left it
+        void writeLegacyProfile() const
+        {
+            write(".app/user_settings/settings.xml", "settings");
+            write(".app/logs/Alchemy.log", "log");
+            write(".app/cache/texturecache/t", "texture");
+            write(".app/bob_resident/settings_per_account.xml", "account");
+            write(".app/skins/default/colors.xml", "skin");
+        }
+
+        bool legacyProfileIntact() const
+        {
+            return exists(".app/user_settings/settings.xml") && exists(".app/logs/Alchemy.log") &&
+                   exists(".app/cache/texturecache/t") && exists(".app/bob_resident/settings_per_account.xml") &&
+                   exists(".app/skins/default/colors.xml");
+        }
+
+        static constexpr const char* VARS[] = { "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME" };
+        std::string home;
+        std::vector<std::optional<std::string>> saved;
+    };
+}
+#endif // LL_LINUX
 
 namespace tut
 {
@@ -711,4 +808,150 @@ namespace tut
         ensure_equals("path trailing slash", lldir.add("a/", "b"), "a/b");
         ensure_equals("both bring slashes", lldir.add("a/", "/b"), "a/b");
     }
+
+    template<> template<>
+    void LLDirTest_object_t::test<8>()
+    {
+        set_test_name("relocateLegacyPath()");
+        LLDir_Relocated lldir;
+        ensure_equals("root", lldir.relocateLegacyPath("old"), "user");
+        ensure_equals("root slash", lldir.relocateLegacyPath("old/"), "user");
+        ensure_equals("account", lldir.relocateLegacyPath("old/bob_resident"), "user/bob_resident");
+        ensure_equals("settings", lldir.relocateLegacyPath("old/user_settings/settings.xml"), "cfg/settings.xml");
+        ensure_equals("logs", lldir.relocateLegacyPath("old/logs"), "state");
+        ensure_equals("cache", lldir.relocateLegacyPath("old/cache/texturecache"), "cachedir/texturecache");
+        ensure_equals("sibling", lldir.relocateLegacyPath("oldish/x"), "oldish/x");
+        ensure_equals("elsewhere", lldir.relocateLegacyPath("chat/logs"), "chat/logs");
+
+        lldir.buildFilesystem("old/bob_resident");
+        ensure_equals("still there", lldir.relocateLegacyPath("old/bob_resident"), "old/bob_resident");
+
+        LLDir_Dummy unmoved;
+        ensure_equals("no legacy root", unmoved.relocateLegacyPath("old/bob_resident"), "old/bob_resident");
+    }
+
+#if LL_LINUX
+    template<> template<>
+    void LLDirTest_object_t::test<9>()
+    {
+        set_test_name("LLDirXDG::layout()");
+        ScratchHome scratch;
+        LLDirXDG::Layout dirs = LLDirXDG::layout("/h", "app");
+        ensure_equals("data default", dirs.data, "/h/.local/share/app");
+        ensure_equals("config default", dirs.config, "/h/.config/app");
+        ensure_equals("cache default", dirs.cache, "/h/.cache/app");
+        ensure_equals("state default", dirs.state, "/h/.local/state/app");
+
+        ::setenv("XDG_DATA_HOME", "/d", 1);
+        ::setenv("XDG_CONFIG_HOME", "relative/c", 1);
+        ::setenv("XDG_CACHE_HOME", "", 1);
+        ::setenv("XDG_STATE_HOME", "/s", 1);
+        dirs = LLDirXDG::layout("/h", "app");
+        ensure_equals("data set", dirs.data, "/d/app");
+        ensure_equals("config relative ignored", dirs.config, "/h/.config/app");
+        ensure_equals("cache empty ignored", dirs.cache, "/h/.cache/app");
+        ensure_equals("state set", dirs.state, "/s/app");
+
+        dirs = LLDirXDG::legacyLayout("/h/.app");
+        ensure_equals("legacy data", dirs.data, "/h/.app");
+        ensure_equals("legacy config", dirs.config, "/h/.app/user_settings");
+        ensure_equals("legacy cache", dirs.cache, "/h/.app/cache");
+        ensure_equals("legacy state", dirs.state, "/h/.app/logs");
+    }
+
+    template<> template<>
+    void LLDirTest_object_t::test<10>()
+    {
+        set_test_name("LLDirXDG::migrate() moves a legacy profile");
+        ScratchHome scratch;
+        std::vector<std::string> notes;
+        const LLDirXDG::Layout dirs = LLDirXDG::layout(scratch.home, "app");
+
+        ensure("no legacy profile", LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::NONE);
+        ensure("nothing made for no profile", !scratch.exists(".local"));
+
+        scratch.writeLegacyProfile();
+        ensure("moved", LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::MOVED);
+        ensure("legacy root gone", !scratch.exists(".app"));
+        ensure("settings", scratch.exists(".config/app/settings.xml"));
+        ensure("logs", scratch.exists(".local/state/app/Alchemy.log"));
+        ensure("cache", scratch.exists(".cache/app/texturecache/t"));
+        ensure("account", scratch.exists(".local/share/app/bob_resident/settings_per_account.xml"));
+        ensure("skins", scratch.exists(".local/share/app/skins/default/colors.xml"));
+        ensure("no settings left in data", !scratch.exists(".local/share/app/user_settings"));
+        ensure("no logs left in data", !scratch.exists(".local/share/app/logs"));
+        ensure("no cache left in data", !scratch.exists(".local/share/app/cache"));
+        ensure("base dirs private",
+               (fs::status(scratch.path(".local/state")).permissions() & fs::perms::all) == fs::perms::owner_all);
+
+        // an older viewer run afterwards makes a new legacy root; it stays put
+        scratch.write(".app/user_settings/settings.xml", "new");
+        ensure("second legacy root left", LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::NONE);
+        ensure("second legacy root intact", scratch.exists(".app/user_settings/settings.xml"));
+    }
+
+    template<> template<>
+    void LLDirTest_object_t::test<11>()
+    {
+        set_test_name("LLDirXDG::migrate() leaves a profile it can't move whole");
+        std::vector<std::string> notes;
+        {
+            ScratchHome scratch;
+            const LLDirXDG::Layout dirs = LLDirXDG::layout(scratch.home, "app");
+            scratch.writeLegacyProfile();
+            scratch.write(".config/app/other.xml");
+            ensure("config dir in the way", LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::FAILED);
+            ensure("put back", scratch.legacyProfileIntact());
+            ensure("no data dir", !scratch.exists(".local/share/app"));
+            ensure("no state dir", !scratch.exists(".local/state/app"));
+            ensure("config dir untouched", scratch.exists(".config/app/other.xml"));
+        }
+        {
+            ScratchHome scratch;
+            const LLDirXDG::Layout dirs = LLDirXDG::layout(scratch.home, "app");
+            scratch.writeLegacyProfile();
+            scratch.write(".app/logs/Alchemy.exec_marker");
+            const int fd = ::open(scratch.path(".app/logs/Alchemy.exec_marker").c_str(), O_RDWR);
+            ensure("marker locked", fd != -1 && ::flock(fd, LOCK_EX | LOCK_NB) == 0);
+            ensure("viewer running", LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::FAILED);
+            ensure("left while running", scratch.legacyProfileIntact());
+            ::close(fd);
+            ensure("moved once it exits", LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::MOVED);
+        }
+        {
+            ScratchHome scratch;
+            const LLDirXDG::Layout dirs = LLDirXDG::layout(scratch.home, "app");
+            scratch.writeLegacyProfile();
+            fs::rename(scratch.path(".app"), scratch.path("elsewhere"));
+            fs::create_directory_symlink(scratch.path("elsewhere"), scratch.path(".app"));
+            ensure("symlink kept", LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::FAILED);
+            ensure("symlinked profile intact", scratch.legacyProfileIntact());
+            ensure("symlink still a symlink", fs::is_symlink(scratch.path(".app")));
+        }
+    }
+
+    template<> template<>
+    void LLDirTest_object_t::test<12>()
+    {
+        set_test_name("LLDirXDG::adoptCache()");
+        ScratchHome scratch;
+        std::vector<std::string> notes;
+        const std::string old_cache = scratch.path(".cache/App");
+        const std::string cache = scratch.path(".cache/app");
+
+        LLDirXDG::adoptCache(old_cache, cache, notes);
+        ensure("nothing to adopt", !scratch.exists(".cache"));
+
+        scratch.write(".cache/App/texturecache/t");
+        LLDirXDG::adoptCache(old_cache, cache, notes);
+        ensure("adopted", scratch.exists(".cache/app/texturecache/t"));
+        ensure("old name gone", !scratch.exists(".cache/App"));
+
+        scratch.write(".cache/App/texturecache/stale");
+        LLDirXDG::adoptCache(old_cache, cache, notes);
+        ensure("current cache kept", scratch.exists(".cache/app/texturecache/t"));
+        ensure("old cache left beside it", scratch.exists(".cache/App/texturecache/stale"));
+        ensure("old cache not merged in", !scratch.exists(".cache/app/texturecache/stale"));
+    }
+#endif // LL_LINUX
 }

@@ -2595,6 +2595,11 @@ void LLAppViewer::initLoggingAndGetLastDuration()
             LLFile::rename(user_data_path_cef_log, user_data_path_cef_old);
         }
     }
+
+    for (const std::string& note : gDirUtilp->getInitNotes())
+    {
+        LL_INFOS("AppInit") << note << LL_ENDL;
+    }
 }
 
 bool LLAppViewer::loadSettingsFromDirectory(const std::string& location_key,
