@@ -42,7 +42,9 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <string>
+#include <vector>
 
 class LLAvatarName;
 const std::string gCodeTestAnonName("Anon");
@@ -3662,5 +3664,191 @@ namespace tut
         };
         ensure("the 2 it makes in the comment's colour", colour_at(6) == comment);
         ensure("and the = before it", colour_at(4) == comment);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<101>()
+    {
+        set_test_name("Return or a paste above a folded block in a long text hides its lines again without every line of the text asked who hides it");
+        std::string text = "x\nf()\n{\n    y();\n}\n";
+        for (S32 i = 0; i < 3000; ++i)
+        {
+            text += "integer z;\n";
+        }
+        ALCodeEditor& e = make("");
+        e.setText(text);
+        const S32 count = e.document().lineCount();
+        e.highlighter().tokens(count - 1);
+        ensure("folds", e.foldAt(1));
+        ensure("its lines hidden", e.layout().hidden(2) && e.layout().hidden(4) && !e.layout().hidden(5));
+
+        e.setCaret(e.document().lineEnd(0));
+        U32 asked = e.layout().hiddenByAsked();
+        key(KEY_RETURN);
+        ensure("the fold down a line with its header", e.isFolded(2) && !e.isFolded(1));
+        ensure("its lines hidden there", !e.layout().hidden(2) && e.layout().hidden(3) && e.layout().hidden(5) && !e.layout().hidden(6));
+        U32 lines = e.layout().hiddenByAsked() - asked;
+        ensure("Return: " + std::to_string(lines) + " lines asked who hides them, of " + std::to_string(count + 1), lines < 100u);
+
+        // Three lines pasted at the top.
+        e.setCaret(ALTextPos(0, 0));
+        asked = e.layout().hiddenByAsked();
+        e.insertText("a\nb\nc\n");
+        ensure("the fold down three lines more", e.isFolded(5) && !e.isFolded(2));
+        ensure("its lines hidden there", !e.layout().hidden(5) && e.layout().hidden(6) && e.layout().hidden(8) && !e.layout().hidden(9));
+        lines = e.layout().hiddenByAsked() - asked;
+        ensure("a paste: " + std::to_string(lines) + " lines asked who hides them, of " + std::to_string(count + 4), lines < 100u);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<102>()
+    {
+        set_test_name("through edits of every kind in and around folded blocks, the layout hides for the folds exactly the lines they hide");
+        std::string text = "integer g;\n";
+        for (S32 f = 0; f < 6; ++f)
+        {
+            text += "f" + std::to_string(f) + "()\n{\n    if (a)\n    {\n        b();\n    }\n    c();\n}\n";
+        }
+        ALCodeEditor& e = make(text.c_str());
+        typedef ALTextLayout::HiddenBy By;
+        // The same edits on every run, each number drawn in a statement of
+        // its own so that no compiler's order of arguments changes them.
+        U32        seed = 20261008u;
+        const auto pick = [&seed](S32 n) {
+            seed = seed * 1664525u + 1013904223u;
+            return n > 0 ? static_cast<S32>((seed >> 8) % static_cast<U32>(n)) : 0;
+        };
+        const auto somewhere = [&]() {
+            const S32 line   = pick(e.document().lineCount());
+            const S32 column = pick(e.document().lineLength(line) + 1);
+            return ALTextPos(line, column);
+        };
+        // A stretch from somewhere to as many as `most` lines on, either way
+        // round.
+        const auto stretch = [&](S32 most) {
+            const ALTextPos from   = somewhere();
+            const S32       line   = llmin(from.line + pick(most + 1), e.document().lineCount() - 1);
+            const S32       column = pick(e.document().lineLength(line) + 1);
+            return ALTextRange(from, ALTextPos(line, column)).normalised();
+        };
+        const char* const PIECES[] = { "", "x", "\n", "\n\n", "{\n", "}\n", "}", "a\nb\nc\n", "    if (q)\n    {\n        r();\n    }\n" };
+        const S32         PIECE_COUNT = static_cast<S32>(sizeof(PIECES) / sizeof(PIECES[0]));
+        S32               folded_steps = 0;
+        for (S32 step = 0; step < 400; ++step)
+        {
+            const std::string at = "step " + std::to_string(step);
+            // A block folded every other step or so, to have folds to edit
+            // in and around.
+            if (pick(2) == 0)
+            {
+                const std::vector<ALCodeEditor::FoldRegion>& regions = e.foldRegions();
+                if (!regions.empty())
+                {
+                    const S32 start = regions[static_cast<size_t>(pick(static_cast<S32>(regions.size())))].start;
+                    e.foldAt(start);
+                }
+            }
+            // Lines taken now and then, and always once the text is long;
+            // never once it is short.
+            const S32 count = e.document().lineCount();
+            S32       what  = pick(7);
+            if (count > 120)
+            {
+                what = 0;
+            }
+            else if (what == 0 && count < 40)
+            {
+                what = 1;
+            }
+            if (what == 0)
+            {
+                // Whole lines, from inside one into another, or within one.
+                e.replaceAll({ { stretch(5), std::string() } });
+            }
+            else if (what == 1)
+            {
+                // One stretch replaced by a piece.
+                const ALTextRange over  = stretch(2);
+                const char*       piece = PIECES[pick(PIECE_COUNT)];
+                e.replaceAll({ { over, piece } });
+            }
+            else if (what == 2)
+            {
+                // A batch: two or three stretches apart, each replaced by a
+                // piece.
+                const S32                stretches = 2 + pick(2);
+                std::vector<ALTextRange> overs;
+                for (S32 i = 0; i < stretches; ++i)
+                {
+                    overs.push_back(stretch(2));
+                }
+                std::sort(overs.begin(), overs.end(), [](const ALTextRange& a, const ALTextRange& b) { return a.begin < b.begin; });
+                std::vector<std::pair<ALTextRange, std::string>> edits;
+                bool                                             apart = true;
+                for (size_t i = 0; i < overs.size(); ++i)
+                {
+                    apart = apart && (i == 0 || overs[i - 1].end < overs[i].begin);
+                    const char* piece = PIECES[pick(PIECE_COUNT)];
+                    edits.emplace_back(overs[i], piece);
+                }
+                if (apart)
+                {
+                    e.replaceAll(std::move(edits));
+                }
+            }
+            else if (what == 3)
+            {
+                // Return, the caret put there first, which opens a folded
+                // block it lands in.
+                e.setCaret(somewhere());
+                key(KEY_RETURN);
+            }
+            else if (what == 4)
+            {
+                e.setCaret(somewhere());
+                type(pick(2) == 0 ? "}" : ";");
+            }
+            else if (what == 5)
+            {
+                e.undo();
+            }
+            else if (pick(2) == 0)
+            {
+                e.unfoldAt(pick(count));
+            }
+            else
+            {
+                e.setCaret(somewhere());
+            }
+            e.pump();
+
+            // What the folds hide, from their blocks.
+            const S32       lines = e.document().lineCount();
+            std::vector<U8> folded(static_cast<size_t>(lines), 0);
+            for (const ALCodeEditor::FoldRegion& region : e.foldRegions())
+            {
+                if (e.isFolded(region.start))
+                {
+                    for (S32 l = region.start + 1; l <= region.end && l < lines; ++l)
+                    {
+                        folded[static_cast<size_t>(l)] = 1;
+                    }
+                }
+            }
+            S32 hidden = 0;
+            for (S32 l = 0; l < lines; ++l)
+            {
+                const bool by_folds = e.layout().hiddenBy(l, By::Folds);
+                const bool wanted   = folded[static_cast<size_t>(l)] != 0;
+                hidden += by_folds ? 1 : 0;
+                if (by_folds != wanted)
+                {
+                    ensure_equals(at + ", line " + std::to_string(l) + ": hidden for the folds as they hide it", by_folds, wanted);
+                }
+            }
+            ensure_equals(at + ": as many hidden for the folds as the layout counts", e.layout().hiddenCount(By::Folds), hidden);
+            folded_steps += hidden > 0 ? 1 : 0;
+        }
+        ensure("folded blocks to edit around on many of the steps: " + std::to_string(folded_steps), folded_steps > 50);
     }
 }
