@@ -222,7 +222,8 @@ void LLExperienceCache::processExperience(const LLUUID& public_key, const LLSD& 
 
     if(row.has(EXPIRES))
     {
-        row[EXPIRES] = row[EXPIRES].asReal() + LLFrameTimer::getTotalSeconds();
+        // A calendar time: the cache file keeps it across sessions.
+        row[EXPIRES] = row[EXPIRES].asReal() + LLDate::now().secondsSinceEpoch();
     }
 
     if(row.has(EXPERIENCE_ID))
@@ -440,7 +441,7 @@ void LLExperienceCache::erase(const LLUUID& key)
 
 void LLExperienceCache::eraseExpired()
 {
-    F64 now = LLFrameTimer::getTotalSeconds();
+    F64 now = LLDate::now().secondsSinceEpoch();
     cache_t::iterator it = mCache.begin();
     while (it != mCache.end())
     {
