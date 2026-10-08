@@ -102,7 +102,7 @@ fi
 confirm "Install @AL_APP_NAME@ to $prefix?" || exit 0
 
 # Copied beside the old installation, then put in its place, so a failed copy
-# leaves the old one as it was.
+# or move leaves the old one as it was.
 parent=$(dirname -- "$prefix")
 mkdir -p -- "$parent" || die "Could not create $parent"
 staging=$(mktemp -d -- "$prefix.new.XXXXXX") || die "Could not write to $parent"
@@ -114,8 +114,11 @@ chmod 755 -- "$staging"
 if [[ -e $prefix ]]; then
     previous=$(mktemp -d -- "$prefix.old.XXXXXX")
     rmdir -- "$previous"
-    mv -- "$prefix" "$previous"
-    mv -- "$staging" "$prefix"
+    mv -- "$prefix" "$previous" || die "Could not move the old installation at $prefix aside"
+    if ! mv -- "$staging" "$prefix"; then
+        mv -- "$previous" "$prefix" || die "Could not put the new installation in place; the old one is at $previous"
+        die "Could not put the new installation in place; the old one is kept"
+    fi
     rm -rf -- "$previous"
 else
     mv -- "$staging" "$prefix"
