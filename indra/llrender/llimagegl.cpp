@@ -66,6 +66,19 @@ static std::vector<U32> sFreeList[DELETE_DELAY+1];
 // thread can empty the others'.
 static std::atomic<U32> sTextureNameGeneration{ 1 };
 
+namespace
+{
+    // An off-thread upload handed to the main thread and waiting for its fence, oldest
+    // first. Main thread only; see LLImageGL::syncToMainThread and publishUploads.
+    struct PendingPublish
+    {
+        LLPointer<LLImageGL> mImage;
+        GLsync               mFence = nullptr;
+        LLGLuint             mName  = 0;
+    };
+    std::vector<PendingPublish> sPendingPublishes;
+}
+
 // Number of mip levels in a full pyramid for the given level-0 dimensions, counting
 // level 0 itself: 256x256 -> 9 (256,128,...,1). This is a COUNT. Note llvertexbuffer's
 // wpo2() returns log2, i.e. the highest mip *index*, which is one less -- it used to be
@@ -133,7 +146,7 @@ void LLImageGLMemory::free_tex_image(U32 texName)
 {
     sTexMemMutex.lock();
     auto iter = sTextureAllocs.find(texName);
-    if (iter != sTextureAllocs.end()) // sometimes a texName will be "freed" before allocated (e.g. first call to setManualImage for a given texName)
+    if (iter != sTextureAllocs.end()) // sometimes a texName will be "freed" before allocated (e.g. the first allocation on a given texName)
     {
         llassert(iter->second <= sTextureBytes); // sTextureBytes MUST NOT go below zero
 
@@ -308,6 +321,30 @@ void LLImageGL::cleanupClass()
     // starts afresh.
     sTextureNameGeneration.fetch_add(1, std::memory_order_relaxed);
 
+    const bool gl_alive = gGLManager.mInited;
+
+    // Uploads handed over and never published. Their thread is gone, and so by now is
+    // whatever was waiting to finish them, so their fences and textures go too. With GL
+    // up the textures join the ring drained below, which releases their accounting; with
+    // it gone deleteTextures drops the name unrecorded, so the accounting is released here
+    // -- left behind, the next context reissuing the name would find it already allocated.
+    for (PendingPublish& pending : sPendingPublishes)
+    {
+        pending.mImage->mOnPublished.clear();
+        pending.mImage->mPublishesPending = 0;
+        pending.mImage->endUpload();
+        if (gl_alive)
+        {
+            glDeleteSync(pending.mFence);
+            deleteTextures(1, &pending.mName);
+        }
+        else
+        {
+            free_tex_image(pending.mName);
+        }
+    }
+    sPendingPublishes.clear();
+
     if (sScratchPBO != 0)
     {
         glDeleteBuffers(1, &sScratchPBO);
@@ -319,7 +356,6 @@ void LLImageGL::cleanupClass()
     // in sTextureAllocs across re-init (the test fixture calls cleanupClass
     // between tests). Always clear the C++ bookkeeping; only issue
     // glDeleteTextures if GL is still around.
-    const bool gl_alive = gGLManager.mInited;
     for (S32 i = 0; i < DELETE_DELAY + 1; ++i)
     {
         if (!sFreeList[i].empty())
@@ -780,6 +816,7 @@ void LLImageGL::cleanup()
         destroyGLTexture();
     }
     freePickMask();
+    discardPendingAlpha();
 
     mSaveData = NULL; // deletes data
 }
@@ -933,19 +970,11 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
 
     const bool is_compressed = isCompressed();
 
-    if (mUseMipMaps)
-    {
-        //set has mip maps to true before binding image so tex parameters get set properly
-        gGL.getTextureSlot(0)->unbind();
+    mHasMipMaps = mUseMipMaps;
 
-        mHasMipMaps = true;
-    }
-    else
-    {
-        mHasMipMaps = false;
-    }
-
-    gGL.getTextureSlot(0)->bind(this, false, false, usename);
+    // Forced, because everything below writes through the ACTIVE unit and a bind that
+    // finds this texture already on slot 0 does not activate it.
+    gGL.getTextureSlot(0)->bind(this, false, true, usename);
 
     // Allocate the whole texture up front, so every write below is a sub-image.
     // glTexStorage2D must be called exactly once for the object and needs the level count
@@ -1055,6 +1084,14 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
 
                     {
                         LL_PROFILE_GPU_ZONE("generate mip map");
+                        // The whole pyramid is allocated and GL is about to fill it, so let
+                        // sampling reach all of it. createGLTexture caps MAX_LEVEL at the
+                        // discard levels, which is as far as levels uploaded by hand go, and
+                        // glGenerateMipmap stops at MAX_LEVEL as well: left there, the
+                        // smallest levels stay unwritten and a distant surface minifies no
+                        // further than 1/32 of the texture's size.
+                        glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_MAX_LEVEL, mMipLevels - 1);
+
                         // generateMipmaps clears the slot's sampler first, which matters
                         // now that storage can be sRGB: mip generation follows the slot's
                         // TEXTURE_SRGB_DECODE -- sampler first if one is bound, else the
@@ -1228,29 +1265,51 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
     return true;
 }
 
-U32 type_width_from_pixtype(U32 pixtype)
+// Bytes one pixel of client data occupies, for stepping through it a row at a time.
+//
+// A packed type holds the whole pixel in one value, whatever the format's component
+// count: GStreamer hands its frames over as GL_BGRA / GL_UNSIGNED_INT_8_8_8_8_REV, which
+// is four bytes a pixel, not four components of four bytes each.
+static U32 pixel_bytes(U32 pixformat, U32 pixtype)
 {
-    U32 type_width = 0;
+    switch (pixtype)
+    {
+    case GL_UNSIGNED_INT_8_8_8_8:
+    case GL_UNSIGNED_INT_8_8_8_8_REV:
+    case GL_UNSIGNED_INT_10_10_10_2:
+    case GL_UNSIGNED_INT_2_10_10_10_REV:
+    case GL_UNSIGNED_INT_10F_11F_11F_REV:
+    case GL_UNSIGNED_INT_5_9_9_9_REV:
+        return 4;
+    case GL_UNSIGNED_SHORT_5_6_5:
+    case GL_UNSIGNED_SHORT_5_6_5_REV:
+    case GL_UNSIGNED_SHORT_4_4_4_4:
+    case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+    case GL_UNSIGNED_SHORT_5_5_5_1:
+    case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+        return 2;
+    default:
+        break;
+    }
+
+    const U32 components = LLImageGL::dataFormatComponents(pixformat);
     switch (pixtype)
     {
     case GL_UNSIGNED_BYTE:
     case GL_BYTE:
-        type_width = 1;
-        break;
+        return components;
     case GL_UNSIGNED_SHORT:
     case GL_SHORT:
     case GL_HALF_FLOAT:
-        type_width = 2;
-        break;
+        return components * 2;
     case GL_UNSIGNED_INT:
     case GL_INT:
     case GL_FLOAT:
-        type_width = 4;
-        break;
+        return components * 4;
     default:
         LL_ERRS() << "Unknown type: " << pixtype << LL_ENDL;
+        return 0;
     }
-    return type_width;
 }
 
 // Whether to break an upload into sub_image_lines slices. This is latency smoothing,
@@ -1264,7 +1323,7 @@ U32 type_width_from_pixtype(U32 pixtype)
 // guard would still be required without it.) setSubImage can pass a genuinely
 // block-compressed texture; the allocation paths always pass false, since driver-side
 // generic compression is gone.
-bool should_stagger_image_set(bool compressed)
+static bool should_stagger_image_set(bool compressed)
 {
 #if LL_LINUX
     // Only NVIDIA's own driver slices. AMD and Intel were taken out on purpose
@@ -1283,17 +1342,14 @@ bool should_stagger_image_set(bool compressed)
 
 // Equivalent to calling glSetSubImage2D(target, miplevel, x_offset, y_offset, width, height, pixformat, pixtype, src), assuming the total width of the image is data_width
 // However, instead there are multiple calls to glSetSubImage2D on smaller slices of the image
-void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset, S32 width, S32 height, U32 pixformat, U32 pixtype, const U8* src, S32 data_width)
+static void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset, S32 width, S32 height, U32 pixformat, U32 pixtype, const U8* src, S32 data_width)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
     LL_PROFILE_ZONE_NUM(width);
     LL_PROFILE_ZONE_NUM(height);
 
-    U32 components = LLImageGL::dataFormatComponents(pixformat);
-    U32 type_width = type_width_from_pixtype(pixtype);
-
-    const U32 line_width = data_width * components * type_width;
+    const U32 line_width = data_width * pixel_bytes(pixformat, pixtype);
     const U32 y_offset_end = y_offset + height;
 
     if (width == data_width && height % 32 == 0)
@@ -1411,19 +1467,18 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
             stop_glerror();
         }
 
-        const U8* sub_datap = datap + (y_pos * data_width + x_pos) * getComponents();
-        // Update the GL texture
-        bool res = gGL.getTextureSlot(0)->bindManual(mBindTarget, tex_name);
+        const U8* sub_datap = datap + (y_pos * data_width + x_pos) * pixel_bytes(mFormatPrimary, mFormatType);
+        // Forced: the write goes to whichever unit is ACTIVE, and a bind that finds the
+        // texture already on slot 0 skips activating it. The glyph atlas is the usual case
+        // -- it is still on slot 0 from the text being drawn when a new glyph arrives, and
+        // a draw in between can have left another unit active.
+        bool res = gGL.getTextureSlot(0)->bind(this, false, true, tex_name);
         if (!res) LL_ERRS() << "LLImageGL::setSubImage(): bindTexture failed" << LL_ENDL;
         stop_glerror();
 
         const bool use_sub_image = should_stagger_image_set(isCompressed());
         if (!use_sub_image)
         {
-            // *TODO: Why does this work here, in setSubImage, but not in
-            // setManualImage? Maybe because it only gets called with the
-            // dimensions of the full image?  Or because the image is never
-            // compressed?
             glTexSubImage2D(mTarget, 0, x_pos, y_pos, width, height, mFormatPrimary, mFormatType, sub_datap);
         }
         else
@@ -1518,10 +1573,13 @@ void LLImageGL::updateClass()
 
     if (!sFreeList[idx].empty())
     {
+        gGL.forgetTextures((S32)sFreeList[idx].size(), sFreeList[idx].data());
         free_tex_images((GLsizei) sFreeList[idx].size(), sFreeList[idx].data());
         glDeleteTextures((GLsizei)sFreeList[idx].size(), sFreeList[idx].data());
         sFreeList[idx].resize(0);
     }
+
+    publishUploads();
 }
 
 // static
@@ -1552,8 +1610,8 @@ void LLImageGL::resolveUploadFormat(S32& intformat, U32& pixformat, U32& pixtype
     // whose resolveDeprecatedFormat ran and applied a specific mask in createGLTexture,
     // or any caller that set up its own swizzle before this call). The format rewrite
     // here still happens so the allocation gets the right backing storage; applying the
-    // swizzle is the caller's responsibility. LLImageGL's createGLTexture path handles it
-    // via mSwizzleMask. Direct callers that pass GL_ALPHA / GL_LUMINANCE /
+    // swizzle is the caller's responsibility. LLImageGL applies it to every name it creates,
+    // from mDeprecatedSourceFormat. Direct callers that pass GL_ALPHA / GL_LUMINANCE /
     // GL_LUMINANCE_ALPHA must apply the matching swizzle themselves before uploading.
     if (pixformat == GL_ALPHA)
     { //GL_ALPHA → R8; caller-set {0,0,0,R} swizzle is required for {0,0,0,A} sample semantics
@@ -1697,6 +1755,9 @@ bool LLImageGL::createGLTexture()
 
 
     LLImageGL::generateTextures(1, &mTexName);
+    // A fresh name with no storage, whatever the old one had.
+    mStorageAllocated = false;
+    mStorage = StorageDesc();
     stop_glerror();
     if (!mTexName)
     {
@@ -1744,18 +1805,13 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
 
     // Everything from setSize onward describes the texture being built, not the one
     // mTexName still names. Off-thread that gap lasts until syncTexName publishes on the
-    // main thread, so snapshot what consumers should keep seeing until then.
-    if (!on_main_thread())
-    {
-        beginUpload();
-    }
+    // main thread, which is why whoever posted this upload began a snapshot first.
+    checkUploadBegun();
 
-    // setSize may call destroyGLTexture if the size does not match
     if (!setSize(w, h, imageraw->getComponents(), discard_level))
     {
         LL_WARNS() << "Trying to create a texture with incorrect dimensions!" << LL_ENDL;
         mGLTextureCreated = false;
-        endUpload(); // nothing will publish; don't leave the getters on a stale snapshot
         return false;
     }
 
@@ -1773,17 +1829,16 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
         switch (mComponents)
         {
         case 1:
-            // Single-channel — used by font glyph maps, but the path
-            // is generic for any 1-component upload. setManualImage
-            // swizzles LUMINANCE → R8 with a gray-replicate mask on
-            // core profile.
+            // Single-channel -- used by font glyph maps, but the path is generic for
+            // any 1-component upload. resolveDeprecatedFormat below stores it as R8,
+            // read back through a gray-replicate swizzle.
             mFormatInternal = GL_LUMINANCE8;
             mFormatPrimary = GL_LUMINANCE;
             mFormatType = GL_UNSIGNED_BYTE;
             break;
         case 2:
-            // Two-channel (luminance + alpha). Same swizzle remap
-            // happens in setManualImage on core profile.
+            // Two-channel (luminance + alpha): RG8 under the matching swizzle, the
+            // same way.
             mFormatInternal = GL_LUMINANCE8_ALPHA8;
             mFormatPrimary = GL_LUMINANCE_ALPHA;
             mFormatType = GL_UNSIGNED_BYTE;
@@ -1825,7 +1880,6 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
         mCurrentDiscardLevel = discard_level;
         mLastBindTime = sLastFrameTime;
         mGLTextureCreated = false;
-        endUpload(); // no texture left to disagree with the members
         return true ;
     }
 
@@ -1843,11 +1897,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
 
     bool main_thread = on_main_thread();
 
-    if (!main_thread)
-    {
-        // No-op when the imageraw overload above already captured.
-        beginUpload();
-    }
+    checkUploadBegun();
 
     if (defer_copy)
     {
@@ -1868,12 +1918,16 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
     discard_level = llclamp(discard_level, 0, (S32)mMaxDiscardLevel);
     discard_level = llmin(discard_level, MAX_DISCARD_LEVEL);
 
+    // Writing into the live texture in place is only legal while the upload fits the
+    // storage it already has. The discard level matching does not say so: setSize has
+    // just taken the new dimensions, and immutable storage cannot follow them, so a
+    // size or format change here has to build a new texture like any other.
     if (main_thread // <--- always force creation of new_texname when not on main thread ...
         && !defer_copy // <--- ... or defer copy is set
-        && mTexName != 0 && discard_level == mCurrentDiscardLevel)
+        && mTexName != 0 && discard_level == mCurrentDiscardLevel
+        && storageFits(liveWidth(discard_level), liveHeight(discard_level)))
     {
         LL_PROFILE_ZONE_NAMED("cglt - early setImage");
-        // This will only be true if the size has not changed
         if (tex_name != nullptr)
         {
             *tex_name = mTexName;
@@ -1891,14 +1945,17 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
     else
     {
         LLImageGL::generateTextures(1, &new_texname);
-        mStorageAllocated = false; // brand-new name, no storage allocated yet
+        // brand-new name, no storage allocated yet
+        mStorageAllocated = false;
+        mStorage = StorageDesc();
         {
-            gGL.getTextureSlot(0)->bind(this, false, false, new_texname);
+            gGL.getTextureSlot(0)->bind(this, false, true, new_texname);
             glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_BASE_LEVEL, 0);
+            // As far as levels uploaded by hand go. setImage raises it to the whole
+            // pyramid when it generates the mips instead.
             glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_MAX_LEVEL, mMaxDiscardLevel - discard_level);
-            // Apply the swizzle mask once if resolveDeprecatedFormat saved
-            // an original format. Per-texture state persists across
-            // glTexImage2D / scaleDown reallocations, so we never re-set it.
+            // The swizzle that re-expresses a deprecated source format is texture-object
+            // state, so every new name needs it -- scaleDown's included.
             if (mDeprecatedSourceFormat != 0)
             {
                 applySwizzleForDeprecatedFormat(mBindTarget,
@@ -1923,7 +1980,6 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
         LL_PROFILE_ZONE_NAMED("cglt - late setImage");
         if (!setImage(data_in, data_hasmips, new_texname))
         {
-            endUpload(); // nothing will publish; don't leave the getters on a stale snapshot
             return false;
         }
     }
@@ -1946,7 +2002,6 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
                 LLImageGL::deleteTextures(1, &old_texname);
             }
             mTexName = new_texname;
-            endUpload();
         }
     }
 
@@ -1978,66 +2033,134 @@ void LLImageGL::syncToMainThread(LLGLuint new_tex_name)
         glFlush();
     }
 
-    // Block here until the upload has actually completed, then let the main thread swap
-    // the name in. This costs this thread's throughput, but publishing mTexName must not
-    // outrun the metadata that createGLTexture already wrote (mWidth/mHeight/mComponents
-    // via setSize, mCurrentDiscardLevel, the format fields) -- consumers read those
-    // through LLGLTexture::getWidth()/getDiscardLevel() and pair them with mTexName.
-    // Deferring the name publish past this point widens that mismatch into something
-    // sculpt reproducibly trips over (LLVOVolume::sculpt reads back from GL at the new
-    // dimensions and gets the old texture).
+    // Not waited on here. This thread used to block until the GPU had finished each upload,
+    // one texture at a time, so a backlog of decoded textures sat waiting for GL creation
+    // while it did. The main thread polls the fence instead (publishUploads) and publishes
+    // the texture once it has signalled.
     //
-    // Do NOT be tempted to turn this into a glWaitSync on the main thread: that is a
-    // GPU-timeline wait only and gives the main thread's context no CPU-side sync point,
-    // so the driver is not obliged to have observed this context's changes to the shared
-    // texture by the time the main thread binds it. That was the original implementation
-    // and it had to be special-cased for NVIDIA (SL-17284). glClientWaitSync *is* a
-    // CPU-side sync point in whichever context calls it, which is the guarantee we need,
-    // and it is now taken uniformly on every vendor.
-    {
-        LL_PROFILE_ZONE_NAMED("cglt - wait sync");
-        // One second per iteration so we actually block in the driver rather than
-        // spinning. Note FENCE_WAIT_TIME_NANOSECONDS is 1000ns despite its "1 ms"
-        // comment, which would busy-wait.
-        constexpr U64 WAIT_SLICE_NS = 1000000000ull;
-        GLenum res = glClientWaitSync(sync, 0, WAIT_SLICE_NS);
-        while (res == GL_TIMEOUT_EXPIRED)
-        {
-            res = glClientWaitSync(sync, 0, WAIT_SLICE_NS);
-        }
-        if (res == GL_WAIT_FAILED)
-        {
-            // Not a valid sync object -- we have no completion guarantee to offer, so
-            // say so rather than silently handing over a texture that may not be ready.
-            LL_WARNS_ONCE() << "glClientWaitSync failed waiting on a texture upload fence." << LL_ENDL;
-        }
-        glDeleteSync(sync);
-    }
-
+    // That is what the spec asks for. GL 4.6 section 5.3.1 has another context's changes
+    // complete once its fence is seen signalled, and polling with glClientWaitSync on the
+    // main thread is a CPU-side sync point in the context that goes on to use the texture
+    // -- the guarantee NVIDIA needed where a GPU-side glWaitSync did not give it (SL-17284).
+    // The main thread's first bind of the new name is then the re-attach section 5.3.3
+    // requires. Meanwhile consumers read the snapshot beginUpload took (see getWidth).
     ref();
     if (!LL::WorkQueue::postMaybe(
             mMainQueue,
             [=, this]()
             {
-                LL_PROFILE_ZONE_NAMED("cglt - delete callback");
-                syncTexName(new_tex_name);
+                LL_PROFILE_ZONE_NAMED("cglt - queue publish");
+                queuePublish(new_tex_name, sync);
                 unref();
             }))
     {
         // main queue is gone (shutdown); nothing will run the lambda, so don't strand
-        // the reference we just took
+        // the reference we just took, or the fence
+        glDeleteSync(sync);
         unref();
     }
 
     LL_PROFILER_GPU_COLLECT;
 }
 
+void LLImageGL::queuePublish(LLGLuint name, GLsync fence)
+{
+    llassert(on_main_thread());
+    ++mPublishesPending;
+    sPendingPublishes.push_back({ LLPointer<LLImageGL>(this), fence, name });
+}
 
-// Capture what mTexName currently holds, before createGLTexture starts overwriting the
-// members with the geometry of the texture it is about to build. Idempotent, because the
-// imageraw overload calls it and then delegates to the data overload which calls it too.
+void LLImageGL::finishPublish(LLGLuint name)
+{
+    syncTexName(name);
+
+    llassert(mPublishesPending > 0);
+    if (--mPublishesPending == 0 && !mOnPublished.empty())
+    {
+        // Moved out first: a callback may ask for another one.
+        std::vector<std::function<void()>> callbacks;
+        callbacks.swap(mOnPublished);
+        for (std::function<void()>& callback : callbacks)
+        {
+            callback();
+        }
+    }
+}
+
+void LLImageGL::afterPublish(std::function<void()> fn)
+{
+    llassert(on_main_thread());
+    if (mPublishesPending == 0)
+    {
+        fn();
+        return;
+    }
+    mOnPublished.push_back(std::move(fn));
+}
+
+// static
+U32 LLImageGL::publishUploads()
+{
+    if (sPendingPublishes.empty())
+    {
+        return 0;
+    }
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    llassert(on_main_thread());
+
+    // Fences of one context signal in the order they were issued, so walking oldest first
+    // publishes an image's uploads in order. The ready ones are taken out before any is
+    // published: publishing runs the callers' callbacks, which must find the list settled.
+    std::vector<PendingPublish> ready;
+    size_t kept = 0;
+    for (size_t i = 0; i < sPendingPublishes.size(); ++i)
+    {
+        PendingPublish& pending = sPendingPublishes[i];
+        const GLenum res = glClientWaitSync(pending.mFence, 0, 0);
+        if (res == GL_TIMEOUT_EXPIRED)
+        {
+            if (kept != i)
+            {
+                sPendingPublishes[kept] = std::move(pending);
+            }
+            ++kept;
+            continue;
+        }
+        if (res == GL_WAIT_FAILED)
+        {
+            // Not a valid sync object: there is no completion guarantee to offer, so say so
+            // rather than hand over a texture that may not be ready without a word.
+            LL_WARNS_ONCE("LLImageGL") << "glClientWaitSync failed on a texture upload fence." << LL_ENDL;
+        }
+        glDeleteSync(pending.mFence);
+        ready.push_back(std::move(pending));
+    }
+    sPendingPublishes.erase(sPendingPublishes.begin() + kept, sPendingPublishes.end());
+
+    for (PendingPublish& pending : ready)
+    {
+        pending.mImage->finishPublish(pending.mName);
+    }
+
+    return (U32)sPendingPublishes.size();
+}
+
+
+// Capture what mTexName currently holds, before an off-thread createGLTexture starts
+// overwriting the members with the geometry of the texture it is about to build.
+//
+// Main thread only, and both ends of it: whoever hands the upload to the LLImageGL thread
+// begins it before posting, syncTexName ends it when the new texture publishes, and the
+// poster's completion callback ends it whatever happened (a no-op after syncTexName).
+// That is what lets the main thread read mUploadInFlight and the snapshot with no
+// synchronisation -- the worker never writes them, and reads them only after the post
+// that ordered them. Were the worker to raise the flag itself, a getter could see it go
+// up before the snapshot behind it was written, or test it just before it went up and
+// then read members the worker had started to overwrite.
 void LLImageGL::beginUpload()
 {
+    llassert(on_main_thread());
     if (mUploadInFlight)
     {
         return;
@@ -2051,6 +2174,26 @@ void LLImageGL::beginUpload()
     mUploadInFlight = true;
 }
 
+void LLImageGL::endUpload()
+{
+    llassert(on_main_thread());
+    mUploadInFlight = false;
+
+    // Whatever the upload staged and did not publish describes a texture that never was.
+    discardPendingAlpha();
+}
+
+void LLImageGL::checkUploadBegun() const
+{
+    if (!on_main_thread() && !mUploadInFlight)
+    {
+        LL_WARNS_ONCE("LLImageGL") << "Texture upload off the main thread with no beginUpload(): "
+                                   << "the image reports the new texture's size before that "
+                                   << "texture is published." << LL_ENDL;
+        llassert(false);
+    }
+}
+
 void LLImageGL::syncTexName(LLGLuint texname)
 {
     if (texname != 0)
@@ -2060,27 +2203,97 @@ void LLImageGL::syncTexName(LLGLuint texname)
             LLImageGL::deleteTextures(1, &mTexName);
         }
         mTexName = texname;
+
+        // The alpha facts derived from the new texture publish with it.
+        publishPendingAlpha();
     }
 
     // Members and mTexName describe the same texture again.
     endUpload();
 }
 
+bool LLImageGL::stagesAlpha() const
+{
+    // Off the main thread, getMask and getIsAlphaMask may be reading the published values
+    // at this very moment; on it, they answer for mTexName, which an upload in flight has
+    // not replaced yet.
+    return mUploadInFlight || !on_main_thread();
+}
+
+void LLImageGL::setPickMask(U8* mask, U16 width, U16 height)
+{
+    if (stagesAlpha())
+    {
+        delete[] mPendingAlpha.mPickMask;
+        mPendingAlpha.mPickMask       = mask;
+        mPendingAlpha.mPickMaskWidth  = width;
+        mPendingAlpha.mPickMaskHeight = height;
+        mPendingAlpha.mHasPickMask    = true;
+        return;
+    }
+
+    freePickMask();
+    mPickMask       = mask;
+    mPickMaskWidth  = width;
+    mPickMaskHeight = height;
+}
+
+void LLImageGL::setIsMask(bool is_mask)
+{
+    if (stagesAlpha())
+    {
+        mPendingAlpha.mIsMask    = is_mask;
+        mPendingAlpha.mHasIsMask = true;
+        return;
+    }
+
+    mIsMask = is_mask;
+}
+
+void LLImageGL::publishPendingAlpha()
+{
+    if (mPendingAlpha.mHasPickMask)
+    {
+        freePickMask();
+        mPickMask       = mPendingAlpha.mPickMask;
+        mPickMaskWidth  = mPendingAlpha.mPickMaskWidth;
+        mPickMaskHeight = mPendingAlpha.mPickMaskHeight;
+        mPendingAlpha.mPickMask = nullptr;
+    }
+    if (mPendingAlpha.mHasIsMask)
+    {
+        mIsMask = mPendingAlpha.mIsMask;
+    }
+    mPendingAlpha = PendingAlpha();
+}
+
+void LLImageGL::discardPendingAlpha()
+{
+    delete[] mPendingAlpha.mPickMask;
+    mPendingAlpha = PendingAlpha();
+}
+
 bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compressed_ok) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
+    // What mTexName holds, through the same published view as getWidth/getComponents
+    // below. While an upload is in flight the members describe the next texture, and
+    // mixing them with those getters reads the old texture's level 0 at the new size.
+    const S32 cur_discard = getDiscardLevel();
+    const S32 max_discard = getMaxDiscardLevel();
+
     if (discard_level < 0)
     {
-        discard_level = mCurrentDiscardLevel;
+        discard_level = cur_discard;
     }
 
-    if (mTexName == 0 || discard_level < mCurrentDiscardLevel || discard_level > mMaxDiscardLevel )
+    if (mTexName == 0 || discard_level < cur_discard || discard_level > max_discard)
     {
         return false;
     }
 
-    S32 gl_discard = discard_level - mCurrentDiscardLevel;
+    S32 gl_discard = discard_level - cur_discard;
 
     //explicitly unbind texture
     gGL.getTextureSlot(0)->unbind();
@@ -2115,7 +2328,7 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
     {
         LL_WARNS() << "texture size is smaller than it should be." << LL_ENDL ;
         LL_WARNS() << "width: " << width << " glwidth: " << glwidth << " mWidth: " << mWidth <<
-            " mCurrentDiscardLevel: " << (S32)mCurrentDiscardLevel << " discard_level: " << (S32)discard_level << LL_ENDL ;
+            " current discard: " << cur_discard << " discard_level: " << (S32)discard_level << LL_ENDL ;
         return false ;
     }
 
@@ -2483,15 +2696,13 @@ void LLImageGL::applySwizzleForDeprecatedFormat(ALTextureSlot::eTextureType type
 
 void LLImageGL::resolveDeprecatedFormat()
 {
-    // setManualImage rewrites the deprecated source/internal formats locally
-    // (so glTexImage2D allocates the right backing storage), but its
-    // rewrites don't propagate to LLImageGL's mFormatPrimary / mFormatInternal
-    // members. Subsequent setSubImage / readBackRaw / scaleDown that read
-    // those members would hand the deprecated enums to GL — invalid in core
-    // profile, divergent from the actual GL texture state on compat. Rewrite
-    // here at format-resolution time so members stay consistent with what
-    // the texture will hold, and remember the original format so
-    // createGLTexture can apply the matching swizzle once via
+    // resolveUploadFormat rewrites the deprecated source/internal formats locally (so the
+    // allocation gets the right backing storage), but its rewrites don't propagate to
+    // LLImageGL's mFormatPrimary / mFormatInternal members. Subsequent setSubImage /
+    // readBackRaw / scaleDown that read those members would hand the deprecated enums to
+    // GL -- invalid in core profile. Rewrite here at format-resolution time so members
+    // stay consistent with what the texture will hold, and remember the original format
+    // so every new texture name gets the matching swizzle via
     // applySwizzleForDeprecatedFormat.
     //
     switch (mFormatPrimary)
@@ -2650,7 +2861,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         // but increment either way, for extra safety.
         ++mAlphaAnalysisSerial;
 
-        mIsMask = analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride);
+        setIsMask(analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride));
         return;
     }
 
@@ -2668,7 +2879,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
     if (!data_copy)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-        mIsMask = analyzeAlphaData(data_in, w, h, alpha_offset, alpha_stride);
+        setIsMask(analyzeAlphaData(data_in, w, h, alpha_offset, alpha_stride));
         return;
     }
     memcpy(data_copy, static_cast<const U8*>(data_in), data_size);
@@ -2730,31 +2941,8 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
         // Queues not available - fall back to synchronous analysis
         delete[] data_copy;
-        mIsMask = analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride);
+        setIsMask(analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride));
     }
-}
-
-//----------------------------------------------------------------------------
-U32 LLImageGL::createPickMask(S32 pWidth, S32 pHeight)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    freePickMask();
-    // updatePickMask walks the source with `for (x = 0; x < width; x += 2)`,
-    // so the actual cells-per-row stored linearly in the bitmap is
-    // ceil(width/2). The reader must use the same stride, otherwise odd
-    // widths read from the wrong row.
-    U32 stride_w = (U32)((pWidth + 1) / 2);
-    U32 stride_h = (U32)((pHeight + 1) / 2);
-
-    U32 size = stride_w * stride_h;
-    size = (size + 7) / 8; // pixelcount-to-bits
-    mPickMask = new U8[size];
-    mPickMaskWidth = stride_w;
-    mPickMaskHeight = stride_h;
-
-    memset(mPickMask, 0, sizeof(U8) * size);
-
-    return size;
 }
 
 //----------------------------------------------------------------------------
@@ -2802,16 +2990,23 @@ void LLImageGL::updatePickMask(S32 width, S32 height, const U8* data_in)
       && (mFormatPrimary != GL_SRGB_ALPHA)))
     {
         //cannot generate a pick mask for this texture
-        freePickMask();
+        setPickMask(nullptr, 0, 0);
         return;
     }
 
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
-#ifdef SHOW_ASSERT
-    const U32 pickSize = createPickMask(width, height);
-#else // SHOW_ASSERT
-    createPickMask(width, height);
-#endif // SHOW_ASSERT
+    // Built aside and handed over whole: setPickMask holds it back until the texture it
+    // was made from is the one mTexName names, and getMask may be reading the published
+    // mask from the main thread while this runs on the LLImageGL thread.
+    //
+    // The walk below steps two texels at a time, so a row holds ceil(width/2) cells and
+    // getMask has to use that stride, or odd widths read from the wrong row.
+    const U32 stride_w = (U32)((width + 1) / 2);
+    const U32 stride_h = (U32)((height + 1) / 2);
+    const U32 size = (stride_w * stride_h + 7) / 8; // pixelcount-to-bits
+    U8* mask = new U8[size];
+    memset(mask, 0, size);
 
     U32 pick_bit = 0;
 
@@ -2825,14 +3020,16 @@ void LLImageGL::updatePickMask(S32 width, S32 height, const U8* data_in)
             {
                 U32 pick_idx = pick_bit/8;
                 U32 pick_offset = pick_bit%8;
-                llassert(pick_idx < pickSize);
+                llassert(pick_idx < size);
 
-                mPickMask[pick_idx] |= 1 << pick_offset;
+                mask[pick_idx] |= 1 << pick_offset;
             }
 
             ++pick_bit;
         }
     }
+
+    setPickMask(mask, (U16)stride_w, (U16)stride_h);
 }
 
 //bool LLImageGL::getMask(const LLVector2 &tc)
@@ -2913,13 +3110,6 @@ void LLImageGL::resetCurTexSizebar()
     sCurTexPickSize = -1 ;
 }
 
-// Allocate backing storage for the currently-bound texture at the given level-0 size,
-// and record the VRAM accounting for it. Callers replacing an existing texture are
-// responsible for releasing the old accounting (free_tex_image) themselves.
-//
-// Single place so the upcoming switch to immutable storage (glTexStorage2D, which also
-// needs mMipLevels and a sized internal format) lands in one spot rather than at every
-// allocation site.
 // The internal format glTexStorage* should be handed. Block-compressed textures carry
 // their (sized) compressed format in mFormatPrimary rather than mFormatInternal, which is
 // the convention the glCompressedTexImage2D calls already follow.
@@ -2928,6 +3118,9 @@ S32 LLImageGL::getStorageInternalFormat() const
     return isCompressed() ? mFormatPrimary : mFormatInternal;
 }
 
+// Allocate backing storage for the currently-bound texture at the given level-0 size,
+// and record the VRAM accounting for it. Callers replacing an existing texture are
+// responsible for releasing the old accounting (free_tex_image) themselves.
 void LLImageGL::allocateTextureStorage(S32 width, S32 height, bool has_mips)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
@@ -2944,9 +3137,28 @@ void LLImageGL::allocateTextureStorage(S32 width, S32 height, bool has_mips)
         glTexStorage2D(mTarget, mMipLevels, getStorageInternalFormat(), width, height);
         skipSRGBDecode(mTarget);
         mStorageAllocated = true;
+        mStorage.mWidth  = width;
+        mStorage.mHeight = height;
+        mStorage.mLevels = mMipLevels;
+        mStorage.mFormat = getStorageInternalFormat();
     }
 
     alloc_tex_image(width, height, mFormatInternal, 1, has_mips);
+}
+
+bool LLImageGL::storageFits(S32 width, S32 height) const
+{
+    // Nothing allocated yet: setImage allocates it at this size. Allocated by the owner of
+    // a shared texture object (markStorageAllocated, no description): sized by that owner.
+    if (!mStorageAllocated || mStorage.mLevels == 0)
+    {
+        return true;
+    }
+
+    return mStorage.mWidth == width
+        && mStorage.mHeight == height
+        && mStorage.mFormat == getStorageInternalFormat()
+        && mStorage.mLevels == (mUseMipMaps ? calcMipLevelCount(width, height) : 1);
 }
 
 // static
@@ -2974,6 +3186,15 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         return false;
     }
 
+    // Not while the LLImageGL thread is building this image's next texture. It is writing
+    // the members this reads and replaces (the discard level, the storage state), and its
+    // syncTexName would then install its own texture under the discard level set here.
+    // Asked again next frame if it still applies.
+    if (mUploadInFlight)
+    {
+        return false;
+    }
+
     desired_discard = llmin(desired_discard, mMaxDiscardLevel);
 
     if (desired_discard <= mCurrentDiscardLevel)
@@ -2994,14 +3215,19 @@ bool LLImageGL::scaleDown(S32 desired_discard)
     const LLGLuint old_texname = mTexName;
     LLGLuint new_texname = 0;
     generateTextures(1, &new_texname);
-    mStorageAllocated = false; // brand-new name; allocateTextureStorage sets this
     if (new_texname == 0)
     {
         LL_WARNS_ONCE("LLImageGL") << "Failed to allocate a texture name for downscaling." << LL_ENDL;
         return false;
     }
 
-    if (gGLManager.mDownScaleMethod == 0)
+    // A deprecated source format is held under a swizzle, and the FBO path cannot carry
+    // one: it samples the old texture THROUGH the swizzle and copies the result back by
+    // position, so luminance-alpha's alpha comes back as luminance and alpha-only loses
+    // its alpha entirely. The PBO path copies the stored channels as they are.
+    const bool use_fbo = gGLManager.mDownScaleMethod == 0 && mDeprecatedSourceFormat == 0;
+
+    if (use_fbo)
     { // use an FBO to downscale the texture
         glViewport(0, 0, desired_width, desired_height);
 
@@ -3071,6 +3297,8 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         gGL.getTextureSlot(0)->bindManual(mBindTarget, new_texname);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, sScratchPBO);
         allocateTextureStorage(desired_width, desired_height, mHasMipMaps);
+        // Texture-object state, so the new name starts without it.
+        applySwizzleForDeprecatedFormat(mBindTarget, mDeprecatedSourceFormat);
         glTexSubImage2D(mTarget, 0, 0, 0, desired_width, desired_height, mFormatPrimary, mFormatType, nullptr);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
@@ -3112,7 +3340,6 @@ LLImageGLThread::LLImageGLThread(LLWindow* window)
     , mWindow(window)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    mFinished = false;
 
     mContext = mWindow->createSharedContext();
     LL::ThreadPool::start();

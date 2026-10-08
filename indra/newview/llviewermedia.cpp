@@ -3116,6 +3116,11 @@ void LLViewerMediaImpl::update()
             mTextureUpdatePending = true;
             ref();  // protect texture from deletion while active on bg queue
             media_tex->ref();
+            // The texture reports the frame it shows until the worker's publishes: see
+            // LLImageGL::beginUpload, taken here on the main thread before the post and
+            // released in the callback.
+            LLPointer<LLImageGL> gl_image = media_tex->getGLTexture();
+            gl_image->beginUpload();
             main_queue->postTo(
                 mTexUpdateQueue, // Worker thread queue
                 [=, this]() // work done on update worker thread
@@ -3130,9 +3135,16 @@ void LLViewerMediaImpl::update()
 #if LL_IMAGEGL_THREAD_CHECK
                     media_tex->getGLTexture()->mActiveThread = LLThread::currentID();
 #endif
-                    mTextureUpdatePending = false;
-                    media_tex->unref();
-                    unref();
+                    // The frame publishes once the GPU has finished with it; the next
+                    // update must not start before then.
+                    gl_image->afterPublish([=, this]()
+                    {
+                        // A no-op when syncTexName published the frame.
+                        gl_image->endUpload();
+                        mTextureUpdatePending = false;
+                        media_tex->unref();
+                        unref();
+                    });
                 });
         }
         else
@@ -3216,18 +3228,26 @@ void LLViewerMediaImpl::doMediaTexUpdate(LLViewerMediaTexture* media_tex, U8* da
         {
             LL_WARNS("Media") << "Failed to create media texture" << LL_ENDL;
         }
-
-        // copy just the subimage covered by the image raw to GL
-        media_tex->setSubImage(data, data_width, data_height, x_pos, y_pos, width, height, tex_name);
+        else
+        {
+            // copy just the subimage covered by the image raw to GL
+            media_tex->setSubImage(data, data_width, data_height, x_pos, y_pos, width, height, tex_name);
+        }
     }
 
-    if (sync)
+    // With no new texture there is nothing to upload into or publish. Given a tex_name of
+    // 0, setSubImage writes the texture on screen instead -- from the worker, while the
+    // main thread may be sampling it.
+    if (tex_name != 0)
     {
-        media_tex->getGLTexture()->syncToMainThread(tex_name);
-    }
-    else
-    {
-        media_tex->getGLTexture()->syncTexName(tex_name);
+        if (sync)
+        {
+            media_tex->getGLTexture()->syncToMainThread(tex_name);
+        }
+        else
+        {
+            media_tex->getGLTexture()->syncTexName(tex_name);
+        }
     }
 
     // release the data pointer before freeing raw so LLImageRaw destructor doesn't

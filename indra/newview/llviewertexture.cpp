@@ -1287,7 +1287,9 @@ void LLViewerFetchedTexture::setForSculpt()
         (S32)LLGLTexture::BOOST_SCULPTED));
 
     mForSculpt = true;
-    if(isForSculptOnly() && hasGLTexture() && !getBoundRecently())
+    // Not while a texture is being created for it: on the LLImageGL thread that would
+    // publish its texture after this destroyed the old one. destroyTexture holds off too.
+    if(isForSculptOnly() && hasGLTexture() && !getBoundRecently() && !mNeedsCreateTexture)
     {
         destroyGLTexture(); //sculpt image does not need gl texture.
         mTextureState = ACTIVE;
@@ -1622,6 +1624,12 @@ void LLViewerFetchedTexture::scheduleCreateTexture()
             auto mainq = LLImageGLThread::sEnabledTextures ? mMainQueue.lock() : nullptr;
             if (mainq)
             {
+                // Until the worker's texture publishes, the image goes on reporting the one
+                // it has. The snapshot that makes it so is taken here, on the main thread,
+                // before the post -- see LLImageGL::beginUpload -- and released in the
+                // callback below, whether or not a texture came of it.
+                LLPointer<LLImageGL> gl_image = mGLTexturep;
+                gl_image->beginUpload();
                 ref();
                 mainq->postTo(
                     mImageQueue,
@@ -1650,7 +1658,7 @@ void LLViewerFetchedTexture::scheduleCreateTexture()
                     },
                     // callback to be run on main thread
 #if LL_IMAGEGL_THREAD_CHECK
-                        [this, data, data_copy, size]()
+                        [this, gl_image, data, data_copy, size]()
                     {
                         mGLTexturep->mActiveThread = LLThread::currentID();
                         llassert(data == mRawImage->getData());
@@ -1658,12 +1666,21 @@ void LLViewerFetchedTexture::scheduleCreateTexture()
                         llassert(memcmp(data, data_copy, size) == 0);
                         delete[] data_copy;
 #else
-                        [this]()
+                        [this, gl_image]()
                         {
 #endif
-                        //finalize on main thread
-                        postCreateTexture();
-                        unref();
+                        // The worker is done, but its texture publishes only once the GPU
+                        // has finished with it, which nothing waits for. Finish then: ending
+                        // the snapshot, or clearing mNeedsCreateTexture and so letting the
+                        // next upload start, must not run ahead of it.
+                        gl_image->afterPublish([this, gl_image]()
+                        {
+                            // A no-op when syncTexName published the new texture.
+                            gl_image->endUpload();
+                            //finalize on main thread
+                            postCreateTexture();
+                            unref();
+                        });
                     });
             }
             else

@@ -39,6 +39,8 @@
 #include "hbxxh.h"
 #include "alprojection.h"
 
+#include <algorithm>
+
 #if GL_ARB_debug_output
 #ifndef APIENTRY
 #define APIENTRY
@@ -364,6 +366,39 @@ bool LLRender::init(bool needs_vertex_buffer)
     // Fresh context: nothing is bound at UB_LIGHTS/UB_MATRICES yet, whatever a previous one had.
     mLightsUBOBound   = false;
     mMatricesUBOBound = false;
+
+    // Nor on any texture unit, and unit 0 is the active one. gGL is thread_local and outlives
+    // a context -- the GL tests make one per test -- and a fresh context hands out the same
+    // first texture names as the last one did, so a slot still caching its namesake would
+    // take the new texture for bound already and skip the bind; an active-unit index left at
+    // 3 would skip the glActiveTexture a slot-3 bind needs, and bind on unit 0 instead.
+    for (ALTextureSlot& slot : mTextureSlots)
+    {
+        slot.mCurrTexture = 0;
+        slot.mCurrTexType = ALTextureSlot::TT_NONE;
+        slot.mCurrSampler = 0;
+    }
+    mCurrTextureUnitIndex = 0;
+
+    // Nor is the last context's blending or colour mask: GL starts every context writing all
+    // four channels and blending ONE, ZERO. The mask cache takes that default. The blend
+    // factors go to unknown, so the BT_ALPHA below is issued rather than skipped for
+    // matching what the previous context was left with.
+    for (bool& write : mCurrColorMask)
+    {
+        write = true;
+    }
+    mCurrBlendColorSFactor = BF_UNDEF;
+    mCurrBlendAlphaSFactor = BF_UNDEF;
+    mCurrBlendColorDFactor = BF_UNDEF;
+    mCurrBlendAlphaDFactor = BF_UNDEF;
+
+    // The same for the rest of what the setters cache, at GL's initial values: a line
+    // width of 1, no polygon offset, three vertices a patch.
+    mLineWidth           = 1.f;
+    mPolygonOffsetFactor = 0.f;
+    mPolygonOffsetUnits  = 0.f;
+    mPatchVertices       = 3;
 
     // Build this context's sampler objects before anything can ask for one.
     mSamplerCache.warmup();
@@ -1049,6 +1084,18 @@ ALTextureSlot* LLRender::getTextureSlot(U32 index)
     {
         LL_DEBUGS() << "Non-existing texture unit layer requested: " << index << LL_ENDL;
         return &mDummySlot;
+    }
+}
+
+void LLRender::forgetTextures(S32 count, const U32* names)
+{
+    const U32* end = names + count;
+    for (ALTextureSlot& slot : mTextureSlots)
+    {
+        if (slot.mCurrTexture != 0 && std::find(names, end, slot.mCurrTexture) != end)
+        {
+            slot.mCurrTexture = 0;
+        }
     }
 }
 

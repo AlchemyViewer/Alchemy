@@ -40,6 +40,8 @@
 #include "threadpool.h"
 #include "workqueue.h"
 #include <boost/unordered_set.hpp>
+#include <functional>
+#include <vector>
 
 #define LL_IMAGEGL_THREAD_CHECK 0 //set to 1 to enable thread debugging for ImageGL
 
@@ -73,6 +75,11 @@ public:
 
     // call once per frame
     static void updateClass();
+
+    // Main thread: publish every off-thread upload whose fence has signalled (syncTexName,
+    // then its afterPublish callbacks). Returns how many are still waiting on the GPU.
+    // updateClass does this; a loop waiting on texture creation can call it too.
+    static U32 publishUploads();
 
     // Get an estimate of how many bytes have been allocated in vram for
     // textures. Allocations recorded via alloc_tex_image with has_mips=true
@@ -138,13 +145,8 @@ public:
     LLImageGL(U32 width, U32 height, U8 components, bool usemipmaps = true);
     LLImageGL(const LLImageRaw* imageraw, bool usemipmaps = true);
 
-    // For wrapping textures created via GL elsewhere with our API only. Use with caution.
-    // The trailing address mode is accepted and ignored: sampling is named at the bind now.
-    // Kept in the signature so the several call sites that pass one still compile; drop it
-    // when they are cleaned up.
-    // Wrap a texture object this LLImageGL does not own. No address-mode parameter: it took
-    // one, the body never read it, and callers were still passing sampling state to a class
-    // that stopped carrying any.
+    // Wrap a texture object this LLImageGL does not own, created via GL elsewhere. Use
+    // with caution: nothing here deletes it.
     LLImageGL(LLGLuint mTexName, U32 components, LLGLenum target, LLGLint  formatInternal, LLGLenum formatPrimary, LLGLenum formatType);
 
 protected:
@@ -223,9 +225,16 @@ public:
     bool setSubImage(const U8* datap, S32 data_width, S32 data_height, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update = false, LLGLuint use_name = 0, bool skip_unbind = false);
     bool setSubImageFromFrameBuffer(S32 fb_x, S32 fb_y, S32 x_pos, S32 y_pos, S32 width, S32 height);
 
-    // wait for gl commands to finish on current thread and push
-    // a lambda to main thread to swap mNewTexName and mTexName
+    // Off the main thread: fence this thread's upload of new_tex_name and hand it to the main
+    // thread, which publishes it in place of mTexName once the fence has signalled (see
+    // publishUploads). Does not wait for the GPU.
     void syncToMainThread(LLGLuint new_tex_name);
+
+    // Main thread: run fn once the upload handed over by syncToMainThread has published, or
+    // now if none is waiting. A caller finishing an off-thread upload goes through this, so
+    // what it does next -- ending the snapshot, letting another upload start -- follows the
+    // texture onto the screen rather than racing it.
+    void afterPublish(std::function<void()> fn);
 
     // Read back a raw image for this discard level, if it exists
     bool readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compressed_ok) const;
@@ -283,6 +292,8 @@ public:
     bool getUseMipMaps() const { return mUseMipMaps; }
     void setUseMipMaps(bool usemips) { mUseMipMaps = usemips; }
     void setHasMipMaps(bool hasmips) { mHasMipMaps = hasmips; }
+    // Build the pick mask from level-0 RGBA8 data. During an upload in flight, or off the
+    // main thread, the result waits for the texture it describes to publish.
     void updatePickMask(S32 width, S32 height, const U8* data_in);
 // [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
     bool getMask(const LLVector2 &tc) const;
@@ -291,7 +302,6 @@ public:
 
     void checkTexSize(bool forced = false) const ;
 
-    // Sets the addressing mode used to sample the texture
     // NO sampling state here, and none coming back.
     //
     // A texture carries data plus facts about itself (dimensions, format, swizzle, whether it
@@ -341,9 +351,23 @@ private:
     // existing texture must release the old accounting themselves.
     void allocateTextureStorage(S32 width, S32 height, bool has_mips);
 
-    U32 createPickMask(S32 pWidth, S32 pHeight);
+    // Whether an upload of this level-0 size, in the current format, can be written into
+    // the storage the current texture object already has rather than needing a new one.
+    bool storageFits(S32 width, S32 height) const;
+
     void freePickMask();
     bool isCompressed() const;
+
+    // The alpha facts an upload derives, routed through mPendingAlpha when stagesAlpha().
+    // setPickMask takes ownership of mask, which may be null for "no pick mask".
+    bool stagesAlpha() const;
+    void setPickMask(U8* mask, U16 width, U16 height);
+    void setIsMask(bool is_mask);
+    void publishPendingAlpha();
+    void discardPendingAlpha();
+
+    // Warn when an upload runs off the main thread without the snapshot beginUpload takes.
+    void checkUploadBegun() const;
 
     LLPointer<LLImageRaw> mSaveData; // used for destroyGL/restoreGL
     LL::WorkQueue::weak_t mMainQueue;
@@ -360,6 +384,30 @@ private:
     S8   mAlphaStride ;
     S8   mAlphaOffset ;
 
+    // The pick mask and mask verdict of a texture that has not published yet.
+    //
+    // getMask and getIsAlphaMask answer for the texture mTexName names, and the main thread
+    // asks them every frame (hover picking, the alpha pool). An off-thread upload building
+    // the mask in place would free the buffer getMask was reading, so it builds here
+    // instead and syncTexName swaps it in with the texture.
+    struct PendingAlpha
+    {
+        U8*  mPickMask       = nullptr;
+        U16  mPickMaskWidth  = 0;
+        U16  mPickMaskHeight = 0;
+        bool mHasPickMask    = false; // a result is waiting, possibly "no pick mask"
+        bool mIsMask         = false;
+        bool mHasIsMask      = false;
+    };
+    PendingAlpha mPendingAlpha;
+
+    // Off-thread uploads of this image handed to the main thread and not yet published, and
+    // what is to run once none are. Main thread only; see syncToMainThread / afterPublish.
+    void queuePublish(LLGLuint name, GLsync fence);
+    void finishPublish(LLGLuint name);
+    U32 mPublishesPending = 0;
+    std::vector<std::function<void()>> mOnPublished;
+
     // Geometry of the texture mTexName currently names, captured when an off-thread
     // upload begins overwriting the members with the *next* texture's geometry.
     //
@@ -369,6 +417,7 @@ private:
     // dimensions while still naming the old one for the whole upload, and anything
     // pairing the two -- sculpt reading back from GL at the advertised size -- gets
     // garbage. Only consulted while mUploadInFlight; the members are the truth otherwise.
+    // Both are written on the main thread only; see beginUpload.
     struct PublishedGeom
     {
         S32 mWidth = 0;
@@ -402,6 +451,16 @@ private:
     // shared texture object allocated on this instance's behalf -- see LLCubeMap, where one
     // glTexStorage2D call covers all six faces. Reset whenever a fresh name is bound.
     bool     mStorageAllocated = false;
+    // What allocateTextureStorage gave it, so a later upload can tell whether it still
+    // fits. All zero when the owner of a shared object allocated it.
+    struct StorageDesc
+    {
+        S32 mWidth  = 0;
+        S32 mHeight = 0;
+        S32 mLevels = 0;
+        S32 mFormat = 0;
+    };
+    StorageDesc mStorage;
     U16      mWidth;
     U16      mHeight;
     S8       mCurrentDiscardLevel;
@@ -485,17 +544,22 @@ public:
     // objects and no individual object is in a position to allocate: glTexStorage2D on
     // GL_TEXTURE_CUBE_MAP allocates all six faces in one call, so LLCubeMap makes it and
     // the six per-face objects only ever write sub-images.
-    void markStorageAllocated() { mStorageAllocated = true; }
+    void markStorageAllocated()
+    {
+        mStorageAllocated = true;
+        mStorage = StorageDesc();
+    }
 
-    //similar to setTexName, but will call deleteTextures on mTexName if mTexName is not 0 or texname
+    // Publish texname in place of mTexName, deleting the old one, along with what the
+    // upload that built it staged (the pick mask), then end the upload. Main thread.
     void syncTexName(LLGLuint texname);
 
-    // Snapshot the currently-published geometry before an off-thread upload starts
-    // overwriting it. Idempotent: both createGLTexture overloads call it, and the outer
-    // one delegates to the inner. endUpload() drops the snapshot once the members and
-    // mTexName agree again, or after a failed upload.
+    // Bracket an upload handed to the LLImageGL thread, on the MAIN thread: begin before
+    // posting the work, and end in its completion callback whatever the worker did
+    // (syncTexName has already ended it if the texture published). In between, the
+    // geometry getters answer for the texture mTexName still names.
     void beginUpload();
-    void endUpload() { mUploadInFlight = false; }
+    void endUpload();
 
     //for debug use: show texture size distribution
     //----------------------------------------
@@ -533,7 +597,6 @@ public:
 private:
     LLWindow* mWindow;
     void* mContext = nullptr;
-    LLAtomicBool mFinished;
 };
 
 #endif // LL_LLIMAGEGL_H
