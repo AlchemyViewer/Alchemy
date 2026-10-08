@@ -1508,6 +1508,7 @@ void LLImageGL::updateClass()
 
     if (!sFreeList[idx].empty())
     {
+        gGL.forgetTextures((S32)sFreeList[idx].size(), sFreeList[idx].data());
         free_tex_images((GLsizei) sFreeList[idx].size(), sFreeList[idx].data());
         glDeleteTextures((GLsizei)sFreeList[idx].size(), sFreeList[idx].data());
         sFreeList[idx].resize(0);

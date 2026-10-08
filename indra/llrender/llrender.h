@@ -383,6 +383,12 @@ public:
 
     ALTextureSlot* getTextureSlot(U32 index);
 
+    // Drop these texture names, about to be deleted in this context, from every slot's
+    // bind cache. Deleting a bound texture returns that binding to 0, and GL may hand the
+    // name out again; a slot still caching it would take the new texture for bound already
+    // and skip the bind.
+    void forgetTextures(S32 count, const U32* names);
+
     U32 getCurrentTexUnitIndex(void) const { return mCurrTextureUnitIndex; }
 
     // Resolve a sampler object belonging to THIS context. See ALSamplerCache -- the cache

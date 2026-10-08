@@ -423,6 +423,32 @@ namespace tut
         ensure_equals("and not b", readTexelRGBA(b, 5, 5), 0x20202020u);
     }
 
+    // A deleted texture's name may come back out of glGenTextures, and a slot whose
+    // bind cache still held it would take the new texture for bound already and skip
+    // the bind -- sampling texture 0 in its place, since deleting the old one put the
+    // binding back to 0. The cache forgets the name when the texture goes.
+    template<> template<>
+    void llimagegl_object::test<17>()
+    {
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        ensure("createGLTexture succeeded",
+               img->createGLTexture(0, makeRaw(16, 16, 4, 0x80).get()));
+        const U32 name = img->getTexName();
+
+        gGL.getTextureSlot(3)->bind(img.get());
+        ensure_equals("slot 3 caches it", gGL.getTextureSlot(3)->getCurrTexture(), name);
+
+        img->destroyGLTexture();
+        // However many frames the delete is held back for.
+        for (S32 frame = 0; frame < 8; ++frame)
+        {
+            LLImageGL::updateClass();
+        }
+
+        ensure_equals("the cache let go of the deleted name",
+                      gGL.getTextureSlot(3)->getCurrTexture(), 0u);
+    }
+
     // gGL is thread_local and outlives a context, as it does across these tests,
     // and init left the slots' bind caches as the last context had them. A fresh
     // context hands out the same first names, so its first texture read as bound

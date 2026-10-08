@@ -39,6 +39,8 @@
 #include "hbxxh.h"
 #include "alprojection.h"
 
+#include <algorithm>
+
 #if GL_ARB_debug_output
 #ifndef APIENTRY
 #define APIENTRY
@@ -1062,6 +1064,18 @@ ALTextureSlot* LLRender::getTextureSlot(U32 index)
     {
         LL_DEBUGS() << "Non-existing texture unit layer requested: " << index << LL_ENDL;
         return &mDummySlot;
+    }
+}
+
+void LLRender::forgetTextures(S32 count, const U32* names)
+{
+    const U32* end = names + count;
+    for (ALTextureSlot& slot : mTextureSlots)
+    {
+        if (slot.mCurrTexture != 0 && std::find(names, end, slot.mCurrTexture) != end)
+        {
+            slot.mCurrTexture = 0;
+        }
     }
 }
 
