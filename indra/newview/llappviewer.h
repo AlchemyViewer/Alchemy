@@ -436,10 +436,11 @@ extern U32 gForegroundFrameCount;
 
 extern LLPumpIO* gServicePump;
 
-extern U64MicrosecondsImplicit  gStartTime;
-extern U64MicrosecondsImplicit   gFrameTime;                    // The timestamp of the most-recently-processed frame
-extern F32SecondsImplicit       gFrameTimeSeconds;          // Loses msec precision after ~4.5 hours...
-extern F32SecondsImplicit       gFrameIntervalSeconds;      // Elapsed time between current and previous gFrameTimeSeconds
+// The frame's time, sampled once at the top of LLAppViewer::idle() from the
+// same reading as LLFrameTimer, and updated every frame, teleports included.
+extern U64MicrosecondsImplicit   gFrameTime;                    // Microseconds since the epoch, as totalTime()
+extern F32SecondsImplicit       gFrameTimeSeconds;          // Seconds since startup, as LLFrameTimer::getUptimeSeconds()
+extern F32SecondsImplicit       gFrameIntervalSeconds;      // This frame's length, as LLFrameTimer::getFrameDeltaTimeF32()
 extern F32      gFPSClamped;                // Frames per second, smoothed, weighted toward last frame
 extern F32      gFrameDTClamped;
 

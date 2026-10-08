@@ -355,7 +355,6 @@ F32SecondsImplicit gFrameTimeSeconds = 0.f;
 F32SecondsImplicit gFrameIntervalSeconds = 0.f;
 F32 gFPSClamped = 10.f;                     // Pretend we start at target rate.
 F32 gFrameDTClamped = 0.f;                  // Time between adjacent checks to network for packets
-U64MicrosecondsImplicit gStartTime = 0; // gStartTime is "private", used only to calculate gFrameTimeSeconds
 
 LLTimer gRenderStartTime;
 LLFrameTimer gForegroundTime;
@@ -3291,8 +3290,6 @@ bool LLAppViewer::initConfiguration()
 
     // Note: this is where we used to initialize gFeatureManagerp.
 
-    gStartTime = totalTime();
-
     //
     // Set the name of the window
     //
@@ -5505,6 +5502,11 @@ void LLAppViewer::idle()
     static LLTimer idle_timer;
 
     LLFrameTimer::updateFrameTime();
+    // The frame's one time sample: the globals read the same reading as
+    // LLFrameTimer, so nothing this frame sees two different times.
+    gFrameTime = LLFrameTimer::getTotalTime();
+    gFrameTimeSeconds = LLFrameTimer::getUptimeSeconds();
+    gFrameIntervalSeconds = LLFrameTimer::getFrameDeltaTimeF32();
     LLFrameTimer::updateFrameCount();
     LLEventTimer::updateClass();
     LLPerfStats::updateClass();

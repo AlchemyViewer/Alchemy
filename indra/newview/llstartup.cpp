@@ -1872,15 +1872,6 @@ bool idle_startup()
         // Sets up the parameters for the first simulator
 
         LL_DEBUGS("AppInit") << "Initializing camera..." << LL_ENDL;
-        gFrameTime    = totalTime();
-        F32Seconds last_time = gFrameTimeSeconds;
-        gFrameTimeSeconds = (gFrameTime - gStartTime);
-
-        gFrameIntervalSeconds = gFrameTimeSeconds - last_time;
-        if (gFrameIntervalSeconds < 0.f)
-        {
-            gFrameIntervalSeconds = 0.f;
-        }
 
         // Make sure agent knows correct aspect ratio
         // FOV limits depend upon aspect ratio so this needs to happen before initializing the FOV below

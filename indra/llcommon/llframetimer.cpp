@@ -29,15 +29,19 @@
 
 #include "llframetimer.h"
 
+const F64 USEC_TO_SEC_F64 = 0.000001;
+
 // Static members
 //LLTimer   LLFrameTimer::sInternalTimer;
 U64 LLFrameTimer::sStartTotalTime = totalTime();
+// The frame clock starts at the start, not at the epoch's zero: the first
+// frame's delta is then its own length, and the total time is a real time
+// before the first frame has been counted.
 F64 LLFrameTimer::sFrameTime = 0.0;
-U64 LLFrameTimer::sTotalTime = 0;
-F64 LLFrameTimer::sTotalSeconds = 0.0;
+U64 LLFrameTimer::sTotalTime = LLFrameTimer::sStartTotalTime;
+F64 LLFrameTimer::sTotalSeconds = U64_to_F64(LLFrameTimer::sStartTotalTime) * USEC_TO_SEC_F64;
 S32 LLFrameTimer::sFrameCount = 0;
 U64 LLFrameTimer::sFrameDeltaTime = 0;
-const F64 USEC_TO_SEC_F64 = 0.000001;
 
 // static
 void LLFrameTimer::updateFrameTime()
