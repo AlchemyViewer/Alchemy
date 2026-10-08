@@ -36,6 +36,7 @@
 #include "llscrolllistcolumn.h"
 #include "llscrolllistitem.h"
 #include "llsdutil.h"
+#include "llstring.h"
 #include "lltooltip.h"
 #include "llui.h"
 #include "lluictrlfactory.h"
@@ -75,12 +76,7 @@ namespace
     // near enough for a table read in a fixed face.
     S32 displayWidth(const std::string& text)
     {
-        S32 count = 0;
-        for (const char c : text)
-        {
-            count += ((U8)c & 0xC0) != 0x80;
-        }
-        return count;
+        return static_cast<S32>(utf8str_codepoint_count(text));
     }
 }
 

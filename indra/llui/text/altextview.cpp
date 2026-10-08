@@ -2600,13 +2600,9 @@ std::string_view ALTextView::fitting(const ALTextRange& over, std::string_view t
     }
     // As much as there is room for, cut where a character starts -- a
     // notecard's item is one character too, and goes whole or not at all.
-    size_t room = mMaxBytes > left ? mMaxBytes - left : 0;
-    while (room > 0 && room < text.size() && (static_cast<unsigned char>(text[room]) & 0xC0) == 0x80)
-    {
-        --room;
-    }
+    const size_t room = mMaxBytes > left ? mMaxBytes - left : 0;
     full();
-    return text.substr(0, room);
+    return text.substr(0, utf8str_truncate(text, static_cast<S32>(room)).size());
 }
 
 bool ALTextView::wouldFit(const std::vector<std::pair<ALTextRange, std::string>>& edits) const
