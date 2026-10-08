@@ -41,8 +41,9 @@ struct ALTextSearchOptions
     // capitalised for Hello, lower for hello, as typed for anything else.
     bool preserveCase  = false;
     // The match reported is this group of the pattern rather than the
-    // whole, where it is not zero: what vim's \zs asks for. A match in
-    // which the group took no part is reported whole.
+    // whole, where it is not zero, and where the whole began is what
+    // `whole_begins` says. A match in which the group took no part is
+    // reported whole.
     S32  matchGroup    = 0;
     // A match may cross a line's end: the lines are searched as one
     // text with a line break between them, so that \n in a pattern is
