@@ -439,10 +439,16 @@ F32SecondsImplicit LLTimer::getElapsedTimeAndResetF32()
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// An expiry as clock ticks: in F64, so a long expiry keeps its precision, and
+// never negative, which as a U64 would be undefined.
+static U64 expiry_ticks(F64 seconds)
+{
+    return (U64)(llmax(seconds, 0.0) * get_timer_info().mClockFrequency.value());
+}
+
 void LLTimer::setTimerExpirySec(F32SecondsImplicit expiration)
 {
-    mExpirationTicks = get_clock_count()
-        + (U64)((F32)(expiration * get_timer_info().mClockFrequency.value()));
+    mExpirationTicks = get_clock_count() + expiry_ticks(expiration.value());
 }
 
 F32SecondsImplicit LLTimer::getRemainingTimeF32() const
@@ -464,8 +470,7 @@ bool LLTimer::checkExpirationAndReset(F32 expiration)
         return false;
     }
 
-    mExpirationTicks = cur_ticks
-        + (U64)((F32)(expiration * get_timer_info().mClockFrequency));
+    mExpirationTicks = cur_ticks + expiry_ticks(expiration);
     return true;
 }
 
