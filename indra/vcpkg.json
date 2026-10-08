@@ -14,7 +14,6 @@
     "boost-iostreams",
     "boost-process",
     "boost-program-options",
-    "boost-random",
     {
       "name": "boost-regex",
       "features": [
