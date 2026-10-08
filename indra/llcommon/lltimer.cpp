@@ -210,17 +210,18 @@ void ms_sleep(U32 ms)
 #if LL_WINDOWS
 U64 get_clock_count()
 {
-    static bool firstTime = true;
-    static U64 offset;
-        // ensures that callers to this function never have to deal with wrap
+    // Counted from the first read, so callers never deal with wrap; a
+    // function-local static, so two threads reading first agree on it.
+    static const LONGLONG offset = []
+    {
+        LARGE_INTEGER first;
+        QueryPerformanceCounter(&first);
+        return first.QuadPart;
+    }();
 
     // QueryPerformanceCounter implementation
     LARGE_INTEGER clock_count;
     QueryPerformanceCounter(&clock_count);
-    if (firstTime) {
-        offset = clock_count.QuadPart;
-        firstTime = false;
-    }
     return clock_count.QuadPart - offset;
 }
 
@@ -251,9 +252,7 @@ U64 get_clock_count()
 
 
 TimerInfo::TimerInfo()
-:   mClockFrequency(0.0),
-    mTotalTimeClockCount(0),
-    mLastTotalTimeClockCount(0)
+:   mClockFrequency(0.0)
 {
     // Known from the first read, so a timer constructed during static initialisation, before
     // anything else has touched the clock, never scales by a frequency of 0.
@@ -275,47 +274,35 @@ TimerInfo& get_timer_info()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// returns a U64 number that represents the number of
-// microseconds since the Unix epoch - Jan 1, 1970
+// Microseconds since the Unix epoch, as the calendar read at the first call,
+// carried forward by the monotonic clock. It reads as a time of day but
+// counts on its own after the first call, so it drifts from the calendar over
+// a session and never steps; LLDate::now() is the calendar.
 U64MicrosecondsImplicit totalTime()
 {
-    U64 current_clock_count = get_clock_count();
-    if (!get_timer_info().mTotalTimeClockCount || get_timer_info().mClocksToMicroseconds.value() == 0)
+    struct Anchor
     {
-        get_timer_info().update();
-        get_timer_info().mTotalTimeClockCount = current_clock_count;
-
-#if LL_WINDOWS
-        // Sync us up with local time (even though we PROBABLY don't need to, this is how it was implemented)
-        // Unix platforms use gettimeofday so they are synced, although this probably isn't a good assumption to
-        // make in the future.
-
-        get_timer_info().mTotalTimeClockCount = (U64)(time(NULL) * get_timer_info().mClockFrequency);
-#endif
-
-        // Update the last clock count
-        get_timer_info().mLastTotalTimeClockCount = current_clock_count;
-    }
-    else
+        U64 clock;          // get_clock_count() at the anchor
+        U64 epochMicros;    // the calendar at the same moment
+        U64 frequency;      // clock ticks a second
+    };
+    // A function-local static, so it is made once and every thread reads it
+    // without a lock.
+    static const Anchor anchor = []
     {
-        if (current_clock_count >= get_timer_info().mLastTotalTimeClockCount)
-        {
-            // No wrapping, we're all okay.
-            get_timer_info().mTotalTimeClockCount += current_clock_count - get_timer_info().mLastTotalTimeClockCount;
-        }
-        else
-        {
-            // We've wrapped.  Compensate correctly
-            get_timer_info().mTotalTimeClockCount += (0xFFFFFFFFFFFFFFFFULL - get_timer_info().mLastTotalTimeClockCount) + current_clock_count;
-        }
+        Anchor made;
+        made.clock = get_clock_count();
+        const auto calendar = std::chrono::system_clock::now().time_since_epoch();
+        made.epochMicros = (U64)std::chrono::duration_cast<std::chrono::microseconds>(calendar).count();
+        made.frequency = (U64)calc_clock_frequency();
+        return made;
+    }();
 
-        // Update the last clock count
-        get_timer_info().mLastTotalTimeClockCount = current_clock_count;
-    }
-
-    // Return the total clock tick count in microseconds.
-    U64Microseconds time(get_timer_info().mTotalTimeClockCount*get_timer_info().mClocksToMicroseconds);
-    return time;
+    const U64 ticks = get_clock_count() - anchor.clock;
+    // Split so the multiply cannot overflow at any frequency a counter runs at.
+    const U64 micros = (ticks / anchor.frequency) * SEC_TO_MICROSEC_U64
+                     + (ticks % anchor.frequency) * SEC_TO_MICROSEC_U64 / anchor.frequency;
+    return U64Microseconds(anchor.epochMicros + micros);
 }
 
 

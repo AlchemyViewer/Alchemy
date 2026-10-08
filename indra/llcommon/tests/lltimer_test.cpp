@@ -28,6 +28,12 @@
 
 #include "../test/lltut.h"
 
+#include <atomic>
+#include <chrono>
+#include <cmath>
+#include <thread>
+#include <vector>
+
 namespace tut
 {
     struct timer_data
@@ -81,5 +87,56 @@ namespace tut
         timer.reset();
         ensure("the timer was just reset", timer.getElapsedTimeF64() < 0.04);
         ensure("the uptime runs from before the reset", LLTimer::getUptimeSeconds() > timer.getElapsedTimeF64());
+    }
+
+    template<> template<>
+    void timer_object::test<5>()
+    {
+        set_test_name("the total time reads the calendar once and keeps pace with the steady clock");
+        const auto calendar = std::chrono::system_clock::now().time_since_epoch();
+        const F64  calendar_seconds = std::chrono::duration<F64>(calendar).count();
+        const F64  total = LLTimer::getTotalSeconds();
+        ensure("anchored to the calendar", std::fabs(total - calendar_seconds) < 1.0);
+
+        const auto steady_start = std::chrono::steady_clock::now();
+        const U64  total_start = totalTime();
+        ms_sleep(200);
+        const F64 steady = std::chrono::duration<F64>(std::chrono::steady_clock::now() - steady_start).count();
+        const F64 counted = (F64)((U64)totalTime() - total_start) / 1000000.0;
+        ensure("counts as the steady clock does", std::fabs(counted - steady) < 0.005);
+    }
+
+    template<> template<>
+    void timer_object::test<6>()
+    {
+        set_test_name("the total time read on many threads at once never steps and never runs fast");
+        const auto steady_start = std::chrono::steady_clock::now();
+        const U64  total_start = totalTime();
+        std::atomic<bool> stepped_back{ false };
+        std::vector<std::thread> readers;
+        for (int i = 0; i < 8; ++i)
+        {
+            readers.emplace_back([&stepped_back]
+            {
+                U64 last = totalTime();
+                for (int read = 0; read < 200000; ++read)
+                {
+                    const U64 now = totalTime();
+                    if (now < last)
+                    {
+                        stepped_back = true;
+                    }
+                    last = now;
+                }
+            });
+        }
+        for (std::thread& reader : readers)
+        {
+            reader.join();
+        }
+        const F64 steady = std::chrono::duration<F64>(std::chrono::steady_clock::now() - steady_start).count();
+        const F64 counted = (F64)((U64)totalTime() - total_start) / 1000000.0;
+        ensure("no thread saw it step back", !stepped_back);
+        ensure("counted no faster than the steady clock", counted < steady + 0.005);
     }
 }
