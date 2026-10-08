@@ -343,6 +343,10 @@ private:
     // existing texture must release the old accounting themselves.
     void allocateTextureStorage(S32 width, S32 height, bool has_mips);
 
+    // Whether an upload of this level-0 size, in the current format, can be written into
+    // the storage the current texture object already has rather than needing a new one.
+    bool storageFits(S32 width, S32 height) const;
+
     void freePickMask();
     bool isCompressed() const;
 
@@ -432,6 +436,16 @@ private:
     // shared texture object allocated on this instance's behalf -- see LLCubeMap, where one
     // glTexStorage2D call covers all six faces. Reset whenever a fresh name is bound.
     bool     mStorageAllocated = false;
+    // What allocateTextureStorage gave it, so a later upload can tell whether it still
+    // fits. All zero when the owner of a shared object allocated it.
+    struct StorageDesc
+    {
+        S32 mWidth  = 0;
+        S32 mHeight = 0;
+        S32 mLevels = 0;
+        S32 mFormat = 0;
+    };
+    StorageDesc mStorage;
     U16      mWidth;
     U16      mHeight;
     S8       mCurrentDiscardLevel;
@@ -515,7 +529,11 @@ public:
     // objects and no individual object is in a position to allocate: glTexStorage2D on
     // GL_TEXTURE_CUBE_MAP allocates all six faces in one call, so LLCubeMap makes it and
     // the six per-face objects only ever write sub-images.
-    void markStorageAllocated() { mStorageAllocated = true; }
+    void markStorageAllocated()
+    {
+        mStorageAllocated = true;
+        mStorage = StorageDesc();
+    }
 
     // Publish texname in place of mTexName, deleting the old one, along with what the
     // upload that built it staged (the pick mask), then end the upload. Main thread.

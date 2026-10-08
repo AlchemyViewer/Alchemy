@@ -612,6 +612,35 @@ namespace tut
         ensure_equals("and not b", readTexelRGBA(b, 5, 5), 0x20202020u);
     }
 
+    // A re-upload at the same discard level wrote into the live texture in place,
+    // on the word of the discard level alone. Immutable storage cannot follow a new
+    // size or format: the write was rejected, or dropped the channel that did not
+    // fit, and the image went on describing a texture GL never had.
+    template<> template<>
+    void llimagegl_object::test<16>()
+    {
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        ensure("create 32x32", img->createGLTexture(0, makeRaw(32, 32, 4, 0x11).get()));
+        ensure("re-create 64x64", img->createGLTexture(0, makeRaw(64, 64, 4, 0x22).get()));
+
+        bindForRead(img);
+        GLint w = 0;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
+        ensure_equals("the texture took the new size", (S32)w, 64);
+        ensure_equals("and the new pixels", readTexelRGBA(img, 40, 40), 0x22222222u);
+
+        // Same size, an alpha channel the old storage has no room for.
+        LLPointer<LLImageGL> rgb = new LLImageGL(/*usemipmaps=*/false);
+        ensure("create RGB", rgb->createGLTexture(0, makeRaw(16, 16, 3, 0x33).get()));
+        ensure("re-create RGBA", rgb->createGLTexture(0, makeRaw(16, 16, 4, 0x44).get()));
+
+        bindForRead(rgb);
+        GLint format = 0;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
+        ensure_equals("the texture took the new format", (S32)format, (S32)GL_SRGB8_ALPHA8);
+        ensure_equals("and the new pixels", readTexelRGBA(rgb, 3, 3), 0x44444444u);
+    }
+
     // A deleted texture's name may come back out of glGenTextures, and a slot whose
     // bind cache still held it would take the new texture for bound already and skip
     // the bind -- sampling texture 0 in its place, since deleting the old one put the

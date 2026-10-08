@@ -1708,6 +1708,9 @@ bool LLImageGL::createGLTexture()
 
 
     LLImageGL::generateTextures(1, &mTexName);
+    // A fresh name with no storage, whatever the old one had.
+    mStorageAllocated = false;
+    mStorage = StorageDesc();
     stop_glerror();
     if (!mTexName)
     {
@@ -1869,12 +1872,16 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
     discard_level = llclamp(discard_level, 0, (S32)mMaxDiscardLevel);
     discard_level = llmin(discard_level, MAX_DISCARD_LEVEL);
 
+    // Writing into the live texture in place is only legal while the upload fits the
+    // storage it already has. The discard level matching does not say so: setSize has
+    // just taken the new dimensions, and immutable storage cannot follow them, so a
+    // size or format change here has to build a new texture like any other.
     if (main_thread // <--- always force creation of new_texname when not on main thread ...
         && !defer_copy // <--- ... or defer copy is set
-        && mTexName != 0 && discard_level == mCurrentDiscardLevel)
+        && mTexName != 0 && discard_level == mCurrentDiscardLevel
+        && storageFits(liveWidth(discard_level), liveHeight(discard_level)))
     {
         LL_PROFILE_ZONE_NAMED("cglt - early setImage");
-        // This will only be true if the size has not changed
         if (tex_name != nullptr)
         {
             *tex_name = mTexName;
@@ -1892,7 +1899,9 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
     else
     {
         LLImageGL::generateTextures(1, &new_texname);
-        mStorageAllocated = false; // brand-new name, no storage allocated yet
+        // brand-new name, no storage allocated yet
+        mStorageAllocated = false;
+        mStorage = StorageDesc();
         {
             gGL.getTextureSlot(0)->bind(this, false, true, new_texname);
             glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_BASE_LEVEL, 0);
@@ -3027,9 +3036,28 @@ void LLImageGL::allocateTextureStorage(S32 width, S32 height, bool has_mips)
         glTexStorage2D(mTarget, mMipLevels, getStorageInternalFormat(), width, height);
         skipSRGBDecode(mTarget);
         mStorageAllocated = true;
+        mStorage.mWidth  = width;
+        mStorage.mHeight = height;
+        mStorage.mLevels = mMipLevels;
+        mStorage.mFormat = getStorageInternalFormat();
     }
 
     alloc_tex_image(width, height, mFormatInternal, 1, has_mips);
+}
+
+bool LLImageGL::storageFits(S32 width, S32 height) const
+{
+    // Nothing allocated yet: setImage allocates it at this size. Allocated by the owner of
+    // a shared texture object (markStorageAllocated, no description): sized by that owner.
+    if (!mStorageAllocated || mStorage.mLevels == 0)
+    {
+        return true;
+    }
+
+    return mStorage.mWidth == width
+        && mStorage.mHeight == height
+        && mStorage.mFormat == getStorageInternalFormat()
+        && mStorage.mLevels == (mUseMipMaps ? calcMipLevelCount(width, height) : 1);
 }
 
 // static
@@ -3086,7 +3114,6 @@ bool LLImageGL::scaleDown(S32 desired_discard)
     const LLGLuint old_texname = mTexName;
     LLGLuint new_texname = 0;
     generateTextures(1, &new_texname);
-    mStorageAllocated = false; // brand-new name; allocateTextureStorage sets this
     if (new_texname == 0)
     {
         LL_WARNS_ONCE("LLImageGL") << "Failed to allocate a texture name for downscaling." << LL_ENDL;
