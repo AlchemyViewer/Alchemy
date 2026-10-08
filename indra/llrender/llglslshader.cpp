@@ -2233,9 +2233,9 @@ LLUUID LLGLSLShader::hash()
     // the other depth convention.
     hash_obj.update(&LLRender::sReverseZ, sizeof(LLRender::sReverseZ));
     hash_obj.update(&mFeatures, sizeof(LLShaderFeatures));
-    hash_obj.update(gGLManager.mGLVendor);
-    hash_obj.update(gGLManager.mGLRenderer);
-    hash_obj.update(gGLManager.mGLVersionString);
+    // Not the raw renderer: radeonsi's carries the kernel release, and a kernel update would
+    // orphan every binary.
+    hash_obj.update(gGLManager.mGLIdentity);
     return hash_obj.digest();
 }
 

@@ -609,9 +609,10 @@ bool LLFeatureManager::loadGPUClass()
     else if (!gSavedSettings.getBOOL("SkipBenchmark"))
     {
         F32 class1_gbps = gSavedSettings.getF32("RenderClass1MemoryBandwidth");
-        // Keep the raw renderer and full GL version: the display GPU string
-        // strips driver information on Linux.
-        const std::string gpu_string = gGLManager.getRawGLString();
+        // The renderer with its driver information but not the kernel release, and the
+        // full GL version: the display GPU string strips both on Linux, and the raw
+        // renderer would rerun the benchmark on every kernel update.
+        const std::string gpu_string = gGLManager.mGLIdentity;
         const LLSD benchmark = gSavedSettings.getLLSD("GPUBenchmarkResult");
         F32 gbps = (F32)benchmark["bandwidth"].asReal();
         bool use_cached_result = benchmark["gpu"].asString() == gpu_string

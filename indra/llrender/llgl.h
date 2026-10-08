@@ -195,6 +195,11 @@ public:
     // In ALL CAPS
     std::string mGLRenderer;
 
+    // GL_VENDOR, GL_RENDERER and GL_VERSION as reported, less the kernel's DRM version and
+    // release radeonsi and r600 put in the renderer on Linux. Keys what a driver update must
+    // invalidate and a kernel update must not: the benchmark result and program binaries.
+    std::string mGLIdentity;
+
     // GL Extension String
     std::set<std::string> mGLExtensions;
 

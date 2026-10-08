@@ -62,6 +62,10 @@
 #include "lldxhardware.h"
 #endif
 
+#if LL_LINUX
+#include <sys/utsname.h>
+#endif
+
 #ifdef _DEBUG
 //#define GL_STATE_VERIFY
 #endif
@@ -1554,6 +1558,45 @@ void LLGLManager::initEGL()
 #if LL_LINUX
 namespace
 {
+    // radeonsi and r600 put the kernel's DRM interface version and release in GL_RENDERER:
+    // "(radeonsi, navi31, ACO, DRM 3.64, 7.2.4-200.fc44.x86_64)", in older Mesa
+    // "(POLARIS10, DRM 3.42.0, 5.15.0-58-generic, LLVM 13.0.1)", and r600
+    // "(DRM 2.50.0 / 6.1.0-13-amd64, LLVM 15.0.6)". Both move with the kernel, not the driver.
+    std::string strip_kernel_from_renderer(std::string renderer)
+    {
+        // With what joins it on, so that a release like "6.1.0" is not found in "LLVM 16.1.0".
+        struct utsname uts;
+        const std::string release = uname(&uts) == 0 ? uts.release : "";
+        for (const std::string separator : { ", ", " / " })
+        {
+            if (size_t pos = renderer.find(separator + release); !release.empty() && pos != std::string::npos)
+            {
+                renderer.erase(pos, separator.size() + release.size());
+                break;
+            }
+        }
+
+        if (size_t pos = renderer.find("DRM "); pos != std::string::npos
+            && pos + 4 < renderer.size() && isdigit((unsigned char)renderer[pos + 4]))
+        {
+            size_t end = pos + 4;
+            while (end < renderer.size() && (isdigit((unsigned char)renderer[end]) || renderer[end] == '.'))
+            {
+                ++end;
+            }
+            if (pos >= 2 && renderer.compare(pos - 2, 2, ", ") == 0)
+            {
+                pos -= 2;   // "navi31, DRM 3.64"
+            }
+            else if (renderer.compare(end, 2, ", ") == 0)
+            {
+                end += 2;   // "(DRM 2.50.0, LLVM"
+            }
+            renderer.erase(pos, end - pos);
+        }
+        return renderer;
+    }
+
     // Whole names only: EGL_EXT_device_drm is a prefix of EGL_EXT_device_drm_render_node.
     bool has_egl_extension(const char* extensions, const std::string& name)
     {
@@ -1768,6 +1811,14 @@ bool LLGLManager::initGL()
         &mGLVersionString);
 
     mGLVersion = mDriverVersionMajor + mDriverVersionMinor * .1f;
+
+    {
+        std::string renderer = ll_safe_string((const char *)glGetString(GL_RENDERER));
+#if LL_LINUX
+        renderer = strip_kernel_from_renderer(renderer);
+#endif
+        mGLIdentity = ll_safe_string((const char *)glGetString(GL_VENDOR)) + " " + renderer + " " + mGLVersionString;
+    }
 
     // Every Mesa driver stamps "Mesa" into the GL_VERSION string
     // (e.g. "4.6 (Core Profile) Mesa 26.1.4"), regardless of the underlying
