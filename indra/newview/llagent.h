@@ -629,7 +629,7 @@ private:
     bool            mAutoPilotUseRotation;
     LLVector3       mAutoPilotTargetFacing;
     F32             mAutoPilotTargetDist;
-    S32             mAutoPilotNoProgressFrameCount;
+    F32             mAutoPilotNoProgressTime;   // seconds without getting closer
     F32             mAutoPilotRotationThreshold;
     std::string     mAutoPilotBehaviorName;
     void            (*mAutoPilotFinishedCallback)(bool, void *);

@@ -455,7 +455,7 @@ LLAgent::LLAgent() :
     mAutoPilotUseRotation(false),
     mAutoPilotTargetFacing(LLVector3::zero),
     mAutoPilotTargetDist(0.f),
-    mAutoPilotNoProgressFrameCount(0),
+    mAutoPilotNoProgressTime(0.f),
     mAutoPilotRotationThreshold(0.f),
     mAutoPilotFinishedCallback(nullptr),
     mAutoPilotCallbackData(nullptr),
@@ -1822,7 +1822,7 @@ void LLAgent::startAutoPilotGlobal(
         mAutoPilotUseRotation = false;
     }
 
-    mAutoPilotNoProgressFrameCount = 0;
+    mAutoPilotNoProgressTime = 0.f;
 }
 
 //-----------------------------------------------------------------------------
@@ -1954,15 +1954,15 @@ void LLAgent::autoPilot(F32 *delta_yaw)
 
         if (target_dist >= mAutoPilotTargetDist)
         {
-            mAutoPilotNoProgressFrameCount++;
+            mAutoPilotNoProgressTime += gFrameDTClamped;
             bool out_of_time = false;
             if (getFlying())
             {
-                out_of_time = mAutoPilotNoProgressFrameCount > AUTOPILOT_MAX_TIME_NO_PROGRESS_FLY * gFPSClamped;
+                out_of_time = mAutoPilotNoProgressTime > AUTOPILOT_MAX_TIME_NO_PROGRESS_FLY;
             }
             else
             {
-                out_of_time = mAutoPilotNoProgressFrameCount > AUTOPILOT_MAX_TIME_NO_PROGRESS_WALK * gFPSClamped;
+                out_of_time = mAutoPilotNoProgressTime > AUTOPILOT_MAX_TIME_NO_PROGRESS_WALK;
             }
             if (out_of_time)
             {
