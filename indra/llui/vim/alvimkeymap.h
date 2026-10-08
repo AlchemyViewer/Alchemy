@@ -475,6 +475,9 @@ private:
     void     put(ALTextView& view, char name, bool after, S32 count, bool past = false);
     // Says a count would make more text than it may, and how much.
     void     tooMuch(size_t bytes);
+    // Says how many lines a put or a copy added, where they are more than
+    // vim's report.
+    void     sayMoreLines(S32 lines);
 
     // Vim's spelling of a pattern as the search engine's (ALVimSearch).
     typedef ALVimPattern Pattern;

@@ -915,6 +915,16 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         const S32 landed = change ? change->caret.line : last;
         mVim.moveTo(view, ALTextPos(llclamp(landed, 0, d.lineCount() - 1), 0));
         mVim.moveTo(view, ALTextPos(view.caret().line, firstNonBlankColumn(d, view.caret().line)));
+        // How many lines were copied, or moved -- not by a :g, which vim
+        // says nothing of -- for more than vim's report.
+        if (change && !move)
+        {
+            mVim.sayMoreLines(last - first + 1);
+        }
+        else if (change && !mInGlobal && last - first + 1 > REPORT_THRESHOLD)
+        {
+            mVim.say(alSaidCount("VimLinesMoved", last - first + 1, "1 line moved", "[COUNT] lines moved"));
+        }
         mVim.finishCommand(change.has_value());
         return;
     }
@@ -1141,6 +1151,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         const S32 put_at   = above ? line : line + 1;
         const S32 put_last = put_at + static_cast<S32>(std::count(text.begin(), text.end(), '\n'));
         mVim.moveTo(view, ALTextPos(put_last, firstNonBlankColumn(d, put_last)));
+        mVim.sayMoreLines(put_last - put_at + 1);
         return;
     }
     if (!bang && (is("ma", "mark") || bare == "k"))

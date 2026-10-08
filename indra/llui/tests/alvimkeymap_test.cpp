@@ -5792,4 +5792,64 @@ namespace tut
         keys("y/three<CR>");
         ensure("y/three: two, nothing said: " + vim->message(), vim->message().empty());
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<202>()
+    {
+        set_test_name("more than two lines put say how many more, and a case operator, = and :m over them how many they changed, indented and moved, as vim's report has them");
+        const char* text = "one\ntwo\nthree\nfour\nfive\nsix\n";
+        make(text);
+        keys("gg3yyp");
+        ensure_equals("3yyp", vim->message(), std::string("3 more lines"));
+        keys("uggyy3p");
+        ensure_equals("yy3p", vim->message(), std::string("3 more lines"));
+        keys("ugg2yyp");
+        ensure("2yyp: nothing said: " + vim->message(), vim->message().empty());
+        keys("uggv$y3p");
+        ensure_equals("three of a line's characters and its break", vim->message(), std::string("3 more lines"));
+        keys("uggv$y2p");
+        ensure("two of them: nothing said: " + vim->message(), vim->message().empty());
+        keys("u:1,3y<CR>:put<CR>");
+        ensure_equals(":put of three lines", vim->message(), std::string("3 more lines"));
+
+        make("one\ntwo\nthree\nfour\nfive\nsix");
+        keys("<C-v>3jyGp");
+        ensure_equals("a block's rows put past the last line", vim->message(), std::string("3 more lines"));
+        keys("uggp");
+        ensure("a block put over lines there are: nothing said: " + vim->message(), vim->message().empty());
+
+        make(text);
+        keys("g~2j");
+        ensure_equals("g~2j", vim->message(), std::string("3 lines changed"));
+        keys("ugggUj");
+        ensure("gUj: nothing said: " + vim->message(), vim->message().empty());
+        keys("ugg3gUU");
+        ensure_equals("3gUU", vim->message(), std::string("3 lines changed"));
+        keys("uggV2jU");
+        ensure_equals("V2jU", vim->message(), std::string("3 lines changed"));
+        keys("uggv2j~");
+        ensure_equals("v2j~", vim->message(), std::string("3 lines changed"));
+        keys("u");
+
+        vim->hooks().format = [](ALTextView&, S32, S32) {};
+        keys("gg=2j");
+        ensure_equals("=2j", vim->message(), std::string("3 lines indented"));
+        keys("=j");
+        ensure("=j: nothing said: " + vim->message(), vim->message().empty());
+        keys("3==");
+        ensure_equals("3==", vim->message(), std::string("3 lines indented"));
+
+        ex("1,3m$");
+        ensure_equals(":1,3m$", vim->message(), std::string("3 lines moved"));
+        keys("u");
+        ex("1,2m$");
+        ensure(":1,2m$: nothing said: " + vim->message(), vim->message().empty());
+        keys("u");
+        ex("1,3t$");
+        ensure_equals(":1,3t$ copies three", vim->message(), std::string("3 more lines"));
+        keys("u");
+        keys(":g/three/.,+2m0<CR>");
+        ensure_equals("moved by a :g", flat(editor->text()), std::string("three|four|five|one|two|six|"));
+        ensure(":m under a :g: nothing said: " + vim->message(), vim->message().empty());
+    }
 }

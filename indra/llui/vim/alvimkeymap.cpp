@@ -5910,6 +5910,12 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                 mHooks.format(view, first, last);
             }
             moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
+            // The lines handed over to be put right, said for more than
+            // vim's report.
+            if (mHooks.format && last - first + 1 > REPORT_THRESHOLD)
+            {
+                say(alSaidCount("VimLinesIndented", last - first + 1, "1 line indented", "[COUNT] lines indented"));
+            }
             return;
         case '~':
         case 'u':
@@ -5926,6 +5932,11 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             }
             view.replaceAll(std::move(edits));
             moveTo(view, span.range.begin);
+            // The lines changed, said for more than vim's report.
+            if (last - first + 1 > REPORT_THRESHOLD)
+            {
+                say(alSaidCount("VimLinesChanged", last - first + 1, "1 line changed", "[COUNT] lines changed"));
+            }
             return;
         }
         default:
@@ -5949,6 +5960,14 @@ void ALVimKeymap::tooMuch(size_t bytes)
 {
     say(said("VimCountTooLarge", "Too large a count: it would put in [SIZE,number,1] MB", { { "[SIZE]", fmt::format("{:f}", static_cast<F64>(bytes) / (1024.0 * 1024.0)) } }),
         true);
+}
+
+void ALVimKeymap::sayMoreLines(S32 lines)
+{
+    if (lines > REPORT_THRESHOLD)
+    {
+        say(alSaidCount("VimMoreLines", lines, "1 more line", "[COUNT] more lines"));
+    }
 }
 
 void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool past)
@@ -5999,6 +6018,7 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
         const S32 column = after && !atLineEnd(d, from) ? d.displayColumn(d.nextCluster(from), tab) : d.displayColumn(from, tab);
         std::vector<std::pair<ALTextRange, std::string>> edits;
         std::string                                       tail;
+        S32                                               added = 0;
         for (size_t i = 0; i < lines.size(); ++i)
         {
             const S32 line = from.line + static_cast<S32>(i);
@@ -6015,6 +6035,7 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
             else
             {
                 tail += "\n" + std::string(static_cast<size_t>(column), ' ') + piece;
+                ++added;
             }
         }
         if (!tail.empty())
@@ -6023,6 +6044,8 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
         }
         view.replaceAll(std::move(edits));
         moveTo(view, d.posAtDisplayColumn(from.line, column, tab));
+        // The lines added past the last, as vim counts a block's.
+        sayMoreLines(added);
         return;
     }
     std::string text;
@@ -6035,6 +6058,9 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
         }
         text += reg.text;
     }
+    // The lines a put adds, said where they are more than vim's report: a
+    // line for each break it puts in, and the one lines are put on.
+    const S32 breaks = static_cast<S32>(std::count(text.begin(), text.end(), '\n'));
     if (reg.linewise)
     {
         if (after)
@@ -6047,11 +6073,12 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
             view.setCaret(d.lineStart(from.line));
             view.insertText(text + "\n");
         }
+        sayMoreLines(breaks + 1);
         const S32 line = after ? from.line + 1 : from.line;
         if (past)
         {
             // The line after the last one put.
-            const S32 below = llmin(line + static_cast<S32>(std::count(text.begin(), text.end(), '\n')) + 1, d.lineCount() - 1);
+            const S32 below = llmin(line + breaks + 1, d.lineCount() - 1);
             moveTo(view, ALTextPos(below, 0));
             return;
         }
@@ -6065,6 +6092,7 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
     }
     view.setCaret(where);
     view.insertText(text);
+    sayMoreLines(breaks);
     // On the last character put, as vim leaves it; gp just after it.
     moveTo(view, past ? view.caret() : text.find('\n') == std::string::npos ? d.prevCluster(view.caret()) : where);
 }
