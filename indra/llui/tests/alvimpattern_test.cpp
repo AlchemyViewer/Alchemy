@@ -427,4 +427,20 @@ namespace tut
         ensure_equals("very magic's", found("a\bb ab", ALVimPattern::of("\\va\\bb", std::string(), plain)), std::string("a\bb"));
     }
 
+    template<> template<>
+    void alvimpattern_object::test<21>()
+    {
+        set_test_name("a magic * first in a branch, or after a ^ that is a line's start, is itself");
+        ensure_equals("first", found("*a a", ALVimPattern::of("*a", std::string(), plain)), std::string("*a"));
+        ensure_equals("after a ^", found("*a a", ALVimPattern::of("^*a", std::string(), plain)), std::string("*a"));
+        ensure_equals("the next a multi", found("**a", ALVimPattern::of("^**a", std::string(), plain)), std::string("**a"));
+        ensure_equals("after \\(", found("x*a a", ALVimPattern::of("x\\(*a\\)", std::string(), plain)), std::string("x*a"));
+        ensure_equals("after \\|", found("x*a a", ALVimPattern::of("x\\|*a", std::string(), plain)), std::string("x|*a"));
+        ensure_equals("after \\&", found("*a a", ALVimPattern::of("*\\&*a", std::string(), plain)), std::string("*a"));
+        ensure_equals("past a \\c", found("*a aa", ALVimPattern::of("\\c*a", std::string(), plain)), std::string("*a"));
+        ensure_equals("very magic's", found("*a aa", ALVimPattern::of("\\v*a", std::string(), plain)), std::string("*a"));
+        ensure_equals("after its (", found("*a aa", ALVimPattern::of("\\v(*a)", std::string(), plain)), std::string("*a"));
+        ensure_equals("after a ^ that is itself a multi", found("a^^b", ALVimPattern::of("a^*b", std::string(), plain)), std::string("a^^b"));
+        ensure("after \\%( a multi, which follows nothing", found("*a", ALVimPattern::of("\\%(*a\\)", std::string(), plain)).rfind("error", 0) == 0);
+    }
 }

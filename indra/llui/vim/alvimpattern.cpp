@@ -310,7 +310,8 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // characters are passed over; a bracket expression is read as vim
     // reads one, its classes as what they hold. A magic ^ is a line's
     // start only first in a branch, a $ its end only last in one, and
-    // either is itself anywhere else.
+    // either is itself anywhere else; a * first in a branch or after such
+    // a ^ is itself too.
     ALVimPattern        out;
     std::optional<bool> case_in_pattern;
     enum class Magic : U8
@@ -408,6 +409,11 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // a \v and the like between them putting in nothing; anywhere else it
     // is itself.
     bool at_start = true;
+    // Whether a magic or very magic * read now is itself, as vim has it:
+    // at the pattern's start, after \( \| or \&, and after a ^ that is a
+    // line's start, a \c and the like between them putting in nothing;
+    // anywhere else it is a multi.
+    bool star_start = true;
     // Whether a magic or nomagic $ before `k` is the line's end, as vim
     // has it: at the pattern's end, and before \| \) \& or \n -- or very
     // magic's | ) and & where a \v comes between -- a \c, a \v and the like
@@ -591,6 +597,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         concats.back() = out.regex.size();
         ze_in_branch   = ze_in_branch && depth > 0;
         at_start       = true;
+        star_start     = true;
         atom_at        = std::string::npos;
         token_atom     = false;
     };
@@ -598,7 +605,9 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     {
         const char c          = vim[i];
         const bool start_here = at_start;
+        const bool star_here  = star_start;
         at_start              = false;
+        star_start            = false;
         // The token before this one is the last atom where it was one; the
         // later bytes of a character are its first's.
         if ((static_cast<unsigned char>(c) & 0xC0) != 0x80)
@@ -618,6 +627,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                 {
                     i          = mark.next - 1;
                     at_start   = start_here;
+                    star_start = star_here;
                     token_atom = false;
                     continue;
                 }
@@ -629,13 +639,13 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
             const bool nomagic = magic == Magic::Off || magic == Magic::None;
             switch (n)
             {
-                case 'v': magic = Magic::Very; at_start = start_here; token_atom = false; continue;
-                case 'm': magic = Magic::Magic; at_start = start_here; token_atom = false; continue;
-                case 'M': magic = Magic::Off; at_start = start_here; token_atom = false; continue;
-                case 'V': magic = Magic::None; at_start = start_here; token_atom = false; continue;
-                case 'c': case_in_pattern = false; at_start = start_here; token_atom = false; continue;
-                case 'C': case_in_pattern = true; at_start = start_here; token_atom = false; continue;
-                case 'Z': at_start = start_here; token_atom = false; continue;
+                case 'v': magic = Magic::Very; at_start = start_here; star_start = star_here; token_atom = false; continue;
+                case 'm': magic = Magic::Magic; at_start = start_here; star_start = star_here; token_atom = false; continue;
+                case 'M': magic = Magic::Off; at_start = start_here; star_start = star_here; token_atom = false; continue;
+                case 'V': magic = Magic::None; at_start = start_here; star_start = star_here; token_atom = false; continue;
+                case 'c': case_in_pattern = false; at_start = start_here; star_start = star_here; token_atom = false; continue;
+                case 'C': case_in_pattern = true; at_start = start_here; star_start = star_here; token_atom = false; continue;
+                case 'Z': at_start = start_here; star_start = star_here; token_atom = false; continue;
                 case '(':
                     if (magic == Magic::Very)
                     {
@@ -648,6 +658,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     vim_groups.push_back(++groups);
                     ++depth;
                     at_start   = true;
+                    star_start = true;
                     atom_at    = std::string::npos;
                     token_atom = false;
                     continue;
@@ -684,6 +695,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     concats.back() = out.regex.size();
                     ze_in_branch   = ze_in_branch && depth > 0;
                     at_start       = true;
+                    star_start     = true;
                     atom_at        = std::string::npos;
                     token_atom     = false;
                     continue;
@@ -1022,8 +1034,17 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     case '>': out.regex += "\\b"; break;
                     case '=': out.regex += "?"; token_atom = false; break;
                     case '+':
-                    case '?':
-                    case '*': out.regex += c; token_atom = false; break;
+                    case '?': out.regex += c; token_atom = false; break;
+                    case '*':
+                        if (star_here)
+                        {
+                            literal(c);
+                            break;
+                        }
+                        out.regex += c;
+                        token_atom = false;
+                        break;
+                    case '^': out.regex += c; star_start = true; break;
                     case '@':
                     {
                         const size_t to = lookAround(i + 1);
@@ -1096,6 +1117,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         vim_groups.push_back(++groups);
                         ++depth;
                         at_start   = true;
+                        star_start = true;
                         atom_at    = std::string::npos;
                         token_atom = false;
                         break;
@@ -1121,6 +1143,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                         concats.back() = out.regex.size();
                         ze_in_branch   = ze_in_branch && depth > 0;
                         at_start       = true;
+                        star_start     = true;
                         atom_at        = std::string::npos;
                         token_atom     = false;
                         break;
@@ -1131,10 +1154,21 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
             case Magic::Magic:
                 switch (c)
                 {
-                    case '^': out.regex += start_here ? "^" : "\\^"; break;
+                    case '^':
+                        out.regex += start_here ? "^" : "\\^";
+                        star_start = start_here;
+                        break;
                     case '$': out.regex += endsAt(i + 1) ? "$" : "\\$"; break;
                     case '.': out.regex += c; break;
-                    case '*': out.regex += c; token_atom = false; break;
+                    case '*':
+                        if (star_here)
+                        {
+                            literal(c);
+                            break;
+                        }
+                        out.regex += c;
+                        token_atom = false;
+                        break;
                     case '~': lastReplacement(); break;
                     default: literal(c); break;
                 }
