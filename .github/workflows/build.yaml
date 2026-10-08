@@ -125,6 +125,9 @@ jobs:
           INPUT_PROJECT: ${{ inputs.project }}
           IS_EDU_TAG: ${{ github.ref_type == 'tag' && contains(github.ref_name, 'edu') }}
           R2_ENABLED: ${{ vars.VCPKG_R2_ENABLED }}
+          # FMOD Studio and the Discord Social SDK come from the private vcpkg
+          # registry, which a proprietary build cannot fetch without it.
+          HAS_PRIVATE_REGISTRY_TOKEN: ${{ secrets.PRIVATE_REGISTRY_TOKEN != '' }}
           REF_PROTECTED: ${{ github.ref_protected }}
           PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
@@ -144,8 +147,19 @@ jobs:
             # PR from fork; don't build with proprietary libs
             echo 'build_type=opensource' >> $GITHUB_OUTPUT
             echo 'build_suffix=-OS' >> $GITHUB_OUTPUT
-          else
+          elif [[ "$HAS_PRIVATE_REGISTRY_TOKEN" != "true" ]]; then
+            # No way into the private registry: Dependabot's runs, which get
+            # only Dependabot secrets, or a repository not given the token.
+            # A release must not quietly ship without the proprietary libs.
+            if [[ -n "$RELEASE_RUN" ]]; then
+              echo "::error::A release build needs the PRIVATE_REGISTRY_TOKEN secret to fetch the proprietary ports"
+              exit 1
+            fi
+            echo "::warning::No PRIVATE_REGISTRY_TOKEN secret, so this is an open-source build"
             echo 'build_type=opensource' >> $GITHUB_OUTPUT
+            echo 'build_suffix=-OS' >> $GITHUB_OUTPUT
+          else
+            echo 'build_type=proprietary' >> $GITHUB_OUTPUT
             echo "build_suffix=" >> $GITHUB_OUTPUT
           fi
 
@@ -323,6 +337,8 @@ jobs:
           # alone would not stop code that finds writer keys from using them.
           r2-access-key-id: ${{ needs.setup.outputs.r2_cache_mode == 'readwrite' && secrets.VCPKG_R2_ACCESS_KEY_ID || secrets.VCPKG_R2_READ_ACCESS_KEY_ID }}
           r2-secret-access-key: ${{ needs.setup.outputs.r2_cache_mode == 'readwrite' && secrets.VCPKG_R2_SECRET_ACCESS_KEY || secrets.VCPKG_R2_READ_SECRET_ACCESS_KEY }}
+          # Only a proprietary build asks for a port from the private registry.
+          private-registry-token: ${{ needs.setup.outputs.build_type == 'proprietary' && secrets.PRIVATE_REGISTRY_TOKEN || '' }}
 
       - name: Configure
         id: configure
@@ -454,13 +470,35 @@ jobs:
           # The package. On Windows and macOS, what the packaging jobs sign and
           # package with Velopack, guided by package.env: the install tree on
           # Windows; on macOS the archive of the stripped bundle, which is
-          # signed ad-hoc and signed again there. On Linux, the release itself.
+          # signed ad-hoc and signed again there. On Linux, the archive, which
+          # the packaging job makes the AppImage of, and the .deb and .rpm.
           if $AL_BUILD_VIEWER
           then
             case "$RUNNER_OS" in
               Windows)
                 cmake --install "$BUILD_DIRECTORY" --config "$cmake_config" --prefix "$RUNNER_TEMP/app"
                 echo "viewer_app=$RUNNER_TEMP/app" >> "$GITHUB_OUTPUT"
+                ;;
+              Linux)
+                cpack --config "$BUILD_DIRECTORY/CPackConfig.cmake" -C "$cmake_config" -G "TXZ;DEB;RPM" -B "$RUNNER_TEMP/package"
+                # The copies of the tree CPack packaged.
+                rm -rf "$RUNNER_TEMP/package/_CPack_Packages"
+                viewer_app="$(ls "$RUNNER_TEMP"/package/*.tar.xz 2>/dev/null | head -n 1 || true)"
+                if [[ -z "$viewer_app" ]]; then
+                  echo "::error::No .tar.xz package under $RUNNER_TEMP/package"
+                  exit 1
+                fi
+                echo "viewer_app=$viewer_app" >> "$GITHUB_OUTPUT"
+                mkdir -p "$RUNNER_TEMP/installer"
+                for ext in deb rpm; do
+                  installer="$(ls "$RUNNER_TEMP"/package/*."$ext" 2>/dev/null | head -n 1 || true)"
+                  if [[ -z "$installer" ]]; then
+                    echo "::error::No .$ext package under $RUNNER_TEMP/package"
+                    exit 1
+                  fi
+                  mv "$installer" "$RUNNER_TEMP/installer/"
+                done
+                echo "viewer_installer=$RUNNER_TEMP/installer" >> "$GITHUB_OUTPUT"
                 ;;
               *)
                 cpack --config "$BUILD_DIRECTORY/CPackConfig.cmake" -C "$cmake_config" -G TXZ -B "$RUNNER_TEMP/package"
@@ -478,7 +516,7 @@ jobs:
 
       - name: Upload package metadata
         uses: actions/upload-artifact@v7
-        if: runner.os != 'Linux' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
+        if: matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
         with:
           name: "${{ steps.build.outputs.artifact }}-metadata"
           path: ${{ steps.configure.outputs.build_directory }}/newview/package.env
@@ -494,6 +532,18 @@ jobs:
           compression-level: ${{ runner.os == 'Windows' && 9 || 0 }}
           path: |
             ${{ steps.build.outputs.viewer_app }}
+
+      # The release job attaches every *-packages artifact; the AppImage is
+      # the packaging job's *-installer.
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
+        with:
+          name: "${{ steps.build.outputs.artifact }}-packages"
+          if-no-files-found: error
+          # A .deb and an .rpm are compressed already.
+          compression-level: 0
+          path: ${{ steps.build.outputs.viewer_installer }}
 
       # Sentry symbolicates a crash report with the symbol store: every binary
       # that shipped with its debug information beside it, PE and PDB, Mach-O
@@ -944,8 +994,128 @@ jobs:
           KEYCHAIN: ${{ steps.keychain.outputs.keychain }}
         run: security delete-keychain "$KEYCHAIN"
 
+  # The AppImage and the Linux update feed, from the archive the build made.
+  # Nothing is signed: an AppImage carries no signature its users check.
+  package-linux:
+    needs: [setup, build]
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-26.04
+          - arch: arm64
+            runner: ubuntu-26.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      # As in the Windows packaging job.
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+    steps:
+      # The app and its metadata come from the build's artifacts; the tree
+      # contributes the .NET tool manifest and the AppDir's layout.
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            /dotnet-tools.json
+            /indra/cmake/ViewerAppDir.cmake
+          sparse-checkout-cone-mode: false
+
+      - name: Setup .NET for Velopack
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.x'
+          cache: true
+          cache-dependency-path: dotnet-tools.json
+
+      - name: Install Velopack CLI
+        run: dotnet tool restore
+
+      # vpk makes the AppImage's filesystem with mksquashfs, and a delta,
+      # given an earlier release beside it, with zstd.
+      - name: Install squashfs-tools and zstd
+        run: sudo apt-get install -y --no-install-recommends squashfs-tools zstd
+
+      - name: Fetch Linux app
+        uses: actions/download-artifact@v8
+        with:
+          name: Linux${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-app
+          path: .package
+
+      - name: Fetch Linux package metadata
+        uses: actions/download-artifact@v8
+        with:
+          name: Linux${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-metadata
+          path: .metadata
+
+      - name: Load package metadata
+        shell: bash
+        run: |
+          # Every key, upper-cased, into the environment of the steps below.
+          while IFS='=' read -r key value; do
+            if [[ -n "$key" ]]; then
+              printf '%s=%s\n' "$(tr '[:lower:]' '[:upper:]' <<< "$key")" "$value" >> "$GITHUB_ENV"
+            fi
+          done < .metadata/package.env
+
+      # The archive's tree goes in the AppDir's usr/bin as it is, and
+      # ViewerAppDir.cmake lays out the rest around it.
+      - name: Lay out the AppDir
+        id: appdir
+        shell: bash
+        run: |
+          appdir="$RUNNER_TEMP/$VELOPACK_PACK_ID.AppDir"
+          mkdir -p "$appdir/usr/bin"
+          tar -xJf .package/*.tar.xz --strip-components=1 -C "$appdir/usr/bin"
+          cmake -DAL_APPDIR="$appdir" -P indra/cmake/ViewerAppDir.cmake
+          echo "appdir=$appdir" >> "$GITHUB_OUTPUT"
+
+      - name: Package with Velopack
+        shell: bash
+        env:
+          APPDIR: ${{ steps.appdir.outputs.appdir }}
+        run: |
+          dotnet vpk pack \
+            --packId "$VELOPACK_PACK_ID" \
+            --packVersion "$VELOPACK_PACK_VERSION" \
+            --packAuthors "$VELOPACK_PACK_AUTHORS" \
+            --packTitle "$VELOPACK_PACK_TITLE" \
+            --packDir "$APPDIR" \
+            --mainExe "$VELOPACK_MAIN_EXE" \
+            --icon "$APPDIR/usr/bin/$VELOPACK_ICON" \
+            --channel "$VELOPACK_CHANNEL" \
+            --runtime "$VELOPACK_RUNTIME"
+
+      # The AppImage is the installer, under the package's name; the feed
+      # keeps the full package that updates it.
+      - name: Rename Velopack outputs
+        shell: bash
+        run: |
+          mkdir -p .installer
+          mv "Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}.AppImage" ".installer/${IMAGENAME}.AppImage"
+
+      # As on Windows, .installer is hidden and must be asked for.
+      - name: Post the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: "Linux${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-installer"
+          path: .installer/
+          if-no-files-found: error
+          compression-level: 0
+          include-hidden-files: true
+
+      - name: Upload Velopack releases
+        uses: actions/upload-artifact@v7
+        with:
+          name: "Linux${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-releases"
+          path: Releases/
+          if-no-files-found: error
+          compression-level: 0
+
   release:
-    needs: [setup, build, sign-and-package-windows, sign-and-package-mac]
+    needs: [setup, build, sign-and-package-windows, sign-and-package-mac, package-linux]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     if: needs.setup.outputs.release_run
@@ -960,6 +1130,10 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           pattern: "*-releases"
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: "*-packages"
 
       - uses: actions/download-artifact@v8
         with:
@@ -987,6 +1161,7 @@ jobs:
           files: |
             *-installer/*
             *-releases/*
+            *-packages/*
             *.tar.xz
 
       - name: post release URL

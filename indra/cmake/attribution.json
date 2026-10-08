@@ -12,6 +12,7 @@
     "alsa": "an empty port; the system library is used",
     "dbus": "an empty port; the system library is used",
     "pulseaudio": "an empty port; the system library is used",
+    "pipewire": "an empty port; the system library is used",
     "dirent": { "platform": "!windows", "reason": "an empty port; the C library has <dirent.h>" },
     "libiconv": { "platform": "!windows", "reason": "an empty port; the C library has iconv" },
     "pthreads": { "platform": "!windows", "reason": "an empty port; the C library has pthreads" },

@@ -1845,9 +1845,18 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
     else
     {
 #if LL_LINUX
+        // GStreamer plays media on Linux; VLC, where it was built, only when
+        // asked for.
         if(plugin_basename == "media_plugin_gstreamer10" && gSavedSettings.getBOOL("MediaPluginForceVLC"))
         {
-            plugin_basename = "media_plugin_libvlc";
+            if (LLFile::isfile(gDirUtilp->getLLPluginFilename("media_plugin_libvlc")))
+            {
+                plugin_basename = "media_plugin_libvlc";
+            }
+            else
+            {
+                LL_WARNS_ONCE("Media") << "MediaPluginForceVLC is set, but this viewer has no VLC plugin; using GStreamer" << LL_ENDL;
+            }
         }
 #endif
 

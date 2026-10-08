@@ -63,6 +63,9 @@
 #include "llcorehttputil.h"
 #include "llinventorymodel.h"
 #include "lltranslate.h"
+#if LL_VELOPACK
+#include "llvelopack.h"
+#endif
 
 // "Minimal Vulkan" to get max API Version
 
@@ -811,7 +814,7 @@ void send_viewer_stats(bool include_preferences)
     fail["off_circuit"] = (S32) gMessageSystem->mOffCircuitPackets;
     fail["invalid"] = (S32) gMessageSystem->mInvalidOnCircuitPackets;
 #if LL_VELOPACK
-    fail["missing_updater"] = false;
+    fail["missing_updater"] = !velopack_is_installed();
 #else
     fail["missing_updater"] = true;
 #endif

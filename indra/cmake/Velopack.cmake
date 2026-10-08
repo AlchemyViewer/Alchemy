@@ -3,8 +3,8 @@
 # The Velopack update client: velopack_libc, Velopack's C API, built from
 # rust/ by Corrosion over the velopack crate. A DLL on Windows, which the
 # install carries beside the viewer with its other runtime DLLs; a static
-# library on macOS, which needs nothing the standard library does not. The
-# release build serves every configuration.
+# library on macOS and Linux, which needs nothing the standard library does
+# not. The release build serves every configuration.
 include_guard()
 add_library(ll::velopack INTERFACE IMPORTED)
 

@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+
+# Installs @AL_APP_NAME@ from this tree, for every user when run as root and
+# for the one running it otherwise, and adds it to the desktop; or takes an
+# installation away again.
+#
+#   install.sh [--prefix DIR] [--yes]
+#   install.sh --uninstall [--prefix DIR] [--yes]
+#
+# The default prefix is /opt/@AL_LINUX_PACKAGE@ for root and
+# $XDG_DATA_HOME/@AL_LINUX_PACKAGE@ (~/.local/share/@AL_LINUX_PACKAGE@)
+# otherwise. An installation there is replaced whole. Settings, chat logs and
+# the cache live in the home directory, and neither touches them.
+
+set -euo pipefail
+
+VT102_STYLE_NORMAL='\e[0m'
+VT102_COLOR_RED='\e[31m'
+
+script=$(readlink -f -- "${BASH_SOURCE[0]}")
+tree=$(dirname -- "$script")
+
+warn()
+{
+    printf "${VT102_COLOR_RED}%s${VT102_STYLE_NORMAL}\n" "$1" >&2
+}
+
+die()
+{
+    warn "$1"
+    exit 1
+}
+
+usage()
+{
+    echo "Usage: $(basename -- "$0") [--uninstall] [--prefix DIR] [--yes]" >&2
+    exit 2
+}
+
+# True for a directory this script may replace or remove: one holding an
+# installed viewer.
+is_installation()
+{
+    [[ -x $1/bin/alchemy-bin && -x $1/etc/desktop_integration.sh ]]
+}
+
+confirm()
+{
+    if $assume_yes || [[ ! -t 0 ]]; then
+        return 0
+    fi
+    local reply
+    read -r -p "$1 [Y/n]: " reply
+    [[ -z $reply || $reply == [Yy]* ]]
+}
+
+uninstall=false
+assume_yes=false
+prefix=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --uninstall) uninstall=true ;;
+        --yes | -y) assume_yes=true ;;
+        --prefix)
+            [[ $# -ge 2 ]] || usage
+            prefix=$2
+            shift
+            ;;
+        --prefix=*) prefix=${1#--prefix=} ;;
+        *) usage ;;
+    esac
+    shift
+done
+
+if [[ $EUID -eq 0 ]]; then
+    scope=--system
+    : "${prefix:=/opt/@AL_LINUX_PACKAGE@}"
+else
+    scope=--user
+    : "${prefix:=${XDG_DATA_HOME:-$HOME/.local/share}/@AL_LINUX_PACKAGE@}"
+fi
+prefix=$(realpath -m -- "$prefix")
+
+if $uninstall; then
+    is_installation "$prefix" || die "No installation of the viewer at $prefix"
+    confirm "Remove @AL_APP_NAME@ from $prefix?" || exit 0
+    "$prefix/etc/desktop_integration.sh" uninstall "$scope" || warn "Could not remove the desktop entry"
+    rm -rf -- "$prefix"
+    echo "Removed $prefix. Your settings and chat logs are kept."
+    exit 0
+fi
+
+is_installation "$tree" || die "$tree does not hold a viewer to install"
+[[ $prefix != "$tree" ]] || die "The viewer is already installed at $prefix"
+if [[ -e $prefix ]] && ! is_installation "$prefix"; then
+    die "$prefix exists and is not an installation of the viewer; choose another with --prefix"
+fi
+
+if [[ $EUID -ne 0 ]]; then
+    echo "Installing for ${USER:-$(id -un)} only. Run this as root, with sudo, to install for every user."
+fi
+confirm "Install @AL_APP_NAME@ to $prefix?" || exit 0
+
+# Copied beside the old installation, then put in its place, so a failed copy
+# or move leaves the old one as it was.
+parent=$(dirname -- "$prefix")
+mkdir -p -- "$parent" || die "Could not create $parent"
+staging=$(mktemp -d -- "$prefix.new.XXXXXX") || die "Could not write to $parent"
+trap 'rm -rf -- "$staging"' EXIT
+# Owned by whoever installs it, not by whoever unpacked the archive.
+cp -R --preserve=mode,timestamps,links -- "$tree"/. "$staging"/ || die "Could not copy the viewer to $parent"
+chmod 755 -- "$staging"
+
+if [[ -e $prefix ]]; then
+    previous=$(mktemp -d -- "$prefix.old.XXXXXX")
+    rmdir -- "$previous"
+    mv -- "$prefix" "$previous" || die "Could not move the old installation at $prefix aside"
+    if ! mv -- "$staging" "$prefix"; then
+        mv -- "$previous" "$prefix" || die "Could not put the new installation in place; the old one is at $previous"
+        die "Could not put the new installation in place; the old one is kept"
+    fi
+    rm -rf -- "$previous"
+else
+    mv -- "$staging" "$prefix"
+fi
+trap - EXIT
+
+"$prefix/etc/desktop_integration.sh" install "$scope" || warn "Could not add the viewer to the desktop"
+
+echo "Installed @AL_APP_NAME@ to $prefix."
+if [[ $EUID -eq 0 ]]; then
+    echo "To sandbox the web browser, run $prefix/etc/chrome_sandboxing_permissions_setup.sh"
+fi

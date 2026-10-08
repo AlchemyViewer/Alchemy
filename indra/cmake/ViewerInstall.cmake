@@ -9,7 +9,8 @@
 #   Windows  <prefix>/AlchemyX.exe, data trees beside it, llplugin/ for the
 #            media plugins and the CEF and VLC payloads.
 #   Linux    <prefix>/bin/alchemy-bin, bin/llplugin/, lib/ for the shared
-#            libraries, data trees at the root, the wrapper and etc/ scripts.
+#            libraries, data trees at the root, the launcher and etc/
+#            scripts, and share/ with the desktop entry and its icons.
 #   macOS    <prefix>/<Channel>.app with data in Contents/Resources, shared
 #            libraries in Contents/Frameworks, and the media plugins as
 #            bundles in Contents/Resources carrying their own Frameworks.
@@ -49,6 +50,33 @@ if(al_package_suffix)
 endif()
 string(REPLACE "." "_" al_package_version "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
 set(AL_PACKAGE_NAME "Alchemy${al_package_suffix}_${al_package_version}_${ARCH}")
+
+# The Linux desktop's names, one set to a channel so channels install side by
+# side. The application ID names the desktop entry, its icon and its AppStream
+# data, and is the Wayland app ID and X11 class the viewer's window carries,
+# which is how the shell matches the window to the entry. The package name is
+# what the viewer installs as and under. The release channel's are
+# org.alchemyviewer.viewer and alchemy-viewer, another channel's
+# org.alchemyviewer.viewer.<words> and alchemy-<words>, its variant's words.
+string(TOLOWER "${al_package_suffix}" al_linux_words)
+string(REGEX REPLACE "[^a-z0-9]+" "_" al_linux_words "${al_linux_words}")
+string(REGEX REPLACE "^_+|_+$" "" al_linux_words "${al_linux_words}")
+set(AL_APP_ID "org.alchemyviewer.viewer")
+if(AL_CHANNEL_TYPE STREQUAL "release")
+  set(AL_LINUX_PACKAGE "alchemy-viewer")
+else()
+  set(AL_LINUX_PACKAGE "alchemy")
+endif()
+if(al_linux_words)
+  # An element of the ID must not begin with a digit.
+  if(al_linux_words MATCHES "^[0-9]")
+    string(APPEND AL_APP_ID "._${al_linux_words}")
+  else()
+    string(APPEND AL_APP_ID ".${al_linux_words}")
+  endif()
+  string(REPLACE "_" "-" al_linux_words "${al_linux_words}")
+  string(APPEND AL_LINUX_PACKAGE "-${al_linux_words}")
+endif()
 
 # ---------------------------------------------------------------------------
 # Layout, relative to the prefix.
@@ -635,27 +663,83 @@ set(AL_SIGN_HELPER_ENTITLEMENTS \"${AL_SIGN_HELPER_ENTITLEMENTS}\")"
 endif()
 
 if(LINUX)
+  # The launcher, and the scripts a tree from the archive is installed and
+  # added to the desktop with. install.sh knows the channel's package name.
   install(
     PROGRAMS "${al_newview_dir}/linux_tools/wrapper.sh"
     RENAME alchemy
     DESTINATION .
     COMPONENT viewer
   )
-  install(PROGRAMS "${al_newview_dir}/linux_tools/install.sh" DESTINATION . COMPONENT viewer)
+  set(al_linux_dir "${CMAKE_CURRENT_BINARY_DIR}/linux")
+  configure_file(
+    "${al_newview_dir}/linux_tools/install.sh.in"
+    "${al_linux_dir}/install.sh"
+    @ONLY
+    FILE_PERMISSIONS
+      OWNER_READ
+      OWNER_WRITE
+      OWNER_EXECUTE
+      GROUP_READ
+      GROUP_EXECUTE
+      WORLD_READ
+      WORLD_EXECUTE
+  )
+  install(PROGRAMS "${al_linux_dir}/install.sh" DESTINATION . COMPONENT viewer)
   install(
     PROGRAMS
-      "${al_newview_dir}/linux_tools/handle_secondlifeprotocol.sh"
-      "${al_newview_dir}/linux_tools/register_secondlifeprotocol.sh"
-      "${al_newview_dir}/linux_tools/refresh_desktop_app_entry.sh"
+      "${al_newview_dir}/linux_tools/desktop_integration.sh"
       "${al_newview_dir}/linux_tools/chrome_sandboxing_permissions_setup.sh"
     DESTINATION etc
     COMPONENT viewer
   )
   install(DIRECTORY "${al_newview_dir}/res-sdl" DESTINATION . COMPONENT viewer)
+
+  # The desktop entry, its AppStream data and its icons, laid out under share/
+  # as they go under /usr/share. The entry runs the launcher by the package
+  # name; desktop_integration.sh points a copy of it at the tree instead.
+  string(TIMESTAMP al_release_date "%Y-%m-%d" UTC)
+  configure_file(
+    "${al_newview_dir}/linux_tools/viewer.desktop.in"
+    "${al_linux_dir}/${AL_APP_ID}.desktop"
+    @ONLY
+  )
+  configure_file(
+    "${al_newview_dir}/linux_tools/viewer.metainfo.xml.in"
+    "${al_linux_dir}/${AL_APP_ID}.metainfo.xml"
+    @ONLY
+  )
   install(
-    FILES "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png"
-    RENAME alchemy_icon.png
-    DESTINATION .
+    FILES "${al_linux_dir}/${AL_APP_ID}.desktop"
+    DESTINATION share/applications
     COMPONENT viewer
+  )
+  install(
+    FILES "${al_linux_dir}/${AL_APP_ID}.metainfo.xml"
+    DESTINATION share/metainfo
+    COMPONENT viewer
+  )
+  foreach(
+    size
+    16
+    32
+    64
+    128
+    256
+    512
+  )
+    install(
+      FILES "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_${size}.png"
+      RENAME "${AL_APP_ID}.png"
+      DESTINATION "share/icons/hicolor/${size}x${size}/apps"
+      COMPONENT viewer
+    )
+  endforeach()
+
+  # The window takes the application ID, so the shell finds its entry.
+  set_property(
+    SOURCE "${al_newview_dir}/llappviewersdl.cpp"
+    APPEND
+    PROPERTY COMPILE_DEFINITIONS "AL_VIEWER_APP_ID=\"${AL_APP_ID}\""
   )
 endif()

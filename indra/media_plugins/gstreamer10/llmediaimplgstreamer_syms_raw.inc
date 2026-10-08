@@ -33,14 +33,20 @@ LL_GRAB_SYM(G, false, gst_segtrap_set_enabled, void, gboolean enabled)
 LL_GRAB_SYM(G, false, gst_message_parse_buffering, void, GstMessage *message, gint *percent)
 LL_GRAB_SYM(G, false, gst_message_parse_info, void, GstMessage *message, GError **gerror, gchar **debug)
 LL_GRAB_SYM(G, false, gst_element_query_position, gboolean, GstElement *element, GstFormat format, gint64 *cur)
+LL_GRAB_SYM(G, false, gst_element_query_duration, gboolean, GstElement *element, GstFormat format, gint64 *duration)
 LL_GRAB_SYM(G, false, gst_version, void, guint *major, guint *minor, guint *micro, guint *nano)
 
 LL_GRAB_SYM(G, true, gst_message_parse_tag, void, GstMessage *, GstTagList **)
 LL_GRAB_SYM(G, true, gst_tag_list_foreach, void, const GstTagList *, GstTagForeachFunc, gpointer)
 LL_GRAB_SYM(G, true, gst_tag_list_get_tag_size, guint, const GstTagList *, const gchar *)
 LL_GRAB_SYM(G, true, gst_tag_list_get_value_index, const GValue *, const GstTagList *, const gchar *, guint)
+LL_GRAB_SYM(G, true, gst_tag_list_get_string, gboolean, const GstTagList *, const gchar *, gchar **)
 
 LL_GRAB_SYM(G, true, gst_caps_new_simple, GstCaps*, const char *, const char*, ... )
+
+LL_GRAB_SYM(G, true, gst_element_get_static_pad, GstPad*, GstElement*, const gchar*)
+LL_GRAB_SYM(G, true, gst_pad_push_event, gboolean, GstPad*, GstEvent*)
+LL_GRAB_SYM(G, true, gst_event_new_reconfigure, GstEvent*, void)
 
 LL_GRAB_SYM(G, true, gst_sample_get_caps, GstCaps*, GstSample* )
 LL_GRAB_SYM(G, true, gst_sample_get_buffer, GstBuffer*, GstSample* )
@@ -48,7 +54,7 @@ LL_GRAB_SYM(G, true, gst_buffer_map, gboolean, GstBuffer*, GstMapInfo*, GstMapFl
 LL_GRAB_SYM(G, true, gst_buffer_unmap, void, GstBuffer*, GstMapInfo* )
 
 LL_GRAB_SYM(G, true, gst_app_sink_set_caps, void, GstAppSink*, GstCaps const* )
-LL_GRAB_SYM(G, true, gst_app_sink_pull_sample, GstSample*, GstAppSink* )
+LL_GRAB_SYM(G, true, gst_app_sink_try_pull_sample, GstSample*, GstAppSink*, GstClockTime )
 
 LL_GRAB_SYM(G, true, g_free, void, gpointer )
 LL_GRAB_SYM(G, true, g_error_free, void, GError* )
@@ -58,6 +64,7 @@ LL_GRAB_SYM(G, true, g_main_loop_get_context, GMainContext*, GMainLoop* )
 LL_GRAB_SYM(G, true, g_main_context_iteration, gboolean, GMainContext*, gboolean )
 LL_GRAB_SYM(G, true, g_main_loop_new, GMainLoop*, GMainContext*, gboolean )
 LL_GRAB_SYM(G, true, g_main_loop_quit, void, GMainLoop* )
+LL_GRAB_SYM(G, true, g_main_loop_unref, void, GMainLoop* )
 LL_GRAB_SYM(G, true, gst_mini_object_unref, void, GstMiniObject* )
 LL_GRAB_SYM(G, true, g_object_set, void, gpointer, gchar const*, ... )
 LL_GRAB_SYM(G, true, g_source_remove, gboolean, guint )

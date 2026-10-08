@@ -40,12 +40,9 @@ if(APPLE)
     include("${CMAKE_CURRENT_LIST_DIR}/ViewerCodeSign.cmake")
   endforeach()
 else()
-  file(
-    GLOB_RECURSE candidates
-    LIST_DIRECTORIES false
-    "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/bin/*"
-    "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/lib/*"
-  )
+  # The .deb and the .rpm stage the tree under their prefix.
+  set(tree "${CPACK_TEMPORARY_INSTALL_DIRECTORY}${CPACK_PACKAGING_INSTALL_PREFIX}")
+  file(GLOB_RECURSE candidates LIST_DIRECTORIES false "${tree}/bin/*" "${tree}/lib/*")
   foreach(path IN LISTS candidates)
     if(IS_SYMLINK "${path}")
       continue()

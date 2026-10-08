@@ -161,7 +161,9 @@
 #include <unistd.h>
 #endif
 #include "../dullahan/src/dullahan_version.h"
+#if LL_LIBVLC
 #include "vlc/libvlc_version.h"
+#endif
 
 #if LL_SDL_WINDOW
 #include "llwindowsdl.h"
@@ -3930,6 +3932,7 @@ LLSD LLAppViewer::getViewerInfo() const
 
     info["LIBCEF_VERSION"] = cef_ver_codec.str();
 
+#if LL_LIBVLC
     std::ostringstream vlc_ver_codec;
     vlc_ver_codec << LIBVLC_VERSION_MAJOR;
     vlc_ver_codec << ".";
@@ -3937,6 +3940,9 @@ LLSD LLAppViewer::getViewerInfo() const
     vlc_ver_codec << ".";
     vlc_ver_codec << LIBVLC_VERSION_REVISION;
     info["LIBVLC_VERSION"] = vlc_ver_codec.str();
+#else
+    info["LIBVLC_VERSION"] = LLTrans::getString("None");
+#endif
 
     LLTrace::Recording& recording = LLViewerStats::instance().getRecording();
     S32 packets_in = (S32)recording.getSum(LLStatViewer::PACKETS_IN);

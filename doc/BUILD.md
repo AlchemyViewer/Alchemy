@@ -19,8 +19,8 @@ Every platform needs a C++ toolchain plus:
 
 - **CMake** 4.0+
 - **Git**
-- **Rust** — only for the Velopack update client (`-DAL_USE_VELOPACK=ON`, Windows and macOS), whose C API the build compiles from `indra/rust`
-- **.NET SDK** — only for Velopack installers
+- **Rust** — only for the Velopack update client (`-DAL_USE_VELOPACK=ON`), whose C API the build compiles from `indra/rust`
+- **.NET SDK** — only for Velopack installers; on Linux the AppImage also needs `mksquashfs` (`squashfs-tools`)
 - **Python** 3 — only for the tests that spawn a Python peer (see [Running tests](#running-tests))
 
 Install commands are platform-specific; see below.
@@ -64,14 +64,14 @@ rustup default stable
 
 ### Linux
 
-Install system packages for your distro:
+Install system packages for your distro. Media plays through GStreamer; the VLC media plugin is left out on Linux unless configured with `-DAL_BUILD_VLC_PLUGIN=ON`, which also needs LibVLC's development package (`libvlc` on Arch, `libvlc-dev` on Debian and Ubuntu, `vlc-devel` on Fedora and openSUSE).
 
 <details>
 <summary>Arch</summary>
 
 ```
 sudo pacman -Syu automake autoconf autoconf-archive base-devel cmake fontconfig git glib2-devel \
-    gstreamer gst-plugins-base-libs ninja libglvnd libtool libvlc libx11 pkgconf python \
+    gstreamer gst-plugins-base-libs ninja libglvnd libtool libx11 pkgconf python \
     wayland dotnet-sdk zip nasm
 ```
 
@@ -87,7 +87,7 @@ sudo apt install \
     libegl1-mesa-dev libfribidi-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
     libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libibus-1.0-dev libjack-dev \
     libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
-    libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
+    libthai-dev libtool libudev-dev libunwind-dev liburing-dev libwayland-dev \
     libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
     libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev ninja-build \
     pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 nasm
@@ -105,7 +105,7 @@ sudo apt install \
     libegl1-mesa-dev libfribidi-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
     libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libibus-1.0-dev libjack-dev \
     libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
-    libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
+    libthai-dev libtool libudev-dev libunwind-dev liburing-dev libwayland-dev \
     libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
     libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev ninja-build \
     pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 nasm
@@ -122,7 +122,7 @@ sudo apt install \
 sudo dnf group install "Development Tools"
 sudo dnf install cmake fontconfig-devel git glib2-devel gstreamer1-devel \
     gstreamer1-plugins-base-devel libX11-devel libglvnd-devel \
-    ninja-build python3 vlc-devel wayland-devel dotnet-sdk-10.0
+    ninja-build python3 wayland-devel dotnet-sdk-10.0
 ```
 
 You may need to enable EPEL first: `sudo dnf install epel-release`
@@ -132,7 +132,7 @@ You may need to enable EPEL first: `sudo dnf install epel-release`
 ```
 sudo dnf install @development-tools @c-development cmake fontconfig-devel git glib-devel \
     gstreamer1-devel gstreamer1-plugins-base-devel libX11-devel \
-    libglvnd-devel ninja-build python3 vlc-devel \
+    libglvnd-devel ninja-build python3 \
     wayland-devel dotnet-sdk-10.0 perl-IPC-Cmd perl-FindBin perl-Time-Piece \
     autoconf-archive perl-open libXcursor-devel wayland-protocols-devel dbus-devel \
     ibus-devel mesa-libGLU-devel libxkbcommon-devel mesa-libEGL-devel mesa-libGL-devel \
@@ -151,7 +151,7 @@ To build with Clang instead of GCC, also install: `sudo dnf install clang lld`
 sudo zypper in -t pattern devel_basis devel_C_C++
 sudo zypper install cmake fontconfig-devel git glib2-devel gstreamer-devel \
     gstreamer-plugins-base-devel libglvnd-devel libX11-devel ninja Mesa-libGL-devel \
-    python3 vlc-devel wayland-devel
+    python3 wayland-devel
 ```
 
 </details>
@@ -311,7 +311,7 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 | `AL_ENABLE_GL_TESTS`     | ON      | Run the tests that render on a hidden window; off, they are built and registered disabled (needs `AL_BUILD_TESTS`) |
 | `AL_BUILD_DOCS`          | OFF     | Add the `doc` target (API documentation with Doxygen)                 |
 | `AL_VCPKG_INSTALL`       | ON      | Let configure run `vcpkg install` when the manifest, the registry configuration, the triplets or the feature list changed; off leaves the ports to you |
-| `AL_BUILD_PACKAGE`       | ON      | Add the `package` target: the CPack archive of the installed tree (zip, tar.xz, dmg) |
+| `AL_BUILD_PACKAGE`       | ON      | Add the `package` target: the CPack archive of the installed tree (zip, tar.xz, dmg), and on Linux the .deb and .rpm |
 | `AL_USE_VELOPACK`        | OFF     | Add the `velopack` target, and the Velopack update client to the viewer |
 | `AL_SOURCEID`            | `$sourceid` | Referring agency recorded in `settings_install.xml`                |
 
@@ -374,8 +374,8 @@ The registry's README covers CI and adding ports.
 | Option                   | Default     | Description                                |
 |:-------------------------|:------------|:-------------------------------------------|
 | `AL_BUILD_CEF_PLUGIN`       | ON          | Chromium Embedded Framework (in-world web) |
-| `AL_BUILD_VLC_PLUGIN`       | ON          | VLC media plugin                           |
-| `AL_BUILD_GSTREAMER_PLUGIN` | ON on Linux | GStreamer media plugin (Linux only)        |
+| `AL_BUILD_VLC_PLUGIN`       | OFF on Linux | VLC media plugin; on Linux GStreamer plays media, and VLC only with `MediaPluginForceVLC` |
+| `AL_BUILD_GSTREAMER_PLUGIN` | ON on Linux | GStreamer media plugin (Linux only): video, audio and the parcel stream |
 | `AL_BUILD_EXAMPLE_PLUGIN`   | ON          | Reference/example plugin                   |
 
 ### Platform-specific
@@ -477,13 +477,19 @@ cpack --config build-<OS>-<preset>/CPackSourceConfig.cmake
 
 (or the `package_source` target under Ninja). Uncommitted changes are not in it, and cpack says so.
 
-The Windows installer and the update packages for Windows and macOS come from [Velopack](https://velopack.io): configure with `-DAL_USE_VELOPACK=ON`, run `dotnet tool restore` once so the `vpk` tool is available, and build the `velopack` target. It installs into `newview/velopack/<Config>/app` and writes the update feed, and on Windows the installer, to `newview/velopack/<Config>/Releases`. Each platform and architecture has its own Velopack channel, named for its runtime, since an installed viewer updates from its channel's feed: `win-x64`, `win-arm64`, `osx-arm64` and `osx-x64`. The channel also names the feed, `releases.<channel>.json`, and the files vpk writes. On macOS vpk adds its updater to the bundle and seals it again, with `AL_SIGNING_IDENTITY` or ad-hoc, and notarizes it when `AL_NOTARY_PROFILE` names a profile stored with `xcrun notarytool store-credentials`.
+The Windows installer, the Linux AppImage and the update packages for every platform come from [Velopack](https://velopack.io): configure with `-DAL_USE_VELOPACK=ON`, run `dotnet tool restore` once so the `vpk` tool is available, and build the `velopack` target. It installs into `newview/velopack/<Config>/app` (on Linux, into the `usr/bin` of `newview/velopack/<Config>/<App>.AppDir`) and writes the update feed, and on Windows the installer and on Linux the AppImage, to `newview/velopack/<Config>/Releases`. Each platform and architecture has its own Velopack channel, named for its runtime, since an installed viewer updates from its channel's feed: `win-x64`, `win-arm64`, `osx-arm64`, `osx-x64`, `linux-x64` and `linux-arm64`. The channel also names the feed, `releases.<channel>.json`, and the files vpk writes. On macOS vpk adds its updater to the bundle and seals it again, with `AL_SIGNING_IDENTITY` or ad-hoc, and notarizes it when `AL_NOTARY_PROFILE` names a profile stored with `xcrun notarytool store-credentials`.
+
+On Linux the AppImage holds the installed tree as it is, at the AppDir's `usr/bin`, where the update client looks for the updater and manifest vpk adds; `cmake/ViewerAppDir.cmake` lays out the rest around it, the `AppRun` that runs the launcher and the tree's desktop entry and icons. Run from the AppImage, the launcher points the desktop entry at the AppImage file rather than at its mount, and the update client replaces that file in place. A tree from the archive or a system package has no Velopack installation, finds no update manager, and is updated by its package manager. The hosted build's `package-linux` job makes the AppImage and feed from the build's archive.
 
 The third-party attribution is generated, not kept by hand: `cmake/Attribution.cmake` reads every installed port's `vcpkg.spdx.json` and `copyright` and writes `app_settings/packages-info.txt` (what the About floater's Licences tab shows) and `licenses.txt` (every licence text). What vcpkg cannot know — the pieces under `indra/externals/`, the SDKs from outside vcpkg, and a holder or licence a port's files do not state — is in `cmake/attribution.json`, as is the list of installed ports that ship nothing and are skipped: build tools, empty ports that stand for a system library, and what is built only for those. A newly added port whose `vcpkg.json` declares no `license` stops the build with its name; fix the port, add an override to the table, or, if the viewer ships none of it, skip it with the reason (and the platform, when the port is empty only on some).
 
 On macOS the install step signs the bundle inside out — ad-hoc, or with `-DAL_SIGNING_IDENTITY=<Developer ID>` — so the CEF helpers keep their sandbox entitlements, and the package step seals it again after stripping the executable. The disk image is APFS: HFS+ decomposes file names, which breaks the seal over the font stand-ins with Japanese names. On Linux the binaries carry an `$ORIGIN`-relative RPATH and find the data one directory above the executable, so the tree runs from wherever it is unpacked.
 
-The hosted build (`.github/workflows/build.yaml`) packages Windows and macOS in jobs of their own, after the build, from the build's install tree or stripped bundle and its `newview/package.env`. Pull requests are packaged unsigned; other builds are signed when the repository has the secrets, and without them are packaged unsigned with a notice:
+On Linux CPack also writes a `.deb` where `dpkg-shlibdeps` is installed and an `.rpm` where `rpmbuild` is (`-G DEB` or `-G RPM` asks for one alone). Each channel is a package of its own — `alchemy-viewer` for the release channel, `alchemy-beta`, `alchemy-test` and so on otherwise — so channels install side by side. A package holds the tree as it is, under `/opt/<package>`, with the launcher linked as `/usr/bin/<package>` and the desktop entry, AppStream data and icons in `/usr/share`, taken from the tree's `share/`. Both are named for the channel's application ID (`org.alchemyviewer.viewer`, `org.alchemyviewer.viewer.beta`, …), which is also the Wayland app ID and X11 class of the viewer's window. CEF's sandbox helper is installed setuid root, which sandboxes the web browser's renderers. Dependencies come from what the binaries link, less the libraries the tree carries; what the viewer loads at run time is listed in `cmake/ViewerPackageLinux.cmake`. `AL_PACKAGE_CONTACT` names the maintainer.
+
+A tree from the archive runs where it is unpacked: its launcher, `alchemy`, adds it to the application menu and makes it the handler of `secondlife://` links the first time, unless the system already has an entry for the channel or `AL_NO_DESKTOP_INTEGRATION` is set. `install.sh` copies it to `/opt/<package>` as root or `~/.local/share/<package>` otherwise, and `install.sh --uninstall` takes it away. `etc/desktop_integration.sh install|uninstall` adds or removes the desktop entry alone.
+
+The hosted build (`.github/workflows/build.yaml`) writes the Linux archive, `.deb` and `.rpm` in the build job, and packages Windows and macOS in jobs of their own, after the build, from the build's install tree or stripped bundle and its `newview/package.env`. Pull requests are packaged unsigned; other builds are signed when the repository has the secrets, and without them are packaged unsigned with a notice:
 
 | Secret | What |
 |:--|:--|

@@ -46,6 +46,13 @@
 
 #include <cstdio>
 
+// An LLVector3 as FMOD takes it. The two are laid out alike, but reading one
+// through a pointer to the other breaks strict aliasing, which GCC rejects.
+static FMOD_VECTOR to_fmod_vector(const LLVector3& v)
+{
+    return FMOD_VECTOR{ v.mV[VX], v.mV[VY], v.mV[VZ] };
+}
+
 FMOD_RESULT F_CALL windCallback(FMOD_DSP_STATE *dsp_state, float *inbuffer, float *outbuffer, unsigned int length, int inchannels, int *outchannels);
 
 FMOD::ChannelGroup *LLAudioEngine_FMODSTUDIO::mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT] = {0};
@@ -855,7 +862,9 @@ void LLAudioChannelFMODSTUDIO::update3DPosition()
 
         LLVector3 float_pos;
         float_pos.setVec(mCurrentSourcep->getPositionGlobal());
-        FMOD_RESULT result = mChannelp->set3DAttributes((FMOD_VECTOR*)float_pos.mV, (FMOD_VECTOR*)mCurrentSourcep->getVelocity().mV);
+        const FMOD_VECTOR position = to_fmod_vector(float_pos);
+        const FMOD_VECTOR velocity = to_fmod_vector(mCurrentSourcep->getVelocity());
+        FMOD_RESULT result = mChannelp->set3DAttributes(&position, &velocity);
         Check_FMOD_Error(result, "FMOD::Channel::set3DAttributes");
     }
 }
@@ -1089,10 +1098,11 @@ FMOD_RESULT F_CALL windCallback(FMOD_DSP_STATE *dsp_state, float *inbuffer, floa
     // outbuffer = the buffer passed from the previous DSP unit.
     // length = length in samples at this mix time.
 
-    LLWindGen<LLAudioEngine_FMODSTUDIO::MIXBUFFERFORMAT> *windgen = nullptr;
     FMOD::DSP *thisdsp = (FMOD::DSP *)dsp_state->instance;
 
-    thisdsp->getUserData((void **)&windgen);
+    void* user_data = nullptr;
+    thisdsp->getUserData(&user_data);
+    auto* windgen = static_cast<LLWindGen<LLAudioEngine_FMODSTUDIO::MIXBUFFERFORMAT>*>(user_data);
 
     if (windgen)
     {
