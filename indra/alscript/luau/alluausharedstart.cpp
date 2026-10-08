@@ -35,8 +35,10 @@
 #include "Luau/Parser.h"
 
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <fmt/format.h>
 
 #include <algorithm>
+#include <iterator>
 
 namespace
 {
@@ -431,7 +433,7 @@ namespace ALLuauSharedStart
                     {
                         // Three digits, so that a digit after it is not
                         // read as part of it.
-                        out += llformat("\\%03u", byte);
+                        fmt::format_to(std::back_inserter(out), "\\{:03}", byte);
                     }
                     else if (byte >= 0x80)
                     {
@@ -444,7 +446,7 @@ namespace ALLuauSharedStart
                         }
                         else
                         {
-                            out += llformat("\\x%02X", byte);
+                            fmt::format_to(std::back_inserter(out), "\\x{:02X}", byte);
                         }
                     }
                     else
