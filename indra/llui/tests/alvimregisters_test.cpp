@@ -163,4 +163,32 @@ namespace tut
         ensure_equals("a yank: 1 as it was", registers.fetch('1', false).text, std::string("word "));
         ensure("and 0 never set", registers.fetch('0', false).text.empty());
     }
+
+    template<> template<>
+    void alvimregisters_object::test<7>()
+    {
+        set_test_name("a digit or - named keeps it as a letter does, and neither 0, the small delete register nor the clipboard takes it too");
+        registers.store(0, "Z0", false, false, true, true);
+        registers.store(0, "Zm", false, false, false, true);
+        const int copied = copies;
+        registers.store('-', "one two", true, false, true, true);
+        const ALVimRegisters::Register small = registers.fetch('-', true);
+        ensure("\"-yy: the line in -", small.text == "one two" && small.linewise);
+        ensure_equals("0 as it was", registers.fetch('0', true).text, std::string("Z0"));
+        ensure_equals("\"\" says it", registers.fetch('"', true).text, std::string("one two"));
+        registers.store('5', "one two", true, false, true, true);
+        ensure_equals("\"5yy: the line in 5", registers.fetch('5', true).text, std::string("one two"));
+        ensure_equals("0 still as it was", registers.fetch('0', true).text, std::string("Z0"));
+        registers.store('5', "one ", false, false, false, true);
+        ensure_equals("\"5dw: the word in 5", registers.fetch('5', true).text, std::string("one "));
+        ensure_equals("not in -", registers.fetch('-', true).text, std::string("one two"));
+        ensure_equals("the clipboard untouched", copies, copied);
+        registers.store(0, "Z1", true, false, false, false);
+        registers.store('1', "line", true, false, false, false);
+        ensure_equals("\"1dd: the line in 1", registers.fetch('1', false).text, std::string("line"));
+        ensure_equals("and moved along to 2 with it", registers.fetch('2', false).text, std::string("line"));
+        registers.store('-', "lines", true, false, false, false);
+        ensure_equals("\"-dd: in -", registers.fetch('-', false).text, std::string("lines"));
+        ensure_equals("and in 1", registers.fetch('1', false).text, std::string("lines"));
+    }
 }

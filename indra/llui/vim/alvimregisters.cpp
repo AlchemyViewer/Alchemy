@@ -53,24 +53,11 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
     {
         return;
     }
-    // A delete of a line or more, or a smaller one `register_one` says is
-    // kept here, goes in 1 whichever register is named, as vim's does: the
-    // last nine kept, newest first, each moved down one rather than copied.
-    const bool lines = linewise || reg.text.find('\n') != std::string::npos;
-    if (!yanked && (lines || register_one))
-    {
-        for (char n = '9'; n > '1'; --n)
-        {
-            const auto older = mRegisters.find(static_cast<char>(n - 1));
-            if (older != mRegisters.end())
-            {
-                mRegisters[n] = std::move(older->second);
-            }
-        }
-        mRegisters['1'] = reg;
-    }
-    // A register named keeps it, and "" says it; the clipboard is not
-    // touched, as vim's clipboard=unnamed leaves a named one alone.
+    // A register named keeps it, and "" says it: a letter, a digit or -,
+    // as vim takes them, none of which then puts it in 0 or the small
+    // delete register too. The clipboard is not touched, as vim's
+    // clipboard=unnamed leaves a named one alone.
+    const bool named = (name >= 'a' && name <= 'z') || (name >= 'A' && name <= 'Z') || (name >= '0' && name <= '9') || name == '-';
     if (name >= 'A' && name <= 'Z')
     {
         // Added to the named register, a line or straight on.
@@ -86,12 +73,31 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
         }
         into.held = true;
         mUnnamed  = into;
-        return;
     }
-    if (name >= 'a' && name <= 'z')
+    else if (named)
     {
         mRegisters[name] = reg;
         mUnnamed         = reg;
+    }
+    // A delete of a line or more, or a smaller one `register_one` says is
+    // kept here, goes in 1 whichever register is named, as vim's does: the
+    // last nine kept, newest first, each moved down one rather than copied.
+    // After the named one, so that "1dd leaves it in 1 and 2, as in vim.
+    const bool lines = linewise || reg.text.find('\n') != std::string::npos;
+    if (!yanked && (lines || register_one))
+    {
+        for (char n = '9'; n > '1'; --n)
+        {
+            const auto older = mRegisters.find(static_cast<char>(n - 1));
+            if (older != mRegisters.end())
+            {
+                mRegisters[n] = std::move(older->second);
+            }
+        }
+        mRegisters['1'] = reg;
+    }
+    if (named)
+    {
         return;
     }
     // "+ and "* are the clipboard, whatever the setting says.
