@@ -332,11 +332,21 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         }
         out.regex += c;
     };
-    // The last replacement made, as the text it is.
+    // The last replacement made, as the text it is: one atom, which a
+    // multi after it repeats whole.
     auto lastReplacement = [&]() {
+        const bool several = !last_replacement.empty() && utf8str_decode_at(last_replacement, 0).next < last_replacement.size();
+        if (several)
+        {
+            out.regex += "(?:";
+        }
         for (const char r : last_replacement)
         {
             literal(r);
+        }
+        if (several)
+        {
+            out.regex += ')';
         }
     };
     // A bracket expression through to its close, as the engine spells it.

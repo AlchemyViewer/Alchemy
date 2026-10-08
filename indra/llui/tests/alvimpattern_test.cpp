@@ -98,7 +98,7 @@ namespace tut
         ensure_equals("classes as brackets", regexOf("\\a\\l\\x"), std::string("[A-Za-z][a-z][0-9A-Fa-f]"));
         ensure_equals("a bracket expression as it stands", regexOf("[^a-z]"), std::string("[^a-z]"));
         ensure_equals("a character by its code", regexOf("\\%x41"), std::string("A"));
-        ensure_equals("~ the last replacement, as text", regexOf("a~", "x.y"), std::string("ax\\.y"));
+        ensure_equals("~ the last replacement, as text", regexOf("a~", "x.y"), std::string("a(?:x\\.y)"));
     }
 
     template<> template<>
@@ -405,6 +405,17 @@ namespace tut
         ensure_equals("before a ] not", found("a]", ALVimPattern::of("[\\]]", std::string(), plain)), std::string("]"));
         ensure_equals("\\_[ with a ^, or a line break", found("xa^b\nyc", ALVimPattern::of("b\\_[^ab]y", std::string(), plain)), std::string("b\ny"));
         ensure_equals("and the characters it does not hold", found("xa^b\nyc", ALVimPattern::of("a\\_[^ab]b", std::string(), plain)), std::string("a^b"));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<19>()
+    {
+        set_test_name("~ is one atom, which a multi after it repeats whole");
+        ensure_equals("in a group of its own", regexOf("a~*", "x.y"), std::string("a(?:x\\.y)*"));
+        ensure_equals("one character in none", regexOf("a~*", "x"), std::string("ax*"));
+        ensure_equals("magic's", found("axyxyb axyyb", ALVimPattern::of("a~*b", std::string("xy"), plain)), std::string("axyxyb"));
+        ensure_equals("very magic's", found("axyxyb axyyb", ALVimPattern::of("\\va~+b", std::string("xy"), plain)), std::string("axyxyb"));
+        ensure_equals("nomagic's", found("axyxyb axyyb", ALVimPattern::of("\\Ma\\~\\+b", std::string("xy"), plain)), std::string("axyxyb"));
     }
 
 }
