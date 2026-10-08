@@ -585,6 +585,21 @@ bool LLFeatureManager::loadGPUClass()
         gSavedSettings.setBOOL("UseOcclusion", false);
     }
 
+    // Earlier viewers took Mesa's "25." for AMD's driver, so on these APUs under Mesa 25 the
+    // workaround above set both settings, and both persist. Put them back, once, and only if
+    // both still hold what it set: anyone who has changed either since meant it.
+    if (gGLManager.mIsMesa && !gSavedSettings.getBOOL("ALMesaRDNA35SettingsRestored")
+        && gGLManager.getRawGLString().find("Radeon") != std::string::npos && checkRDNA35())
+    {
+        if (gSavedSettings.getBOOL("SkipBenchmark") && !gSavedSettings.getBOOL("UseOcclusion"))
+        {
+            LL_INFOS("RenderInit") << "Restoring the benchmark and occlusion culling, which the RDNA 3.5 workaround turned off under Mesa" << LL_ENDL;
+            gSavedSettings.setBOOL("SkipBenchmark", false);
+            gSavedSettings.setBOOL("UseOcclusion", true);
+        }
+        gSavedSettings.setBOOL("ALMesaRDNA35SettingsRestored", true);
+    }
+
     if (gGLManager.mIsSoftwareRenderer)
     {
         // The benchmark would measure the CPU, which no GPU class describes.
