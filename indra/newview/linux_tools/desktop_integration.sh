@@ -12,8 +12,9 @@
 # --system writes under /usr/local/share and is the default for root;
 # --user writes under $XDG_DATA_HOME and is the default otherwise. refresh is
 # what the launcher runs: for a user, it points the entry at this tree when
-# there is none, or when the one there is another tree's, and does nothing
-# when the system already has an entry or AL_NO_DESKTOP_INTEGRATION is set.
+# there is none, or when the one there is another tree's, takes the links
+# nothing has any more for one pointing here already, and does nothing when
+# the system already has an entry or AL_NO_DESKTOP_INTEGRATION is set.
 #
 # The tree carries the entry and icons under share/, as a package installs
 # them under /usr/share; the copy made here runs this tree's launcher. Run
@@ -130,6 +131,36 @@ remove_legacy()
     fi
 }
 
+# The schemes this entry is free to take, one a line: those nothing handles,
+# or whose handler's entry is gone, so another viewer -- or another channel
+# of this one -- keeps the links it has. Given "again", those this channel
+# has already as well, as an install takes them.
+free_schemes()
+{
+    command -v xdg-mime >/dev/null || return 0
+    local again=${1:-} scheme current
+    for scheme in "${schemes[@]}"; do
+        current=$(xdg-mime query default "$scheme" 2>/dev/null | head -n 1) || true
+        current=${current%%;*}
+        if [[ $current == "$app_id.desktop" ]]; then
+            if [[ -n $again ]]; then
+                printf '%s\n' "$scheme"
+            fi
+        elif [[ -z $current ]] || ! entry_exists "$current"; then
+            printf '%s\n' "$scheme"
+        fi
+    done
+}
+
+# Makes this entry the handler of the schemes given.
+take_schemes()
+{
+    if [[ $# -gt 0 ]]; then
+        mkdir -p -- "${XDG_CONFIG_HOME:-$HOME/.config}"
+        xdg-mime default "$app_id.desktop" "$@" || true
+    fi
+}
+
 update_caches()
 {
     local data=$1
@@ -159,21 +190,12 @@ do_install()
     remove_legacy "$apps"
 
     # A user's choice of handler is the user's own: the system scope offers
-    # the entry as one, and leaves the choice to each user. For a user, a
-    # scheme is made this entry's only when nothing handles it, this channel
-    # does, or the entry that did is gone, so another viewer -- or another
-    # channel of this one -- keeps the links it has. xdg-mime is asked before
-    # the entry is written, after which it could name the entry itself.
+    # the entry as one, and leaves the choice to each user. xdg-mime is asked
+    # before the entry is written, after which it could name the entry
+    # itself.
     local -a take=()
-    if [[ $scope == user ]] && command -v xdg-mime >/dev/null; then
-        local scheme current
-        for scheme in "${schemes[@]}"; do
-            current=$(xdg-mime query default "$scheme" 2>/dev/null | head -n 1) || true
-            current=${current%%;*}
-            if [[ -z $current || $current == "$app_id.desktop" ]] || ! entry_exists "$current"; then
-                take+=("$scheme")
-            fi
-        done
+    if [[ $scope == user ]]; then
+        mapfile -t take < <(free_schemes again)
     fi
 
     local entry="$apps/$app_id.desktop"
@@ -200,11 +222,7 @@ do_install()
     done
 
     update_caches "$data"
-
-    if [[ ${#take[@]} -gt 0 ]]; then
-        mkdir -p -- "${XDG_CONFIG_HOME:-$HOME/.config}"
-        xdg-mime default "$app_id.desktop" "${take[@]}" || true
-    fi
+    take_schemes "${take[@]}"
 
     echo "Added $app_id to the desktop in $data"
 }
@@ -238,9 +256,19 @@ do_refresh()
     local entry="$user_data/applications/$app_id.desktop"
     if [[ -f $entry ]]; then
         # One the user wrote, or one pointing here already, stays as it is.
+        # One pointing here takes the links nothing has, as the viewer that
+        # had them when it was written may be gone. Those it has already are
+        # left alone, so the launcher writes nothing on a run that changes
+        # nothing.
         local installed
         installed=$(entry_install "$entry")
-        if [[ -z $installed || $installed == "$origin" ]]; then
+        if [[ -z $installed ]]; then
+            return 0
+        fi
+        if [[ $installed == "$origin" ]]; then
+            local -a take
+            mapfile -t take < <(free_schemes)
+            take_schemes "${take[@]}"
             return 0
         fi
     else
