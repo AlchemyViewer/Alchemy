@@ -799,7 +799,6 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
     mCulled( false ),
     mVisibilityRank(0),
     mNeedsSkin(false),
-    mLastSkinTime(0.f),
     mUpdatePeriod(1),
     mUpdatePeriodFrame(-1),
     mNeedsUpdateFrame(-1),
@@ -5780,7 +5779,6 @@ U32 LLVOAvatar::renderSkinned()
                 }
             }
             mNeedsSkin = false;
-            mLastSkinTime = gFrameTimeSeconds;
 
             LLFace * face = mDrawable->getFace(0);
             if (face)

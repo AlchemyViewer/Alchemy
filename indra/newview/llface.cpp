@@ -126,7 +126,6 @@ void LLFace::init(LLDrawable* drawablep, LLViewerObject* objp)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_FACE;
     mLastUpdateTime = gFrameTimeSeconds;
     mLastMoveTime = 0.f;
-    mLastSkinTime = gFrameTimeSeconds;
     mVSize = 0.f;
     mPixelArea = 16.f;
     mState      = GLOBAL;

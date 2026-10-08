@@ -256,7 +256,6 @@ public:
     LLVector2       mTexExtents[2];
     F32             mDistance;
     F64         mLastUpdateTime;
-    F64         mLastSkinTime;
     F64         mLastMoveTime;
     LLMatrix4*  mTextureMatrix;
     LLMatrix4*  mSpecMapMatrix;

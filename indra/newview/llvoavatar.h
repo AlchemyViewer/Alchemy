@@ -561,7 +561,6 @@ public:
 
     U32         renderRigid();
     U32         renderSkinned();
-    F64         getLastSkinTime() { return mLastSkinTime; }
     U32         renderTransparent(bool first_pass);
     void        renderCollisionVolumes();
     void        renderBones(const std::string &selected_joint = std::string());
@@ -580,7 +579,6 @@ private:
     bool        shouldAlphaMask();
 
     bool        mNeedsSkin; // avatar has been animated and verts have not been updated
-    F64         mLastSkinTime; //value of gFrameTimeSeconds at last skin update
 
     S32         mUpdatePeriod;
     // An avatar wearing animesh is asked both of these once for itself and
