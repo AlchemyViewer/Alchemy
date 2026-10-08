@@ -337,7 +337,13 @@ bool ALTextureSlot::bind(LLImageGL* texture, bool for_rendering, bool forceBind,
         mCurrTexture = texname;
         glBindTexture(sGLTextureType[texture->getTarget()], mCurrTexture);
         stop_glerror();
-        texture->updateBindStats();
+        // A name passed in is one an upload writes into, on the LLImageGL thread or before
+        // it publishes: not a use of the texture, and the frame time the stats stamp with is
+        // the main thread's.
+        if (!usename)
+        {
+            texture->updateBindStats();
+        }
     }
 
     // The sampler is deliberately LEFT ALONE.

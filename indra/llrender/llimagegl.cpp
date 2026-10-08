@@ -2014,8 +2014,13 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
 
     mTextureMemory = (S64Bytes)getMipBytes(mCurrentDiscardLevel);
 
-    // mark this as bound at this point, so we don't throw it out immediately
-    mLastBindTime = sLastFrameTime;
+    // mark this as bound at this point, so we don't throw it out immediately. Off the main
+    // thread syncTexName() marks it when the texture publishes: the frame time is the main
+    // thread's, and so is everything that reads the mark.
+    if (main_thread)
+    {
+        mLastBindTime = sLastFrameTime;
+    }
 
     checkActiveThread();
     return true;
@@ -2209,6 +2214,9 @@ void LLImageGL::syncTexName(LLGLuint texname)
             LLImageGL::deleteTextures(1, &mTexName);
         }
         mTexName = texname;
+
+        // Marked bound as it publishes, so it is not thrown out before anything draws it.
+        mLastBindTime = sLastFrameTime;
 
         // The alpha facts derived from the new texture publish with it.
         publishPendingAlpha();
