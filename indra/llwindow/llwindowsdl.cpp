@@ -166,6 +166,12 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
         LLDXHardware::updateVRAMBudgetFromDXGI();
 #endif
 
+        // Tracy's GPU context makes GL calls, so it waits for initGL to load
+        // the entry points, as on Win32.
+        {
+            LL_PROFILER_GPU_CONTEXT;
+        }
+
         //start with arrow cursor
         initCursors();
         setCursor( UI_CURSOR_ARROW );
@@ -558,8 +564,6 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         return false;
     }
 
-    LL_PROFILER_GPU_CONTEXT;
-
     // Enable vertical sync
     toggleVSync(enable_vsync);
 
@@ -702,6 +706,9 @@ bool LLWindowSDL::switchContext(bool fullscreen, const LLCoordScreen &size, bool
 #if LL_WINDOWS
             LLDXHardware::updateVRAMBudgetFromDXGI();
 #endif
+            {
+                LL_PROFILER_GPU_CONTEXT;
+            }
 
             //start with arrow cursor
             initCursors();
