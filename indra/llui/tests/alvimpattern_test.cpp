@@ -72,9 +72,9 @@ namespace tut
         ensure_equals("counts", regexOf("a\\{2,3}"), std::string("a{2,3}"));
         ensure_equals("as few as may be", regexOf("a\\{-}"), std::string("a*?"));
         ensure_equals("very magic: bare", regexOf("\\v(a|b)+<x>"), std::string("(a|b)+\\bx\\b"));
-        ensure_equals("very nomagic: only the end", regexOf("\\Va.*$"), std::string("a\\.\\*$"));
-        ensure_equals("and the start, past the \\V", regexOf("\\V^a.*$"), std::string("^a\\.\\*$"));
-        ensure_equals("or past a \\c", regexOf("\\c\\V^a"), std::string("^a"));
+        ensure_equals("very nomagic: a ^ and a $ are themselves", regexOf("\\V^a.*$"), std::string("\\^a\\.\\*\\$"));
+        ensure_equals("\\^ and \\$ the line's start and end", regexOf("\\V\\^a.*\\$"), std::string("^a\\.\\*$"));
+        ensure_equals("past a \\c too", regexOf("\\c\\V\\^a"), std::string("^a"));
         ensure_equals("a ^ inside is itself", regexOf("\\Va^b"), std::string("a\\^b"));
         ensure_equals("classes as brackets", regexOf("\\a\\l\\x"), std::string("[A-Za-z][a-z][0-9A-Fa-f]"));
         ensure_equals("a bracket expression as it stands", regexOf("[^a-z]"), std::string("[^a-z]"));
@@ -228,5 +228,20 @@ namespace tut
         ensure("and one past ASCII", ALVimPattern::of("\xC3\x89" "a", std::string(), smart).caseSensitive);
         ensure("but not a small one", !ALVimPattern::of("\xC3\xA9" "a", std::string(), smart).caseSensitive);
         ensure_equals("found without regard to case", found("FOO1 foo1", ALVimPattern::of("foo\\S", std::string(), smart)), std::string("FOO1|foo1"));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<10>()
+    {
+        set_test_name("very nomagic's bare ^ and $ are themselves and \\^ \\$ a line's ends anywhere, and nomagic's ^ and $ are magic's");
+        ensure_equals("a ^ under \\V is the character", found("x^ab ^ab", ALVimPattern::of("\\V^ab", std::string(), plain)), std::string("^ab|^ab"));
+        ensure_equals("and a $", found("ab$ ab", ALVimPattern::of("\\Vab$", std::string(), plain)), std::string("ab$"));
+        ensure_equals("\\^ the line's start", found("ab xab", ALVimPattern::of("\\V\\^ab", std::string(), plain)), std::string("ab"));
+        ensure_equals("\\$ its end", found("ab ab", ALVimPattern::of("\\Vab\\$", std::string(), plain)), std::string("ab"));
+        ensure_equals("nomagic's ^ after \\| is the line's start", found("ab", ALVimPattern::of("\\Mx\\|^ab", std::string(), plain)), std::string("ab"));
+        ensure_equals("and no character", found("z^ab", ALVimPattern::of("\\Mx\\|^ab", std::string(), plain)), std::string());
+        ensure_equals("its $ before \\| the line's end", found("ab", ALVimPattern::of("\\Mab$\\|x", std::string(), plain)), std::string("ab"));
+        ensure_equals("its ^ first in a group", found("ab", ALVimPattern::of("\\M\\(^ab\\)", std::string(), plain)), std::string("ab"));
+        ensure_equals("and either itself elsewhere", found("a^b$c", ALVimPattern::of("\\Ma^b$c", std::string(), plain)), std::string("a^b$c"));
     }
 }

@@ -700,8 +700,8 @@ namespace tut
         ensure_equals("\\ze ends it before what follows", flat(e.text()), std::string("X why Z BARFOO|"));
         keys(":s/B.\\{-}O/-/<CR>");
         ensure_equals("\\{-} is lazy", flat(e.text()), std::string("X why Z -O|"));
-        keys(":s/\\V-O$/[-O]/<CR>");
-        ensure_equals("very nomagic: only ^ and $ special", flat(e.text()), std::string("X why Z [-O]|"));
+        keys(":s/\\V-O\\$/[-O]/<CR>");
+        ensure_equals("very nomagic: \\$ the line's end", flat(e.text()), std::string("X why Z [-O]|"));
         keys(":s/\\V[-O]/end/<CR>");
         ensure_equals("brackets themselves under \\V", flat(e.text()), std::string("X why Z end|"));
         keys(":s/x/lower/<CR>");

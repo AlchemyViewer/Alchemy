@@ -117,19 +117,24 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // < > are the engine's own ( ) | + ? ? { } \b \b, and without one
     // they are themselves; \v makes what follows very magic, where they
     // are the engine's own bare and themselves with a backslash; \V very
-    // nomagic, where only ^ $ and the backslash items are special. \zs
-    // is \K; \ze looks ahead at the rest of its branch; \@= \@! \@<=
-    // \@<! and \@> look round the atom before them; \{-} is *?; the
-    // classes \a \l \u \x \o \h \i \k are brackets; \c and \C say how case
-    // is matched; a bracket expression is copied through as it stands. A
-    // magic ^ is a line's start only first in a branch, a $ its end only
-    // last in one, and either is itself anywhere else.
+    // nomagic, where only the backslash items are special, a bare ^ and $
+    // themselves and \^ \$ a line's start and end anywhere; \M nomagic,
+    // the same but for magic's ^ and $. \zs is \K; \ze looks ahead at the
+    // rest of its branch; \@= \@! \@<= \@<! and \@> look round the atom
+    // before them; \{-} is *?; the classes \a \l \u \x \o \h \i \k are
+    // brackets; \c and \C say how case is matched; a bracket expression is
+    // copied through as it stands. A magic ^ is a line's start only first
+    // in a branch, a $ its end only last in one, and either is itself
+    // anywhere else.
     ALVimPattern        out;
     std::optional<bool> case_in_pattern;
     enum class Magic : U8
     {
         Magic,
         Very,
+        // \M, nomagic.
+        Off,
+        // \V, very nomagic.
         None
     };
     Magic magic    = Magic::Magic;
@@ -182,15 +187,15 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
         }
         return body[0] == ',' ? "{0" + body + "}" : "{" + body + "}";
     };
-    // Whether a magic ^ read now is the line's start, as vim has it: at
-    // the pattern's start, and after \( \%( \| \& or \n, a \c, a \v and
-    // the like between them putting in nothing; anywhere else it is
-    // itself.
+    // Whether a magic or nomagic ^ read now is the line's start, as vim
+    // has it: at the pattern's start, and after \( \%( \| \& or \n, a \c,
+    // a \v and the like between them putting in nothing; anywhere else it
+    // is itself.
     bool at_start = true;
-    // Whether a magic $ before `k` is the line's end, as vim has it: at the
-    // pattern's end, and before \| \) \& or \n -- or very magic's | ) and &
-    // where a \v comes between -- a \c, a \v and the like between them
-    // putting in nothing; anywhere else it is itself.
+    // Whether a magic or nomagic $ before `k` is the line's end, as vim
+    // has it: at the pattern's end, and before \| \) \& or \n -- or very
+    // magic's | ) and & where a \v comes between -- a \c, a \v and the like
+    // between them putting in nothing; anywhere else it is itself.
     auto endsAt = [&vim](size_t k) {
         constexpr std::string_view SWITCHES("cCmMvVZ");
         constexpr std::string_view ENDS("|&)");
@@ -300,7 +305,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
             {
                 case 'v': magic = Magic::Very; at_start = start_here; token_atom = false; continue;
                 case 'm': magic = Magic::Magic; at_start = start_here; token_atom = false; continue;
-                case 'M':
+                case 'M': magic = Magic::Off; at_start = start_here; token_atom = false; continue;
                 case 'V': magic = Magic::None; at_start = start_here; token_atom = false; continue;
                 case 'c': case_in_pattern = false; at_start = start_here; token_atom = false; continue;
                 case 'C': case_in_pattern = true; at_start = start_here; token_atom = false; continue;
@@ -363,6 +368,10 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                 case '=': out.regex += magic == Magic::Very ? std::string(1, n) : "?"; token_atom = magic == Magic::Very; continue;
                 case '<':
                 case '>': out.regex += magic == Magic::Very ? std::string(1, n) : "\\b"; continue;
+                // Very nomagic's line's start and end, anywhere; elsewhere
+                // the characters.
+                case '^':
+                case '$': out.regex += magic == Magic::None ? std::string(1, n) : "\\" + std::string(1, n); continue;
                 case '{':
                 {
                     if (magic == Magic::Very)
@@ -601,7 +610,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     continue;
             }
         }
-        if (c == '[' && magic != Magic::None)
+        if (c == '[' && (magic == Magic::Magic || magic == Magic::Very))
         {
             // A bracket expression through to its close, as it stands; an
             // unclosed [ is itself.
@@ -764,15 +773,18 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     default: literal(c); break;
                 }
                 break;
-            case Magic::None:
+            case Magic::Off:
+                // Magic's ^ and $, and every other character itself.
                 switch (c)
                 {
-                    // At the pattern's start -- nothing put in yet, \V and \c
-                    // putting in nothing -- the line's start; elsewhere itself.
-                    case '^': out.regex += out.regex.empty() ? "^" : "\\^"; break;
-                    case '$': out.regex += i + 1 == vim.size() ? "$" : "\\$"; break;
+                    case '^': out.regex += start_here ? "^" : "\\^"; break;
+                    case '$': out.regex += endsAt(i + 1) ? "$" : "\\$"; break;
                     default: literal(c); break;
                 }
+                break;
+            case Magic::None:
+                // Every character itself, ^ and $ too.
+                literal(c);
                 break;
         }
     }
