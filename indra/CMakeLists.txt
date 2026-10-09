@@ -41,6 +41,13 @@ cmake_dependent_option(
   "AL_BUILD_TESTS"
   OFF
 )
+cmake_dependent_option(
+  AL_TEST_PER_CASE
+  "Register a Catch2 binary's test cases one CTest entry each, found when ctest runs, in place of one entry a test file: for finding a failure that comes from order or shared state"
+  OFF
+  "AL_BUILD_TESTS"
+  OFF
+)
 option(AL_BUILD_SHARED_LLCOMMON "Build llcommon as a shared library" OFF)
 option(AL_BUILD_PACKAGE "Add the package target: the CPack archive of the installed tree" ON)
 
@@ -413,13 +420,15 @@ if(AL_BUILD_TESTS)
   # Set parallel level to decrease test runtime. Benchmarks are registered
   # as tests under their own label and left out of the default run, since
   # their numbers are their output and a shared parallel run would ruin them.
+  # A Catch2 binary's run of all its tests in one process stays out too until
+  # they are known to share one (combined_pending; see ALAddTestBinary.cmake).
   # Each run also writes its results as JUnit, which CI keeps.
   set(
     CMAKE_CTEST_ARGUMENTS
     -j${NUM_CORES}
     --output-on-failure
     -LE
-    benchmark
+    "benchmark|combined_pending"
     --output-junit
     "${CMAKE_BINARY_DIR}/Testing/test-results.xml"
   )
@@ -481,6 +490,7 @@ endforeach()
 # Add our test macros
 if(AL_BUILD_TESTS)
   include(LLAddBuildTest)
+  include(ALAddTestBinary)
 endif()
 
 # The build system's own files, for the IDE.
