@@ -32,6 +32,7 @@
 
 #include "../llinventory.h"
 #include "../test/lltut.h"
+#include "../test/namedtempfile.h"
 
 
 #if LL_WINDOWS
@@ -351,7 +352,8 @@ namespace tut
     template<> template<>
     void inventory_object::test<7>()
     {
-        std::string filename("linden_file.dat");
+        NamedTempFile temp_file("linden_file", "", ".dat");
+        std::string filename(temp_file.getPath().string());
         llofstream fileXML(filename.c_str());
         if (!fileXML.is_open())
         {
@@ -484,7 +486,8 @@ namespace tut
     template<> template<>
     void inventory_object::test<13>()
     {
-        std::string filename("linden_file.dat");
+        NamedTempFile temp_file("linden_file", "", ".dat");
+        std::string filename(temp_file.getPath().string());
         llofstream fileXML(filename.c_str());
         if (!fileXML.is_open())
         {
