@@ -2524,7 +2524,13 @@ S32 LLVOVolume::setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID)
     LL_DEBUGS("MaterialTEs") << " " << pMaterialID.asString() << LL_ENDL;
     if (res)
     {
-        LLMaterialMgr::instance().getTE(getRegion()->getRegionID(), pMaterialID, te, boost::bind(&LLVOVolume::setTEMaterialParamsCallbackTE, getID(), _1, _2, _3));
+        // A client-only object's params are set on it directly; no sim ever
+        // gives it a material id, and resolving the null one it keeps would
+        // replace them with no material when its faces are deselected.
+        if (!isLocalOnly())
+        {
+            LLMaterialMgr::instance().getTE(getRegion()->getRegionID(), pMaterialID, te, boost::bind(&LLVOVolume::setTEMaterialParamsCallbackTE, getID(), _1, _2, _3));
+        }
 
         setChanged(ALL_CHANGED);
         if (!mDrawable.isNull())
