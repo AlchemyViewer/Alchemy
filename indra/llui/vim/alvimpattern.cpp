@@ -31,6 +31,7 @@
 #include "altextchars.h"
 #include "llstring.h"
 
+#include <fmt/format.h>
 #include <unicode/uchar.h>
 
 #include <algorithm>
@@ -68,16 +69,56 @@ namespace
         { "fname", "A-Za-z0-9/.\\-_+,#$%~=" },
     };
 
+    // A character's code after \d \o \x \u or \U in a bracket expression,
+    // or after \%d and the rest out of one, read from `at` as vim reads it
+    // (getdecchrs, getoctchrs, gethexchrs): as many decimal digits as
+    // there are, up to three octal ones while the code is under 040, and up
+    // to two, four or eight hex ones. `at` is moved past them; -1 comes
+    // back where no digit follows.
+    S64 charCode(std::string_view vim, size_t& at, char how)
+    {
+        const S64    radix = how == 'd' ? 10 : how == 'o' ? 8 : 16;
+        const size_t most  = how == 'U' ? 8 : how == 'u' ? 4 : how == 'x' ? 2 : how == 'o' ? 3 : std::string_view::npos;
+        S64          code  = 0;
+        size_t       taken = 0;
+        while (at < vim.size() && taken < most && !(how == 'o' && code >= 040))
+        {
+            const char h = vim[at];
+            const S64  v = h >= '0' && h <= '9' ? h - '0' : h >= 'a' && h <= 'f' ? h - 'a' + 10 : h >= 'A' && h <= 'F' ? h - 'A' + 10 : radix;
+            if (v >= radix)
+            {
+                break;
+            }
+            // Past what any character's code is, the rest of the digits are
+            // all one.
+            code = std::min(code * radix + v, S64(S32_MAX) + 1);
+            ++at;
+            ++taken;
+        }
+        return taken > 0 ? code : -1;
+    }
+
+    // A character by its code as the engine reads it, in a bracket
+    // expression or out of one. 0 and 10 are both the NUL, as vim keeps a
+    // NUL in its text as a line feed and reads either code as it.
+    std::string codeAsEngine(S64 code)
+    {
+        return fmt::format("\\x{{{:X}}}", code == 10 ? 0 : code);
+    }
+
     // A bracket expression of vim's, its [ at `at`, as vim's skip_anyof
     // reads it: a ^ first negates it and a ] or - after that is itself; a
     // backslash takes the character after it with it only where it is
     // one vim means something by there, and is itself before any other;
     // [:alpha:] [=a=] and [.a.] are whole, and any other [ is itself.
-    // The index of its ] comes back, or npos where none closes it; the
-    // engine's spelling of it is put in `engine` where one is given.
+    // \d123 \o40 \x20 \u20AC and \U0001F600 are characters by their codes,
+    // as vim's coll_get_char reads them. The index of its ] comes back, or
+    // npos where none closes it; the engine's spelling of it is put in
+    // `engine` where one is given.
     size_t bracketOf(std::string_view vim, size_t at, std::string* engine = nullptr)
     {
         constexpr std::string_view TAKEN("]^-n\\nrtebdoxuU");
+        constexpr std::string_view CODED("doxuU");
         auto put = [engine](std::string_view s) {
             if (engine)
             {
@@ -98,7 +139,23 @@ namespace
         }
         while (j < vim.size() && vim[j] != ']')
         {
-            if (vim[j] == '\\' && j + 1 < vim.size() && TAKEN.find(vim[j + 1]) != std::string_view::npos)
+            if (vim[j] == '\\' && j + 1 < vim.size() && CODED.find(vim[j + 1]) != std::string_view::npos)
+            {
+                // With no digit after it the backslash is itself, and the
+                // letter read on its own after it; with a code past any a
+                // character has, itself again, read on from the last digit.
+                size_t    end  = j + 2;
+                const S64 code = charCode(vim, end, vim[j + 1]);
+                if (code < 0 || code > S32_MAX)
+                {
+                    put("\\\\");
+                    j = code < 0 ? j + 1 : end - 1;
+                    continue;
+                }
+                put(codeAsEngine(code));
+                j = end;
+            }
+            else if (vim[j] == '\\' && j + 1 < vim.size() && TAKEN.find(vim[j + 1]) != std::string_view::npos)
             {
                 put(vim.substr(j, 2));
                 j += 2;
@@ -853,34 +910,11 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                     // A character by its code: \%d123 \%x7b \%o173 \%u007b.
                     if (i + 1 < vim.size() && (vim[i + 1] == 'd' || vim[i + 1] == 'x' || vim[i + 1] == 'o' || vim[i + 1] == 'u' || vim[i + 1] == 'U'))
                     {
-                        const char how   = vim[i + 1];
-                        const int  radix = how == 'd' ? 10 : how == 'o' ? 8 : 16;
-                        size_t     k     = i + 2;
-                        U32        code  = 0;
-                        S32        taken = 0;
-                        while (k < vim.size() && taken < (how == 'U' ? 8 : how == 'u' ? 4 : how == 'x' ? 2 : 12))
+                        size_t    k    = i + 2;
+                        const S64 code = charCode(vim, k, vim[i + 1]);
+                        if (code >= 0 && code <= S32_MAX)
                         {
-                            const char h = vim[k];
-                            int        v = -1;
-                            if (h >= '0' && h <= '9') v = h - '0';
-                            else if (h >= 'a' && h <= 'f') v = h - 'a' + 10;
-                            else if (h >= 'A' && h <= 'F') v = h - 'A' + 10;
-                            if (v < 0 || v >= radix)
-                            {
-                                break;
-                            }
-                            code = code * static_cast<U32>(radix) + static_cast<U32>(v);
-                            ++k;
-                            ++taken;
-                        }
-                        if (taken > 0)
-                        {
-                            // As the bytes it is, each escaped where it is
-                            // anything to the engine.
-                            for (const char b : utf8str_from_cp(static_cast<llwchar>(code)))
-                            {
-                                literal(b);
-                            }
+                            out.regex += codeAsEngine(code);
                             i = k - 1;
                             continue;
                         }

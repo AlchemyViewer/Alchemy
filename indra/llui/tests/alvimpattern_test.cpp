@@ -97,7 +97,7 @@ namespace tut
         ensure_equals("a ^ inside is itself", regexOf("\\Va^b"), std::string("a\\^b"));
         ensure_equals("classes as brackets", regexOf("\\a\\l\\x"), std::string("[A-Za-z][a-z][0-9A-Fa-f]"));
         ensure_equals("a bracket expression as it stands", regexOf("[^a-z]"), std::string("[^a-z]"));
-        ensure_equals("a character by its code", regexOf("\\%x41"), std::string("A"));
+        ensure_equals("a character by its code", regexOf("\\%x41"), std::string("\\x{41}"));
         ensure_equals("~ the last replacement, as text", regexOf("a~", "x.y"), std::string("a(?:x\\.y)"));
     }
 
@@ -454,5 +454,32 @@ namespace tut
         ensure_equals("very magic's", ALVimPattern::of("\\va~+", std::string(), plain).readError, none.readError);
         ensure("one to stand for", ALVimPattern::of("a~*b", std::string("x"), plain).readError.empty());
         ensure("very nomagic's bare ~ itself", ALVimPattern::of("\\Va~b", std::string(), plain).readError.empty());
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<23>()
+    {
+        set_test_name("in a bracket expression \\d123 \\o40 \\x20 \\u20AC and \\U0001F600 are characters by their codes, read as vim reads them; with no digit, a backslash and the letter");
+        const auto in = [this](const std::string& text, const char* vim) { return alvimpattern_data::found(text, ALVimPattern::of(vim, std::string(), this->plain)); };
+        ensure_equals("decimal", in("A B", "[\\d65]"), std::string("A"));
+        ensure_equals("two", in("A B", "[\\d65\\d66]"), std::string("A|B"));
+        ensure_equals("octal", in("A B", "[\\o101]"), std::string("A"));
+        ensure_equals("hex", in("A B", "[\\x41]"), std::string("A"));
+        ensure_equals("four hex", in("e\xe2\x82\xac" "f", "[\\u20AC]"), std::string("\xe2\x82\xac"));
+        ensure_equals("eight hex", in("e\xe2\x82\xac" "f", "[\\U000020ac]"), std::string("\xe2\x82\xac"));
+        ensure_equals("negated", in("AB", "[^\\d65]"), std::string("B"));
+        ensure_equals("repeated", in("xABx", "[\\x41\\x42]\\+"), std::string("AB"));
+        ensure_equals("a range's ends", in("ABCD", "[\\x41-\\x43]"), std::string("A|B|C"));
+        ensure_equals("its end alone", in("aZz", "[a-\\x7a]"), std::string("a|z"));
+        ensure_equals("decimal ends", in("LMNOP", "[\\d77-\\d79]"), std::string("M|N|O"));
+        ensure_equals("no digit: a backslash and the letter", in("x d y p\\q", "[\\d]"), std::string("d|\\"));
+        ensure_equals("nor a hex one", in("x\\g", "[\\xg]"), std::string("x|\\|g"));
+        ensure_equals("up to three octal digits while under 040", in("o?7z", "[\\o777]"), std::string("?|7"));
+        ensure_equals("0 the NUL", in(std::string("a\0b", 3), "[\\d0]"), std::string(1, '\0'));
+        ensure_equals("and 10, as vim keeps it", in(std::string("a\0b\nc", 5), "[\\x0a]"), std::string(1, '\0'));
+        ensure_equals("past any character, none", in("ab", "[\\U00110000]"), std::string());
+        ensure_equals("\\b a backspace", in("a\bb", "[\\b]"), std::string("\b"));
+        ensure_equals("out of one, octal the same", in("o?7z", "\\%o777"), std::string("?7"));
+        ensure_equals("and 10 the NUL", in(std::string("a\0b\nc", 5), "\\%x0a"), std::string(1, '\0'));
     }
 }
