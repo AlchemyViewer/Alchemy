@@ -36,6 +36,7 @@ wired.)
 		 height="192"
 		 name="atab_sec_dof"
 		 title="Depth of Field"
+		 header_tool_tip="Blur what is out of focus, as a camera lens does: the aperture, the focal length, and where the focus sits."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -138,6 +139,7 @@ wired.)
 		 height="218"
 		 name="atab_sec_dof_adv"
 		 title="Depth of Field - Advanced"
+		 header_tool_tip="The camera model behind depth of field and what it costs: field of view, the blur's size cap and resolution, how fast focus moves, and whether the foreground blurs too."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -261,6 +263,7 @@ wired.)
 		 height="168"
 		 name="atab_sec_bokeh"
 		 title="Bokeh"
+		 header_tool_tip="The shape of out-of-focus highlights: aperture blades, anamorphic ovals, how much highlights stand out, and cat's eye clipping toward the edges. Needs Depth of Field on."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -413,6 +416,7 @@ wired.)
 		 height="254"
 		 name="atab_sec_bokeh_adv"
 		 title="Bokeh - Advanced"
+		 header_tool_tip="Finer bokeh shaping: which highlights are boosted and how far, the blades' rotation and rounding, and color fringes in front of and behind the focus. Needs Depth of Field on."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -604,6 +608,7 @@ wired.)
 		 height="168"
 		 name="atab_sec_aberration"
 		 title="Lens Aberrations"
+		 header_tool_tip="Real-lens flaws in the out-of-focus blur: bubble-rimmed or creamy highlights, and swirl and comet shapes toward the corners. Needs Depth of Field on."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -703,6 +708,7 @@ wired.)
 		 height="142"
 		 name="atab_sec_bloom"
 		 title="Bloom (HDR)"
+		 header_tool_tip="Light spilling from bright areas into their surroundings: how strongly, from how bright, and how far it spreads."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -786,6 +792,7 @@ wired.)
 		 height="251"
 		 name="atab_sec_bloom_adv"
 		 title="Bloom (HDR) - Advanced"
+		 header_tool_tip="Bloom's soft onset, how much prim glow feeds it, the size and starting resolution of its blur, and halation, a warm halo around highlights."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -992,6 +999,7 @@ wired.)
 		 height="142"
 		 name="atab_sec_crossfilter"
 		 title="Cross Filter"
+		 header_tool_tip="Turn every bright point into a star, as an etched glass filter does: how bright, how many arms, how long. Built on bloom, so bloom strength 0 silences it."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -1120,6 +1128,7 @@ wired.)
 		 height="142"
 		 name="atab_sec_crossfilter_adv"
 		 title="Cross Filter - Advanced"
+		 header_tool_tip="Rotate the star, set how its arms fade along their length, and spread them into rainbow tips."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -1203,6 +1212,7 @@ wired.)
 		 height="165"
 		 name="atab_sec_glow"
 		 title="Glow (Legacy)"
+		 header_tool_tip="The older glow effect, used in place of bloom when HDR rendering is off."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -1292,6 +1302,7 @@ wired.)
 		 height="301"
 		 name="atab_sec_glow_adv"
 		 title="Glow (Legacy) - Advanced"
+		 header_tool_tip="How the legacy glow is extracted and blurred: its passes, thresholds, resolution, warmth and dithering."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -1465,6 +1476,7 @@ wired.)
 		 height="172"
 		 name="atab_sec_flare"
 		 title="Lens Flare"
+		 header_tool_tip="Flare from the sun shining into the lens: an anamorphic streak, a soft glow around the sun and a starburst."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -1582,6 +1594,7 @@ wired.)
 		 height="715"
 		 name="atab_sec_flare_adv"
 		 title="Lens Flare - Advanced"
+		 header_tool_tip="Each part of the flare on its own: the streak, the glow, the ghosts, the halo and the starburst, plus how the flare dims and fades when the sun is hidden."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -1994,6 +2007,7 @@ wired.)
 		 height="194"
 		 name="atab_sec_lensdirt"
 		 title="Lens Dirt"
+		 header_tool_tip="Dust, smudges and scratches on the lens, lit up wherever bloom or lens flare catches them."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -2124,6 +2138,7 @@ wired.)
 		 height="194"
 		 name="atab_sec_lensdirt_adv"
 		 title="Lens Dirt - Advanced"
+		 header_tool_tip="A different pattern of dirt, how much of the faint grime survives, and how strongly bloom and flare each light it."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -2249,6 +2264,7 @@ wired.)
 		 height="272"
 		 name="atab_sec_ca"
 		 title="Chromatic Aberration"
+		 header_tool_tip="Red and blue fringes that grow toward the frame edges, where a lens brings colors to focus at slightly different places."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -2404,6 +2420,7 @@ wired.)
 		 height="142"
 		 name="atab_sec_distortion"
 		 title="Distortion"
+		 header_tool_tip="Bend the world view as a lens does: barrel or pincushion, and anamorphic squeeze. Name tags, outlines and the UI stay straight."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -2485,6 +2502,7 @@ wired.)
 		 height="170"
 		 name="atab_sec_distortion_adv"
 		 title="Distortion - Advanced"
+		 header_tool_tip="Moustache distortion toward the corners, how the bent image is fitted to the frame, the lens's center, and the tilt of a decentered element."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -2619,6 +2637,7 @@ wired.)
 		 height="142"
 		 name="atab_sec_vignette"
 		 title="Vignette"
+		 header_tool_tip="Darken the edges of the frame: how much, how far in, and how gradually."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -2699,6 +2718,7 @@ wired.)
 		 height="255"
 		 name="atab_sec_vignette_adv"
 		 title="Vignette - Advanced"
+		 header_tool_tip="The vignette's edge softness and shape, its edge and middle colors, where it is centered, and whether it stays round on wide screens."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -2881,6 +2901,7 @@ wired.)
 		 height="224"
 		 name="atab_sec_grain"
 		 title="Film Grain"
+		 header_tool_tip="Film or sensor grain over the image: its strength, size and character, which tones it sits in, its color, and whether it moves."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -3061,6 +3082,7 @@ wired.)
 		 height="90"
 		 name="atab_sec_sharp"
 		 title="Sharpen"
+		 header_tool_tip="Sharpen fine detail with contrast adaptive sharpening, which sharpens soft areas more than edges that are already crisp."
 		 fit_panel="true">
 			<panel
 			 follows="all"

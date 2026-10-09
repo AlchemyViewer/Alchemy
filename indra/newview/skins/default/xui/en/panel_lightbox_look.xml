@@ -37,6 +37,7 @@ Row conventions:
 		 height="142"
 		 name="atab_sec_tone"
 		 title="Exposure &amp; Tone"
+		 header_tool_tip="How bright the image is and how the scene's brightness is fitted to your display: exposure, the tonemapper, and how much of it is applied."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -166,6 +167,7 @@ Row conventions:
 		 height="194"
 		 name="atab_sec_tone_adv"
 		 title="Exposure &amp; Tone - Advanced"
+		 header_tool_tip="Each tonemapper's own shaping: the white point for ACES, Reinhard and Filmic, and contrast and white point for AgX. Only the selected tonemapper's rows have any effect."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -276,6 +278,7 @@ Row conventions:
 		 height="168"
 		 name="atab_sec_autoexp"
 		 title="Auto Exposure"
+		 header_tool_tip="Meter the frame and set the exposure automatically, adapting as the scene gets brighter or darker. The checkbox on the right switches it on."
 		 fit_panel="true">
 			<!-- A real setting on the header, like the grading master: it can be read
 			     and thrown with the section shut, and it is saved with the Look. -->
@@ -415,6 +418,7 @@ Row conventions:
 		 height="194"
 		 name="atab_sec_autoexp_adv"
 		 title="Auto Exposure - Advanced"
+		 header_tool_tip="How quickly auto exposure adapts in each direction, how much of the darkest and brightest parts of the frame the meter ignores, and how much the sky counts."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -530,6 +534,7 @@ Row conventions:
 		 height="155"
 		 name="atab_sec_grading"
 		 title="Color Grading"
+		 header_tool_tip="Color grading as a whole. The checkbox on the right is the master switch for every grading section; below it, grab a still of the frame to compare your grade against."
 		 fit_panel="true">
 			<!-- The master switch rides the header rather than sitting in the body,
 			     so it can be read and thrown with the section shut, and so it reads
@@ -669,6 +674,7 @@ Row conventions:
 		 height="466"
 		 name="atab_sec_basic"
 		 title="Basic"
+		 header_tool_tip="White balance and the everyday adjustments: contrast, highlights and shadows, white and black point, vibrance, saturation, brightness and hue."
 		 fit_panel="true">
 			<!-- Ticked is the section switched on, which is the only way a box
 			     beside a section title reads. -->
@@ -960,6 +966,7 @@ Row conventions:
 		 height="248"
 		 name="atab_sec_primaries"
 		 title="Primaries"
+		 header_tool_tip="Lift, gamma and gain: color wheels that tint and level the shadows, midtones and highlights separately."
 		 fit_panel="true">
 			<accordion_tab.header_check_box
 			 name="section_primaries"
@@ -1049,6 +1056,7 @@ Row conventions:
 		 height="461"
 		 name="atab_sec_split"
 		 title="Split Toning"
+		 header_tool_tip="Push one color into the shadows, another into the highlights and a third into the midtones, and choose where the shadows end and the highlights begin."
 		 fit_panel="true">
 			<accordion_tab.header_check_box
 			 name="section_split"
@@ -1241,6 +1249,7 @@ Row conventions:
 		 height="116"
 		 name="atab_sec_lut"
 		 title="3D LUT"
+		 header_tool_tip="Grade with a color look-up table, a .cube or image LUT from your colorlut folder, at the strength you choose."
 		 fit_panel="true">
 			<accordion_tab.header_check_box
 			 name="section_lut"
@@ -1357,6 +1366,7 @@ Row conventions:
 		 height="285"
 		 name="atab_sec_curve"
 		 title="Tone Curve"
+		 header_tool_tip="Reshape the tones with curves, on all channels together or on red, green and blue separately."
 		 fit_panel="true">
 			<accordion_tab.header_check_box
 			 name="section_curve"
