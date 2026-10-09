@@ -1015,11 +1015,22 @@ void LLWorld::updateWaterObjects()
 
     S32 rwidth = 256;
 
-    // We only want to fill in water for stuff that's near us, say, within 256 or 512m
+    // Hole water fills the cells among the loaded regions that have none, and edge water starts past the box, so
+    // the box reaches 256 m around the agent's region, or 512 m past a 256 m draw distance, and out to the farthest
+    // region loaded, which a long draw distance puts kilometres away; short of it, edge water would lie under them.
     S32 range = LLViewerCamera::getInstance()->getFar() > 256.f ? 512 : 256;
 
     LLViewerRegion* regionp = gAgent.getRegion();
     from_region_handle(regionp->getHandle(), &region_x, &region_y);
+
+    for (LLViewerRegion* loaded : mRegionList)
+    {
+        U32 loaded_x, loaded_y;
+        from_region_handle(loaded->getHandle(), &loaded_x, &loaded_y);
+        const S32 width = (S32)loaded->getWidth();
+        range = llmax(range, (S32)region_x - (S32)loaded_x, (S32)loaded_x + width - rwidth - (S32)region_x);
+        range = llmax(range, (S32)region_y - (S32)loaded_y, (S32)loaded_y + width - rwidth - (S32)region_y);
+    }
 
     min_x = (S32)region_x - range;
     min_y = (S32)region_y - range;
@@ -1048,8 +1059,8 @@ void LLWorld::updateWaterObjects()
     {
         for (y = min_y; y <= max_y; y += rwidth)
         {
-            U64 region_handle = to_region_handle(x, y);
-            if (!getRegionFromHandle(region_handle))
+            // Containment, not the handle: a variable-sized region covers cells that are not its origin.
+            if (!getRegionFromPosGlobal(LLVector3d(x + rwidth / 2, y + rwidth / 2, 0.0)))
             {   // No region at that area, so make water
                 LLVOWater* waterp = (LLVOWater *)gObjectList.createObjectViewer(LLViewerObject::LL_VO_WATER, gAgent.getRegion());
                 waterp->setPositionGlobal(LLVector3d(x + rwidth/2,
@@ -1070,11 +1081,13 @@ void LLWorld::updateWaterObjects()
     center_x = min_x + (wx >> 1);
     center_y = min_y + (wy >> 1);
 
+    // Edge water reaches 512 m past the agent's region before its stretch, or starts at the box where the box
+    // already reaches further.
     S32 add_boundary[4] = {
-        (S32)(512 - (max_x - region_x)),
-        (S32)(512 - (max_y - region_y)),
-        (S32)(512 - (region_x - min_x)),
-        (S32)(512 - (region_y - min_y)) };
+        llmax(0, (S32)(512 - (max_x - region_x))),
+        llmax(0, (S32)(512 - (max_y - region_y))),
+        llmax(0, (S32)(512 - (region_x - min_x))),
+        llmax(0, (S32)(512 - (region_y - min_y))) };
 
     S32 dir;
     for (dir = 0; dir < EDGE_WATER_OBJECTS_COUNT; dir++)
