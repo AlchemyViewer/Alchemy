@@ -21,7 +21,7 @@ else()
 endif()
 
 # al_add_test(<name> PROJECT <project> [UNIT] [DIR <folder>] [PYTHON] [GL] [ISA_TIER <tier>]
-#             [PCH <target>] [SOURCES <file>...] [LIBRARIES <target>...] [INCLUDES <dir>...]
+#             [SOURCES <file>...] [LIBRARIES <target>...] [INCLUDES <dir>...]
 #             [DEFINES <define>...] [COMMAND <arg>...] [ENVIRONMENT <VAR=value>...])
 #
 # Builds tests/<name>_test.cpp into an executable and registers it as a test
@@ -43,11 +43,6 @@ endif()
 # labelled gl, and where AL_ENABLE_GL_TESTS is off it is built and
 # registered disabled.
 #
-# PCH names a target whose precompiled header the test's sources are
-# compiled against. Clang alone: a test's LL_TEST definitions differ from the
-# header's, which MSVC warns of -- an error here -- and GCC takes as a reason
-# not to use the header at all.
-#
 # ISA_TIER builds the test for that x86-64 tier (baseline, v2, v3 or v4)
 # rather than the tree's, against the tree's libraries: its own sources are
 # compiled with that tier's flag and AL_ISA_LEVEL, so a SIMD path can be
@@ -65,7 +60,7 @@ function(al_add_test name)
     PARSE_ARGV 1
     arg
     "UNIT;PYTHON;GL"
-    "PROJECT;ISA_TIER;PCH;DIR"
+    "PROJECT;ISA_TIER;DIR"
     "SOURCES;LIBRARIES;INCLUDES;DEFINES;COMMAND;ENVIRONMENT"
   )
   if(NOT arg_PROJECT)
@@ -153,14 +148,6 @@ function(al_add_test name)
     list(REMOVE_AT command ${executable_position})
     list(INSERT command ${executable_position} "$<TARGET_FILE:${target}>")
   endif()
-  if(arg_UNIT)
-    list(
-      APPEND command
-      "--touch=${CMAKE_CURRENT_BINARY_DIR}/${target}_ok.txt"
-      "--sourcedir=${CMAKE_CURRENT_SOURCE_DIR}"
-    )
-  endif()
-
   set(environment ${arg_ENVIRONMENT})
   set(labels)
   set(disabled FALSE)
@@ -218,7 +205,7 @@ function(al_add_bench name)
   add_executable(${target} tests/${name}_bench.cpp ${arg_SOURCES})
   target_link_libraries(${target} PRIVATE al::flags ${arg_LIBRARIES})
   target_include_directories(${target} PRIVATE ${arg_INCLUDES} ${INDRA_SOURCE_DIR}/llmath)
-  target_compile_definitions(${target} PRIVATE "AL_BENCH=1" ${arg_DEFINES})
+  target_compile_definitions(${target} PRIVATE ${arg_DEFINES})
   set_target_properties(${target} PROPERTIES FOLDER "Benchmarks/${arg_PROJECT}")
   if(WINDOWS)
     set_target_properties(${target} PROPERTIES AL_SKIP_RELEASE_DEBUG_INFO ON)

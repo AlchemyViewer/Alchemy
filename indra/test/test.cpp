@@ -57,8 +57,6 @@ void wouldHaveCrashed(const std::string& message);
 
 namespace tut
 {
-    std::string sSourceDir;
-
     test_runner_singleton runner;
 }
 
@@ -318,8 +316,6 @@ static const apr_getopt_option_t TEST_CL_OPTIONS[] =
     {"verbose", 'v', 0, "Verbose output."},
     {"group", 'g', 1, "Run test group specified by option argument."},
     {"output", 'o', 1, "Write output to the named file."},
-    {"sourcedir", 's', 1, "Project source file directory from CMake."},
-    {"touch", 't', 1, "Touch the given file if all tests succeed"},
     {"wait", 'w', 0, "Wait for input before exit."},
     {"debug", 'd', 0, "Emit full debug logs."},
     {"suitename", 'x', 1, "Run tests using this suitename"},
@@ -434,7 +430,6 @@ int main(int argc, char **argv)
     const char* opt_arg = NULL;
     int opt_id = 0;
     std::unique_ptr<llofstream> output;
-    const char *touch = NULL;
 
     while(true)
     {
@@ -465,14 +460,6 @@ int main(int argc, char **argv)
             case 'o':
                 output.reset(new llofstream);
                 output->open(opt_arg);
-                break;
-            case 's':   // --sourcedir
-                tut::sSourceDir = opt_arg;
-                // For convenience, so you can use tut::sSourceDir + "myfile"
-                tut::sSourceDir += '/';
-                break;
-            case 't':
-                touch = opt_arg;
                 break;
             case 'w':
                 wait_at_exit = true;
@@ -552,14 +539,6 @@ int main(int argc, char **argv)
     {
         std::cerr << "Press return to exit..." << std::endl;
         std::cin.get();
-    }
-
-    if (touch && success)
-    {
-        llofstream s;
-        s.open(touch);
-        s << "ok" << std::endl;
-        s.close();
     }
 
     ll_cleanup_apr();
