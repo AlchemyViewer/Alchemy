@@ -234,16 +234,37 @@ private:
         bool alone  = false;
         S32  target = 0;
     };
+    // What was open at a place, or the region markers: as much as the place
+    // before it held, at the bottom, and these over that -- what is open
+    // where blocks never close is open at every place after, and is held
+    // once, and moved along with an edit once -- and how far down the
+    // lines from there to the next place reached.
+    template <typename T>
+    struct Held
+    {
+        size_t         under = 0;
+        std::vector<T> own;
+        size_t         low   = 0;
+    };
     struct Walked
     {
-        S32                 line   = 0;
-        size_t              closed = 0;
-        std::vector<Opened> open;
-        std::vector<S32>    marked;
-        size_t              openLow   = 0;
-        size_t              markedLow = 0;
+        S32          line   = 0;
+        size_t       closed = 0;
+        Held<Opened> open;
+        Held<S32>    marked;
     };
     static constexpr S32 WALK_STEP = 128;
+    // A place kept at a line, over the place before it, from which the
+    // lines have reached as far down as `open_low` and `marked_low`.
+    static Walked placeAt(S32 line, size_t closed, const std::vector<Opened>& open, size_t open_low, const std::vector<S32>& marked, size_t marked_low);
+    // What was open at a place, whole: what it holds over what the places
+    // before it hold under it.
+    template <typename T>
+    void wholeAt(size_t index, Held<T> Walked::* held, std::vector<T>& out) const;
+    // A place let go of: what it held of its own under the place after it,
+    // put under that one's own.
+    template <typename T>
+    static void handDown(const Held<T>& gone, Held<T>& next);
     // The walk, again from before the lines changed or whole; and one line
     // of it, which closes what it closes of what was open before it, and
     // takes the low marks down to as little as it leaves open.

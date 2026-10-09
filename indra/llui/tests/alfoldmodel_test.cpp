@@ -326,21 +326,46 @@ namespace tut
     template<> template<>
     void alfoldmodel_object::test<8>()
     {
-        set_test_name("by syntax, through edits of every kind, the blocks found from the walk kept are those a walk of the whole text finds, and an edit walks only near it and puts the blocks together from what it walked");
-        // The same edits on every run from a seed, three runs.
-        S32        nearby  = 0;
-        S32        spliced = 0;
-        const auto run     = [&](U32 first_seed) {
-            // Functions with braces their own lines' and their headers', an
-            // else, regions, and block comments, which a lexer here reads as
-            // a highlighter does: a line's braces count where they are code.
+        set_test_name("by syntax, through edits of every kind, in a short text and in a long one whose blocks are left open, the blocks found from the walk kept are those a walk of the whole text finds, and an edit walks only near it and puts the blocks together from what it walked");
+        // The same edits on every run from a seed, four runs.
+        S32 nearby  = 0;
+        S32 spliced = 0;
+        // Functions with braces their own lines' and their headers', an else,
+        // regions, and block comments, which a lexer here reads as a
+        // highlighter does: a line's braces count where they are code. Or
+        // many more of them, every third brace alone on its line left out,
+        // so that what is open grows down the text.
+        const auto functions = [](S32 count, bool unclosed) {
             std::string text;
-            for (S32 f = 0; f < 60; ++f)
+            for (S32 f = 0; f < count; ++f)
             {
                 text += f % 3 == 0 ? "f()\n{\n    if (a) {\n        b();\n    } else {\n        c();\n    }\n}\n"
                       : f % 3 == 1 ? "// #region r\ng() {\n    d();\n}\n// #endregion\n\n"
                                    : "/* h() {\n */\nh()\n{\n    e();\n}\n";
             }
+            if (!unclosed)
+            {
+                return text;
+            }
+            std::string out;
+            S32         alone = 0;
+            size_t      at    = 0;
+            while (at < text.size())
+            {
+                const size_t end  = text.find('\n', at);
+                std::string  line = text.substr(at, end - at);
+                if (line == "}" && ++alone % 3 == 0)
+                {
+                    line.clear();
+                }
+                out += line + "\n";
+                at = end + 1;
+            }
+            return out;
+        };
+        // `sweeping`: now and then hundreds of lines taken at once, over
+        // places the walk keeps.
+        const auto run = [&](U32 first_seed, const std::string& text, bool sweeping) {
             ALTextDocument doc(text);
             // Whether each line starts inside a comment, as the lexer has it.
             const auto starts = [&doc]() {
@@ -427,7 +452,12 @@ namespace tut
                     // One run: a piece put in, over a stretch of up to a few
                     // lines or none.
                     const ALTextPos from  = somewhere();
-                    const S32       lines = pick(4);
+                    S32             lines = pick(4);
+                    if (sweeping)
+                    {
+                        const S32 big = pick(12);
+                        lines         = big == 0 ? pick(400) : lines;
+                    }
                     const S32       piece = pick(PIECE_COUNT);
                     const S32       to    = llmin(from.line + lines, doc.lineCount() - 1);
                     const S32       col   = pick(doc.lineLength(to) + 1);
@@ -501,9 +531,10 @@ namespace tut
             spliced += kept.lastSpliced() ? 1 : 0;
             }
         };
-        run(20261009u);
-        run(7u);
-        run(4242u);
+        run(20261009u, functions(60, false), false);
+        run(7u, functions(60, false), false);
+        run(4242u, functions(60, false), false);
+        run(99u, functions(400, true), true);
         ensure("most edits walked only near them: " + std::to_string(nearby), nearby > 1200);
         ensure("and most put the blocks together from the walk's changes: " + std::to_string(spliced), spliced > 300);
     }

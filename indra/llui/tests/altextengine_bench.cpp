@@ -163,6 +163,33 @@ namespace
         e.deleteRange(ALTextRange(ALTextPos(0, 0), ALTextPos(0, static_cast<S32>(what.size()))));
     }
 
+    // A text with every third line that is a closer alone -- `}`, `end` --
+    // left empty, as a paste cut short leaves its blocks: never closed.
+    std::string withoutClosers(const std::string& text, std::string_view closer)
+    {
+        std::string out;
+        out.reserve(text.size());
+        size_t at   = 0;
+        S32    seen = 0;
+        while (at < text.size())
+        {
+            const size_t           end   = std::min(text.find('\n', at), text.size());
+            const std::string_view line  = std::string_view(text).substr(at, end - at);
+            const size_t           begin = line.find_first_not_of(" \t");
+            const bool             alone = begin != std::string_view::npos && line.substr(begin) == closer;
+            if (!alone || ++seen % 3 != 0)
+            {
+                out.append(line);
+            }
+            if (end < text.size())
+            {
+                out.push_back('\n');
+            }
+            at = end + 1;
+        }
+        return out;
+    }
+
     // Keys typed as vim sees them: the key, then its character where the
     // key was not taken; an escape character is Escape.
     void typeKeys(ALCodeEditor& e, const char* keys)
@@ -715,12 +742,26 @@ int main(int, char**)
         editAtTop(e, "x");
         g_sink = g_sink + e.foldRegions().size();
     });
-    both("a line broken at the top and joined, then the editor's fold regions", subjects, 1, [&](Subject&, ALCodeEditor& e) {
+    const auto brokenAndJoined = [](Subject&, ALCodeEditor& e) {
         e.setCaret(ALTextPos(0, 0));
         e.insertText("\n");
         e.deleteRange(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
         g_sink = g_sink + e.foldRegions().size();
-    });
+    };
+    both("a line broken at the top and joined, then the editor's fold regions", subjects, 1, brokenAndJoined);
+    // A third of the blocks never closed, so that what is open grows down
+    // the text, and every place the walk keeps is under all of it.
+    for (Subject& s : subjects)
+    {
+        s.editor->setText(withoutClosers(s.text, &s == subjects ? "}" : "end"));
+        g_sink = g_sink + s.editor->foldRegions().size();
+    }
+    both("a third never closed: the same", subjects, 1, brokenAndJoined);
+    for (Subject& s : subjects)
+    {
+        s.editor->setText(s.text);
+        s.editor->undoJournal().clear();
+    }
 
     std::printf("\nLaying out every line\n");
     const S32 tab   = subjects[0].editor->layout().tabWidth();
