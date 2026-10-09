@@ -1838,7 +1838,7 @@ namespace tut
     // How often each module ran, as a module says it through `counted`,
     // a builtin of the VM, as SLua's are: a module's own globals are its
     // own, and what it sets is not the script's.
-    std::map<std::string, int> gRuns;
+    static std::map<std::string, int> gRuns;
 
     template<> template<>
     void alpreprocessor_object::test<48>()
