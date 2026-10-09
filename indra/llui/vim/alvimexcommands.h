@@ -45,7 +45,8 @@ class ALVimExCommands
 public:
     explicit ALVimExCommands(ALVimKeymap& vim) : mVim(vim) {}
 
-    // The : line.
+    // The : line: its commands in turn, each to the | that ends it, as
+    // vim's :bar has them, an error ending the line there.
     void runCommand(ALTextView& view, const std::string& line);
     // The : line run as one entered on it, by a key from the keyboard or
     // not -- a macro's, :normal's, a mapping's -- as vim's KeyTyped has it:
@@ -85,6 +86,9 @@ public:
         // its edits here and asks nothing; the asking starts, over the
         // lot in order, once the :g is through.
         bool                                             gathering = false;
+        // What follows the asking :s on its : line, after a |: run once
+        // the asking is done, as vim runs it after.
+        std::string                                      then;
     };
     Confirming confirming;
     bool       confirmKey(ALTextView& view, const ALVimInput& input);
@@ -100,7 +104,7 @@ public:
     // :d, :s, :> and :< with no lines of their own -- the command puts its
     // edits here, measured in the text as it was, and they go in at once
     // when the :g is through: one edit, heard of once, for the lot. The
-    // place the caret lands is kept likewise, and what is said is added up.
+    // place the caret lands is kept likewise.
     struct GlobalBatch
     {
         std::vector<std::pair<ALTextRange, std::string>> edits;
@@ -109,9 +113,6 @@ public:
         ALTextPos                                        landing;
         S32                                              landingBelow = 0;
         bool                                             landed       = false;
-        S32                                              substitutions = 0;
-        S32                                              substitutedLines = 0;
-        S32                                              deletedLines = 0;
     };
     GlobalBatch* globalBatch = nullptr;
     // Whether a :g's command is one it batches.
@@ -139,11 +140,21 @@ public:
     std::string lastReplacement;
     std::string lastSubstituteFlags;
 
+    // Whether a :g is running its command over lines, which says nothing
+    // until it is through, as vim's global_busy has it.
+    bool inGlobal() const { return mInGlobal; }
+
 private:
+    // One command of a : line, no | ending it.
+    void runOneCommand(ALTextView& view, const std::string& line);
+
     ALVimKeymap& mVim;
     // Whether a :g is running its command over lines, which another :g
-    // may not do, as vim has it (E147).
+    // may not do, as vim has it (E147); and what its :s commands made,
+    // and over how many lines, said once it is through.
     bool mInGlobal = false;
+    S32  mGlobalSubstitutions = 0;
+    S32  mGlobalSubstitutedLines = 0;
     // Whether the line being run was entered by a key typed (runEntered).
     bool mLineTyped = false;
 };

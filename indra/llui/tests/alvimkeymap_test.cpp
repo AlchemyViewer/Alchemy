@@ -219,7 +219,7 @@ namespace tut
 
     // More than TUT's fifty a group holds by default, which runs the first
     // fifty and says nothing of the rest: keep this above the highest test.
-    typedef test_group<alvimkeymap_data, 210> alvimkeymap_group;
+    typedef test_group<alvimkeymap_data, 220> alvimkeymap_group;
     typedef alvimkeymap_group::object    alvimkeymap_object;
     alvimkeymap_group                    alvimkeymap_group_instance("alvimkeymap");
 
@@ -874,11 +874,18 @@ namespace tut
         keys(":%s/x\\nb/Q/c<CR>");
         ensure_equals("the question says how many lines", vim->status(), std::string("replace with Q (over 2 lines) (y/n/a/q/l)?"));
         keys("q");
-        // The lines are run from the top down: the first gathers its
-        // edit, the next errors.
+        // The lines are run from the top down: a line with none to
+        // substitute is no error under :g, as in vim, and the asking is
+        // over what the others gathered.
         keys(":g/a/s/x/X/c<CR>");
+        ensure("asking", vim->mode() == ALVimKeymap::Mode::Confirm);
+        keys("y");
+        ensure_equals("the one there was", flat(e.text()), std::string("a X|b|a y|a z|"));
+        keys("u");
+        // The first gathers its edit, the command after it errors.
+        keys(":g/a/s/x/X/c|nosuch<CR>");
         ensure("not asking", vim->mode() == ALVimKeymap::Mode::Normal);
-        ensure_equals("the error, and that nothing was done", vim->message(), std::string("E486: Pattern not found: x -- nothing substituted"));
+        ensure_equals("the error, and that nothing was done", vim->message(), std::string("E492: Not an editor command: nosuch -- nothing substituted"));
         ensure_equals("nothing was", flat(e.text()), std::string("a x|b|a y|a z|"));
     }
     template<> template<>
@@ -1526,9 +1533,12 @@ namespace tut
         ensure("the heading", listed[0].compare(0, 17, "Type Name Content") == 0);
         ensure("a yank of lines", listed[0].find("\n  l  \"0   one^J") != std::string::npos);
         ensure("a named one, of characters, a tab as ^I", listed[0].find("\n  c  \"a   ^I") != std::string::npos);
-        ensure("the last : line", listed[0].find("\n  c  \":   registers") != std::string::npos);
+        ensure("no : line run before it", listed[0].find("\":") == std::string::npos);
         keys(":di a<CR>");
         ensure("only those named", listed[1].find("\"0") == std::string::npos && listed[1].find("\"a") != std::string::npos);
+        keys(":di :<CR>");
+        ensure("the : line run before this one", listed.back().find("\n  c  \":   di a") != std::string::npos);
+        listed.pop_back();
 
         keys("mb:marks<CR>");
         ensure_equals("marks", listed[2], std::string("mark line  col file/text\n b      2    0 two three"));
@@ -5935,5 +5945,469 @@ namespace tut
         editor->setCaret(ALTextPos(0, 1));
         keys("dit");
         ensure_equals("dit on an empty tag between its tags", caretText(), std::string("0:3"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<205>()
+    {
+        set_test_name("a count's $ from the last line fails where the caret is, as vim's cursor_down() does: d2$, y2$, c2$, 2D, 2C and 2g_ take nothing, and k after any wants the line's end; from a line above it goes as far as there are");
+        const char* text = "abcdefgh\nghi jkl";
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("2$");
+        ensure_equals("2$ on the last line stays", caretText(), std::string("1:2"));
+        keys("k");
+        ensure_equals("k after it to the line's end", caretText(), std::string("0:7"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("d2$");
+        ensure_equals("d2$ takes nothing", flat(editor->text()), std::string("abcdefgh|ghi jkl"));
+        ensure_equals("and leaves the caret", caretText(), std::string("1:2"));
+        keys("k");
+        ensure_equals("k after it to the line's end", caretText(), std::string("0:7"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("yly2$");
+        ensure_equals("y2$ yanks nothing", vim->registerText('"'), std::string("i"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("c2$");
+        ensure("c2$ inserts nothing", vim->mode() == ALVimKeymap::Mode::Normal);
+        keys("X");
+        ensure_equals("and the X after it is normal mode's", flat(editor->text()), std::string("abcdefgh|gi jkl"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("2D");
+        ensure_equals("2D takes nothing", flat(editor->text()), std::string("abcdefgh|ghi jkl"));
+        keys("k");
+        ensure_equals("k after it to the line's end", caretText(), std::string("0:7"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("2C");
+        ensure("2C inserts nothing", vim->mode() == ALVimKeymap::Mode::Normal);
+        ensure_equals("and takes nothing", flat(editor->text()), std::string("abcdefgh|ghi jkl"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("2g_");
+        ensure_equals("2g_ on the last line stays", caretText(), std::string("1:2"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 2));
+        keys("vl2$d");
+        ensure_equals("a visual 2$ leaves the selection as it was", flat(editor->text()), std::string("abcdefgh|ghjkl"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 1));
+        keys("<C-v>2$d");
+        ensure_equals("a block's to every line's end all the same", flat(editor->text()), std::string("abcdefgh|g"));
+
+        make("abc def\nghi jkl\nmno pqr");
+        editor->setCaret(ALTextPos(1, 2));
+        keys("3$");
+        ensure_equals("3$ with one line below to its end", caretText(), std::string("2:6"));
+        editor->setCaret(ALTextPos(1, 2));
+        keys("d3$");
+        ensure_equals("d3$ through it", flat(editor->text()), std::string("abc def|gh"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<206>()
+    {
+        set_test_name(":d and :y take a register and then a count after them as vim's do -- a capital adding to its register, a digit the count's, a \" the start of a comment -- and anything more after them, or after :put's register, is trailing characters");
+        const char* text = "one\ntwo\nthree\nfour\nfive\nsix";
+        make(text);
+        editor->setCaret(ALTextPos(1, 1));
+        ex("y a");
+        ensure_equals(":y a", vim->registerText('a'), std::string("two"));
+        ensure_equals("the caret left where it was", caretText(), std::string("1:1"));
+        ex("y A 3");
+        ensure_equals(":y A 3 adds three lines", vim->registerText('a'), std::string("two\ntwo\nthree\nfour"));
+        ensure_equals("and says so", vim->message(), std::string("3 lines yanked into \"A"));
+        ex("2,3y b 2");
+        ensure_equals(":2,3y b 2: two lines from the range's last", vim->registerText('b'), std::string("three\nfour"));
+        ex("y 3");
+        ensure_equals(":y 3: a count, not register 3", vim->registerText('0'), std::string("two\nthree\nfour"));
+        ensure_equals("said", vim->message(), std::string("3 lines yanked"));
+        ex("y \"x");
+        ensure_equals("a \" begins a comment", vim->registerText('0'), std::string("two"));
+        ensure_equals("and names no register", vim->registerText('x'), std::string());
+        ex("d x 3");
+        ensure_equals(":d x 3", flat(editor->text()), std::string("one|five|six"));
+        ensure_equals("into x", vim->registerText('x'), std::string("two\nthree\nfour"));
+        ensure_equals("said", vim->message(), std::string("3 fewer lines"));
+        ex("d 2");
+        ensure_equals(":d 2 from the caret's line", flat(editor->text()), std::string("one"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 1));
+        ex("d a b");
+        ensure("more after the register", vim->messageIsError() && vim->message() == "E488: Trailing characters: b");
+        ensure_equals("takes nothing", flat(editor->text()), std::string("one|two|three|four|five|six"));
+        ex("y a 3l");
+        ensure("more after the count", vim->messageIsError() && vim->message() == "E488: Trailing characters: l");
+        ensure_equals("yanks nothing", vim->registerText('a'), std::string());
+        ex("d 0");
+        ensure("a count of none", vim->messageIsError() && vim->message() == "E939: Positive count required");
+        ensure_equals("takes nothing either", flat(editor->text()), std::string("one|two|three|four|five|six"));
+        ex("pu a b");
+        ensure(":put's register with more after it", vim->messageIsError() && vim->message() == "E488: Trailing characters: b");
+        ensure_equals("puts nothing", flat(editor->text()), std::string("one|two|three|four|five|six"));
+
+        make(text);
+        editor->setCaret(ALTextPos(1, 1));
+        keys("\"a:y<CR>");
+        ensure_equals("a register named before the : is none of :y's", vim->registerText('a'), std::string());
+        ensure_equals("which yanks into 0", vim->registerText('0'), std::string("two"));
+
+        make(text);
+        keys(":g/o/d A<CR>");
+        ensure_equals(":g/o/d A", flat(editor->text()), std::string("three|five|six"));
+        ensure_equals("each line added to a", vim->registerText('a'), std::string("one\ntwo\nfour"));
+        ensure_equals("and how many said once", vim->message(), std::string("3 fewer lines"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<207>()
+    {
+        set_test_name("a delete or a change of characters over lines says how many fewer there are, and a change of lines how many it took but the one it leaves, for more than two as vim's report has it; a block's says nothing");
+        const char* text = "one\ntwo\nthree\nfour\nfive\nsix";
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("d/five<CR>");
+        ensure_equals("d/five from the first line's second character", flat(editor->text()), std::string("o|five|six"));
+        ensure_equals("said", vim->message(), std::string("3 fewer lines"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("d/ive<CR>");
+        ensure_equals("d/ive into the fifth line", flat(editor->text()), std::string("oive|six"));
+        ensure_equals("said", vim->message(), std::string("4 fewer lines"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("d/hree<CR>");
+        ensure_equals("d/hree into the third", flat(editor->text()), std::string("ohree|four|five|six"));
+        ensure("two fewer: nothing said: " + vim->message(), vim->message().empty());
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("v3jx");
+        ensure_equals("v3jx", flat(editor->text()), std::string("our|five|six"));
+        ensure_equals("said", vim->message(), std::string("3 fewer lines"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("c/ive<CR>");
+        ensure("c/ive inserts", vim->mode() == ALVimKeymap::Mode::Insert);
+        ensure_equals("and says how many fewer", vim->message(), std::string("4 fewer lines"));
+        keys("X<Esc>");
+        ensure_equals("what it typed in their place", flat(editor->text()), std::string("oXive|six"));
+
+        make(text);
+        keys("4cc");
+        ensure("4cc inserts", vim->mode() == ALVimKeymap::Mode::Insert);
+        ensure_equals("the line it leaves not counted", vim->message(), std::string("3 fewer lines"));
+        keys("X<Esc>");
+        ensure_equals("4cc", flat(editor->text()), std::string("X|five|six"));
+
+        make(text);
+        keys("3cc");
+        ensure("3cc: two fewer, nothing said: " + vim->message(), vim->message().empty());
+        keys("<Esc>");
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("<C-v>3jd");
+        ensure_equals("a block over four lines", flat(editor->text()), std::string("oe|to|tree|fur|five|six"));
+        ensure("takes no line: nothing said: " + vim->message(), vim->message().empty());
+
+        make("a1\na2\na3\na4\n\nb");
+        editor->setCaret(ALTextPos(0, 1));
+        keys("d}");
+        ensure_equals("d} from the paragraph's second character", flat(editor->text()), std::string("a||b"));
+        ensure_equals("said", vim->message(), std::string("3 fewer lines"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<208>()
+    {
+        set_test_name("visual p and P say how many more lines they put, as a put does -- lines in place of lines, lines into characters with the line broken round them, characters over lines -- and nothing of the lines they replaced");
+        const char* text = "one\ntwo\nthree\nfour\nfive\nsix";
+        make(text);
+        keys("3yyGVp");
+        ensure_equals("3yy then Vp", flat(editor->text()), std::string("one|two|three|four|five|one|two|three"));
+        ensure_equals("said", vim->message(), std::string("3 more lines"));
+
+        make(text);
+        keys("3yyGVP");
+        ensure_equals("VP too", vim->message(), std::string("3 more lines"));
+
+        make(text);
+        keys("3yyjjjV2jp");
+        ensure_equals("over as many lines", flat(editor->text()), std::string("one|two|three|one|two|three"));
+        ensure_equals("said all the same", vim->message(), std::string("3 more lines"));
+
+        make(text);
+        keys("yyGV3p");
+        ensure_equals("a count's copies", vim->message(), std::string("3 more lines"));
+
+        make(text);
+        keys("3yyjlvp");
+        ensure_equals("lines into a character", flat(editor->text()), std::string("one|t|one|two|three|o|three|four|five|six"));
+        ensure_equals("the line broken round them counted", vim->message(), std::string("4 more lines"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 1));
+        keys("v3jyG0vp");
+        ensure_equals("characters over four lines", flat(editor->text()), std::string("one|two|three|four|five|ne|two|three|foix"));
+        ensure_equals("said by their breaks", vim->message(), std::string("3 more lines"));
+
+        make(text);
+        keys("yyjV3jp");
+        ensure_equals("a line over four", flat(editor->text()), std::string("one|one|six"));
+        ensure("nothing said of the lines it replaced: " + vim->message(), vim->message().empty());
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<209>()
+    {
+        set_test_name(":put of the registers vim keeps itself: : the line run before this one and / the last search as lines, . the last insert typed in after the caret, and each its own error while it holds nothing");
+        make("one\ntwo");
+        keys(":put :<CR>");
+        ensure_equals("no : line yet", vim->message(), std::string("E30: No previous command line"));
+        keys(":put .<CR>");
+        ensure_equals("nothing typed yet", vim->message(), std::string("E29: No inserted text yet"));
+        keys(":put /<CR>");
+        ensure_equals("no search yet", vim->message(), std::string("E35: No previous regular expression"));
+        ensure_equals("nothing put", flat(editor->text()), std::string("one|two"));
+
+        make("one\ntwo");
+        keys(":s/o/0/<CR>:put :<CR>");
+        ensure_equals(": the line before", flat(editor->text()), std::string("0ne|s/o/0/|two"));
+        keys(":put :<CR>");
+        ensure_equals("which is this one the second time", flat(editor->text()), std::string("0ne|s/o/0/|put :|two"));
+
+        make("one\ntwo");
+        keys("/tw<CR>:put /<CR>");
+        ensure_equals("/ the search", flat(editor->text()), std::string("one|two|tw"));
+
+        make("one\ntwo");
+        keys("Ahey<Esc>:put .<CR>");
+        ensure_equals(". typed in after the caret", flat(editor->text()), std::string("oneheyhey|two"));
+        ensure_equals("the caret on its last character", caretText(), std::string("0:8"));
+
+        make("one two\nthree");
+        keys("wiab<Esc>");
+        editor->setCaret(ALTextPos(0, 1));
+        keys(":2put .<CR>");
+        ensure_equals("on the range's line, the column kept", flat(editor->text()), std::string("one abtwo|thabree"));
+        ensure_equals("there", caretText(), std::string("1:3"));
+        editor->setCaret(ALTextPos(0, 2));
+        keys(":put! .<CR>");
+        ensure_equals("with ! at the caret", flat(editor->text()), std::string("onabe abtwo|thabree"));
+        ensure_equals("and there", caretText(), std::string("0:3"));
+        editor->setCaret(ALTextPos(1, 0));
+        keys(":0put .<CR>");
+        ensure_equals(":0put as :1put!", flat(editor->text()), std::string("abonabe abtwo|thabree"));
+
+        make("a a a");
+        keys(":s/a/b/<CR>:normal @:<CR>");
+        ensure_equals("@: in a line runs the one before it", flat(editor->text()), std::string("b b a"));
+        keys("@:");
+        ensure_equals("and that line is never the : register", flat(editor->text()), std::string("b b b"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<210>()
+    {
+        set_test_name("a block put into characters takes them out and goes in as a block where they began, after the line's last where they ran to its end");
+        const char* text = "abcd\nefgh\nijklmn\nopqrst";
+        make(text);
+        keys("<C-v>jly3jlvlp");
+        ensure_equals("vp: past the last line, a line of blanks to the column", flat(editor->text()), std::string("abcd|efgh|ijklmn|oabrst| ef"));
+        ensure_equals("the caret at its corner", caretText(), std::string("3:1"));
+        const ALVimRegisters::Register taken = vim->shared().registers.fetch('"', false);
+        ensure("what it took in the unnamed register, as characters", taken.text == "pq" && !taken.block && !taken.linewise);
+
+        make(text);
+        keys("<C-v>jly3jlvlP");
+        ensure_equals("vP the same", flat(editor->text()), std::string("abcd|efgh|ijklmn|oabrst| ef"));
+        ensure("the block kept", vim->shared().registers.fetch('"', false).block);
+
+        make(text);
+        keys("<C-v>jly2jlvjp");
+        ensure_equals("characters over lines", flat(editor->text()), std::string("abcd|efgh|iabqrst| ef"));
+        ensure_equals("there", caretText(), std::string("2:1"));
+
+        make(text);
+        keys("<C-v>jly3jlvl2p");
+        ensure_equals("a count side by side", flat(editor->text()), std::string("abcd|efgh|ijklmn|oababrst| efef"));
+
+        make("abcd\nefgh\nijklmn\nop");
+        keys("<C-v>jly2j$vp");
+        ensure_equals("to the line's end: after its last", flat(editor->text()), std::string("abcd|efgh|ijklmab|op   ef"));
+        ensure_equals("and there", caretText(), std::string("2:5"));
+
+        make("abcd\nefgh\nijklmn\no");
+        keys("<C-v>jly2jllvlp");
+        ensure_equals("a short line under it padded", flat(editor->text()), std::string("abcd|efgh|ijabmn|o ef"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<211>()
+    {
+        set_test_name("a | on the : line ends one command and begins the next, but in :s's pattern and replacement, after :g and :normal, and as \\|; an error ends the line");
+        make("a c\na c");
+        keys(":s/a/b/ | s/c/d/<CR>");
+        ensure_equals("both, on the line", flat(editor->text()), std::string("b d|a c"));
+
+        make("a c");
+        keys(":s/zzz/y/ | s/c/d/<CR>");
+        ensure_equals("an error ends it", flat(editor->text()), std::string("a c"));
+        ensure_equals("said", vim->message(), std::string("E486: Pattern not found: zzz"));
+
+        make("a|b c");
+        keys(":s/a|b/X/|s/c/d/<CR>");
+        ensure_equals("in the pattern its own", flat(editor->text()), std::string("X d"));
+        make("a c");
+        keys(":s/a/x|y/|s/c/d/<CR>");
+        ensure_equals("in the replacement too", flat(editor->text()), std::string("x|y d"));
+        make("a|c");
+        keys(":s/a|c/z<CR>");
+        ensure_equals("and to the end where nothing closes it", flat(editor->text()), std::string("z"));
+
+        make("a\nb\nc");
+        keys(":3|d<CR>");
+        ensure_equals("after a range alone", flat(editor->text()), std::string("a|b"));
+        make("a\nb\nc");
+        keys(":1d|d<CR>");
+        ensure_equals("each its own range, or the caret's line", flat(editor->text()), std::string("c"));
+        make("a\nb\nc");
+        keys(":1d | 2d<CR>");
+        ensure_equals("a range after it", flat(editor->text()), std::string("b"));
+        make("a\nb");
+        keys(":1d|<CR>");
+        ensure_equals("nothing after it", flat(editor->text()), std::string("b"));
+
+        make("a\nb\na");
+        keys(":g/a/s/a/x/|s/x/y/<CR>");
+        ensure_equals(":g's command, each line", flat(editor->text()), std::string("y|b|y"));
+        make("a\nb");
+        keys(":normal Ax|y<CR>");
+        ensure_equals(":normal's keys", flat(editor->text()), std::string("ax|y|b"));
+
+        make("ab");
+        keys(":nnoremap Q x|s/b/c/<CR>");
+        ensure_equals("a mapping, then the next", flat(editor->text()), std::string("ac"));
+        keys("Q");
+        ensure_equals("the mapping to the |", flat(editor->text()), std::string("c"));
+        make("ab");
+        keys(":nnoremap Q ax\\|y<CR>Q<Esc>");
+        ensure_equals("\\| a | in it", flat(editor->text()), std::string("ax|yb"));
+
+        make("a c");
+        keys(":s/a/b/c|s/c/d/<CR>");
+        ensure_equals("after an asking :s, nothing while it asks", flat(editor->text()), std::string("a c"));
+        keys("y");
+        ensure_equals("the rest once it is done", flat(editor->text()), std::string("b d"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<212>()
+    {
+        set_test_name("a vimrc's line runs each command to its | in turn, the rest of the line not after one that fails, and a comment to its end");
+        ALVimKeymap::Shared      shared;
+        std::vector<std::string> errors;
+        const auto               host = [](const std::string&) { return false; };
+        ALVimKeymap::source(shared, "nnoremap Q x | nnoremap W ia\\|b<Esc>\nset nosuchthing | nnoremap E z\n\" a | comment\n", host, errors);
+        const ALVimMappings& maps = shared.mappings;
+        const ALVimMappings::Match q = maps.match(ALVimMappings::NORMAL, maps.keysOf("Q"), true);
+        ensure("the first", q.full && ALVimMappings::shown(q.full->to) == "x");
+        const ALVimMappings::Match w = maps.match(ALVimMappings::NORMAL, maps.keysOf("W"), true);
+        ensure("the second, its \\| a |", w.full && ALVimMappings::shown(w.full->to) == "ia<Bar>b<Esc>");
+        ensure("none after one that fails", maps.match(ALVimMappings::NORMAL, maps.keysOf("E"), true).full == nullptr);
+        ensure_equals("the one said", errors.size(), size_t(1));
+        ensure("by its line", errors[0].find("line 2:") == 0 && errors[0].find("E518") != std::string::npos);
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<213>()
+    {
+        set_test_name(":g says nothing of its command's lines while it runs and once it is through says the substitutions made, or the lines there are more or fewer of, and a :s that finds none on a line is no error there");
+        const char* five = "a1\nb\na2\nc\na3";
+        const auto  run  = [&](const char* text, const char* line) {
+            make(text);
+            keys(line);
+            return vim->message();
+        };
+        ensure_equals(":d", run(five, ":g/a/d<CR>"), std::string("3 fewer lines"));
+        ensure_equals("two said of by none", run("a\nb\na", ":g/a/d<CR>"), std::string());
+        ensure_equals(":s", run(five, ":g/a/s/a/x/<CR>"), std::string("3 substitutions on 3 lines"));
+        ensure_equals("several a line", run("aa\nb\naaa", ":g/a/s/a/x/g<CR>"), std::string("5 substitutions on 2 lines"));
+        ensure_equals("none on some lines", run(five, ":g/./s/a/x/<CR>"), std::string("3 substitutions on 3 lines"));
+        ensure_equals("and all made", flat(editor->text()), std::string("x1|b|x2|c|x3"));
+        ensure_equals("none on any", run(five, ":g/a/s/zzz/y/<CR>"), std::string());
+        ensure("and no error", !vim->messageIsError());
+        ensure_equals("counted only, as substitutions", run(five, ":g/./s/a//n<CR>"), std::string("3 substitutions on 3 lines"));
+        ensure_equals(":t", run(five, ":g/a/t.<CR>"), std::string("3 more lines"));
+        ensure_equals("each its own lines added up", run("a\nb\na\nb\na\nb", ":g/a/t.|t.<CR>"), std::string("6 more lines"));
+        ensure_equals(":j", run("a\n1\na\n2\na\n3\na\n4", ":g/a/j<CR>"), std::string("4 fewer lines"));
+        ensure_equals(":j with a count", run("a\n1\n2\na\n3\n4\na\n5\n6", ":g/a/j 3<CR>"), std::string("6 fewer lines"));
+        ensure_equals("and made", flat(editor->text()), std::string("a 1 2|a 3 4|a 5 6"));
+        ensure_equals("what each would say not said", run("a\n1\n2\nx\na\n3\n4\ny", ":g/a/normal 3dd<CR>"), std::string("6 fewer lines"));
+        ensure_equals(":normal of none", run(five, ":g/a/normal Ax<CR>"), std::string());
+        ensure_equals("a | after it", run(five, ":g/a/d|s/b/q/<CR>"), std::string("3 fewer lines"));
+        ensure_equals("substitutions before lines", run("a\na\na\na", ":g/a/s/a/x/|d<CR>"), std::string("4 substitutions on 4 lines"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<214>()
+    {
+        set_test_name("the registers vim keeps itself named for p and P and after Control-R, as characters, . typed in again; nothing yanked or deleted into them, and a change into one types where it was");
+        make("one\ntwo");
+        keys(":s/o/0/<CR>\":p");
+        ensure_equals("\":p the last : line after the caret", flat(editor->text()), std::string("0s/o/0/ne|two"));
+        ensure_equals("on its last character", caretText(), std::string("0:6"));
+        make("one\ntwo");
+        keys(":s/o/0/<CR>\":P");
+        ensure_equals("\":P before it", flat(editor->text()), std::string("s/o/0/0ne|two"));
+        ensure_equals("there too", caretText(), std::string("0:5"));
+        make("one\ntwo");
+        keys(":s/o/0/<CR>2\":p");
+        ensure_equals("a count's copies", flat(editor->text()), std::string("0s/o/0/s/o/0/ne|two"));
+        make("one\ntwo");
+        keys("/tw<CR>\"/p");
+        ensure_equals("\"/p the last search", flat(editor->text()), std::string("one|ttwwo"));
+        ensure_equals("on its last", caretText(), std::string("1:2"));
+        make("one\ntwo");
+        keys("Axy<Esc>0\".p");
+        ensure_equals("\".p the last insert's text", flat(editor->text()), std::string("oxynexy|two"));
+        ensure_equals("and there", caretText(), std::string("0:2"));
+
+        make("one two");
+        keys(":s/o/0/<CR>\":yy");
+        ensure("\":yy: nothing yanked", !vim->shared().registers.fetch('0', false).held && !vim->shared().registers.fetch('"', false).held);
+        keys("\":dd\":x\":D");
+        ensure_equals("\":dd, \":x, \":D: nothing taken", flat(editor->text()), std::string("0ne two"));
+        keys("\":cwZZ<Esc>");
+        ensure_equals("\":cw: nothing taken, typed where it was", flat(editor->text()), std::string("ZZ0ne two"));
+        ensure_equals("on what was typed", caretText(), std::string("0:1"));
+
+        make("one\ntwo");
+        keys(":s/o/0/<CR>A<C-r>:<Esc>");
+        ensure_equals("Control-R : the last : line typed in", flat(editor->text()), std::string("0nes/o/0/|two"));
+        make("one\ntwo");
+        keys("/tw<CR>A<C-r>/<Esc>");
+        ensure_equals("Control-R / the last search", flat(editor->text()), std::string("one|twotw"));
+
+        make("aab");
+        keys("/a~*b<CR>");
+        ensure_equals("~ with no last replacement: vim's own error", vim->message(), std::string("E33: No previous substitute regular expression"));
     }
 }

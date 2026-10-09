@@ -530,7 +530,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimConfirmReplaceLines">replace with [WITH] (over [COUNT] lines) (y/n/a/q/l)?</string>
 	<string name="VimTooRecursive">E169: Command too recursive</string>
 	<string name="VimNoPreviousCommand">E30: No previous command line</string>
+	<string name="VimNoInsertedText">E29: No inserted text yet</string>
 	<string name="VimNoPreviousPattern">E35: No previous regular expression</string>
+	<string name="VimNoPreviousSubstitute">E33: No previous substitute regular expression</string>
 	<string name="VimMarkNotSet">E20: Mark not set</string>
 	<string name="CodeFixSpelling">Change to "[WORD]"</string>
 	<string name="CodeFixAddWord">Add "[WORD]" to the dictionary</string>
@@ -556,6 +558,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimNotACommand">E492: Not an editor command: [LINE]</string>
 	<string name="VimInvalidAddress">E14: Invalid address</string>
 	<string name="VimMoveIntoItself">E134: Cannot move a range of lines into itself</string>
+	<string name="VimTrailingCharacters">E488: Trailing characters: [TEXT]</string>
+	<string name="VimPositiveCount">E939: Positive count required</string>
 	<!-- The counted ones take a form by the count as LLTrans's
 	     getCountString picks it: A for one, B for the rest in English;
 	     a language that counts a third way adds a C (Russian: 2-4). -->

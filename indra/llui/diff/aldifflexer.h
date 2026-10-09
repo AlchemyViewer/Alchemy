@@ -49,6 +49,8 @@
 // it did, and the rest kept, as the highlighter does. What it read again
 // is said of each (ALTextDiff::Reread): how far after the edit the lines'
 // regions changed, which a comparison compares again, and no further.
+// Where the edit is said (ALTextDiff::Known), the texts it holds are not
+// compared with the one asked for to find it.
 class ALDiffLexer
 {
 public:
@@ -56,8 +58,16 @@ public:
 
     // Each line's regions; held until the text after next is read.
     const std::vector<ALTextDiff::regions_t>& regions(const std::vector<std::string>& lines);
+    // As regions(), of a text known to be one it holds edited: that one as
+    // it is, or read again in its place from the edit said where that one
+    // is the text it would read in the place of; as regions(), where it
+    // holds no text so numbered or would read in the place of the other.
+    const std::vector<ALTextDiff::regions_t>& regions(const std::vector<std::string>& lines, const ALTextDiff::Known& known);
     // A lexer_t over this, kept alive by what holds it.
     static ALTextDiff::lexer_t lexerOf(std::shared_ptr<ALDiffLexer> lexer);
+    // A told_t over this, kept alive by what holds it: given beside a
+    // lexer_t over the same.
+    static ALTextDiff::told_t  toldOf(std::shared_ptr<ALDiffLexer> lexer);
 
     // What it says of the text it holds whose regions it answered as
     // `regions` (ALTextDiff::Reread); nothing of one it does not hold.
@@ -66,9 +76,12 @@ public:
     // lexer_t over the same.
     static ALTextDiff::reread_t rereadOf(std::shared_ptr<ALDiffLexer> lexer);
 
-    // How many lines the last text asked for was read again: what a test
-    // holds an edit's cost to.
+    // How many lines the last text asked for was read again; and how many
+    // lines of the texts asked for it has compared with those of a text it
+    // held, to find where the two differ: what a test holds an edit's cost
+    // to.
     S32 lastRead() const { return mLastRead; }
+    U64 linesCompared() const { return mCompared; }
 
 private:
     struct Text
@@ -108,6 +121,13 @@ private:
         boost::unordered_flat_map<std::string_view, std::vector<S32>, ll::string_hash, std::equal_to<>> mPlaces;
     };
 
+    // Where a text held and one asked for differ, each pair of lines
+    // compared counted.
+    ALDiffEdit::Edges edgesOf(const Text& text, const std::vector<std::string>& lines);
+    // A text read in the place of the one a slot holds: again in place,
+    // where that is mostly this text by where the two differ -- found,
+    // where `edges` does not say -- else whole.
+    const std::vector<ALTextDiff::regions_t>& readIn(size_t slot, const std::vector<std::string>& lines, const ALDiffEdit::Edges* edges);
     // A text mostly the one a slot held -- a keystroke's -- read again in
     // place: only from where the two first differ until a line after the
     // last starts as it did, what lies between taken from what it held
@@ -133,6 +153,7 @@ private:
     // How many texts it has read, which numbers each.
     U64                                    mNumbered = 0;
     S32                                    mLastRead = 0;
+    U64                                    mCompared = 0;
 };
 
 #endif // AL_ALDIFFLEXER_H

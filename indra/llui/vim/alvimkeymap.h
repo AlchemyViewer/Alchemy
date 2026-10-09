@@ -161,8 +161,9 @@ public:
     // of the studio's editors: the registers, so that what is yanked in
     // one is put in another, the system clipboard or not; the lines
     // entered on the : line and on the search line, oldest first, for Up
-    // and Down on the line, q: q/
-    // @: and :history; and the settings a :set changes, ignorecase and
+    // and Down on the line, q: q/ and :history; the last : line run to
+    // its end, vim's ": register, for @: and :put :; and the settings a
+    // :set changes, ignorecase and
     // smartcase, and clipboard: whether what is yanked, deleted and put
     // with no register named goes by the system clipboard, as vim's
     // clipboard=unnamed has it, or stays the editor's own -- vim's own
@@ -177,6 +178,7 @@ public:
         ALVimRegisters           registers;
         std::vector<std::string> command;
         std::vector<std::string> search;
+        std::string              commandLine;
         // Beside each search line, what ended it, as vim's history keeps:
         // / or ? where it was typed, nothing where * or # put it there.
         std::vector<char>        searchEnds;
@@ -674,12 +676,15 @@ private:
     VisualExtent       mLastVisual;
 
     // Macros: the register being recorded into, or 0, and what has
-    // been typed since; the last one played, for @@; and how deep the
-    // playing goes, so that a macro playing itself stops.
+    // been typed since; the last one played, for @@; how deep the
+    // playing goes, so that a macro playing itself stops; and whether the
+    // : line running is to be the ": register once it has run, which one
+    // that plays @: is not, as in vim.
     char               mRecording = 0;
     std::vector<Input> mRecorded;
     char               mLastPlayed = 0;
     S32                mPlaying    = 0;
+    bool               mKeepCommandLine = true;
 
     // Keys typed and held while they may be the start of a mapping, and
     // since when, for the timeout; how deep feeding what mappings stand

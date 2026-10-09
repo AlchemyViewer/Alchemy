@@ -144,8 +144,6 @@ namespace tut
         ensure_equals("a class with a break in it does", said(ALTextSearch::matches(doc, "two[\\s\\n]three", options)), std::string("0:4-1:5"));
         const ALTextRange stretch(ALTextPos(0, 4), ALTextPos(1, 5));
         ensure_equals("within a stretch that spans lines", said(ALTextSearch::matches(doc, "\\w+", options, &stretch)), std::string("0:4-7 1:0-5"));
-        ensure_equals("a group over the break, with the whole's start said",
-                      said(ALTextSearch::matches(doc, "two\\n(three)", [&] { ALTextSearchOptions o = options; o.matchGroup = 1; return o; }())), std::string("1:0-5"));
         ensure_equals("what replaces a match over the break", ALTextSearch::replacement(doc, ALTextRange(ALTextPos(0, 4), ALTextPos(1, 5)), "two\\n(three)", options, "$1"),
                       std::string("three"));
         options.regex = false;

@@ -60,12 +60,27 @@ namespace
     }
 }
 
-void ALFoldModel::setSyntax(blocks_t blocks, revision_t revision)
+void ALFoldModel::setSyntax(blocks_t blocks, lex_t lex)
 {
-    mBlocks   = std::move(blocks);
-    mRevision = std::move(revision);
+    mBlocks = std::move(blocks);
+    mLex    = std::move(lex);
     mLines.clear();
-    mValid = false;
+    invalidate();
+}
+
+void ALFoldModel::relexed(S32 first, S32 last)
+{
+    const S32 end = llmin(last, static_cast<S32>(mLines.size()) - 1);
+    for (S32 line = llmax(first, 0); line <= end; ++line)
+    {
+        mLines[static_cast<size_t>(line)].valid = false;
+    }
+    if (mBlocks && first <= last)
+    {
+        mValid      = false;
+        mDirtyFirst = mDirtyFirst > mDirtyLast ? first : llmin(mDirtyFirst, first);
+        mDirtyLast  = llmax(mDirtyLast, last);
+    }
 }
 
 void ALFoldModel::setLineComment(std::string token)
@@ -74,7 +89,7 @@ void ALFoldModel::setLineComment(std::string token)
     {
         mLineComment = std::move(token);
         mLines.clear();
-        mValid = false;
+        invalidate();
     }
 }
 
@@ -84,15 +99,13 @@ const ALFoldModel::Line& ALFoldModel::lineAt(const ALTextDocument& doc, S32 line
     {
         mLines.resize(static_cast<size_t>(doc.lineCount()));
     }
-    Line&     entry    = mLines[static_cast<size_t>(line)];
-    const U32 revision = mRevision ? mRevision(line) : 0;
-    if (entry.valid && entry.revision == revision)
+    Line& entry = mLines[static_cast<size_t>(line)];
+    if (entry.valid)
     {
         return entry;
     }
-    entry          = Line();
-    entry.valid    = true;
-    entry.revision = revision;
+    entry       = Line();
+    entry.valid = true;
     const std::string&     text = doc.line(line);
     size_t                 lead = 0;
     const S32              n    = alBlanksWidth(text, mTabWidth, &lead);
@@ -125,7 +138,7 @@ void ALFoldModel::setTabWidth(S32 tab_width)
     {
         mTabWidth = tab_width;
         mLines.clear();
-        mValid = false;
+        invalidate();
     }
 }
 
@@ -169,6 +182,12 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
         return mRegions;
     }
     const S32 count = doc.lineCount();
+    // Lexed through to the end first, so that every line whose blocks
+    // changed has been said to (relexed) before any is read.
+    if (mLex && count > 0)
+    {
+        mLex(count - 1);
+    }
     // Each block's last line by its first, the widest where several start
     // on a line; then in order, with no sort.
     std::vector<S32>& end_of = mEndOf;
@@ -205,52 +224,237 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
     return mRegions;
 }
 
-void ALFoldModel::bySyntax(const ALTextDocument& doc, std::vector<S32>& end_of)
+void ALFoldModel::walkLine(const Line& line, S32 at, std::vector<Opened>& open, std::vector<S32>& marked, std::vector<Closed>& closed, size_t& open_low,
+                           size_t& marked_low) const
+{
+    // A region the comment marks, as pairMarker pairs one.
+    if (line.marker > 0)
+    {
+        marked.push_back(at);
+    }
+    else if (line.marker < 0 && !marked.empty())
+    {
+        if (at > marked.back())
+        {
+            closed.push_back(Closed{ at, marked.back(), at, false });
+        }
+        marked.pop_back();
+        marked_low = std::min(marked_low, marked.size());
+    }
+    for (size_t i = 0; i < line.blocks.size(); ++i)
+    {
+        const Block& block = line.blocks[i];
+        if (block.event != Event::Open && !open.empty())
+        {
+            // Through this line, unless it opens again after the close,
+            // which it then starts.
+            bool again = block.event == Event::Middle;
+            for (size_t k = i + 1; k < line.blocks.size() && !again; ++k)
+            {
+                again = line.blocks[k].event != Event::Close;
+            }
+            const S32 start = open.back().line;
+            const S32 end   = again ? at - 1 : at;
+            if (end > start)
+            {
+                closed.push_back(Closed{ at, start, end, open.back().first });
+            }
+            open.pop_back();
+            open_low = std::min(open_low, open.size());
+        }
+        if (block.event != Event::Close)
+        {
+            open.push_back(Opened{ at, block.event == Event::Open && block.first });
+        }
+    }
+}
+
+void ALFoldModel::walkSyntax(const ALTextDocument& doc)
 {
     const S32 count = doc.lineCount();
-    // What is open, each where it opened and whether it opened its line.
-    std::vector<Opened>& open = mOpen;
-    open.clear();
-    // The blocks, as they close; those opened on a line of their own go
-    // with their headers after.
+    // What is open, each where it opened and whether it opened its line,
+    // and the regions marked open; and how far down each the lines walked
+    // since the last place kept have reached.
+    std::vector<Opened>& open       = mOpen;
+    std::vector<S32>&    marked     = mMarked;
+    size_t               open_low   = 0;
+    size_t               marked_low = 0;
+    if (!mWalkKept || mWalked.empty() || mWalkLines != count)
+    {
+        // Whole, from the top.
+        open.clear();
+        marked.clear();
+        mClosed.clear();
+        mWalked.clear();
+        for (S32 l = 0; l < count; ++l)
+        {
+            if (l % WALK_STEP == 0)
+            {
+                if (!mWalked.empty())
+                {
+                    mWalked.back().openLow   = open_low;
+                    mWalked.back().markedLow = marked_low;
+                }
+                mWalked.push_back(Walked{ l, mClosed.size(), open, marked });
+                open_low   = open.size();
+                marked_low = marked.size();
+            }
+            walkLine(lineAt(doc, l), l, open, marked, mClosed, open_low, marked_low);
+        }
+        mWalked.back().openLow   = open_low;
+        mWalked.back().markedLow = marked_low;
+        mLastWalked              = count;
+    }
+    else if (mDirtyFirst > mDirtyLast)
+    {
+        mLastWalked = 0;
+    }
+    else
+    {
+        const S32  first  = llclamp(mDirtyFirst, 0, count - 1);
+        const S32  last   = llmin(mDirtyLast, count - 1);
+        const auto byLine = [](S32 line, const Walked& walked) { return line < walked.line; };
+        // From the last place kept before the first line changed: every
+        // line above it as it was, with what was open there and what it
+        // closed before it. What the walk closes from there and the places
+        // it keeps go in the place of the old walk's over the same lines.
+        const size_t        from         = static_cast<size_t>(std::upper_bound(mWalked.begin(), mWalked.end(), first, byLine) - mWalked.begin()) - 1;
+        const size_t        start_closed = mWalked[from].closed;
+        std::vector<Closed> fresh;
+        std::vector<Walked> places;
+        open       = mWalked[from].open;
+        marked     = mWalked[from].marked;
+        open_low   = open.size();
+        marked_low = marked.size();
+        // The last place kept, told how far down its lines reached once
+        // they are walked; and a place kept at a line.
+        const auto latest = [&]() -> Walked& { return places.empty() ? mWalked[from] : places.back(); };
+        const auto settle = [&]() {
+            latest().openLow   = open_low;
+            latest().markedLow = marked_low;
+        };
+        const auto keep = [&](S32 line) {
+            settle();
+            places.push_back(Walked{ line, start_closed + fresh.size(), open, marked });
+            open_low   = open.size();
+            marked_low = marked.size();
+        };
+        // Whether what was open at a place, over how far its lines reached,
+        // is what is open over the rest now. Where they closed all of it, a
+        // close after that closed nothing, which with more under it now
+        // would close that: so then there may be nothing under it.
+        const auto tops = [](const auto& now, const auto& was, size_t low) {
+            const size_t need = was.size() - low;
+            return now.size() >= need && (low > 0 || now.size() == need) &&
+                   std::equal(was.begin() + static_cast<std::ptrdiff_t>(low), was.end(), now.end() - static_cast<std::ptrdiff_t>(need));
+        };
+        // The old places past the last line changed. At one, where the
+        // walk finds open what it found there before, it goes on as it went
+        // before: what it closed from there is kept, as are those places.
+        // Where only what is under what the lines from there to the next
+        // place reached differs, they close what they closed before, and
+        // what is open after them is what was then over what is under.
+        size_t old    = static_cast<size_t>(std::upper_bound(mWalked.begin(), mWalked.end(), last, byLine) - mWalked.begin());
+        size_t rejoin = mWalked.size();
+        S32    kept   = mWalked[from].line;
+        S32    l      = kept;
+        S32    lines  = 0;
+        bool   done   = false;
+        while (l < count)
+        {
+            if (l > last)
+            {
+                while (old < mWalked.size() && mWalked[old].line < l)
+                {
+                    ++old;
+                }
+                if (old < mWalked.size() && mWalked[old].line == l)
+                {
+                    const Walked& was = mWalked[old];
+                    if (was.open == open && was.marked == marked)
+                    {
+                        settle();
+                        rejoin = old;
+                        done   = true;
+                        break;
+                    }
+                    if (latest().line != l)
+                    {
+                        keep(l);
+                        kept = l;
+                    }
+                    if (tops(open, was.open, was.openLow) && tops(marked, was.marked, was.markedLow))
+                    {
+                        const size_t next  = old + 1;
+                        const size_t until = next < mWalked.size() ? mWalked[next].closed : mClosed.size();
+                        fresh.insert(fresh.end(), mClosed.begin() + static_cast<std::ptrdiff_t>(was.closed), mClosed.begin() + static_cast<std::ptrdiff_t>(until));
+                        open_low   = open.size() - (was.open.size() - was.openLow);
+                        marked_low = marked.size() - (was.marked.size() - was.markedLow);
+                        if (next == mWalked.size())
+                        {
+                            settle();
+                            done = true;
+                            break;
+                        }
+                        const Walked& then = mWalked[next];
+                        open.resize(open_low);
+                        open.insert(open.end(), then.open.begin() + static_cast<std::ptrdiff_t>(was.openLow), then.open.end());
+                        marked.resize(marked_low);
+                        marked.insert(marked.end(), then.marked.begin() + static_cast<std::ptrdiff_t>(was.markedLow), then.marked.end());
+                        l    = then.line;
+                        kept = l;
+                        continue;
+                    }
+                }
+            }
+            if (l - kept >= WALK_STEP)
+            {
+                keep(l);
+                kept = l;
+            }
+            walkLine(lineAt(doc, l), l, open, marked, fresh, open_low, marked_low);
+            ++lines;
+            ++l;
+        }
+        if (!done)
+        {
+            settle();
+        }
+        const size_t         old_closed = rejoin < mWalked.size() ? mWalked[rejoin].closed : mClosed.size();
+        const std::ptrdiff_t moved      = static_cast<std::ptrdiff_t>(start_closed + fresh.size()) - static_cast<std::ptrdiff_t>(old_closed);
+        mClosed.erase(mClosed.begin() + static_cast<std::ptrdiff_t>(start_closed), mClosed.begin() + static_cast<std::ptrdiff_t>(old_closed));
+        mClosed.insert(mClosed.begin() + static_cast<std::ptrdiff_t>(start_closed), fresh.begin(), fresh.end());
+        for (size_t i = rejoin; i < mWalked.size(); ++i)
+        {
+            mWalked[i].closed = static_cast<size_t>(static_cast<std::ptrdiff_t>(mWalked[i].closed) + moved);
+        }
+        mWalked.erase(mWalked.begin() + static_cast<std::ptrdiff_t>(from + 1), mWalked.begin() + static_cast<std::ptrdiff_t>(rejoin));
+        mWalked.insert(mWalked.begin() + static_cast<std::ptrdiff_t>(from + 1), std::make_move_iterator(places.begin()), std::make_move_iterator(places.end()));
+        mLastWalked = lines;
+    }
+    mWalkKept   = true;
+    mWalkLines  = count;
+    mDirtyFirst = 0;
+    mDirtyLast  = -1;
+}
+
+void ALFoldModel::bySyntax(const ALTextDocument& doc, std::vector<S32>& end_of)
+{
+    walkSyntax(doc);
+    // Each block's end by its start, the widest where several start on a
+    // line; those opened on a line of their own go with their headers
+    // after, in the order they closed.
     std::vector<Region>& alone = mAlone;
     alone.clear();
-    std::vector<S32>& marked = mMarked;
-    marked.clear();
-    for (S32 l = 0; l < count; ++l)
+    for (const Closed& block : mClosed)
     {
-        const Line& line = lineAt(doc, l);
-        pairMarker(line.marker, l, marked, end_of);
-        for (size_t i = 0; i < line.blocks.size(); ++i)
+        if (block.alone)
         {
-            const Block& block = line.blocks[i];
-            if (block.event != Event::Open && !open.empty())
-            {
-                // Through this line, unless it opens again after the
-                // close, which it then starts.
-                bool again = block.event == Event::Middle;
-                for (size_t k = i + 1; k < line.blocks.size() && !again; ++k)
-                {
-                    again = line.blocks[k].event != Event::Close;
-                }
-                const Region region{ open.back().line, again ? l - 1 : l };
-                if (region.end > region.start)
-                {
-                    if (open.back().first)
-                    {
-                        alone.push_back(region);
-                    }
-                    else
-                    {
-                        end_of[static_cast<size_t>(region.start)] = llmax(end_of[static_cast<size_t>(region.start)], region.end);
-                    }
-                }
-                open.pop_back();
-            }
-            if (block.event != Event::Close)
-            {
-                open.push_back(Opened{ l, block.event == Event::Open && block.first });
-            }
+            alone.push_back(Region{ block.start, block.end });
+        }
+        else
+        {
+            end_of[static_cast<size_t>(block.start)] = llmax(end_of[static_cast<size_t>(block.start)], block.end);
         }
     }
     // Opened on a line of its own -- a brace under its header -- a block
@@ -294,6 +498,12 @@ std::vector<S32> ALFoldModel::openAt(const ALTextDocument& doc, S32 tab_width, S
         return out;
     }
     setTabWidth(tab_width);
+    // Lexed through the line before it, so that every line read back from
+    // there has been said to where its blocks changed, and none below it.
+    if (mLex && line > 0)
+    {
+        mLex(llmin(line, doc.lineCount()) - 1);
+    }
     // Whether a line opens what nothing after it closes, walked back to with
     // `closes` closers after it still to be matched, which it matches; and
     // whether the outermost it leaves open opened the line.
@@ -539,6 +749,93 @@ void ALFoldModel::edited(const ALTextDocument::Edit& edit, S32 lines)
     const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
     // The lines it touched are read again.
     mLines.applySpans(spans, lines, Line(), Line());
+    if (mWalkKept && !spans.empty())
+    {
+        // The walk kept moved along with the text: a line after a run by
+        // what the runs up to it added or took, one inside a run to the
+        // line as far down the run's lines as it was, or their last -- any
+        // place, so long as every line kept goes by the same. The lines the
+        // runs made are walked again, with those changed before.
+        typedef ALTextDocument::Edit::LineSpan LineSpan;
+        const auto now = [&spans](S32 line) {
+            const auto after = std::upper_bound(spans.begin(), spans.end(), line, [](S32 at, const LineSpan& span) { return at < span.first; });
+            if (after == spans.begin())
+            {
+                return line;
+            }
+            const LineSpan& span   = *(after - 1);
+            const S32       before = after - 1 == spans.begin() ? 0 : (after - 2)->shiftAfter;
+            return line <= span.last ? span.first + before + llmin(line - span.first, llmax(span.made, 1) - 1) : line + span.shiftAfter;
+        };
+        // Where every run made as many lines as it took -- typing on a line
+        // -- no line moves. Else those closed in order, so that none closed
+        // above the first run moves; past it, with one run -- as nearly
+        // every edit has -- by its sums alone.
+        const bool same  = std::all_of(spans.begin(), spans.end(), [](const LineSpan& span) { return span.made == span.last - span.first + 1; });
+        const auto moves = same ? mClosed.end()
+                                : std::lower_bound(mClosed.begin(), mClosed.end(), spans.front().first,
+                                                   [](const Closed& block, S32 line) { return block.line < line; });
+        if (spans.size() == 1)
+        {
+            const S32 first = spans.front().first;
+            const S32 last  = spans.front().last;
+            const S32 most  = first + llmax(spans.front().made, 1) - 1;
+            const S32 shift = spans.front().shiftAfter;
+            const auto one  = [=](S32 line) { return line > last ? line + shift : line > first ? llmin(line, most) : line; };
+            for (auto it = moves; it != mClosed.end(); ++it)
+            {
+                it->line  = one(it->line);
+                it->start = one(it->start);
+                it->end   = one(it->end);
+            }
+        }
+        else
+        {
+            for (auto it = moves; it != mClosed.end(); ++it)
+            {
+                it->line  = now(it->line);
+                it->start = now(it->start);
+                it->end   = now(it->end);
+            }
+        }
+        // A place inside a run, after its first line, had lines above it
+        // that the run changed: no place to walk again from, nor one the
+        // walk is where it was at.
+        std::erase_if(mWalked, [&spans](const Walked& walked) {
+            const auto after = std::upper_bound(spans.begin(), spans.end(), walked.line, [](S32 at, const LineSpan& span) { return at < span.first; });
+            return after != spans.begin() && walked.line > (after - 1)->first && walked.line <= (after - 1)->last;
+        });
+        if (!same)
+        {
+            for (Walked& walked : mWalked)
+            {
+                walked.line = now(walked.line);
+                for (Opened& opened : walked.open)
+                {
+                    opened.line = now(opened.line);
+                }
+                for (S32& marker : walked.marked)
+                {
+                    marker = now(marker);
+                }
+            }
+        }
+        if (mDirtyFirst <= mDirtyLast)
+        {
+            mDirtyFirst = now(mDirtyFirst);
+            mDirtyLast  = now(mDirtyLast);
+        }
+        S32 before = 0;
+        for (const LineSpan& span : spans)
+        {
+            const S32 first = span.first + before;
+            const S32 last  = first + llmax(span.made, 1) - 1;
+            mDirtyFirst     = mDirtyFirst > mDirtyLast ? first : llmin(mDirtyFirst, first);
+            mDirtyLast      = llmax(mDirtyLast, last);
+            before          = span.shiftAfter;
+        }
+        mWalkLines += spans.back().shiftAfter;
+    }
     std::vector<S32>                                  kept;
     kept.reserve(mFolded.size());
     for (const S32 start : mFolded)

@@ -313,6 +313,12 @@ bool ALVimKeymap::typingLine(std::string& line, S32& caret) const
 
 void ALVimKeymap::say(const std::string& message, bool error)
 {
+    // Nothing but an error while a :g runs its command, which says what
+    // they did once it is through, as vim's global_busy keeps them.
+    if (!error && mEx && mEx->inGlobal())
+    {
+        return;
+    }
     mMessage      = message;
     mMessageError = error;
     mFailed       = mFailed || error;
@@ -1260,8 +1266,10 @@ bool ALVimKeymap::afterSurroundPair(ALTextView& view, llwchar pending, llwchar c
 
 bool ALVimKeymap::afterRegisterName(ALTextView& view, llwchar pending, llwchar ch)
 {
+    // Those vim keeps itself -- . : / -- as well, to put, which nothing may
+    // write to (applyOperator).
     if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '"' || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '+' ||
-        ch == '*')
+        ch == '*' || ch == '.' || ch == ':' || ch == '/')
     {
         // A count typed before the name is kept, for the one typed after
         // it to multiply (takeRegisterCount).
@@ -1350,11 +1358,13 @@ bool ALVimKeymap::afterPlay(ALTextView& view, llwchar pending, llwchar ch)
     }
     if (name == ':')
     {
-        // The last : line again.
+        // The last : line run again, the ": register: while a line runs,
+        // the one before it.
         clearPending();
-        mLastPlayed = ':';
-        const std::vector<std::string>& history = mCommandLine.historyOf(':');
-        if (history.empty())
+        mLastPlayed      = ':';
+        mKeepCommandLine = false;
+        const std::string line = mShared->commandLine;
+        if (line.empty())
         {
             say(said("VimNoPreviousCommand", "E30: No previous command line"), true);
             return true;
@@ -1362,7 +1372,7 @@ bool ALVimKeymap::afterPlay(ALTextView& view, llwchar pending, llwchar ch)
         view.undoJournal().beginGroup();
         for (S32 n = 0; n < count; ++n)
         {
-            mEx->runCommand(view, history.back());
+            mEx->runCommand(view, line);
             if (mMessageError)
             {
                 break;
@@ -3868,7 +3878,9 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                 // copies of it. Lines are replaced by its text, its lines
                 // taking theirs, a copy a line or more; lines put into less
                 // than a line go on lines of their own, the line broken
-                // round them; characters go in straight on. What a block
+                // round them; characters go in straight on; a block put
+                // into characters goes in as a block where they were, as
+                // vim's put of one at the caret has it. What a block
                 // holds of each line is replaced by a register of one line,
                 // its copies side by side, as vim's blockwise put has it; by
                 // anything else it is taken out, and the register put at
@@ -3938,6 +3950,18 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                         put(view, mRegister, below, count);
                     }
                 }
+                else if (put_this.block && !span.linewise)
+                {
+                    // The characters taken out and the block put where they
+                    // began, before what follows them -- after the line's
+                    // last character where they ran to its end -- the caret
+                    // at its corner, as vim's visual put has it.
+                    view.deleteRange(span.range);
+                    const ALTextPos at       = d.clamp(span.range.begin);
+                    const bool      past_end = at.column > 0 && at == d.lineEnd(at.line);
+                    view.setCaret(past_end ? d.prevCluster(at) : at);
+                    put(view, mRegister, past_end, count);
+                }
                 else
                 {
                     // As lines -- a register's lines, or anything into lines
@@ -3957,9 +3981,10 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                         }
                         text += put_this.text;
                     }
+                    const std::string put_in = split ? "\n" + text + "\n" : text;
                     view.deleteRange(span.range);
                     view.setCaret(span.range.begin);
-                    view.insertText(split ? "\n" + text + "\n" : text);
+                    view.insertText(put_in);
                     if (lines)
                     {
                         const S32 line = span.range.begin.line + (split ? 1 : 0);
@@ -3969,6 +3994,12 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                     {
                         moveTo(view, text.empty() ? view.caret() : text.find('\n') != std::string::npos ? span.range.begin : d.prevCluster(view.caret()));
                     }
+                    // The lines the put adds, said as a put says them: a line
+                    // for each break it puts in, and one more where lines go
+                    // in the place of lines. What it replaced is not said, as
+                    // vim takes the selection out without a word.
+                    const S32 breaks = static_cast<S32>(std::count(put_in.begin(), put_in.end(), '\n'));
+                    sayMoreLines(lines && !split ? breaks + 1 : breaks);
                 }
                 view.undoJournal().endGroup();
                 if (ch == 'p' && (span.linewise || span.block || !span.range.empty()))
@@ -4297,7 +4328,17 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             }
             else
             {
-                // d$ and c$, through the line's end as $ goes.
+                // d$ and c$, through the line's end as $ goes, and failing
+                // where a count's $ fails: from the last line, nothing taken
+                // and no insert, every line's end wanted after it (motion).
+                if (count > 1 && view.caret().line + 1 >= d.lineCount())
+                {
+                    mFailed       = true;
+                    mWantColumn   = S32_MAX;
+                    mVerticalMove = true;
+                    clearPending();
+                    return true;
+                }
                 const S32 last = llmin(d.lineCount() - 1, view.caret().line + count - 1);
                 span.range     = ALTextRange(view.caret(), d.lineEnd(last));
                 span.inclusive = true;
@@ -4845,21 +4886,29 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             return m;
         case '$':
         {
-            const S32 line = llmin(d.lineCount() - 1, from.line + count - 1);
-            m.to           = d.lineEnd(line);
-            m.inclusive    = false;
+            // The count's lines down first, as vim's cursor_down() goes
+            // them: as far as there are, but none from the last line, which
+            // fails the motion where the caret is -- d2$ there takes nothing.
+            const bool stuck = count > 1 && from.line + 1 >= d.lineCount();
+            m.moved          = !stuck;
+            m.inclusive      = false;
+            if (!stuck)
+            {
+                m.to = d.lineEnd(llmin(d.lineCount() - 1, from.line + count - 1));
+            }
             // To the line's end, taken with the last character: an
             // operator reaches the end, the caret sits on the last -- a
             // visual one past it, on the line's break, which the selection
             // takes, as vim's does. And every line's end from here on, for
             // j and k -- but not once an operator has taken it, which
             // forgets the column as vim's does, so that j after d$ keeps
-            // the caret's.
-            if (!mOperator && !isVisual() && m.to.column > 0)
+            // the caret's; one that failed wants them all the same, as
+            // vim's curswant is set before it moves.
+            if (!stuck && !mOperator && !isVisual() && m.to.column > 0)
             {
                 m.to = d.prevCluster(m.to);
             }
-            if (!mOperator)
+            if (!mOperator || stuck)
             {
                 mWantColumn   = S32_MAX;
                 mVerticalMove = true;
@@ -4943,7 +4992,16 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
         case LAST_NON_BLANK:
         {
             // The last character on the line that is not a blank, the count
-            // lines on; inclusive, as $ is.
+            // lines on; inclusive, as $ is, and failing from the last line
+            // as a count's $ fails there, every line's end wanted after it.
+            if (count > 1 && from.line + 1 >= d.lineCount())
+            {
+                m.moved       = false;
+                m.inclusive   = true;
+                mWantColumn   = S32_MAX;
+                mVerticalMove = true;
+                return m;
+            }
             const S32          line = llmin(d.lineCount() - 1, from.line + count - 1);
             const std::string& text = d.line(line);
             const size_t       last = text.find_last_not_of(" \t");
@@ -5693,6 +5751,23 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
         moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
         return;
     }
+    // A register vim keeps itself -- . : / -- is read only: a yank or a
+    // delete into it takes nothing and fails, and a change takes nothing
+    // and types from the stretch's start, as vim's op_change goes on into
+    // insert mode once its delete has refused.
+    if ((op == 'd' || op == 'y' || op == 'c') && (mRegister == '.' || mRegister == ':' || mRegister == '/'))
+    {
+        if (op == 'c' && editing)
+        {
+            view.setCaret(span.range.begin);
+            view.undoJournal().beginGroup();
+            enterInsert(view, 1, true);
+            return;
+        }
+        mFailed = true;
+        clearPending();
+        return;
+    }
     // A delete of characters over more than one line with nothing but
     // blanks before it on its first line and after it on its last is those
     // lines whole, as vim's is: 2daw over a line's words and the next's,
@@ -5819,7 +5894,6 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                         mEx->globalBatch->landing      = whole.begin;
                         mEx->globalBatch->landingBelow = 0;
                         mEx->globalBatch->landed       = true;
-                        mEx->globalBatch->deletedLines += last - first + 1;
                         return;
                     }
                     view.deleteRange(whole);
@@ -5835,6 +5909,14 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             {
                 view.deleteRange(span.range);
                 view.setCaret(span.range.begin);
+            }
+            // The lines a change of lines took, but the one it leaves to type
+            // on, and those characters over lines took, the first and the
+            // last joined: said for more than vim's report, as a delete of
+            // lines says them.
+            if (!span.block && (op == 'c' || !span.linewise) && last - first > REPORT_THRESHOLD)
+            {
+                say(alSaidCount("VimFewerLines", last - first, "1 fewer line", "[COUNT] fewer lines"));
             }
             if (op == 'c')
             {
@@ -5965,6 +6047,15 @@ void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, 
 
 ALVimKeymap::Register ALVimKeymap::fetch(char name) const
 {
+    // The registers vim keeps itself and lets be read only: what the last
+    // insert typed, the last : line run and the last search.
+    if (name == '.' || name == ':' || name == '/')
+    {
+        Register reg;
+        reg.text = name == '.' ? mLastTyped : name == ':' ? mShared->commandLine : mSearch.pattern;
+        reg.held = !reg.text.empty();
+        return reg;
+    }
     return mShared->registers.fetch(name, mShared->unnamedClipboard);
 }
 
@@ -6526,7 +6617,7 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
         {
             typeIn(view, mLastTyped);
         }
-        else if (isalnum(static_cast<unsigned char>(name)) || name == '"' || name == '-' || name == '+' || name == '*')
+        else if (isalnum(static_cast<unsigned char>(name)) || name == '"' || name == '-' || name == '+' || name == '*' || name == ':' || name == '/')
         {
             typeIn(view, fetch(name).text);
         }

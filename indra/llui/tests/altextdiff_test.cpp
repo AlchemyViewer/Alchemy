@@ -879,7 +879,8 @@ namespace tut
         ensure("as the whole would find them", runs == ALTextDiff::lines(left, typed));
 
         // Where it must be compared whole: an anchor across the stretch's
-        // edge; comments let go of; most of the text changed.
+        // edge; most of the text changed. Comments let go of, with nothing
+        // to say where they are, as any other edit.
         ALTextDiff::Options anchored;
         anchored.anchors = { { 10000, 5 } };
         std::vector<Run> kept = runs;
@@ -888,7 +889,9 @@ namespace tut
         ensure("an anchor across the edge", !ALDiffSplice::splice(kept, left, left, typed, again, anchored) && kept == runs);
         ALTextDiff::Options comments;
         comments.like.ignoreComments = true;
-        ensure("comments let go of", !ALDiffSplice::splice(kept, left, left, typed, again, comments));
+        std::vector<Run> commented   = runs;
+        ensure("comments let go of: spliced", ALDiffSplice::splice(commented, left, left, typed, again, comments) && ALDiffSplice::lastCompared() <= 4);
+        ensure("comments let go of: as the whole would find them", commented == ALTextDiff::lines(left, again, comments));
         std::vector<std::string> most = numbered(20000, "other ");
         ensure("most of it changed", !ALDiffSplice::splice(kept, left, left, typed, most, ALTextDiff::Options()));
         ensure("nothing changed: as it was", ALDiffSplice::splice(kept, left, left, typed, typed, ALTextDiff::Options()) && kept == runs);
@@ -1440,7 +1443,7 @@ namespace tut
     template<> template<>
     void altextdiff_object::test<30>()
     {
-        set_test_name("compared again where it changed, blanks let go of: the stretch told the same by the regions its texts were read in whole, the lexer asked for nothing less than a text; lined up at anchors too");
+        set_test_name("compared again where it changed, blanks or comments let go of: the stretch told the same by the regions its texts were read in whole, the lexer asked for nothing less than a text; lined up at anchors too");
         // Lines whole: a comment from a line starting /* to one holding */,
         // a line with a quote in it a string, the rest code. Each text it
         // was asked for, by how many lines it had.
@@ -1491,6 +1494,22 @@ namespace tut
         ensure("the whole texts asked for, nothing less", whole_texts(60));
         ensure("the line the same", told_same(runs, 21));
         ensure("as the whole would find them", runs == ALTextDiff::lines(left, typed, loose));
+
+        // Comments let go of, by the same lexer: a line of the comment said
+        // otherwise no change, compared again only about itself.
+        ALTextDiff::Options commented;
+        commented.like.ignoreComments = true;
+        commented.lexer               = loose.lexer;
+        std::vector<Run> by_comments  = ALTextDiff::lines(left, right, commented);
+        ensure("the comment's words no change", told_same(by_comments, 21));
+        std::vector<std::string> worded = right;
+        worded[22]                      = "a line of the comment said otherwise";
+        asked->clear();
+        ensure("spliced, comments let go of", ALDiffSplice::splice(by_comments, left, left, right, worded, commented));
+        ensure("a few lines compared, comments let go of", ALDiffSplice::lastCompared() > 0 && ALDiffSplice::lastCompared() <= 4);
+        ensure("the whole texts asked for, nothing less, comments let go of", whole_texts(60));
+        ensure("the line the same, comments let go of", told_same(by_comments, 22));
+        ensure("as the whole would find them, comments let go of", by_comments == ALTextDiff::lines(left, worded, commented));
 
         // Lined up at anchors, every line unlike its other but the one
         // typed: between the anchors either side of it, inside a comment

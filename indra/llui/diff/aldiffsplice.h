@@ -41,15 +41,14 @@
 // stretch between anchors is.
 //
 // The whole is compared again, rather, where the stretch is more than
-// MOST_SHARE of the texts, an anchor holds a line in it and one outside
-// it, or comments are let go of (which a lexer reads whole texts for).
-// Compared by structure, the runs are the lines' (Histogram), which
+// MOST_SHARE of the texts, or an anchor holds a line in it and one outside
+// it. Compared by structure, the runs are the lines' (Histogram), which
 // ALStructuralDiff::read then reads as tokens. Where blanks or case are
-// let go of, which a string keeps, the stretch's lines are told the same
-// by the regions the whole texts were read in, cut to it: the options'
-// lexer is never asked for a stretch, which it would read from its
-// grammar's first state -- the lines inside a block comment as code -- and
-// hold in the place of a whole text.
+// let go of, which a string keeps, or comments, the stretch's lines are
+// told the same by the regions the whole texts were read in, cut to it:
+// the options' lexer is never asked for a stretch, which it would read
+// from its grammar's first state -- the lines inside a block comment as
+// code -- and hold in the place of a whole text.
 namespace ALDiffSplice
 {
     // As a share of both texts' lines.

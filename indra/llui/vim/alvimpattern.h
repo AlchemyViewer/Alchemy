@@ -74,6 +74,10 @@ struct ALVimPattern
     // The engine's number for each of vim's groups, in order; empty where
     // the two count alike.
     std::vector<S32>   groupNumbers;
+    // What vim says of the pattern where it cannot be read -- a ~ with no
+    // last replacement to stand for -- said as it is, and no match looked
+    // for (matchesIn); empty where it reads.
+    std::string        readError;
 
     bool operator==(const ALVimPattern&) const = default;
     // Whether where its matches may stand depends on the caret or the last
@@ -92,8 +96,9 @@ struct ALVimPattern
     static ALVimPattern of(const std::string& vim, const std::string& last_replacement, const Case& case_rules,
                            std::optional<bool> force_case = std::nullopt);
     // A replacement in vim's spelling as the engine's: & and \0 the whole
-    // match, \1 to \9 the groups, \r and \n a line break, \t a tab, \u \U
-    // \l \L \e \E changing case; the ~ was put in before this.
+    // match, \1 to \9 the groups -- \0 to \9 as ${0} to ${9}, so that a
+    // digit after one is the digit -- \r and \n a line break, \t a tab,
+    // \u \U \l \L \e \E changing case; the ~ was put in before this.
     static std::string replacementOf(const std::string& with);
 
     // What the places a pattern names are measured against: the caret, and

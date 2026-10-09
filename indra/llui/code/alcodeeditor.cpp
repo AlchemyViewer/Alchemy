@@ -108,6 +108,89 @@ namespace
     {
         return !(at > 0 && joins(text[at - 1])) && !(end < text.size() && joins(text[end]));
     }
+
+    // Runs of lines, in order and apart, moved as an edit moves a table of
+    // the lines (ALLineTable::applySpans): what its runs of lines replaced
+    // gone, what lies after one along by the lines it and those before it
+    // added or took; and cut to the text's `line_count` lines.
+    void slideRuns(std::vector<std::pair<S32, S32>>& runs, const std::vector<ALTextDocument::Edit::LineSpan>& spans, S32 line_count)
+    {
+        if (runs.empty() || spans.empty())
+        {
+            return;
+        }
+        std::vector<std::pair<S32, S32>> out;
+        out.reserve(runs.size() + spans.size());
+        const auto keep = [&out, line_count](S32 first, S32 last) {
+            last = llmin(last, line_count - 1);
+            if (first > last)
+            {
+                return;
+            }
+            if (!out.empty() && first <= out.back().second + 1)
+            {
+                out.back().second = llmax(out.back().second, last);
+            }
+            else
+            {
+                out.emplace_back(first, last);
+            }
+        };
+        size_t span  = 0;
+        S32    above = 0;
+        for (const std::pair<S32, S32>& run : runs)
+        {
+            // Moved by the edit's runs wholly above it; its lines between
+            // those over it kept, each stretch by the ones before it.
+            for (; span < spans.size() && spans[span].last < run.first; ++span)
+            {
+                above = spans[span].shiftAfter;
+            }
+            S32 from  = run.first;
+            S32 shift = above;
+            for (size_t k = span; from <= run.second; ++k)
+            {
+                if (k == spans.size() || spans[k].first > run.second)
+                {
+                    keep(from + shift, run.second + shift);
+                    break;
+                }
+                keep(from + shift, spans[k].first - 1 + shift);
+                from  = llmax(from, spans[k].last + 1);
+                shift = spans[k].shiftAfter;
+            }
+        }
+        runs.swap(out);
+    }
+
+    // Each stretch of the lines in `from`'s runs that none of `of`'s holds,
+    // both in order and apart: one pass over the two.
+    template <typename Each>
+    void eachRunOutside(const std::vector<std::pair<S32, S32>>& from, const std::vector<std::pair<S32, S32>>& of, Each each)
+    {
+        size_t past = 0;
+        for (const std::pair<S32, S32>& run : from)
+        {
+            while (past < of.size() && of[past].second < run.first)
+            {
+                ++past;
+            }
+            S32 at = run.first;
+            for (size_t k = past; at <= run.second; ++k)
+            {
+                if (k == of.size() || of[k].first > run.second)
+                {
+                    each(at, run.second);
+                    break;
+                }
+                if (at < of[k].first)
+                {
+                    each(at, of[k].first - 1);
+                }
+                at = llmax(at, of[k].second + 1);
+            }
+        }
+    }
 }
 
 ALCodeEditor::Params::Params()
@@ -342,10 +425,12 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
         [](ALTextPos&) {});
 
     // Folds slide the same way (ALFoldModel::edited), and are hidden again
-    // once the command is done.
+    // once the command is done; the lines they hide move as the layout
+    // moves its own, which is what they are hidden again against.
     const bool folded = !mFolds.folded().empty();
     mFolds.edited(edit, document().lineCount());
     mFoldsDirty = mFoldsDirty || folded || !mFolds.folded().empty();
+    slideRuns(mHiddenByFolds, spans, lines);
 }
 
 void ALCodeEditor::setMark(S32 line, Mark mark)
@@ -2192,35 +2277,61 @@ void ALCodeEditor::settleFolds()
 void ALCodeEditor::applyFolds()
 {
     mFoldsDirty = false;
-    // The layout slides what it hides with an edit and shows every line an
-    // edit makes, so once what it hides has changed, the lines last hidden
-    // by folds are no guide to the lines it has folded: each line is set
-    // as the folds have it, where it is not so already. With no folds then
-    // or now, it has none folded.
-    std::vector<std::pair<S32, S32>> hidden = folds().hidden(document(), getTabWidth());
-    ALTextLayout&                    lines  = layout();
-    if (hidden == mHiddenByFolds && (hidden.empty() || lines.hiddenRevision() == mHiddenByFoldsAt))
+    // The lines the folds hide, as runs: in the order the folds start in,
+    // one inside another ending inside it.
+    ALTextLayout&                    lines = layout();
+    const S32                        count = lines.lineCount();
+    std::vector<std::pair<S32, S32>> runs;
+    for (const std::pair<S32, S32>& range : folds().hidden(document(), getTabWidth()))
     {
-        return;
-    }
-    // In the order the folds start in; one inside another ends inside it.
-    const S32 count   = lines.lineCount();
-    size_t    next    = 0;
-    S32       through = -1;
-    for (S32 l = 0; l < count; ++l)
-    {
-        for (; next < hidden.size() && hidden[next].first <= l; ++next)
+        const S32 first = llmax(range.first, 0);
+        const S32 last  = llmin(range.second, count - 1);
+        if (first > last)
         {
-            through = llmax(through, hidden[next].second);
+            continue;
         }
-        const bool folded = l <= through;
-        if (lines.hiddenBy(l, ALTextLayout::HiddenBy::Folds) != folded)
+        if (!runs.empty() && first <= runs.back().second + 1)
         {
-            lines.setHidden(ALTextLayout::HiddenBy::Folds, l, l, folded);
+            runs.back().second = llmax(runs.back().second, last);
+        }
+        else
+        {
+            runs.emplace_back(first, last);
         }
     }
-    mHiddenByFolds.swap(hidden);
-    mHiddenByFoldsAt = lines.hiddenRevision();
+    // Nothing but this hides a line for the folds, and the lines it last
+    // hid move with each edit as the layout's do (slideRuns), so the
+    // layout hides no line for them but those; where it hides as many,
+    // nothing has shown one of them since -- a caret put on it -- and only
+    // the lines one side holds and the other does not are set. Otherwise
+    // every line is set as the folds have it, where it is not so already.
+    S32 kept = 0;
+    for (const std::pair<S32, S32>& run : mHiddenByFolds)
+    {
+        kept += run.second - run.first + 1;
+    }
+    if (kept == lines.hiddenCount(ALTextLayout::HiddenBy::Folds))
+    {
+        eachRunOutside(runs, mHiddenByFolds, [&lines](S32 first, S32 last) { lines.setHidden(ALTextLayout::HiddenBy::Folds, first, last, true); });
+        eachRunOutside(mHiddenByFolds, runs, [&lines](S32 first, S32 last) { lines.setHidden(ALTextLayout::HiddenBy::Folds, first, last, false); });
+    }
+    else
+    {
+        size_t next = 0;
+        for (S32 l = 0; l < count; ++l)
+        {
+            while (next < runs.size() && runs[next].second < l)
+            {
+                ++next;
+            }
+            const bool folded = next < runs.size() && runs[next].first <= l;
+            if (lines.hiddenBy(l, ALTextLayout::HiddenBy::Folds) != folded)
+            {
+                lines.setHidden(ALTextLayout::HiddenBy::Folds, l, l, folded);
+            }
+        }
+    }
+    mHiddenByFolds.swap(runs);
 }
 
 ALFoldModel& ALCodeEditor::folds()
@@ -2235,12 +2346,16 @@ ALFoldModel& ALCodeEditor::folds()
         mFolds.setLineComment(grammar ? grammar->lineComment() : std::string());
         if (grammar && !grammar->prose())
         {
+            // Each line's blocks, read again where the highlighter says its
+            // tokens changed.
             mFolds.setSyntax([this](S32 line, std::vector<ALFoldModel::Block>& out) { foldBlocksOn(line, out); },
-                             [this](S32 line) { return highlighter().revision(line); });
+                             [this](S32 line) { highlighter().revision(line); });
+            mFoldsRelexed = highlighter().onRelexed([this](S32 first, S32 last) { mFolds.relexed(first, last); });
         }
         else
         {
             mFolds.setSyntax(nullptr, nullptr);
+            mFoldsRelexed.disconnect();
         }
     }
     return mFolds;

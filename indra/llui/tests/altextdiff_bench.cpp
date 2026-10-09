@@ -187,7 +187,7 @@ namespace
 
     void row(const char* name, double small, double big)
     {
-        std::printf("  %-52s %10.3f %10.3f\n", name, small, big);
+        std::printf("  %-54s %10.3f %10.3f\n", name, small, big);
     }
 
     // What a comparison says, laid out: its changes, the lines marked on
@@ -239,7 +239,7 @@ int main(int, char**)
     const std::string              big1kt   = joined(big1k);
 
     std::printf("altextdiff_bench: comparing generated LSL scripts (ms per operation)\n");
-    std::printf("\n  %-52s %10s %10s\n", "", "5,000", "50,000");
+    std::printf("\n  %-54s %10s %10s\n", "", "5,000", "50,000");
 
     std::printf("\nLines (ALTextDiff::lines)\n");
     const auto lines = [&](const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Options& options) {
@@ -268,11 +268,16 @@ int main(int, char**)
     std::string                            error;
     std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
     const auto lexer = [&lsl]() { return lsl ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)) : ALTextDiff::lexer_t(); };
-    // A model's lexer as a view gives it: saying what it read again.
+    // A model's lexer as a view gives it: saying what it read again, and
+    // told what an edit knows; and a merge's of its own, likewise.
     const auto lexing = [&lsl](ALDiffModel& model) {
         const std::shared_ptr<ALDiffLexer> compared = lsl ? std::make_shared<ALDiffLexer>(lsl) : nullptr;
-        model.setLexer(compared ? ALDiffLexer::lexerOf(compared) : ALTextDiff::lexer_t(), ALTextDiff::lexer_t(),
-                       compared ? ALDiffLexer::rereadOf(compared) : ALTextDiff::reread_t());
+        const std::shared_ptr<ALDiffLexer> merging  = lsl ? std::make_shared<ALDiffLexer>(lsl) : nullptr;
+        model.setLexer(compared ? ALDiffLexer::lexerOf(compared) : ALTextDiff::lexer_t(), merging ? ALDiffLexer::lexerOf(merging) : ALTextDiff::lexer_t(),
+                       compared ? ALDiffLexer::rereadOf(compared) : ALTextDiff::reread_t(),
+                       compared ? ALDiffLexer::toldOf(compared) : ALTextDiff::told_t(),
+                       merging ? ALDiffLexer::rereadOf(merging) : ALTextDiff::reread_t(),
+                       merging ? ALDiffLexer::toldOf(merging) : ALTextDiff::told_t());
     };
     const auto laid = [&](const std::string& left, const std::string& right, bool grammar) {
         return ms_per_item(1, [&] {
@@ -292,10 +297,10 @@ int main(int, char**)
     // A live comparison, the right typed in: a character put in a line
     // near the middle and compared again, then taken out and compared
     // again; per keystroke. Blanks let go of where asked, which a grammar's
-    // strings keep.
+    // strings keep, or comments, which a grammar says where they are.
     const auto typed = [&](const std::string& left, const std::string& right, bool grammar = false,
                            ALTextDiff::Algorithm algorithm = ALTextDiff::Algorithm::Histogram, const ALTextDiff::ranges_t& ranges = {},
-                           bool blanks = false) {
+                           bool blanks = false, bool comments = false) {
         ALDiffModel model;
         if (grammar)
         {
@@ -303,6 +308,7 @@ int main(int, char**)
         }
         ALTextDiff::Likeness like;
         like.ignoreWhitespace = blanks;
+        like.ignoreComments   = comments;
         model.setLikeness(like);
         model.setAlgorithm(algorithm);
         model.setTexts(left, right, ranges);
@@ -320,8 +326,31 @@ int main(int, char**)
     row("a keystroke, a thousand edits, LSL's grammar", typed(small_t, small1kt, true), typed(big_t, big1kt, true));
     row("a keystroke, a thousand edits, LSL's, blanks let go", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Histogram, {}, true),
         typed(big_t, big1kt, true, ALTextDiff::Algorithm::Histogram, {}, true));
+    row("a keystroke, a thousand edits, LSL's, comments let go", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Histogram, {}, false, true),
+        typed(big_t, big1kt, true, ALTextDiff::Algorithm::Histogram, {}, false, true));
     row("a keystroke, a thousand edits, by structure", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Structural),
         typed(big_t, big1kt, true, ALTextDiff::Algorithm::Structural));
+    // The same keystroke in a merge: the text before both versions the
+    // base, theirs the left with ten edits, ours the right with a thousand.
+    const auto merged = [&](const std::string& base, const std::string& left, const std::string& right, bool comments) {
+        ALDiffModel model;
+        lexing(model);
+        ALTextDiff::Likeness like;
+        like.ignoreComments = comments;
+        model.setLikeness(like);
+        model.setTexts(left, right);
+        model.setMergeBase(base);
+        const size_t at   = right.find('\n', right.size() / 2);
+        std::string  with = right;
+        with.insert(at, "x");
+        return ms_per_item(2, [&] {
+            model.setRightText(with);
+            model.setRightText(right);
+            g_sink = g_sink + static_cast<size_t>(model.conflictCount());
+        });
+    };
+    row("a keystroke in a merge, LSL's grammar", merged(small_t, small10t, small1kt, false), merged(big_t, big10t, big1kt, false));
+    row("a keystroke in a merge, LSL's, comments let go", merged(small_t, small10t, small1kt, true), merged(big_t, big10t, big1kt, true));
     {
         // Another version on the left, as a slider over a script's saves
         // steps: a line apart from the one before.
@@ -359,6 +388,9 @@ int main(int, char**)
             typed(big_t, big_c, false, ALTextDiff::Algorithm::Histogram, big_ranges));
         row("a keystroke, converted, LSL's, blanks let go", typed(small_t, small_c, true, ALTextDiff::Algorithm::Histogram, small_ranges, true),
             typed(big_t, big_c, true, ALTextDiff::Algorithm::Histogram, big_ranges, true));
+        row("a keystroke, converted, LSL's, comments let go",
+            typed(small_t, small_c, true, ALTextDiff::Algorithm::Histogram, small_ranges, false, true),
+            typed(big_t, big_c, true, ALTextDiff::Algorithm::Histogram, big_ranges, false, true));
     }
 
     std::printf("\nWhat it says (5,000 lines)\n");

@@ -98,7 +98,7 @@ namespace tut
         ensure_equals("classes as brackets", regexOf("\\a\\l\\x"), std::string("[A-Za-z][a-z][0-9A-Fa-f]"));
         ensure_equals("a bracket expression as it stands", regexOf("[^a-z]"), std::string("[^a-z]"));
         ensure_equals("a character by its code", regexOf("\\%x41"), std::string("A"));
-        ensure_equals("~ the last replacement, as text", regexOf("a~", "x.y"), std::string("ax\\.y"));
+        ensure_equals("~ the last replacement, as text", regexOf("a~", "x.y"), std::string("a(?:x\\.y)"));
     }
 
     template<> template<>
@@ -164,11 +164,11 @@ namespace tut
     {
         set_test_name("a replacement: & and \\0 the match, \\1 a group, a $ only a $, \\r a line break, and the case changes kept");
         ensure_equals("the match", ALVimPattern::replacementOf("[&]"), std::string("[$&]"));
-        ensure_equals("a group", ALVimPattern::replacementOf("\\1-\\2"), std::string("$1-$2"));
+        ensure_equals("a group", ALVimPattern::replacementOf("\\1-\\2"), std::string("${1}-${2}"));
         ensure_equals("a dollar", ALVimPattern::replacementOf("$5"), std::string("$$5"));
         ensure_equals("a line break", ALVimPattern::replacementOf("a\\rb"), std::string("a\nb"));
         ensure_equals("themselves", ALVimPattern::replacementOf("\\&\\~\\\\"), std::string("&~\\\\"));
-        ensure_equals("case", ALVimPattern::replacementOf("\\u\\1\\e"), std::string("\\u$1\\E"));
+        ensure_equals("case", ALVimPattern::replacementOf("\\u\\1\\e"), std::string("\\u${1}\\E"));
     }
 
     template<> template<>
@@ -312,5 +312,147 @@ namespace tut
         ensure_equals("a group's characters take theirs", found("a\xCC\x81" "b", ALVimPattern::of("\\Z\\(a\\)b", std::string(), plain)),
                       std::string("a\xCC\x81" "b"));
         ensure_equals("a line's ends none", found("a\xCC\x81" "b", ALVimPattern::of("\\Z^ab$", std::string(), plain)), std::string("a\xCC\x81" "b"));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<14>()
+    {
+        set_test_name("very nomagic's and nomagic's \\. \\* \\~ \\[ are magic's . * ~ [, and their bare ones the characters");
+        ensure_equals("the engine's own", regexOf("\\M\\[ab]\\.\\*\\~", "x"), std::string("[ab].*x"));
+        ensure_equals("any character", found("abc a.c", ALVimPattern::of("\\Va\\.c", std::string(), plain)), std::string("abc|a.c"));
+        ensure_equals("a bare one a dot", found("abc a.c", ALVimPattern::of("\\Va.c", std::string(), plain)), std::string("a.c"));
+        ensure_equals("a repeat", found("xaaa x*", ALVimPattern::of("\\Mxa\\*", std::string(), plain)), std::string("xaaa|x"));
+        ensure_equals("very nomagic's", found("xaaa x*", ALVimPattern::of("\\Vxa\\*", std::string(), plain)), std::string("xaaa|x"));
+        ensure_equals("a bare one a star", found("aaa a*", ALVimPattern::of("\\Va*", std::string(), plain)), std::string("a*"));
+        ensure_equals("the last replacement", found("ayzb a~b", ALVimPattern::of("\\Ma\\~b", std::string("yz"), plain)), std::string("ayzb"));
+        ensure_equals("very nomagic's", found("ayzb a~b", ALVimPattern::of("\\Va\\~b", std::string("yz"), plain)), std::string("ayzb"));
+        ensure_equals("a bare one a tilde", found("ayzb a~b", ALVimPattern::of("\\Va~b", std::string("yz"), plain)), std::string("a~b"));
+        ensure_equals("a bracket expression", found("x[ab] b", ALVimPattern::of("\\V\\[ab]", std::string(), plain)), std::string("a|b|b"));
+        ensure_equals("nomagic's", found("x[ab] b", ALVimPattern::of("\\M\\[ab]", std::string(), plain)), std::string("a|b|b"));
+        ensure_equals("a bare one the characters", found("x[ab] b", ALVimPattern::of("\\M[ab]", std::string(), plain)), std::string("[ab]"));
+        ensure_equals("an unclosed one a [", found("x[ab b", ALVimPattern::of("\\V\\[ab", std::string(), plain)), std::string("[ab"));
+        ensure_equals("magic's the characters", found("abc a.c", ALVimPattern::of("a\\.c", std::string(), plain)), std::string("a.c"));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<15>()
+    {
+        set_test_name("\\& has each concat but a branch's last match where the last does, and the last is the match");
+        ensure_equals("looked ahead at", regexOf("foobar\\&foo"), std::string("(?=foobar)foo"));
+        ensure_equals("the last concat's match", found("foobar foobaz", ALVimPattern::of("foobar\\&foo", std::string(), plain)), std::string("foo"));
+        ensure_equals("both in a line", found("Bob and Peter", ALVimPattern::of(".*Peter\\&.*Bob", std::string(), plain)), std::string("Bob"));
+        ensure_equals("or none", found("Bob and Paul", ALVimPattern::of(".*Peter\\&.*Bob", std::string(), plain)), std::string());
+        ensure_equals("three", found("xabcabc", ALVimPattern::of("...\\&a..\\&..c", std::string(), plain)), std::string("abc|abc"));
+        ensure_equals("in a branch after \\|", found("foobar xyz", ALVimPattern::of("xyz\\|foobar\\&foo", std::string(), plain)), std::string("foo|xyz"));
+        ensure_equals("in each branch", found("foobar baz", ALVimPattern::of("foobar\\&foo\\|baz\\&b", std::string(), plain)), std::string("foo|b"));
+        ensure_equals("in a group", found("foobar foofoo", ALVimPattern::of("\\(foobar\\&foo\\)bar", std::string(), plain)), std::string("foobar"));
+        ensure_equals("in a group's branch", found("foo bazoo", ALVimPattern::of("\\(foo\\&f\\|baz\\)oo", std::string(), plain)),
+                      std::string("foo|bazoo"));
+        ensure_equals("an empty one before it matching anywhere", found("foo", ALVimPattern::of("\\&foo", std::string(), plain)), std::string("foo"));
+        ensure_equals("a ^ after it the line's start", found("a ba", ALVimPattern::of("a\\&^a", std::string(), plain)), std::string("a"));
+        ensure_equals("a \\zs before it counts for nothing", found("foo", ALVimPattern::of("f\\zsoo\\&foo", std::string(), plain)), std::string("foo"));
+        ensure_equals("one after it does", found("foo", ALVimPattern::of("foo\\&f\\zsoo", std::string(), plain)), std::string("oo"));
+        ensure_equals("a \\ze before it counts for nothing", found("foo", ALVimPattern::of("fo\\zeo\\&foo", std::string(), plain)), std::string("foo"));
+        ensure_equals("one after it does", found("foo", ALVimPattern::of("foo\\&fo\\zeo", std::string(), plain)), std::string("fo"));
+        ensure_equals("the groups before it kept", replacedIn("foo", ALVimPattern::of("\\(f\\)oo\\&f\\(o\\)o", std::string(), plain), "[\\1|\\2|&]"),
+                      std::string("[f|o|foo]"));
+        ensure_equals("very magic's &", found("foobar baz", ALVimPattern::of("\\vfoobar&foo|baz", std::string(), plain)), std::string("foo|baz"));
+        ensure_equals("and its \\& the character", found("a&b ab", ALVimPattern::of("\\va\\&b", std::string(), plain)), std::string("a&b"));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<16>()
+    {
+        set_test_name("a group in a replacement is the one digit after the backslash, and a digit after it the digit");
+        ensure_equals("a group and a 0", replacedIn("a", ALVimPattern::of("\\(a\\)", std::string(), plain), "\\10"), std::string("a0"));
+        ensure_equals("the match and a 1", replacedIn("a", ALVimPattern::of("a", std::string(), plain), "\\01"), std::string("a1"));
+        ensure_equals("and after &", replacedIn("a", ALVimPattern::of("a", std::string(), plain), "&1"), std::string("a1"));
+        ensure_equals("two groups each with a digit", replacedIn("ab", ALVimPattern::of("\\(a\\)\\(b\\)", std::string(), plain), "\\21\\12"),
+                      std::string("b1a2"));
+        ensure_equals("and changed in case", replacedIn("a", ALVimPattern::of("\\(a\\)", std::string(), plain), "\\u\\10"), std::string("A0"));
+        ensure_equals("by vim's numbers where a cut comes between", replacedIn("abcc", ALVimPattern::of("\\(a\\zeb\\)\\(c\\)\\2", std::string(), plain),
+                                                                               "<\\21|\\10|\\01>"),
+                      std::string("<c1|ab0|a1>"));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<17>()
+    {
+        set_test_name("a \\ze with nothing after it in its branch ends the match there and looks ahead at nothing");
+        ensure_equals("no look ahead", regexOf("foo\\ze"), std::string("foo"));
+        ensure_equals("the match", found("foobar", ALVimPattern::of("foo\\ze", std::string(), plain)), std::string("foo"));
+        ensure_equals("before a \\|", found("foobar foo", ALVimPattern::of("foo\\ze\\|bar", std::string(), plain)), std::string("foo|bar|foo"));
+        ensure_equals("before a \\c", found("FOO", ALVimPattern::of("foo\\ze\\c", std::string(), plain)), std::string("FOO"));
+        ensure_equals("one with something after it still looks", found("foobar foobaz", ALVimPattern::of("foo\\zeba\\|x", std::string(), plain)),
+                      std::string("foo|foo"));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<18>()
+    {
+        set_test_name("a bracket expression is read as vim reads one: its [:classes:] whole, and a backslash itself before what means nothing there");
+        ensure_equals("a class", found("ab1c", ALVimPattern::of("[[:alpha:]]\\+", std::string(), plain)), std::string("ab|c"));
+        ensure_equals("two", found("ab1c", ALVimPattern::of("[[:alpha:][:digit:]]\\+", std::string(), plain)), std::string("ab1c"));
+        ensure_equals("a ] after it", found("a]b", ALVimPattern::of("[[:alpha:]]]", std::string(), plain)), std::string("a]"));
+        ensure_equals("negated", found("ab1]", ALVimPattern::of("[^[:alpha:]]\\+", std::string(), plain)), std::string("1]"));
+        ensure_equals("vim's letters are ASCII's", found("\xC3\xA9 a", ALVimPattern::of("[[:alpha:]]", std::string(), plain)), std::string("a"));
+        ensure_equals("its lower case Unicode's", found("\xC3\xA9 A", ALVimPattern::of("[[:lower:]]", std::string(), plain)), std::string("\xC3\xA9"));
+        ensure_equals("vim's own classes", found("a\tb", ALVimPattern::of("a[[:tab:]]b", std::string(), plain)), std::string("a\tb"));
+        ensure_equals("a name vim does not know is no class", found("o] :]", ALVimPattern::of("[[:foo:]]", std::string(), plain)), std::string("o]|:]"));
+        ensure_equals("a collating element", found("abc", ALVimPattern::of("[[.c.]]", std::string(), plain)), std::string("c"));
+        ensure_equals("an equivalence class", found("\xC3\xA1" "b", ALVimPattern::of("[[=a=]]", std::string(), plain)), std::string("\xC3\xA1"));
+        ensure_equals("a backslash itself", found("x s\\", ALVimPattern::of("[\\s]\\+", std::string(), plain)), std::string("s\\"));
+        ensure_equals("before a ] not", found("a]", ALVimPattern::of("[\\]]", std::string(), plain)), std::string("]"));
+        ensure_equals("\\_[ with a ^, or a line break", found("xa^b\nyc", ALVimPattern::of("b\\_[^ab]y", std::string(), plain)), std::string("b\ny"));
+        ensure_equals("and the characters it does not hold", found("xa^b\nyc", ALVimPattern::of("a\\_[^ab]b", std::string(), plain)), std::string("a^b"));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<19>()
+    {
+        set_test_name("~ is one atom, which a multi after it repeats whole");
+        ensure_equals("in a group of its own", regexOf("a~*", "x.y"), std::string("a(?:x\\.y)*"));
+        ensure_equals("one character in none", regexOf("a~*", "x"), std::string("ax*"));
+        ensure_equals("magic's", found("axyxyb axyyb", ALVimPattern::of("a~*b", std::string("xy"), plain)), std::string("axyxyb"));
+        ensure_equals("very magic's", found("axyxyb axyyb", ALVimPattern::of("\\va~+b", std::string("xy"), plain)), std::string("axyxyb"));
+        ensure_equals("nomagic's", found("axyxyb axyyb", ALVimPattern::of("\\Ma\\~\\+b", std::string("xy"), plain)), std::string("axyxyb"));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<20>()
+    {
+        set_test_name("\\b is a backspace, as \\e is an escape");
+        ensure_equals("the engine's", regexOf("a\\bb"), std::string("a\\x08b"));
+        ensure_equals("the character", found("a\bb ab", ALVimPattern::of("a\\bb", std::string(), plain)), std::string("a\bb"));
+        ensure_equals("very magic's", found("a\bb ab", ALVimPattern::of("\\va\\bb", std::string(), plain)), std::string("a\bb"));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<21>()
+    {
+        set_test_name("a magic * first in a branch, or after a ^ that is a line's start, is itself");
+        ensure_equals("first", found("*a a", ALVimPattern::of("*a", std::string(), plain)), std::string("*a"));
+        ensure_equals("after a ^", found("*a a", ALVimPattern::of("^*a", std::string(), plain)), std::string("*a"));
+        ensure_equals("the next a multi", found("**a", ALVimPattern::of("^**a", std::string(), plain)), std::string("**a"));
+        ensure_equals("after \\(", found("x*a a", ALVimPattern::of("x\\(*a\\)", std::string(), plain)), std::string("x*a"));
+        ensure_equals("after \\|", found("x*a a", ALVimPattern::of("x\\|*a", std::string(), plain)), std::string("x|*a"));
+        ensure_equals("after \\&", found("*a a", ALVimPattern::of("*\\&*a", std::string(), plain)), std::string("*a"));
+        ensure_equals("past a \\c", found("*a aa", ALVimPattern::of("\\c*a", std::string(), plain)), std::string("*a"));
+        ensure_equals("very magic's", found("*a aa", ALVimPattern::of("\\v*a", std::string(), plain)), std::string("*a"));
+        ensure_equals("after its (", found("*a aa", ALVimPattern::of("\\v(*a)", std::string(), plain)), std::string("*a"));
+        ensure_equals("after a ^ that is itself a multi", found("a^^b", ALVimPattern::of("a^*b", std::string(), plain)), std::string("a^^b"));
+        ensure("after \\%( a multi, which follows nothing", found("*a", ALVimPattern::of("\\%(*a\\)", std::string(), plain)).rfind("error", 0) == 0);
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<22>()
+    {
+        set_test_name("a ~ with no last replacement, or only an empty one, reads as no pattern: vim's E33, and no match looked for");
+        const ALVimPattern none = ALVimPattern::of("a~*b", std::string(), plain);
+        ensure_equals("said", none.readError, std::string("E33: No previous substitute regular expression"));
+        ensure_equals("and nothing found", found("aab ab", none), std::string("error: E33: No previous substitute regular expression"));
+        ensure_equals("very magic's", ALVimPattern::of("\\va~+", std::string(), plain).readError, none.readError);
+        ensure("one to stand for", ALVimPattern::of("a~*b", std::string("x"), plain).readError.empty());
+        ensure("very nomagic's bare ~ itself", ALVimPattern::of("\\Va~b", std::string(), plain).readError.empty());
     }
 }

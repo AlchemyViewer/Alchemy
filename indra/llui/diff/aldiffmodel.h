@@ -192,9 +192,14 @@ public:
     // (mergeOptions): a lexer holds the last two texts it read, which are
     // the comparison's, and a merge reads three. Without it, the merge
     // reads by the comparison's. And what the comparison's says it read
-    // again of a text (ALTextDiff::reread_t), where it says.
+    // again of a text (ALTextDiff::reread_t), where it says; and the
+    // comparison's told what an edit knows of the texts it asks for
+    // (ALTextDiff::told_t), where it can be, which beside what it says
+    // then need not compare them with those it holds. And the same of the
+    // merge's, which reads ours again only about an edit where they are.
     void    setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging = ALTextDiff::lexer_t(),
-                     ALTextDiff::reread_t reread = ALTextDiff::reread_t());
+                     ALTextDiff::reread_t reread = ALTextDiff::reread_t(), ALTextDiff::told_t told = ALTextDiff::told_t(),
+                     ALTextDiff::reread_t merging_reread = ALTextDiff::reread_t(), ALTextDiff::told_t merging_told = ALTextDiff::told_t());
 
     // The texts as given, their line endings LF as an editor reads them.
     const std::string&           leftText() const { return mLeftText; }
@@ -438,9 +443,11 @@ private:
     // Each line's regions of the texts as shown, where a grammar cuts their
     // words and answers a line each; none else. Asked of the lexer once a
     // rebuild, which reads and lays out by them as many times as it needs:
-    // a text it holds is compared whole to be known again.
+    // a text it holds is compared whole to be known again -- but where it
+    // is told what is `known` of each as shown (ALTextDiff::told_t), the
+    // left's then the right's.
     typedef const std::vector<ALTextDiff::regions_t>* line_regions_t;
-    std::pair<line_regions_t, line_regions_t> shownRegions() const;
+    std::pair<line_regions_t, line_regions_t> shownRegions(const ALTextDiff::Known* known = nullptr) const;
     const ColumnData& of(Column column) const { return mColumns[static_cast<size_t>(column)]; }
     ColumnData&       of(Column column) { return mColumns[static_cast<size_t>(column)]; }
     // A line added to a column, a row of nothing that is a row of the gap
@@ -499,6 +506,9 @@ private:
     // were, outside the change. Nothing where all of it is to be laid out
     // again.
     std::optional<Reuse> reusable(const Relayout& again, const ALDiffMoves::moves_t& moves, size_t last_change) const;
+    // Of the runs after a splice, how many at the start are as they were
+    // before it, and how many at the end as they were moved along.
+    static std::pair<size_t, size_t> runsKept(const Relayout& again, const std::vector<ALTextDiff::Run>& now);
     // Compared again and made again from the texts, the runs folded as
     // foldsSame() says; or with the runs the reader opened open again,
     // where they hide the same first line of the right (openedLines). And
@@ -564,6 +574,8 @@ private:
     // are (mergeOptions): what lines are told the same by, how the lines
     // that stay are chosen, and the grammar, each as it is set.
     void              refreshMerge();
+    // The merge told what the lexer it reads by says and can be told.
+    void              mergeLexing();
 
     std::string           mLeftText;
     std::string           mRightText;
@@ -578,10 +590,14 @@ private:
     std::vector<S32>      mRangeOrder[2];
     std::vector<S32>      mRangeReach[2];
     ALTextDiff::Options   mOptions;
-    // The lexer a merge reads by, where it has one of its own; and what the
-    // comparison's says it read again, where it says.
+    // The lexer a merge reads by, where it has one of its own; what the
+    // comparison's says it read again, where it says; and it told what is
+    // known of a text, where it can be; the same of the merge's.
     ALTextDiff::lexer_t   mMergeLexer;
     ALTextDiff::reread_t  mReread;
+    ALTextDiff::told_t    mTold;
+    ALTextDiff::reread_t  mMergeReread;
+    ALTextDiff::told_t    mMergeTold;
     bool                  mSwapped  = false;
     bool                  mFoldSame = true;
     ColumnData            mColumns[3];
@@ -600,6 +616,9 @@ private:
     std::vector<Mark>     mGroups;
     size_t                mLastChange = 0;
     Relaid                mRelaid;
+    // Whether each run of the last layout is of a change that is none, as
+    // lines are told the same.
+    std::vector<bool>     mIgnored;
     U32                   mLayouts = 0;
     bool                  mKeepsLayout = true;
     std::vector<Note>     mNotes;

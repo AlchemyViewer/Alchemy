@@ -199,6 +199,7 @@ void ALTextLayout::invalidateAll()
     {
         mHidden.assign(mLines.size(), 0);
         mHiddenCount = 0;
+        mHiddenByCount.fill(0);
         ++mHiddenRevision;
     }
     heightsMoved();
@@ -231,6 +232,7 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
             for (S32 l = first; l <= last && l < size; ++l)
             {
                 hidden_gone += mHidden[l] ? 1 : 0;
+                ownersChanged(mHidden[l], 0);
             }
         }
     }
@@ -351,6 +353,7 @@ void ALTextLayout::setHidden(HiddenBy by, S32 first, S32 last, bool hidden)
         const U8 was = mHidden[l];
         const U8 now = hidden ? static_cast<U8>(was | bits) : static_cast<U8>(was & ~bits);
         mHidden[l]   = now;
+        ownersChanged(was, now);
         if ((was != 0) != (now != 0))
         {
             mHiddenCount += now != 0 ? 1 : -1;
@@ -361,6 +364,32 @@ void ALTextLayout::setHidden(HiddenBy by, S32 first, S32 last, bool hidden)
                 ++mHeightsRevision;
             }
         }
+    }
+}
+
+void ALTextLayout::ownersChanged(U8 was, U8 now)
+{
+    const U8 changed = static_cast<U8>(was ^ now);
+    for (size_t i = 0; i < mHiddenByCount.size(); ++i)
+    {
+        const U8 bit = static_cast<U8>(1u << i);
+        if ((changed & bit) != 0)
+        {
+            mHiddenByCount[i] += (now & bit) != 0 ? 1 : -1;
+        }
+    }
+}
+
+S32 ALTextLayout::hiddenCount(HiddenBy by) const
+{
+    switch (by)
+    {
+        case HiddenBy::Folds:
+            return mHiddenByCount[0];
+        case HiddenBy::Host:
+            return mHiddenByCount[1];
+        default:
+            return mHiddenCount;
     }
 }
 

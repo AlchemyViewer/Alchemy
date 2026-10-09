@@ -343,4 +343,83 @@ namespace tut
         const std::vector<ALTextDiff::regions_t> copied = other_read;
         ensure_equals("regions it does not hold: nothing", lexer.reread(copied).text, U64(0));
     }
+
+    template<> template<>
+    void aldifflexer_object::test<7>()
+    {
+        set_test_name("told what an edit knows of the texts asked for: the one it holds as it is, and the edit of the other read again in its place, no line compared to find either, as read afresh and said of as where the edit is found; told of a text it does not hold, or of one it would not read in the place of, as where it is told nothing");
+        ensure("the LSL grammar", lsl != nullptr);
+        std::vector<std::string> left;
+        for (S32 n = 0; n < 100; ++n)
+        {
+            left.push_back(n == 25 ? "    done */" : "integer v" + std::to_string(n) + " = " + std::to_string(n) + ";");
+        }
+        std::vector<std::string> right = left;
+        right[80]                      = "llSay(0, \"right\");";
+
+        // Two texts asked for in turn, as a comparison does, by one lexer
+        // told and one not.
+        ALDiffLexer told(lsl);
+        ALDiffLexer found(lsl);
+        const auto& left_read  = told.regions(left);
+        const auto& right_read = told.regions(right);
+        const U64   left_text  = told.reread(left_read).text;
+        const U64   right_text = told.reread(right_read).text;
+        found.regions(left);
+        found.regions(right);
+
+        // Typed in on the right, the left asked for again first: told, the
+        // left as it holds it and the right edited at line 50.
+        std::vector<std::string> typed = right;
+        typed[50] += " // typed";
+        const U64   compared   = told.linesCompared();
+        const auto& left_again = told.regions(left, ALTextDiff::Known{ left_text, 100, 0 });
+        ensure("the left as it holds it, nothing read", &left_again == &left_read && told.lastRead() == 0);
+        const auto& typed_read = told.regions(typed, ALTextDiff::Known{ right_text, 50, 49 });
+        ensure_equals("no line compared to know either", told.linesCompared() - compared, U64(0));
+        ensure("the right read again in its place, the line typed alone: " + std::to_string(told.lastRead()),
+               &typed_read == &right_read && told.lastRead() >= 1 && told.lastRead() <= 2);
+        ALDiffLexer fresh(lsl);
+        ensure("as read afresh", typed_read == fresh.regions(typed));
+        const U64                found_was  = found.linesCompared();
+        found.regions(left);
+        const ALTextDiff::Reread found_said = found.reread(found.regions(typed));
+        ensure("not told: every line of both compared with those held: " + std::to_string(found.linesCompared() - found_was),
+               found.linesCompared() - found_was >= 200);
+        const ALTextDiff::Reread typed_said = told.reread(typed_read);
+        ensure("said of as where the edit is found: from the right, the lines after the edit as they were",
+               typed_said.was == right_text && typed_said.same == 51 && found_said.same == 51);
+
+        // A comment opened above line 25, which closes it: told, the lines
+        // down to it read otherwise, and said so.
+        std::vector<std::string> opened = typed;
+        opened[20]                      = "/* opened";
+        told.regions(left, ALTextDiff::Known{ left_text, 100, 0 });
+        const auto&              opened_read = told.regions(opened, ALTextDiff::Known{ typed_said.text, 20, 79 });
+        const ALTextDiff::Reread opened_said = told.reread(opened_read);
+        ensure_equals("from the line after the comment's close", opened_said.same, 26);
+        ensure("from the text typed", opened_said.was == typed_said.text);
+        ALDiffLexer fresh_opened(lsl);
+        ensure("as read afresh, the comment's lines its", opened_read == fresh_opened.regions(opened) && opened_read[23].size() == 1 &&
+                                                               opened_read[23][0].region == ALTextDiff::Region::Comment);
+        ensure_equals("still no line compared", told.linesCompared() - compared, U64(0));
+
+        // Told of a text it does not hold, and of the one asked for last,
+        // which it would not read in the place of: found, as told nothing.
+        std::vector<std::string> other = opened;
+        other[60]                      = "integer sixty;";
+        told.regions(left, ALTextDiff::Known{ left_text, 100, 0 });
+        const auto& unknown_read = told.regions(other, ALTextDiff::Known{ right_text, 60, 39 });
+        ALDiffLexer fresh_other(lsl);
+        ensure("a text it does not hold: as read afresh", unknown_read == fresh_other.regions(other));
+        ensure("found by comparing", told.linesCompared() - compared > 0);
+        const U64   other_text = told.reread(unknown_read).text;
+        const U64   before     = told.linesCompared();
+        std::vector<std::string> last = other;
+        last[70]                      = "integer seventy;";
+        const auto& last_read = told.regions(last, ALTextDiff::Known{ other_text, 70, 29 });
+        ALDiffLexer fresh_last(lsl);
+        ensure("the one asked for last: as read afresh", last_read == fresh_last.regions(last));
+        ensure("found by comparing", told.linesCompared() > before);
+    }
 }

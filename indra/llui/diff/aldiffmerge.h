@@ -70,12 +70,18 @@ public:
     // merge found again.
     void setOptions(const ALTextDiff::Options& options);
     void setOurs(lines_t ours);
+    // What the options' lexer says it read again of a text, and it told
+    // what an edit knows of one (ALTextDiff::reread_t, told_t), where it
+    // can be: where lines are told the same by their regions, ours is read
+    // again only about an edit, as the lexer reads one.
+    void setLexing(ALTextDiff::reread_t reread, ALTextDiff::told_t told);
     // Ours made anew where it differs from ours as it was, between its
     // edges (ALDiffEdit::edgesOf): only those lines taken in, and ours
     // compared with the base again only about them (ALDiffSplice) where
-    // that is enough -- not where lines are told the same by a grammar's
-    // regions, which are read of whole texts -- before the merge is found
-    // again: a comparison's right as it is typed in.
+    // that is enough -- where lines are told the same by a grammar's
+    // regions, the lines after them it made read otherwise as well, where
+    // the lexer is told and says what it read again -- before the merge is
+    // found again: a comparison's right as it is typed in.
     void setOurs(const lines_t& ours, const ALDiffEdit::Edges& edges);
 
     const ALTextMerge::hunks_t& hunks() const { return mHunks; }
@@ -120,6 +126,10 @@ private:
     // change.
     void find();
     void findTheirs();
+    // The options, their lexer answering for the base and theirs what was
+    // kept of them, and for ours by the options' own, told that it is ours
+    // as last read; as they are where nothing is kept.
+    ALTextDiff::Options lexing();
     // Whether a conflict is one a settling kept settles: its lines of the
     // base those of one, or beside them, and ours there not as it was
     // before -- undone -- and each change of theirs in it one a settling
@@ -140,6 +150,21 @@ private:
     bool                   mOurRunsKnown = false;
     // By lines alone, as told the same (ALTextDiff::linesOnly).
     ALTextDiff::Options    mOptions;
+    // Where lines are told the same by their regions: the base's and
+    // theirs's read once and kept, as neither changes, so that only ours
+    // is read by the lexer after, which holds two texts and would read a
+    // merge's three again in turn; ours's number and the base's as the
+    // lexer last read them, nought where that is not known -- the base
+    // asked for as it is before ours is read again, so that the two are
+    // what the lexer holds; and what the lexer says it read again and is
+    // told.
+    std::vector<ALTextDiff::regions_t> mBaseRegions;
+    std::vector<ALTextDiff::regions_t> mTheirRegions;
+    bool                               mKeptRegions = false;
+    U64                                mOurText     = 0;
+    U64                                mBaseText    = 0;
+    ALTextDiff::reread_t               mReread;
+    ALTextDiff::told_t                 mTold;
     ALTextMerge::changes_t mTheirChanges;
     ALTextMerge::hunks_t   mHunks;
     // Each hunk that is a conflict, by its place, in order.

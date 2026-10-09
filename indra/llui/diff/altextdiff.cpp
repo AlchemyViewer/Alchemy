@@ -43,8 +43,9 @@ namespace
     typedef ALTextDiff::Run  Run;
     typedef ALTextDiff::Kind Kind;
 
-    // A test's hook, of the thread that hashed.
+    // A test's hooks, of the thread that hashed or asked.
     thread_local U64 sHashed = 0;
+    thread_local U64 sAsked  = 0;
 }
 
 const char* ALTextDiff::algorithmName(Algorithm algorithm)
@@ -163,6 +164,7 @@ std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like, 
 
 bool ALTextDiff::ignorable(std::string_view line, const Likeness& like, const regions_t* regions)
 {
+    ++sAsked;
     if (!like.ignoreBlankLines && !like.ignoreComments)
     {
         return false;
@@ -179,6 +181,11 @@ bool ALTextDiff::ignorable(std::string_view line, const Likeness& like, const re
     // Nothing but a comment and blanks.
     const bool has_comment = std::any_of(regions->begin(), regions->end(), [](const Piece& piece) { return piece.region == Region::Comment; });
     return has_comment && likenessOf(line, Likeness{ true, false, true, true, true }, regions).empty();
+}
+
+U64 ALTextDiff::askedIgnorable()
+{
+    return sAsked;
 }
 
 namespace

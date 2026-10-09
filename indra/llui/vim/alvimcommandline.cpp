@@ -235,8 +235,15 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                 remember(which, entered);
                 if (which == ':')
                 {
-                    // Typed where the Enter that ends it was.
+                    // Typed where the Enter that ends it was. It is the ":
+                    // register once it has run, the one before while it
+                    // runs, as in vim, unless it played @:.
+                    mVim.mKeepCommandLine = true;
                     mVim.mEx->runEntered(view, entered, mVim.keyTyped());
+                    if (mVim.mKeepCommandLine)
+                    {
+                        mVim.mShared->commandLine = entered;
+                    }
                 }
                 else
                 {

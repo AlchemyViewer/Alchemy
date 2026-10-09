@@ -1166,9 +1166,11 @@ private:
 
     // The blocks that fold, and which are folded: by the syntax the
     // grammar gives -- brackets that are code, and its block words -- and
-    // its line comment's regions, told again when the grammar changes.
-    ALFoldModel             mFolds;
-    const void*             mFoldGrammar = nullptr;
+    // its line comment's regions, told again when the grammar changes, and
+    // of the lines whose tokens the highlighter lexed anew.
+    ALFoldModel                        mFolds;
+    const void*                        mFoldGrammar = nullptr;
+    boost::signals2::scoped_connection mFoldsRelexed;
     ALFoldModel&            folds();
     void                    foldBlocksOn(S32 line, std::vector<ALFoldModel::Block>& out);
     // The sticky headers as last worked out: for which text, which top
@@ -1178,10 +1180,10 @@ private:
     S32                     mStickyTop     = -1;
     std::vector<S32>        mStickyFolded;
     bool                    mStickyValid   = false;
-    // The lines last hidden by folds, and the layout's hidden revision
-    // then: while neither has moved, the layout hides what the folds do.
+    // The lines the folds last hid, as runs in order and apart, moved with
+    // every edit as the layout moves its lines: what they are hidden again
+    // against.
     std::vector<std::pair<S32, S32>> mHiddenByFolds;
-    U32                              mHiddenByFoldsAt = 0;
 
     completion_provider_t   mProvider;
     completion_request_t    mCompletionRequest;

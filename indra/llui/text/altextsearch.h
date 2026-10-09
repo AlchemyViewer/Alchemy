@@ -40,10 +40,6 @@ struct ALTextSearchOptions
     // What replaces a match takes the match's case: upper for HELLO,
     // capitalised for Hello, lower for hello, as typed for anything else.
     bool preserveCase  = false;
-    // The match reported is this group of the pattern rather than the
-    // whole, where it is not zero: what vim's \zs asks for. A match in
-    // which the group took no part is reported whole.
-    S32  matchGroup    = 0;
     // A match may cross a line's end: the lines are searched as one
     // text with a line break between them, so that \n in a pattern is
     // the end of a line and a class with a line break in it -- vim's

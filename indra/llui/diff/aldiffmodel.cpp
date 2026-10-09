@@ -215,11 +215,16 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> between, co
     // reads again and nothing else reads by it meanwhile -- a merge with no
     // lexer of its own; else the lines of the changes after the edit, each
     // with its regions as read -- every line's after it, where lines are
-    // told the same by them.
+    // told the same by them. And the number of the text it holds the other
+    // side as, where it can be told so.
     const bool           regioned   = static_cast<bool>(mOptions.lexer);
-    const bool           by_regions = regioned && mOptions.like.byRegions() && !mOptions.like.ignoreComments;
-    const line_regions_t before     = regioned ? (shown ? shownRegions().second : shownRegions().first) : nullptr;
-    const U64            held       = before && mReread && (!mMerge || mMergeLexer) ? mReread(*before).text : 0;
+    const bool           by_regions = regioned && mOptions.like.byRegions();
+    const std::pair<line_regions_t, line_regions_t> had = regioned ? shownRegions() : std::pair<line_regions_t, line_regions_t>();
+    const line_regions_t before     = shown ? had.second : had.first;
+    const line_regions_t other_had  = shown ? had.first : had.second;
+    const bool           alone      = mReread && (!mMerge || mMergeLexer);
+    const U64            held       = before && alone ? mReread(*before).text : 0;
+    const U64            other_held = other_had && alone && mTold ? mReread(*other_had).text : 0;
     const std::vector<std::pair<S32, size_t>> read_before =
         before && !held ? readFrom(shown, was - edges.tail, by_regions) : std::vector<std::pair<S32, size_t>>();
     // The moves' ids of the lines edited let go of, those after moved along.
@@ -242,8 +247,14 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> between, co
     again.lines                          = was;
     // The texts' regions as they now are, read whole as the rebuild reads
     // them after: what the lines compared again are told the same by, where
-    // they are so.
-    const auto [left_regions, right_regions] = shownRegions();
+    // they are so. The lexer told what is known of each, where it holds it
+    // as it was: the side changed that text edited between the edges, the
+    // other as it is.
+    const std::vector<std::string>& other = given_left ? mRightLines : mLeftLines;
+    ALTextDiff::Known               known[2];
+    known[shown]                             = ALTextDiff::Known{ held, edges.head, edges.tail };
+    known[1 - shown]                         = ALTextDiff::Known{ other_held, static_cast<S32>(other.size()), 0 };
+    const auto [left_regions, right_regions] = shownRegions(known);
     // The edit reaches as far as the lines after it that now read otherwise
     // -- a block comment opened or closed -- of its changes, or of every
     // line where lines are told the same by their regions; or to the end
@@ -293,7 +304,6 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> between, co
     {
         compared.tail = std::min(edges.tail, static_cast<S32>(side.size()) - reach);
     }
-    const std::vector<std::string>& other = given_left ? mRightLines : mLeftLines;
     const ALDiffSplice::Side        changed{ side, was, compared, shown_left ? left_regions : right_regions };
     const ALDiffSplice::Side        same{ other, static_cast<S32>(other.size()), ALDiffEdit::Edges{ static_cast<S32>(other.size()), 0 },
                                    shown_left ? right_regions : left_regions };
@@ -458,11 +468,15 @@ void ALDiffModel::setAlgorithm(ALTextDiff::Algorithm algorithm)
     }
 }
 
-void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging, ALTextDiff::reread_t reread)
+void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging, ALTextDiff::reread_t reread, ALTextDiff::told_t told,
+                           ALTextDiff::reread_t merging_reread, ALTextDiff::told_t merging_told)
 {
     mOptions.lexer = std::move(lexer);
     mMergeLexer    = std::move(merging);
     mReread        = std::move(reread);
+    mTold          = std::move(told);
+    mMergeReread   = std::move(merging_reread);
+    mMergeTold     = std::move(merging_told);
     if (!mOptions.lexer && mOptions.like.ignoreComments)
     {
         // Lines told the same otherwise now: as setLikeness.
@@ -479,8 +493,17 @@ void ALDiffModel::refreshMerge()
 {
     if (mMerge)
     {
+        mergeLexing();
         mMerge->setOptions(mergeOptions());
     }
+}
+
+void ALDiffModel::mergeLexing()
+{
+    // What the merge's own lexer says and is told. One reading by the
+    // comparison's is told nothing: reading ours again about an edit, it
+    // would have that lexer hold the base in the place of a text shown.
+    mMerge->setLexing(mMergeLexer ? mMergeReread : ALTextDiff::reread_t(), mMergeLexer ? mMergeTold : ALTextDiff::told_t());
 }
 
 // --- made --------------------------------------------------------------------------
@@ -542,13 +565,23 @@ ALTextDiff::Options ALDiffModel::shownOptions() const
     return options;
 }
 
-std::pair<ALDiffModel::line_regions_t, ALDiffModel::line_regions_t> ALDiffModel::shownRegions() const
+std::pair<ALDiffModel::line_regions_t, ALDiffModel::line_regions_t> ALDiffModel::shownRegions(const ALTextDiff::Known* known) const
 {
     // Kept while they are as long as the texts shown: a lexer asked for
     // another text reads it in the place of one it held, and what is kept
     // of that one is then another's.
     if (mRegions && (!mRegions->first || (mRegions->first->size() == shownLeft().size() && mRegions->second->size() == shownRight().size())))
     {
+        return *mRegions;
+    }
+    if (known && mTold && mOptions.lexer)
+    {
+        // Asked in turn as lexed() asks, and none of either where it
+        // answers other than a line each.
+        const line_regions_t left  = &mTold(shownLeft(), known[0]);
+        const line_regions_t right = &mTold(shownRight(), known[1]);
+        const bool           whole = left->size() == shownLeft().size() && right->size() == shownRight().size();
+        mRegions.emplace(whole ? left : nullptr, whole ? right : nullptr);
         return *mRegions;
     }
     mRegions.emplace(ALTextDiff::lexed(mOptions, shownLeft(), shownRight(), true));
@@ -686,6 +719,17 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const Relayout* aga
     };
     if (like.ignoreBlankLines || like.ignoreComments || by_tokens)
     {
+        // After a splice, a change's answer as it was where it is a change
+        // there was -- its runs as they were before the edit or moved along
+        // after it, between runs the same then too -- and none of its lines
+        // on the side edited is among those edited or read otherwise: its
+        // lines, their regions and the tokens of them kept are as they were.
+        const bool                          keeps        = again && mKeepsLayout && mIgnored.size() == again->runs.size();
+        const std::vector<ALTextDiff::Run>* was          = keeps ? &again->runs : nullptr;
+        const std::pair<size_t, size_t>     kept_runs    = keeps ? runsKept(*again, runs) : std::pair<size_t, size_t>(0, 0);
+        const S32                           delta        = keeps ? static_cast<S32>(runs.size()) - static_cast<S32>(was->size()) : 0;
+        const size_t                        edited       = keeps ? again->side : 0;
+        const S32                           edited_lines = static_cast<S32>((edited ? right : left).size());
         for (size_t i = 0; i < runs.size();)
         {
             if (runs[i].kind == Kind::Same)
@@ -693,17 +737,47 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const Relayout* aga
                 ++i;
                 continue;
             }
-            bool   none = true;
-            size_t j    = i;
-            for (; j < runs.size() && runs[j].kind != Kind::Same; ++j)
+            size_t j = i;
+            while (j < runs.size() && runs[j].kind != Kind::Same)
             {
-                const bool out = runs[j].kind == Kind::Removed;
-                for (S32 n = 0; n < runs[j].count && none; ++n)
+                ++j;
+            }
+            // Its lines on the side edited: from where it starts to where
+            // the run after it does.
+            const S32 from = edited ? runs[i].right : runs[i].left;
+            const S32 to   = j < runs.size() ? (edited ? runs[j].right : runs[j].left) : edited_lines;
+            // Where it was: as it is, its runs among those as they were and
+            // the one after it the same then, or the end then; else moved
+            // along, its runs among those moved along and the one before it
+            // the same then, or the start then.
+            bool   was_one = false;
+            size_t at      = i;
+            if (keeps && j <= kept_runs.first && to <= again->head)
+            {
+                was_one = j < runs.size() ? (j < was->size() && (*was)[j].kind == Kind::Same) : j == was->size();
+            }
+            else if (keeps && i + kept_runs.second >= runs.size() && from >= edited_lines - again->tail)
+            {
+                at      = static_cast<size_t>(static_cast<S32>(i) - delta);
+                was_one = i == 0 ? at == 0 : (at > 0 && (*was)[at - 1].kind == Kind::Same);
+            }
+            bool none = true;
+            if (was_one)
+            {
+                none = mIgnored[at];
+            }
+            else
+            {
+                for (size_t k = i; k < j && none; ++k)
                 {
-                    const S32 line = (out ? runs[j].left : runs[j].right) + n;
-                    none = (tokened(out, line) && marksOf(out, line).empty()) ||
-                           ALTextDiff::ignorable(out ? left[static_cast<size_t>(line)] : right[static_cast<size_t>(line)], like,
-                                                 regionsOf(out ? left_regions : right_regions, line));
+                    const bool out = runs[k].kind == Kind::Removed;
+                    for (S32 n = 0; n < runs[k].count && none; ++n)
+                    {
+                        const S32 line = (out ? runs[k].left : runs[k].right) + n;
+                        none = (tokened(out, line) && marksOf(out, line).empty()) ||
+                               ALTextDiff::ignorable(out ? left[static_cast<size_t>(line)] : right[static_cast<size_t>(line)], like,
+                                                     regionsOf(out ? left_regions : right_regions, line));
+                    }
                 }
             }
             for (; i < j; ++i)
@@ -1199,6 +1273,7 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const Relayout* aga
     }
     mark(runs.size());
     mLastChange = last_change;
+    mIgnored    = std::move(ignored);
     for (ColumnData& c : mColumns)
     {
         c.endPadding = c.pending;
@@ -1233,26 +1308,12 @@ std::optional<ALDiffModel::Reuse> ALDiffModel::reusable(const Relayout& again, c
         return std::nullopt;
     }
     // The runs before the change as they were, and those after it moved
-    // along by as many lines as each side gained or lost: where an edit
-    // inside a change left every run as it was, both all of them, the lines
-    // changed parting what is kept from what is moved.
-    size_t before = 0;
-    while (before < was.size() && before < now.size() && was[before] == now[before])
-    {
-        ++before;
-    }
-    size_t after = 0;
-    while (after < was.size() && after < now.size())
-    {
-        ALTextDiff::Run run = was[was.size() - 1 - after];
-        run.left += again.left;
-        run.right += again.right;
-        if (!(run == now[now.size() - 1 - after]))
-        {
-            break;
-        }
-        ++after;
-    }
+    // along: where an edit inside a change left every run as it was, both
+    // all of them, the lines changed parting what is kept from what is
+    // moved.
+    const std::pair<size_t, size_t> kept_runs = runsKept(again, now);
+    const size_t                    before    = kept_runs.first;
+    const size_t                    after     = kept_runs.second;
     // The groups wholly before the change; and the first wholly after it,
     // at a group's edge in the runs as they now are too: a change after
     // the change begins a group only after a run the same...
@@ -1349,6 +1410,31 @@ std::optional<ALDiffModel::Reuse> ALDiffModel::reusable(const Relayout& again, c
         }
     }
     return Reuse{ kept, moved, from, to };
+}
+
+// static
+std::pair<size_t, size_t> ALDiffModel::runsKept(const Relayout& again, const std::vector<ALTextDiff::Run>& now)
+{
+    // Those after moved along by as many lines as each side gained or lost.
+    const std::vector<ALTextDiff::Run>& was    = again.runs;
+    size_t                              before = 0;
+    while (before < was.size() && before < now.size() && was[before] == now[before])
+    {
+        ++before;
+    }
+    size_t after = 0;
+    while (after < was.size() && after < now.size())
+    {
+        ALTextDiff::Run run = was[was.size() - 1 - after];
+        run.left += again.left;
+        run.right += again.right;
+        if (!(run == now[now.size() - 1 - after]))
+        {
+            break;
+        }
+        ++after;
+    }
+    return { before, after };
 }
 
 // --- a column's lines ----------------------------------------------------------
@@ -1600,6 +1686,7 @@ void ALDiffModel::setMergeBase(std::optional<std::string_view> base)
     {
         // Theirs the left as given, ours the right.
         mMerge.emplace(ALTextDiff::split(*base), mLeftLines, mergeOptions());
+        mergeLexing();
         mMerge->setOurs(mRightLines);
         mergeRead();
     }
