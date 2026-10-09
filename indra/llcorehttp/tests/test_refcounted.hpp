@@ -32,6 +32,8 @@ using namespace LLCoreInt;
 
 namespace tut
 {
+namespace
+{
     struct RefCountedTestData
     {
         // the test objects inherit from this so the member functions and variables
@@ -41,6 +43,7 @@ namespace tut
     typedef test_group<RefCountedTestData> RefCountedTestGroupType;
     typedef RefCountedTestGroupType::object RefCountedTestObjectType;
     RefCountedTestGroupType RefCountedTestGroup("RefCounted Tests");
+}
 
     template <> template <>
     void RefCountedTestObjectType::test<1>()
