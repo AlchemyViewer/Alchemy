@@ -125,6 +125,7 @@ target_sources(
         allinebreaks.h
         alserialworker.h
         alparamtype.h
+        alrandmap.h
         alrecoverystore.h
         alregex.h
         alsavehistory.h

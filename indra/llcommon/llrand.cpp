@@ -27,147 +27,96 @@
 #include "linden_common.h"
 
 #include "llrand.h"
-#include "lluuid.h"
+#include "alrandmap.h"
 
+#include <array>
+#include <chrono>
+#include <cstdint>
+#include <exception>
+#include <functional>
 #include <random>
+#include <thread>
 
-/**
- * Through analysis, we have decided that we want to take values which
- * are close enough to 1.0 to map back to 0.0.  We came to this
- * conclusion from noting that:
- *
- * [0.0, 1.0)
- *
- * when scaled to the integer set:
- *
- * [0, 4)
- *
- * there is some value close enough to 1.0 that when multiplying by 4,
- * gets truncated to 4. Therefore:
- *
- * [0,1-eps] => 0
- * [1,2-eps] => 1
- * [2,3-eps] => 2
- * [3,4-eps] => 3
- *
- * So 0 gets uneven distribution if we simply clamp. The actual
- * clamp utilized in this file is to map values out of range back
- * to 0 to restore uniform distribution.
- *
- * Also, for clamping floats when asking for a distribution from
- * [0.0,g) we have determined that for values of g < 0.5, then
- * rand*g=g, which is not the desired result. As above, we clamp to 0
- * to restore uniform distribution.
- */
+namespace
+{
+    // std::mt19937_64: the standard fixes the sequence it draws from a seed,
+    // so a seed draws the same on every platform, and each draw is 64 bits,
+    // enough for any one result.
+    using Generator = std::mt19937_64;
 
-// pRandomGenerator is a stateful static object, which is therefore not
-// inherently thread-safe.
-//We use a pointer to not construct a huge object in the TLS space, sadly this is necessary
-// due to libcef.so on Linux being compiled with TLS model initial-exec (resulting in
-// FLAG STATIC_TLS, see readelf libcef.so). CEFs own TLS objects + LLRandLagFib2281 then will exhaust the
-// available TLS space, causing media failure.
+    // Each thread draws from a generator of its own, so drawing takes no
+    // lock. It is on the heap, behind a pointer, because libcef.so on Linux
+    // is built with the initial-exec TLS model (FLAG STATIC_TLS, see readelf
+    // libcef.so), and CEF's own TLS objects beside a generator's 2.5 KB in
+    // every thread's static TLS would exhaust it, causing media failure.
+    thread_local std::unique_ptr<Generator> sGenerator;
 
-static thread_local std::unique_ptr< LLRandLagFib2281 > pRandomGenerator = nullptr;
-
-namespace {
-    F64 ll_internal_get_rand()
+    // A generator seeded with 256 bits from the system's entropy source.
+    std::unique_ptr<Generator> seededGenerator()
     {
-        if( !pRandomGenerator )
+        std::array<U32, 8> entropy{};
+        try
         {
-            std::random_device rd;
-            pRandomGenerator.reset(new LLRandLagFib2281(rd()));
+            std::random_device device;
+            for (U32& word : entropy)
+            {
+                word = device();
+            }
         }
+        catch (const std::exception&)
+        {
+            // No entropy source: the clock, this thread and where its stack
+            // is, which differ between threads and between runs.
+            const U64 now    = static_cast<U64>(std::chrono::steady_clock::now().time_since_epoch().count());
+            const U64 thread = static_cast<U64>(std::hash<std::thread::id>()(std::this_thread::get_id()));
+            const U64 stack  = static_cast<U64>(reinterpret_cast<uintptr_t>(&entropy));
+            entropy          = { U32(now), U32(now >> 32), U32(thread), U32(thread >> 32), U32(stack), U32(stack >> 32), 0, 0 };
+        }
+        std::seed_seq seeds(entropy.begin(), entropy.end());
+        return std::make_unique<Generator>(seeds);
+    }
 
-        return(*pRandomGenerator)();
+    U64 draw()
+    {
+        if (!sGenerator)
+        {
+            sGenerator = seededGenerator();
+        }
+        return (*sGenerator)();
     }
 }
 
-// no default implementation, only specific F64 and F32 specializations
-template <typename REAL>
-inline REAL ll_internal_random();
-
-template <>
-inline F64 ll_internal_random<F64>()
+void ll_rand_seed(U64 seed)
 {
-    // *HACK: Through experimentation, we have found that dual core
-    // CPUs (or at least multi-threaded processes) seem to
-    // occasionally give an obviously incorrect random number -- like
-    // 5^15 or something. Sooooo, clamp it as described above.
-    F64 rv{ ll_internal_get_rand() };
-    if(!((rv >= 0.0) && (rv < 1.0))) return fmod(rv, 1.0);
-    return rv;
-}
-
-template <>
-inline F32 ll_internal_random<F32>()
-{
-    // *HACK: clamp the result as described above.
-    // Per Monty, it's important to clamp using the correct fmodf() rather
-    // than expanding to F64 for fmod() and then truncating back to F32. Prior
-    // to this change, we were getting sporadic ll_frand() == 1.0 results.
-    F32 rv{ narrow<F64>(ll_internal_get_rand()) };
-    if(!((rv >= 0.0f) && (rv < 1.0f))) return fmodf(rv, 1.0f);
-    return rv;
-}
-
-/*------------------------------ F64 aliases -------------------------------*/
-inline F64 ll_internal_random_double()
-{
-    return ll_internal_random<F64>();
+    sGenerator = std::make_unique<Generator>(seed);
 }
 
 F64 ll_drand()
 {
-    return ll_internal_random_double();
-}
-
-/*------------------------------ F32 aliases -------------------------------*/
-inline F32 ll_internal_random_float()
-{
-    return ll_internal_random<F32>();
+    return ALRandMap::unitF64(draw());
 }
 
 F32 ll_frand()
 {
-    return ll_internal_random_float();
-}
-
-/*-------------------------- clamped random range --------------------------*/
-S32 ll_rand()
-{
-    return ll_rand(RAND_MAX);
+    return ALRandMap::unitF32(draw());
 }
 
 S32 ll_rand(S32 val)
 {
-    // The clamping rules are described above.
-    S32 rv = (S32)(ll_internal_random_double() * val);
-    if(rv == val) return 0;
-    return rv;
-}
-
-template <typename REAL>
-REAL ll_grand(REAL val)
-{
-    // The clamping rules are described above.
-    REAL rv = ll_internal_random<REAL>() * val;
-    if(val > 0)
-    {
-        if(rv >= val) return REAL();
-    }
-    else
-    {
-        if(rv <= val) return REAL();
-    }
-    return rv;
+    return ALRandMap::extentS32(ALRandMap::unitF64(draw()), val);
 }
 
 F32 ll_frand(F32 val)
 {
-    return ll_grand<F32>(val);
+    return ALRandMap::extentReal<F32>(ALRandMap::unitF32(draw()), val);
 }
 
 F64 ll_drand(F64 val)
 {
-    return ll_grand<F64>(val);
+    return ALRandMap::extentReal<F64>(ALRandMap::unitF64(draw()), val);
+}
+
+U32 ll_rand_u32()
+{
+    return ALRandMap::bitsU32(draw());
 }

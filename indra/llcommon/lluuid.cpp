@@ -428,17 +428,13 @@ std::istream& operator>>(std::istream& s, LLUUID& uuid)
 
 static void get_random_bytes(void* buf, int nbytes)
 {
-    int i;
-    char* cp = (char*)buf;
-
-    // *NOTE: If we are not using the janky generator ll_rand()
-    // generates at least 3 good bytes of data since it is 0 to
-    // RAND_MAX. This could be made more efficient by copying all the
-    // bytes.
-    for (i = 0; i < nbytes; i++)
-        * cp++ = ll_rand() & 0xFF;
-
-    return;
+    U8*          cp    = static_cast<U8*>(buf);
+    const size_t count = static_cast<size_t>(nbytes);
+    for (size_t i = 0; i < count; i += sizeof(U32))
+    {
+        const U32 bits = ll_rand_u32();
+        memcpy(cp + i, &bits, std::min(sizeof(bits), count - i)); /* Flawfinder: ignore */
+    }
 }
 
 #if LL_WINDOWS
@@ -819,14 +815,15 @@ void LLUUID::generate()
             /*
              * Set multicast bit, to prevent conflicts
              * with IEEE 802 addresses obtained from
-             * network cards
+             * network cards: the least significant bit
+             * of the first octet (RFC 4122, 4.5).
              */
-            node_id[0] |= 0x80;
+            node_id[0] |= 0x01;
         }
 
         getCurrentTime(&time_last);
 
-        clock_seq = (U16)ll_rand(65536);
+        clock_seq = (U16)ll_rand(0x4000);
     }
 
     // get current time

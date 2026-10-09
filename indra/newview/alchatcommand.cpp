@@ -298,7 +298,7 @@ bool ALChatCommand::parseCommand(std::string data)
         else if (cmd == DICE_ROLL_TRIGGER)
         {
             S32 dice_sides;
-            if (!(input >> dice_sides))
+            if (!(input >> dice_sides) || dice_sides < 1)
                 dice_sides = 6;
             LLSD args;
             args["RESULT"] = (ll_rand(dice_sides) + 1);

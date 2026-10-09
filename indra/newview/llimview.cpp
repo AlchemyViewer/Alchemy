@@ -1553,8 +1553,8 @@ void LLIMModel::testMessages()
     std::string firstname[] = {"Roflcopter", "Joe"};
     std::string lastname[] = {"Linden", "Tester", "Resident", "Schmoe"};
 
-    S32 rand1 = ll_rand(sizeof firstname)/(sizeof firstname[0]);
-    S32 rand2 = ll_rand(sizeof lastname)/(sizeof lastname[0]);
+    S32 rand1 = ll_rand(static_cast<S32>(std::size(firstname)));
+    S32 rand2 = ll_rand(static_cast<S32>(std::size(lastname)));
 
     from = firstname[rand1] + " " + lastname[rand2];
     bot2_id.generate(from);

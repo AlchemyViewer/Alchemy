@@ -178,7 +178,7 @@ const LLUUID& AOSet::getAnimationForState(AOState* state) const
             {
                 if (state->mRandom)
                 {
-                    state->mCurrentAnimation = static_cast<size_t>(ll_frand() * numOfAnimations);
+                    state->mCurrentAnimation = static_cast<size_t>(ll_rand(static_cast<S32>(numOfAnimations)));
                     LL_DEBUGS("AOEngine") << "randomly chosen " << state->mCurrentAnimation << " of " << numOfAnimations << LL_ENDL;
                 }
                 else
