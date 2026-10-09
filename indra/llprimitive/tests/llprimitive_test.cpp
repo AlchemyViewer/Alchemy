@@ -32,6 +32,8 @@
 
 #include "../../llmath/llvolumemgr.h"
 
+namespace
+{
 class DummyVolumeMgr : public LLVolumeMgr
 {
 public:
@@ -70,6 +72,7 @@ private:
     LLVolumeParams mCurrParamsTest;
     S32 mCurrDetailTest;
 };
+}
 
 LLMaterialID::LLMaterialID() = default;
 void LLMaterialID::set(void const*) { }
@@ -109,6 +112,8 @@ void LLPrimTextureList::setAllIDs(const LLUUID &id) { }
 LLTextureEntry * LLPrimTextureList::getTexture(const U8 index) const { return nullptr; }
 S32 LLPrimTextureList::size() const { return static_cast<S32>(mEntryList.size()); }
 
+namespace
+{
 class PRIMITIVE_TEST_SETUP
 {
 public:
@@ -124,8 +129,11 @@ public:
     }
     DummyVolumeMgr * volume_manager_test;
 };
+}
 
 namespace tut
+{
+namespace
 {
     struct llprimitive
     {
@@ -135,6 +143,7 @@ namespace tut
     typedef test_group<llprimitive> llprimitive_t;
     typedef llprimitive_t::object llprimitive_object_t;
     tut::llprimitive_t tut_llprimitive("LLPrimitive");
+}
 
     template<> template<>
     void llprimitive_object_t::test<1>()

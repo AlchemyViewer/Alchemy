@@ -27,10 +27,13 @@
 
 namespace tut
 {
+namespace
+{
     struct llmaterialid_data { };
     typedef test_group<llmaterialid_data> llmaterialid_t;
     typedef llmaterialid_t::object llmaterialid_object_t;
     tut::llmaterialid_t tut_llmaterialid("llmaterialid");
+}
 
     static const U8 kSampleBytes[MATERIAL_ID_SIZE] = {
         0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,

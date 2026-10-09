@@ -137,6 +137,8 @@
 
 namespace tut
 {
+namespace
+{
     // this is fixture data that gets created before each test and destroyed
     // after each test.  this is where we put all of the setup/takedown code
     // and data needed for each test.
@@ -159,6 +161,7 @@ namespace tut
     typedef test_group<MediaEntry_test, 55> factory;
     typedef factory::object object;
 }
+}
 
 
 namespace
@@ -169,6 +172,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     void ensure_llsd_equals(const std::string& msg, const LLSD& expected, const LLSD& actual)
     {
         if (!llsd_equals(expected, actual))
@@ -178,20 +183,6 @@ namespace tut
             message += ll_pretty_print_sd(actual);
             message += "\n  expected: ";
             message += ll_pretty_print_sd(expected);
-            message += "\n";
-            ensure(message, false);
-        }
-    }
-
-    void ensure_string_equals(const std::string& msg, const std::string& expected, const std::string& actual)
-    {
-        if ( expected != actual )
-        {
-            std::string message = msg;
-            message += ": actual: ";
-            message += actual;
-            message += "\n  expected: ";
-            message += expected;
             message += "\n";
             ensure(message, false);
         }
@@ -227,10 +218,7 @@ namespace tut
     {
         whitelist_test(num, true, whitelist, candidate_url, expected_pass);
     }
-    void whitelist_test(int num, const char *whitelist, const char *candidate_url)
-    {
-        whitelist_test(num, true, whitelist, candidate_url, true);
-    }
+}
 
     template<> template<>
     void object::test<1>()
@@ -297,9 +285,12 @@ namespace tut
         ensure_llsd_equals(get_test_name() + " failed", defaultMediaEntryLLSD, entry2.asLLSD());
     }
 
+namespace
+{
     // limit tests
     const char *URL_OK = "http://www.example.com";
     const char *URL_TOO_BIG = "http://www.example.com.qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+}
 
     template<> template<>
     void object::test<6>()
