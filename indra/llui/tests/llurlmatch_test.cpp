@@ -29,106 +29,18 @@
 
 #include "../llurlmatch.h"
 #include "../llrender/lluiimage.h"
+
+#include "alheadlessui_fixture.h"
+
 #include "lltut.h"
-
-// link seams
-
-LLUIColor::LLUIColor()
-    : mColorPtr(NULL)
-{}
-
-LLStyle::Params::Params()
-{
-}
-
-LLUIImage::LLUIImage(const std::string& name, LLPointer<LLTexture> image)
-{
-}
-
-LLUIImage::~LLUIImage()
-{
-}
-
-//virtual
-S32 LLUIImage::getWidth() const
-{
-    return 0;
-}
-
-//virtual
-S32 LLUIImage::getHeight() const
-{
-    return 0;
-}
-
-namespace LLInitParam
-{
-    ParamValue<LLUIColor>::ParamValue(const LLUIColor& color)
-    :   super_t(color)
-    {}
-
-    void ParamValue<LLUIColor>::updateValueFromBlock()
-    {}
-
-    void ParamValue<LLUIColor>::updateBlockFromValue(bool)
-    {}
-
-    bool ParamCompare<const LLFontGL*, false>::equals(const LLFontGL* a, const LLFontGL* b)
-    {
-        return false;
-    }
-
-
-    ParamValue<const LLFontGL*>::ParamValue(const LLFontGL* fontp)
-    :   super_t(fontp)
-    {}
-
-    void ParamValue<const LLFontGL*>::updateValueFromBlock()
-    {}
-
-    void ParamValue<const LLFontGL*>::updateBlockFromValue(bool)
-    {}
-
-    void TypeValues<LLFontGL::HAlign>::declareValues()
-    {}
-
-    void TypeValues<LLFontGL::VAlign>::declareValues()
-    {}
-
-    void TypeValues<LLFontGL::ShadowType>::declareValues()
-    {}
-
-    void ParamValue<LLUIImage*>::updateValueFromBlock()
-    {}
-
-    void ParamValue<LLUIImage*>::updateBlockFromValue(bool)
-    {}
-
-    bool ParamCompare<LLUIImage*, false>::equals(
-        LLUIImage* const &a,
-        LLUIImage* const &b)
-    {
-        return false;
-    }
-
-    bool ParamCompare<LLUIColor, false>::equals(const LLUIColor &a, const LLUIColor &b)
-    {
-        return false;
-    }
-
-}
-
-//static
-LLFontGL* LLFontGL::getFontDefault()
-{
-    return NULL;
-}
-
 
 namespace tut
 {
+    // A match is given a style, and a style's parameters start from the
+    // default font, so the fonts are loaded first.
     struct LLUrlMatchData
     {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
     };
 
     typedef test_group<LLUrlMatchData> factory;
@@ -145,6 +57,10 @@ namespace tut
     template<> template<>
     void object::test<1>()
     {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
         //
         // test the empty() method
         //
@@ -158,6 +74,10 @@ namespace tut
     template<> template<>
     void object::test<2>()
     {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
         //
         // test the getStart() method
         //
@@ -171,6 +91,10 @@ namespace tut
     template<> template<>
     void object::test<3>()
     {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
         //
         // test the getEnd() method
         //
@@ -184,6 +108,10 @@ namespace tut
     template<> template<>
     void object::test<4>()
     {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
         //
         // test the getUrl() method
         //
@@ -200,6 +128,10 @@ namespace tut
     template<> template<>
     void object::test<5>()
     {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
         //
         // test the getLabel() method
         //
@@ -216,6 +148,10 @@ namespace tut
     template<> template<>
     void object::test<6>()
     {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
         //
         // test the getTooltip() method
         //
@@ -232,6 +168,10 @@ namespace tut
     template<> template<>
     void object::test<7>()
     {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
         //
         // test the getIcon() method
         //
@@ -248,6 +188,10 @@ namespace tut
     template<> template<>
     void object::test<8>()
     {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
         //
         // test the getMenuName() method
         //
@@ -264,6 +208,10 @@ namespace tut
     template<> template<>
     void object::test<9>()
     {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
         //
         // test the getLocation() method
         //

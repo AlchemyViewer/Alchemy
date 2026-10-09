@@ -33,56 +33,6 @@
 #include "../llrender/lluiimage.h"
 #include "../llmessage/llexperiencecache.h"
 
-
-// namespace LLExperienceCache
-// {
-//     const LLSD& get( const LLUUID& key)
-//     {
-//      static LLSD boo;
-//         return boo;
-//     }
-//
-//     void get( const LLUUID& key, callback_slot_t slot ){}
-//
-// }
-
-/*==========================================================================*|
-typedef std::map<std::string, LLControlGroup*> settings_map_t;
-settings_map_t LLUI::sSettingGroups;
-
-bool LLControlGroup::getBOOL(const std::string& name)
-{
-    return false;
-}
-
-LLUIColor LLUIColorTable::getColor(const std::string& name, const LLColor4& default_color) const
-{
-    return LLUIColor();
-}
-
-LLUIColor::LLUIColor() : mColorPtr(NULL) {}
-
-LLUIImage::LLUIImage(const std::string& name, LLPointer<LLTexture> image)
-{
-}
-
-LLUIImage::~LLUIImage()
-{
-}
-
-//virtual
-S32 LLUIImage::getWidth() const
-{
-    return 0;
-}
-
-//virtual
-S32 LLUIImage::getHeight() const
-{
-    return 0;
-}
-|*==========================================================================*/
-
 namespace tut
 {
     struct LLUrlEntryData
