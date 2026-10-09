@@ -2193,7 +2193,9 @@ void LLGLManager::initExtensions()
     // OpenGL 4.x capabilities
     mHasCubeMapArray = mGLVersion >= 3.99f;
     mHasTransformFeedback = mGLVersion >= 3.99f;
-    mHasDebugOutput = mGLVersion >= 4.29f;
+    // Core in 4.3; also GL_KHR_debug, which names the same entry points without a suffix.
+    // Downgraded below if glDebugMessageCallback doesn't resolve.
+    mHasDebugOutput = mGLVersion >= 4.29f || mGLExtensions.contains("GL_KHR_debug");
     mHasAnisotropic = mGLVersion >= 4.59f;
     if(!mHasAnisotropic)
     {
@@ -2286,6 +2288,28 @@ void LLGLManager::initExtensions()
                                << ", no GL_ARB_texture_storage); using mutable textures." << LL_ENDL;
     }
 
+    // Immutable buffer storage. Resolved here for the same reason as glTexStorage above: the
+    // GL_VERSION_4_4 ladder early-outs on a lower context, so a 4.1 driver exposing
+    // GL_ARB_buffer_storage -- GLOn12 -- would otherwise leave glBufferStorage null, and every
+    // persistently mapped uniform ring falls back to orphaning without it.
+    if (mGLVersion >= 4.39f || mGLExtensions.contains("GL_ARB_buffer_storage"))
+    {
+        glBufferStorage = (PFNGLBUFFERSTORAGEPROC)LL_GET_PROC_ADDRESS("glBufferStorage");
+
+        if (!glBufferStorage)
+        {
+            LL_WARNS("RenderInit") << "Buffer storage advertised (GL " << mGLVersion
+                                   << ") but glBufferStorage did not resolve; uniform rings will orphan."
+                                   << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS("RenderInit") << "Buffer storage available (GL " << mGLVersion
+                                   << (mGLVersion >= 4.39f ? ", core)" : ", GL_ARB_buffer_storage)")
+                                   << LL_ENDL;
+        }
+    }
+
     // Direct state access. Resolved here for the same reason as glTexStorage above: the
     // GL_VERSION_4_5 ladder early-outs on a lower context, so a 4.1/4.4 driver exposing
     // GL_ARB_direct_state_access would otherwise leave these null. Only the entry points
@@ -2295,7 +2319,23 @@ void LLGLManager::initExtensions()
         glBindTextureUnit = (PFNGLBINDTEXTUREUNITPROC)LL_GET_PROC_ADDRESS("glBindTextureUnit");
         glCreateSamplers  = (PFNGLCREATESAMPLERSPROC)LL_GET_PROC_ADDRESS("glCreateSamplers");
 
-        if (!glBindTextureUnit || !glCreateSamplers)
+        // The named-buffer calls ALUniformBuffer makes. glNamedBufferStorage exists only
+        // alongside buffer storage, so without it the pointer stays null and that class keeps
+        // to the bind-target path.
+        glCreateBuffers               = (PFNGLCREATEBUFFERSPROC)LL_GET_PROC_ADDRESS("glCreateBuffers");
+        glNamedBufferData             = (PFNGLNAMEDBUFFERDATAPROC)LL_GET_PROC_ADDRESS("glNamedBufferData");
+        glNamedBufferSubData          = (PFNGLNAMEDBUFFERSUBDATAPROC)LL_GET_PROC_ADDRESS("glNamedBufferSubData");
+        glMapNamedBufferRange         = (PFNGLMAPNAMEDBUFFERRANGEPROC)LL_GET_PROC_ADDRESS("glMapNamedBufferRange");
+        glUnmapNamedBuffer            = (PFNGLUNMAPNAMEDBUFFERPROC)LL_GET_PROC_ADDRESS("glUnmapNamedBuffer");
+        glFlushMappedNamedBufferRange = (PFNGLFLUSHMAPPEDNAMEDBUFFERRANGEPROC)LL_GET_PROC_ADDRESS("glFlushMappedNamedBufferRange");
+        if (glBufferStorage)
+        {
+            glNamedBufferStorage = (PFNGLNAMEDBUFFERSTORAGEPROC)LL_GET_PROC_ADDRESS("glNamedBufferStorage");
+        }
+
+        if (!glBindTextureUnit || !glCreateSamplers || !glCreateBuffers || !glNamedBufferData ||
+            !glNamedBufferSubData || !glMapNamedBufferRange || !glUnmapNamedBuffer ||
+            !glFlushMappedNamedBufferRange)
         {
             mHasDirectStateAccess = false;
             LL_WARNS("RenderInit") << "Direct state access advertised (GL " << mGLVersion
@@ -2340,6 +2380,44 @@ void LLGLManager::initExtensions()
     {
         LL_INFOS("RenderInit") << "Clip control unavailable (GL " << mGLVersion
                                << ", no GL_ARB_clip_control); reverse-Z depth disabled." << LL_ENDL;
+    }
+
+    // Debug output and object labels. Resolved here for the same reason as glTexStorage
+    // above: the GL_VERSION_4_3 ladder early-outs on a lower context, so a 4.1 driver
+    // exposing GL_KHR_debug -- GLOn12 -- would otherwise leave these null.
+    if (mHasDebugOutput)
+    {
+        glDebugMessageControl  = (PFNGLDEBUGMESSAGECONTROLPROC)LL_GET_PROC_ADDRESS("glDebugMessageControl");
+        glDebugMessageInsert   = (PFNGLDEBUGMESSAGEINSERTPROC)LL_GET_PROC_ADDRESS("glDebugMessageInsert");
+        glDebugMessageCallback = (PFNGLDEBUGMESSAGECALLBACKPROC)LL_GET_PROC_ADDRESS("glDebugMessageCallback");
+        glGetDebugMessageLog   = (PFNGLGETDEBUGMESSAGELOGPROC)LL_GET_PROC_ADDRESS("glGetDebugMessageLog");
+        glPushDebugGroup       = (PFNGLPUSHDEBUGGROUPPROC)LL_GET_PROC_ADDRESS("glPushDebugGroup");
+        glPopDebugGroup        = (PFNGLPOPDEBUGGROUPPROC)LL_GET_PROC_ADDRESS("glPopDebugGroup");
+        glObjectLabel          = (PFNGLOBJECTLABELPROC)LL_GET_PROC_ADDRESS("glObjectLabel");
+        glGetObjectLabel       = (PFNGLGETOBJECTLABELPROC)LL_GET_PROC_ADDRESS("glGetObjectLabel");
+        glObjectPtrLabel       = (PFNGLOBJECTPTRLABELPROC)LL_GET_PROC_ADDRESS("glObjectPtrLabel");
+        glGetObjectPtrLabel    = (PFNGLGETOBJECTPTRLABELPROC)LL_GET_PROC_ADDRESS("glGetObjectPtrLabel");
+
+        if (!glDebugMessageCallback)
+        {
+            mHasDebugOutput = false;
+            LL_WARNS("RenderInit") << "Debug output advertised (GL " << mGLVersion
+                                   << ") but glDebugMessageCallback did not resolve; GL debug output is off."
+                                   << LL_ENDL;
+        }
+    }
+
+    // Reset status. Core in 4.5, and GL_KHR_robustness names it without a suffix on a lower
+    // context, so it is resolved here for the GL_VERSION_4_5 ladder's early-out as above.
+    // GL_ARB_robustness alone names it glGetGraphicsResetStatusARB, which the window layer
+    // looks up itself.
+    if (mGLVersion >= 4.49f || mGLExtensions.contains("GL_KHR_robustness"))
+    {
+        glGetGraphicsResetStatus = (PFNGLGETGRAPHICSRESETSTATUSPROC)LL_GET_PROC_ADDRESS("glGetGraphicsResetStatus");
+        glReadnPixels            = (PFNGLREADNPIXELSPROC)LL_GET_PROC_ADDRESS("glReadnPixels");
+        glGetnUniformfv          = (PFNGLGETNUNIFORMFVPROC)LL_GET_PROC_ADDRESS("glGetnUniformfv");
+        glGetnUniformiv          = (PFNGLGETNUNIFORMIVPROC)LL_GET_PROC_ADDRESS("glGetnUniformiv");
+        glGetnUniformuiv         = (PFNGLGETNUNIFORMUIVPROC)LL_GET_PROC_ADDRESS("glGetnUniformuiv");
     }
 
     // GL_EXT_memory_object

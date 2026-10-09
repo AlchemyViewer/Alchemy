@@ -113,6 +113,9 @@ public:
 
     // GL 4.x capabilities
     bool mHasCubeMapArray = false;
+    // Debug output and object labels (glDebugMessageCallback, glObjectLabel, ...). Core in
+    // 4.3, also reachable as GL_KHR_debug. Only true once glDebugMessageCallback has
+    // actually resolved, so callers may trust it directly.
     bool mHasDebugOutput = false;
     bool mHasTransformFeedback = false;
     bool mHasAnisotropic = false;
