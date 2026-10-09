@@ -5100,6 +5100,23 @@ bool LLViewerWindow::mousePointOnLandGlobal(const S32 x, const S32 y, LLVector3d
     LLVector3d      probe_point_global;
     LLVector3       probe_point_region;
 
+    // The walk probes every metre out to the draw distance, and a 2048 m draw distance loads up to some 200 regions,
+    // all of which LLWorld::resolveRegionGlobal scans. A probe almost always lies in the region the last one did, so
+    // that one is asked first; regions do not overlap, so the answer is the scan's.
+    LLViewerRegion* last_region = nullptr;
+    const auto resolve_region = [&last_region](LLVector3& pos_region, const LLVector3d& pos_global) -> LLViewerRegion*
+    {
+        if (!last_region || !last_region->pointInRegionGlobal(pos_global))
+        {
+            last_region = LLWorld::getInstance()->getRegionFromPosGlobal(pos_global);
+        }
+        if (last_region)
+        {
+            pos_region = last_region->getPosRegionFromGlobal(pos_global);
+        }
+        return last_region;
+    };
+
     // walk forwards to find the point
     for (mouse_dir_scale = FIRST_PASS_STEP; mouse_dir_scale < draw_distance; mouse_dir_scale += FIRST_PASS_STEP)
     {
@@ -5107,7 +5124,7 @@ bool LLViewerWindow::mousePointOnLandGlobal(const S32 x, const S32 y, LLVector3d
         mouse_direction_global_d.setVec(mouse_direction_global * mouse_dir_scale);
         probe_point_global = camera_pos_global + mouse_direction_global_d;
 
-        regionp = LLWorld::getInstance()->resolveRegionGlobal(probe_point_region, probe_point_global);
+        regionp = resolve_region(probe_point_region, probe_point_global);
 
         if (!regionp)
         {
@@ -5154,7 +5171,7 @@ bool LLViewerWindow::mousePointOnLandGlobal(const S32 x, const S32 y, LLVector3d
             mouse_direction_global_d.setVec(mouse_direction_global * mouse_dir_scale);
             probe_point_global = camera_pos_global + mouse_direction_global_d;
 
-            regionp = LLWorld::getInstance()->resolveRegionGlobal(probe_point_region, probe_point_global);
+            regionp = resolve_region(probe_point_region, probe_point_global);
 
             if (!regionp)
             {
