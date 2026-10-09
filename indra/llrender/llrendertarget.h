@@ -167,6 +167,14 @@ public:
     // blended geometry drew, and those are what light the billboard afterwards.
     void setDrawBuffers(U32 count = 0);
 
+    // Take the fragment shader's output `output` (frag_data[output]) into the first colour attachment and
+    // discard every other output. Asserts that this target is currently bound and has a colour attachment;
+    // the next bindTarget restores the one-to-one mapping.
+    //
+    // How a single-attachment target hosts a pass written for a G-buffer: the sky writes its colour to the
+    // emissive output, frag_data[3], when that buffer is on, and mSkyBehind keeps only that colour.
+    void setDrawOutput(U32 output);
+
     //get X resolution
     U32 getWidth() const { return mResX; }
 

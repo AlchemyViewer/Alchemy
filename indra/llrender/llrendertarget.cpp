@@ -811,6 +811,20 @@ void LLRenderTarget::setDrawBuffers(U32 count)
     glDrawBuffers(static_cast<GLsizei>(wanted), drawbuffers);
 }
 
+void LLRenderTarget::setDrawOutput(U32 output)
+{
+    llassert(sBoundTarget == this);
+    llassert(!mTex.empty());
+
+    // As many outputs as the G-buffer writes; GL guarantees at least eight draw buffers.
+    GLenum drawbuffers[] = { GL_NONE, GL_NONE, GL_NONE, GL_NONE };
+    llassert(output < LL_ARRAY_SIZE(drawbuffers));
+    output = llmin(output, (U32)LL_ARRAY_SIZE(drawbuffers) - 1);
+    drawbuffers[output] = GL_COLOR_ATTACHMENT0;
+
+    glDrawBuffers(static_cast<GLsizei>(output + 1), drawbuffers);
+}
+
 bool LLRenderTarget::isBoundInStack() const
 {
     LLRenderTarget* cur = sBoundTarget;

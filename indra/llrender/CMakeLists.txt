@@ -174,4 +174,6 @@ if(AL_BUILD_TESTS)
   al_add_test(altessellation_gl GL PROJECT llrender LIBRARIES llrender)
   # Infinite reverse-Z projection: stored depth, round trip and depth order out to 100 km.
   al_add_test(alinfiniteprojection_gl GL PROJECT llrender LIBRARIES llrender)
+  # Which fragment output reaches a render target's colour attachment.
+  al_add_test(llrendertarget_gl GL PROJECT llrender LIBRARIES llrender)
 endif()
