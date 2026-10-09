@@ -24,9 +24,11 @@
 
 /**
  * LLException is intended as the common base class from which all
- * viewer-specific exceptions are derived. Rationale for why it's derived from
- * both std::exception and boost::exception is explained in
- * tests/llexception_test.cpp.
+ * viewer-specific exceptions are derived. It derives from std::exception
+ * because BOOST_THROW_EXCEPTION(), which annotates the exception with the file,
+ * line and function that threw it, requires that. It also derives from
+ * boost::exception only because that makes the logged message slightly
+ * cleaner; dropping that base, should a reason appear, costs nothing else.
  *
  * boost::current_exception_diagnostic_information() is quite wonderful: if
  * all we need to do with an exception is log it, in most places we should

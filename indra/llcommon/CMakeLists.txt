@@ -363,11 +363,6 @@ if(AL_BUILD_TESTS)
     al_add_test(${test} PROJECT llcommon LIBRARIES llcommon PYTHON)
   endforeach()
 
-  ## llexception_test.cpp isn't a regression test, and doesn't need to be run
-  ## every build. It's to help a developer make implementation choices about
-  ## throwing and catching exceptions.
-  ##al_add_test(llexception PROJECT llcommon LIBRARIES llcommon)
-
   # The SIMD ops layer, at the tree's tier and, where the tiers differ, at
   # each of them; a variant the host cannot run skips.
   al_add_test(alsimd PROJECT llcommon LIBRARIES llcommon)
