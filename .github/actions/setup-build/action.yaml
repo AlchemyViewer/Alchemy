@@ -117,8 +117,9 @@ runs:
     # vcpkg builds the ports with this CMake and hashes its version into
     # every package ABI, so a CMake release on PyPI would otherwise miss the
     # whole binary cache until a protected build filled it again. llsd is
-    # for the tests that spawn a Python peer, sentry-cli uploads the debug
-    # files.
+    # for the tests that spawn a Python peer, PyYAML for lsl-definitions'
+    # generator, which LL's LSL compiler needs for its tests, and sentry-cli
+    # uploads the debug files.
     - name: Python tools
       uses: ./.github/actions/python-tools
       with:
@@ -127,6 +128,7 @@ runs:
           cmake==4.4.4; sys_platform != "linux"
           ninja==1.13.2
           llsd==1.2.4
+          PyYAML==6.0.3
           sentry-cli==3.8.0
 
     - name: Bootstrap vcpkg Windows

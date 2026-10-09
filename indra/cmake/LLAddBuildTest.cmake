@@ -38,8 +38,8 @@ endif()
 # COMMAND runs the test through another program; "{}" stands for the test
 # executable and is appended when absent. ENVIRONMENT sets variables for the
 # run, VAR=value each. A PYTHON test spawns a Python peer: PYTHON is set to
-# the interpreter for its run, and without one the test is registered
-# disabled. A GL test stands up a GL context on a hidden window: it is
+# the interpreter for its run, and without one that has the llsd module the
+# test is registered disabled. A GL test stands up a GL context on a hidden window: it is
 # labelled gl, and where AL_ENABLE_GL_TESTS is off it is built and
 # registered disabled.
 #
@@ -151,13 +151,19 @@ function(al_add_test name)
   set(environment ${arg_ENVIRONMENT})
   set(labels)
   set(disabled FALSE)
+  # Five minutes: the slowest test without a Python peer runs in under 15
+  # seconds. One with a peer gets fifteen; the slowest of those runs in under
+  # 40. CTest's own default, 25 minutes, holds a hung test longer than the
+  # rest of a CI run takes.
+  set(timeout 300)
   if(arg_ISA_TIER)
     al_isa_level(${arg_ISA_TIER} ${CMAKE_SYSTEM_NAME} ${ARCH} level)
     list(APPEND command "--isa-level=${level}")
     list(APPEND labels isa)
   endif()
   if(arg_PYTHON)
-    if(Python3_Interpreter_FOUND)
+    set(timeout 900)
+    if(AL_PYTHON_PEERS)
       list(APPEND environment "PYTHON=${Python3_EXECUTABLE}")
     else()
       set(disabled TRUE)
@@ -178,6 +184,7 @@ function(al_add_test name)
       LABELS "${labels}"
       DISABLED ${disabled}
       SKIP_RETURN_CODE 125
+      TIMEOUT ${timeout}
   )
 
   add_dependencies(BUILD_TESTS ${target})

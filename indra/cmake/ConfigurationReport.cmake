@@ -357,8 +357,13 @@ function(al_configuration_report)
 
   if(NOT AL_BUILD_TESTS)
     _al_report_row("Python" "not used (tests off)")
-  elseif(Python3_Interpreter_FOUND)
+  elseif(AL_PYTHON_PEERS)
     _al_report_row("Python" "${Python3_VERSION} (${Python3_EXECUTABLE})")
+  elseif(Python3_Interpreter_FOUND)
+    _al_report_row(
+      "Python"
+      "${Python3_VERSION} without the llsd module; the tests that spawn a Python peer are disabled"
+    )
   else()
     _al_report_row("Python" "not found; the tests that spawn a Python peer are disabled")
   endif()

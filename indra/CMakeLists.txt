@@ -409,7 +409,16 @@ if(AL_BUILD_TESTS)
   # Set parallel level to decrease test runtime. Benchmarks are registered
   # as tests under their own label and left out of the default run, since
   # their numbers are their output and a shared parallel run would ruin them.
-  set(CMAKE_CTEST_ARGUMENTS -j${NUM_CORES} --output-on-failure -LE benchmark)
+  # Each run also writes its results as JUnit, which CI keeps.
+  set(
+    CMAKE_CTEST_ARGUMENTS
+    -j${NUM_CORES}
+    --output-on-failure
+    -LE
+    benchmark
+    --output-junit
+    "${CMAKE_BINARY_DIR}/Testing/test-results.xml"
+  )
 
   # Set up our test targets
   set(CTEST_TEST_TARGET_ALIAS BUILD_AND_RUN_TESTS)
