@@ -525,8 +525,12 @@ int main(int, char**)
         g_sink = g_sink + e.undoJournal().asNotation().size();
     });
     countRow("  steps written", written[0], written[1]);
+    // The scripts as they were: an x at the start of every seventh line
+    // makes SLua's ends names, and every block after the first so made
+    // would be measured open to the end of the text.
     for (Subject& s : subjects)
     {
+        s.editor->setText(s.text);
         s.editor->undoJournal().clear();
     }
 
