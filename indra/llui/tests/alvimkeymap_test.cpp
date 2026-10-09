@@ -32,19 +32,11 @@
 
 #include "llsd.h"
 #include "alheadlessui_fixture.h"
+#include "altextviewprobe.h"
 
 #include "../test/lltut.h"
 
 #include <string>
-
-namespace ll_test
-{
-    // How long a search for a misspelling may check lines for.
-    struct TextViewProbe
-    {
-        static void misspellingBudget(ALTextView& view, F32 seconds) { view.mMisspellingBudget = seconds; }
-    };
-}
 
 namespace tut
 {

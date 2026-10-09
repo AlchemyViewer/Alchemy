@@ -39,27 +39,13 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "altextviewprobe.h"
 
 #include "../test/lltut.h"
 
 #include <algorithm>
 #include <string>
 #include <vector>
-
-namespace ll_test
-{
-    // The colours the view works out for a row's glyphs, as it draws them.
-    struct TextViewProbe
-    {
-        static std::vector<LLColor4U> colours(ALTextView& view, S32 line, const ALTextLayout::Row& row)
-        {
-            const ALTextLayout::Line& laid = view.layout().line(line);
-            view.colorRow(line, laid, row, 1.f);
-            view.tintRow(line, laid, row, 1.f, view.mColorScratch);
-            return view.mColorScratch;
-        }
-    };
-}
 
 namespace tut
 {

@@ -39,6 +39,7 @@
 #include "llpreeditor.h"
 
 #include "alheadlessui_fixture.h"
+#include "altextviewprobe.h"
 
 #include "../test/lltut.h"
 
@@ -48,34 +49,6 @@
 #include <optional>
 #include <set>
 #include <string>
-
-namespace ll_test
-{
-    // What a test reaches inside the view for: how long Next Misspelling
-    // may check lines for, and its going on as the next frame would.
-    struct TextViewProbe
-    {
-        static void misspellingBudget(ALTextView& view, F32 seconds) { view.mMisspellingBudget = seconds; }
-        static bool seeking(const ALTextView& view) { return view.mMisspellingSought.has_value(); }
-        static void trimLayout(ALTextView& view) { view.trimLayout(); }
-        // Every selection, the main one among them, in the order they begin.
-        static std::vector<ALTextRange> selections(const ALTextView& view) { return view.selectionsInOrder(); }
-        static S32  heldMost() { return ALTextView::LAYOUT_HELD_MOST; }
-        // The rows and the gaps in sight, as the view walks them to draw.
-        static void visibleRows(ALTextView& view, const LLRect& text, const std::function<void(S32, S32, S32)>& visit) { view.forEachVisibleRow(text, visit); }
-        static void visibleGaps(ALTextView& view, const LLRect& text, const std::function<void(S32, S32, S32)>& visit) { view.forEachVisibleGap(text, visit); }
-        // What a frame does before it draws, of what a test reaches:
-        // Next Misspelling gone on with, and the primary selection offered.
-        static void nextFrame(ALTextView& view)
-        {
-            if (view.mMisspellingSought)
-            {
-                view.seekMisspelling();
-            }
-            view.publishPrimary();
-        }
-    };
-}
 
 namespace tut
 {
