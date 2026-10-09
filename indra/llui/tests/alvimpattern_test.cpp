@@ -482,4 +482,34 @@ namespace tut
         ensure_equals("out of one, octal the same", in("o?7z", "\\%o777"), std::string("?7"));
         ensure_equals("and 10 the NUL", in(std::string("a\0b\nc", 5), "\\%x0a"), std::string(1, '\0'));
     }
+
+    template<> template<>
+    void alvimpattern_object::test<24>()
+    {
+        set_test_name("a range in a bracket expression from 0, or over 10, takes in the NUL as vim keeps it, and what is between, and never a line break, as vim 9.2 finds them");
+        const auto in = [this](const std::string& text, const char* vim) { return alvimpattern_data::found(text, ALVimPattern::of(vim, std::string(), this->plain)); };
+        const char        raw[] = "a\x01" "b\x02" "c\td\0e\x0b" "f\x0c" "gh\n i\x05" "j\nk";
+        const std::string text(raw, sizeof(raw) - 1);
+        // The characters found, by their codes, as found() puts them.
+        const auto codes = [](std::initializer_list<int> list) {
+            std::string out;
+            for (const int c : list)
+            {
+                out += out.empty() ? std::string() : std::string("|");
+                out += static_cast<char>(c);
+            }
+            return out;
+        };
+        ensure_equals("from 0 to 10", in(text, "[\\x00-\\x0a]"), codes({ 1, 2, 9, 0, 5 }));
+        ensure_equals("from a tab to 10", in(text, "[\\t-\\x0a]"), codes({ 9, 0 }));
+        ensure_equals("from 10", in(text, "[\\x0a-\\x0c]"), codes({ 0, 11, 12 }));
+        ensure_equals("over 10", in(text, "[\\x05-\\x0b]"), codes({ 9, 0, 11, 5 }));
+        ensure_equals("from 0, short of 10", in(text, "[\\x00-\\x02]"), codes({ 1, 2, 0 }));
+        ensure_equals("from 0 to 9", in(text, "[\\x00-\\x09]"), codes({ 1, 2, 9, 0, 5 }));
+        ensure_equals("decimal, 0 to 1", in(text, "[\\d0-\\d1]"), codes({ 1, 0 }));
+        ensure_equals("10 to 10", in(text, "[\\x0a-\\x0a]"), codes({ 0 }));
+        ensure_equals("a tab to a return, by their letters", in(text, "[\\t-\\r]"), codes({ 9, 0, 11, 12 }));
+        ensure_equals("1 to 9: no NUL", in(text, "[\\x01-\\x09]"), codes({ 1, 2, 9, 5 }));
+        ensure_equals("all but 0 to 10", in(text, "[^\\x00-\\x0a]"), codes({ 'a', 'b', 'c', 'd', 'e', 11, 'f', 12, 'g', 'h', ' ', 'i', 'j', 'k' }));
+    }
 }
