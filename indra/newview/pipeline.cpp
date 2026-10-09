@@ -1071,8 +1071,11 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         // must match it -- flip together via mainDepthFormat().
         mWaterDis.allocate(resX, resY, screenFormat, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
 
-        // The emissive attachment's format, which the sky writes to, so the sky behind quantizes as the sky does.
-        mSkyBehind.allocate(llmax(resX / 2, 1U), llmax(resY / 2, 1U), GL_R11F_G11F_B10F, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE);
+        // The format the sky's colour lands in (addDeferredAttachments), so the sky behind clamps and quantizes as the sky
+        // does: the emissive attachment's float with HDR, and 8 bits otherwise, the emissive attachment's or the albedo's,
+        // which the sky writes raw.
+        const bool sky_float = hdr && gSavedSettings.getBOOL("RenderEnableEmissiveBuffer");
+        mSkyBehind.allocate(llmax(resX / 2, 1U), llmax(resY / 2, 1U), sky_float ? GL_R11F_G11F_B10F : GL_RGBA8, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE);
         mSkyBehindFrame = 0;
 
         if(RenderScreenSpaceReflections)
