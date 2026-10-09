@@ -444,10 +444,15 @@ elseif(LINUX)
       "LINKER:--no-undefined"
   )
 elseif(DARWIN)
+  # Under -dead_strip, ld only warns of a symbol defined both in an object and
+  # in an archive member it loads, and keeps the object's: a stub in a test, or
+  # a stray copy in the viewer, silently replaces the real one. An error, as
+  # GNU ld and MSVC make it.
   target_link_options(
     al_flags
     INTERFACE
       $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:LINKER:-dead_strip>
+      "LINKER:-duplicate_symbols,error"
       LINKER:-dead_strip_dylibs
       "LINKER:-headerpad_max_install_names"
       "LINKER:-search_paths_first"
