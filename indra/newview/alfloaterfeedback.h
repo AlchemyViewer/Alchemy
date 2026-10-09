@@ -80,6 +80,7 @@ private:
     static void onResult(LLHandle<ALFloaterFeedback> handle, const ALFeedback::Result& result);
 
     ALFeedback::Kind kind() const;
+    void reportChanged();
     void applyKey(const LLSD& key);
     void applyKindDefaults();
     void setDefault(AttachmentRow& row, bool on);
@@ -158,6 +159,10 @@ private:
     bool mDraftDirty = false;
     // Set once the report has gone, so closing keeps no draft.
     bool mSent = false;
+    // Set while the report as last sent is kept to go by itself.
+    bool mQueued = false;
+    // Whether the controls were last set for a report being sent.
+    bool mShownBusy = false;
 };
 
 // One attachment as it will be sent, to read before sending.

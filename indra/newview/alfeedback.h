@@ -152,6 +152,30 @@ namespace ALFeedback
     // Settings whose values are nobody else's: keys, passwords, tokens.
     bool privateSetting(std::string_view name);
 
+    // A report kept to be sent again when the server could not be reached:
+    // when it was made, how often it has been tried, when it may go next.
+    struct Queued
+    {
+        std::string eventId;
+        S64 created = 0; // seconds since the epoch
+        S32 attempts = 0;
+        S64 nextAt = 0;
+    };
+    inline constexpr S32 QUEUE_MAX_ATTEMPTS = 5;
+    inline constexpr S64 QUEUE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+    inline constexpr size_t QUEUE_MAX_ENTRIES = 5;
+    inline constexpr S64 QUEUE_RETRY_SECONDS = 15 * 60;
+    inline constexpr S64 QUEUE_RETRY_MAX_SECONDS = 6 * 60 * 60;
+
+    // When a report that did not go after this many tries may go again: a
+    // quarter of an hour, doubling, no more than six hours, and never before
+    // the server said.
+    S64 nextAttempt(S64 now, S32 attempts, F32 retry_after);
+    // Too old, or tried too often, to try again.
+    bool expired(const Queued& queued, S64 now);
+    std::string queuedToJson(const Queued& queued);
+    std::optional<Queued> queuedFromJson(std::string_view json);
+
     // What the user chose to send.
     struct Report
     {
@@ -172,13 +196,23 @@ namespace ALFeedback
         Outcome outcome = Outcome::Unreachable;
         std::string eventId;
         F32 retryAfter = 0.f; // seconds, when rate limited
+        // Kept on disk, to go by itself once the server can be reached.
+        bool queued = false;
     };
     using done_t = std::function<void(const Result&)>;
 
     bool sending();
     // Gathers what the report asks for, sends it, and calls done on the main
-    // thread with what the server answered. One report at a time.
+    // thread with what the server answered. One report at a time. A report
+    // is kept on disk until the server has answered it, so one that cannot
+    // reach the server, or whose run ends before it does, goes later.
     void send(Report report, done_t done);
+
+    // Sends every kept report now, when the server may be back, and then
+    // those that are due every quarter hour.
+    void startQueue();
+    // Forgets a kept report: the user is writing it again.
+    void discardQueued(const std::string& event_id);
 
     // What each attachment would carry, for the user to read before sending.
     std::string systemInformation();

@@ -34,6 +34,7 @@
 #include <zlib.h>
 
 #include <algorithm>
+#include <cmath>
 
 namespace
 {
@@ -313,6 +314,54 @@ ALFeedback::Outcome ALFeedback::classify(S32 http_status)
 bool ALFeedback::retryable(Outcome outcome)
 {
     return outcome == Outcome::RateLimited || outcome == Outcome::Unreachable;
+}
+
+S64 ALFeedback::nextAttempt(S64 now, S32 attempts, F32 retry_after)
+{
+    S64 delay = QUEUE_RETRY_SECONDS;
+    for (S32 i = 1; i < attempts && delay < QUEUE_RETRY_MAX_SECONDS; ++i)
+    {
+        delay *= 2;
+    }
+    delay = std::min(delay, QUEUE_RETRY_MAX_SECONDS);
+    delay = std::max(delay, static_cast<S64>(std::ceil(retry_after)));
+    return now + delay;
+}
+
+bool ALFeedback::expired(const Queued& queued, S64 now)
+{
+    return queued.attempts >= QUEUE_MAX_ATTEMPTS || now - queued.created > QUEUE_MAX_AGE_SECONDS;
+}
+
+std::string ALFeedback::queuedToJson(const Queued& queued)
+{
+    // Times as reals: an LLSD integer is 32 bits, and seconds since the
+    // epoch outgrow it in 2038.
+    LLSD record = LLSD::emptyMap();
+    record["event_id"] = queued.eventId;
+    record["created"] = static_cast<LLSD::Real>(queued.created);
+    record["attempts"] = queued.attempts;
+    record["next_at"] = static_cast<LLSD::Real>(queued.nextAt);
+    return LlsdToJson(record);
+}
+
+std::optional<ALFeedback::Queued> ALFeedback::queuedFromJson(std::string_view json)
+{
+    LLSD record;
+    if (!LlsdFromJsonString(json, record) || !record.isMap() || !record.has("event_id"))
+    {
+        return std::nullopt;
+    }
+    Queued queued;
+    queued.eventId = record["event_id"].asString();
+    queued.created = static_cast<S64>(record["created"].asReal());
+    queued.attempts = record["attempts"].asInteger();
+    queued.nextAt = static_cast<S64>(record["next_at"].asReal());
+    if (queued.eventId.empty())
+    {
+        return std::nullopt;
+    }
+    return queued;
 }
 
 bool ALFeedback::privateSetting(std::string_view name)

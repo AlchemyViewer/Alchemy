@@ -107,13 +107,15 @@ namespace
 
     std::string failure_reason(const ALFeedback::Result& result)
     {
+        // A report kept to go later says so, rather than asking for a retry.
         switch (result.outcome)
         {
             case ALFeedback::Outcome::RateLimited:
             {
                 LLStringUtil::format_map_t args;
                 args["[MINUTES]"] = std::to_string(std::max(1, static_cast<S32>(std::ceil(result.retryAfter / 60.f))));
-                return LLTrans::getString("AlchemyFeedbackRateLimited", args);
+                return LLTrans::getString(result.queued ? "AlchemyFeedbackRateLimitedQueued" : "AlchemyFeedbackRateLimited",
+                                          args);
             }
             case ALFeedback::Outcome::TooLarge:
                 return LLTrans::getString("AlchemyFeedbackTooLarge");
@@ -121,7 +123,8 @@ namespace
                 return LLTrans::getString("AlchemyFeedbackRejected");
             case ALFeedback::Outcome::Unreachable:
             default:
-                return LLTrans::getString("AlchemyFeedbackUnreachable");
+                return LLTrans::getString(result.queued ? "AlchemyFeedbackUnreachableQueued"
+                                                        : "AlchemyFeedbackUnreachable");
         }
     }
 
@@ -176,22 +179,18 @@ bool ALFloaterFeedback::postBuild()
     mKind->setCommitCallback(
         [this](LLUICtrl*, const LLSD&)
         {
+            reportChanged();
             applyKindDefaults();
             updateControls();
-            mDraftDirty = true;
-            mDraftTimer.reset();
         });
 
     mMessage = getChild<LLTextEditor>("message");
     mMessage->setKeystrokeCallback(
         [this](LLTextEditor*)
         {
-            // Changed, it is another report, and goes under an id of its own.
-            mEventId.clear();
+            reportChanged();
             updateCounter();
             updateControls();
-            mDraftDirty = true;
-            mDraftTimer.reset();
         });
 
     mCounter = getChild<LLTextBox>("counter");
@@ -200,13 +199,11 @@ bool ALFloaterFeedback::postBuild()
     mUnlinkButton->setCommitCallback(
         [this](LLUICtrl*, const LLSD&)
         {
+            reportChanged();
             mAssociatedEventId.clear();
             mLinked.clear();
             mLinkedAt.clear();
-            mEventId.clear();
             updateLinked();
-            mDraftDirty = true;
-            mDraftTimer.reset();
         });
 
     mScreenshotPreview = getChild<LLView>("screenshot_preview");
@@ -216,6 +213,7 @@ bool ALFloaterFeedback::postBuild()
     mScreenshotRow.check->setCommitCallback(
         [this](LLUICtrl*, const LLSD&)
         {
+            reportChanged();
             mScreenshotRow.touched = true;
             if (mScreenshotRow.check->get() && !mScreenshot)
             {
@@ -224,9 +222,19 @@ bool ALFloaterFeedback::postBuild()
             updateControls();
         });
     mHideInterface = getChild<LLCheckBoxCtrl>("hide_ui_check");
-    mHideInterface->setCommitCallback([this](LLUICtrl*, const LLSD&) { requestScreenshot(); });
+    mHideInterface->setCommitCallback(
+        [this](LLUICtrl*, const LLSD&)
+        {
+            reportChanged();
+            requestScreenshot();
+        });
     mRetakeButton = getChild<LLButton>("retake_btn");
-    mRetakeButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { requestScreenshot(); });
+    mRetakeButton->setCommitCallback(
+        [this](LLUICtrl*, const LLSD&)
+        {
+            reportChanged();
+            requestScreenshot();
+        });
     mViewScreenshotButton = getChild<LLButton>("view_screenshot_btn");
     mViewScreenshotButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { viewScreenshot(); });
 
@@ -243,6 +251,7 @@ bool ALFloaterFeedback::postBuild()
         row->check->setCommitCallback(
             [this, row](LLUICtrl*, const LLSD&)
             {
+                reportChanged();
                 row->touched = true;
                 updateControls();
             });
@@ -263,8 +272,15 @@ bool ALFloaterFeedback::postBuild()
                             { viewText("title_settings", ALFeedback::changedSettings()); });
 
     mIncludeAvatar = getChild<LLCheckBoxCtrl>("include_avatar_check");
+    mIncludeAvatar->setCommitCallback([this](LLUICtrl*, const LLSD&) { reportChanged(); });
     mEmail = getChild<LLLineEditor>("email");
-    mEmail->setKeystrokeCallback([this](LLLineEditor*, void*) { updateControls(); }, nullptr);
+    mEmail->setKeystrokeCallback(
+        [this](LLLineEditor*, void*)
+        {
+            reportChanged();
+            updateControls();
+        },
+        nullptr);
     mEmailHint = getChild<LLTextBox>("email_hint");
     mRememberEmail = getChild<LLCheckBoxCtrl>("remember_email_check");
     if (mRememberEmail->get())
@@ -324,7 +340,8 @@ void ALFloaterFeedback::onOpen(const LLSD& key)
 
 void ALFloaterFeedback::onClose(bool app_quitting)
 {
-    if (!mSent)
+    // A report sent, or kept to go by itself, leaves nothing to come back to.
+    if (!mSent && !mQueued)
     {
         saveDraft();
     }
@@ -462,6 +479,27 @@ void ALFloaterFeedback::onIdle(void* self_ptr)
         sHeldUntil = 0.0;
         self->updateControls();
     }
+
+    // A kept report going by itself holds Send for as long as it takes.
+    if (ALFeedback::sending() != self->mShownBusy)
+    {
+        self->updateControls();
+    }
+}
+
+void ALFloaterFeedback::reportChanged()
+{
+    // Changed, it is another report under an id of its own: sent again with
+    // the old one, the server would keep what it already had. A copy kept to
+    // go by itself is the version the user is replacing.
+    if (mQueued)
+    {
+        ALFeedback::discardQueued(mEventId);
+        mQueued = false;
+    }
+    mEventId.clear();
+    mDraftDirty = true;
+    mDraftTimer.reset();
 }
 
 ALFeedback::Kind ALFloaterFeedback::kind() const
@@ -539,6 +577,7 @@ void ALFloaterFeedback::updateCounter()
 void ALFloaterFeedback::updateControls()
 {
     const bool busy = ALFeedback::sending();
+    mShownBusy = busy;
     const size_t length = utf8str_codepoint_count(trimmed(mMessage->getText()));
     const std::string email = trimmed(mEmail->getText());
     const bool email_ok = email.empty() || ALFeedback::plausibleEmail(email);
@@ -774,6 +813,16 @@ void ALFloaterFeedback::onResult(LLHandle<ALFloaterFeedback> handle, const ALFee
         return;
     }
 
+    // Kept to go by itself, the report is the outbox's, not the draft's.
+    if (result.queued)
+    {
+        clearDraft();
+    }
+    if (self)
+    {
+        self->mQueued = result.queued;
+    }
+
     if (self && self->getVisible() && !self->isMinimized())
     {
         self->updateControls();
@@ -785,7 +834,14 @@ void ALFloaterFeedback::onResult(LLHandle<ALFloaterFeedback> handle, const ALFee
         {
             self->updateControls();
         }
-        notify_failed(result);
+        if (result.queued)
+        {
+            LLNotificationsUtil::add("AlchemyFeedbackQueued");
+        }
+        else
+        {
+            notify_failed(result);
+        }
     }
 }
 

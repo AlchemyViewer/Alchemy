@@ -13920,6 +13920,20 @@ Reference: [REF]
  </notification>
 
  <notification
+  icon="notifytip.tga"
+  name="AlchemyFeedbackQueued"
+  type="notifytip">
+Your feedback could not reach the server yet. It is kept, and goes by itself once it can.
+ </notification>
+
+ <notification
+  icon="notifytip.tga"
+  name="AlchemyFeedbackKeptSent"
+  type="notifytip">
+Feedback you sent earlier has now reached the Alchemy developers. Reference: [REF]
+ </notification>
+
+ <notification
   icon="notify.tga"
   name="AlchemyFeedbackFailed"
   type="notify">

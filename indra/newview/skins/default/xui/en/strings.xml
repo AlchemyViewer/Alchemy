@@ -5480,4 +5480,6 @@ and report the problem.
     <string name="AlchemyFeedbackTooLarge">That's too large to send. It can go without the attachments.</string>
     <string name="AlchemyFeedbackRejected">The server refused this report.</string>
     <string name="AlchemyFeedbackUnreachable">Couldn't reach the server. Check your connection and try again.</string>
+    <string name="AlchemyFeedbackRateLimitedQueued">The server is busy. Kept: it goes by itself in [MINUTES] min.</string>
+    <string name="AlchemyFeedbackUnreachableQueued">Couldn't reach the server. Kept: it goes by itself once it can.</string>
 </strings>

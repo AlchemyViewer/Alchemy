@@ -331,4 +331,48 @@ namespace tut
         ensure("no retry when too large", !ALFeedback::retryable(Outcome::TooLarge));
         ensure("no retry when sent", !ALFeedback::retryable(Outcome::Sent));
     }
+
+    template<> template<>
+    void object::test<17>()
+    {
+        set_test_name("a kept report waits a quarter hour, doubling to six hours, never less than asked");
+        const S64 now = 1000000;
+        ensure_equals("first", ALFeedback::nextAttempt(now, 1, 0.f), now + 15 * 60);
+        ensure_equals("second", ALFeedback::nextAttempt(now, 2, 0.f), now + 30 * 60);
+        ensure_equals("third", ALFeedback::nextAttempt(now, 3, 0.f), now + 60 * 60);
+        ensure_equals("capped", ALFeedback::nextAttempt(now, 20, 0.f), now + 6 * 60 * 60);
+        ensure_equals("the server's word", ALFeedback::nextAttempt(now, 1, 3600.5f), now + 3601);
+    }
+
+    template<> template<>
+    void object::test<18>()
+    {
+        set_test_name("a kept report is given up after a week or five tries");
+        ALFeedback::Queued queued;
+        queued.created = 0;
+        queued.attempts = 4;
+        ensure("young and tried four times", !ALFeedback::expired(queued, ALFeedback::QUEUE_MAX_AGE_SECONDS));
+        ensure("over a week", ALFeedback::expired(queued, ALFeedback::QUEUE_MAX_AGE_SECONDS + 1));
+        queued.attempts = 5;
+        ensure("five tries", ALFeedback::expired(queued, 0));
+    }
+
+    template<> template<>
+    void object::test<19>()
+    {
+        set_test_name("a kept report's record round-trips, past 2038 too");
+        ALFeedback::Queued queued;
+        queued.eventId = "0123abcd89abcdef0123456789abcdef";
+        queued.created = 4102444800; // 2100
+        queued.attempts = 3;
+        queued.nextAt = 4102448400;
+        const auto back = ALFeedback::queuedFromJson(ALFeedback::queuedToJson(queued));
+        ensure("parsed", back.has_value());
+        ensure_equals("id", back->eventId, queued.eventId);
+        ensure_equals("created", back->created, queued.created);
+        ensure_equals("attempts", back->attempts, queued.attempts);
+        ensure_equals("next", back->nextAt, queued.nextAt);
+        ensure("not a record", !ALFeedback::queuedFromJson("{\"nothing\":1}"));
+        ensure("not json", !ALFeedback::queuedFromJson("garbage"));
+    }
 }

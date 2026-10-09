@@ -93,6 +93,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alcrashreporter.h"
+#include "alfeedback.h"
 #include "alfloaterfeedback.h"
 #include "llappviewer.h"
 #include "llstartup.h"
@@ -1078,6 +1079,9 @@ bool idle_startup()
             {
                 ALFloaterFeedback::askAboutLastRun();
             }
+            // Feedback that could not be sent before goes now, and then
+            // whenever it is due.
+            ALFeedback::startQueue();
 
             // MAINT-3231 Show first run dialog only for Desura viewer
             if (gSavedSettings.getString("sourceid") == "1208_desura")
