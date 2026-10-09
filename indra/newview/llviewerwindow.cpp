@@ -5684,7 +5684,8 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     // W*(f-n) <= f-n < f for any W in range.
     const bool reverse_z_snapshot = LLRender::sReverseZ;
     const F32 snap_near = LLViewerCamera::getInstance()->getNear();
-    const F32 snap_far  = LLViewerCamera::getInstance()->getFar();
+    // The projection's far plane, which depth was stored against, not the draw distance (getFar()).
+    const F32 snap_far  = LLViewerCamera::getInstance()->getProjectionFar();
     const bool infinite_snapshot = al_projection_is_infinite(LLViewerCamera::getInstance()->getProjection());
     auto linearize_snapshot_depth = [&](F32 d) -> F32
     {
