@@ -39,13 +39,13 @@ namespace tut
 {
     struct alwindowsdlheadless_data
     {
+        // The window is the shared context's, which has the image, render
+        // and shader classes up on it: the tests look only at the window
+        // and its shared contexts, and leave the context's bindings as
+        // they found them.
         static ll_test::HeadlessGL& gl()
         {
-            static ll_test::HeadlessGL instance(/*needs_vbos=*/false,
-                                                /*needs_imagegl=*/false,
-                                                /*needs_llrender=*/false,
-                                                /*needs_render=*/false);
-            return instance;
+            return ll_test::sharedHeadlessGL();
         }
 
         alwindowsdlheadless_data() { gl(); }
@@ -110,10 +110,14 @@ namespace tut
         ensure("the worker made a texture", name != 0);
         ensure("the main context sees the worker's texture", glIsTexture(name) == GL_TRUE);
 
+        // The shared context's texture slots cache what they bound, so the
+        // read puts back the texture it found.
+        GLint prior = 0;
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, &prior);
         glBindTexture(GL_TEXTURE_2D, name);
         GLint width = 0;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
-        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindTexture(GL_TEXTURE_2D, prior);
         ensure_equals("with the storage the worker gave it", width, 1);
         ensure_equals("and no error on this side", glGetError(), (GLenum)GL_NO_ERROR);
 

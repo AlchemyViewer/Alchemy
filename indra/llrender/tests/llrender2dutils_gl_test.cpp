@@ -48,11 +48,7 @@ namespace tut
         // and LLImageGL's class state does not survive a re-init.
         static ll_test::HeadlessGL& gl()
         {
-            static ll_test::HeadlessGL instance(/*needs_vbos=*/true,
-                                                /*needs_imagegl=*/true,
-                                                /*needs_llrender=*/true,
-                                                /*needs_render=*/true);
-            return instance;
+            return ll_test::sharedHeadlessGL();
         }
 
         llrender2dutils_data()

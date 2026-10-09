@@ -49,7 +49,7 @@ namespace tut
 
     // -------------------------------------------------------------
     // GL-backed group: COLRv1 painter integrated with the LLFontFreetype
-    // / LLFontBitmapCache / LLImageGL pipeline. The shared HeadlessGL
+    // / LLFontBitmapCache / LLImageGL pipeline. Each test's own HeadlessGL
     // context is what the addGlyph path's gGL.bind plus the
     // setSubImageBGRA → LLImageGL upload land on.
     // -------------------------------------------------------------

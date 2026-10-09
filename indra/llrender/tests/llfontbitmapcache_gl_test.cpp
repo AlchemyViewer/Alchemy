@@ -37,8 +37,8 @@ namespace tut
 {
     using namespace ll_test;
 
-    // GL-backed fixture: shares the binary's HeadlessGL singleton so
-    // every test below has a live GL context available for the
+    // GL-backed fixture: a HeadlessGL of each test's own, so every
+    // test below has a live GL context available for the
     // gGL.bind call inside nextOpenPos and the destroyGLTexture call
     // inside releaseSheet.
     struct llfontbitmapcache_gl_data

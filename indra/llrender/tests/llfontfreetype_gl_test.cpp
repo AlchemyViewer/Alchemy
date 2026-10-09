@@ -43,8 +43,8 @@ namespace tut
     using namespace ll_test;
 
     // -------------------------------------------------------------
-    // GL-backed group: rasterizer-touching paths. The HeadlessGl
-    // singleton supplies the GL context so addGlyph's
+    // GL-backed group: rasterizer-touching paths. Each test's own
+    // HeadlessGL supplies the GL context so addGlyph's
     // gGL.bind(image_gl) call lands on a live GL state.
     // -------------------------------------------------------------
 

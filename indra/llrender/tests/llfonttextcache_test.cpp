@@ -82,20 +82,8 @@ namespace tut
     // fontps reference (LLFontManager::cleanupClass + LLImageGL::
     // cleanupClass in HeadlessGL dtor). Sharing the GL context across
     // tests keeps all that state coherent for the binary's lifetime.
-    inline ll_test::HeadlessGL& getSharedHeadlessGL(bool needs_render)
-    {
-        // The first test in the binary picks the needs_render mode.
-        // Both groups in this binary use needs_render=true (the smoke
-        // tests don't drive rendering, but having gUIProgram bound is
-        // harmless for them). All subsequent fixtures share this one.
-        static ll_test::HeadlessGL gl(/*needs_vbos=*/true,
-                                      /*needs_imagegl=*/true,
-                                      /*needs_llrender=*/true,
-                                      /*needs_render=*/true);
-        (void)needs_render;
-        return gl;
-    }
-
+    // Both groups take it with gUIProgram bound (the smoke tests don't
+    // drive rendering, but having it bound is harmless for them).
     inline void ensureLLFontGLLoaded()
     {
         static bool initialized = false;
@@ -111,11 +99,11 @@ namespace tut
 
     // Fixture: minimal — just gates the static toggles and ensures the
     // shared GL fixture is up. The actual HeadlessGL instance lives in
-    // the static getSharedHeadlessGL() and stays alive for the whole
+    // ll_test::sharedHeadlessGL() and stays alive for the whole
     // binary, so font/atlas state stays coherent across tests.
     struct llfonttextcache_data
     {
-        ll_test::HeadlessGL& gl = getSharedHeadlessGL(/*needs_render=*/false);
+        ll_test::HeadlessGL& gl = ll_test::sharedHeadlessGL();
 
         llfonttextcache_data()
         {
@@ -433,7 +421,7 @@ namespace tut
 
     struct llfonttextcache_render_data
     {
-        ll_test::HeadlessGL& gl = getSharedHeadlessGL(/*needs_render=*/true);
+        ll_test::HeadlessGL& gl = ll_test::sharedHeadlessGL();
 
         llfonttextcache_render_data()
         {

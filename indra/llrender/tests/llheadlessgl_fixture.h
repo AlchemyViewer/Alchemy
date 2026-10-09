@@ -8,10 +8,10 @@
  * Linux -- and where Linux has no display, SDL's offscreen driver.
  *
  * Standing the context up is the expensive part — TUT spins a fresh
- * fixture per test method, so we hide a static-local instance
- * behind getHeadlessGl() and let every fixture struct embed a
- * reference. That keeps each test isolated against its own state
- * (font registry, atlas pages) while reusing the GL context.
+ * fixture per test method, so a test that can share one takes the
+ * static-local instance behind sharedHeadlessGL() and keeps its own
+ * state (font registry, atlas pages) in the fixture. A test that
+ * needs a context of its own makes a HeadlessGL per test instead.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -81,7 +81,7 @@ namespace ll_test
     };
 
     // Drop transient font caches that would otherwise leak between tests
-    // sharing this binary's HeadlessGl singleton. Safe to call repeatedly;
+    // sharing sharedHeadlessGL(). Safe to call repeatedly;
     // does NOT touch LLFontManager / LLImageGL / GL state — those stay
     // alive for the whole binary because LLFontGL's static fontp caches
     // (getFontSansSerif et al.) dangle across a re-init cycle (see
@@ -463,6 +463,21 @@ namespace ll_test
         LLWindow* mWindow = nullptr;
         std::unique_ptr<TestShaderMgr> mShaderMgr;
     };
+
+    // The one context of the tests that share theirs: made by the first test
+    // to ask and kept for the rest of the process, so a binary of them has
+    // one window. Every part of the fixture is up, the union of what those
+    // tests need, so each must leave the image, render and shader state as
+    // it found it. Tests that make a HeadlessGL of their own per test end
+    // the GL classes under it, and are never linked beside a caller of this.
+    inline HeadlessGL& sharedHeadlessGL()
+    {
+        static HeadlessGL gl(/*needs_vbos=*/true,
+                             /*needs_imagegl=*/true,
+                             /*needs_llrender=*/true,
+                             /*needs_render=*/true);
+        return gl;
+    }
 }
 
 #endif // LL_LLHEADLESSGL_FIXTURE_H

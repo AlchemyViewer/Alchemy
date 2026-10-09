@@ -73,29 +73,20 @@ namespace
 
 namespace tut
 {
-    // Shared GL fixture. TUT spins fixtures per-test method, but
+    // The shared GL context. TUT spins fixtures per-test method, but
     // per-fixture HeadlessGL recreation poisons LLFontGL's per-getter
     // static fontp caches after ~10 cycles (the per-test new GL
     // context invalidates LLImageGL textures the fontps reference).
     // Sharing the GL context for the binary's lifetime keeps font
     // state coherent across all tests.
     //
-    // needs_render=true so the render group can drive gGL.beginList /
-    // flush against a real bound gUIProgram. Layout-only tests (which
+    // It binds gUIProgram, so the render group can drive gGL.beginList /
+    // flush against a real shader. Layout-only tests (which
     // never issue a draw) still work fine — the bound shader is harmless
     // when no draw call is in flight.
-    inline ll_test::HeadlessGL& getSharedFontGL()
-    {
-        static ll_test::HeadlessGL gl(/*needs_vbos=*/true,
-                                      /*needs_imagegl=*/true,
-                                      /*needs_llrender=*/true,
-                                      /*needs_render=*/true);
-        return gl;
-    }
-
     struct llfontgl_data
     {
-        ll_test::HeadlessGL& gl = getSharedFontGL();
+        ll_test::HeadlessGL& gl = ll_test::sharedHeadlessGL();
         llfontgl_data() = default;
         ~llfontgl_data() = default;
     };
@@ -1004,7 +995,7 @@ namespace tut
 
     struct llfontgl_render_data
     {
-        ll_test::HeadlessGL& gl = getSharedFontGL();
+        ll_test::HeadlessGL& gl = ll_test::sharedHeadlessGL();
         llfontgl_render_data() { ensureRenderLLFontGL(); }
         ~llfontgl_render_data() = default;
     };
