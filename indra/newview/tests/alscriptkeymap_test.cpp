@@ -40,11 +40,27 @@
 #include <string>
 #include <tuple>
 
+namespace
+{
+    // What names keys as a person reads them, which LLKeyboard keeps
+    // without saying.
+    struct KeyTranslator : LLKeyboard
+    {
+        static LLKeyStringTranslatorFunc* current() { return mStringTranslator; }
+    };
+}
+
 namespace tut
 {
     struct alscriptkeymap_data
     {
         typedef ALEditorCommand C;
+
+        // What the fixture sets, as it was: put back as each test ends, for
+        // whatever runs after it.
+        LLKeyStringTranslatorFunc* translatorWas = KeyTranslator::current();
+        LLSD                       keysWas;
+        std::string                presetWas;
 
         alscriptkeymap_data()
         {
@@ -57,8 +73,18 @@ namespace tut
             {
                 gSavedSettings.declareString("ALScriptStudioKeymapPreset", "studio", "another editor's keys", LLControlVariable::PERSIST_NO);
             }
+            keysWas   = gSavedSettings.getLLSD("ALScriptStudioKeymap");
+            presetWas = gSavedSettings.getString("ALScriptStudioKeymapPreset");
             ALScriptKeymap::setPreset(ALScriptKeyPresets::STANDARD);
             ALScriptKeymap::restoreAll();
+        }
+        ~alscriptkeymap_data()
+        {
+            // The keymap hears its settings change, and builds again from
+            // them when next asked.
+            gSavedSettings.setString("ALScriptStudioKeymapPreset", presetWas);
+            gSavedSettings.setLLSD("ALScriptStudioKeymap", keysWas);
+            LLKeyboard::setStringTranslatorFunc(translatorWas);
         }
 
         static bool has(const ALScriptKeymap::chords_t& keys, const ALKeyChord& chord)

@@ -239,6 +239,39 @@ get_region(const LLSD & sd, U64 region_handle1)
 
 namespace tut
 {
+    namespace
+    {
+        // The fixture's ThreadRecorder makes itself this thread's recorder,
+        // with its own timer stack and current accumulators, and leaves all
+        // of them null when it goes; the fixture makes it the master recorder
+        // too. This takes the runner's as they were before the test's
+        // recorder, and puts them back after it.
+        struct RecorderRestore
+        {
+            template <typename T>
+            using Current = LLThreadLocalSingletonPointer<T>;
+
+            LLTrace::ThreadRecorder*        mMaster{ LLTrace::get_master_thread_recorder() };
+            LLTrace::ThreadRecorder*        mRecorder{ LLTrace::get_thread_recorder() };
+            LLTrace::BlockTimerStackRecord* mTimerStack{ Current<LLTrace::BlockTimerStackRecord>::getInstance() };
+            LLTrace::CountAccumulator*      mCounts{ Current<LLTrace::CountAccumulator>::getInstance() };
+            LLTrace::SampleAccumulator*     mSamples{ Current<LLTrace::SampleAccumulator>::getInstance() };
+            LLTrace::EventAccumulator*      mEvents{ Current<LLTrace::EventAccumulator>::getInstance() };
+            LLTrace::TimeBlockAccumulator*  mTimers{ Current<LLTrace::TimeBlockAccumulator>::getInstance() };
+
+            ~RecorderRestore()
+            {
+                LLTrace::set_master_thread_recorder(mMaster);
+                LLTrace::set_thread_recorder(mRecorder);
+                Current<LLTrace::BlockTimerStackRecord>::setInstance(mTimerStack);
+                Current<LLTrace::CountAccumulator>::setInstance(mCounts);
+                Current<LLTrace::SampleAccumulator>::setInstance(mSamples);
+                Current<LLTrace::EventAccumulator>::setInstance(mEvents);
+                Current<LLTrace::TimeBlockAccumulator>::setInstance(mTimers);
+            }
+        };
+    } // anonymous namespace
+
     struct tst_viewerassetstats_index
     {
         tst_viewerassetstats_index()
@@ -251,6 +284,8 @@ namespace tut
             LLTrace::set_master_thread_recorder(NULL);
         }
 
+        // before mThreadRecorder, so it is put back after mThreadRecorder is gone
+        RecorderRestore         mRestore;
         LLTrace::ThreadRecorder mThreadRecorder;
     };
     typedef test_group<tst_viewerassetstats_index> tst_viewerassetstats_index_t;

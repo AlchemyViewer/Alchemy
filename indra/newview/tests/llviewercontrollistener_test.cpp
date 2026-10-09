@@ -22,6 +22,8 @@
 #include "commoncontrol.h"
 #include "llcontrol.h"              // LLControlGroup
 
+#include <algorithm>
+
 /*****************************************************************************
 *   TUT
 *****************************************************************************/
@@ -142,9 +144,18 @@ namespace
     void object::test<9>()
     {
         set_test_name("CommonControl get_groups");
-        std::vector<std::string> groups{ LL::CommonControl::get_groups() };
-        ensure_equals(groups.size(), 1);
-        ensure_equals(groups[0], "FakeGlobal");
+        // Every group the process has: the fixture's, and whatever else has
+        // been made -- HeadlessUI's, another test's gSavedSettings. So the
+        // fixture's is there once, and one more group made adds its name.
+        const std::vector<std::string> groups{ LL::CommonControl::get_groups() };
+        ensure_equals("FakeGlobal", std::count(groups.begin(), groups.end(), "FakeGlobal"), std::ptrdiff_t(1));
+        {
+            LLControlGroup another{ "FakeAnother" };
+            const std::vector<std::string> more{ LL::CommonControl::get_groups() };
+            ensure_equals("one more", more.size(), groups.size() + 1);
+            ensure_equals("FakeAnother", std::count(more.begin(), more.end(), "FakeAnother"), std::ptrdiff_t(1));
+        }
+        ensure_equals("one fewer once it goes", LL::CommonControl::get_groups().size(), groups.size());
     }
 
     template<> template<>
