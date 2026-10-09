@@ -260,4 +260,25 @@ namespace tut
         sky->blend(to_cloudier, 0.25);
         ensure_close("between two textured skies", sky->getCloudShadow(), 0.7f);
     }
+
+    // Flattening looks through nesting to any depth, as validation and the first-layer getters do, so the
+    // anisotropy setter reaches a layer nested two arrays deep.
+    template<> template<>
+    void llsettingssky_object::test<10>()
+    {
+        LLSD settings = default_settings();
+        const LLSD deep = layer(0.0f, 1.0f, -1.0f / 1200.0f, 0.0f, 0.0f, 0.8f);
+        const LLSD shallow = layer(0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.3f);
+        settings[LLSettingsSky::SETTING_MIE_CONFIG] = llsd::array(llsd::array(llsd::array(deep)), shallow);
+
+        LLSD flat = LLSettingsSky::flattenDensityProfile(settings[LLSettingsSky::SETTING_MIE_CONFIG]);
+        ensure_equals("both layers flattened", flat.size(), size_t(2));
+        ensure_close("the deep layer first", term(flat[0], LLSettingsSky::SETTING_MIE_ANISOTROPY_FACTOR), 0.8f);
+
+        LLSettingsSky::ptr_t sky = make_sky(settings);
+        ensure_close("g from the deep layer", sky->getMieAnisotropy(), 0.8f);
+        sky->setMieAnisotropy(0.6f);
+        ensure_close("g after the setter", sky->getMieAnisotropy(), 0.6f);
+        ensure_equals("the setter keeps both layers", sky->getMieConfigs().size(), size_t(2));
+    }
 }

@@ -161,8 +161,8 @@ public:
     LLSD getMieConfigs() const;
     LLSD getAbsorptionConfigs() const;
 
-    // The profile's layers as one flat array. Skies edited by earlier Density tabs hold a
-    // layer array nested inside the absorption profile.
+    // The profile's layers as one flat array, however deeply they are nested. Skies edited by
+    // earlier Density tabs hold a layer array nested inside the absorption profile.
     static LLSD flattenDensityProfile(const LLSD& profile);
 
     LLUUID getBloomTextureId() const;

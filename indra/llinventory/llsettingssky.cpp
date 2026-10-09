@@ -1884,9 +1884,12 @@ LLSD LLSettingsSky::getAbsorptionConfig() const
     return first_density_layer(mAbsorptionConfigs);
 }
 
-LLSD LLSettingsSky::flattenDensityProfile(const LLSD& profile)
+namespace
 {
-    LLSD flat = LLSD::emptyArray();
+// Appends the profile's layers to flat, looking through nested arrays to any depth, as validateDensityLayers and
+// first_density_layer do.
+void append_density_layers(LLSD& flat, const LLSD& profile)
+{
     for (LLSD::array_const_iterator itf = profile.beginArray(); itf != profile.endArray(); ++itf)
     {
         if (itf->isMap())
@@ -1895,15 +1898,16 @@ LLSD LLSettingsSky::flattenDensityProfile(const LLSD& profile)
         }
         else if (itf->isArray())
         {
-            for (LLSD::array_const_iterator itn = itf->beginArray(); itn != itf->endArray(); ++itn)
-            {
-                if (itn->isMap())
-                {
-                    flat.append(*itn);
-                }
-            }
+            append_density_layers(flat, *itf);
         }
     }
+}
+}
+
+LLSD LLSettingsSky::flattenDensityProfile(const LLSD& profile)
+{
+    LLSD flat = LLSD::emptyArray();
+    append_density_layers(flat, profile);
     return flat;
 }
 
