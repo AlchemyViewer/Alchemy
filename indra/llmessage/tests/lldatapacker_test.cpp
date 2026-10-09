@@ -37,8 +37,8 @@
 #include "v3math.h"
 #include "v4math.h"
 #include "llsdserialize.h"
+#include "../test/namedtempfile.h"
 
-#define TEST_FILE_NAME  "datapacker_test.txt"
 
 namespace tut
 {
@@ -351,7 +351,10 @@ namespace
     {
         F32 f_val = 44.44f, f_unpkval;
 
-        LLFILE* fp = LLFile::fopen(TEST_FILE_NAME, LLFILE_MODE("w+"));
+        // A file of the test's own, where no other run writes, removed as
+        // the test ends.
+        NamedTempFile file("datapacker_test", "", ".txt");
+        LLFILE* fp = LLFile::fopen(file.getPath().string(), LLFILE_MODE("w+"));
         if(!fp)
         {
             LL_ERRS() << "File couldnt be open" << LL_ENDL;
@@ -406,7 +409,10 @@ namespace
         LLVector4 unpkllvec4;
         LLUUID unpkuuid;
 
-        LLFILE* fp = LLFile::fopen(TEST_FILE_NAME, LLFILE_MODE("w+"));
+        // A file of the test's own, where no other run writes, removed as
+        // the test ends.
+        NamedTempFile file("datapacker_test", "", ".txt");
+        LLFILE* fp = LLFile::fopen(file.getPath().string(), LLFILE_MODE("w+"));
         if(!fp)
         {
             LL_ERRS() << "File couldnt be open" << LL_ENDL;
