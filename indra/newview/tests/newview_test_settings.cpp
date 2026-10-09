@@ -1,6 +1,6 @@
 /**
- * @file newview_test_fakes.cpp
- * @brief What newview's tests take of the viewer, faked once for every test that links it.
+ * @file newview_test_settings.cpp
+ * @brief The viewer's settings group, for the tests whose code reads it.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -24,28 +24,10 @@
 
 #include "linden_common.h"
 
-#include "newview_test_fakes.h"
+#include "llcontrol.h"
 
-#include "workqueue.h"
-
-#include <string>
-
-// An object, linked whole into each test that names it, rather than an
-// archive's member, so each test binary has one definition of each.
-
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it. A linker that
-// reads its archives once, in order, would have passed an archive listed
-// before llui by the time llui asked.
-class LLAvatarName;
-const std::string& rlvGetAnonym(const LLAvatarName&)
-{
-    static const std::string anon("Anon");
-    return anon;
-}
-
-LL::WorkQueue& newview_test::mainLoop()
-{
-    static LL::WorkQueue queue("mainloop", 1024);
-    return queue;
-}
+// The code under test names gSavedSettings, so it is an object from the
+// start, as the viewer's is, and a group's name is its key in a process: one
+// definition for every test that links this, named as the viewer names it,
+// and only those tests link it. Each test declares the settings it reads.
+LLControlGroup gSavedSettings("Global");

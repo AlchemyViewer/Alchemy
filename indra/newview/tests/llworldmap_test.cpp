@@ -89,7 +89,7 @@ void LLUIString::assign(std::string_view ) { }
 LLControlGroup::LLControlGroup(const std::string& name) : LLInstanceTracker<LLControlGroup, std::string>(name) {}
 LLControlGroup::~LLControlGroup() {}
 bool LLControlGroup::getBOOL(std::string_view) { return true; }
-LLControlGroup gSavedSettings("test_settings");
+LLControlGroup gSavedSettings("llworldmap");
 
 // End Stubbing
 // -------------------------------------------------------------------------------------------

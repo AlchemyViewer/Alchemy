@@ -113,7 +113,7 @@ void LLCredential::authenticatorType(std::string &idType)
 }
 
 
-LLControlGroup gSavedSettings("test");
+LLControlGroup gSavedSettings("llsechandler_basic");
 unsigned char gMACAddress[MAC_ADDRESS_BYTES] = {77,21,46,31,89,2};
 
 

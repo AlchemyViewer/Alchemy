@@ -111,7 +111,7 @@ LLPointer<LLControlVariable> LLControlGroup::getControl(std::string_view name)
     return iter == mNameTable.end() ? LLPointer<LLControlVariable>() : iter->second;
 }
 
-LLControlGroup gSavedSettings("test");
+LLControlGroup gSavedSettings("llviewernetwork");
 
 static const char *gSampleGridFile =
     "<?xml version=\"1.0\"?>"

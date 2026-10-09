@@ -1,5 +1,5 @@
 /**
- * @file newview_test_fakes.cpp
+ * @file newview_test_fakes.h
  * @brief What newview's tests take of the viewer, faked once for every test that links it.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -22,30 +22,21 @@
  * $/LicenseInfo$
  */
 
-#include "linden_common.h"
+#ifndef AL_NEWVIEW_TEST_FAKES_H
+#define AL_NEWVIEW_TEST_FAKES_H
 
-#include "newview_test_fakes.h"
-
-#include "workqueue.h"
-
-#include <string>
-
-// An object, linked whole into each test that names it, rather than an
-// archive's member, so each test binary has one definition of each.
-
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it. A linker that
-// reads its archives once, in order, would have passed an archive listed
-// before llui by the time llui asked.
-class LLAvatarName;
-const std::string& rlvGetAnonym(const LLAvatarName&)
+namespace LL
 {
-    static const std::string anon("Anon");
-    return anon;
+    class WorkQueue;
 }
 
-LL::WorkQueue& newview_test::mainLoop()
+namespace newview_test
 {
-    static LL::WorkQueue queue("mainloop", 1024);
-    return queue;
+    // The main loop's queue, as the viewer's is: made the first time a test
+    // asks for it, never while the process starts, and kept for the rest of
+    // the run, since what was posted to it for a test gone finds nobody. A
+    // queue's name is its key in a process, so every test shares this one.
+    LL::WorkQueue& mainLoop();
 }
+
+#endif // AL_NEWVIEW_TEST_FAKES_H

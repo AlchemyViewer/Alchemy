@@ -50,7 +50,7 @@ std::string LLControlGroup::getString(std::string_view name)
 }
 
 
-LLControlGroup gSavedSettings("test");
+LLControlGroup gSavedSettings("llsecapi");
 
 LLSecAPIBasicHandler::LLSecAPIBasicHandler() {}
 void LLSecAPIBasicHandler::init() {}

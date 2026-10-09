@@ -26,6 +26,9 @@
 
 #include "../alscriptkeymap.h"
 #include "../alscriptkeypresets.h"
+// The settings the keymap is kept in, the viewer's group, which the test
+// links (newview_test_settings.cpp).
+#include "../llviewercontrol.h"
 
 #include "llcontrol.h"
 #include "llkeyboard.h"
@@ -36,9 +39,6 @@
 #include <set>
 #include <string>
 #include <tuple>
-
-// The setting the keymap is kept in, in a group of the test's own.
-LLControlGroup gSavedSettings("Global");
 
 namespace tut
 {

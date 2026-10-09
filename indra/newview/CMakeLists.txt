@@ -2498,6 +2498,11 @@ if(AL_BUILD_TESTS)
   add_library(newview_test_fakes OBJECT tests/newview_test_fakes.cpp)
   target_link_libraries(newview_test_fakes PRIVATE al::flags llcommon)
   set_target_properties(newview_test_fakes PROPERTIES FOLDER "Tests/${test_project}")
+  # The viewer's settings group, gSavedSettings, for a test whose code reads
+  # it: a group made as the process starts, so linked by those tests alone.
+  add_library(newview_test_settings OBJECT tests/newview_test_settings.cpp)
+  target_link_libraries(newview_test_settings PRIVATE al::flags llxml)
+  set_target_properties(newview_test_settings PROPERTIES FOLDER "Tests/${test_project}")
 
   # A unit test compiles one viewer source file on its own. Each line is one
   # such file and its test under tests/.
@@ -2781,7 +2786,7 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     SOURCES alscriptkeypresets.cpp
-    LIBRARIES newview_test_fakes llui ${test_libs}
+    LIBRARIES newview_test_fakes newview_test_settings llui ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -3071,7 +3076,7 @@ if(AL_BUILD_TESTS)
   al_add_test(
     lltextureinfo
     PROJECT ${test_project}
-    LIBRARIES llxml ${test_libs}
+    LIBRARIES newview_test_settings llxml ${test_libs}
     SOURCES lltextureinfo.cpp
   )
 endif()

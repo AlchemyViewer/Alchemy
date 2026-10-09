@@ -36,6 +36,7 @@
 #include "../alscriptstudiowords.h"
 #include "alscriptstudio_fixture.h"
 #include "llfocusmgr.h"
+#include "newview_test_fakes.h"
 
 #include "../test/lltut.h"
 
@@ -1076,8 +1077,8 @@ namespace tut
         studio.disk = { root.string() };
         // The main loop's queue, as the viewer's is: kept, since a walk
         // let go of may hand back to it after the test.
-        static LL::WorkQueue main_loop("mainloop", 1024);
-        const auto pumped = [](const std::function<bool()>& until, std::chrono::milliseconds within) {
+        LL::WorkQueue& main_loop = newview_test::mainLoop();
+        const auto pumped = [&main_loop](const std::function<bool()>& until, std::chrono::milliseconds within) {
             const auto deadline = std::chrono::steady_clock::now() + within;
             while (std::chrono::steady_clock::now() < deadline)
             {
