@@ -27,6 +27,7 @@
 #include "../alcrashreporter.h"
 
 #include "llsd.h"
+#include "lluuid.h"
 #include "v3math.h"
 
 #include "../test/lltut.h"
@@ -112,8 +113,9 @@ namespace tut
     void object::test<7>()
     {
         set_test_name("consent is a sentinel file: recorded, seen, withdrawn");
+        // A name of this run's own: another run of the tests may be at it.
         const std::string sentinel =
-            (std::filesystem::temp_directory_path() / "alcrashreporter_test_consent").string();
+            (std::filesystem::temp_directory_path() / ("alcrashreporter_test_consent_" + LLUUID::generateNewID().asString())).string();
 
         ALCrashReporter::recordConsent(sentinel, false);
         ensure("absent to begin with", !ALCrashReporter::consentRecorded(sentinel));

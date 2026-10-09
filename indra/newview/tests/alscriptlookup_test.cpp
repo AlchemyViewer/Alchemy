@@ -942,7 +942,7 @@ namespace tut
         // A folder of the scripter's, as the window lists it, where it
         // stands: what the walk names each file by.
         namespace fs = std::filesystem;
-        const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + LLUUID::generateNewID().asString());
         fs::create_directories(made);
         const fs::path    root     = fs::canonical(made);
         const std::string LIB_TEXT = "local M = {}\nfunction M.twice(n) return n * 2 end\nreturn M\n";
@@ -1032,7 +1032,7 @@ namespace tut
         set_test_name("a file open here by another way to its path is the one file: looked through once, as its tab has it, and found to be where the name is declared");
         make();
         namespace fs = std::filesystem;
-        const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + LLUUID::generateNewID().asString());
         fs::create_directories(made / "sub");
         const fs::path    root     = fs::canonical(made);
         const std::string LIB_TEXT = "local M = {}\nfunction M.twice(n) return n * 2 end\nreturn M\n";
@@ -1069,7 +1069,7 @@ namespace tut
         set_test_name("with a main loop to hand them back to, the folders on disk are walked and read off the main thread, the lookup held open for them; nothing comes of a walk once the lookups are gone");
         make();
         namespace fs = std::filesystem;
-        const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + LLUUID::generateNewID().asString());
         fs::create_directories(made);
         const fs::path    root  = fs::canonical(made);
         const std::string B_LUA = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
