@@ -75,6 +75,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     // Shared GL context + LLFontGL bring-up. One per binary. TUT
     // creates a fresh fixture per test method; per-fixture HeadlessGL
     // creation poisons LLFontGL's process-static fontp cache, since
@@ -121,6 +123,7 @@ namespace tut
     typedef test_group<llfonttextcache_data> llfonttextcache_test;
     typedef llfonttextcache_test::object     llfonttextcache_object;
     tut::llfonttextcache_test llfonttextcache_testcase("LLFontTextCache");
+}
 
     // Default construction must not crash and must leave the buffer
     // in a destructible state. Catches uninitialized-member regressions
@@ -419,6 +422,8 @@ namespace tut
     // framebuffer.
     // ===================================================================
 
+namespace
+{
     struct llfonttextcache_render_data
     {
         ll_test::HeadlessGL& gl = ll_test::sharedHeadlessGL();
@@ -439,6 +444,7 @@ namespace tut
     typedef test_group<llfonttextcache_render_data> llfonttextcache_render_test;
     typedef llfonttextcache_render_test::object     llfonttextcache_render_object;
     tut::llfonttextcache_render_test llfonttextcache_render_testcase("LLFontTextCacheRender");
+}
 
     // First render() populates the buffer cache and returns the
     // character count rendered. Pins genBuffers + drawBuffer end-to-end

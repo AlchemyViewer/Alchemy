@@ -73,6 +73,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     // The shared GL context. TUT spins fixtures per-test method, but
     // per-fixture HeadlessGL recreation poisons LLFontGL's per-getter
     // static fontp caches after ~10 cycles (the per-test new GL
@@ -94,6 +96,7 @@ namespace tut
     typedef test_group<llfontgl_data> llfontgl_test;
     typedef llfontgl_test::object     llfontgl_object;
     tut::llfontgl_test llfontgl_testcase("LLFontGL");
+}
 
     // initClass through the explicit-path overload should bring up a
     // working font registry under a real GL context. loadDefaultFonts
@@ -982,6 +985,8 @@ namespace tut
     // static fontp cache after a few cycles (see vertexbuffer fixture).
     // ===================================================================
 
+namespace
+{
     inline void ensureRenderLLFontGL()
     {
         static bool initialized = false;
@@ -1003,6 +1008,7 @@ namespace tut
     typedef test_group<llfontgl_render_data> llfontgl_render_test;
     typedef llfontgl_render_test::object     llfontgl_render_object;
     tut::llfontgl_render_test llfontgl_render_testcase("LLFontGLRender");
+}
 
     // First end-to-end render() call with LEFT/BASELINE places glyph
     // pixels into the framebuffer at the requested x. Pins the full

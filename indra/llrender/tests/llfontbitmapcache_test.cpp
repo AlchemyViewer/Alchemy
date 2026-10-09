@@ -36,6 +36,8 @@
 
 namespace tut
 {
+namespace
+{
     // Pure-CPU fixture: no GL context required. The tests in this group
     // touch only the bookkeeping state that LLFontBitmapCache maintains
     // independently of any GL allocation.
@@ -46,6 +48,7 @@ namespace tut
     typedef test_group<llfontbitmapcache_data> llfontbitmapcache_test;
     typedef llfontbitmapcache_test::object     llfontbitmapcache_object;
     tut::llfontbitmapcache_test llfontbitmapcache_testcase("LLFontBitmapCache");
+}
 
     // Construction takes a fresh value from sNextGeneration. Two
     // back-to-back instances must therefore land on distinct

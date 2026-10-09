@@ -50,6 +50,8 @@
 
 namespace tut
 {
+namespace
+{
     struct llimagegl_data
     {
         std::unique_ptr<ll_test::HeadlessGL> gl = std::make_unique<ll_test::HeadlessGL>();
@@ -97,6 +99,7 @@ namespace tut
     typedef test_group<llimagegl_data> llimagegl_test;
     typedef llimagegl_test::object     llimagegl_object;
     tut::llimagegl_test llimagegl_testcase("LLImageGL");
+}
 
     // createGLTexture(LLImageRaw) allocates immutable storage under a
     // fresh GL name. After it succeeds the instance reports

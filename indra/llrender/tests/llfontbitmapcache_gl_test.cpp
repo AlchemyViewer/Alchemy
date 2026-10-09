@@ -35,6 +35,8 @@
 
 namespace tut
 {
+namespace
+{
     using namespace ll_test;
 
     // GL-backed fixture: a HeadlessGL of each test's own, so every
@@ -49,6 +51,7 @@ namespace tut
     typedef test_group<llfontbitmapcache_gl_data> llfontbitmapcache_gl_test;
     typedef llfontbitmapcache_gl_test::object     llfontbitmapcache_gl_object;
     tut::llfontbitmapcache_gl_test llfontbitmapcache_gl_testcase("LLFontBitmapCacheGL");
+}
 
     // After a Grayscale allocation, the underlying LLImageRaw must
     // carry 2 components (R+G with R=255 stem, G=alpha) — pins

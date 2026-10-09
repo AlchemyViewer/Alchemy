@@ -43,6 +43,8 @@
 
 namespace tut
 {
+namespace
+{
     using namespace ll_test;
 
     // GL-backed group: monospace shaping ends up rendering glyphs through
@@ -59,6 +61,7 @@ namespace tut
     typedef test_group<alfontshaping_gl_data> alfontshaping_gl_test;
     typedef alfontshaping_gl_test::object     alfontshaping_gl_object;
     tut::alfontshaping_gl_test alfontshaping_gl_testcase("ALFontShapingGL");
+}
 
     // Strict-monospace (ligatures off): shape "AB" through DejaVuSansMono.
     // Routes through HB with the kFixedWidthStrict feature plan

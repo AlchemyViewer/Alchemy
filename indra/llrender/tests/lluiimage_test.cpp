@@ -90,6 +90,8 @@ namespace ll_test
 
 namespace tut
 {
+namespace
+{
     struct lluiimage_data
     {
         // One context for the binary: standing it up is the expensive part,
@@ -145,6 +147,7 @@ namespace tut
     typedef test_group<lluiimage_data> lluiimage_test;
     typedef lluiimage_test::object     lluiimage_object;
     tut::lluiimage_test lluiimage_testcase("LLUIImage");
+}
 
     // One recording serves every position the image is drawn at. A floater
     // being dragged is this test run at frame rate.

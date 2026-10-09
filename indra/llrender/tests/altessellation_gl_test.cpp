@@ -95,7 +95,6 @@ namespace tut
         const std::array<F32, 8> kCW  = { -1.f, -1.f, -1.f,  1.f,  1.f, 1.f,  1.f, -1.f };
 
         struct Vertex { F32 x, y, z, w; };
-    }
 
     struct altessellation_data
     {
@@ -277,6 +276,7 @@ namespace tut
     typedef test_group<altessellation_data> altessellation_test;
     typedef altessellation_test::object     altessellation_object;
     tut::altessellation_test altessellation_testcase("ALTessellation");
+    }
 
     // The context compiles both tessellation stages and links them with a
     // vertex and fragment shader. Everything below assumes this.

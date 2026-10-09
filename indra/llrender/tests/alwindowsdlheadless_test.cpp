@@ -37,6 +37,8 @@
 
 namespace tut
 {
+namespace
+{
     struct alwindowsdlheadless_data
     {
         // The window is the shared context's, which has the image, render
@@ -54,6 +56,7 @@ namespace tut
     typedef test_group<alwindowsdlheadless_data> alwindowsdlheadless_test;
     typedef alwindowsdlheadless_test::object     alwindowsdlheadless_object;
     tut::alwindowsdlheadless_test alwindowsdlheadless_testcase("ALWindowSDLHeadless");
+}
 
     // The window the manager handed the fixture is the hidden backend, valid,
     // with an SDL window behind it and the size that was asked for.

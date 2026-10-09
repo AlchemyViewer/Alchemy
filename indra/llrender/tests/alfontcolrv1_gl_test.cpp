@@ -45,6 +45,8 @@
 
 namespace tut
 {
+namespace
+{
     using namespace ll_test;
 
     // -------------------------------------------------------------
@@ -63,6 +65,7 @@ namespace tut
     typedef test_group<alfontcolrv1_render_data> alfontcolrv1_render_test;
     typedef alfontcolrv1_render_test::object     alfontcolrv1_render_object;
     tut::alfontcolrv1_render_test alfontcolrv1_render_testcase("ALFontColrV1Render");
+}
 
     // End-to-end: requesting a Color glyph for the fire emoji on
     // Noto-COLRv1 must route through renderColrV1Glyph → painter →
