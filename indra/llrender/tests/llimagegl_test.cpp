@@ -903,4 +903,32 @@ namespace tut
 
         ensure("the position array is enabled on the new context", enabled == GL_TRUE);
     }
+
+    // A worker ends by destroying its shared context on its own thread, where
+    // it is current, as LLImageGLThread does. On EGL that only marked it for
+    // destruction, and the context held its display past the window, so the
+    // next window was made on the stale display, and failed.
+    template<> template<>
+    void llimagegl_object::test<25>()
+    {
+        LLWindow* window = gl->window();
+        void* shared = window->createSharedContext();
+        ensure("a shared context was made", shared != nullptr);
+        std::thread worker([window, shared]
+        {
+            window->makeContextCurrent(shared);
+            window->destroySharedContext(shared);
+        });
+        worker.join();
+
+        gl.reset();
+        try
+        {
+            gl = std::make_unique<ll_test::HeadlessGL>();
+        }
+        catch (const std::exception& e)
+        {
+            fail(std::string("the next window: ") + e.what());
+        }
+    }
 }

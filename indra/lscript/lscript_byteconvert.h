@@ -36,6 +36,8 @@
 #include "lscript_byteformat.h"
 #include "lluuid.h"
 
+#include <bit>
+
 void reset_hp_to_safe_spot(const U8 *buffer);
 
 // remember that LScript byte stream is BigEndian
@@ -129,7 +131,7 @@ inline void u162bytestream(U8 *stream, S32 &offset, U16 integer)
 inline F32 bytestream2float(const U8 *stream, S32 &offset)
 {
     S32 value = bytestream2integer(stream, offset);
-    F32 fpvalue = *(F32 *)&value;
+    F32 fpvalue = std::bit_cast<F32>(value);
     if (!llfinite(fpvalue))
     {
         fpvalue = 0;
@@ -140,7 +142,7 @@ inline F32 bytestream2float(const U8 *stream, S32 &offset)
 
 inline void float2bytestream(U8 *stream, S32 &offset, F32 floatingpoint)
 {
-    S32 value = *(S32 *)&floatingpoint;
+    S32 value = std::bit_cast<S32>(floatingpoint);
     integer2bytestream(stream, offset, value);
 }
 
@@ -223,21 +225,21 @@ inline void bytestream2uuid(U8 *stream, S32 &offset, LLUUID &uuid)
 inline void bytestream2vector(LLVector3 &vector, const U8 *stream, S32 &offset)
 {
     S32 value = bytestream2integer(stream, offset);
-    vector.mV[VZ] = *(F32 *)&value;
+    vector.mV[VZ] = std::bit_cast<F32>(value);
     if (!llfinite(vector.mV[VZ]))
     {
         vector.mV[VZ] = 0;
         set_fault(stream, LSRF_MATH);
     }
     value = bytestream2integer(stream, offset);
-    vector.mV[VY] = *(F32 *)&value;
+    vector.mV[VY] = std::bit_cast<F32>(value);
     if (!llfinite(vector.mV[VY]))
     {
         vector.mV[VY] = 0;
         set_fault(stream, LSRF_MATH);
     }
     value = bytestream2integer(stream, offset);
-    vector.mV[VX] = *(F32 *)&value;
+    vector.mV[VX] = std::bit_cast<F32>(value);
     if (!llfinite(vector.mV[VX]))
     {
         vector.mV[VX] = 0;
@@ -247,39 +249,39 @@ inline void bytestream2vector(LLVector3 &vector, const U8 *stream, S32 &offset)
 
 inline void vector2bytestream(U8 *stream, S32 &offset, const LLVector3 &vector)
 {
-    S32 value = *(S32 *)&vector.mV[VZ];
+    S32 value = std::bit_cast<S32>(vector.mV[VZ]);
     integer2bytestream(stream, offset, value);
-    value = *(S32 *)&vector.mV[VY];
+    value = std::bit_cast<S32>(vector.mV[VY]);
     integer2bytestream(stream, offset, value);
-    value = *(S32 *)&vector.mV[VX];
+    value = std::bit_cast<S32>(vector.mV[VX]);
     integer2bytestream(stream, offset, value);
 }
 
 inline void bytestream2quaternion(LLQuaternion &quat, const U8 *stream, S32 &offset)
 {
     S32 value = bytestream2integer(stream, offset);
-    quat.mQ[VS] = *(F32 *)&value;
+    quat.mQ[VS] = std::bit_cast<F32>(value);
     if (!llfinite(quat.mQ[VS]))
     {
         quat.mQ[VS] = 0;
         set_fault(stream, LSRF_MATH);
     }
     value = bytestream2integer(stream, offset);
-    quat.mQ[VZ] = *(F32 *)&value;
+    quat.mQ[VZ] = std::bit_cast<F32>(value);
     if (!llfinite(quat.mQ[VZ]))
     {
         quat.mQ[VZ] = 0;
         set_fault(stream, LSRF_MATH);
     }
     value = bytestream2integer(stream, offset);
-    quat.mQ[VY] = *(F32 *)&value;
+    quat.mQ[VY] = std::bit_cast<F32>(value);
     if (!llfinite(quat.mQ[VY]))
     {
         quat.mQ[VY] = 0;
         set_fault(stream, LSRF_MATH);
     }
     value = bytestream2integer(stream, offset);
-    quat.mQ[VX] = *(F32 *)&value;
+    quat.mQ[VX] = std::bit_cast<F32>(value);
     if (!llfinite(quat.mQ[VX]))
     {
         quat.mQ[VX] = 0;
@@ -289,13 +291,13 @@ inline void bytestream2quaternion(LLQuaternion &quat, const U8 *stream, S32 &off
 
 inline void quaternion2bytestream(U8 *stream, S32 &offset, const LLQuaternion &quat)
 {
-    S32 value = *(S32 *)&quat.mQ[VS];
+    S32 value = std::bit_cast<S32>(quat.mQ[VS]);
     integer2bytestream(stream, offset, value);
-    value = *(S32 *)&quat.mQ[VZ];
+    value = std::bit_cast<S32>(quat.mQ[VZ]);
     integer2bytestream(stream, offset, value);
-    value = *(S32 *)&quat.mQ[VY];
+    value = std::bit_cast<S32>(quat.mQ[VY]);
     integer2bytestream(stream, offset, value);
-    value = *(S32 *)&quat.mQ[VX];
+    value = std::bit_cast<S32>(quat.mQ[VX]);
     integer2bytestream(stream, offset, value);
 }
 
