@@ -2189,8 +2189,8 @@ function="World.EnvPreset"
                  function="ReportAbuse" />
             </menu_item_call>
         <menu_item_call
-             label="Report Bug"
-             name="Report Bug">
+             label="Send Feedback..."
+             name="Send Feedback">
                 <menu_item_call.on_click
                  function="Advanced.ReportBug"/>
             </menu_item_call>

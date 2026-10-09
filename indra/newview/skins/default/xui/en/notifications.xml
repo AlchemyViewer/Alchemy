@@ -13888,6 +13888,45 @@ A report carries where the viewer crashed, its log, your settings and your avata
      yestext="Send reports"/>
  </notification>
 
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackSent"
+  type="notify">
+Thanks. Your feedback reached the Alchemy developers.
+Reference: [REF]
+    <form name="form">
+      <button
+       index="0"
+       name="copy"
+       text="Copy reference"/>
+      <button
+       default="true"
+       index="1"
+       name="ok"
+       text="OK"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackFailed"
+  type="notify">
+Your feedback was not sent. [REASON]
+
+It is kept: open Send Feedback to try again.
+    <form name="form">
+      <button
+       index="0"
+       name="open"
+       text="Open"/>
+      <button
+       default="true"
+       index="1"
+       name="dismiss"
+       text="Dismiss"/>
+    </form>
+ </notification>
+
   <notification
    icon="alertmodal.tga"
    name="SceneExplorerFullRegion"

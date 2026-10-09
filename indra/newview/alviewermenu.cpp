@@ -629,6 +629,7 @@ void ALViewerMenu::initialize_menus()
     enable.add("Avatar.EnableTeleportTo", [](LLUICtrl* ctrl, const LLSD& param) { return can_teleport_to(); });
     enable.add("Object.EnableEditParticles", [](LLUICtrl* ctrl, const LLSD& param) { return enable_edit_particle_source(); });
     enable.add("SavedSetting", [](LLUICtrl* ctrl, const LLSD& param) { return get_saved_setting(param); });
+    enable.add("Feedback.Available", [](LLUICtrl* ctrl, const LLSD& param) { return ALFeedback::available(); });
 
     LLUICtrl::CommitCallbackRegistry::Registrar& commit = LLUICtrl::CommitCallbackRegistry::currentRegistrar();
     commit.add("Avatar.CopyData",       [](LLUICtrl* ctrl, const LLSD& param) { avatar_copy_data(param); });

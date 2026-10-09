@@ -147,7 +147,6 @@
 		<menu_item_call label="Destek portalı" name="Support portal"/>
 		<menu_item_call label="[SECOND_LIFE] Blogları" name="Second Life Blogs"/>
 		<menu_item_call label="Kötüye Kullanımı Bildir" name="Report Abuse"/>
-		<menu_item_call label="Hata Bildir" name="Report Bug"/>
 		<menu_item_call label="Toslamalar, İtmeler ve Vurmalar" name="Bumps, Pushes &amp;amp; Hits"/>
 		<menu_item_call label="[APP_NAME] Hakkında" name="About Second Life"/>
 	</menu>

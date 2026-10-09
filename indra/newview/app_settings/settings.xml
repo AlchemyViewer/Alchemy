@@ -10683,13 +10683,13 @@
 		<key>ReportBugURL</key>
 		<map>
 			<key>Comment</key>
-			<string>URL used for filing bugs from viewer</string>
+			<string>URL used for filing bugs from a viewer built without feedback reports</string>
 			<key>Persist</key>
 			<integer>1</integer>
 			<key>Type</key>
 			<string>String</string>
 			<key>Value</key>
-			<string>https://feedback.secondlife.com/</string>
+			<string>https://github.com/AlchemyViewer/Alchemy/issues</string>
 		</map>
 	<key>RevokePermsOnStopAnimation</key>
     <map>

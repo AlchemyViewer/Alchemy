@@ -147,7 +147,6 @@
 		<menu_item_call label="支援入口" name="Support portal"/>
 		<menu_item_call label="[SECOND_LIFE] 部落格" name="Second Life Blogs"/>
 		<menu_item_call label="違規舉報" name="Report Abuse"/>
-		<menu_item_call label="回報臭蟲" name="Report Bug"/>
 		<menu_item_call label="碰撞、推擠與打擊" name="Bumps, Pushes &amp;amp; Hits"/>
 		<menu_item_call label="關於 [APP_NAME]" name="About Second Life"/>
 	</menu>

@@ -166,6 +166,7 @@ if(AL_BUILD_VIEWER)
     alfloaterdirectory.cpp
     alfloaterevent.cpp
     alfloaterexploresounds.cpp
+    alfloaterfeedback.cpp
     alfloatergenerictext.cpp
     alfloatergroupprofile.cpp
     alfloaterlightbox.cpp
@@ -1029,6 +1030,7 @@ if(AL_BUILD_VIEWER)
     alfloaterdirectory.h
     alfloaterevent.h
     alfloaterexploresounds.h
+    alfloaterfeedback.h
     alfloatergenerictext.h
     alfloatergroupprofile.h
     alfloaterlightbox.h
