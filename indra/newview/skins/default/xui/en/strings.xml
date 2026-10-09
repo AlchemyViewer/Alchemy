@@ -533,6 +533,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimNoInsertedText">E29: No inserted text yet</string>
 	<string name="VimNoPreviousPattern">E35: No previous regular expression</string>
 	<string name="VimNoPreviousSubstitute">E33: No previous substitute regular expression</string>
+	<string name="VimNoFileName">E32: No file name</string>
+	<string name="VimNoAlternate">E23: No alternate file</string>
 	<string name="VimMarkNotSet">E20: Mark not set</string>
 	<string name="CodeFixSpelling">Change to "[WORD]"</string>
 	<string name="CodeFixAddWord">Add "[WORD]" to the dictionary</string>

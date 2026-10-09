@@ -6410,4 +6410,71 @@ namespace tut
         keys("/a~*b<CR>");
         ensure_equals("~ with no last replacement: vim's own error", vim->message(), std::string("E33: No previous substitute regular expression"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<215>()
+    {
+        set_test_name("% and # are the names the host gives the file and the alternate one, put, typed and listed as vim's; without one, vim's E32 and E23, and the rest of vim's own say what they say empty");
+        const auto named = [this]() {
+            vim->hooks().fileName = [](const ALTextView&, char name) { return std::string(name == '%' ? "Script.lsl" : "Other"); };
+        };
+        make("one\ntwo");
+        named();
+        keys("\"%p");
+        ensure_equals("\"%p the file's name after the caret", flat(editor->text()), std::string("oScript.lslne|two"));
+        ensure_equals("on its last character", caretText(), std::string("0:10"));
+        make("one\ntwo");
+        named();
+        keys("\"#P");
+        ensure_equals("\"#P the alternate's before it", flat(editor->text()), std::string("Otherone|two"));
+        ensure_equals("there too", caretText(), std::string("0:4"));
+        make("one\ntwo");
+        named();
+        keys(":put %<CR>");
+        ensure_equals(":put % as a line", flat(editor->text()), std::string("one|Script.lsl|two"));
+        make("one\ntwo");
+        named();
+        keys("A <C-r>%<Esc>");
+        ensure_equals("Control-R % typed in", flat(editor->text()), std::string("one Script.lsl|two"));
+
+        make("one two");
+        named();
+        keys("\"%yy");
+        ensure("\"%yy: nothing yanked", !vim->shared().registers.fetch('0', false).held && !vim->shared().registers.fetch('"', false).held);
+        keys("\"#dd\"%x");
+        ensure_equals("\"#dd, \"%x: nothing taken", flat(editor->text()), std::string("one two"));
+        keys("\"%cwZZ<Esc>");
+        ensure_equals("\"%cw: nothing taken, typed where it was", flat(editor->text()), std::string("ZZone two"));
+
+        make("one\ntwo");
+        named();
+        std::vector<std::string> listed;
+        vim->hooks().listing = [&listed](ALTextView&, const std::string& text) { listed.push_back(text); };
+        keys("Axy<Esc>:s/o/0/<CR>/tw<CR>:registers<CR>");
+        ensure_equals("one listing", listed.size(), size_t(1));
+        ensure("the last insert, the : line, the file, the alternate, the search, in vim's order",
+               listed[0].find("\n  c  \".   xy\n  c  \":   s/o/0/\n  c  \"%   Script.lsl\n  c  \"#   Other\n  c  \"/   tw") != std::string::npos);
+        keys(":reg %.<CR>");
+        ensure_equals("those named", listed.back(), std::string("Type Name Content\n  c  \".   xy\n  c  \"%   Script.lsl"));
+
+        make("one");
+        keys("\"%p");
+        ensure_equals("no file: E32", vim->message(), std::string("E32: No file name"));
+        keys("\"#p");
+        ensure_equals("no alternate: E23", vim->message(), std::string("E23: No alternate file"));
+        keys(":put #<CR>");
+        ensure_equals("for :put too", vim->message(), std::string("E23: No alternate file"));
+        keys("A<C-r>%");
+        ensure_equals("and Control-R", vim->message(), std::string("E32: No file name"));
+        keys("<Esc>0vl\"%p");
+        ensure_equals("a visual put takes the selection out first", flat(editor->text()), std::string("e"));
+        ensure_equals("and says so", vim->message(), std::string("E32: No file name"));
+        make("one");
+        keys("\".p");
+        ensure_equals("no insert yet: E29", vim->message(), std::string("E29: No inserted text yet"));
+        keys("\":p");
+        ensure_equals("no : line: E30", vim->message(), std::string("E30: No previous command line"));
+        keys("\"bp");
+        ensure_equals("a register: E353", vim->message(), std::string("E353: Nothing in register b"));
+    }
 }

@@ -116,6 +116,9 @@ public:
         std::function<void(ALTextView& view, const std::string& title, const std::vector<std::string>& items,
                            std::function<void(size_t index)> chosen)>
             pick;
+        // The name of the file the view shows, for the % register, or of
+        // the alternate one, for #; none where there is none.
+        std::function<std::string(const ALTextView& view, char name)> fileName;
     };
 
     ALVimKeymap();
@@ -475,7 +478,16 @@ private:
     // Registers, the unnamed one on the clipboard; a delete in 1 whatever
     // its size where `register_one` says (Span::registerOne).
     void     store(char name, std::string text, bool linewise, bool block, bool yanked, bool register_one = false);
-    Register fetch(char name) const;
+    // % and # are the names the host gives the file `view` shows and the
+    // alternate one, none without a view.
+    Register fetch(char name, const ALTextView* view) const;
+    // Those vim keeps itself -- . : / % # -- which a yank, a delete or a
+    // change writes nothing to.
+    static bool readOnly(char name);
+    // What vim says of a put from a register holding nothing: E29, E30,
+    // E35, E32 and E23 for those it keeps itself, E353 for the rest, and
+    // nothing for _.
+    static std::string nothingIn(char name);
     // gp and gP, `past`: the caret after what was put.
     void     put(ALTextView& view, char name, bool after, S32 count, bool past = false);
     // Says a count would make more text than it may, and how much.

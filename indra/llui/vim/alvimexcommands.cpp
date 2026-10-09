@@ -1405,26 +1405,10 @@ void ALVimExCommands::runOneCommand(ALTextView& view, const std::string& line_in
         {
             return;
         }
-        const ALVimRegisters::Register reg = mVim.fetch(named);
+        const ALVimRegisters::Register reg = mVim.fetch(named, &view);
         if (!reg.held && named != '_')
         {
-            if (named == '.')
-            {
-                mVim.say(ALVimKeymap::said("VimNoInsertedText", "E29: No inserted text yet"), true);
-            }
-            else if (named == ':')
-            {
-                mVim.say(ALVimKeymap::said("VimNoPreviousCommand", "E30: No previous command line"), true);
-            }
-            else if (named == '/')
-            {
-                mVim.say(ALVimKeymap::said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
-            }
-            else
-            {
-                mVim.say(ALVimKeymap::said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, named ? named : '"') } }),
-                         true);
-            }
+            mVim.say(ALVimKeymap::nothingIn(named), true);
             return;
         }
         if (named == '.')
@@ -2205,7 +2189,8 @@ void ALVimExCommands::listRegisters(ALTextView& view, const std::string& names)
 {
     // Each that holds anything, as vim's :registers has them: its kind --
     // c characters, l lines, b a block -- its name, and what it holds; the
-    // last : line and the last search after them.
+    // last insert, the last : line, the file's name, the alternate's and
+    // the last search after them.
     std::string text = "Type Name Content";
     auto        row  = [&](char kind, char name, const std::string& held) {
         if (!held.empty() && (names.empty() || names.find(name) != std::string::npos))
@@ -2217,11 +2202,13 @@ void ALVimExCommands::listRegisters(ALTextView& view, const std::string& names)
     {
         // Lines are kept without the break that ends the last, which vim
         // shows.
-        const ALVimRegisters::Register held = mVim.fetch(*name);
+        const ALVimRegisters::Register held = mVim.fetch(*name, &view);
         row(held.block ? 'b' : held.linewise ? 'l' : 'c', *name, held.linewise && !held.text.empty() ? held.text + "\n" : held.text);
     }
-    row('c', ':', mVim.fetch(':').text);
-    row('c', '/', mVim.fetch('/').text);
+    for (const char* name = ".:%#/"; *name; ++name)
+    {
+        row('c', *name, mVim.fetch(*name, &view).text);
+    }
     list(view, text);
 }
 

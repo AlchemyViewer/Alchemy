@@ -163,6 +163,20 @@ void ALScriptStudioVim::connect(ALVimKeymap& vim)
             mWindow.showOutput();
         }
     };
+    // % is the tab's name, as :file says it, and # the alternate tab's.
+    vim.hooks().fileName = [this, alive](const ALTextView& view, char name) {
+        if (!alive.lock())
+        {
+            return std::string();
+        }
+        const Doc* doc = docOf(view);
+        if (name == '#')
+        {
+            const Doc* alternate = alternateTab();
+            return alternate && alternate != doc ? alternate->name : std::string();
+        }
+        return doc ? doc->name : std::string();
+    };
 }
 
 void ALScriptStudioVim::source(bool show)
