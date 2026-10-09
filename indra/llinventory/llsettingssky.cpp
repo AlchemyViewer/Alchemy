@@ -351,6 +351,42 @@ LLSD lerp_density_profile(const LLSD& from, const LLSD& to, F32 mix)
     return result;
 }
 
+// Whether two profiles hold the same layers, terms and values. blend() asks every frame a day cycle plays; this walks
+// both in step without llsd_equals' per-map key set.
+bool density_profiles_equal(const LLSD& a, const LLSD& b)
+{
+    if (a.type() != b.type() || a.size() != b.size())
+    {
+        return false;
+    }
+    switch (a.type())
+    {
+    case LLSD::TypeArray:
+        for (LLSD::array_const_iterator ia = a.beginArray(), ib = b.beginArray(); ia != a.endArray(); ++ia, ++ib)
+        {
+            if (!density_profiles_equal(*ia, *ib))
+            {
+                return false;
+            }
+        }
+        return true;
+    case LLSD::TypeMap:
+        // Map keys iterate in order, so equal maps walk their keys in step.
+        for (LLSD::map_const_iterator ia = a.beginMap(), ib = b.beginMap(); ia != a.endMap(); ++ia, ++ib)
+        {
+            if (ia->first != ib->first || !density_profiles_equal(ia->second, ib->second))
+            {
+                return false;
+            }
+        }
+        return true;
+    case LLSD::TypeReal:
+        return a.asReal() == b.asReal();
+    default:
+        return llsd_equals(a, b);
+    }
+}
+
 // The first layer of a profile, looking through a nested array; undefined when there is none.
 const LLSD& first_density_layer(const LLSD& profile)
 {
@@ -608,15 +644,15 @@ void LLSettingsSky::blend(LLSettingsBase::ptr_t &end, F64 blendf)
         mPlanetRadius = lerp(mPlanetRadius, other->mPlanetRadius, (F32)blendf);
 
         // Equal profiles, the usual case, stay shared rather than rebuilt every frame.
-        if (!llsd_equals(mRayleighConfigs, other->mRayleighConfigs))
+        if (!density_profiles_equal(mRayleighConfigs, other->mRayleighConfigs))
         {
             mRayleighConfigs = lerp_density_profile(mRayleighConfigs, other->mRayleighConfigs, (F32)blendf);
         }
-        if (!llsd_equals(mMieConfigs, other->mMieConfigs))
+        if (!density_profiles_equal(mMieConfigs, other->mMieConfigs))
         {
             mMieConfigs = lerp_density_profile(mMieConfigs, other->mMieConfigs, (F32)blendf);
         }
-        if (!llsd_equals(mAbsorptionConfigs, other->mAbsorptionConfigs))
+        if (!density_profiles_equal(mAbsorptionConfigs, other->mAbsorptionConfigs))
         {
             mAbsorptionConfigs = lerp_density_profile(mAbsorptionConfigs, other->mAbsorptionConfigs, (F32)blendf);
         }
