@@ -381,6 +381,12 @@ namespace tut
             logininstance->setNotificationsInterface(&notifications);
             logininstance->setPlatformInfo("win", "1.3.5", "Windows Bogus Version 100.6.6.6");
         }
+        ~lllogininstance_data()
+        {
+            // The login instance outlives the test: not left holding the
+            // fixture's notifications once they are gone.
+            logininstance->setNotificationsInterface(nullptr);
+        }
 
         LLLoginInstance* logininstance;
         LLPointer<LLCredential> agentCredential;
