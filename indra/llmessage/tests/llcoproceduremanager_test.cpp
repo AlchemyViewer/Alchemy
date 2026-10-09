@@ -48,7 +48,8 @@
 #pragma warning(disable: 4702)
 #endif
 
-LLCoreHttpUtil::HttpCoroutineAdapter::HttpCoroutineAdapter(std::string name, LLCore::HttpRequest::policy_t policyId)
+LLCoreHttpUtil::HttpCoroutineAdapter::HttpCoroutineAdapter(std::string name, LLCore::HttpRequest::policy_t policyId,
+                                                           Destination destination)
 {
 }
 
