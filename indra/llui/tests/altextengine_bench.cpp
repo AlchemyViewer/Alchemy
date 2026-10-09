@@ -603,6 +603,30 @@ int main(int, char**)
         }
     }
 
+    // The widest line, of 400 characters, near the top: a character typed
+    // at its end and taken away; and the same with the widest asked after
+    // each, as the horizontal scrollbar asks after every key.
+    std::printf("\nThe widest line\n");
+    for (Subject& s : subjects)
+    {
+        s.editor->setCaret(ALTextPos(5, 0));
+        s.editor->insertText(std::string(400, 'w') + "\n");
+    }
+    const auto typedAtWidest = [](ALCodeEditor& e, bool ask) {
+        const S32 end = e.document().lineLength(5);
+        e.setCaret(ALTextPos(5, end));
+        e.insertText("x");
+        g_sink = g_sink + (ask ? static_cast<size_t>(e.layout().contentWidth()) : 0);
+        e.deleteRange(ALTextRange(ALTextPos(5, end), ALTextPos(5, end + 1)));
+        g_sink = g_sink + (ask ? static_cast<size_t>(e.layout().contentWidth()) : 0);
+    };
+    both("a character typed at its end and taken back, per edit", subjects, 2, [&](Subject&, ALCodeEditor& e) { typedAtWidest(e, false); });
+    both("the same, the widest asked after each", subjects, 2, [&](Subject&, ALCodeEditor& e) { typedAtWidest(e, true); });
+    for (Subject& s : subjects)
+    {
+        s.editor->deleteRange(ALTextRange(ALTextPos(5, 0), ALTextPos(6, 0)));
+    }
+
     // Word wrap on: a character typed at the top and taken away, and the
     // last line's top found after each, which every line's height above it
     // goes into; the width moved by a pixel and back, and the lines in

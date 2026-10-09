@@ -432,6 +432,7 @@ target_sources(
         code/alkeychord.h
         code/alkeymap.h
         text/allinetable.h
+        text/almaxima.h
         studio/almenuslot.h
         text/alprefixsums.h
         vim/alvimcommandline.h
@@ -628,6 +629,7 @@ if(AL_BUILD_TESTS)
   al_add_test(alanchoredranges PROJECT llui SOURCES text/altextdocument.cpp LIBRARIES ${test_libs})
   al_add_test(alfenwicktree PROJECT llui LIBRARIES ${test_libs})
   al_add_test(allinetable PROJECT llui LIBRARIES ${test_libs})
+  al_add_test(almaxima PROJECT llui LIBRARIES ${test_libs})
   al_add_test(alprefixsums PROJECT llui LIBRARIES ${test_libs})
   al_add_test(altextdocument UNIT PROJECT llui DIR text LIBRARIES ${test_libs})
   al_add_test(

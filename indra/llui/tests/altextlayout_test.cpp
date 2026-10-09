@@ -1135,4 +1135,94 @@ namespace tut
         same("hidden lines replaced, then shown");
         layout.setGapProvider(nullptr);
     }
+
+    template<> template<>
+    void altextlayout_object::test<29>()
+    {
+        set_test_name("the widest is kept through lines typed wider, the widest cut short, lines made and taken and a batch's runs, as a count of every line finds it, without every line's width counted again");
+        std::string text;
+        for (S32 i = 0; i < 3000; ++i)
+        {
+            text += std::string(static_cast<size_t>((i * 37) % 61), 'a') + "\n";
+        }
+        ready(text.c_str());
+        // No line laid out: each counts its bytes at a column's width.
+        const auto widest_line = [this] {
+            S32 at = 0;
+            for (S32 l = 1; l < doc.lineCount(); ++l)
+            {
+                at = doc.lineLength(l) > doc.lineLength(at) ? l : at;
+            }
+            return at;
+        };
+        const auto widest = [&] { return static_cast<F32>(doc.lineLength(widest_line())) * layout.columnWidth(); };
+        ensure_equals("as made", layout.contentWidth(), widest());
+        const U32 passes = layout.widthPasses();
+        U32        seed  = 777;
+        const auto next  = [&seed](U32 below) {
+            seed = seed * 1103515245u + 12345u;
+            return below == 0 ? 0 : (seed >> 8) % below;
+        };
+        for (S32 step = 0; step < 1500; ++step)
+        {
+            const U32 kind = next(10);
+            const S32 line = next(3) == 0 ? widest_line() : static_cast<S32>(next(static_cast<U32>(doc.lineCount())));
+            const S32 length = doc.lineLength(line);
+            if (kind < 3)
+            {
+                doc.insert(ALTextPos(line, length), std::string(next(30) + 1, 'x'));
+            }
+            else if (kind < 5)
+            {
+                const S32 cut = llmin(length, static_cast<S32>(next(40)) + 1);
+                doc.remove(ALTextRange(ALTextPos(line, length - cut), ALTextPos(line, length)));
+            }
+            else if (kind < 7)
+            {
+                doc.insert(ALTextPos(line, static_cast<S32>(next(static_cast<U32>(length + 1)))), "\n" + std::string(next(90), 'b') + (next(2) ? "\n" : ""));
+            }
+            else if (kind < 9)
+            {
+                const S32 last  = llmin(doc.lineCount() - 1, line + static_cast<S32>(next(4)));
+                const S32 from  = static_cast<S32>(next(static_cast<U32>(length + 1)));
+                const S32 to    = static_cast<S32>(next(static_cast<U32>(doc.lineLength(last) + 1)));
+                doc.remove(ALTextRange(ALTextPos(line, from), ALTextPos(last, last == line ? llmax(from, to) : to)));
+            }
+            else if (line + 200 < doc.lineCount())
+            {
+                std::vector<std::pair<ALTextRange, std::string>> batch;
+                batch.emplace_back(ALTextRange(ALTextPos(line, 0), ALTextPos(line, 0)), std::string(next(120), 'c') + "\n\n");
+                batch.emplace_back(ALTextRange(ALTextPos(line + 100, 0), ALTextPos(line + 102, 0)), std::string());
+                batch.emplace_back(ALTextRange(ALTextPos(line + 200, 0), ALTextPos(line + 200, 0)), "d\n" + std::string(next(120), 'd'));
+                doc.replaceMany(std::move(batch));
+            }
+            ensure_equals("step " + std::to_string(step), layout.contentWidth(), widest());
+        }
+        ensure_equals("no edit had every line's width counted again", layout.widthPasses(), passes);
+
+        std::string pasted;
+        for (S32 i = 0; i < 2000; ++i)
+        {
+            pasted += std::string(static_cast<size_t>(i % 150), 'p') + "\n";
+        }
+        doc.insert(ALTextPos(10, 0), pasted);
+        ensure_equals("a paste of thousands", layout.contentWidth(), widest());
+        ensure_equals("a paste of thousands has every line's width counted again, once", layout.widthPasses(), passes + 1);
+
+        // Laid out, a line counts its width as laid.
+        F32 laid = 0.f;
+        for (S32 l = 0; l < doc.lineCount(); ++l)
+        {
+            laid = llmax(laid, layout.line(l).width);
+        }
+        ensure_equals("every line laid out", layout.contentWidth(), laid);
+        const S32 at = widest_line();
+        doc.remove(ALTextRange(ALTextPos(at, 0), ALTextPos(at, doc.lineLength(at))));
+        laid = 0.f;
+        for (S32 l = 0; l < doc.lineCount(); ++l)
+        {
+            laid = llmax(laid, l == at ? 0.f : layout.line(l).width);
+        }
+        ensure_equals("the widest laid out emptied, before it is laid out again", layout.contentWidth(), laid);
+    }
 }

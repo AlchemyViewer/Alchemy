@@ -27,6 +27,7 @@
 #include "alprefixsums.h"
 #include "alfontshaping.h"
 #include "allinetable.h"
+#include "almaxima.h"
 #include "altextdocument.h"
 #include "llfontgl.h"
 
@@ -359,6 +360,9 @@ public:
     // test that says what an owner hides is set again without going over
     // every line.
     U32 hiddenByAsked() const { return mHiddenByAsked; }
+    // How many times every line's width has been counted, for a test that
+    // says the widest is kept up through edits without it.
+    U32 widthPasses() const { return mWidthPasses; }
 
     // --- memory --------------------------------------------------------------
 
@@ -399,9 +403,11 @@ private:
     // out as its text is, or let go of since; else its bytes at a space's
     // width, `per_byte`.
     F32  countedWidth(S32 index, F32 per_byte) const;
-    // A line's width as it counts may have changed: the widest raised to
-    // it where it is wider, and found again where it was the widest.
+    // A line's width as it counts may have changed.
     void widthChanged(S32 index);
+    // An edit that made lines or took them: its runs' widths taken out and
+    // those of the lines it made put in.
+    void spliceWidths(const ALTextDocument::Edit& edit);
     // A space's advance, in the screen's pixels.
     F32  spaceAdvance();
     // Throws everything away when the fonts were reloaded or the UI
@@ -457,11 +463,13 @@ private:
     // The rows below the text, as last asked.
     S32                                mEndGap = 0;
     F32                                mSpaceAdvance = -1.f;
-    // Negative until asked for; and the line that is that wide, -1 for
-    // none, an edit of which, or its being laid out narrower, has the
-    // widest found again over every line.
-    F32                                mContentWidth = -1.f;
-    S32                                mWidestLine   = -1;
+    // Each line's width as it counts, kept with the widest of them, so
+    // that the widest cut short has the next found without every line's
+    // width looked at again; counted afresh when next asked for where
+    // everything was thrown away.
+    ALMaxima<F32>                      mWidths;
+    bool                               mWidthsStale = true;
+    U32                                mWidthPasses = 0;
     // What the lines were laid out under: the fonts' generation and the UI
     // scale as the fonts had it, and the scale as used, which is one where
     // the fonts have none yet.
