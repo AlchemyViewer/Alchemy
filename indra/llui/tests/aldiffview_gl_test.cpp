@@ -26,7 +26,7 @@
 
 #include "llglheaders.h"
 
-#include "../../llrender/tests/llheadlessgl_fixture.h"
+#include "aluigl_fixture.h"
 
 #include "alcodeeditor.h"
 #include "aldiffview.h"
@@ -46,16 +46,10 @@ namespace
     constexpr S32 W = ll_test::HeadlessGL::WIDTH;
     constexpr S32 H = ll_test::HeadlessGL::HEIGHT;
 
-    ll_test::HeadlessGL& gl()
-    {
-        static ll_test::HeadlessGL instance(true, true, true, /*needs_render=*/true);
-        return instance;
-    }
-
     // The view drawn over black, read back: RGBA, bottom row first.
     std::vector<U8> drawn(LLView& view)
     {
-        gl().clearFramebuffer();
+        ll_test::uiGL().clearFramebuffer();
         glEnable(GL_BLEND);
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
         view.draw();
@@ -96,7 +90,7 @@ namespace tut
 
         aldiffview_gl_data()
         {
-            gl();
+            ll_test::uiGL();
             // What a rect without a texture of its own is drawn with.
             ll_test::installWhiteTexture();
         }

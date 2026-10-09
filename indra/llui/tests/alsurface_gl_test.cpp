@@ -26,7 +26,7 @@
 
 #include "llglheaders.h"
 
-#include "../../llrender/tests/llheadlessgl_fixture.h"
+#include "aluigl_fixture.h"
 
 #include "alsurface.h"
 #include "altabstrip.h"
@@ -46,17 +46,11 @@ namespace
     constexpr S32 W = ll_test::HeadlessGL::WIDTH;
     constexpr S32 H = ll_test::HeadlessGL::HEIGHT;
 
-    ll_test::HeadlessGL& gl()
-    {
-        static ll_test::HeadlessGL instance(true, true, true, /*needs_render=*/true);
-        return instance;
-    }
-
     // What is drawn over black, read back: each pixel's red, bottom row
     // first.
     std::vector<S32> drawn(const std::function<void()>& draw)
     {
-        gl().clearFramebuffer();
+        ll_test::uiGL().clearFramebuffer();
         glEnable(GL_BLEND);
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
         draw();
@@ -81,7 +75,7 @@ namespace tut
     {
         alsurface_gl_data()
         {
-            gl();
+            ll_test::uiGL();
             ll_test::installWhiteTexture();
         }
     };

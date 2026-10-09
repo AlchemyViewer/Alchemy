@@ -26,7 +26,7 @@
 
 #include "llglheaders.h"
 
-#include "../../llrender/tests/llheadlessgl_fixture.h"
+#include "aluigl_fixture.h"
 
 #include "alcodeeditor.h"
 #include "altextruler.h"
@@ -58,17 +58,11 @@ namespace
     constexpr S32 W = ll_test::HeadlessGL::WIDTH;
     constexpr S32 H = ll_test::HeadlessGL::HEIGHT;
 
-    ll_test::HeadlessGL& gl()
-    {
-        static ll_test::HeadlessGL instance(true, true, true, /*needs_render=*/true);
-        return instance;
-    }
-
     // White drawn over black, blended by its alpha, and read back: how
     // much of each pixel it covered, 0 to 255, bottom row first.
     std::vector<S32> coverage(const std::function<void()>& draw)
     {
-        gl().clearFramebuffer();
+        ll_test::uiGL().clearFramebuffer();
         glEnable(GL_BLEND);
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
         draw();
@@ -115,7 +109,7 @@ namespace
     // what is drawn past its edges lands where it can be seen.
     std::vector<U8> drawnAt(LLView& view)
     {
-        gl().clearFramebuffer();
+        ll_test::uiGL().clearFramebuffer();
         glEnable(GL_BLEND);
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
         LLUI::pushMatrix();
@@ -151,7 +145,7 @@ namespace tut
     {
         altextview_gl_data()
         {
-            gl();
+            ll_test::uiGL();
             ll_test::installWhiteTexture();
         }
 
@@ -328,7 +322,7 @@ namespace tut
         const S32  map_left = W - view->scrollMapWidth();
         // Every channel of the map's pixels, as the view draws them.
         const auto map_of = [&]() {
-            gl().clearFramebuffer();
+            ll_test::uiGL().clearFramebuffer();
             glEnable(GL_BLEND);
             gGL.setSceneBlendType(LLRender::BT_ALPHA);
             view->draw();
@@ -386,7 +380,7 @@ namespace tut
         editor->setSelectionColor(LLUIColor(LLColor4(0.2f, 0.4f, 0.9f, 0.6f)));
 
         const auto frame = [&]() {
-            gl().clearFramebuffer();
+            ll_test::uiGL().clearFramebuffer();
             glEnable(GL_BLEND);
             gGL.setSceneBlendType(LLRender::BT_ALPHA);
             editor->draw();
@@ -486,7 +480,7 @@ namespace tut
         ALTextRuler* map = view->findChild<ALTextRuler>("ruler");
         // Every pixel of the view, as it draws.
         const auto drawn = [&]() {
-            gl().clearFramebuffer();
+            ll_test::uiGL().clearFramebuffer();
             glEnable(GL_BLEND);
             gGL.setSceneBlendType(LLRender::BT_ALPHA);
             view->draw();
@@ -587,7 +581,7 @@ namespace tut
         view->setFocus(true);
 
         const auto frame = [&]() {
-            gl().clearFramebuffer();
+            ll_test::uiGL().clearFramebuffer();
             glEnable(GL_BLEND);
             gGL.setSceneBlendType(LLRender::BT_ALPHA);
             view->draw();
@@ -682,7 +676,7 @@ namespace tut
         ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
         view->setFont(LLFontGL::getFontMonospace());
         const auto frame = [&]() {
-            gl().clearFramebuffer();
+            ll_test::uiGL().clearFramebuffer();
             glEnable(GL_BLEND);
             gGL.setSceneBlendType(LLRender::BT_ALPHA);
             view->draw();
@@ -944,7 +938,7 @@ namespace tut
         editor->setText(text);
         const S32  last  = editor->document().lineCount() - 1;
         const auto frame = [&]() {
-            gl().clearFramebuffer();
+            ll_test::uiGL().clearFramebuffer();
             editor->draw();
             gGL.flush();
             glFinish();
@@ -992,7 +986,7 @@ namespace tut
         view->setFont(LLFontGL::getFontMonospace());
         view->setWordWrap(true);
         const auto frame = [&]() {
-            gl().clearFramebuffer();
+            ll_test::uiGL().clearFramebuffer();
             glEnable(GL_BLEND);
             gGL.setSceneBlendType(LLRender::BT_ALPHA);
             view->draw();
@@ -1098,7 +1092,7 @@ namespace tut
         ALTextRuler* map = editor->findChild<ALTextRuler>("ruler");
         ensure("a map", map != nullptr);
         const auto drawn = [&]() {
-            gl().clearFramebuffer();
+            ll_test::uiGL().clearFramebuffer();
             glEnable(GL_BLEND);
             gGL.setSceneBlendType(LLRender::BT_ALPHA);
             editor->draw();
@@ -1173,7 +1167,7 @@ namespace tut
             std::vector<U8> map;
             for (S32 pass = 0; pass < 2; ++pass)
             {
-                gl().clearFramebuffer();
+                ll_test::uiGL().clearFramebuffer();
                 glEnable(GL_BLEND);
                 gGL.setSceneBlendType(LLRender::BT_ALPHA);
                 view->draw();
@@ -1303,7 +1297,7 @@ namespace tut
             return indent;
         });
         view->setSelection(ALTextRange(ALTextPos(1, 2), ALTextPos(2, 0)));
-        gl().clearFramebuffer();
+        ll_test::uiGL().clearFramebuffer();
         glEnable(GL_BLEND);
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
         view->draw();
@@ -1349,7 +1343,7 @@ namespace tut
         keymap->asked = &asked;
         view->setModalKeymap(std::move(keymap));
         const auto frame = [&]() {
-            gl().clearFramebuffer();
+            ll_test::uiGL().clearFramebuffer();
             view->draw();
             gGL.flush();
             glFinish();
