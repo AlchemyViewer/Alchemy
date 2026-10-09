@@ -219,4 +219,45 @@ namespace tut
         LLSettingsSky::ptr_t sky = make_sky(settings);
         ensure("no first Rayleigh layer", sky->getRayleighConfig().isUndefined());
     }
+
+    // Cloud cover fades in from a sky without a cloud texture toward the next sky's cover, and out toward none,
+    // so neither end of the blend jumps.
+    template<> template<>
+    void llsettingssky_object::test<9>()
+    {
+        const LLUUID cloud_texture("2bfd3884-7e27-69b9-ba3a-3e673f680004");
+
+        LLSD clear = default_settings();
+        clear[LLSettingsSky::SETTING_CLOUD_TEXTUREID] = LLUUID::null;
+        clear[LLSettingsSky::SETTING_CLOUD_SHADOW] = 0.2;
+
+        LLSD cloudy = default_settings();
+        cloudy[LLSettingsSky::SETTING_CLOUD_TEXTUREID] = cloud_texture;
+        cloudy[LLSettingsSky::SETTING_CLOUD_SHADOW] = 0.6;
+
+        LLSettingsBase::ptr_t to_cloudy = make_sky(cloudy);
+        for (F64 t : { 0.25, 0.5, 1.0 })
+        {
+            LLSettingsSky::ptr_t sky = make_sky(clear);
+            sky->blend(to_cloudy, t);
+            ensure_close("fading in at " + std::to_string(t), sky->getCloudShadow(), 0.6f * (F32)t);
+            ensure("fading in takes the next sky's texture", sky->getCloudNoiseTextureId() == cloud_texture);
+        }
+
+        LLSettingsBase::ptr_t to_clear = make_sky(clear);
+        for (F64 t : { 0.25, 0.5, 1.0 })
+        {
+            LLSettingsSky::ptr_t sky = make_sky(cloudy);
+            sky->blend(to_clear, t);
+            ensure_close("fading out at " + std::to_string(t), sky->getCloudShadow(), 0.6f * (1.f - (F32)t));
+            ensure("fading out keeps its own texture", sky->getCloudNoiseTextureId() == cloud_texture);
+        }
+
+        LLSD cloudier = cloudy;
+        cloudier[LLSettingsSky::SETTING_CLOUD_SHADOW] = 1.0;
+        LLSettingsBase::ptr_t to_cloudier = make_sky(cloudier);
+        LLSettingsSky::ptr_t sky = make_sky(cloudy);
+        sky->blend(to_cloudier, 0.25);
+        ensure_close("between two textured skies", sky->getCloudShadow(), 0.7f);
+    }
 }

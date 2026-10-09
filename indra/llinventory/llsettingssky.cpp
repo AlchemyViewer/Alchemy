@@ -569,7 +569,7 @@ void LLSettingsSky::blend(LLSettingsBase::ptr_t &end, F64 blendf)
         {
             // Source has no cloud texture, reduce initial coverage to imitate appearance
             // use same texture as destination
-            mCloudShadow = lerp(0.f, mCloudShadow, (F32)blendf);
+            mCloudShadow = lerp(0.f, (F32)other->mCloudShadow, (F32)blendf);
             setCloudNoiseTextureId(cloud_noise_id_next);
         }
         else
