@@ -46,7 +46,6 @@
 #include "llmemory.h"
 #include "llstartup.h"
 #include "llstring.h"
-#include "llsys.h"
 #include "llthread.h"
 #include "lluuid.h"
 #include "llversioninfo.h"
@@ -65,10 +64,6 @@
 namespace
 {
     bool sEngaged = false;
-
-    // The report the previous run ended with: a freeze's from the record it
-    // left, a crash's from the SDK as it starts.
-    std::optional<ALCrashReporter::PreviousReport> sPreviousReport;
 
     // Raised while a signal handler of ours calls into the SDK, whose
     // warnings would otherwise reach the log's locks from inside it.
@@ -243,24 +238,25 @@ namespace
         return event;
     }
 
-    // Inside sentry_init, for each crash a previous run left: the event it was
-    // filed as, which feedback about the crash names.
+    // Inside sentry_init, for each crash a run that has ended left unsent in
+    // the database, which every instance shares: the event it was filed as,
+    // which feedback about the crash names when the run is the previous one.
     void on_crashed_last_run(const sentry_envelope_t* envelope, void*)
     {
         const sentry_value_t event = sentry_envelope_get_event(envelope);
         const char* id = sentry_value_as_string(sentry_value_get_by_key(event, "event_id"));
-        std::string event_id = ALCrashReporter::compactEventId(id ? id : "");
-        if (!event_id.empty())
-        {
-            sPreviousReport = ALCrashReporter::PreviousReport{ "crash", std::move(event_id) };
-        }
+        const char* run_id =
+            sentry_value_as_string(sentry_value_get_by_key(sentry_value_get_by_key(event, "tags"), "run_id"));
+        ALCrashReporter::foundCrashReport(id ? id : "", run_id ? run_id : "");
     }
 
     // A freeze ends the run that reports it, so its event is recorded for the
-    // next run, which is where the user can say what happened.
+    // next run, which is where the user can say what happened. A second
+    // instance records nothing: the record is the first instance's, as the
+    // markers are.
     void record_freeze(const sentry_uuid_t& id)
     {
-        if (sentry_uuid_is_nil(&id))
+        if (sentry_uuid_is_nil(&id) || LLAppViewer::instance()->isSecondInstance())
         {
             return;
         }
@@ -394,14 +390,13 @@ namespace
     bool engage()
     {
         LLAppViewer* app = LLAppViewer::instance();
-        const LLVersionInfo& version = LLVersionInfo::instance();
+        const ALCrashReporter::Release release = ALCrashReporter::release();
 
         sentry_options_t* options = sentry_options_new();
         sentry_options_set_dsn(options, AL_SENTRY_DSN);
-        sentry_options_set_release(options, ALCrashReporter::releaseName(version.getMajor(), version.getMinor(),
-                                                                         version.getPatch(), version.getBuild()).c_str());
-        sentry_options_set_environment(options, version.getChannel().c_str());
-        sentry_options_set_dist(options, std::to_string(version.getBuild()).c_str());
+        sentry_options_set_release(options, release.name.c_str());
+        sentry_options_set_environment(options, release.environment.c_str());
+        sentry_options_set_dist(options, release.dist.c_str());
         set_handler_path(options, gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, HANDLER_NAME));
         set_database_path(options, gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry"));
         add_attachment(options, LLError::logFileName());
@@ -422,10 +417,10 @@ namespace
         sEngaged = true;
         follow_wer(true);
 
-        sentry_set_tag("run_id", ALCrashReporter::runId().c_str());
-        sentry_set_tag("os", LLOSInfo::instance().getOSStringSimple().c_str());
-        sentry_set_tag("second_instance", app->isSecondInstance() ? "true" : "false");
-        sentry_set_tag("app_state", LLStartUp::getStartupStateString().c_str());
+        for (const auto& [key, value] : ALCrashReporter::commonTags())
+        {
+            ALCrashReporter::setTag(key, value);
+        }
 
         // The region's name follows the agent, and the region's own renames.
         static bool following_region = false;
@@ -440,7 +435,7 @@ namespace
         prepare_frozen_walk();
 #endif
 
-        LL_INFOS("CrashReporter") << "Sentry engaged for " << version.getChannelAndVersion() << LL_ENDL;
+        LL_INFOS("CrashReporter") << "Sentry engaged for " << LLVersionInfo::instance().getChannelAndVersion() << LL_ENDL;
         return true;
     }
 
@@ -459,10 +454,6 @@ bool ALCrashReporter::init()
 #if !LL_SEND_CRASH_REPORTS
     return false;
 #else
-    if (!LLAppViewer::instance()->isSecondInstance())
-    {
-        sPreviousReport = takeRecordedReport(reportRecordFile());
-    }
     if (!consentRecorded(consentSentinel()))
     {
         LL_INFOS("CrashReporter") << "No consent to crash reports recorded; none are sent until it is" << LL_ENDL;
@@ -618,11 +609,6 @@ bool ALCrashReporter::reportFreeze(const std::string& description)
     LL_INFOS("CrashReporter") << (with_stack ? "Freeze reported with the main thread's stack"
                                              : "Freeze reported as an event") << LL_ENDL;
     return true;
-}
-
-std::optional<ALCrashReporter::PreviousReport> ALCrashReporter::previousReport()
-{
-    return sPreviousReport;
 }
 
 bool ALCrashReporter::handleException(void* exception_pointers)

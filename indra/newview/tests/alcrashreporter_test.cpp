@@ -184,4 +184,75 @@ namespace tut
         ALCrashReporter::recordReport(record, { "crash", "nonsense" });
         ensure("nor is a broken id", !ALCrashReporter::takeRecordedReport(record));
     }
+
+    template<> template<>
+    void object::test<11>()
+    {
+        set_test_name("the nil UUID is no event, however it is spelled");
+        ensure("dashed", ALCrashReporter::compactEventId("00000000-0000-0000-0000-000000000000").empty());
+        ensure("braced", ALCrashReporter::compactEventId("{00000000-0000-0000-0000-000000000000}").empty());
+        ensure("compact", ALCrashReporter::compactEventId("00000000000000000000000000000000").empty());
+        ensure_equals("one digit set is an event",
+                      ALCrashReporter::compactEventId("00000000-0000-0000-0000-000000000001"),
+                      "00000000000000000000000000000001");
+
+        const std::string record =
+            (std::filesystem::temp_directory_path() / "alcrashreporter_test_nil_report").string();
+        ALCrashReporter::recordReport(record, { "freeze", "00000000000000000000000000000000" });
+        ensure("a nil report is not taken", !ALCrashReporter::takeRecordedReport(record));
+    }
+
+    template<> template<>
+    void object::test<12>()
+    {
+        set_test_name("a crash found at start is the previous run's only when it carries that run's id");
+        const std::string_view event = "0123abcd-89ab-cdef-0123-456789abcdef";
+        const std::string_view previous = "6f4b1b2e-9d8c-4d0f-a5b7-2c3e4f5a6b7c";
+
+        const auto crash = ALCrashReporter::previousRunCrash(event, previous, previous);
+        ensure("the previous run's", crash.has_value());
+        ensure_equals("a crash", crash->kind, "crash");
+        ensure_equals("its id", crash->eventId, "0123abcd89abcdef0123456789abcdef");
+        ensure("the run id however it is spelled",
+               ALCrashReporter::previousRunCrash(event, "6F4B1B2E9D8C4D0FA5B72C3E4F5A6B7C", previous).has_value());
+
+        ensure("another run's", !ALCrashReporter::previousRunCrash(event, "7f4b1b2e-9d8c-4d0f-a5b7-2c3e4f5a6b7c",
+                                                                   previous));
+        ensure("one that carries no run id", !ALCrashReporter::previousRunCrash(event, "", previous));
+        ensure("any, when the previous run is not known", !ALCrashReporter::previousRunCrash(event, previous, ""));
+        ensure("one filed as nothing",
+               !ALCrashReporter::previousRunCrash("00000000-0000-0000-0000-000000000000", previous, previous));
+    }
+
+    template<> template<>
+    void object::test<13>()
+    {
+        set_test_name("a record is written whole over the last, and nothing is left beside it");
+        const std::filesystem::path dir = std::filesystem::temp_directory_path() / "alcrashreporter_test_records";
+        std::filesystem::remove_all(dir);
+        std::filesystem::create_directories(dir);
+        const auto entries = [&dir]()
+        {
+            return std::distance(std::filesystem::directory_iterator(dir), std::filesystem::directory_iterator());
+        };
+        const std::string record = (dir / "last_report").string();
+
+        ALCrashReporter::recordReport(record, { "freeze", "0123abcd89abcdef0123456789abcdef" });
+        ALCrashReporter::recordReport(record, { "crash", "fedcba9876543210fedcba9876543210" });
+        ensure_equals("the record alone", entries(), 1);
+        const auto taken = ALCrashReporter::takeRecordedReport(record);
+        ensure("taken", taken.has_value());
+        ensure_equals("the later kind", taken->kind, "crash");
+        ensure_equals("the later id", taken->eventId, "fedcba9876543210fedcba9876543210");
+        ensure_equals("nothing once taken", entries(), 0);
+
+        // A record that cannot be put in place leaves nothing written.
+        const std::filesystem::path blocked = dir / "blocked";
+        std::filesystem::create_directories(blocked / "inside");
+        ALCrashReporter::recordReport(blocked.string(), { "freeze", "0123abcd89abcdef0123456789abcdef" });
+        ensure_equals("only what was there", entries(), 1);
+        ensure("still a directory", std::filesystem::is_directory(blocked));
+
+        std::filesystem::remove_all(dir);
+    }
 }

@@ -124,6 +124,10 @@ public:
     // from the entry point, before anything can throw.
     static void installTerminateHandler();
 
+    // The log the previous run wrote, or empty when there is none. Known
+    // once the viewer is constructed, which moves the logs into place.
+    static std::string previousLogFile();
+
     bool quitRequested() { return mQuitRequested; }
     bool logoutRequestSent() { return mLogoutRequestSent; }
     bool isSecondInstance() { return mSecondInstance; }
@@ -338,6 +342,7 @@ private:
     void cleanupSavedSettings(); // Sets some config data to current or default values during cleanup.
     void removeCacheFiles(const std::string& filemask); // Deletes cached files the match the given wildcard.
 
+    void startDebugInfo(); // Write this run's id and log to "static_debug_info.log", ahead of the rest
     void writeSystemInfo(); // Write system info to "debug_info.log"
 
     void processMarkerFiles();
@@ -361,6 +366,9 @@ private:
     static LLAppViewer* sInstance;
 
     bool mSecondInstance; // Is this a second instance of the app?
+
+    // Where the previous run's log was moved as this run started.
+    std::string mPreviousLogFile;
 
     std::string mMarkerFileName;
     LLFile mMarkerFile; // A file created to indicate the app is running.

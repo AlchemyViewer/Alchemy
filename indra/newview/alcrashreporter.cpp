@@ -142,7 +142,8 @@ std::string ALCrashReporter::compactEventId(std::string_view id)
         }
     }
     LLStringUtil::toLower(hex);
-    if (hex.size() != 32 || hex.find_first_not_of("0123456789abcdef") != std::string::npos)
+    if (hex.size() != 32 || hex.find_first_not_of("0123456789abcdef") != std::string::npos
+        || hex.find_first_not_of('0') == std::string::npos)
     {
         return std::string();
     }
@@ -156,12 +157,21 @@ std::string ALCrashReporter::reportRecordFile()
 
 void ALCrashReporter::recordReport(const std::string& record_file, const PreviousReport& report)
 {
+    // Written beside the record under a name of its own, then renamed over
+    // it: whatever stops the write, or writes alongside it, the record is
+    // one whole line.
     const std::string line = report.kind + " " + report.eventId + "\n";
-    std::error_code ec;
-    LLFile file(record_file, LLFile::out | LLFile::trunc | LLFile::binary, ec);
-    if (!ec)
+    const std::string written = fmt::format("{}.{}.tmp", record_file, LLUUID::generateNewID().asString());
+    bool whole = false;
     {
-        file.write(line.data(), static_cast<S64>(line.size()), ec);
+        std::error_code ec;
+        LLFile file(written, LLFile::out | LLFile::trunc | LLFile::binary, ec);
+        whole = !ec && file.write(line.data(), static_cast<S64>(line.size()), ec) == static_cast<S64>(line.size())
+                && file.close(ec) == 0;
+    }
+    if (!whole || LLFile::rename(written, record_file) != 0)
+    {
+        LLFile::remove(written, ENOENT);
     }
 }
 
@@ -188,6 +198,19 @@ std::optional<ALCrashReporter::PreviousReport> ALCrashReporter::takeRecordedRepo
         return std::nullopt;
     }
     return report;
+}
+
+std::optional<ALCrashReporter::PreviousReport> ALCrashReporter::previousRunCrash(std::string_view event_id,
+                                                                                 std::string_view crashed_run_id,
+                                                                                 std::string_view previous_run_id)
+{
+    const std::string previous_run = compactEventId(previous_run_id);
+    std::string id = compactEventId(event_id);
+    if (previous_run.empty() || id.empty() || compactEventId(crashed_run_id) != previous_run)
+    {
+        return std::nullopt;
+    }
+    return PreviousReport{ "crash", std::move(id) };
 }
 
 ALCrashReporter::PreviousRun ALCrashReporter::previousRun(const LLSD& info)

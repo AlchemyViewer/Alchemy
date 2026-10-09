@@ -270,6 +270,7 @@ if(AL_BUILD_VIEWER)
     alobjectproperties.cpp
     alagentlocationformat.cpp
     alcrashreporter.cpp
+    alcrashreporter_run.cpp
     alfeedback.cpp
     alfeedback_send.cpp
     alpanelaomini.cpp

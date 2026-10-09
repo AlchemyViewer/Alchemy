@@ -31,65 +31,18 @@
 #include "llappviewer.h"
 #include "lldir.h"
 #include "llfile.h"
-#include "llmutex.h"
-#include "llsdserialize.h"
 #include "llstartup.h"
-#include "llsys.h"
 #include "lluuid.h"
 #include "llversioninfo.h"
-
-#include <fstream>
-#include <iterator>
 
 namespace
 {
     bool sEngaged = false;
 
-    // What the previous run left in the static debug file, read at init
-    // before this run rewrites it; the reporter may only engage later.
-    ALCrashReporter::PreviousRun sLastRun;
-    std::string sLastRunDebugInfo;
-    bool sLastRunRead = false;
-
-    // The report the previous run ended with: a freeze's from the record it
-    // left, a crash's from the SDK, which may say so off the main thread.
-    LLMutex sPreviousReportMutex;
-    std::optional<ALCrashReporter::PreviousReport> sPreviousReport;
-
-    void set_previous_report(std::optional<ALCrashReporter::PreviousReport> report)
-    {
-        LLMutexLock lock(&sPreviousReportMutex);
-        sPreviousReport = std::move(report);
-    }
-
     NSString* ns(const std::string& text)
     {
         NSString* string = [NSString stringWithUTF8String:text.c_str()];
         return string ? string : @"";
-    }
-
-    void read_last_run()
-    {
-        if (sLastRunRead)
-        {
-            return;
-        }
-        sLastRunRead = true;
-
-        const std::string path = *LLAppViewer::instance()->getStaticDebugFile();
-        llifstream file(path);
-        if (!file.is_open())
-        {
-            return;
-        }
-        sLastRunDebugInfo.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
-
-        std::istringstream contents(sLastRunDebugInfo);
-        LLSD info;
-        if (LLSDSerialize::deserialize(info, contents, LLSDSerialize::SIZE_UNLIMITED))
-        {
-            sLastRun = ALCrashReporter::previousRun(info);
-        }
     }
 
     // The Cocoa SDK sends a crash report on the launch after the crash and
@@ -102,36 +55,39 @@ namespace
             return;
         }
 
+        const ALCrashReporter::PreviousRun& last_run = ALCrashReporter::lastRun();
+        const std::string& last_run_debug_info = ALCrashReporter::lastRunDebugInfo();
+
         SentryObjCEvent* event = [[SentryObjCEvent alloc] initWithLevel:SentryObjCLevelInfo];
         event.message = [[SentryObjCMessage alloc] initWithFormatted:@"Files from the run that crashed"];
         event.logger = @"crash-context";
 
         NSMutableDictionary<NSString*, NSString*>* tags = [NSMutableDictionary dictionary];
-        if (!sLastRun.runId.empty())
+        if (!last_run.runId.empty())
         {
-            tags[@"crashed_run_id"] = ns(sLastRun.runId);
+            tags[@"crashed_run_id"] = ns(last_run.runId);
         }
-        if (!sLastRun.region.empty())
+        if (!last_run.region.empty())
         {
-            tags[@"crashed_region"] = ns(sLastRun.region);
+            tags[@"crashed_region"] = ns(last_run.region);
         }
         event.tags = tags;
-        if (!sLastRun.fatalMessage.empty())
+        if (!last_run.fatalMessage.empty())
         {
-            event.extra = @{ @"fatal_message" : ns(sLastRun.fatalMessage) };
+            event.extra = @{ @"fatal_message" : ns(last_run.fatalMessage) };
         }
 
         SentryObjCScope* scope = [[SentryObjCScope alloc] init];
-        for (const std::string& path : { sLastRun.logFile, sLastRun.userSettingsFile, sLastRun.accountSettingsFile })
+        for (const std::string& path : { last_run.logFile, last_run.userSettingsFile, last_run.accountSettingsFile })
         {
             if (!path.empty() && LLFile::isfile(path))
             {
                 [scope addAttachment:[[SentryObjCAttachment alloc] initWithPath:ns(path)]];
             }
         }
-        if (!sLastRunDebugInfo.empty())
+        if (!last_run_debug_info.empty())
         {
-            NSData* data = [NSData dataWithBytes:sLastRunDebugInfo.data() length:sLastRunDebugInfo.size()];
+            NSData* data = [NSData dataWithBytes:last_run_debug_info.data() length:last_run_debug_info.size()];
             [scope addAttachment:[[SentryObjCAttachment alloc] initWithData:data filename:@"static_debug_info.log"]];
         }
 
@@ -140,20 +96,14 @@ namespace
 
     bool engage()
     {
-        LLAppViewer* app = LLAppViewer::instance();
-        const LLVersionInfo& version = LLVersionInfo::instance();
-
-        const std::string release = ALCrashReporter::releaseName(version.getMajor(), version.getMinor(),
-                                                                 version.getPatch(), version.getBuild());
-        const std::string environment = version.getChannel();
-        const std::string dist = std::to_string(version.getBuild());
+        const ALCrashReporter::Release release = ALCrashReporter::release();
         const std::string cache = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry");
 
         [SentryObjCSDK startWithConfigureOptions:^(SentryObjCOptions* options) {
             options.dsn = @AL_SENTRY_DSN;
-            options.releaseName = ns(release);
-            options.environment = ns(environment);
-            options.dist = ns(dist);
+            options.releaseName = ns(release.name);
+            options.environment = ns(release.environment);
+            options.dist = ns(release.dist);
             options.cacheDirectoryPath = ns(cache);
             options.enableCrashHandler = YES;
             options.enableUncaughtNSExceptionReporting = YES;
@@ -174,19 +124,20 @@ namespace
             options.enableLogs = NO;
             options.enableMetrics = NO;
 
-            // The event a crash in the previous run was filed as, which
-            // feedback about the crash names.
+            // The first crash report the SDK sends as it starts, which may be
+            // any run's it had not sent, an older one's or a second
+            // instance's: the event it was filed as, which feedback about the
+            // crash names when the run is the previous one. A crash event
+            // carries the scope of the run that crashed, its run id with it.
             options.onLastRunStatusDetermined = ^(SentryObjCLastRunStatus status, SentryObjCEvent* _Nullable event) {
-                NSString* text = event ? event.eventId.sentryIdString : nil;
-                if (status != SentryObjCLastRunStatusDidCrash || !text)
+                if (status != SentryObjCLastRunStatusDidCrash || !event)
                 {
                     return;
                 }
-                std::string event_id = ALCrashReporter::compactEventId([text UTF8String]);
-                if (!event_id.empty())
-                {
-                    set_previous_report(ALCrashReporter::PreviousReport{ "crash", std::move(event_id) });
-                }
+                NSString* event_id = event.eventId.sentryIdString;
+                NSString* run_id = event.tags[@"run_id"];
+                ALCrashReporter::foundCrashReport(event_id ? [event_id UTF8String] : "",
+                                                  run_id ? [run_id UTF8String] : "");
             };
         }];
 
@@ -197,23 +148,17 @@ namespace
         }
         sEngaged = true;
 
-        const std::string run_id = ALCrashReporter::runId();
-        const std::string os = LLOSInfo::instance().getOSStringSimple();
-        const std::string app_state = LLStartUp::getStartupStateString();
-        const bool second_instance = app->isSecondInstance();
-        [SentryObjCSDK configureScope:^(SentryObjCScope* scope) {
-            [scope setTagValue:ns(run_id) forKey:@"run_id"];
-            [scope setTagValue:ns(os) forKey:@"os"];
-            [scope setTagValue:(second_instance ? @"true" : @"false") forKey:@"second_instance"];
-            [scope setTagValue:ns(app_state) forKey:@"app_state"];
-        }];
+        for (const auto& [key, value] : ALCrashReporter::commonTags())
+        {
+            ALCrashReporter::setTag(key, value);
+        }
 
         if ([SentryObjCSDK lastRunStatus] == SentryObjCLastRunStatusDidCrash)
         {
             report_last_run();
         }
 
-        LL_INFOS("CrashReporter") << "Sentry engaged for " << version.getChannelAndVersion() << LL_ENDL;
+        LL_INFOS("CrashReporter") << "Sentry engaged for " << LLVersionInfo::instance().getChannelAndVersion() << LL_ENDL;
         return true;
     }
 
@@ -232,11 +177,6 @@ bool ALCrashReporter::init()
 #if !LL_SEND_CRASH_REPORTS
     return false;
 #else
-    read_last_run();
-    if (!LLAppViewer::instance()->isSecondInstance())
-    {
-        set_previous_report(takeRecordedReport(reportRecordFile()));
-    }
     if (!consentRecorded(consentSentinel()))
     {
         LL_INFOS("CrashReporter") << "No consent to crash reports recorded; none are sent until it is" << LL_ENDL;
@@ -352,20 +292,16 @@ bool ALCrashReporter::reportFreeze(const std::string& description)
     };
     SentryObjCId* id = [SentryObjCSDK captureEvent:event attachAllThreads:YES];
     // A freeze ends the run that reports it, so its event is recorded for the
-    // next run, which is where the user can say what happened.
+    // next run, which is where the user can say what happened. A second
+    // instance records nothing: the record is the first instance's, as the
+    // markers are.
     NSString* text = id ? id.sentryIdString : nil;
     const std::string event_id = ALCrashReporter::compactEventId(text ? [text UTF8String] : "");
-    if (!event_id.empty())
+    if (!event_id.empty() && !LLAppViewer::instance()->isSecondInstance())
     {
         recordReport(reportRecordFile(), { "freeze", event_id });
     }
     return true;
-}
-
-std::optional<ALCrashReporter::PreviousReport> ALCrashReporter::previousReport()
-{
-    LLMutexLock lock(&sPreviousReportMutex);
-    return sPreviousReport;
 }
 
 bool ALCrashReporter::handleException(void*)
