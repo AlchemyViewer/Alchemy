@@ -29,7 +29,7 @@ endif()
 # benchmarks, so the filter leaves those out, as a run with no filter does. A
 # filter that matches nothing exits 2, so a file whose test cases went missing
 # fails rather than passing empty. A stem names one file in a binary, and a
-# file belongs to one binary.
+# file belongs to one binary, or to one at each ISA tier.
 #
 # <name>/combined runs all of them in one process. It is labelled
 # combined_pending, which the default run leaves out, until the binary's tests
@@ -42,7 +42,8 @@ endif()
 # registered disabled without AL_ENABLE_GL_TESTS, a PYTHON binary is given the
 # interpreter and registered disabled without one that has llsd, and an
 # ISA_TIER binary is built at that x86-64 tier, named <name>_<tier>, labelled
-# isa, and skips on a host below it. RESOURCE_LOCK names what the binary's
+# isa, and skips on a host below it -- or below the tree's own tier, since it
+# links the tree's libraries, built at that one. RESOURCE_LOCK names what the binary's
 # entries hold that no two may hold at once, such as a fixed port.
 function(al_add_test_binary name)
   cmake_parse_arguments(
@@ -86,8 +87,10 @@ function(al_add_test_binary name)
     endif()
     list(APPEND stems ${stem})
 
+    # A file is in one binary at each tier: the variants of an ISA_TIER
+    # binary build the same files at the others.
     get_filename_component(path "${source}" ABSOLUTE)
-    string(MD5 key "${path}")
+    string(MD5 key "${path}${arg_ISA_TIER}")
     get_property(owner GLOBAL PROPERTY AL_TEST_SOURCE_${key})
     if(owner)
       message(
@@ -129,6 +132,10 @@ function(al_add_test_binary name)
   set(timeout 300)
   if(arg_ISA_TIER)
     al_isa_level(${arg_ISA_TIER} ${CMAKE_SYSTEM_NAME} ${ARCH} level)
+    al_isa_level(${AL_ISA_TIER} ${CMAKE_SYSTEM_NAME} ${ARCH} tree_level)
+    if(tree_level GREATER level)
+      set(level ${tree_level})
+    endif()
     list(APPEND arguments --isa-level ${level})
     list(APPEND labels isa)
   endif()
