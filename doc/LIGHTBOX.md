@@ -191,6 +191,7 @@ persist — declare everything you expose).
  height="{PANEL_HEIGHT + 29}"
  name="atab_sec_myfx"
  title="My Effect"
+ header_tool_tip="What the section is for, in a sentence: what it does to the picture and what is in it."
  fit_panel="true">
     <panel
      follows="all"
@@ -216,6 +217,13 @@ persist — declare everything you expose).
 
 The essentials section's Reset All resets the Advanced sibling too (the walker
 includes `sec_<id>_adv`); the sibling's own button uses `parameter="sec_myfx_adv"`.
+
+Every section says what it is for in `header_tool_tip`, shown over its header
+only. Not `tool_tip` on the tab: `LLView::handleToolTip` offers a parent's
+tooltip before its children's, so one on the tab pops up over every caption
+and gap in the section that has no tooltip of its own — the same reason the
+tab pages' tooltips are moved onto their tab buttons (§4g). A title the header
+cuts short is put in full ahead of it.
 
 ### 3b. A switch on the section header (optional)
 
@@ -1398,9 +1406,11 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
 - For a new row: Ctrl+F, type its caption, and confirm it is listed under the
   name its row shows (not its setting key — §4i says what a row needs for that)
   and that Return lands on it, scrolled into view with its caption lit.
+- For a new section: hover its header and confirm its `header_tool_tip`
+  appears, then hover a gap in its panel and confirm nothing does.
 - For anything on an accordion header: click it and confirm the section does
   **not** expand or collapse, then hover it with the section expanded and
-  confirm its own tooltip appears rather than the title's. Those are the two
+  confirm its own tooltip appears rather than the section's. Those are the two
   interceptions in §3b, and the tooltip one only shows up when expanded — test
   it collapsed and it will look fine.
 - If you added a print effect: take a snapshot with "No post-processing" ticked

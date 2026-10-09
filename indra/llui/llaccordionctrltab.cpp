@@ -109,6 +109,7 @@ public:
 private:
     LLTextBox* mHeaderTextbox;
     LLCheckBoxCtrl* mHeaderCheckBox = nullptr;
+    const std::string mHeaderToolTip;
 
     // Overlay images (arrows)
     LLPointer<LLUIImage> mImageCollapsed;
@@ -137,6 +138,7 @@ LLAccordionCtrlTab::LLAccordionCtrlTabHeader::Params::Params()
 LLAccordionCtrlTab::LLAccordionCtrlTabHeader::LLAccordionCtrlTabHeader(
     const LLAccordionCtrlTabHeader::Params& p)
 : LLUICtrl(p)
+, mHeaderToolTip(p.header_tool_tip())
 , mHeaderBGColor(p.header_bg_color())
 , mNeedsHighlight(false)
 , mIsSelected(false),
@@ -319,13 +321,16 @@ void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::reshape(S32 width, S32 height
         mHeaderTextbox->setRect(textboxRect);
     }
 
-    if (mHeaderTextbox->getTextPixelWidth() > mHeaderTextbox->getRect().getWidth())
+    // A title cut short is said in full ahead of what the section is for,
+    // since the tooltip is then the only place it can be read whole.
+    const bool clipped = mHeaderTextbox->getTextPixelWidth() > mHeaderTextbox->getRect().getWidth();
+    if (clipped && !mHeaderToolTip.empty())
     {
-        setToolTip(mHeaderTextbox->getText());
+        setToolTip(mHeaderTextbox->getText() + "\n" + mHeaderToolTip);
     }
     else
     {
-        setToolTip(LLStringUtil::null);
+        setToolTip(clipped ? mHeaderTextbox->getText() : mHeaderToolTip);
     }
 }
 
@@ -392,6 +397,7 @@ LLAccordionCtrlTab::Params::Params()
     ,header_bg_color("header_bg_color")
     ,dropdown_bg_color("dropdown_bg_color")
     ,header_visible("header_visible",true)
+    ,header_tool_tip("header_tool_tip")
     ,padding_left("padding_left",2)
     ,padding_right("padding_right",2)
     ,padding_top("padding_top",2)
@@ -440,6 +446,7 @@ LLAccordionCtrlTab::LLAccordionCtrlTab(const LLAccordionCtrlTab::Params&p)
     LLAccordionCtrlTabHeader::Params headerParams;
     headerParams.name(DD_HEADER_NAME);
     headerParams.title(p.title);
+    headerParams.header_tool_tip(p.header_tool_tip);
     mHeader = LLUICtrlFactory::create<LLAccordionCtrlTabHeader>(headerParams);
     addChild(mHeader, 1);
 
@@ -1282,11 +1289,12 @@ bool LLAccordionCtrlTab::handleToolTip(S32 x, S32 y, MASK mask)
         }
     }
 
-    //header may be not the first child but we need to process it first
-    if (y >= (getRect().getHeight() - HEADER_HEIGHT - HEADER_HEIGHT / 2))
+    // The header may not be the first child, but it answers first -- over its
+    // own rect and no further, the same band handleMouseDown claims. Half a
+    // header more reached into the panel, where the section's own tooltip
+    // would cover the gap under the header and the top of its first row.
+    if (mHeader->getVisible() && mHeader->getRect().pointInRect(x, y))
     {
-        //inside tab header
-        //fix for EXT-6619
         mHeader->handleToolTip(x, y, mask);
         return true;
     }

@@ -171,6 +171,13 @@
              function="Floater.Toggle"
              parameter="preferences" />
         </menu_item_call>
+        <menu_item_call
+         label="Lightbox..."
+         name="Lightbox Settings">
+            <menu_item_call.on_click
+             function="Floater.Toggle"
+             parameter="lightbox" />
+        </menu_item_call>
          <menu_item_call
          label="Toolbar buttons..."
          name="Toolbars">
@@ -866,6 +873,16 @@
              function="Floater.Show"
              parameter="360capture" />
         </menu_item_call>
+        <menu_item_check
+         label="Lightbox"
+         name="Lightbox">
+            <menu_item_check.on_check
+             function="Floater.Visible"
+             parameter="lightbox" />
+            <menu_item_check.on_click
+             function="Floater.Toggle"
+             parameter="lightbox" />
+        </menu_item_check>
         <menu_item_check
          label="Scopes"
          name="Scopes">

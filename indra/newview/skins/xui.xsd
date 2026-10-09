@@ -2268,6 +2268,7 @@
     <xs:attribute name="header_text_color.blue" type="al_real"/>
     <xs:attribute name="header_text_color.green" type="al_real"/>
     <xs:attribute name="header_text_color.red" type="al_real"/>
+    <xs:attribute name="header_tool_tip" type="xs:string"/>
     <xs:attribute name="header_visible" type="xs:boolean"/>
     <xs:attribute name="height" type="xs:integer"/>
     <xs:attribute name="hover_cursor" type="xs:string"/>

@@ -26,6 +26,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		 height="116"
 		 name="atab_sec_aa"
 		 title="Anti-Aliasing"
+		 header_tool_tip="Smooth jagged edges: the anti-aliasing method and its quality."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -161,6 +162,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		 height="142"
 		 name="atab_sec_reflect"
 		 title="Reflections"
+		 header_tool_tip="Screen space reflections of what is on screen, and how reflection probes cover the scene and update."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -307,6 +309,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		 height="327"
 		 name="atab_sec_reflect_adv"
 		 title="Reflections - Advanced"
+		 header_tool_tip="Tuning for the screen space reflection ray march and its glossy samples, and how many reflection probes there are and how far away they reach."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -541,6 +544,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		 height="142"
 		 name="atab_sec_mirrors"
 		 title="Mirrors"
+		 header_tool_tip="Sharp planar mirrors: whether they are drawn, at what resolution, and how often they refresh."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -693,6 +697,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		 height="194"
 		 name="atab_sec_shadow"
 		 title="Shadows &amp; AO"
+		 header_tool_tip="Which lights cast shadows, how soft and how detailed they are, how much of each avatar casts them, and ambient occlusion."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -935,6 +940,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		 height="380"
 		 name="atab_sec_shadow_adv"
 		 title="Shadows &amp; AO - Advanced"
+		 header_tool_tip="Depth bias and offset for sun, moon and projector shadows, to trade shadow acne against floating shadows, and ambient occlusion's radius, strength and color."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -1161,6 +1167,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		 height="168"
 		 name="atab_sec_perf"
 		 title="Performance"
+		 header_tool_tip="The settings that cost the most frame time: draw distance, object detail, and how many avatars are drawn in full."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -1256,6 +1263,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		 height="296"
 		 name="atab_sec_perf_adv"
 		 title="Performance - Advanced"
+		 header_tool_tip="Detail for avatars, terrain, trees, flexible prims and particles, and how the avatar complexity limit is applied."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -1451,6 +1459,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		 height="142"
 		 name="atab_sec_preview"
 		 title="Preview &amp; Accessibility"
+		 header_tool_tip="Check your image as others may see it: simulate color vision deficiencies, show exposure in false color, or compensate for a color vision deficiency."
 		 fit_panel="true">
 			<panel
 			 follows="all"

@@ -33,6 +33,7 @@ them was reachable from any UI before this; they were Debug Settings only.
 		 height="190"
 		 name="atab_sec_daycycle"
 		 title="Day cycle"
+		 header_tool_tip="Hold the sky and water at one moment of the day cycle, or jump to sunrise, noon, sunset or midnight. This changes the environment you see, not only the image."
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -193,6 +194,7 @@ them was reachable from any UI before this; they were Debug Settings only.
 		 height="195"
 		 name="atab_sec_skyfx"
 		 title="Sky Effects"
+		 header_tool_tip="Aurora, meteors and the star field: night sky effects drawn only on your screen."
 		 fit_panel="true">
 			<panel
 			 follows="all"

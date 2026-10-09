@@ -80,6 +80,12 @@ public:
 
         Optional<bool>          header_visible;
 
+        // What the section is for, shown over the header and nowhere else.
+        // The tab's own tool_tip is no use for that: a parent's tooltip is
+        // offered before its children's, so one on the tab pops up over
+        // every caption and gap in the panel it holds.
+        Optional<std::string>   header_tool_tip;
+
         // An interactive checkbox at the right end of the header, for a
         // section that can be switched off without being collapsed. Omitted
         // by every tab that does not want one, and there is no checkbox at
