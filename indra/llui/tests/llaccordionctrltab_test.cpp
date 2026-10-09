@@ -258,4 +258,69 @@ namespace tut
 
         accordion->die();
     }
+
+    // What a section is for is said over its header and nowhere else: the
+    // tab carries no tooltip of its own, since a parent's is offered before
+    // its children's and would pop up over everything in the panel. A title
+    // the header cuts short is said in full ahead of it. The Lightbox gives
+    // every one of its sections one.
+    template<> template<>
+    void llaccordionctrltab_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        const std::string source =
+            "<accordion_tab name=\"tab\" title=\"Tab\" header_tool_tip=\"What it does\"/>\n";
+        LLXMLNodePtr node;
+        ensure("parses", LLXMLNode::parseBuffer(source.data(), source.size(), node));
+        LLAccordionCtrlTab::Params read;
+        LLXUIParser parser;
+        parser.readXUI(node, read, "accordion_test.xml");
+        ensure_equals("a file can say it", read.header_tool_tip(), std::string("What it does"));
+
+        const auto build = [](const std::string& title, const std::string& tip)
+        {
+            LLAccordionCtrlTab::Params tp(LLUICtrlFactory::getDefaultParams<LLAccordionCtrlTab>());
+            tp.name = "tab";
+            tp.title = title;
+            if (!tip.empty())
+            {
+                tp.header_tool_tip = tip;
+            }
+            tp.rect = LLRect(0, 100, 300, 0);
+            return LLUICtrlFactory::create<LLAccordionCtrlTab>(tp);
+        };
+        const auto header = [](LLAccordionCtrlTab* tab)
+        {
+            LLView* found = tab->findChild<LLView>("dd_header", false);
+            ensure("the tab has its header", found != nullptr);
+            return found;
+        };
+
+        LLAccordionCtrlTab* tab = build("Tab", "What it does");
+        tab->reshape(300, 100);
+        ensure_equals("the header says it", header(tab)->getToolTip(), std::string("What it does"));
+        ensure("and the tab does not", tab->getToolTip().empty());
+
+        const std::string title = "A title far too long for the header it is in";
+        tab->setTitle(title);
+        tab->reshape(60, 100);
+        ensure_equals("cut short, the title comes first", header(tab)->getToolTip(),
+                      title + "\nWhat it does");
+        tab->setTitle("Tab");
+        tab->reshape(300, 100);
+        ensure_equals("and goes once it fits", header(tab)->getToolTip(), std::string("What it does"));
+        tab->die();
+
+        LLAccordionCtrlTab* plain = build("Tab", "");
+        plain->reshape(300, 100);
+        ensure("without one, a title that fits says nothing", header(plain)->getToolTip().empty());
+        plain->setTitle(title);
+        plain->reshape(60, 100);
+        ensure_equals("and one cut short says itself", header(plain)->getToolTip(), title);
+        plain->die();
+    }
 }
