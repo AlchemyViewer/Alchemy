@@ -36,15 +36,6 @@
 #include <filesystem>
 #include <string>
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it.
-class LLAvatarName;
-const std::string gKeeperTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gKeeperTestAnonName;
-}
-
 namespace tut
 {
     struct alrecoverykeeper_data

@@ -41,13 +41,6 @@
 #include <fstream>
 #include <iterator>
 
-class LLAvatarName;
-const std::string gScriptThemeTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gScriptThemeTestAnonName;
-}
-
 namespace tut
 {
     struct alscripttheme_data

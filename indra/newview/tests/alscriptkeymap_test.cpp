@@ -40,15 +40,6 @@
 // The setting the keymap is kept in, in a group of the test's own.
 LLControlGroup gSavedSettings("Global");
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it.
-class LLAvatarName;
-const std::string gKeymapTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gKeymapTestAnonName;
-}
-
 namespace tut
 {
     struct alscriptkeymap_data
