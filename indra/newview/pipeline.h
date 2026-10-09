@@ -418,6 +418,10 @@ public:
     // and just before rendering alpha when camera is above water
     void doAtmospherics();
 
+    // Whether this frame's haze pass could converge anything on the sky behind (mSkyBehind): the main view's, with
+    // atmospherics on, the camera above the water, and water among what was sorted to draw.
+    bool skyBehindWanted() const;
+
     // apply water haze based on contents of color and depth buffer
     // should be called just before rendering pre-water alpha objects
     void doWaterHaze();

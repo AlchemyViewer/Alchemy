@@ -11505,6 +11505,18 @@ void LLPipeline::renderDeferredLighting()
     gGL.setColorMask(true, true);
 }
 
+bool LLPipeline::skyBehindWanted() const
+{
+    // The haze pass converges only the water surface seen from above it (hazeF.glsl).
+    if (gCubeSnapshot || sImpostorRender || mRT != &mMainRT || !RenderDeferredAtmospheric || sUnderWaterRender || !mSkyBehind.isComplete())
+    {
+        return false;
+    }
+    // stateSort fills the water pool with this view's visible water, edge water included, before the sky pool draws.
+    const LLFacePool* water = static_cast<const LLFacePool*>(mWaterPool);
+    return water && !water->mDrawFace.empty();
+}
+
 void LLPipeline::doAtmospherics()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
