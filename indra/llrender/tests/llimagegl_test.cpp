@@ -767,20 +767,35 @@ namespace tut
     template<> template<>
     void llimagegl_object::test<21>()
     {
+        // A buffer of three vertices, written and unmapped as a caller does. Where the
+        // name comes from the pool differs: the default VBO pool draws it when it
+        // allocates, and binds it to give it storage; Apple's allocates only memory, and
+        // draws and binds the name when the buffer is unmapped. Either way, what is bound
+        // after the unmap is the name this buffer drew from the pool.
+        auto fill = [](LLVertexBuffer* vb, const std::string& when)
+        {
+            ensure("allocateBuffer succeeded " + when, vb->allocateBuffer(3, 0));
+            LLStrider<LLVector3> verts;
+            ensure("getVertexStrider succeeded " + when, vb->getVertexStrider(verts));
+            for (S32 i = 0; i < 3; ++i)
+            {
+                verts[i] = LLVector3((F32)i, 0.f, 0.f);
+            }
+            vb->unmapBuffer();
+        };
+
         {
             // Fill this thread's pool from this context.
             LLPointer<LLVertexBuffer> vb = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
-            ensure("allocateBuffer succeeded", vb->allocateBuffer(3, 0));
+            fill(vb, "in the first context");
         }
 
         // A new context on the same thread.
         gl.reset();
         gl = std::make_unique<ll_test::HeadlessGL>();
 
-        // The pool binds a buffer it has just generated to give it storage, so what is
-        // bound now is the name this allocation drew from the pool.
         LLPointer<LLVertexBuffer> vb = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
-        ensure("allocateBuffer succeeded in the new context", vb->allocateBuffer(3, 0));
+        fill(vb, "in the new context");
         GLint bound = 0;
         glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &bound);
         ensure("a buffer is bound", bound != 0);
