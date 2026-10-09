@@ -40,8 +40,7 @@
 #include "v3math.h"
 #include "v4math.h"
 #include "llsdutil.h"
-//#include "llsdutil.cpp"
-#include "llsdutil_math.cpp"
+#include "llsdutil_math.h"
 #include "lltemplatemessagebuilder.h"
 
 namespace tut
