@@ -59,6 +59,8 @@ void LLUrlEntryParcel::processParcelInfo(const LLUrlEntryParcel::LLParcelData& p
 
 namespace tut
 {
+namespace
+{
     struct TestObserver : public LLRemoteParcelInfoObserver {
         TestObserver() : mProcessed(false) { }
 
@@ -73,6 +75,7 @@ namespace tut
 
         bool mProcessed;
     };
+} // anonymous namespace
 
     struct RemoteParcelRequestData
     {

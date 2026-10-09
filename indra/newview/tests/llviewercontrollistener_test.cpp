@@ -27,10 +27,13 @@
 *****************************************************************************/
 namespace tut
 {
+namespace
+{
     void ensure_contains(const std::string& msg, const std::string& substr)
     {
-        ensure_contains("Exception does not contain " + substr, msg, substr);
+        tut::ensure_contains("Exception does not contain " + substr, msg, substr);
     }
+} // anonymous namespace
 
     struct llviewercontrollistener_data
     {

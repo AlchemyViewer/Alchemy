@@ -249,6 +249,8 @@ void LLProgressView::setMessage(std::string const &){}
 
 //-----------------------------------------------------------------------------
 // LLNotifications
+namespace
+{
 class MockNotifications : public LLNotificationsInterface
 {
     std::function<void (const LLSD&, const LLSD&)> mResponder;
@@ -300,6 +302,7 @@ public:
 
     int addedCount() { return mAddedCount; }
 };
+} // anonymous namespace
 
 S32 LLNotification::getSelectedOption(const LLSD& notification, const LLSD& response)
 {

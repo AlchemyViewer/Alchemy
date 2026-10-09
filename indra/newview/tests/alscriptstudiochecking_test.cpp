@@ -211,10 +211,7 @@ namespace
         return out;
     }
     const std::string SCRIPT = "integer count;\ndefault\n{\n    state_entry() { count = 1; }\n}\n";
-}
 
-namespace tut
-{
     // A notecard's items need a world to be made with; this one answers
     // nothing.
     class NoWorld final : public ALNotecardEmbedded::World
@@ -232,7 +229,10 @@ namespace tut
         bool        pastDragStart(S32, S32) override { return false; }
         void        dragOut(const LLInventoryItem&, const ALScriptRef&) override {}
     };
+}
 
+namespace tut
+{
     struct alscriptstudiochecking_data
     {
         al_studio_test::ChosenLints lints{ applyLints };

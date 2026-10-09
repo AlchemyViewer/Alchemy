@@ -134,6 +134,9 @@ void cpp_features_test_object_t::test<3>()
 // * Some compilers require that any class using override must use it consistently for all functions.
 //   This makes switching a class to use override a lot more work.
 
+namespace
+{
+
 class Foo
 {
 public:
@@ -150,6 +153,8 @@ public:
     // bool is_happx() override { return true; }
 };
 
+} // anonymous namespace
+
 template<> template<>
 void cpp_features_test_object_t::test<4>()
 {
@@ -162,6 +167,9 @@ void cpp_features_test_object_t::test<4>()
 // https://en.cppreference.com/w/cpp/language/final: "Specifies that a
 // virtual function cannot be overridden in a derived class or that a
 // class cannot be inherited from."
+
+namespace
+{
 
 class Vehicle
 {
@@ -181,6 +189,8 @@ public:
     // Error: can't override final version in WheeledVehicle
     // virtual bool has_wheels() override const { return true; }
 };
+
+} // anonymous namespace
 
 template<> template<>
 void cpp_features_test_object_t::test<5>()
@@ -203,12 +213,17 @@ void cpp_features_test_object_t::test<5>()
 // * Makes the intention clear
 // * Creates an error sooner, at compile time
 
+namespace
+{
+
 class DoNotCopy
 {
 public:
     DoNotCopy() {}
     DoNotCopy(const DoNotCopy& ref) = delete;
 };
+
+} // anonymous namespace
 
 template<> template<>
 void cpp_features_test_object_t::test<6>()
@@ -226,6 +241,9 @@ void cpp_features_test_object_t::test<6>()
 // and are happy with the default implementation the compiler will make (memberwise copy).
 // Now you can explicitly declare that too.
 // Usage: I guess it makes the intent clearer, but otherwise not obviously useful.
+namespace
+{
+
 class DefaultCopyOK
 {
 public:
@@ -235,6 +253,8 @@ public:
 private:
     S32 mVal;
 };
+
+} // anonymous namespace
 
 template<> template<>
 void cpp_features_test_object_t::test<7>()
@@ -256,6 +276,9 @@ void cpp_features_test_object_t::test<7>()
 // It is preferred to skip creating a constructor if all the work can be done by inline initialization:
 // http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines.html#c45-dont-define-a-default-constructor-that-only-initializes-data-members-use-in-class-member-initializers-instead
 //
+namespace
+{
+
 class InitInline
 {
 public:
@@ -276,6 +299,8 @@ public:
     S32 mBar = 20;
 };
 
+} // anonymous namespace
+
 template<> template<>
 void cpp_features_test_object_t::test<8>()
 {
@@ -292,6 +317,9 @@ void cpp_features_test_object_t::test<8>()
 // https://en.cppreference.com/w/cpp/language/constexpr
 //
 // Various things can be computed at compile time, and flagged as constexpr.
+namespace
+{
+
 constexpr S32 compute2() { return 2; }
 
 constexpr S32 ce_factorial(S32 n)
@@ -305,6 +333,8 @@ constexpr S32 ce_factorial(S32 n)
         return n*ce_factorial(n-1);
     }
 }
+
+} // anonymous namespace
 
 template<> template<>
 void cpp_features_test_object_t::test<9>()

@@ -70,8 +70,8 @@ extern bool _cert_hostname_wildcard_match(const std::string& hostname, const std
 //----------------------------------------------------------------------------
 // Mock objects for the dependencies of the code we're testing
 
-std::string gFirstName;
-std::string gLastName;
+static std::string gFirstName;
+static std::string gLastName;
 LLControlGroup::LLControlGroup(const std::string& name)
 : LLInstanceTracker<LLControlGroup, std::string>(name) {}
 LLControlGroup::~LLControlGroup() {}

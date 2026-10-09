@@ -54,12 +54,15 @@ LLViewerFetchedTexture* LLViewerTextureManager::getFetchedTexture(const LLUUID&,
 
 // Stub related map calls
 
+namespace
+{
 // Records each sendMapBlockRequest call for inspection in tests
 struct MapBlockRequest
 {
     U16 min_x, min_y, max_x, max_y;
 };
-static std::vector<MapBlockRequest> gMapBlockRequests;
+std::vector<MapBlockRequest> gMapBlockRequests;
+} // anonymous namespace
 
 LLWorldMapMessage::LLWorldMapMessage() { }
 LLWorldMapMessage::~LLWorldMapMessage() { }
