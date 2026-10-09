@@ -27,14 +27,19 @@
 #include "alfeedback.h"
 
 #include "alcrashreporter.h"
+#include "alfeedbackoutbox.h"
 #include "llagent.h"
 #include "llappviewer.h"
+#include "llavatarnamecache.h"
 #include "llcallbacklist.h"
+#include "llclipboard.h"
 #include "llcorehttputil.h"
 #include "llcoros.h"
 #include "lldate.h"
 #include "llerrorcontrol.h"
+#include "llevents.h"
 #include "llfile.h"
+#include "llfloaterreg.h"
 #include "llgl.h"
 #include "llhttpconstants.h"
 #include "llhttpretrypolicy.h"
@@ -42,9 +47,9 @@
 #include "llimagepng.h"
 #include "llnotificationsutil.h"
 #include "llsdjson.h"
-#include "llsdserialize.h"
 #include "llstartup.h"
 #include "llsys.h"
+#include "lltrans.h"
 #include "llversioninfo.h"
 #include "llviewercontrol.h"
 #include "llviewerregion.h"
@@ -58,7 +63,10 @@
 
 namespace
 {
+    // A report the user sent is going.
     bool sSending = false;
+    // Kept reports are going.
+    bool sDraining = false;
 
     constexpr std::string_view SDK_NAME = "alchemy.feedback";
     // A screenshot's PNG over this goes as a JPEG instead.
@@ -73,12 +81,35 @@ namespace
         return LLVersionInfo::instance().getVersion();
     }
 
-    // A sibling of a log file: its name with another extension.
-    std::string log_sibling(const std::string& log_file, std::string_view extension)
+    std::string dsn_string()
     {
-        std::string name = gDirUtilp->getBaseFileName(log_file, true);
-        name += extension;
-        return gDirUtilp->add(gDirUtilp->getDirName(log_file), name);
+#if AL_SENTRY
+        return AL_SENTRY_DSN;
+#else
+        return std::string();
+#endif
+    }
+
+    S64 now_seconds()
+    {
+        return static_cast<S64>(LLDate::now().secondsSinceEpoch());
+    }
+
+    // Made on the main thread before any worker uses it.
+    ALFeedbackOutbox& outbox()
+    {
+        static ALFeedbackOutbox box(gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "feedback_outbox"));
+        return box;
+    }
+
+    std::string draft_file()
+    {
+        return gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "feedback_draft.json");
+    }
+
+    std::string contact_file()
+    {
+        return gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "feedback_contact.json");
     }
 
     // The persisted settings that differ from their defaults, keys and
@@ -107,20 +138,19 @@ namespace
         out << '[' << title << "]\n";
         for (const auto& [name, control] : collect.mChanged)
         {
-            out << name << " = " << LLSDNotationStreamer(control->getSaveValue()) << '\n';
+            out << name << " = " << ALFeedback::settingText(name, control->getSaveValue()) << '\n';
         }
         out << '\n';
     }
 
-    ALFeedback::Context gather_context(bool include_user)
+    ALFeedback::Context gather_context(const ALFeedback::Report& report, const std::string& event_id)
     {
-        const LLVersionInfo& version = LLVersionInfo::instance();
+        const ALCrashReporter::Release release = ALCrashReporter::release();
         ALFeedback::Context context;
-        context.release = ALCrashReporter::releaseName(version.getMajor(), version.getMinor(), version.getPatch(),
-                                                       version.getBuild());
-        context.environment = version.getChannel();
-        context.dist = std::to_string(version.getBuild());
-        if (include_user && isAgentAvatarValid())
+        context.release = release.name;
+        context.environment = release.environment;
+        context.dist = release.dist;
+        if (report.includeUser && isAgentAvatarValid())
         {
             context.userId = gAgent.getID().asString();
             context.userName = gAgentAvatarp->getFullname();
@@ -132,13 +162,20 @@ namespace
                                                                            : gGLManager.mDriverVersionVendorString;
 
         auto& tags = context.tags;
-        tags.emplace_back("run_id", ALCrashReporter::runId());
-        tags.emplace_back("os", context.osName);
-        tags.emplace_back("app_state", LLStartUp::getStartupStateString());
+        tags = ALCrashReporter::commonTags();
+        tags.emplace_back("ref", ALFeedback::reference(event_id));
         tags.emplace_back("gpu_vendor", gGLManager.mGLVendorShort);
         tags.emplace_back("render_quality", std::to_string(gSavedSettings.getU32("RenderQualityPerformance")));
-        tags.emplace_back("second_instance", LLAppViewer::instance()->isSecondInstance() ? "true" : "false");
         tags.emplace_back("crash_reports", ALCrashReporter::isEngaged() ? "on" : "off");
+        if (!report.linked.empty())
+        {
+            tags.emplace_back("linked", report.linked);
+            tags.emplace_back("linked_run_id", report.linkedRunId);
+        }
+        if (report.test)
+        {
+            tags.emplace_back("feedback_test", "true");
+        }
         const LLViewerRegion* region = gAgent.getRegion();
         if (region && RlvActions::canShowLocation())
         {
@@ -175,151 +212,94 @@ namespace
 
     struct Gathered
     {
-        std::string eventId;
+        ALFeedback::Queued record;
         std::string version;
         std::string eventJson;
         std::vector<ALFeedback::Attachment> attachments;
         LLPointer<LLImageRaw> screenshot;
         std::vector<LogFile> logs;
+        std::vector<std::string> hide;
     };
 
-    std::string dsn_string()
+    struct Built
     {
-#if AL_SENTRY
-        return AL_SENTRY_DSN;
-#else
-        return std::string();
-#endif
-    }
+        std::string body;
+        bool kept = false;
+        std::vector<ALFeedback::Queued> givenUp;
+    };
 
-    S64 now_seconds()
+    // Off the main thread: the slow parts, and the body as it goes.
+    Built build_body(Gathered gathered, std::string dsn, ALFeedbackOutbox* box)
     {
-        return static_cast<S64>(LLDate::now().secondsSinceEpoch());
-    }
-
-    // The outbox: each report as the body that was posted, beside a record
-    // of its tries, until the server has answered it. A body being sent by
-    // a run is renamed so no other run sends it at the same time.
-    constexpr std::string_view BODY = ".envelope";
-    constexpr std::string_view RECORD = ".json";
-    constexpr std::string_view CLAIMED = ".sending";
-    // A claim this old is a run that ended mid-send.
-    constexpr S64 CLAIM_STALE_SECONDS = 60 * 60;
-
-    std::string outbox_dir()
-    {
-        return gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "feedback_outbox");
-    }
-
-    std::string outbox_file(const std::string& dir, const std::string& event_id, std::string_view extension)
-    {
-        return gDirUtilp->add(dir, event_id + std::string(extension));
-    }
-
-    bool write_file(const std::string& path, std::string_view data)
-    {
-        std::error_code ec;
-        LLFile file(path, LLFile::out | LLFile::trunc | LLFile::binary, ec);
-        return !ec && file.write(data.data(), static_cast<S64>(data.size()), ec) == static_cast<S64>(data.size());
-    }
-
-    std::optional<ALFeedback::Queued> read_record(const std::string& dir, const std::string& event_id)
-    {
-        return ALFeedback::queuedFromJson(LLFile::getContents(outbox_file(dir, event_id, RECORD)));
-    }
-
-    void write_record(const std::string& dir, const ALFeedback::Queued& queued)
-    {
-        write_file(outbox_file(dir, queued.eventId, RECORD), ALFeedback::queuedToJson(queued));
-    }
-
-    void forget(const std::string& dir, const std::string& event_id)
-    {
-        for (std::string_view extension : { BODY, CLAIMED, RECORD })
+        Built built;
+        if (gathered.screenshot)
         {
-            LLFile::remove(outbox_file(dir, event_id, extension), ENOENT);
-        }
-    }
-
-    std::vector<ALFeedback::Queued> kept_records(const std::string& dir)
-    {
-        std::vector<ALFeedback::Queued> records;
-        for (const std::string& name : gDirUtilp->getFilesInDir(dir))
-        {
-            if (LLStringUtil::endsWith(name, RECORD))
+            if (auto screenshot = encode_screenshot(gathered.screenshot))
             {
-                const std::string event_id = name.substr(0, name.size() - RECORD.size());
-                if (std::optional<ALFeedback::Queued> record = read_record(dir, event_id))
-                {
-                    records.push_back(std::move(*record));
-                }
-                else
-                {
-                    forget(dir, event_id);
-                }
+                gathered.attachments.insert(gathered.attachments.begin(), std::move(*screenshot));
             }
         }
-        return records;
+        for (const LogFile& log : gathered.logs)
+        {
+            gathered.attachments.push_back({ log.name, "text/plain", ALFeedback::readLog(log.path, gathered.hide) });
+        }
+
+        const std::string envelope = ALFeedback::envelope(gathered.record.eventId, dsn, { SDK_NAME, gathered.version },
+                                                          gathered.eventJson, gathered.attachments);
+        if (!ALFeedback::gzip(envelope, built.body))
+        {
+            built.body.clear();
+            return built;
+        }
+        built.kept = box->keep(gathered.record, built.body, now_seconds(), built.givenUp);
+        return built;
     }
 
-    // Off the main thread, as the body is made: kept until the server has
-    // answered it, the oldest given up to make room. A report sent again
-    // keeps its record; a new one is due only if this send does not settle.
-    void keep(const std::string& dir, const std::string& event_id, const std::string& body)
+    // Main thread: a kept report that will never go. Its message comes back
+    // as the draft when there is none, so what the user wrote is not lost.
+    void report_given_up(const std::vector<ALFeedback::Queued>& given_up)
     {
-        LLFile::mkdir(dir);
-        std::vector<ALFeedback::Queued> records = kept_records(dir);
-        std::sort(records.begin(), records.end(),
-                  [](const ALFeedback::Queued& lhs, const ALFeedback::Queued& rhs) { return lhs.created < rhs.created; });
-        size_t others = std::count_if(records.begin(), records.end(),
-                                      [&](const ALFeedback::Queued& record) { return record.eventId != event_id; });
-        for (const ALFeedback::Queued& record : records)
+        for (const ALFeedback::Queued& record : given_up)
         {
-            if (others < ALFeedback::QUEUE_MAX_ENTRIES)
-            {
-                break;
-            }
-            if (record.eventId != event_id)
-            {
-                LL_WARNS("Feedback") << "Too many reports kept; giving up " << record.eventId << LL_ENDL;
-                forget(dir, record.eventId);
-                --others;
-            }
-        }
+            LLEventPumps::instance().obtain(ALFeedback::QUEUE_PUMP).post(
+                LLSD().with("event_id", record.eventId).with("sent", false));
 
-        if (!write_file(outbox_file(dir, event_id, BODY), body))
-        {
-            return;
-        }
-        if (!read_record(dir, event_id))
-        {
-            const S64 now = now_seconds();
-            write_record(dir, { event_id, now, 0, now + ALFeedback::QUEUE_RETRY_SECONDS });
-        }
-    }
+            const std::optional<ALFeedback::Draft> draft = ALFeedback::loadDraft();
+            const bool restored = !record.message.empty() && (!draft || draft->eventId == record.eventId);
+            if (restored)
+            {
+                ALFeedback::Draft back;
+                back.kind = record.kind;
+                back.message = record.message;
+                ALFeedback::saveDraft(back);
+            }
 
-    // Once the server has answered: gone if it took the report or never
-    // will, kept for later if it could not be reached. True when kept.
-    bool settle(const std::string& dir, const std::string& event_id, ALFeedback::Outcome outcome, F32 retry_after)
-    {
-        if (!ALFeedback::retryable(outcome) || !LLFile::isfile(outbox_file(dir, event_id, BODY)))
-        {
-            forget(dir, event_id);
-            return false;
+            std::string date = LLTrans::getString("AlchemyFeedbackDate");
+            LLStringUtil::format(date, LLSD().with("datetime", static_cast<S32>(record.created)));
+            LLSD args;
+            args["DATE"] = date;
+            LLSD payload;
+            payload["message"] = record.message;
+            LLNotificationsUtil::add(restored ? "AlchemyFeedbackGivenUpRestored" : "AlchemyFeedbackGivenUp", args,
+                                     payload,
+                                     [restored](const LLSD& notification, const LLSD& response)
+                                     {
+                                         if (LLNotificationsUtil::getSelectedOption(notification, response) != 0)
+                                         {
+                                             return;
+                                         }
+                                         if (restored)
+                                         {
+                                             LLFloaterReg::showInstance("feedback", LLSD(), true);
+                                         }
+                                         else
+                                         {
+                                             const std::string message = notification["payload"]["message"].asString();
+                                             LLClipboard::instance().copyToClipboard(message, 0,
+                                                                                     static_cast<S32>(message.size()));
+                                         }
+                                     });
         }
-        const S64 now = now_seconds();
-        ALFeedback::Queued record = read_record(dir, event_id).value_or(ALFeedback::Queued{ event_id, now, 0, now });
-        ++record.attempts;
-        record.nextAt = ALFeedback::nextAttempt(now, record.attempts, retry_after);
-        if (ALFeedback::expired(record, now))
-        {
-            LL_WARNS("Feedback") << "Giving up feedback " << event_id << " after " << record.attempts << " tries"
-                                 << LL_ENDL;
-            forget(dir, event_id);
-            return false;
-        }
-        write_record(dir, record);
-        return true;
     }
 
     struct Answer
@@ -343,6 +323,11 @@ namespace
         // A report that did not go is kept and goes again later, with the
         // same id, rather than llcorehttp's to repeat while the floater waits.
         options->setRetries(0);
+        // What goes is the user's: only to the server the DSN names, proven
+        // by its certificate, whatever the settings say about other servers.
+        options->setSSLVerifyPeer(true);
+        options->setSSLVerifyHost(true);
+        options->setFollowRedirects(false);
         LLCore::HttpHeaders::ptr_t headers = std::make_shared<LLCore::HttpHeaders>();
         headers->append(HTTP_OUT_HEADER_CONTENT_TYPE, "application/x-sentry-envelope");
         headers->append(HTTP_OUT_HEADER_CONTENT_ENCODING, "gzip");
@@ -384,37 +369,10 @@ namespace
         return answer;
     }
 
-    // Off the main thread: the slow parts, and the body as it goes.
-    std::string build_body(Gathered gathered, std::string dsn, std::string outbox)
-    {
-        if (gathered.screenshot)
-        {
-            if (auto screenshot = encode_screenshot(gathered.screenshot))
-            {
-                gathered.attachments.insert(gathered.attachments.begin(), std::move(*screenshot));
-            }
-        }
-        for (const LogFile& log : gathered.logs)
-        {
-            gathered.attachments.push_back({ log.name, "text/plain", ALFeedback::readLogTail(log.path) });
-        }
-
-        const std::string envelope = ALFeedback::envelope(gathered.eventId, dsn, LLDate::now().asString(),
-                                                          { SDK_NAME, gathered.version }, gathered.eventJson,
-                                                          gathered.attachments);
-        std::string zipped;
-        if (!ALFeedback::gzip(envelope, zipped))
-        {
-            return std::string();
-        }
-        keep(outbox, gathered.eventId, zipped);
-        return zipped;
-    }
-
     void send_coro(ALFeedback::Report report, ALFeedback::done_t done)
     {
         ALFeedback::Result result;
-        result.eventId = report.eventId.empty() ? ALFeedback::newEventId() : report.eventId;
+        result.eventId = ALFeedback::validEventId(report.eventId) ? report.eventId : ALFeedback::newEventId();
         auto finish = [&]()
         {
             sSending = false;
@@ -425,7 +383,6 @@ namespace
         };
 
         const std::string dsn = dsn_string();
-        const std::string outbox = outbox_dir();
         const std::optional<ALFeedback::Endpoint> endpoint = ALFeedback::endpointFromDsn(dsn);
         if (!ALFeedback::available() || !endpoint)
         {
@@ -436,10 +393,20 @@ namespace
         }
 
         // What only the main thread may read.
+        if (report.includeUser && isAgentAvatarValid())
+        {
+            report.message.name = gAgentAvatarp->getFullname();
+        }
+        else
+        {
+            report.message.name.clear();
+        }
         Gathered gathered;
-        gathered.eventId = result.eventId;
+        gathered.record.eventId = result.eventId;
+        gathered.record.kind = report.message.kind;
+        gathered.record.message = report.message.text;
         gathered.version = version_string();
-        const ALFeedback::Context context = gather_context(report.includeUser);
+        const ALFeedback::Context context = gather_context(report, result.eventId);
         gathered.eventJson = LlsdToJson(
             ALFeedback::feedbackEvent(result.eventId, LLDate::now().asString(), report.message, context));
         if (report.systemInfo)
@@ -459,25 +426,28 @@ namespace
                 gathered.logs.push_back({ path, gDirUtilp->getBaseFileName(path) });
             }
         }
+        gathered.hide = ALFeedback::hiddenFromLogs(report.includeUser);
 
-        std::string body;
+        Built built;
+        ALFeedbackOutbox* box = &outbox();
         try
         {
             if (LL::WorkQueue::ptr_t queue = LL::WorkQueue::getInstance("General"))
             {
-                body = queue->waitForResult([gathered = std::move(gathered), dsn, outbox]() mutable
-                                            { return build_body(std::move(gathered), dsn, outbox); });
+                built = queue->waitForResult([gathered = std::move(gathered), dsn, box]() mutable
+                                             { return build_body(std::move(gathered), dsn, box); });
             }
             else
             {
-                body = build_body(std::move(gathered), dsn, outbox);
+                built = build_body(std::move(gathered), dsn, box);
             }
         }
         catch (const LL::WorkQueue::Closed&)
         {
             // Shutting down.
         }
-        if (body.empty())
+        report_given_up(built.givenUp);
+        if (built.body.empty())
         {
             LL_WARNS("Feedback") << "Feedback " << result.eventId << " could not be put together" << LL_ENDL;
             result.outcome = ALFeedback::Outcome::Unreachable;
@@ -485,23 +455,38 @@ namespace
             return;
         }
 
-        const Answer answer = post_body(*endpoint, result.eventId, body, version_string());
+        // Disconnected, no secure request gets through; the kept report goes
+        // when the viewer next starts.
+        if (gDisconnected)
+        {
+            result.outcome = ALFeedback::Outcome::Unreachable;
+            result.queued = built.kept;
+            result.disconnected = built.kept;
+            finish();
+            return;
+        }
+
+        const Answer answer = post_body(*endpoint, result.eventId, built.body, version_string());
         result.outcome = answer.outcome;
-        result.retryAfter = answer.retryAfter;
-        result.queued = settle(outbox, result.eventId, answer.outcome, answer.retryAfter);
+        const ALFeedbackOutbox::Settled settled =
+            outbox().settle(result.eventId, false, answer.outcome, answer.retryAfter, now_seconds());
+        result.queued = settled.kept;
+        if (settled.givenUp)
+        {
+            report_given_up({ *settled.givenUp });
+        }
         finish();
     }
 
     // In a coroutine: one kept report, claimed so no other run sends it too,
-    // sent again. False when the run is ending and the rest must wait.
-    bool send_kept(const ALFeedback::Endpoint& endpoint, const std::string& outbox, const std::string& event_id)
+    // sent again. What the server answered; nothing when another run had it.
+    std::optional<ALFeedback::Outcome> send_kept(const ALFeedback::Endpoint& endpoint, const ALFeedback::Queued& record)
     {
-        const std::string body_file = outbox_file(outbox, event_id, BODY);
-        const std::string claimed_file = outbox_file(outbox, event_id, CLAIMED);
-        // Claimed by renaming: a run that loses the race finds nothing to send.
-        if (LLFile::rename(body_file, claimed_file, ENOENT) != 0)
+        ALFeedbackOutbox& box = outbox();
+        const std::string& event_id = record.eventId;
+        if (!box.claim(event_id))
         {
-            return true;
+            return std::nullopt;
         }
 
         std::string body;
@@ -509,111 +494,133 @@ namespace
         {
             if (LL::WorkQueue::ptr_t queue = LL::WorkQueue::getInstance("General"))
             {
-                body = queue->waitForResult([claimed_file]() { return LLFile::getContents(claimed_file); });
+                body = queue->waitForResult([&box, event_id]() { return box.claimedBody(event_id); });
             }
             else
             {
-                body = LLFile::getContents(claimed_file);
+                body = box.claimedBody(event_id);
             }
         }
         catch (const LL::WorkQueue::Closed&)
         {
-            // Shutting down; the claim goes stale and the next run takes it.
-            return false;
+            // Shutting down: the next run takes it.
+            box.release(event_id);
+            return std::nullopt;
         }
         if (body.empty())
         {
-            forget(outbox, event_id);
-            return true;
+            box.release(event_id);
+            return std::nullopt;
         }
 
         const Answer answer = post_body(endpoint, event_id, body, version_string());
-        if (ALFeedback::retryable(answer.outcome))
-        {
-            LLFile::rename(claimed_file, body_file, ENOENT);
-            settle(outbox, event_id, answer.outcome, answer.retryAfter);
-        }
-        else
-        {
-            forget(outbox, event_id);
-        }
-
+        const ALFeedbackOutbox::Settled settled = box.settle(event_id, true, answer.outcome, answer.retryAfter,
+                                                             now_seconds());
         if (answer.outcome == ALFeedback::Outcome::Sent)
         {
+            // A draft of this report, from a run that ended while it went,
+            // has gone too.
+            ALFeedback::clearDraftFor(event_id);
+            LLEventPumps::instance().obtain(ALFeedback::QUEUE_PUMP).post(
+                LLSD().with("event_id", event_id).with("sent", true));
             LLSD args;
-            args["REF"] = event_id.substr(0, 8);
-            LLNotificationsUtil::add("AlchemyFeedbackKeptSent", args);
+            args["REF"] = ALFeedback::reference(event_id);
+            LLNotificationsUtil::add("AlchemyFeedbackKeptSent", args, LLSD().with("event_id", event_id),
+                                     [](const LLSD& notification, const LLSD& response)
+                                     {
+                                         if (LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+                                         {
+                                             const std::string id = notification["payload"]["event_id"].asString();
+                                             LLClipboard::instance().copyToClipboard(id, 0, static_cast<S32>(id.size()));
+                                         }
+                                     });
         }
-        return !LLApp::isExiting();
+        else if (!ALFeedback::retryable(answer.outcome))
+        {
+            // Refused for good: as lost as a report given up.
+            report_given_up({ record });
+        }
+        else if (settled.givenUp)
+        {
+            report_given_up({ *settled.givenUp });
+        }
+        return answer.outcome;
     }
 
-    void send_kept_coro(std::vector<std::string> event_ids, std::string outbox)
+    void send_kept_coro(std::vector<ALFeedback::Queued> due)
     {
         if (const std::optional<ALFeedback::Endpoint> endpoint = ALFeedback::endpointFromDsn(dsn_string()))
         {
-            for (const std::string& event_id : event_ids)
+            for (const ALFeedback::Queued& record : due)
             {
-                if (!send_kept(*endpoint, outbox, event_id))
+                if (LLApp::isExiting() || gDisconnected)
+                {
+                    break;
+                }
+                const std::optional<ALFeedback::Outcome> outcome = send_kept(*endpoint, record);
+                // A server that could not take one will not take the rest:
+                // they keep their tries for when it can.
+                if (outcome && ALFeedback::retryable(*outcome))
                 {
                     break;
                 }
             }
         }
-        sSending = false;
+        sDraining = false;
     }
 
-    // The kept reports that are due, or at a launch, when the server may be
-    // back, all of them, in the order they were made.
-    void send_kept_reports(bool all)
+    // The kept reports that are due, in the order they were made. At a
+    // launch, when the server may be back, every one it has not asked to
+    // wait for.
+    void send_kept_reports(bool launch)
     {
-        if (sSending || !ALFeedback::available() || LLApp::isExiting())
+        if (sDraining || !ALFeedback::available() || LLApp::isExiting() || gDisconnected)
         {
             return;
         }
-        const std::string outbox = outbox_dir();
-        if (!LLFile::isdir(outbox))
-        {
-            return;
-        }
-
         const S64 now = now_seconds();
+        std::vector<ALFeedback::Queued> given_up;
         std::vector<ALFeedback::Queued> due;
-        for (const ALFeedback::Queued& record : kept_records(outbox))
+        for (const ALFeedback::Queued& record : outbox().records(now, given_up))
         {
-            if (ALFeedback::expired(record, now))
-            {
-                LL_WARNS("Feedback") << "Giving up feedback " << record.eventId << LL_ENDL;
-                forget(outbox, record.eventId);
-                continue;
-            }
-            // A run that ended mid-send leaves its claim; an old one is free.
-            const std::string claimed_file = outbox_file(outbox, record.eventId, CLAIMED);
-            llstat claimed;
-            if (LLFile::stat(claimed_file, &claimed) == 0
-                && now - static_cast<S64>(claimed.st_mtime) > CLAIM_STALE_SECONDS)
-            {
-                LLFile::rename(claimed_file, outbox_file(outbox, record.eventId, BODY), ENOENT);
-            }
-            if (all || record.nextAt <= now)
+            if (launch ? record.notBefore <= now : record.nextAt <= now)
             {
                 due.push_back(record);
             }
         }
+        report_given_up(given_up);
         if (due.empty())
         {
             return;
         }
-        std::sort(due.begin(), due.end(),
-                  [](const ALFeedback::Queued& lhs, const ALFeedback::Queued& rhs) { return lhs.created < rhs.created; });
-        std::vector<std::string> event_ids;
-        for (const ALFeedback::Queued& record : due)
-        {
-            event_ids.push_back(record.eventId);
-        }
 
-        sSending = true;
-        LLCoros::instance().launch("ALFeedback::sendKept", [event_ids = std::move(event_ids), outbox]() mutable
-                                   { send_kept_coro(std::move(event_ids), outbox); });
+        sDraining = true;
+        LLCoros::instance().launch("ALFeedback::sendKept", [due = std::move(due)]() mutable
+                                   { send_kept_coro(std::move(due)); });
+    }
+
+    // The ways a name is written: as it is, and with its space and dot
+    // swapped, "First Last" and "first.last".
+    void add_name(std::vector<std::string>& words, std::string name)
+    {
+        LLStringUtil::trim(name);
+        if (name.empty())
+        {
+            return;
+        }
+        words.push_back(name);
+        std::string swapped = name;
+        LLStringUtil::replaceChar(swapped, ' ', '.');
+        if (swapped != name)
+        {
+            words.push_back(swapped);
+        }
+        swapped = name;
+        LLStringUtil::replaceChar(swapped, '.', ' ');
+        if (swapped != name)
+        {
+            words.push_back(swapped);
+        }
     }
 }
 
@@ -622,27 +629,34 @@ bool ALFeedback::sending()
     return sSending;
 }
 
-void ALFeedback::send(Report report, done_t done)
+bool ALFeedback::send(Report report, done_t done)
 {
     if (sSending)
     {
         LL_WARNS("Feedback") << "A report is already being sent" << LL_ENDL;
-        return;
+        return false;
     }
     sSending = true;
     LLCoros::instance().launch("ALFeedback::send",
                                [report = std::move(report), done = std::move(done)]() mutable
                                { send_coro(std::move(report), std::move(done)); });
+    return true;
 }
 
 void ALFeedback::startQueue()
 {
     static bool started = false;
-    if (started || !available())
+    if (started)
     {
         return;
     }
     started = true;
+    if (!available())
+    {
+        // A build with nowhere to send keeps nothing another build left.
+        outbox().forgetAll();
+        return;
+    }
     send_kept_reports(true);
     doPeriodically(
         []()
@@ -653,11 +667,126 @@ void ALFeedback::startQueue()
         static_cast<F32>(QUEUE_RETRY_SECONDS));
 }
 
+size_t ALFeedback::queuedCount()
+{
+    std::vector<Queued> given_up;
+    const size_t count = outbox().records(now_seconds(), given_up).size();
+    report_given_up(given_up);
+    return count;
+}
+
+bool ALFeedback::queued(const std::string& event_id)
+{
+    return outbox().has(event_id);
+}
+
 void ALFeedback::discardQueued(const std::string& event_id)
 {
-    if (!event_id.empty())
+    outbox().forget(event_id);
+}
+
+void ALFeedback::discardAllQueued()
+{
+    outbox().forgetAll();
+}
+
+void ALFeedback::askAboutLastRun()
+{
+    // The login screen is shown again after a failed login; once a launch.
+    static bool asked = false;
+    if (asked || !available() || LLAppViewer::instance()->isSecondInstance())
     {
-        forget(outbox_dir(), event_id);
+        return;
+    }
+    asked = true;
+
+    const std::optional<ALCrashReporter::LastRunEnd> end = ALCrashReporter::lastRunEnd();
+    if (!end)
+    {
+        return;
+    }
+
+    LLSD key;
+    key["kind"] = "problem";
+    key["linked"] = end->kind;
+    if (!end->eventId.empty())
+    {
+        key["associated_event_id"] = end->eventId;
+    }
+    if (!end->runId.empty())
+    {
+        key["linked_run_id"] = end->runId;
+    }
+    if (end->when > 0.0)
+    {
+        key["linked_at"] = LLDate(end->when).asString();
+    }
+    // The run's log is part of what a crash report sends: offered when the
+    // user has not turned crash reports down.
+    key["previous_log"] = gSavedSettings.getS32("AlchemyCrashReportConsent") != 2;
+
+    const bool froze = end->kind == "freeze";
+    LLSD args;
+    args["WHAT"] = LLTrans::getString(froze ? (end->atLogout ? "AlchemyFeedbackFrozeQuitting" : "AlchemyFeedbackFroze")
+                                            : (end->atLogout ? "AlchemyFeedbackCrashedQuitting" : "AlchemyFeedbackCrashed"));
+    LLNotificationsUtil::add("AlchemyFeedbackAfterCrash", args, key,
+                             [](const LLSD& notification, const LLSD& response)
+                             {
+                                 if (LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+                                 {
+                                     LLFloaterReg::showInstance("feedback", notification["payload"], true);
+                                 }
+                             });
+}
+
+std::optional<ALFeedback::Draft> ALFeedback::loadDraft()
+{
+    return draftFromJson(LLFile::getContents(draft_file()));
+}
+
+void ALFeedback::saveDraft(const Draft& draft)
+{
+    if (!ALFeedbackOutbox::replaceFile(draft_file(), draftToJson(draft)))
+    {
+        LL_WARNS("Feedback") << "The draft could not be kept in " << draft_file() << LL_ENDL;
+    }
+}
+
+void ALFeedback::clearDraft()
+{
+    LLFile::remove(draft_file(), ENOENT);
+}
+
+void ALFeedback::clearDraftFor(const std::string& event_id)
+{
+    const std::optional<Draft> draft = loadDraft();
+    if (draft && !event_id.empty() && draft->eventId == event_id)
+    {
+        clearDraft();
+    }
+}
+
+std::string ALFeedback::rememberedEmail()
+{
+    LLSD contact;
+    const std::string contents = LLFile::getContents(contact_file());
+    if (contents.empty() || !LlsdFromJsonString(contents, contact) || !contact.isMap())
+    {
+        return std::string();
+    }
+    return contact["email"].asString();
+}
+
+void ALFeedback::rememberEmail(const std::string& email)
+{
+    if (email.empty())
+    {
+        LLFile::remove(contact_file(), ENOENT);
+        return;
+    }
+    if (email != rememberedEmail())
+    {
+        ALFeedbackOutbox::replaceFile(contact_file(), LlsdToJson(LLSD().with("email", email)));
     }
 }
 
@@ -681,24 +810,46 @@ std::string ALFeedback::sessionLogFile()
 
 std::string ALFeedback::previousLogFile()
 {
-    const std::string log_file = LLError::logFileName();
-    if (log_file.empty())
-    {
-        return std::string();
-    }
-    // macOS moves a crashed run's log aside for the crash report to find.
-    for (std::string_view extension : { ".crash", ".old" })
-    {
-        std::string sibling = log_sibling(log_file, extension);
-        if (LLFile::isfile(sibling))
-        {
-            return sibling;
-        }
-    }
-    return std::string();
+    return LLAppViewer::previousLogFile();
 }
 
-std::string ALFeedback::readLogTail(const std::string& path)
+std::vector<std::string> ALFeedback::hiddenFromLogs(bool include_user)
+{
+    std::vector<std::string> words;
+    // Whoever holds these is this session.
+    for (const LLUUID& secret : { gAgent.getSessionID(), gAgent.getSecureSessionID() })
+    {
+        if (secret.notNull())
+        {
+            words.push_back(secret.asString());
+        }
+    }
+    if (include_user)
+    {
+        return words;
+    }
+
+    if (gAgentID.notNull())
+    {
+        words.push_back(gAgentID.asString());
+        LLAvatarName name;
+        if (LLAvatarNameCache::get(gAgentID, &name))
+        {
+            add_name(words, name.getAccountName());
+            add_name(words, name.getLegacyName());
+            add_name(words, name.getDisplayName(true));
+        }
+    }
+    if (isAgentAvatarValid())
+    {
+        add_name(words, gAgentAvatarp->getFullname());
+    }
+    // Who the login screen holds, which is who the last session's log names.
+    add_name(words, LLStartUp::getUserId());
+    return words;
+}
+
+std::string ALFeedback::readLog(const std::string& path, const std::vector<std::string>& hide)
 {
     const S64 size = LLFile::size(path);
     if (size <= 0)
@@ -714,5 +865,5 @@ std::string ALFeedback::readLogTail(const std::string& path)
         return std::string();
     }
     data.resize(static_cast<size_t>(read));
-    return std::string(logTail(data, LOG_TAIL_BYTES));
+    return scrubLog(logTail(data, LOG_TAIL_BYTES), hide);
 }

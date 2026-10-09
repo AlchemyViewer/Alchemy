@@ -40,6 +40,7 @@
 #include "alfloaterevent.h"
 #include "alfloaterexploresounds.h"
 #include "alfloaterfeedback.h"
+#include "alfloaterfeedbackpreview.h"
 #include "alfloatergenerictext.h"
 #include "alfloatergroupprofile.h"
 #include "alfloaterlightbox.h"
@@ -242,6 +243,8 @@ public:
             const std::list<std::string> blacklist_clicked = {
                 "camera_presets",
                 "delete_pref_preset",
+                "feedback", // A link must not say what a report is about.
+                "feedback_preview",
                 "forget_username",
                 "god_tools",
                 "group_picker",
@@ -279,6 +282,8 @@ public:
                 "env_fixed_environmentent_water",
                 "env_fixed_environmentent_sky",
                 "env_edit_extdaycycle",
+                "feedback",
+                "feedback_preview",
                 "font_test",
                 "forget_username",
                 "god_tools",

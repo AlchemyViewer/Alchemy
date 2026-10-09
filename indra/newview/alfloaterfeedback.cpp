@@ -26,33 +26,33 @@
 
 #include "alfloaterfeedback.h"
 
-#include "alcrashreporter.h"
-#include "altextview.h"
-#include "llappviewer.h"
+#include "alfloaterfeedbackpreview.h"
 #include "llbutton.h"
 #include "llcallbacklist.h"
 #include "llcheckboxctrl.h"
 #include "llclipboard.h"
 #include "lldate.h"
-#include "lldir.h"
 #include "llfile.h"
 #include "llfloaterreg.h"
+#include "llfontgl.h"
 #include "lllineeditor.h"
 #include "llloadingindicator.h"
 #include "llnotificationsutil.h"
 #include "llpanel.h"
 #include "llradiogroup.h"
 #include "llrender2dutils.h"
-#include "llsdjson.h"
 #include "llstartup.h"
 #include "lltextbox.h"
 #include "lltexteditor.h"
 #include "lltrans.h"
+#include "lluicolortable.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
 #include "llviewertexture.h"
 #include "llviewerwindow.h"
 #include "llvoavatarself.h"
+#include "llweb.h"
+#include "rlvactions.h"
 
 #include <fmt/format.h>
 
@@ -60,14 +60,15 @@
 
 namespace
 {
-    // Fewer characters than this is not yet a message.
-    constexpr size_t MESSAGE_MIN_CHARS = 4;
     // The long edge of the screenshot sent; a larger window is scaled down.
     constexpr S32 SCREENSHOT_MAX_EDGE = 2560;
     // A report that has gone holds the next one back this long.
     constexpr F64 SEND_HOLD_SECONDS = 30.0;
     // A pause in typing this long saves the draft.
     constexpr F32 DRAFT_SAVE_DELAY = 2.f;
+    // How often the floater looks again at what it is not told about: the
+    // login, RLVa's restrictions, the hold on sending.
+    constexpr F32 STATE_CHECK_SECONDS = 0.25f;
 
     F64 sHeldUntil = 0.0;
 
@@ -79,14 +80,17 @@ namespace
         return LLStartUp::getStartupState() >= STATE_STARTED;
     }
 
-    std::string draft_file()
+    // The logs name regions; while RLVa hides where the user is, they stay
+    // out of a report.
+    bool location_hidden()
     {
-        return gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "feedback_draft.json");
+        return !RlvActions::canShowLocation();
     }
 
-    std::string short_reference(const std::string& event_id)
+    S32 hold_seconds_left()
     {
-        return event_id.substr(0, 8);
+        const F64 left = sHeldUntil - LLFrameTimer::getTotalSeconds();
+        return left > 0.0 ? static_cast<S32>(std::ceil(left)) : 0;
     }
 
     std::string trimmed(const std::string& text)
@@ -105,18 +109,23 @@ namespace
         return fmt::format("{:.1f} MB", static_cast<F64>(bytes) / (1024.0 * 1024.0));
     }
 
+    void copy_text(const std::string& text)
+    {
+        LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
+    }
+
     std::string failure_reason(const ALFeedback::Result& result)
     {
         // A report kept to go later says so, rather than asking for a retry.
+        if (result.disconnected)
+        {
+            return LLTrans::getString("AlchemyFeedbackDisconnectedQueued");
+        }
         switch (result.outcome)
         {
             case ALFeedback::Outcome::RateLimited:
-            {
-                LLStringUtil::format_map_t args;
-                args["[MINUTES]"] = std::to_string(std::max(1, static_cast<S32>(std::ceil(result.retryAfter / 60.f))));
-                return LLTrans::getString(result.queued ? "AlchemyFeedbackRateLimitedQueued" : "AlchemyFeedbackRateLimited",
-                                          args);
-            }
+                return LLTrans::getString(result.queued ? "AlchemyFeedbackRateLimitedQueued"
+                                                        : "AlchemyFeedbackRateLimited");
             case ALFeedback::Outcome::TooLarge:
                 return LLTrans::getString("AlchemyFeedbackTooLarge");
             case ALFeedback::Outcome::Rejected:
@@ -131,7 +140,7 @@ namespace
     void notify_sent(const std::string& event_id)
     {
         LLSD args;
-        args["REF"] = short_reference(event_id);
+        args["REF"] = ALFeedback::reference(event_id);
         LLSD payload;
         payload["event_id"] = event_id;
         LLNotificationsUtil::add("AlchemyFeedbackSent", args, payload,
@@ -139,14 +148,19 @@ namespace
                                  {
                                      if (LLNotificationsUtil::getSelectedOption(notification, response) == 0)
                                      {
-                                         const std::string id = notification["payload"]["event_id"].asString();
-                                         LLClipboard::instance().copyToClipboard(id, 0, static_cast<S32>(id.size()));
+                                         copy_text(notification["payload"]["event_id"].asString());
                                      }
                                  });
     }
 
-    void notify_failed(const ALFeedback::Result& result)
+    void notify_unsent(const ALFeedback::Result& result)
     {
+        if (result.queued)
+        {
+            LLNotificationsUtil::add(result.disconnected ? "AlchemyFeedbackQueuedDisconnected"
+                                                         : "AlchemyFeedbackQueued");
+            return;
+        }
         LLSD args;
         args["REASON"] = failure_reason(result);
         LLNotificationsUtil::add("AlchemyFeedbackFailed", args, LLSD(),
@@ -194,6 +208,7 @@ bool ALFloaterFeedback::postBuild()
         });
 
     mCounter = getChild<LLTextBox>("counter");
+    mCounterColor = mCounter->getColor();
     mLinkedText = getChild<LLTextBox>("linked_text");
     mUnlinkButton = getChild<LLButton>("unlink_btn");
     mUnlinkButton->setCommitCallback(
@@ -203,12 +218,18 @@ bool ALFloaterFeedback::postBuild()
             mAssociatedEventId.clear();
             mLinked.clear();
             mLinkedAt.clear();
+            mLinkedRunId.clear();
+            // A report of its own takes its kind's attachments.
+            mPreviousLogRow.touched = false;
+            applyKindDefaults();
             updateLinked();
+            updateControls();
         });
 
     mScreenshotPreview = getChild<LLView>("screenshot_preview");
     getChild<LLUICtrl>("screenshot_preview")->setMouseUpCallback([this](LLUICtrl*, S32, S32, MASK) { viewScreenshot(); });
     mScreenshotNote = getChild<LLTextBox>("screenshot_note");
+    mScreenshotShows = getChild<LLTextBox>("screenshot_shows");
     mScreenshotRow.check = getChild<LLCheckBoxCtrl>("screenshot_check");
     mScreenshotRow.check->setCommitCallback(
         [this](LLUICtrl*, const LLSD&)
@@ -227,6 +248,7 @@ bool ALFloaterFeedback::postBuild()
         {
             reportChanged();
             requestScreenshot();
+            updateControls();
         });
     mRetakeButton = getChild<LLButton>("retake_btn");
     mRetakeButton->setCommitCallback(
@@ -234,6 +256,7 @@ bool ALFloaterFeedback::postBuild()
         {
             reportChanged();
             requestScreenshot();
+            updateControls();
         });
     mViewScreenshotButton = getChild<LLButton>("view_screenshot_btn");
     mViewScreenshotButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { viewScreenshot(); });
@@ -258,9 +281,9 @@ bool ALFloaterFeedback::postBuild()
     }
     mSessionLogSize = getChild<LLTextBox>("session_log_size");
     mPreviousLogSize = getChild<LLTextBox>("previous_log_size");
-    getChild<LLButton>("view_session_log_btn")
-        ->setCommitCallback([this](LLUICtrl*, const LLSD&)
-                            { viewLog("title_session_log", ALFeedback::sessionLogFile()); });
+    mViewSessionLogButton = getChild<LLButton>("view_session_log_btn");
+    mViewSessionLogButton->setCommitCallback([this](LLUICtrl*, const LLSD&)
+                                             { viewLog("title_session_log", ALFeedback::sessionLogFile()); });
     mViewPreviousLogButton = getChild<LLButton>("view_previous_log_btn");
     mViewPreviousLogButton->setCommitCallback([this](LLUICtrl*, const LLSD&)
                                               { viewLog("title_previous_log", mPreviousLogFile); });
@@ -283,9 +306,18 @@ bool ALFloaterFeedback::postBuild()
         nullptr);
     mEmailHint = getChild<LLTextBox>("email_hint");
     mRememberEmail = getChild<LLCheckBoxCtrl>("remember_email_check");
+    mRememberEmail->setCommitCallback(
+        [this](LLUICtrl*, const LLSD&)
+        {
+            // Unticked, the address is forgotten now, not at the next send.
+            if (!mRememberEmail->get())
+            {
+                ALFeedback::rememberEmail(std::string());
+            }
+        });
     if (mRememberEmail->get())
     {
-        mEmail->setText(gSavedSettings.getString("AlchemyFeedbackEmail"));
+        mEmail->setText(ALFeedback::rememberedEmail());
     }
 
     mPrivacyText = getChild<LLTextBox>("privacy_text");
@@ -305,13 +337,18 @@ bool ALFloaterFeedback::postBuild()
     }
 
     getChild<LLButton>("whats_in_btn")
-        ->setCommitCallback([this](LLUICtrl*, const LLSD&) { viewText("title_whats_in", getString("whats_in")); });
+        ->setCommitCallback([this](LLUICtrl*, const LLSD&)
+                            { ALFloaterFeedbackPreview::showProse(getString("title_whats_in"), getString("whats_in")); });
     mSendingIndicator = getChild<LLLoadingIndicator>("sending_indicator");
     mSendButton = getChild<LLButton>("send_btn");
     mSendButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { send(true); });
-    mCancelButton = getChild<LLButton>("cancel_btn");
-    mCancelButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { closeFloater(); });
+    setDefaultBtn(mSendButton);
+    mDiscardButton = getChild<LLButton>("discard_btn");
+    mDiscardButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { discard(); });
+    getChild<LLButton>("close_btn")->setCommitCallback([this](LLUICtrl*, const LLSD&) { closeFloater(); });
 
+    mQueueListener = LLEventPumps::instance().obtain(ALFeedback::QUEUE_PUMP).listen(
+        "ALFloaterFeedback", [this](const LLSD& event) { return onQueueEvent(event); });
     gIdleCallbacks.addFunction(onIdle, this);
     return true;
 }
@@ -330,21 +367,29 @@ void ALFloaterFeedback::onOpen(const LLSD& key)
     updateAvatarLabel();
     updateLogSizes();
     updateCounter();
-    updateControls();
-    if (mScreenshotRow.check->get() && !mScreenshot)
+    if (!mStatusPanel->getVisible())
+    {
+        showQueuedStatus();
+    }
+    // The screen now, not as it was when the report was started.
+    if (mScreenshotRow.check->get())
     {
         requestScreenshot();
     }
+    updateControls();
     mMessage->setFocus(true);
 }
 
 void ALFloaterFeedback::onClose(bool app_quitting)
 {
-    // A report sent, or kept to go by itself, leaves nothing to come back to.
-    if (!mSent && !mQueued)
+    // A report kept to go by itself is the outbox's: nothing is left here.
+    if (mQueued)
     {
-        saveDraft();
+        resetReport();
+        return;
     }
+    saveDraft();
+    mDraftDirty = false;
 }
 
 void ALFloaterFeedback::draw()
@@ -386,71 +431,24 @@ void ALFloaterFeedback::show(const LLSD& key)
 }
 
 // static
-void ALFloaterFeedback::askAboutLastRun()
-{
-    // The login screen is shown again after a failed login; once a launch.
-    static bool asked = false;
-    if (asked || !ALFeedback::available() || LLAppViewer::instance()->isSecondInstance())
-    {
-        return;
-    }
-    asked = true;
-
-    std::string kind;
-    switch (gLastExecEvent)
-    {
-        case LAST_EXEC_FROZE:
-        case LAST_EXEC_LOGOUT_FROZE:
-            kind = "freeze";
-            break;
-        case LAST_EXEC_LLERROR_CRASH:
-        case LAST_EXEC_OTHER_CRASH:
-        case LAST_EXEC_LOGOUT_CRASH:
-        case LAST_EXEC_BAD_ALLOC:
-            kind = "crash";
-            break;
-        default:
-            // An unknown end is as often the task manager or a power cut.
-            return;
-    }
-
-    LLSD key;
-    key["kind"] = "problem";
-    key["linked"] = kind;
-    key["previous_log"] = true;
-    if (const std::optional<ALCrashReporter::PreviousReport> report = ALCrashReporter::previousReport())
-    {
-        key["associated_event_id"] = report->eventId;
-    }
-    // When it happened: about when the previous run last wrote its log.
-    const std::string previous_log = ALFeedback::previousLogFile();
-    llstat status;
-    if (!previous_log.empty() && LLFile::stat(previous_log, &status) == 0)
-    {
-        key["linked_at"] = LLDate(static_cast<F64>(status.st_mtime)).asString();
-    }
-
-    LLSD args;
-    args["WHAT"] = LLTrans::getString(kind == "freeze" ? "AlchemyFeedbackFroze" : "AlchemyFeedbackCrashed");
-    LLNotificationsUtil::add("AlchemyFeedbackAfterCrash", args, key,
-                             [](const LLSD& notification, const LLSD& response)
-                             {
-                                 if (LLNotificationsUtil::getSelectedOption(notification, response) == 0)
-                                 {
-                                     ALFloaterFeedback::show(notification["payload"]);
-                                 }
-                             });
-}
-
-// static
 void ALFloaterFeedback::onIdle(void* self_ptr)
 {
     ALFloaterFeedback* self = static_cast<ALFloaterFeedback*>(self_ptr);
 
+    if (self->mDraftDirty && !self->mQueued && self->mDraftTimer.getElapsedTimeF32() > DRAFT_SAVE_DELAY)
+    {
+        self->mDraftDirty = false;
+        self->saveDraft();
+    }
+    if (!self->getVisible())
+    {
+        return;
+    }
+
     // An inactive window draws nothing, so its snapshot would be a frame
     // already shown; the capture waits for the window to be back.
-    static LLCachedControl<F32> screenshot_delay(gSavedSettings, "AbuseReportScreenshotDelay", 0.3f);
-    if (self->mScreenshotPending && self->getVisible() && !self->isMinimized() && gViewerWindow->getActive()
+    static LLCachedControl<F32> screenshot_delay(gSavedSettings, "AlchemyFeedbackScreenshotDelay", 0.3f);
+    if (self->mScreenshotPending && !self->isMinimized() && gViewerWindow->getActive()
         && self->mScreenshotTimer.getElapsedTimeF32() > screenshot_delay)
     {
         self->mScreenshotPending = false;
@@ -458,6 +456,7 @@ void ALFloaterFeedback::onIdle(void* self_ptr)
         {
             self->captureScreenshot();
         }
+        self->updateControls();
     }
 
     const bool can_screenshot = can_take_screenshot();
@@ -468,52 +467,114 @@ void ALFloaterFeedback::onIdle(void* self_ptr)
         self->updateControls();
     }
 
-    if (self->mDraftDirty && self->mDraftTimer.getElapsedTimeF32() > DRAFT_SAVE_DELAY)
-    {
-        self->mDraftDirty = false;
-        self->saveDraft();
-    }
-
-    if (sHeldUntil > 0.0 && LLFrameTimer::getTotalSeconds() >= sHeldUntil)
-    {
-        sHeldUntil = 0.0;
-        self->updateControls();
-    }
-
-    // A kept report going by itself holds Send for as long as it takes.
     if (ALFeedback::sending() != self->mShownBusy)
     {
         self->updateControls();
     }
+
+    if (self->mStateCheckTimer.getElapsedTimeF32() > STATE_CHECK_SECONDS)
+    {
+        self->mStateCheckTimer.reset();
+        const bool logged_in = isAgentAvatarValid();
+        if (logged_in != self->mShownLoggedIn)
+        {
+            self->updateAvatarLabel();
+            self->updateControls();
+        }
+        else if (location_hidden() != self->mShownLocationHidden || hold_seconds_left() != self->mShownHoldSeconds)
+        {
+            self->updateControls();
+        }
+    }
+}
+
+bool ALFloaterFeedback::onQueueEvent(const LLSD& event)
+{
+    const std::string event_id = event["event_id"].asString();
+    if (!mQueued || event_id.empty() || event_id != mEventId)
+    {
+        return false;
+    }
+    if (event["sent"].asBoolean())
+    {
+        resetReport();
+        showStatus(getString("kept_sent"));
+    }
+    else
+    {
+        // Given up: the report is this floater's again, to send or not.
+        mQueued = false;
+        mLastResult.reset();
+        mEventId.clear();
+        mDraftDirty = true;
+        mDraftTimer.reset();
+        showStatus(getString("kept_given_up"), getString("action_try_again"), [this]() { send(true); });
+    }
+    updateControls();
+    return false;
 }
 
 void ALFloaterFeedback::reportChanged()
 {
     // Changed, it is another report under an id of its own: sent again with
     // the old one, the server would keep what it already had. A copy kept to
-    // go by itself is the version the user is replacing.
+    // go by itself is the version the user is replacing, and what was said
+    // about the last send no longer holds.
     if (mQueued)
     {
         ALFeedback::discardQueued(mEventId);
         mQueued = false;
     }
+    if (!ALFeedback::sending() && mStatusPanel->getVisible())
+    {
+        hideStatus();
+    }
+    mLastResult.reset();
     mEventId.clear();
     mDraftDirty = true;
     mDraftTimer.reset();
 }
 
+void ALFloaterFeedback::resetReport()
+{
+    mMessage->setText(LLStringUtil::null);
+    mKind->setSelectedIndex(0);
+    mEventId.clear();
+    mAssociatedEventId.clear();
+    mLinked.clear();
+    mLinkedAt.clear();
+    mLinkedRunId.clear();
+    mQueued = false;
+    mLastResult.reset();
+    mScreenshot = nullptr;
+    mThumbnail = nullptr;
+    mScreenshotPending = false;
+    mScreenshotFailed = false;
+    for (AttachmentRow* row : { &mScreenshotRow, &mSessionLogRow, &mPreviousLogRow, &mSystemInfoRow, &mSettingsRow })
+    {
+        row->touched = false;
+    }
+    mDraftDirty = false;
+    hideStatus();
+    applyKindDefaults();
+    updateLinked();
+    updateCounter();
+    updateControls();
+}
+
+void ALFloaterFeedback::discard()
+{
+    if (!mEventId.empty() && (mQueued || ALFeedback::queued(mEventId)))
+    {
+        ALFeedback::discardQueued(mEventId);
+    }
+    ALFeedback::clearDraft();
+    resetReport();
+}
+
 ALFeedback::Kind ALFloaterFeedback::kind() const
 {
-    const std::string value = mKind->getValue().asString();
-    if (value == "idea")
-    {
-        return ALFeedback::Kind::Idea;
-    }
-    if (value == "other")
-    {
-        return ALFeedback::Kind::Other;
-    }
-    return ALFeedback::Kind::Problem;
+    return ALFeedback::kindFromName(mKind->getValue().asString());
 }
 
 void ALFloaterFeedback::applyKey(const LLSD& key)
@@ -524,14 +585,17 @@ void ALFloaterFeedback::applyKey(const LLSD& key)
     }
     if (key.has("associated_event_id") || key.has("linked"))
     {
-        mAssociatedEventId = key["associated_event_id"].asString();
-        mLinked = key["linked"].asString();
-        mLinkedAt = key["linked_at"].asString();
-        mEventId.clear();
+        reportChanged();
+        const std::string associated = key["associated_event_id"].asString();
+        mAssociatedEventId = ALFeedback::validEventId(associated) ? associated : std::string();
+        const std::string linked = key["linked"].asString();
+        mLinked = (linked == "crash" || linked == "freeze") ? linked : std::string();
+        mLinkedAt = mLinked.empty() ? std::string() : key["linked_at"].asString();
+        mLinkedRunId = mLinked.empty() ? std::string() : key["linked_run_id"].asString();
     }
-    if (key["previous_log"].asBoolean() && !mPreviousLogFile.empty())
+    if (key.has("previous_log"))
     {
-        mPreviousLogRow.check->set(true);
+        mPreviousLogRow.check->set(key["previous_log"].asBoolean() && !mPreviousLogFile.empty());
         mPreviousLogRow.touched = true;
     }
 }
@@ -553,7 +617,7 @@ void ALFloaterFeedback::applyKindDefaults()
     setDefault(mScreenshotRow, problem && !about_crash && can_take_screenshot());
     setDefault(mSessionLogRow, problem && !about_crash);
     setDefault(mPreviousLogRow, about_crash && !mPreviousLogFile.empty());
-    setDefault(mSystemInfoRow, true);
+    setDefault(mSystemInfoRow, problem);
     setDefault(mSettingsRow, problem);
 
     static const std::array<const char*, 3> placeholders = { "placeholder_problem", "placeholder_idea",
@@ -568,23 +632,67 @@ void ALFloaterFeedback::applyKindDefaults()
 
 void ALFloaterFeedback::updateCounter()
 {
+    const size_t count = utf8str_codepoint_count(mMessage->getText());
     LLStringUtil::format_map_t args;
-    args["[COUNT]"] = std::to_string(utf8str_codepoint_count(mMessage->getText()));
+    args["[COUNT]"] = std::to_string(count);
     args["[MAX]"] = std::to_string(ALFeedback::MESSAGE_MAX_CHARS);
     mCounter->setText(getString("counter", args));
+    mCounter->setColor(count > ALFeedback::MESSAGE_MAX_CHARS
+                           ? LLUIColorTable::instance().getColor("AlertCautionTextColor")
+                           : mCounterColor);
 }
 
 void ALFloaterFeedback::updateControls()
 {
     const bool busy = ALFeedback::sending();
+    const bool logged_in = isAgentAvatarValid();
+    const bool hide_logs = location_hidden();
+    const S32 hold = hold_seconds_left();
     mShownBusy = busy;
+    mShownLoggedIn = logged_in;
+    mShownLocationHidden = hide_logs;
+    mShownHoldSeconds = hold;
+
     const size_t length = utf8str_codepoint_count(trimmed(mMessage->getText()));
     const std::string email = trimmed(mEmail->getText());
     const bool email_ok = email.empty() || ALFeedback::plausibleEmail(email);
-    const bool held = sHeldUntil > LLFrameTimer::getTotalSeconds();
+    if (!mCouldTakeScreenshot && mScreenshotRow.check->get())
+    {
+        mScreenshotRow.check->set(false);
+    }
+    const bool screenshot = mScreenshotRow.check->get();
 
-    mSendButton->setEnabled(!busy && !held && email_ok && length >= MESSAGE_MIN_CHARS
-                            && length <= ALFeedback::MESSAGE_MAX_CHARS);
+    // Send says why it cannot be pressed.
+    std::string why_not;
+    if (busy)
+    {
+        why_not = getString("send_busy");
+    }
+    else if (hold > 0)
+    {
+        why_not = getString("send_held", { { "[SECONDS]", std::to_string(hold) } });
+    }
+    else if (length < ALFeedback::MESSAGE_MIN_CHARS)
+    {
+        why_not = getString("send_too_short");
+    }
+    else if (length > ALFeedback::MESSAGE_MAX_CHARS)
+    {
+        why_not = getString("send_too_long");
+    }
+    else if (!email_ok)
+    {
+        why_not = getString("send_bad_email");
+    }
+    else if (screenshot && mScreenshotPending)
+    {
+        why_not = getString("screenshot_taking");
+    }
+    mSendButton->setEnabled(why_not.empty());
+    mSendButton->setToolTip(why_not.empty() ? getString("send_tooltip") : why_not);
+    mSendButton->setLabel(hold > 0 && !busy ? getString("label_send_held", { { "[SECONDS]", std::to_string(hold) } })
+                                            : getString("label_send"));
+
     mSendingIndicator->setVisible(busy);
     if (busy)
     {
@@ -594,36 +702,48 @@ void ALFloaterFeedback::updateControls()
     {
         mSendingIndicator->stop();
     }
-    mCancelButton->setLabel(getString(busy ? "label_close" : "label_cancel"));
+    mDiscardButton->setEnabled(!busy && !trimmed(mMessage->getText()).empty());
 
     mKind->setEnabled(!busy);
     mMessage->setReadOnly(busy);
     mUnlinkButton->setEnabled(!busy);
-    if (!mCouldTakeScreenshot && mScreenshotRow.check->get())
-    {
-        mScreenshotRow.check->set(false);
-    }
-    const bool screenshot = mScreenshotRow.check->get();
+
     mScreenshotRow.check->setEnabled(!busy && mCouldTakeScreenshot);
-    mScreenshotRow.check->setToolTip(mCouldTakeScreenshot ? LLStringUtil::null : getString("screenshot_in_world"));
+    mScreenshotRow.check->setToolTip(mCouldTakeScreenshot ? getString("screenshot_tooltip")
+                                                          : getString("screenshot_in_world"));
     // The empty box says why it is empty.
-    const bool shown = screenshot && mThumbnail.notNull();
+    const bool shown = screenshot && mThumbnail.notNull() && !mScreenshotPending;
     mScreenshotNote->setVisible(!shown);
     if (!shown)
     {
-        mScreenshotNote->setText(getString(!mCouldTakeScreenshot ? "screenshot_in_world"
-                                           : screenshot           ? "screenshot_taking"
-                                                                  : "screenshot_none"));
+        const char* note = !mCouldTakeScreenshot ? "screenshot_in_world"
+                           : !screenshot         ? "screenshot_none"
+                           : mScreenshotPending  ? "screenshot_taking"
+                           : mScreenshotFailed   ? "screenshot_failed"
+                                                 : "screenshot_taking";
+        mScreenshotNote->setText(getString(note));
     }
+    mScreenshotShows->setVisible(screenshot && !mHideInterface->get());
     mHideInterface->setEnabled(!busy && screenshot);
     mRetakeButton->setEnabled(!busy && screenshot);
     mViewScreenshotButton->setEnabled(screenshot && mScreenshot.notNull());
-    mSessionLogRow.check->setEnabled(!busy);
-    mPreviousLogRow.check->setEnabled(!busy && !mPreviousLogFile.empty());
-    mViewPreviousLogButton->setEnabled(!mPreviousLogFile.empty());
+
+    if (hide_logs)
+    {
+        mSessionLogRow.check->set(false);
+        mPreviousLogRow.check->set(false);
+    }
+    const std::string& logs_tooltip = hide_logs ? getString("logs_location_hidden") : LLStringUtil::null;
+    mSessionLogRow.check->setEnabled(!busy && !hide_logs);
+    mSessionLogRow.check->setToolTip(logs_tooltip);
+    mViewSessionLogButton->setEnabled(!hide_logs);
+    mPreviousLogRow.check->setEnabled(!busy && !hide_logs && !mPreviousLogFile.empty());
+    mPreviousLogRow.check->setToolTip(logs_tooltip);
+    mViewPreviousLogButton->setEnabled(!hide_logs && !mPreviousLogFile.empty());
     mSystemInfoRow.check->setEnabled(!busy);
     mSettingsRow.check->setEnabled(!busy);
-    mIncludeAvatar->setEnabled(!busy);
+
+    mIncludeAvatar->setEnabled(!busy && logged_in);
     mEmail->setEnabled(!busy);
     mRememberEmail->setEnabled(!busy);
     if (email_ok != mEmailShownValid)
@@ -651,29 +771,30 @@ void ALFloaterFeedback::updateLinked()
     }
     else
     {
-        text = getString(freeze ? "linked_freeze" : "linked_crash");
-        LLSD substitution;
-        substitution["datetime"] = static_cast<S32>(LLDate(mLinkedAt).secondsSinceEpoch());
-        LLStringUtil::format(text, substitution);
-    }
-    if (!mAssociatedEventId.empty())
-    {
-        LLStringUtil::format_map_t args;
-        args["[REF]"] = short_reference(mAssociatedEventId);
-        text += ' ';
-        text += getString("linked_reference", args);
+        const LLSD when = LLSD().with("datetime", static_cast<S32>(LLDate(mLinkedAt).secondsSinceEpoch()));
+        std::string date = getString("linked_date");
+        LLStringUtil::format(date, when);
+        std::string time = getString(gSavedSettings.getBOOL("Use24HourClock") ? "linked_time_24" : "linked_time_12");
+        LLStringUtil::format(time, when);
+        text = getString(freeze ? "linked_freeze" : "linked_crash", { { "[DATE]", date }, { "[TIME]", time } });
     }
     mLinkedText->setText(text);
-    mLinkedText->setToolTip(mAssociatedEventId);
+
+    std::string tooltip = getString(freeze ? "linked_tooltip_freeze" : "linked_tooltip_crash");
+    if (!mAssociatedEventId.empty())
+    {
+        tooltip += '\n';
+        tooltip += getString("linked_tooltip_report", { { "[ID]", mAssociatedEventId } });
+    }
+    mLinkedText->setToolTip(tooltip);
+    mUnlinkButton->setToolTip(getString(freeze ? "unlink_freeze" : "unlink_crash"));
 }
 
 void ALFloaterFeedback::updateAvatarLabel()
 {
     if (isAgentAvatarValid())
     {
-        LLStringUtil::format_map_t args;
-        args["[NAME]"] = gAgentAvatarp->getFullname();
-        mIncludeAvatar->setLabel(getString("include_avatar", args));
+        mIncludeAvatar->setLabel(getString("include_avatar", { { "[NAME]", gAgentAvatarp->getFullname() } }));
     }
     else
     {
@@ -695,6 +816,26 @@ void ALFloaterFeedback::updateLogSizes()
     {
         mPreviousLogSize->setText(size_text(std::min(LLFile::size(mPreviousLogFile), tail)));
     }
+}
+
+void ALFloaterFeedback::showQueuedStatus()
+{
+    if (mQueued)
+    {
+        return;
+    }
+    const size_t count = ALFeedback::queuedCount();
+    if (count == 0)
+    {
+        return;
+    }
+    showStatus(getString(count == 1 ? "queued_one" : "queued_many", { { "[COUNT]", std::to_string(count) } }),
+               getString("action_dont_send"),
+               [this]()
+               {
+                   ALFeedback::discardAllQueued();
+                   hideStatus();
+               });
 }
 
 void ALFloaterFeedback::requestScreenshot()
@@ -733,10 +874,11 @@ void ALFloaterFeedback::captureScreenshot()
         LL_WARNS("Feedback") << "The screenshot could not be taken" << LL_ENDL;
         mScreenshot = nullptr;
         mThumbnail = nullptr;
-        updateControls();
+        mScreenshotFailed = true;
         return;
     }
     mScreenshot = raw;
+    mScreenshotFailed = false;
 
     // The thumbnail fills the preview's box, keeping the picture's shape.
     const LLRect box = mScreenshotPreview->getLocalRect();
@@ -748,7 +890,6 @@ void ALFloaterFeedback::captureScreenshot()
                                                      raw->getComponents());
     thumbnail->scale(mThumbnailWidth, mThumbnailHeight);
     mThumbnail = LLViewerTextureManager::getLocalTexture(thumbnail.get(), false);
-    updateControls();
 }
 
 void ALFloaterFeedback::send(bool with_attachments)
@@ -763,11 +904,9 @@ void ALFloaterFeedback::send(bool with_attachments)
     report.message.text = trimmed(mMessage->getText());
     report.message.email = trimmed(mEmail->getText());
     report.message.associatedEventId = mAssociatedEventId;
-    report.includeUser = mIncludeAvatar->get();
-    if (report.includeUser && isAgentAvatarValid())
-    {
-        report.message.name = gAgentAvatarp->getFullname();
-    }
+    report.includeUser = isAgentAvatarValid() && mIncludeAvatar->get();
+    report.linked = mLinked;
+    report.linkedRunId = mLinkedRunId;
     if (mEventId.empty())
     {
         mEventId = ALFeedback::newEventId();
@@ -779,20 +918,26 @@ void ALFloaterFeedback::send(bool with_attachments)
         {
             report.screenshot = mScreenshot;
         }
-        report.sessionLog = mSessionLogRow.check->get();
-        report.previousLog = mPreviousLogRow.check->get() && !mPreviousLogFile.empty();
+        const bool logs = !location_hidden();
+        report.sessionLog = logs && mSessionLogRow.check->get();
+        report.previousLog = logs && mPreviousLogRow.check->get() && !mPreviousLogFile.empty();
         report.systemInfo = mSystemInfoRow.check->get();
         report.settings = mSettingsRow.check->get();
     }
 
-    gSavedSettings.setString("AlchemyFeedbackEmail", mRememberEmail->get() ? report.message.email : std::string());
+    ALFeedback::rememberEmail(mRememberEmail->get() ? report.message.email : std::string());
 
-    hideStatus();
     // Closing while it goes keeps the message, should it not arrive.
     saveDraft();
-    ALFeedback::send(std::move(report),
-                     [handle = getDerivedHandle<ALFloaterFeedback>()](const ALFeedback::Result& result)
-                     { onResult(handle, result); });
+    mDraftDirty = false;
+    if (!ALFeedback::send(std::move(report),
+                          [handle = getDerivedHandle<ALFloaterFeedback>()](const ALFeedback::Result& result)
+                          { onResult(handle, result); }))
+    {
+        return;
+    }
+    mLastResult.reset();
+    showStatus(getString("sending"));
     updateControls();
 }
 
@@ -803,11 +948,11 @@ void ALFloaterFeedback::onResult(LLHandle<ALFloaterFeedback> handle, const ALFee
     if (result.outcome == ALFeedback::Outcome::Sent)
     {
         sHeldUntil = LLFrameTimer::getTotalSeconds() + SEND_HOLD_SECONDS;
-        clearDraft();
+        ALFeedback::clearDraft();
         notify_sent(result.eventId);
         if (self)
         {
-            self->mSent = true;
+            self->resetReport();
             self->closeFloater();
         }
         return;
@@ -816,45 +961,39 @@ void ALFloaterFeedback::onResult(LLHandle<ALFloaterFeedback> handle, const ALFee
     // Kept to go by itself, the report is the outbox's, not the draft's.
     if (result.queued)
     {
-        clearDraft();
+        ALFeedback::clearDraft();
     }
+    const bool seen = self && self->getVisible() && !self->isMinimized();
     if (self)
     {
         self->mQueued = result.queued;
-    }
-
-    if (self && self->getVisible() && !self->isMinimized())
-    {
-        self->updateControls();
+        self->mLastResult = result;
         self->showFailure(result);
+        self->updateControls();
     }
-    else
+    if (!seen)
     {
-        if (self)
-        {
-            self->updateControls();
-        }
-        if (result.queued)
-        {
-            LLNotificationsUtil::add("AlchemyFeedbackQueued");
-        }
-        else
-        {
-            notify_failed(result);
-        }
+        notify_unsent(result);
     }
 }
 
 void ALFloaterFeedback::showFailure(const ALFeedback::Result& result)
 {
     const std::string reason = failure_reason(result);
+    if (result.disconnected)
+    {
+        showStatus(reason);
+        return;
+    }
     switch (result.outcome)
     {
         case ALFeedback::Outcome::TooLarge:
             showStatus(reason, getString("action_without_attachments"), [this]() { send(false); });
             break;
         case ALFeedback::Outcome::Rejected:
-            showStatus(reason, std::string(), nullptr);
+            showStatus(reason, getString("action_github"),
+                       []() { LLWeb::loadURLExternal(gSavedSettings.getString("ReportBugURL")); },
+                       getString("action_copy_message"), [this]() { copy_text(trimmed(mMessage->getText())); });
             break;
         case ALFeedback::Outcome::RateLimited:
         case ALFeedback::Outcome::Unreachable:
@@ -879,8 +1018,35 @@ void ALFloaterFeedback::showStatus(const std::string& text, const std::string& f
             mStatusButtons[i]->setLabel(*labels[i]);
         }
     }
+    layoutStatus();
     mPrivacyText->setVisible(false);
     mStatusPanel->setVisible(true);
+}
+
+void ALFloaterFeedback::layoutStatus()
+{
+    // The buttons as wide as their labels, at the right; the text has the
+    // rest of the line, all of it when there are no buttons.
+    constexpr S32 PAD = 6;
+    constexpr S32 GAP = 4;
+    constexpr S32 BUTTON_MIN_WIDTH = 70;
+    constexpr S32 LABEL_PAD = 16;
+    S32 right = mStatusPanel->getRect().getWidth() - PAD;
+    for (size_t i = mStatusButtons.size(); i-- > 0;)
+    {
+        LLButton* button = mStatusButtons[i];
+        if (!button->getVisible())
+        {
+            continue;
+        }
+        const S32 width = std::max(BUTTON_MIN_WIDTH, button->getFont()->getWidth(button->getCurrentLabel().getString())
+                                                          + LABEL_PAD);
+        const LLRect old_rect = button->getRect();
+        button->setShape(LLRect(right - width, old_rect.mTop, right, old_rect.mBottom));
+        right -= width + GAP;
+    }
+    const LLRect text_rect = mStatusText->getRect();
+    mStatusText->setShape(LLRect(PAD, text_rect.mTop, std::max(PAD + 1, right), text_rect.mBottom));
 }
 
 void ALFloaterFeedback::hideStatus()
@@ -897,9 +1063,11 @@ void ALFloaterFeedback::viewText(const std::string& title_string, const std::str
 
 void ALFloaterFeedback::viewLog(const std::string& title_string, const std::string& path)
 {
+    // What the report would carry, hidden parts and all.
     if (!path.empty())
     {
-        viewText(title_string, ALFeedback::readLogTail(path));
+        const bool include_user = isAgentAvatarValid() && mIncludeAvatar->get();
+        viewText(title_string, ALFeedback::readLog(path, ALFeedback::hiddenFromLogs(include_user)));
     }
 }
 
@@ -913,42 +1081,30 @@ void ALFloaterFeedback::viewScreenshot()
 
 void ALFloaterFeedback::loadDraft()
 {
-    const std::string contents = LLFile::getContents(draft_file());
-    LLSD draft;
-    if (contents.empty() || !LlsdFromJsonString(contents, draft) || !draft.isMap())
-    {
-        return;
-    }
-    const std::string message = draft["message"].asString();
-    if (trimmed(message).empty())
+    const std::optional<ALFeedback::Draft> draft = ALFeedback::loadDraft();
+    if (!draft)
     {
         return;
     }
 
-    mMessage->setText(message);
-    mKind->setSelectedByValue(draft["kind"], true);
+    mMessage->setText(draft->message);
+    mKind->setSelectedByValue(std::string(ALFeedback::kindName(draft->kind)), true);
     // A report the key tied to a crash keeps that; otherwise the draft's.
-    if (mLinked.empty() && draft.has("linked"))
+    if (mLinked.empty() && !draft->linked.empty())
     {
-        mAssociatedEventId = draft["associated_event_id"].asString();
-        mLinked = draft["linked"].asString();
-        mLinkedAt = draft["linked_at"].asString();
+        mAssociatedEventId = draft->associatedEventId;
+        mLinked = draft->linked;
+        mLinkedAt = draft->linkedAt;
+        mLinkedRunId = draft->linkedRunId;
     }
-    if (draft["associated_event_id"].asString() == mAssociatedEventId)
+    if (draft->associatedEventId == mAssociatedEventId)
     {
-        mEventId = draft["event_id"].asString();
+        mEventId = draft->eventId;
     }
-
-    showStatus(getString("restored"), getString("action_discard"),
-               [this]()
-               {
-                   mMessage->setText(LLStringUtil::null);
-                   mEventId.clear();
-                   clearDraft();
-                   hideStatus();
-                   updateCounter();
-                   updateControls();
-               });
+    // A run that ended while it went left the report kept, too: it is still
+    // to go by itself, unless the user changes or discards it.
+    mQueued = !mEventId.empty() && ALFeedback::queued(mEventId);
+    showStatus(getString(mQueued ? "restored_queued" : "restored"), getString("action_discard"), [this]() { discard(); });
 }
 
 void ALFloaterFeedback::saveDraft()
@@ -956,99 +1112,17 @@ void ALFloaterFeedback::saveDraft()
     const std::string message = mMessage->getText();
     if (trimmed(message).empty())
     {
-        clearDraft();
+        ALFeedback::clearDraft();
         return;
     }
 
-    LLSD draft;
-    draft["kind"] = mKind->getValue();
-    draft["message"] = message;
-    draft["event_id"] = mEventId;
-    draft["associated_event_id"] = mAssociatedEventId;
-    if (!mLinked.empty())
-    {
-        draft["linked"] = mLinked;
-        draft["linked_at"] = mLinkedAt;
-    }
-    const std::string json = LlsdToJson(draft);
-    const std::string path = draft_file();
-    std::error_code ec;
-    LLFile file(path, LLFile::out | LLFile::trunc | LLFile::binary, ec);
-    if (ec || file.write(json.data(), static_cast<S64>(json.size()), ec) != static_cast<S64>(json.size()))
-    {
-        LL_WARNS("Feedback") << "The draft could not be kept in " << path << ": " << ec.message() << LL_ENDL;
-    }
-}
-
-// static
-void ALFloaterFeedback::clearDraft()
-{
-    LLFile::remove(draft_file(), ENOENT);
-}
-
-ALFloaterFeedbackPreview::ALFloaterFeedbackPreview(const LLSD& key)
-:   LLFloater(key)
-{
-}
-
-bool ALFloaterFeedbackPreview::postBuild()
-{
-    mText = getChild<ALTextView>("text");
-    return true;
-}
-
-void ALFloaterFeedbackPreview::draw()
-{
-    LLFloater::draw();
-
-    if (mImage && !isMinimized())
-    {
-        // The picture, whole, as large as the floater lets it be.
-        constexpr S32 MARGIN = 4;
-        const LLRect rect = getLocalRect();
-        const S32 room_width = rect.getWidth() - 2 * MARGIN;
-        const S32 room_height = rect.getHeight() - getHeaderHeight() - 2 * MARGIN;
-        if (room_width <= 0 || room_height <= 0)
-        {
-            return;
-        }
-        const F32 scale = std::min(static_cast<F32>(room_width) / mImageWidth,
-                                   static_cast<F32>(room_height) / mImageHeight);
-        const S32 width = ll_round(mImageWidth * scale);
-        const S32 height = ll_round(mImageHeight * scale);
-        const S32 x = MARGIN + (room_width - width) / 2;
-        const S32 y = MARGIN + (room_height - height) / 2;
-        gl_draw_scaled_image(x, y, width, height, mImage);
-    }
-}
-
-// static
-void ALFloaterFeedbackPreview::showText(const std::string& title, std::string_view text)
-{
-    ALFloaterFeedbackPreview* floater = LLFloaterReg::showTypedInstance<ALFloaterFeedbackPreview>("feedback_preview",
-                                                                                               LLSD(), true);
-    if (!floater)
-    {
-        return;
-    }
-    floater->setTitle(title);
-    floater->mImage = nullptr;
-    floater->mText->setVisible(true);
-    floater->mText->setText(text);
-}
-
-// static
-void ALFloaterFeedbackPreview::showImage(const std::string& title, const LLPointer<LLImageRaw>& image)
-{
-    ALFloaterFeedbackPreview* floater = LLFloaterReg::showTypedInstance<ALFloaterFeedbackPreview>("feedback_preview",
-                                                                                               LLSD(), true);
-    if (!floater || image.isNull())
-    {
-        return;
-    }
-    floater->setTitle(title);
-    floater->mText->setVisible(false);
-    floater->mImage = LLViewerTextureManager::getLocalTexture(image.get(), false);
-    floater->mImageWidth = image->getWidth();
-    floater->mImageHeight = image->getHeight();
+    ALFeedback::Draft draft;
+    draft.kind = kind();
+    draft.message = message;
+    draft.eventId = mEventId;
+    draft.associatedEventId = mAssociatedEventId;
+    draft.linked = mLinked;
+    draft.linkedAt = mLinkedAt;
+    draft.linkedRunId = mLinkedRunId;
+    ALFeedback::saveDraft(draft);
 }

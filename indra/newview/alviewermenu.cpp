@@ -341,26 +341,39 @@ namespace
     }
 
     // A report with the system information and this session's log, to see
-    // the way to the server work end to end.
+    // the way to the server work end to end. Tagged as a test, to be told
+    // apart from what users send.
     void send_test_feedback()
     {
         if (!ALFeedback::available() || ALFeedback::sending())
         {
             return;
         }
-        ALFeedback::Report report;
-        report.message.kind = ALFeedback::Kind::Other;
-        report.message.text = "Test feedback from Advanced > Debugging.";
-        report.systemInfo = true;
-        report.sessionLog = true;
-        ALFeedback::send(std::move(report),
-                         [](const ALFeedback::Result& result)
-                         {
-                             LLSD args;
-                             args["MESSAGE"] = fmt::format("Test feedback {}: outcome {}", result.eventId,
-                                                           static_cast<S32>(result.outcome));
-                             LLNotificationsUtil::add("SystemMessageTip", args);
-                         });
+        LLNotificationsUtil::add(
+            "AlchemyFeedbackSendTest", LLSD(), LLSD(),
+            [](const LLSD& notification, const LLSD& response)
+            {
+                if (LLNotificationsUtil::getSelectedOption(notification, response) != 0)
+                {
+                    return;
+                }
+                ALFeedback::Report report;
+                report.message.kind = ALFeedback::Kind::Other;
+                report.message.text = "Test feedback from Develop > Send Test Feedback.";
+                report.includeUser = isAgentAvatarValid() && gSavedSettings.getBOOL("AlchemyFeedbackIncludeAvatar");
+                report.systemInfo = true;
+                report.sessionLog = true;
+                report.test = true;
+                ALFeedback::send(std::move(report),
+                                 [](const ALFeedback::Result& result)
+                                 {
+                                     LLSD args;
+                                     args["MESSAGE"] = fmt::format("Test feedback {}: {}{}", result.eventId,
+                                                                   ALFeedback::outcomeName(result.outcome),
+                                                                   result.queued ? ", kept to send later" : "");
+                                     LLNotificationsUtil::add("SystemMessageTip", args);
+                                 });
+            });
     }
 
     void destroy_texture(const LLUUID& id)
@@ -629,7 +642,8 @@ void ALViewerMenu::initialize_menus()
     enable.add("Avatar.EnableTeleportTo", [](LLUICtrl* ctrl, const LLSD& param) { return can_teleport_to(); });
     enable.add("Object.EnableEditParticles", [](LLUICtrl* ctrl, const LLSD& param) { return enable_edit_particle_source(); });
     enable.add("SavedSetting", [](LLUICtrl* ctrl, const LLSD& param) { return get_saved_setting(param); });
-    enable.add("Feedback.Available", [](LLUICtrl* ctrl, const LLSD& param) { return ALFeedback::available(); });
+    enable.add("Feedback.CanSend",
+               [](LLUICtrl* ctrl, const LLSD& param) { return ALFeedback::available() && !ALFeedback::sending(); });
 
     LLUICtrl::CommitCallbackRegistry::Registrar& commit = LLUICtrl::CommitCallbackRegistry::currentRegistrar();
     commit.add("Avatar.CopyData",       [](LLUICtrl* ctrl, const LLSD& param) { avatar_copy_data(param); });

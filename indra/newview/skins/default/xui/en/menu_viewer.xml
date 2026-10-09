@@ -3513,10 +3513,12 @@ function="World.EnvPreset"
                </menu_item_call>
         </menu>
         <menu_item_call
-         label="Send Test Feedback"
+         label="Send Test Feedback..."
          name="Send Test Feedback">
             <menu_item_call.on_click
              function="Advanced.SendTestFeedback" />
+            <menu_item_call.on_enable
+             function="Feedback.CanSend" />
         </menu_item_call>
       <menu
          create_jump_keys="true"

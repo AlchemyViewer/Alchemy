@@ -13892,12 +13892,19 @@ A report carries where the viewer crashed, its log, your settings and your avata
   icon="alert.tga"
   name="AlchemyFeedbackAfterCrash"
   type="alert">
-Alchemy [WHAT] the last time it ran. If you remember what you were doing, telling the developers helps them find the cause.
-    <usetemplate
-     ignoretext="Ask what happened after Alchemy crashes or freezes"
-     name="okcancelignore"
-     notext="Not now"
-     yestext="Tell us what happened"/>
+[WHAT] If you remember what you were doing, telling the developers helps them find the cause.
+    <form name="form">
+      <button
+       index="0"
+       name="tell"
+       text="Tell us what happened"/>
+      <button
+       default="true"
+       index="1"
+       name="not_now"
+       text="Not now"/>
+      <ignore text="Ask what happened after Alchemy crashes or stops responding"/>
+    </form>
  </notification>
 
  <notification
@@ -13923,14 +13930,33 @@ Reference: [REF]
   icon="notifytip.tga"
   name="AlchemyFeedbackQueued"
   type="notifytip">
-Your feedback could not reach the server yet. It is kept, and goes by itself once it can.
+Your feedback couldn't reach the server yet. It will be sent automatically.
  </notification>
 
  <notification
   icon="notifytip.tga"
-  name="AlchemyFeedbackKeptSent"
+  name="AlchemyFeedbackQueuedDisconnected"
   type="notifytip">
-Feedback you sent earlier has now reached the Alchemy developers. Reference: [REF]
+You're disconnected, so your feedback will be sent the next time Alchemy starts.
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackKeptSent"
+  type="notify">
+Feedback you sent earlier has now reached the Alchemy developers.
+Reference: [REF]
+    <form name="form">
+      <button
+       index="0"
+       name="copy"
+       text="Copy reference"/>
+      <button
+       default="true"
+       index="1"
+       name="ok"
+       text="OK"/>
+    </form>
  </notification>
 
  <notification
@@ -13939,7 +13965,7 @@ Feedback you sent earlier has now reached the Alchemy developers. Reference: [RE
   type="notify">
 Your feedback was not sent. [REASON]
 
-It is kept: open Send Feedback to try again.
+Your message is saved in Send Feedback.
     <form name="form">
       <button
        index="0"
@@ -13951,6 +13977,53 @@ It is kept: open Send Feedback to try again.
        name="dismiss"
        text="Dismiss"/>
     </form>
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackGivenUpRestored"
+  type="notify">
+Feedback you wrote on [DATE] could not reach the Alchemy developers, and Alchemy has stopped trying. Your message is back in Send Feedback.
+    <form name="form">
+      <button
+       index="0"
+       name="open"
+       text="Open"/>
+      <button
+       default="true"
+       index="1"
+       name="ok"
+       text="OK"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="notify.tga"
+  name="AlchemyFeedbackGivenUp"
+  type="notify">
+Feedback you wrote on [DATE] could not reach the Alchemy developers, and Alchemy has stopped trying.
+    <form name="form">
+      <button
+       index="0"
+       name="copy"
+       text="Copy message"/>
+      <button
+       default="true"
+       index="1"
+       name="ok"
+       text="OK"/>
+    </form>
+ </notification>
+
+ <notification
+  icon="alertmodal.tga"
+  name="AlchemyFeedbackSendTest"
+  type="alertmodal">
+Send a test report to the Alchemy developers? It carries your system information and this session's log, and your avatar's name if Send Feedback is set to include it.
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Send"/>
  </notification>
 
   <notification

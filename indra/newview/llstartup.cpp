@@ -94,7 +94,6 @@
 
 #include "alcrashreporter.h"
 #include "alfeedback.h"
-#include "alfloaterfeedback.h"
 #include "llappviewer.h"
 #include "llstartup.h"
 
@@ -1077,11 +1076,8 @@ bool idle_startup()
             }
             else
             {
-                ALFloaterFeedback::askAboutLastRun();
+                ALFeedback::askAboutLastRun();
             }
-            // Feedback that could not be sent before goes now, and then
-            // whenever it is due.
-            ALFeedback::startQueue();
 
             // MAINT-3231 Show first run dialog only for Desura viewer
             if (gSavedSettings.getString("sourceid") == "1208_desura")
@@ -1105,6 +1101,9 @@ bool idle_startup()
             // skip directly to message template verification
             LLStartUp::setStartupState( STATE_LOGIN_CLEANUP );
         }
+        // Feedback that could not be sent before goes now, and then whenever
+        // it is due, however the login goes.
+        ALFeedback::startQueue();
 
         gViewerWindow->setNormalControlsVisible( false );
         gLoginMenuBarView->setVisible( true );
@@ -2761,6 +2760,9 @@ bool idle_startup()
         LLStartUp::setStartupState( STATE_STARTED );
         do_startup_frame();
 
+        // A login that skipped the login screen asks about the last run here.
+        ALFeedback::askAboutLastRun();
+
         // Unmute audio if desired and setup volumes.
         // This is a not-uncommon crash site, so surround it with
         // LL_INFOS() output to aid diagnosis.
@@ -3057,7 +3059,7 @@ bool crash_report_consent_callback(const LLSD& notification, const LLSD& respons
     gSavedSettings.setS32("AlchemyCrashReportConsent", option == 0 ? 1 : 2);
     if (notification["payload"]["ask_about_last_run"].asBoolean())
     {
-        ALFloaterFeedback::askAboutLastRun();
+        ALFeedback::askAboutLastRun();
     }
     return false;
 }

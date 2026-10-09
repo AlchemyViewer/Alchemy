@@ -1278,17 +1278,6 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>AlchemyFeedbackEmail</key>
-        <map>
-            <key>Comment</key>
-            <string>The email address a feedback report gives for a reply, kept when the user asks</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>String</string>
-            <key>Value</key>
-            <string />
-        </map>
         <key>AlchemyFeedbackHideInterface</key>
         <map>
             <key>Comment</key>
@@ -1321,6 +1310,17 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>1</integer>
+        </map>
+        <key>AlchemyFeedbackScreenshotDelay</key>
+        <map>
+            <key>Comment</key>
+            <string>Seconds Send Feedback waits, once its window is open, before taking the screenshot</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.3</real>
         </map>
         <key>AlchemyDisableClickToSit</key>
         <map>

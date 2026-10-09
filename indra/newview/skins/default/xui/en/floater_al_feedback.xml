@@ -3,9 +3,9 @@
  can_close="true"
  can_minimize="true"
  can_resize="true"
- height="616"
+ height="634"
  width="460"
- min_height="540"
+ min_height="558"
  min_width="420"
  layout="topleft"
  name="floater_al_feedback"
@@ -16,31 +16,56 @@
   <floater.string name="placeholder_idea">What would you like Alchemy to do, and what for?</floater.string>
   <floater.string name="placeholder_other">What's on your mind?</floater.string>
   <floater.string name="counter">[COUNT] / [MAX]</floater.string>
-  <floater.string name="linked_crash">About the crash on [day,datetime,local] [mth,datetime,local] at [hour24,datetime,local]:[min,datetime,local]</floater.string>
-  <floater.string name="linked_freeze">About the freeze on [day,datetime,local] [mth,datetime,local] at [hour24,datetime,local]:[min,datetime,local]</floater.string>
+  <floater.string name="linked_date">[day,datetime,local] [mth,datetime,local]</floater.string>
+  <floater.string name="linked_time_24">[hour24,datetime,local]:[min,datetime,local]</floater.string>
+  <floater.string name="linked_time_12">[hour12,datetime,local]:[min,datetime,local] [ampm,datetime,local]</floater.string>
+  <floater.string name="linked_crash">About the crash on [DATE] at [TIME]</floater.string>
+  <floater.string name="linked_freeze">About the freeze on [DATE] at [TIME]</floater.string>
   <floater.string name="linked_crash_undated">About the last crash</floater.string>
   <floater.string name="linked_freeze_undated">About the last freeze</floater.string>
-  <floater.string name="linked_reference">· [REF]</floater.string>
+  <floater.string name="linked_tooltip_crash">This report is tied to the crash, so the developers see the two together.</floater.string>
+  <floater.string name="linked_tooltip_freeze">This report is tied to the freeze, so the developers see the two together.</floater.string>
+  <floater.string name="linked_tooltip_report">Crash report: [ID]</floater.string>
+  <floater.string name="unlink_crash">Send this as feedback of its own, not about that crash</floater.string>
+  <floater.string name="unlink_freeze">Send this as feedback of its own, not about that freeze</floater.string>
   <floater.string name="include_avatar">Include my avatar name ([NAME])</floater.string>
-  <floater.string name="include_avatar_logged_out">Include my avatar name (once logged in)</floater.string>
+  <floater.string name="include_avatar_logged_out">Include my avatar name (not available until you log in)</floater.string>
   <floater.string name="no_previous_log">none</floater.string>
+  <floater.string name="screenshot_tooltip">What's on your screen, open windows such as IMs included. Tick "Hide the interface" to leave them out.</floater.string>
   <floater.string name="screenshot_in_world">A screenshot can be taken once you're logged in.</floater.string>
   <floater.string name="screenshot_taking">Taking the screenshot…</floater.string>
+  <floater.string name="screenshot_failed">Couldn't take the screenshot. Retake to try again.</floater.string>
   <floater.string name="screenshot_none">No screenshot</floater.string>
-  <floater.string name="label_cancel">Cancel</floater.string>
-  <floater.string name="label_close">Close</floater.string>
+  <floater.string name="logs_location_hidden">Logs name the places you've been, so they stay out while your location is hidden.</floater.string>
+  <floater.string name="label_send">Send</floater.string>
+  <floater.string name="label_send_held">Send ([SECONDS])</floater.string>
+  <floater.string name="send_tooltip">Send this report to the Alchemy developers (Ctrl+Enter)</floater.string>
+  <floater.string name="send_busy">Sending…</floater.string>
+  <floater.string name="send_held">You can send another report in [SECONDS] seconds.</floater.string>
+  <floater.string name="send_too_short">Write a little more first.</floater.string>
+  <floater.string name="send_too_long">That's too long to send. Shorten it, or attach a log instead of pasting one.</floater.string>
+  <floater.string name="send_bad_email">Check the email address, or leave it empty.</floater.string>
   <floater.string name="email_hint">Only if you'd like a reply.</floater.string>
   <floater.string name="email_invalid">That doesn't look like an email address.</floater.string>
+  <floater.string name="sending">Sending…</floater.string>
   <floater.string name="restored">Your unsent message is back.</floater.string>
+  <floater.string name="restored_queued">This report is waiting to be sent automatically.</floater.string>
+  <floater.string name="kept_sent">Your report has now reached the Alchemy developers.</floater.string>
+  <floater.string name="kept_given_up">Your report couldn't reach the server, and Alchemy has stopped trying. It's still here to send.</floater.string>
+  <floater.string name="queued_one">An earlier report is waiting to be sent automatically.</floater.string>
+  <floater.string name="queued_many">[COUNT] earlier reports are waiting to be sent automatically.</floater.string>
   <floater.string name="action_discard">Discard</floater.string>
+  <floater.string name="action_dont_send">Don't send</floater.string>
   <floater.string name="action_try_again">Try again</floater.string>
   <floater.string name="action_without_attachments">Send without them</floater.string>
-  <floater.string name="title_screenshot">Screenshot</floater.string>
-  <floater.string name="title_session_log">This session's log</floater.string>
-  <floater.string name="title_previous_log">Last session's log</floater.string>
-  <floater.string name="title_system_info">System information</floater.string>
-  <floater.string name="title_settings">Settings you've changed</floater.string>
-  <floater.string name="title_whats_in">What's in a report</floater.string>
+  <floater.string name="action_github">Report on GitHub</floater.string>
+  <floater.string name="action_copy_message">Copy message</floater.string>
+  <floater.string name="title_screenshot">SCREENSHOT</floater.string>
+  <floater.string name="title_session_log">THIS SESSION'S LOG</floater.string>
+  <floater.string name="title_previous_log">LAST SESSION'S LOG</floater.string>
+  <floater.string name="title_system_info">SYSTEM INFORMATION</floater.string>
+  <floater.string name="title_settings">SETTINGS YOU'VE CHANGED</floater.string>
+  <floater.string name="title_whats_in">WHAT'S IN A REPORT</floater.string>
   <floater.string name="whats_in">A report goes to the Alchemy developers' Sentry project, the one crash reports go to, and only when you press Send.
 
 Every report carries:
@@ -50,9 +75,11 @@ Every report carries:
 - where the viewer was in starting up or running, and the region you were in (unless an RLVa restriction hides your location)
 - whether crash reports are on, and an id for this run of the viewer, so a report can be matched to a crash from the same run
 
-With "Include my avatar name", your avatar's name and key go too, so a developer can find you in world.
+With "Include my avatar name", your avatar's name and key go too, so a developer can find you in world. Without it, your name and key are hidden in the logs, but logs and system information can still say things about you: untick them as well for a report that says nothing about who you are.
 
-Each attachment you tick goes as it is; View shows exactly what will be sent. Logs go as their last 4 MB. The changed settings leave out translation keys, passwords and tokens.</floater.string>
+Each attachment you tick goes as you see it in View, as it is when you press Send. Logs go as their last 4 MB, with the addresses that act for your session hidden; while RLVa hides your location, they stay out. Settings you've changed leave out keys, passwords, tokens and email addresses, and text that could name you, a file or a place reads as hidden.
+
+A report that can't reach the server is kept and sent automatically for up to a week.</floater.string>
   <radio_group
    follows="left|top"
    height="20"
@@ -215,8 +242,23 @@ Each attachment you tick goes as it is; View shows exactly what will be sent. Lo
    layout="topleft"
    left_pad="6"
    name="view_screenshot_btn"
+   tool_tip="See the screenshot whole"
    top_delta="0"
    width="80" />
+  <text
+   type="string"
+   length="1"
+   follows="left|bottom"
+   font="SansSerifSmall"
+   height="14"
+   layout="topleft"
+   left="184"
+   name="screenshot_shows"
+   text_color="LtGray_50"
+   top="326"
+   width="264">
+    Your open windows show in it, IMs included.
+  </text>
   <check_box
    follows="left|bottom"
    height="16"
@@ -244,6 +286,7 @@ Each attachment you tick goes as it is; View shows exactly what will be sent. Lo
    layout="topleft"
    left="368"
    name="view_session_log_btn"
+   tool_tip="See what this session's log sends"
    top="346"
    width="80" />
   <check_box
@@ -273,6 +316,7 @@ Each attachment you tick goes as it is; View shows exactly what will be sent. Lo
    layout="topleft"
    left="368"
    name="view_previous_log_btn"
+   tool_tip="See what the last session's log sends"
    top="370"
    width="80" />
   <check_box
@@ -291,6 +335,7 @@ Each attachment you tick goes as it is; View shows exactly what will be sent. Lo
    layout="topleft"
    left="368"
    name="view_system_info_btn"
+   tool_tip="See the system information this sends"
    top="394"
    width="80" />
   <check_box
@@ -309,6 +354,7 @@ Each attachment you tick goes as it is; View shows exactly what will be sent. Lo
    layout="topleft"
    left="368"
    name="view_settings_btn"
+   tool_tip="See the settings this sends"
    top="418"
    width="80" />
   <text
@@ -333,6 +379,7 @@ Each attachment you tick goes as it is; View shows exactly what will be sent. Lo
    left="12"
    name="include_avatar_check"
    tab_group="3"
+   tool_tip="Your avatar's name and key, so a developer can find you in world. Without them, they're hidden in the logs; logs and system information can still say things about you."
    top="472"
    width="436" />
   <text
@@ -394,11 +441,11 @@ Each attachment you tick goes as it is; View shows exactly what will be sent. Lo
    type="string"
    length="1"
    follows="left|right|bottom"
-   height="32"
+   height="44"
    layout="topleft"
    left="12"
    name="privacy_text"
-   top="550"
+   top="552"
    width="436"
    word_wrap="true">
     Sent to the Alchemy developers when you press Send, and only then.
@@ -408,7 +455,7 @@ Each attachment you tick goes as it is; View shows exactly what will be sent. Lo
    bg_alpha_color="DkGray2"
    border="true"
    follows="left|right|bottom"
-   height="32"
+   height="50"
    layout="topleft"
    left="12"
    name="status_panel"
@@ -419,11 +466,12 @@ Each attachment you tick goes as it is; View shows exactly what will be sent. Lo
      type="string"
      length="1"
      follows="left|right|top"
-     height="28"
+     height="46"
      layout="topleft"
      left="6"
      name="status_text"
      top="2"
+     valign="center"
      width="236"
      word_wrap="true" />
     <button
@@ -432,7 +480,7 @@ Each attachment you tick goes as it is; View shows exactly what will be sent. Lo
      layout="topleft"
      left="246"
      name="status_action_1"
-     top="5"
+     top="14"
      width="90" />
     <button
      follows="right|top"
@@ -450,25 +498,36 @@ Each attachment you tick goes as it is; View shows exactly what will be sent. Lo
    layout="topleft"
    left="12"
    name="whats_in_btn"
-   top="586"
+   top="604"
    width="140" />
   <loading_indicator
    follows="right|bottom"
    height="16"
    layout="topleft"
-   left="262"
+   left="176"
    name="sending_indicator"
-   top="589"
+   top="607"
    visible="false"
    width="16" />
   <button
    follows="right|bottom"
    height="22"
-   label="Cancel"
+   label="Discard"
+   layout="topleft"
+   left="200"
+   name="discard_btn"
+   tool_tip="Throw this report away and start again"
+   top="604"
+   width="80" />
+  <button
+   follows="right|bottom"
+   height="22"
+   label="Close"
    layout="topleft"
    left="284"
-   name="cancel_btn"
-   top="586"
+   name="close_btn"
+   tool_tip="Close this window. What you've written is kept for next time."
+   top="604"
    width="80" />
   <button
    follows="right|bottom"
@@ -477,6 +536,6 @@ Each attachment you tick goes as it is; View shows exactly what will be sent. Lo
    layout="topleft"
    left="368"
    name="send_btn"
-   top="586"
+   top="604"
    width="80" />
 </floater>

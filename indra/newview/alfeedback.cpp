@@ -28,6 +28,7 @@
 
 #include "llsd.h"
 #include "llsdjson.h"
+#include "llsdserialize.h"
 #include "llstring.h"
 #include "lluuid.h"
 
@@ -35,6 +36,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <sstream>
 
 namespace
 {
@@ -79,6 +82,19 @@ std::string_view ALFeedback::kindName(Kind kind)
     }
 }
 
+ALFeedback::Kind ALFeedback::kindFromName(std::string_view name)
+{
+    if (name == "idea")
+    {
+        return Kind::Idea;
+    }
+    if (name == "other")
+    {
+        return Kind::Other;
+    }
+    return Kind::Problem;
+}
+
 std::optional<ALFeedback::Endpoint> ALFeedback::endpointFromDsn(std::string_view dsn)
 {
     const size_t scheme_end = dsn.find("://");
@@ -88,6 +104,10 @@ std::optional<ALFeedback::Endpoint> ALFeedback::endpointFromDsn(std::string_view
     }
     const std::string_view scheme = dsn.substr(0, scheme_end);
     std::string_view rest = dsn.substr(scheme_end + 3);
+    if (scheme != "https" && scheme != "http")
+    {
+        return std::nullopt;
+    }
 
     const size_t at = rest.find('@');
     if (at == std::string_view::npos)
@@ -113,6 +133,23 @@ std::optional<ALFeedback::Endpoint> ALFeedback::endpointFromDsn(std::string_view
     if (project.empty() || host_and_path.front() == '/')
     {
         return std::nullopt;
+    }
+    // What goes is the user's: in the clear only to this machine.
+    if (scheme == "http")
+    {
+        std::string_view host = host_and_path.substr(0, host_and_path.find('/'));
+        if (host.front() == '[')
+        {
+            host = host.substr(0, host.find(']') + 1);
+        }
+        else
+        {
+            host = host.substr(0, host.find(':'));
+        }
+        if (host != "127.0.0.1" && host != "localhost" && host != "[::1]")
+        {
+            return std::nullopt;
+        }
     }
 
     Endpoint endpoint;
@@ -172,6 +209,76 @@ std::string_view ALFeedback::logTail(std::string_view log, size_t max_bytes)
     return log.substr(start);
 }
 
+std::string ALFeedback::scrubLog(std::string_view log, const std::vector<std::string>& hide)
+{
+    constexpr std::string_view HIDDEN = "[hidden]";
+    // ASCII case folded in place keeps every offset the same as the log's.
+    std::string folded(log);
+    std::transform(folded.begin(), folded.end(), folded.begin(),
+                   [](char c) { return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c; });
+
+    // What to hide, as [start, end) spans of the log.
+    std::vector<std::pair<size_t, size_t>> spans;
+    const auto is_id_char = [](char c)
+    { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || c == '-'; };
+    // A capability is its address's path: /cap/<uuid> on Second Life,
+    // /caps/<uuid><suffix> on OpenSim grids.
+    for (std::string_view marker : { std::string_view("/cap/"), std::string_view("/caps/") })
+    {
+        for (size_t pos = folded.find(marker); pos != std::string::npos; pos = folded.find(marker, pos + 1))
+        {
+            const size_t start = pos + marker.size();
+            size_t end = start;
+            while (end < folded.size() && is_id_char(folded[end]))
+            {
+                ++end;
+            }
+            if (end > start)
+            {
+                spans.emplace_back(start, end);
+            }
+        }
+    }
+    for (const std::string& word : hide)
+    {
+        std::string needle(word);
+        std::transform(needle.begin(), needle.end(), needle.begin(),
+                       [](char c) { return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c; });
+        if (needle.size() < 3)
+        {
+            continue;
+        }
+        for (size_t pos = folded.find(needle); pos != std::string::npos; pos = folded.find(needle, pos + needle.size()))
+        {
+            spans.emplace_back(pos, pos + needle.size());
+        }
+    }
+    if (spans.empty())
+    {
+        return std::string(log);
+    }
+
+    std::sort(spans.begin(), spans.end());
+    std::string out;
+    out.reserve(log.size());
+    size_t copied = 0;
+    for (const auto& [start, end] : spans)
+    {
+        if (end <= copied)
+        {
+            continue;
+        }
+        if (start >= copied)
+        {
+            out.append(log.substr(copied, start - copied));
+            out.append(HIDDEN);
+        }
+        copied = end;
+    }
+    out.append(log.substr(copied));
+    return out;
+}
+
 std::string ALFeedback::newEventId()
 {
     LLUUID id;
@@ -179,6 +286,17 @@ std::string ALFeedback::newEventId()
     std::string hex = id.asString();
     hex.erase(std::remove(hex.begin(), hex.end(), '-'), hex.end());
     return hex;
+}
+
+bool ALFeedback::validEventId(std::string_view id)
+{
+    return id.size() == 32 && id.find_first_not_of("0123456789abcdef") == std::string_view::npos
+           && id.find_first_not_of('0') != std::string_view::npos;
+}
+
+std::string ALFeedback::reference(std::string_view event_id)
+{
+    return std::string(event_id.substr(0, REFERENCE_CHARS));
 }
 
 LLSD ALFeedback::feedbackEvent(const std::string& event_id, std::string_view timestamp, const Message& message,
@@ -232,13 +350,12 @@ LLSD ALFeedback::feedbackEvent(const std::string& event_id, std::string_view tim
     return event;
 }
 
-std::string ALFeedback::envelope(const std::string& event_id, std::string_view dsn, std::string_view sent_at,
-                                 const Sdk& sdk, std::string_view event_json, const std::vector<Attachment>& attachments)
+std::string ALFeedback::envelope(const std::string& event_id, std::string_view dsn, const Sdk& sdk,
+                                 std::string_view event_json, const std::vector<Attachment>& attachments)
 {
     LLSD header = LLSD::emptyMap();
     header["event_id"] = event_id;
     header["dsn"] = std::string(dsn);
-    header["sent_at"] = std::string(sent_at);
     header["sdk"]["name"] = std::string(sdk.name);
     header["sdk"]["version"] = std::string(sdk.version);
 
@@ -287,6 +404,24 @@ bool ALFeedback::gzip(std::string_view data, std::string& out)
     return result == Z_STREAM_END;
 }
 
+std::string_view ALFeedback::outcomeName(Outcome outcome)
+{
+    switch (outcome)
+    {
+        case Outcome::Sent:
+            return "sent";
+        case Outcome::RateLimited:
+            return "rate limited";
+        case Outcome::TooLarge:
+            return "too large";
+        case Outcome::Rejected:
+            return "rejected";
+        case Outcome::Unreachable:
+        default:
+            return "unreachable";
+    }
+}
+
 ALFeedback::Outcome ALFeedback::classify(S32 http_status)
 {
     if (http_status >= 200 && http_status < 300)
@@ -316,6 +451,26 @@ bool ALFeedback::retryable(Outcome outcome)
     return outcome == Outcome::RateLimited || outcome == Outcome::Unreachable;
 }
 
+S64 ALFeedback::serverWait(F32 retry_after)
+{
+    // Read by its bits: under fast floating point the compiler may take any
+    // value to be finite and fold a test for infinity or not-a-number away.
+    U32 bits = 0;
+    std::memcpy(&bits, &retry_after, sizeof(bits));
+    const bool negative = (bits >> 31) != 0;
+    if (((bits >> 23) & 0xff) == 0xff)
+    {
+        // Forever, as long as a report is kept; not a number, nothing.
+        return ((bits & 0x7fffff) == 0 && !negative) ? QUEUE_MAX_AGE_SECONDS : 0;
+    }
+    if (negative || (bits & 0x7fffffff) == 0)
+    {
+        return 0;
+    }
+    return std::min(static_cast<S64>(std::ceil(std::min(retry_after, static_cast<F32>(QUEUE_MAX_AGE_SECONDS)))),
+                    QUEUE_MAX_AGE_SECONDS);
+}
+
 S64 ALFeedback::nextAttempt(S64 now, S32 attempts, F32 retry_after)
 {
     S64 delay = QUEUE_RETRY_SECONDS;
@@ -324,7 +479,7 @@ S64 ALFeedback::nextAttempt(S64 now, S32 attempts, F32 retry_after)
         delay *= 2;
     }
     delay = std::min(delay, QUEUE_RETRY_MAX_SECONDS);
-    delay = std::max(delay, static_cast<S64>(std::ceil(retry_after)));
+    delay = std::max(delay, serverWait(retry_after));
     return now + delay;
 }
 
@@ -333,42 +488,120 @@ bool ALFeedback::expired(const Queued& queued, S64 now)
     return queued.attempts >= QUEUE_MAX_ATTEMPTS || now - queued.created > QUEUE_MAX_AGE_SECONDS;
 }
 
-std::string ALFeedback::queuedToJson(const Queued& queued)
+namespace
 {
     // Times as reals: an LLSD integer is 32 bits, and seconds since the
     // epoch outgrow it in 2038.
+    LLSD::Real seconds_to_llsd(S64 seconds)
+    {
+        return static_cast<LLSD::Real>(seconds);
+    }
+
+    // A time read back from a file, which anything may have written: what
+    // is not a time this side of the year 10000 reads as none.
+    S64 seconds_from_llsd(const LLSD& value)
+    {
+        constexpr LLSD::Real LATEST = 253402300800.0;
+        const LLSD::Real seconds = value.asReal();
+        // Infinity and not-a-number by their bits, as serverWait() does.
+        U64 bits = 0;
+        std::memcpy(&bits, &seconds, sizeof(bits));
+        if (((bits >> 52) & 0x7ff) == 0x7ff)
+        {
+            return 0;
+        }
+        return (seconds >= 0.0 && seconds < LATEST) ? static_cast<S64>(seconds) : 0;
+    }
+}
+
+std::string ALFeedback::queuedToJson(const Queued& queued)
+{
     LLSD record = LLSD::emptyMap();
     record["event_id"] = queued.eventId;
-    record["created"] = static_cast<LLSD::Real>(queued.created);
+    record["created"] = seconds_to_llsd(queued.created);
     record["attempts"] = queued.attempts;
-    record["next_at"] = static_cast<LLSD::Real>(queued.nextAt);
+    record["next_at"] = seconds_to_llsd(queued.nextAt);
+    record["not_before"] = seconds_to_llsd(queued.notBefore);
+    record["kind"] = std::string(kindName(queued.kind));
+    record["message"] = queued.message;
     return LlsdToJson(record);
 }
 
 std::optional<ALFeedback::Queued> ALFeedback::queuedFromJson(std::string_view json)
 {
     LLSD record;
-    if (!LlsdFromJsonString(json, record) || !record.isMap() || !record.has("event_id"))
+    if (!LlsdFromJsonString(json, record) || !record.isMap())
     {
         return std::nullopt;
     }
     Queued queued;
     queued.eventId = record["event_id"].asString();
-    queued.created = static_cast<S64>(record["created"].asReal());
-    queued.attempts = record["attempts"].asInteger();
-    queued.nextAt = static_cast<S64>(record["next_at"].asReal());
-    if (queued.eventId.empty())
+    if (!validEventId(queued.eventId))
     {
         return std::nullopt;
     }
+    queued.created = seconds_from_llsd(record["created"]);
+    queued.attempts = std::max(record["attempts"].asInteger(), 0);
+    queued.nextAt = seconds_from_llsd(record["next_at"]);
+    queued.notBefore = seconds_from_llsd(record["not_before"]);
+    queued.kind = kindFromName(record["kind"].asString());
+    queued.message = record["message"].asString();
     return queued;
+}
+
+std::string ALFeedback::draftToJson(const Draft& draft)
+{
+    LLSD out = LLSD::emptyMap();
+    out["kind"] = std::string(kindName(draft.kind));
+    out["message"] = draft.message;
+    set_if(out, "event_id", draft.eventId);
+    set_if(out, "associated_event_id", draft.associatedEventId);
+    set_if(out, "linked", draft.linked);
+    set_if(out, "linked_at", draft.linkedAt);
+    set_if(out, "linked_run_id", draft.linkedRunId);
+    return LlsdToJson(out);
+}
+
+std::optional<ALFeedback::Draft> ALFeedback::draftFromJson(std::string_view json)
+{
+    LLSD in;
+    if (!LlsdFromJsonString(json, in) || !in.isMap())
+    {
+        return std::nullopt;
+    }
+    Draft draft;
+    draft.kind = kindFromName(in["kind"].asString());
+    draft.message = in["message"].asString();
+    if (draft.message.find_first_not_of(" \t\r\n") == std::string::npos)
+    {
+        return std::nullopt;
+    }
+    // Ids name files and other reports: one that is not an id is dropped.
+    draft.eventId = in["event_id"].asString();
+    if (!validEventId(draft.eventId))
+    {
+        draft.eventId.clear();
+    }
+    draft.associatedEventId = in["associated_event_id"].asString();
+    if (!validEventId(draft.associatedEventId))
+    {
+        draft.associatedEventId.clear();
+    }
+    const std::string linked = in["linked"].asString();
+    if (linked == "crash" || linked == "freeze")
+    {
+        draft.linked = linked;
+        draft.linkedAt = in["linked_at"].asString();
+        draft.linkedRunId = in["linked_run_id"].asString();
+    }
+    return draft;
 }
 
 bool ALFeedback::privateSetting(std::string_view name)
 {
     std::string lower(name);
     LLStringUtil::toLower(lower);
-    for (std::string_view word : { "apikey", "password", "token", "secret", "credential" })
+    for (std::string_view word : { "apikey", "password", "token", "secret", "credential", "email" })
     {
         if (lower.find(word) != std::string::npos)
         {
@@ -376,4 +609,40 @@ bool ALFeedback::privateSetting(std::string_view name)
         }
     }
     return false;
+}
+
+std::string ALFeedback::settingText(std::string_view name, const LLSD& value)
+{
+    constexpr std::string_view HIDDEN = "(hidden)";
+    if (value.isMap() || value.isArray() || value.isBinary())
+    {
+        return std::string(HIDDEN);
+    }
+    if (!value.isString() && !value.isURI())
+    {
+        std::ostringstream out;
+        out << LLSDNotationStreamer(value);
+        return out.str();
+    }
+
+    // A word or a number: no spaces (something written), no separators of
+    // paths or addresses, nothing a name would be.
+    constexpr size_t PLAIN_MAX_BYTES = 32;
+    const std::string text = value.asString();
+    std::string lower(name);
+    LLStringUtil::toLower(lower);
+    const bool plain = text.size() <= PLAIN_MAX_BYTES && lower.find("name") == std::string::npos
+                       && std::all_of(text.begin(), text.end(),
+                                      [](char c)
+                                      {
+                                          return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                                                 || c == '_' || c == '-' || c == '.' || c == '+';
+                                      });
+    if (!plain)
+    {
+        return std::string(HIDDEN);
+    }
+    std::ostringstream out;
+    out << LLSDNotationStreamer(value);
+    return out.str();
 }

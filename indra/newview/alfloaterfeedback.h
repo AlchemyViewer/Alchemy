@@ -26,14 +26,15 @@
 #define AL_ALFLOATERFEEDBACK_H
 
 #include "alfeedback.h"
+#include "llevents.h"
 #include "llfloater.h"
 #include "llframetimer.h"
 #include "llimage.h"
 
 #include <array>
 #include <functional>
+#include <optional>
 
-class ALTextView;
 class LLButton;
 class LLCheckBoxCtrl;
 class LLLineEditor;
@@ -51,7 +52,7 @@ public:
 
     // The key may say what the report is about: kind ("problem", "idea",
     // "other"), associated_event_id, linked ("crash" or "freeze"),
-    // linked_at (a date) and previous_log (true to tick it).
+    // linked_at (a date), linked_run_id, and previous_log (true to tick it).
     explicit ALFloaterFeedback(const LLSD& key);
 
     bool postBuild() override;
@@ -62,10 +63,6 @@ public:
 
     // Opens the floater with the menus out of the way of its screenshot.
     static void show(const LLSD& key = LLSD());
-
-    // After a run that crashed or froze, asks the user what happened, and
-    // opens the floater on the report that run was filed as.
-    static void askAboutLastRun();
 
 private:
     ~ALFloaterFeedback() override;
@@ -78,9 +75,14 @@ private:
 
     static void onIdle(void* self);
     static void onResult(LLHandle<ALFloaterFeedback> handle, const ALFeedback::Result& result);
+    bool onQueueEvent(const LLSD& event);
 
     ALFeedback::Kind kind() const;
     void reportChanged();
+    // Back to an empty report: the last one has gone, or been given to the
+    // outbox, or thrown away.
+    void resetReport();
+    void discard();
     void applyKey(const LLSD& key);
     void applyKindDefaults();
     void setDefault(AttachmentRow& row, bool on);
@@ -89,15 +91,18 @@ private:
     void updateLinked();
     void updateAvatarLabel();
     void updateLogSizes();
+    void showQueuedStatus();
 
     void requestScreenshot();
     void captureScreenshot();
 
     void send(bool with_attachments);
     void showFailure(const ALFeedback::Result& result);
-    void showStatus(const std::string& text, const std::string& first_label, std::function<void()> first,
-                    const std::string& second_label = std::string(), std::function<void()> second = nullptr);
+    void showStatus(const std::string& text, const std::string& first_label = std::string(),
+                    std::function<void()> first = nullptr, const std::string& second_label = std::string(),
+                    std::function<void()> second = nullptr);
     void hideStatus();
+    void layoutStatus();
 
     void viewText(const std::string& title_string, const std::string& text);
     void viewLog(const std::string& title_string, const std::string& path);
@@ -105,11 +110,11 @@ private:
 
     void loadDraft();
     void saveDraft();
-    static void clearDraft();
 
     LLRadioGroup* mKind = nullptr;
     LLTextEditor* mMessage = nullptr;
     LLTextBox* mCounter = nullptr;
+    LLUIColor mCounterColor;
     LLTextBox* mLinkedText = nullptr;
     LLButton* mUnlinkButton = nullptr;
     LLView* mScreenshotPreview = nullptr;
@@ -123,6 +128,7 @@ private:
     AttachmentRow mSettingsRow;
     LLTextBox* mSessionLogSize = nullptr;
     LLTextBox* mPreviousLogSize = nullptr;
+    LLButton* mViewSessionLogButton = nullptr;
     LLButton* mViewPreviousLogButton = nullptr;
     LLCheckBoxCtrl* mIncludeAvatar = nullptr;
     LLLineEditor* mEmail = nullptr;
@@ -136,7 +142,7 @@ private:
     std::array<std::function<void()>, 2> mStatusActions;
     LLLoadingIndicator* mSendingIndicator = nullptr;
     LLButton* mSendButton = nullptr;
-    LLButton* mCancelButton = nullptr;
+    LLButton* mDiscardButton = nullptr;
 
     LLPointer<LLImageRaw> mScreenshot;
     LLPointer<LLViewerTexture> mThumbnail;
@@ -144,12 +150,15 @@ private:
     S32 mThumbnailHeight = 0;
     LLFrameTimer mScreenshotTimer;
     bool mScreenshotPending = false;
+    bool mScreenshotFailed = false;
     bool mCouldTakeScreenshot = false;
     LLTextBox* mScreenshotNote = nullptr;
+    LLTextBox* mScreenshotShows = nullptr;
 
     std::string mAssociatedEventId;
     std::string mLinked;
     std::string mLinkedAt;
+    std::string mLinkedRunId;
     // The id of the report as it was last sent, so sending it again is the
     // same report to the server.
     std::string mEventId;
@@ -157,35 +166,17 @@ private:
 
     LLFrameTimer mDraftTimer;
     bool mDraftDirty = false;
-    // Set once the report has gone, so closing keeps no draft.
-    bool mSent = false;
     // Set while the report as last sent is kept to go by itself.
     bool mQueued = false;
-    // Whether the controls were last set for a report being sent.
+    // How the last send went, while it did not go and nothing has changed.
+    std::optional<ALFeedback::Result> mLastResult;
+    // What the controls were last set for, to notice when it changes.
     bool mShownBusy = false;
-};
-
-// One attachment as it will be sent, to read before sending.
-class ALFloaterFeedbackPreview final : public LLFloater
-{
-public:
-    AL_VIEW_TYPE(ALFloaterFeedbackPreview, LLFloater);
-
-    explicit ALFloaterFeedbackPreview(const LLSD& key);
-
-    bool postBuild() override;
-    void draw() override;
-
-    static void showText(const std::string& title, std::string_view text);
-    static void showImage(const std::string& title, const LLPointer<LLImageRaw>& image);
-
-private:
-    ~ALFloaterFeedbackPreview() override = default;
-
-    ALTextView* mText = nullptr;
-    LLPointer<LLViewerTexture> mImage;
-    S32 mImageWidth = 0;
-    S32 mImageHeight = 0;
+    bool mShownLoggedIn = false;
+    bool mShownLocationHidden = false;
+    S32 mShownHoldSeconds = 0;
+    LLFrameTimer mStateCheckTimer;
+    LLTempBoundListener mQueueListener;
 };
 
 #endif // AL_ALFLOATERFEEDBACK_H

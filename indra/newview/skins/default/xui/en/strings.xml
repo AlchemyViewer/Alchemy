@@ -5472,14 +5472,20 @@ and report the problem.
     <string name="DiscordHiddenRegion">Hidden Region</string>
 
     <!-- What ended the previous run, for the question about it -->
-    <string name="AlchemyFeedbackCrashed">crashed</string>
-    <string name="AlchemyFeedbackFroze">froze</string>
+    <string name="AlchemyFeedbackCrashed">Alchemy crashed the last time it ran.</string>
+    <string name="AlchemyFeedbackFroze">Alchemy stopped responding the last time it ran.</string>
+    <string name="AlchemyFeedbackCrashedQuitting">Alchemy crashed while quitting the last time it ran.</string>
+    <string name="AlchemyFeedbackFrozeQuitting">Alchemy stopped responding while quitting the last time it ran.</string>
+
+    <!-- When a report was written -->
+    <string name="AlchemyFeedbackDate">[day,datetime,local] [mth,datetime,local]</string>
 
     <!-- Feedback that did not reach the developers -->
-    <string name="AlchemyFeedbackRateLimited">Too many reports are reaching the server right now. Try again in [MINUTES] min.</string>
+    <string name="AlchemyFeedbackRateLimited">Too many reports are reaching the server right now. Try again later.</string>
     <string name="AlchemyFeedbackTooLarge">That's too large to send. It can go without the attachments.</string>
-    <string name="AlchemyFeedbackRejected">The server refused this report.</string>
+    <string name="AlchemyFeedbackRejected">The server refused this report. You can report it on GitHub instead.</string>
     <string name="AlchemyFeedbackUnreachable">Couldn't reach the server. Check your connection and try again.</string>
-    <string name="AlchemyFeedbackRateLimitedQueued">The server is busy. Kept: it goes by itself in [MINUTES] min.</string>
-    <string name="AlchemyFeedbackUnreachableQueued">Couldn't reach the server. Kept: it goes by itself once it can.</string>
+    <string name="AlchemyFeedbackRateLimitedQueued">The server is busy. Your report will be sent automatically later; you can close this window.</string>
+    <string name="AlchemyFeedbackUnreachableQueued">Couldn't reach the server. Your report will be sent automatically once it can be; you can close this window.</string>
+    <string name="AlchemyFeedbackDisconnectedQueued">You're disconnected. Your report will be sent the next time Alchemy starts; you can close this window.</string>
 </strings>
