@@ -29,8 +29,8 @@
 #include "linden_common.h"
 #include "lltut.h"
 #include "llhttpconstants.h"
-#include "llapr.h"
 #include "llmessageconfig.h"
+#include "llmessagesystem_fixture.h"
 #include "llsdserialize.h"
 #include "message.h"
 #include "message_prehash.h"
@@ -56,34 +56,13 @@ namespace
 {
     struct LLMessageSystemTestData
     {
+        // currently test disconnected message system
+        ll_test::MessageSystemScope mMessageSystem;
         std::string mTestConfigDir;
         std::string mSep;
 
         LLMessageSystemTestData()
         {
-            static bool init = false;
-            if(!init)
-            {
-                ll_init_apr();
-                //init_prehash_data();
-                init = true;
-            }
-            const F32 circuit_heartbeat_interval=5;
-            const F32 circuit_timeout=100;
-
-
-            // currently test disconnected message system
-            start_messaging_system("notafile", 13035,
-                                   1,
-                                   0,
-                                   0,
-                                   false,
-                                   "notasharedsecret",
-                                   NULL,
-                                   false,
-                                   circuit_heartbeat_interval,
-                                   circuit_timeout
-                                   );
             // generate temp dir
             std::ostringstream ostr;
 #if LL_WINDOWS
@@ -104,10 +83,6 @@ namespace
 
         ~LLMessageSystemTestData()
         {
-            // not end_messaging_system()
-            delete static_cast<LLMessageSystem*>(gMessageSystem);
-            gMessageSystem = NULL;
-
             // rm contents of temp dir
             std::ostringstream ostr;
             ostr << mTestConfigDir << mSep << "message.xml";

@@ -29,7 +29,7 @@
 #include "linden_common.h"
 #include "lltut.h"
 
-#include "llapr.h"
+#include "llmessagesystem_fixture.h"
 #include "llmessagetemplate.h"
 #include "llmath.h"
 #include "llquaternion.h"
@@ -50,28 +50,12 @@ namespace
 
     struct LLTemplateMessageBuilderTestData
     {
+        // The reader hands what it reads to gMessageSystem, so each test has
+        // one, and leaves gMessageSystem as it found it.
+        ll_test::MessageSystemScope mMessageSystem;
+
         static LLMessageTemplate defaultTemplate()
         {
-            static bool init = false;
-            if(! init)
-            {
-                ll_init_apr();
-                const F32 circuit_heartbeat_interval=5;
-                const F32 circuit_timeout=100;
-
-                start_messaging_system("notafile", 13035,
-                                       1,
-                                       0,
-                                       0,
-                                       false,
-                                       "notasharedsecret",
-                                       NULL,
-                                       false,
-                                       circuit_heartbeat_interval,
-                                       circuit_timeout);
-                //init_prehash_data();
-                init = true;
-            }
             return LLMessageTemplate(_PREHASH_TestMessage, 1, MFT_HIGH);
         }
 
