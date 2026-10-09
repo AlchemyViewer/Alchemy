@@ -6192,13 +6192,14 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
         const LLVector3& cam_pos = camera.getOrigin();
 
         F32 max_dist;
+        // The draw distance, which the depth convention holds the setting to.
         if (LLPipeline::sRenderDeferred)
         {
-            max_dist = RenderFarClip;
+            max_dist = gAgentCamera.mDrawDistance;
         }
         else
         {
-            max_dist = llmin(RenderFarClip, LIGHT_MAX_RADIUS * 4.f);
+            max_dist = llmin(gAgentCamera.mDrawDistance, LIGHT_MAX_RADIUS * 4.f);
         }
 
         // UPDATE THE EXISTING NEARBY LIGHTS
@@ -12615,7 +12616,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
     LLPlane shadow_near_clip;
     {
         LLVector3 p = camera.getOrigin(); // gAgent.getPositionAgent();
-        p += caster_dir * RenderFarClip*2.f;
+        p += caster_dir * gAgentCamera.mDrawDistance*2.f;
         shadow_near_clip.setVec(p, caster_dir);
     }
 
