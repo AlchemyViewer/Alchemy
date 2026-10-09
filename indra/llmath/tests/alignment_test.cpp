@@ -44,6 +44,8 @@ namespace tut
 #define is_aligned(ptr,alignment) ((reinterpret_cast<uintptr_t>(ptr))%(alignment)==0)
 #define is_aligned_relative(ptr,base_ptr,alignment) ((reinterpret_cast<uintptr_t>(ptr)-reinterpret_cast<uintptr_t>(base_ptr))%(alignment)==0)
 
+namespace
+{
 struct alignment_test {};
 
 typedef test_group<alignment_test> alignment_test_t;
@@ -63,6 +65,7 @@ struct alignas(64) MyCacheLine
 {
     LLQuad mQ[4];
 };
+}
 
 // Verify that aligned allocators perform as advertised.
 template<> template<>

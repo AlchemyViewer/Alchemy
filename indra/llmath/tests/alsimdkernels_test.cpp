@@ -175,12 +175,15 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct alsimdkernels_data
     {
     };
     typedef test_group<alsimdkernels_data> alsimdkernels_test;
     typedef alsimdkernels_test::object alsimdkernels_object;
     tut::alsimdkernels_test alsimdkernels_testcase("alsimdkernels");
+}
 
     // Points, with w from the rows and with w set, against
     // affineTransform, bit for bit, at every count and width; nothing

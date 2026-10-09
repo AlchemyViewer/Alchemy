@@ -41,12 +41,15 @@
 
 namespace tut
 {
+namespace
+{
     struct math_data
     {
     };
     typedef test_group<math_data> math_test;
     typedef math_test::object math_object;
     tut::math_test tm("BasicLindenMath");
+}
 
     template<> template<>
     void math_object::test<1>()
@@ -173,6 +176,8 @@ namespace tut
 
 namespace tut
 {
+namespace
+{
     struct uuid_data
     {
         LLUUID id;
@@ -180,6 +185,7 @@ namespace tut
     typedef test_group<uuid_data> uuid_test;
     typedef uuid_test::object uuid_object;
     tut::uuid_test tu("mathmisc LLUUID");
+}
 
     template<> template<>
     void uuid_object::test<1>()
@@ -229,12 +235,15 @@ namespace tut
 
 namespace tut
 {
+namespace
+{
     struct crc_data
     {
     };
     typedef test_group<crc_data> crc_test;
     typedef crc_test::object crc_object;
     tut::crc_test tc("LLCrc");
+}
 
     template<> template<>
     void crc_object::test<1>()
@@ -281,6 +290,8 @@ namespace tut
 
 namespace tut
 {
+namespace
+{
     F32 SMALL_RADIUS = 1.0f;
     F32 MEDIUM_RADIUS = 5.0f;
     F32 LARGE_RADIUS = 10.0f;
@@ -291,6 +302,7 @@ namespace tut
     typedef test_group<line_data> line_test;
     typedef line_test::object line_object;
     tut::line_test tline("LLLine");
+}
 
     template<> template<>
     void line_object::test<1>()
@@ -466,7 +478,11 @@ namespace tut
           */
     }
 
+namespace
+{
     F32 ALMOST_PARALLEL = 0.99f;
+}
+
     template<> template<>
     void line_object::test<3>()
     {

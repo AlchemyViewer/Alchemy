@@ -92,6 +92,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct llquaternion2_data
     {
         std::vector<LLQuaternion> mRotations = rotations();
@@ -99,6 +101,7 @@ namespace tut
     typedef test_group<llquaternion2_data> llquaternion2_test;
     typedef llquaternion2_test::object llquaternion2_object;
     tut::llquaternion2_test llquaternion2_testcase("LLQuaternion2");
+}
 
     template<> template<>
     void llquaternion2_object::test<1>()

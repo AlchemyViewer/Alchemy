@@ -160,6 +160,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct llvector4a_data
     {
         // Four lanes of distinct bit patterns, including a NaN payload and a
@@ -181,6 +183,7 @@ namespace tut
     typedef test_group<llvector4a_data> llvector4a_test;
     typedef llvector4a_test::object llvector4a_object;
     tut::llvector4a_test llvector4a_testcase("LLVector4a");
+}
 
     // Plain data of one register, and the two constants.
     template<> template<>

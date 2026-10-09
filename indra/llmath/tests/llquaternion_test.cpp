@@ -38,12 +38,15 @@
 
 namespace tut
 {
+namespace
+{
     struct llquat_test
     {
     };
     typedef test_group<llquat_test> llquat_test_t;
     typedef llquat_test_t::object llquat_test_object_t;
     tut::llquat_test_t tut_llquat_test("LLQuaternion");
+}
 
     //test case for LLQuaternion::LLQuaternion(void) fn.
     template<> template<>
