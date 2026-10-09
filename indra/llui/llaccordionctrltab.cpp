@@ -1289,11 +1289,12 @@ bool LLAccordionCtrlTab::handleToolTip(S32 x, S32 y, MASK mask)
         }
     }
 
-    //header may be not the first child but we need to process it first
-    if (y >= (getRect().getHeight() - HEADER_HEIGHT - HEADER_HEIGHT / 2))
+    // The header may not be the first child, but it answers first -- over its
+    // own rect and no further, the same band handleMouseDown claims. Half a
+    // header more reached into the panel, where the section's own tooltip
+    // would cover the gap under the header and the top of its first row.
+    if (mHeader->getVisible() && mHeader->getRect().pointInRect(x, y))
     {
-        //inside tab header
-        //fix for EXT-6619
         mHeader->handleToolTip(x, y, mask);
         return true;
     }

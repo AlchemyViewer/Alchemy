@@ -323,4 +323,39 @@ namespace tut
         ensure_equals("and one cut short says itself", header(plain)->getToolTip(), title);
         plain->die();
     }
+
+    // And the header says it over itself and no further. The tab used to hand
+    // the header half a header more than it is tall, which is the gap under
+    // it and the top of the first row: with every Lightbox section saying
+    // what it is for, that band said so over the controls instead of them.
+    template<> template<>
+    void llaccordionctrltab_object::test<7>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLAccordionCtrlTab::Params tp(LLUICtrlFactory::getDefaultParams<LLAccordionCtrlTab>());
+        tp.name = "tab";
+        tp.title = "Tab";
+        tp.header_tool_tip = "What it does";
+        tp.display_children = true;
+        tp.fit_panel = false;
+        tp.rect = LLRect(0, 200, 300, 0);
+        LLAccordionCtrlTab* tab = LLUICtrlFactory::create<LLAccordionCtrlTab>(tp);
+        LLPanel::Params pp;
+        pp.name = "rows";
+        pp.rect = LLRect(0, 150, 300, 0);
+        tab->setAccordionView(LLUICtrlFactory::create<LLPanel>(pp));
+        tab->reshape(300, 200);
+
+        const S32 header_bottom = 200 - tab->getHeaderHeight();
+        ensure("over the header, the header answers",
+               tab->handleToolTip(10, header_bottom + 4, MASK_NONE));
+        ensure("just under it, nothing does",
+               !tab->handleToolTip(10, header_bottom - 4, MASK_NONE));
+
+        tab->die();
+    }
 }
