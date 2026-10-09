@@ -51,7 +51,7 @@
 #include "stringize.h"
 
 template<typename T>
-T make(const T& value)
+static T make(const T& value)
 {
     return value;
 }
@@ -185,20 +185,6 @@ void events_object::test<2>()
     check_listener("got", listener0, 1);
     // Because listener0.callstop() returns true, control never reaches listener1.call().
     check_listener("got", listener1, 0);
-}
-
-bool chainEvents(Listener& someListener, const LLSD& event)
-{
-    // Make this call so we can watch for side effects for test purposes.
-    someListener.call(event);
-    // This function represents a recursive event chain -- or some other
-    // scenario in which an event handler raises additional events.
-    int value = event.asInteger();
-    if (value)
-    {
-        LLEventPumps::instance().obtain("login").post(value - 1);
-    }
-    return false;
 }
 
 template<> template<>
@@ -371,7 +357,7 @@ void events_object::test<7>()
 }
 
 // Define a function that accepts an LLListenerOrPumpName
-void eventSource(const LLListenerOrPumpName& listener)
+static void eventSource(const LLListenerOrPumpName& listener)
 {
     // Pretend that some time has elapsed. Call listener immediately.
     listener(17);
@@ -400,6 +386,9 @@ void events_object::test<8>()
     ensure("threw Empty", !threw.empty());
 }
 
+namespace
+{
+
 class TempListener: public Listener
 {
 public:
@@ -417,6 +406,8 @@ public:
 private:
     bool& mLiveFlag;
 };
+
+} // anonymous namespace
 
 template<> template<>
 void events_object::test<9>()
@@ -447,6 +438,9 @@ void events_object::test<9>()
     heaptest.stopListening("temp");
 }
 
+namespace
+{
+
 class TempTrackableListener: public TempListener, public LLEventTrackable
 {
 public:
@@ -454,6 +448,8 @@ public:
         TempListener(name, liveFlag)
     {}
 };
+
+} // anonymous namespace
 
 template<> template<>
 void events_object::test<10>()

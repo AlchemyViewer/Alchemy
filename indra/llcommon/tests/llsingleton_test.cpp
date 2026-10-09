@@ -32,6 +32,9 @@
 #include "wrapllerrs.h"
 #include "llsd.h"
 
+namespace
+{
+
 // Capture execution sequence by appending to log string.
 std::string sLog;
 
@@ -87,6 +90,8 @@ CLS::~CLS()                                     \
 
 DEFINE_MEMBERS(A, B)
 DEFINE_MEMBERS(B, A)
+
+} // anonymous namespace
 
 namespace tut
 {
@@ -209,8 +214,11 @@ namespace tut
     // validly initialize each using two different constructors. If we tried
     // to test that with a single LLParamSingleton class within the same test
     // program, we'd get 'trying to use deleted LLParamSingleton' errors.
-    PARAMSINGLETON(PSing1);
-    PARAMSINGLETON(PSing2);
+    namespace
+    {
+        PARAMSINGLETON(PSing1);
+        PARAMSINGLETON(PSing2);
+    } // anonymous namespace
 
     template<> template<>
     void singleton_object_t::test<12>()
@@ -276,14 +284,17 @@ namespace tut
         ensure_contains("other ctor(string) didn't throw", threw, "twice");
     }
 
-    class CircularPCtor: public LLParamSingleton<CircularPCtor>
+    namespace
     {
-        LLSINGLETON(CircularPCtor)
+        class CircularPCtor: public LLParamSingleton<CircularPCtor>
         {
-            // never mind indirection, just go straight for the circularity
-            (void)instance();
-        }
-    };
+            LLSINGLETON(CircularPCtor)
+            {
+                // never mind indirection, just go straight for the circularity
+                (void)instance();
+            }
+        };
+    } // anonymous namespace
 
     template<> template<>
     void singleton_object_t::test<14>()
@@ -296,20 +307,23 @@ namespace tut
         ensure_contains("constructor circularity didn't throw", threw, "constructor");
     }
 
-    class CircularPInit: public LLParamSingleton<CircularPInit>
+    namespace
     {
-        LLSINGLETON_EMPTY_CTOR(CircularPInit);
-    public:
-        virtual void initSingleton() override
+        class CircularPInit: public LLParamSingleton<CircularPInit>
         {
-            // never mind indirection, just go straight for the circularity
-            CircularPInit *pt = getInstance();
-            if (!pt)
+            LLSINGLETON_EMPTY_CTOR(CircularPInit);
+        public:
+            virtual void initSingleton() override
             {
-                throw;
+                // never mind indirection, just go straight for the circularity
+                CircularPInit *pt = getInstance();
+                if (!pt)
+                {
+                    throw;
+                }
             }
-        }
-    };
+        };
+    } // anonymous namespace
 
     template<> template<>
     void singleton_object_t::test<15>()

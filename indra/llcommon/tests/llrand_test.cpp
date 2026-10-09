@@ -45,8 +45,8 @@
 // testing extent < 0, negate the return value and the extent before passing
 // into ensure_in_range().
 template <typename NUMBER>
-void ensure_in_range(const std::string_view& name,
-                     NUMBER value, NUMBER low, NUMBER high)
+static void ensure_in_range(const std::string_view& name,
+                            NUMBER value, NUMBER low, NUMBER high)
 {
     auto failmsg{ stringize(name, " >= ", low, " (", value, ')') };
     tut::ensure(failmsg, (value >= low));

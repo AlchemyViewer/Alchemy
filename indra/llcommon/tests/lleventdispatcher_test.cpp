@@ -65,6 +65,9 @@ using namespace llsd;
 #define NARGSa   b, i, f, d, cp
 #define NARGSb   s, uuid, date, uri, bin
 
+namespace
+{
+
 // For some registration methods we need methods on a subclass of
 // LLEventDispatcher. To simplify things, we'll use this Dispatcher subclass
 // for all our testing, including testing its own methods.
@@ -312,19 +315,21 @@ void freenb(NPARAMSb)
     g.methodnb(NARGSb);
 }
 
+} // anonymous namespace
+
 /*****************************************************************************
 *   TUT
 *****************************************************************************/
 namespace tut
 {
-    void ensure_has(const std::string& outer, const std::string& inner)
+    static void ensure_has(const std::string& outer, const std::string& inner)
     {
         ensure(stringize("'", outer, "' does not contain '", inner, "'"),
                outer.find(inner) != std::string::npos);
     }
 
     template <typename CALLABLE>
-    std::string call_exc(CALLABLE&& func, const std::string& exc_frag)
+    static std::string call_exc(CALLABLE&& func, const std::string& exc_frag)
     {
         std::string what =
             catch_what<LLEventDispatcher::DispatchError>(std::forward<CALLABLE>(func));
@@ -333,7 +338,7 @@ namespace tut
     }
 
     template <typename CALLABLE>
-    void call_logerr(CALLABLE&& func, const std::string& frag)
+    static void call_logerr(CALLABLE&& func, const std::string& frag)
     {
         CaptureLog capture;
         // the error should be logged; we just need to stop the exception
@@ -1080,11 +1085,14 @@ namespace tut
     }
 
     // Cannot be defined inside function body... remind me again why we use C++...  :-P
-    struct CallablesTriple
+    namespace
     {
-        std::string name, name_req;
-        LLSD& llsd;
-    };
+        struct CallablesTriple
+        {
+            std::string name, name_req;
+            LLSD& llsd;
+        };
+    } // anonymous namespace
 
     template<> template<>
     void object::test<16>()
@@ -1170,10 +1178,10 @@ namespace tut
     }
 
     // Break out this data because we use it in a couple different tests.
-    LLSD array_funcs(llsd::array
-                     (LLSDMap("a", "freena_array")   ("b", "freenb_array"),
-                      LLSDMap("a", "smethodna_array")("b", "smethodnb_array"),
-                      LLSDMap("a", "methodna_array") ("b", "methodnb_array")));
+    static LLSD array_funcs(llsd::array
+                            (LLSDMap("a", "freena_array")   ("b", "freenb_array"),
+                             LLSDMap("a", "smethodna_array")("b", "smethodnb_array"),
+                             LLSDMap("a", "methodna_array") ("b", "methodnb_array")));
 
     template<> template<>
     void object::test<19>()
@@ -1331,40 +1339,43 @@ namespace tut
         }
     }
 
-    struct DispatchResult: public LLDispatchListener
+    namespace
     {
-        using DR = DispatchResult;
+        struct DispatchResult: public LLDispatchListener
+        {
+            using DR = DispatchResult;
 
-        DispatchResult(): LLDispatchListener("results", "op")
-        {
-            add("strfunc",   "return string",       &DR::strfunc);
-            add("voidfunc",  "void function",       &DR::voidfunc);
-            add("emptyfunc", "return empty LLSD",   &DR::emptyfunc);
-            add("intfunc",   "return Integer LLSD", &DR::intfunc);
-            add("llsdfunc",  "return passed LLSD",  &DR::llsdfunc);
-            add("mapfunc",   "return map LLSD",     &DR::mapfunc);
-            add("arrayfunc", "return array LLSD",   &DR::arrayfunc);
-        }
+            DispatchResult(): LLDispatchListener("results", "op")
+            {
+                add("strfunc",   "return string",       &DR::strfunc);
+                add("voidfunc",  "void function",       &DR::voidfunc);
+                add("emptyfunc", "return empty LLSD",   &DR::emptyfunc);
+                add("intfunc",   "return Integer LLSD", &DR::intfunc);
+                add("llsdfunc",  "return passed LLSD",  &DR::llsdfunc);
+                add("mapfunc",   "return map LLSD",     &DR::mapfunc);
+                add("arrayfunc", "return array LLSD",   &DR::arrayfunc);
+            }
 
-        std::string strfunc(const std::string& str) const { return "got " + str; }
-        void voidfunc()                  const {}
-        LLSD emptyfunc()                 const { return {}; }
-        int  intfunc(int i)              const { return -i; }
-        LLSD llsdfunc(const LLSD& event) const
-        {
-            LLSD result{ event };
-            result["with"] = "string";
-            return result;
-        }
-        LLSD mapfunc(int i, const std::string& str) const
-        {
-            return llsd::map("i", intfunc(i), "str", strfunc(str));
-        }
-        LLSD arrayfunc(int i, const std::string& str) const
-        {
-            return llsd::array(intfunc(i), strfunc(str));
-        }
-    };
+            std::string strfunc(const std::string& str) const { return "got " + str; }
+            void voidfunc()                  const {}
+            LLSD emptyfunc()                 const { return {}; }
+            int  intfunc(int i)              const { return -i; }
+            LLSD llsdfunc(const LLSD& event) const
+            {
+                LLSD result{ event };
+                result["with"] = "string";
+                return result;
+            }
+            LLSD mapfunc(int i, const std::string& str) const
+            {
+                return llsd::map("i", intfunc(i), "str", strfunc(str));
+            }
+            LLSD arrayfunc(int i, const std::string& str) const
+            {
+                return llsd::array(intfunc(i), strfunc(str));
+            }
+        };
+    } // anonymous namespace
 
     template<> template<>
     void object::test<23>()

@@ -99,8 +99,8 @@ namespace tut
         ensure("Current time in RFC 1123", (strcmp(expected, actual.c_str()) == 0));
     }
 
-    void test_date_string(const std::string &locale, struct tm *t,
-                          const std::string &fmt, const std::string &expected)
+    static void test_date_string(const std::string &locale, struct tm *t,
+                                 const std::string &fmt, const std::string &expected)
     {
         std::string result = LLDate::toHTTPDateString(t, fmt);
         LLStringUtil::toLower(result);

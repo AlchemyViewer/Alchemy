@@ -45,6 +45,9 @@
 /*****************************************************************************
 *   Test classes
 *****************************************************************************/
+namespace
+{
+
 // Strictly speaking, we're testing LLEventTimeoutBase rather than the
 // production LLEventTimeout (using LLTimer) because we don't want every test
 // run to pause for some number of seconds until we reach a real timeout. But
@@ -151,6 +154,8 @@ public:
     F32 mAlarmRemaining, mTimerRemaining;
     LLEventTimeoutBase::Action mAlarmAction;
 };
+
+} // anonymous namespace
 
 /*****************************************************************************
 *   TUT

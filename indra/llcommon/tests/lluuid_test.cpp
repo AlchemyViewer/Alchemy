@@ -96,33 +96,36 @@ namespace tut
         return z ^ (z >> 31);
     }
 
-    // Occupancy of a 256-bucket table indexed from one end of the hash or the
-    // other: containers take the index from the low bits (MSVC's
-    // std::unordered_map, any hand-rolled `h & (n-1)`) or from the high bits
-    // (boost's open-addressing tables), so both ends have to be mixed.
-    struct BucketSpread
+    namespace
     {
-        static constexpr size_t NUM_BUCKETS = 256;
-        int mLowMax = 0, mHighMax = 0, mLowEmpty = 0, mHighEmpty = 0;
-
-        explicit BucketSpread(const std::vector<LLUUID>& ids)
+        // Occupancy of a 256-bucket table indexed from one end of the hash or the
+        // other: containers take the index from the low bits (MSVC's
+        // std::unordered_map, any hand-rolled `h & (n-1)`) or from the high bits
+        // (boost's open-addressing tables), so both ends have to be mixed.
+        struct BucketSpread
         {
-            std::vector<int> low(NUM_BUCKETS, 0), high(NUM_BUCKETS, 0);
-            for (const LLUUID& id : ids)
+            static constexpr size_t NUM_BUCKETS = 256;
+            int mLowMax = 0, mHighMax = 0, mLowEmpty = 0, mHighEmpty = 0;
+
+            explicit BucketSpread(const std::vector<LLUUID>& ids)
             {
-                const size_t h = hash_value(id);
-                ++low[h & (NUM_BUCKETS - 1)];
-                ++high[(h >> (sizeof(size_t) * 8 - 8)) & (NUM_BUCKETS - 1)];
+                std::vector<int> low(NUM_BUCKETS, 0), high(NUM_BUCKETS, 0);
+                for (const LLUUID& id : ids)
+                {
+                    const size_t h = hash_value(id);
+                    ++low[h & (NUM_BUCKETS - 1)];
+                    ++high[(h >> (sizeof(size_t) * 8 - 8)) & (NUM_BUCKETS - 1)];
+                }
+                for (size_t i = 0; i < NUM_BUCKETS; ++i)
+                {
+                    if (low[i]  > mLowMax)  mLowMax  = low[i];
+                    if (high[i] > mHighMax) mHighMax = high[i];
+                    if (!low[i])  ++mLowEmpty;
+                    if (!high[i]) ++mHighEmpty;
+                }
             }
-            for (size_t i = 0; i < NUM_BUCKETS; ++i)
-            {
-                if (low[i]  > mLowMax)  mLowMax  = low[i];
-                if (high[i] > mHighMax) mHighMax = high[i];
-                if (!low[i])  ++mLowEmpty;
-                if (!high[i]) ++mHighEmpty;
-            }
-        }
-    };
+        };
+    } // anonymous namespace
 
     // Structured payloads: a counter walking each 8-byte window, every
     // one-bit value, a pair of small ints in the outermost lanes, and short

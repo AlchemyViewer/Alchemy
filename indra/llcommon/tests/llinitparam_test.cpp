@@ -42,6 +42,9 @@
 // ParamValue<> is specialised for TestPoint below.
 //
 
+namespace
+{
+
 // A named-value lookup, the mechanism behind "left"/"center" in XUI.
 struct TestNames : public LLInitParam::TypeValuesHelper<S32, TestNames>
 {
@@ -151,6 +154,8 @@ struct TestPoint
     S32 mY;
 };
 
+} // anonymous namespace
+
 namespace LLInitParam
 {
     template<>
@@ -188,6 +193,9 @@ namespace LLInitParam
     };
 }
 
+namespace
+{
+
 struct PointBlock : public LLInitParam::Block<PointBlock>
 {
     Optional<TestPoint> point;
@@ -209,6 +217,8 @@ struct PointChoice : public LLInitParam::ChoiceBlock<PointChoice>
         point("point")
     {}
 };
+
+} // anonymous namespace
 
 namespace tut
 {

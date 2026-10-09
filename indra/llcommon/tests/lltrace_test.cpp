@@ -38,14 +38,17 @@
 
 namespace LLUnits
 {
-    // using powers of 2 to allow strict floating point equality
-    LL_DECLARE_BASE_UNIT(Ounces, "oz");
-    LL_DECLARE_DERIVED_UNIT(TallCup, "", Ounces, / 12);
-    LL_DECLARE_DERIVED_UNIT(GrandeCup, "", Ounces, / 16);
-    LL_DECLARE_DERIVED_UNIT(VentiCup, "", Ounces, / 20);
+    namespace
+    {
+        // using powers of 2 to allow strict floating point equality
+        LL_DECLARE_BASE_UNIT(Ounces, "oz");
+        LL_DECLARE_DERIVED_UNIT(TallCup, "", Ounces, / 12);
+        LL_DECLARE_DERIVED_UNIT(GrandeCup, "", Ounces, / 16);
+        LL_DECLARE_DERIVED_UNIT(VentiCup, "", Ounces, / 20);
 
-    LL_DECLARE_BASE_UNIT(Grams, "g");
-    LL_DECLARE_DERIVED_UNIT(Milligrams, "mg", Grams, * 1000);
+        LL_DECLARE_BASE_UNIT(Grams, "g");
+        LL_DECLARE_DERIVED_UNIT(Milligrams, "mg", Grams, * 1000);
+    } // anonymous namespace
 }
 
 LL_DECLARE_UNIT_TYPEDEFS(LLUnits, Ounces);
@@ -75,7 +78,7 @@ namespace tut
     static F32 sCaffeineLevel(0.f);
     const F32Milligrams sCaffeinePerOz(18.f);
 
-    void drink_coffee(S32 num_cups, S32Ounces cup_size)
+    static void drink_coffee(S32 num_cups, S32Ounces cup_size)
     {
         add(sCupsOfCoffeeConsumed, num_cups);
         for (S32 i = 0; i < num_cups; i++)

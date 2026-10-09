@@ -53,6 +53,9 @@ using namespace llcoro;
 /*****************************************************************************
 *   Test helpers
 *****************************************************************************/
+namespace
+{
+
 /// Simulate an event API whose response is immediate: sent on receipt of the
 /// initial request, rather than after some delay. This is the case that
 /// distinguishes postAndSuspend() from calling post(), then calling
@@ -85,12 +88,14 @@ private:
     Sync& mSync;
 };
 
+} // anonymous namespace
+
 /*****************************************************************************
 *   TUT
 *****************************************************************************/
 namespace tut
 {
-    struct test_data
+    struct lleventcoro_data
     {
         Sync mSync;
         ImmediateAPI immediateAPI{mSync};
@@ -105,11 +110,11 @@ namespace tut
         void postAndWait1();
         void coroPumpPost();
     };
-    typedef test_group<test_data> coroutine_group;
+    typedef test_group<lleventcoro_data> coroutine_group;
     typedef coroutine_group::object object;
     coroutine_group coroutinegrp("coroutine");
 
-    void test_data::explicit_wait(std::shared_ptr<LLCoros::Promise<std::string>>& cbp)
+    void lleventcoro_data::explicit_wait(std::shared_ptr<LLCoros::Promise<std::string>>& cbp)
     {
         BEGIN
         {
@@ -159,7 +164,7 @@ namespace tut
         ensure_equals(stringdata, "received");
     }
 
-    void test_data::waitForEventOn1()
+    void lleventcoro_data::waitForEventOn1()
     {
         BEGIN
         {
@@ -185,7 +190,7 @@ namespace tut
         ensure_equals(result.asString(), "received");
     }
 
-    void test_data::coroPump()
+    void lleventcoro_data::coroPump()
     {
         BEGIN
         {
@@ -213,7 +218,7 @@ namespace tut
         ensure_equals(result.asString(), "received");
     }
 
-    void test_data::postAndWait1()
+    void lleventcoro_data::postAndWait1()
     {
         BEGIN
         {
@@ -236,7 +241,7 @@ namespace tut
         ensure_equals(result.asInteger(), 18);
     }
 
-    void test_data::coroPumpPost()
+    void lleventcoro_data::coroPumpPost()
     {
         BEGIN
         {

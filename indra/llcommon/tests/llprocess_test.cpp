@@ -43,7 +43,7 @@
 #include <sys/wait.h>
 #endif
 
-std::string apr_strerror_helper(apr_status_t rv)
+static std::string apr_strerror_helper(apr_status_t rv)
 {
     char errbuf[256];
     apr_strerror(rv, errbuf, sizeof(errbuf));
@@ -126,7 +126,7 @@ static std::string readfile_if_present(const std::string& pathname)
 /// Looping on LLProcess::isRunning() must now be accompanied by pumping
 /// "mainloop" -- otherwise the status won't update and you get an infinite
 /// loop.
-void yield(int seconds=1)
+static void yield(int seconds=1)
 {
     // This function simulates waiting for another viewer frame
     sleep(seconds);
@@ -136,7 +136,7 @@ void yield(int seconds=1)
 constexpr int EOF_EVENT_RETRY_COUNT = 20;
 constexpr auto EOF_EVENT_RETRY_DELAY = std::chrono::milliseconds(50);
 
-void waitfor(LLProcess& proc, int timeout=60)
+static void waitfor(LLProcess& proc, int timeout=60)
 {
     int i = 0;
     for ( ; i < timeout && proc.isRunning(); ++i)
@@ -149,7 +149,7 @@ void waitfor(LLProcess& proc, int timeout=60)
     tut::ensure(msg, i < timeout);
 }
 
-void waitfor(LLProcess::handle h, const std::string& desc, int timeout=60)
+static void waitfor(LLProcess::handle h, const std::string& desc, int timeout=60)
 {
     int i = 0;
     for ( ; i < timeout && LLProcess::isRunning(h, desc); ++i)
@@ -161,6 +161,9 @@ void waitfor(LLProcess::handle h, const std::string& desc, int timeout=60)
     std::string msg = "process took longer than " + std::to_string(timeout) + " seconds to terminate";
     tut::ensure(msg, i < timeout);
 }
+
+namespace
+{
 
 /**
  * Construct an LLProcess to run a Python script.
@@ -263,6 +266,8 @@ struct PythonProcessLauncher
     std::string mDesc;
     NamedExtTempFile mScript;
 };
+
+} // anonymous namespace
 
 #if LL_WINDOWS
 namespace
@@ -489,6 +494,9 @@ static std::string python_out(const std::string& desc, const CONTENT& script)
     return py.run_read();
 }
 
+namespace
+{
+
 /// Create a temporary directory and clean it up later.
 class NamedTempDir
 {
@@ -518,6 +526,8 @@ private:
     bool mCreated;
 };
 
+} // anonymous namespace
+
 /*****************************************************************************
 *   TUT
 *****************************************************************************/
@@ -538,13 +548,16 @@ namespace tut
     typedef llprocess_group::object object;
     llprocess_group llprocessgrp("llprocess");
 
-    struct Item
+    namespace
     {
-        Item(): tries(0) {}
-        unsigned    tries;
-        std::string which;
-        std::string what;
-    };
+        struct Item
+        {
+            Item(): tries(0) {}
+            unsigned    tries;
+            std::string which;
+            std::string what;
+        };
+    } // anonymous namespace
 
 /*==========================================================================*|
 #define tabent(symbol) { symbol, #symbol }
@@ -564,21 +577,24 @@ namespace tut
 #undef tabent
 |*==========================================================================*/
 
-    struct WaitInfo
+    namespace
     {
-        WaitInfo(apr_proc_t* child_):
-            child(child_),
-            rv(-1),                 // we haven't yet called apr_proc_wait()
-            rc(0),                   // child's exit code
-            why(apr_exit_why_e(0))
-        {}
-        apr_proc_t* child;          // which subprocess
-        apr_status_t rv;            // return from apr_proc_wait()
-        int rc;                     // child's exit code
-        apr_exit_why_e why;         // APR_PROC_EXIT, APR_PROC_SIGNAL, APR_PROC_SIGNAL_CORE
-    };
+        struct WaitInfo
+        {
+            WaitInfo(apr_proc_t* child_):
+                child(child_),
+                rv(-1),                 // we haven't yet called apr_proc_wait()
+                rc(0),                   // child's exit code
+                why(apr_exit_why_e(0))
+            {}
+            apr_proc_t* child;          // which subprocess
+            apr_status_t rv;            // return from apr_proc_wait()
+            int rc;                     // child's exit code
+            apr_exit_why_e why;         // APR_PROC_EXIT, APR_PROC_SIGNAL, APR_PROC_SIGNAL_CORE
+        };
+    } // anonymous namespace
 
-    void child_status_callback(int reason, void* data, int status)
+    static void child_status_callback(int reason, void* data, int status)
     {
 /*==========================================================================*|
         std::string reason_str;
@@ -1329,46 +1345,49 @@ namespace tut
         ensure_equals("bad child exit code",   py.mPy->getStatus().mData,  0);
     }
 
-    struct EventListener
+    namespace
     {
-        EventListener(const EventListener&) = delete;
-        EventListener& operator=(const EventListener&) = delete;
-
-        EventListener(LLEventPump& pump)
+        struct EventListener
         {
-            mConnection =
-                pump.listen("EventListener", boost::bind(&EventListener::tick, this, _1));
-        }
+            EventListener(const EventListener&) = delete;
+            EventListener& operator=(const EventListener&) = delete;
 
-        bool tick(const LLSD& data)
-        {
-            mHistory.push_back(data);
-            return false;
-        }
-
-        template <typename CALLABLE>
-        void checkHistory(CALLABLE&& code)
-        {
-            try
+            EventListener(LLEventPump& pump)
             {
-                // we expect this lambda to contain tut::ensure() calls
-                std::forward<CALLABLE>(code)(mHistory);
+                mConnection =
+                    pump.listen("EventListener", boost::bind(&EventListener::tick, this, _1));
             }
-            catch (const failure&)
+
+            bool tick(const LLSD& data)
             {
-                LL_INFOS() << "event history:" << LL_ENDL;
-                for (const LLSD& item : mHistory)
+                mHistory.push_back(data);
+                return false;
+            }
+
+            template <typename CALLABLE>
+            void checkHistory(CALLABLE&& code)
+            {
+                try
                 {
-                    LL_INFOS() << item << LL_ENDL;
+                    // we expect this lambda to contain tut::ensure() calls
+                    std::forward<CALLABLE>(code)(mHistory);
                 }
-                throw;
+                catch (const failure&)
+                {
+                    LL_INFOS() << "event history:" << LL_ENDL;
+                    for (const LLSD& item : mHistory)
+                    {
+                        LL_INFOS() << item << LL_ENDL;
+                    }
+                    throw;
+                }
             }
-        }
 
-        using Listory = std::list<LLSD>;
-        Listory mHistory;
-        LLTempBoundListener mConnection;
-    };
+            using Listory = std::list<LLSD>;
+            Listory mHistory;
+            LLTempBoundListener mConnection;
+        };
+    } // anonymous namespace
 
     static bool ack(std::ostream& out, const LLSD& data)
     {
@@ -1627,30 +1646,33 @@ namespace tut
             });
     }
 
-    struct PostendListener
+    namespace
     {
-        PostendListener(LLProcess::ReadPipe& rpipe,
-                        const std::string& pumpname,
-                        const std::string& expect):
-            mReadPipe(rpipe),
-            mExpect(expect),
-            mTriggered(false)
+        struct PostendListener
         {
-            LLEventPumps::instance().obtain(pumpname)
-                .listen("PostendListener", boost::bind(&PostendListener::postend, this, _1));
-        }
+            PostendListener(LLProcess::ReadPipe& rpipe,
+                            const std::string& pumpname,
+                            const std::string& expect):
+                mReadPipe(rpipe),
+                mExpect(expect),
+                mTriggered(false)
+            {
+                LLEventPumps::instance().obtain(pumpname)
+                    .listen("PostendListener", boost::bind(&PostendListener::postend, this, _1));
+            }
 
-        bool postend(const LLSD&)
-        {
-            mTriggered = true;
-            ensure_equals("postend listener", mReadPipe.read(mReadPipe.size()), mExpect);
-            return false;
-        }
+            bool postend(const LLSD&)
+            {
+                mTriggered = true;
+                ensure_equals("postend listener", mReadPipe.read(mReadPipe.size()), mExpect);
+                return false;
+            }
 
-        LLProcess::ReadPipe& mReadPipe;
-        std::string mExpect;
-        bool mTriggered;
-    };
+            LLProcess::ReadPipe& mReadPipe;
+            std::string mExpect;
+            bool mTriggered;
+        };
+    } // anonymous namespace
 
     template<> template<>
     void object::test<24>()

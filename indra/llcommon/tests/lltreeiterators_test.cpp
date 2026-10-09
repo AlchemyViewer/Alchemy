@@ -59,6 +59,9 @@ namespace tut
     tut::iter_group ig("LLTreeIterators");
 } // namespace tut
 
+namespace
+{
+
 /*****************************************************************************
 *   boost::get_pointer() specialization for LLPointer<>
 *****************************************************************************/
@@ -149,7 +152,7 @@ struct Expected
 
 // We have a couple of generic Expected template subclasses. This list of
 // strings is used for the "else" case when all specializations fail.
-const char* bad_strings[] = { "FAIL" };
+[[maybe_unused]] const char* bad_strings[] = { "FAIL" };
 
 /*****************************************************************************
 *   verify()
@@ -226,6 +229,8 @@ private:
     std::string mName;
 };
 
+} // anonymous namespace
+
 namespace tut
 {
     template<> template<>
@@ -277,6 +282,9 @@ namespace tut
     }
 } // tut
 
+namespace
+{
+
 /*****************************************************************************
 *   RCNode: LLLinkIter, refcounted
 *****************************************************************************/
@@ -307,7 +315,7 @@ private:
     std::string mName;
 };
 
-std::ostream& operator<<(std::ostream& out, const RCNode& node)
+[[maybe_unused]] std::ostream& operator<<(std::ostream& out, const RCNode& node)
 {
     out << "RCNode(" << node.name() << ')';
     return out;
@@ -324,6 +332,8 @@ RCNode::~RCNode()
 //  std::cout << "Kill " << *this << "\n";
     last_RCNode_destroyed = mName;
 }
+
+} // anonymous namespace
 
 namespace tut
 {
@@ -356,6 +366,9 @@ namespace tut
         ensure(rcni == end2);
     }
 }
+
+namespace
+{
 
 /*****************************************************************************
 *   TreeNode
@@ -1077,6 +1090,8 @@ bool LLTreeIter_tests(const std::string& nodename,
         success = false;
     return success;
 }
+
+} // anonymous namespace
 
 namespace tut
 {

@@ -37,38 +37,41 @@ using std::fpclassify;
 
 namespace tut
 {
-    class SDCleanupCheck
+    namespace
     {
-    private:
-        U32 mOutstandingAtStart;
-    public:
-        SDCleanupCheck() : mOutstandingAtStart(llsd::outstandingCount()) { }
-        ~SDCleanupCheck()
+        class SDCleanupCheck
         {
-            ensure_equals("SDCleanupCheck",
-                llsd::outstandingCount(), mOutstandingAtStart);
-        }
-    };
+        private:
+            U32 mOutstandingAtStart;
+        public:
+            SDCleanupCheck() : mOutstandingAtStart(llsd::outstandingCount()) { }
+            ~SDCleanupCheck()
+            {
+                ensure_equals("SDCleanupCheck",
+                    llsd::outstandingCount(), mOutstandingAtStart);
+            }
+        };
 
-    class SDAllocationCheck : public SDCleanupCheck
-    {
-    private:
-        std::string mMessage;
-        U32 mExpectedAllocations;
-        U32 mAllocationAtStart;
-    public:
-        SDAllocationCheck(const std::string& message, int expectedAllocations)
-            : mMessage(message),
-            mExpectedAllocations(expectedAllocations),
-            mAllocationAtStart(llsd::allocationCount())
-            { }
-        ~SDAllocationCheck()
+        class SDAllocationCheck : public SDCleanupCheck
         {
-            ensure_equals(mMessage + " SDAllocationCheck",
-                llsd::allocationCount() - mAllocationAtStart,
-                mExpectedAllocations);
-        }
-    };
+        private:
+            std::string mMessage;
+            U32 mExpectedAllocations;
+            U32 mAllocationAtStart;
+        public:
+            SDAllocationCheck(const std::string& message, int expectedAllocations)
+                : mMessage(message),
+                mExpectedAllocations(expectedAllocations),
+                mAllocationAtStart(llsd::allocationCount())
+                { }
+            ~SDAllocationCheck()
+            {
+                ensure_equals(mMessage + " SDAllocationCheck",
+                    llsd::allocationCount() - mAllocationAtStart,
+                    mExpectedAllocations);
+            }
+        };
+    } // anonymous namespace
 
     struct SDTestData {
         template<class T>
@@ -218,7 +221,7 @@ namespace tut
         LLSD x2 = data; ensureTypeAndRefValue("initialize vector<U8>", x2, data);
     }
 
-    void checkConversions(const char* msg, const LLSD& v,
+    static void checkConversions(const char* msg, const LLSD& v,
         LLSD::Boolean eBoolean, LLSD::Integer eInteger,
         LLSD::Real eReal, const LLSD::String& eString)
     {
@@ -290,7 +293,7 @@ namespace tut
     }
 
     template<class T>
-    void checkRoundTrip(const std::string& msg, const LLSD& actual,
+    static void checkRoundTrip(const std::string& msg, const LLSD& actual,
         const char* sExpected, T vExpected)
     {
         std::string str = actual.asString();
