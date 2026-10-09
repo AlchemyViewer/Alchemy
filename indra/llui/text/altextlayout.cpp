@@ -203,8 +203,7 @@ void ALTextLayout::invalidateAll()
         ++mHiddenRevision;
     }
     heightsMoved();
-    mContentWidth = -1.f;
-    mWidestLine   = -1;
+    mWidthsStale = true;
 }
 
 void ALTextLayout::heightsMoved()
@@ -238,24 +237,8 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
     }
     if (moved)
     {
-        // The widest line moves with the lines, unless the edit replaced
-        // it; the lines it made count by their bytes, in the widest too.
-        const S32 widest = mWidestLine >= 0 ? edit.lineAfter(mWidestLine) : -1;
         mLines.applySpans(spans, line_count, Entry());
-        if (mWidestLine >= 0 && widest < 0)
-        {
-            mContentWidth = -1.f;
-        }
-        mWidestLine = widest;
-        S32 shift   = 0;
-        for (const ALTextDocument::Edit::LineSpan& span : spans)
-        {
-            for (S32 made = 0; made < span.made; ++made)
-            {
-                widthChanged(span.first + shift + made);
-            }
-            shift = span.shiftAfter;
-        }
+        spliceWidths(edit);
     }
     else
     {
@@ -284,29 +267,87 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
     }
     if (moved || hidden_gone > 0)
     {
-        heightsMoved();
+        spliceHeights(edit);
     }
+}
+
+void ALTextLayout::spliceHeights(const ALTextDocument::Edit& edit)
+{
+    ++mHeightsRevision;
+    if (mHeightsStale)
+    {
+        return;
+    }
+    // An edit over much of the text -- the text set, a paste of thousands
+    // of lines -- sums every height again when next asked for, which costs
+    // no more than counting the lines it made; so do many edits made with
+    // no height asked for between them, a macro's, whose lines still to
+    // count would each move with every edit.
+    const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
+    size_t                                            lines = 0;
+    for (const ALTextDocument::Edit::LineSpan& span : spans)
+    {
+        lines += static_cast<size_t>(llmax(span.made, 0) + llmax(span.last - span.first + 1, 0));
+    }
+    if (lines + mUncounted.size() > llmax<size_t>(1024, mHeights.size() / 4))
+    {
+        mUncounted.clear();
+        mHeightsStale = true;
+        return;
+    }
+    // Those still to count move with the text, or go with the lines the
+    // edit replaced.
+    std::vector<S32> uncounted;
+    for (const S32 line : mUncounted)
+    {
+        const S32 now = edit.lineAfter(line);
+        if (now >= 0)
+        {
+            uncounted.push_back(now);
+        }
+    }
+    // From the last run up, each where its lines still are: the heights it
+    // replaced taken out, and a row's for each line it made put in, which
+    // are counted once every listener has heard of the edit.
+    const S32 row_h = rowHeight();
+    for (auto span = spans.rbegin(); span != spans.rend(); ++span)
+    {
+        const size_t size  = mHeights.size();
+        const size_t first = static_cast<size_t>(llclamp(span->first, 0, static_cast<S32>(size)));
+        const size_t count = first < size ? static_cast<size_t>(llclamp(span->last, static_cast<S32>(first), static_cast<S32>(size) - 1)) - first + 1 : 0;
+        mHeights.erase(first, count);
+        mHeights.insert(first, std::vector<S32>(static_cast<size_t>(llmax(span->made, 0)), row_h));
+    }
+    S32 shift = 0;
+    for (const ALTextDocument::Edit::LineSpan& span : spans)
+    {
+        for (S32 made = 0; made < span.made; ++made)
+        {
+            uncounted.push_back(span.first + shift + made);
+        }
+        shift = span.shiftAfter;
+    }
+    std::sort(uncounted.begin(), uncounted.end());
+    uncounted.erase(std::unique(uncounted.begin(), uncounted.end()), uncounted.end());
+    mUncounted.swap(uncounted);
 }
 
 F32 ALTextLayout::contentWidth()
 {
     refreshIfFontsChanged();
-    if (mContentWidth < 0.f)
+    if (mWidthsStale)
     {
-        const F32 per_byte = spaceAdvance() / mScaleX;
-        mContentWidth      = 0.f;
-        mWidestLine        = -1;
+        const F32        per_byte = spaceAdvance() / mScaleX;
+        std::vector<F32> widths(static_cast<size_t>(lineCount()));
         for (S32 i = 0; i < lineCount(); ++i)
         {
-            const F32 width = countedWidth(i, per_byte);
-            if (width > mContentWidth)
-            {
-                mContentWidth = width;
-                mWidestLine   = i;
-            }
+            widths[static_cast<size_t>(i)] = countedWidth(i, per_byte);
         }
+        mWidths.assign(widths);
+        mWidthsStale = false;
+        ++mWidthPasses;
     }
-    return mContentWidth;
+    return mWidths.most();
 }
 
 F32 ALTextLayout::countedWidth(S32 index, F32 per_byte) const
@@ -321,21 +362,52 @@ F32 ALTextLayout::countedWidth(S32 index, F32 per_byte) const
 
 void ALTextLayout::widthChanged(S32 index)
 {
-    if (mContentWidth < 0.f || index < 0 || index >= lineCount())
+    if (mWidthsStale || index < 0 || index >= lineCount())
     {
         return;
     }
-    if (index == mWidestLine)
+    mWidths.set(static_cast<size_t>(index), countedWidth(index, spaceAdvance() / mScaleX));
+}
+
+void ALTextLayout::spliceWidths(const ALTextDocument::Edit& edit)
+{
+    if (mWidthsStale)
     {
-        // It may have narrowed, and another line be the widest.
-        mContentWidth = -1.f;
         return;
     }
-    const F32 width = countedWidth(index, spaceAdvance() / mScaleX);
-    if (width > mContentWidth)
+    // An edit over much of the text counts every width again when next
+    // asked for, which costs no more than putting in those it made.
+    const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
+    size_t                                            lines = 0;
+    for (const ALTextDocument::Edit::LineSpan& span : spans)
     {
-        mContentWidth = width;
-        mWidestLine   = index;
+        lines += static_cast<size_t>(llmax(span.made, 0) + llmax(span.last - span.first + 1, 0));
+    }
+    if (lines > llmax<size_t>(1024, mWidths.size() / 4))
+    {
+        mWidthsStale = true;
+        return;
+    }
+    // From the last run up, each where its lines still are: the widths it
+    // replaced taken out, and those of the lines it made, where they are
+    // now, put in.
+    const F32        per_byte = spaceAdvance() / mScaleX;
+    std::vector<F32> made;
+    for (size_t i = spans.size(); i-- > 0;)
+    {
+        const ALTextDocument::Edit::LineSpan& span  = spans[i];
+        const S32                             shift = i > 0 ? spans[i - 1].shiftAfter : 0;
+        const size_t                          size  = mWidths.size();
+        const size_t first = static_cast<size_t>(llclamp(span.first, 0, static_cast<S32>(size)));
+        const size_t count = first < size ? static_cast<size_t>(llclamp(span.last, static_cast<S32>(first), static_cast<S32>(size) - 1)) - first + 1 : 0;
+        made.clear();
+        for (S32 k = 0; k < span.made; ++k)
+        {
+            const S32 now = span.first + shift + k;
+            made.push_back(now >= 0 && now < lineCount() ? countedWidth(now, per_byte) : 0.f);
+        }
+        mWidths.erase(first, count);
+        mWidths.insert(first, made);
     }
 }
 
@@ -736,20 +808,6 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     {
         out.ordered = out.glyphs[k].cluster >= out.glyphs[k - 1].cluster;
     }
-    // The widest line, kept up in the UI's pixels as the width is: wider,
-    // or found again where this line was the widest and has narrowed.
-    if (mContentWidth >= 0.f)
-    {
-        if (index == mWidestLine && out.width < mContentWidth)
-        {
-            mContentWidth = -1.f;
-        }
-        else if (out.width > mContentWidth)
-        {
-            mContentWidth = out.width;
-            mWidestLine   = index;
-        }
-    }
     wrapLine(index, out);
 }
 
@@ -941,6 +999,7 @@ const ALTextLayout::Line& ALTextLayout::line(S32 index)
         entry.trimmed = false;
         entry.height  = laid.height;
         entry.width   = laid.width;
+        widthChanged(index);
         if (!mHeightsStale && static_cast<size_t>(index) < mHeights.size() && mHeights.at(static_cast<size_t>(index)) != countedHeight(index))
         {
             mHeights.set(static_cast<size_t>(index), countedHeight(index));
@@ -1001,6 +1060,31 @@ void ALTextLayout::ensureHeights()
     refreshIfFontsChanged();
     if (!mHeightsStale)
     {
+        // The lines edits made, counted now that the host has moved its
+        // gaps along with the lines; and the rows below the text, which
+        // are another line's once the count has changed.
+        if (!mUncounted.empty())
+        {
+            const S32 row_h = rowHeight();
+            bool      moved = false;
+            for (const S32 line : mUncounted)
+            {
+                if (line < static_cast<S32>(mHeights.size()))
+                {
+                    const S32 height = countedHeight(line, row_h);
+                    moved            = moved || mHeights.at(static_cast<size_t>(line)) != height;
+                    mHeights.set(static_cast<size_t>(line), height);
+                }
+            }
+            mUncounted.clear();
+            const S32 end_gap = mGaps ? llmax(0, mGaps(lineCount())) : 0;
+            moved             = moved || end_gap != mEndGap;
+            mEndGap           = end_gap;
+            if (moved)
+            {
+                ++mHeightsRevision;
+            }
+        }
         return;
     }
     // The font's row asked once, not once a line.
@@ -1011,6 +1095,7 @@ void ALTextLayout::ensureHeights()
         mHeightScratch[i] = countedHeight(static_cast<S32>(i), row_h);
     }
     mHeights.assign(mHeightScratch);
+    mUncounted.clear();
     mEndGap       = mGaps ? llmax(0, mGaps(lineCount())) : 0;
     mHeightsStale = false;
 }

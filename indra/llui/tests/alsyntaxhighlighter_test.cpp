@@ -486,4 +486,120 @@ namespace tut
         highlighter.setGrammar(nullptr);
         ensure("no grammar, no tokens", highlighter.tokens(0).empty() && highlighter.tokens(1).empty());
     }
+
+    template<> template<>
+    void alsyntaxhighlighter_object::test<14>()
+    {
+        set_test_name("after edits, asking for the last line lexes each from where it was made to where lexing settles, and looks at no line between them or past");
+        std::string text;
+        for (S32 i = 0; i < 20000; ++i)
+        {
+            text += "if x == " + std::to_string(i) + "\n";
+        }
+        ALTextDocument      doc(text);
+        ALSyntaxHighlighter highlighter;
+        highlighter.setGrammar(loaded(mini()));
+        highlighter.attach(&doc);
+        const S32 last = doc.lineCount() - 1;
+        highlighter.tokens(last);
+        doc.insert(ALTextPos(5, 0), "y ");
+        highlighter.tokens(last);
+        ensure_equals("the line edited lexed", highlighter.lastLexed(), 1);
+        ensure("and the one after it looked at, no more", highlighter.lastLooked() <= 2);
+        doc.insert(ALTextPos(10, 0), "a\nb ");
+        doc.insert(ALTextPos(15000, 0), "c ");
+        highlighter.tokens(last + 1);
+        ensure_equals("two edits: the lines each made", highlighter.lastLexed(), 3);
+        ensure("and the line after each looked at", highlighter.lastLooked() <= 5);
+        ALSyntaxHighlighter fresh;
+        fresh.setGrammar(loaded(mini()));
+        fresh.attach(&doc);
+        ensure("lexed as they read", highlighter.tokens(15000) == fresh.tokens(15000) && highlighter.tokens(11) == fresh.tokens(11));
+    }
+
+    template<> template<>
+    void alsyntaxhighlighter_object::test<15>()
+    {
+        set_test_name("edits of every kind, with lexing asked for a line at a time, a slice at a time or to the end between them, leave every line's tokens what a highlighter lexing afresh finds");
+        const auto grammar = loaded(mini());
+        const char* pieces[] = { "if a == 1", "/* open", "close */", "x = \"s", "// note", "y = \"a\" + 2", "", "end */ if", "\"", "/**/ z" };
+        U32         seed     = 777;
+        const auto  next     = [&seed](U32 below) {
+            seed = seed * 1664525u + 1013904223u;
+            return below == 0 ? 0 : (seed >> 8) % below;
+        };
+        std::string text;
+        for (S32 i = 0; i < 300; ++i)
+        {
+            text += std::string(pieces[next(10)]) + "\n";
+        }
+        ALTextDocument      doc(text);
+        ALSyntaxHighlighter highlighter;
+        highlighter.setGrammar(grammar);
+        highlighter.attach(&doc);
+        for (S32 step = 0; step < 600; ++step)
+        {
+            const S32 lines = doc.lineCount();
+            const S32 line  = static_cast<S32>(next(static_cast<U32>(lines)));
+            const U32 kind  = next(6);
+            if (kind == 0)
+            {
+                doc.insert(ALTextPos(line, 0), std::string(pieces[next(10)]) + "\n");
+            }
+            else if (kind == 1 && lines > 2)
+            {
+                const S32 to = llmin(line + static_cast<S32>(next(4)) + 1, lines - 1);
+                doc.replace(ALTextRange(ALTextPos(line, 0), ALTextPos(to, 0)), std::string());
+            }
+            else if (kind == 2)
+            {
+                doc.insert(ALTextPos(line, static_cast<S32>(next(static_cast<U32>(doc.line(line).size() + 1)))), pieces[next(10)]);
+            }
+            else if (kind == 3 && lines > 40)
+            {
+                // A batch's runs, apart.
+                std::vector<std::pair<ALTextRange, std::string>> batch;
+                S32                                              at = static_cast<S32>(next(10));
+                while (at + 3 < lines && batch.size() < 4)
+                {
+                    batch.emplace_back(ALTextRange(ALTextPos(at, 0), ALTextPos(at + static_cast<S32>(next(2)), 0)), std::string(pieces[next(10)]) + "\n");
+                    at += 5 + static_cast<S32>(next(30));
+                }
+                doc.replaceMany(std::move(batch));
+            }
+            else
+            {
+                doc.insert(ALTextPos(line, 0), pieces[next(10)]);
+            }
+            // Between edits, as a view asks: a line drawn, a slice a frame,
+            // the last line, or nothing.
+            const U32 ask = next(4);
+            if (ask == 0)
+            {
+                highlighter.tokens(static_cast<S32>(next(static_cast<U32>(doc.lineCount()))));
+            }
+            else if (ask == 1)
+            {
+                highlighter.lexSome(static_cast<S32>(next(20)) + 1);
+            }
+            else if (ask == 2)
+            {
+                highlighter.tokens(doc.lineCount() - 1);
+            }
+            if (step % 20 == 19)
+            {
+                ALSyntaxHighlighter fresh;
+                fresh.setGrammar(grammar);
+                fresh.attach(&doc);
+                for (S32 l = 0; l < doc.lineCount(); ++l)
+                {
+                    const std::vector<ALSyntaxToken> mine = highlighter.tokens(l);
+                    if (mine != fresh.tokens(l))
+                    {
+                        ensure_equals("step " + std::to_string(step) + ", line " + std::to_string(l), said(doc.line(l), mine), said(doc.line(l), fresh.tokens(l)));
+                    }
+                }
+            }
+        }
+    }
 }

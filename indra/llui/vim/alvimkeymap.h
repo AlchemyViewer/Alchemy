@@ -116,6 +116,9 @@ public:
         std::function<void(ALTextView& view, const std::string& title, const std::vector<std::string>& items,
                            std::function<void(size_t index)> chosen)>
             pick;
+        // The name of the file the view shows, for the % register, or of
+        // the alternate one, for #; none where there is none.
+        std::function<std::string(const ALTextView& view, char name)> fileName;
     };
 
     ALVimKeymap();
@@ -129,7 +132,8 @@ public:
     // A line put up on the : or / line, as the history window hands one
     // back: to be edited and entered, or run as it is, as vim's window
     // runs the row Enter is pressed on. An insert or an asking :s still
-    // going ends first, as Escape and q end them.
+    // going ends first, as Escape and q end them, nothing after the :s
+    // run and a :g it is a line of let go of.
     void               takeLine(ALTextView& view, llwchar kind, const std::string& text, bool run = false);
     // What the mode last said: a pattern not found, lines yanked, a
     // command unknown; cleared by the next key.
@@ -475,7 +479,16 @@ private:
     // Registers, the unnamed one on the clipboard; a delete in 1 whatever
     // its size where `register_one` says (Span::registerOne).
     void     store(char name, std::string text, bool linewise, bool block, bool yanked, bool register_one = false);
-    Register fetch(char name) const;
+    // % and # are the names the host gives the file `view` shows and the
+    // alternate one, none without a view.
+    Register fetch(char name, const ALTextView* view) const;
+    // Those vim keeps itself -- . : / % # -- which a yank, a delete or a
+    // change writes nothing to.
+    static bool readOnly(char name);
+    // What vim says of a put from a register holding nothing: E29, E30,
+    // E35, E32 and E23 for those it keeps itself, E353 for the rest, and
+    // nothing for _.
+    static std::string nothingIn(char name);
     // gp and gP, `past`: the caret after what was put.
     void     put(ALTextView& view, char name, bool after, S32 count, bool past = false);
     // Says a count would make more text than it may, and how much.

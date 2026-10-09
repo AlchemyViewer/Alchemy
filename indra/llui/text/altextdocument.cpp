@@ -312,7 +312,17 @@ ALTextDocument::Edit ALTextDocument::setText(std::string_view text)
 
 std::string ALTextDocument::text() const
 {
-    return ALLineBreaks::join(mLines.rows());
+    std::string out;
+    out.reserve(mBytes);
+    for (size_t l = 0; l < mLines.size(); ++l)
+    {
+        if (l > 0)
+        {
+            out += '\n';
+        }
+        out += mLines[l];
+    }
+    return out;
 }
 
 const std::string& ALTextDocument::wholeText() const

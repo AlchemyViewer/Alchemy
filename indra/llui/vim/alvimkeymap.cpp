@@ -296,7 +296,7 @@ void ALVimKeymap::mouseChanged(ALTextView& view)
 
 std::string ALVimKeymap::registerText(char name) const
 {
-    return fetch(name).text;
+    return fetch(name, nullptr).text;
 }
 
 bool ALVimKeymap::typingLine(std::string& line, S32& caret) const
@@ -1266,10 +1266,10 @@ bool ALVimKeymap::afterSurroundPair(ALTextView& view, llwchar pending, llwchar c
 
 bool ALVimKeymap::afterRegisterName(ALTextView& view, llwchar pending, llwchar ch)
 {
-    // Those vim keeps itself -- . : / -- as well, to put, which nothing may
-    // write to (applyOperator).
+    // Those vim keeps itself -- . : / % # -- as well, to put, which nothing
+    // may write to (applyOperator).
     if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '"' || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '+' ||
-        ch == '*' || ch == '.' || ch == ':' || ch == '/')
+        ch == '*' || (ch < 0x80 && readOnly(static_cast<char>(ch))))
     {
         // A count typed before the name is kept, for the one typed after
         // it to multiply (takeRegisterCount).
@@ -1386,7 +1386,7 @@ bool ALVimKeymap::afterPlay(ALTextView& view, llwchar pending, llwchar ch)
         clearPending();
         return true;
     }
-    const std::vector<Input> inputs = decodeInputs(fetch(static_cast<char>(std::tolower(name))).text);
+    const std::vector<Input> inputs = decodeInputs(fetch(static_cast<char>(std::tolower(name)), &view).text);
     mLastPlayed                     = static_cast<char>(std::tolower(name));
     clearPending();
     // The count's plays one step to undo, and the first to fail
@@ -3890,7 +3890,7 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                 // register is put, whichever was named, so a further p puts
                 // that; P leaves every register as it was, for a further P
                 // to put the same again.
-                const Register                 put_this = fetch(mRegister);
+                const Register                 put_this = fetch(mRegister, &view);
                 const std::vector<ALTextRange> pieces   = span.block ? blockPieces(view, span) : std::vector<ALTextRange>();
                 std::string                    taken    = span.block ? blockText(d, pieces, span.left, span.right, span.toEnd, view.getTabWidth()) : d.text(span.range);
                 leaveVisual(view);
@@ -4005,6 +4005,16 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                 if (ch == 'p' && (span.linewise || span.block || !span.range.empty()))
                 {
                     store(0, std::move(taken), span.linewise, span.block, false);
+                }
+                // A register with nothing in it puts nothing where the
+                // selection was, and says so, as vim's takes the selection
+                // out before it finds the register empty.
+                if (!put_this.held)
+                {
+                    if (const std::string nothing = nothingIn(mRegister); !nothing.empty())
+                    {
+                        say(nothing, true);
+                    }
                 }
                 finishCommand(true);
                 return true;
@@ -5751,11 +5761,11 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
         moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
         return;
     }
-    // A register vim keeps itself -- . : / -- is read only: a yank or a
+    // A register vim keeps itself -- . : / % # -- is read only: a yank or a
     // delete into it takes nothing and fails, and a change takes nothing
     // and types from the stretch's start, as vim's op_change goes on into
     // insert mode once its delete has refused.
-    if ((op == 'd' || op == 'y' || op == 'c') && (mRegister == '.' || mRegister == ':' || mRegister == '/'))
+    if ((op == 'd' || op == 'y' || op == 'c') && readOnly(mRegister))
     {
         if (op == 'c' && editing)
         {
@@ -6045,18 +6055,52 @@ void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, 
     mShared->registers.store(name, std::move(text), linewise, block, yanked, mShared->unnamedClipboard, register_one);
 }
 
-ALVimKeymap::Register ALVimKeymap::fetch(char name) const
+ALVimKeymap::Register ALVimKeymap::fetch(char name, const ALTextView* view) const
 {
     // The registers vim keeps itself and lets be read only: what the last
-    // insert typed, the last : line run and the last search.
-    if (name == '.' || name == ':' || name == '/')
+    // insert typed, the last : line run, the last search, and the names of
+    // the file and the alternate one.
+    if (readOnly(name))
     {
         Register reg;
-        reg.text = name == '.' ? mLastTyped : name == ':' ? mShared->commandLine : mSearch.pattern;
+        if (name == '%' || name == '#')
+        {
+            reg.text = view && mHooks.fileName ? mHooks.fileName(*view, name) : std::string();
+        }
+        else
+        {
+            reg.text = name == '.' ? mLastTyped : name == ':' ? mShared->commandLine : mSearch.pattern;
+        }
         reg.held = !reg.text.empty();
         return reg;
     }
     return mShared->registers.fetch(name, mShared->unnamedClipboard);
+}
+
+bool ALVimKeymap::readOnly(char name)
+{
+    return name == '.' || name == ':' || name == '/' || name == '%' || name == '#';
+}
+
+std::string ALVimKeymap::nothingIn(char name)
+{
+    switch (name)
+    {
+        case '_':
+            return std::string();
+        case '.':
+            return said("VimNoInsertedText", "E29: No inserted text yet");
+        case ':':
+            return said("VimNoPreviousCommand", "E30: No previous command line");
+        case '/':
+            return said("VimNoPreviousPattern", "E35: No previous regular expression");
+        case '%':
+            return said("VimNoFileName", "E32: No file name");
+        case '#':
+            return said("VimNoAlternate", "E23: No alternate file");
+        default:
+            return said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, name ? name : '"') } });
+    }
 }
 
 void ALVimKeymap::tooMuch(size_t bytes)
@@ -6076,16 +6120,16 @@ void ALVimKeymap::sayMoreLines(S32 lines)
 void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool past)
 {
     const ALTextDocument& d   = view.document();
-    const Register        reg = fetch(name);
+    const Register        reg = fetch(name, &view);
     // Nothing is a register never set. One set to no text -- yiw on an
     // empty line keeps one -- puts nothing and says nothing, as vim's does,
     // where a line is something however empty, as yy on an empty line keeps
     // one. What _ gives back is no text, put as nothing and said nothing of.
     if (!reg.held)
     {
-        if (name != '_')
+        if (const std::string nothing = nothingIn(name); !nothing.empty())
         {
-            say(said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, name ? name : '"') } }), true);
+            say(nothing, true);
         }
         return;
     }
@@ -6617,9 +6661,16 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
         {
             typeIn(view, mLastTyped);
         }
-        else if (isalnum(static_cast<unsigned char>(name)) || name == '"' || name == '-' || name == '+' || name == '*' || name == ':' || name == '/')
+        else if (isalnum(static_cast<unsigned char>(name)) || name == '"' || name == '-' || name == '+' || name == '*' || readOnly(name))
         {
-            typeIn(view, fetch(name).text);
+            // One of vim's own with nothing in it is said of, as its
+            // Control-R says it; any other types nothing.
+            const Register reg = fetch(name, &view);
+            if (!reg.held && readOnly(name))
+            {
+                say(nothingIn(name), true);
+            }
+            typeIn(view, reg.text);
         }
         return true;
     }
@@ -6975,15 +7026,17 @@ void ALVimKeymap::takeLine(ALTextView& view, llwchar kind, const std::string& te
 {
     // Handed over whenever the window is done, whatever vim is doing then,
     // which ends as its own keys would end it: an insert as Escape does,
-    // the asking :s as q does, and a visual selection let go of for a :
-    // line as : lets it go -- a search line goes over it, as / does.
+    // the asking :s as q does -- what would follow it not run, for the
+    // line handed over to be the one that runs -- and a visual selection
+    // let go of for a : line as : lets it go -- a search line goes over
+    // it, as / does.
     if (inserting())
     {
         leaveInsert(view);
     }
     else if (mMode == Mode::Confirm)
     {
-        mEx->endConfirming(view);
+        mEx->endConfirming(view, false);
     }
     else if (kind == ':' && isVisual())
     {

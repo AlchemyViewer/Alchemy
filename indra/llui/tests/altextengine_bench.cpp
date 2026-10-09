@@ -163,6 +163,33 @@ namespace
         e.deleteRange(ALTextRange(ALTextPos(0, 0), ALTextPos(0, static_cast<S32>(what.size()))));
     }
 
+    // A text with every third line that is a closer alone -- `}`, `end` --
+    // left empty, as a paste cut short leaves its blocks: never closed.
+    std::string withoutClosers(const std::string& text, std::string_view closer)
+    {
+        std::string out;
+        out.reserve(text.size());
+        size_t at   = 0;
+        S32    seen = 0;
+        while (at < text.size())
+        {
+            const size_t           end   = std::min(text.find('\n', at), text.size());
+            const std::string_view line  = std::string_view(text).substr(at, end - at);
+            const size_t           begin = line.find_first_not_of(" \t");
+            const bool             alone = begin != std::string_view::npos && line.substr(begin) == closer;
+            if (!alone || ++seen % 3 != 0)
+            {
+                out.append(line);
+            }
+            if (end < text.size())
+            {
+                out.push_back('\n');
+            }
+            at = end + 1;
+        }
+        return out;
+    }
+
     // Keys typed as vim sees them: the key, then its character where the
     // key was not taken; an escape character is Escape.
     void typeKeys(ALCodeEditor& e, const char* keys)
@@ -285,6 +312,11 @@ int main(int, char**)
         s.editor->highlighter().tokens(lastLine(*s.editor));
     }
     both("the edit alone, per edit", subjects, 2, [](Subject&, ALCodeEditor& e) { editAtTop(e, "x"); });
+    both("a line broken at the top and joined, the edit alone", subjects, 1, [](Subject&, ALCodeEditor& e) {
+        e.setCaret(ALTextPos(0, 0));
+        e.insertText("\n");
+        e.deleteRange(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
+    });
     size_t relexed[2] = {};
     both("the edit, then the highlight to the end, per edit", subjects, 2, [&](Subject& s, ALCodeEditor& e) {
         e.setCaret(ALTextPos(0, 0));
@@ -520,8 +552,12 @@ int main(int, char**)
         g_sink = g_sink + e.undoJournal().asNotation().size();
     });
     countRow("  steps written", written[0], written[1]);
+    // The scripts as they were: an x at the start of every seventh line
+    // makes SLua's ends names, and every block after the first so made
+    // would be measured open to the end of the text.
     for (Subject& s : subjects)
     {
+        s.editor->setText(s.text);
         s.editor->undoJournal().clear();
     }
 
@@ -592,6 +628,30 @@ int main(int, char**)
         {
             s.editor->deleteRange(ALTextRange(ALTextPos(5, 0), ALTextPos(6, 0)));
         }
+    }
+
+    // The widest line, of 400 characters, near the top: a character typed
+    // at its end and taken away; and the same with the widest asked after
+    // each, as the horizontal scrollbar asks after every key.
+    std::printf("\nThe widest line\n");
+    for (Subject& s : subjects)
+    {
+        s.editor->setCaret(ALTextPos(5, 0));
+        s.editor->insertText(std::string(400, 'w') + "\n");
+    }
+    const auto typedAtWidest = [](ALCodeEditor& e, bool ask) {
+        const S32 end = e.document().lineLength(5);
+        e.setCaret(ALTextPos(5, end));
+        e.insertText("x");
+        g_sink = g_sink + (ask ? static_cast<size_t>(e.layout().contentWidth()) : 0);
+        e.deleteRange(ALTextRange(ALTextPos(5, end), ALTextPos(5, end + 1)));
+        g_sink = g_sink + (ask ? static_cast<size_t>(e.layout().contentWidth()) : 0);
+    };
+    both("a character typed at its end and taken back, per edit", subjects, 2, [&](Subject&, ALCodeEditor& e) { typedAtWidest(e, false); });
+    both("the same, the widest asked after each", subjects, 2, [&](Subject&, ALCodeEditor& e) { typedAtWidest(e, true); });
+    for (Subject& s : subjects)
+    {
+        s.editor->deleteRange(ALTextRange(ALTextPos(5, 0), ALTextPos(6, 0)));
     }
 
     // Word wrap on: a character typed at the top and taken away, and the
@@ -682,12 +742,26 @@ int main(int, char**)
         editAtTop(e, "x");
         g_sink = g_sink + e.foldRegions().size();
     });
-    both("a line broken at the top and joined, then the editor's fold regions", subjects, 1, [&](Subject&, ALCodeEditor& e) {
+    const auto brokenAndJoined = [](Subject&, ALCodeEditor& e) {
         e.setCaret(ALTextPos(0, 0));
         e.insertText("\n");
         e.deleteRange(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
         g_sink = g_sink + e.foldRegions().size();
-    });
+    };
+    both("a line broken at the top and joined, then the editor's fold regions", subjects, 1, brokenAndJoined);
+    // A third of the blocks never closed, so that what is open grows down
+    // the text, and every place the walk keeps is under all of it.
+    for (Subject& s : subjects)
+    {
+        s.editor->setText(withoutClosers(s.text, &s == subjects ? "}" : "end"));
+        g_sink = g_sink + s.editor->foldRegions().size();
+    }
+    both("a third never closed: the same", subjects, 1, brokenAndJoined);
+    for (Subject& s : subjects)
+    {
+        s.editor->setText(s.text);
+        s.editor->undoJournal().clear();
+    }
 
     std::printf("\nLaying out every line\n");
     const S32 tab   = subjects[0].editor->layout().tabWidth();

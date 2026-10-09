@@ -632,7 +632,7 @@ bool ALVimExCommands::confirmKey(ALTextView& view, const ALVimInput& input)
     }
 }
 
-void ALVimExCommands::endConfirming(ALTextView& view)
+void ALVimExCommands::endConfirming(ALTextView& view, bool go_on)
 {
     const ALTextDocument& d = view.document();
     mVim.setMode(view, ALVimKeymap::Mode::Normal);
@@ -646,13 +646,19 @@ void ALVimExCommands::endConfirming(ALTextView& view)
         mVim.moveTo(view, view.caret());
     }
     // As :s says it (substitute), typed where the answer that ended the
-    // asking was.
-    if (confirming.made > REPORT_THRESHOLD && (confirming.lines > 1 || mVim.keyTyped()))
+    // asking was; one of a :g's lines added up for the :g to say.
+    if (mGlobalWalk)
+    {
+        mGlobalSubstitutions += confirming.made;
+        mGlobalSubstitutedLines += confirming.lines;
+    }
+    else if (confirming.made > REPORT_THRESHOLD && (confirming.lines > 1 || mVim.keyTyped()))
     {
         mVim.say(ALVimKeymap::substitutionsSaid(confirming.made, confirming.lines));
     }
     const bool        changed = confirming.made > 0;
-    const std::string then    = std::move(confirming.then);
+    const std::string then    = go_on ? std::move(confirming.then) : std::string();
+    const U64         step    = confirming.undoStep;
     confirming                = Confirming();
     if (ALVimHost* host = view.vimHost())
     {
@@ -660,6 +666,31 @@ void ALVimExCommands::endConfirming(ALTextView& view)
     }
     mVim.finishCommand(changed);
     mVim.bump();
+    if (mGlobalWalk)
+    {
+        // The :g the asking was a line of, in the step it makes: the rest
+        // of that line's commands, then its lines after it.
+        view.undoJournal().resumeGroup(step);
+        if (!go_on)
+        {
+            const S32 lines_before = mGlobalWalk->linesBefore;
+            mGlobalWalk.reset();
+            finishGlobal(view, lines_before);
+            return;
+        }
+        mInGlobal = true;
+        if (!then.empty())
+        {
+            runCommand(view, then);
+        }
+        if (mVim.mMode == ALVimKeymap::Mode::Confirm)
+        {
+            pauseGlobal(view);
+            return;
+        }
+        walkGlobal(view);
+        return;
+    }
     if (!then.empty())
     {
         runCommand(view, then);
@@ -1405,26 +1436,10 @@ void ALVimExCommands::runOneCommand(ALTextView& view, const std::string& line_in
         {
             return;
         }
-        const ALVimRegisters::Register reg = mVim.fetch(named);
+        const ALVimRegisters::Register reg = mVim.fetch(named, &view);
         if (!reg.held && named != '_')
         {
-            if (named == '.')
-            {
-                mVim.say(ALVimKeymap::said("VimNoInsertedText", "E29: No inserted text yet"), true);
-            }
-            else if (named == ':')
-            {
-                mVim.say(ALVimKeymap::said("VimNoPreviousCommand", "E30: No previous command line"), true);
-            }
-            else if (named == '/')
-            {
-                mVim.say(ALVimKeymap::said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
-            }
-            else
-            {
-                mVim.say(ALVimKeymap::said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, named ? named : '"') } }),
-                         true);
-            }
+            mVim.say(ALVimKeymap::nothingIn(named), true);
             return;
         }
         if (named == '.')
@@ -1830,11 +1845,8 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
         mVim.say(alSaidCount("VimLinesPicked", static_cast<S32>(lines.size()), "1 line", "[COUNT] lines"));
         return true;
     }
-    // One step to undo for the lot; an asking :s among the commands
-    // gathers its edits here and the asking runs once, in order, after.
+    // One step to undo for the lot.
     view.undoJournal().beginGroup();
-    confirming              = Confirming();
-    confirming.gathering    = true;
     mInGlobal               = true;
     mGlobalSubstitutions    = 0;
     mGlobalSubstitutedLines = 0;
@@ -1844,39 +1856,43 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
         // Each line changed only where it is, in the text as it was: the
         // edits gathered from the top down and put in at once. Those of
         // the lines before an error go in, as they would have one by one.
+        // An asking :s is found out on the first line it would ask on,
+        // nothing gathered before it, as each line runs the same command.
         GlobalBatch batch;
         globalBatch = &batch;
         for (const S32 line : lines)
         {
             runCommand(view, std::to_string(line + 1 + view.lineNumberBase()) + command);
-            if (mVim.mMessageError)
+            if (mVim.mMessageError || batch.asks)
             {
                 break;
             }
         }
         globalBatch = nullptr;
-        applyGlobalBatch(view, batch);
-    }
-    else
-    {
-        // The lines marked, as vim marks them, and visited from the top
-        // down, the topmost left each time: a mark moves with the text,
-        // so that :g/^/m0 turns the lines over, and goes with its line --
-        // taken out with its break, or joined onto the one above -- so
-        // that :g/^/j joins them in pairs.
-        std::vector<ALTextPos> starts;
-        starts.reserve(lines.size());
-        for (const S32 line : lines)
+        if (!batch.asks)
         {
-            starts.emplace_back(line, 0);
+            applyGlobalBatch(view, batch);
+            return finishGlobal(view, lines_before);
         }
-        ALAnchoredRanges<ALTextPos> marks;
-        marks.assign(std::move(starts));
-        // A command with an address of its own -- .,+1d, .m0, 'a,.d, 3d --
-        // runs as it is written, from the line; one without is given the
-        // line's number.
-        const char lead      = command[0];
-        const bool addressed = lead == '.' || lead == '$' || lead == '\'' || lead == '%' || lead == '+' || lead == '-' || isDigit(lead);
+    }
+    // The lines marked, as vim marks them: a mark moves with the text, so
+    // that :g/^/m0 turns the lines over, and goes with its line -- taken
+    // out with its break, or joined onto the one above -- so that :g/^/j
+    // joins them in pairs. A command with an address of its own -- .,+1d,
+    // .m0, 'a,.d, 3d -- runs as it is written, from the line.
+    std::vector<ALTextPos> starts;
+    starts.reserve(lines.size());
+    for (const S32 line : lines)
+    {
+        starts.emplace_back(line, 0);
+    }
+    auto walk         = std::make_unique<GlobalWalk>();
+    walk->command     = command;
+    const char lead   = command[0];
+    walk->addressed   = lead == '.' || lead == '$' || lead == '\'' || lead == '%' || lead == '+' || lead == '-' || isDigit(lead);
+    walk->linesBefore = lines_before;
+    walk->marks.assign(std::move(starts));
+    walk->following = view.document().onChanged([marks = &walk->marks](const ALTextDocument::Edit& edit) {
         const auto slide = [](ALTextPos& mark, const ALTextDocument::Edit& edit) {
             const ALTextPos start(mark.line, 0);
             const ALTextPos next(mark.line + 1, 0);
@@ -1906,29 +1922,54 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
             mark = edit.placed(mark);
             return true;
         };
-        boost::signals2::scoped_connection following =
-            view.document().onChanged([&marks, &slide](const ALTextDocument::Edit& edit) { marks.apply(edit, slide, [](ALTextPos&) {}); });
-        while (!marks.empty())
+        marks->apply(edit, slide, [](ALTextPos&) {});
+    });
+    mGlobalWalk = std::move(walk);
+    return walkGlobal(view);
+}
+
+bool ALVimExCommands::walkGlobal(ALTextView& view)
+{
+    const ALTextDocument& d    = view.document();
+    GlobalWalk&           walk = *mGlobalWalk;
+    mInGlobal                  = true;
+    while (!walk.marks.empty() && !mVim.mMessageError)
+    {
+        const S32 line = walk.marks.front().line;
+        walk.marks.erase(walk.marks.begin());
+        if (line >= d.lineCount())
         {
-            const S32 line = marks.front().line;
-            marks.erase(marks.begin());
-            if (line >= d.lineCount())
-            {
-                continue;
-            }
-            // On the line, as vim puts the cursor there: `.` in the
-            // command is the line.
-            view.setCaret(ALTextPos(line, 0));
-            runCommand(view, addressed ? command : std::to_string(line + 1 + view.lineNumberBase()) + command);
-            if (mVim.mMessageError)
-            {
-                break;
-            }
+            continue;
+        }
+        // On the line, as vim puts the cursor there: `.` in the command
+        // is the line.
+        view.setCaret(ALTextPos(line, 0));
+        runCommand(view, walk.addressed ? walk.command : std::to_string(line + 1 + view.lineNumberBase()) + walk.command);
+        if (mVim.mMode == ALVimKeymap::Mode::Confirm)
+        {
+            pauseGlobal(view);
+            return false;
         }
     }
-    mInGlobal             = false;
-    confirming.gathering = false;
-    if (!mVim.mMessageError && confirming.edits.empty())
+    const S32 lines_before = walk.linesBefore;
+    mGlobalWalk.reset();
+    return finishGlobal(view, lines_before);
+}
+
+void ALVimExCommands::pauseGlobal(ALTextView& view)
+{
+    // The step closed while the question stands, what is said yes to
+    // going on with it; nothing kept back as the :g's meanwhile.
+    mInGlobal = false;
+    view.undoJournal().endGroup();
+    confirming.undoStep = view.undoJournal().groupStep();
+}
+
+bool ALVimExCommands::finishGlobal(ALTextView& view, S32 lines_before)
+{
+    const ALTextDocument& d = view.document();
+    mInGlobal               = false;
+    if (!mVim.mMessageError)
     {
         // What the commands made, said once, as vim's :g says it: the
         // substitutions, where there were more than vim's report over more
@@ -1949,26 +1990,6 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
             mVim.say(alSaidCount("VimFewerLines", -more, "1 fewer line", "[COUNT] fewer lines"));
         }
     }
-    if (mVim.mMessageError && !confirming.edits.empty())
-    {
-        // An error part way: what was gathered from the lines before it
-        // is not asked about, as vim stops there too; said, since the
-        // error alone would not say so.
-        mVim.say(ALVimKeymap::said("VimNothingSubstituted", "[MESSAGE] -- nothing substituted", { { "[MESSAGE]", mVim.mMessage } }), true);
-    }
-    if (!confirming.edits.empty() && !mVim.mMessageError)
-    {
-        // The group closed while the asking waits; what is said yes to goes
-        // on with the step the :g made, where it made one.
-        std::sort(confirming.edits.begin(), confirming.edits.end(),
-                  [](const std::pair<ALTextRange, std::string>& a, const std::pair<ALTextRange, std::string>& b) { return a.first.begin < b.first.begin; });
-        view.undoJournal().endGroup();
-        confirming.undoStep = view.undoJournal().groupStep();
-        mVim.setMode(view, ALVimKeymap::Mode::Confirm);
-        askNext(view);
-        return false;
-    }
-    confirming = Confirming();
     view.undoJournal().endGroup();
     return !mVim.mMessageError;
 }
@@ -2147,13 +2168,9 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
     }
     if (asking && !view.isReadOnly())
     {
-        if (confirming.gathering)
+        if (globalBatch)
         {
-            // A :g's line: the edits kept for the asking after the :g.
-            for (auto& edit : edits)
-            {
-                confirming.edits.push_back(std::move(edit));
-            }
+            globalBatch->asks = true;
             return false;
         }
         // Each match asked about in turn; the command finishes when the
@@ -2205,7 +2222,8 @@ void ALVimExCommands::listRegisters(ALTextView& view, const std::string& names)
 {
     // Each that holds anything, as vim's :registers has them: its kind --
     // c characters, l lines, b a block -- its name, and what it holds; the
-    // last : line and the last search after them.
+    // last insert, the last : line, the file's name, the alternate's and
+    // the last search after them.
     std::string text = "Type Name Content";
     auto        row  = [&](char kind, char name, const std::string& held) {
         if (!held.empty() && (names.empty() || names.find(name) != std::string::npos))
@@ -2217,11 +2235,13 @@ void ALVimExCommands::listRegisters(ALTextView& view, const std::string& names)
     {
         // Lines are kept without the break that ends the last, which vim
         // shows.
-        const ALVimRegisters::Register held = mVim.fetch(*name);
+        const ALVimRegisters::Register held = mVim.fetch(*name, &view);
         row(held.block ? 'b' : held.linewise ? 'l' : 'c', *name, held.linewise && !held.text.empty() ? held.text + "\n" : held.text);
     }
-    row('c', ':', mVim.fetch(':').text);
-    row('c', '/', mVim.fetch('/').text);
+    for (const char* name = ".:%#/"; *name; ++name)
+    {
+        row('c', *name, mVim.fetch(*name, &view).text);
+    }
     list(view, text);
 }
 

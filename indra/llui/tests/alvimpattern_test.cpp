@@ -97,7 +97,7 @@ namespace tut
         ensure_equals("a ^ inside is itself", regexOf("\\Va^b"), std::string("a\\^b"));
         ensure_equals("classes as brackets", regexOf("\\a\\l\\x"), std::string("[A-Za-z][a-z][0-9A-Fa-f]"));
         ensure_equals("a bracket expression as it stands", regexOf("[^a-z]"), std::string("[^a-z]"));
-        ensure_equals("a character by its code", regexOf("\\%x41"), std::string("A"));
+        ensure_equals("a character by its code", regexOf("\\%x41"), std::string("\\x{41}"));
         ensure_equals("~ the last replacement, as text", regexOf("a~", "x.y"), std::string("a(?:x\\.y)"));
     }
 
@@ -454,5 +454,62 @@ namespace tut
         ensure_equals("very magic's", ALVimPattern::of("\\va~+", std::string(), plain).readError, none.readError);
         ensure("one to stand for", ALVimPattern::of("a~*b", std::string("x"), plain).readError.empty());
         ensure("very nomagic's bare ~ itself", ALVimPattern::of("\\Va~b", std::string(), plain).readError.empty());
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<23>()
+    {
+        set_test_name("in a bracket expression \\d123 \\o40 \\x20 \\u20AC and \\U0001F600 are characters by their codes, read as vim reads them; with no digit, a backslash and the letter");
+        const auto in = [this](const std::string& text, const char* vim) { return alvimpattern_data::found(text, ALVimPattern::of(vim, std::string(), this->plain)); };
+        ensure_equals("decimal", in("A B", "[\\d65]"), std::string("A"));
+        ensure_equals("two", in("A B", "[\\d65\\d66]"), std::string("A|B"));
+        ensure_equals("octal", in("A B", "[\\o101]"), std::string("A"));
+        ensure_equals("hex", in("A B", "[\\x41]"), std::string("A"));
+        ensure_equals("four hex", in("e\xe2\x82\xac" "f", "[\\u20AC]"), std::string("\xe2\x82\xac"));
+        ensure_equals("eight hex", in("e\xe2\x82\xac" "f", "[\\U000020ac]"), std::string("\xe2\x82\xac"));
+        ensure_equals("negated", in("AB", "[^\\d65]"), std::string("B"));
+        ensure_equals("repeated", in("xABx", "[\\x41\\x42]\\+"), std::string("AB"));
+        ensure_equals("a range's ends", in("ABCD", "[\\x41-\\x43]"), std::string("A|B|C"));
+        ensure_equals("its end alone", in("aZz", "[a-\\x7a]"), std::string("a|z"));
+        ensure_equals("decimal ends", in("LMNOP", "[\\d77-\\d79]"), std::string("M|N|O"));
+        ensure_equals("no digit: a backslash and the letter", in("x d y p\\q", "[\\d]"), std::string("d|\\"));
+        ensure_equals("nor a hex one", in("x\\g", "[\\xg]"), std::string("x|\\|g"));
+        ensure_equals("up to three octal digits while under 040", in("o?7z", "[\\o777]"), std::string("?|7"));
+        ensure_equals("0 the NUL", in(std::string("a\0b", 3), "[\\d0]"), std::string(1, '\0'));
+        ensure_equals("and 10, as vim keeps it", in(std::string("a\0b\nc", 5), "[\\x0a]"), std::string(1, '\0'));
+        ensure_equals("past any character, none", in("ab", "[\\U00110000]"), std::string());
+        ensure_equals("\\b a backspace", in("a\bb", "[\\b]"), std::string("\b"));
+        ensure_equals("out of one, octal the same", in("o?7z", "\\%o777"), std::string("?7"));
+        ensure_equals("and 10 the NUL", in(std::string("a\0b\nc", 5), "\\%x0a"), std::string(1, '\0'));
+    }
+
+    template<> template<>
+    void alvimpattern_object::test<24>()
+    {
+        set_test_name("a range in a bracket expression from 0, or over 10, takes in the NUL as vim keeps it, and what is between, and never a line break, as vim 9.2 finds them");
+        const auto in = [this](const std::string& text, const char* vim) { return alvimpattern_data::found(text, ALVimPattern::of(vim, std::string(), this->plain)); };
+        const char        raw[] = "a\x01" "b\x02" "c\td\0e\x0b" "f\x0c" "gh\n i\x05" "j\nk";
+        const std::string text(raw, sizeof(raw) - 1);
+        // The characters found, by their codes, as found() puts them.
+        const auto codes = [](std::initializer_list<int> list) {
+            std::string out;
+            for (const int c : list)
+            {
+                out += out.empty() ? std::string() : std::string("|");
+                out += static_cast<char>(c);
+            }
+            return out;
+        };
+        ensure_equals("from 0 to 10", in(text, "[\\x00-\\x0a]"), codes({ 1, 2, 9, 0, 5 }));
+        ensure_equals("from a tab to 10", in(text, "[\\t-\\x0a]"), codes({ 9, 0 }));
+        ensure_equals("from 10", in(text, "[\\x0a-\\x0c]"), codes({ 0, 11, 12 }));
+        ensure_equals("over 10", in(text, "[\\x05-\\x0b]"), codes({ 9, 0, 11, 5 }));
+        ensure_equals("from 0, short of 10", in(text, "[\\x00-\\x02]"), codes({ 1, 2, 0 }));
+        ensure_equals("from 0 to 9", in(text, "[\\x00-\\x09]"), codes({ 1, 2, 9, 0, 5 }));
+        ensure_equals("decimal, 0 to 1", in(text, "[\\d0-\\d1]"), codes({ 1, 0 }));
+        ensure_equals("10 to 10", in(text, "[\\x0a-\\x0a]"), codes({ 0 }));
+        ensure_equals("a tab to a return, by their letters", in(text, "[\\t-\\r]"), codes({ 9, 0, 11, 12 }));
+        ensure_equals("1 to 9: no NUL", in(text, "[\\x01-\\x09]"), codes({ 1, 2, 9, 5 }));
+        ensure_equals("all but 0 to 10", in(text, "[^\\x00-\\x0a]"), codes({ 'a', 'b', 'c', 'd', 'e', 11, 'f', 12, 'g', 'h', ' ', 'i', 'j', 'k' }));
     }
 }
