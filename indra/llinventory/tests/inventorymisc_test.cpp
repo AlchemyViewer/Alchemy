@@ -40,6 +40,8 @@
 #pragma warning(disable: 4702)
 #endif
 
+namespace
+{
 void set_random_inventory_metadata(LLInventoryObject* obj)
 {
     S32 extra = rand() % 4;
@@ -123,8 +125,11 @@ LLPointer<LLInventoryCategory> create_random_inventory_cat()
     set_random_inventory_metadata(cat);
     return cat;
 }
+}
 
 namespace tut
+{
+namespace
 {
     struct inventory_data
     {
@@ -132,6 +137,7 @@ namespace tut
     typedef test_group<inventory_data> inventory_test;
     typedef inventory_test::object inventory_object;
     tut::inventory_test inv("LLInventory");
+}
 
 //***class LLInventoryType***//
 

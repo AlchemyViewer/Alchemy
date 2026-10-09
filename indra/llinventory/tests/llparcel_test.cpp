@@ -35,12 +35,15 @@
 
 namespace tut
 {
+namespace
+{
     struct llinventoryparcel_data
     {
     };
     typedef test_group<llinventoryparcel_data> llinventoryparcel_test;
     typedef llinventoryparcel_test::object llinventoryparcel_object;
     tut::llinventoryparcel_test llinventoryparcel("LLInventoryParcel");
+}
 
     template<> template<>
     void llinventoryparcel_object::test<1>()
