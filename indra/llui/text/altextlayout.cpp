@@ -284,8 +284,69 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
     }
     if (moved || hidden_gone > 0)
     {
-        heightsMoved();
+        spliceHeights(edit);
     }
+}
+
+void ALTextLayout::spliceHeights(const ALTextDocument::Edit& edit)
+{
+    ++mHeightsRevision;
+    if (mHeightsStale)
+    {
+        return;
+    }
+    // An edit over much of the text -- the text set, a paste of thousands
+    // of lines -- sums every height again when next asked for, which costs
+    // no more than counting the lines it made; so do many edits made with
+    // no height asked for between them, a macro's, whose lines still to
+    // count would each move with every edit.
+    const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
+    size_t                                            lines = 0;
+    for (const ALTextDocument::Edit::LineSpan& span : spans)
+    {
+        lines += static_cast<size_t>(llmax(span.made, 0) + llmax(span.last - span.first + 1, 0));
+    }
+    if (lines + mUncounted.size() > llmax<size_t>(1024, mHeights.size() / 4))
+    {
+        mUncounted.clear();
+        mHeightsStale = true;
+        return;
+    }
+    // Those still to count move with the text, or go with the lines the
+    // edit replaced.
+    std::vector<S32> uncounted;
+    for (const S32 line : mUncounted)
+    {
+        const S32 now = edit.lineAfter(line);
+        if (now >= 0)
+        {
+            uncounted.push_back(now);
+        }
+    }
+    // From the last run up, each where its lines still are: the heights it
+    // replaced taken out, and a row's for each line it made put in, which
+    // are counted once every listener has heard of the edit.
+    const S32 row_h = rowHeight();
+    for (auto span = spans.rbegin(); span != spans.rend(); ++span)
+    {
+        const size_t size  = mHeights.size();
+        const size_t first = static_cast<size_t>(llclamp(span->first, 0, static_cast<S32>(size)));
+        const size_t count = first < size ? static_cast<size_t>(llclamp(span->last, static_cast<S32>(first), static_cast<S32>(size) - 1)) - first + 1 : 0;
+        mHeights.erase(first, count);
+        mHeights.insert(first, std::vector<S32>(static_cast<size_t>(llmax(span->made, 0)), row_h));
+    }
+    S32 shift = 0;
+    for (const ALTextDocument::Edit::LineSpan& span : spans)
+    {
+        for (S32 made = 0; made < span.made; ++made)
+        {
+            uncounted.push_back(span.first + shift + made);
+        }
+        shift = span.shiftAfter;
+    }
+    std::sort(uncounted.begin(), uncounted.end());
+    uncounted.erase(std::unique(uncounted.begin(), uncounted.end()), uncounted.end());
+    mUncounted.swap(uncounted);
 }
 
 F32 ALTextLayout::contentWidth()
@@ -1001,6 +1062,31 @@ void ALTextLayout::ensureHeights()
     refreshIfFontsChanged();
     if (!mHeightsStale)
     {
+        // The lines edits made, counted now that the host has moved its
+        // gaps along with the lines; and the rows below the text, which
+        // are another line's once the count has changed.
+        if (!mUncounted.empty())
+        {
+            const S32 row_h = rowHeight();
+            bool      moved = false;
+            for (const S32 line : mUncounted)
+            {
+                if (line < static_cast<S32>(mHeights.size()))
+                {
+                    const S32 height = countedHeight(line, row_h);
+                    moved            = moved || mHeights.at(static_cast<size_t>(line)) != height;
+                    mHeights.set(static_cast<size_t>(line), height);
+                }
+            }
+            mUncounted.clear();
+            const S32 end_gap = mGaps ? llmax(0, mGaps(lineCount())) : 0;
+            moved             = moved || end_gap != mEndGap;
+            mEndGap           = end_gap;
+            if (moved)
+            {
+                ++mHeightsRevision;
+            }
+        }
         return;
     }
     // The font's row asked once, not once a line.
@@ -1011,6 +1097,7 @@ void ALTextLayout::ensureHeights()
         mHeightScratch[i] = countedHeight(static_cast<S32>(i), row_h);
     }
     mHeights.assign(mHeightScratch);
+    mUncounted.clear();
     mEndGap       = mGaps ? llmax(0, mGaps(lineCount())) : 0;
     mHeightsStale = false;
 }

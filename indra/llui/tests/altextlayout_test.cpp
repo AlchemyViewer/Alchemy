@@ -1059,4 +1059,80 @@ namespace tut
         layout.setHidden(By::Any, 0, 20, false);
         ensure("none hidden again", layout.hiddenCount(By::Folds) == 0 && layout.hiddenCount(By::Host) == 0 && layout.hiddenCount(By::Any) == 0);
     }
+
+    template<> template<>
+    void altextlayout_object::test<28>()
+    {
+        set_test_name("lines made or taken go into and out of the heights summed, the lines made counted with their gaps once asked: the tops a layout made afresh finds, and no line else asked");
+        std::string text;
+        for (S32 i = 0; i < 3000; ++i)
+        {
+            text += (i % 7 == 0 ? "g" : "line ") + std::to_string(i) + "\n";
+        }
+        ready(text.c_str());
+        // A gap of a row over each line that starts with g, as a host that
+        // keeps its gaps with the lines' text; and two rows below the text
+        // while it has an odd number of lines.
+        S32        asked = 0;
+        const auto gaps  = [this, &asked](S32 line) {
+            ++asked;
+            if (line >= doc.lineCount())
+            {
+                return doc.lineCount() % 2 ? 2 : 0;
+            }
+            return doc.line(line).compare(0, 1, "g") == 0 ? 1 : 0;
+        };
+        layout.setGapProvider(gaps);
+        const S32 row = layout.rowHeight();
+        const auto same = [&](const std::string& what) {
+            ALTextLayout fresh;
+            fresh.attach(&doc);
+            fresh.setFont(LLFontGL::getFontMonospace());
+            fresh.setGapProvider(gaps);
+            ensure_equals(what + ": the whole height", layout.totalHeight(), fresh.totalHeight());
+            for (S32 l = 0; l <= doc.lineCount(); l += 97)
+            {
+                ensure_equals(what + ": the top of " + std::to_string(l), layout.lineTop(l), fresh.lineTop(l));
+            }
+            ensure_equals(what + ": the last's top", layout.lineTop(doc.lineCount() - 1), fresh.lineTop(doc.lineCount() - 1));
+        };
+        same("as made");
+
+        doc.insert(ALTextPos(10, 0), "g new\n");
+        asked = 0;
+        ensure_equals("a line made, with a gap over it", layout.lineTop(10) - layout.lineTop(9), 2 * row);
+        ensure("only the line made asked, and the rows below the text, a handful of times", asked < 10);
+        same("a line made");
+        doc.replace(ALTextRange(ALTextPos(20, 0), ALTextPos(25, 0)), std::string());
+        same("five lines taken");
+        doc.replace(ALTextRange(ALTextPos(30, 2), ALTextPos(31, 3)), "g\ng\ng");
+        same("two lines made three");
+        doc.replace(ALTextRange(ALTextPos(2000, 0), ALTextPos(2000, 0)), "a\nb\ng\n");
+        doc.replace(ALTextRange(ALTextPos(5, 0), ALTextPos(6, 0)), std::string());
+        same("two edits before any is asked");
+        std::vector<std::pair<ALTextRange, std::string>> batch;
+        batch.emplace_back(ALTextRange(ALTextPos(100, 0), ALTextPos(100, 0)), "g\n");
+        batch.emplace_back(ALTextRange(ALTextPos(400, 0), ALTextPos(403, 0)), std::string());
+        batch.emplace_back(ALTextRange(ALTextPos(900, 1), ALTextPos(900, 1)), "\n\n");
+        doc.replaceMany(std::move(batch));
+        same("a batch's runs");
+        std::string pasted;
+        for (S32 i = 0; i < 2000; ++i)
+        {
+            pasted += i % 3 ? "p\n" : "g\n";
+        }
+        doc.insert(ALTextPos(1500, 0), pasted);
+        same("a paste of thousands, summed again");
+        for (S32 i = 0; i < 1500; ++i)
+        {
+            doc.insert(ALTextPos(i, 0), "\n");
+        }
+        same("many lines made with no height asked between");
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 50, 60, true);
+        doc.replace(ALTextRange(ALTextPos(55, 0), ALTextPos(58, 0)), "g\n");
+        ensure("the hidden lines it replaced gone, the line made in sight", !layout.hidden(55) && layout.hidden(54) && layout.hidden(57));
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 0, doc.lineCount(), false);
+        same("hidden lines replaced, then shown");
+        layout.setGapProvider(nullptr);
+    }
 }

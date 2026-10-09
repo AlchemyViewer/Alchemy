@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "alfenwicktree.h"
+#include "alprefixsums.h"
 #include "alfontshaping.h"
 #include "allinetable.h"
 #include "altextdocument.h"
@@ -386,10 +386,15 @@ private:
     // With the row's height given, for a pass over every line.
     S32  countedHeight(S32 index) const;
     S32  countedHeight(S32 index, S32 row_h) const;
-    // Every line's height summed afresh, where lines were made or taken
-    // away, hidden or everything thrown away since.
+    // Every line's height summed afresh, where everything was thrown away
+    // since or the gaps all changed; else the lines an edit made counted,
+    // now every listener has heard of it.
     void ensureHeights();
     void heightsMoved();
+    // An edit that made lines or took them, or showed hidden ones it
+    // replaced: its runs' heights taken out of the sums and the lines it
+    // made put in, to be counted when next asked for.
+    void spliceHeights(const ALTextDocument::Edit& edit);
     // What a line counts for in the widest: its width where it was laid
     // out as its text is, or let go of since; else its bytes at a space's
     // width, `per_byte`.
@@ -440,9 +445,13 @@ private:
     // And how many each owner hides, by its bit: the folds', the host's.
     std::array<S32, 2>                 mHiddenByCount{};
     // Each line's height as it counts, summed so that one changing moves
-    // the tops after it without adding them all up again.
-    ALFenwickTree<S32>                 mHeights;
+    // the tops after it without adding them all up again, and lines put in
+    // or taken out go in or out of the sums. Those an edit made go in at a
+    // row's height and are counted when next asked for, by which time the
+    // host has moved its gaps along with the lines: the lines, in order.
+    ALPrefixSums<S32>                  mHeights;
     std::vector<S32>                   mHeightScratch;
+    std::vector<S32>                   mUncounted;
     bool                               mHeightsStale    = true;
     U32                                mHeightsRevision = 0;
     // The rows below the text, as last asked.
