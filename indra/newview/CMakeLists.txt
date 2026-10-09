@@ -2505,6 +2505,7 @@ if(AL_BUILD_TESTS)
     alwhitebalancesolver
     llagentaccess
     lldateutil
+    llremoteparcelrequest
     llviewerhelputil
     llversioninfo
     llvocache
