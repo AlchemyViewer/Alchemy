@@ -36,6 +36,8 @@
 #include "lluuid.h"
 #include "v4color.h"
 
+#include "altesttempdir.h"
+
 #include "../test/lltut.h"
 
 #include <filesystem>
@@ -95,27 +97,24 @@ namespace
     };
 
     // LLSimpleXUIParser reads a file rather than a buffer, so every case here
-    // needs one on disk. Named per case so a crashed run leaves something
-    // identifiable behind rather than clobbering the next test's input.
+    // needs one on disk: in a directory of its own, since a fixed name is
+    // shared by two runs at once. Named per case within it, so a crashed run
+    // leaves something identifiable behind.
     class ScratchXui
     {
     public:
         ScratchXui(const char* tag, const std::string& contents)
-        :   mPath(std::filesystem::temp_directory_path() / (std::string("al_xuiparser_") + tag + ".xml"))
+        :   mDir("al_xuiparser"),
+            mPath(mDir.path() / (std::string("al_xuiparser_") + tag + ".xml"))
         {
             std::ofstream out(mPath, std::ios::binary);
             out << contents;
         }
 
-        ~ScratchXui()
-        {
-            std::error_code ignored;
-            std::filesystem::remove(mPath, ignored);
-        }
-
         std::string name() const { return mPath.string(); }
 
     private:
+        ll_test::TempDir      mDir;
         std::filesystem::path mPath;
     };
 
@@ -272,9 +271,12 @@ namespace tut
     {
         set_test_name("a missing file is reported, not assumed empty");
 
+        // In a directory of the test's own, not the working one, where a
+        // file of that name could be.
+        const ll_test::TempDir dir("al_xuiparser");
         XuiRoot block;
         LLSimpleXUIParser parser;
         ensure("reading a file that is not there fails",
-               !parser.readXUI("al_xuiparser_no_such_file.xml", block, true));
+               !parser.readXUI((dir.path() / "al_xuiparser_no_such_file.xml").string(), block, true));
     }
 }

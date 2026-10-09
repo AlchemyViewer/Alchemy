@@ -29,6 +29,8 @@
 #include "lldir.h"
 #include "llfile.h"
 
+#include "altesttempdir.h"
+
 #include "../test/lltut.h"
 
 #include <fstream>
@@ -37,19 +39,9 @@ namespace tut
 {
     struct alxuidocuments_data
     {
-        std::string mDir;
-
-        alxuidocuments_data()
-        {
-            mDir = gDirUtilp->add(gDirUtilp->getTempDir(), "alxuidocuments_test");
-            gDirUtilp->deleteDirAndContents(mDir);
-            LLFile::mkdir(mDir);
-        }
-
-        ~alxuidocuments_data()
-        {
-            gDirUtilp->deleteDirAndContents(mDir);
-        }
+        // A directory of its own for each test, removed as it ends.
+        ll_test::TempDir mTemp{ "alxuidocuments_test" };
+        std::string      mDir = mTemp.string();
 
         std::string write(const std::string& name, const std::string& text) const
         {

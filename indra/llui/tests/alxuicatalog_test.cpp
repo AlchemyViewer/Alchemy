@@ -31,6 +31,7 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "altesttempdir.h"
 
 #include "lldir.h"
 #include "llfile.h"
@@ -48,12 +49,12 @@ namespace tut
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
 
-        std::string mSkins;
+        // A tree of its own for each test, removed as it ends.
+        ll_test::TempDir mTemp{ "alxuicatalog_test" };
+        std::string      mSkins = mTemp.string();
 
         alxuicatalog_data()
         {
-            mSkins = gDirUtilp->add(gDirUtilp->getTempDir(), "alxuicatalog_test");
-            gDirUtilp->deleteDirAndContents(mSkins);
             write("default/xui/en/floater_a.xml",
                   "<floater name=\"a\" title=\"Floater A\" width=\"100\" height=\"50\">\n"
                   "  <floater.string name=\"greeting\">Hello</floater.string>\n"
@@ -78,11 +79,6 @@ namespace tut
                   "<button name=\"button\" font=\"SansSerif\"/>\n");
             write("default/xui/de/broken.xml",
                   "<floater name=\"broken\">\n<panel>\n");
-        }
-
-        ~alxuicatalog_data()
-        {
-            gDirUtilp->deleteDirAndContents(mSkins);
         }
 
         void write(const std::string& relative, const std::string& text)
