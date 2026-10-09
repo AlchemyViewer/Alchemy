@@ -36,12 +36,15 @@
 
 namespace tut
 {
+namespace
+{
     struct llxmlnode_data
     {
     };
     typedef test_group<llxmlnode_data> llxmlnode_test;
     typedef llxmlnode_test::object llxmlnode_object;
     tut::llxmlnode_test llxmlnode_testcase("llxmlnode");
+}
 
     // Element name, id, attributes (string + int) and text value round-trip.
     template<> template<>
