@@ -77,7 +77,6 @@ target_sources(
     llmortician.cpp
     llmutex.cpp
     llpointer.cpp
-    llptrto.cpp
     llpredicate.cpp
     llprocess.cpp
     llprocessor.cpp
@@ -334,6 +333,7 @@ if(AL_BUILD_TESTS)
     llpounceable
     llprocessor
     llprocinfo
+    llptrto
     llrand
     llsd
     llsdjson
