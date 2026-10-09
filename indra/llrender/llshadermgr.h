@@ -604,6 +604,17 @@ public:
 
         SH_PARTIAL,                         //  "shPartial"  (row partial sums of the probe SH projection)
 
+        WATER_FAR,                          //  "waterFar"  wave clamp distance, edge water stretch (ALFarPlane::WaterFar)
+        WATER_RIM,                          //  "waterRim"  the edge water's outer rectangle relative to the camera
+
+        EYE_TO_SKY,                         //  "eyeToSky"  eye space to the sky dome's (north, up, east)
+        SKY_BEHIND_MAP,                     //  "skyBehindMap"  the sky dome behind everything, for the haze pass
+        SKY_BEHIND_WEIGHT,                  //  "skyBehindWeight"  1 while skyBehindMap holds this view's sky
+
+        MOON_QUAD_CENTER,                   //  "moonQuadCenter"  the moon quad's centre direction, for the stars it covers
+        MOON_QUAD_U,                        //  "moonQuadU"  its right half-extent over its squared length
+        MOON_QUAD_V,                        //  "moonQuadV"  its up half-extent over its squared length
+
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
     // clang-format on

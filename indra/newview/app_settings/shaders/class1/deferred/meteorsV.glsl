@@ -79,8 +79,9 @@ void main()
     clip.xy += streak_ndc * texcoord0.x * clip.w;
     clip.xy += perp_ndc   * texcoord0.y * clip.w;
 
-    // Pin to far plane so the moon and other geometry occlude meteors correctly. Reverse-Z
-    // (glClipControl ZERO_TO_ONE) puts the far plane at ndc z 0, not 1.
+    // On the far plane with the rest of the sky, so geometry occludes meteors; they are drawn
+    // after the sun and moon, in front of them. Reverse-Z (glClipControl ZERO_TO_ONE) puts the
+    // far plane at ndc z 0, not 1.
 #ifdef REVERSE_Z
     clip.z = 0.0;
 #else

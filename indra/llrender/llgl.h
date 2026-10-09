@@ -400,25 +400,6 @@ private:
 };
 
 /*
-  Modify and load projection matrix to push depth values to far clip plane.
-  The default constructor squashes the projection on the stack.
-
-  Restores projection matrix on destruction.
-  Saves/restores matrix mode around projection manipulation.
-  Does not stack.
-*/
-class LLGLSquashToFarClip
-{
-public:
-    LLGLSquashToFarClip();
-    LLGLSquashToFarClip(const LLMatrix4a& projection, U32 layer = 0);
-
-    void setProjectionMatrix(LLMatrix4a projection, U32 layer);
-
-    ~LLGLSquashToFarClip();
-};
-
-/*
     Interface for objects that need periodic GL updates applied to them.
     Used to synchronize GL updates with GL thread.
 */

@@ -38,8 +38,15 @@ in float vary_subpixel_fade; // energy attenuation for stars widened for sub-pix
 
 uniform float custom_alpha;   // star_brightness slider output (0..2 range in practice)
 uniform float time;           // seconds, wrapped to avoid precision drift
-uniform vec3  moon_dir;       // world-space moon direction (z up)
+uniform vec3  moon_dir;       // moon direction in the stars' frame, as vary_world_dir (z up)
 uniform float moon_brightness;// moon illumination 0..1 (from LLSettingsSky)
+
+// The moon's quad in the stars' frame, on the plane a unit away along moonQuadCenter (zero when no moon is drawn), and
+// its texture (LLDrawPoolWLSky::renderStarsDeferred).
+uniform vec3 moonQuadCenter;
+uniform vec3 moonQuadU;
+uniform vec3 moonQuadV;
+uniform sampler2D diffuseMap;
 
 // 3D value noise
 // -------------------------------------------------------------------
@@ -106,6 +113,20 @@ void main()
     // Discard pixels where the quad contributes effectively nothing - keeps
     // the overdraw budget in check given how many tiny quads we render.
     if (shape < 0.002) discard;
+
+    // SL-14113: no star behind the moon. The moon draws after the stars and fades low in the sky, which would let them
+    // through its disc, so they leave out every texel moonF.glsl draws, taken from the moon's own quad and texture.
+    float moon_facing = dot(vary_world_dir, moonQuadCenter);
+    if (moon_facing > 0.0)
+    {
+        vec3 on_quad = vary_world_dir / moon_facing - moonQuadCenter;
+        vec2 quad = vec2(dot(on_quad, moonQuadU), dot(on_quad, moonQuadV));
+        // textureLod: no derivatives inside this branch.
+        if (all(lessThan(abs(quad), vec2(1.0))) && textureLod(diffuseMap, quad * 0.5 + 0.5, 0.0).a > 2./255.)
+        {
+            discard;
+        }
+    }
 
     // --- Atmospheric extinction ----------------------------------------------
     // Airmass grows sharply near the horizon. The wavelength-dependent

@@ -380,8 +380,6 @@ void LLHeroProbeManager::updateProbeFace(LLReflectionMap* probe, U32 face, bool 
             gGL.getTextureSlot(depthChannel)->bind(depth_rt, true);
 
             gReflectionMipProgram.uniform1f(LLShaderMgr::RES_SCALE, 1.f / (mProbeResolution * 2));
-            gReflectionMipProgram.uniform1f(LLShaderMgr::ZNEAR, probe->getNearClip());
-            gReflectionMipProgram.uniform1f(LLShaderMgr::ZFAR, MAX_FAR_CLIP);
 
             gPipeline.mScreenTriangleVB->setBuffer();
             gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);

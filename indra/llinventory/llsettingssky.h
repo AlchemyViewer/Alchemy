@@ -76,6 +76,13 @@ public:
     static const std::string SETTING_SUN_SCALE;
     static const std::string SETTING_SUN_TEXTUREID;
 
+    // Physical atmosphere. The radii are in kilometres. Each profile is an array of density
+    // layers stacked upward from the ground: a layer covers `width` metres and the last one
+    // covers the rest of the atmosphere whatever its width, so width 0 means "to the top".
+    // A layer's density at altitude h metres is
+    //     exp_term * exp(exp_scale * h) + linear_term * h + constant_term
+    // with exp_scale and linear_term in inverse metres. The first Mie layer's anisotropy is the
+    // Mie phase function's asymmetry g.
     static const std::string SETTING_PLANET_RADIUS;
     static const std::string SETTING_SKY_BOTTOM_RADIUS;
     static const std::string SETTING_SKY_TOP_RADIUS;
@@ -144,7 +151,7 @@ public:
     // auto_adjust - if true and canAutoAdjust() is true, return 1.0
     F32 getReflectionProbeAmbiance(bool auto_adjust = false) const;
 
-    // Return first (only) profile layer represented in LLSD
+    // Return the first layer of the profile, or undefined when it has none
     LLSD getRayleighConfig() const;
     LLSD getMieConfig() const;
     LLSD getAbsorptionConfig() const;
@@ -153,6 +160,10 @@ public:
     LLSD getRayleighConfigs() const;
     LLSD getMieConfigs() const;
     LLSD getAbsorptionConfigs() const;
+
+    // The profile's layers as one flat array, however deeply they are nested. Skies edited by
+    // earlier Density tabs hold a layer array nested inside the absorption profile.
+    static LLSD flattenDensityProfile(const LLSD& profile);
 
     LLUUID getBloomTextureId() const;
     LLUUID getRainbowTextureId() const;

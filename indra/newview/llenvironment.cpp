@@ -37,6 +37,7 @@
 #include "lltrans.h"
 #include "lltrace.h"
 #include "llfasttimer.h"
+#include "alfarplane.h"
 #include "llviewercamera.h"
 #include "pipeline.h"
 #include "llsky.h"
@@ -1587,14 +1588,19 @@ LLVector4 LLEnvironment::getMoonDirectionCFR() const
     return light_direction_cfr;
 }
 
-LLVector4 LLEnvironment::getClampedLightNorm() const
+LLVector3 LLEnvironment::getClampedLightDirection() const
 {
     LLVector3 light_direction = getLightDirection();
     if (light_direction.mV[2] < -0.1f)
     {
         light_direction.mV[2] = -0.1f;
     }
-    return toLightNorm(light_direction);
+    return light_direction;
+}
+
+LLVector4 LLEnvironment::getClampedLightNorm() const
+{
+    return toLightNorm(getClampedLightDirection());
 }
 
 LLVector4 LLEnvironment::getClampedSunNorm() const
@@ -1650,6 +1656,8 @@ void LLEnvironment::update(const LLViewerCamera * cam)
         mLastCamYaw = cam->getYaw() + SUN_DELTA_YAW;
     }
 
+    mEyeToSky = ALFarPlane::eyeToSkyFrame(cam->frameModelview());
+
     updateSettingsUniforms();
 
     LLGLSLShader::dirtyEnvironmentUniforms();
@@ -1690,9 +1698,12 @@ namespace
 {
     // The CPU block must exactly match the std140 layout the shaders declare. Each vec3 is
     // paired with a trailing scalar (fills the vec3's std140 tail), so the C++ float[3]+float
-    // packing reproduces std140 with no manual padding; only the final 16-byte round needs it.
-    static_assert(sizeof(LLEnvironment::EnvironmentUBOData) == 160,
-                  "Environment UBO layout must match std140 (160 bytes)");
+    // packing reproduces std140 with no manual padding; only the round to 16 bytes before
+    // eyeToSky needs it, a mat3's columns being vec4-aligned.
+    static_assert(sizeof(LLEnvironment::EnvironmentUBOData) == 208,
+                  "Environment UBO layout must match std140 (208 bytes)");
+    static_assert(offsetof(LLEnvironment::EnvironmentUBOData, eyeToSky) == 160,
+                  "eyeToSky must start on a 16-byte boundary, as a std140 mat3 does");
 
     // LLShaderMgr uniform enum -> (byte offset in the block, float component count). The pack
     // walks the per-frame LLShaderUniforms buckets and writes any setting whose enum appears
@@ -1753,6 +1764,7 @@ namespace
         {
             members.push_back({ f.uniform, nullptr, f.offset, false });
         }
+        members.push_back({ LLShaderMgr::EYE_TO_SKY, nullptr, (U32)offsetof(LLEnvironment::EnvironmentUBOData, eyeToSky), true });
         LLGLSLShader::registerEngineBlockLayout("Environment", std::move(members));
         return true;
     }();
@@ -1894,6 +1906,11 @@ void LLEnvironment::packEnvironmentUBO()
 
     pack_group(mSkyUniforms);
     pack_group(mWaterUniforms);
+
+    for (U32 column = 0; column < 3; ++column)
+    {
+        memcpy(&d.eyeToSky[column * 4], &mEyeToSky[column * 3], 3 * sizeof(F32));
+    }
 
     mEnvUBODirty = true;
 }

@@ -33,6 +33,7 @@
 #include "llviewercontrol.h"
 
 // Library includes
+#include "alfarplane.h"
 #include "aluniformbuffer.h"
 #include "llwindow.h"   // getGamma()
 
@@ -44,6 +45,7 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llconsole.h"
+#include "llf32uictrl.h"
 #include "lldrawpoolbump.h"
 #include "llfontgl.h"
 #include "lldrawpoolterrain.h"
@@ -138,12 +140,55 @@ static bool handleRenderFarClipChanged(const LLSD& newvalue)
 {
     if (LLStartUp::getStartupState() >= STATE_STARTED)
     {
-        F32 draw_distance = (F32)newvalue.asReal();
+        F32 draw_distance = ALFarPlane::clampDrawDistance((F32)newvalue.asReal(), LLRender::sReverseZ);
     gAgentCamera.mDrawDistance = draw_distance;
     LLWorld::getInstance()->setLandFarClip(draw_distance);
     return true;
     }
     return false;
+}
+
+namespace
+{
+    // Every draw distance control capped so far, so that a change of depth convention caps them again.
+    std::vector<std::pair<LLHandle<LLF32UICtrl>, LLHandle<LLUICtrl>>> sDrawDistanceControls;
+
+    void apply_draw_distance_cap(LLF32UICtrl* range, LLUICtrl* bound)
+    {
+        const F32 ceiling = ALFarPlane::drawDistanceCeiling(LLRender::sReverseZ);
+        range->setMaxValue(ceiling);
+        // A slider does not take a lower maximum back into the value it shows, and a spinner never
+        // clamps: given the setting held to the ceiling, both show what the draw distance is.
+        if (LLControlVariable* control = bound->getControlVariable())
+        {
+            bound->setValue(llmin((F32)control->getValue().asReal(), ceiling));
+        }
+    }
+
+    // Caps again every draw distance control still alive, for the depth convention now in force.
+    void recap_draw_distance_controls()
+    {
+        std::erase_if(sDrawDistanceControls, [](const auto& c) { return c.first.isDead() || c.second.isDead(); });
+        for (const auto& [range, bound] : sDrawDistanceControls)
+        {
+            apply_draw_distance_cap(range.get(), bound.get());
+        }
+    }
+}
+
+void cap_draw_distance_control(LLF32UICtrl* range, LLUICtrl* bound)
+{
+    apply_draw_distance_cap(range, bound);
+
+    std::erase_if(sDrawDistanceControls, [](const auto& c) { return c.first.isDead() || c.second.isDead(); });
+    for (const auto& [known_range, known_bound] : sDrawDistanceControls)
+    {
+        if (known_range.get() == range)
+        {
+            return;
+        }
+    }
+    sDrawDistanceControls.emplace_back(range->getDerivedHandle<LLF32UICtrl>(), bound->getHandle());
 }
 
 static bool handleTerrainScaleChanged(const LLSD& newvalue)
@@ -313,7 +358,10 @@ static bool handleReverseZChanged(const LLSD& newvalue)
     // releases + recreates the GL buffers at the new depth format itself, so -- unlike the
     // emissive case -- do NOT release buffers up front (that would rebuild them at the old
     // format only to have setShaders rebuild them again).
-    return handleSetShaderChanged(newvalue);
+    const bool handled = handleSetShaderChanged(newvalue);
+    // The draw distance ceiling follows the convention setShaders latched; controls already shown take it now.
+    recap_draw_distance_controls();
+    return handled;
 }
 
 static bool handleHalationChanged(const LLSD& newvalue)

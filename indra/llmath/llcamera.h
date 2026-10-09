@@ -43,7 +43,14 @@ constexpr F32 DEFAULT_FAR_PLANE     = 64.f; // far reaches across two horizontal
 constexpr F32 MAX_ASPECT_RATIO  = 50.0f;
 constexpr F32 MAX_NEAR_PLANE    = 1023.9f;   // Clamp the near plane just before the skybox ends
 constexpr F32 MAX_FAR_PLANE     = 100000.0f; //1000000.0f; // Max allowed. Not good Z precision though.
-constexpr F32 MAX_FAR_CLIP      = 512.0f;
+constexpr F32 MAX_FAR_CLIP      = 2048.0f;   // Draw distance ceiling under reverse-Z, whose float depth keeps its precision there
+constexpr F32 FORWARD_Z_MAX_FAR_CLIP = 512.0f; // Draw distance ceiling under forward 24-bit depth
+// The far plane of every finite projection: forward-Z's main view, probe captures and previews. An infinite
+// request under forward-Z falls back to it.
+constexpr F32 FINITE_PROJECTION_FAR = 1024.0f;
+// Depth reconstruction places no point farther than this; the cleared far depth of an infinite projection
+// would otherwise unproject to infinity. The shaders carry it as deferredUtil.glsl's RECONSTRUCT_W_FLOOR, 1 / this.
+constexpr F32 MAX_RECONSTRUCT_DISTANCE = 1000000.0f;
 
 constexpr F32 MIN_ASPECT_RATIO  = 0.02f;
 constexpr F32 MIN_NEAR_PLANE    = 0.1f;

@@ -43,7 +43,7 @@ void main()
 
     vec4 c      = texture(diffuseMap, vary_texcoord0.xy);
 
-    // SL-14113 Don't write to depth; prevent moon's quad from hiding stars which should be visible
+    // SL-14113 The quad around the disc leaves the stars behind it alone.
     // Moon texture has transparent pixels <0x55,0x55,0x55,0x00>
     if (c.a <= 2./255.) // 0.00784
     {
@@ -63,8 +63,5 @@ void main()
 #else
     frag_data[0] = vec4(c.rgb, c.a);
 #endif
-
-    // Added and commented out for a ground truth.  Do not uncomment - Geenz
-    //gl_FragDepth = 0.999985f;
 }
 

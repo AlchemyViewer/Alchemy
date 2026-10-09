@@ -162,6 +162,8 @@ if(AL_BUILD_VIEWER)
     aldaycyclelandmarks.cpp
     alderenderlist.cpp
     aldroptarget.cpp
+    alfarplane.cpp
+    alfarplaneoverlay.cpp
     alfloaterblocked.cpp
     alfloaterdirectory.cpp
     alfloaterevent.cpp
@@ -1029,6 +1031,8 @@ if(AL_BUILD_VIEWER)
     aldaycyclelandmarks.h
     alderenderlist.h
     aldroptarget.h
+    alfarplane.h
+    alfarplaneoverlay.h
     alfloaterblocked.h
     alfloaterdirectory.h
     alfloaterevent.h
@@ -2509,6 +2513,7 @@ if(AL_BUILD_TESTS)
     alcrashreporter
     alcurvemodel
     aldaycyclelandmarks
+    alfarplane
     alfeedback
     algradehistory
     almotionpredictor

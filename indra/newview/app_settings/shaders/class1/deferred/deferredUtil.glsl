@@ -402,12 +402,18 @@ vec3 getProjectedLightSpecularColor(float light_distance, vec2 projected_uv)
     return color.rgb * plcol.rgb * plcol.a;
 }
 
+// Under an infinite projection the cleared far depth unprojects to w = 0. There w is 1 / view distance, so
+// flooring it keeps every point within MAX_RECONSTRUCT_DISTANCE (llcamera.h) and leaves finite projections,
+// whose w never gets this small, untouched.
+#define RECONSTRUCT_W_FLOOR 0.000001
+
 vec4 getPosition(vec2 pos_screen)
 {
     float depth = getDepth(pos_screen);
     vec2 sc = getScreenCoordinate(pos_screen);
     vec4 ndc = vec4(sc.x, sc.y, ndcZFromScreenDepth(depth), 1.0);
     vec4 pos = inv_proj * ndc;
+    pos.w = max(pos.w, RECONSTRUCT_W_FLOOR);
     pos /= pos.w;
     pos.w = 1.0;
     return pos;
@@ -417,7 +423,7 @@ vec4 getPosition(vec2 pos_screen)
 vec3 getPositionWithNDC(vec3 ndc)
 {
     vec4 pos = inv_proj * vec4(ndc, 1.0);
-    return pos.xyz / pos.w;
+    return pos.xyz / max(pos.w, RECONSTRUCT_W_FLOOR);
 }
 
 vec4 getPositionWithDepth(vec2 pos_screen, float depth)

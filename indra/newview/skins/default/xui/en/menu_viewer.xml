@@ -3921,6 +3921,53 @@ function="World.EnvPreset"
          label="Rendering"
          name="Rendering"
          tear_off="true">
+            <menu
+             create_jump_keys="true"
+             label="Far Plane"
+             name="Far Plane"
+             tear_off="true">
+                <menu_item_check
+                 label="Projection Overlay"
+                 name="Projection Overlay">
+                    <menu_item_check.on_check
+                     function="CheckControl"
+                     parameter="AlchemyRenderFarPlaneOverlay" />
+                    <menu_item_check.on_click
+                     function="ToggleControl"
+                     parameter="AlchemyRenderFarPlaneOverlay" />
+                </menu_item_check>
+                <menu_item_separator />
+                <menu_item_check
+                 label="Projection: Automatic"
+                 name="Projection Automatic">
+                    <menu_item_check.on_check
+                     function="Advanced.CheckFarPlaneForce"
+                     parameter="0" />
+                    <menu_item_check.on_click
+                     function="Advanced.SetFarPlaneForce"
+                     parameter="0" />
+                </menu_item_check>
+                <menu_item_check
+                 label="Projection: Finite (2x draw distance)"
+                 name="Projection Finite">
+                    <menu_item_check.on_check
+                     function="Advanced.CheckFarPlaneForce"
+                     parameter="1" />
+                    <menu_item_check.on_click
+                     function="Advanced.SetFarPlaneForce"
+                     parameter="1" />
+                </menu_item_check>
+                <menu_item_check
+                 label="Projection: Infinite (reverse-Z)"
+                 name="Projection Infinite">
+                    <menu_item_check.on_check
+                     function="Advanced.CheckFarPlaneForce"
+                     parameter="2" />
+                    <menu_item_check.on_click
+                     function="Advanced.SetFarPlaneForce"
+                     parameter="2" />
+                </menu_item_check>
+            </menu>
             <menu_item_check
              label="Axes"
              name="Axes">

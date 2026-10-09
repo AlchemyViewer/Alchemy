@@ -36,16 +36,25 @@ vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 
 float getDepth(vec2 pos_screen);
-bool isFarDepth(float d);             // deferredUtil.glsl -- depth-convention aware
 
-vec3 linear_to_srgb(vec3 c);
-vec3 srgb_to_linear(vec3 c);
+vec3 atmosFragLighting(vec3 light, vec3 additive, vec3 atten);
 
 uniform vec4 waterPlane;
 
 uniform int cube_snapshot;
 
-uniform float sky_hdr_scale;
+// The sky dome behind everything, as the sky writes it (before srgb_to_linear and sky_hdr_scale), while
+// skyBehindWeight is 1 (LLPipeline::mSkyBehind). WindLight's in-scatter converges on a colour of its own, up to two
+// stops off the dome's toward a low sun and half a stop at night, which leaves a seam where far water meets the sky.
+// The water surface converges on the sky behind it instead: it lies below the horizon, where the dome is the
+// horizon's own colour turned only by the sun's glow. Nothing else does, since a few degrees above the horizon the
+// dome changes fast (at dusk, from no sunlight to the sun's glow), and a mountain took the glow of a sun behind it.
+uniform sampler2D skyBehindMap;
+uniform float skyBehindWeight;
+
+#ifndef REVERSE_Z
+uniform float near_clip; // twice the near plane (LLPipeline::bindDeferredShader)
+#endif
 
 void main()
 {
@@ -77,19 +86,35 @@ void main()
     vec3  irradiance = vec3(0);
     vec3  radiance  = vec3(0);
 
-    if (isFarDepth(depth))
-    {
-        //should only be true of sky, clouds, sun/moon, and stars
-        discard;
-    }
+    // No sky reaches here: the triangle is drawn on the far plane, and the depth test rejects every pixel the
+    // world left at the cleared depth (hazeV.glsl).
 
    float alpha = 0.0;
 
     if (do_atmospherics)
     {
+        // On the water surface, seen from above it. Reverse-Z float depth puts the surface within about a millionth of
+        // its distance of the plane, held here with twenty times that to spare. Forward 24-bit depth is coarser: a step
+        // of 2^-24 moves a point at distance L by up to L^2 / (near 2^24) along its ray, which is L h / (near 2^24) off
+        // the plane from a camera h above it, about 0.12 m at 1 km from 500 m up with a 0.25 m near plane; held at a
+        // whole step, twice the rounding.
+        float plane_dist = dot(pos.xyz, waterPlane.xyz) + waterPlane.w;
+        float dist = length(pos.xyz);
+        float plane_tolerance = max(0.05, 2e-5 * dist);
+#ifndef REVERSE_Z
+        plane_tolerance = max(plane_tolerance, dist * waterPlane.w / (near_clip * 0.5 * 16777216.0));
+#endif
+        bool on_water = waterPlane.w > 0.0 && abs(plane_dist) <= plane_tolerance;
+        if (on_water && skyBehindWeight > 0.0)
+        {
+            // atmosFragLighting doubles additive, so the sky is halved
+            vec3 sky = texture(skyBehindMap, tc).rgb * 0.5;
+            additive = mix(additive, sky * (vec3(1.0) - atten), (vec3(1.0) - atten) * skyBehindWeight);
+        }
+
+        // the in-scatter alone: the blend multiplies what is already lit by alpha
         alpha = atten.r;
-        color = srgb_to_linear(additive*2.0);
-        color *= sky_hdr_scale;
+        color = atmosFragLighting(vec3(0), additive, atten);
     }
     else
     {

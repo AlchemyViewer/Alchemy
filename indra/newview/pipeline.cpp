@@ -57,6 +57,8 @@
 #include "aluniformbuffer.h"
 #include "alwhitebalancesolver.h"
 #include "alcurvemodel.h"
+#include "alfarplane.h"
+#include "alfarplaneoverlay.h"
 #include "llrender.h"
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
@@ -1069,6 +1071,13 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         // must match it -- flip together via mainDepthFormat().
         mWaterDis.allocate(resX, resY, screenFormat, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
 
+        // The format the sky's colour lands in (addDeferredAttachments), so the sky behind clamps and quantizes as the sky
+        // does: the emissive attachment's float with HDR, and 8 bits otherwise, the emissive attachment's or the albedo's,
+        // which the sky writes raw.
+        const bool sky_float = hdr && gSavedSettings.getBOOL("RenderEnableEmissiveBuffer");
+        mSkyBehind.allocate(llmax(resX / 2, 1U), llmax(resY / 2, 1U), sky_float ? GL_R11F_G11F_B10F : GL_RGBA8, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE);
+        mSkyBehindFrame = 0;
+
         if(RenderScreenSpaceReflections)
         {
             mSceneMap.allocate(resX, resY, screenFormat, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
@@ -1355,6 +1364,8 @@ void LLPipeline::releaseGLBuffers()
     releaseLUTBuffers();
 
     mWaterDis.release();
+    mSkyBehind.release();
+    mSkyBehindFrame = 0;
 
     mSceneMap.release();
 
@@ -1374,6 +1385,8 @@ void LLPipeline::releaseGLBuffers()
     {
         mGlow[i].release();
     }
+
+    ALFarPlaneOverlay::release();
 
     mHeroProbeManager.cleanup(); // release hero probes
 
@@ -3050,6 +3063,13 @@ void LLPipeline::updateReverseZ()
     const bool changed   = (effective != LLRender::sReverseZ);
 
     LLRender::sReverseZ = effective;
+
+    // The draw distance ceiling follows the depth convention, for every consumer.
+    if (changed && LLStartUp::getStartupState() >= STATE_STARTED)
+    {
+        gAgentCamera.mDrawDistance = ALFarPlane::clampDrawDistance(gSavedSettings.getF32("RenderFarClip"), effective);
+        LLWorld::getInstance()->setLandFarClip(gAgentCamera.mDrawDistance);
+    }
 
     // Issued unconditionally, not just on a change. These are the only writers of clip control
     // and clear depth in the tree, so if GL is ever reset underneath us -- a context restore,
@@ -4865,6 +4885,10 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
         mHighlightFaces.clear();
 
         renderDebug();
+        if (!hasRenderType(LLPipeline::RENDER_TYPE_HUD))
+        {
+            ALFarPlaneOverlay::render();
+        }
     }
 
     if (gUseWireframe)
@@ -6168,13 +6192,14 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
         const LLVector3& cam_pos = camera.getOrigin();
 
         F32 max_dist;
+        // The draw distance, which the depth convention holds the setting to.
         if (LLPipeline::sRenderDeferred)
         {
-            max_dist = RenderFarClip;
+            max_dist = gAgentCamera.mDrawDistance;
         }
         else
         {
-            max_dist = llmin(RenderFarClip, LIGHT_MAX_RADIUS * 4.f);
+            max_dist = llmin(gAgentCamera.mDrawDistance, LIGHT_MAX_RADIUS * 4.f);
         }
 
         // UPDATE THE EXISTING NEARBY LIGHTS
@@ -11480,6 +11505,18 @@ void LLPipeline::renderDeferredLighting()
     gGL.setColorMask(true, true);
 }
 
+bool LLPipeline::skyBehindWanted() const
+{
+    // The haze pass converges only the water surface seen from above it (hazeF.glsl).
+    if (gCubeSnapshot || sImpostorRender || mRT != &mMainRT || !RenderDeferredAtmospheric || sUnderWaterRender || !mSkyBehind.isComplete())
+    {
+        return false;
+    }
+    // stateSort fills the water pool with this view's visible water, edge water included, before the sky pool draws.
+    const LLFacePool* water = static_cast<const LLFacePool*>(mWaterPool);
+    return water && !water->mDrawFace.empty();
+}
+
 void LLPipeline::doAtmospherics()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -11520,12 +11557,25 @@ void LLPipeline::doAtmospherics()
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
 
-        LLGLDepthTest depth(GL_FALSE);
+        // Far water converges on the sky drawn behind it when this view's is there: the main view's alone, once the
+        // sky pool has drawn it this frame (HDRI skies and probe captures keep WindLight's own limit).
+        const bool sky_behind = !gCubeSnapshot && mRT == &mMainRT && mSkyBehind.isComplete() && mSkyBehindFrame == gFrameCount;
+        haze_shader.uniform1f(LLShaderMgr::SKY_BEHIND_WEIGHT, sky_behind ? 1.f : 0.f);
+        if (sky_behind)
+        {
+            haze_shader.bindTexture(LLShaderMgr::SKY_BEHIND_MAP, &mSkyBehind, ALSamplers::BilinearClamp);
+        }
+
+        // The triangle lies on the far plane (hazeV.glsl), level with the depth the sky leaves cleared: the test
+        // passes only where the world drew something, so the sky is rejected before it is shaded. The screen
+        // target shares the G-buffer's depth; the shader reads its copy in mWaterDis.
+        LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
 
         // full screen blit
         mScreenTriangleVB->setBuffer();
         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
+        haze_shader.disableTexture(LLShaderMgr::SKY_BEHIND_MAP);
         unbindDeferredShader(haze_shader);
 
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
@@ -12578,7 +12628,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
     LLPlane shadow_near_clip;
     {
         LLVector3 p = camera.getOrigin(); // gAgent.getPositionAgent();
-        p += caster_dir * RenderFarClip*2.f;
+        p += caster_dir * gAgentCamera.mDrawDistance*2.f;
         shadow_near_clip.setVec(p, caster_dir);
     }
 

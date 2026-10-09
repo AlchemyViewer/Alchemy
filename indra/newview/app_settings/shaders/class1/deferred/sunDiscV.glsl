@@ -43,12 +43,12 @@ void main()
 
     sun_fade = smoothstep(0.3, 1.0, (position.z + 50) / 512.0f);
 
-    // smash to *almost* far clip plane -- behind clouds but in front of stars.
-    // Reverse-Z mirrors the stored depth (far=0): 1 - 0.9999995 window == 0.0000005 ndc.
+    // On the far plane with the rest of the sky, which layers by draw order: after the stars,
+    // before the clouds. Reverse-Z puts the far plane at ndc z 0.
 #ifdef REVERSE_Z
-    pos.z = pos.w*0.0000005;
+    pos.z = 0.0;
 #else
-    pos.z = pos.w*0.999999;
+    pos.z = pos.w;
 #endif
     gl_Position = pos;
 

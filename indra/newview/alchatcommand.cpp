@@ -29,6 +29,7 @@
 #include "object_flags.h"
 
 // viewer includes
+#include "alfarplane.h"
 #include "aoengine.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -50,6 +51,7 @@
 #include "llvoavatarself.h"
 #include "llvolume.h"
 #include "llvolumemessage.h"
+#include "llrender.h"
 
 #include <iterator>
 
@@ -163,7 +165,7 @@ bool ALChatCommand::parseCommand(std::string data)
             F32 dist;
             if (input >> dist)
             {
-                dist = llclamp(dist, 16.f, 512.f);
+                dist = ALFarPlane::clampDrawDistance(llclamp(dist, 16.f, MAX_FAR_CLIP), LLRender::sReverseZ);
                 gSavedSettings.setF32("RenderFarClip", dist);
                 gAgentCamera.mDrawDistance = dist;
                 return true;

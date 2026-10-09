@@ -14,12 +14,16 @@ FadeTime, a slew cap relative to a running reference luminance, and adaptive
 damping keyed off direction reversals of the raw target, detected as
 displacement from an anchor so the verdict does not depend on frame rate.
 Replayed at 30/60/144 fps.  Pure Python on purpose (no numpy).
+Model C -- skyOf: only the cleared far depth counts as unoccluded sky, under
+the finite projections and under the infinite reverse-Z one, where geometry
+stores near / distance and so never reaches it: 1 km stores 1e-4, 1000 km 1e-7.
 
     python check_lens_flare_state.py          # verify the chosen constants
     python check_lens_flare_state.py --grid   # compare tap counts and patterns
 """
 import math
 import random
+import struct
 import sys
 
 GOLDEN_ANGLE = 2.39996322972865332
@@ -455,11 +459,68 @@ def model_b(p=P):
           "drive p-p %.4f, instability peak %.3f" % (max(last) - min(last), imax))
 
 
+# ---- Model C: skyOf ----------------------------------------------------------
+NEAR = 0.1            # MIN_NEAR_PLANE
+FAR = 1024.0          # FINITE_PROJECTION_FAR, every finite projection's far plane
+FLOOR = 1000000.0     # MAX_RECONSTRUCT_DISTANCE, the farthest point reconstruction places
+EDGE = 256000.0       # ALFarPlane::EDGE_WATER_STRETCH
+SHADER = __file__.replace("\\", "/").rsplit("/scripts/", 1)[0] +     "/indra/newview/app_settings/shaders/class1/alchemy/lensFlareStateF.glsl"
+
+
+def smoothstep(e0, e1, x):
+    t = min(max((x - e0) / (e1 - e0), 0.0), 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def f32(x):
+    """x as the nearest single, which a 32-bit float depth buffer holds."""
+    return struct.unpack("f", struct.pack("f", x))[0]
+
+
+def stored_depth(z, reverse, infinite=False):
+    """Window depth held for geometry at eye distance z: float under reverse-Z, 24-bit fixed point forward."""
+    if infinite:
+        return f32(NEAR / z)
+    fwd = (1.0 / NEAR - 1.0 / z) / (1.0 / NEAR - 1.0 / FAR)
+    if reverse:
+        return f32(1.0 - fwd)
+    top = float((1 << 24) - 1)
+    return round(fwd * top) / top
+
+
+def sky_of(d, reverse):
+    """lensFlareStateF.glsl skyOf."""
+    if reverse:
+        return 1.0 if d <= 0.0 else 0.0
+    return 1.0 if d >= 1.0 else 0.0
+
+
+def model_c():
+    print("Model C: skyOf")
+    src = open(SHADER).read()
+    check("shader parity", "return d <= 0.0 ? 1.0 : 0.0;" in src and "return d >= 1.0 ? 1.0 : 0.0;" in src,
+          "skyOf expressions match the mirror")
+    check("the cleared depth is sky", sky_of(0.0, True) == 1.0 and sky_of(1.0, False) == 1.0,
+          "0 reversed, 1 forward")
+    edge = EDGE + 2048.0
+    farthest = math.sqrt(2.0 * edge * edge + EDGE * EDGE)
+    dists = (1000.0, 8192.0, 100000.0, farthest, FLOOR)
+    inf = [sky_of(stored_depth(z, True, True), True) for z in dists]
+    check("infinite: geometry at any distance occludes", max(inf) == 0.0,
+          "1, 8.2, 100, %.0f, %.0f km -> %s" % (farthest / 1000.0, FLOOR / 1000.0, inf))
+    fin = [sky_of(stored_depth(z, rev), rev) for rev in (True, False) for z in (500.0, 900.0, 1000.0)]
+    check("finite: geometry short of the far plane occludes", max(fin) == 0.0,
+          "500, 900, 1000 m reversed then forward -> %s" % fin)
+    old = smoothstep(0.9999, 1.0, 1.0 - stored_depth(900.0, True))
+    check("the old 0.9999 ramp counted far geometry as sky", old > 0.5, "900 m under it %.3f" % old)
+
+
 if __name__ == "__main__":
     if "--grid" in sys.argv:
         grid()
         sys.exit(0)
     model_a()
     model_b()
+    model_c()
     print("%d failure(s)" % len(FAIL))
     sys.exit(1 if FAIL else 0)

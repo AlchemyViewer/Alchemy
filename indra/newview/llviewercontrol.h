@@ -47,6 +47,16 @@ void settings_setup_listeners();
 // for the graphics settings
 void create_graphics_group(LLControlGroup& group);
 
+class LLF32UICtrl;
+class LLUICtrl;
+
+// Holds a draw distance control to what the depth convention lets RenderFarClip reach
+// (ALFarPlane::drawDistanceCeiling): range takes the ceiling as its maximum, and bound, the
+// control bound to RenderFarClip, shows the setting held to it. The setting itself is left
+// alone, so switching back to reverse-Z gives back what was chosen. A control capped once is
+// capped again whenever AlchemyRenderReverseZ changes, while it lives.
+void cap_draw_distance_control(LLF32UICtrl* range, LLUICtrl* bound);
+
 // saved at end of session
 extern LLControlGroup gSavedSettings;
 extern LLControlGroup gSavedPerAccountSettings;

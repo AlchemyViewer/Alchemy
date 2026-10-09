@@ -38,14 +38,12 @@ void main()
     vec4 vert = vec4(position.xyz, 1.0);
     vec4 pos = (modelview_projection_matrix * vert);
 
-    // smash to *almost* far clip plane -- stars are still behind
-    // SL-19283 - finagle the moon position to be between clouds and stars.
-    // Reverse-Z mirrors the stored depth (far=0): 1 - 0.9999955 window == 0.0000045 ndc,
-    // which stays nearer than the sun (0.0000005) under GREATER, matching forward order.
+    // On the far plane with the rest of the sky, which layers by draw order: after the stars,
+    // before the clouds (SL-19283). Reverse-Z puts the far plane at ndc z 0.
 #ifdef REVERSE_Z
-    pos.z = pos.w*0.0000045;
+    pos.z = 0.0;
 #else
-    pos.z = pos.w*0.999991;
+    pos.z = pos.w;
 #endif
     gl_Position = pos;
 

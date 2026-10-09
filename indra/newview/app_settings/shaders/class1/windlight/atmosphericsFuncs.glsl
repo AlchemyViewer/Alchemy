@@ -48,13 +48,28 @@ float getAmbientClamp() { return 1.0f; }
 vec3 srgb_to_linear(vec3 col);
 
 // return colors in sRGB space
+// inPositionEye and light_dir are in eye space. The haze is worked in the sky dome's frame (eyeToSky), where y is
+// altitude: in eye space the altitude limit below would follow the camera's pitch, and far geometry looked at from
+// above or below would take a fraction of its haze.
 void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, out vec3 sunlit, out vec3 amblit, out vec3 additive,
                          out vec3 atten)
 {
-    vec3 rel_pos = inPositionEye;
+    vec3 rel_pos = eyeToSky * inPositionEye;
+    light_dir = eyeToSky * light_dir;
 
-    //(TERRAIN) limit altitude
-    if (abs(rel_pos.y) > max_y) rel_pos *= (max_y / rel_pos.y);
+    //(TERRAIN) limit altitude. The haze lies max_y deep above the camera, as the sky dome's does (skyF.glsl): a ray
+    // rising h = y / max_y layers is hazed over about 1/h of its length, and a far point over max_y / sin(elevation),
+    // the dome's own path. A ray falling below the camera stays in the haze, as the dome's do, and keeps its whole
+    // length. Eased, (1 + h^8)^(-1/8), where a hard limit creased the haze along the contour max_y up (and, when it
+    // took falling rays too, max_y down), a line on the terrain that moved as the camera climbed.
+    // Taken over m = max(h, 1), so h^8 cannot overflow for a point far above a shallow layer.
+    float h = max(rel_pos.y, 0.0) / max(max_y, 1.0);
+    float m = max(h, 1.0);
+    float q = h / m;
+    float r = 1.0 / m;
+    q *= q; q *= q; q *= q;
+    r *= r; r *= r; r *= r;
+    rel_pos *= pow(q + r, -0.125) / m;
 
     vec3  rel_pos_norm = normalize(rel_pos);
     float rel_pos_len  = length(rel_pos);
@@ -87,16 +102,14 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
     atten = combined_haze.rgb;
 
     // compute haze glow
-    float haze_glow = dot(rel_pos_norm, lightnorm.xyz);
-
-    // dampen sun additive contrib when not facing it...
-    // SL-13539: This "if" clause causes an "additive" white artifact at roughly 77 degreees.
-    //    if (length(light_dir) > 0.01)
-    haze_glow *= max(0.0f, dot(light_dir, rel_pos_norm));
-
-    haze_glow = 1. - haze_glow;
+    // the angle to the light, against light_dir: rel_pos and light_dir are in the same frame, the sky's,
+    // turned there together above. lightnorm, held no lower than 0.1 below the horizon, is for the
+    // sunlight's path above.
+    float haze_glow = 1. - dot(rel_pos_norm, light_dir);
     // haze_glow is 0 at the sun and increases away from sun
-    haze_glow = max(haze_glow, .001);  // set a minimum "angle" (smaller glow.y allows tighter, brighter hotspot)
+    // set a minimum "angle" (smaller allows a tighter, brighter hotspot). WindLight's objects used .03;
+    // only its sky dome used .001, and skyF keeps that.
+    haze_glow = max(haze_glow, .03);
     haze_glow *= glow.x;
     // higher glow.x gives dimmer glow (because next step is 1 / "angle")
     haze_glow = clamp(pow(haze_glow, glow.z), -100000, 100000);

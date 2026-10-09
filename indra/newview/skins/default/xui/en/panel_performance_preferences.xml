@@ -214,7 +214,7 @@
     label_width="90"
     layout="topleft"
     min_val="64"
-    max_val="512"
+    max_val="2048"
     name="draw_distance"
     left_pad="5"
     width="250">

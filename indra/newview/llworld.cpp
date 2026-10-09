@@ -58,8 +58,10 @@
 #include "pipeline.h"
 #include "llappviewer.h"        // for do_disconnect()
 #include "llscenemonitor.h"
+#include "alfarplane.h"
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <deque>
 #include <queue>
 #include <map>
@@ -118,6 +120,7 @@ LLWorld::LLWorld() :
 void LLWorld::resetClass()
 {
     mHoleWaterObjects.clear();
+    mHoleWaterKey = HoleWaterKey();
     mWaterObjectsDirty = false;
     gObjectList.destroy();
     gSky.cleanup(); // references an object
@@ -976,6 +979,7 @@ void LLWorld::clearHoleWaterObjects()
         gObjectList.killObject(waterp);
     }
     mHoleWaterObjects.clear();
+    mHoleWaterKey = HoleWaterKey();
 }
 
 void LLWorld::clearEdgeWaterObjects()
@@ -1006,24 +1010,34 @@ void LLWorld::updateWaterObjects()
     }
 
     // First, determine the min and max "box" of water objects
-    S32 min_x = 0;
-    S32 min_y = 0;
-    S32 max_x = 0;
-    S32 max_y = 0;
     U32 region_x, region_y;
 
     S32 rwidth = 256;
 
-    // We only want to fill in water for stuff that's near us, say, within 256 or 512m
-    S32 range = LLViewerCamera::getInstance()->getFar() > 256.f ? 512 : 256;
+    // Hole water fills the cells among the loaded regions that have none, and edge water starts past the box, so
+    // the box reaches 256 m around the agent's region, or 512 m past a 256 m draw distance, and on each side out to
+    // the farthest region loaded there, which a long draw distance puts kilometres away; short of it, edge water would
+    // lie under them. Each side goes only as far as its own regions: a square sized by the farthest one would fill
+    // the far corners and the empty sides with hole water.
+    const S32 range = LLViewerCamera::getInstance()->getFar() > 256.f ? 512 : 256;
 
     LLViewerRegion* regionp = gAgent.getRegion();
     from_region_handle(regionp->getHandle(), &region_x, &region_y);
 
-    min_x = (S32)region_x - range;
-    min_y = (S32)region_y - range;
-    max_x = (S32)region_x + range;
-    max_y = (S32)region_y + range;
+    S32 min_x = (S32)region_x - range;
+    S32 min_y = (S32)region_y - range;
+    S32 max_x = (S32)region_x + range;
+    S32 max_y = (S32)region_y + range;
+    for (LLViewerRegion* loaded : mRegionList)
+    {
+        U32 loaded_x, loaded_y;
+        from_region_handle(loaded->getHandle(), &loaded_x, &loaded_y);
+        const S32 width = (S32)loaded->getWidth();
+        min_x = llmin(min_x, (S32)loaded_x);
+        min_y = llmin(min_y, (S32)loaded_y);
+        max_x = llmax(max_x, (S32)loaded_x + width - rwidth);
+        max_y = llmax(max_y, (S32)loaded_y + width - rwidth);
+    }
 
     for (region_list_t::iterator iter = mRegionList.begin();
          iter != mRegionList.end(); ++iter)
@@ -1036,29 +1050,77 @@ void LLWorld::updateWaterObjects()
         }
     }
 
-    clearHoleWaterObjects();
-
     // Use the water height of the region we're on for areas where there is no region
     F32 water_height = gAgent.getRegion()->getWaterHeight();
 
     // Now, get a list of the holes
-    S32 x, y;
-    for (x = min_x; x <= max_x; x += rwidth)
+    const S32 cells_x = (max_x - min_x) / rwidth + 1;
+    const S32 cells_y = (max_y - min_y) / rwidth + 1;
+    std::vector<U8> hole(cells_x * cells_y);
+    for (S32 j = 0; j < cells_y; ++j)
     {
-        for (y = min_y; y <= max_y; y += rwidth)
+        for (S32 i = 0; i < cells_x; ++i)
         {
-            U64 region_handle = to_region_handle(x, y);
-            if (!getRegionFromHandle(region_handle))
-            {   // No region at that area, so make water
-                LLVOWater* waterp = (LLVOWater *)gObjectList.createObjectViewer(LLViewerObject::LL_VO_WATER, gAgent.getRegion());
-                waterp->setPositionGlobal(LLVector3d(x + rwidth/2,
-                                                     y + rwidth/2,
-                                                     256.f + water_height));
-                waterp->setScale(LLVector3((F32)rwidth, (F32)rwidth, 512.f));
-                gPipeline.createObject(waterp);
-                mHoleWaterObjects.push_back(waterp);
-            }
+            // Containment, not the handle: a variable-sized region covers cells that are not its origin.
+            const S32 x = min_x + i * rwidth;
+            const S32 y = min_y + j * rwidth;
+            hole[j * cells_x + i] = !getRegionFromPosGlobal(LLVector3d(x + rwidth / 2, y + rwidth / 2, 0.0));
         }
+    }
+
+    // One patch for each rectangle of holes, grown along a row and then down while every cell under it is a hole, so
+    // a stretch of open sea is one draw and one occlusion test rather than one per cell.
+    HoleWaterKey key;
+    key.mAgentRegion = regionp->getHandle();
+    key.mWaterHeight = water_height;
+    key.mTransparent = LLPipeline::sRenderTransparentWater;
+    const auto cell = [&hole, cells_x](S32 i, S32 j) { return hole.data() + j * cells_x + i; };
+    for (S32 j = 0; j < cells_y; ++j)
+    {
+        for (S32 i = 0; i < cells_x; ++i)
+        {
+            if (!*cell(i, j))
+            {
+                continue;
+            }
+            S32 w = 1;
+            while (i + w < cells_x && *cell(i + w, j))
+            {
+                ++w;
+            }
+            S32 h = 1;
+            while (j + h < cells_y && std::all_of(cell(i, j + h), cell(i + w, j + h), [](U8 c) { return c != 0; }))
+            {
+                ++h;
+            }
+            for (S32 row = j; row < j + h; ++row)
+            {
+                std::fill_n(cell(i, row), w, U8(0));
+            }
+            key.mRects.insert(key.mRects.end(), { min_x + i * rwidth, min_y + j * rwidth, w * rwidth, h * rwidth });
+        }
+    }
+
+    // The same patches for the same region, height and water shader stay as they are, rather than being killed and
+    // made again at every region connection.
+    const bool hole_water_alive = std::none_of(mHoleWaterObjects.begin(), mHoleWaterObjects.end(),
+                                               [](const LLPointer<LLVOWater>& waterp) { return waterp.isNull() || waterp->isDead(); });
+    if (!(hole_water_alive && key == mHoleWaterKey))
+    {
+        clearHoleWaterObjects();
+        for (size_t r = 0; r < key.mRects.size(); r += 4)
+        {
+            const S32 x = key.mRects[r];
+            const S32 y = key.mRects[r + 1];
+            const S32 w = key.mRects[r + 2];
+            const S32 h = key.mRects[r + 3];
+            LLVOWater* waterp = (LLVOWater *)gObjectList.createObjectViewer(LLViewerObject::LL_VO_WATER, gAgent.getRegion());
+            waterp->setPositionGlobal(LLVector3d(x + w * 0.5, y + h * 0.5, 256.f + water_height));
+            waterp->setScale(LLVector3((F32)w, (F32)h, 512.f));
+            gPipeline.createObject(waterp);
+            mHoleWaterObjects.push_back(waterp);
+        }
+        mHoleWaterKey = std::move(key);
     }
 
     // Update edge water objects
@@ -1069,11 +1131,13 @@ void LLWorld::updateWaterObjects()
     center_x = min_x + (wx >> 1);
     center_y = min_y + (wy >> 1);
 
+    // Edge water reaches 512 m past the agent's region before its stretch, or starts at the box where the box
+    // already reaches further.
     S32 add_boundary[4] = {
-        (S32)(512 - (max_x - region_x)),
-        (S32)(512 - (max_y - region_y)),
-        (S32)(512 - (region_x - min_x)),
-        (S32)(512 - (region_y - min_y)) };
+        llmax(0, (S32)(512 - (max_x - region_x))),
+        llmax(0, (S32)(512 - (max_y - region_y))),
+        llmax(0, (S32)(512 - (region_x - min_x))),
+        llmax(0, (S32)(512 - (region_y - min_y))) };
 
     S32 dir;
     for (dir = 0; dir < EDGE_WATER_OBJECTS_COUNT; dir++)
@@ -1112,13 +1176,17 @@ void LLWorld::updateWaterObjects()
         LLVector3d water_pos(water_center_x, water_center_y, 256.f + water_height) ;
         LLVector3 water_scale((F32) dim[0], (F32) dim[1], 512.f);
 
-        //stretch out to horizon
-        water_scale.mV[0] += fabsf(2048.f * gDirAxes[dir][0]);
-        water_scale.mV[1] += fabsf(2048.f * gDirAxes[dir][1]);
+        // Stretch out to the horizon while the main view's projection is infinite. Not getProjectionFar(), which
+        // a probe capture leaves finite between main frames.
+        const F32 stretch = ALFarPlane::edgeWaterStretch(LLViewerCamera::getInstance()->isMainViewInfinite());
+        water_scale.mV[0] += fabsf(stretch * gDirAxes[dir][0]);
+        water_scale.mV[1] += fabsf(stretch * gDirAxes[dir][1]);
 
-        water_pos.mdV[0] += 1024.f * gDirAxes[dir][0];
-        water_pos.mdV[1] += 1024.f * gDirAxes[dir][1];
+        water_pos.mdV[0] += stretch * 0.5f * gDirAxes[dir][0];
+        water_pos.mdV[1] += stretch * 0.5f * gDirAxes[dir][1];
 
+        // Water is a static object, so each of these rebuilds the patch's geometry (LLStaticViewerObject::updateDrawable),
+        // and its vertices take the new extent when the stretch changes.
         waterp->setPositionGlobal(water_pos);
         waterp->setScale(water_scale);
 
@@ -1126,6 +1194,31 @@ void LLWorld::updateWaterObjects()
     }
 }
 
+bool LLWorld::getEdgeWaterBounds(LLVector3& min_agent, LLVector3& max_agent) const
+{
+    bool any = false;
+    for (const LLPointer<LLVOWater>& waterp : mEdgeWaterObjects)
+    {
+        if (waterp.isNull() || waterp->isDead())
+        {
+            continue;
+        }
+        const LLVector3 half = waterp->getScale() * 0.5f;
+        const LLVector3 pos = waterp->getPositionAgent();
+        if (!any)
+        {
+            min_agent = pos - half;
+            max_agent = pos + half;
+            any = true;
+            continue;
+        }
+        min_agent.mV[VX] = llmin(min_agent.mV[VX], pos.mV[VX] - half.mV[VX]);
+        min_agent.mV[VY] = llmin(min_agent.mV[VY], pos.mV[VY] - half.mV[VY]);
+        max_agent.mV[VX] = llmax(max_agent.mV[VX], pos.mV[VX] + half.mV[VX]);
+        max_agent.mV[VY] = llmax(max_agent.mV[VY], pos.mV[VY] + half.mV[VY]);
+    }
+    return any;
+}
 
 void LLWorld::shiftRegions(const LLVector3& offset)
 {

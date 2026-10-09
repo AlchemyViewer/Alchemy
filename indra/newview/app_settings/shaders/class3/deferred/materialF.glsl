@@ -208,7 +208,7 @@ float getShadow(vec3 pos, vec3 norm)
 {
 #ifdef HAS_SUN_SHADOW
     #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
-        return sampleDirectionalShadow(pos, norm, vary_texcoord0.xy);
+        return sampleDirectionalShadow(pos, norm, gl_FragCoord.xy / screen_res); // screen position, as alphaF passes: it seeds the PCSS rotation
     #else
         return 1.0;
     #endif
@@ -277,7 +277,8 @@ void main()
     vec3 ambenv = amblit;
     vec3 glossenv = vec3(0.0);
     vec3 legacyenv = vec3(0.0);
-    sampleReflectionProbesLegacy(ambenv, glossenv, legacyenv, pos.xy*0.5+0.5, pos.xyz, norm.xyz, glossiness, env, true, amblit_linear);
+    // the screen position (SSR's noise and screen-edge fade), not the eye-space position
+    sampleReflectionProbesLegacy(ambenv, glossenv, legacyenv, gl_FragCoord.xy / screen_res, pos.xyz, norm.xyz, glossiness, env, true, amblit_linear);
 
     color = ambenv;
 
@@ -320,7 +321,11 @@ void main()
             float gt = max(0,(min(gtdenom * nv / vh, gtdenom * nl / vh)));
 
             float scol = shadow*fres*blinnPhongLobe(nh, glossiness)*gt/(nh*nl);
-            color.rgb += lit*scol*sunlit_linear.rgb*spec.rgb;
+            vec3 spec_contrib = lit*scol*sunlit_linear.rgb*spec.rgb;
+            color.rgb += spec_contrib;
+
+            // the sun's glint raises the alpha of a blended surface, so it shows on clear glass, as in WindLight
+            glare = max(max(spec_contrib.r, spec_contrib.g), spec_contrib.b);
         }
 
         // add radiance map
@@ -334,8 +339,7 @@ void main()
         applyLegacyEnv(color, legacyenv, spec, pos.xyz, norm.xyz, env);
 
         float cur_glare = max(max(legacyenv.r, legacyenv.g), legacyenv.b);
-        cur_glare = clamp(cur_glare, 0, 1);
-        cur_glare *= env;
+        cur_glare = max(cur_glare, 0.0) * env * 4.0; // WindLight's weight; glare is clamped to 1 below
         glare += cur_glare;
     }
 

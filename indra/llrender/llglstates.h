@@ -139,31 +139,6 @@ public:
     {}
 };
 
-class LLGLSPipelineSkyBox
-{
-protected:
-    LLGLDisable mCullFace;
-    LLGLSquashToFarClip mSquashClip;
-public:
-    LLGLSPipelineSkyBox();
-   ~LLGLSPipelineSkyBox();
-};
-
-class LLGLSPipelineDepthTestSkyBox : public LLGLSPipelineSkyBox
-{
-public:
-    LLGLSPipelineDepthTestSkyBox(bool depth_test, bool depth_write);
-
-    LLGLDepthTest mDepth;
-};
-
-class LLGLSPipelineBlendSkyBox : public LLGLSPipelineDepthTestSkyBox
-{
-public:
-    LLGLSPipelineBlendSkyBox(bool depth_test, bool depth_write);
-    LLGLEnable mBlend;
-};
-
 // Scoped colour write mask: restores whatever was in force, not a hardcoded convention.
 //
 // The write mask is ambient state with two live conventions in the tree -- the G-buffer

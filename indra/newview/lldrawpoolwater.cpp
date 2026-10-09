@@ -48,6 +48,7 @@
 #include "llenvironment.h"
 #include "llsettingssky.h"
 #include "llsettingswater.h"
+#include "alfarplane.h"
 
 bool LLDrawPoolWater::sSkipScreenCopy = false;
 bool LLDrawPoolWater::sNeedsReflectionUpdate = true;
@@ -96,7 +97,8 @@ void LLDrawPoolWater::prerender()
 
 S32 LLDrawPoolWater::getNumPostDeferredPasses()
 {
-    if (LLViewerCamera::getInstance()->getOrigin().mV[2] < 1024.f)
+    const LLViewerCamera* camera = LLViewerCamera::getInstance();
+    if (ALFarPlane::waterVisibleFrom(camera->getOrigin().mV[2], LLEnvironment::instance().getWaterHeight(), camera->getProjectionFar()))
     {
         return 1;
     }
@@ -128,7 +130,9 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LLGLDisable blend(GL_BLEND);
 
-    gGL.setColorMask(true, true);
+    // Leave the alpha alone, as WindLight's deferred water did: it is the glow channel, and the
+    // water's zero there wiped the glow of whatever lies beneath the surface.
+    gGL.setColorMask(true, false);
 
     LLColor3 light_diffuse(0, 0, 0);
 
@@ -279,6 +283,19 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     shader->uniform3fv(LLViewerShaderMgr::LIGHTNORM, 1, rotated_light_direction.mV);
 
     shader->uniform3fv(LLShaderMgr::WL_CAMPOSLOCAL, 1, LLViewerCamera::getInstance()->getOrigin().mV);
+
+    // The wave clamp, and the edge water's outer rectangle relative to the camera for its fade. The whole rim,
+    // not the patches in view: a culled side would pull the rectangle in over interior water.
+    {
+        LLVector3 rim_min, rim_max;
+        const bool have_rim = LLWorld::getInstance()->getEdgeWaterBounds(rim_min, rim_max);
+        const LLVector3& eye = LLViewerCamera::getInstance()->getOrigin();
+        const LLVector2 rim_lo(rim_min.mV[VX] - eye.mV[VX], rim_min.mV[VY] - eye.mV[VY]);
+        const LLVector2 rim_hi(rim_max.mV[VX] - eye.mV[VX], rim_max.mV[VY] - eye.mV[VY]);
+        const ALFarPlane::WaterFar water_far = ALFarPlane::waterFar(LLViewerCamera::getInstance()->getProjectionFar(), have_rim, rim_lo, rim_hi);
+        shader->uniform2f(LLShaderMgr::WATER_FAR, water_far.mWaveClamp, water_far.mEdgeFade);
+        shader->uniform4f(LLShaderMgr::WATER_RIM, rim_lo.mV[VX], rim_lo.mV[VY], rim_hi.mV[VX], rim_hi.mV[VY]);
+    }
 
     if (LLViewerCamera::getInstance()->cameraUnderWater())
     {

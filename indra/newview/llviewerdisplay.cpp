@@ -28,6 +28,7 @@
 
 #include "llviewerdisplay.h"
 
+#include "alfarplane.h"
 #include "alfloaterprogressview.h"
 #include "aluniformbuffer.h"
 #include "fsyspath.h"
@@ -210,7 +211,8 @@ void display_update_camera()
 
     // Cut draw distance in half when customizing avatar,
     // but on the viewer only.
-    F32 final_far = gAgentCamera.mDrawDistance;
+    const bool reverse_z = LLRender::sReverseZ;
+    F32 final_far = ALFarPlane::clampDrawDistance(gAgentCamera.mDrawDistance, reverse_z);
     if (gCubeSnapshot)
     {
         if (gPipeline.mHeroProbeManager.isMirrorPass())
@@ -235,6 +237,18 @@ void display_update_camera()
         final_far = llmax(32.f, final_far / mem_factor);
     }
     LLViewerCamera::getInstance()->setFar(final_far);
+
+    // The camera's far plane above stays the draw distance. The projection's only says how depth is stored
+    // (alfarplane.h), and setup3DRender() below applies it.
+    static LLCachedControl<S32> force_projection(gSavedSettings, "AlchemyRenderFarPlaneForce", ALFarPlane::FORCE_AUTOMATIC);
+    LLViewerCamera* camera = LLViewerCamera::getInstance();
+    camera->setProjectionFar(ALFarPlane::projectionFar(reverse_z, gCubeSnapshot, force_projection(), gAgentCamera.mDrawDistance));
+    // Edge water stretches with the main view's projection, which reverse-Z or the debug force can switch at runtime.
+    if (!gCubeSnapshot && ALFarPlane::isInfinite(camera->getProjectionFar()) != camera->isMainViewInfinite())
+    {
+        camera->setMainViewInfinite(!camera->isMainViewInfinite());
+        LLWorld::getInstance()->updateWaterObjects();
+    }
     LLVOAvatar::sRenderDistance = llclamp(final_far, 16.f, 256.f);
     gViewerWindow->setup3DRender();
 

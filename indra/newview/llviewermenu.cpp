@@ -10996,6 +10996,9 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToggleControl(), "ToggleControl");
     view_listener_t::addMenu(new LLToggleShaderControl(), "ToggleShaderControl");
     view_listener_t::addMenu(new LLCheckControl(), "CheckControl");
+    // Develop > Rendering > Far Plane, a radio over AlchemyRenderFarPlaneForce
+    commit.add("Advanced.SetFarPlaneForce", [](LLUICtrl*, const LLSD& param) { gSavedSettings.setS32("AlchemyRenderFarPlaneForce", param.asInteger()); });
+    enable.add("Advanced.CheckFarPlaneForce", [](LLUICtrl*, const LLSD& param) { return gSavedSettings.getS32("AlchemyRenderFarPlaneForce") == param.asInteger(); });
     view_listener_t::addMenu(new LLResetControl(), "ResetControl");
 
     view_listener_t::addMenu(new LLToggleControlPerAccount(), "ToggleControlPerAccount");

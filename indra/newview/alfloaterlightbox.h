@@ -71,6 +71,7 @@ public:
     ALFloaterLightBox(const LLSD& key);
     ~ALFloaterLightBox() override;
     bool postBuild() override;
+    void onOpen(const LLSD& key) override;
     /// Ctrl+Z / Ctrl+Y (and Ctrl+Shift+Z) drive the grade's undo stack.
     ///
     /// Floater-local rather than a global action, unlike the hold-to-compare

@@ -5093,12 +5093,29 @@ bool LLViewerWindow::mousePointOnLandGlobal(const S32 x, const S32 y, LLVector3d
     F32         land_z;
     const F32   FIRST_PASS_STEP = 1.0f;     // meters
     const F32   SECOND_PASS_STEP = 0.1f;    // meters
-    const F32   draw_distance = ignore_distance ? MAX_FAR_CLIP : gAgentCamera.mDrawDistance;
+    const F32   draw_distance = ignore_distance ? llmax(FORWARD_Z_MAX_FAR_CLIP, gAgentCamera.mDrawDistance) : gAgentCamera.mDrawDistance;
     LLVector3d  camera_pos_global;
 
     camera_pos_global = gAgentCamera.getCameraPositionGlobal();
     LLVector3d      probe_point_global;
     LLVector3       probe_point_region;
+
+    // The walk probes every metre out to the draw distance, and a 2048 m draw distance loads up to some 200 regions,
+    // all of which LLWorld::resolveRegionGlobal scans. A probe almost always lies in the region the last one did, so
+    // that one is asked first; regions do not overlap, so the answer is the scan's.
+    LLViewerRegion* last_region = nullptr;
+    const auto resolve_region = [&last_region](LLVector3& pos_region, const LLVector3d& pos_global) -> LLViewerRegion*
+    {
+        if (!last_region || !last_region->pointInRegionGlobal(pos_global))
+        {
+            last_region = LLWorld::getInstance()->getRegionFromPosGlobal(pos_global);
+        }
+        if (last_region)
+        {
+            pos_region = last_region->getPosRegionFromGlobal(pos_global);
+        }
+        return last_region;
+    };
 
     // walk forwards to find the point
     for (mouse_dir_scale = FIRST_PASS_STEP; mouse_dir_scale < draw_distance; mouse_dir_scale += FIRST_PASS_STEP)
@@ -5107,7 +5124,7 @@ bool LLViewerWindow::mousePointOnLandGlobal(const S32 x, const S32 y, LLVector3d
         mouse_direction_global_d.setVec(mouse_direction_global * mouse_dir_scale);
         probe_point_global = camera_pos_global + mouse_direction_global_d;
 
-        regionp = LLWorld::getInstance()->resolveRegionGlobal(probe_point_region, probe_point_global);
+        regionp = resolve_region(probe_point_region, probe_point_global);
 
         if (!regionp)
         {
@@ -5154,7 +5171,7 @@ bool LLViewerWindow::mousePointOnLandGlobal(const S32 x, const S32 y, LLVector3d
             mouse_direction_global_d.setVec(mouse_direction_global * mouse_dir_scale);
             probe_point_global = camera_pos_global + mouse_direction_global_d;
 
-            regionp = LLWorld::getInstance()->resolveRegionGlobal(probe_point_region, probe_point_global);
+            regionp = resolve_region(probe_point_region, probe_point_global);
 
             if (!regionp)
             {
@@ -5684,9 +5701,16 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     // W*(f-n) <= f-n < f for any W in range.
     const bool reverse_z_snapshot = LLRender::sReverseZ;
     const F32 snap_near = LLViewerCamera::getInstance()->getNear();
-    const F32 snap_far  = LLViewerCamera::getInstance()->getFar();
+    // The projection's far plane, which depth was stored against, not the draw distance (getFar()).
+    const F32 snap_far  = LLViewerCamera::getInstance()->getProjectionFar();
+    const bool infinite_snapshot = al_projection_is_infinite(LLViewerCamera::getInstance()->getProjection());
     auto linearize_snapshot_depth = [&](F32 d) -> F32
     {
+        // An infinite projection stores near / distance, and its cleared depth reads as MAX_RECONSTRUCT_DISTANCE.
+        if (infinite_snapshot)
+        {
+            return snap_near / llmax(d, snap_near / MAX_RECONSTRUCT_DISTANCE);
+        }
         const F32 window_depth = reverse_z_snapshot ? (1.f - d) : d;
         return (snap_far * snap_near) / (snap_far - window_depth * (snap_far - snap_near));
     };
@@ -6310,7 +6334,7 @@ void LLViewerWindow::setup2DViewport(S32 x_offset, S32 y_offset)
 void LLViewerWindow::setup3DRender()
 {
     // setup perspective camera
-    LLViewerCamera::getInstance()->setPerspective(NOT_FOR_SELECTION, mWorldViewRectRaw.mLeft, mWorldViewRectRaw.mBottom,  mWorldViewRectRaw.getWidth(), mWorldViewRectRaw.getHeight(), false, LLViewerCamera::getInstance()->getNear(), MAX_FAR_CLIP*2.f);
+    LLViewerCamera::getInstance()->setPerspective(NOT_FOR_SELECTION, mWorldViewRectRaw.mLeft, mWorldViewRectRaw.mBottom,  mWorldViewRectRaw.getWidth(), mWorldViewRectRaw.getHeight(), false, LLViewerCamera::getInstance()->getNear(), LLViewerCamera::getInstance()->getProjectionFar());
     setup3DViewport();
 }
 

@@ -29,6 +29,7 @@
 
 #include "pipeline.h"
 
+#include "alfarplane.h"
 #include "aoengine.h"
 #include "llagent.h"
 #include "llanimationstates.h"
@@ -39,6 +40,7 @@
 #include "llmorphview.h"
 #include "llmoveview.h"
 #include "llnotificationsutil.h"
+#include "llrender.h"
 #include "llselectmgr.h"
 #include "llsmoothstep.h"
 #include "lltoolmgr.h"
@@ -210,7 +212,8 @@ void LLAgentCamera::init()
 {
     // *Note: this is where LLViewerCamera::getInstance() used to be constructed.
 
-    mDrawDistance = gSavedSettings.getF32("RenderFarClip");
+    // LLPipeline::updateReverseZ clamps it again when the depth convention changes.
+    mDrawDistance = ALFarPlane::clampDrawDistance(gSavedSettings.getF32("RenderFarClip"), LLRender::sReverseZ);
 
     LLViewerCamera::getInstance()->setView(DEFAULT_FIELD_OF_VIEW);
     // Leave at 0.1 meters until we have real near clip management
