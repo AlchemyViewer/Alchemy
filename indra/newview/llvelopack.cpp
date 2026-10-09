@@ -210,7 +210,8 @@ static std::string rewrite_release_feed(const std::string& json_str)
 static std::string download_url_raw(const std::string& url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-    auto httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("VelopackSource", httpPolicy);
+    auto httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>(
+        "VelopackSource", httpPolicy, LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
     auto httpRequest = std::make_shared<LLCore::HttpRequest>();
     auto httpOpts = std::make_shared<LLCore::HttpOptions>();
     httpOpts->setFollowRedirects(true);
@@ -231,7 +232,8 @@ static std::string download_url_raw(const std::string& url)
 static bool download_url_to_file(const std::string& url, const std::string& local_path)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-    auto httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("VelopackDownload", httpPolicy);
+    auto httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>(
+        "VelopackDownload", httpPolicy, LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
     auto httpRequest = std::make_shared<LLCore::HttpRequest>();
     auto httpOpts = std::make_shared<LLCore::HttpOptions>();
     httpOpts->setFollowRedirects(true);

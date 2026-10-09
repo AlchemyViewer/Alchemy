@@ -303,7 +303,8 @@ private:
 /// the request if they have not been previously specified in a supplied
 /// HttpHeaders object:
 ///     "Accept=application/llsd+xml"
-///     "X-SecondLife-UDP-Listen-Port=###"
+///     "Content-Type=application/llsd+xml"
+///     "X-SecondLife-UDP-Listen-Port=###" (to the grid only, see Destination)
 ///
 class HttpCoroutineAdapter
 {
@@ -321,7 +322,18 @@ public:
     typedef std::shared_ptr<HttpCoroutineAdapter> ptr_t;
     typedef std::weak_ptr<HttpCoroutineAdapter>   wptr_t;
 
-    HttpCoroutineAdapter(std::string name, LLCore::HttpRequest::policy_t policyId);
+    /// Who the requests go to. The simulator matches a capability request to
+    /// the viewer's circuit by the UDP port it listens on, so the grid is told
+    /// it; a server outside the grid, which a parcel's media or a translation
+    /// provider names, is not.
+    enum class Destination
+    {
+        Grid,
+        Outside
+    };
+
+    HttpCoroutineAdapter(std::string name, LLCore::HttpRequest::policy_t policyId,
+                         Destination destination = Destination::Grid);
     ~HttpCoroutineAdapter();
 
     /// Execute a Post transaction on the supplied URL and yield execution of
@@ -668,6 +680,7 @@ private:
 
     std::string                     mAdapterName;
     LLCore::HttpRequest::policy_t   mPolicyId;
+    Destination                     mDestination;
 
     LLCore::HttpHandle              mYieldingHandle;
     LLCore::HttpRequest::wptr_t     mWeakRequest;
