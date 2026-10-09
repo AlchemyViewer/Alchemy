@@ -188,44 +188,92 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
     {
         mLex(count - 1);
     }
-    // Each block's last line by its first, the widest where several start
-    // on a line; then in order, with no sort.
-    std::vector<S32>& end_of = mEndOf;
-    end_of.assign(static_cast<size_t>(count), -1);
+    // By syntax, from the walk's changes alone where they say enough
+    // (spliceRegions); else each block's last line by its first, the
+    // widest where several start on a line, then in order, with no sort.
+    mLastSpliced = false;
     if (mBlocks)
     {
-        bySyntax(doc, end_of);
-    }
-    else
-    {
-        byIndent(doc, end_of);
-        // And the regions the text marks, as the comment says: after the
-        // blocks by indentation, which give a brace alone to its header
-        // without them; the syntax pass pairs them as it goes.
-        if (!mLineComment.empty())
+        walkSyntax(doc);
+        mLastSpliced = mRegionsKept && mSplice.ok;
+        if (mLastSpliced)
         {
-            mMarked.clear();
-            for (S32 l = 0; l < count; ++l)
+            spliceRegions();
+        }
+    }
+    if (!mLastSpliced)
+    {
+        std::vector<S32>& end_of = mEndOf;
+        end_of.assign(static_cast<size_t>(count), -1);
+        if (mBlocks)
+        {
+            bySyntax(end_of);
+        }
+        else
+        {
+            byIndent(doc, end_of);
+            // And the regions the text marks, as the comment says: after the
+            // blocks by indentation, which give a brace alone to its header
+            // without them; the syntax pass pairs them as it goes.
+            if (!mLineComment.empty())
             {
-                pairMarker(lineAt(doc, l).marker, l, mMarked, end_of);
+                mMarked.clear();
+                for (S32 l = 0; l < count; ++l)
+                {
+                    pairMarker(lineAt(doc, l).marker, l, mMarked, end_of);
+                }
+            }
+        }
+        mRegions.clear();
+        for (S32 l = 0; l < count; ++l)
+        {
+            if (end_of[static_cast<size_t>(l)] > l)
+            {
+                mRegions.push_back(Region{ l, end_of[static_cast<size_t>(l)] });
             }
         }
     }
-    mRegions.clear();
-    for (S32 l = 0; l < count; ++l)
-    {
-        if (end_of[static_cast<size_t>(l)] > l)
-        {
-            mRegions.push_back(Region{ l, end_of[static_cast<size_t>(l)] });
-        }
-    }
-    mVersion = doc.version();
-    mValid   = true;
+    // Kept, to move with the edits and be put together from the next walk's
+    // changes, where they were found by syntax.
+    mRegionsKept = static_cast<bool>(mBlocks);
+    mVersion     = doc.version();
+    mValid       = true;
     return mRegions;
 }
 
-void ALFoldModel::walkLine(const Line& line, S32 at, std::vector<Opened>& open, std::vector<S32>& marked, std::vector<Closed>& closed, size_t& open_low,
-                           size_t& marked_low) const
+S32 ALFoldModel::aloneTarget(const ALTextDocument& doc, S32 at, const std::vector<Opened>& open, const std::vector<S32>& marked)
+{
+    // The header is the line with anything on it above; what it opens of
+    // its own that is still open is opened later than anything under it,
+    // so near the top of what is open.
+    S32 header = at - 1;
+    while (header >= 0 && lineAt(doc, header).indent < 0)
+    {
+        --header;
+    }
+    if (header < 0)
+    {
+        return at;
+    }
+    for (auto it = open.rbegin(); it != open.rend() && it->line >= header; ++it)
+    {
+        if (it->line == header && !it->first)
+        {
+            return at;
+        }
+    }
+    for (auto it = marked.rbegin(); it != marked.rend() && *it >= header; ++it)
+    {
+        if (*it == header)
+        {
+            return at;
+        }
+    }
+    return header;
+}
+
+void ALFoldModel::walkLine(const ALTextDocument& doc, const Line& line, S32 at, std::vector<Opened>& open, std::vector<S32>& marked, std::vector<Closed>& closed,
+                           size_t& open_low, size_t& marked_low)
 {
     // A region the comment marks, as pairMarker pairs one.
     if (line.marker > 0)
@@ -236,7 +284,7 @@ void ALFoldModel::walkLine(const Line& line, S32 at, std::vector<Opened>& open, 
     {
         if (at > marked.back())
         {
-            closed.push_back(Closed{ at, marked.back(), at, false });
+            closed.push_back(Closed{ at, marked.back(), at, false, marked.back() });
         }
         marked.pop_back();
         marked_low = std::min(marked_low, marked.size());
@@ -257,14 +305,17 @@ void ALFoldModel::walkLine(const Line& line, S32 at, std::vector<Opened>& open, 
             const S32 end   = again ? at - 1 : at;
             if (end > start)
             {
-                closed.push_back(Closed{ at, start, end, open.back().first });
+                closed.push_back(Closed{ at, start, end, open.back().first, open.back().target });
             }
             open.pop_back();
             open_low = std::min(open_low, open.size());
         }
         if (block.event != Event::Close)
         {
-            open.push_back(Opened{ at, block.event == Event::Open && block.first });
+            // One opened on a line of its own -- a brace under its header --
+            // is told now the line it folds from (aloneTarget).
+            const bool alone = block.event == Event::Open && block.first;
+            open.push_back(Opened{ at, alone, alone ? aloneTarget(doc, at, open, marked) : at });
         }
     }
 }
@@ -279,6 +330,7 @@ void ALFoldModel::walkSyntax(const ALTextDocument& doc)
     std::vector<S32>&    marked     = mMarked;
     size_t               open_low   = 0;
     size_t               marked_low = 0;
+    mSplice.ok                      = false;
     if (!mWalkKept || mWalked.empty() || mWalkLines != count)
     {
         // Whole, from the top.
@@ -299,7 +351,7 @@ void ALFoldModel::walkSyntax(const ALTextDocument& doc)
                 open_low   = open.size();
                 marked_low = marked.size();
             }
-            walkLine(lineAt(doc, l), l, open, marked, mClosed, open_low, marked_low);
+            walkLine(doc, lineAt(doc, l), l, open, marked, mClosed, open_low, marked_low);
         }
         mWalked.back().openLow   = open_low;
         mWalked.back().markedLow = marked_low;
@@ -311,8 +363,16 @@ void ALFoldModel::walkSyntax(const ALTextDocument& doc)
     }
     else
     {
-        const S32  first  = llclamp(mDirtyFirst, 0, count - 1);
-        const S32  last   = llmin(mDirtyLast, count - 1);
+        const S32 first = llclamp(mDirtyFirst, 0, count - 1);
+        // And the first line with anything on it after those changed, whose
+        // header they may have changed: a brace on a line of its own folds
+        // from it (aloneTarget).
+        S32 last = llmin(mDirtyLast, count - 1);
+        while (last + 1 < count && lineAt(doc, last + 1).indent < 0)
+        {
+            ++last;
+        }
+        last              = llmin(last + 1, count - 1);
         const auto byLine = [](S32 line, const Walked& walked) { return line < walked.line; };
         // From the last place kept before the first line changed: every
         // line above it as it was, with what was open there and what it
@@ -360,6 +420,7 @@ void ALFoldModel::walkSyntax(const ALTextDocument& doc)
         S32    l      = kept;
         S32    lines  = 0;
         bool   done   = false;
+        bool   whole  = false;
         while (l < count)
         {
             if (l > last)
@@ -376,6 +437,7 @@ void ALFoldModel::walkSyntax(const ALTextDocument& doc)
                         settle();
                         rejoin = old;
                         done   = true;
+                        whole  = true;
                         break;
                     }
                     if (latest().line != l)
@@ -412,7 +474,7 @@ void ALFoldModel::walkSyntax(const ALTextDocument& doc)
                 keep(l);
                 kept = l;
             }
-            walkLine(lineAt(doc, l), l, open, marked, fresh, open_low, marked_low);
+            walkLine(doc, lineAt(doc, l), l, open, marked, fresh, open_low, marked_low);
             ++lines;
             ++l;
         }
@@ -422,6 +484,67 @@ void ALFoldModel::walkSyntax(const ALTextDocument& doc)
         }
         const size_t         old_closed = rejoin < mWalked.size() ? mWalked[rejoin].closed : mClosed.size();
         const std::ptrdiff_t moved      = static_cast<std::ptrdiff_t>(start_closed + fresh.size()) - static_cast<std::ptrdiff_t>(old_closed);
+        // What the blocks are put together from, where they may be from the
+        // walk's changes alone: it found open where it rejoined all it found
+        // there before, under which is all that was open where it began --
+        // nothing open above the lines walked closed among them, then or now.
+        // What closed among them, then and now, folds from those lines, or
+        // from the header just above the first of them (spliceRegions).
+        if (whole)
+        {
+            const Walked& began = mWalked[from];
+            const Walked& ended = mWalked[rejoin];
+            const auto    under = [](const auto& below, const auto& above) {
+                return below.size() <= above.size() && std::equal(below.begin(), below.end(), above.begin());
+            };
+            if (under(began.open, ended.open) && under(began.marked, ended.marked))
+            {
+                mSplice.ok   = true;
+                mSplice.from = began.line;
+                mSplice.to   = ended.line;
+                mSplice.touched.clear();
+                for (size_t i = start_closed; i < old_closed; ++i)
+                {
+                    mSplice.touched.push_back(mClosed[i].target);
+                }
+                for (const Closed& block : fresh)
+                {
+                    mSplice.touched.push_back(block.target);
+                }
+                mSplice.kept.clear();
+                for (const Opened& opened : ended.open)
+                {
+                    mSplice.kept.push_back(opened.target);
+                }
+                mSplice.kept.insert(mSplice.kept.end(), ended.marked.begin(), ended.marked.end());
+                // And a brace on a line of its own first after where it
+                // rejoined, which was not walked again: it folds from the
+                // header above it, among the lines walked, as it did.
+                S32 below = ended.line;
+                while (below < count && lineAt(doc, below).indent < 0)
+                {
+                    ++below;
+                }
+                if (below < count)
+                {
+                    const std::vector<Block>& blocks = lineAt(doc, below).blocks;
+                    if (!blocks.empty() && blocks.front().event == Event::Open && blocks.front().first)
+                    {
+                        S32 header = below - 1;
+                        while (header >= 0 && lineAt(doc, header).indent < 0)
+                        {
+                            --header;
+                        }
+                        if (header >= 0)
+                        {
+                            mSplice.kept.push_back(header);
+                        }
+                    }
+                }
+                mSplice.freshBegin = start_closed;
+                mSplice.freshEnd   = start_closed + fresh.size();
+            }
+        }
         mClosed.erase(mClosed.begin() + static_cast<std::ptrdiff_t>(start_closed), mClosed.begin() + static_cast<std::ptrdiff_t>(old_closed));
         mClosed.insert(mClosed.begin() + static_cast<std::ptrdiff_t>(start_closed), fresh.begin(), fresh.end());
         for (size_t i = rejoin; i < mWalked.size(); ++i)
@@ -438,40 +561,103 @@ void ALFoldModel::walkSyntax(const ALTextDocument& doc)
     mDirtyLast  = -1;
 }
 
-void ALFoldModel::bySyntax(const ALTextDocument& doc, std::vector<S32>& end_of)
+void ALFoldModel::bySyntax(std::vector<S32>& end_of) const
 {
-    walkSyntax(doc);
-    // Each block's end by its start, the widest where several start on a
-    // line; those opened on a line of their own go with their headers
-    // after, in the order they closed.
-    std::vector<Region>& alone = mAlone;
-    alone.clear();
+    // Each block's end by the line it folds from -- its start, or for one
+    // opened on a line of its own its header's, as it was told when opened
+    // -- the widest where several fold from a line.
     for (const Closed& block : mClosed)
     {
-        if (block.alone)
-        {
-            alone.push_back(Region{ block.start, block.end });
-        }
-        else
-        {
-            end_of[static_cast<size_t>(block.start)] = llmax(end_of[static_cast<size_t>(block.start)], block.end);
-        }
+        end_of[static_cast<size_t>(block.target)] = llmax(end_of[static_cast<size_t>(block.target)], block.end);
     }
-    // Opened on a line of its own -- a brace under its header -- a block
-    // is its header's, where that starts none of its own.
-    for (Region region : alone)
+}
+
+void ALFoldModel::spliceRegions()
+{
+    // Every block that folds from a line the walk did not reach is as it
+    // was, and so is every one that folds from a line something still open
+    // where the walk rejoined folds from: of the blocks that fold from one
+    // line and close, the first opened is the last to close, and it was not
+    // walked again. The rest that fold from the lines walked are what the
+    // walk closed among them.
+    const S32  from  = mSplice.from;
+    const S32  to    = mSplice.to;
+    const auto found = [this](S32 line) {
+        const auto it = std::lower_bound(mRegions.begin(), mRegions.end(), line, [](const Region& region, S32 l) { return region.start < l; });
+        return it != mRegions.end() && it->start == line ? it : mRegions.end();
+    };
+    // Of the lines what was still open where the walk rejoined folds from,
+    // those where something of it closes after the lines walked: the block
+    // found reaches past them, or one closed on the line it rejoined at,
+    // reopened there, ends just before it. Where nothing of it ever closes,
+    // the line is as any other walked.
+    std::vector<S32> kept;
+    for (const S32 line : mSplice.kept)
     {
-        S32 header = region.start - 1;
-        while (header >= 0 && lineAt(doc, header).indent < 0)
+        const auto at    = found(line);
+        bool       stays = at != mRegions.end() && at->end >= to;
+        for (size_t i = mSplice.freshEnd; !stays && i < mClosed.size() && mClosed[i].line == to; ++i)
         {
-            --header;
+            stays = mClosed[i].target == line;
         }
-        if (header >= 0 && end_of[static_cast<size_t>(header)] < 0)
+        if (stays)
         {
-            region.start = header;
+            kept.push_back(line);
         }
-        end_of[static_cast<size_t>(region.start)] = llmax(end_of[static_cast<size_t>(region.start)], region.end);
     }
+    std::sort(kept.begin(), kept.end());
+    kept.erase(std::unique(kept.begin(), kept.end()), kept.end());
+    const auto keeps = [&kept](S32 line) { return std::binary_search(kept.begin(), kept.end(), line); };
+    // The lines above the walk that what it took out or put in folds from:
+    // only the header just above it, which holds no block that is not kept.
+    std::vector<S32> above;
+    for (const S32 target : mSplice.touched)
+    {
+        if (target < from && !keeps(target))
+        {
+            above.push_back(target);
+        }
+    }
+    std::sort(above.begin(), above.end());
+    above.erase(std::unique(above.begin(), above.end()), above.end());
+    // What closed among the lines walked, by the line it folds from, the
+    // widest where several fold from one, but for those kept.
+    std::vector<Region> made;
+    for (size_t i = mSplice.freshBegin; i < mSplice.freshEnd; ++i)
+    {
+        const Closed& block = mClosed[i];
+        if (!keeps(block.target))
+        {
+            made.push_back(Region{ block.target, block.end });
+        }
+    }
+    std::sort(made.begin(), made.end(), [](const Region& a, const Region& b) { return a.start < b.start || (a.start == b.start && a.end > b.end); });
+    made.erase(std::unique(made.begin(), made.end(), [](const Region& a, const Region& b) { return a.start == b.start; }), made.end());
+    made.erase(std::remove_if(made.begin(), made.end(), [](const Region& region) { return region.end <= region.start; }), made.end());
+    // In their places: those that folded from the lines walked, but those
+    // kept, and from the header above, let go of, and these put in.
+    const auto in_place = [&](S32 line) { return ((line >= from && line < to) || std::binary_search(above.begin(), above.end(), line)) && !keeps(line); };
+    std::vector<Region> between;
+    between.reserve(made.size() + 16);
+    const auto first = std::lower_bound(mRegions.begin(), mRegions.end(), above.empty() ? from : llmin(from, above.front()),
+                                        [](const Region& region, S32 l) { return region.start < l; });
+    const auto past  = std::lower_bound(first, mRegions.end(), to, [](const Region& region, S32 l) { return region.start < l; });
+    auto       next  = made.begin();
+    for (auto it = first; it != past; ++it)
+    {
+        if (in_place(it->start))
+        {
+            continue;
+        }
+        for (; next != made.end() && next->start < it->start; ++next)
+        {
+            between.push_back(*next);
+        }
+        between.push_back(*it);
+    }
+    between.insert(between.end(), next, made.end());
+    const auto at = mRegions.erase(first, past);
+    mRegions.insert(at, between.begin(), between.end());
 }
 
 std::vector<S32> ALFoldModel::openAt(const ALTextDocument& doc, S32 tab_width, S32 line, size_t most, S32 reach)
@@ -749,6 +935,7 @@ void ALFoldModel::edited(const ALTextDocument::Edit& edit, S32 lines)
     const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
     // The lines it touched are read again.
     mLines.applySpans(spans, lines, Line(), Line());
+    mRegionsKept = mRegionsKept && mWalkKept;
     if (mWalkKept && !spans.empty())
     {
         // The walk kept moved along with the text: a line after a run by
@@ -784,18 +971,40 @@ void ALFoldModel::edited(const ALTextDocument::Edit& edit, S32 lines)
             const auto one  = [=](S32 line) { return line > last ? line + shift : line > first ? llmin(line, most) : line; };
             for (auto it = moves; it != mClosed.end(); ++it)
             {
-                it->line  = one(it->line);
-                it->start = one(it->start);
-                it->end   = one(it->end);
+                it->line   = one(it->line);
+                it->start  = one(it->start);
+                it->end    = one(it->end);
+                it->target = one(it->target);
+            }
+            if (mRegionsKept && !same)
+            {
+                // The blocks as found move with them, to be put together
+                // from the next walk's changes (spliceRegions).
+                for (Region& region : mRegions)
+                {
+                    region.start = one(region.start);
+                    region.end   = one(region.end);
+                }
             }
         }
         else
         {
             for (auto it = moves; it != mClosed.end(); ++it)
             {
-                it->line  = now(it->line);
-                it->start = now(it->start);
-                it->end   = now(it->end);
+                it->line   = now(it->line);
+                it->start  = now(it->start);
+                it->end    = now(it->end);
+                it->target = now(it->target);
+            }
+            if (mRegionsKept && !same)
+            {
+                // The blocks as found move with them, to be put together
+                // from the next walk's changes (spliceRegions).
+                for (Region& region : mRegions)
+                {
+                    region.start = now(region.start);
+                    region.end   = now(region.end);
+                }
             }
         }
         // A place inside a run, after its first line, had lines above it
@@ -812,7 +1021,8 @@ void ALFoldModel::edited(const ALTextDocument::Edit& edit, S32 lines)
                 walked.line = now(walked.line);
                 for (Opened& opened : walked.open)
                 {
-                    opened.line = now(opened.line);
+                    opened.line   = now(opened.line);
+                    opened.target = now(opened.target);
                 }
                 for (S32& marker : walked.marked)
                 {
