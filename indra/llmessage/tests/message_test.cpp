@@ -81,17 +81,23 @@ namespace
             LLMessageConfig::initClass("simulator", ostr.str());
         }
 
+        // A destructor cannot fail a test, so the clean-up only says what
+        // it could not remove.
         ~LLMessageSystemTestData()
         {
             // rm contents of temp dir
             std::ostringstream ostr;
             ostr << mTestConfigDir << mSep << "message.xml";
-            int rmfile = LLFile::remove(ostr.str());
-            ensure_equals("rmfile value", rmfile, 0);
+            if (LLFile::remove(ostr.str()) != 0)
+            {
+                LL_WARNS() << "Could not remove " << ostr.str() << LL_ENDL;
+            }
 
             // rm temp dir
-            int rmdir = LLFile::remove(mTestConfigDir);
-            ensure_equals("rmdir value", rmdir, 0);
+            if (LLFile::remove(mTestConfigDir) != 0)
+            {
+                LL_WARNS() << "Could not remove " << mTestConfigDir << LL_ENDL;
+            }
         }
 
         void writeConfigFile(const LLSD& config)

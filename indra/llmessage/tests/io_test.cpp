@@ -916,21 +916,39 @@ namespace
     struct pipe_and_pump_fitness
     {
     public:
-        enum
-        {
-            SERVER_LISTEN_PORT = 13050
-        };
-
         pipe_and_pump_fitness()
         {
             LLFrameTimer::updateFrameTime();
             apr_pool_create(&mPool, NULL);
             mPump = new LLPumpIO(mPool);
-            mSocket = LLSocket::create(
-                mPool,
-                LLSocket::STREAM_TCP,
-                SERVER_LISTEN_PORT,
-                "127.0.0.1");
+            mSocket = listenOnAnyPort(mPool, mServerPort);
+        }
+
+        // LLSocket::create binds and listens only on a port it is given, so
+        // the fixture does as it does on port 0 and reads back the port the
+        // OS chose: two runs at once then never contend for one.
+        static LLSocket::ptr_t listenOnAnyPort(apr_pool_t* parent, U16& port)
+        {
+            port = 0;
+            apr_pool_t* pool = NULL;
+            if (apr_pool_create(&pool, parent) != APR_SUCCESS)
+            {
+                return LLSocket::ptr_t();
+            }
+            apr_socket_t* socket = NULL;
+            apr_sockaddr_t* address = NULL;
+            if (apr_socket_create(&socket, APR_INET, SOCK_STREAM, APR_PROTO_TCP, pool) != APR_SUCCESS
+                || apr_sockaddr_info_get(&address, "127.0.0.1", APR_INET, 0, 0, pool) != APR_SUCCESS
+                || apr_socket_bind(socket, address) != APR_SUCCESS
+                || apr_socket_listen(socket, 10) != APR_SUCCESS
+                || apr_socket_addr_get(&address, APR_LOCAL, socket) != APR_SUCCESS)
+            {
+                apr_pool_destroy(pool);
+                return LLSocket::ptr_t();
+            }
+            port = address->port;
+            // The socket takes the pool, as it does one LLSocket::create made.
+            return LLSocket::create(socket, pool);
         }
 
         ~pipe_and_pump_fitness()
@@ -944,6 +962,7 @@ namespace
         apr_pool_t* mPool;
         LLPumpIO* mPump;
         LLSocket::ptr_t mSocket;
+        U16 mServerPort = 0;
     };
     typedef test_group<pipe_and_pump_fitness> fitness_test_group;
     typedef fitness_test_group::object fitness_test_object;
@@ -980,7 +999,7 @@ namespace
         //LL_DEBUGS() << "fitness_test_object::test<1> - connecting client."
         //   << LL_ENDL;
         LLSocket::ptr_t client = LLSocket::create(mPool, LLSocket::STREAM_TCP);
-        LLHost server_host("127.0.0.1", SERVER_LISTEN_PORT);
+        LLHost server_host("127.0.0.1", mServerPort);
         bool connected = client->blockingConnect(server_host);
         ensure("Connected to server", connected);
         LL_DEBUGS() << "connected" << LL_ENDL;
@@ -1023,7 +1042,7 @@ namespace
 
         // Set up the client
         LLSocket::ptr_t client = LLSocket::create(mPool, LLSocket::STREAM_TCP);
-        LLHost server_host("127.0.0.1", SERVER_LISTEN_PORT);
+        LLHost server_host("127.0.0.1", mServerPort);
         bool connected = client->blockingConnect(server_host);
         ensure("Connected to server", connected);
         LL_DEBUGS() << "connected" << LL_ENDL;
@@ -1066,7 +1085,7 @@ namespace
 
         // Set up the client
         LLSocket::ptr_t client = LLSocket::create(mPool, LLSocket::STREAM_TCP);
-        LLHost server_host("127.0.0.1", SERVER_LISTEN_PORT);
+        LLHost server_host("127.0.0.1", mServerPort);
         bool connected = client->blockingConnect(server_host);
         ensure("Connected to server", connected);
         LL_DEBUGS() << "connected" << LL_ENDL;
@@ -1109,7 +1128,7 @@ namespace
 
         // Set up the client
         LLSocket::ptr_t client = LLSocket::create(mPool, LLSocket::STREAM_TCP);
-        LLHost server_host("127.0.0.1", SERVER_LISTEN_PORT);
+        LLHost server_host("127.0.0.1", mServerPort);
         bool connected = client->blockingConnect(server_host);
         ensure("Connected to server", connected);
         LL_DEBUGS() << "connected" << LL_ENDL;
@@ -1152,7 +1171,7 @@ namespace
 
         // Set up the client
         LLSocket::ptr_t client = LLSocket::create(mPool, LLSocket::STREAM_TCP);
-        LLHost server_host("127.0.0.1", SERVER_LISTEN_PORT);
+        LLHost server_host("127.0.0.1", mServerPort);
         bool connected = client->blockingConnect(server_host);
         ensure("Connected to server", connected);
         LL_DEBUGS() << "connected" << LL_ENDL;
