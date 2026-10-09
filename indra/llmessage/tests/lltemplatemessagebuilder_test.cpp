@@ -43,6 +43,8 @@
 
 namespace tut
 {
+namespace
+{
     static LLTemplateMessageBuilder::message_template_name_map_t nameMap;
     static LLTemplateMessageReader::message_template_number_map_t numberMap;
 
@@ -121,6 +123,7 @@ namespace tut
     typedef test_group<LLTemplateMessageBuilderTestData, 60>    LLTemplateMessageBuilderTestGroup;
     typedef LLTemplateMessageBuilderTestGroup::object       LLTemplateMessageBuilderTestObject;
     LLTemplateMessageBuilderTestGroup templateMessageBuilderTestGroup("LLTemplateMessageBuilder");
+}
 
     template<> template<>
     void LLTemplateMessageBuilderTestObject::test<1>()

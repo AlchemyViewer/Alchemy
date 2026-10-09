@@ -45,6 +45,8 @@
 
 namespace tut
 {
+namespace
+{
     static LLTemplateMessageBuilder::message_template_name_map_t templateNameMap;
 
     LLMsgData* messageData = NULL;
@@ -114,6 +116,7 @@ namespace tut
     typedef test_group<LLSDMessageBuilderTestData>  LLSDMessageBuilderTestGroup;
     typedef LLSDMessageBuilderTestGroup::object     LLSDMessageBuilderTestObject;
     LLSDMessageBuilderTestGroup llsdMessageBuilderTestGroup("LLSDMessageBuilder");
+}
 
     template<> template<>
     void LLSDMessageBuilderTestObject::test<1>()

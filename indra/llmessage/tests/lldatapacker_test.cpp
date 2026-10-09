@@ -42,12 +42,15 @@
 
 namespace tut
 {
+namespace
+{
     struct datapacker_test
     {
     };
     typedef test_group<datapacker_test> datapacker_test_t;
     typedef datapacker_test_t::object datapacker_test_object_t;
     tut::datapacker_test_t tut_datapacker_test("datapacker_test");
+}
 
     //*********LLDataPackerBinaryBuffer
     template<> template<>

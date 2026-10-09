@@ -52,6 +52,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct LLMessageSystemTestData
     {
         std::string mTestConfigDir;
@@ -132,6 +134,7 @@ namespace tut
     typedef test_group<LLMessageSystemTestData> LLMessageSystemTestGroup;
     typedef LLMessageSystemTestGroup::object        LLMessageSystemTestObject;
     LLMessageSystemTestGroup messageTestGroup("LLMessageSystem");
+}
 
     template<> template<>
     void LLMessageSystemTestObject::test<1>()

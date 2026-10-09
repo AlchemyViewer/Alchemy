@@ -49,6 +49,8 @@
 
 namespace tut
 {
+namespace
+{
     struct heap_buffer_data
     {
         heap_buffer_data() : mBuffer(NULL) {}
@@ -58,6 +60,7 @@ namespace tut
     typedef test_group<heap_buffer_data> heap_buffer_test;
     typedef heap_buffer_test::object heap_buffer_object;
     tut::heap_buffer_test thb("heap_buffer");
+}
 
     template<> template<>
     void heap_buffer_object::test<1>()
@@ -144,6 +147,8 @@ namespace tut
 
 namespace tut
 {
+namespace
+{
     struct buffer_data
     {
         LLBufferArray mBuffer;
@@ -151,6 +156,7 @@ namespace tut
     typedef test_group<buffer_data> buffer_test;
     typedef buffer_test::object buffer_object;
     tut::buffer_test tba("buffer_array");
+}
 
     template<> template<>
     void buffer_object::test<1>()
@@ -400,6 +406,8 @@ namespace tut
 
 namespace tut
 {
+namespace
+{
     struct buffer_and_stream_data
     {
         LLBufferArray mBuffer;
@@ -407,6 +415,7 @@ namespace tut
     typedef test_group<buffer_and_stream_data> bas_test;
     typedef bas_test::object bas_object;
     tut::bas_test tbs("buffer_stream");
+}
 
     template<> template<>
     void bas_object::test<1>()
@@ -820,6 +829,8 @@ namespace tut
 
 namespace tut
 {
+namespace
+{
     class PumpAndChainTestData
     {
     protected:
@@ -844,6 +855,7 @@ namespace tut
     typedef test_group<PumpAndChainTestData>    PumpAndChainTestGroup;
     typedef PumpAndChainTestGroup::object       PumpAndChainTestObject;
     PumpAndChainTestGroup pumpAndChainTestGroup("pump_and_chain");
+}
 
     template<> template<>
     void PumpAndChainTestObject::test<1>()
@@ -896,6 +908,8 @@ namespace tut
 
 namespace tut
 {
+namespace
+{
     /**
      * @brief we want to test the pipes & pumps under bad conditions.
      */
@@ -934,6 +948,7 @@ namespace tut
     typedef test_group<pipe_and_pump_fitness> fitness_test_group;
     typedef fitness_test_group::object fitness_test_object;
     fitness_test_group fitness("pipe and pump fitness");
+}
 
     template<> template<>
     void fitness_test_object::test<1>()

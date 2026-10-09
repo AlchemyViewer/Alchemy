@@ -34,6 +34,8 @@
 
 namespace tut
 {
+namespace
+{
     struct zerocode_data
     {
     };
@@ -90,6 +92,7 @@ namespace tut
         ensure(std::string(msg) + ": decoded bytes should match original",
                memcmp(dec.data(), src.data(), src.size()) == 0);
     }
+}
 
     // Basic mixed body; header carries an unrelated flag bit (0x40) that must survive untouched.
     template<> template<>
