@@ -1,7 +1,7 @@
 /**
  * @file altestmatchers.h
  * @brief Catch2 matchers for what LL's TUT helpers compared: floats to a number of
- *        bits, and LLSD deeply.
+ *        bits, LLSD deeply, and memory byte for byte.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -31,6 +31,8 @@
 
 #include <catch2/matchers/catch_matchers.hpp>
 
+#include <cstddef>
+#include <ostream>
 #include <sstream>
 #include <string>
 
@@ -95,6 +97,43 @@ namespace ll_test
     inline LLSDEqualsMatcher LLSDEquals(LLSD expected)
     {
         return LLSDEqualsMatcher(std::move(expected));
+    }
+
+    // ensure_memory_matches: so many bytes at an address, compared as bytes.
+    // The bytes are not copied; they must outlive the assertion.
+    struct MemoryView
+    {
+        const void* data;
+        size_t size;
+    };
+
+    inline MemoryView Memory(const void* data, size_t size)
+    {
+        return MemoryView{ data, size };
+    }
+
+    std::ostream& operator<<(std::ostream& out, const MemoryView& memory);
+
+    class MemoryMatchesMatcher : public Catch::Matchers::MatcherBase<MemoryView>
+    {
+    public:
+        explicit MemoryMatchesMatcher(MemoryView expected)
+            : mExpected(expected)
+        {
+        }
+
+        bool match(const MemoryView& actual) const override;
+        std::string describe() const override;
+
+    private:
+        MemoryView mExpected;
+        // Where match() last found the two to part, for describe().
+        mutable std::string mDifference;
+    };
+
+    inline MemoryMatchesMatcher MemoryMatches(const void* expected, size_t size)
+    {
+        return MemoryMatchesMatcher(MemoryView{ expected, size });
     }
 }
 

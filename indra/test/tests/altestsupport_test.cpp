@@ -29,6 +29,7 @@
 
 #include "altestfatal.h"
 #include "altestmatchers.h"
+#include "altestname.h"
 #include "altestteardown.h"
 
 #include "llerror.h"
@@ -74,6 +75,24 @@ TEST_CASE("LLSDEquals compares all the way down and says where two differ", "[al
     const ll_test::LLSDEqualsMatcher top = ll_test::LLSDEquals(LLSD("1"));
     CHECK_FALSE(top.match(LLSD(1)));
     CHECK_THAT(top.describe(), Catch::Matchers::ContainsSubstring("the top: type"));
+}
+
+TEST_CASE("MemoryMatches compares byte for byte and says where two part", "[altestsupport]")
+{
+    const char same[] = "abcd";
+    const char other[] = "abxd";
+    CHECK_THAT(ll_test::Memory(same, 4), ll_test::MemoryMatches(same, 4));
+
+    const ll_test::MemoryMatchesMatcher differs = ll_test::MemoryMatches(other, 4);
+    CHECK_FALSE(differs.match(ll_test::Memory(same, 4)));
+    CHECK_THAT(differs.describe(), Catch::Matchers::ContainsSubstring("byte 2"));
+
+    CHECK_FALSE(ll_test::MemoryMatches(same, 3).match(ll_test::Memory(same, 4)));
+}
+
+TEST_CASE("currentTestName is the running test case's", "[altestsupport]")
+{
+    CHECK(ll_test::currentTestName() == "currentTestName is the running test case's");
 }
 
 TEST_CASE("An LL_ERRS throws FatalError, which a test can catch", "[altestsupport]")

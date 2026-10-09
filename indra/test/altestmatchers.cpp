@@ -26,7 +26,11 @@
 
 #include "altestmatchers.h"
 
+#include "llformat.h"
 #include "llsdserialize.h"
+
+#include <algorithm>
+#include <cstring>
 
 namespace ll_test
 {
@@ -140,6 +144,61 @@ namespace ll_test
     {
         std::ostringstream out;
         out << "equals " << LLSDNotationStreamer(mExpected);
+        if (!mDifference.empty())
+        {
+            out << " (they differ at " << mDifference << ")";
+        }
+        return out.str();
+    }
+
+    std::ostream& operator<<(std::ostream& out, const MemoryView& memory)
+    {
+        // The first bytes are what tell two buffers apart at a glance.
+        constexpr size_t SHOWN = 32;
+        const U8* bytes = static_cast<const U8*>(memory.data);
+        out << memory.size << " bytes";
+        if (bytes && memory.size)
+        {
+            out << ":";
+            for (size_t i = 0; i < std::min(memory.size, SHOWN); ++i)
+            {
+                out << llformat(" %02x", bytes[i]);
+            }
+            if (memory.size > SHOWN)
+            {
+                out << " ...";
+            }
+        }
+        return out;
+    }
+
+    bool MemoryMatchesMatcher::match(const MemoryView& actual) const
+    {
+        if (actual.size != mExpected.size)
+        {
+            mDifference = "the sizes";
+            return false;
+        }
+        if (actual.size == 0 || std::memcmp(actual.data, mExpected.data, actual.size) == 0)
+        {
+            mDifference.clear();
+            return true;
+        }
+        const U8* a = static_cast<const U8*>(actual.data);
+        const U8* e = static_cast<const U8*>(mExpected.data);
+        size_t at = 0;
+        while (a[at] == e[at])
+        {
+            ++at;
+        }
+        mDifference = llformat("byte %zu", at);
+        return false;
+    }
+
+    std::string MemoryMatchesMatcher::describe() const
+    {
+        std::ostringstream out;
+        out << "matches " << mExpected;
         if (!mDifference.empty())
         {
             out << " (they differ at " << mDifference << ")";

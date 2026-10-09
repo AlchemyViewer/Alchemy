@@ -26,9 +26,10 @@ target_link_libraries(lltut_runner_lib PRIVATE al::flags PUBLIC llcommon ll::tut
 set_target_properties(lltut_runner_lib PROPERTIES FOLDER "Tests")
 
 # The Catch2 harness: the main, what an LL_ERRS does, LOGFAIL's replay, the
-# state guard, the teardown and the matchers. An OBJECT library, which each
-# test binary links directly: in a static archive the listeners'
-# registrations, which nothing references, would be dropped by the linker.
+# state guard, the teardown, the matchers, the running case's name and the
+# failure type. An OBJECT library, which each test binary links directly: in
+# a static archive the listeners' registrations, which nothing references,
+# would be dropped by the linker.
 add_library(al_test_support OBJECT)
 
 target_sources(
@@ -38,6 +39,7 @@ target_sources(
     altestlogreplay.cpp
     altestmain.cpp
     altestmatchers.cpp
+    altestname.cpp
     alteststateguard.cpp
     altestteardown.cpp
 )
@@ -46,7 +48,14 @@ target_sources(
   al_test_support
   PUBLIC
     FILE_SET HEADERS
-      FILES altestfatal.h altestlogreplay.h altestmatchers.h alteststateguard.h altestteardown.h
+      FILES
+        altestfailure.h
+        altestfatal.h
+        altestlogreplay.h
+        altestmatchers.h
+        altestname.h
+        alteststateguard.h
+        altestteardown.h
 )
 
 # The matchers compare as llmath's is_approx_equal_fraction() does, a header
