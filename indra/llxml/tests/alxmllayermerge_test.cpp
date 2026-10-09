@@ -28,6 +28,7 @@
 
 #include "lldir.h"
 #include "llfile.h"
+#include "lluuid.h"
 
 #include "../test/lltut.h"
 
@@ -213,10 +214,10 @@ namespace tut
 
         std::string mDir;
 
+        // A folder of its own each time, so two runs at once never share one.
         alxmllayermerge_data()
         {
-            mDir = gDirUtilp->add(gDirUtilp->getTempDir(), "alxmllayermerge_test");
-            gDirUtilp->deleteDirAndContents(mDir);
+            mDir = gDirUtilp->add(gDirUtilp->getTempDir(), "alxmllayermerge_test_" + LLUUID::generateNewID().asString());
             LLFile::mkdir(mDir);
         }
 
