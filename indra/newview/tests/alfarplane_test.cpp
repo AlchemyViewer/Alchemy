@@ -254,6 +254,9 @@ namespace tut
         const std::string funcs = shader_source("class1/windlight/atmosphericsFuncs.glsl");
         ensure("haze position into the sky's frame", funcs.find("vec3 rel_pos = eyeToSky * inPositionEye;") != std::string::npos);
         ensure("haze light into the sky's frame", funcs.find("light_dir = eyeToSky * light_dir;") != std::string::npos);
+        // Only rising rays leave the haze, as the dome's do; a falling ray keeps its whole length.
+        ensure("altitude limit on rising rays alone", funcs.find("float h = max(rel_pos.y, 0.0) / max(max_y, 1.0);") != std::string::npos);
+        ensure("no limit on falling rays", funcs.find("abs(rel_pos.y)") == std::string::npos);
         ensure("the rotation is in the Environment block", shader_source("class1/deferred/environmentBlock.glsl").find("mat3  eyeToSky;") != std::string::npos);
         ensure("the haze pass hands over eye space", shader_source("class3/deferred/hazeF.glsl").find("eyeToSky") == std::string::npos);
     }
