@@ -96,6 +96,19 @@ void ALPanelQuickSettings::refresh()
     LLPanel::refresh();
 }
 
+// virtual
+void ALPanelQuickSettings::onVisibilityChange(bool new_visibility)
+{
+    if (new_visibility)
+    {
+        LLSlider* slider = getChild<LLSlider>("draw_dist_slider_bar");
+        cap_draw_distance_control(slider, slider);
+        LLSpinCtrl* spinner = getChild<LLSpinCtrl>("draw_dist_spinner");
+        cap_draw_distance_control(spinner, spinner);
+    }
+    LLPanel::onVisibilityChange(new_visibility);
+}
+
 void ALPanelQuickSettings::syncFromPreferenceSetting()
 {
     F32 value = gSavedPerAccountSettings.getF32("AvatarHoverOffsetZ");

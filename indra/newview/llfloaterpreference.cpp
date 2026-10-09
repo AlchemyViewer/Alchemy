@@ -1956,6 +1956,8 @@ void LLAvatarComplexityControls::setIndirectMaxArc()
 void LLFloaterPreference::refresh()
 {
     LLPanel::refresh();
+    LLSliderCtrl* draw_distance = getChild<LLSliderCtrl>("DrawDistance", true);
+    cap_draw_distance_control(draw_distance, draw_distance);
     setMaxNonImpostorsText(
         gSavedSettings.getU32("RenderAvatarMaxNonImpostors"),
         getChild<LLTextBox>("IndirectMaxNonImpostorsText", true));

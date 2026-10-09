@@ -466,6 +466,15 @@ bool ALFloaterLightBox::postBuild()
     return ALStudioFloater::postBuild();
 }
 
+void ALFloaterLightBox::onOpen(const LLSD& key)
+{
+    if (ALSettingRow* row = findChild<ALSettingRow>("perf_farclip"))
+    {
+        cap_draw_distance_control(row->getSlider(), row);
+    }
+    ALStudioFloater::onOpen(key);
+}
+
 // Shared by the colour LUT and lens dirt pickers. Both enumerate a bundled
 // directory and a user directory of the same name, list the bundled entries
 // first and the user ones behind a separator, and select whatever the setting

@@ -45,6 +45,7 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llconsole.h"
+#include "llf32uictrl.h"
 #include "lldrawpoolbump.h"
 #include "llfontgl.h"
 #include "lldrawpoolterrain.h"
@@ -145,6 +146,18 @@ static bool handleRenderFarClipChanged(const LLSD& newvalue)
     return true;
     }
     return false;
+}
+
+void cap_draw_distance_control(LLF32UICtrl* range, LLUICtrl* bound)
+{
+    const F32 ceiling = ALFarPlane::drawDistanceCeiling(LLRender::sReverseZ);
+    range->setMaxValue(ceiling);
+    // A slider does not take a lower maximum back into the value it shows, and a spinner never
+    // clamps: given the setting held to the ceiling, both show what the draw distance is.
+    if (LLControlVariable* control = bound->getControlVariable())
+    {
+        bound->setValue(llmin((F32)control->getValue().asReal(), ceiling));
+    }
 }
 
 static bool handleTerrainScaleChanged(const LLSD& newvalue)

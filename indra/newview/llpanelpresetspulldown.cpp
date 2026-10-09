@@ -38,8 +38,10 @@
 #include "llfloaterpreference.h"
 #include "llfloaterreg.h"
 #include "llpresetsmanager.h"
+#include "llslider.h"
 #include "llsliderctrl.h"
 #include "llscrolllistctrl.h"
+#include "llspinctrl.h"
 #include "lltrans.h"
 
 ///----------------------------------------------------------------------------
@@ -69,6 +71,18 @@ bool LLPanelPresetsPulldown::postBuild()
     populatePanel();
 
     return LLPanelPulldown::postBuild();
+}
+
+void LLPanelPresetsPulldown::onVisibilityChange(bool new_visibility)
+{
+    if (new_visibility)
+    {
+        LLSlider* slider = getChild<LLSlider>("draw_dist_slider_bar");
+        cap_draw_distance_control(slider, slider);
+        LLSpinCtrl* spinner = getChild<LLSpinCtrl>("draw_dist_spinner");
+        cap_draw_distance_control(spinner, spinner);
+    }
+    LLPanelPulldown::onVisibilityChange(new_visibility);
 }
 
 void LLPanelPresetsPulldown::populatePanel()

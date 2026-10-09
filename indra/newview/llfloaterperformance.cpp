@@ -44,6 +44,7 @@
 #include "llsliderctrl.h"
 #include "lltextbox.h"
 #include "lltrans.h"
+#include "llviewercontrol.h"
 #include "llviewerobjectlist.h"
 #include "llviewerwindow.h"
 #include "llvoavatar.h"
@@ -181,6 +182,11 @@ void LLFloaterPerformance::showSelectedPanel(LLPanel* selected_panel)
     else if (mComplexityPanel == selected_panel)
     {
         populateObjectList();
+    }
+    else if (mSettingsPanel == selected_panel)
+    {
+        LLSliderCtrl* draw_distance = mSettingsPanel->getChild<LLSliderCtrl>("draw_distance");
+        cap_draw_distance_control(draw_distance, draw_distance);
     }
 }
 
