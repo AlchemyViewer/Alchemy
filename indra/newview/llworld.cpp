@@ -1135,16 +1135,10 @@ void LLWorld::updateWaterObjects()
         water_pos.mdV[0] += stretch * 0.5f * gDirAxes[dir][0];
         water_pos.mdV[1] += stretch * 0.5f * gDirAxes[dir][1];
 
-        // The patch's vertices are built from its scale only on a geometry rebuild, and setScale only moves the
-        // drawable, so a change of stretch (the projection turning infinite after login) would keep the old extent.
-        const bool rescaled = waterp->getScale() != water_scale;
+        // Water is a static object, so each of these rebuilds the patch's geometry (LLStaticViewerObject::updateDrawable),
+        // and its vertices take the new extent when the stretch changes.
         waterp->setPositionGlobal(water_pos);
         waterp->setScale(water_scale);
-        if (rescaled && waterp->mDrawable.notNull())
-        {
-            gPipeline.markRebuild(waterp->mDrawable, LLDrawable::REBUILD_ALL);
-            LL_DEBUGS("Water") << "Edge water " << dir << " rebuilt at " << water_scale.mV[0] << " x " << water_scale.mV[1] << " m" << LL_ENDL;
-        }
 
         gObjectList.updateActive(waterp);
     }
