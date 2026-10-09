@@ -997,8 +997,8 @@ void LLWindowSDL::swapBuffers()
 #if LL_LINUX
 // Once initGL has loaded GL: poll for a GPU reset if createContext got a
 // context that reports one, which only NVIDIA's EGL is asked for; elsewhere
-// nothing is polled. Below GL 4.5, which initGL loads the call for,
-// ARB_robustness names it with a suffix.
+// nothing is polled. Below GL 4.5 without KHR_robustness, which initGL
+// loads the call for, ARB_robustness names it with a suffix.
 void LLWindowSDL::armGraphicsResetCheck()
 {
     sGetGraphicsResetStatus = nullptr;
