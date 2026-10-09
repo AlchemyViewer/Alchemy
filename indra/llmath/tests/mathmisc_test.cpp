@@ -179,7 +179,7 @@ namespace tut
     };
     typedef test_group<uuid_data> uuid_test;
     typedef uuid_test::object uuid_object;
-    tut::uuid_test tu("LLUUID");
+    tut::uuid_test tu("mathmisc LLUUID");
 
     template<> template<>
     void uuid_object::test<1>()

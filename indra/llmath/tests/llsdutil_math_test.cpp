@@ -77,7 +77,7 @@ namespace tut
     };
     typedef test_group<llsdutil_math_data> llsdutil_math_test;
     typedef llsdutil_math_test::object llsdutil_math_object;
-    tut::llsdutil_math_test tutil("llsdutil_math");
+    tut::llsdutil_math_test llsdutil_math_testcase("llsdutil_math");
 
     template<> template<>
     void llsdutil_math_object::test<1>()
