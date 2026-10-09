@@ -2128,6 +2128,10 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("skyBehindMap");
     mReservedUniforms.push_back("skyBehindWeight");
 
+    mReservedUniforms.push_back("moonQuadCenter");
+    mReservedUniforms.push_back("moonQuadU");
+    mReservedUniforms.push_back("moonQuadV");
+
     // The enum and this list are parallel, and an entry added or removed on one side only
     // shifts every later uniform index for every shader in the viewer -- silently, since a
     // wrong index still resolves to some other real uniform. Fatal, like the duplicate check
