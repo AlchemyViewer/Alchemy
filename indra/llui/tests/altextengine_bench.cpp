@@ -285,6 +285,11 @@ int main(int, char**)
         s.editor->highlighter().tokens(lastLine(*s.editor));
     }
     both("the edit alone, per edit", subjects, 2, [](Subject&, ALCodeEditor& e) { editAtTop(e, "x"); });
+    both("a line broken at the top and joined, the edit alone", subjects, 1, [](Subject&, ALCodeEditor& e) {
+        e.setCaret(ALTextPos(0, 0));
+        e.insertText("\n");
+        e.deleteRange(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
+    });
     size_t relexed[2] = {};
     both("the edit, then the highlight to the end, per edit", subjects, 2, [&](Subject& s, ALCodeEditor& e) {
         e.setCaret(ALTextPos(0, 0));
