@@ -52,6 +52,10 @@ uniform int cube_snapshot;
 uniform sampler2D skyBehindMap;
 uniform float skyBehindWeight;
 
+#ifndef REVERSE_Z
+uniform float near_clip; // twice the near plane (LLPipeline::bindDeferredShader)
+#endif
+
 void main()
 {
     vec2  tc           = vary_fragcoord.xy;
@@ -89,10 +93,18 @@ void main()
 
     if (do_atmospherics)
     {
-        // On the water surface, seen from above it: reconstructed depth puts the surface within about a millionth of
-        // its distance of the plane, held here with twenty times that to spare.
+        // On the water surface, seen from above it. Reverse-Z float depth puts the surface within about a millionth of
+        // its distance of the plane, held here with twenty times that to spare. Forward 24-bit depth is coarser: a step
+        // of 2^-24 moves a point at distance L by up to L^2 / (near 2^24) along its ray, which is L h / (near 2^24) off
+        // the plane from a camera h above it, about 0.12 m at 1 km from 500 m up with a 0.25 m near plane; held at a
+        // whole step, twice the rounding.
         float plane_dist = dot(pos.xyz, waterPlane.xyz) + waterPlane.w;
-        bool on_water = waterPlane.w > 0.0 && abs(plane_dist) <= max(0.05, 2e-5 * length(pos.xyz));
+        float dist = length(pos.xyz);
+        float plane_tolerance = max(0.05, 2e-5 * dist);
+#ifndef REVERSE_Z
+        plane_tolerance = max(plane_tolerance, dist * waterPlane.w / (near_clip * 0.5 * 16777216.0));
+#endif
+        bool on_water = waterPlane.w > 0.0 && abs(plane_dist) <= plane_tolerance;
         if (on_water && skyBehindWeight > 0.0)
         {
             // atmosFragLighting doubles additive, so the sky is halved
