@@ -14,6 +14,9 @@
  * LLEnvironment::EnvironmentUBOData, packed by packEnvironmentUBO and registered
  * for debug validation from the same offsetof table. Each vec3 is paired with a
  * scalar that fills its std140 tail.
+ *
+ * eyeToSky is the camera's, not the sky settings': the rotation from this view's
+ * eye space to the sky dome's frame (north, up, east), ALFarPlane::eyeToSkyFrame.
  */
 
 layout (std140) uniform Environment
@@ -32,4 +35,5 @@ layout (std140) uniform Environment
     float gamma;
     float waterFogKS;
     float waterFogDensity;
+    mat3  eyeToSky;
 };

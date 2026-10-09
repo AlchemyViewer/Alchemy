@@ -161,6 +161,8 @@ namespace tut
         const std::string flare = shader_source("class1/alchemy/lensFlareStateF.glsl");
         ensure("flare sky is the far plane, reversed", flare.find("return d <= 0.0 ? 1.0 : 0.0;") != std::string::npos);
         ensure("flare sky is the far plane, forward", flare.find("return d >= 1.0 ? 1.0 : 0.0;") != std::string::npos);
+        // Opaque geometry in the haze pass takes the in-scatter blended geometry takes in its own shading.
+        ensure("the haze pass's in-scatter is alpha's", haze.find("atmosFragLighting(vec3(0), additive, atten)") != std::string::npos);
         // The farthest geometry: a top corner of the edge water's extent, from as high above it as the water shows.
         const F64 edge = (F64)ALFarPlane::edgeWaterStretch(true) + MAX_FAR_CLIP;
         const F64 farthest = sqrt(2.0 * edge * edge + (F64)ALFarPlane::EDGE_WATER_STRETCH * ALFarPlane::EDGE_WATER_STRETCH);
@@ -199,6 +201,59 @@ namespace tut
             ensure(std::string("waterV scrolls by ") + scroll, water_v.find(scroll) != std::string::npos);
             ensure(std::string("rebuilt waves scroll by ") + scroll, water_f.find(scroll) != std::string::npos);
         }
+    }
+
+    // The eye-to-sky rotation: a level camera's forward, up and right land on the sky's (north, up, east) for its heading,
+    // and any view's eye directions come back as toLightNorm's swizzle of the agent directions it rotated.
+    template<> template<>
+    void alfarplane_object::test<8>()
+    {
+        set_test_name("eye to sky frame");
+        const auto apply = [](const std::array<F32, 9>& m, const LLVector3& v)
+        {
+            return LLVector3(m[0] * v.mV[0] + m[3] * v.mV[1] + m[6] * v.mV[2],
+                             m[1] * v.mV[0] + m[4] * v.mV[1] + m[7] * v.mV[2],
+                             m[2] * v.mV[0] + m[5] * v.mV[1] + m[8] * v.mV[2]);
+        };
+        const auto close_to = [](const LLVector3& a, const LLVector3& b) { return (a - b).length() < 1e-5f; };
+
+        // A level camera facing north: eye right is east, eye up is up, eye -z is north. LLMatrix4a stores the
+        // rotation's columns.
+        LLMatrix4a north;
+        north.setIdentity();
+        north.setRows(LLVector4a(1.f, 0.f, 0.f), LLVector4a(0.f, 0.f, -1.f), LLVector4a(0.f, 1.f, 0.f));
+        const std::array<F32, 9> n = ALFarPlane::eyeToSkyFrame(north);
+        ensure("facing north, forward is north", close_to(apply(n, LLVector3(0.f, 0.f, -1.f)), LLVector3(1.f, 0.f, 0.f)));
+        ensure("facing north, up is up", close_to(apply(n, LLVector3(0.f, 1.f, 0.f)), LLVector3(0.f, 1.f, 0.f)));
+        ensure("facing north, right is east", close_to(apply(n, LLVector3(1.f, 0.f, 0.f)), LLVector3(0.f, 0.f, 1.f)));
+
+        // Facing east: eye right is south, eye -z is east.
+        LLMatrix4a east;
+        east.setIdentity();
+        east.setRows(LLVector4a(0.f, 0.f, -1.f), LLVector4a(-1.f, 0.f, 0.f), LLVector4a(0.f, 1.f, 0.f));
+        const std::array<F32, 9> e = ALFarPlane::eyeToSkyFrame(east);
+        ensure("facing east, forward is east", close_to(apply(e, LLVector3(0.f, 0.f, -1.f)), LLVector3(0.f, 0.f, 1.f)));
+        ensure("facing east, right is south", close_to(apply(e, LLVector3(1.f, 0.f, 0.f)), LLVector3(-1.f, 0.f, 0.f)));
+
+        // A pitched, rolled, yawed view: what the pipeline rotates into eye space (as it does the sun's direction)
+        // comes back as the sky frame's swizzle of the agent direction.
+        LLMatrix4a view = LLMatrix4a::lookDir(LLVector4a(10.f, -20.f, 30.f), LLVector4a(0.3f, 0.8f, -0.25f), LLVector4a(0.1f, 0.f, 1.f));
+        const std::array<F32, 9> v = ALFarPlane::eyeToSkyFrame(view);
+        for (const LLVector3& agent : { LLVector3(1.f, 0.f, 0.f), LLVector3(0.f, 1.f, 0.f), LLVector3(0.f, 0.f, 1.f), LLVector3(0.48f, -0.6f, 0.64f) })
+        {
+            LLVector4a eye;
+            view.rotate(LLVector4a(agent.mV[0], agent.mV[1], agent.mV[2], 0.f), eye);
+            const LLVector3 sky = apply(v, LLVector3(eye.getF32ptr()));
+            ensure("agent direction back as (north, up, east)", close_to(sky, LLVector3(agent.mV[1], agent.mV[2], agent.mV[0])));
+        }
+
+        // WindLight's haze takes the rotation from the Environment block, for every pass that hazes geometry, and its
+        // callers hand it eye space.
+        const std::string funcs = shader_source("class1/windlight/atmosphericsFuncs.glsl");
+        ensure("haze position into the sky's frame", funcs.find("vec3 rel_pos = eyeToSky * inPositionEye;") != std::string::npos);
+        ensure("haze light into the sky's frame", funcs.find("light_dir = eyeToSky * light_dir;") != std::string::npos);
+        ensure("the rotation is in the Environment block", shader_source("class1/deferred/environmentBlock.glsl").find("mat3  eyeToSky;") != std::string::npos);
+        ensure("the haze pass hands over eye space", shader_source("class3/deferred/hazeF.glsl").find("eyeToSky") == std::string::npos);
     }
 
     // The far plane overlay: nearer-first pairs out to 100 km on distinct bearings, each farther column behind its

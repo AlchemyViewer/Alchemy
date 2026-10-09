@@ -48,13 +48,17 @@ float getAmbientClamp() { return 1.0f; }
 vec3 srgb_to_linear(vec3 col);
 
 // return colors in sRGB space
+// inPositionEye and light_dir are in eye space. The haze is worked in the sky dome's frame (eyeToSky), where y is
+// altitude and lightnorm lies: in eye space the camera's pitch would change how much haze a point gets, and its yaw
+// would move the sun's glow.
 void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, out vec3 sunlit, out vec3 amblit, out vec3 additive,
                          out vec3 atten)
 {
-    vec3 rel_pos = inPositionEye;
+    vec3 rel_pos = eyeToSky * inPositionEye;
+    light_dir = eyeToSky * light_dir;
 
-    //(TERRAIN) limit altitude
-    if (abs(rel_pos.y) > max_y) rel_pos *= (max_y / rel_pos.y);
+    //(TERRAIN) limit altitude, keeping the direction: a point max_y below would otherwise turn to face the sky
+    if (abs(rel_pos.y) > max_y) rel_pos *= (max_y / abs(rel_pos.y));
 
     vec3  rel_pos_norm = normalize(rel_pos);
     float rel_pos_len  = length(rel_pos);

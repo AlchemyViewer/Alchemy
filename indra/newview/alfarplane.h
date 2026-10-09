@@ -28,8 +28,11 @@
 #include "stdtypes.h"
 #include "v2math.h"
 
+#include <array>
 #include <limits>
 #include <vector>
+
+class LLMatrix4a;
 
 /// The main view keeps four distances apart, each read by its own code:
 ///
@@ -107,6 +110,13 @@ struct WaterFar
 /// whether there is one. Under an infinite projection the waves follow the surface to the rim's farthest
 /// corner, so no stretch of water shares one wave coordinate, and the water fades out toward the rim.
 WaterFar waterFar(F32 projection_far, bool have_rim, const LLVector2& rim_min, const LLVector2& rim_max);
+
+/// The rotation from a view's eye space to the sky dome's frame (north, up, east), column-major for a GLSL mat3.
+/// view is the camera's modelview, which takes agent directions (east, north, up) to the eye. LLEnvironment hands it
+/// to every shader in the Environment block, and WindLight's haze (calcAtmosphericVars) works in this frame: its y
+/// is altitude, and its directions agree with the sky's light directions (lightnorm), so neither changes as the
+/// camera turns.
+std::array<F32, 9> eyeToSkyFrame(const LLMatrix4a& view);
 
 /// One column of the Develop far plane overlay (ALFarPlaneOverlay), in camera-relative metres: horizontal
 /// distance, bearing in degrees clockwise from north, sideways offset, half width and height, all scaled with

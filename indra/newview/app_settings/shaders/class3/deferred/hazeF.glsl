@@ -38,14 +38,11 @@ void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, ou
 float getDepth(vec2 pos_screen);
 bool isFarDepth(float d);             // deferredUtil.glsl -- depth-convention aware
 
-vec3 linear_to_srgb(vec3 c);
-vec3 srgb_to_linear(vec3 c);
+vec3 atmosFragLighting(vec3 light, vec3 additive, vec3 atten);
 
 uniform vec4 waterPlane;
 
 uniform int cube_snapshot;
-
-uniform float sky_hdr_scale;
 
 void main()
 {
@@ -87,9 +84,9 @@ void main()
 
     if (do_atmospherics)
     {
+        // the in-scatter alone: the blend multiplies what is already lit by alpha
         alpha = atten.r;
-        color = srgb_to_linear(additive*2.0);
-        color *= sky_hdr_scale;
+        color = atmosFragLighting(vec3(0), additive, atten);
     }
     else
     {

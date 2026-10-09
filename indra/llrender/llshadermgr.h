@@ -607,6 +607,8 @@ public:
         WATER_FAR,                          //  "waterFar"  wave clamp distance, edge water stretch (ALFarPlane::WaterFar)
         WATER_RIM,                          //  "waterRim"  the edge water's outer rectangle relative to the camera
 
+        EYE_TO_SKY,                         //  "eyeToSky"  eye space to the sky dome's (north, up, east)
+
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
     // clang-format on

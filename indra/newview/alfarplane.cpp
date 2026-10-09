@@ -102,6 +102,21 @@ WaterFar waterFar(F32 projection_far, bool have_rim, const LLVector2& rim_min, c
     return water;
 }
 
+std::array<F32, 9> eyeToSkyFrame(const LLMatrix4a& view)
+{
+    // The view's rotation is orthonormal, so the eye axes in agent space are the rows of its rotation, which
+    // getColumn reads; the sky frame is toLightNorm's swizzle of the agent's.
+    const LLVector4a axes[3] = { view.getColumn<0>(), view.getColumn<1>(), view.getColumn<2>() };
+    std::array<F32, 9> m;
+    for (U32 axis = 0; axis < 3; ++axis)
+    {
+        m[axis * 3 + 0] = axes[axis][VY];
+        m[axis * 3 + 1] = axes[axis][VZ];
+        m[axis * 3 + 2] = axes[axis][VX];
+    }
+    return m;
+}
+
 const std::vector<OverlayColumn>& overlayColumns()
 {
     static const std::vector<OverlayColumn> columns = []

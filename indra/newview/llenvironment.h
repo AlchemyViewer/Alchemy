@@ -268,14 +268,17 @@ public:
     // moonlight, lightnorm, camPosLocal, water/clip plane, mirror flag, sky_hdr_scale,
     // sun_up_factor, moisture/droplet/ice/moon_brightness/cloud_variance/sun_moon_glow_factor,
     // density_multiplier) are deliberately re-pushed per context and STAY on the loose apply()
-    // path. (classic_mode is a compile-time program variant -- see CLASSIC_MODE.)
+    // path. (classic_mode is a compile-time program variant -- see CLASSIC_MODE.) One member
+    // is the camera's rather than the settings': eyeToSky, the rotation from the view's eye
+    // space to the sky dome's frame, taken from the camera update() is given -- the main view,
+    // or each probe face -- so every shader that hazes geometry works in the sky's frame.
     //
     // Field order/types/padding MUST byte-match the GLSL block. Each vec3 is paired with a
     // trailing scalar so that scalar fills the vec3's std140 tail (the next member lands at
     // offset+12) -- which is exactly how float[3]+float pack in C++, so this struct mirrors
-    // std140 with no manual inter-member padding. Only the final round to a 16-byte multiple
-    // needs explicit tail padding. See packEnvironmentUBO() and the sEnvBlockFields table in
-    // llenvironment.cpp.
+    // std140 with no manual inter-member padding among them. Only the round to a 16-byte
+    // multiple before eyeToSky needs explicit padding: a mat3 is three vec4-aligned columns.
+    // See packEnvironmentUBO() and the sEnvBlockFields table in llenvironment.cpp.
     struct alignas(16) EnvironmentUBOData
     {
         F32 waterFogColor[4];
@@ -292,7 +295,8 @@ public:
         F32 gamma;
         F32 waterFogKS;
         F32 waterFogDensity;
-        F32 _tail_pad[2];
+        F32 _pad0[2];
+        F32 eyeToSky[12];              // mat3: three columns, each padded to a vec4
     };
 
     // Pack mSky/mWaterUniforms into the CPU-side block and mark it for upload (no GL calls).
@@ -301,6 +305,8 @@ public:
     EnvironmentUBOData          mEnvUBOData{};
     ALUniformBuffer             mEnvUBO;
     bool                        mEnvUBODirty{ true };
+    // eyeToSky as ALFarPlane::eyeToSkyFrame gives it, for the camera of the last update()
+    std::array<F32, 9>          mEyeToSky{ 1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f };
 
     class DayInstance: public std::enable_shared_from_this<DayInstance>
     {

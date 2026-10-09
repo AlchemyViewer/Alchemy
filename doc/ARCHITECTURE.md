@@ -101,6 +101,7 @@ Depth of field runs **before** bloom and before the tonemapper, on linear HDR. G
 - The **projection's far plane** (`LLViewerCamera::getProjectionFar()`) only says how depth is stored. Under reverse-Z the main view's projection is infinite (`al_perspective` with `z_far` = infinity, stored depth = near / distance); forward-Z, probe captures and previews keep `FINITE_PROJECTION_FAR` (1024 m). Depth reconstruction floors w so the cleared depth unprojects to `MAX_RECONSTRUCT_DISTANCE`, never infinity.
 - The **sky** draws last, on the far plane, writing no depth: it is wherever the depth buffer still holds the cleared value, under either projection. Every pass that tells sky from geometry (`isFarDepth`, the lens flare's `skyOf`, void water's fog) tests for exactly that value.
 - **Terrain and water**, whose partitions ignore the draw distance, reach as far as the projection lets them: under the infinite one terrain is culled to `TERRAIN_REACH` (8 km) and edge water stretches `EDGE_WATER_STRETCH` (256 km) past the regions, to the horizon.
+- **Haze** is worked in the sky dome's frame wherever geometry is hazed: WindLight's `calcAtmosphericVars` takes eye space and turns it by `eyeToSky`, which the Environment block carries for the camera of each environment update (`ALFarPlane::eyeToSkyFrame`), so its altitude is the world's and its sun glow does not turn with the camera.
 
 **GBuffer layout** (MRT attachments on `deferredScreen`):
 - frag_data[0]: Base color (GL_RGBA)
