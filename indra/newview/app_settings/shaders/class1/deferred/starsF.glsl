@@ -38,7 +38,7 @@ in float vary_subpixel_fade; // energy attenuation for stars widened for sub-pix
 
 uniform float custom_alpha;   // star_brightness slider output (0..2 range in practice)
 uniform float time;           // seconds, wrapped to avoid precision drift
-uniform vec3  moon_dir;       // world-space moon direction (z up)
+uniform vec3  moon_dir;       // moon direction in the stars' frame, as vary_world_dir (z up)
 uniform float moon_brightness;// moon illumination 0..1 (from LLSettingsSky)
 
 // The moon's quad in the stars' frame, on the plane a unit away along moonQuadCenter (zero when no moon is drawn), and

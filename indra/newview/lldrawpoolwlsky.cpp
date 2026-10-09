@@ -265,14 +265,20 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
                                    (GLfloat)deferred_target->getWidth(),
                                    (GLfloat)deferred_target->getHeight());
 
-    // Moon glare inputs. moon_dir is in world space; vary_world_dir in the
-    // fragment is the pre-rotation star direction, so there's a very slow
-    // drift (0.01 deg/sec of sky rotation) between the visual moon position
-    // and where the glare halo lands. That drift is imperceptible over any
-    // realistic session length and keeps the uniform path simple.
+    // The stars' frame is the agent's turned by the rotation above, and the fragment shader works in it
+    // (vary_world_dir), so agent directions are turned back by the rotation's transpose.
+    LLMatrix4a to_stars = LLMatrix4a::rotation(star_rotation * DEG_TO_RAD, LLVector4a(0.f, 0.f, 1.f));
+    to_stars.transpose();
+    const auto in_stars = [&to_stars](const LLVector3& v)
+    {
+        LLVector4a out;
+        to_stars.rotate(LLVector4a(v.mV[VX], v.mV[VY], v.mV[VZ]), out);
+        return LLVector3(out.getF32ptr());
+    };
+
+    // Moon glare inputs, in the stars' frame so the glare stays on the moon however far the stars have turned.
     LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
-    const LLVector3 moon_dir = psky->getMoonDirection();
-    gDeferredStarProgram.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, moon_dir.mV);
+    gDeferredStarProgram.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, in_stars(psky->getMoonDirection()).mV);
     gDeferredStarProgram.uniform1f(LLShaderMgr::MOON_BRIGHTNESS,
                                    psky->getIsMoonUp() ? (F32)psky->getMoonBrightness() : 0.0f);
 
@@ -285,23 +291,13 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
     gDeferredStarProgram.uniform1f(LLShaderMgr::WATER_TIME, sStarTime);
 
     // The moon draws after the stars and fades low in the sky, so the stars leave out what its quad and texture cover
-    // (starsF.glsl). Its corners lie around the camera in agent space, and the stars' frame is the agent's turned by the
-    // rotation above, so they are turned back by its transpose.
+    // (starsF.glsl). Its corners lie around the camera in agent space.
     LLFace* moon_face = gSky.mVOSkyp->mFace[LLVOSky::FACE_MOON];
     LLViewerTexture* moon_tex = moon_face ? moon_face->getTexture(LLRender::DIFFUSE_MAP) : nullptr;
     const LLHeavenBody& moon = gSky.mVOSkyp->getMoon();
     const bool mask_moon = moon.getDraw() && moon_tex && moon_face->getGeomCount();
     if (mask_moon)
     {
-        LLMatrix4a to_stars = LLMatrix4a::rotation(star_rotation * DEG_TO_RAD, LLVector4a(0.f, 0.f, 1.f));
-        to_stars.transpose();
-        const auto in_stars = [&to_stars](const LLVector3& v)
-        {
-            LLVector4a out;
-            to_stars.rotate(LLVector4a(v.mV[VX], v.mV[VY], v.mV[VZ]), out);
-            return LLVector3(out.getF32ptr());
-        };
-
         // Corners 0..3 are (-right, +up), (-right, -up), (+right, +up), (+right, -up) (LLVOSky::updateHeavenlyBodyGeometry).
         const LLVector3 centre = (moon.corner(0) + moon.corner(3)) * 0.5f;
         const F32 dist = centre.length();

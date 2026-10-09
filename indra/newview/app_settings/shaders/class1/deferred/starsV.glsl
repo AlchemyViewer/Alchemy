@@ -35,7 +35,7 @@ in vec3 position;       // star center world position (shared by all 6 verts of 
 in vec4 diffuse_color;  // RGB = sRGB black-body color, A = intrinsic intensity (0..1)
 in vec2 texcoord0;      // corner offset in [-1, 1] for GPU-side billboarding
 
-out vec3 vary_world_dir;     // world-space direction from camera to star (post-rotation)
+out vec3 vary_world_dir;     // direction from camera to star in the stars' frame, before their slow rotation about z
 out vec2 vary_corner;        // corner offset, pass-through for fragment shape
 out vec4 vary_color;         // rgb = linear BB color, a = intensity
 out float vary_intensity;
