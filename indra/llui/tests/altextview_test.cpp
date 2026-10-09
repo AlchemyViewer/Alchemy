@@ -1515,6 +1515,12 @@ namespace tut
     void altextview_object::test<50>()
     {
         set_test_name("find: no more matches than a list is any use as, said with a plus; a long text looked through once the query settles, not at each key");
+        // The worker the long text is looked through on, closed and waited
+        // for when the test ends: nothing of its own left running.
+        struct WorkerClosed
+        {
+            ~WorkerClosed() { ALTextFind::closeWorker(); }
+        } worker_closed;
         std::string many;
         for (size_t i = 0; i < ALTextFind::LIMIT + 5; ++i)
         {
@@ -3047,6 +3053,12 @@ namespace tut
     void altextview_object::test<98>()
     {
         set_test_name("Next over matches that are empty -- ^ at each line's start -- goes on from the current one at the caret, round the end; one the caret was put on is found first");
+        // A pattern across lines is looked for on the worker; closed and
+        // waited for when the test ends.
+        struct WorkerClosed
+        {
+            ~WorkerClosed() { ALTextFind::closeWorker(); }
+        } worker_closed;
 #if LL_DARWIN
         constexpr MASK toggle = MASK_CONTROL | MASK_ALT;
 #else

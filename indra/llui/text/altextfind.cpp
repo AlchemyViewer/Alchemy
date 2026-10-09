@@ -63,6 +63,15 @@ namespace
         }
         // Closing, it passes over what waits for it.
         bool closing() const { return mThread && mThread->closing(); }
+        // Closed and waited for, and let go of: the next post starts another.
+        void stop()
+        {
+            if (mThread)
+            {
+                mThread->close();
+                mThread.reset();
+            }
+        }
 
     private:
         std::unique_ptr<ALSerialWorker> mThread;
@@ -91,6 +100,15 @@ struct ALTextFind::Working
 ALTextFind::~ALTextFind()
 {
     letGo();
+}
+
+// static
+void ALTextFind::closeWorker()
+{
+    if (ALTextFindThread::instanceExists())
+    {
+        ALTextFindThread::instance().stop();
+    }
 }
 
 void ALTextFind::letGo()
