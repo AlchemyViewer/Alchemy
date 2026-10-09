@@ -162,6 +162,12 @@ namespace tut
         const std::string water_v = shader_source("class1/environment/waterV.glsl");
         ensure("wave clamp from the uniform", water_v.find("min(d, sk_water_far.x)") != std::string::npos);
         ensure("no literal wave clamp", water_v.find("min(d, 2560.0)") == std::string::npos);
+        // The per-fragment rebuild scrolls by the offsets waterV takes from the CPU, which sets no wave direction or time.
+        for (const char* scroll : { "+ bigWaveScroll;", "+ littleWaveScroll.xy;", "+ littleWaveScroll.zw;" })
+        {
+            ensure(std::string("waterV scrolls by ") + scroll, water_v.find(scroll) != std::string::npos);
+            ensure(std::string("rebuilt waves scroll by ") + scroll, water_f.find(scroll) != std::string::npos);
+        }
     }
 
     // SKRenderFarPlaneForce: automatic passes through, 1 and 2 force on reverse-Z only, cube snapshots never.

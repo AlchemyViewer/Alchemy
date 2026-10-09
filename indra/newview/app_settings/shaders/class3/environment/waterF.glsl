@@ -88,9 +88,8 @@ uniform vec4 sk_water_rim;
 // The wave coordinates, rebuilt per fragment under the infinite projection: interpolated from edge water vertices
 // hundreds of km out, waterV's world-space coordinates lost the precision the normal maps need, so far water went flat.
 uniform vec3 eyeVec;
-uniform vec2 waveDir1;
-uniform vec2 waveDir2;
-uniform float time;
+uniform vec2 bigWaveScroll;
+uniform vec4 littleWaveScroll;
 // </SK:Nexii>
 
 //bigWave is (refCoord.w, view.w);
@@ -146,9 +145,9 @@ void generateWaveNormals(out vec3 wave1, out vec3 wave2, out vec3 wave3)
         float d = max(length(view.xy), 0.001);
         vec2 v = eyeVec.xy + view.xy / d * min(d, sk_water_far.x);
         v.x += (cos(v.x*0.08)+sin(v.y*0.02))*6.0;
-        bigwave = v * vec2(0.04,0.04) + waveDir1 * time * 0.055;
-        little.xy = v * vec2(0.45, 0.9) + waveDir2 * time * 0.13;
-        little.zw = v * vec2(0.1, 0.2) + waveDir1 * time * 0.1;
+        bigwave = v * vec2(0.04,0.04) + bigWaveScroll;
+        little.xy = v * vec2(0.45, 0.9) + littleWaveScroll.xy;
+        little.zw = v * vec2(0.1, 0.2) + littleWaveScroll.zw;
     }
     // </SK:Nexii>
 
