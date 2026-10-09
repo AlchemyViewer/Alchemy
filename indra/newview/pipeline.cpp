@@ -1377,6 +1377,8 @@ void LLPipeline::releaseGLBuffers()
         mGlow[i].release();
     }
 
+    skReleaseFarProjectionOverlay();
+
     mHeroProbeManager.cleanup(); // release hero probes
 
     mDeferredUBO.release(); // shared shadow/SSAO block (UB_DEFERRED); re-created lazily on next use

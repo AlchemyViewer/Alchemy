@@ -30,3 +30,6 @@
 // The scene does not hide them, culling and reach are bypassed, and the projection alone decides what shows:
 // a finite plane clips the far pairs, and broken depth order shows cyan over orange.
 void skRenderFarProjectionOverlay();
+
+// Releases the overlay's render target with the pipeline's own (LLPipeline::releaseGLBuffers).
+void skReleaseFarProjectionOverlay();

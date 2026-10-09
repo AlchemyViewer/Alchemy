@@ -42,6 +42,11 @@ extern bool gCubeSnapshot;
 
 namespace
 {
+    // Owned for the session and never freed at exit, where GL is already gone. Its GL objects go whenever the
+    // pipeline releases its own (skReleaseFarProjectionOverlay), so a recreated context or a new depth format
+    // never finds names it does not own.
+    LLRenderTarget* sTarget = nullptr;
+
     void box(const LLVector3& lo, const LLVector3& hi)
     {
         const LLVector3 v[8] = {
@@ -70,16 +75,22 @@ namespace
     }
 }
 
+void skReleaseFarProjectionOverlay()
+{
+    if (sTarget)
+    {
+        sTarget->release();
+    }
+}
+
 void skRenderFarProjectionOverlay()
 {
     static LLCachedControl<bool> enabled(gSavedSettings, "SKRenderFarProjectionOverlay", false);
-    // Owned for the session and never freed at exit, where GL is already gone.
-    static LLRenderTarget* target = nullptr;
     if (!enabled || gCubeSnapshot)
     {
-        if (!enabled && target)
+        if (!enabled)
         {
-            target->release();
+            skReleaseFarProjectionOverlay();
         }
         return;
     }
@@ -89,12 +100,12 @@ void skRenderFarProjectionOverlay()
     // in it for later passes to read.
     const U32 width = gPipeline.mRT->screen.getWidth();
     const U32 height = gPipeline.mRT->screen.getHeight();
-    if (!target)
+    if (!sTarget)
     {
-        target = new LLRenderTarget();
+        sTarget = new LLRenderTarget();
     }
-    if ((!target->isComplete() || target->getWidth() != width || target->getHeight() != height) &&
-        !target->allocate(width, height, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, LLPipeline::mainDepthFormat()))
+    if ((!sTarget->isComplete() || sTarget->getWidth() != width || sTarget->getHeight() != height) &&
+        !sTarget->allocate(width, height, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, LLPipeline::mainDepthFormat()))
     {
         return;
     }
@@ -102,11 +113,11 @@ void skRenderFarProjectionOverlay()
     const LLVector3 origin = LLViewerCamera::getInstance()->getOrigin();
 
     gGL.flush();
-    target->bindTarget();
+    sTarget->bindTarget();
     {
         LLGLSColorMask mask(true, true);
         glClearColor(0.f, 0.f, 0.f, 0.f);
-        target->clear();
+        sTarget->clear();
         gDebugProgram.bind();
         LLGLDepthTest depth(GL_TRUE, GL_TRUE);
         LLGLDisable cull(GL_CULL_FACE);
@@ -136,7 +147,7 @@ void skRenderFarProjectionOverlay()
         }
         gDebugProgram.unbind();
     }
-    target->flush();
+    sTarget->flush();
 
     // Laid over the frame without its depth, so the columns show in front of the scene.
     LLGLSColorMask mask(true, false);
@@ -144,7 +155,7 @@ void skRenderFarProjectionOverlay()
     LLGLEnable blend(GL_BLEND);
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
     gCopyProgram.bind();
-    gCopyProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, target);
+    gCopyProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, sTarget);
     gPipeline.mScreenTriangleVB->setBuffer();
     gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
     gCopyProgram.unbind();
