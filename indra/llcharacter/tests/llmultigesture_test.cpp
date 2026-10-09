@@ -118,12 +118,15 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct llmultigesture_data
     {
     };
     typedef test_group<llmultigesture_data> llmultigesture_test;
     typedef llmultigesture_test::object llmultigesture_object;
     tut::llmultigesture_test llmultigesture_testcase("LLMultiGesture");
+}
 
     template<> template<>
     void llmultigesture_object::test<1>()
