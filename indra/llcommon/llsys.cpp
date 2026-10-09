@@ -1343,7 +1343,7 @@ public:
 
     bool tick(const LLSD&)
     {
-        F32 timestamp(mTimer.getElapsedTimeF32());
+        const F64 timestamp(mTimer.getElapsedTimeF64());
 
         // Count this frame in the interval just completed.
         ++mFrames;
@@ -1358,7 +1358,7 @@ public:
         // Set up for next sample window. Capture values for previous frame in
         // local variables and reset data members.
         U32 frames(mFrames);
-        F32 sampleStart(mSampleStart);
+        const F64 sampleStart(mSampleStart);
         // No frames yet in next window
         mFrames = 0;
         // which starts right now
@@ -1376,7 +1376,7 @@ public:
         // How long did this actually take? As framerate slows, the duration
         // of the frame we just finished could push us WELL beyond our desired
         // sample window size.
-        F32 elapsed(timestamp - sampleStart);
+        const F32 elapsed((F32)(timestamp - sampleStart));
         F32 framerate(frames/elapsed);
 
         // Remember previous slowest framerate because we're just about to
@@ -1446,8 +1446,8 @@ private:
     // can get from LLTimer. Unfortunately the LLTimer API is missing the
     // feature we need: has at least the stated interval elapsed, and if so,
     // exactly how long has passed? So we have to do it by hand, sigh.
-    // Time at start, end of sample window
-    F32 mSampleStart, mSampleEnd;
+    // Time at start, end of sample window, in F64: the timer runs all session
+    F64 mSampleStart, mSampleEnd;
     // Frames this sample window
     U32 mFrames;
     // Sliding window of framerate samples

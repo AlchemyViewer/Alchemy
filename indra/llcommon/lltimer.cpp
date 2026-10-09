@@ -37,7 +37,10 @@
 #   include "llwin32headers.h"
 #elif LL_LINUX || LL_DARWIN
 #   include <errno.h>
-#   include <sys/time.h>
+#   include <time.h>
+#   if LL_DARWIN
+#       include <mach/mach_time.h>
+#   endif
 #else
 #   error "architecture not supported"
 #endif
@@ -210,17 +213,18 @@ void ms_sleep(U32 ms)
 #if LL_WINDOWS
 U64 get_clock_count()
 {
-    static bool firstTime = true;
-    static U64 offset;
-        // ensures that callers to this function never have to deal with wrap
+    // Counted from the first read, so callers never deal with wrap; a
+    // function-local static, so two threads reading first agree on it.
+    static const LONGLONG offset = []
+    {
+        LARGE_INTEGER first;
+        QueryPerformanceCounter(&first);
+        return first.QuadPart;
+    }();
 
     // QueryPerformanceCounter implementation
     LARGE_INTEGER clock_count;
     QueryPerformanceCounter(&clock_count);
-    if (firstTime) {
-        offset = clock_count.QuadPart;
-        firstTime = false;
-    }
     return clock_count.QuadPart - offset;
 }
 
@@ -233,27 +237,51 @@ F64 calc_clock_frequency()
 #endif // LL_WINDOWS
 
 
-#if LL_LINUX || LL_DARWIN
-// Both Linux and Mac use gettimeofday for accurate time
+#if LL_DARWIN
 F64 calc_clock_frequency()
 {
-    return 1000000.0; // microseconds, so 1 MHz.
+    // A mach tick is numer/denom nanoseconds: 125/3 on Apple silicon, whose
+    // counter runs at 24 MHz, and 1/1 on Intel.
+    static const F64 frequency = []
+    {
+        mach_timebase_info_data_t timebase;
+        mach_timebase_info(&timebase);
+        return 1000000000.0 * timebase.denom / timebase.numer;
+    }();
+    return frequency;
 }
 
 U64 get_clock_count()
 {
-    // Linux clocks are in microseconds
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec*SEC_TO_MICROSEC_U64 + tv.tv_usec;
+    // The counter itself, unconverted. It stops while the system sleeps, as
+    // CLOCK_MONOTONIC does on Linux, and it is the tick mach_wait_until and
+    // kqueue's NOTE_MACHTIME take. Not std::chrono::steady_clock: libc++ reads
+    // CLOCK_MONOTONIC_RAW for it, which counts on through sleep, so the two
+    // drift apart by however long the system has slept.
+    return mach_absolute_time();
+}
+#endif
+
+#if LL_LINUX
+F64 calc_clock_frequency()
+{
+    return 1000000000.0; // nanoseconds, so 1 GHz.
+}
+
+U64 get_clock_count()
+{
+    // Read directly rather than through std::chrono::steady_clock, whose now()
+    // lives in whichever C++ runtime is loaded. It stops while the system is
+    // suspended, and a change to the system clock never moves it.
+    timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (U64)now.tv_sec * 1000000000ULL + (U64)now.tv_nsec;
 }
 #endif
 
 
 TimerInfo::TimerInfo()
-:   mClockFrequency(0.0),
-    mTotalTimeClockCount(0),
-    mLastTotalTimeClockCount(0)
+:   mClockFrequency(0.0)
 {
     // Known from the first read, so a timer constructed during static initialisation, before
     // anything else has touched the clock, never scales by a frequency of 0.
@@ -275,47 +303,35 @@ TimerInfo& get_timer_info()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// returns a U64 number that represents the number of
-// microseconds since the Unix epoch - Jan 1, 1970
+// Microseconds since the Unix epoch, as the calendar read at the first call,
+// carried forward by the monotonic clock. It reads as a time of day but
+// counts on its own after the first call, so it drifts from the calendar over
+// a session and never steps; LLDate::now() is the calendar.
 U64MicrosecondsImplicit totalTime()
 {
-    U64 current_clock_count = get_clock_count();
-    if (!get_timer_info().mTotalTimeClockCount || get_timer_info().mClocksToMicroseconds.value() == 0)
+    struct Anchor
     {
-        get_timer_info().update();
-        get_timer_info().mTotalTimeClockCount = current_clock_count;
-
-#if LL_WINDOWS
-        // Sync us up with local time (even though we PROBABLY don't need to, this is how it was implemented)
-        // Unix platforms use gettimeofday so they are synced, although this probably isn't a good assumption to
-        // make in the future.
-
-        get_timer_info().mTotalTimeClockCount = (U64)(time(NULL) * get_timer_info().mClockFrequency);
-#endif
-
-        // Update the last clock count
-        get_timer_info().mLastTotalTimeClockCount = current_clock_count;
-    }
-    else
+        U64 clock;          // get_clock_count() at the anchor
+        U64 epochMicros;    // the calendar at the same moment
+        U64 frequency;      // clock ticks a second
+    };
+    // A function-local static, so it is made once and every thread reads it
+    // without a lock.
+    static const Anchor anchor = []
     {
-        if (current_clock_count >= get_timer_info().mLastTotalTimeClockCount)
-        {
-            // No wrapping, we're all okay.
-            get_timer_info().mTotalTimeClockCount += current_clock_count - get_timer_info().mLastTotalTimeClockCount;
-        }
-        else
-        {
-            // We've wrapped.  Compensate correctly
-            get_timer_info().mTotalTimeClockCount += (0xFFFFFFFFFFFFFFFFULL - get_timer_info().mLastTotalTimeClockCount) + current_clock_count;
-        }
+        Anchor made;
+        made.clock = get_clock_count();
+        const auto calendar = std::chrono::system_clock::now().time_since_epoch();
+        made.epochMicros = (U64)std::chrono::duration_cast<std::chrono::microseconds>(calendar).count();
+        made.frequency = (U64)calc_clock_frequency();
+        return made;
+    }();
 
-        // Update the last clock count
-        get_timer_info().mLastTotalTimeClockCount = current_clock_count;
-    }
-
-    // Return the total clock tick count in microseconds.
-    U64Microseconds time(get_timer_info().mTotalTimeClockCount*get_timer_info().mClocksToMicroseconds);
-    return time;
+    const U64 ticks = get_clock_count() - anchor.clock;
+    // Split so the multiply cannot overflow at any frequency a counter runs at.
+    const U64 micros = (ticks / anchor.frequency) * SEC_TO_MICROSEC_U64
+                     + (ticks % anchor.frequency) * SEC_TO_MICROSEC_U64 / anchor.frequency;
+    return U64Microseconds(anchor.epochMicros + micros);
 }
 
 
@@ -423,10 +439,16 @@ F32SecondsImplicit LLTimer::getElapsedTimeAndResetF32()
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// An expiry as clock ticks: in F64, so a long expiry keeps its precision, and
+// never negative, which as a U64 would be undefined.
+static U64 expiry_ticks(F64 seconds)
+{
+    return (U64)(llmax(seconds, 0.0) * get_timer_info().mClockFrequency.value());
+}
+
 void LLTimer::setTimerExpirySec(F32SecondsImplicit expiration)
 {
-    mExpirationTicks = get_clock_count()
-        + (U64)((F32)(expiration * get_timer_info().mClockFrequency.value()));
+    mExpirationTicks = get_clock_count() + expiry_ticks(expiration.value());
 }
 
 F32SecondsImplicit LLTimer::getRemainingTimeF32() const
@@ -448,8 +470,7 @@ bool LLTimer::checkExpirationAndReset(F32 expiration)
         return false;
     }
 
-    mExpirationTicks = cur_ticks
-        + (U64)((F32)(expiration * get_timer_info().mClockFrequency));
+    mExpirationTicks = cur_ticks + expiry_ticks(expiration);
     return true;
 }
 

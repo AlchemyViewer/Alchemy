@@ -129,7 +129,7 @@ void LLMotion::setDeactivateCallback( void (*cb)(void *), void* userdata )
 }
 
 //virtual
-void LLMotion::setStopTime(F32 time)
+void LLMotion::setStopTime(F64 time)
 {
     mStopTimestamp = time;
     mStopped = true;
@@ -143,7 +143,7 @@ bool LLMotion::isBlending()
 //-----------------------------------------------------------------------------
 // activate()
 //-----------------------------------------------------------------------------
-void LLMotion::activate(F32 time)
+void LLMotion::activate(F64 time)
 {
     mActivationTimestamp = time;
     mStopped = false;

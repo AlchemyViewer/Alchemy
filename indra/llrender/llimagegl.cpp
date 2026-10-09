@@ -190,7 +190,7 @@ U32 LLImageGL::sUniqueCount             = 0;
 U32 LLImageGL::sBindCount               = 0;
 S32 LLImageGL::sCount                   = 0;
 
-F32 LLImageGL::sLastFrameTime           = 0.f;
+F64 LLImageGL::sLastFrameTime           = 0.0;
 LLImageGL* LLImageGL::sDefaultGLTexture = NULL ;
 boost::unordered_set<LLImageGL*> LLImageGL::sImageList;
 
@@ -620,7 +620,7 @@ S32 LLImageGL::dataFormatComponents(S32 dataformat)
 //----------------------------------------------------------------------------
 
 // static
-void LLImageGL::updateStats(F32 current_time)
+void LLImageGL::updateStats(F64 current_time)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     sLastFrameTime = current_time;
@@ -929,7 +929,7 @@ bool LLImageGL::updateBindStats() const
 
 F32 LLImageGL::getTimePassedSinceLastBound()
 {
-    return sLastFrameTime - mLastBindTime ;
+    return (F32)(sLastFrameTime - mLastBindTime);
 }
 
 void LLImageGL::setExplicitFormat( LLGLint internal_format, LLGLenum primary_format, LLGLenum type_format, bool swap_bytes )
@@ -2014,8 +2014,13 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
 
     mTextureMemory = (S64Bytes)getMipBytes(mCurrentDiscardLevel);
 
-    // mark this as bound at this point, so we don't throw it out immediately
-    mLastBindTime = sLastFrameTime;
+    // mark this as bound at this point, so we don't throw it out immediately. Off the main
+    // thread syncTexName() marks it when the texture publishes: the frame time is the main
+    // thread's, and so is everything that reads the mark.
+    if (main_thread)
+    {
+        mLastBindTime = sLastFrameTime;
+    }
 
     checkActiveThread();
     return true;
@@ -2209,6 +2214,9 @@ void LLImageGL::syncTexName(LLGLuint texname)
             LLImageGL::deleteTextures(1, &mTexName);
         }
         mTexName = texname;
+
+        // Marked bound as it publishes, so it is not thrown out before anything draws it.
+        mLastBindTime = sLastFrameTime;
 
         // The alpha facts derived from the new texture publish with it.
         publishPendingAlpha();

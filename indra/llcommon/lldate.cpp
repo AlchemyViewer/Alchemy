@@ -31,6 +31,7 @@
 
 #include <time.h>
 #include <locale.h>
+#include <chrono>
 #include <string>
 #include <iomanip>
 #include <sstream>
@@ -427,8 +428,11 @@ bool LLDate::fromYMDHMS(S32 year, S32 month, S32 day, S32 hour, S32 min, S32 sec
 
 /* static */ LLDate LLDate::now()
 {
-    // time() returns seconds, we want fractions of a second, which LLTimer provides --RN
-    return LLDate(LLTimer::getTotalSeconds());
+    // The calendar clock, to a fraction of a second. LLTimer's total time is
+    // anchored to the epoch once and counts on its own after that, so it
+    // drifts from the calendar over a session.
+    const std::chrono::system_clock::duration since_epoch = std::chrono::system_clock::now().time_since_epoch();
+    return LLDate(std::chrono::duration<F64>(since_epoch).count());
 }
 
 std::ostream& operator<<(std::ostream& s, const LLDate& date)

@@ -101,13 +101,13 @@ public:
     LLSD waitFor(const std::string& desc, PRED&& pred, double seconds=2.0) const
     {
         // remember when we started waiting
-        auto start = std::chrono::system_clock::now();
+        auto start = std::chrono::steady_clock::now();
         // Break loop when the passed predicate returns true
         while (! std::forward<PRED>(pred)())
         {
             // but if we've been spinning here too long, test failed
             // how long have we been here, anyway?
-            auto now = std::chrono::system_clock::now();
+            auto now = std::chrono::steady_clock::now();
             // the default ratio for duration is seconds
             std::chrono::duration<double> elapsed = (now - start);
             if (elapsed.count() > seconds)

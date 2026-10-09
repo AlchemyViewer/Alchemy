@@ -181,7 +181,7 @@ void ReplySender::flush()
 
 using AskQueue     = std::set<LLUUID>;
 using ReplyQueue   = std::list<PendingReply*>;
-using PendingQueue = boost::unordered_map<LLUUID, U32>;
+using PendingQueue = boost::unordered_map<LLUUID, F64>; // LLFrameTimer::getTotalSeconds() of the ask
 using Cache        = boost::unordered_map<LLUUID, LLCacheNameEntry*>;
 using ReverseCache = boost::unordered_map<std::string, LLUUID>;
 
@@ -698,7 +698,7 @@ void LLCacheName::deleteEntriesOlderThan(S32 secs)
     }
 
     // These are pending requests that we never heard back from.
-    U32 pending_expire_time = now - PENDING_TIMEOUT_SECS;
+    F64 pending_expire_time = LLFrameTimer::getTotalSeconds() - PENDING_TIMEOUT_SECS;
     for(PendingQueue::iterator p_iter = impl.mPendingQueue.begin();
         p_iter != impl.mPendingQueue.end(); )
     {
@@ -863,8 +863,10 @@ void LLCacheName::Impl::sendRequest(
 
 bool LLCacheName::Impl::isRequestPending(const LLUUID& id)
 {
-    U32 now = (U32)time(NULL);
-    U32 expire_time = now - PENDING_TIMEOUT_SECS;
+    // A window inside this session, so the monotonic clock: on the calendar a
+    // clock set back would hold every request pending for as long as it moved.
+    F64 now = LLFrameTimer::getTotalSeconds();
+    F64 expire_time = now - PENDING_TIMEOUT_SECS;
 
     PendingQueue::iterator iter = mPendingQueue.find(id);
 

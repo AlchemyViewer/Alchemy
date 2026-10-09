@@ -32,9 +32,12 @@ in vec3 position;
 
 void calcAtmospherics(vec3 inPositionEye);
 
-uniform vec2 waveDir1;
-uniform vec2 waveDir2;
-uniform float time;
+// How far each wave layer has scrolled, as a fraction of the normal maps' repeat. The CPU takes
+// them in double precision from the wave directions and the time, and keeps only the fraction:
+// the maps wrap, so that is all that shows, and a time multiplied here in float moves the waves
+// in steps once the session is a day or two old.
+uniform vec2 bigWaveScroll;
+uniform vec4 littleWaveScroll;
 uniform vec3 eyeVec;
 uniform float waterHeight;
 uniform vec3 lightDir;
@@ -106,10 +109,10 @@ void main()
     calcAtmospherics(pos.xyz);
 
     //pass wave parameters to pixel shader
-    vec2 bigWave =  (v.xy) * vec2(0.04,0.04)  + waveDir1 * time * 0.055;
+    vec2 bigWave =  (v.xy) * vec2(0.04,0.04)  + bigWaveScroll;
     //get two normal map (detail map) texture coordinates
-    littleWave.xy = (v.xy) * vec2(0.45, 0.9)   + waveDir2 * time * 0.13;
-    littleWave.zw = (v.xy) * vec2(0.1, 0.2) + waveDir1 * time * 0.1;
+    littleWave.xy = (v.xy) * vec2(0.45, 0.9)   + littleWaveScroll.xy;
+    littleWave.zw = (v.xy) * vec2(0.1, 0.2) + littleWaveScroll.zw;
     view.w = bigWave.y;
     refCoord.w = bigWave.x;
 

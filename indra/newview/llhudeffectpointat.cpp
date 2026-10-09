@@ -132,7 +132,7 @@ void LLHUDEffectPointAt::packData(LLMessageSystem *mesgsys)
 
     mesgsys->addBinaryDataFast(_PREHASH_TypeData, packed_data, PKT_SIZE);
 
-    mLastSendTime = mTimer.getElapsedTimeF32();
+    mLastSendTime = mTimer.getElapsedTimeF64();
 }
 
 //-----------------------------------------------------------------------------
@@ -238,7 +238,7 @@ bool LLHUDEffectPointAt::setPointAt(EPointAtType target_type, LLViewerObject *ob
         return false;
     }
 
-    F32 current_time  = mTimer.getElapsedTimeF32();
+    const F64 current_time  = mTimer.getElapsedTimeF64();
 
     // type of pointat behavior or target object has changed
     bool targetTypeChanged = (target_type != mTargetType) ||
@@ -272,7 +272,7 @@ bool LLHUDEffectPointAt::setPointAt(EPointAtType target_type, LLViewerObject *ob
             mTargetOffsetGlobal = gAgent.getPosGlobalFromAgent(position);
         }
 
-        mKillTime = mTimer.getElapsedTimeF32() + mDuration;
+        mKillTime = mTimer.getElapsedTimeF64() + mDuration;
 
         //set up requisite animation data
         update();
@@ -362,7 +362,7 @@ void LLHUDEffectPointAt::update()
         return;
     }
 
-    F32 time = mTimer.getElapsedTimeF32();
+    const F64 time = mTimer.getElapsedTimeF64();
 
     // clear out the effect if time is up
     if (mKillTime != 0.f && time > mKillTime)

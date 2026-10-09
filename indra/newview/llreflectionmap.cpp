@@ -33,7 +33,7 @@
 #include "llworld.h"
 #include "llshadermgr.h"
 
-extern F32SecondsImplicit gFrameTimeSeconds;
+extern F64SecondsImplicit gFrameTimeSeconds;
 
 extern U32 get_box_fan_indices(LLCamera* camera, const LLVector4a& center);
 

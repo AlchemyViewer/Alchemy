@@ -455,7 +455,7 @@ LLAgent::LLAgent() :
     mAutoPilotUseRotation(false),
     mAutoPilotTargetFacing(LLVector3::zero),
     mAutoPilotTargetDist(0.f),
-    mAutoPilotNoProgressFrameCount(0),
+    mAutoPilotNoProgressTime(0.f),
     mAutoPilotRotationThreshold(0.f),
     mAutoPilotFinishedCallback(nullptr),
     mAutoPilotCallbackData(nullptr),
@@ -684,10 +684,17 @@ void LLAgent::showLatestFeatureNotification(const std::string key)
 
 void LLAgent::ageChat()
 {
+    // Every movement key held this frame asks, and the frame is one dt however many there are.
+    if (mChatAgedFrame == LLFrameTimer::getFrameCount())
+    {
+        return;
+    }
+    mChatAgedFrame = LLFrameTimer::getFrameCount();
+
     if (isAgentAvatarValid())
     {
         // get amount of time since I last chatted
-        F64 elapsed_time = (F64)gAgentAvatarp->mChatTimer.getElapsedTimeF32();
+        F64 elapsed_time = gAgentAvatarp->mChatTimer.getElapsedTimeF64();
         // add in frame time * 3 (so it ages 4x)
         gAgentAvatarp->mChatTimer.setAge(elapsed_time + (F64)gFrameDTClamped * (CHAT_AGE_FAST_RATE - 1.0));
     }
@@ -1822,7 +1829,7 @@ void LLAgent::startAutoPilotGlobal(
         mAutoPilotUseRotation = false;
     }
 
-    mAutoPilotNoProgressFrameCount = 0;
+    mAutoPilotNoProgressTime = 0.f;
 }
 
 //-----------------------------------------------------------------------------
@@ -1954,15 +1961,15 @@ void LLAgent::autoPilot(F32 *delta_yaw)
 
         if (target_dist >= mAutoPilotTargetDist)
         {
-            mAutoPilotNoProgressFrameCount++;
+            mAutoPilotNoProgressTime += gFrameDTClamped;
             bool out_of_time = false;
             if (getFlying())
             {
-                out_of_time = mAutoPilotNoProgressFrameCount > AUTOPILOT_MAX_TIME_NO_PROGRESS_FLY * gFPSClamped;
+                out_of_time = mAutoPilotNoProgressTime > AUTOPILOT_MAX_TIME_NO_PROGRESS_FLY;
             }
             else
             {
-                out_of_time = mAutoPilotNoProgressFrameCount > AUTOPILOT_MAX_TIME_NO_PROGRESS_WALK * gFPSClamped;
+                out_of_time = mAutoPilotNoProgressTime > AUTOPILOT_MAX_TIME_NO_PROGRESS_WALK;
             }
             if (out_of_time)
             {
@@ -1992,7 +1999,7 @@ void LLAgent::autoPilot(F32 *delta_yaw)
             direction = mAutoPilotTargetFacing;
         }
 
-        yaw = 4.f * yaw / gFPSClamped;
+        yaw = 4.f * yaw * gFrameDTClamped;
 
         // figure out which direction to turn
         LLVector3 scratch(at % direction);
@@ -3622,7 +3629,8 @@ LLColor4 LLAgent::getEffectColor()
     if(AlchemyRainbowEffects)
     {
         LLColor3 rainbow;
-        rainbow.setHSL(fmodf((F32)LLFrameTimer::getUptimeSeconds()/4.f, 1.f), 1.f, 0.5f);
+        // The hue's fraction taken in F64, before the uptime of a long session rounds it.
+        rainbow.setHSL((F32)fmod(LLFrameTimer::getUptimeSeconds().value() / 4.0, 1.0), 1.f, 0.5f);
         effect_color.set(rainbow, 1.0f);
     }
     return effect_color;
@@ -4867,7 +4875,7 @@ void LLAgent::fidget()
 {
     if (!getAFK())
     {
-        F32 curTime = mFidgetTimer.getElapsedTimeF32();
+        const F64 curTime = mFidgetTimer.getElapsedTimeF64();
         if (curTime > mNextFidgetTime)
         {
             // pick a random fidget anim here

@@ -379,15 +379,18 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask)
+    virtual bool onUpdate(F64 time, U8* joint_mask)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+        // The noise lattice repeats every 256 units, so the coordinate is wrapped to that in
+        // F64: one taken in F32 after hours of activity moves in steps.
+        const F32 noise_pos = (F32)fmod(time * TORSO_NOISE_SPEED, 256.0);
         F32 nx[2];
-        nx[0]=time*TORSO_NOISE_SPEED;
+        nx[0]=noise_pos;
         nx[1]=0.0f;
         F32 ny[2];
         ny[0]=0.0f;
-        ny[1]=time*TORSO_NOISE_SPEED;
+        ny[1]=noise_pos;
         F32 noiseX = noise2(nx);
         F32 noiseY = noise2(ny);
 
@@ -500,12 +503,13 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask)
+    virtual bool onUpdate(F64 time, U8* joint_mask)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
         mBreatheRate = 1.f;
 
-        F32 breathe_amt = (sinf(mBreatheRate * time) * BREATHE_ROT_MOTION_STRENGTH);
+        // The phase in F64: breathing runs all session, and an F32 phase of hours steps.
+        F32 breathe_amt = (F32)sin(mBreatheRate * time) * BREATHE_ROT_MOTION_STRENGTH;
 
         mChestState->setRotation(LLQuaternion(breathe_amt, LLVector3(0.f, 1.f, 0.f)));
 
@@ -602,7 +606,7 @@ public:
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
-    virtual bool onUpdate(F32 time, U8* joint_mask)
+    virtual bool onUpdate(F64 time, U8* joint_mask)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
         mPelvisState->setPosition(LLVector3::zero);
@@ -734,9 +738,9 @@ U32 LLVOAvatar::sBuddyListGeneration = 0;
 F32 LLVOAvatar::sLODFactor = 1.f;
 F32 LLVOAvatar::sPhysicsLODFactor = 1.f;
 F32 LLVOAvatar::sUnbakedTime = 0.f;
-F32 LLVOAvatar::sUnbakedUpdateTime = 0.f;
+U32 LLVOAvatar::sUnbakedUpdateFrame = 0;
 F32 LLVOAvatar::sGreyTime = 0.f;
-F32 LLVOAvatar::sGreyUpdateTime = 0.f;
+U32 LLVOAvatar::sGreyUpdateFrame = 0;
 LLPointer<LLViewerTexture> LLVOAvatar::sCloudTexture = NULL;
 std::vector<LLUUID> LLVOAvatar::sAVsIgnoringARTLimit;
 S32 LLVOAvatar::sAvatarsNearby = 0;
@@ -795,7 +799,6 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
     mCulled( false ),
     mVisibilityRank(0),
     mNeedsSkin(false),
-    mLastSkinTime(0.f),
     mUpdatePeriod(1),
     mUpdatePeriodFrame(-1),
     mNeedsUpdateFrame(-1),
@@ -860,7 +863,7 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
     mWasOnGroundLeft = false;
     mWasOnGroundRight = false;
 
-    mTimeLast = 0.0f;
+    mTimeLast = -1.0;
     mSpeedAccum = 0.0f;
 
     mRippleTimeLast = 0.f;
@@ -3528,8 +3531,9 @@ void LLVOAvatar::idleUpdateWindEffect()
     if (LLPipeline::RenderAvatarCloth)
     {
         F32 hover_strength = 0.f;
-        F32 time_delta = mRippleTimer.getElapsedTimeF32() - mRippleTimeLast;
-        mRippleTimeLast = mRippleTimer.getElapsedTimeF32();
+        const F64 ripple_time = mRippleTimer.getElapsedTimeF64();
+        F32 time_delta = (F32)(ripple_time - mRippleTimeLast);
+        mRippleTimeLast = ripple_time;
         LLVector3 velocity = getVelocity();
         F32 speed = velocity.length();
         //RN: velocity varies too much frame to frame for this to work
@@ -4939,14 +4943,15 @@ void LLVOAvatar::updateOrientation(LLAgent& agent, F32 speed, F32 delta_time)
                 if (mTurning)
                 {
                     pelvis_rot_threshold *= 0.4f;
-                    // account for fps, assume that above value is for ~60fps
+                    // account for the step, assume that above value is for ~60fps: this
+                    // avatar's own step, which for one updated every few frames is longer
+                    // than the frame
                     constexpr F32 default_frame_sec = 0.016f;
-                    F32 prev_frame_sec = LLFrameTimer::getFrameDeltaTimeF32();
-                    if (default_frame_sec > prev_frame_sec)
+                    if (delta_time > 0.f && default_frame_sec > delta_time)
                     {
                         // reduce threshold since turn rate per second is constant,
-                        // shorter frame means shorter turn.
-                        pelvis_rot_threshold *= prev_frame_sec/default_frame_sec;
+                        // shorter step means shorter turn.
+                        pelvis_rot_threshold *= delta_time/default_frame_sec;
                     }
                 }
 
@@ -5068,8 +5073,11 @@ void LLVOAvatar::updateRootPositionAndRotation(LLAgent& agent, F32 speed, bool w
         // get timing info
         // handle initial condition case
         //--------------------------------------------------------------------
-        F32 animation_time = mAnimTimer.getElapsedTimeF32();
-        if (mTimeLast == 0.0f)
+        // The frame clock, in F64: every avatar updated in a frame steps to the same time, one
+        // updated every few frames steps over the frames it sat out, and a long session does
+        // not round the step.
+        const F64 animation_time = LLFrameTimer::getUptimeSeconds();
+        if (mTimeLast < 0.0)
         {
             mTimeLast = animation_time;
 
@@ -5082,7 +5090,7 @@ void LLVOAvatar::updateRootPositionAndRotation(LLAgent& agent, F32 speed, bool w
         //--------------------------------------------------------------------
         // dont' let dT get larger than 1/5th of a second
         //--------------------------------------------------------------------
-        F32 delta_time = animation_time - mTimeLast;
+        F32 delta_time = (F32)(animation_time - mTimeLast);
 
         // Only a ceiling. There used to be a 10 ms floor here as well, which meant that above
         // 100 fps every step was inflated to the floor: at 300 fps the pelvis closed a turn
@@ -5467,7 +5475,7 @@ void LLVOAvatar::updateHeadOffset()
     }
     else
     {
-        F32 u = llmax(0.f, HEAD_MOVEMENT_AVG_TIME - (1.f / gFPSClamped));
+        F32 u = llmax(0.f, HEAD_MOVEMENT_AVG_TIME - gFrameDTClamped);
         mHeadOffset = lerp(midEyePt, mHeadOffset,  u);
     }
 }
@@ -5771,7 +5779,6 @@ U32 LLVOAvatar::renderSkinned()
                 }
             }
             mNeedsSkin = false;
-            mLastSkinTime = gFrameTimeSeconds;
 
             LLFace * face = mDrawable->getFace(0);
             if (face)
@@ -11411,16 +11418,19 @@ void LLVOAvatar::cullAvatarsByPixelArea()
     S32 grey_avatars = 0;
     if (!LLVOAvatar::areAllNearbyInstancesBaked(grey_avatars))
     {
-        if (gFrameTimeSeconds != sUnbakedUpdateTime) // only update once per frame
+        // only update once per frame, which the frame count says and a time compared for
+        // equality does not
+        const U32 frame = LLFrameTimer::getFrameCount();
+        if (frame != sUnbakedUpdateFrame)
         {
-            sUnbakedUpdateTime = gFrameTimeSeconds;
+            sUnbakedUpdateFrame = frame;
             sUnbakedTime += gFrameIntervalSeconds.value();
         }
         if (grey_avatars > 0)
         {
-            if (gFrameTimeSeconds != sGreyUpdateTime) // only update once per frame
+            if (frame != sGreyUpdateFrame)
             {
-                sGreyUpdateTime = gFrameTimeSeconds;
+                sGreyUpdateFrame = frame;
                 sGreyTime += gFrameIntervalSeconds.value();
             }
         }

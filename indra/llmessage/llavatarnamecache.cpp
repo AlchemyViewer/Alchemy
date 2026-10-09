@@ -223,7 +223,7 @@ void LLAvatarNameCache::handleAvNameCacheSuccess(const LLSD &data, const LLSD &h
     LLSD headers = httpResult["headers"];
     // Pull expiration out of headers if available
     F64 expires = LLAvatarNameCache::nameExpirationFromHeaders(headers);
-    F64 now = LLFrameTimer::getTotalSeconds();
+    F64 now = LLDate::now().secondsSinceEpoch();
 
     const LLSD& agents = data["agents"];
     LLSD::array_const_iterator it = agents.beginArray();
@@ -495,7 +495,7 @@ bool LLAvatarNameCache::importFile(std::istream& istr)
 void LLAvatarNameCache::exportFile(std::ostream& ostr)
 {
     LLSD agents;
-    F64 max_unrefreshed = LLFrameTimer::getTotalSeconds() - MAX_UNREFRESHED_TIME;
+    F64 max_unrefreshed = LLDate::now().secondsSinceEpoch() - MAX_UNREFRESHED_TIME;
     LL_INFOS("AvNameCache") << "LLAvatarNameCache at exit cache has " << mCache.size() << LL_ENDL;
     cache_t::const_iterator it = mCache.begin();
     for ( ; it != mCache.end(); ++it)
@@ -589,7 +589,7 @@ bool LLAvatarNameCache::isRequestPending(const LLUUID& agent_id)
 
 void LLAvatarNameCache::eraseUnrefreshed()
 {
-    F64 now = LLFrameTimer::getTotalSeconds();
+    F64 now = LLDate::now().secondsSinceEpoch();
     F64 max_unrefreshed = now - MAX_UNREFRESHED_TIME;
 
     if (!mLastExpireCheck || mLastExpireCheck < max_unrefreshed)
@@ -636,7 +636,7 @@ bool LLAvatarNameCache::getName(const LLUUID& agent_id, LLAvatarName *av_name)
             *av_name = it->second;
 
             // re-request name if entry is expired
-            if (av_name->mExpires < LLFrameTimer::getTotalSeconds())
+            if (av_name->mExpires < LLDate::now().secondsSinceEpoch())
             {
                 if (!isRequestPending(agent_id))
                 {
@@ -686,7 +686,7 @@ LLAvatarNameCache::callback_connection_t LLAvatarNameCache::getNameCallback(cons
         {
             const LLAvatarName& av_name = it->second;
 
-            if (av_name.mExpires > LLFrameTimer::getTotalSeconds())
+            if (av_name.mExpires > LLDate::now().secondsSinceEpoch())
             {
                 // ...name already exists in cache, fire callback now
                 fireSignal(agent_id, slot, av_name);
@@ -802,7 +802,7 @@ F64 LLAvatarNameCache::nameExpirationFromHeaders(LLCore::HttpHeaders *headers)
     {
         // With no expiration info, default to an hour
         const F64 DEFAULT_EXPIRES = 60.0 * 60.0;
-        F64 now = LLFrameTimer::getTotalSeconds();
+        F64 now = LLDate::now().secondsSinceEpoch();
         return now + DEFAULT_EXPIRES;
     }
 }
@@ -810,7 +810,7 @@ F64 LLAvatarNameCache::nameExpirationFromHeaders(LLCore::HttpHeaders *headers)
 bool LLAvatarNameCache::expirationFromCacheControl(LLCore::HttpHeaders *headers, F64 *expires)
 {
     bool fromCacheControl = false;
-    F64 now = LLFrameTimer::getTotalSeconds();
+    F64 now = LLDate::now().secondsSinceEpoch();
 
     // Allow the header to override the default
     const std::string *cache_control;
@@ -845,7 +845,7 @@ F64 LLAvatarNameCache::nameExpirationFromHeaders(const LLSD& headers)
     {
         // With no expiration info, default to an hour
         const F64 DEFAULT_EXPIRES = 60.0 * 60.0;
-        F64 now = LLFrameTimer::getTotalSeconds();
+        F64 now = LLDate::now().secondsSinceEpoch();
         return now + DEFAULT_EXPIRES;
     }
 }
@@ -853,7 +853,7 @@ F64 LLAvatarNameCache::nameExpirationFromHeaders(const LLSD& headers)
 bool LLAvatarNameCache::expirationFromCacheControl(const LLSD& headers, F64 *expires)
 {
     bool fromCacheControl = false;
-    F64 now = LLFrameTimer::getTotalSeconds();
+    F64 now = LLDate::now().secondsSinceEpoch();
 
     // Allow the header to override the default
     std::string cache_control;

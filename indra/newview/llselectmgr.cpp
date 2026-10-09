@@ -7603,10 +7603,12 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
             LLVector3 view_vector = LLViewerCamera::getInstance()->getOrigin() - objectp->getRenderPosition();
             silhouette_thickness = view_vector.magVec() * LLSelectMgr::sHighlightThickness * (LLViewerCamera::getInstance()->getView() / LLViewerCamera::getInstance()->getDefaultFOV());
         }
-        F32 animationTime = (F32)LLFrameTimer::getUptimeSeconds();
+        // In F64 until the fraction is taken: the uptime of a long session in F32 moves the
+        // highlight's texture in steps.
+        const F64 animationTime = LLFrameTimer::getUptimeSeconds();
 
-        F32 u_coord = fmod(animationTime * LLSelectMgr::sHighlightUAnim, 1.f);
-        F32 v_coord = 1.f - fmod(animationTime * LLSelectMgr::sHighlightVAnim, 1.f);
+        F32 u_coord = (F32)fmod(animationTime * LLSelectMgr::sHighlightUAnim, 1.0);
+        F32 v_coord = 1.f - (F32)fmod(animationTime * LLSelectMgr::sHighlightVAnim, 1.0);
         F32 u_divisor = 1.f / ((F32)(mSilhouetteVertices.size() - 1));
 
         if (LLSelectMgr::sRenderHiddenSelections) // && gFloaterTools && gFloaterTools->getVisible())
@@ -7631,7 +7633,7 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
                 }
             }
             gGL.end();
-            u_coord = fmod(animationTime * LLSelectMgr::sHighlightUAnim, 1.f);
+            u_coord = (F32)fmod(animationTime * LLSelectMgr::sHighlightUAnim, 1.0);
         }
 
         gGL.flush();

@@ -31,6 +31,7 @@
 
 #include "llagent.h"
 #include "llagentui.h"
+#include "llappviewer.h"
 #include "llbase64.h"
 #include "llcallbacklist.h"
 #include "lldate.h"
@@ -399,9 +400,11 @@ void LLFloater360Capture::encodeAndSave(LLPointer<LLImageRaw> raw_image, const s
 // the renderer a chance to update the UI if it is needed
 void LLFloater360Capture::suspendForAFrame()
 {
+    // gFrameCount, the frames display() drew: LLFrameTimer counts idle() frames, which go
+    // on when nothing is drawn.
     const U32 frame_count_delta = 1;
-    U32 curr_frame_count = LLFrameTimer::getFrameCount();
-    while (LLFrameTimer::getFrameCount() <= curr_frame_count + frame_count_delta)
+    U32 curr_frame_count = gFrameCount;
+    while (gFrameCount <= curr_frame_count + frame_count_delta)
     {
         llcoro::suspendUntilNextFrame();
     }
@@ -575,9 +578,9 @@ void LLFloater360Capture::capture360Images()
                                       mSourceImageSize, mSourceImageSize, num_render_passes);
 
         // encode each image and write to disk while saving how long it took to do so
-        auto t_start = std::chrono::high_resolution_clock::now();
+        auto t_start = std::chrono::steady_clock::now();
         encodeAndSave(mRawImages[i], cubemap_js_full_path, prefixes[i]);
-        auto t_end = std::chrono::high_resolution_clock::now();
+        auto t_end = std::chrono::steady_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(t_end - t_start);
         encode_time_total += duration.count();
 

@@ -123,22 +123,27 @@ S32 LLViewerTextureAnim::animateTextures(F32 &off_s, F32 &off_t,
     }
 
 
-    F32 frame_counter;
+    // Counted in F64, and a loop's count kept within the loop: it grows as long as the animation
+    // runs, and an F32 count of hours rounds a frame's step to nothing, which stops a smooth
+    // scroll dead.
+    F64 counter;
     if (mMode & SMOOTH)
     {
-        frame_counter = mTimer.getElapsedTimeAndResetF32() * mRate + (F32)mLastTime;
+        counter = mTimer.getElapsedTimeF64() * mRate + mLastTime;
+        mTimer.reset();
     }
     else
     {
-        frame_counter = mTimer.getElapsedTimeF32() * mRate;
+        counter = mTimer.getElapsedTimeF64() * mRate;
     }
-    mLastTime = frame_counter;
-
     if (mMode & LOOP)
     {
-        frame_counter  = fmod(frame_counter, full_length);
+        counter = fmod(counter, (F64)full_length);
     }
-    else
+    mLastTime = counter;
+
+    F32 frame_counter = (F32)counter;
+    if (!(mMode & LOOP))
     {
         frame_counter = llmin(full_length - 1.f, frame_counter);
     }

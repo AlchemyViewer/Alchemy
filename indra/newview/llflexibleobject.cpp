@@ -94,7 +94,9 @@ void LLVolumeImplFlexible::updateClass()
 {
     LL_PROFILE_ZONE_SCOPED;
 
-    U64 virtual_frame_num = (U64)(LLTimer::getUptimeSeconds() / SEC_PER_FLEXI_FRAME);
+    // On the frame clock, as doIdleUpdate() reads it: every flexi this frame, here and there,
+    // agrees on the virtual frame.
+    U64 virtual_frame_num = (U64)(LLFrameTimer::getUptimeSeconds() / SEC_PER_FLEXI_FRAME);
     for (std::vector<LLVolumeImplFlexible*>::iterator iter = sInstanceList.begin();
             iter != sInstanceList.end();
             ++iter)
@@ -362,7 +364,7 @@ void LLVolumeImplFlexible::doIdleUpdate()
                 update_period = llclamp(update_period, 1U, 32U);
 
                 // We control how fast flexies update, buy splitting updates among frames
-                U64 virtual_frame_num = (U64)(LLTimer::getUptimeSeconds() / SEC_PER_FLEXI_FRAME);
+                U64 virtual_frame_num = (U64)(LLFrameTimer::getUptimeSeconds() / SEC_PER_FLEXI_FRAME);
 
                 if  (visible)
                 {

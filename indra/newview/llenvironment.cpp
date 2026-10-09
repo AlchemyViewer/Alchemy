@@ -1659,9 +1659,12 @@ void LLEnvironment::updateCloudScroll()
 {
     // This is a function of the environment rather than the sky, since it should
     // persist through sky transitions.
-    static LLTimer s_cloud_timer;
+    // On the frame clock, as update()'s day-cycle delta is, so the clouds and the sky move by
+    // the same time.
+    static LLFrameTimer s_cloud_timer;
 
-    F64 delta_t = s_cloud_timer.getElapsedTimeAndResetF64();
+    const F64 delta_t = s_cloud_timer.getElapsedTimeF64();
+    s_cloud_timer.reset();
 
     if (mCurrentEnvironment->getSky() && !mCloudScrollPaused)
     {
@@ -1674,6 +1677,10 @@ void LLEnvironment::updateCloudScroll()
         {
             LLVector2 cloud_delta = static_cast<F32>(delta_t) * (mCurrentEnvironment->getSky()->getCloudScrollRate()) / 100.0;
             mCloudScrollDelta += cloud_delta;
+            // It offsets coordinates the noise repeats over every whole unit, so only its
+            // fraction shows; kept to that, it does not lose the frame's step to its own size.
+            mCloudScrollDelta.mV[VX] -= floorf(mCloudScrollDelta.mV[VX]);
+            mCloudScrollDelta.mV[VY] -= floorf(mCloudScrollDelta.mV[VY]);
         }
     }
 

@@ -351,11 +351,10 @@ U32 gForegroundFrameCount = 0; // number of frames that app window was in foregr
 LLPumpIO* gServicePump = NULL;
 
 U64MicrosecondsImplicit gFrameTime = 0;
-F32SecondsImplicit gFrameTimeSeconds = 0.f;
+F64SecondsImplicit gFrameTimeSeconds = 0.0;
 F32SecondsImplicit gFrameIntervalSeconds = 0.f;
 F32 gFPSClamped = 10.f;                     // Pretend we start at target rate.
-F32 gFrameDTClamped = 0.f;                  // Time between adjacent checks to network for packets
-U64MicrosecondsImplicit gStartTime = 0; // gStartTime is "private", used only to calculate gFrameTimeSeconds
+F32 gFrameDTClamped = 0.f;
 
 LLTimer gRenderStartTime;
 LLFrameTimer gForegroundTime;
@@ -3291,8 +3290,6 @@ bool LLAppViewer::initConfiguration()
 
     // Note: this is where we used to initialize gFeatureManagerp.
 
-    gStartTime = totalTime();
-
     //
     // Set the name of the window
     //
@@ -5501,10 +5498,12 @@ void LLAppViewer::idle()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_APP;
     pingMainloopTimeout("Main:Idle");
 
-    // Update frame timers
-    static LLTimer idle_timer;
-
     LLFrameTimer::updateFrameTime();
+    // The frame's one time sample: the globals read the same reading as
+    // LLFrameTimer, so nothing this frame sees two different times.
+    gFrameTime = LLFrameTimer::getTotalTime();
+    gFrameTimeSeconds = LLFrameTimer::getUptimeSeconds();
+    gFrameIntervalSeconds = LLFrameTimer::getFrameDeltaTimeF32();
     LLFrameTimer::updateFrameCount();
     LLEventTimer::updateClass();
     LLPerfStats::updateClass();
@@ -5522,7 +5521,6 @@ void LLAppViewer::idle()
     {
         LLWebsocketMgr::instance().update();
     }
-    F32 dt_raw = idle_timer.getElapsedTimeAndResetF32();
 
     LLGLTFMaterialList::flushUpdates();
 
@@ -5559,9 +5557,9 @@ void LLAppViewer::idle()
     const F32 MIN_FRAME_RATE = 1.f;
     const F32 MAX_FRAME_RATE = 10000.f;
 
-    F32 frame_rate_clamped = 1.f / dt_raw;
-    frame_rate_clamped = llclamp(frame_rate_clamped, MIN_FRAME_RATE, MAX_FRAME_RATE);
-    gFrameDTClamped = 1.f / frame_rate_clamped;
+    // From the frame's one sample, so the clamped dt and the raw one are the same interval.
+    gFrameDTClamped = llclamp(gFrameIntervalSeconds.value(), 1.f / MAX_FRAME_RATE, 1.f / MIN_FRAME_RATE);
+    const F32 frame_rate_clamped = 1.f / gFrameDTClamped;
 
     // Global frame timer
     // Smoothly weight toward current frame
@@ -5604,7 +5602,9 @@ void LLAppViewer::idle()
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_NETWORK("network"); //LL_RECORD_BLOCK_TIME(FTM_NETWORK);
         // Update spaceserver timeinfo
-        LLWorld::getInstance()->setSpaceTimeUSec(LLWorld::getInstance()->getSpaceTimeUSec() + LLUnits::Seconds::fromValue(dt_raw));
+        // In integer microseconds: a U64 time plus F32 seconds is an F32 sum, which rounds a
+        // count of microseconds this large to far more than a frame.
+        LLWorld::getInstance()->setSpaceTimeUSec(LLWorld::getInstance()->getSpaceTimeUSec() + U64Microseconds(LLFrameTimer::getFrameDeltaTime()));
 
 
         //////////////////////////////////////

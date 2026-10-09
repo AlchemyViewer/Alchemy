@@ -74,7 +74,7 @@ const ALGradeHistory::Step& ALGradeHistory::stepAt(size_t index) const
     return forward[forward.size() - 1 - (index - back.size())];
 }
 
-void ALGradeHistory::record(const std::string& name, const LLSD& before, const LLSD& after, F32 now)
+void ALGradeHistory::record(const std::string& name, const LLSD& before, const LLSD& after, F64 now)
 {
     // Not a change, so not a reason to touch anything -- least of all the
     // redo tail, which a write of the value already there would otherwise

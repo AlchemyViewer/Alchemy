@@ -311,7 +311,7 @@ private:
 
     // if true, only update the default probe
     bool mPaused = false;
-    F32 mResumeTime = 0.f;
+    F64 mResumeTime = 0.0;
 
     ReflectionProbeData mProbeData;
 };

@@ -361,7 +361,7 @@ private:
     LLFrameTimer    mFidgetTimer;
     LLFrameTimer    mFocusObjectFadeTimer;
     LLFrameTimer    mMoveTimer;
-    F32             mNextFidgetTime;
+    F64             mNextFidgetTime;    // on mFidgetTimer, which runs all session
     S32             mCurrentFidget;
 
     //--------------------------------------------------------------------
@@ -412,6 +412,7 @@ protected:
     void            ageChat();              // Helper function to prematurely age chat when agent is moving
 private:
     LLFrameTimer    mChatTimer;
+    U32             mChatAgedFrame = 0;     // LLFrameTimer::getFrameCount() of the last ageChat(), which ages a frame once
     LLUUID          mLastChatterID;
     F32             mNearChatRadius;
 
@@ -629,7 +630,7 @@ private:
     bool            mAutoPilotUseRotation;
     LLVector3       mAutoPilotTargetFacing;
     F32             mAutoPilotTargetDist;
-    S32             mAutoPilotNoProgressFrameCount;
+    F32             mAutoPilotNoProgressTime;   // seconds without getting closer
     F32             mAutoPilotRotationThreshold;
     std::string     mAutoPilotBehaviorName;
     void            (*mAutoPilotFinishedCallback)(bool, void *);

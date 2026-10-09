@@ -172,8 +172,22 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         has_normal_mips ? ALSamplers::AnisoWrap : ALSamplers::PointWrap;
 
     LLColor4      specular(sun_up ? psky->getSunlightColor() : psky->getMoonlightColor());
-    F32           phase_time = (F32) LLFrameTimer::getUptimeSeconds() * 0.5f;
     LLGLSLShader *shader     = nullptr;
+
+    // Each wave layer's scroll, the wave direction times the time times the layer's rate, taken
+    // in F64 and kept to its fraction: the normal maps wrap, so the fraction is all that shows,
+    // and the product taken in the shader's float stepped once the session was a day or two old.
+    const F64 phase_time = LLFrameTimer::getUptimeSeconds() * 0.5;
+    const auto wave_scroll = [phase_time](F32 direction, F64 rate)
+    {
+        const F64 scroll = direction * phase_time * rate;
+        return (F32)(scroll - floor(scroll));
+    };
+    const LLVector2 wave1_dir = pwater->getWave1Dir();
+    const LLVector2 wave2_dir = pwater->getWave2Dir();
+    const LLVector2 big_wave_scroll(wave_scroll(wave1_dir.mV[VX], 0.055), wave_scroll(wave1_dir.mV[VY], 0.055));
+    const LLVector4 little_wave_scroll(wave_scroll(wave2_dir.mV[VX], 0.13), wave_scroll(wave2_dir.mV[VY], 0.13),
+                                       wave_scroll(wave1_dir.mV[VX], 0.1), wave_scroll(wave1_dir.mV[VY], 0.1));
 
     // One pass, one of two shaders.  Void water and region water share state.
     // There isn't a good reason anymore to really have void water run in a separate pass.
@@ -229,13 +243,12 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     F32 water_height = environment.getWaterHeight();
     F32 camera_height = LLViewerCamera::getInstance()->getOrigin().mV[2];
     shader->uniform1f(LLShaderMgr::WATER_WATERHEIGHT, camera_height - water_height);
-    shader->uniform1f(LLShaderMgr::WATER_TIME, phase_time);
     shader->uniform3fv(LLShaderMgr::WATER_EYEVEC, 1, LLViewerCamera::getInstance()->getOrigin().mV);
 
     shader->uniform3fv(LLShaderMgr::WATER_SPECULAR, 1, light_diffuse.mV);
 
-    shader->uniform2fv(LLShaderMgr::WATER_WAVE_DIR1, 1, pwater->getWave1Dir().mV);
-    shader->uniform2fv(LLShaderMgr::WATER_WAVE_DIR2, 1, pwater->getWave2Dir().mV);
+    shader->uniform2fv(LLShaderMgr::WATER_BIG_WAVE_SCROLL, 1, big_wave_scroll.mV);
+    shader->uniform4fv(LLShaderMgr::WATER_LITTLE_WAVE_SCROLL, 1, little_wave_scroll.mV);
 
     shader->uniform3fv(LLShaderMgr::WATER_LIGHT_DIR, 1, light_dir.mV);
 

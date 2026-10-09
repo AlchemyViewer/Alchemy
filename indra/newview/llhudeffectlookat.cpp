@@ -298,7 +298,7 @@ void LLHUDEffectLookAt::packData(LLMessageSystem *mesgsys)
 
     mesgsys->addBinaryDataFast(_PREHASH_TypeData, packed_data, PKT_SIZE);
 
-    mLastSendTime = mTimer.getElapsedTimeF32();
+    mLastSendTime = mTimer.getElapsedTimeF64();
 }
 
 //-----------------------------------------------------------------------------
@@ -418,7 +418,7 @@ bool LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
         return false;
     }
 
-    F32 current_time  = mTimer.getElapsedTimeF32();
+    const F64 current_time  = mTimer.getElapsedTimeF64();
 
     bool looking_at_self = false;
     if (object && object->isAvatar())
@@ -513,7 +513,7 @@ bool LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
                 setNeedsSendToSim(true);
             }
         }
-        mKillTime = mTimer.getElapsedTimeF32() + mDuration;
+        mKillTime = mTimer.getElapsedTimeF64() + mDuration;
 
         update();
     }
@@ -675,7 +675,7 @@ void LLHUDEffectLookAt::update()
     mAttentions = (source_avatar->getSex() == SEX_MALE) ? &gBoyAttentions : &gGirlAttentions;
     //printf("updated to %s\n", (source_avatar->getSex() == SEX_MALE) ? "male" : "female");
 
-    F32 time = mTimer.getElapsedTimeF32();
+    const F64 time = mTimer.getElapsedTimeF64();
 
     // clear out the effect if time is up
     if (mKillTime != 0.f && time > mKillTime)

@@ -287,7 +287,7 @@ void LLMotionController::deactivateStoppedMotions()
 //-----------------------------------------------------------------------------
 // computeQuantumStep()
 //-----------------------------------------------------------------------------
-LLMotionController::QuantumStep LLMotionController::computeQuantumStep(F32 continuous_time, F32 time_step, S32 last_count)
+LLMotionController::QuantumStep LLMotionController::computeQuantumStep(F64 continuous_time, F32 time_step, S32 last_count)
 {
     // One quantum ahead of real time, on purpose: the pose computed for the
     // boundary this lands on is what the frames until then interpolate
@@ -295,12 +295,12 @@ LLMotionController::QuantumStep LLMotionController::computeQuantumStep(F32 conti
     // That is the +1. It was never the defect -- the defect was the caller
     // writing the snapped time back into its accumulator, which turned the
     // lookahead into a full quantum of advance every frame.
-    const F32 quanta = continuous_time / time_step;
-    const F32 whole = llmax(0.f, floorf(quanta));
+    const F64 quanta = continuous_time / time_step;
+    const F64 whole = llmax(0.0, floor(quanta));
 
     QuantumStep step;
     step.count = (S32)whole + 1;
-    step.interp = llclamp(quanta - whole, 0.f, 1.f);
+    step.interp = (F32)llclamp(quanta - whole, 0.0, 1.0);
     step.advanced = (step.count != last_count);
     return step;
 }
@@ -353,7 +353,7 @@ void LLMotionController::setTimeStep(F32 step)
         {
             for (LLMotion* motionp : motions)
             {
-                motionp->mActivationTimestamp = (F32)llfloor(motionp->mActivationTimestamp / step) * step;
+                motionp->mActivationTimestamp = floor(motionp->mActivationTimestamp / step) * step;
                 // setStopTime stops a motion, and the keyframe motion's
                 // override aligns whatever time it is handed to the loop, so
                 // a running motion is left alone rather than given a stop
@@ -361,11 +361,11 @@ void LLMotionController::setTimeStep(F32 step)
                 // send-stop time to snap either.
                 if (motionp->isStopped())
                 {
-                    motionp->mStopTimestamp = (F32)llfloor(motionp->mStopTimestamp / step) * step;
+                    motionp->mStopTimestamp = floor(motionp->mStopTimestamp / step) * step;
                 }
                 if (motionp->mSendStopTimestamp != F32_MAX)
                 {
-                    motionp->mSendStopTimestamp = (F32)llfloor(motionp->mSendStopTimestamp / step) * step;
+                    motionp->mSendStopTimestamp = floor(motionp->mSendStopTimestamp / step) * step;
                 }
             }
         }
@@ -853,7 +853,7 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
             }
             else
             {
-                posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight * cubic_step(1.f - ((mAnimTime - motionp->getStopTime()) / ease_out_duration)));
+                posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight * cubic_step(1.f - (F32)((mAnimTime - motionp->getStopTime()) / ease_out_duration)));
             }
 
             // perform motion update
@@ -901,7 +901,7 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
             else
             {
                 // perform motion update
-                posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight + (1.f - motionp->mResidualWeight) * cubic_step((mAnimTime - motionp->mActivationTimestamp) / ease_in_duration));
+                posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight + (1.f - motionp->mResidualWeight) * cubic_step((F32)((mAnimTime - motionp->mActivationTimestamp) / ease_in_duration)));
             }
             // perform motion update
             update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, mJointSaturated);
@@ -1015,8 +1015,8 @@ void LLMotionController::updateMotions(bool force_update)
     bool use_quantum = (mTimeStep != 0.f);
 
     // Always update mPrevTimerElapsed
-    F32 cur_time = mTimer.getElapsedTimeF32();
-    F32 delta_time = cur_time - mPrevTimerElapsed;
+    const F64 cur_time = mTimer.getElapsedTimeF64();
+    const F64 delta_time = cur_time - mPrevTimerElapsed;
     mPrevTimerElapsed = cur_time;
     mLastTime = mAnimTime;
 
@@ -1051,7 +1051,7 @@ void LLMotionController::updateMotions(bool force_update)
             clearBlenders();
 
             mTimeStepCount = step.count;
-            mAnimTime = (F32)step.count * mTimeStep;
+            mAnimTime = (F64)step.count * mTimeStep;
             mLastInterp = 0.f;
         }
         else
@@ -1100,7 +1100,7 @@ void LLMotionController::updateMotionsMinimal()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     // Always update mPrevTimerElapsed
-    mPrevTimerElapsed = mTimer.getElapsedTimeF32();
+    mPrevTimerElapsed = mTimer.getElapsedTimeF64();
 
     purgeExcessMotions();
     updateLoadingMotions();
@@ -1114,7 +1114,7 @@ void LLMotionController::updateMotionsMinimal()
 //-----------------------------------------------------------------------------
 // activateMotionInstance()
 //-----------------------------------------------------------------------------
-bool LLMotionController::activateMotionInstance(LLMotion *motion, F32 time)
+bool LLMotionController::activateMotionInstance(LLMotion *motion, F64 time)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     // It's not clear why the getWeight() line seems to be crashing this, but
@@ -1292,7 +1292,7 @@ void LLMotionController::flushAllMotions()
     {
         for (LLMotion* motionp : motions)
         {
-            F32 dtime = mAnimTime - motionp->mActivationTimestamp;
+            F32 dtime = (F32)(mAnimTime - motionp->mActivationTimestamp);
             active_motions.push_back(std::make_pair(motionp->getID(),dtime));
             motionp->deactivate(); // don't call deactivateMotionInstance() because we are going to reactivate it
         }

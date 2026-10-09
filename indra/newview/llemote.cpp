@@ -96,7 +96,7 @@ bool LLEmote::onActivate()
 //-----------------------------------------------------------------------------
 // LLEmote::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLEmote::onUpdate(F32 time, U8* joint_mask)
+bool LLEmote::onUpdate(F64 time, U8* joint_mask)
 {
     if( mParam )
     {

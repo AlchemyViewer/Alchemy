@@ -370,7 +370,7 @@ public:
     F32 mDistance;
     F32 mDepth;
     F32 mLastUpdateDistance;
-    F32 mLastUpdateTime;
+    F64 mLastUpdateTime;
 
     F32 mPixelArea;
     F32 mRadius;

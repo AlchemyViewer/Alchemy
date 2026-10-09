@@ -119,11 +119,11 @@ bool LLHandMotion::onActivate()
 //-----------------------------------------------------------------------------
 // LLHandMotion::onUpdate()
 //-----------------------------------------------------------------------------
-bool LLHandMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLHandMotion::onUpdate(F64 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
-    F32 timeDelta = time - mLastTime;
+    F32 timeDelta = (F32)(time - mLastTime);
     mLastTime = time;
 
     // check to see if requested pose has changed

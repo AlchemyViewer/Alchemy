@@ -147,7 +147,7 @@ class LLChatHistory final : public LLUICtrl
 // [/SL:KB]
         std::string mLastFromName;
         LLUUID mLastFromID;
-        LLDate mLastMessageTime;
+        F64 mLastMessageTime = 0.0;    // LLFrameTimer::getTotalSeconds(), for the one-minute run of a sender's lines
         bool mIsLastMessageFromLog;
         bool mNotifyAboutUnreadMsg;
         //std::string mLastMessageTimeStr;

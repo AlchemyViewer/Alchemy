@@ -433,7 +433,7 @@ const Image& Image::operator=(const Value& src)
 void Asset::update()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_GLTF;
-    F32 dt = gFrameTimeSeconds - mLastUpdateTime;
+    F32 dt = (F32)(gFrameTimeSeconds - mLastUpdateTime);
 
     if (dt > 0.f)
     {

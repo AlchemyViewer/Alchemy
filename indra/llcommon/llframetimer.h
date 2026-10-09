@@ -36,6 +36,16 @@
 
 #include "lltimer.h"
 
+// The frame clock is the main thread's: updateFrameTime() writes it there once a frame, and
+// another thread reading it sees a time that thread did not sample and cannot tell when it
+// moves. Anything timed off the main thread uses LLTimer. Debug builds check the statics.
+#if LL_DEBUG
+extern LL_COMMON_API bool on_main_thread();
+#define LL_FRAME_CLOCK_ON_MAIN_THREAD() llassert_msg(on_main_thread(), "the frame clock read off the main thread")
+#else
+#define LL_FRAME_CLOCK_ON_MAIN_THREAD()
+#endif
+
 class LL_COMMON_API LLFrameTimer
 {
 public:
@@ -46,18 +56,21 @@ public:
     // timer's elapsed time, which is getElapsedTimeF32().
     static F64SecondsImplicit getUptimeSeconds()
     {
+        LL_FRAME_CLOCK_ON_MAIN_THREAD();
         return sFrameTime;
     }
 
     // Return a low precision usec since epoch
     static U64 getTotalTime()
     {
+        LL_FRAME_CLOCK_ON_MAIN_THREAD();
         return sTotalTime ? U64MicrosecondsImplicit(sTotalTime) : totalTime();
     }
 
     // Return a low precision seconds since epoch
     static F64 getTotalSeconds()
     {
+        LL_FRAME_CLOCK_ON_MAIN_THREAD();
         return sTotalSeconds;
     }
 
@@ -68,9 +81,14 @@ public:
     // Call this method once, and only once, per frame to update the current frame count.
     static void updateFrameCount()                  { sFrameCount++; }
 
-    static U32  getFrameCount()                     { return sFrameCount; }
+    // Frames of the main loop's idle(), drawn or not. The viewer's gFrameCount counts the frames
+    // drawn; a wait for a rendered frame uses that one.
+    static U32  getFrameCount()                     { LL_FRAME_CLOCK_ON_MAIN_THREAD(); return sFrameCount; }
 
     static F32  getFrameDeltaTimeF32();
+
+    // The same interval in microseconds, as getTotalTime() counts them
+    static U64  getFrameDeltaTime()                 { LL_FRAME_CLOCK_ON_MAIN_THREAD(); return sFrameDeltaTime; }
 
     // Return seconds since the current frame started
     static F32  getCurrentFrameTime();
@@ -92,7 +110,8 @@ public:
     // ACCESSORS
     bool hasExpired() const                         { return (sFrameTime >= mExpiry); }
     F32  getTimeToExpireF32() const                 { return (F32)(mExpiry - sFrameTime); }
-    F32  getElapsedTimeF32() const                  { return mStarted ? (F32)(sFrameTime - mStartTime) : (F32)mStartTime; }
+    F32  getElapsedTimeF32() const                  { return (F32)getElapsedTimeF64(); }
+    F64  getElapsedTimeF64() const                  { return mStarted ? sFrameTime - mStartTime : mStartTime; }
     bool getStarted() const                         { return mStarted; }
 
     // return the seconds since epoch when this timer will expire.

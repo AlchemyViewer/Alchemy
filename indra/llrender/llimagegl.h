@@ -121,7 +121,7 @@ public:
     void forceUpdateBindStats(void) const;
 
     // needs to be called every frame
-    static void updateStats(F32 current_time);
+    static void updateStats(F64 current_time);
 
     // cleanup GL state
     static void destroyGL();
@@ -332,7 +332,7 @@ public:
 public:
     // Various GL/Rendering options
     S64Bytes mTextureMemory;
-    mutable F32  mLastBindTime; // last time this was bound, by discard level
+    mutable F64  mLastBindTime; // last time this was bound, by discard level
 
 private:
     // Resolve the GL formats and pixel data an upload will actually use: deprecated
@@ -500,7 +500,7 @@ public:
     static boost::unordered_set<LLImageGL*> sImageList;
     static S32 sCount;
     static U32 sFrameCount;
-    static F32 sLastFrameTime;
+    static F64 sLastFrameTime;
 
     // Global memory statistics
     static U32 sBindCount;                  // Tracks number of texture binds for current frame

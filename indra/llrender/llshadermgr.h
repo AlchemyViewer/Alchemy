@@ -245,8 +245,8 @@ public:
         WATER_EXCLUSIONTEX,                 //  "exclusionTex"
         WATER_EYEVEC,                       //  "eyeVec"
         WATER_TIME,                         //  "time"
-        WATER_WAVE_DIR1,                    //  "waveDir1"
-        WATER_WAVE_DIR2,                    //  "waveDir2"
+        WATER_BIG_WAVE_SCROLL,              //  "bigWaveScroll"
+        WATER_LITTLE_WAVE_SCROLL,           //  "littleWaveScroll"
         WATER_LIGHT_DIR,                    //  "lightDir"
         WATER_SPECULAR,                     //  "specular"
         WATER_SPECULAR_EXP,                 //  "lightExp"
@@ -692,7 +692,7 @@ public:
     {
         GLsizei mBinaryLength = 0;
         GLenum mBinaryFormat = 0;
-        F32 mLastUsedTime = 0.0;
+        F64 mLastUsedTime = 0.0;    // calendar seconds, kept across sessions
     };
     std::map<LLUUID, ProgramBinaryData> mShaderBinaryCache;
     LLUUID mShaderCacheVersion;

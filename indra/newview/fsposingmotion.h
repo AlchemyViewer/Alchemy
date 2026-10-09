@@ -78,7 +78,7 @@ public:
     // called per time step
     // must return TRUE while it is active, and
     // must return FALSE when the motion is completed.
-    virtual bool onUpdate(F32 time, U8 *joint_mask);
+    virtual bool onUpdate(F64 time, U8 *joint_mask);
 
     // called when a motion is deactivated
     virtual void onDeactivate();
@@ -220,7 +220,7 @@ private:
     /// </summary>
 
     /// <summary>
-    /// The time constant, in seconds, we use for transitioning between one animation-state to another; this affects the 'damping'
+    /// The half-life, in seconds, we use for transitioning between one animation-state to another; this affects the 'damping'
     /// of motion between changes to a joint. 'Constant' in this context is not a reference to the language-idea of 'const' value.
     /// Smaller is less damping => faster transition.
     /// As implemented, the actual rotation of a joint decays towards the target rotation in something akin to (if not) an exponential.
@@ -230,8 +230,9 @@ private:
     /// Undo-function waits an amount of time after the last user-incited joint change to add a 'restore point'.
     /// Important to note is that the actual rotation/position/scale never reaches the target, which seems absurd, however
     /// it's the user that closes the feedback loop here: if they want more change, they input more until the result is as they like it.
+    /// At 0.04 s a frame at 60 fps closes a quarter of the gap, and a frame at any other rate closes what the same time would.
     /// </summary>
-    const F32 mInterpolationTime = 0.25f;
+    const F32 mInterpolationHalfLife = 0.04f;
 
     /// <summary>
     /// The collection of joint poses this motion uses to pose the joints of the character this is animating.
