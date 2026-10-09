@@ -167,7 +167,7 @@ Row conventions:
 		 height="194"
 		 name="atab_sec_tone_adv"
 		 title="Exposure &amp; Tone - Advanced"
-		 header_tool_tip="Each tonemapper's own shaping: the white point for ACES, Reinhard and Filmic, and contrast and white point for AgX. Only the selected tonemapper's rows have any effect."
+		 header_tool_tip="Each tonemapper's own shaping: the white point for ACES Boosted, Reinhard and Filmic, and contrast and white point for AgX. Only the selected tonemapper's rows have any effect."
 		 fit_panel="true">
 			<panel
 			 follows="all"
