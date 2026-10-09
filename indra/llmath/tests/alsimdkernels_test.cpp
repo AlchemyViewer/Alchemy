@@ -135,6 +135,41 @@ namespace
     }
 
     const LLVector4a SENTINEL(1234.f, 1234.f, 1234.f, 1234.f);
+
+    // The floating-point control state set_thread_fp_mode() writes: MXCSR on
+    // x86-64, FPCR on aarch64. It is per thread, so a test that changes it
+    // on the main thread changes it for every test after it; this puts back
+    // what it found.
+    class FPModeRestorer
+    {
+    public:
+        FPModeRestorer() : mSaved(read()) {}
+        ~FPModeRestorer() { write(mSaved); }
+        FPModeRestorer(const FPModeRestorer&) = delete;
+        FPModeRestorer& operator=(const FPModeRestorer&) = delete;
+
+    private:
+#if AL_SIMD_X86
+        using State = U32;
+        static State read() { return _mm_getcsr(); }
+        static void write(State state) { _mm_setcsr(state); }
+#elif defined(_MSC_VER) && !defined(__clang__)
+        using State = U64;
+        static State read() { return static_cast<State>(_ReadStatusReg(ARM64_FPCR)); }
+        static void write(State state) { _WriteStatusReg(ARM64_FPCR, static_cast<__int64>(state)); }
+#else
+        using State = U64;
+        static State read()
+        {
+            State fpcr;
+            __asm__ volatile("mrs %0, fpcr" : "=r"(fpcr));
+            return fpcr;
+        }
+        static void write(State state) { __asm__ volatile("msr fpcr, %0" : : "r"(state)); }
+#endif
+
+        State mSaved;
+    };
 }
 } // namespace tut
 
@@ -683,6 +718,7 @@ namespace tut
     template<> template<>
     void alsimdkernels_object::test<10>()
     {
+        FPModeRestorer restore_fp_mode;
         set_thread_fp_mode();
         const LLMatrix4a m = some_matrix();
         for (S32 index : {0, 1, 7, 15})
