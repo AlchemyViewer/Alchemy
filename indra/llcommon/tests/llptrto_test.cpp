@@ -1,5 +1,5 @@
 /**
- * @file   llptrto.cpp
+ * @file   llptrto_test.cpp
  * @author Nat Goodspeed
  * @date   2008-08-20
  * @brief  Test for llptrto.h
@@ -29,51 +29,53 @@
 // Precompiled header
 #include "linden_common.h"
 // associated header
-#include "llptrto.h"
+#include "../llptrto.h"
 // STL headers
 #include <type_traits>
 // std headers
 // external library headers
 // other Linden headers
-#include "llmemory.h"
+#include "../llmemory.h"
 
-// a refcounted class
-class RCFoo: public LLRefCount
-{
-public:
-    RCFoo() {}
-};
+#include "../test/lltut.h"
 
-// a refcounted subclass
-class RCSubFoo: public RCFoo
+namespace
 {
-public:
-    RCSubFoo() {}
-};
+    // a refcounted class
+    class RCFoo: public LLRefCount
+    {
+    public:
+        RCFoo() {}
+    };
 
-// a refcounted class using the other refcount base class
-class TSRCFoo: public LLThreadSafeRefCount
-{
-public:
-    TSRCFoo() {}
-};
+    // a refcounted subclass
+    class RCSubFoo: public RCFoo
+    {
+    public:
+        RCSubFoo() {}
+    };
 
-// a non-refcounted class
-class Bar
-{
-public:
-    Bar() {}
-};
+    // a refcounted class using the other refcount base class
+    class TSRCFoo: public LLThreadSafeRefCount
+    {
+    public:
+        TSRCFoo() {}
+    };
 
-// a non-refcounted subclass
-class SubBar: public Bar
-{
-public:
-    SubBar() {}
-};
+    // a non-refcounted class
+    class Bar
+    {
+    public:
+        Bar() {}
+    };
 
-int main(int argc, char *argv[])
-{
+    // a non-refcounted subclass
+    class SubBar: public Bar
+    {
+    public:
+        SubBar() {}
+    };
+
     // test LLPtrTo<>
     static_assert((std::is_same_v<LLPtrTo<RCFoo>::type, LLPointer<RCFoo> >));
     static_assert((std::is_same_v<LLPtrTo<RCSubFoo>::type, LLPointer<RCSubFoo> >));
@@ -96,6 +98,28 @@ int main(int argc, char *argv[])
     static_assert((std::is_same_v<LLRemovePointer< LLPointer<SubBar> >::type, SubBar>));
     static_assert((std::is_same_v<LLRemovePointer<int*>::type, int>));
     static_assert((std::is_same_v<LLRemovePointer< LLPointer<int> >::type, int>));
+}
 
-    return 0;
+/*****************************************************************************
+*   tut test group
+*****************************************************************************/
+namespace tut
+{
+    struct llptrto_data
+    {
+    };
+    typedef test_group<llptrto_data> llptrto_group;
+    typedef llptrto_group::object llptrto_object;
+    llptrto_group llptrtogrp("LLPtrTo");
+
+    // The checks above are static_asserts, made when this file compiles. Here,
+    // what LLPtrTo names for a refcounted class holds a reference, as an
+    // LLPointer does.
+    template<> template<>
+    void llptrto_object::test<1>()
+    {
+        set_test_name("LLPtrTo of a refcounted class holds a reference");
+        LLPtrTo<RCFoo>::type ptr(new RCFoo);
+        ensure_equals("one reference", ptr->getNumRefs(), 1);
+    }
 }

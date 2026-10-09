@@ -17,3 +17,18 @@ set(Python3_FIND_VIRTUALENV FIRST)
 # The interpreter is for the tests that spawn a Python peer; without it they
 # are registered disabled. Nothing that builds or packages the viewer runs it.
 find_package(Python3 COMPONENTS Interpreter)
+
+# The peers import llsd. A Python without it would fail those tests rather
+# than skip them, so for them it counts as no Python.
+set(AL_PYTHON_PEERS OFF)
+if(Python3_Interpreter_FOUND)
+  execute_process(
+    COMMAND ${Python3_EXECUTABLE} -c "import llsd"
+    RESULT_VARIABLE llsd_import
+    OUTPUT_QUIET
+    ERROR_QUIET
+  )
+  if(llsd_import EQUAL 0)
+    set(AL_PYTHON_PEERS ON)
+  endif()
+endif()

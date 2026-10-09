@@ -19,7 +19,6 @@ target_sources(
         print.h
         setenv.h
         sync.h
-        test.h
 )
 
 target_link_libraries(lltut_runner_lib PRIVATE al::flags PUBLIC llcommon ll::tut)

@@ -28,7 +28,6 @@
 #include "linden_common.h"
 #include "../llurlentry.h"
 #include "../lluictrl.h"
-//#include "llurlentry_stub.cpp"
 #include "lltut.h"
 #include "../lluicolortable.h"
 #include "../llrender/lluiimage.h"

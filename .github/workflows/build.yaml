@@ -514,6 +514,20 @@ jobs:
             esac
           fi
 
+      # What each test did, on a row whose tests failed as much as on one
+      # whose tests passed: the JUnit file CTest writes and its own log. The
+      # build step's artifact name is unset when a test fails, so this one
+      # names itself.
+      - name: Upload test results
+        uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() && matrix.build_variant == 'Tests' }}
+        with:
+          name: "test-results-${{ runner.os }}-${{ matrix.arch }}"
+          path: |
+            ${{ steps.configure.outputs.build_directory }}/Testing/test-results.xml
+            ${{ steps.configure.outputs.build_directory }}/Testing/Temporary/LastTest*.log
+          if-no-files-found: warn
+
       - name: Upload package metadata
         uses: actions/upload-artifact@v7
         if: matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
