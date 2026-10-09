@@ -281,8 +281,8 @@ bool intersect(const Ray &ray) const
 // adapted -- assume that origin is inside sphere, return intersection of ray with edge of sphere.
 // guards `radius2 - d2` against negative values so callers that pass a position outside the sphere
 // (or use the 4096*4096 automatic-probe hack) get a clamped intersection instead of NaN.
-// <SK:Nexii> render/farplane: set while water samples the probes (sampleReflectionProbesWater).
-bool sk_water_sample = false;
+// Set while water samples the probes (sampleReflectionProbesWater).
+bool water_sample = false;
 
 vec3 sphereIntersect(vec3 origin, vec3 dir, vec3 center, float radius2)
 {
@@ -290,13 +290,12 @@ vec3 sphereIntersect(vec3 origin, vec3 dir, vec3 center, float radius2)
 
         vec3 L = center - origin;
 
-        // <SK:Nexii> render/farplane: a point outside the parallax sphere (past 4 km of an automatic probe, which only an
-        // infinite projection shows) has no exit point; the closest approach sampled the horizon, so water there went dark.
+        // A point outside the parallax sphere (past 4 km of an automatic probe, which only an infinite projection
+        // shows) has no exit point; its closest approach samples the horizon, and water there goes dark.
         if (dot(L, L) > radius2)
         {
             return center + dir;
         }
-        // </SK:Nexii>
         float tca = dot(L,dir);
 
         float d2 = dot(L,L) - tca * tca;
@@ -547,19 +546,18 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
 
         float rr = r * r;
 
-        v = (sk_water_sample && i == 0) ? c + dir : // <SK:Nexii> render/farplane: water takes the sky-only default probe without parallax
+        v = (water_sample && i == 0) ? c + dir : // water takes the sky-only default probe without parallax
             sphereIntersect(pos, dir, c,
         refIndex[i].w < 1 ? 4096.0*4096.0 : // <== effectively disable parallax correction for automatically placed probes to keep from bombing the world with obvious spheres
                 rr);
 
         w = sphereWeight(pos, dir, refSphere[i].xyz, r, refParams[i], dw);
-        // <SK:Nexii> render/farplane: the default probe is the fallback everywhere; past its 4 km radius (only an infinite
-        // projection shows that far) its weight fell to zero and water there lost its sky reflection entirely.
+        // The default probe is the fallback everywhere. Past its 4 km radius, which only an infinite projection
+        // shows, its weight falls to zero and below, and far water would lose its sky reflection entirely.
         if (i == 0)
         {
             w = max(w, 1e-6);
         }
-        // </SK:Nexii>
     }
 
     v -= c;
@@ -636,19 +634,18 @@ vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int
         // pad sphere for manual probe extending into automatic probe space
         float rr = r * r;
 
-        v = (sk_water_sample && i == 0) ? c + dir : // <SK:Nexii> render/farplane: water takes the sky-only default probe without parallax
+        v = (water_sample && i == 0) ? c + dir : // water takes the sky-only default probe without parallax
             sphereIntersect(pos, dir, c,
         refIndex[i].w < 1 ? 4096.0*4096.0 : // <== effectively disable parallax correction for automatically placed probes to keep from bombing the world with obvious spheres
                 rr);
 
         w = sphereWeight(pos, dir, refSphere[i].xyz, r, refParams[i], dw);
-        // <SK:Nexii> render/farplane: the default probe is the fallback everywhere; past its 4 km radius (only an infinite
-        // projection shows that far) its weight fell to zero and water there lost its sky reflection entirely.
+        // The default probe is the fallback everywhere. Past its 4 km radius, which only an infinite projection
+        // shows, its weight falls to zero and below, and far water would lose its sky reflection entirely.
         if (i == 0)
         {
             w = max(w, 1e-6);
         }
-        // </SK:Nexii>
     }
 
     v -= c;
@@ -904,9 +901,9 @@ void sampleReflectionProbesWater(inout vec3 ambenv, inout vec3 glossenv,
         probeIndex[probeInfluences++] = 0;
     }
 
-    sk_water_sample = true; // <SK:Nexii> render/farplane
+    water_sample = true;
     doProbeSample(ambenv, glossenv, tc, pos, norm, glossiness, false, amblit);
-    sk_water_sample = false; // <SK:Nexii> render/farplane
+    water_sample = false;
 }
 
 void debugTapRefMap(vec3 pos, vec3 dir, float depth, int i, inout vec4 col)

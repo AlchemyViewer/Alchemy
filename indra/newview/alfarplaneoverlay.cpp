@@ -1,5 +1,5 @@
 /**
- * @file skfarprojectionoverlay.cpp
+ * @file alfarplaneoverlay.cpp
  * @brief Develop overlay that draws column pairs out to 100 km with the main projection.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -24,27 +24,26 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "skfarprojectionoverlay.h"
+#include "alfarplaneoverlay.h"
 
-#include "skfarplane.h"
+#include "alfarplane.h"
 
 #include "llgl.h"
-#include "llglstates.h"
-#include "llrendertarget.h"
-#include "pipeline.h"
 #include "llglslshader.h"
+#include "llglstates.h"
 #include "llrender.h"
+#include "llrendertarget.h"
 #include "llviewercamera.h"
 #include "llviewercontrol.h"
 #include "llviewershadermgr.h"
+#include "pipeline.h"
 
 extern bool gCubeSnapshot;
 
 namespace
 {
     // Owned for the session and never freed at exit, where GL is already gone. Its GL objects go whenever the
-    // pipeline releases its own (skReleaseFarProjectionOverlay), so a recreated context or a new depth format
-    // never finds names it does not own.
+    // pipeline releases its own, so a recreated context or a new depth format never finds names it does not own.
     LLRenderTarget* sTarget = nullptr;
 
     void box(const LLVector3& lo, const LLVector3& hi)
@@ -64,7 +63,7 @@ namespace
     }
 
     // A column on an axis-aligned square footprint, centred on the horizon at its bearing and offset.
-    void column(const LLVector3& origin, const SKFarOverlayColumn& c)
+    void column(const LLVector3& origin, const ALFarPlane::OverlayColumn& c)
     {
         const F32 rad = c.mBearing * DEG_TO_RAD;
         const LLVector3 forward(sinf(rad), cosf(rad), 0.f);
@@ -75,7 +74,10 @@ namespace
     }
 }
 
-void skReleaseFarProjectionOverlay()
+namespace ALFarPlaneOverlay
+{
+
+void release()
 {
     if (sTarget)
     {
@@ -83,14 +85,14 @@ void skReleaseFarProjectionOverlay()
     }
 }
 
-void skRenderFarProjectionOverlay()
+void render()
 {
-    static LLCachedControl<bool> enabled(gSavedSettings, "SKRenderFarProjectionOverlay", false);
+    static LLCachedControl<bool> enabled(gSavedSettings, "AlchemyRenderFarPlaneOverlay", false);
     if (!enabled || gCubeSnapshot)
     {
         if (!enabled)
         {
-            skReleaseFarProjectionOverlay();
+            release();
         }
         return;
     }
@@ -134,7 +136,7 @@ void skRenderFarProjectionOverlay()
                 gGL.diffuseColor4f(0.f, 0.8f, 1.f, 1.f);
             }
             gGL.begin(LLRender::TRIANGLES);
-            for (const SKFarOverlayColumn& c : skFarOverlayColumns())
+            for (const ALFarPlane::OverlayColumn& c : ALFarPlane::overlayColumns())
             {
                 if (c.mNearer == nearer)
                 {
@@ -160,3 +162,5 @@ void skRenderFarProjectionOverlay()
     gCopyProgram.unbind();
     gGL.setSceneBlendType(LLRender::BT_ALPHA); // the tree's default, as other passes leave it
 }
+
+} // namespace ALFarPlaneOverlay

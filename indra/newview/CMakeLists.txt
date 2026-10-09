@@ -162,6 +162,8 @@ if(AL_BUILD_VIEWER)
     aldaycyclelandmarks.cpp
     alderenderlist.cpp
     aldroptarget.cpp
+    alfarplane.cpp
+    alfarplaneoverlay.cpp
     alfloaterblocked.cpp
     alfloaterdirectory.cpp
     alfloaterevent.cpp
@@ -1007,8 +1009,6 @@ if(AL_BUILD_VIEWER)
     rlvinventory.cpp
     rlvlocks.cpp
     rlvui.cpp
-    skfarplane.cpp
-    skfarprojectionoverlay.cpp
   )
 
   set(
@@ -1031,6 +1031,8 @@ if(AL_BUILD_VIEWER)
     aldaycyclelandmarks.h
     alderenderlist.h
     aldroptarget.h
+    alfarplane.h
+    alfarplaneoverlay.h
     alfloaterblocked.h
     alfloaterdirectory.h
     alfloaterevent.h
@@ -1881,8 +1883,6 @@ if(AL_BUILD_VIEWER)
     rlvmodifiers.h
     rlvui.h
     roles_constants.h
-    skfarplane.h
-    skfarprojectionoverlay.h
   )
 
   # Discord rich presence, over the SDK from the private registry.
@@ -2513,6 +2513,7 @@ if(AL_BUILD_TESTS)
     alcrashreporter
     alcurvemodel
     aldaycyclelandmarks
+    alfarplane
     alfeedback
     algradehistory
     almotionpredictor
@@ -2526,7 +2527,6 @@ if(AL_BUILD_TESTS)
     llvocache
     lutcube
     noise
-    skfarplane
   )
     al_add_test(${test} UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
   endforeach()

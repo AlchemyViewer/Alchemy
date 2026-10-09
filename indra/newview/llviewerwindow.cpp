@@ -5093,7 +5093,7 @@ bool LLViewerWindow::mousePointOnLandGlobal(const S32 x, const S32 y, LLVector3d
     F32         land_z;
     const F32   FIRST_PASS_STEP = 1.0f;     // meters
     const F32   SECOND_PASS_STEP = 0.1f;    // meters
-    const F32   draw_distance = ignore_distance ? llmax(FORWARD_Z_MAX_FAR_CLIP, gAgentCamera.mDrawDistance) : gAgentCamera.mDrawDistance; // <SK:Nexii> render/farplane: was MAX_FAR_CLIP
+    const F32   draw_distance = ignore_distance ? llmax(FORWARD_Z_MAX_FAR_CLIP, gAgentCamera.mDrawDistance) : gAgentCamera.mDrawDistance;
     LLVector3d  camera_pos_global;
 
     camera_pos_global = gAgentCamera.getCameraPositionGlobal();
@@ -5685,14 +5685,14 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     const bool reverse_z_snapshot = LLRender::sReverseZ;
     const F32 snap_near = LLViewerCamera::getInstance()->getNear();
     const F32 snap_far  = LLViewerCamera::getInstance()->getFar();
+    const bool infinite_snapshot = al_projection_is_infinite(LLViewerCamera::getInstance()->getProjection());
     auto linearize_snapshot_depth = [&](F32 d) -> F32
     {
-        // <SK:Nexii> render/farplane: an infinite projection stores near / distance; the cleared depth is SK_RECONSTRUCT_FAR.
-        if (al_projection_is_infinite(LLViewerCamera::getInstance()->getProjection()))
+        // An infinite projection stores near / distance, and its cleared depth reads as MAX_RECONSTRUCT_DISTANCE.
+        if (infinite_snapshot)
         {
-            return snap_near / llmax(d, snap_near / SK_RECONSTRUCT_FAR);
+            return snap_near / llmax(d, snap_near / MAX_RECONSTRUCT_DISTANCE);
         }
-        // </SK:Nexii>
         const F32 window_depth = reverse_z_snapshot ? (1.f - d) : d;
         return (snap_far * snap_near) / (snap_far - window_depth * (snap_far - snap_near));
     };
@@ -6316,7 +6316,7 @@ void LLViewerWindow::setup2DViewport(S32 x_offset, S32 y_offset)
 void LLViewerWindow::setup3DRender()
 {
     // setup perspective camera
-    LLViewerCamera::getInstance()->setPerspective(NOT_FOR_SELECTION, mWorldViewRectRaw.mLeft, mWorldViewRectRaw.mBottom,  mWorldViewRectRaw.getWidth(), mWorldViewRectRaw.getHeight(), false, LLViewerCamera::getInstance()->getNear(), LLViewerCamera::getInstance()->getProjectionFar()); // <SK:Nexii> render/farplane: was MAX_FAR_CLIP*2
+    LLViewerCamera::getInstance()->setPerspective(NOT_FOR_SELECTION, mWorldViewRectRaw.mLeft, mWorldViewRectRaw.mBottom,  mWorldViewRectRaw.getWidth(), mWorldViewRectRaw.getHeight(), false, LLViewerCamera::getInstance()->getNear(), LLViewerCamera::getInstance()->getProjectionFar());
     setup3DViewport();
 }
 

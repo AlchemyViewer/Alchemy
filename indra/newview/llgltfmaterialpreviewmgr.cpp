@@ -471,7 +471,7 @@ bool LLGLTFPreviewTexture::render()
     camera.lookAt(origin, object_position);
     camera.setAspect((F32)(mFullWidth / mFullHeight));
     const LLRect texture_rect(0, mFullHeight, mFullWidth, 0);
-    camera.setPerspective(NOT_FOR_SELECTION, texture_rect.mLeft, texture_rect.mBottom, texture_rect.getWidth(), texture_rect.getHeight(), false, camera.getNear(), FORWARD_Z_MAX_FAR_CLIP*2.f); // <SK:Nexii> render/farplane: was MAX_FAR_CLIP*2
+    camera.setPerspective(NOT_FOR_SELECTION, texture_rect.mLeft, texture_rect.mBottom, texture_rect.getWidth(), texture_rect.getHeight(), false, camera.getNear(), FINITE_PROJECTION_FAR);
 
     // Generate sphere object on-the-fly. Discard afterwards. (Vertex buffer is
     // discarded, but the sphere should be cached in LLVolumeMgr.)

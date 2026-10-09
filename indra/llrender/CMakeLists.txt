@@ -173,5 +173,5 @@ if(AL_BUILD_TESTS)
   # Tessellation stages and the quad conventions the terrain relies on.
   al_add_test(altessellation_gl GL PROJECT llrender LIBRARIES llrender)
   # Infinite reverse-Z projection: stored depth, round trip and depth order out to 100 km.
-  al_add_test(skinfiniteprojection_gl GL PROJECT llrender LIBRARIES llrender)
+  al_add_test(alinfiniteprojection_gl GL PROJECT llrender LIBRARIES llrender)
 endif()

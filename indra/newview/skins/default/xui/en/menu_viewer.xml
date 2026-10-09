@@ -3931,10 +3931,10 @@ function="World.EnvPreset"
                  name="Projection Overlay">
                     <menu_item_check.on_check
                      function="CheckControl"
-                     parameter="SKRenderFarProjectionOverlay" />
+                     parameter="AlchemyRenderFarPlaneOverlay" />
                     <menu_item_check.on_click
                      function="ToggleControl"
-                     parameter="SKRenderFarProjectionOverlay" />
+                     parameter="AlchemyRenderFarPlaneOverlay" />
                 </menu_item_check>
                 <menu_item_separator />
                 <menu_item_check

@@ -38,7 +38,7 @@
 #include "llshadermgr.h"
 #include "hbxxh.h"
 #include "alprojection.h"
-#include "llcamera.h" // <SK:Nexii> render/farplane: FORWARD_Z_MAX_FAR_CLIP
+#include "llcamera.h"
 
 #include <algorithm>
 
@@ -1740,29 +1740,26 @@ LLMatrix4a al_reverse_z_transform(const LLMatrix4a& p)
 
 LLMatrix4a al_perspective(F32 fovy_rad, F32 aspect, F32 z_near, F32 z_far)
 {
-    // <SK:Nexii> render/farplane: an infinite far plane is exact only when reversed; forward 24-bit depth keeps the old fixed plane.
+    // An infinite far plane is exact only when reversed: forward 24-bit depth keeps the finite plane.
     if (std::isinf(z_far))
     {
         if (!LLRender::sReverseZ)
         {
-            return LLMatrix4a::perspective(fovy_rad, aspect, z_near, SK_FORWARD_Z_PROJECTION_FAR);
+            return LLMatrix4a::perspective(fovy_rad, aspect, z_near, FINITE_PROJECTION_FAR);
         }
         // Stored depth d = near / distance: the depth row is (0, 0, 0, near) against a w row of (0, 0, -1, 0).
         LLMatrix4a p = LLMatrix4a::perspective(fovy_rad, aspect, z_near, z_near * 2.f);
         p.setColumn<2>(LLVector4a(0.f, 0.f, 0.f, z_near));
         return p;
     }
-    // </SK:Nexii>
     const LLMatrix4a p = LLMatrix4a::perspective(fovy_rad, aspect, z_near, z_far);
     return LLRender::sReverseZ ? al_reverse_z_transform(p) : p;
 }
 
-// <SK:Nexii> render/farplane
 bool al_projection_is_infinite(const LLMatrix4a& proj)
 {
     return LLRender::sReverseZ && proj.getColumn<2>()[2] == 0.f && proj.getColumn<3>()[2] != 0.f;
 }
-// </SK:Nexii>
 
 LLMatrix4a al_ortho(F32 left, F32 right, F32 bottom, F32 top, F32 z_near, F32 z_far)
 {

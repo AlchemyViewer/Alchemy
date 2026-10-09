@@ -461,9 +461,9 @@ def model_b(p=P):
 
 # ---- Model C: skyOf ----------------------------------------------------------
 NEAR = 0.1            # MIN_NEAR_PLANE
-FAR = 1024.0          # SK_FORWARD_Z_PROJECTION_FAR, every finite projection's far plane
-FLOOR = 1000000.0     # SK_RECONSTRUCT_FAR, the farthest point reconstruction places
-EDGE = 256000.0       # SK_EDGE_WATER_STRETCH
+FAR = 1024.0          # FINITE_PROJECTION_FAR, every finite projection's far plane
+FLOOR = 1000000.0     # MAX_RECONSTRUCT_DISTANCE, the farthest point reconstruction places
+EDGE = 256000.0       # ALFarPlane::EDGE_WATER_STRETCH
 SHADER = __file__.replace("\\", "/").rsplit("/scripts/", 1)[0] +     "/indra/newview/app_settings/shaders/class1/alchemy/lensFlareStateF.glsl"
 
 

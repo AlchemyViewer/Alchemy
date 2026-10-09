@@ -36,12 +36,11 @@ vec4 getWaterFogView(vec3 pos);
 
 uniform int above_water;
 
-// <SK:Nexii> render/farplane: void water has no floor. The sky behind it keeps the cleared far depth, which an
-// infinite projection reconstructs a thousand km out and a finite one at its far plane, wherever that falls
-// relative to the surface; it is fogged instead as water this deep past where the ray enters, at any distance.
+// Void water has no floor. The sky behind it keeps the cleared far depth, which an infinite projection
+// reconstructs a thousand km out and a finite one at its far plane, wherever that falls relative to the surface;
+// it is fogged instead as water this deep past where the ray enters, at any distance.
 const float VOID_WATER_FOG_DEPTH = 1024.0;
 uniform vec4 waterPlane;
-// </SK:Nexii>
 
 uniform sampler2D exclusionTex;
 
@@ -84,7 +83,6 @@ void main()
 
     vec4  pos          = getPositionWithDepth(tc, depth);
 
-    // <SK:Nexii> render/farplane
     if (isFarDepth(depth))
     {
         vec3 dir = normalize(pos.xyz);
@@ -92,7 +90,6 @@ void main()
         float entry = (waterPlane.w > 0.0 && es > 0.0) ? waterPlane.w / es : 0.0;
         pos.xyz = dir * (entry + VOID_WATER_FOG_DEPTH);
     }
-    // </SK:Nexii>
 
     vec4 fogged = getWaterFogView(pos.xyz);
     fogged.a = max(pow(fogged.a, 1.7), 0);

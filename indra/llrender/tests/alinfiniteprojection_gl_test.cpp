@@ -1,5 +1,5 @@
 /**
- * @file skinfiniteprojection_gl_test.cpp
+ * @file alinfiniteprojection_gl_test.cpp
  * @brief The infinite reverse-Z projection on the hidden window: stored depth, the round trip
  *        back to a view distance, and depth order between surfaces a few depth steps apart,
  *        at 1, 8, 32 and 100 km.
@@ -78,7 +78,7 @@ namespace tut
         {
             LLVector4a pos;
             inv.transform4(LLVector4a(0.f, 0.f, d, 1.f), pos);
-            return -pos[2] / llmax(pos[3], 1.f / SK_RECONSTRUCT_FAR);
+            return -pos[2] / llmax(pos[3], 1.f / MAX_RECONSTRUCT_DISTANCE);
         }
 
         // True metres between the depth stored for `dist` and the next representable (farther) one.
@@ -94,7 +94,7 @@ namespace tut
         }
     }
 
-    struct skinfiniteprojection_data
+    struct alinfiniteprojection_data
     {
         static ll_test::HeadlessGL& gl()
         {
@@ -102,13 +102,13 @@ namespace tut
             return instance;
         }
 
-        skinfiniteprojection_data()
+        alinfiniteprojection_data()
         {
             gl();
             LLRender::sReverseZ = true;
         }
 
-        ~skinfiniteprojection_data()
+        ~alinfiniteprojection_data()
         {
             LLRender::sReverseZ = false;
             if (mReady)
@@ -212,14 +212,14 @@ namespace tut
         bool mReady = false;
     };
 
-    typedef test_group<skinfiniteprojection_data> skinfiniteprojection_t;
-    typedef skinfiniteprojection_t::object skinfiniteprojection_object_t;
-    tut::skinfiniteprojection_t tut_skinfiniteprojection("skinfiniteprojection_gl");
+    typedef test_group<alinfiniteprojection_data> alinfiniteprojection_t;
+    typedef alinfiniteprojection_t::object alinfiniteprojection_object_t;
+    tut::alinfiniteprojection_t tut_alinfiniteprojection("alinfiniteprojection_gl");
 
     // The matrix: recognised as infinite, stores near / distance, and its inverse gives w = 0 at the cleared
-    // depth, which the reconstruction floor turns into SK_RECONSTRUCT_FAR. Finite and forward matrices are not.
+    // depth, which the reconstruction floor turns into MAX_RECONSTRUCT_DISTANCE. Finite and forward matrices are not.
     template<> template<>
-    void skinfiniteprojection_object_t::test<1>()
+    void alinfiniteprojection_object_t::test<1>()
     {
         const LLMatrix4a proj = infinite();
         ensure("infinite", al_projection_is_infinite(proj));
@@ -239,7 +239,7 @@ namespace tut
         LLVector4a far_point;
         inv.transform4(LLVector4a(0.f, 0.f, 0.f, 1.f), far_point);
         ensure("cleared depth unprojects to w = 0", fabsf(far_point[3]) < 1e-12f);
-        ensure_approximately_equals("floored to SK_RECONSTRUCT_FAR", reconstruct(inv, 0.f), SK_RECONSTRUCT_FAR, 8);
+        ensure_approximately_equals("floored to MAX_RECONSTRUCT_DISTANCE", reconstruct(inv, 0.f), MAX_RECONSTRUCT_DISTANCE, 8);
 
         // The floor leaves a finite projection alone: its cleared depth still reconstructs at its far plane.
         LLMatrix4a inv_finite = al_perspective(FOV, 1.f, NEAR_PLANE, 1024.f);
@@ -258,27 +258,27 @@ namespace tut
     // Forward-Z cannot hold an infinite plane in 24-bit depth, so an infinite request falls back to the old
     // fixed plane rather than MAX_FAR_PLANE, and depth beyond it is clipped as before.
     template<> template<>
-    void skinfiniteprojection_object_t::test<4>()
+    void alinfiniteprojection_object_t::test<4>()
     {
         LLRender::sReverseZ = false;
         const LLMatrix4a forward = al_perspective(FOV, 1.f, NEAR_PLANE, std::numeric_limits<F32>::infinity());
-        const LLMatrix4a legacy = al_perspective(FOV, 1.f, NEAR_PLANE, SK_FORWARD_Z_PROJECTION_FAR);
+        const LLMatrix4a legacy = al_perspective(FOV, 1.f, NEAR_PLANE, FINITE_PROJECTION_FAR);
         LLRender::sReverseZ = true;
         for (S32 i = 0; i < 16; ++i)
         {
             ensure_equals("same as the old fixed plane", forward.getF32ptr()[i], legacy.getF32ptr()[i]);
         }
         LLVector4a clip;
-        forward.transform4(LLVector4a(0.f, 0.f, -SK_FORWARD_Z_PROJECTION_FAR, 1.f), clip);
+        forward.transform4(LLVector4a(0.f, 0.f, -FINITE_PROJECTION_FAR, 1.f), clip);
         ensure("far plane at the old fixed plane", fabsf(clip[2] / clip[3] - 1.f) < 1e-5f);
-        forward.transform4(LLVector4a(0.f, 0.f, -2.f * SK_FORWARD_Z_PROJECTION_FAR, 1.f), clip);
+        forward.transform4(LLVector4a(0.f, 0.f, -2.f * FINITE_PROJECTION_FAR, 1.f), clip);
         ensure("past it is clipped", clip[2] / clip[3] > 1.f);
     }
 
     // Draw at each distance: the stored depth is near / distance (oracle), nothing is clipped far, and the
     // reconstructed distance is within the oracle's bound (0.29 mm, 3.9 mm, 9.3 mm, 45 mm).
     template<> template<>
-    void skinfiniteprojection_object_t::test<2>()
+    void alinfiniteprojection_object_t::test<2>()
     {
         setUp();
         const LLMatrix4a proj = infinite();
@@ -308,7 +308,7 @@ namespace tut
 
     // Two surfaces four depth steps apart at each distance: the nearer one wins whichever is drawn first.
     template<> template<>
-    void skinfiniteprojection_object_t::test<3>()
+    void alinfiniteprojection_object_t::test<3>()
     {
         setUp();
         const LLMatrix4a proj = infinite();
@@ -338,7 +338,7 @@ namespace tut
     // covered (skyV.glsl). Under the infinite projection the far plane is the cleared depth exactly and geometry as
     // far out as reconstruction reaches still stores more, so the sky passes where nothing was drawn and nowhere else.
     template<> template<>
-    void skinfiniteprojection_object_t::test<5>()
+    void alinfiniteprojection_object_t::test<5>()
     {
         setUp();
         const LLMatrix4a proj = infinite();
@@ -362,7 +362,7 @@ namespace tut
         ensure_equals("the sky fills an empty frame", sky_samples(), (GLuint)(SIZE * SIZE));
         ensure_equals("the sky leaves the cleared depth", centreDepth(), 0.f);
 
-        for (F32 dist : { 1000.f, 100000.f, SK_RECONSTRUCT_FAR })
+        for (F32 dist : { 1000.f, 100000.f, MAX_RECONSTRUCT_DISTANCE })
         {
             const std::string at = std::to_string((S32)dist) + " m";
             glClear(GL_DEPTH_BUFFER_BIT);

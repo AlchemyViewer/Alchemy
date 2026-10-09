@@ -604,10 +604,8 @@ public:
 
         SH_PARTIAL,                         //  "shPartial"  (row partial sums of the probe SH projection)
 
-        // <SK:Nexii> render/farplane
-        SK_WATER_FAR,                       //  "sk_water_far" water: wave clamp, edge fade
-        SK_WATER_RIM,                       //  "sk_water_rim" water: edge water's outer rectangle relative to the camera
-        // </SK:Nexii>
+        WATER_FAR,                          //  "waterFar"  wave clamp distance, edge water stretch (ALFarPlane::WaterFar)
+        WATER_RIM,                          //  "waterRim"  the edge water's outer rectangle relative to the camera
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;

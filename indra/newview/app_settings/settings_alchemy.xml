@@ -2097,10 +2097,10 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
-        <key>SKRenderFarPlaneForce</key>
+        <key>AlchemyRenderFarPlaneForce</key>
         <map>
             <key>Comment</key>
-            <string>Debug A/B for the main projection: 0 automatic (infinite on reverse-Z, finite 1024 m on forward-Z), 1 force the finite plane the viewer used before, twice the draw distance and never under 1024 m, 2 force infinite on reverse-Z (forward-Z ignores it). Reflection probes are never forced.</string>
+            <string>Debug A/B for the main view's projection: 0 automatic (infinite on reverse-Z, finite 1024 m on forward-Z), 1 force a finite plane at twice the draw distance and never under 1024 m, 2 force infinite on reverse-Z (forward-Z ignores it). Probe captures are never forced.</string>
             <key>Persist</key>
             <integer>0</integer>
             <key>Type</key>
@@ -2108,7 +2108,7 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>SKRenderFarProjectionOverlay</key>
+        <key>AlchemyRenderFarPlaneOverlay</key>
         <map>
             <key>Comment</key>
             <string>Debug: draw column pairs from 500 m to 100 km around the camera with the main projection, nearer orange and farther cyan, depth tested against each other only and laid over the frame, to see where the projection clips and whether depth order holds. Ignores the scene, object culling and reach.</string>

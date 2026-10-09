@@ -2121,10 +2121,8 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("shPartial");
 
-    // <SK:Nexii> render/farplane
-    mReservedUniforms.push_back("sk_water_far");
-    mReservedUniforms.push_back("sk_water_rim");
-    // </SK:Nexii>
+    mReservedUniforms.push_back("waterFar");
+    mReservedUniforms.push_back("waterRim");
 
     // The enum and this list are parallel, and an entry added or removed on one side only
     // shifts every later uniform index for every shader in the viewer -- silently, since a

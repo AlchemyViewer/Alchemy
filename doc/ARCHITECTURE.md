@@ -96,6 +96,12 @@ The deferred rendering pipeline is orchestrated by `LLPipeline` (`indra/newview/
 
 Depth of field runs **before** bloom and before the tonemapper, on linear HDR. Gathering over display-space values gathers over already-compressed highlights, and bloom-after-defocus is the optical order, so a defocused highlight blooms as a soft disc rather than a sharp core on a blurred background.
 
+**Distances** (`ALFarPlane`, `alfarplane.h`) are kept apart, each with its own reader:
+- The **draw distance** (`RenderFarClip`, `LLViewerCamera::getFar()`) is a content budget: cull sphere, interest list, object cache, fog, shadow splits. Its ceiling is `MAX_FAR_CLIP` (2048 m) under reverse-Z and `FORWARD_Z_MAX_FAR_CLIP` (512 m) under forward 24-bit depth.
+- The **projection's far plane** (`LLViewerCamera::getProjectionFar()`) only says how depth is stored. Under reverse-Z the main view's projection is infinite (`al_perspective` with `z_far` = infinity, stored depth = near / distance); forward-Z, probe captures and previews keep `FINITE_PROJECTION_FAR` (1024 m). Depth reconstruction floors w so the cleared depth unprojects to `MAX_RECONSTRUCT_DISTANCE`, never infinity.
+- The **sky** draws last, on the far plane, writing no depth: it is wherever the depth buffer still holds the cleared value, under either projection. Every pass that tells sky from geometry (`isFarDepth`, the lens flare's `skyOf`, void water's fog) tests for exactly that value.
+- **Terrain and water**, whose partitions ignore the draw distance, reach as far as the projection lets them: under the infinite one terrain is culled to `TERRAIN_REACH` (8 km) and edge water stretches `EDGE_WATER_STRETCH` (256 km) past the regions, to the horizon.
+
 **GBuffer layout** (MRT attachments on `deferredScreen`):
 - frag_data[0]: Base color (GL_RGBA)
 - frag_data[1]: Specular/ORM — PBR occlusion/roughness/metallic (GL_RGBA)

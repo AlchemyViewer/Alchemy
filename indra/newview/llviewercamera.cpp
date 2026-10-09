@@ -30,10 +30,10 @@
 #include "llviewercamera.h"
 
 // Viewer includes
+#include "alfarplane.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llmatrix4a.h"
-#include "skfarplane.h" // <SK:Nexii> render/farplane
 #include "llviewercontrol.h"
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
@@ -230,10 +230,9 @@ void LLViewerCamera::updateFrustumPlanes(LLCamera& camera, bool ortho, bool zfli
     // al_window_far(); al_unproject uses the ZO variant under reverse-Z. frust[0..3]=near,
     // frust[4..7]=far in every branch below.
     const F32 win_near = al_window_near();
-    // <SK:Nexii> render/farplane: an infinite projection has no far plane to unproject, so the far corners
-    // are taken at SK_RECONSTRUCT_FAR; the callers that use them (shadow cascades) only need their direction.
-    const F32 win_far  = skFrustumFarWindowDepth(al_projection_is_infinite(camera.getProjection()), camera.getNear(), al_window_far());
-    // </SK:Nexii>
+    // An infinite projection has no far plane to unproject, so its far corners are taken at
+    // MAX_RECONSTRUCT_DISTANCE; the callers that use them (shadow cascades) only need their direction.
+    const F32 win_far  = ALFarPlane::frustumFarWindowDepth(al_projection_is_infinite(camera.getProjection()), camera.getNear(), al_window_far());
 
     const F32 x0 = F32(viewport[0]);
     const F32 x1 = F32(viewport[0] + viewport[2]);
@@ -351,10 +350,12 @@ void LLViewerCamera::setPerspective(bool for_selection,
     }
     else
     {
-        // Only override the far clip if it's not passed in explicitly.
+        // Only override the far clip if it's not passed in explicitly; the previews that name none get
+        // a finite plane well past anything they show.
         if (z_default_far)
         {
-            z_far = FORWARD_Z_MAX_FAR_CLIP; // <SK:Nexii> render/farplane: was MAX_FAR_CLIP
+            constexpr F32 PREVIEW_FAR = 512.f;
+            z_far = PREVIEW_FAR;
         }
         glViewport(x, y_from_bot, width, height);
         gGLViewport[0] = x;

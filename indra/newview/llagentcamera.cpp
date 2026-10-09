@@ -26,11 +26,10 @@
 
 #include "llviewerprecompiledheaders.h"
 #include "llagentcamera.h"
-#include "llrender.h" // <SK:Nexii> render/farplane
-#include "skfarplane.h" // <SK:Nexii> render/farplane
 
 #include "pipeline.h"
 
+#include "alfarplane.h"
 #include "aoengine.h"
 #include "llagent.h"
 #include "llanimationstates.h"
@@ -41,6 +40,7 @@
 #include "llmorphview.h"
 #include "llmoveview.h"
 #include "llnotificationsutil.h"
+#include "llrender.h"
 #include "llselectmgr.h"
 #include "llsmoothstep.h"
 #include "lltoolmgr.h"
@@ -212,7 +212,8 @@ void LLAgentCamera::init()
 {
     // *Note: this is where LLViewerCamera::getInstance() used to be constructed.
 
-    mDrawDistance = skClampDrawDistance(gSavedSettings.getF32("RenderFarClip"), LLRender::sReverseZ); // <SK:Nexii> render/farplane: re-clamped in LLPipeline::updateReverseZ
+    // LLPipeline::updateReverseZ clamps it again when the depth convention changes.
+    mDrawDistance = ALFarPlane::clampDrawDistance(gSavedSettings.getF32("RenderFarClip"), LLRender::sReverseZ);
 
     LLViewerCamera::getInstance()->setView(DEFAULT_FIELD_OF_VIEW);
     // Leave at 0.1 meters until we have real near clip management

@@ -41,7 +41,7 @@ uniform vec4 littleWaveScroll;
 uniform vec3 eyeVec;
 uniform float waterHeight;
 uniform vec3 lightDir;
-uniform vec4 sk_water_far; // <SK:Nexii> render/farplane: x is the wave clamp distance (skWaterFar)
+uniform vec2 waterFar; // x: the wave clamp distance (ALFarPlane::WaterFar)
 
 out vec4 refCoord;
 out vec4 littleWave;
@@ -75,7 +75,7 @@ void main()
     oEyeVec.xyz = pos.xyz-eyeVec;
 
     float d = length(oEyeVec.xy);
-    float ld = min(d, sk_water_far.x); // <SK:Nexii> render/farplane: was 2560.0
+    float ld = min(d, waterFar.x);
 
     pos.xy = eyeVec.xy + oEyeVec.xy/d*ld;
     view.xyz = oEyeVec;

@@ -58,7 +58,7 @@
 #include "pipeline.h"
 #include "llappviewer.h"        // for do_disconnect()
 #include "llscenemonitor.h"
-#include "skfarplane.h" // <SK:Nexii> render/farplane
+#include "alfarplane.h"
 #include <fmt/format.h>
 
 #include <deque>
@@ -1113,36 +1113,30 @@ void LLWorld::updateWaterObjects()
         LLVector3d water_pos(water_center_x, water_center_y, 256.f + water_height) ;
         LLVector3 water_scale((F32) dim[0], (F32) dim[1], 512.f);
 
-        //stretch out to horizon
-        // <SK:Nexii> render/farplane: out to the horizon while the main view's projection is infinite; was 2048 m. Not
-        // getProjectionFar(), which a probe capture leaves finite between main frames.
-        const F32 stretch = skEdgeWaterStretch(LLViewerCamera::getInstance()->isMainViewInfinite());
+        // Stretch out to the horizon while the main view's projection is infinite. Not getProjectionFar(), which
+        // a probe capture leaves finite between main frames.
+        const F32 stretch = ALFarPlane::edgeWaterStretch(LLViewerCamera::getInstance()->isMainViewInfinite());
         water_scale.mV[0] += fabsf(stretch * gDirAxes[dir][0]);
         water_scale.mV[1] += fabsf(stretch * gDirAxes[dir][1]);
 
         water_pos.mdV[0] += stretch * 0.5f * gDirAxes[dir][0];
         water_pos.mdV[1] += stretch * 0.5f * gDirAxes[dir][1];
-        // </SK:Nexii>
 
-        // <SK:Nexii> render/farplane: the patch's vertices are built from its scale only on a geometry rebuild, and setScale
-        // only moves the drawable, so a stretch change (the projection turning infinite after login) kept the old extent.
+        // The patch's vertices are built from its scale only on a geometry rebuild, and setScale only moves the
+        // drawable, so a change of stretch (the projection turning infinite after login) would keep the old extent.
         const bool rescaled = waterp->getScale() != water_scale;
-        // </SK:Nexii>
         waterp->setPositionGlobal(water_pos);
         waterp->setScale(water_scale);
-        // <SK:Nexii> render/farplane
         if (rescaled && waterp->mDrawable.notNull())
         {
             gPipeline.markRebuild(waterp->mDrawable, LLDrawable::REBUILD_ALL);
             LL_DEBUGS("Water") << "Edge water " << dir << " rebuilt at " << water_scale.mV[0] << " x " << water_scale.mV[1] << " m" << LL_ENDL;
         }
-        // </SK:Nexii>
 
         gObjectList.updateActive(waterp);
     }
 }
 
-// <SK:Nexii> render/farplane
 bool LLWorld::getEdgeWaterBounds(LLVector3& min_agent, LLVector3& max_agent) const
 {
     bool any = false;
@@ -1168,7 +1162,6 @@ bool LLWorld::getEdgeWaterBounds(LLVector3& min_agent, LLVector3& max_agent) con
     }
     return any;
 }
-// </SK:Nexii>
 
 void LLWorld::shiftRegions(const LLVector3& offset)
 {

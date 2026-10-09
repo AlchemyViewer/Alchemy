@@ -1,5 +1,5 @@
 /**
- * @file skfarprojectionoverlay.h
+ * @file alfarplaneoverlay.h
  * @brief Develop overlay that draws column pairs out to 100 km with the main projection,
  *        so depth order and the far plane can be judged by eye.
  *
@@ -25,11 +25,18 @@
 
 #pragma once
 
-// Draws skFarOverlayColumns() around the camera when SKRenderFarProjectionOverlay is on: nearer columns orange,
-// farther ones cyan, depth tested against each other in a depth buffer of their own and laid over the frame.
-// The scene does not hide them, culling and reach are bypassed, and the projection alone decides what shows:
-// a finite plane clips the far pairs, and broken depth order shows cyan over orange.
-void skRenderFarProjectionOverlay();
+/// Develop > Rendering > Far Plane > Projection Overlay (AlchemyRenderFarPlaneOverlay): the column pairs of
+/// ALFarPlane::overlayColumns around the camera, nearer columns orange and farther ones cyan, depth tested
+/// against each other in a depth buffer of their own and laid over the frame. The scene does not hide them,
+/// culling and reach are bypassed, and the projection alone decides what shows: a finite plane clips the far
+/// pairs, and broken depth order shows cyan over orange.
+namespace ALFarPlaneOverlay
+{
 
-// Releases the overlay's render target with the pipeline's own (LLPipeline::releaseGLBuffers).
-void skReleaseFarProjectionOverlay();
+/// Draws the overlay while it is on, and gives up its render target once it is off.
+void render();
+
+/// Gives up the overlay's render target with the pipeline's own (LLPipeline::releaseGLBuffers).
+void release();
+
+} // namespace ALFarPlaneOverlay

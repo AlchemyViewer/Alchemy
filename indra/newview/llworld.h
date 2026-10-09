@@ -214,9 +214,8 @@ public:
     // return max GPU time
     F32 getNearbyAvatarsAndMaxGPUTime(std::vector<LLVOAvatar*> &valid_nearby_avs);
 
-    // <SK:Nexii> render/farplane: the edge water's outer rectangle in agent space, whether or not its patches are in view; false with none.
+    // The edge water's outer rectangle in agent space, whether or not its patches are in view; false with none.
     bool getEdgeWaterBounds(LLVector3& min_agent, LLVector3& max_agent) const;
-    // </SK:Nexii>
 
 private:
     void clearHoleWaterObjects();

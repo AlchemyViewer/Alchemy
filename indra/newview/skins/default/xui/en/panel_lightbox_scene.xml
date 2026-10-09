@@ -1177,7 +1177,6 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 			 top="0"
 			 right="-1"
 			 name="sec_perf">
-				<!-- <SK:Nexii> render/farplane: draw distance up to MAX_FAR_CLIP, was 512 -->
 				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"

@@ -127,14 +127,13 @@ public:
     F32 getZoomFactor() const { return mZoomFactor; }
     S16 getZoomSubRegion() const { return mZoomSubregion; }
 
-    // <SK:Nexii> render/farplane: the main projection's far plane (skProjectionFar), decided once per
-    // camera update; getFar() stays the draw distance.
+    // The main projection's far plane (ALFarPlane::projectionFar), decided once per camera update;
+    // getFar() stays the draw distance.
     void setProjectionFar(F32 projection_far) { mProjectionFar = projection_far; }
     F32 getProjectionFar() const { return mProjectionFar; }
     // Whether the main view's projection is infinite; unlike getProjectionFar(), probe captures never change it.
     void setMainViewInfinite(bool infinite) { mMainViewInfinite = infinite; }
     bool isMainViewInfinite() const { return mMainViewInfinite; }
-    // </SK:Nexii>
 
 protected:
     static LLTrace::CountStatHandle<> sVelocityStat;
@@ -155,8 +154,8 @@ protected:
     S32                 mScreenPixelArea; // Pixel area of entire window
     F32                 mZoomFactor;
     S16                 mZoomSubregion;
-    F32                 mProjectionFar = SK_FORWARD_Z_PROJECTION_FAR; // <SK:Nexii> render/farplane
-    bool                mMainViewInfinite = false; // <SK:Nexii> render/farplane
+    F32                 mProjectionFar = FINITE_PROJECTION_FAR;
+    bool                mMainViewInfinite = false;
 
 public:
 };

@@ -57,6 +57,8 @@
 #include "aluniformbuffer.h"
 #include "alwhitebalancesolver.h"
 #include "alcurvemodel.h"
+#include "alfarplane.h"
+#include "alfarplaneoverlay.h"
 #include "llrender.h"
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
@@ -91,8 +93,6 @@
 #include "lltool.h"
 #include "lltoolmgr.h"
 #include "llviewercamera.h"
-#include "skfarplane.h" // <SK:Nexii> render/farplane
-#include "skfarprojectionoverlay.h" // <SK:Nexii> render/farplane: Develop projection overlay
 #include "llviewermediafocus.h"
 #include "llviewertexturelist.h"
 #include "llviewerobject.h"
@@ -1377,7 +1377,7 @@ void LLPipeline::releaseGLBuffers()
         mGlow[i].release();
     }
 
-    skReleaseFarProjectionOverlay();
+    ALFarPlaneOverlay::release();
 
     mHeroProbeManager.cleanup(); // release hero probes
 
@@ -3055,13 +3055,12 @@ void LLPipeline::updateReverseZ()
 
     LLRender::sReverseZ = effective;
 
-    // <SK:Nexii> render/farplane: the draw distance ceiling follows the depth convention, for every consumer.
+    // The draw distance ceiling follows the depth convention, for every consumer.
     if (changed && LLStartUp::getStartupState() >= STATE_STARTED)
     {
-        gAgentCamera.mDrawDistance = skClampDrawDistance(gSavedSettings.getF32("RenderFarClip"), effective);
+        gAgentCamera.mDrawDistance = ALFarPlane::clampDrawDistance(gSavedSettings.getF32("RenderFarClip"), effective);
         LLWorld::getInstance()->setLandFarClip(gAgentCamera.mDrawDistance);
     }
-    // </SK:Nexii>
 
     // Issued unconditionally, not just on a change. These are the only writers of clip control
     // and clear depth in the tree, so if GL is ever reset underneath us -- a context restore,
@@ -4879,7 +4878,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
         renderDebug();
         if (!hasRenderType(LLPipeline::RENDER_TYPE_HUD))
         {
-            skRenderFarProjectionOverlay(); // <SK:Nexii> render/farplane
+            ALFarPlaneOverlay::render();
         }
     }
 
