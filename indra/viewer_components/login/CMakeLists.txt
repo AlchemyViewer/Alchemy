@@ -11,5 +11,5 @@ target_link_libraries(
 )
 
 if(AL_BUILD_TESTS)
-  al_add_test(lllogin UNIT PROJECT lllogin LIBRARIES llmessage llcorehttp llcommon)
+  al_add_test(lllogin PROJECT lllogin LIBRARIES lllogin)
 endif()
