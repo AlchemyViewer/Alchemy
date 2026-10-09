@@ -816,7 +816,16 @@ namespace
         // The queue the upload thread hands its results back on, as the viewer's.
         // It has to exist before the image, which looks it up when built.
         LL::WorkQueue mainloop("mainloop");
+        std::atomic<bool> worker_done{ false };
+        std::atomic<bool> worker_ok{ false };
         LLImageGLThread::createInstance(gl->window());
+        // The thread ends with the test however the test ends: left running
+        // after a failure, it would outlive the window its context shares,
+        // and the flags its work writes to.
+        struct ThreadEnd
+        {
+            ~ThreadEnd() { LLImageGLThread::deleteSingleton(); }
+        } thread_end;
 
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
         ensure("createGLTexture succeeded",
@@ -824,8 +833,6 @@ namespace
         const U32 old_name = img->getTexName();
 
         LLPointer<LLImageRaw> raw = makeRaw(32, 32, 4, 0x55);
-        std::atomic<bool> worker_done{ false };
-        std::atomic<bool> worker_ok{ false };
 
         img->beginUpload();
         LLImageGLThread::instance().post(
