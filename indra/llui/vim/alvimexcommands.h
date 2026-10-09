@@ -25,10 +25,14 @@
 
 #pragma once
 
+#include "alanchoredranges.h"
 #include "altextdocument.h"
 #include "alvimkeymap.h"
 
+#include <boost/signals2/connection.hpp>
+
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -82,10 +86,6 @@ public:
         // while the question waits, so that nothing made meanwhile -- a
         // format on save -- joins it (ALTextUndo::resumeGroup).
         U64                                              undoStep = 0;
-        // While a :g runs its command over the lines, an asking :s puts
-        // its edits here and asks nothing; the asking starts, over the
-        // lot in order, once the :g is through.
-        bool                                             gathering = false;
         // What follows the asking :s on its : line, after a |: run once
         // the asking is done, as vim runs it after.
         std::string                                      then;
@@ -98,7 +98,11 @@ public:
     // makes them without asking.
     void       applyRest(ALTextView& view);
     void       askNext(ALTextView& view);
-    void       endConfirming(ALTextView& view);
+    // The asking done, and what follows it on its : line run -- or, a :g
+    // waiting on it, the rest of that line's commands and then the :g's
+    // lines after it -- where `go_on` says; without it, a :g waiting is
+    // let go of, its lines not visited, what it made one step to undo.
+    void       endConfirming(ALTextView& view, bool go_on = true);
 
     // While a :g runs a command that changes only the line it is on --
     // :d, :s, :> and :< with no lines of their own -- the command puts its
@@ -113,6 +117,9 @@ public:
         ALTextPos                                        landing;
         S32                                              landingBelow = 0;
         bool                                             landed       = false;
+        // An asking :s, which asks line by line and so is no batch's: the
+        // :g walks its lines instead.
+        bool                                             asks         = false;
     };
     GlobalBatch* globalBatch = nullptr;
     // Whether a :g's command is one it batches.
@@ -148,6 +155,30 @@ private:
     // One command of a : line, no | ending it.
     void runOneCommand(ALTextView& view, const std::string& line);
 
+    // A :g visiting its lines one at a time, from the top down, the
+    // topmost left each time, as vim marks them: a mark moves with the
+    // text and goes with its line. An asking :s on one of them -- asked
+    // line by line, as vim asks, each line's a, q and l its own -- makes
+    // the :g wait, the step it makes closed while the question stands;
+    // once the asking is done, the rest of that line's commands run and
+    // the :g goes on (endConfirming), in the same step.
+    struct GlobalWalk
+    {
+        std::string                        command;
+        // Whether the command has an address of its own, and runs as it is
+        // written rather than given the line's number.
+        bool                               addressed   = false;
+        ALAnchoredRanges<ALTextPos>        marks;
+        boost::signals2::scoped_connection following;
+        S32                                linesBefore = 0;
+    };
+    // The lines still to visit, until there are none, an error, or an
+    // asking :s; the :g finished where it is through.
+    bool walkGlobal(ALTextView& view);
+    void pauseGlobal(ALTextView& view);
+    // What the :g made said once, as vim's :g says it, and its step closed.
+    bool finishGlobal(ALTextView& view, S32 lines_before);
+
     ALVimKeymap& mVim;
     // Whether a :g is running its command over lines, which another :g
     // may not do, as vim has it (E147); and what its :s commands made,
@@ -155,6 +186,7 @@ private:
     bool mInGlobal = false;
     S32  mGlobalSubstitutions = 0;
     S32  mGlobalSubstitutedLines = 0;
+    std::unique_ptr<GlobalWalk> mGlobalWalk;
     // Whether the line being run was entered by a key typed (runEntered).
     bool mLineTyped = false;
 };

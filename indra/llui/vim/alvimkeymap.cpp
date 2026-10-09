@@ -7026,15 +7026,17 @@ void ALVimKeymap::takeLine(ALTextView& view, llwchar kind, const std::string& te
 {
     // Handed over whenever the window is done, whatever vim is doing then,
     // which ends as its own keys would end it: an insert as Escape does,
-    // the asking :s as q does, and a visual selection let go of for a :
-    // line as : lets it go -- a search line goes over it, as / does.
+    // the asking :s as q does -- what would follow it not run, for the
+    // line handed over to be the one that runs -- and a visual selection
+    // let go of for a : line as : lets it go -- a search line goes over
+    // it, as / does.
     if (inserting())
     {
         leaveInsert(view);
     }
     else if (mMode == Mode::Confirm)
     {
-        mEx->endConfirming(view);
+        mEx->endConfirming(view, false);
     }
     else if (kind == ':' && isVisual())
     {

@@ -856,37 +856,38 @@ namespace tut
         ensure_equals("\\_s reaches the next line, and the two lines are one", flat(e.text()), std::string("one joined four|five|"));
         keys(":%s/four\\n//<CR>");
         ensure_equals("\\n taken out joins the lines", flat(e.text()), std::string("one joined five|"));
-        // An asking :s under :g asks once, over every line's matches in
-        // order, after the :g has been through them.
+        // An asking :s under :g asks line by line, the :g waiting on each.
         e.setText("a x\nb\na y\na z\n");
         vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
         keys(":g/^a/s/a/A/c<CR>");
-        ensure("asking after the g", vim->mode() == ALVimKeymap::Mode::Confirm);
-        ensure_equals("three to ask about", e.highlights().size(), size_t(3));
+        ensure("asking", vim->mode() == ALVimKeymap::Mode::Confirm);
+        ensure_equals("the line's one to ask about", e.highlights().size(), size_t(1));
         ensure("the first line's first", e.selection().normalised() == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)));
         keys("yny");
         ensure_equals("the first and the third said yes to", flat(e.text()), std::string("A x|b|a y|A z|"));
         ensure("done", vim->mode() == ALVimKeymap::Mode::Normal);
         keys("u");
         ensure_equals("one step to undo for the lot", flat(e.text()), std::string("a x|b|a y|a z|"));
-        // A match over lines says so in the question; an error part way
-        // through a :g drops what was gathered and says so.
+        // A match over lines says so in the question.
         keys(":%s/x\\nb/Q/c<CR>");
         ensure_equals("the question says how many lines", vim->status(), std::string("replace with Q (over 2 lines) (y/n/a/q/l)?"));
         keys("q");
         // The lines are run from the top down: a line with none to
-        // substitute is no error under :g, as in vim, and the asking is
-        // over what the others gathered.
+        // substitute is no error under :g, as in vim.
         keys(":g/a/s/x/X/c<CR>");
         ensure("asking", vim->mode() == ALVimKeymap::Mode::Confirm);
         keys("y");
         ensure_equals("the one there was", flat(e.text()), std::string("a X|b|a y|a z|"));
+        ensure("done", vim->mode() == ALVimKeymap::Mode::Normal);
         keys("u");
-        // The first gathers its edit, the command after it errors.
+        // The first line asked about, then the command after it there,
+        // which errors, and the :g goes no further.
         keys(":g/a/s/x/X/c|nosuch<CR>");
-        ensure("not asking", vim->mode() == ALVimKeymap::Mode::Normal);
-        ensure_equals("the error, and that nothing was done", vim->message(), std::string("E492: Not an editor command: nosuch -- nothing substituted"));
-        ensure_equals("nothing was", flat(e.text()), std::string("a x|b|a y|a z|"));
+        ensure("asking first", vim->mode() == ALVimKeymap::Mode::Confirm);
+        keys("y");
+        ensure("then not", vim->mode() == ALVimKeymap::Mode::Normal);
+        ensure_equals("the error", vim->message(), std::string("E492: Not an editor command: nosuch"));
+        ensure_equals("what was said yes to made", flat(e.text()), std::string("a X|b|a y|a z|"));
     }
     template<> template<>
     void alvimkeymap_object::test<21>()
@@ -6476,5 +6477,49 @@ namespace tut
         ensure_equals("no : line: E30", vim->message(), std::string("E30: No previous command line"));
         keys("\"bp");
         ensure_equals("a register: E353", vim->message(), std::string("E353: Nothing in register b"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<216>()
+    {
+        set_test_name("an asking :s under :g asks line by line, as vim's: a, q and l each the line's own, and what follows its | run on the line once it is asked about, before the next");
+        const auto run = [&](const char* text, const char* line, const char* answers) {
+            make(text);
+            keys(line);
+            keys(answers);
+            return alvimkeymap_data::flat(editor->text());
+        };
+        ensure_equals("y and n", run("a1\nb\na2\na3", ":g/a/s/a/x/c<CR>", "yny"), std::string("x1|b|a2|x3"));
+        ensure_equals("a the line's rest", run("aa1\nb\naa2\na3", ":g/a/s/a/x/gc<CR>", "annn"), std::string("xx1|b|aa2|a3"));
+        ensure_equals("q the line's", run("a1\nb\na2\na3", ":g/a/s/a/x/c<CR>", "qyy"), std::string("a1|b|x2|x3"));
+        ensure_equals("l the line's", run("a1\nb\na2\na3", ":g/a/s/a/x/c<CR>", "lyy"), std::string("x1|b|x2|x3"));
+        ensure_equals("said once through, as the :g's", vim->message(), std::string("3 substitutions on 3 lines"));
+        ensure("done", vim->mode() == ALVimKeymap::Mode::Normal);
+
+        ensure_equals("what follows reads what the answer made", run("a1\nb\na2\na3", ":g/a/s/a/x/c|s/x/y/<CR>", "yny"), std::string("y1|b|a2|y3"));
+        ensure_equals("all said together", vim->message(), std::string("4 substitutions on 4 lines"));
+        keys("u");
+        ensure_equals("one step to undo", flat(editor->text()), std::string("a1|b|a2|a3"));
+        ensure_equals("a :d after it", run("a1\nb\na2\na3", ":g/a/s/a/x/c|d<CR>", "yny"), std::string("b"));
+        ensure_equals("its lines said", vim->message(), std::string("3 fewer lines"));
+        ensure_equals("run after a q too", run("a1 b\nb\na2 b\na3 b", ":g/a/s/a/x/c|s/b/B/<CR>", "nyq"), std::string("a1 B|b|x2 B|a3 B"));
+        ensure_equals("lines it adds not visited", run("ax\nb\nax", ":g/a/s/x/X/c|t.<CR>", "yy"), std::string("aX|aX|b|aX|aX"));
+        ensure_equals("an asking :s after it asks in turn", run("a x\nb\na x\na z", ":g/a/s/x/X/c|s/a/B/c<CR>", "ynyy"), std::string("a X|b|B X|a z"));
+        ensure("the last line's still asking", vim->mode() == ALVimKeymap::Mode::Confirm);
+        keys("<Esc>");
+        ensure_equals("Escape its q", flat(editor->text()), std::string("a X|b|B X|a z"));
+        ensure_equals("and the :g through", vim->message(), std::string("3 substitutions on 3 lines"));
+
+        // A line handed over while it waits ends the asking and the :g,
+        // what they made one step to undo.
+        run("a1\nb\na2", ":g/a/s/a/x/c|s/1/9/<CR>", "y");
+        ensure("waiting on the next line", vim->mode() == ALVimKeymap::Mode::Confirm);
+        ex("%s/b/Q/");
+        ensure_equals("the line run, nothing after the asking", flat(editor->text()), std::string("x9|Q|a2"));
+        ensure("and asking no more", vim->mode() == ALVimKeymap::Mode::Normal);
+        keys("u");
+        ensure_equals("its step", flat(editor->text()), std::string("x9|b|a2"));
+        keys("u");
+        ensure_equals("then the :g's", flat(editor->text()), std::string("a1|b|a2"));
     }
 }

@@ -132,7 +132,8 @@ public:
     // A line put up on the : or / line, as the history window hands one
     // back: to be edited and entered, or run as it is, as vim's window
     // runs the row Enter is pressed on. An insert or an asking :s still
-    // going ends first, as Escape and q end them.
+    // going ends first, as Escape and q end them, nothing after the :s
+    // run and a :g it is a line of let go of.
     void               takeLine(ALTextView& view, llwchar kind, const std::string& text, bool run = false);
     // What the mode last said: a pattern not found, lines yanked, a
     // command unknown; cleared by the next key.
