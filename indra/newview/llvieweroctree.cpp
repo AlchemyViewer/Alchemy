@@ -1249,22 +1249,6 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
                                                                  bounds[1][1]+SG_OCCLUSION_FUDGE,
                                                                  bounds[1][2]+OCCLUSION_FUDGE_Z);
 
-                        if (!use_depth_clamp && mSpatialPartition->mDrawableType == LLPipeline::RENDER_TYPE_VOIDWATER)
-                        {
-                            LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("doOcclusion - draw water");
-
-                            LLGLSquashToFarClip squash;
-                            if (camera->getOrigin().isExactlyZero())
-                            { //origin is invalid, draw entire box
-                                gPipeline.mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, 0);
-                                gPipeline.mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, b111*8);
-                            }
-                            else
-                            {
-                                gPipeline.mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(camera, bounds[0]));
-                            }
-                        }
-                        else
                         {
                             LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("doOcclusion - draw");
                             if (camera->getOrigin().isExactlyZero())
