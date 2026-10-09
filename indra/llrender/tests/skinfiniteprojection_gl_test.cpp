@@ -49,16 +49,19 @@ namespace tut
         constexpr F32 DISTANCES[] = { 1000.f, 8192.f, 32000.f, 100000.f };
 
         // A triangle covering the viewport at view distance `dist`, placed in eye space so the projection
-        // under test is what puts it on screen.
+        // under test is what puts it on screen; on the reverse-Z far plane instead when `far_plane` is set, as
+        // skyV.glsl puts the sky.
         const char* kVertex =
             "#version 400\n"
             "uniform mat4 proj;\n"
             "uniform float dist;\n"
             "uniform vec2 inv_scale;\n"
+            "uniform int far_plane;\n"
             "void main()\n"
             "{\n"
             "    vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0;\n"
             "    gl_Position = proj * vec4(p * inv_scale * dist, -dist, 1.0);\n"
+            "    if (far_plane != 0) gl_Position.z = 0.0;\n"
             "}\n";
 
         const char* kFragment =
@@ -181,12 +184,13 @@ namespace tut
             glClear(GL_DEPTH_BUFFER_BIT);
         }
 
-        void draw(const LLMatrix4a& proj, F32 dist)
+        void draw(const LLMatrix4a& proj, F32 dist, bool far_plane = false)
         {
             glUseProgram(mProgram);
             glUniformMatrix4fv(glGetUniformLocation(mProgram, "proj"), 1, GL_FALSE, proj.getF32ptr());
             glUniform1f(glGetUniformLocation(mProgram, "dist"), dist);
             glUniform2f(glGetUniformLocation(mProgram, "inv_scale"), 1.f / proj.getRow<0>()[0], 1.f / proj.getRow<1>()[1]);
+            glUniform1i(glGetUniformLocation(mProgram, "far_plane"), far_plane ? 1 : 0);
             glBindVertexArray(mVAO);
             glDrawArrays(GL_TRIANGLES, 0, 3);
             glBindVertexArray(0);
@@ -327,6 +331,47 @@ namespace tut
             draw(proj, dist);
             ensure_equals("farther drawn second loses at " + at, centreDepth(), d_near);
         }
+        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+    }
+
+    // The sky draws last, on the far plane, writing no depth, and the depth test spares it every pixel the world
+    // covered (skyV.glsl). Under the infinite projection the far plane is the cleared depth exactly and geometry as
+    // far out as reconstruction reaches still stores more, so the sky passes where nothing was drawn and nowhere else.
+    template<> template<>
+    void skinfiniteprojection_object_t::test<5>()
+    {
+        setUp();
+        const LLMatrix4a proj = infinite();
+        GLuint query = 0;
+        glGenQueries(1, &query);
+        const auto sky_samples = [&]()
+        {
+            glDepthFunc(GL_GEQUAL);
+            glDepthMask(GL_FALSE);
+            glBeginQuery(GL_SAMPLES_PASSED, query);
+            draw(proj, 1000.f, true);
+            glEndQuery(GL_SAMPLES_PASSED);
+            glDepthMask(GL_TRUE);
+            glDepthFunc(GL_GREATER);
+            GLuint samples = 0;
+            glGetQueryObjectuiv(query, GL_QUERY_RESULT, &samples);
+            return samples;
+        };
+
+        glClear(GL_DEPTH_BUFFER_BIT);
+        ensure_equals("the sky fills an empty frame", sky_samples(), (GLuint)(SIZE * SIZE));
+        ensure_equals("the sky leaves the cleared depth", centreDepth(), 0.f);
+
+        for (F32 dist : { 1000.f, 100000.f, SK_RECONSTRUCT_FAR })
+        {
+            const std::string at = std::to_string((S32)dist) + " m";
+            glClear(GL_DEPTH_BUFFER_BIT);
+            draw(proj, dist);
+            ensure("geometry at " + at + " stores more than the far plane", centreDepth() > 0.f);
+            ensure_equals("the sky stays behind geometry at " + at, sky_samples(), (GLuint)0);
+        }
+
+        glDeleteQueries(1, &query);
         ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
     }
 }
