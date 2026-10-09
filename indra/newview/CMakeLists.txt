@@ -269,6 +269,8 @@ if(AL_BUILD_VIEWER)
     alobjectproperties.cpp
     alagentlocationformat.cpp
     alcrashreporter.cpp
+    alfeedback.cpp
+    alfeedback_send.cpp
     alpanelaomini.cpp
     alparceliconstrip.cpp
     alpanelaopulldown.cpp
@@ -1138,6 +1140,7 @@ if(AL_BUILD_VIEWER)
     alobjectproperties.h
     alagentlocationformat.h
     alcrashreporter.h
+    alfeedback.h
     alpanelaomini.h
     alparceliconstrip.h
     alpanelaopulldown.h
@@ -2499,6 +2502,7 @@ if(AL_BUILD_TESTS)
     alcrashreporter
     alcurvemodel
     aldaycyclelandmarks
+    alfeedback
     algradehistory
     almotionpredictor
     alsceneexplorerpredicate
