@@ -39,13 +39,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gImageFieldTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gImageFieldTestAnonName;
-}
-
 namespace tut
 {
     struct alimagefield_data

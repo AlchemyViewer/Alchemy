@@ -41,13 +41,6 @@
 #include <string>
 #include <vector>
 
-class LLAvatarName;
-const std::string gDiffGLTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gDiffGLTestAnonName;
-}
-
 namespace
 {
     constexpr S32 W = ll_test::HeadlessGL::WIDTH;

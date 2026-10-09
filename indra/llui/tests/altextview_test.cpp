@@ -49,15 +49,6 @@
 #include <set>
 #include <string>
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gViewTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gViewTestAnonName;
-}
-
 namespace ll_test
 {
     // What a test reaches inside the view for: how long Next Misspelling

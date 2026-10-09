@@ -46,13 +46,6 @@
 #include <string>
 #include <vector>
 
-class LLAvatarName;
-const std::string gStudioFloaterTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gStudioFloaterTestAnonName;
-}
-
 namespace
 {
     // A studio with nothing in it but what every studio has.

@@ -658,7 +658,14 @@ if(AL_BUILD_TESTS)
     LIBRARIES ${test_libs}
   )
 
-  set(test_libs llui ${test_libs})
+  # What llui asks the viewer for, defined once: compiled here and linked
+  # into every test and benchmark below, which link the library. A test
+  # file holds no copy of its own, since two in one binary would not link.
+  add_library(llui_test_fakes OBJECT tests/llui_test_fakes.cpp)
+  target_link_libraries(llui_test_fakes PRIVATE al::flags llcommon)
+  set_target_properties(llui_test_fakes PROPERTIES FOLDER "Tests/llui")
+
+  set(test_libs llui llui_test_fakes ${test_libs})
   foreach(
     test
     llstatbar

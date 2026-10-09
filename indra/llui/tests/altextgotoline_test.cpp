@@ -41,13 +41,6 @@
 #include <string>
 #include <vector>
 
-class LLAvatarName;
-const std::string gGoToLineTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gGoToLineTestAnonName;
-}
-
 // A place, as a failed check says it.
 std::ostream& operator<<(std::ostream& out, const ALTextPos& pos)
 {

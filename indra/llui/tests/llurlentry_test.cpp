@@ -83,12 +83,6 @@ S32 LLUIImage::getHeight() const
 }
 |*==========================================================================*/
 
-const std::string anonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& avName)
-{
-    return anonName;
-}
-
 namespace tut
 {
     struct LLUrlEntryData

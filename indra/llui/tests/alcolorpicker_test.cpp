@@ -33,13 +33,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gColorPickerTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gColorPickerTestAnonName;
-}
-
 namespace tut
 {
     struct alcolorpicker_data

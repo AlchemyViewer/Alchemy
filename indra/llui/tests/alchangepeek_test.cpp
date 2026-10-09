@@ -40,13 +40,6 @@
 #include <string>
 #include <vector>
 
-class LLAvatarName;
-const std::string gPeekTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gPeekTestAnonName;
-}
-
 namespace tut
 {
     struct alchangepeek_data

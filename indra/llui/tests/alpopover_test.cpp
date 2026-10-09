@@ -37,13 +37,6 @@
 
 #include <vector>
 
-class LLAvatarName;
-const std::string gPopoverTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gPopoverTestAnonName;
-}
-
 namespace tut
 {
     struct alpopover_data

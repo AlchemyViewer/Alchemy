@@ -39,13 +39,6 @@
 
 #include <fstream>
 
-class LLAvatarName;
-const std::string gCatalogTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gCatalogTestAnonName;
-}
-
 namespace tut
 {
     // A skin tree of two skins and two languages: one floater in every

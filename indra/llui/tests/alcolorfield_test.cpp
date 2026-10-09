@@ -39,13 +39,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gColorFieldTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gColorFieldTestAnonName;
-}
-
 namespace tut
 {
     struct alcolorfield_data

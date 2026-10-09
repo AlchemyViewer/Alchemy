@@ -37,13 +37,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gMenuSlotTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gMenuSlotTestAnonName;
-}
-
 namespace tut
 {
     struct almenuslot_data

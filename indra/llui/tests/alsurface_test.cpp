@@ -35,13 +35,6 @@
 #include <cmath>
 #include <string>
 
-class LLAvatarName;
-const std::string gSurfaceTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gSurfaceTestAnonName;
-}
-
 namespace tut
 {
     struct alsurface_data

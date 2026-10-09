@@ -36,13 +36,6 @@
 
 #include <string>
 
-class LLAvatarName;
-const std::string gOutputTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gOutputTestAnonName;
-}
-
 namespace tut
 {
     struct aloutputview_data

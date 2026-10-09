@@ -46,13 +46,6 @@
 #include <algorithm>
 #include <cstring>
 
-class LLAvatarName;
-const std::string gLintTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gLintTestAnonName;
-}
-
 namespace tut
 {
     // Every element here is a panel. The rules that read the document

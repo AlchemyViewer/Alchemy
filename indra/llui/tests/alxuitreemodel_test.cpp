@@ -42,13 +42,6 @@
 
 #include <boost/unordered_map.hpp>
 
-class LLAvatarName;
-const std::string gTreeModelTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gTreeModelTestAnonName;
-}
-
 // Two functors the folder view declares and the viewer's inventory code
 // defines; linking the folder view pulls them, and nothing here runs them.
 void LLOpenFilteredFolders::doFolder(LLFolderViewFolder* folder) {}

@@ -33,13 +33,6 @@
 
 #include <fstream>
 
-class LLAvatarName;
-const std::string gDocumentsTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gDocumentsTestAnonName;
-}
-
 namespace tut
 {
     struct alxuidocuments_data

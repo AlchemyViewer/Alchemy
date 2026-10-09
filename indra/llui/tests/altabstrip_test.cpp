@@ -36,13 +36,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gTabStripTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gTabStripTestAnonName;
-}
-
 namespace tut
 {
     struct altabstrip_data

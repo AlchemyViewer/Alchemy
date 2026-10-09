@@ -41,13 +41,6 @@
 #include <string>
 #include <vector>
 
-class LLAvatarName;
-const std::string gSurfaceGLTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gSurfaceGLTestAnonName;
-}
-
 namespace
 {
     constexpr S32 W = ll_test::HeadlessGL::WIDTH;

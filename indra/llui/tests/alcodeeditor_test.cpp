@@ -46,13 +46,6 @@
 #include <string>
 #include <vector>
 
-class LLAvatarName;
-const std::string gCodeTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gCodeTestAnonName;
-}
-
 namespace ll_test
 {
     // The colours the view works out for a row's glyphs, as it draws them.

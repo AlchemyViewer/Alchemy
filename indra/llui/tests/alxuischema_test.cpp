@@ -46,13 +46,6 @@
 
 #include <algorithm>
 
-class LLAvatarName;
-const std::string gSchemaTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gSchemaTestAnonName;
-}
-
 namespace tut
 {
     struct alxuischema_data

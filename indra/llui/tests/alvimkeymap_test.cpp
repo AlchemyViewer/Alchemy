@@ -37,13 +37,6 @@
 
 #include <string>
 
-class LLAvatarName;
-const std::string gVimTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gVimTestAnonName;
-}
-
 namespace ll_test
 {
     // How long a search for a misspelling may check lines for.

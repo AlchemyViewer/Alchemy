@@ -42,13 +42,6 @@
 #include <string>
 #include <vector>
 
-class LLAvatarName;
-const std::string gKeyCaptureTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gKeyCaptureTestAnonName;
-}
-
 namespace tut
 {
     struct alkeycapture_data

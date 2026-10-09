@@ -46,13 +46,6 @@
 #include <string>
 #include <vector>
 
-class LLAvatarName;
-const std::string gDiffTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gDiffTestAnonName;
-}
-
 namespace tut
 {
     struct aldiffview_data

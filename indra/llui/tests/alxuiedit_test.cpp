@@ -41,13 +41,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gEditTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gEditTestAnonName;
-}
-
 namespace tut
 {
     // Every element here is a panel: a widget that draws text cannot be

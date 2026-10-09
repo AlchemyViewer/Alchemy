@@ -36,13 +36,6 @@
 
 #include <cstring>
 
-class LLAvatarName;
-const std::string gSourceMapTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gSourceMapTestAnonName;
-}
-
 namespace tut
 {
     struct alxuisourcemap_data

@@ -42,13 +42,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gFontFieldTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gFontFieldTestAnonName;
-}
-
 namespace tut
 {
     struct alfontfield_data

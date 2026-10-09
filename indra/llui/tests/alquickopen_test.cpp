@@ -30,27 +30,15 @@
 #include "llfontgl.h"
 #include "alpopover.h"
 
+#include "../llfloater.h"
+#include "../llfocusmgr.h"
 #include "../lllineeditor.h"
 #include "../llscrolllistctrl.h"
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
 
-#include "../llfloater.h"
-#include "../llfocusmgr.h"
-#include "../lllineeditor.h"
-#include "../lluictrlfactory.h"
-
-#include "alheadlessui_fixture.h"
-
 #include "../test/lltut.h"
-
-class LLAvatarName;
-const std::string gQuickTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gQuickTestAnonName;
-}
 
 namespace tut
 {
@@ -78,14 +66,6 @@ namespace tut
             return order.empty() ? std::string() : all[order.front()].label;
         }
     };
-
-    // Something in the widgets' own library asks the world for this.
-    class LLAvatarName;
-    const std::string gQuickTestAnonName("Anon");
-    const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-    {
-        return gQuickTestAnonName;
-    }
 
     typedef test_group<alquickopen_data> alquickopen_test;
     typedef alquickopen_test::object     alquickopen_object;

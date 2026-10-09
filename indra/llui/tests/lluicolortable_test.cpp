@@ -30,13 +30,6 @@
 
 #include <sstream>
 
-class LLAvatarName;
-const std::string gColorTableTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gColorTableTestAnonName;
-}
-
 namespace tut
 {
     // The table is a singleton and lives across the tests; each uses names

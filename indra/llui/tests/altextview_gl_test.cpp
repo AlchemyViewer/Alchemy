@@ -46,13 +46,6 @@
 #include <string>
 #include <vector>
 
-class LLAvatarName;
-const std::string gTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gTestAnonName;
-}
-
 namespace
 {
     // The drawing the text view does, from outside it.
