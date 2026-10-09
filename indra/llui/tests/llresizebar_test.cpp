@@ -214,6 +214,12 @@ namespace tut
         }
 
         LLUICtrlFactory::instance().pushFileName("panel_people.xml");
+        // Popped however the test ends: the factory's stack of file names
+        // is the process's, and the next file built would be named by this.
+        struct Popped
+        {
+            ~Popped() { LLUICtrlFactory::instance().popFileName(); }
+        } popped;
         const std::string before = LLUICtrlFactory::instance().getCurFileName();
 
         LLXMLNodePtr node;
@@ -227,7 +233,6 @@ namespace tut
                !panel->initPanelXML(node, nullptr, LLUICtrlFactory::getDefaultParams<LLPanel>()));
 
         const std::string after = LLUICtrlFactory::instance().getCurFileName();
-        LLUICtrlFactory::instance().popFileName();
         ensure_equals("and left the file name where it found it", after, before);
     }
 }

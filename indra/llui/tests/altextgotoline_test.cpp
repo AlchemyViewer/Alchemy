@@ -34,6 +34,7 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
@@ -64,6 +65,9 @@ namespace tut
     struct altextgotoline_data
     {
         ll_test::HeadlessUI& ui     = ll_test::HeadlessUI::get();
+        // Focus and capture as the test found them, whatever it leaves
+        // them on.
+        ll_test::FocusScope  focus;
         Window*              window = nullptr;
         ALTextView*          view   = nullptr;
         ALQuickAsk           asker;

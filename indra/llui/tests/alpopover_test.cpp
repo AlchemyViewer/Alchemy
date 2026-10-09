@@ -276,20 +276,25 @@ namespace tut
         {
             Remembering(const LLFloater::Params& p) : ALPopover(p) {}
         };
+        // Kinds of its own each time it runs: the sizes are kept for the
+        // process, and a kind seen before would open at what it was left at.
+        static S32        runs       = 0;
+        const std::string kind       = "popover_test_kind_" + std::to_string(++runs);
+        const std::string other_kind = "popover_test_other_" + std::to_string(runs);
         LLPanel* over = anchor();
-        ALPopover* first = new Remembering(ALPopover::paramsRemembered("popover_test_kind", 200, 120));
+        ALPopover* first = new Remembering(ALPopover::paramsRemembered(kind, 200, 120));
         first->openBeside(over);
         ensure_equals("opens at the size given", first->getRect().getWidth(), 200);
         first->reshape(260, 150);
         first->closeFloater();
 
-        ALPopover* second = new Remembering(ALPopover::paramsRemembered("popover_test_kind", 200, 120));
+        ALPopover* second = new Remembering(ALPopover::paramsRemembered(kind, 200, 120));
         second->openBeside(over);
         ensure_equals("the next of its kind opens as wide as the last was left", second->getRect().getWidth(), 260);
         ensure_equals("and as tall", second->getRect().getHeight(), 150);
         second->closeFloater();
 
-        ALPopover* other = new Remembering(ALPopover::paramsRemembered("popover_test_other", 200, 120));
+        ALPopover* other = new Remembering(ALPopover::paramsRemembered(other_kind, 200, 120));
         other->openBeside(over);
         ensure_equals("another kind is not told", other->getRect().getWidth(), 200);
         other->closeFloater();

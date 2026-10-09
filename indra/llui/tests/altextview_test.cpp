@@ -716,7 +716,17 @@ namespace tut
         }
         const std::string agent  = "secondlife:///app/agent/11111111-1111-1111-1111-111111111111/about";
         const std::string object = "secondlife:///app/objectim/22222222-2222-2222-2222-222222222222?name=Thing";
-        // Nothing installed: nothing changes.
+        // Nothing installed: nothing changes. And nothing left installed when
+        // the test ends, a failed check included, for the next to find.
+        struct Uninstalled
+        {
+            ~Uninstalled()
+            {
+                LLUrlAction::setIsFriendCallback(nullptr);
+                LLUrlAction::setIsObjectBlockedCallback(nullptr);
+                LLUrlAction::setIsObjectReachableCallback(nullptr);
+            }
+        } uninstalled;
         LLUrlAction::setIsFriendCallback(nullptr);
         LLUrlAction::setIsObjectBlockedCallback(nullptr);
         LLUrlAction::setIsObjectReachableCallback(nullptr);
@@ -737,9 +747,6 @@ namespace tut
         menu->getChild<LLView>("zoom_in")->setEnabled(true);
         LLUrlAction::adjustMenu(menu, object, true, true, false);
         ensure("the zoom item left alone when not asked", menu->getChild<LLView>("zoom_in")->getEnabled());
-        LLUrlAction::setIsFriendCallback(nullptr);
-        LLUrlAction::setIsObjectBlockedCallback(nullptr);
-        LLUrlAction::setIsObjectReachableCallback(nullptr);
         menu->die();
     }
     template<> template<>

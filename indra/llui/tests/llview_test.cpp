@@ -27,6 +27,8 @@
 #include "../llview.h"
 #include "../llfocusmgr.h"
 
+#include "aluistatescope.h"
+
 #include "../test/lltut.h"
 
 namespace tut
@@ -386,6 +388,9 @@ namespace tut
         TestView* their_combo = view("combo");
         mine->addChild(my_combo);
         theirs->addChild(their_combo);
+        // Let go of before the views it is given to are deleted, a failed
+        // check included: a plain view does not let go of it itself.
+        ll_test::FocusScope focus;
 
         gFocusMgr.setKeyboardFocus(my_combo);
         ensure("the view holding it owns the child", mine->childHasKeyboardFocus("combo"));

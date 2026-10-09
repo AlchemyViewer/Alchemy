@@ -33,6 +33,7 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
@@ -81,6 +82,9 @@ namespace tut
     struct alcanvasview_data
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
+        // Focus and capture as the test found them, whatever it leaves
+        // them on.
+        ll_test::FocusScope  focus;
 
         // The room a surface is shown in, in these tests.
         static constexpr S32 ROOM_W = 700;

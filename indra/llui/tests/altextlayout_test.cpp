@@ -564,6 +564,9 @@ namespace tut
             text += "value" + std::to_string(i % 97) + " = f(x, [y, z]) + ";
         }
         ready(text.c_str());
+        // Counted from empty: the cache is the process's, and one an earlier
+        // test had filled would trade a piece for a piece and not grow.
+        ALFontShaping::clearCache();
         const size_t              before = ALFontShaping::cacheSize();
         const ALTextLayout::Line& line   = layout.line(0);
         ensure("shaped in pieces", ALFontShaping::cacheSize() > before + 10);

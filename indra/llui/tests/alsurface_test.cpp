@@ -29,6 +29,7 @@
 #include "../lluicolortable.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
@@ -89,8 +90,9 @@ namespace tut
         {
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        // The skin's, told here before any part is first asked for: nothing
-        // loads a skin's colours in a test.
+        // The skin's, told here: nothing loads a skin's colours in a test.
+        // Taken back after, since every surface drawn later would read them.
+        ll_test::ColorTableScope colours;
         LLUIColorTable& table = LLUIColorTable::instance();
         table.setColor("DefaultShadowLight", LLColor4(0.1f, 0.1f, 0.1f, 1.f));
         table.setColor("LabelDisabledColor", LLColor4(0.2f, 0.3f, 0.4f, 1.f));

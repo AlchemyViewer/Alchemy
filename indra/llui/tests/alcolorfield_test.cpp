@@ -36,8 +36,11 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
+
+#include <optional>
 
 namespace tut
 {
@@ -54,7 +57,17 @@ namespace tut
             {
                 loaded = LLUIColorTable::instance().loadFromSettings();
             }
+            colours.emplace();
         }
+
+        // What a test sets in the table, set back when it ends; begun once
+        // the skin's colours are in, which every test here reads.
+        std::optional<ll_test::ColorTableScope> colours;
+        ll_test::FocusScope                     focus;
+
+        // A popover left open holds the keys, and the next test looking for
+        // the popover showing would find it before its own.
+        ~alcolorfield_data() { ll_test::escapePopovers(); }
 
         static ALColorField* make()
         {

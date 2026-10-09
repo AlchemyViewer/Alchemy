@@ -42,6 +42,7 @@
 #include <type_traits>
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
@@ -150,7 +151,7 @@ namespace tut
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
         TestFloater* f = floater();     // parents itself into gFloaterView
 
         ensure("a floater is a floater", f->as<LLFloater>() == f);
@@ -188,7 +189,6 @@ namespace tut
         ensure("its parent is its stack", lp->getParentAs<LLLayoutStack>() == s.get());
 
         fv.reset();
-        gFloaterView = nullptr;
     }
 
     // The parent as a kind, and the nearest ancestor of a kind.
@@ -201,7 +201,7 @@ namespace tut
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
         TestFloater* f = floater();
         TestView* inner = view("inner");
         f->addChild(inner);
@@ -215,7 +215,6 @@ namespace tut
         ensure("no ancestor is a type with no kind", inner->getParentByType<TestCtrl>() == nullptr);
 
         fv.reset();
-        gFloaterView = nullptr;
     }
 
     // A view being destroyed answers for the base that is left, as

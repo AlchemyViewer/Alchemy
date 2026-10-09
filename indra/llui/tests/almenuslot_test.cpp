@@ -43,6 +43,8 @@ namespace tut
     {
         ll_test::HeadlessUI& ui     = ll_test::HeadlessUI::get();
         LLMenuHolderGL*      holder = nullptr;
+        // Put back when the test ends, rather than left null for the next.
+        LLMenuHolderGL*      container_before = LLMenuGL::sMenuContainer;
 
         almenuslot_data()
         {
@@ -61,7 +63,7 @@ namespace tut
 
         ~almenuslot_data()
         {
-            LLMenuGL::sMenuContainer = nullptr;
+            LLMenuGL::sMenuContainer = container_before;
             LLMortician::updateClass();
             delete holder;
         }

@@ -33,6 +33,7 @@
 #include "llcontrol.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
@@ -108,7 +109,11 @@ namespace tut
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
-        LLControlVariable* setting = config().declareBOOL("RadioGroupTestChoice", false, std::string("A yes or no"));
+        // Back to its default when the test ends: declared again, a setting
+        // keeps the value it has, so a second run would start where this
+        // one left it.
+        ll_test::SettingsScope settings;
+        LLControlVariable* setting = settings.keep(config().declareBOOL("RadioGroupTestChoice", false, std::string("A yes or no")));
         LLRadioGroup* group = choice("stay", "open");
         group->setControlName("RadioGroupTestChoice");
         ensure_equals("no is the first item", group->getSelectedIndex(), 0);
@@ -134,7 +139,11 @@ namespace tut
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
-        LLControlVariable* setting = config().declareBOOL("RadioGroupTestNamed", true, std::string("A yes or no"));
+        // Back to its default when the test ends: declared again, a setting
+        // keeps the value it has, so a second run would start where this
+        // one left it.
+        ll_test::SettingsScope settings;
+        LLControlVariable* setting = settings.keep(config().declareBOOL("RadioGroupTestNamed", true, std::string("A yes or no")));
         LLRadioGroup* group = choice("false", "true");
         group->setControlName("RadioGroupTestNamed");
         ensure_equals("yes is the item named true", group->getSelectedIndex(), 1);

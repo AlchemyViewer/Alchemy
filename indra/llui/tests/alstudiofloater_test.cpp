@@ -40,6 +40,7 @@
 #include "llcontrol.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
@@ -244,6 +245,10 @@ namespace tut
         {
             config->declareLLSD(setting, LLSD(), "a test studio's state", LLControlVariable::PERSIST_NO);
         }
+        // Emptied when the test ends, so a studio made later under the same
+        // setting does not open where this one was saved.
+        ll_test::SettingsScope settings;
+        settings.keep(config->getControl(setting).get());
         TestStudio* window = studio(setting);
         window->setCanMinimize(true);
         const LLRect whole = window->getRect();
@@ -457,7 +462,7 @@ namespace tut
     void alstudiofloater_object::test<10>()
     {
         set_test_name("two keys written apart; a menu item shows keys it does not answer to, and a key it answers to in their place");
-        LLKeyboard::setStringTranslatorFunc([](std::string_view name) { return std::string(name); });
+        ll_test::KeyNamesScope key_names([](std::string_view name) { return std::string(name); });
         const ALKeyChord two{ 'S', MASK_NONE, 'K', MASK_CONTROL };
         ensure_equals("the two", two.describe(), LLKeyboard::stringFromAccelerator(MASK_CONTROL, 'K') + " " + LLKeyboard::stringFromAccelerator(MASK_NONE, 'S'));
         ensure_equals("one", ALKeyChord{ 'S', MASK_CONTROL }.describe(), LLKeyboard::stringFromAccelerator(MASK_CONTROL, 'S'));

@@ -39,6 +39,7 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 #include "altextviewprobe.h"
 
 #include "../test/lltut.h"
@@ -53,13 +54,16 @@ namespace tut
     {
         ll_test::HeadlessUI& ui     = ll_test::HeadlessUI::get();
         ALCodeEditor*        editor = nullptr;
+        // Every editor a test made, the last of them being editor: a test
+        // that makes more than one leaves none of them behind alive.
+        std::vector<ALCodeEditor*> made;
 
         ~alcodeeditor_data()
         {
             gFocusMgr.setKeyboardFocus(nullptr);
-            if (editor)
+            for (ALCodeEditor* each : made)
             {
-                editor->die();
+                each->die();
             }
         }
 
@@ -75,6 +79,7 @@ namespace tut
             p.default_text = text;
             p.syntax       = syntax;
             editor         = LLUICtrlFactory::create<ALCodeEditor>(p);
+            made.push_back(editor);
             editor->setFont(LLFontGL::getFontMonospace());
             editor->setFocus(true);
             return *editor;
@@ -3604,7 +3609,9 @@ namespace tut
     {
         set_test_name("a fix previewed inside a block comment colours what it makes as the comment it is in, not as code");
         // The skin's colours for the kinds, told before the editor reads
-        // them: nothing loads a skin's colours in a test.
+        // them: nothing loads a skin's colours in a test. Taken back after,
+        // since every editor made later would read them.
+        ll_test::ColorTableScope colours;
         LLUIColorTable& table = LLUIColorTable::instance();
         table.setColor("SyntaxComment", LLColor4(0.f, 0.5f, 0.f, 1.f));
         table.setColor("SyntaxNumber", LLColor4(0.f, 0.f, 0.8f, 1.f));

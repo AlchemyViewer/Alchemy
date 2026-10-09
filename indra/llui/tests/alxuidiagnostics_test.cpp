@@ -29,6 +29,7 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
@@ -118,7 +119,7 @@ namespace tut
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
 
         {
             ALXUIDiagnostics sink;
@@ -155,7 +156,6 @@ namespace tut
         ensure("the sink detaches when it dies", ALXUIDiagnostics::active() == nullptr);
 
         fv.reset();
-        gFloaterView = nullptr;
     }
 
     // The attributes of a child widget fail against the parent's parameter
@@ -171,7 +171,7 @@ namespace tut
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
 
         ALXUIDiagnostics sink;
         LLFloater* view = build(fv.get());
@@ -183,6 +183,5 @@ namespace tut
                !has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 0, "name"));
 
         fv.reset();
-        gFloaterView = nullptr;
     }
 }

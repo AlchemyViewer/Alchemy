@@ -53,6 +53,14 @@ namespace tut
             {
                 editor->die();
             }
+            // Reaped now, as the next frame would: test 73 empties the
+            // graveyard itself, and then finds only its own views there.
+            LLMortician::updateClass();
+            // What a test yanked or deleted is not the next one's to put.
+            if (LLClipboard::instanceExists())
+            {
+                LLClipboard::instance().reset();
+            }
         }
 
         ALCodeEditor& make(const char* text, const char* syntax = "lsl", bool auto_complete = false)

@@ -43,6 +43,7 @@
 #include "v3math.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
@@ -54,6 +55,26 @@ namespace tut
     struct alsettingrow_data
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
+        // The settings a test asked for, put back to their defaults when it
+        // ends as well as when the next asks.
+        ll_test::SettingsScope settings;
+        bool                   gave_words = false;
+
+        // What the reset button's words were given, taken back: nothing else
+        // in these tests gives LLTrans strings, and it has no way to hand
+        // back what it held, so it is left as empty as it was found.
+        ~alsettingrow_data()
+        {
+            if (gave_words)
+            {
+                const std::string none = "<strings></strings>";
+                LLXMLNodePtr      node;
+                if (LLXMLNode::parseBuffer(none.data(), none.size(), node))
+                {
+                    LLTrans::parseStrings(node, {});
+                }
+            }
+        }
 
         static LLControlGroup& config()
         {
@@ -62,7 +83,7 @@ namespace tut
 
         // One setting per test, put back to its default, so no test sees what
         // another left behind.
-        static LLControlVariable* setting(const std::string& name, F32 value)
+        LLControlVariable* setting(const std::string& name, F32 value)
         {
             LLControlVariable* control = config().getControl(name).get();
             if (!control)
@@ -70,7 +91,7 @@ namespace tut
                 control = config().declareF32(name, value, std::string("A setting row test value"));
             }
             control->resetToDefault(false);
-            return control;
+            return settings.keep(control);
         }
 
         static ALSettingRow::Params params(const std::string& control_name, F32 min_value = 0.f,
@@ -99,20 +120,17 @@ namespace tut
         }
 
         // What the reset button says, as the viewer's strings have it:
-        // nothing here loads them.
-        static void resetWords()
+        // nothing here loads them. Given for each test that asks, since
+        // parsing strings anywhere replaces every string there was.
+        void resetWords()
         {
-            static bool given = false;
-            if (!given)
-            {
-                const std::string source = "<strings><string name=\"SettingRowReset\">Reset to [VALUE]</string></strings>";
-                LLXMLNodePtr      node;
-                given = LLXMLNode::parseBuffer(source.data(), source.size(), node) && LLTrans::parseStrings(node, {});
-            }
+            const std::string source = "<strings><string name=\"SettingRowReset\">Reset to [VALUE]</string></strings>";
+            LLXMLNodePtr      node;
+            gave_words = LLXMLNode::parseBuffer(source.data(), source.size(), node) && LLTrans::parseStrings(node, {});
         }
 
         // A vector setting, put back to its default.
-        static LLControlVariable* vector(const std::string& name, const LLVector3& value)
+        LLControlVariable* vector(const std::string& name, const LLVector3& value)
         {
             LLControlVariable* control = config().getControl(name).get();
             if (!control)
@@ -120,7 +138,7 @@ namespace tut
                 control = config().declareVec3(name, value, std::string("A setting row test vector"));
             }
             control->resetToDefault(false);
-            return control;
+            return settings.keep(control);
         }
 
         static bool sameParts(const LLSD& value, F64 x, F64 y, F64 z)

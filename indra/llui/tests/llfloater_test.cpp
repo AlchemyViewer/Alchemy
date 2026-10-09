@@ -29,6 +29,7 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
@@ -76,7 +77,7 @@ namespace tut
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
 
         LLFloater::Params fp;
         fp.name = "floater";
@@ -94,7 +95,6 @@ namespace tut
         delete v;
 
         fv.reset();
-        gFloaterView = nullptr;
     }
 
     // Built from a tree the caller already holds rather than from the file
@@ -112,7 +112,7 @@ namespace tut
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
 
         const std::string xml =
             "<floater name=\"built\" title=\"Held in memory\" width=\"123\" height=\"45\"/>";
@@ -128,7 +128,6 @@ namespace tut
         ensure_equals("and titled what it says", f->getTitle(), std::string("Held in memory"));
 
         fv.reset();
-        gFloaterView = nullptr;
     }
 
     // A floater's strings are parameters written as elements, and every
@@ -149,7 +148,7 @@ namespace tut
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
 
         const std::string xml =
             "<floater name=\"strings\" width=\"200\" height=\"100\">"
@@ -198,6 +197,5 @@ namespace tut
         ensure_equals("with nothing left under it", panel_node->getChildCount(), 0u);
 
         fv.reset();
-        gFloaterView = nullptr;
     }
 }
