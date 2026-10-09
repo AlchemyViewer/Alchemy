@@ -49,8 +49,8 @@ vec3 srgb_to_linear(vec3 col);
 
 // return colors in sRGB space
 // inPositionEye and light_dir are in eye space. The haze is worked in the sky dome's frame (eyeToSky), where y is
-// altitude and lightnorm lies: in eye space the camera's pitch would change how much haze a point gets, and its yaw
-// would move the sun's glow.
+// altitude: in eye space the altitude limit below would follow the camera's pitch, and far geometry looked at from
+// above or below would take a fraction of its haze.
 void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, out vec3 sunlit, out vec3 amblit, out vec3 additive,
                          out vec3 atten)
 {
@@ -91,9 +91,9 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
     atten = combined_haze.rgb;
 
     // compute haze glow
-    // rel_pos is eye space, so the angle to the light is taken against light_dir, which callers pass in
-    // eye space. lightnorm is world space (its .y is the elevation used above): dotted against an eye
-    // space position it put the hotspot wherever the camera's heading happened to put it.
+    // the angle to the light, against light_dir: rel_pos and light_dir are in the same frame, the sky's,
+    // turned there together above. lightnorm, held no lower than 0.1 below the horizon, is for the
+    // sunlight's path above.
     float haze_glow = 1. - dot(rel_pos_norm, light_dir);
     // haze_glow is 0 at the sun and increases away from sun
     // set a minimum "angle" (smaller allows a tighter, brighter hotspot). WindLight's objects used .03;
