@@ -114,7 +114,7 @@
                     layout="topleft"
                     left_delta="5"
                     min_val="0"
-                    max_val="3.0"
+                    max_val="2.0"
                     name="mie_exponential"
                     label="Mie Exponential Term:"
                     top_pad="12"
