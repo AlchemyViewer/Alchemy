@@ -66,7 +66,7 @@ namespace tut
 
     typedef test_group<trace> trace_t;
     typedef trace_t::object trace_object_t;
-    tut::trace_t tut_singleton("LLTrace");
+    tut::trace_t tut_lltrace("LLTrace");
 
     static CountStatHandle<S32> sCupsOfCoffeeConsumed("coffeeconsumed", "Delicious cup of dark roast.");
     static SampleStatHandle<F32Milligrams> sCaffeineLevelStat("caffeinelevel", "Coffee buzz quotient");

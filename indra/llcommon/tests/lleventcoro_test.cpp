@@ -258,8 +258,9 @@ namespace tut
         ensure_equals(result.asInteger(), 18);
     }
 
+    // A coroutine consumes what a PUMP holds for it, one value a wait.
     template <class PUMP>
-    void test()
+    static void check_coro_consumes()
     {
         PUMP pump(typeid(PUMP).name());
         bool running{false};
@@ -324,13 +325,13 @@ namespace tut
     void object::test<6>()
     {
         set_test_name("LLEventMailDrop");
-        tut::test<LLEventMailDrop>();
+        check_coro_consumes<LLEventMailDrop>();
     }
 
     template<> template<>
     void object::test<7>()
     {
         set_test_name("LLEventLogProxyFor<LLEventMailDrop>");
-        tut::test< LLEventLogProxyFor<LLEventMailDrop> >();
+        check_coro_consumes< LLEventLogProxyFor<LLEventMailDrop> >();
     }
 }

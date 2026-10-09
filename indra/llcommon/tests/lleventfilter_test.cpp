@@ -405,8 +405,9 @@ namespace tut
         ensure_equals("17", cat.result, "136;12;17"); // "17" delivered
     }
 
+    // A PUMP keeps what no listener consumed, and replays it on the next listen().
     template<class PUMP>
-    void test()
+    static void check_mail_drop_replay()
     {
         PUMP pump(typeid(PUMP).name());
         LLSD data{LLSD::emptyArray()};
@@ -467,14 +468,14 @@ namespace tut
     void filter_object::test<6>()
     {
         set_test_name("LLEventMailDrop");
-        tut::test<LLEventMailDrop>();
+        check_mail_drop_replay<LLEventMailDrop>();
     }
 
     template<> template<>
     void filter_object::test<7>()
     {
         set_test_name("LLEventLogProxyFor<LLEventMailDrop>");
-        tut::test< LLEventLogProxyFor<LLEventMailDrop> >();
+        check_mail_drop_replay< LLEventLogProxyFor<LLEventMailDrop> >();
     }
 } // namespace tut
 

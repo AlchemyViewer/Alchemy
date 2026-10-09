@@ -38,7 +38,7 @@
 *   test listener class
 *****************************************************************************/
 class Listener;
-std::ostream& operator<<(std::ostream&, const Listener&);
+inline std::ostream& operator<<(std::ostream&, const Listener&);
 
 /// Bear in mind that this is strictly for testing
 class Listener
@@ -116,7 +116,7 @@ private:
     LLSD mLastEvent;
 };
 
-std::ostream& operator<<(std::ostream& out, const Listener& listener)
+inline std::ostream& operator<<(std::ostream& out, const Listener& listener)
 {
     out << "Listener(" << listener.getName() /* << "@" << &listener */ << ')';
     return out;

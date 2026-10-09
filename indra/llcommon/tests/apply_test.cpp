@@ -15,7 +15,6 @@
 #include "apply.h"
 // STL headers
 // std headers
-#include <iomanip>
 // external library headers
 // other Linden headers
 #include "llsd.h"
@@ -24,19 +23,8 @@
 #include <string>
 #include <vector>
 
-// for ensure_equals
-std::ostream& operator<<(std::ostream& out, const std::vector<std::string>& stringvec)
-{
-    const char* delim = "[";
-    for (const auto& str : stringvec)
-    {
-        out << delim << std::quoted(str);
-        delim = ", ";
-    }
-    return out << ']';
-}
-
-// the above must be declared BEFORE ensure_equals(std::vector<std::string>)
+// for ensure_equals(std::vector<std::string>): must come BEFORE lltut.h
+#include "StringVec.h"
 #include "../test/lltut.h"
 
 /*****************************************************************************

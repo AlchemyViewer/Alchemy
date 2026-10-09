@@ -63,7 +63,7 @@ namespace tut
 
     typedef test_group<units> units_t;
     typedef units_t::object units_object_t;
-    tut::units_t tut_singleton("LLUnit");
+    tut::units_t tut_llunits("LLUnit");
 
     // storage type conversions
     template<> template<>

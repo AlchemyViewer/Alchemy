@@ -101,7 +101,7 @@ namespace tut
 
     typedef test_group<singleton> singleton_t;
     typedef singleton_t::object singleton_object_t;
-    tut::singleton_t tut_singleton("LLSingleton");
+    tut::singleton_t tut_llsingleton("LLSingleton");
 
     template<> template<>
     void singleton_object_t::test<1>()
