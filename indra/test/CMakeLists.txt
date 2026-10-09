@@ -55,3 +55,79 @@ target_include_directories(al_test_support PUBLIC ${INDRA_SOURCE_DIR}/llmath)
 target_link_libraries(al_test_support PRIVATE al::flags PUBLIC llcommon ll::catch2)
 
 set_target_properties(al_test_support PROPERTIES FOLDER "Tests")
+
+# The harness's own tests, the first Catch2 binary. Its hidden test cases are
+# run one at a time by the entries below, which check the exit code and the
+# output CTest sees from the harness: the state guard, LOGFAIL's replay, the
+# skip and no-match codes, the ISA gate, and a listing needing no setup.
+al_add_test_binary(
+  test_support_tests
+  PROJECT test
+  SOURCES tests/altestsupport_test.cpp
+  LIBRARIES llcommon
+  COMBINED
+)
+
+function(al_expect_from_test_support name)
+  cmake_parse_arguments(PARSE_ARGV 1 arg "" "ARGS;EXIT;OUTPUT;REJECT" "")
+  set(
+    defines
+    "-DEXE=$<TARGET_FILE:test_support_tests>"
+    "-DARGS=${arg_ARGS}"
+    "-DEXPECT_EXIT=${arg_EXIT}"
+  )
+  if(DEFINED arg_OUTPUT)
+    list(APPEND defines "-DEXPECT_OUTPUT=${arg_OUTPUT}")
+  endif()
+  if(DEFINED arg_REJECT)
+    list(APPEND defines "-DREJECT_OUTPUT=${arg_REJECT}")
+  endif()
+  add_test(
+    NAME test_support_tests/${name}
+    COMMAND ${CMAKE_COMMAND} ${defines} -P ${CMAKE_CURRENT_SOURCE_DIR}/run_and_expect.cmake
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  )
+  # LOGTEST, if a developer has it set, would print every log line and blur
+  # what LOGFAIL alone does.
+  set_tests_properties(
+    test_support_tests/${name}
+    PROPERTIES
+      ENVIRONMENT "LOGTEST=;LOGFAIL=DEBUG"
+      ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+      LABELS test
+      TIMEOUT 60
+  )
+endfunction()
+
+al_expect_from_test_support(
+  guard_names_the_case
+  ARGS "[.guard-leak]"
+  EXIT 1
+  OUTPUT "a test case that leaves the environment changed. left the environment changed.*AL_TEST_SUPPORT_LEAK=1"
+)
+al_expect_from_test_support(
+  replay_on_failure
+  ARGS "[.replay-fail]"
+  EXIT 42
+  OUTPUT "log of .a failing test case that logged.*the line a failing case logged"
+)
+al_expect_from_test_support(
+  no_replay_on_pass
+  ARGS "[.replay-pass]"
+  EXIT 0
+  REJECT "the line a passing case logged"
+)
+al_expect_from_test_support(all_skipped_is_125 ARGS "[.skip]" EXIT 125)
+al_expect_from_test_support(nothing_matched_fails ARGS "no such test case" EXIT 2)
+al_expect_from_test_support(
+  isa_gate_skips
+  ARGS "--isa-level|9"
+  EXIT 125
+  OUTPUT "does not run x86-64 level 9"
+)
+al_expect_from_test_support(
+  listing_needs_no_setup
+  ARGS "--list-tests"
+  EXIT 0
+  OUTPUT "LLSDEquals compares all the way down"
+)

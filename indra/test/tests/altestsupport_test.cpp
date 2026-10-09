@@ -1,0 +1,128 @@
+/**
+ * @file altestsupport_test.cpp
+ * @brief Tests of the Catch2 harness itself: its matchers, what an LL_ERRS
+ *        does, the teardown, and the cases that CTest entries in
+ *        test/CMakeLists.txt run to check the guard, the log replay and the exit
+ *        codes from outside.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "altestfatal.h"
+#include "altestmatchers.h"
+#include "altestteardown.h"
+
+#include "llerror.h"
+#include "llsd.h"
+
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
+
+#include <cstdlib>
+#include <vector>
+
+namespace
+{
+    LLSD nested(F64 leaf)
+    {
+        LLSD sd;
+        sd["a"][2] = leaf;
+        sd["b"] = "text";
+        return sd;
+    }
+}
+
+TEST_CASE("WithinBits holds to the bits asked for, and no further", "[altestsupport]")
+{
+    // 2^-20 apart: equal to 16 bits of the fraction, not to 24.
+    const F32 one = 1.f;
+    const F32 near = 1.f + 1.f / (1 << 20);
+    CHECK_THAT(near, ll_test::WithinBits(one, 16));
+    CHECK_FALSE(ll_test::WithinBits(one, 24).match(near));
+    CHECK_FALSE(ll_test::WithinBits(one, 16).match(1.01f));
+    CHECK_THAT(F64(near), ll_test::WithinBits(F64(one), 16));
+}
+
+TEST_CASE("LLSDEquals compares all the way down and says where two differ", "[altestsupport]")
+{
+    CHECK_THAT(nested(1.5), ll_test::LLSDEquals(nested(1.5)));
+
+    const ll_test::LLSDEqualsMatcher deep = ll_test::LLSDEquals(nested(1.5));
+    CHECK_FALSE(deep.match(nested(2.5)));
+    CHECK_THAT(deep.describe(), Catch::Matchers::ContainsSubstring("[\"a\"][2]: value"));
+
+    const ll_test::LLSDEqualsMatcher top = ll_test::LLSDEquals(LLSD("1"));
+    CHECK_FALSE(top.match(LLSD(1)));
+    CHECK_THAT(top.describe(), Catch::Matchers::ContainsSubstring("the top: type"));
+}
+
+TEST_CASE("An LL_ERRS throws FatalError, which a test can catch", "[altestsupport]")
+{
+    // Named, not written inside the assertion: Catch2 hands its argument on to
+    // a macro of its own after expanding it, and LL_ERRS expands to commas.
+    const auto deliberate = [] { LL_ERRS("altestsupport") << "deliberate" << LL_ENDL; };
+    CHECK_THROWS_AS(deliberate(), ll_test::FatalError);
+    CHECK_THROWS_WITH(deliberate(), Catch::Matchers::ContainsSubstring("deliberate"));
+}
+
+TEST_CASE("Teardown runs each step once, newest first", "[altestsupport]")
+{
+    std::vector<int> order;
+    ll_test::Teardown::add([&order] { order.push_back(1); });
+    ll_test::Teardown::add([&order] { order.push_back(2); });
+    ll_test::Teardown::runAll();
+    const std::vector<int> newest_first{ 2, 1 };
+    CHECK(order == newest_first);
+    ll_test::Teardown::runAll();
+    CHECK(order.size() == 2);
+}
+
+// Hidden: the CTest entries in test/CMakeLists.txt run these one at a time
+// and check what the harness made of them.
+
+TEST_CASE("a test case that leaves the environment changed", "[.guard-leak]")
+{
+#if LL_WINDOWS
+    _putenv_s("AL_TEST_SUPPORT_LEAK", "1");
+#else
+    setenv("AL_TEST_SUPPORT_LEAK", "1", 1);
+#endif
+    SUCCEED();
+}
+
+TEST_CASE("a failing test case that logged", "[.replay-fail]")
+{
+    LL_INFOS("altestsupport") << "the line a failing case logged" << LL_ENDL;
+    FAIL("deliberately");
+}
+
+TEST_CASE("a passing test case that logged", "[.replay-pass]")
+{
+    LL_INFOS("altestsupport") << "the line a passing case logged" << LL_ENDL;
+    SUCCEED();
+}
+
+TEST_CASE("a test case that skips", "[.skip]")
+{
+    SKIP("deliberately");
+}
