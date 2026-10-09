@@ -155,7 +155,9 @@ namespace tut
     {
         set_test_name("sky is the cleared depth");
         const std::string haze = shader_source("class3/deferred/hazeF.glsl");
-        ensure("haze leaves the sky to the sky", haze.find("if (isFarDepth(depth))") != std::string::npos);
+        const std::string haze_v = shader_source("class1/deferred/hazeV.glsl");
+        ensure("haze drawn on the far plane, reversed", haze_v.find("gl_Position = vec4(position.xy, 0.0, 1.0);") != std::string::npos);
+        ensure("haze drawn on the far plane, forward", haze_v.find("gl_Position = vec4(position.xy, 1.0, 1.0);") != std::string::npos);
         ensure("haze takes geometry where it is", haze.find("= getPositionWithDepth(tc, depth);") != std::string::npos);
         ensure("void water fog keys on the far depth", shader_source("class3/deferred/waterHazeF.glsl").find("if (isFarDepth(depth))") != std::string::npos);
         const std::string flare = shader_source("class1/alchemy/lensFlareStateF.glsl");

@@ -36,7 +36,6 @@ vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 
 float getDepth(vec2 pos_screen);
-bool isFarDepth(float d);             // deferredUtil.glsl -- depth-convention aware
 
 vec3 atmosFragLighting(vec3 light, vec3 additive, vec3 atten);
 
@@ -74,11 +73,8 @@ void main()
     vec3  irradiance = vec3(0);
     vec3  radiance  = vec3(0);
 
-    if (isFarDepth(depth))
-    {
-        //should only be true of sky, clouds, sun/moon, and stars
-        discard;
-    }
+    // No sky reaches here: the triangle is drawn on the far plane, and the depth test rejects every pixel the
+    // world left at the cleared depth (hazeV.glsl).
 
    float alpha = 0.0;
 

@@ -28,6 +28,7 @@
 
 #include "../llgl.h"
 #include "../llglheaders.h"
+#include "../llglstates.h"
 #include "../llrender.h"
 #include "llcamera.h"
 
@@ -370,6 +371,52 @@ namespace tut
             ensure("geometry at " + at + " stores more than the far plane", centreDepth() > 0.f);
             ensure_equals("the sky stays behind geometry at " + at, sky_samples(), (GLuint)0);
         }
+
+        glDeleteQueries(1, &query);
+        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+    }
+
+    // The haze pass draws on the far plane too (hazeV.glsl), testing the other way (LLPipeline::doAtmospherics): only
+    // in front of the far plane, so it shades every pixel geometry covers, however far out, and no pixel of sky.
+    template<> template<>
+    void alinfiniteprojection_object_t::test<6>()
+    {
+        setUp();
+        const LLMatrix4a proj = infinite();
+        ensure_equals("in front of the far plane is LESS under reverse-Z", (U32)LLGLDepthTest::remap(GL_GREATER), (U32)GL_LESS);
+        GLuint query = 0;
+        glGenQueries(1, &query);
+        const auto haze_samples = [&]()
+        {
+            glDepthFunc(LLGLDepthTest::remap(GL_GREATER));
+            glDepthMask(GL_FALSE);
+            glBeginQuery(GL_SAMPLES_PASSED, query);
+            draw(proj, 1000.f, true);
+            glEndQuery(GL_SAMPLES_PASSED);
+            glDepthMask(GL_TRUE);
+            glDepthFunc(GL_GREATER);
+            GLuint samples = 0;
+            glGetQueryObjectuiv(query, GL_QUERY_RESULT, &samples);
+            return samples;
+        };
+
+        glClear(GL_DEPTH_BUFFER_BIT);
+        ensure_equals("no haze on an empty frame", haze_samples(), (GLuint)0);
+
+        for (F32 dist : { 1.f, 1000.f, 100000.f, MAX_RECONSTRUCT_DISTANCE })
+        {
+            const std::string at = std::to_string((S32)dist) + " m";
+            glClear(GL_DEPTH_BUFFER_BIT);
+            draw(proj, dist);
+            ensure_equals("haze over all of the geometry at " + at, haze_samples(), (GLuint)(SIZE * SIZE));
+        }
+
+        // Pixel by pixel: geometry over the left half only, sky over the right.
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glViewport(0, 0, SIZE / 2, SIZE);
+        draw(proj, MAX_RECONSTRUCT_DISTANCE);
+        glViewport(0, 0, SIZE, SIZE);
+        ensure_equals("haze over the geometry's half alone", haze_samples(), (GLuint)(SIZE * SIZE / 2));
 
         glDeleteQueries(1, &query);
         ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);

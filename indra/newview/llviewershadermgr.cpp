@@ -2489,7 +2489,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gHazeProgram.mFeatures.hasReflectionProbes    = mShaderLevel[SHADER_DEFERRED] > 2;
 
         gHazeProgram.clearPermutations();
-        gHazeProgram.mShaderFiles.push_back(make_pair("deferred/softenLightV.glsl", GL_VERTEX_SHADER));
+        gHazeProgram.mShaderFiles.push_back(make_pair("deferred/hazeV.glsl", GL_VERTEX_SHADER));
         gHazeProgram.mShaderFiles.push_back(make_pair("deferred/hazeF.glsl", GL_FRAGMENT_SHADER));
 
         add_common_permutations(&gHazeProgram);

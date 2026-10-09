@@ -11535,7 +11535,10 @@ void LLPipeline::doAtmospherics()
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
 
-        LLGLDepthTest depth(GL_FALSE);
+        // The triangle lies on the far plane (hazeV.glsl), level with the depth the sky leaves cleared: the test
+        // passes only where the world drew something, so the sky is rejected before it is shaded. The screen
+        // target shares the G-buffer's depth; the shader reads its copy in mWaterDis.
+        LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
 
         // full screen blit
         mScreenTriangleVB->setBuffer();
