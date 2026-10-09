@@ -2515,7 +2515,6 @@ if(AL_BUILD_TESTS)
     almotionpredictor
     alsceneexplorerpredicate
     alwhitebalancesolver
-    llagentaccess
     lldateutil
     llremoteparcelrequest
     llviewerhelputil
@@ -2526,6 +2525,9 @@ if(AL_BUILD_TESTS)
   )
     al_add_test(${test} UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
   endforeach()
+  # The agent's maturity, read and written through a settings group of each
+  # test's own.
+  al_add_test(llagentaccess UNIT PROJECT ${test_project} LIBRARIES llxml ${test_libs})
   # The vectorscope bins on the colour wheels' own chroma plane, so the scope
   # data test links the model that defines it rather than keeping a second copy
   # of the basis that could drift from it.
@@ -3045,13 +3047,8 @@ if(AL_BUILD_TESTS)
   al_add_test(
     llviewercontrollistener
     PROJECT ${test_project}
-    LIBRARIES ${test_libs}
-    SOURCES
-      llviewercontrollistener.cpp
-      ../llxml/llcontrol.cpp
-      ../llxml/llxmltree.cpp
-      ../llxml/alxmldocument.cpp
-      ../llcommon/commoncontrol.cpp
+    LIBRARIES llxml ${test_libs}
+    SOURCES llviewercontrollistener.cpp
   )
   al_add_test(
     llviewernetwork
@@ -3074,12 +3071,7 @@ if(AL_BUILD_TESTS)
   al_add_test(
     lltextureinfo
     PROJECT ${test_project}
-    LIBRARIES ${test_libs}
-    SOURCES
-      lltextureinfo.cpp
-      ../llxml/llcontrol.cpp
-      ../llxml/llxmltree.cpp
-      ../llxml/alxmldocument.cpp
-      ../llcommon/commoncontrol.cpp
+    LIBRARIES llxml ${test_libs}
+    SOURCES lltextureinfo.cpp
   )
 endif()
