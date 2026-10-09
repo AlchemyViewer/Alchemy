@@ -44,6 +44,9 @@ uniform float minimum_alpha;
 
 #ifdef IS_ALPHA
 uniform vec4 waterPlane;
+uniform vec3 sun_dir;
+uniform vec3 moon_dir;
+uniform int sun_up_factor;
 void waterClip(vec3 pos);
 void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, out vec3 sunlit, out vec3 amblit, out vec3 additive,
                          out vec3 atten);
@@ -88,7 +91,9 @@ void main()
     vec3 amblit;
     vec3 additive;
     vec3 atten;
-    calcAtmosphericVars(pos.xyz, vec3(0), 1.0, sunlit, amblit, additive, atten);
+    // The light the glow gathers around, as blended lit geometry takes it (alphaF.glsl).
+    vec3 light_dir = (sun_up_factor == 1) ? sun_dir : moon_dir;
+    calcAtmosphericVars(pos.xyz, light_dir, 1.0, sunlit, amblit, additive, atten);
 
     color.rgb = applySkyAndWaterFog(pos, additive, atten, color).rgb;
 
