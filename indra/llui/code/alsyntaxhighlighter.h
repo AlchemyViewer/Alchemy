@@ -94,9 +94,12 @@ public:
     boost::signals2::connection onRelexed(const relexed_signal_t::slot_type& slot) { return mRelexed.connect(slot); }
 
     // How many lines the last request had to lex, for a test that says an
-    // edit re-lexes only what it must; and how many states are kept, for a
-    // test that says they do not pile up.
+    // edit re-lexes only what it must, and how many it looked at, lexed or
+    // found to lex as they did, for one that says the rest are not looked
+    // at; and how many states are kept, for a test that says they do not
+    // pile up.
     S32    lastLexed() const { return mLastLexed; }
+    S32    lastLooked() const { return mLastLooked; }
     size_t statesKept() const { return mStates.size(); }
 
 private:
@@ -149,7 +152,16 @@ private:
     // one it ends in: one kept, whose room each line lexed uses again,
     // rather than a copy made and freed for every line.
     ALSyntaxState                                              mLexing;
-    S32                                    mFirstDirty = 0;
+    // Where each run of lines that may not lex as they did begins, in
+    // order: an edit's first line, or where lexing last stopped short. A
+    // run goes on from there through each line lexed anew, to the first
+    // that starts in the state the line before it ends in; past that,
+    // every line lexes as it did until the next run, which lexing goes on
+    // to without looking at the lines between.
+    std::vector<S32>                                           mDirty;
     S32                                    mLastLexed  = 0;
+    S32                                    mLastLooked = 0;
+    // The first line that may not lex as it did, past them all for none.
+    S32 firstDirty() const { return mDirty.empty() ? static_cast<S32>(mLines.size()) : mDirty.front(); }
     relexed_signal_t                       mRelexed;
 };

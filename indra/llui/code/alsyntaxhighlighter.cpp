@@ -114,7 +114,7 @@ void ALSyntaxHighlighter::reset()
     {
         line.valid = false;
     }
-    mFirstDirty = 0;
+    mDirty.assign(1, 0);
     mStates.clear();
     mStateIds.clear();
     mInitialState = mGrammar ? intern(mGrammar->initialState()) : 0;
@@ -187,10 +187,31 @@ void ALSyntaxHighlighter::onEdit(const ALTextDocument::Edit& edit)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     // The lines the edit replaced go, and the lines it made come in, dirty;
     // what follows keeps its tokens until the state it starts in is seen
-    // to have changed.
+    // to have changed. A run begins at each run of the edit's, and those
+    // begun before move with the text, or go where the edit replaced
+    // their first line.
     const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
     mLines.applySpans(spans, mDocument ? mDocument->lineCount() : -1, Line());
-    mFirstDirty = llmin(mFirstDirty, llclamp(spans.front().first, 0, static_cast<S32>(mLines.size())));
+    std::vector<S32> dirty;
+    dirty.reserve(mDirty.size() + spans.size());
+    for (const S32 line : mDirty)
+    {
+        if (const S32 now = edit.lineAfter(line); now >= 0)
+        {
+            dirty.push_back(now);
+        }
+    }
+    S32 shift = 0;
+    for (const ALTextDocument::Edit::LineSpan& span : spans)
+    {
+        dirty.push_back(span.first + shift);
+        shift = span.shiftAfter;
+    }
+    std::sort(dirty.begin(), dirty.end());
+    dirty.erase(std::unique(dirty.begin(), dirty.end()), dirty.end());
+    const S32 lines = static_cast<S32>(mLines.size());
+    dirty.erase(std::remove_if(dirty.begin(), dirty.end(), [lines](S32 line) { return line < 0 || line >= lines; }), dirty.end());
+    mDirty.swap(dirty);
 }
 
 void ALSyntaxHighlighter::ensure(S32 line)
@@ -201,18 +222,19 @@ void ALSyntaxHighlighter::ensure(S32 line)
 bool ALSyntaxHighlighter::lexSome(S32 most)
 {
     lex(static_cast<S32>(mLines.size()) - 1, most);
-    return !mDocument || !mGrammar || mFirstDirty >= static_cast<S32>(mLines.size());
+    return !mDocument || !mGrammar || mDirty.empty();
 }
 
 void ALSyntaxHighlighter::lex(S32 line, S32 most)
 {
-    mLastLexed = 0;
+    mLastLexed  = 0;
+    mLastLooked = 0;
     if (!mDocument || !mGrammar || mLines.empty())
     {
         return;
     }
     line = llclamp(line, 0, static_cast<S32>(mLines.size()) - 1);
-    if (mFirstDirty > line)
+    if (firstDirty() > line)
     {
         return;
     }
@@ -224,39 +246,57 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
     // Each line starts in the state the one before ends in, by number,
     // copied into the one kept for lexing only for a line lexed anew. A
     // line that lexes as it did costs nothing against `most`: the stop is
-    // at the first that would be lexed past it.
-    S32 i       = mFirstDirty;
-    S32 changed = -1;
-    S32 through = -1;
-    for (; i <= line; ++i)
+    // at the first that would be lexed past it. Each run is lexed from
+    // where it begins to the first line that lexes as it did, and every
+    // run it went past with it; the lines from there to the next run lex
+    // as they did, and are not looked at.
+    S32  changed = -1;
+    S32  through = -1;
+    bool short_of = false;
+    while (!mDirty.empty() && mDirty.front() <= line && !short_of)
     {
-        Line&     entry = mLines[i];
-        const U32 start = (i == 0) ? mInitialState : mLines[i - 1].end;
-        if (entry.valid && entry.start == start)
+        S32 i = mDirty.front();
+        for (; i <= line; ++i)
         {
-            // Lexes as it did.
-            continue;
+            ++mLastLooked;
+            Line&     entry = mLines[i];
+            const U32 start = (i == 0) ? mInitialState : mLines[i - 1].end;
+            if (entry.valid && entry.start == start)
+            {
+                // Lexes as it did, and so does every line after it up to
+                // the next run.
+                break;
+            }
+            if (mLastLexed >= most)
+            {
+                short_of = true;
+                break;
+            }
+            mLexing = mStates[start];
+            mGrammar->lexLine(mDocument->line(i), mLexing, fresh, *mWords);
+            ++mLastLexed;
+            if (!entry.lexed || fresh != entry.tokens)
+            {
+                entry.tokens.swap(fresh);
+                ++entry.revision;
+                changed = changed < 0 ? i : changed;
+                through = i;
+            }
+            entry.start = start;
+            entry.end   = intern(mLexing);
+            entry.valid = true;
+            entry.lexed = true;
         }
-        if (mLastLexed >= most)
+        // The runs it went past are lexed with it. Where it stopped at the
+        // line asked for, or short of `most`, it goes on from there.
+        const bool settled = i <= line && !short_of;
+        const auto past    = std::upper_bound(mDirty.begin(), mDirty.end(), settled ? i : i - 1);
+        mDirty.erase(mDirty.begin(), past);
+        if (!settled && i < static_cast<S32>(mLines.size()) && (mDirty.empty() || mDirty.front() != i))
         {
-            break;
+            mDirty.insert(mDirty.begin(), i);
         }
-        mLexing = mStates[start];
-        mGrammar->lexLine(mDocument->line(i), mLexing, fresh, *mWords);
-        ++mLastLexed;
-        if (!entry.lexed || fresh != entry.tokens)
-        {
-            entry.tokens.swap(fresh);
-            ++entry.revision;
-            changed = changed < 0 ? i : changed;
-            through = i;
-        }
-        entry.start = start;
-        entry.end   = intern(mLexing);
-        entry.valid = true;
-        entry.lexed = true;
     }
-    mFirstDirty = i;
     if (changed >= 0)
     {
         mRelexed(changed, through);
