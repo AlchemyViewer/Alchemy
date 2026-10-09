@@ -31,12 +31,15 @@
 
 namespace tut
 {
-    // LLView's constructor is protected, for LLUICtrlFactory. A test builds
-    // views the same way a widget does.
-    struct TestView : public LLView
+    namespace
     {
-        TestView(const LLView::Params& p) : LLView(p) {}
-    };
+        // LLView's constructor is protected, for LLUICtrlFactory. A test builds
+        // views the same way a widget does.
+        struct TestView : public LLView
+        {
+            TestView(const LLView::Params& p) : LLView(p) {}
+        };
+    }
 
     struct llview_data
     {
@@ -307,16 +310,19 @@ namespace tut
     // it handled the message is the answer to give back, not a reason to stop:
     // a panel telling each of its accordions to store its state has as many
     // handlers as it has accordions.
-    struct CountingView : public LLView
+    namespace
     {
-        CountingView(const LLView::Params& p) : LLView(p) {}
-        bool notifyChildren(const LLSD& info) override
+        struct CountingView : public LLView
         {
-            ++mHeard;
-            return true;
-        }
-        S32 mHeard = 0;
-    };
+            CountingView(const LLView::Params& p) : LLView(p) {}
+            bool notifyChildren(const LLSD& info) override
+            {
+                ++mHeard;
+                return true;
+            }
+            S32 mHeard = 0;
+        };
+    }
 
     template<> template<>
     void llview_object::test<12>()

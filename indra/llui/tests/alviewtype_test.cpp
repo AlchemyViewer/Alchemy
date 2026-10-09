@@ -47,36 +47,39 @@
 
 namespace tut
 {
-    struct TestView : public LLView
+    namespace
     {
-        TestView(const LLView::Params& p) : LLView(p) {}
-    };
-
-    struct TestCtrl : public LLUICtrl
-    {
-        AL_VIEW_TYPE(TestCtrl, LLUICtrl);
-        TestCtrl(const LLUICtrl::Params& p) : LLUICtrl(p) {}
-    };
-
-    struct TestFloater : public LLFloater
-    {
-        TestFloater(const LLFloater::Params& p) : LLFloater(LLSD(), p) {}
-    };
-
-    // A parent that asks what a child is as it leaves. ~LLView removes a
-    // child from its parent after every derived destructor has run.
-    struct AskingView : public LLView
-    {
-        AskingView(const LLView::Params& p) : LLView(p) {}
-
-        bool mLeaverWasCtrl { false };
-
-        void removeChild(LLView* child) override
+        struct TestView : public LLView
         {
-            mLeaverWasCtrl = child->as<LLUICtrl>() != nullptr;
-            LLView::removeChild(child);
-        }
-    };
+            TestView(const LLView::Params& p) : LLView(p) {}
+        };
+
+        struct TestCtrl : public LLUICtrl
+        {
+            AL_VIEW_TYPE(TestCtrl, LLUICtrl);
+            TestCtrl(const LLUICtrl::Params& p) : LLUICtrl(p) {}
+        };
+
+        struct TestFloater : public LLFloater
+        {
+            TestFloater(const LLFloater::Params& p) : LLFloater(LLSD(), p) {}
+        };
+
+        // A parent that asks what a child is as it leaves. ~LLView removes a
+        // child from its parent after every derived destructor has run.
+        struct AskingView : public LLView
+        {
+            AskingView(const LLView::Params& p) : LLView(p) {}
+
+            bool mLeaverWasCtrl { false };
+
+            void removeChild(LLView* child) override
+            {
+                mLeaverWasCtrl = child->as<LLUICtrl>() != nullptr;
+                LLView::removeChild(child);
+            }
+        };
+    }
 
     struct alviewtype_data
     {

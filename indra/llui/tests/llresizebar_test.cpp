@@ -37,10 +37,13 @@
 namespace tut
 {
     // LLView's constructor is protected, for LLUICtrlFactory.
-    struct TestView : public LLView
+    namespace
     {
-        TestView(const LLView::Params& p) : LLView(p) {}
-    };
+        struct TestView : public LLView
+        {
+            TestView(const LLView::Params& p) : LLView(p) {}
+        };
+    }
 
     struct llresizebar_data
     {
@@ -165,10 +168,13 @@ namespace tut
     // Being disabled is a reason focus cannot arrive, not a reason it cannot
     // leave. A control disabled while it held focus would otherwise keep it,
     // with nothing able to ask for it back.
-    struct PlainCtrl : public LLUICtrl
+    namespace
     {
-        PlainCtrl(const LLUICtrl::Params& p) : LLUICtrl(p) {}
-    };
+        struct PlainCtrl : public LLUICtrl
+        {
+            PlainCtrl(const LLUICtrl::Params& p) : LLUICtrl(p) {}
+        };
+    }
 
     template<> template<>
     void llresizebar_object::test<5>()

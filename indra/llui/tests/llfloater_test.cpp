@@ -34,15 +34,18 @@
 
 namespace tut
 {
-    struct TestFloater : public LLFloater
+    namespace
     {
-        TestFloater(const LLFloater::Params& p) : LLFloater(LLSD(), p) {}
-    };
+        struct TestFloater : public LLFloater
+        {
+            TestFloater(const LLFloater::Params& p) : LLFloater(LLSD(), p) {}
+        };
 
-    struct TestView : public LLView
-    {
-        TestView(const LLView::Params& p) : LLView(p) {}
-    };
+        struct TestView : public LLView
+        {
+            TestView(const LLView::Params& p) : LLView(p) {}
+        };
+    }
 
     struct llfloater_data
     {

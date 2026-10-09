@@ -31,15 +31,18 @@
 
 namespace tut
 {
-    struct TestView : public LLView
+    namespace
     {
-        TestView(const LLView::Params& p) : LLView(p) {}
-    };
+        struct TestView : public LLView
+        {
+            TestView(const LLView::Params& p) : LLView(p) {}
+        };
 
-    // A focusable that is not a view. The viewer has one: media focus.
-    struct TestFocusable : public LLFocusableElement
-    {
-    };
+        // A focusable that is not a view. The viewer has one: media focus.
+        struct TestFocusable : public LLFocusableElement
+        {
+        };
+    }
 
     struct llfocusmgr_data
     {

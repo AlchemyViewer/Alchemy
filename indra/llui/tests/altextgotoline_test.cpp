@@ -41,8 +41,10 @@
 #include <string>
 #include <vector>
 
-// A place, as a failed check says it.
-std::ostream& operator<<(std::ostream& out, const ALTextPos& pos)
+// A place, as a failed check says it. Static rather than in the anonymous
+// namespace: tut's ensure_equals finds it by argument-dependent lookup,
+// which looks in ALTextPos's namespace and not in a nested one.
+static std::ostream& operator<<(std::ostream& out, const ALTextPos& pos)
 {
     return out << pos.line << ":" << pos.column;
 }
