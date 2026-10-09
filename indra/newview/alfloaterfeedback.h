@@ -63,6 +63,10 @@ public:
     // Opens the floater with the menus out of the way of its screenshot.
     static void show(const LLSD& key = LLSD());
 
+    // After a run that crashed or froze, asks the user what happened, and
+    // opens the floater on the report that run was filed as.
+    static void askAboutLastRun();
+
 private:
     ~ALFloaterFeedback() override;
 

@@ -147,4 +147,41 @@ namespace tut
         length = ALCrashReporter::locationTag(small, sizeof(small), "Ahern", position);
         ensure_equals("cut in the numbers", std::string(small, length), "Ahern/128/-");
     }
+
+    template<> template<>
+    void object::test<9>()
+    {
+        set_test_name("an event id is its 32 hex digits however it is spelled");
+        ensure_equals("dashed", ALCrashReporter::compactEventId("0123ABCD-89ab-cdef-0123-456789ABCDEF"),
+                      "0123abcd89abcdef0123456789abcdef");
+        ensure_equals("braced", ALCrashReporter::compactEventId("{0123abcd-89ab-cdef-0123-456789abcdef}"),
+                      "0123abcd89abcdef0123456789abcdef");
+        ensure_equals("already compact", ALCrashReporter::compactEventId("0123abcd89abcdef0123456789abcdef"),
+                      "0123abcd89abcdef0123456789abcdef");
+        ensure("too short", ALCrashReporter::compactEventId("0123abcd").empty());
+        ensure("not hex", ALCrashReporter::compactEventId("0123abcd89abcdef0123456789abcdeg").empty());
+        ensure("empty", ALCrashReporter::compactEventId("").empty());
+    }
+
+    template<> template<>
+    void object::test<10>()
+    {
+        set_test_name("a freeze's report is recorded for the next run, which takes it once");
+        const std::string record =
+            (std::filesystem::temp_directory_path() / "alcrashreporter_test_last_report").string();
+        ALCrashReporter::takeRecordedReport(record);
+        ensure("nothing to begin with", !ALCrashReporter::takeRecordedReport(record));
+
+        ALCrashReporter::recordReport(record, { "freeze", "0123abcd89abcdef0123456789abcdef" });
+        const auto taken = ALCrashReporter::takeRecordedReport(record);
+        ensure("taken", taken.has_value());
+        ensure_equals("kind", taken->kind, "freeze");
+        ensure_equals("id", taken->eventId, "0123abcd89abcdef0123456789abcdef");
+        ensure("once", !ALCrashReporter::takeRecordedReport(record));
+
+        ALCrashReporter::recordReport(record, { "lunch", "0123abcd89abcdef0123456789abcdef" });
+        ensure("an unknown kind is not a report", !ALCrashReporter::takeRecordedReport(record));
+        ALCrashReporter::recordReport(record, { "crash", "nonsense" });
+        ensure("nor is a broken id", !ALCrashReporter::takeRecordedReport(record));
+    }
 }

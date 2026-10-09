@@ -31,6 +31,7 @@
 #include "llappviewer.h"
 #include "lldir.h"
 #include "llfile.h"
+#include "llmutex.h"
 #include "llsdserialize.h"
 #include "llstartup.h"
 #include "llsys.h"
@@ -49,6 +50,17 @@ namespace
     ALCrashReporter::PreviousRun sLastRun;
     std::string sLastRunDebugInfo;
     bool sLastRunRead = false;
+
+    // The report the previous run ended with: a freeze's from the record it
+    // left, a crash's from the SDK, which may say so off the main thread.
+    LLMutex sPreviousReportMutex;
+    std::optional<ALCrashReporter::PreviousReport> sPreviousReport;
+
+    void set_previous_report(std::optional<ALCrashReporter::PreviousReport> report)
+    {
+        LLMutexLock lock(&sPreviousReportMutex);
+        sPreviousReport = std::move(report);
+    }
 
     NSString* ns(const std::string& text)
     {
@@ -161,6 +173,21 @@ namespace
             options.enableMetricKit = NO;
             options.enableLogs = NO;
             options.enableMetrics = NO;
+
+            // The event a crash in the previous run was filed as, which
+            // feedback about the crash names.
+            options.onLastRunStatusDetermined = ^(SentryObjCLastRunStatus status, SentryObjCEvent* _Nullable event) {
+                NSString* text = event ? event.eventId.sentryIdString : nil;
+                if (status != SentryObjCLastRunStatusDidCrash || !text)
+                {
+                    return;
+                }
+                std::string event_id = ALCrashReporter::compactEventId([text UTF8String]);
+                if (!event_id.empty())
+                {
+                    set_previous_report(ALCrashReporter::PreviousReport{ "crash", std::move(event_id) });
+                }
+            };
         }];
 
         if (![SentryObjCSDK isEnabled])
@@ -206,6 +233,10 @@ bool ALCrashReporter::init()
     return false;
 #else
     read_last_run();
+    if (!LLAppViewer::instance()->isSecondInstance())
+    {
+        set_previous_report(takeRecordedReport(reportRecordFile()));
+    }
     if (!consentRecorded(consentSentinel()))
     {
         LL_INFOS("CrashReporter") << "No consent to crash reports recorded; none are sent until it is" << LL_ENDL;
@@ -319,8 +350,22 @@ bool ALCrashReporter::reportFreeze(const std::string& description)
         @"watchdog_state" : ns(LLAppViewer::instance()->getMainloopWatchdogState()),
         @"app_state" : ns(LLStartUp::getStartupStateString()),
     };
-    [SentryObjCSDK captureEvent:event attachAllThreads:YES];
+    SentryObjCId* id = [SentryObjCSDK captureEvent:event attachAllThreads:YES];
+    // A freeze ends the run that reports it, so its event is recorded for the
+    // next run, which is where the user can say what happened.
+    NSString* text = id ? id.sentryIdString : nil;
+    const std::string event_id = ALCrashReporter::compactEventId(text ? [text UTF8String] : "");
+    if (!event_id.empty())
+    {
+        recordReport(reportRecordFile(), { "freeze", event_id });
+    }
     return true;
+}
+
+std::optional<ALCrashReporter::PreviousReport> ALCrashReporter::previousReport()
+{
+    LLMutexLock lock(&sPreviousReportMutex);
+    return sPreviousReport;
 }
 
 bool ALCrashReporter::handleException(void*)

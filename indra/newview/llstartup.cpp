@@ -93,6 +93,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alcrashreporter.h"
+#include "alfloaterfeedback.h"
 #include "llappviewer.h"
 #include "llstartup.h"
 
@@ -1065,10 +1066,17 @@ bool idle_startup()
             LLPanelLogin::populateFields( gUserCredential, gRememberUser, gRememberPassword);
             LLPanelLogin::giveFocus();
 
-            // The first launch asks before any crash report is sent.
+            // The first launch asks before any crash report is sent. After a
+            // crash or a freeze the user is asked what happened: once that
+            // question is answered, when it is asked, so the two never stack.
             if (ALCrashReporter::available() && gSavedSettings.getS32("AlchemyCrashReportConsent") == 0)
             {
-                LLNotificationsUtil::add("AlchemyCrashReportConsent", LLSD(), LLSD(), crash_report_consent_callback);
+                LLNotificationsUtil::add("AlchemyCrashReportConsent", LLSD(), LLSD().with("ask_about_last_run", true),
+                                         crash_report_consent_callback);
+            }
+            else
+            {
+                ALFloaterFeedback::askAboutLastRun();
             }
 
             // MAINT-3231 Show first run dialog only for Desura viewer
@@ -3042,6 +3050,10 @@ bool crash_report_consent_callback(const LLSD& notification, const LLSD& respons
 {
     S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
     gSavedSettings.setS32("AlchemyCrashReportConsent", option == 0 ? 1 : 2);
+    if (notification["payload"]["ask_about_last_run"].asBoolean())
+    {
+        ALFloaterFeedback::askAboutLastRun();
+    }
     return false;
 }
 

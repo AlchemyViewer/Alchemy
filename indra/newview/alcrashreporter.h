@@ -28,6 +28,7 @@
 #include "stdtypes.h"
 
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -83,6 +84,21 @@ namespace ALCrashReporter
     };
     PreviousRun previousRun(const LLSD& info);
 
+    // What a crash or freeze that ended the previous run was filed as, so
+    // feedback about it can be tied to the report.
+    struct PreviousReport
+    {
+        std::string kind;    // "crash" or "freeze"
+        std::string eventId; // 32 lower-case hex digits
+    };
+    // The 32 hex digits of a UUID however it is spelled, or empty.
+    std::string compactEventId(std::string_view id);
+    // A freeze's report is only known in the run it ends, which records it
+    // in a file of one line for the next run to take.
+    std::string reportRecordFile();
+    void recordReport(const std::string& record_file, const PreviousReport& report);
+    std::optional<PreviousReport> takeRecordedReport(const std::string& record_file);
+
     // How the viewer dies on purpose: LL_ERRS and std::terminate end here.
     // The kind and the message ride the report as its fatal context, and
     // the crash is one the reporter is sure to see: on Windows the
@@ -107,6 +123,8 @@ namespace ALCrashReporter
     void attach(const std::string& path);
     bool reportFreeze(const std::string& description);
     bool handleException(void* exception_pointers);
+    // The report the previous run ended with, when this reporter filed one.
+    std::optional<PreviousReport> previousReport();
 #else
     inline bool init() { return false; }
     inline void refreshConsent(bool allowed) { recordConsent(consentSentinel(), allowed); }
@@ -119,6 +137,7 @@ namespace ALCrashReporter
     inline void attach(const std::string&) {}
     inline bool reportFreeze(const std::string&) { return false; }
     inline bool handleException(void*) { return false; }
+    inline std::optional<PreviousReport> previousReport() { return std::nullopt; }
 #endif
 }
 

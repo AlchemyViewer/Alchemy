@@ -16,8 +16,10 @@
   <floater.string name="placeholder_idea">What would you like Alchemy to do, and what for?</floater.string>
   <floater.string name="placeholder_other">What's on your mind?</floater.string>
   <floater.string name="counter">[COUNT] / [MAX]</floater.string>
-  <floater.string name="linked_crash">About the crash on [DATE]</floater.string>
-  <floater.string name="linked_freeze">About the freeze on [DATE]</floater.string>
+  <floater.string name="linked_crash">About the crash on [day,datetime,local] [mth,datetime,local] at [hour24,datetime,local]:[min,datetime,local]</floater.string>
+  <floater.string name="linked_freeze">About the freeze on [day,datetime,local] [mth,datetime,local] at [hour24,datetime,local]:[min,datetime,local]</floater.string>
+  <floater.string name="linked_crash_undated">About the last crash</floater.string>
+  <floater.string name="linked_freeze_undated">About the last freeze</floater.string>
   <floater.string name="linked_reference">· [REF]</floater.string>
   <floater.string name="include_avatar">Include my avatar name ([NAME])</floater.string>
   <floater.string name="include_avatar_logged_out">Include my avatar name (once logged in)</floater.string>

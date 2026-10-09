@@ -5471,6 +5471,10 @@ and report the problem.
     <string name="DiscordViaViewer">via [APP_NAME]</string>
     <string name="DiscordHiddenRegion">Hidden Region</string>
 
+    <!-- What ended the previous run, for the question about it -->
+    <string name="AlchemyFeedbackCrashed">crashed</string>
+    <string name="AlchemyFeedbackFroze">froze</string>
+
     <!-- Feedback that did not reach the developers -->
     <string name="AlchemyFeedbackRateLimited">Too many reports are reaching the server right now. Try again in [MINUTES] min.</string>
     <string name="AlchemyFeedbackTooLarge">That's too large to send. It can go without the attachments.</string>

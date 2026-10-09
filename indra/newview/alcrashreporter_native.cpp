@@ -66,6 +66,10 @@ namespace
 {
     bool sEngaged = false;
 
+    // The report the previous run ended with: a freeze's from the record it
+    // left, a crash's from the SDK as it starts.
+    std::optional<ALCrashReporter::PreviousReport> sPreviousReport;
+
     // Raised while a signal handler of ours calls into the SDK, whose
     // warnings would otherwise reach the log's locks from inside it.
     std::atomic<bool> sSdkLogMuted{ false };
@@ -239,6 +243,33 @@ namespace
         return event;
     }
 
+    // Inside sentry_init, for each crash a previous run left: the event it was
+    // filed as, which feedback about the crash names.
+    void on_crashed_last_run(const sentry_envelope_t* envelope, void*)
+    {
+        const sentry_value_t event = sentry_envelope_get_event(envelope);
+        const char* id = sentry_value_as_string(sentry_value_get_by_key(event, "event_id"));
+        std::string event_id = ALCrashReporter::compactEventId(id ? id : "");
+        if (!event_id.empty())
+        {
+            sPreviousReport = ALCrashReporter::PreviousReport{ "crash", std::move(event_id) };
+        }
+    }
+
+    // A freeze ends the run that reports it, so its event is recorded for the
+    // next run, which is where the user can say what happened.
+    void record_freeze(const sentry_uuid_t& id)
+    {
+        if (sentry_uuid_is_nil(&id))
+        {
+            return;
+        }
+        char text[37];
+        sentry_uuid_as_string(&id, text);
+        ALCrashReporter::recordReport(ALCrashReporter::reportRecordFile(),
+                                      { "freeze", ALCrashReporter::compactEventId(text) });
+    }
+
 #if LL_LINUX
     // A freeze report's stack, where there is no minidump of a running
     // process to send: the hung main thread is sent a real-time signal of
@@ -377,6 +408,7 @@ namespace
         add_attachment(options, *app->getStaticDebugFile());
         add_attachment(options, gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "settings.xml"));
         sentry_options_set_on_crash(options, on_crash, nullptr);
+        sentry_options_set_on_crashed_last_run(options, on_crashed_last_run, nullptr);
         sentry_options_set_debug(options, 1);
         sentry_options_set_logger(options, sdk_log, nullptr);
         sentry_options_set_logger_enabled_when_crashed(options, 0);
@@ -427,6 +459,10 @@ bool ALCrashReporter::init()
 #if !LL_SEND_CRASH_REPORTS
     return false;
 #else
+    if (!LLAppViewer::instance()->isSecondInstance())
+    {
+        sPreviousReport = takeRecordedReport(reportRecordFile());
+    }
     if (!consentRecorded(consentSentinel()))
     {
         LL_INFOS("CrashReporter") << "No consent to crash reports recorded; none are sent until it is" << LL_ENDL;
@@ -548,6 +584,7 @@ namespace
         sentry_remove_tag("freeze");
         sentry_remove_context("watchdog");
         LLFile::remove(path);
+        record_freeze(id);
         return !sentry_uuid_is_nil(&id);
     }
 #endif
@@ -577,10 +614,15 @@ bool ALCrashReporter::reportFreeze(const std::string& description)
 #else
     const bool with_stack = false;
 #endif
-    sentry_capture_event(event);
+    record_freeze(sentry_capture_event(event));
     LL_INFOS("CrashReporter") << (with_stack ? "Freeze reported with the main thread's stack"
                                              : "Freeze reported as an event") << LL_ENDL;
     return true;
+}
+
+std::optional<ALCrashReporter::PreviousReport> ALCrashReporter::previousReport()
+{
+    return sPreviousReport;
 }
 
 bool ALCrashReporter::handleException(void* exception_pointers)

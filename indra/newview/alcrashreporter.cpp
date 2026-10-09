@@ -130,6 +130,66 @@ void ALCrashReporter::recordConsent(const std::string& sentinel, bool allowed)
     }
 }
 
+std::string ALCrashReporter::compactEventId(std::string_view id)
+{
+    std::string hex;
+    hex.reserve(32);
+    for (char c : id)
+    {
+        if (c != '-' && c != '{' && c != '}')
+        {
+            hex += c;
+        }
+    }
+    LLStringUtil::toLower(hex);
+    if (hex.size() != 32 || hex.find_first_not_of("0123456789abcdef") != std::string::npos)
+    {
+        return std::string();
+    }
+    return hex;
+}
+
+std::string ALCrashReporter::reportRecordFile()
+{
+    return gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "last_report");
+}
+
+void ALCrashReporter::recordReport(const std::string& record_file, const PreviousReport& report)
+{
+    const std::string line = report.kind + " " + report.eventId + "\n";
+    std::error_code ec;
+    LLFile file(record_file, LLFile::out | LLFile::trunc | LLFile::binary, ec);
+    if (!ec)
+    {
+        file.write(line.data(), static_cast<S64>(line.size()), ec);
+    }
+}
+
+std::optional<ALCrashReporter::PreviousReport> ALCrashReporter::takeRecordedReport(const std::string& record_file)
+{
+    if (!LLFile::isfile(record_file))
+    {
+        return std::nullopt;
+    }
+    std::string line = LLFile::getContents(record_file);
+    LLFile::remove(record_file, ENOENT);
+
+    LLStringUtil::trim(line);
+    const size_t space = line.find(' ');
+    if (space == std::string::npos)
+    {
+        return std::nullopt;
+    }
+    PreviousReport report;
+    report.kind = line.substr(0, space);
+    report.eventId = compactEventId(std::string_view(line).substr(space + 1));
+    if ((report.kind != "crash" && report.kind != "freeze") || report.eventId.empty())
+    {
+        return std::nullopt;
+    }
+    return report;
+}
+
 ALCrashReporter::PreviousRun ALCrashReporter::previousRun(const LLSD& info)
 {
     PreviousRun run;

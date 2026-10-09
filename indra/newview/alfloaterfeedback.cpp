@@ -26,7 +26,9 @@
 
 #include "alfloaterfeedback.h"
 
+#include "alcrashreporter.h"
 #include "altextview.h"
+#include "llappviewer.h"
 #include "llbutton.h"
 #include "llcallbacklist.h"
 #include "llcheckboxctrl.h"
@@ -367,6 +369,63 @@ void ALFloaterFeedback::show(const LLSD& key)
 }
 
 // static
+void ALFloaterFeedback::askAboutLastRun()
+{
+    // The login screen is shown again after a failed login; once a launch.
+    static bool asked = false;
+    if (asked || !ALFeedback::available() || LLAppViewer::instance()->isSecondInstance())
+    {
+        return;
+    }
+    asked = true;
+
+    std::string kind;
+    switch (gLastExecEvent)
+    {
+        case LAST_EXEC_FROZE:
+        case LAST_EXEC_LOGOUT_FROZE:
+            kind = "freeze";
+            break;
+        case LAST_EXEC_LLERROR_CRASH:
+        case LAST_EXEC_OTHER_CRASH:
+        case LAST_EXEC_LOGOUT_CRASH:
+        case LAST_EXEC_BAD_ALLOC:
+            kind = "crash";
+            break;
+        default:
+            // An unknown end is as often the task manager or a power cut.
+            return;
+    }
+
+    LLSD key;
+    key["kind"] = "problem";
+    key["linked"] = kind;
+    key["previous_log"] = true;
+    if (const std::optional<ALCrashReporter::PreviousReport> report = ALCrashReporter::previousReport())
+    {
+        key["associated_event_id"] = report->eventId;
+    }
+    // When it happened: about when the previous run last wrote its log.
+    const std::string previous_log = ALFeedback::previousLogFile();
+    llstat status;
+    if (!previous_log.empty() && LLFile::stat(previous_log, &status) == 0)
+    {
+        key["linked_at"] = LLDate(static_cast<F64>(status.st_mtime)).asString();
+    }
+
+    LLSD args;
+    args["WHAT"] = LLTrans::getString(kind == "freeze" ? "AlchemyFeedbackFroze" : "AlchemyFeedbackCrashed");
+    LLNotificationsUtil::add("AlchemyFeedbackAfterCrash", args, key,
+                             [](const LLSD& notification, const LLSD& response)
+                             {
+                                 if (LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+                                 {
+                                     ALFloaterFeedback::show(notification["payload"]);
+                                 }
+                             });
+}
+
+// static
 void ALFloaterFeedback::onIdle(void* self_ptr)
 {
     ALFloaterFeedback* self = static_cast<ALFloaterFeedback*>(self_ptr);
@@ -545,10 +604,19 @@ void ALFloaterFeedback::updateLinked()
         return;
     }
 
-    std::string text = getString(mLinked == "freeze" ? "linked_freeze" : "linked_crash");
-    LLSD substitution;
-    substitution["datetime"] = static_cast<S32>(LLDate(mLinkedAt).secondsSinceEpoch());
-    LLStringUtil::format(text, substitution);
+    const bool freeze = mLinked == "freeze";
+    std::string text;
+    if (mLinkedAt.empty())
+    {
+        text = getString(freeze ? "linked_freeze_undated" : "linked_crash_undated");
+    }
+    else
+    {
+        text = getString(freeze ? "linked_freeze" : "linked_crash");
+        LLSD substitution;
+        substitution["datetime"] = static_cast<S32>(LLDate(mLinkedAt).secondsSinceEpoch());
+        LLStringUtil::format(text, substitution);
+    }
     if (!mAssociatedEventId.empty())
     {
         LLStringUtil::format_map_t args;
