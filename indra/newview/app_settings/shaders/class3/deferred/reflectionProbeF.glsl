@@ -278,12 +278,11 @@ bool intersect(const Ray &ray) const
         return true;
 } */
 
-// adapted -- assume that origin is inside sphere, return intersection of ray with edge of sphere.
-// guards `radius2 - d2` against negative values so callers that pass a position outside the sphere
-// (or use the 4096*4096 automatic-probe hack) get a clamped intersection instead of NaN.
 // Set while water samples the probes (sampleReflectionProbesWater).
 bool water_sample = false;
 
+// adapted -- assume that origin is inside sphere, return intersection of ray with edge of sphere.
+// An origin outside it has no exit point and gets center + dir: the probe sampled along the ray without parallax.
 vec3 sphereIntersect(vec3 origin, vec3 dir, vec3 center, float radius2)
 {
         float t0, t1; // solutions for t if the ray intersects
@@ -546,7 +545,7 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
 
         float rr = r * r;
 
-        v = (water_sample && i == 0) ? c + dir : // water takes the sky-only default probe without parallax
+        v = (water_sample && i == 0) ? c + dir : // water takes the default probe without parallax
             sphereIntersect(pos, dir, c,
         refIndex[i].w < 1 ? 4096.0*4096.0 : // <== effectively disable parallax correction for automatically placed probes to keep from bombing the world with obvious spheres
                 rr);
@@ -634,7 +633,7 @@ vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int
         // pad sphere for manual probe extending into automatic probe space
         float rr = r * r;
 
-        v = (water_sample && i == 0) ? c + dir : // water takes the sky-only default probe without parallax
+        v = (water_sample && i == 0) ? c + dir : // water takes the default probe without parallax
             sphereIntersect(pos, dir, c,
         refIndex[i].w < 1 ? 4096.0*4096.0 : // <== effectively disable parallax correction for automatically placed probes to keep from bombing the world with obvious spheres
                 rr);
