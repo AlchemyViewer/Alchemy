@@ -69,6 +69,23 @@ struct events_data
         listener1("second")
     {
     }
+    // The named pumps these tests obtain go with each test, and every
+    // listener on them, bound to this fixture or to a test's locals, with
+    // them: each test finds them new whatever ran before it, and none is
+    // left for a later post to call into a dead object.
+    ~events_data()
+    {
+        for (const char* name : { "per-frame", "login", "upstream", "filter0", "filter1", "button",
+                                  "stream", "heaptest" })
+        {
+            const auto found = pumps.mPumpMap.find(name);
+            if (found != pumps.mPumpMap.end() && pumps.mOurPumps.count(found->second))
+            {
+                // unregisters itself
+                delete found->second;
+            }
+        }
+    }
     LLEventPumps& pumps;
     Listener listener0;
     Listener listener1;

@@ -93,6 +93,16 @@ namespace tut
         // LLPounceableStatic<LLMessageSystem*, LLPounceableStatic>.
         ensure("static_check should still be null", ! static_check);
         Data myData("test<1>");
+        // gForward and static_check let go of myData with the test, however
+        // it ends, rather than point past it at whatever runs next.
+        struct LetGo
+        {
+            ~LetGo()
+            {
+                gForward = nullptr;
+                static_check = nullptr;
+            }
+        } let_go;
         gForward = &myData;         // should run setter
         ensure_equals("static_check should be &myData", static_check, &myData);
     }

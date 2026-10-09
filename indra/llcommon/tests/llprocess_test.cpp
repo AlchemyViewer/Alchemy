@@ -1657,7 +1657,9 @@ namespace tut
                 mExpect(expect),
                 mTriggered(false)
             {
-                LLEventPumps::instance().obtain(pumpname)
+                // Held, so the listener goes with this: left on the pump, it
+                // would be called on a dead object by the next post there.
+                mConnection = LLEventPumps::instance().obtain(pumpname)
                     .listen("PostendListener", boost::bind(&PostendListener::postend, this, _1));
             }
 
@@ -1671,6 +1673,7 @@ namespace tut
             LLProcess::ReadPipe& mReadPipe;
             std::string mExpect;
             bool mTriggered;
+            LLTempBoundListener mConnection;
         };
     } // anonymous namespace
 

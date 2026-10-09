@@ -88,6 +88,33 @@ private:
     Sync& mSync;
 };
 
+/// The coroutines need LLApp::isRunning(), and on Windows LLCoros hands an
+/// exception escaping one to LLApp::instance(). An app per test, as this had,
+/// ran ~LLApp after each, and that ends LLCommon -- the APR pool, the LLTrace
+/// master recorder -- for every test after it in the process. So there is one
+/// app for the process, never destroyed, which each test sees start running
+/// and stop.
+class CoroTestApp: public LLTestApp
+{
+public:
+    struct Running
+    {
+        Running()
+        {
+            app();
+            setStatus(APP_STATUS_RUNNING);
+        }
+        ~Running() { setStopped(); }
+    };
+
+private:
+    static CoroTestApp& app()
+    {
+        static CoroTestApp* sApp = new CoroTestApp;
+        return *sApp;
+    }
+};
+
 } // anonymous namespace
 
 /*****************************************************************************
@@ -102,7 +129,7 @@ namespace tut
         std::string replyName, errorName, threw, stringdata;
         LLSD result, errordata;
         int which;
-        LLTestApp testApp;
+        CoroTestApp::Running running;
 
         void explicit_wait(std::shared_ptr<LLCoros::Promise<std::string>>& cbp);
         void waitForEventOn1();
