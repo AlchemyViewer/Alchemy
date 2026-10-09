@@ -291,6 +291,10 @@ endif()
 # vcpkg feature flags MUST be set before the first project() call below  #
 ##########################################################################
 
+if(AL_BUILD_TESTS)
+  list(APPEND VCPKG_MANIFEST_FEATURES "tests")
+endif()
+
 if(AL_USE_KDU)
   list(APPEND VCPKG_MANIFEST_FEATURES "kdu")
 endif()
