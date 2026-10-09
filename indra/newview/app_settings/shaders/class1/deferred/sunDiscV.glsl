@@ -28,7 +28,6 @@
 //[ENGINE_BLOCK Matrices]
 
 in vec3 position;
-uniform float sk_sky_body_depth; // <SK:Nexii> render/farplane: pin under the infinite projection, 0 otherwise
 in vec2 texcoord0;
 
 out vec2 vary_texcoord0;
@@ -47,7 +46,7 @@ void main()
     // smash to *almost* far clip plane -- behind clouds but in front of stars.
     // Reverse-Z mirrors the stored depth (far=0): 1 - 0.9999995 window == 0.0000005 ndc.
 #ifdef REVERSE_Z
-    pos.z = pos.w*(sk_sky_body_depth > 0.0 ? sk_sky_body_depth : 0.0000005); // <SK:Nexii> render/farplane: was 0.0000005
+    pos.z = pos.w*0.0000005;
 #else
     pos.z = pos.w*0.999999;
 #endif

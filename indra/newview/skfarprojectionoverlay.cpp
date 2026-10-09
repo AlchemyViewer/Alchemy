@@ -95,9 +95,8 @@ void skRenderFarProjectionOverlay()
         return;
     }
 
-    // The columns get a depth buffer of their own: the main one holds the sky pin (~13,400 km out under the infinite
-    // projection, ~974 m under a finite one), which would reject everything past it, and the overlay must leave nothing
-    // in it for later passes to read.
+    // The columns get a depth buffer of their own: the main one holds the scene, which would hide them, and the
+    // overlay must leave nothing in it for later passes to read.
     const U32 width = gPipeline.mRT->screen.getWidth();
     const U32 height = gPipeline.mRT->screen.getHeight();
     if (!sTarget)

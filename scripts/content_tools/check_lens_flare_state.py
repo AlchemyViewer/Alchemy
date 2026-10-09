@@ -14,16 +14,16 @@ FadeTime, a slew cap relative to a running reference luminance, and adaptive
 damping keyed off direction reversals of the raw target, detected as
 displacement from an anchor so the verdict does not depend on frame rate.
 Replayed at 30/60/144 fps.  Pure Python on purpose (no numpy).
-Model C -- skyOf: which stored depths count as unoccluded sky, under the
-finite projections and under the infinite reverse-Z one (render/farplane),
-where 1 km stores 1e-4 and the nearest sky (the pin) is 2^-27, ~13,400 km out,
-the dome 2^-31, then the moon and sun at their real distances.
+Model C -- skyOf: only the cleared far depth counts as unoccluded sky, under
+the finite projections and under the infinite reverse-Z one, where geometry
+stores near / distance and so never reaches it: 1 km stores 1e-4, 1000 km 1e-7.
 
     python check_lens_flare_state.py          # verify the chosen constants
     python check_lens_flare_state.py --grid   # compare tap counts and patterns
 """
 import math
 import random
+import struct
 import sys
 
 GOLDEN_ANGLE = 2.39996322972865332
@@ -460,15 +460,9 @@ def model_b(p=P):
 
 
 # ---- Model C: skyOf ----------------------------------------------------------
-SKY_PIN = 5e-6        # llcamera.h SK_SKY_PIN_DEPTH, the dome under a finite reverse-Z projection
-SUN_PIN = 5e-7        # sunDiscV.glsl, finite
-MOON_PIN = 4.5e-6     # moonV.glsl, finite
-INF_PIN = 2.0 ** -27  # llcamera.h SK_SKY_PIN_DEPTH_INFINITE, the nearest sky under the infinite projection
-INF_DOME = 2.0 ** -31 # skSkyLayerDepth(0, true)
-INF_MOON = 0.1 / 384400000.0     # SK_SKY_MOON_DEPTH_INFINITE
-INF_SUN = 0.1 / 149597870700.0   # SK_SKY_SUN_DEPTH_INFINITE
 NEAR = 0.1            # MIN_NEAR_PLANE
-REACH = 8192.0        # SK_REACH_TERRAIN
+FAR = 1024.0          # SK_FORWARD_Z_PROJECTION_FAR, every finite projection's far plane
+FLOOR = 1000000.0     # SK_RECONSTRUCT_FAR, the farthest point reconstruction places
 EDGE = 256000.0       # SK_EDGE_WATER_STRETCH
 SHADER = __file__.replace("\\", "/").rsplit("/scripts/", 1)[0] +     "/indra/newview/app_settings/shaders/class1/alchemy/lensFlareStateF.glsl"
 
@@ -478,40 +472,47 @@ def smoothstep(e0, e1, x):
     return t * t * (3.0 - 2.0 * t)
 
 
-def sky_of(d, reverse, ramp=(0.0, 0.0)):
-    """lensFlareStateF.glsl skyOf; ramp is sk_sky_ramp, (pin, reach depth) under an infinite projection."""
+def f32(x):
+    """x as the nearest single, which a 32-bit float depth buffer holds."""
+    return struct.unpack("f", struct.pack("f", x))[0]
+
+
+def stored_depth(z, reverse, infinite=False):
+    """Window depth held for geometry at eye distance z: float under reverse-Z, 24-bit fixed point forward."""
+    if infinite:
+        return f32(NEAR / z)
+    fwd = (1.0 / NEAR - 1.0 / z) / (1.0 / NEAR - 1.0 / FAR)
     if reverse:
-        if ramp[1] > 0.0:
-            return 1.0 - smoothstep(ramp[0], ramp[1], d)
-        return smoothstep(0.9999, 1.0, 1.0 - d)
-    return smoothstep(0.9999, 1.0, d)
+        return f32(1.0 - fwd)
+    top = float((1 << 24) - 1)
+    return round(fwd * top) / top
+
+
+def sky_of(d, reverse):
+    """lensFlareStateF.glsl skyOf."""
+    if reverse:
+        return 1.0 if d <= 0.0 else 0.0
+    return 1.0 if d >= 1.0 else 0.0
 
 
 def model_c():
     print("Model C: skyOf")
     src = open(SHADER).read()
-    check("shader parity", "return 1.0 - smoothstep(sk_sky_ramp.x, sk_sky_ramp.y, d);" in src
-          and "return smoothstep(0.9999, 1.0, 1.0 - d);" in src and "return smoothstep(0.9999, 1.0, d);" in src,
+    check("shader parity", "return d <= 0.0 ? 1.0 : 0.0;" in src and "return d >= 1.0 ? 1.0 : 0.0;" in src,
           "skyOf expressions match the mirror")
-    fwd_sky = sky_of(1.0 - SKY_PIN, False)
-    check("finite reverse mirrors forward", abs(sky_of(SKY_PIN, True) - fwd_sky) < 1e-9,
-          "sky pin %.4f forward, %.4f reverse" % (fwd_sky, sky_of(SKY_PIN, True)))
-    ramp = (INF_PIN, NEAR / REACH)  # pipeline.cpp: sk_sky_ramp = (SK_SKY_PIN_DEPTH_INFINITE, near / reach)
-    pins = [sky_of(d, True, ramp) for d in (0.0, INF_SUN, INF_MOON, INF_DOME, INF_PIN)]
-    check("infinite: sky layers are sky", min(pins) == 1.0, "cleared/sun/moon/dome/pin %s" % pins)
-    check("infinite: sky order", 0.0 < INF_SUN < INF_MOON < INF_DOME < INF_PIN, "sun < moon < dome < pin in depth")
-    # skfarplane.cpp skSkyDepth: threshold is the geometric mean of the pin and the farthest water.
+    check("the cleared depth is sky", sky_of(0.0, True) == 1.0 and sky_of(1.0, False) == 1.0,
+          "0 reversed, 1 forward")
     edge = EDGE + 2048.0
     farthest = math.sqrt(2.0 * edge * edge + EDGE * EDGE)
-    threshold = math.sqrt(INF_PIN * NEAR / farthest)
-    check("infinite: sky threshold between the pin and the farthest water",
-          INF_PIN * 5.0 < threshold < (NEAR / farthest) / 5.0,
-          "threshold %.4g (%.0f km), farthest water %.0f km" % (threshold, NEAR / threshold / 1000.0, farthest / 1000.0))
-    geo = [sky_of(NEAR / z, True, ramp) for z in (1000.0, 2000.0, 4000.0, 8000.0, REACH)]
-    check("infinite: geometry within reach occludes", max(geo) == 0.0,
-          "1, 2, 4, 8, 8.192 km -> %s" % geo)
-    old = sky_of(NEAR / 2000.0, True)
-    check("the old ramp would count 2 km as half sky", old > 0.4, "2 km under the finite ramp %.3f" % old)
+    dists = (1000.0, 8192.0, 100000.0, farthest, FLOOR)
+    inf = [sky_of(stored_depth(z, True, True), True) for z in dists]
+    check("infinite: geometry at any distance occludes", max(inf) == 0.0,
+          "1, 8.2, 100, %.0f, %.0f km -> %s" % (farthest / 1000.0, FLOOR / 1000.0, inf))
+    fin = [sky_of(stored_depth(z, rev), rev) for rev in (True, False) for z in (500.0, 900.0, 1000.0)]
+    check("finite: geometry short of the far plane occludes", max(fin) == 0.0,
+          "500, 900, 1000 m reversed then forward -> %s" % fin)
+    old = smoothstep(0.9999, 1.0, 1.0 - stored_depth(900.0, True))
+    check("the old 0.9999 ramp counted far geometry as sky", old > 0.5, "900 m under it %.3f" % old)
 
 
 if __name__ == "__main__":

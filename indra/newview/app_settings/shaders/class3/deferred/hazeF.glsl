@@ -33,7 +33,6 @@ in vec2 vary_fragcoord;
 
 vec4 getNorm(vec2 pos_screen);
 vec4 getPositionWithDepth(vec2 pos_screen, float depth);
-vec4 skPinnedSkyPosition(vec4 pos, float depth); // <SK:Nexii> render/farplane
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 
 float getDepth(vec2 pos_screen);
@@ -52,7 +51,7 @@ void main()
 {
     vec2  tc           = vary_fragcoord.xy;
     float depth        = getDepth(tc.xy);
-    vec4  pos          = skPinnedSkyPosition(getPositionWithDepth(tc, depth), depth); // <SK:Nexii> render/farplane: was getPositionWithDepth(tc, depth)
+    vec4  pos          = getPositionWithDepth(tc, depth);
     vec4  norm         = getNorm(tc);
     vec3  light_dir   = (sun_up_factor == 1) ? sun_dir : moon_dir;
 

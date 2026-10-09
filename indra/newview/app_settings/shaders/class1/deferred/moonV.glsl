@@ -28,7 +28,6 @@
 //[ENGINE_BLOCK Matrices]
 
 in vec3 position;
-uniform float sk_sky_body_depth; // <SK:Nexii> render/farplane: pin under the infinite projection, 0 otherwise
 in vec2 texcoord0;
 
 out vec2 vary_texcoord0;
@@ -44,7 +43,7 @@ void main()
     // Reverse-Z mirrors the stored depth (far=0): 1 - 0.9999955 window == 0.0000045 ndc,
     // which stays nearer than the sun (0.0000005) under GREATER, matching forward order.
 #ifdef REVERSE_Z
-    pos.z = pos.w*(sk_sky_body_depth > 0.0 ? sk_sky_body_depth : 0.0000045); // <SK:Nexii> render/farplane: was 0.0000045
+    pos.z = pos.w*0.0000045;
 #else
     pos.z = pos.w*0.999991;
 #endif

@@ -30,13 +30,16 @@ in vec4 vary_fragcoord;
 
 vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 float getDepth(vec2 pos_screen);
+bool isFarDepth(float d);             // deferredUtil.glsl -- depth-convention aware
 
 vec4 getWaterFogView(vec3 pos);
 
 uniform int above_water;
 
-// <SK:Nexii> render/farplane: deferredUtil's sky classification; sky behind water is held a legacy distance past the surface.
-uniform vec2 sk_sky_pin;
+// <SK:Nexii> render/farplane: void water has no floor. The sky behind it keeps the cleared far depth, which an
+// infinite projection reconstructs a thousand km out and a finite one at its far plane, wherever that falls
+// relative to the surface; it is fogged instead as water this deep past where the ray enters, at any distance.
+const float VOID_WATER_FOG_DEPTH = 1024.0;
 uniform vec4 waterPlane;
 // </SK:Nexii>
 
@@ -81,14 +84,13 @@ void main()
 
     vec4  pos          = getPositionWithDepth(tc, depth);
 
-    // <SK:Nexii> render/farplane: an infinite projection puts the sky behind void water tens of km down, so its fog would depend on
-    // that distance; it is held at the pin's legacy distance past where the ray enters the water, a depth upstream's saturates at.
-    if (depth <= sk_sky_pin.x)
+    // <SK:Nexii> render/farplane
+    if (isFarDepth(depth))
     {
         vec3 dir = normalize(pos.xyz);
         float es = -dot(dir, waterPlane.xyz);
         float entry = (waterPlane.w > 0.0 && es > 0.0) ? waterPlane.w / es : 0.0;
-        pos.xyz = dir * (entry + sk_sky_pin.y);
+        pos.xyz = dir * (entry + VOID_WATER_FOG_DEPTH);
     }
     // </SK:Nexii>
 

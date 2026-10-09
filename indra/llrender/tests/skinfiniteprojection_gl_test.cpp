@@ -329,25 +329,4 @@ namespace tut
         }
         ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
     }
-
-    // Under the infinite projection the far-clip squash puts the dome at skSkyLayerDepth, behind content at
-    // any reach and in front of the cleared depth.
-    template<> template<>
-    void skinfiniteprojection_object_t::test<5>()
-    {
-        const LLMatrix4a proj = infinite();
-        for (U32 layer : { 0u, 1u, SK_SKY_PIN_LAYERS, SK_SKY_PIN_LAYERS + 3 })
-        {
-            gGL.matrixMode(LLRender::MM_PROJECTION);
-            gGL.loadMatrix(proj);
-            gGL.matrixMode(LLRender::MM_MODELVIEW);
-            LLGLSquashToFarClip squash(proj, layer);
-            LLVector4a clip;
-            gGL.getProjectionMatrix().transform4(LLVector4a(0.3f, -0.2f, -50.f, 1.f), clip);
-            const F32 depth = clip[2] / clip[3];
-            ensure("layer depth " + std::to_string(layer), fabsf(depth - skSkyLayerDepth(layer, true)) <= skSkyLayerDepth(layer, true) * 1e-6f);
-            ensure("sky behind 100 km " + std::to_string(layer), depth < NEAR_PLANE / 100000.f && depth > 0.f);
-
-        }
-    }
 }

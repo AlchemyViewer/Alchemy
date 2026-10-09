@@ -8186,12 +8186,6 @@ void LLPipeline::generateLensFlareState(LLRenderTarget* src)
     shader.uniform1f(LLShaderMgr::LENS_FLARE_SUN_VISIBILITY, edge_fade);
     shader.uniform1f(LLShaderMgr::LENS_FLARE_OCCLUSION_RADIUS, radius_uv);
     shader.uniform1f(LLShaderMgr::LENS_FLARE_FADE_TIME, fade);
-    // <SK:Nexii> render/farplane: the sky ramp under an infinite projection (skSkyDepth).
-    {
-        const SKSkyDepth sky = skSkyDepth(LLViewerCamera::getInstance()->getNear(), LLViewerCamera::getInstance()->getProjectionFar());
-        shader.uniform2f(LLShaderMgr::SK_SKY_RAMP, sky.mReachDepth > 0.f ? SK_SKY_PIN_DEPTH_INFINITE : 0.f, sky.mReachDepth);
-    }
-    // </SK:Nexii>
 
     mScreenTriangleVB->setBuffer();
     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
@@ -11502,14 +11496,6 @@ void LLPipeline::renderDeferredLighting()
     gGL.setColorMask(true, true);
 }
 
-// <SK:Nexii> render/farplane: tells the haze shaders where the pinned sky is (deferredUtil's skPinnedSkyPosition).
-static void skBindSkyPin(LLGLSLShader& shader)
-{
-    const SKSkyDepth sky = skSkyDepth(LLViewerCamera::getInstance()->getNear(), LLViewerCamera::getInstance()->getProjectionFar());
-    shader.uniform2f(LLShaderMgr::SK_SKY_PIN, sky.mThreshold, sky.mLegacyDistance);
-}
-// </SK:Nexii>
-
 void LLPipeline::doAtmospherics()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -11549,7 +11535,6 @@ void LLPipeline::doAtmospherics()
         haze_shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
-        skBindSkyPin(haze_shader); // <SK:Nexii> render/farplane
 
         LLGLDepthTest depth(GL_FALSE);
 
@@ -11599,7 +11584,6 @@ void LLPipeline::doWaterHaze()
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
         haze_shader.uniform1i(LLShaderMgr::WATER_ABOVE_WATER, sUnderWaterRender ? -1 : 1);
-        skBindSkyPin(haze_shader); // <SK:Nexii> render/farplane
         haze_shader.bindTexture(LLShaderMgr::WATER_EXCLUSIONTEX, &mWaterExclusionMask);
 
         if (LLPipeline::sUnderWaterRender)

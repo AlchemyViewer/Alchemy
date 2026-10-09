@@ -30,8 +30,10 @@
 
 #include "llcamera.h"
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <sstream>
 
 namespace tut
@@ -96,10 +98,10 @@ namespace tut
     template<> template<>
     void skfarplane_object::test<8>()
     {
-        // Under the infinite projection the nearest sky is SK_SKY_PIN_DEPTH_INFINITE: everything within reach
-        // must store a larger depth, so the sky stays behind it.
-        ensure("terrain in front of the sky", MIN_NEAR_PLANE / SK_REACH_TERRAIN > SK_SKY_PIN_DEPTH_INFINITE);
+        // The sky keeps the cleared depth, 0 under reverse-Z. Anything drawn stores near / distance, which must stay
+        // a normal float out to the reconstruction floor so no geometry rounds onto the sky.
         ensure("reconstruction floor past the reach", SK_RECONSTRUCT_FAR > SK_REACH_TERRAIN);
+        ensure("geometry at the floor stores a normal depth", MIN_NEAR_PLANE / SK_RECONSTRUCT_FAR >= std::numeric_limits<F32>::min());
         // The floors the shaders actually carry, read from their sources.
         const F32 floor = 1.f / SK_RECONSTRUCT_FAR;
         const std::string util = shader_source("class1/deferred/deferredUtil.glsl");
@@ -120,27 +122,23 @@ namespace tut
         ensure_equals("finite, forward", skFrustumFarWindowDepth(false, 0.1f, 1.f), 1.f);
     }
 
-    // Pinned-sky classification, against an independent double-precision reference.
+    // The sky is the cleared far depth and nothing else: every pass that tells sky from geometry tests for exactly
+    // that value, so no distance, projection or pin enters the test.
     template<> template<>
     void skfarplane_object::test<12>()
     {
-        const SKSkyDepth finite = skSkyDepth(0.1f, 1024.f);
-        ensure("finite classifies nothing", finite.mThreshold < 0.f && finite.mReachDepth == 0.f);
-        const SKSkyDepth sky = skSkyDepth(MIN_NEAR_PLANE, SK_PROJECTION_INFINITE);
-        ensure("threshold", fabsf(sky.mThreshold - 4.08825704e-08f) < 1e-13f);
-        ensure("farthest water", fabsf(skFarthestWater() - 445773.0f) < 2.f);
-        ensure("farthest water is not sky", MIN_NEAR_PLANE / skFarthestWater() > sky.mThreshold);
-        ensure("reach depth", fabsf(sky.mReachDepth - 1.220703e-5f) < 1e-11f);
-        ensure("legacy pin distance", fabsf(sky.mLegacyDistance - 974.1294f) < 0.01f);
-        ensure("pin is sky", SK_SKY_PIN_DEPTH_INFINITE <= sky.mThreshold);
-        // A wide margin on both sides, since the GPU's z/w division may round.
-        ensure("margin to the pin", sky.mThreshold > 5.f * SK_SKY_PIN_DEPTH_INFINITE);
-        ensure("margin to the farthest water", MIN_NEAR_PLANE / skFarthestWater() > 5.f * sky.mThreshold);
-        ensure("reach is not sky", MIN_NEAR_PLANE / SK_REACH_TERRAIN > sky.mThreshold);
-        // The haze and lens flare shaders take the pin from the uniform, never a literal of their own.
-        ensure("haze uses the pin", shader_source("class3/deferred/hazeF.glsl").find("skPinnedSkyPosition(getPositionWithDepth") != std::string::npos);
-        // Water fog must not use the pin: it would place the sky under void water in front of the water.
-        ensure("water haze does not use the pin", shader_source("class3/deferred/waterHazeF.glsl").find("skPinnedSkyPosition") == std::string::npos);
+        const std::string haze = shader_source("class3/deferred/hazeF.glsl");
+        ensure("haze leaves the sky to the sky", haze.find("if (isFarDepth(depth))") != std::string::npos);
+        ensure("haze takes geometry where it is", haze.find("= getPositionWithDepth(tc, depth);") != std::string::npos);
+        ensure("void water fog keys on the far depth", shader_source("class3/deferred/waterHazeF.glsl").find("if (isFarDepth(depth))") != std::string::npos);
+        const std::string flare = shader_source("class1/alchemy/lensFlareStateF.glsl");
+        ensure("flare sky is the far plane, reversed", flare.find("return d <= 0.0 ? 1.0 : 0.0;") != std::string::npos);
+        ensure("flare sky is the far plane, forward", flare.find("return d >= 1.0 ? 1.0 : 0.0;") != std::string::npos);
+        // The farthest geometry: a top corner of the edge water's extent, from as high above it as the water shows.
+        const F64 edge = (F64)skEdgeWaterStretch(true) + MAX_FAR_CLIP;
+        const F64 farthest = sqrt(2.0 * edge * edge + (F64)SK_EDGE_WATER_STRETCH * SK_EDGE_WATER_STRETCH);
+        ensure("farthest water inside the floor", farthest < SK_RECONSTRUCT_FAR);
+        ensure("farthest water stores a normal depth", (F32)(MIN_NEAR_PLANE / farthest) >= std::numeric_limits<F32>::min());
     }
 
     // Water's far terms: upstream's under a finite projection, reach, edge fade and sky threshold under an infinite one.
@@ -158,7 +156,7 @@ namespace tut
         const std::string water_f = shader_source("class3/environment/waterF.glsl");
         ensure("void water refracts its fog, not the haze", water_f.find("sk_water_far.z") == std::string::npos);
         const std::string haze = shader_source("class3/deferred/waterHazeF.glsl");
-        ensure("sky behind water is held past the surface", haze.find("entry + sk_sky_pin.y") != std::string::npos);
+        ensure("sky behind water is held past the surface", haze.find("entry + VOID_WATER_FOG_DEPTH") != std::string::npos);
         const std::string water_v = shader_source("class1/environment/waterV.glsl");
         ensure("wave clamp from the uniform", water_v.find("min(d, sk_water_far.x)") != std::string::npos);
         ensure("no literal wave clamp", water_v.find("min(d, 2560.0)") == std::string::npos);
@@ -186,42 +184,6 @@ namespace tut
         }
         ensure_equals("forward ignores infinite", skForcedProjectionFar(1024.f, 2, 2048.f, false, false), 1024.f);
         ensure_equals("forward ignores finite", skForcedProjectionFar(1024.f, 1, 2048.f, false, false), 1024.f);
-    }
-
-    // Sky pins: upstream's exact values under a finite projection; under the infinite one, powers of two from the
-    // pin back, with sun behind moon behind the dome behind the higher layers, and the pin ~13,400 km out.
-    template<> template<>
-    void skfarplane_object::test<19>()
-    {
-        for (U32 layer = 0; layer < 8; ++layer)
-        {
-            ensure_equals("finite layer is upstream's " + std::to_string(layer), skSkyLayerDepth(layer, false), 0.000005f + 0.00005f * layer);
-        }
-        ensure_equals("pin bits", SK_SKY_PIN_DEPTH_INFINITE, ldexpf(1.f, -27));
-        ensure("pin is about 13,400 km at 0.1 m", fabsf(MIN_NEAR_PLANE / SK_SKY_PIN_DEPTH_INFINITE - 13421772.8f) < 2.f);
-        ensure_equals("dome bits", skSkyLayerDepth(0, true), ldexpf(1.f, -31));
-        for (U32 layer = 1; layer < 8; ++layer)
-        {
-            ensure("layer at or behind the pin " + std::to_string(layer), skSkyLayerDepth(layer, true) <= SK_SKY_PIN_DEPTH_INFINITE);
-            ensure("layer nearer than the one below " + std::to_string(layer),
-                   skSkyLayerDepth(layer, true) == 2.f * skSkyLayerDepth(layer - 1, true) || layer > SK_SKY_PIN_LAYERS);
-        }
-        ensure_equals("top layer at the pin", skSkyLayerDepth(SK_SKY_PIN_LAYERS, true), SK_SKY_PIN_DEPTH_INFINITE);
-        // Real distances: decode back within float precision at the main view's near plane.
-        const F32 moon = SK_SKY_MOON_DEPTH_INFINITE;
-        const F32 sun = SK_SKY_SUN_DEPTH_INFINITE;
-        ensure("moon decodes to 384,400 km at 0.1 m", fabs(0.1 / (F64)moon - 384400000.0) < 384400000.0 * 1e-6);
-        ensure("sun decodes to 1 AU at 0.1 m", fabs(0.1 / (F64)sun - 149597870700.0) < 149597870700.0 * 1e-6);
-        // Front to back, upstream's order: pin and layers, dome, moon, sun, stars (0).
-        ensure("moon behind the dome", moon < skSkyLayerDepth(0, true));
-        ensure("sun behind the moon", sun < moon);
-        ensure("stars behind the sun", sun > 0.f);
-        // Every sky element classifies as sky, with margin.
-        const SKSkyDepth sky = skSkyDepth(MIN_NEAR_PLANE, SK_PROJECTION_INFINITE);
-        ensure("pin and bodies are sky", SK_SKY_PIN_DEPTH_INFINITE * 5.f < sky.mThreshold && moon < sky.mThreshold);
-        // The shaders keep upstream's literals as their finite fallback.
-        ensure("sun upstream fallback", shader_source("class1/deferred/sunDiscV.glsl").find(": 0.0000005)") != std::string::npos);
-        ensure("moon upstream fallback", shader_source("class1/deferred/moonV.glsl").find(": 0.0000045)") != std::string::npos);
     }
 
     // The draw distance consumers see: forward-Z keeps 512 m, reverse-Z reaches MAX_FAR_CLIP.

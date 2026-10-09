@@ -59,26 +59,6 @@ F32 skFrustumFarWindowDepth(bool infinite, F32 near_plane, F32 window_far)
     return infinite ? near_plane / SK_RECONSTRUCT_FAR : window_far;
 }
 
-SKSkyDepth skSkyDepth(F32 near_plane, F32 projection_far)
-{
-    SKSkyDepth sky;
-    if (!skIsInfinite(projection_far))
-    {
-        return sky;
-    }
-    constexpr F32 legacy_far = SK_FORWARD_Z_PROJECTION_FAR;
-    sky.mReachDepth = near_plane / SK_REACH_TERRAIN;
-    sky.mThreshold = sqrtf(SK_SKY_PIN_DEPTH_INFINITE * (near_plane / skFarthestWater()));
-    sky.mLegacyDistance = near_plane * legacy_far / (near_plane + SK_SKY_PIN_DEPTH * (legacy_far - near_plane));
-    return sky;
-}
-
-F32 skFarthestWater()
-{
-    const F32 edge = skEdgeWaterStretch(true) + MAX_FAR_CLIP;
-    return sqrtf(2.f * edge * edge + SK_EDGE_WATER_STRETCH * SK_EDGE_WATER_STRETCH);
-}
-
 F32 skFarthestWaterHorizontal()
 {
     const F32 edge = skEdgeWaterStretch(true) + MAX_FAR_CLIP;

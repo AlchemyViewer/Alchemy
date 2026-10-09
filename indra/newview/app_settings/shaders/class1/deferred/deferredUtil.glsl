@@ -406,19 +406,6 @@ vec3 getProjectedLightSpecularColor(float light_distance, vec2 projected_uv)
 // 1 / view distance, so flooring it keeps every point within SK_RECONSTRUCT_FAR (llcamera.h) and leaves
 // finite projections, whose w never gets this small, untouched.
 #define SK_RECONSTRUCT_W_FLOOR 0.000001
-
-// Under an infinite projection the pinned sky (depth <= x) is put back at the eye depth it had under the old
-// 1024 m projection (y), so haze sees it where upstream did; x is -1 under a finite projection (skSkyDepth).
-uniform vec2 sk_sky_pin;
-
-vec4 skPinnedSkyPosition(vec4 pos, float depth)
-{
-    if (depth <= sk_sky_pin.x)
-    {
-        pos.xyz *= sk_sky_pin.y / max(-pos.z, SK_RECONSTRUCT_W_FLOOR);
-    }
-    return pos;
-}
 // </SK:Nexii>
 
 vec4 getPosition(vec2 pos_screen)
