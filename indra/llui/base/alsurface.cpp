@@ -99,33 +99,62 @@ namespace ALSurface
         gl_rect_2d(rect, frame(ink, alpha), false);
     }
 
+    namespace
+    {
+        // A colour of the skin's by name, asked of the table again whenever
+        // the table has changed rather than only the first time. Asked once,
+        // a name the table did not have yet -- a control built before the
+        // skin's colours were in, as a test builds them -- would be the
+        // fallback for good, and one reset since would still point into the
+        // table. Every caller is handed the same object, so a reference one
+        // keeps follows as well.
+        const LLUIColor& skinColor(LLUIColor& color, U32& seen, std::string_view name, const LLColor4& fallback)
+        {
+            const LLUIColorTable& table = LLUIColorTable::instance();
+            if (seen != table.generation())
+            {
+                color = table.getColor(name, fallback);
+                seen  = table.generation();
+            }
+            return color;
+        }
+
+        // Before the first look: no generation the table counts to soon.
+        constexpr U32 NEVER = U32_MAX;
+    }
+
     const LLUIColor& well()
     {
-        static const LLUIColor color = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
-        return color;
+        static LLUIColor color;
+        static U32       seen = NEVER;
+        return skinColor(color, seen, "DefaultShadowLight", LLColor4::black);
     }
 
     const LLUIColor& rim()
     {
-        static const LLUIColor color = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
-        return color;
+        static LLUIColor color;
+        static U32       seen = NEVER;
+        return skinColor(color, seen, "LabelDisabledColor", LLColor4::grey);
     }
 
     const LLUIColor& handle()
     {
-        static const LLUIColor color = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
-        return color;
+        static LLUIColor color;
+        static U32       seen = NEVER;
+        return skinColor(color, seen, "EmphasisColor", LLColor4::yellow);
     }
 
     const LLUIColor& text()
     {
-        static const LLUIColor color = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
-        return color;
+        static LLUIColor color;
+        static U32       seen = NEVER;
+        return skinColor(color, seen, "LabelTextColor", LLColor4::white);
     }
 
     const LLUIColor& quiet()
     {
-        static const LLUIColor color = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
-        return color;
+        static LLUIColor color;
+        static U32       seen = NEVER;
+        return skinColor(color, seen, "LabelDisabledColor", LLColor4::grey);
     }
 }
