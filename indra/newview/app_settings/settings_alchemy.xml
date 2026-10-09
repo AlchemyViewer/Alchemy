@@ -1278,6 +1278,50 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyFeedbackHideInterface</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether a feedback report's screenshot is of the world alone, without windows, chat or HUDs</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyFeedbackIncludeAvatar</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether a feedback report names the avatar who sent it</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyFeedbackRememberEmail</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether the email address given in a feedback report is kept for the next one</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyFeedbackScreenshotDelay</key>
+        <map>
+            <key>Comment</key>
+            <string>Seconds Send Feedback waits, once its window is open, before taking the screenshot</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.3</real>
+        </map>
         <key>AlchemyDisableClickToSit</key>
         <map>
             <key>Comment</key>

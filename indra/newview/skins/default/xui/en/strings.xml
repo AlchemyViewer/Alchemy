@@ -5166,6 +5166,7 @@ name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_Debug_Label">Debug Settings</string>
   <string name="Command_Destinations_Label">Destinations</string>
   <string name="Command_Environments_Label">My Environments</string>
+  <string name="Command_Feedback_Label">Feedback</string>
   <string name="Command_Gestures_Label">Gestures</string>
   <string name="Command_Grid_Status_Label">Grid status</string>
   <string name="Command_Inventory_Label">Inventory</string>
@@ -5212,6 +5213,7 @@ name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_Debug_Tooltip">Debug settings for advanced users</string>
   <string name="Command_Destinations_Tooltip">Destinations of interest</string>
   <string name="Command_Environments_Tooltip">My Environments</string>
+  <string name="Command_Feedback_Tooltip">Tell the Alchemy developers what's wrong or what you'd like</string>
   <string name="Command_Gestures_Tooltip">Gestures for your avatar</string>
   <string name="Command_Grid_Status_Tooltip">Show current Grid status</string>
   <string name="Command_Inventory_Tooltip">View and use your belongings</string>
@@ -5469,4 +5471,22 @@ and report the problem.
     <!-- Discord rich presence -->
     <string name="DiscordViaViewer">via [APP_NAME]</string>
     <string name="DiscordHiddenRegion">Hidden Region</string>
+
+    <!-- What ended the previous run, for the question about it -->
+    <string name="AlchemyFeedbackCrashed">Alchemy crashed the last time it ran.</string>
+    <string name="AlchemyFeedbackFroze">Alchemy stopped responding the last time it ran.</string>
+    <string name="AlchemyFeedbackCrashedQuitting">Alchemy crashed while quitting the last time it ran.</string>
+    <string name="AlchemyFeedbackFrozeQuitting">Alchemy stopped responding while quitting the last time it ran.</string>
+
+    <!-- When a report was written -->
+    <string name="AlchemyFeedbackDate">[day,datetime,local] [mth,datetime,local]</string>
+
+    <!-- Feedback that did not reach the developers -->
+    <string name="AlchemyFeedbackRateLimited">Too many reports are reaching the server right now. Try again later.</string>
+    <string name="AlchemyFeedbackTooLarge">That's too large to send. It can go without the attachments.</string>
+    <string name="AlchemyFeedbackRejected">The server refused this report. You can report it on GitHub instead.</string>
+    <string name="AlchemyFeedbackUnreachable">Couldn't reach the server. Check your connection and try again.</string>
+    <string name="AlchemyFeedbackRateLimitedQueued">The server is busy. Your report will be sent automatically later; you can close this window.</string>
+    <string name="AlchemyFeedbackUnreachableQueued">Couldn't reach the server. Your report will be sent automatically once it can be; you can close this window.</string>
+    <string name="AlchemyFeedbackDisconnectedQueued">You're disconnected. Your report will be sent the next time Alchemy starts; you can close this window.</string>
 </strings>

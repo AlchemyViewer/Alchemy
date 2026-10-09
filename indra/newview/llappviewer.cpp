@@ -790,6 +790,10 @@ bool LLAppViewer::init()
     // is a crash handler to write it.
     prepareCrashMarker();
 
+    // What the previous run left, read before this run writes its own over it.
+    ALCrashReporter::readLastRun();
+    startDebugInfo();
+
     // As early as consent can be read: before the settings, on the sentinel
     // they keep for it.
     ALCrashReporter::init();
@@ -2584,6 +2588,7 @@ void LLAppViewer::initLoggingAndGetLastDuration()
 
         // Rename current log file to ".old"
         LLFile::rename(log_file, old_log_file);
+        mPreviousLogFile = old_log_file;
 
         // Set the log file.
         LLError::logToFile(log_file);
@@ -4133,13 +4138,11 @@ void LLAppViewer::removeCacheFiles(const std::string& file_mask)
     gDirUtilp->deleteFilesInDir(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ""), file_mask);
 }
 
-void LLAppViewer::writeSystemInfo()
+void LLAppViewer::startDebugInfo()
 {
-
-    if (! gDebugInfo.has("Dynamic") )
-        gDebugInfo["Dynamic"] = LLSD::emptyMap();
-
-    // The report filed on the next launch joins the crash by this.
+    // The report filed on the next launch joins the crash by this. Written
+    // first thing, so a run that ends before the rest is known is not taken
+    // on the next launch for the run before it.
     gDebugInfo["RunId"] = ALCrashReporter::runId();
 
 #if LL_DARWIN
@@ -4151,6 +4154,15 @@ void LLAppViewer::writeSystemInfo()
     // is the one to name.
     gDebugInfo["SLLog"] = getActiveLogFileName();
 #endif
+
+    writeDebugInfo();
+}
+
+void LLAppViewer::writeSystemInfo()
+{
+
+    if (! gDebugInfo.has("Dynamic") )
+        gDebugInfo["Dynamic"] = LLSD::emptyMap();
 
     gDebugInfo["ClientInfo"]["Name"] = LLVersionInfo::instance().getChannel();
     gDebugInfo["ClientInfo"]["MajorVersion"] = LLVersionInfo::instance().getMajor();
@@ -4685,8 +4697,19 @@ void LLAppViewer::processMarkerFiles()
         LLFile::remove(crash_log_file);
         // Rename ".old" log file to ".crash"
         LLFile::rename(old_log_file, crash_log_file);
+        mPreviousLogFile = crash_log_file;
     }
 #endif
+}
+
+// static
+std::string LLAppViewer::previousLogFile()
+{
+    // Where processMarkerFiles() moved it: ".old", or on macOS ".crash"
+    // when the run did not end normally. A ".crash" left after a normal end
+    // is an older run's, and a second instance moves no log.
+    const std::string log_file = sInstance ? sInstance->mPreviousLogFile : std::string();
+    return !log_file.empty() && LLFile::isfile(log_file) ? log_file : std::string();
 }
 
 void LLAppViewer::removeMarkerFiles()

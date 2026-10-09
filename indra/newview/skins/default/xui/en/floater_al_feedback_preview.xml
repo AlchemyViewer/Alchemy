@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater
+ can_close="true"
+ can_minimize="true"
+ can_resize="true"
+ height="420"
+ width="560"
+ min_height="160"
+ min_width="240"
+ layout="topleft"
+ name="floater_al_feedback_preview"
+ save_rect="true"
+ single_instance="true"
+ title="FEEDBACK ATTACHMENT">
+  <text_view
+   follows="all"
+   font="Monospace"
+   height="412"
+   layout="topleft"
+   left="4"
+   name="text"
+   read_only="true"
+   top="4"
+   width="552"
+   word_wrap="true" />
+</floater>

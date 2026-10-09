@@ -1,0 +1,541 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater
+ can_close="true"
+ can_minimize="true"
+ can_resize="true"
+ height="634"
+ width="460"
+ min_height="558"
+ min_width="420"
+ layout="topleft"
+ name="floater_al_feedback"
+ save_rect="true"
+ single_instance="true"
+ title="SEND FEEDBACK">
+  <floater.string name="placeholder_problem">What happened, and what did you expect? Steps that make it happen again help the most.</floater.string>
+  <floater.string name="placeholder_idea">What would you like Alchemy to do, and what for?</floater.string>
+  <floater.string name="placeholder_other">What's on your mind?</floater.string>
+  <floater.string name="counter">[COUNT] / [MAX]</floater.string>
+  <floater.string name="linked_date">[day,datetime,local] [mth,datetime,local]</floater.string>
+  <floater.string name="linked_time_24">[hour24,datetime,local]:[min,datetime,local]</floater.string>
+  <floater.string name="linked_time_12">[hour12,datetime,local]:[min,datetime,local] [ampm,datetime,local]</floater.string>
+  <floater.string name="linked_crash">About the crash on [DATE] at [TIME]</floater.string>
+  <floater.string name="linked_freeze">About the freeze on [DATE] at [TIME]</floater.string>
+  <floater.string name="linked_crash_undated">About the last crash</floater.string>
+  <floater.string name="linked_freeze_undated">About the last freeze</floater.string>
+  <floater.string name="linked_tooltip_crash">This report is tied to the crash, so the developers see the two together.</floater.string>
+  <floater.string name="linked_tooltip_freeze">This report is tied to the freeze, so the developers see the two together.</floater.string>
+  <floater.string name="linked_tooltip_report">Crash report: [ID]</floater.string>
+  <floater.string name="unlink_crash">Send this as feedback of its own, not about that crash</floater.string>
+  <floater.string name="unlink_freeze">Send this as feedback of its own, not about that freeze</floater.string>
+  <floater.string name="include_avatar">Include my avatar name ([NAME])</floater.string>
+  <floater.string name="include_avatar_logged_out">Include my avatar name (not available until you log in)</floater.string>
+  <floater.string name="no_previous_log">none</floater.string>
+  <floater.string name="screenshot_tooltip">What's on your screen, open windows such as IMs included. Tick "Hide the interface" to leave them out.</floater.string>
+  <floater.string name="screenshot_in_world">A screenshot can be taken once you're logged in.</floater.string>
+  <floater.string name="screenshot_taking">Taking the screenshot…</floater.string>
+  <floater.string name="screenshot_failed">Couldn't take the screenshot. Retake to try again.</floater.string>
+  <floater.string name="screenshot_none">No screenshot</floater.string>
+  <floater.string name="logs_location_hidden">Logs name the places you've been, so they stay out while your location is hidden.</floater.string>
+  <floater.string name="label_send">Send</floater.string>
+  <floater.string name="label_send_held">Send ([SECONDS])</floater.string>
+  <floater.string name="send_tooltip">Send this report to the Alchemy developers (Ctrl+Enter)</floater.string>
+  <floater.string name="send_busy">Sending…</floater.string>
+  <floater.string name="send_held">You can send another report in [SECONDS] seconds.</floater.string>
+  <floater.string name="send_too_short">Write a little more first.</floater.string>
+  <floater.string name="send_too_long">That's too long to send. Shorten it, or attach a log instead of pasting one.</floater.string>
+  <floater.string name="send_bad_email">Check the email address, or leave it empty.</floater.string>
+  <floater.string name="email_hint">Only if you'd like a reply.</floater.string>
+  <floater.string name="email_invalid">That doesn't look like an email address.</floater.string>
+  <floater.string name="sending">Sending…</floater.string>
+  <floater.string name="restored">Your unsent message is back.</floater.string>
+  <floater.string name="restored_queued">This report is waiting to be sent automatically.</floater.string>
+  <floater.string name="kept_sent">Your report has now reached the Alchemy developers.</floater.string>
+  <floater.string name="kept_given_up">Your report couldn't reach the server, and Alchemy has stopped trying. It's still here to send.</floater.string>
+  <floater.string name="queued_one">An earlier report is waiting to be sent automatically.</floater.string>
+  <floater.string name="queued_many">[COUNT] earlier reports are waiting to be sent automatically.</floater.string>
+  <floater.string name="action_discard">Discard</floater.string>
+  <floater.string name="action_dont_send">Don't send</floater.string>
+  <floater.string name="action_try_again">Try again</floater.string>
+  <floater.string name="action_without_attachments">Send without them</floater.string>
+  <floater.string name="action_github">Report on GitHub</floater.string>
+  <floater.string name="action_copy_message">Copy message</floater.string>
+  <floater.string name="title_screenshot">SCREENSHOT</floater.string>
+  <floater.string name="title_session_log">THIS SESSION'S LOG</floater.string>
+  <floater.string name="title_previous_log">LAST SESSION'S LOG</floater.string>
+  <floater.string name="title_system_info">SYSTEM INFORMATION</floater.string>
+  <floater.string name="title_settings">SETTINGS YOU'VE CHANGED</floater.string>
+  <floater.string name="title_whats_in">WHAT'S IN A REPORT</floater.string>
+  <floater.string name="whats_in">A report goes to the Alchemy developers' Sentry project, the one crash reports go to, and only when you press Send.
+
+Every report carries:
+- your message, and your email if you give one
+- the viewer's version, channel and build
+- your operating system and graphics card
+- where the viewer was in starting up or running, and the region you were in (unless an RLVa restriction hides your location)
+- whether crash reports are on, and an id for this run of the viewer, so a report can be matched to a crash from the same run
+
+With "Include my avatar name", your avatar's name and key go too, so a developer can find you in world. Without it, your name and key are hidden in the logs, but logs and system information can still say things about you: untick them as well for a report that says nothing about who you are.
+
+Each attachment you tick goes as you see it in View, as it is when you press Send. Logs go as their last 4 MB, with the addresses that act for your session hidden; while RLVa hides your location, they stay out. Settings you've changed leave out keys, passwords, tokens and email addresses, and text that could name you, a file or a place reads as hidden.
+
+A report that can't reach the server is kept and sent automatically for up to a week.</floater.string>
+  <radio_group
+   follows="left|top"
+   height="20"
+   layout="topleft"
+   left="12"
+   name="kind"
+   top="8"
+   width="436">
+    <radio_item
+     height="20"
+     label="Something's wrong"
+     layout="topleft"
+     left="0"
+     name="problem"
+     top="0"
+     value="problem"
+     width="150" />
+    <radio_item
+     height="20"
+     label="Idea"
+     layout="topleft"
+     left_pad="8"
+     name="idea"
+     top_delta="0"
+     value="idea"
+     width="80" />
+    <radio_item
+     height="20"
+     label="Something else"
+     layout="topleft"
+     left_pad="8"
+     name="other"
+     top_delta="0"
+     value="other"
+     width="130" />
+  </radio_group>
+  <text_editor
+   follows="all"
+   height="170"
+   layout="topleft"
+   left="12"
+   max_length="32768"
+   name="message"
+   tab_group="1"
+   top="34"
+   width="436"
+   word_wrap="true" />
+  <text
+   type="string"
+   length="1"
+   follows="left|bottom"
+   height="16"
+   layout="topleft"
+   left="12"
+   name="linked_text"
+   top="207"
+   use_ellipses="true"
+   visible="false"
+   width="270" />
+  <button
+   follows="left|bottom"
+   font="SansSerifSmall"
+   height="18"
+   label="Unlink"
+   layout="topleft"
+   left_pad="4"
+   name="unlink_btn"
+   tool_tip="Send this as feedback of its own, not about that crash"
+   top_delta="-1"
+   visible="false"
+   width="56" />
+  <text
+   type="string"
+   length="1"
+   follows="right|bottom"
+   halign="right"
+   height="16"
+   layout="topleft"
+   left="348"
+   name="counter"
+   top="207"
+   width="100" />
+  <text
+   type="string"
+   length="1"
+   follows="left|bottom"
+   font.style="BOLD"
+   height="16"
+   layout="topleft"
+   left="12"
+   name="include_label"
+   top="230"
+   width="200">
+    Include
+  </text>
+  <panel
+   background_visible="true"
+   bg_alpha_color="DkGray"
+   border="true"
+   follows="left|bottom"
+   height="90"
+   layout="topleft"
+   left="12"
+   mouse_opaque="true"
+   name="screenshot_preview"
+   tool_tip="The screenshot that goes with the report. Click to see it whole."
+   top="250"
+   width="160">
+    <text
+     type="string"
+     length="1"
+     follows="all"
+     halign="center"
+     height="80"
+     layout="topleft"
+     left="6"
+     mouse_opaque="false"
+     name="screenshot_note"
+     text_color="LtGray_50"
+     top="5"
+     valign="center"
+     width="148"
+     word_wrap="true" />
+  </panel>
+  <check_box
+   follows="left|bottom"
+   height="16"
+   label="Screenshot"
+   layout="topleft"
+   left="184"
+   name="screenshot_check"
+   tab_group="2"
+   top="252"
+   width="240" />
+  <check_box
+   control_name="AlchemyFeedbackHideInterface"
+   follows="left|bottom"
+   height="16"
+   label="Hide the interface"
+   layout="topleft"
+   left="204"
+   name="hide_ui_check"
+   tool_tip="Take the screenshot of the world alone: no windows, chat or HUDs"
+   top="274"
+   width="220" />
+  <button
+   follows="left|bottom"
+   height="22"
+   label="Retake"
+   layout="topleft"
+   left="184"
+   name="retake_btn"
+   tool_tip="Take the screenshot again, with this window out of the way"
+   top="300"
+   width="80" />
+  <button
+   follows="left|bottom"
+   height="22"
+   label="View"
+   layout="topleft"
+   left_pad="6"
+   name="view_screenshot_btn"
+   tool_tip="See the screenshot whole"
+   top_delta="0"
+   width="80" />
+  <text
+   type="string"
+   length="1"
+   follows="left|bottom"
+   font="SansSerifSmall"
+   height="14"
+   layout="topleft"
+   left="184"
+   name="screenshot_shows"
+   text_color="LtGray_50"
+   top="326"
+   width="264">
+    Your open windows show in it, IMs included.
+  </text>
+  <check_box
+   follows="left|bottom"
+   height="16"
+   label="This session's log"
+   layout="topleft"
+   left="12"
+   name="session_log_check"
+   top="350"
+   width="240" />
+  <text
+   type="string"
+   length="1"
+   follows="right|bottom"
+   halign="right"
+   height="16"
+   layout="topleft"
+   left="262"
+   name="session_log_size"
+   top="350"
+   width="90" />
+  <button
+   follows="right|bottom"
+   height="22"
+   label="View"
+   layout="topleft"
+   left="368"
+   name="view_session_log_btn"
+   tool_tip="See what this session's log sends"
+   top="346"
+   width="80" />
+  <check_box
+   follows="left|bottom"
+   height="16"
+   label="Last session's log"
+   layout="topleft"
+   left="12"
+   name="previous_log_check"
+   top="374"
+   width="240" />
+  <text
+   type="string"
+   length="1"
+   follows="right|bottom"
+   halign="right"
+   height="16"
+   layout="topleft"
+   left="262"
+   name="previous_log_size"
+   top="374"
+   width="90" />
+  <button
+   follows="right|bottom"
+   height="22"
+   label="View"
+   layout="topleft"
+   left="368"
+   name="view_previous_log_btn"
+   tool_tip="See what the last session's log sends"
+   top="370"
+   width="80" />
+  <check_box
+   follows="left|bottom"
+   height="16"
+   label="System information"
+   layout="topleft"
+   left="12"
+   name="system_info_check"
+   top="398"
+   width="240" />
+  <button
+   follows="right|bottom"
+   height="22"
+   label="View"
+   layout="topleft"
+   left="368"
+   name="view_system_info_btn"
+   tool_tip="See the system information this sends"
+   top="394"
+   width="80" />
+  <check_box
+   follows="left|bottom"
+   height="16"
+   label="Settings you've changed"
+   layout="topleft"
+   left="12"
+   name="settings_check"
+   top="422"
+   width="240" />
+  <button
+   follows="right|bottom"
+   height="22"
+   label="View"
+   layout="topleft"
+   left="368"
+   name="view_settings_btn"
+   tool_tip="See the settings this sends"
+   top="418"
+   width="80" />
+  <text
+   type="string"
+   length="1"
+   follows="left|bottom"
+   font.style="BOLD"
+   height="16"
+   layout="topleft"
+   left="12"
+   name="contact_label"
+   top="452"
+   width="200">
+    Contact
+  </text>
+  <check_box
+   control_name="AlchemyFeedbackIncludeAvatar"
+   follows="left|bottom"
+   height="16"
+   label="Include my avatar name"
+   layout="topleft"
+   left="12"
+   name="include_avatar_check"
+   tab_group="3"
+   tool_tip="Your avatar's name and key, so a developer can find you in world. Without them, they're hidden in the logs; logs and system information can still say things about you."
+   top="472"
+   width="436" />
+  <text
+   type="string"
+   length="1"
+   follows="left|bottom"
+   height="16"
+   layout="topleft"
+   left="12"
+   name="email_label"
+   top="500"
+   width="48">
+    Email
+  </text>
+  <line_editor
+   follows="left|right|bottom"
+   height="23"
+   layout="topleft"
+   left="62"
+   max_length_bytes="254"
+   name="email"
+   tab_group="3"
+   top="496"
+   width="272" />
+  <check_box
+   control_name="AlchemyFeedbackRememberEmail"
+   follows="right|bottom"
+   height="16"
+   label="Remember"
+   layout="topleft"
+   left="344"
+   name="remember_email_check"
+   tool_tip="Keep this address for the next report"
+   top="500"
+   width="104" />
+  <text
+   type="string"
+   length="1"
+   follows="left|bottom"
+   font="SansSerifSmall"
+   height="14"
+   layout="topleft"
+   left="62"
+   name="email_hint"
+   top="522"
+   width="380">
+    Only if you'd like a reply.
+  </text>
+  <view_border
+   bevel_style="none"
+   follows="left|right|bottom"
+   height="0"
+   layout="topleft"
+   left="12"
+   name="separator"
+   top="544"
+   width="436" />
+  <text
+   type="string"
+   length="1"
+   follows="left|right|bottom"
+   height="44"
+   layout="topleft"
+   left="12"
+   name="privacy_text"
+   top="552"
+   width="436"
+   word_wrap="true">
+    Sent to the Alchemy developers when you press Send, and only then.
+  </text>
+  <panel
+   background_visible="true"
+   bg_alpha_color="DkGray2"
+   border="true"
+   follows="left|right|bottom"
+   height="50"
+   layout="topleft"
+   left="12"
+   name="status_panel"
+   top="548"
+   visible="false"
+   width="436">
+    <text
+     type="string"
+     length="1"
+     follows="left|right|top"
+     height="46"
+     layout="topleft"
+     left="6"
+     name="status_text"
+     top="2"
+     valign="center"
+     width="236"
+     word_wrap="true" />
+    <button
+     follows="right|top"
+     height="22"
+     layout="topleft"
+     left="246"
+     name="status_action_1"
+     top="14"
+     width="90" />
+    <button
+     follows="right|top"
+     height="22"
+     layout="topleft"
+     left_pad="4"
+     name="status_action_2"
+     top_delta="0"
+     width="92" />
+  </panel>
+  <button
+   follows="left|bottom"
+   height="22"
+   label="What's in a report"
+   layout="topleft"
+   left="12"
+   name="whats_in_btn"
+   top="604"
+   width="140" />
+  <loading_indicator
+   follows="right|bottom"
+   height="16"
+   layout="topleft"
+   left="176"
+   name="sending_indicator"
+   top="607"
+   visible="false"
+   width="16" />
+  <button
+   follows="right|bottom"
+   height="22"
+   label="Discard"
+   layout="topleft"
+   left="200"
+   name="discard_btn"
+   tool_tip="Throw this report away and start again"
+   top="604"
+   width="80" />
+  <button
+   follows="right|bottom"
+   height="22"
+   label="Close"
+   layout="topleft"
+   left="284"
+   name="close_btn"
+   tool_tip="Close this window. What you've written is kept for next time."
+   top="604"
+   width="80" />
+  <button
+   follows="right|bottom"
+   height="22"
+   label="Send"
+   layout="topleft"
+   left="368"
+   name="send_btn"
+   top="604"
+   width="80" />
+</floater>

@@ -166,6 +166,8 @@ if(AL_BUILD_VIEWER)
     alfloaterdirectory.cpp
     alfloaterevent.cpp
     alfloaterexploresounds.cpp
+    alfloaterfeedback.cpp
+    alfloaterfeedbackpreview.cpp
     alfloatergenerictext.cpp
     alfloatergroupprofile.cpp
     alfloaterlightbox.cpp
@@ -269,6 +271,10 @@ if(AL_BUILD_VIEWER)
     alobjectproperties.cpp
     alagentlocationformat.cpp
     alcrashreporter.cpp
+    alcrashreporter_run.cpp
+    alfeedback.cpp
+    alfeedback_send.cpp
+    alfeedbackoutbox.cpp
     alpanelaomini.cpp
     alparceliconstrip.cpp
     alpanelaopulldown.cpp
@@ -1027,6 +1033,8 @@ if(AL_BUILD_VIEWER)
     alfloaterdirectory.h
     alfloaterevent.h
     alfloaterexploresounds.h
+    alfloaterfeedback.h
+    alfloaterfeedbackpreview.h
     alfloatergenerictext.h
     alfloatergroupprofile.h
     alfloaterlightbox.h
@@ -1138,6 +1146,8 @@ if(AL_BUILD_VIEWER)
     alobjectproperties.h
     alagentlocationformat.h
     alcrashreporter.h
+    alfeedback.h
+    alfeedbackoutbox.h
     alpanelaomini.h
     alparceliconstrip.h
     alpanelaopulldown.h
@@ -2499,6 +2509,7 @@ if(AL_BUILD_TESTS)
     alcrashreporter
     alcurvemodel
     aldaycyclelandmarks
+    alfeedback
     algradehistory
     almotionpredictor
     alsceneexplorerpredicate
@@ -2523,6 +2534,14 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES ${test_libs}
     SOURCES alcolorwheelmodel.cpp
+  )
+  # The outbox keeps what the pure feedback code makes.
+  al_add_test(
+    alfeedbackoutbox
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
+    SOURCES alfeedback.cpp
   )
   al_add_test(
     lllogininstance

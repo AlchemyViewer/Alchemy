@@ -28,9 +28,11 @@
 #include "stdtypes.h"
 
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 class LLSD;
 class LLUUID;
@@ -51,6 +53,18 @@ namespace ALCrashReporter
 
     // The release a report files under: "alchemy@1.2.3+4567".
     std::string releaseName(S32 major, S32 minor, S32 patch, U64 build);
+
+    // What this build's reports file under.
+    struct Release
+    {
+        std::string name;        // "alchemy@1.2.3+4567"
+        std::string environment; // the channel
+        std::string dist;        // the build number
+    };
+    Release release();
+
+    // The tags every report from this run carries, as they stand now.
+    std::vector<std::pair<std::string, std::string>> commonTags();
 
     // Where the agent stood, "Region/128/64/22", in whole metres.
     std::string locationTag(std::string_view region, const LLVector3& position);
@@ -82,6 +96,53 @@ namespace ALCrashReporter
         std::string fatalMessage;
     };
     PreviousRun previousRun(const LLSD& info);
+
+    // What a crash or freeze that ended the previous run was filed as, so
+    // feedback about it can be tied to the report.
+    struct PreviousReport
+    {
+        std::string kind;    // "crash" or "freeze"
+        std::string eventId; // 32 lower-case hex digits
+    };
+    // The 32 hex digits of a UUID however it is spelled, or empty; empty too
+    // for the nil UUID, which is what an SDK returns for an event it did not
+    // send.
+    std::string compactEventId(std::string_view id);
+    // A freeze's report is only known in the run it ends, which records it
+    // in a file of one line for the next run to take.
+    std::string reportRecordFile();
+    void recordReport(const std::string& record_file, const PreviousReport& report);
+    std::optional<PreviousReport> takeRecordedReport(const std::string& record_file);
+    // A crash report the reporter finds as it starts may be any run's that
+    // it had not sent: an older one's, or a second instance's. It is the
+    // previous run's when it carries that run's id.
+    std::optional<PreviousReport> previousRunCrash(std::string_view event_id, std::string_view crashed_run_id,
+                                                   std::string_view previous_run_id);
+
+    // What the previous run left, read once from the top of init, before
+    // this run writes its own static debug file over that run's: the file,
+    // and the freeze report the run recorded. A second instance reads
+    // nothing, since the files are the running first instance's.
+    void readLastRun();
+    // What the previous run's static debug file says, and its text.
+    const PreviousRun& lastRun();
+    const std::string& lastRunDebugInfo();
+    // A crash report the reporter found as it started, which becomes the
+    // previous report when it is the previous run's.
+    void foundCrashReport(std::string_view event_id, std::string_view crashed_run_id);
+    // The report the previous run ended with, when one was filed and is known.
+    std::optional<PreviousReport> previousReport();
+
+    // How the previous run ended, when it crashed or froze.
+    struct LastRunEnd
+    {
+        std::string kind;      // "crash" or "freeze"
+        bool atLogout = false; // while it was quitting
+        std::string eventId;   // the report it was filed as, when one of that kind is known
+        std::string runId;     // the previous run's id, when its static debug file says
+        F64 when = 0.0;        // seconds since the epoch, about when it happened; 0 when unknown
+    };
+    std::optional<LastRunEnd> lastRunEnd();
 
     // How the viewer dies on purpose: LL_ERRS and std::terminate end here.
     // The kind and the message ride the report as its fatal context, and

@@ -42,7 +42,9 @@
 
 // newview includes
 #include "alavataractions.h"
+#include "alfeedback.h"
 #include "alfloaterblocked.h"
+#include "alfloaterfeedback.h"
 #include "alviewermenu.h"
 #include "llagent.h"
 #include "llagentaccess.h"
@@ -9652,6 +9654,11 @@ void handle_show_url(const LLSD& param)
 
 void handle_report_bug(const LLSD& param)
 {
+    if (ALFeedback::available())
+    {
+        ALFloaterFeedback::show();
+        return;
+    }
     std::string url = gSavedSettings.getString("ReportBugURL");
     LLWeb::loadURLExternal(url);
 }

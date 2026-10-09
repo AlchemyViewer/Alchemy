@@ -207,7 +207,8 @@ namespace LLMarketplaceImport
     {
         LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
         LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-            httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("marketplacePostCoro", httpPolicy);
+            httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("marketplacePostCoro", httpPolicy,
+                LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
         LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
         LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
         LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
@@ -268,7 +269,8 @@ namespace LLMarketplaceImport
     {
         LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
         LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-            httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("marketplaceGetCoro", httpPolicy);
+            httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("marketplaceGetCoro", httpPolicy,
+                LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
         LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
         LLCore::HttpHeaders::ptr_t httpHeaders;
         LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();

@@ -248,7 +248,6 @@
 		<menu_item_call label="Second Lifeサポートポータル" name="Support portal"/>
 		<menu_item_call label="Second Lifeブログ" name="Second Life Blogs"/>
 		<menu_item_call label="嫌がらせの報告" name="Report Abuse"/>
-		<menu_item_call label="バグの報告" name="Report Bug"/>
 		<menu_item_call label="衝突・プッシュ＆打撃" name="Bumps, Pushes &amp;amp; Hits"/>
 		<menu_item_call label="[APP_NAME]について" name="About Second Life"/>
 	</menu>

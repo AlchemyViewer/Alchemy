@@ -702,9 +702,10 @@ const std::string HttpCoroutineAdapter::HTTP_RESULTS_CONTENT("content");
 const std::string HttpCoroutineAdapter::HTTP_RESULTS_RAW("raw");
 
 HttpCoroutineAdapter::HttpCoroutineAdapter(std::string name,
-    LLCore::HttpRequest::policy_t policyId) :
+    LLCore::HttpRequest::policy_t policyId, Destination destination) :
     mAdapterName(std::move(name)),
     mPolicyId(policyId),
+    mDestination(destination),
     mYieldingHandle(LLCORE_HTTP_HANDLE_INVALID),
     mWeakRequest(),
     mWeakHandler()
@@ -1195,9 +1196,9 @@ void HttpCoroutineAdapter::checkDefaultHeaders(LLCore::HttpHeaders::ptr_t &heade
         headers->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_LLSD_XML);
     }
 
-    if (!headers->find("X-SecondLife-UDP-Listen-Port") && gMessageSystem)
+    if (mDestination == Destination::Grid && gMessageSystem && !headers->find(HTTP_OUT_HEADER_SL_UDP_LISTEN_PORT))
     {
-        headers->append("X-SecondLife-UDP-Listen-Port", llformat("%d", gMessageSystem->mPort));
+        headers->append(HTTP_OUT_HEADER_SL_UDP_LISTEN_PORT, std::to_string(gMessageSystem->mPort));
     }
 }
 

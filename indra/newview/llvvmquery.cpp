@@ -111,7 +111,8 @@ namespace
         // Make HTTP GET request
         LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
         LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t adapter =
-            std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("VVMQuery", httpPolicy);
+            std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("VVMQuery", httpPolicy,
+                LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
         LLCore::HttpRequest::ptr_t request = std::make_shared<LLCore::HttpRequest>();
 
         LLSD result = adapter->getAndSuspend(request, url);

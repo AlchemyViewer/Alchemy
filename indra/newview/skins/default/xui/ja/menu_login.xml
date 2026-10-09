@@ -12,7 +12,6 @@
 		<menu_item_call label="Second Lifeコミュニティフォーラム" name="Community Forums"/>
 		<menu_item_call label="Second Lifeサポートポータル" name="Support portal"/>
 		<menu_item_call label="Second Lifeブログ" name="Second Life Blogs"/>
-		<menu_item_call label="Second Lifeのバグ報告" name="Report Bug"/>
 		<menu_item_call label="[APP_NAME]について" name="About Second Life"/>
 	</menu>
 	<menu_item_check label="デバッグメニューを表示する" name="Show Debug Menu"/>

@@ -93,6 +93,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alcrashreporter.h"
+#include "alfeedback.h"
 #include "llappviewer.h"
 #include "llstartup.h"
 
@@ -1065,10 +1066,17 @@ bool idle_startup()
             LLPanelLogin::populateFields( gUserCredential, gRememberUser, gRememberPassword);
             LLPanelLogin::giveFocus();
 
-            // The first launch asks before any crash report is sent.
+            // The first launch asks before any crash report is sent. After a
+            // crash or a freeze the user is asked what happened: once that
+            // question is answered, when it is asked, so the two never stack.
             if (ALCrashReporter::available() && gSavedSettings.getS32("AlchemyCrashReportConsent") == 0)
             {
-                LLNotificationsUtil::add("AlchemyCrashReportConsent", LLSD(), LLSD(), crash_report_consent_callback);
+                LLNotificationsUtil::add("AlchemyCrashReportConsent", LLSD(), LLSD().with("ask_about_last_run", true),
+                                         crash_report_consent_callback);
+            }
+            else
+            {
+                ALFeedback::askAboutLastRun();
             }
 
             // MAINT-3231 Show first run dialog only for Desura viewer
@@ -1093,6 +1101,9 @@ bool idle_startup()
             // skip directly to message template verification
             LLStartUp::setStartupState( STATE_LOGIN_CLEANUP );
         }
+        // Feedback that could not be sent before goes now, and then whenever
+        // it is due, however the login goes.
+        ALFeedback::startQueue();
 
         gViewerWindow->setNormalControlsVisible( false );
         gLoginMenuBarView->setVisible( true );
@@ -2749,6 +2760,9 @@ bool idle_startup()
         LLStartUp::setStartupState( STATE_STARTED );
         do_startup_frame();
 
+        // A login that skipped the login screen asks about the last run here.
+        ALFeedback::askAboutLastRun();
+
         // Unmute audio if desired and setup volumes.
         // This is a not-uncommon crash site, so surround it with
         // LL_INFOS() output to aid diagnosis.
@@ -2878,7 +2892,8 @@ void release_notes_coro(const std::string url)
 
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("releaseNotesCoro", httpPolicy);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("releaseNotesCoro", httpPolicy,
+            LLCoreHttpUtil::HttpCoroutineAdapter::Destination::Outside);
     LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
@@ -3042,6 +3057,10 @@ bool crash_report_consent_callback(const LLSD& notification, const LLSD& respons
 {
     S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
     gSavedSettings.setS32("AlchemyCrashReportConsent", option == 0 ? 1 : 2);
+    if (notification["payload"]["ask_about_last_run"].asBoolean())
+    {
+        ALFeedback::askAboutLastRun();
+    }
     return false;
 }
 

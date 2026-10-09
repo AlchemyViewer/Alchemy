@@ -12,7 +12,6 @@
 		<menu_item_call label="Community-Foren" name="Community Forums"/>
 		<menu_item_call label="Support-Portal" name="Support portal"/>
 		<menu_item_call label="[SECOND_LIFE]-Blogs" name="Second Life Blogs"/>
-		<menu_item_call label="Fehler melden" name="Report Bug"/>
 		<menu_item_call label="INFO ÜBER [APP_NAME]" name="About Second Life"/>
 	</menu>
 	<menu_item_check label="Debug-Menü anzeigen" name="Show Debug Menu"/>
