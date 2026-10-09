@@ -118,6 +118,8 @@ namespace tut
 
         ensure("finite: below 1024 m", waterVisibleFrom(1000.f, 20.f, FINITE_PROJECTION_FAR));
         ensure("finite: from 1024 m it stops", !waterVisibleFrom(1024.f, 20.f, FINITE_PROJECTION_FAR));
+        ensure("finite: a farther plane shows it from higher", waterVisibleFrom(2000.f, 20.f, 4096.f));
+        ensure("finite: up to that plane", !waterVisibleFrom(4096.f, 20.f, 4096.f));
         ensure("infinite: 2 km up still shows", waterVisibleFrom(2000.f, 20.f, INFINITE_FAR));
         ensure("infinite: within reach above the water", waterVisibleFrom(20.f + EDGE_WATER_STRETCH - 1.f, 20.f, INFINITE_FAR));
         ensure("infinite: past reach above the water", !waterVisibleFrom(20.f + EDGE_WATER_STRETCH, 20.f, INFINITE_FAR));

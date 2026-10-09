@@ -80,7 +80,7 @@ F32 edgeWaterStretch(bool infinite)
 
 bool waterVisibleFrom(F32 camera_z, F32 water_height, F32 projection_far)
 {
-    return isInfinite(projection_far) ? camera_z - water_height < EDGE_WATER_STRETCH : camera_z < FINITE_PROJECTION_FAR;
+    return isInfinite(projection_far) ? camera_z - water_height < EDGE_WATER_STRETCH : camera_z < projection_far;
 }
 
 WaterFar waterFar(F32 projection_far, bool have_rim, const LLVector2& rim_min, const LLVector2& rim_max)

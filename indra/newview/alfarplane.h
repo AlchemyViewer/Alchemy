@@ -94,8 +94,8 @@ F32 terrainReach(F32 projection_far);
 /// How far edge water stretches past the loaded regions.
 F32 edgeWaterStretch(bool infinite);
 
-/// Whether water is drawn from a camera this high: below FINITE_PROJECTION_FAR under a finite projection, which
-/// has clipped the water away from higher, and while the edge water stretches under an infinite one.
+/// Whether water is drawn from a camera this high: below a finite projection's far plane, which has clipped the water
+/// away from higher, and while the edge water stretches under an infinite one.
 bool waterVisibleFrom(F32 camera_z, F32 water_height, F32 projection_far);
 
 /// The water shaders' far terms (waterFar). A finite projection keeps the defaults, which leave the shaders as
