@@ -477,6 +477,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     if(!ok)
     {
         LL_WARNS() << "Application init failed." << LL_ENDL;
+        // A failed init() is owed neither cleanup() nor the destructor. Its
+        // early-outs tear down what they need to themselves: the later ones
+        // delete every singleton, which cleanup() would build again with no
+        // UI under them, and two delete the settings location list, which
+        // the destructor would delete again. SDL_AppQuit runs after a failed
+        // SDL_AppInit too, so the app is let go here and left to the exit,
+        // as WINMAIN leaves it.
+        gViewerAppPtr = nullptr;
         return SDL_APP_FAILURE;
     }
 
@@ -543,9 +551,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     // gViewerAppPtr is null when SDL_AppInit bailed before constructing the
-    // app (e.g. the Windows velopack install-hook path). A GPU benchmark child
-    // only gets here having failed before it measured anything, and the
-    // settings it would save are its parent's.
+    // app (e.g. the Windows velopack install-hook path) or when its init()
+    // failed. A GPU benchmark child only gets here having failed before it
+    // measured anything, and the settings it would save are its parent's.
     if (gViewerAppPtr && !LLApp::isError() && !gGPUBenchmarkMode)
     {
         //
