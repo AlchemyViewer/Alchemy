@@ -608,6 +608,8 @@ public:
         WATER_RIM,                          //  "waterRim"  the edge water's outer rectangle relative to the camera
 
         EYE_TO_SKY,                         //  "eyeToSky"  eye space to the sky dome's (north, up, east)
+        SKY_BEHIND_MAP,                     //  "skyBehindMap"  the sky dome behind everything, for the haze pass
+        SKY_BEHIND_WEIGHT,                  //  "skyBehindWeight"  1 while skyBehindMap holds this view's sky
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;

@@ -1013,6 +1013,11 @@ public:
     //water distortion texture (refraction)
     LLRenderTarget              mWaterDis;
 
+    // The sky dome behind everything at half resolution: the sky pool draws it again here, with no depth, and the
+    // haze pass converges far water on it (hazeF.glsl). Holds the main view's sky for mSkyBehindFrame only.
+    LLRenderTarget              mSkyBehind;
+    U32                         mSkyBehindFrame = 0;
+
     static const U32 MAX_PREVIEW_WIDTH;
 
     //texture for making the glow

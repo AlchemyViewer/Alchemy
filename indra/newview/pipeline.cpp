@@ -1071,6 +1071,10 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         // must match it -- flip together via mainDepthFormat().
         mWaterDis.allocate(resX, resY, screenFormat, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
 
+        // The emissive attachment's format, which the sky writes to, so the sky behind quantizes as the sky does.
+        mSkyBehind.allocate(llmax(resX / 2, 1U), llmax(resY / 2, 1U), GL_R11F_G11F_B10F, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE);
+        mSkyBehindFrame = 0;
+
         if(RenderScreenSpaceReflections)
         {
             mSceneMap.allocate(resX, resY, screenFormat, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
@@ -1357,6 +1361,8 @@ void LLPipeline::releaseGLBuffers()
     releaseLUTBuffers();
 
     mWaterDis.release();
+    mSkyBehind.release();
+    mSkyBehindFrame = 0;
 
     mSceneMap.release();
 
@@ -11535,6 +11541,15 @@ void LLPipeline::doAtmospherics()
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
 
+        // Far water converges on the sky drawn behind it when this view's is there: the main view's alone, once the
+        // sky pool has drawn it this frame (HDRI skies and probe captures keep WindLight's own limit).
+        const bool sky_behind = !gCubeSnapshot && mRT == &mMainRT && mSkyBehind.isComplete() && mSkyBehindFrame == gFrameCount;
+        haze_shader.uniform1f(LLShaderMgr::SKY_BEHIND_WEIGHT, sky_behind ? 1.f : 0.f);
+        if (sky_behind)
+        {
+            haze_shader.bindTexture(LLShaderMgr::SKY_BEHIND_MAP, &mSkyBehind, ALSamplers::BilinearClamp);
+        }
+
         // The triangle lies on the far plane (hazeV.glsl), level with the depth the sky leaves cleared: the test
         // passes only where the world drew something, so the sky is rejected before it is shaded. The screen
         // target shares the G-buffer's depth; the shader reads its copy in mWaterDis.
@@ -11544,6 +11559,7 @@ void LLPipeline::doAtmospherics()
         mScreenTriangleVB->setBuffer();
         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
+        haze_shader.disableTexture(LLShaderMgr::SKY_BEHIND_MAP);
         unbindDeferredShader(haze_shader);
 
         gGL.setSceneBlendType(LLRender::BT_ALPHA);

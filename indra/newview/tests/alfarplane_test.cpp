@@ -163,8 +163,11 @@ namespace tut
         const std::string flare = shader_source("class1/alchemy/lensFlareStateF.glsl");
         ensure("flare sky is the far plane, reversed", flare.find("return d <= 0.0 ? 1.0 : 0.0;") != std::string::npos);
         ensure("flare sky is the far plane, forward", flare.find("return d >= 1.0 ? 1.0 : 0.0;") != std::string::npos);
-        // Opaque geometry in the haze pass takes the in-scatter blended geometry takes in its own shading.
+        // Opaque geometry in the haze pass takes the in-scatter blended geometry takes in its own shading, and the
+        // water surface alone converges on the sky behind it.
         ensure("the haze pass's in-scatter is alpha's", haze.find("atmosFragLighting(vec3(0), additive, atten)") != std::string::npos);
+        ensure("water converges on the sky behind", haze.find("if (on_water && skyBehindWeight > 0.0)") != std::string::npos);
+        ensure("the sky behind is sampled for water", haze.find("texture(skyBehindMap, tc)") != std::string::npos);
         // The farthest geometry: a top corner of the edge water's extent, from as high above it as the water shows.
         const F64 edge = (F64)ALFarPlane::edgeWaterStretch(true) + MAX_FAR_CLIP;
         const F64 farthest = sqrt(2.0 * edge * edge + (F64)ALFarPlane::EDGE_WATER_STRETCH * ALFarPlane::EDGE_WATER_STRETCH);

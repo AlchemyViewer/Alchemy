@@ -2125,6 +2125,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterRim");
 
     mReservedUniforms.push_back("eyeToSky");
+    mReservedUniforms.push_back("skyBehindMap");
+    mReservedUniforms.push_back("skyBehindWeight");
 
     // The enum and this list are parallel, and an entry added or removed on one side only
     // shifts every later uniform index for every shader in the viewer -- silently, since a

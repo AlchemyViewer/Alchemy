@@ -202,6 +202,26 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
         /// Render the skydome
         renderDome(origin, camHeightLocal, sky_shader);
 
+        // Again into the sky behind everything, with the same program and uniforms and no depth, so it covers what
+        // the world hides: the haze pass converges far water on it (hazeF.glsl). The main view's only; an HDRI sky
+        // is colour already shaded, which the haze cannot take the same way.
+        LLRenderTarget& behind = gPipeline.mSkyBehind;
+        if (!gCubeSnapshot && !LLPipeline::sImpostorRender && !use_hdri_sky() && gPipeline.mRT == &gPipeline.mMainRT && behind.isComplete())
+        {
+            behind.bindTarget();
+            behind.clear();
+            // skyF writes its colour to frag_data[3] with the emissive buffer, and to frag_data[0] without it.
+            static LLCachedControl<bool> has_emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
+            behind.setDrawOutput(has_emissive ? 3 : 0);
+            {
+                LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
+                LLGLDisable no_blend(GL_BLEND);
+                renderDome(origin, camHeightLocal, sky_shader);
+            }
+            behind.flush();
+            gPipeline.mSkyBehindFrame = gFrameCount;
+        }
+
         sky_shader->unbind();
     }
 }

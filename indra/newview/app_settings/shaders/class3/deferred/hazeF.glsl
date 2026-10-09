@@ -43,6 +43,15 @@ uniform vec4 waterPlane;
 
 uniform int cube_snapshot;
 
+// The sky dome behind everything, as the sky writes it (before srgb_to_linear and sky_hdr_scale), while
+// skyBehindWeight is 1 (LLPipeline::mSkyBehind). WindLight's in-scatter converges on a colour of its own, up to two
+// stops off the dome's toward a low sun and half a stop at night, which leaves a seam where far water meets the sky.
+// The water surface converges on the sky behind it instead: it lies below the horizon, where the dome is the
+// horizon's own colour turned only by the sun's glow. Nothing else does, since a few degrees above the horizon the
+// dome changes fast (at dusk, from no sunlight to the sun's glow), and a mountain took the glow of a sun behind it.
+uniform sampler2D skyBehindMap;
+uniform float skyBehindWeight;
+
 void main()
 {
     vec2  tc           = vary_fragcoord.xy;
@@ -80,6 +89,17 @@ void main()
 
     if (do_atmospherics)
     {
+        // On the water surface, seen from above it: reconstructed depth puts the surface within about a millionth of
+        // its distance of the plane, held here with twenty times that to spare.
+        float plane_dist = dot(pos.xyz, waterPlane.xyz) + waterPlane.w;
+        bool on_water = waterPlane.w > 0.0 && abs(plane_dist) <= max(0.05, 2e-5 * length(pos.xyz));
+        if (on_water && skyBehindWeight > 0.0)
+        {
+            // atmosFragLighting doubles additive, so the sky is halved
+            vec3 sky = texture(skyBehindMap, tc).rgb * 0.5;
+            additive = mix(additive, sky * (vec3(1.0) - atten), (vec3(1.0) - atten) * skyBehindWeight);
+        }
+
         // the in-scatter alone: the blend multiplies what is already lit by alpha
         alpha = atten.r;
         color = atmosFragLighting(vec3(0), additive, atten);
