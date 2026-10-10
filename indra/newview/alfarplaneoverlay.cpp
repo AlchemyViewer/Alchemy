@@ -117,7 +117,7 @@ void render()
     sTarget->bindTarget();
     {
         LLGLSColorMask mask(true, true);
-        glClearColor(0.f, 0.f, 0.f, 0.f);
+        gGL.setClearColor(LLColor4::transparent);
         sTarget->clear();
         gDebugProgram.bind();
         LLGLDepthTest depth(GL_TRUE, GL_TRUE);

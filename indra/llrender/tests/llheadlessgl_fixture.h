@@ -439,7 +439,7 @@ namespace ll_test
         // reflects only what the test rendered this turn.
         void clearFramebuffer()
         {
-            glClearColor(0.f, 0.f, 0.f, 1.f);
+            gGL.setClearColor(LLColor4::black);
             glClear(GL_COLOR_BUFFER_BIT);
         }
 

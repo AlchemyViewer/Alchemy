@@ -1688,9 +1688,9 @@ void LLPipeline::createLUTBuffers()
     // Scale 1 at EV 0: the first frame adapts from no exposure at all.
     mExposureMap.allocate(1, 1, GL_RGBA16F);
     mExposureMap.bindTarget();
-    glClearColor(1, 0, 0, 1);
+    gGL.setClearColor(LLColor4::red);
     mExposureMap.clear();
-    glClearColor(0, 0, 0, 0);
+    gGL.setClearColor(LLColor4::transparent);
     mExposureMap.flush();
 
     mLuminanceMap.allocate(EXPOSURE_METER_WIDTH, EXPOSURE_METER_HEIGHT, GL_RGBA16F);
@@ -5106,7 +5106,7 @@ void LLPipeline::renderDebug()
                     {
                         const LLColor4 clearColor = gSavedSettings.getColor4("PathfindingNavMeshClear");
                         gGL.setColorMask(true, true);
-                        glClearColor(clearColor.mV[0],clearColor.mV[1],clearColor.mV[2],0);
+                        gGL.setClearColor(LLColor4(clearColor.mV[0], clearColor.mV[1], clearColor.mV[2], 0.f));
                         glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // no stencil -- deprecated | GL_STENCIL_BUFFER_BIT);
                         gGL.setColorMask(true, false);
                         glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
@@ -10102,7 +10102,7 @@ void LLPipeline::renderFinalize()
     enableLightsFullbright();
 
     gGL.setColorMask(true, true);
-    glClearColor(0, 0, 0, 0);
+    gGL.setClearColor(LLColor4::transparent);
 
     static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
     bool hdr = gGLManager.mGLVersion > 4.05f && has_hdr();
@@ -11068,9 +11068,9 @@ void LLPipeline::renderDeferredLighting()
                 LLGLSLShader& sun_shader = gCubeSnapshot ? gDeferredSunProbeProgram : gDeferredSunProgram;
                 bindDeferredShader(sun_shader, deferred_light_target);
                 mScreenTriangleVB->setBuffer();
-                glClearColor(1, 1, 1, 1);
+                gGL.setClearColor(LLColor4::white);
                 deferred_light_target->clear(GL_COLOR_BUFFER_BIT);
-                glClearColor(0, 0, 0, 0);
+                gGL.setClearColor(LLColor4::transparent);
 
                 sun_shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
                                               (GLfloat)deferred_light_target->getWidth(),
@@ -11094,9 +11094,9 @@ void LLPipeline::renderDeferredLighting()
             LL_PROFILE_GPU_ZONE("soften shadow");
             // blur lightmap
             screen_target->bindTarget();
-            glClearColor(1, 1, 1, 1);
+            gGL.setClearColor(LLColor4::white);
             screen_target->clear(GL_COLOR_BUFFER_BIT);
-            glClearColor(0, 0, 0, 0);
+            gGL.setClearColor(LLColor4::transparent);
 
             bindDeferredShader(gDeferredBlurLightProgram);
 
@@ -11151,7 +11151,7 @@ void LLPipeline::renderDeferredLighting()
 
         screen_target->bindTarget();
         // clear color buffer here - zeroing alpha (glow) is important or it will accumulate against sky
-        glClearColor(0, 0, 0, 0);
+        gGL.setClearColor(LLColor4::transparent);
         screen_target->clear(GL_COLOR_BUFFER_BIT);
 
         if (RenderDeferredAtmospheric)
@@ -11664,12 +11664,12 @@ void LLPipeline::doWaterExclusionMask()
     }
 
     mWaterExclusionMask.bindTarget();
-    glClearColor(1, 1, 1, 1);
+    gGL.setClearColor(LLColor4::white);
     mWaterExclusionMask.clear();
     mWaterExclusionPool->render();
 
     mWaterExclusionMask.flush();
-    glClearColor(0, 0, 0, 0);
+    gGL.setClearColor(LLColor4::transparent);
 }
 
 // The map from clip space to a texture: x and y from [-1, 1] to [0, 1], z by
@@ -13514,7 +13514,7 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
     // generateImpostor's clear colour is its own business everywhere else, because display()
     // sets one before each clear it cares about. Nothing does that on the way back into a UI
     // draw, so put it back to the ambient here.
-    glClearColor(0.f, 0.f, 0.f, 0.f);
+    gGL.setClearColor(LLColor4::transparent);
 
     if (cur_shader)
     {
@@ -13771,7 +13771,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
             avatar->setImpostorViewRotation(bake_rot);
         }
 
-        glClearColor(0.0f,0.0f,0.0f,0.0f);
+        gGL.setClearColor(LLColor4::transparent);
         gGL.setColorMask(true, true);
 
         // get the number of pixels per angle

@@ -83,11 +83,7 @@ void LLScreenClipRect::updateScissorRegion()
 {
     if (sClipRectStack.empty()) return;
 
-    // finish any deferred calls in the old clipping region
-    gGL.flush();
-
     LLRect rect = sClipRectStack.top();
-    stop_glerror();
     S32 x,y,w,h;
     x = llfloor(rect.mLeft * LLUI::getScaleFactor().mV[VX]);
     y = llfloor(rect.mBottom * LLUI::getScaleFactor().mV[VY]);
@@ -96,8 +92,8 @@ void LLScreenClipRect::updateScissorRegion()
     // names no pixels at all, it let a column of them through at the origin.
     w = rect.getWidth() > 0 ? llceil(rect.getWidth() * LLUI::getScaleFactor().mV[VX]) + 1 : 0;
     h = rect.getHeight() > 0 ? llceil(rect.getHeight() * LLUI::getScaleFactor().mV[VY]) + 1 : 0;
-    glScissor( x,y,w,h );
-    stop_glerror();
+    // Draws batched under the old box are flushed by the change; an unchanged box costs nothing.
+    gGL.setScissor(x, y, w, h);
 }
 
 //---------------------------------------------------------------------------

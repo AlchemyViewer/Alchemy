@@ -401,6 +401,16 @@ bool LLRender::init(bool needs_vertex_buffer)
     mPolygonOffsetUnits  = 0.f;
     mPatchVertices       = 3;
 
+    // The clear colour is issued rather than assumed: a window may have cleared to a colour of
+    // its own before this ran. The scissor box GL starts at is the size of the window the
+    // context was made for, which nothing here knows, so it stays unknown until set.
+    mClearColor = LLColor4(0.f, 0.f, 0.f, 0.f);
+    glClearColor(0.f, 0.f, 0.f, 0.f);
+    mScissor[0] = 0;
+    mScissor[1] = 0;
+    mScissor[2] = -1;
+    mScissor[3] = -1;
+
     // Build this context's sampler objects before anything can ask for one.
     mSamplerCache.warmup();
 
@@ -534,6 +544,13 @@ void LLRender::refreshState(void)
     // Unconditional re-issue: setPolygonOffset would see the cache already agreeing with the
     // requested value and skip the GL call, leaving the fresh context at its 0,0 default.
     rebasePolygonOffset();
+
+    // The same for the clear colour and a scissor box that was ever set.
+    glClearColor(mClearColor.mV[VRED], mClearColor.mV[VGREEN], mClearColor.mV[VBLUE], mClearColor.mV[VALPHA]);
+    if (mScissor[2] >= 0)
+    {
+        glScissor(mScissor[0], mScissor[1], mScissor[2], mScissor[3]);
+    }
 
     flush();
 
@@ -1683,6 +1700,35 @@ void LLRender::setPatchVertices(U32 count)
         mPatchVertices = count;
         flush();
         glPatchParameteri(GL_PATCH_VERTICES, count);
+    }
+}
+
+void LLRender::setClearColor(const LLColor4& color)
+{
+    if (mClearColor != color)
+    {
+        mClearColor = color;
+        glClearColor(color.mV[VRED], color.mV[VGREEN], color.mV[VBLUE], color.mV[VALPHA]);
+    }
+}
+
+void LLRender::clear(U32 mask)
+{
+    flush();
+    glClear(mask);
+}
+
+void LLRender::setScissor(S32 x, S32 y, S32 width, S32 height)
+{
+    llassert(width >= 0 && height >= 0);
+    if (mScissor[0] != x || mScissor[1] != y || mScissor[2] != width || mScissor[3] != height)
+    {
+        flush();
+        mScissor[0] = x;
+        mScissor[1] = y;
+        mScissor[2] = width;
+        mScissor[3] = height;
+        glScissor(x, y, width, height);
     }
 }
 

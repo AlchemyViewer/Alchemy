@@ -428,7 +428,7 @@ bool LLGLTFPreviewTexture::render()
 
     if (!mShouldRender) { return false; }
 
-    glClearColor(0, 0, 0, 0);
+    gGL.setClearColor(LLColor4::transparent);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     LLGLDepthTest depth(GL_FALSE);
