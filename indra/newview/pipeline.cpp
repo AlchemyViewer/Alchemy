@@ -976,6 +976,9 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
     if (shadow_detail > 0 || ssao)
     { //only need mRT->deferredLight for shadows OR ssao
         if (!mRT->deferredLight.allocate(resX, resY, screenFormat)) return false;
+        // The scene's depth, for the far-plane test that keeps the light map's passes off the sky
+        // (renderDeferredLighting).
+        mRT->deferredScreen.shareDepthBuffer(mRT->deferredLight);
     }
     else
     {
@@ -11077,8 +11080,11 @@ void LLPipeline::renderDeferredLighting()
                                               (GLfloat)deferred_light_target->getHeight());
 
                 {
+                    // The triangle lies on the far plane (sunLightV.glsl) and the target shares the scene's
+                    // depth: only geometry is shadowed and occluded, and the sky keeps the clear's white, which
+                    // nothing reads there (the soften pass's sky program lights nothing).
                     LLGLDisable   blend(GL_BLEND);
-                    LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_ALWAYS);
+                    LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
                     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                 }
 
@@ -11123,9 +11129,11 @@ void LLPipeline::renderDeferredLighting()
             gDeferredBlurLightProgram.uniform3fv(LLShaderMgr::KERN, kern_length, gauss[0].mV);
             gDeferredBlurLightProgram.uniform1f(LLShaderMgr::KERN_SCALE, blur_size * (kern_length / 2.f - 0.5f));
 
+            // Both blurs on the far plane (blurLightV.glsl), over geometry alone: the sky stays the clear's white
+            // in either target.
             {
                 LLGLDisable   blend(GL_BLEND);
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_ALWAYS);
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
@@ -11141,7 +11149,7 @@ void LLPipeline::renderDeferredLighting()
 
             {
                 LLGLDisable   blend(GL_BLEND);
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_ALWAYS);
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
@@ -11174,16 +11182,28 @@ void LLPipeline::renderDeferredLighting()
 
             soften_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
 
+            // The triangle lies on the far plane (softenLightV.glsl), level with the depth the sky leaves cleared:
+            // this draw passes only where the world drew something, and the sky's draw below only where it did
+            // not, so no sky pixel pays for the G-buffer decode and atmospherics it would throw away.
+            LLGLDisable blend(GL_BLEND);
             {
-                LLGLDepthTest depth(GL_FALSE);
-                LLGLDisable   blend(GL_BLEND);
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
 
-                // full screen blit
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
 
             unbindDeferredShader(soften_shader);
+
+            LLGLSLShader& sky_shader = *gDeferredSoftenSkyProgram.selectVariant();
+            bindDeferredShader(sky_shader);
+            {
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_EQUAL);
+
+                mScreenTriangleVB->setBuffer();
+                mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+            }
+            unbindDeferredShader(sky_shader);
         }
 
         static LLCachedControl<S32> local_light_count(gSavedSettings, "RenderLocalLightCount", 256);
@@ -11372,7 +11392,9 @@ void LLPipeline::renderDeferredLighting()
 
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - fullscreen lights");
-                LLGLDepthTest depth(GL_FALSE);
+                // On the far plane (multiPointLightV.glsl): only where the world drew something, so no light is
+                // shaded over the sky.
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
                 LL_PROFILE_GPU_ZONE("fullscreen lights");
 
                 U32 count = 0;

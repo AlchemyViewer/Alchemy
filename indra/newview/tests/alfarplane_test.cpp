@@ -160,6 +160,17 @@ namespace tut
         const std::string haze_v = shader_source("class1/deferred/hazeV.glsl");
         ensure("haze drawn on the far plane, reversed", haze_v.find("gl_Position = vec4(position.xy, 0.0, 1.0);") != std::string::npos);
         ensure("haze drawn on the far plane, forward", haze_v.find("gl_Position = vec4(position.xy, 1.0, 1.0);") != std::string::npos);
+        // The lighting passes draw there too: the light map's passes, the lights and the soften pass's lit program in
+        // front of it, the soften pass's sky program on it.
+        for (const char* path : { "class2/deferred/softenLightV.glsl", "class3/deferred/multiPointLightV.glsl",
+                                  "class2/deferred/sunLightV.glsl", "class1/deferred/blurLightV.glsl" })
+        {
+            const std::string v = shader_source(path);
+            ensure(std::string(path) + " drawn on the far plane, reversed", v.find("gl_Position = vec4(position.xy, 0.0, 1.0);") != std::string::npos);
+            ensure(std::string(path) + " drawn on the far plane, forward", v.find("gl_Position = vec4(position.xy, 1.0, 1.0);") != std::string::npos);
+        }
+        const std::string soften = shader_source("class3/deferred/softenLightF.glsl");
+        ensure("the sky's soften program lights nothing", soften.find("writeColor(skyColor(getGBuffer(tc)));") != std::string::npos);
         ensure("haze takes geometry where it is", haze.find("= getPositionWithDepth(tc, depth);") != std::string::npos);
         ensure("void water fog keys on the far depth", shader_source("class3/deferred/waterHazeF.glsl").find("if (isFarDepth(depth))") != std::string::npos);
         const std::string flare = shader_source("class1/alchemy/lensFlareStateF.glsl");

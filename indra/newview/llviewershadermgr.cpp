@@ -197,6 +197,7 @@ LLGLSLShader            gHazeProgram;
 LLGLSLShader            gHazeWaterProgram;
 LLGLSLShader            gDeferredBlurLightProgram;
 LLGLSLShader            gDeferredSoftenProgram;
+LLGLSLShader            gDeferredSoftenSkyProgram;
 LLGLSLShader            gDeferredShadowProgram;
 LLGLSLShader            gDeferredTerrainShadowProgram;
 LLGLSLShader            gDeferredShadowCubeProgram;
@@ -1309,6 +1310,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredSunProgram.unload();
         gDeferredBlurLightProgram.unload();
         gDeferredSoftenProgram.unload();
+        gDeferredSoftenSkyProgram.unload();
         gDeferredShadowProgram.unload();
         gDeferredTerrainShadowProgram.unload();
         gDeferredShadowCubeProgram.unload();
@@ -2443,37 +2445,51 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        gDeferredSoftenProgram.mName = "Deferred Soften Shader";
-        gDeferredSoftenProgram.mShaderFiles.clear();
-        gDeferredSoftenProgram.mFeatures.hasSrgb = true;
-        gDeferredSoftenProgram.mFeatures.calculatesAtmospherics = true;
-        gDeferredSoftenProgram.mFeatures.hasAtmospherics = true;
-        gDeferredSoftenProgram.mFeatures.hasGamma = true;
-        gDeferredSoftenProgram.mFeatures.isDeferred = true;
-        gDeferredSoftenProgram.mFeatures.hasFullGBuffer = true;
-        gDeferredSoftenProgram.mFeatures.hasShadows = use_sun_shadow;
-        gDeferredSoftenProgram.mFeatures.hasReflectionProbes = mShaderLevel[SHADER_DEFERRED] > 2;
-
-        gDeferredSoftenProgram.clearPermutations();
-        add_common_permutations(&gDeferredSoftenProgram);
-        gDeferredSoftenProgram.mShaderFiles.push_back(make_pair("deferred/softenLightV.glsl", GL_VERTEX_SHADER));
-        gDeferredSoftenProgram.mShaderFiles.push_back(make_pair("deferred/softenLightF.glsl", GL_FRAGMENT_SHADER));
-
-        gDeferredSoftenProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-
-        if (use_sun_shadow)
+        // The soften pass, and its variant for the sky alone (softenLightF.glsl, SOFTEN_SKY), from one configuration,
+        // so the two resolve the same shader level and link the same objects.
+        const auto load_soften = [&](LLGLSLShader& shader, const char* name, bool sky)
         {
-            gDeferredSoftenProgram.addPermutation("HAS_SUN_SHADOW", "1");
-        }
+            shader.mName = name;
+            shader.mShaderFiles.clear();
+            shader.mFeatures.hasSrgb = true;
+            shader.mFeatures.calculatesAtmospherics = true;
+            shader.mFeatures.hasAtmospherics = true;
+            shader.mFeatures.hasGamma = true;
+            shader.mFeatures.isDeferred = true;
+            shader.mFeatures.hasFullGBuffer = true;
+            shader.mFeatures.hasShadows = use_sun_shadow;
+            shader.mFeatures.hasReflectionProbes = mShaderLevel[SHADER_DEFERRED] > 2;
 
-        if (gSavedSettings.getBOOL("RenderDeferredSSAO"))
-        { //if using SSAO, take screen space light map into account as if shadows are enabled
-            gDeferredSoftenProgram.mShaderLevel = llmax(gDeferredSoftenProgram.mShaderLevel, 2);
-            gDeferredSoftenProgram.addPermutation("HAS_SSAO", "1");
-        }
+            shader.clearPermutations();
+            add_common_permutations(&shader);
+            shader.mShaderFiles.push_back(make_pair("deferred/softenLightV.glsl", GL_VERTEX_SHADER));
+            shader.mShaderFiles.push_back(make_pair("deferred/softenLightF.glsl", GL_FRAGMENT_SHADER));
 
-        success = gDeferredSoftenProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
-        llassert(success);
+            shader.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+
+            if (use_sun_shadow)
+            {
+                shader.addPermutation("HAS_SUN_SHADOW", "1");
+            }
+
+            if (gSavedSettings.getBOOL("RenderDeferredSSAO"))
+            { //if using SSAO, take screen space light map into account as if shadows are enabled
+                shader.mShaderLevel = llmax(shader.mShaderLevel, 2);
+                shader.addPermutation("HAS_SSAO", "1");
+            }
+
+            if (sky)
+            {
+                shader.addPermutation("SOFTEN_SKY", "1");
+            }
+
+            const bool loaded = shader.createShader(LLGLSLShader::VARIANT_CLASSIC);
+            llassert(loaded);
+            return loaded;
+        };
+
+        success = load_soften(gDeferredSoftenProgram, "Deferred Soften Shader", false) &&
+                  load_soften(gDeferredSoftenSkyProgram, "Deferred Soften Sky Shader", true);
     }
 
     if (success)

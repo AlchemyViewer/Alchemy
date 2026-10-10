@@ -421,4 +421,55 @@ namespace tut
         glDeleteQueries(1, &query);
         ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
     }
+
+    // The soften pass draws on the far plane twice (softenLightV.glsl, LLPipeline::renderDeferredLighting): its lit
+    // program in front of the far plane, as the haze does, and its sky program on it. Between them every pixel is
+    // shaded once, by the program for what it is, however far out the geometry lies.
+    template<> template<>
+    void alinfiniteprojection_object_t::test<7>()
+    {
+        setUp();
+        const LLMatrix4a proj = infinite();
+        GLuint query = 0;
+        glGenQueries(1, &query);
+        const auto samples = [&](GLenum func)
+        {
+            glDepthFunc(LLGLDepthTest::remap(func));
+            glDepthMask(GL_FALSE);
+            glBeginQuery(GL_SAMPLES_PASSED, query);
+            draw(proj, 1000.f, true);
+            glEndQuery(GL_SAMPLES_PASSED);
+            glDepthMask(GL_TRUE);
+            glDepthFunc(GL_GREATER);
+            GLuint passed = 0;
+            glGetQueryObjectuiv(query, GL_QUERY_RESULT, &passed);
+            return passed;
+        };
+
+        glClear(GL_DEPTH_BUFFER_BIT);
+        ensure_equals("nothing lit on an empty frame", samples(GL_GREATER), (GLuint)0);
+        ensure_equals("all sky on an empty frame", samples(GL_EQUAL), (GLuint)(SIZE * SIZE));
+
+        for (F32 dist : { 1.f, 1000.f, 100000.f, MAX_RECONSTRUCT_DISTANCE })
+        {
+            const std::string at = std::to_string((S32)dist) + " m";
+            glClear(GL_DEPTH_BUFFER_BIT);
+            draw(proj, dist);
+            ensure_equals("all lit over geometry at " + at, samples(GL_GREATER), (GLuint)(SIZE * SIZE));
+            ensure_equals("no sky over geometry at " + at, samples(GL_EQUAL), (GLuint)0);
+        }
+
+        // Pixel by pixel: geometry at the reconstruction floor over the left half only, sky over the right.
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glViewport(0, 0, SIZE / 2, SIZE);
+        draw(proj, MAX_RECONSTRUCT_DISTANCE);
+        glViewport(0, 0, SIZE, SIZE);
+        const GLuint lit = samples(GL_GREATER);
+        const GLuint sky = samples(GL_EQUAL);
+        ensure_equals("lit over the geometry's half", lit, (GLuint)(SIZE * SIZE / 2));
+        ensure_equals("every pixel shaded once", lit + sky, (GLuint)(SIZE * SIZE));
+
+        glDeleteQueries(1, &query);
+        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+    }
 }
