@@ -68,6 +68,7 @@ target_sources(
     luau/alluaufrontend.cpp
     luau/alluaunavigation.cpp
     luau/alluauservice.cpp
+    luau/alluaushadowed.cpp
     luau/alluausharedstart.cpp
     luau/alluautaskpool.cpp
     luau/alluautypes.cpp
@@ -153,6 +154,7 @@ target_sources(
         luau/alluaufrontend.h
         luau/alluaunavigation.h
         luau/alluauservice.h
+        luau/alluaushadowed.h
         luau/alluausharedstart.h
         luau/alluautaskpool.h
         luau/alluautypes.h
