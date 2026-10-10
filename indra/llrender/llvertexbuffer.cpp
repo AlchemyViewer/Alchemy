@@ -1504,14 +1504,22 @@ void LLVertexBuffer::_unmapBuffer()
         STOP_GLERROR;
         if (mMappedData)
         {
-            if (mGLBuffer)
+            if (!mGLBuffer)
             {
-                delete_buffers(1, &mGLBuffer);
+                mGLBuffer = gen_buffer();
+                glBindBuffer(GL_ARRAY_BUFFER, mGLBuffer);
+                sGLRenderBuffer = mGLBuffer;
+                glBufferData(GL_ARRAY_BUFFER, mSize, mMappedData, GL_STATIC_DRAW);
             }
-            mGLBuffer = gen_buffer();
-            glBindBuffer(GL_ARRAY_BUFFER, mGLBuffer);
-            sGLRenderBuffer = mGLBuffer;
-            glBufferData(GL_ARRAY_BUFFER, mSize, mMappedData, GL_STATIC_DRAW);
+            else
+            {
+                if (mGLBuffer != sGLRenderBuffer)
+                {
+                    glBindBuffer(GL_ARRAY_BUFFER, mGLBuffer);
+                    sGLRenderBuffer = mGLBuffer;
+                }
+                glBufferSubData(GL_ARRAY_BUFFER, 0, mSize, mMappedData);
+            }
         }
         else if (mGLBuffer != sGLRenderBuffer)
         {
@@ -1522,16 +1530,22 @@ void LLVertexBuffer::_unmapBuffer()
 
         if (mMappedIndexData)
         {
-            if (mGLIndices)
+            if (!mGLIndices)
             {
-                delete_buffers(1, &mGLIndices);
+                mGLIndices = gen_buffer();
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mGLIndices);
+                sGLRenderIndices = mGLIndices;
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, mIndicesSize, mMappedIndexData, GL_STATIC_DRAW);
             }
-
-            mGLIndices = gen_buffer();
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mGLIndices);
-            sGLRenderIndices = mGLIndices;
-
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, mIndicesSize, mMappedIndexData, GL_STATIC_DRAW);
+            else
+            {
+                if (mGLIndices != sGLRenderIndices)
+                {
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mGLIndices);
+                    sGLRenderIndices = mGLIndices;
+                }
+                glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, mIndicesSize, mMappedIndexData);
+            }
         }
         else if (mGLIndices != sGLRenderIndices)
         {
@@ -1988,7 +2002,6 @@ void LLVertexBuffer::setIndexData(const U32* data, U32 offset, U32 count)
     }
     flush_vbo(GL_ELEMENT_ARRAY_BUFFER, offset * sizeof(U32), (offset + count) * sizeof(U32) - 1, (U8*)data, mMappedIndexData);
 }
-
 
 
 
