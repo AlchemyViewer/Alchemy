@@ -128,7 +128,11 @@ LLKeyboardSDL::LLKeyboardSDL()
     mTranslateKeyMap[SDLK_MINUS]  = '-';
     mTranslateKeyMap[SDLK_PERIOD] = '.';
     mTranslateKeyMap[SDLK_GRAVE] = '`';
-    mTranslateKeyMap[SDLK_SLASH] = KEY_DIVIDE;
+    // The main-row slash is '/', as Win32 maps VK_OEM_2: LL moved it off the
+    // keypad's code there because that broke typing into media prims
+    // (EXT-3650), and as KEY_DIVIDE it also fired the start_gesture binding
+    // the keypad's slash has. Only the keypad's slash is KEY_DIVIDE, above.
+    mTranslateKeyMap[SDLK_SLASH] = '/';
     mTranslateKeyMap[SDLK_SEMICOLON] = ';';
     mTranslateKeyMap[SDLK_LEFTBRACKET] = '[';
     mTranslateKeyMap[SDLK_BACKSLASH] = '\\';
