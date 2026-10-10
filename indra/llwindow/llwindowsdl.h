@@ -445,9 +445,11 @@ private:
     LLMutex mSharedCtxMutex;
     std::set<void*> mSharedContexts;
 
-    // Files accumulated between SDL_EVENT_DROP_BEGIN and SDL_EVENT_DROP_COMPLETE.
-    // Each SDL_EVENT_DROP_FILE only carries one path, so we batch them and
-    // dispatch a single handleDragNDrop on COMPLETE.
+    // Files and text accumulated between SDL_EVENT_DROP_BEGIN and
+    // SDL_EVENT_DROP_COMPLETE. Each SDL_EVENT_DROP_FILE only carries one path
+    // and each SDL_EVENT_DROP_TEXT one line, so we batch them and dispatch a
+    // single handleDragNDrop on COMPLETE.
+    std::string mPendingDropText;
     std::vector<std::string> mPendingDropFiles;
 
     // Currently-focused preeditor receiving SDL_EVENT_TEXT_EDITING composition

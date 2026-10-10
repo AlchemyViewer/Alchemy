@@ -2581,8 +2581,21 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
         {
             // Drag-and-drop session starting. SDL3 doesn't populate event.drop.x/y
             // or deliver file paths until later (DROP_FILE between BEGIN and
-            // COMPLETE), so we can't START_TRACKING here — just reset the buffer.
+            // COMPLETE), so we can't START_TRACKING here — just reset the buffers.
             mPendingDropFiles.clear();
+            mPendingDropText.clear();
+            break;
+        }
+        case SDL_EVENT_DROP_POSITION:
+        {
+            // Where the drag is, but not what it carries: every backend reads
+            // the payload only once it is dropped (Wayland's data offer, X11's
+            // XdndSelection, Cocoa's pasteboard), so there is nothing to
+            // START_TRACKING or TRACK with. The viewer's hover feedback, a face
+            // lit for a URL or a texture, depends on what is dragged, and an
+            // empty payload would light faces for a file drag too. SDL stamps
+            // this last position on the DROP_FILE / DROP_TEXT / DROP_COMPLETE
+            // that follow, which is where the drop is dispatched.
             break;
         }
         case SDL_EVENT_DROP_FILE:
@@ -2597,8 +2610,19 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
         }
         case SDL_EVENT_DROP_TEXT:
         {
-            // The current handleDragNDrop pipeline is file-only (DNDT_FILE); SDL3
-            // also delivers dropped text but we have nowhere to route it. Drop silently.
+            // Dropped text, a SLURL or a URL, goes to the viewer as DNDT_DEFAULT
+            // the way Win32 hands over CF_TEXT (lldragdropwin32.cpp): a spatial
+            // SLURL teleports, a URL dropped on a face becomes its media. SDL
+            // sends one DROP_TEXT a line; join them back into the one string
+            // Win32 passes, and dispatch on DROP_COMPLETE.
+            if (event.drop.data)
+            {
+                if (!mPendingDropText.empty())
+                {
+                    mPendingDropText += '\n';
+                }
+                mPendingDropText += event.drop.data;
+            }
             break;
         }
         case SDL_EVENT_DROP_COMPLETE:
@@ -2611,15 +2635,20 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // DNDA_DROPPED — a DROPPED event with no preceding START_TRACKING is
             // a no-op (see indra/newview/llviewerwindow.cpp:1455+).
             //
-            // SDL3's drop API only surfaces file paths between DROP_BEGIN and
-            // DROP_COMPLETE, so we can't drive START/TRACK live the way the
-            // Win32 OLE backend does (DragEnter/DragOver/Drop). Instead we
-            // synthesise the same three-step sequence here so the receiver's
-            // state machine sees a well-formed transaction:
+            // SDL3's drop API only surfaces file paths and text between
+            // DROP_BEGIN and DROP_COMPLETE (see DROP_POSITION), so we can't
+            // drive START/TRACK live the way the Win32 OLE backend does
+            // (DragEnter/DragOver/Drop). Instead we synthesise the same
+            // three-step sequence here so the receiver's state machine sees a
+            // well-formed transaction:
             //
             //   1) DNDA_START_TRACKING with the file list -> mDragItems populated
             //   2) DNDA_DROPPED                           -> upload / apply
             //   3) DNDA_STOP_TRACKING                     -> mDragItems cleared
+            //
+            // Text runs the same three steps as DNDT_DEFAULT: the handler
+            // weighs the string on START_TRACKING and teleports or sets the
+            // media on DROPPED. Files win if a drop carries both.
             // event.drop.x/y are screen-coord units; scale to PIXEL units.
             const float scale = mCachedPixelDensity; // cached; see refreshPixelMetrics
             LLCoordWindow winCoord(llfloor(event.drop.x * scale),
@@ -2627,25 +2656,34 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             LLCoordGL openGlCoord;
             convertCoords(winCoord, &openGlCoord);
             const MASK mask = gKeyboard->currentMask(true);
+            LLWindowCallbacks::DragNDropType type = LLWindowCallbacks::DNDT_FILE;
+            std::vector<std::string> data;
             if (!mPendingDropFiles.empty())
+            {
+                data.swap(mPendingDropFiles);
+            }
+            else if (!mPendingDropText.empty())
+            {
+                type = LLWindowCallbacks::DNDT_DEFAULT;
+                data.push_back(std::move(mPendingDropText));
+            }
+            if (!data.empty())
             {
                 mCallbacks->handleDragNDrop(this, openGlCoord, mask,
                                             LLWindowCallbacks::DNDA_START_TRACKING,
-                                            LLWindowCallbacks::DNDT_FILE,
-                                            mPendingDropFiles);
+                                            type, data);
                 mCallbacks->handleDragNDrop(this, openGlCoord, mask,
                                             LLWindowCallbacks::DNDA_DROPPED,
-                                            LLWindowCallbacks::DNDT_FILE,
-                                            mPendingDropFiles);
+                                            type, data);
             }
             // Always send STOP_TRACKING so any cached state (mDragItems,
-            // hover highlight) is cleared, whether or not files were dropped
-            // (text-only drops and cancelled drags both arrive here too).
+            // hover highlight) is cleared, whether or not anything was dropped
+            // (cancelled drags arrive here too).
             mCallbacks->handleDragNDrop(this, openGlCoord, mask,
                                         LLWindowCallbacks::DNDA_STOP_TRACKING,
-                                        LLWindowCallbacks::DNDT_FILE,
-                                        {});
+                                        type, {});
             mPendingDropFiles.clear();
+            mPendingDropText.clear();
             break;
         }
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
