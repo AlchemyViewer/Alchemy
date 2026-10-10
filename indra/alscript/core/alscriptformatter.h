@@ -43,7 +43,8 @@
 // gap before a trailing comment, a preprocessor line, anything inside
 // a string or a comment. Runs of blank lines are shortened and trailing
 // whitespace dropped, unless only some lines are asked for, in which
-// case every line keeps its number.
+// case every line keeps its number. A line too long may be broken at
+// the commas of a bracket on it; no other break is added.
 class ALScriptFormatter
 {
 public:
@@ -58,6 +59,16 @@ public:
         // Whether the spaces within a line are touched at all, or only
         // the indentation.
         bool spacing = true;
+        // How many columns a line may take before it is broken, a tab as
+        // wide as a level: at the commas of the widest bracket on it that
+        // has any, or of the table or list a call ends with, which stays
+        // on the call's line -- `f(a, {` and `})` -- each part on a line
+        // of its own, a level further in, and broken again where it is
+        // still too long. Never a vector or rotation, nor a line with a
+        // comment inside it or a string or comment running on past it.
+        // Nought for never. Not where only some lines are asked for of
+        // formatLines, whose lines keep their numbers.
+        S32  width = 0;
     };
 
     // The whole text.
@@ -65,6 +76,12 @@ public:
     // Only the lines from `first` to `last`, zero-based and inclusive,
     // changed; the rest as it was, and every line where it was.
     static std::string formatLines(std::string_view text, const Options& options, S32 first, S32 last);
+    // The same, as each line of the text in order, one entry a line --
+    // and an entry for the empty line after a final newline -- each of
+    // those from `first` to `last` broken past the width, its entry
+    // holding the breaks. A `first` below nought is the first line: no
+    // line is taken out.
+    static std::vector<std::string> formatEach(std::string_view text, const Options& options, S32 first, S32 last);
 
     // Which line breaks stand inside a string, one for each line of `text`:
     // true where the break that ends the line is part of a string that runs

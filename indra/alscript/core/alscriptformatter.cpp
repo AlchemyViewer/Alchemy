@@ -30,7 +30,9 @@
 #include "alscriptlexicon.h"
 
 #include <algorithm>
+#include <optional>
 #include <set>
+#include <string>
 #include <vector>
 
 namespace
@@ -175,6 +177,12 @@ namespace
             }
             if (!prev)
             {
+                // A vector or rotation opens where nothing stands before
+                // it: a line of a list may begin with one.
+                if (!lua && t.kind == Kind::Punct && t.text == "<")
+                {
+                    ++vector;
+                }
                 out += t.text;
                 prev = &t;
                 gap.clear();
@@ -666,11 +674,270 @@ namespace
         }
     }
 
-    std::string emit(const std::vector<Line>& lines, const ALScriptFormatter::Options& options, bool endsWithNewline, S32 first, S32 last)
+    // How many columns text takes: a tab a level's width, a character of
+    // several bytes one.
+    S32 columns(std::string_view text, S32 tab)
     {
+        S32 n = 0;
+        for (const char c : text)
+        {
+            n += c == '\t' ? tab : (static_cast<unsigned char>(c) & 0xC0) != 0x80 ? 1 : 0;
+        }
+        return n;
+    }
+
+    // A bracket of a line that closes on it, by its tokens' indexes: the
+    // commas directly in it, and the bracket it is in. An LSL vector or
+    // rotation is one too, which nothing breaks.
+    struct Group
+    {
+        size_t              open   = 0;
+        size_t              close  = 0;
+        size_t              parent = std::string::npos;
+        size_t              width  = 0;
+        bool                vector = false;
+        std::vector<size_t> commas;
+    };
+
+    // What the tokens' brackets are; none where they do not match, or one
+    // is left open: a line that runs on over the next is not broken.
+    std::vector<Group> groupsOf(const std::vector<Token>& tokens, bool lua)
+    {
+        std::vector<Group>  groups;
+        std::vector<size_t> open;
+        const Token*        before = nullptr;
+        for (size_t i = 0; i < tokens.size(); ++i)
+        {
+            const Token& t = tokens[i];
+            if (!significant(t))
+            {
+                continue;
+            }
+            if (t.kind == Kind::Punct)
+            {
+                // A vector where no operand stands before its <, as spaced
+                // reads one; one that never closes was a comparison.
+                const bool vector = !lua && t.text == "<" && !(before && operand(lua, *before));
+                if (t.text == "(" || t.text == "[" || t.text == "{" || vector)
+                {
+                    Group group;
+                    group.open   = i;
+                    group.close  = std::string::npos;
+                    group.parent = open.empty() ? std::string::npos : open.back();
+                    group.vector = vector;
+                    open.push_back(groups.size());
+                    groups.push_back(std::move(group));
+                }
+                else if (t.text == ")" || t.text == "]" || t.text == "}")
+                {
+                    while (!open.empty() && groups[open.back()].vector)
+                    {
+                        open.pop_back();
+                    }
+                    const std::string_view opener = t.text == ")" ? "(" : t.text == "]" ? "[" : "{";
+                    if (open.empty() || tokens[groups[open.back()].open].text != opener)
+                    {
+                        return {};
+                    }
+                    groups[open.back()].close = i;
+                    open.pop_back();
+                }
+                else if (t.text == ">" && !lua && !open.empty() && groups[open.back()].vector)
+                {
+                    groups[open.back()].close = i;
+                    open.pop_back();
+                }
+                else if (t.text == "," && !open.empty() && !groups[open.back()].vector)
+                {
+                    groups[open.back()].commas.push_back(i);
+                }
+            }
+            before = &t;
+        }
+        if (!open.empty() && std::any_of(open.begin(), open.end(), [&groups](size_t g) { return !groups[g].vector; }))
+        {
+            return {};
+        }
+        for (Group& group : groups)
+        {
+            for (size_t i = group.open; group.close != std::string::npos && i <= group.close; ++i)
+            {
+                group.width += tokens[i].text.size();
+            }
+        }
+        return groups;
+    }
+
+    // A line's tokens as lines of their own, each with how far in it is.
+    struct Piece
+    {
+        std::vector<Token> tokens;
+        S32                indent = 0;
+    };
+
+    // The tokens from `from` to `to`, the blanks at either end left off.
+    std::vector<Token> slice(const std::vector<Token>& tokens, size_t from, size_t to)
+    {
+        while (from < to && tokens[from].kind == Kind::Space)
+        {
+            ++from;
+        }
+        while (to > from && tokens[to - 1].kind == Kind::Space)
+        {
+            --to;
+        }
+        return std::vector<Token>(tokens.begin() + static_cast<std::ptrdiff_t>(from), tokens.begin() + static_cast<std::ptrdiff_t>(to));
+    }
+
+    std::string written(const std::vector<Token>& tokens, S32 indent, const ALScriptFormatter::Options& options)
+    {
+        Line line;
+        line.tokens = tokens;
+        return indentText(options, indent) + spaced(line, options.lua);
+    }
+
+    // The tokens as pieces no wider than the width where a bracket's commas
+    // let them be: the bracket broken is the widest with commas, looked
+    // for in the widest without, down; or, where its last part is a table
+    // or a list with commas of its own, that, which stays on the line
+    // that opens the bracket where that fits.
+    void wrap(const std::vector<Token>& tokens, S32 indent, const ALScriptFormatter::Options& options, std::vector<Piece>& out)
+    {
+        const S32 tab = options.tabs ? options.indent : 1;
+        if (columns(written(tokens, indent, options), tab) <= options.width)
+        {
+            out.push_back({ tokens, indent });
+            return;
+        }
+        const std::vector<Group> groups = groupsOf(tokens, options.lua);
+        const auto               pick   = [&groups](size_t parent, auto&& self) -> std::optional<size_t> {
+            std::vector<size_t> in;
+            for (size_t g = 0; g < groups.size(); ++g)
+            {
+                if (groups[g].parent == parent && !groups[g].vector && groups[g].close != std::string::npos)
+                {
+                    in.push_back(g);
+                }
+            }
+            std::stable_sort(in.begin(), in.end(), [&groups](size_t a, size_t b) { return groups[a].width > groups[b].width; });
+            for (size_t g : in)
+            {
+                if (!groups[g].commas.empty())
+                {
+                    return g;
+                }
+                if (const std::optional<size_t> inner = self(g, self))
+                {
+                    return inner;
+                }
+            }
+            return std::nullopt;
+        };
+        std::optional<size_t> chosen = pick(std::string::npos, pick);
+        if (!chosen)
+        {
+            out.push_back({ tokens, indent });
+            return;
+        }
+        // Its last part, where that is a table or a list of its own with
+        // commas, and the line to its opening fits.
+        const Group& group = groups[*chosen];
+        size_t       last  = group.commas.back() + 1;
+        while (last < group.close && !significant(tokens[last]))
+        {
+            ++last;
+        }
+        for (size_t g = 0; g < groups.size(); ++g)
+        {
+            const Group& inner = groups[g];
+            if (inner.parent == *chosen && inner.open == last && !inner.commas.empty() && tokens[inner.open].text != "(")
+            {
+                size_t end = inner.close + 1;
+                while (end < group.close && !significant(tokens[end]))
+                {
+                    ++end;
+                }
+                if (end == group.close && columns(written(slice(tokens, 0, inner.open + 1), indent, options), tab) <= options.width)
+                {
+                    chosen = g;
+                }
+                break;
+            }
+        }
+        const Group& broken = groups[*chosen];
+        wrap(slice(tokens, 0, broken.open + 1), indent, options, out);
+        size_t from = broken.open + 1;
+        for (size_t comma : broken.commas)
+        {
+            wrap(slice(tokens, from, comma + 1), indent + 1, options, out);
+            from = comma + 1;
+        }
+        const std::vector<Token> rest = slice(tokens, from, broken.close);
+        if (!rest.empty())
+        {
+            wrap(rest, indent + 1, options, out);
+        }
+        wrap(slice(tokens, broken.close, tokens.size()), indent, options, out);
+    }
+
+    // A line past the width broken where it can be: its comment after its
+    // code, where it has one, after the last piece. As it is where it has
+    // a comment inside it, or a string or comment runs on past it.
+    std::string wrapped(const Line& line, const ALScriptFormatter::Options& options, const std::string& text)
+    {
+        const S32 tab = options.tabs ? options.indent : 1;
+        if (options.width <= 0 || line.first != line.last || columns(text, tab) <= options.width)
+        {
+            return text;
+        }
+        std::vector<Token> tokens = slice(line.tokens, 0, line.tokens.size());
+        std::vector<Token> after;
+        if (!tokens.empty() && tokens.back().kind == Kind::Comment)
+        {
+            after.push_back(tokens.back());
+            tokens = slice(tokens, 0, tokens.size() - 1);
+        }
+        if (std::any_of(tokens.begin(), tokens.end(), [](const Token& t) { return t.kind == Kind::Comment; }))
+        {
+            return text;
+        }
+        std::vector<Piece> pieces;
+        wrap(tokens, line.indent, options, pieces);
+        if (pieces.size() < 2)
+        {
+            return text;
+        }
+        if (!after.empty())
+        {
+            Token gap;
+            gap.kind = Kind::Space;
+            gap.text = " ";
+            pieces.back().tokens.push_back(gap);
+            pieces.back().tokens.push_back(after.front());
+        }
         std::string out;
-        S32         blanks = 0;
-        const bool  whole  = first < 0;
+        for (const Piece& piece : pieces)
+        {
+            std::string one = options.spacing ? written(piece.tokens, piece.indent, options) : indentText(options, piece.indent) + asWritten(Line{ piece.tokens });
+            while (!one.empty() && (one.back() == ' ' || one.back() == '\t'))
+            {
+                one.pop_back();
+            }
+            out += (out.empty() ? "" : "\n") + one;
+        }
+        return out;
+    }
+
+    // Each line as written out, or none for a blank line past a run's
+    // length where the whole text is asked for; past the width broken
+    // where `wrap`.
+    std::vector<std::optional<std::string>> writtenLines(const std::vector<Line>& lines, const ALScriptFormatter::Options& options, S32 first,
+                                                         S32 last, bool wrap)
+    {
+        std::vector<std::optional<std::string>> out;
+        S32                                     blanks = 0;
+        size_t                                  kept   = 0;
+        const bool                              whole  = first < 0;
         for (size_t i = 0; i < lines.size(); ++i)
         {
             const Line& line = lines[i];
@@ -695,8 +962,9 @@ namespace
                 if (whole)
                 {
                     ++blanks;
-                    if (blanks > options.maxBlankLines || out.empty())
+                    if (blanks > options.maxBlankLines || kept == 0)
                     {
+                        out.emplace_back();
                         continue;
                     }
                 }
@@ -719,13 +987,35 @@ namespace
                 {
                     text.pop_back();
                 }
+                if (wrap)
+                {
+                    text = wrapped(line, options, text);
+                }
             }
             if (!line.blank)
             {
                 blanks = 0;
             }
-            out += text;
-            if (i + 1 < lines.size() || endsWithNewline)
+            ++kept;
+            out.push_back(std::move(text));
+        }
+        return out;
+    }
+
+    std::string emit(const std::vector<Line>& lines, const ALScriptFormatter::Options& options, bool endsWithNewline, S32 first, S32 last,
+                     bool wrap)
+    {
+        const std::vector<std::optional<std::string>> each = writtenLines(lines, options, first, last, wrap);
+        const bool                                    whole = first < 0;
+        std::string                                   out;
+        for (size_t i = 0; i < each.size(); ++i)
+        {
+            if (!each[i])
+            {
+                continue;
+            }
+            out += *each[i];
+            if (i + 1 < each.size() || endsWithNewline)
             {
                 out += '\n';
             }
@@ -753,7 +1043,7 @@ std::string ALScriptFormatter::format(std::string_view text, const Options& opti
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);
-    return emit(lines, options, endsWithNewline, -1, -1);
+    return emit(lines, options, endsWithNewline, -1, -1, true);
 }
 
 // static
@@ -763,7 +1053,46 @@ std::string ALScriptFormatter::formatLines(std::string_view text, const Options&
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);
-    return emit(lines, options, endsWithNewline, first, last);
+    return emit(lines, options, endsWithNewline, first, last, false);
+}
+
+// static
+std::vector<std::string> ALScriptFormatter::formatEach(std::string_view text, const Options& options, S32 first, S32 last)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    bool              endsWithNewline = false;
+    std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
+    decide(lines, options.lua);
+    // Every line kept, blank or not: from the first where `first` is
+    // below it, which would otherwise ask for the whole text's runs.
+    const std::vector<std::optional<std::string>> each = writtenLines(lines, options, llmax(first, 0), last, true);
+    // A line a string or a comment runs on over is as many of the text's;
+    // a line broken at the width is still one.
+    std::vector<std::string> out;
+    for (size_t i = 0; i < each.size(); ++i)
+    {
+        const std::string& one = *each[i];
+        if (lines[i].first == lines[i].last)
+        {
+            out.push_back(one);
+            continue;
+        }
+        for (size_t at = 0;;)
+        {
+            const size_t nl = one.find('\n', at);
+            out.push_back(one.substr(at, nl == std::string::npos ? std::string::npos : nl - at));
+            if (nl == std::string::npos)
+            {
+                break;
+            }
+            at = nl + 1;
+        }
+    }
+    if (endsWithNewline)
+    {
+        out.emplace_back();
+    }
+    return out;
 }
 
 // static

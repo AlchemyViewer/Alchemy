@@ -27,6 +27,7 @@
 #include "../lsl/allsltoslua.h"
 #include "../lint/alscriptfixes.h"
 #include "../lsl/allslservice.h"
+#include "../lsl/allsltraits.h"
 #include "../luau/alluauservice.h"
 
 #include "../test/lltut.h"
@@ -92,13 +93,19 @@ namespace tut
 
         // What the converter must not write: an error, what the studio's own
         // lints would have written SLua's way, or a deprecated ll function --
-        // SLua's way where it means the same, llcompat's where not.
+        // SLua's way where it means the same, llcompat's where not. But one
+        // SLua only deprecates, the one function llcompat's is: ll's.
         static bool unwanted(const ALScriptProblem& p)
         {
             static const std::vector<std::string_view> OWN = { "SlCompoundAssign", "SlNumberTruth",    "SlZeroIndex",    "SlParenCondition",
                                                                "SlGeneralizedFor", "SlIndexDivision", "SlVectorProduct" };
+            const auto only_deprecated = [](const std::string& member) {
+                const ALLSLTraits::Trait* trait = ALLSLTraits::of(("ll" + member.substr(3)).c_str());
+                return trait && trait->slua == ALLSLTraits::SluaDeprecated;
+            };
             return p.severity == ALScriptProblem::Severity::Error || std::find(OWN.begin(), OWN.end(), p.code) != OWN.end() ||
-                   (p.key.rfind("LuauLintDeprecatedMember", 0) == 0 && !p.args.empty() && p.args[0].rfind("ll.", 0) == 0);
+                   (p.key.rfind("LuauLintDeprecatedMember", 0) == 0 && !p.args.empty() && p.args[0].rfind("ll.", 0) == 0 &&
+                    !only_deprecated(p.args[0]));
         }
 
         // What SLua's check says of it: nothing unwanted.
@@ -351,7 +358,8 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<7>()
     {
-        set_test_name("close to LSL: llcompat's Detected functions and timer event, as LSL had them, noted with SLua's ways");
+        set_test_name("close to LSL: llcompat's Detected functions and timer event, as LSL had them, noted with SLua's ways; ll's "
+                      "OwnerSay, which only SLua's deprecating sets apart");
         const ALLSLToSLua::Options close = ALLSLToSLua::Options::closeToLSL();
         const ALLSLToSLua::Result  r     = ALLSLToSLua::convert("default {\n"
                                                                 "    state_entry() { llSetTimerEvent(2.0); }\n"
@@ -362,8 +370,8 @@ namespace tut
         ensure("converted", r.converted);
         ensure("llcompat's Detected: " + r.text, has(r, "llcompat.DetectedName(0)") && noted(r, "SluaDetected"));
         ensure("the timer event: " + r.text, has(r, "llcompat.SetTimerEvent(2") && has(r, "LLEvents:on(\"timer\"") && noted(r, "SluaTimer"));
-        ensure("llcompat.OwnerSay, SLua deprecating ll's for print: " + r.text,
-               has(r, "llcompat.OwnerSay(\"tick\")") && noted(r, "SluaDeprecatedFor", "OwnerSay"));
+        ensure("ll.OwnerSay, SLua deprecating it for print: " + r.text,
+               has(r, "ll.OwnerSay(\"tick\")") && !has(r, "llcompat.OwnerSay") && noted(r, "SluaDeprecatedFor", "OwnerSay"));
         checksClean(r);
     }
 
@@ -1263,7 +1271,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<37>()
     {
-        set_test_name("the script's comments carried over, each over what it stood over: the script's own at the top, a global's, those inside a list, "
+        set_test_name("the script's comments carried over, each over what it stood over: the script's own at the top, a global's, those inside a list on their lines, "
                       "a trailing one, a brace's after its opening line, between branches, at a block's end; // as --, /* */ as --[[ ]] at a level nothing in it closes");
         const std::string lsl = "// Door script by Someone.\n"
                                 "// Do as you like with it.\n"
@@ -1310,7 +1318,8 @@ namespace tut
         ensure("the script's own at the top: " + r.text, has(r, "-- Door script by Someone.\n-- Do as you like with it.\n\n"));
         ensure("over everything, once: " + r.text, at("-- Door script by Someone.") < at("local SWING") && count(r, "Door script") == 1);
         ensure("a global's, what trailed it still after it: " + r.text, has(r, "-- How far it swings, in degrees\nlocal SWING = 90.0 -- a right angle\n"));
-        ensure("those inside a list, over it: " + r.text, has(r, "-- when it is open\n-- when it is shut\nlocal NAMES = {\"open\", \"closed\"}\n"));
+        ensure("those inside a list, on their lines: " + r.text,
+               has(r, "local NAMES = {\n    \"open\", -- when it is open\n    \"closed\" -- when it is shut\n}\n"));
         ensure("a block comment as Luau's: " + r.text, has(r, "--[[ old code:\ninteger unused() { return 1; }\n]]\n"));
         ensure("over the function it stood over: " + r.text, at("--[[ old code:") > at("local NAMES") && at("--[[ old code:") < at("-- Turns the door."));
         ensure("a brace's, after the line that opens it: " + r.text, has(r, "-- Turns the door.\nlocal function swing(by) -- by degrees\n"));
@@ -2004,7 +2013,7 @@ namespace tut
     void allsltoslua_object::test<66>()
     {
         set_test_name("Base64 through llbase64: encode as it is, the same bytes as LSL's; decode noted once, as it keeps a NUL and what is "
-                      "not UTF-8; close to LSL, llcompat's");
+                      "not UTF-8; close to LSL, ll's, which only SLua's deprecating sets apart from llcompat's");
         const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
                                               "    key k = llDetectedKey(0);\n"
                                               "    string s = llStringToBase64(\"hello\");\n"
@@ -2016,14 +2025,15 @@ namespace tut
         ensure("encode: " + r.text, has(r, "local s = llbase64.encode(\"hello\")") && has(r, "local t = llbase64.encode(tostring(k))"));
         ensure("decode: " + r.text, has(r, "local d = llbase64.decode(s)") && has(r, "local e = llbase64.decode(t .. \"=\")"));
         ensure("decode noted once: " + r.text, noted(r, "SluaBase64Decode") && count(r, "-- LSL: llbase64.decode keeps every byte") == 1);
-        ensure("nothing of llcompat's: " + r.text, !has(r, "llcompat.") && !noted(r, "SluaDeprecatedFor", "StringToBase64") &&
-                                                     !noted(r, "SluaDeprecatedFor", "Base64ToString"));
+        ensure("nothing of llcompat's or ll's: " + r.text, !has(r, "llcompat.") && !has(r, "ll.StringToBase64") && !has(r, "ll.Base64ToString") &&
+                                                             !noted(r, "SluaDeprecatedFor", "StringToBase64") &&
+                                                             !noted(r, "SluaDeprecatedFor", "Base64ToString"));
         checksClean(r);
 
         const ALLSLToSLua::Result close =
             ALLSLToSLua::convert("default { state_entry() { llOwnerSay(llBase64ToString(llStringToBase64(\"x\"))); } }\n", ALLSLToSLua::Options::closeToLSL());
         ensure("close to LSL: " + close.text,
-               has(close, "llcompat.Base64ToString(llcompat.StringToBase64(\"x\"))") && !has(close, "llbase64.decode(") &&
+               has(close, "ll.Base64ToString(ll.StringToBase64(\"x\"))") && !has(close, "llcompat.") && !has(close, "llbase64.decode(") &&
                    !has(close, "llbase64.encode(") && !noted(close, "SluaBase64Decode"));
     }
 
@@ -2162,7 +2172,7 @@ namespace tut
     void allsltoslua_object::test<76>()
     {
         set_test_name("a key of no text said to be NULL_KEY, and one with capitals said to be written small, cast or given; other text as "
-                      "it was said; the two XorBase64Strings said to be what ll.XorBase64 is not, llcompat's kept");
+                      "it was said; the two XorBase64Strings said to be what ll.XorBase64 is not, LSL's kept");
         const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
                                               "    key a = (key)\"\"; key c = (key)\"A2E76FCD-9360-4F6D-A924-938F923DF11D\";\n"
                                               "    if ((key)\"\" == NULL_KEY) llOwnerSay(\"same\");\n"
@@ -2175,8 +2185,8 @@ namespace tut
         ensure("capitals, small: " + r.text, has(r, "uuid(\"A2E76FCD-9360-4F6D-A924-938F923DF11D\")") && noted(r, "SluaKeyCase"));
         ensure("other text as it was: " + r.text, has(r, "local d = uuid(s)") && noted(r, "SluaUuid"));
         ensure("ll.XorBase64 as it is: " + r.text, has(r, "ll.XorBase64(\"a\", \"b\")"));
-        ensure("the two, llcompat's: " + r.text,
-               has(r, "llcompat.XorBase64Strings(\"a\", \"b\")") && has(r, "llcompat.XorBase64StringsCorrect(\"a\", \"b\")"));
+        ensure("the two, LSL's: " + r.text,
+               has(r, "ll.XorBase64Strings(\"a\", \"b\")") && has(r, "ll.XorBase64StringsCorrect(\"a\", \"b\")") && !has(r, "llcompat."));
         ensure("said what ll.XorBase64 is not: " + r.text, noted(r, "SluaXorBase64Wrong") && noted(r, "SluaXorBase64Nul") &&
                                                               !noted(r, "SluaDeprecated", "XorBase64Strings") &&
                                                               !noted(r, "SluaDeprecated", "XorBase64StringsCorrect"));
@@ -2757,5 +2767,102 @@ namespace tut
             }
             ensure("strict:\n" + said + "---\n" + r.text, said.empty());
         }
+    }
+}
+
+namespace tut
+{
+    template<> template<>
+    void allsltoslua_object::test<82>()
+    {
+        set_test_name("a list the LSL wrote over several lines is written over the same lines, nested ones a level further in, each "
+                      "comment in it where it was; a comment after it on the line it ends trails that line; a list on one line, or in "
+                      "a line made inside an expression, stays on one");
+        const ALLSLToSLua::Result r = convert("list gColours = [\n"
+                                              "    // warm\n"
+                                              "    \"red\", \"orange\",\n"
+                                              "    /* cool */ \"blue\" // last\n"
+                                              "];\n"
+                                              "list gTwo = [1, 2,\n"
+                                              "             3]; // three\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "       string activeRequest = llList2Json(JSON_OBJECT, [\n"
+                                              "            \"fn\", \"SELECT\",\n"
+                                              "            \"radius\", 10,\n"
+                                              "            \"ima\", llList2Json(JSON_ARRAY, [\"Ungulate\"]),\n"
+                                              "            \"ownerOnly\", TRUE, // only the owner\n"
+                                              "            \"toucher\", llGetOwner(),\n"
+                                              "            \"requestor\", llList2Json(JSON_OBJECT, [\n"
+                                              "                \"id\", llGetKey(),\n"
+                                              "                \"ima\", \"[]\",\n"
+                                              "                \"playsWith\", \"[]\"\n"
+                                              "            ]),\n"
+                                              "            \"responders\", \"[]\"\n"
+                                              "        ]); // sent\n"
+                                              "       llSay(0, activeRequest + llList2CSV(gColours + gTwo + [n, 1]));\n"
+                                              "       list m;\n"
+                                              "       llSay(0, (string)llGetListLength(m = [1,\n"
+                                              "                                             2]));\n"
+                                              "       while (llGetListLength(m = [3,\n"
+                                              "                                   4]) < 0) {}\n"
+                                              "       if (~llListFindList([\"a\", // first\n"
+                                              "                            \"b\"], [activeRequest])) llSay(0, \"found\");\n"
+                                              "       llParticleSystem([\n"
+                                              "           PSYS_PART_FLAGS, 0, // none\n"
+                                              "           PSYS_SRC_PATTERN, PSYS_SRC_PATTERN_DROP\n"
+                                              "       ]);\n"
+                                              "} }\n");
+        ensure("a global's, its comments where they were: " + r.text,
+               has(r, "local gColours = {\n    -- warm\n    \"red\", \"orange\",\n    --[[ cool ]] \"blue\" -- last\n}\n"));
+        ensure("closed on the line it closed on, a comment after it trailing that: " + r.text,
+               has(r, "local gTwo = {1, 2,\n    3} -- three\n"));
+        ensure("Tapple's, as the LSL had it: " + r.text,
+               has(r, "    local activeRequest = ll.List2Json(JSON_OBJECT, {\n"
+                      "        \"fn\", \"SELECT\",\n"
+                      "        \"radius\", 10,\n"
+                      "        \"ima\", ll.List2Json(JSON_ARRAY, {\"Ungulate\"}),\n"
+                      "        \"ownerOnly\", 1, -- only the owner\n"
+                      "        \"toucher\", ll.GetOwner(),\n"
+                      "        \"requestor\", ll.List2Json(JSON_OBJECT, {\n"
+                      "            \"id\", ll.GetKey(),\n"
+                      "            \"ima\", \"[]\",\n"
+                      "            \"playsWith\", \"[]\"\n"
+                      "        }),\n"
+                      "        \"responders\", \"[]\"\n"
+                      "    }) -- sent\n"));
+        ensure("each comment once: " + r.text, count(r, "only the owner") == 1 && count(r, "-- sent") == 1 && count(r, "-- first") == 1);
+        ensure("in a line made inside an expression, one line: " + r.text, has(r, "(function() m = {3, 4} return m end)()"));
+        ensure("in a condition: " + r.text, has(r, "    if table.find({\"a\", -- first\n        \"b\"}"));
+        ensure("one written another way, its comment over it: " + r.text, has(r, "    -- none\n    ll.ParticleSystem({\n"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<83>()
+    {
+        set_test_name("a detected event's count made of the detected table only where the body names it: none that nothing reads, which "
+                      "a lint would ask to take out");
+        const ALLSLToSLua::Result r = convert("selectHorse() {}\n"
+                                              "default {\n"
+                                              "    touch_start (integer num) {\n"
+                                              "        if (llDetectedKey(0) == llGetOwner()) {\n"
+                                              "            selectHorse();\n"
+                                              "        }\n"
+                                              "    }\n"
+                                              "    collision_start(integer n) { llOwnerSay((string)n); }\n"
+                                              "    sensor(integer found) { found = 0; }\n"
+                                              "}\n");
+        ensure("none that nothing reads: " + r.text,
+               has(r, "LLEvents:on(\"touch_start\", function(detected)\n    -- LSL: detected[n]") && !has(r, "local num"));
+        ensure("one read: " + r.text, has(r, "function(detected)\n    local n = #detected\n    print(tostring(n))\n"));
+        ensure("one set, which needs it there: " + r.text, has(r, "    local found = #detected\n    found = 0\n"));
+        // Unused, of what Luau says: only what the LSL itself never read.
+        std::string unused;
+        for (const ALScriptProblem& p : service.check(r.text))
+        {
+            unused += p.code == "LocalUnused" ? p.message + "\n" : std::string();
+        }
+        ensure_equals("unused", unused, std::string("Variable 'found' is never used; prefix with '_' to silence\n"));
+        checksClean(r);
     }
 }

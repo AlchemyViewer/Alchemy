@@ -278,4 +278,108 @@ namespace tut
         options.lua = true;
         ensure_equals("Luau, by lines", ALScriptFormatter::formatLines("do\n-- note\nend\n", options, 0, 3), std::string("do\n    -- note\nend\n"));
     }
+
+    template<> template<>
+    void alscriptformatter_object::test<10>()
+    {
+        set_test_name("a line past the width broken at the commas of its widest bracket, or of the table a call ends with on the call's "
+                      "line, each part a level further in and broken again where still too long, its comment after the last; formatted "
+                      "again, the same; not where no width is set, nor by formatLines; formatEach gives it as one line's");
+        ALScriptFormatter::Options options;
+        options.lua   = true;
+        options.width = 100;
+        const std::string in = "local function f()\n"
+                               "    local r: string = llcompat.List2Json(JSON_OBJECT, {\"fn\", \"SELECT\", \"radius\", 10, \"ima\", "
+                               "llcompat.List2Json(JSON_ARRAY, {\"Ungulate\"}), \"requestor\", llcompat.List2Json(JSON_OBJECT, {\"id\", "
+                               "ll.GetKey(), \"ima\", \"[]\", \"playsWith\", \"[]\"}), \"responders\", \"[]\"}) -- sent\n"
+                               "    print(string.format(\"%s and %s and %s\", tostring(aVeryLongName), tostring(anotherVeryLongName), "
+                               "tostring(yetAnotherName)))\n"
+                               "    print(\"a string with no comma in it that is longer than the width of one hundred columns, and so on\")\n"
+                               "end\n";
+        const std::string want = "local function f()\n"
+                                 "    local r: string = llcompat.List2Json(JSON_OBJECT, {\n"
+                                 "        \"fn\",\n"
+                                 "        \"SELECT\",\n"
+                                 "        \"radius\",\n"
+                                 "        10,\n"
+                                 "        \"ima\",\n"
+                                 "        llcompat.List2Json(JSON_ARRAY, { \"Ungulate\" }),\n"
+                                 "        \"requestor\",\n"
+                                 "        llcompat.List2Json(JSON_OBJECT, { \"id\", ll.GetKey(), \"ima\", \"[]\", \"playsWith\", \"[]\" }),\n"
+                                 "        \"responders\",\n"
+                                 "        \"[]\"\n"
+                                 "    }) -- sent\n"
+                                 "    print(string.format(\n"
+                                 "        \"%s and %s and %s\",\n"
+                                 "        tostring(aVeryLongName),\n"
+                                 "        tostring(anotherVeryLongName),\n"
+                                 "        tostring(yetAnotherName)\n"
+                                 "    ))\n"
+                                 "    print(\"a string with no comma in it that is longer than the width of one hundred columns, and so on\")\n"
+                                 "end\n";
+        const std::string out = ALScriptFormatter::format(in, options);
+        ensure_equals("broken", out, want);
+        ensure_equals("the same again", ALScriptFormatter::format(out, options), want);
+
+        ALScriptFormatter::Options none = options;
+        none.width                      = 0;
+        ensure("no width, no break", ALScriptFormatter::format(in, none).find("{\n") == std::string::npos);
+        const std::string lines = ALScriptFormatter::formatLines(in, options, 0, 5);
+        ensure_equals("formatLines keeps every line's number", std::count(lines.begin(), lines.end(), '\n'), std::count(in.begin(), in.end(), '\n'));
+
+        const std::vector<std::string> each = ALScriptFormatter::formatEach(in, options, 0, 5);
+        ensure_equals("one a line, and the empty one after the last break", each.size(), size_t(6));
+        ensure_equals("the broken line's, breaks and all", each[1] + "\n", want.substr(want.find("    local r"), want.find("    print(string") - want.find("    local r")));
+        ensure_equals("a line asked for", ALScriptFormatter::formatEach(in, options, 2, 2)[1], in.substr(in.find("    local r"), in.find(" -- sent") + 8 - in.find("    local r")));
+        // From below the first line: every line still one of its own, the
+        // blank ones that the whole text's runs would take out too.
+        const std::vector<std::string> blanks = ALScriptFormatter::formatEach("\n\n\n\n\nprint(1)\n", options, -1, 5);
+        ensure_equals("a line each, blank or not", blanks.size(), size_t(7));
+        ensure_equals("the code where it was", blanks[5], std::string("print(1)"));
+    }
+
+    template<> template<>
+    void alscriptformatter_object::test<11>()
+    {
+        set_test_name("LSL past the width: a vector or rotation never broken, nor spaced inside where a line begins with one; a call's list "
+                      "on the call's line; tabs a level wide; not a line with a comment inside it");
+        ALScriptFormatter::Options options;
+        options.width        = 100;
+        const std::string in = "default\n{\n    state_entry()\n    {\n"
+                               "        llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_POSITION, <1.0, 2.0, 3.0>, PRIM_ROTATION, "
+                               "<0.0, 0.0, 0.0, 1.0>, PRIM_SIZE, <0.5, 0.5, 0.5>, PRIM_COLOR, ALL_SIDES, <1, 1, 1>, 1.0]);\n"
+                               "        llSetText(\"a\", <1, 1, 1>, 1.0); /* inside */ llSetText(\"and a longer piece of text than fits\", "
+                               "<1, 1, 1>, 1.0);\n"
+                               "    }\n}\n";
+        const std::string want = "default\n{\n    state_entry()\n    {\n"
+                                 "        llSetLinkPrimitiveParamsFast(LINK_THIS, [\n"
+                                 "            PRIM_POSITION,\n"
+                                 "            <1.0, 2.0, 3.0>,\n"
+                                 "            PRIM_ROTATION,\n"
+                                 "            <0.0, 0.0, 0.0, 1.0>,\n"
+                                 "            PRIM_SIZE,\n"
+                                 "            <0.5, 0.5, 0.5>,\n"
+                                 "            PRIM_COLOR,\n"
+                                 "            ALL_SIDES,\n"
+                                 "            <1, 1, 1>,\n"
+                                 "            1.0\n"
+                                 "        ]);\n"
+                                 "        llSetText(\"a\", <1, 1, 1>, 1.0); /* inside */ llSetText(\"and a longer piece of text than fits\", "
+                                 "<1, 1, 1>, 1.0);\n"
+                                 "    }\n}\n";
+        const std::string out = ALScriptFormatter::format(in, options);
+        ensure_equals("broken", out, want);
+        ensure_equals("the same again", ALScriptFormatter::format(out, options), want);
+
+        // With tabs, each a level's width: 2 levels of 4 and the call's 92
+        // are 100, which fits; at 99 it does not.
+        ALScriptFormatter::Options tabs = options;
+        tabs.tabs                       = true;
+        const std::string call = "llSay(0, \"" + std::string(92 - 13, 'x') + "\");";
+        ensure_equals("a call of 92", call.size(), size_t(92));
+        const std::string tabbed = "default\n{\n    state_entry()\n    {\n        " + call + "\n    }\n}\n";
+        ensure("fits", ALScriptFormatter::format(tabbed, tabs).find("\t\t" + call + "\n") != std::string::npos);
+        tabs.width = 99;
+        ensure("does not", ALScriptFormatter::format(tabbed, tabs).find("\t\tllSay(\n\t\t\t0,\n") != std::string::npos);
+    }
 }
