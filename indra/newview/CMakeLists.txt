@@ -1145,6 +1145,7 @@ if(AL_BUILD_VIEWER)
     alfloaterxuistudio.h
     alviewcapture.h
     algradehistory.h
+    alhuddepth.h
     allegacynotificationwellwindow.h
     allightboxdirectory.h
     almotionpredictor.h
@@ -2546,6 +2547,15 @@ if(AL_BUILD_TESTS)
   # read from the source tree, on LLWindowManager's hidden window.
   al_add_test(
     alselectionoutline_gl
+    GL
+    PROJECT ${test_project}
+    LIBRARIES llrender
+    DEFINES "AL_TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders\""
+  )
+  # The window's depth under the HUD: cleared in the HUD's rects, then the
+  # scene's written back with the viewer's own copy shader.
+  al_add_test(
+    alhuddepth_gl
     GL
     PROJECT ${test_project}
     LIBRARIES llrender

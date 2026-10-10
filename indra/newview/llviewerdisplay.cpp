@@ -30,6 +30,7 @@
 
 #include "alfarplane.h"
 #include "alfloaterprogressview.h"
+#include "alhuddepth.h"
 #include "aluniformbuffer.h"
 #include "fsyspath.h"
 #include "hexdump.h"
@@ -140,6 +141,7 @@ void render_hud_attachments();
 void render_ui_3d();
 void render_ui_2d();
 void render_disconnected_background();
+bool get_hud_matrices(LLMatrix4a& proj, LLMatrix4a& model);
 
 void getProfileStatsContext(LLSD& stats);
 std::string getProfileStatsFilename();
@@ -1284,6 +1286,48 @@ void display_cube_face()
     gPipeline.clearReferences();
 }
 
+// The viewport pixels the HUD can cover, a rect per attachment point with something on it, overlapping ones merged
+// (ALHUDDepth::mergeRect). A point's box is in the frame the HUD's model matrix takes in (LLVOAvatar::getHUDBBox),
+// with no rotation or offset of its own.
+static void hud_screen_rects(std::vector<LLRect>& rects)
+{
+    rects.clear();
+    LLMatrix4a proj;
+    LLMatrix4a model;
+    if (!isAgentAvatarValid() || !get_hud_matrices(proj, model))
+    {
+        return;
+    }
+
+    LLMatrix4a mvp;
+    mvp.setMul(model, proj);
+
+    for (const auto& [id, attachment] : gAgentAvatarp->mAttachmentPoints)
+    {
+        if (!attachment || !attachment->getIsHUDAttachment() || attachment->mAttachedObjects.empty())
+        {
+            continue;
+        }
+        const LLBBox bbox = LLVOAvatar::getHUDBBox(attachment);
+        const LLRect rect = ALHUDDepth::boxRect(mvp, bbox.getMinLocal(), bbox.getMaxLocal(), gGLViewport[2], gGLViewport[3]);
+        if (!rect.isEmpty())
+        {
+            ALHUDDepth::mergeRect(rects, rect);
+        }
+    }
+}
+
+// Writes the scene's depth back under the HUD, as the final blit left it (ALHUDDepth::restore).
+static void restore_scene_depth(const std::vector<LLRect>& rects)
+{
+    if (!gPipeline.mRT || !gPipeline.mScreenTriangleVB)
+    {
+        return;
+    }
+    ALHUDDepth::restore(gCopyDepthProgram, gPipeline.mRT->deferredScreen, *gPipeline.mScreenTriangleVB, rects,
+                        gGLViewport[0], gGLViewport[1]);
+}
+
 void render_hud_attachments()
 {
     LLPerfStats::RecordSceneTime T ( LLPerfStats::StatType_t::RENDER_HUDS); // render time capture - Primary contributor to HUDs (though these end up in render batches)
@@ -1372,12 +1416,24 @@ void render_hud_attachments()
 
         gPipeline.stateSort(hud_cam, result);
 
+        // The HUD is drawn over the window's framebuffer, whose depth the final blit filled with the scene's for the
+        // 3D UI around it. get_hud_matrices squeezes the HUD into a band of that depth in front of the scene, but a
+        // world surface at the near plane still reached into it, and the band widens with the HUD's own depth: a
+        // HUD with a prim parked far along its axis put its rear within reach of surfaces half a metre away. So
+        // under the HUD the depth is cleared, the HUD tests against itself alone, and the scene's is put back after
+        // it for the 3D UI that follows, which the world and the HUD both hide.
+        static std::vector<LLRect> hud_rects;
+        hud_screen_rects(hud_rects);
+        ALHUDDepth::clear(hud_rects, gGLViewport[0], gGLViewport[1]);
+
         gPipeline.renderGeomPostDeferred(hud_cam);
 
         LLSpatialGroup::sNoDelete = false;
         //gPipeline.clearReferences();
 
         render_hud_elements();
+
+        restore_scene_depth(hud_rects);
 
         //restore type mask
         gPipeline.popRenderTypeMask();
