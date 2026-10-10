@@ -908,15 +908,6 @@ public:
     // Get a reference to the octree, which may be null
     const LLVolumeOctree* getOctree() const;
 
-    // Part of silhouette generation (used by selection outlines)
-    // Populates the provided edge array with numbers corresponding to
-    // *partial* logic of whether a particular index should be rendered
-    // as a silhouette edge. -1 indicates the index should be rendered as a
-    // silhouette edge. See generateSilhouetteVertices for the full logic.
-    // Silhouette edges can only be generated for some types of prims. If a
-    // silhouette edge cannot be generated, the edge array will be left empty.
-    void generateSilhouetteEdge(const LLVolume* volume, std::vector<S32>& edge) const;
-
     enum
     {
         SINGLE_MASK =   0x0001,
@@ -1048,13 +1039,6 @@ public:
     static void getLoDTriangleCounts(const LLVolumeParams& params, S32* counts);
 
     S32 getNumTriangles(S32* vcount = nullptr) const;
-
-    void generateSilhouetteVertices(std::vector<LLVector3> &vertices,
-                                    std::vector<LLVector3> &normals,
-                                    const LLVector3& view_vec,
-                                    const LLMatrix4& mat,
-                                    const LLMatrix3& norm_mat,
-                                    S32 face_index);
 
     //get the face index of the face that intersects with the given line segment at the point
     //closest to start.  Moves end to the point of intersection.  Returns -1 if no intersection.

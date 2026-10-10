@@ -154,6 +154,8 @@ LLGLSLShader        gUnderWaterProgram;
 LLGLSLShader        gHighlightProgram;
 LLGLSLShader        gHighlightNormalProgram;
 LLGLSLShader        gHighlightSpecularProgram;
+LLGLSLShader        gSelectionIdProgram;
+LLGLSLShader        gSelectionOutlineProgram;
 
 LLGLSLShader        gDeferredHighlightProgram;
 
@@ -3821,6 +3823,26 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gHighlightSpecularProgram.mShaderFiles.push_back(make_pair("interface/highlightF.glsl", GL_FRAGMENT_SHADER));
         gHighlightSpecularProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gHighlightSpecularProgram.createShader();
+    }
+
+    if (success)
+    {
+        gSelectionIdProgram.mName = "Selection Id Shader";
+        gSelectionIdProgram.mShaderFiles.clear();
+        gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/debugV.glsl", GL_VERTEX_SHADER));
+        gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionIdF.glsl", GL_FRAGMENT_SHADER));
+        gSelectionIdProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        success = gSelectionIdProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+    }
+
+    if (success)
+    {
+        gSelectionOutlineProgram.mName = "Selection Outline Shader";
+        gSelectionOutlineProgram.mShaderFiles.clear();
+        gSelectionOutlineProgram.mShaderFiles.push_back(make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
+        gSelectionOutlineProgram.mShaderFiles.push_back(make_pair("interface/selectionOutlineF.glsl", GL_FRAGMENT_SHADER));
+        gSelectionOutlineProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        success = gSelectionOutlineProgram.createShader();
     }
 
     if (success)

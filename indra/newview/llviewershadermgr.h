@@ -162,6 +162,9 @@ extern LLGLSLShader         gLensDirtGenProgram;
 extern LLGLSLShader         gHighlightProgram;
 extern LLGLSLShader         gHighlightNormalProgram;
 extern LLGLSLShader         gHighlightSpecularProgram;
+// Selection outlines (ALSelectionOutline): the id pass, with a rigged variant, and the edge pass.
+extern LLGLSLShader         gSelectionIdProgram;
+extern LLGLSLShader         gSelectionOutlineProgram;
 
 extern LLGLSLShader         gDeferredHighlightProgram;
 

@@ -50,6 +50,7 @@
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/signals2.hpp>
 
+class ALSelectionOutline;
 class LLMessageSystem;
 class LLViewerTexture;
 class LLColor4;
@@ -180,7 +181,6 @@ public:
     S32 getLastSelectedTE() const;
     S32 getLastOperatedTE() const { return mLastTESelected; }
     S32 getTESelectMask() { return mTESelectMask; }
-    void renderOneSilhouette(const LLColor4 &color);
     void setTransient(bool transient) { mTransient = transient; }
     bool isTransient() const { return mTransient; }
     LLViewerObject* getObject() const;
@@ -243,9 +243,6 @@ public:
     std::vector< std::vector<LLVector3> >  mGLTFScaleRatios;
     std::vector< std::vector<LLVector2> >  mGLTFScales;
     std::vector< std::vector<LLVector2> >  mGLTFOffsets;
-    std::vector<LLVector3>  mSilhouetteVertices;    // array of vertices to render silhouette of object
-    std::vector<LLVector3>  mSilhouetteNormals; // array of normals to render silhouette of object
-    bool                    mSilhouetteExists;  // need to generate silhouette?
 
 protected:
     mutable LLPointer<LLViewerObject>   mObject;
@@ -447,12 +444,7 @@ public:
     static bool                 sRenderLightRadius; // do we show the radius of selected lights?
 
     static F32                  sHighlightThickness;
-    static F32                  sHighlightUScale;
-    static F32                  sHighlightVScale;
     static F32                  sHighlightAlpha;
-    static F32                  sHighlightAlphaTest;
-    static F32                  sHighlightUAnim;
-    static F32                  sHighlightVAnim;
     static LLUIColor            sSilhouetteParentColor;
     static LLUIColor            sSilhouetteChildColor;
     static LLUIColor            sHighlightParentColor;
@@ -624,9 +616,8 @@ public:
     LLBBox getSavedBBoxOfSelection() const { return mSavedSelectionBBox; }
 
     void dump();
-    void cleanup();
 
-    void updateSilhouettes();
+    void updateHighlightedObjects();
     void renderSilhouettes(bool for_hud);
     void enableSilhouette(bool enable) { mRenderSilhouettes = enable; }
 
@@ -852,8 +843,7 @@ private:
     void convertTransient(); // converts temporarily selected objects to full-fledged selections
     ESelectType getSelectTypeForObject(LLViewerObject* object);
     void addAsFamily(std::vector<LLViewerObject*>& objects, bool add_to_end = false);
-    void generateSilhouette(LLSelectNode *nodep, const LLVector3& view_point);
-    void updateSelectionSilhouette(LLObjectSelectionHandle object_handle, S32& num_sils_genned, std::vector<LLViewerObject*>& changed_objects);
+    void addOutlines(ALSelectionOutline& outline, bool for_hud);
     // Send one message to each region containing an object on selection list.
     void sendListToRegions( const std::string& message_name,
                             void (*pack_header)(void *user_data),
@@ -916,7 +906,6 @@ public:
     update_signal_t mUpdateSignal;
 
 private:
-    LLPointer<LLViewerTexture>              mSilhouetteImagep;
     LLObjectSelectionHandle                 mSelectedObjects;
     LLObjectSelectionHandle                 mHoverObjects;
     LLObjectSelectionHandle                 mHighlightedObjects;
@@ -935,7 +924,6 @@ private:
 
     LLVector3d              mLastSentSelectionCenterGlobal;
     bool                    mShowSelection; // do we send the selection center name value and do we animate this selection?
-    LLVector3d              mLastCameraPos;     // camera position from last generation of selection silhouette
     bool                    mRenderSilhouettes; // do we render the silhouette
     LLBBox                  mSavedSelectionBBox;
 

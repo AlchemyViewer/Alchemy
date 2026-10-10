@@ -4005,40 +4005,6 @@ void LLVOVolume::updateRiggingInfo()
 
 //----------------------------------------------------------------------------
 
-void LLVOVolume::generateSilhouette(LLSelectNode* nodep, const LLVector3& view_point)
-{
-    LLVolume *volume = getVolume();
-
-    if (volume)
-    {
-        LLVector3 view_vector;
-        view_vector = view_point;
-
-        //transform view vector into volume space
-        view_vector -= getRenderPosition();
-        //mDrawable->mDistanceWRTCamera = view_vector.length();
-        LLQuaternion worldRot = getRenderRotation();
-        view_vector = view_vector * ~worldRot;
-        if (!isVolumeGlobal())
-        {
-            LLVector3 objScale = getScale();
-            LLVector3 invObjScale(1.f / objScale.mV[VX], 1.f / objScale.mV[VY], 1.f / objScale.mV[VZ]);
-            view_vector.scaleVec(invObjScale);
-        }
-
-        updateRelativeXform();
-        LLMatrix4 trans_mat = mRelativeXform;
-        if (mDrawable->isStatic())
-        {
-            trans_mat.translate(getRegion()->getOriginAgent());
-        }
-
-        volume->generateSilhouetteVertices(nodep->mSilhouetteVertices, nodep->mSilhouetteNormals, view_vector, trans_mat, mRelativeXformInvTrans, nodep->getTESelectMask());
-
-        nodep->mSilhouetteExists = true;
-    }
-}
-
 void LLVOVolume::deleteFaces()
 {
     S32 face_count = mNumFaces;

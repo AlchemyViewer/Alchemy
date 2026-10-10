@@ -2761,9 +2761,6 @@ void LLViewerWindow::shutdownGL()
 
     LL_INFOS() << "All textures and llimagegl images are destroyed!" << LL_ENDL ;
 
-    LL_INFOS() << "Cleaning up select manager" << LL_ENDL;
-    LLSelectMgr::getInstance()->cleanup();
-
     LL_INFOS() << "Stopping GL during shutdown" << LL_ENDL;
     stopGL();
     stop_glerror();
@@ -4520,7 +4517,7 @@ void LLViewerWindow::renderSelections( bool for_gl_pick, bool pick_parcel_walls,
     if (!for_hud && !for_gl_pick)
     {
         // Call this once and only once
-        LLSelectMgr::getInstance()->updateSilhouettes();
+        LLSelectMgr::getInstance()->updateHighlightedObjects();
     }
 
     // <FS:Beq> render the poser manipulator guides

@@ -2283,7 +2283,7 @@ void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
             addDebugBeacon(objectp->getPositionAgent(),"");
 #endif
             gPipeline.markMoved(objectp->mDrawable);
-            objectp->setChanged(LLXform::MOVED | LLXform::SILHOUETTE);
+            objectp->setChanged(LLXform::MOVED);
 
             // Flag the object as no longer orphaned
             childp->mOrphaned = false;

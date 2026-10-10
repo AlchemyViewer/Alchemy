@@ -59,6 +59,7 @@
 #include "alcurvemodel.h"
 #include "alfarplane.h"
 #include "alfarplaneoverlay.h"
+#include "alselectionoutline.h"
 #include "llrender.h"
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
@@ -1390,6 +1391,7 @@ void LLPipeline::releaseGLBuffers()
     }
 
     ALFarPlaneOverlay::release();
+    ALSelectionOutline::instance().release();
 
     mHeroProbeManager.cleanup(); // release hero probes
 
@@ -3598,7 +3600,7 @@ void LLPipeline::markShift(LLDrawable *drawablep)
 
     if (!drawablep->isState(LLDrawable::ON_SHIFT_LIST))
     {
-        drawablep->getVObj()->setChanged(LLXform::SHIFTED | LLXform::SILHOUETTE);
+        drawablep->getVObj()->setChanged(LLXform::SHIFTED);
         if (drawablep->getParent())
         {
             markShift(drawablep->getParent());
@@ -3744,10 +3746,6 @@ void LLPipeline::markRebuild(LLDrawable *drawablep, LLDrawable::EDrawableFlags f
             drawablep->setState(LLDrawable::IN_REBUILD_Q); // mark drawable as being in priority queue
         }
 
-        if (flag & (LLDrawable::REBUILD_VOLUME | LLDrawable::REBUILD_POSITION))
-        {
-            drawablep->getVObj()->setChanged(LLXform::SILHOUETTE);
-        }
         drawablep->setState(flag);
     }
 }
