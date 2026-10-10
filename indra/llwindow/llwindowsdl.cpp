@@ -2016,6 +2016,67 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             break;
         }
 
+        // Touchpad pinch: Wayland's pointer gestures, XInput 2.4's, Cocoa's
+        // magnify. A Windows precision touchpad delivers a pinch as
+        // Control+wheel, so it zooms what Control+wheel zooms (a script's
+        // text, XUI Studio's canvas, a web page) and does to the camera what
+        // Control+wheel does: in the default third-person view, that raises
+        // or lowers the camera rather than zooming. Give it to the viewer the
+        // same way, as wheel clicks with Control held, at the cursor. SDL
+        // sends a pinch on its own stream with no wheel events beside it, so
+        // there is nothing to hold back.
+        case SDL_EVENT_PINCH_BEGIN:
+        case SDL_EVENT_PINCH_END:
+        {
+            mPinchLastScale = 1.f;
+            mPinchClickAccum = 0.f;
+            break;
+        }
+        case SDL_EVENT_PINCH_UPDATE:
+        {
+            // SDL documents the scale as the change since the last update, and
+            // Cocoa sends that, but SDL 3.4's Wayland and X11 backends pass on
+            // what their protocols carry: the scale since the gesture began
+            // (pointer-gestures-unstable-v1, XIGesturePinchEvent). Take the
+            // ratio to the last one there. Should SDL come to divide it itself,
+            // this must stop.
+            const F32 scale = event.pinch.scale;
+            if (scale <= 0.f || mPinchLastScale <= 0.f)
+            {
+                break;
+            }
+            const bool from_start = (mServerProtocol != Unknown);
+            const F32 ratio = from_start ? scale / mPinchLastScale : scale;
+            if (from_start)
+            {
+                mPinchLastScale = scale;
+            }
+
+            // A click for every quarter octave of spread, the step the camera's
+            // orbit takes a click (2^(1/4), LLAgentCamera::handleScrollWheel):
+            // where Control does not change what the wheel does, fingers spread
+            // twice as far apart bring the camera in to half its distance.
+            // Spreading zooms in, as a wheel rolled away from you does, which
+            // is negative clicks. Fractions gather as the wheel's do, so a slow
+            // pinch still makes its clicks.
+            const F32 precise = -4.f * std::log2(ratio);
+            mPinchClickAccum += precise;
+            const S32 clicks = lltrunc(mPinchClickAccum);
+            mPinchClickAccum -= (F32)clicks;
+            if (clicks != 0 || precise != 0.f)
+            {
+                // The wheel's handlers ask the keyboard for Control, and
+                // LLKeyboardSDL::currentMask asks SDL_GetModState, so hold it
+                // there for the call, as a Windows pinch arrives with it down.
+                const SDL_Keymod held = SDL_GetModState();
+                const SDL_Keymod added = (held & SDL_KMOD_CTRL) ? SDL_KMOD_NONE : SDL_KMOD_LCTRL;
+                SDL_SetModState(static_cast<SDL_Keymod>(held | added));
+                mCallbacks->handleScrollWheel(this, LLScrollDelta(clicks, precise));
+                SDL_SetModState(static_cast<SDL_Keymod>(SDL_GetModState() & ~added));
+            }
+            break;
+        }
+
         // Pen / stylus native events. SDL3 also emits mouse-emulation events
         // for these (with event.motion.which == SDL_PEN_MOUSEID) which our
         // mouse handlers already route through the usual input plumbing. The

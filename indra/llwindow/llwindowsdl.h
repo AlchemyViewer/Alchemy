@@ -385,6 +385,13 @@ private:
     F32 mScrollWheelAccumX = 0.f;
     F32 mScrollWheelAccumY = 0.f;
 
+    // A touchpad pinch, given to the viewer as Control+wheel clicks (see
+    // SDL_EVENT_PINCH_UPDATE): the scale the gesture last reported, where a
+    // backend reports it from the gesture's start, and the clicks it has not
+    // yet made whole. Both reset with each gesture.
+    F32 mPinchLastScale = 1.f;
+    F32 mPinchClickAccum = 0.f;
+
     // Mirrors LLWindowWin32::mAbsoluteCursorPosition. Set true while the
     // most recent mouse motion/button event was synthesised from a touch
     // screen (event.motion.which == SDL_TOUCH_MOUSEID) or a pen / stylus
