@@ -845,7 +845,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<23>()
     {
-        set_test_name("keys that hold text: link_message's id as SLua passes it, a string; a key given text that is no UUID kept a string; text where SLua takes it, uuid() where only a uuid will do");
+        set_test_name("keys that hold text: link_message's id as SLua passes it, a string; a key given text that is no UUID kept a string; text where SLua takes it, ll's key too");
         const ALLSLToSLua::Result r = convert("key DOMAIN = \"MY CHANNEL\";\n"
                                               "key gOwner;\n"
                                               "send(key to) { llMessageLinked(LINK_SET, 0, \"\", to); }\n"
@@ -869,7 +869,8 @@ namespace tut
                    has(r, "send(\"other text\")") && has(r, "ll.MessageLinked(LINK_SET, 0, \"\", to)"));
         ensure("compared as text: " + r.text, has(r, "if id == DOMAIN then") && has(r, "if id == tostring(gOwner) then"));
         ensure("a key given the id, text: " + r.text, has(r, "local k = id") && has(r, "{k}`)"));
-        ensure("uuid() where only a uuid will do, said: " + r.text, has(r, "ll.GetOwnerKey(uuid(\"abc\"))") && noted(r, "SluaKeyText"));
+        ensure("ll's key given text as it is, said: " + r.text,
+               has(r, "ll.GetOwnerKey(\"abc\" :: any)") && noted(r, "SluaKeyAsText") && !noted(r, "SluaKeyText"));
         checksClean(r);
     }
 
@@ -2864,5 +2865,46 @@ namespace tut
         }
         ensure_equals("unused", unused, std::string("Variable 'found' is never used; prefix with '_' to silence\n"));
         checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<84>()
+    {
+        set_test_name("text given where ll or llcompat takes a key is given as it is, as LSL's function took it, `:: any` for the type "
+                      "checker, said once; a UUID written out still a uuid; the script's own function's key still uuid()");
+        const std::string lsl = "string gJson;\n"
+                                "integer mine(key who) { return who == llGetOwner(); }\n"
+                                "default { touch_start(integer n) {\n"
+                                "    llOwnerSay(\"selected: \" + llKey2Name(llJsonGetValue(gJson, [\"selected\"])));\n"
+                                "    llOwnerSay(llKey2Name(\"a2e76fcd-9360-4f6d-a924-\" + \"938f923df11d\"));\n"
+                                "    llOwnerSay(llKey2Name(\"a2e76fcd-9360-4f6d-a924-938f923df11d\"));\n"
+                                "    if (mine(llJsonGetValue(gJson, [\"owner\"]))) llOwnerSay(\"mine\");\n"
+                                "} }\n";
+        const ALLSLToSLua::Result r = convert(lsl);
+        ensure("Tapple's, as it is: " + r.text, has(r, "ll.Key2Name(ll.JsonGetValue(gJson, {\"selected\"}) :: any)"));
+        ensure("bracketed where it must be: " + r.text, has(r, "ll.Key2Name((\"a2e76fcd-9360-4f6d-a924-\" .. \"938f923df11d\") :: any)"));
+        ensure("a UUID written out, a uuid: " + r.text, has(r, "ll.Key2Name(uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\"))"));
+        ensure("the script's own function's key, uuid(): " + r.text, has(r, "mine(uuid(ll.JsonGetValue(gJson, {\"owner\"})))") &&
+                                                                        noted(r, "SluaUuidText"));
+        ensure("said once: " + r.text, count(r, "-- LSL: SLua's ll takes a key as text") == 1);
+        checksClean(r);
+        if (!newSolver)
+        {
+            // ll's calls alone, strict.
+            const ALLSLToSLua::Result calls = convert("default { touch_start(integer n) {\n"
+                                                      "    llOwnerSay(llKey2Name(llJsonGetValue(\"{}\", [\"selected\"])));\n"
+                                                      "    llOwnerSay((string)llGetOwnerKey(\"a\" + (string)n));\n"
+                                                      "} }\n");
+            std::string said;
+            for (const ALScriptProblem& p : service.check("--!strict\n" + calls.text))
+            {
+                said += p.severity == ALScriptProblem::Severity::Error ? p.message + "\n" : std::string();
+            }
+            ensure("strict:\n" + said + "---\n" + calls.text, said.empty() && calls.text.find(":: any") != std::string::npos);
+        }
+
+        const ALLSLToSLua::Result close = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
+        ensure("llcompat's the same: " + close.text, close.converted && close.text.find(":: any)") != std::string::npos);
+        checksClean(close);
     }
 }
