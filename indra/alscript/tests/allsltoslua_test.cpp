@@ -1271,7 +1271,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<37>()
     {
-        set_test_name("the script's comments carried over, each over what it stood over: the script's own at the top, a global's, those inside a list, "
+        set_test_name("the script's comments carried over, each over what it stood over: the script's own at the top, a global's, those inside a list on their lines, "
                       "a trailing one, a brace's after its opening line, between branches, at a block's end; // as --, /* */ as --[[ ]] at a level nothing in it closes");
         const std::string lsl = "// Door script by Someone.\n"
                                 "// Do as you like with it.\n"
@@ -1318,7 +1318,8 @@ namespace tut
         ensure("the script's own at the top: " + r.text, has(r, "-- Door script by Someone.\n-- Do as you like with it.\n\n"));
         ensure("over everything, once: " + r.text, at("-- Door script by Someone.") < at("local SWING") && count(r, "Door script") == 1);
         ensure("a global's, what trailed it still after it: " + r.text, has(r, "-- How far it swings, in degrees\nlocal SWING = 90.0 -- a right angle\n"));
-        ensure("those inside a list, over it: " + r.text, has(r, "-- when it is open\n-- when it is shut\nlocal NAMES = {\"open\", \"closed\"}\n"));
+        ensure("those inside a list, on their lines: " + r.text,
+               has(r, "local NAMES = {\n    \"open\", -- when it is open\n    \"closed\" -- when it is shut\n}\n"));
         ensure("a block comment as Luau's: " + r.text, has(r, "--[[ old code:\ninteger unused() { return 1; }\n]]\n"));
         ensure("over the function it stood over: " + r.text, at("--[[ old code:") > at("local NAMES") && at("--[[ old code:") < at("-- Turns the door."));
         ensure("a brace's, after the line that opens it: " + r.text, has(r, "-- Turns the door.\nlocal function swing(by) -- by degrees\n"));
@@ -2766,5 +2767,73 @@ namespace tut
             }
             ensure("strict:\n" + said + "---\n" + r.text, said.empty());
         }
+    }
+}
+
+namespace tut
+{
+    template<> template<>
+    void allsltoslua_object::test<82>()
+    {
+        set_test_name("a list the LSL wrote over several lines is written over the same lines, nested ones a level further in, each "
+                      "comment in it where it was; a comment after it on the line it ends trails that line; a list on one line, or in "
+                      "a line made inside an expression, stays on one");
+        const ALLSLToSLua::Result r = convert("list gColours = [\n"
+                                              "    // warm\n"
+                                              "    \"red\", \"orange\",\n"
+                                              "    /* cool */ \"blue\" // last\n"
+                                              "];\n"
+                                              "list gTwo = [1, 2,\n"
+                                              "             3]; // three\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "       string activeRequest = llList2Json(JSON_OBJECT, [\n"
+                                              "            \"fn\", \"SELECT\",\n"
+                                              "            \"radius\", 10,\n"
+                                              "            \"ima\", llList2Json(JSON_ARRAY, [\"Ungulate\"]),\n"
+                                              "            \"ownerOnly\", TRUE, // only the owner\n"
+                                              "            \"toucher\", llGetOwner(),\n"
+                                              "            \"requestor\", llList2Json(JSON_OBJECT, [\n"
+                                              "                \"id\", llGetKey(),\n"
+                                              "                \"ima\", \"[]\",\n"
+                                              "                \"playsWith\", \"[]\"\n"
+                                              "            ]),\n"
+                                              "            \"responders\", \"[]\"\n"
+                                              "        ]); // sent\n"
+                                              "       llSay(0, activeRequest + llList2CSV(gColours + gTwo + [n, 1]));\n"
+                                              "       list m;\n"
+                                              "       llSay(0, (string)llGetListLength(m = [1,\n"
+                                              "                                             2]));\n"
+                                              "       while (llGetListLength(m = [3,\n"
+                                              "                                   4]) < 0) {}\n"
+                                              "       if (~llListFindList([\"a\", // first\n"
+                                              "                            \"b\"], [activeRequest])) llSay(0, \"found\");\n"
+                                              "       llParticleSystem([\n"
+                                              "           PSYS_PART_FLAGS, 0, // none\n"
+                                              "           PSYS_SRC_PATTERN, PSYS_SRC_PATTERN_DROP\n"
+                                              "       ]);\n"
+                                              "} }\n");
+        ensure("a global's, its comments where they were: " + r.text,
+               has(r, "local gColours = {\n    -- warm\n    \"red\", \"orange\",\n    --[[ cool ]] \"blue\" -- last\n}\n"));
+        ensure("closed on the line it closed on, a comment after it trailing that: " + r.text,
+               has(r, "local gTwo = {1, 2,\n    3} -- three\n"));
+        ensure("Tapple's, as the LSL had it: " + r.text,
+               has(r, "    local activeRequest = ll.List2Json(JSON_OBJECT, {\n"
+                      "        \"fn\", \"SELECT\",\n"
+                      "        \"radius\", 10,\n"
+                      "        \"ima\", ll.List2Json(JSON_ARRAY, {\"Ungulate\"}),\n"
+                      "        \"ownerOnly\", 1, -- only the owner\n"
+                      "        \"toucher\", ll.GetOwner(),\n"
+                      "        \"requestor\", ll.List2Json(JSON_OBJECT, {\n"
+                      "            \"id\", ll.GetKey(),\n"
+                      "            \"ima\", \"[]\",\n"
+                      "            \"playsWith\", \"[]\"\n"
+                      "        }),\n"
+                      "        \"responders\", \"[]\"\n"
+                      "    }) -- sent\n"));
+        ensure("each comment once: " + r.text, count(r, "only the owner") == 1 && count(r, "-- sent") == 1 && count(r, "-- first") == 1);
+        ensure("in a line made inside an expression, one line: " + r.text, has(r, "(function() m = {3, 4} return m end)()"));
+        ensure("in a condition: " + r.text, has(r, "    if table.find({\"a\", -- first\n        \"b\"}"));
+        ensure("one written another way, its comment over it: " + r.text, has(r, "    -- none\n    ll.ParticleSystem({\n"));
+        checksClean(r);
     }
 }

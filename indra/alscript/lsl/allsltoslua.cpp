@@ -454,8 +454,28 @@ namespace
         bool placeInside(size_t k, LSLASTNode* node);
         void placeIn(size_t k, LSLASTNode* compound);
         // Those given to a node, written over it; those at a holder's end,
-        // with any of what it held that nothing wrote, at its end.
+        // with any of what it held that nothing wrote, at its end. Those
+        // inside the node are put off to the first line written of it,
+        // which may be a list's over several lines that has them in its
+        // lines (Writer::listLines), and are over it where not.
         void commentsBefore(LSLASTNode* node);
+        std::vector<size_t> mDeferred;
+        // Where a list over lines has a comment, in its text: marked with a
+        // byte no expression's text has (strings escape it) and the
+        // comment's index, and how it goes -- after what is on the line
+        // (After), on a line of its own (Own), or before what follows on
+        // the line (Before). Written by Writer::line, which writes each
+        // comment once: a mark of one written is taken out, its line with
+        // it if it had one.
+        static constexpr char COMMENT_MARK = '\x7f';
+        enum class Marked : char
+        {
+            After  = 'a',
+            Own    = 'o',
+            Before = 'b'
+        };
+        static std::string marked(size_t k, Marked how);
+        std::string        withComments(const std::string& text);
         void commentsAtEnd(LSLASTNode* holder);
         void writeComment(Comment& c);
         // Those after a node on the line it ends, where it is all on one
@@ -463,6 +483,10 @@ namespace
         // written of it from `from` in the text, as the LSL had them; or
         // where nothing was, on a line of their own.
         void commentsAfter(LSLASTNode* node, size_t from);
+        // Where the line of code that begins at `from` in the text ends:
+        // its break, or that of the last line a bracket it opens runs on
+        // over.
+        size_t codeLineEnd(size_t from) const;
         // How long what commentsAfter put after each node's line was.
         boost::unordered_flat_map<LSLASTNode*, size_t> mTrailed;
         // Those on the line a block's brace opens, before anything in it:
@@ -504,10 +528,20 @@ namespace
         };
         std::vector<Lined> mRun;
         std::string indent() const { return std::string(static_cast<size_t>(mDepth) * 4, ' '); }
+        // How far in what a list over lines (Writer::listLines) or a rule
+        // table holds goes: a level past the line it opens on, and a level
+        // more for each it is in.
+        S32         mListDepth = 0;
+        std::string listIndent(S32 more) const { return indent() + std::string(static_cast<size_t>(mListDepth + more) * 4, ' '); }
 
         // --- expressions ------------------------------------------------------------
 
         Expr expr(LSLExpression* e);
+        // A list literal the LSL wrote over several lines, over the same
+        // lines: what it put on a line together on one, `{` where its `[`
+        // was and `}` on a line of its own where its `]` was, each comment
+        // in it where it was.
+        std::string listLines(LSLASTNode* list);
         // As a number where LSL has one, a boolean made 1 or 0.
         Expr value(LSLExpression* e);
         // As a boolean, as LSL reads a value in a condition.
@@ -1082,9 +1116,28 @@ namespace
     void Writer::line(const std::string& text)
     {
         // What was noted of it, over it -- over the statement a line made
-        // inside an expression stands in, where it is one.
+        // inside an expression stands in, where it is one -- under the
+        // comments put off to it that it has no place for.
         if (!mInline)
         {
+            const auto has_mark = [&text](size_t k) {
+                const std::string head = COMMENT_MARK + std::to_string(k);
+                for (size_t at = text.find(head); at != std::string::npos; at = text.find(head, at + 1))
+                {
+                    if (at + head.size() < text.size() && std::isalpha(static_cast<unsigned char>(text[at + head.size()])))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            for (size_t k : std::exchange(mDeferred, {}))
+            {
+                if (!has_mark(k))
+                {
+                    writeComment(mComments[k]);
+                }
+            }
             for (const std::string& said : mPending)
             {
                 if (mOptions.comments)
@@ -1114,7 +1167,50 @@ namespace
         {
             sameAs("}", "end");
         }
-        mText += text.empty() ? std::string("\n") : indent() + text + "\n";
+        mText += text.empty() ? std::string("\n") : indent() + withComments(text) + "\n";
+    }
+
+    // static
+    std::string Writer::marked(size_t k, Marked how)
+    {
+        return COMMENT_MARK + std::to_string(k) + static_cast<char>(how) + COMMENT_MARK;
+    }
+
+    std::string Writer::withComments(const std::string& text)
+    {
+        if (text.find(COMMENT_MARK) == std::string::npos)
+        {
+            return text;
+        }
+        std::string out;
+        size_t      at = 0;
+        while (at < text.size())
+        {
+            const size_t mark = text.find(COMMENT_MARK, at);
+            if (mark == std::string::npos)
+            {
+                out.append(text, at, std::string::npos);
+                break;
+            }
+            out.append(text, at, mark - at);
+            const size_t close = text.find(COMMENT_MARK, mark + 1);
+            const size_t k     = std::strtoul(text.c_str() + mark + 1, nullptr, 10);
+            const Marked how   = static_cast<Marked>(text[close - 1]);
+            at                 = close + 1;
+            Comment& c         = mComments[k];
+            if (!c.written)
+            {
+                c.written = true;
+                out += how == Marked::After ? " " + c.text : how == Marked::Before ? c.text + " " : c.text;
+            }
+            else if (how == Marked::Own)
+            {
+                // Its line too, break and all.
+                const size_t line = out.rfind('\n');
+                out.erase(line == std::string::npos ? 0 : line);
+            }
+        }
+        return out;
     }
 
     S32 Writer::linesWritten()
@@ -1599,11 +1695,24 @@ namespace
         // Every node written is through here first: the first line of code
         // written after its comments is the one made of it.
         mAnchorPending.reset();
+        // Any put off that no line took, over what follows.
+        for (size_t k : std::exchange(mDeferred, {}))
+        {
+            writeComment(mComments[k]);
+        }
         if (const auto found = mCommentsBefore.find(node); found != mCommentsBefore.end())
         {
+            const Pos begins = isNull(node) ? Pos{} : Pos{ node->getLoc()->first_line, node->getLoc()->first_column };
             for (size_t k : found->second)
             {
-                writeComment(mComments[k]);
+                if (!isNull(node) && begins < mComments[k].at)
+                {
+                    mDeferred.push_back(k);
+                }
+                else
+                {
+                    writeComment(mComments[k]);
+                }
             }
         }
         if (!isNull(node) && node->getLoc())
@@ -1636,13 +1745,70 @@ namespace
             const size_t first = mText.find_first_not_of(' ', at);
             if (first < end && mText.compare(first, 2, "--") != 0)
             {
-                putTrailing(end, after);
+                putTrailing(codeLineEnd(at), after);
                 mTrailed[node] = after.size();
                 return;
             }
             at = end + 1;
         }
         mText += indent() + after.substr(1) + "\n";
+    }
+
+    size_t Writer::codeLineEnd(size_t from) const
+    {
+        // Past strings and comments, counting brackets: Luau's, as written
+        // here.
+        S32    open = 0;
+        size_t i    = from;
+        // A long bracket's level at `at`, `[==[`, or -1 where there is none.
+        const auto level = [this](size_t at) {
+            size_t n = at + 1;
+            while (n < mText.size() && mText[n] == '=')
+            {
+                ++n;
+            }
+            return n < mText.size() && mText[n] == '[' ? static_cast<S32>(n - at - 1) : -1;
+        };
+        const auto pastLong = [this](size_t at, S32 equals) {
+            const std::string closer = "]" + std::string(static_cast<size_t>(equals), '=') + "]";
+            const size_t      found  = mText.find(closer, at);
+            return found == std::string::npos ? mText.size() : found + closer.size();
+        };
+        while (i < mText.size())
+        {
+            const char c = mText[i];
+            if (c == '\n')
+            {
+                if (open <= 0)
+                {
+                    return i;
+                }
+                ++i;
+            }
+            else if (c == '"' || c == '\'' || c == '`')
+            {
+                for (++i; i < mText.size() && mText[i] != c && mText[i] != '\n'; ++i)
+                {
+                    i += mText[i] == '\\' ? 1 : 0;
+                }
+                ++i;
+            }
+            else if (c == '-' && i + 1 < mText.size() && mText[i + 1] == '-')
+            {
+                const S32 equals = i + 2 < mText.size() && mText[i + 2] == '[' ? level(i + 2) : -1;
+                i                = equals >= 0 ? pastLong(i + 2, equals) : std::min(mText.find('\n', i), mText.size());
+            }
+            else if (c == '[' && level(i) >= 0)
+            {
+                i = pastLong(i, level(i));
+            }
+            else
+            {
+                open += c == '(' || c == '{' || c == '[' ? 1 : c == ')' || c == '}' || c == ']' ? -1 : 0;
+                ++i;
+            }
+        }
+        return std::min(mText.find('\n', from), mText.size());
     }
 
     bool Writer::trail(LSLASTNode* body)
@@ -2946,9 +3112,9 @@ namespace
         std::string table = lines ? "{\n" : "{ ";
         for (size_t i = 0; i < fields.size(); ++i)
         {
-            table += lines ? indent() + "    " + fields[i] + ",\n" : (i ? ", " : "") + fields[i];
+            table += lines ? listIndent(1) + fields[i] + ",\n" : (i ? ", " : "") + fields[i];
         }
-        table += lines ? indent() + "}" : " }";
+        table += lines ? listIndent(0) + "}" : " }";
         called = "ll." + lsl.substr(2);
         LSLParamList* params = e->getIdentifier()->getSymbol()->getFunctionDecl();
         return Expr{ called + "(" + args(e->getArguments(), params, 0, call->at, table) + ")" };
@@ -3842,6 +4008,12 @@ namespace
             }
             case NODE_LIST_EXPRESSION:
             {
+                // Over the lines the LSL wrote it over; but not in a line
+                // made inside an expression, which is made one line.
+                if (!mInline && e->getChild(0) && !isNull(e->getChild(0)) && e->getLoc()->first_line != e->getLoc()->last_line)
+                {
+                    return { listLines(e) };
+                }
                 std::string out;
                 for (LSLASTNode* item = e->getChild(0); item; item = item->getNext())
                 {
@@ -3854,6 +4026,87 @@ namespace
             default:
                 return { "nil" };
         }
+    }
+
+    std::string Writer::listLines(LSLASTNode* list)
+    {
+        const auto begins = [](LSLASTNode* n) { return Pos{ n->getLoc()->first_line, n->getLoc()->first_column }; };
+        const auto ends   = [](LSLASTNode* n) { return Pos{ n->getLoc()->last_line, n->getLoc()->last_column }; };
+        std::vector<LSLExpression*> items;
+        for (LSLASTNode* item = list->getChild(0); item; item = item->getNext())
+        {
+            items.push_back(static_cast<LSLExpression*>(item));
+        }
+        // Its comments, in order: those in no item of it, an item's being
+        // its own to place. Not a toggle's, which is about the code over or
+        // under it.
+        const Pos           open  = begins(list);
+        const Pos           close = ends(list);
+        std::vector<size_t> comments;
+        const auto from = std::lower_bound(mComments.begin(), mComments.end(), open, [](const Comment& c, const Pos& p) { return c.at < p; });
+        for (auto it = from; it != mComments.end() && it->at < close; ++it)
+        {
+            const Comment& c = *it;
+            if (c.written || c.closer || c.text.rfind("---[", 0) == 0 ||
+                std::any_of(items.begin(), items.end(), [&](LSLExpression* item) { return !(c.at < begins(item)) && c.at < ends(item); }))
+            {
+                continue;
+            }
+            comments.push_back(static_cast<size_t>(it - mComments.begin()));
+        }
+        ++mListDepth;
+        std::string out  = "{";
+        // The LSL line what is written ends on, and the comment next.
+        S32         line = open.line;
+        size_t      next = 0;
+        // Those before `upto`: after what is on the line so far, on lines of
+        // their own, then before what is on the line `upto` is on; a break
+        // to that line, written at `in`, or a space where there was one.
+        const auto to = [&](const Pos& upto, const std::string& in, bool spaced) {
+            std::string before;
+            for (; next < comments.size() && mComments[comments[next]].at < upto; ++next)
+            {
+                const size_t k  = comments[next];
+                const S32    at = mComments[k].at.line;
+                if (at == line)
+                {
+                    out += marked(k, Marked::After);
+                }
+                else if (at < upto.line)
+                {
+                    out += "\n" + listIndent(0) + marked(k, Marked::Own);
+                }
+                else
+                {
+                    before += marked(k, Marked::Before);
+                }
+            }
+            if (upto.line > line)
+            {
+                out += "\n" + in;
+            }
+            else if (spaced)
+            {
+                out += " ";
+            }
+            out += before;
+        };
+        for (size_t i = 0; i < items.size(); ++i)
+        {
+            LSLExpression* item = items[i];
+            if (i)
+            {
+                out += ",";
+            }
+            to(begins(item), listIndent(0), i > 0);
+            // As LSL typed it: NULL_KEY in a list is LSL's string.
+            out += coerced(item, item->getIType()).text;
+            line = item->getLoc()->last_line;
+        }
+        to(close, listIndent(-1), false);
+        out += "}";
+        --mListDepth;
+        return out;
     }
 
     // --- statements -------------------------------------------------------------------
