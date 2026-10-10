@@ -150,7 +150,7 @@ public:
     static constexpr F32 HIDDEN_ALPHA = 0.4f;
     /// The contour's width in pixels at a UI scale of 1: AlchemySelectionOutlineWidth's default, and the range it
     /// is held to.
-    static constexpr F32 DEFAULT_CONTOUR_WIDTH = 4.f;
+    static constexpr F32 DEFAULT_CONTOUR_WIDTH = 2.f;
     static constexpr F32 MIN_CONTOUR_WIDTH = 1.f;
     static constexpr F32 MAX_CONTOUR_WIDTH = 16.f;
     /// The width of the edges between objects in pixels at a UI scale of 1. It does not follow the contour's: the

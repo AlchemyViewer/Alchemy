@@ -916,9 +916,9 @@ namespace tut
     template<> template<>
     void alselectionoutline_object_t::test<9>()
     {
-        ensure_equals("the setting's default", Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 1.f), 4);
-        ensure_equals("the default at 1.5", Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 1.5f), 6);
-        ensure_equals("the default at 2", Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 2.f), 8);
+        ensure_equals("the setting's default", Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 1.f), 2);
+        ensure_equals("the default at 1.5", Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 1.5f), 3);
+        ensure_equals("the default at 2", Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 2.f), 4);
         ensure_equals("a setting between pixels rounds", Outline::contourWidth(2.5f, 1.f), 3);
         ensure_equals("a setting under 1 held to 1", Outline::contourWidth(0.25f, 1.f), 1);
         ensure_equals("a setting over 16 held to 16", Outline::contourWidth(40.f, 1.f), 16);
@@ -1046,7 +1046,7 @@ namespace tut
     void alselectionoutline_object_t::test<12>()
     {
         const std::pair<F32, F32> settings[] = { { Outline::DEFAULT_CONTOUR_WIDTH, 1.f }, { Outline::DEFAULT_CONTOUR_WIDTH, 2.f },
-                                                 { 1.f, 1.f }, { 2.5f, 1.f }, { 0.25f, 1.f }, { 40.f, 1.f } };
+                                                 { 4.f, 1.f }, { 1.f, 1.f }, { 2.5f, 1.f }, { 0.25f, 1.f }, { 40.f, 1.f } };
         for (bool reverse : conventions())
         {
             setUp(reverse);

@@ -2414,7 +2414,7 @@
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>4.0</real>
+            <real>2.0</real>
         </map>
         <key>AlchemyRenderUBOUpdateMode</key>
         <map>
