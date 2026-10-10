@@ -30,6 +30,10 @@
 // visible, 0.5 hidden and drawn dimmed, 0 hidden and left out; in .a the priority, 0 the highest, below 128, and
 // 128 more on a texel the jump pass marks as the near side of a jump in its object's surface.
 
+// The priority of what the pointer is over, which glows instead of being outlined
+// (ALSelectionOutline::PRIORITY_HOVER).
+#define PRIORITY_HOVER 6
+
 int decodeId(vec4 texel)
 {
     return int(texel.r * 255.0 + 0.5) + (int(texel.g * 255.0 + 0.5) << 8);
@@ -38,6 +42,11 @@ int decodeId(vec4 texel)
 int decodePriority(vec4 texel)
 {
     return int(texel.a * 255.0 + 0.5) & 127;
+}
+
+bool isGlow(vec4 texel)
+{
+    return decodePriority(texel) == PRIORITY_HOVER;
 }
 
 bool isJumpFront(vec4 texel)

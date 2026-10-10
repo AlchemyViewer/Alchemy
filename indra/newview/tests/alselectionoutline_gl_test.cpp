@@ -2,7 +2,8 @@
  * @file alselectionoutline_gl_test.cpp
  * @brief ALSelectionOutline's id and edge passes on the hidden window, with the viewer's own shader files: ids,
  *        cut-out faces, the contour's width and anti-aliasing, priorities and the edges between objects, hidden
- *        parts, the scissor, a rigged pose, the HUD, and the palette, width and scissor helpers.
+ *        parts, the scissor, a rigged pose, the HUD, the wireframe, the hover glow and ALHoverGlow's fades, and the
+ *        palette, width and scissor helpers.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -26,6 +27,7 @@
 
 #include "linden_common.h"
 
+#include "../alhoverglow.h"
 #include "../alselectionoutline.h"
 
 #include "llgl.h"
@@ -42,6 +44,7 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -206,7 +209,7 @@ namespace tut
             mScene.release();
             mFar.release();
             mFrame.release();
-            for (U32* texture : { &mPalette, &mRamp })
+            for (U32* texture : { &mPalette, &mRamp, &mClear })
             {
                 if (*texture)
                 {
@@ -470,6 +473,21 @@ namespace tut
             return mRamp;
         }
 
+        // A texture that is clear everywhere, as the library's transparent texture (IMG_TRANSPARENT) is.
+        U32 clearTexture()
+        {
+            if (!mClear)
+            {
+                const std::vector<U8> texels(4 * 4 * 4, 0);
+                LLImageGL::generateTextures(1, &mClear);
+                gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mClear);
+                LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), GL_RGBA8, 4, 4,
+                                             GL_RGBA, GL_UNSIGNED_BYTE, texels.data());
+                gGL.getTextureSlot(0)->unbind();
+            }
+            return mClear;
+        }
+
         struct Draw
         {
             LLVertexBuffer* mBuffer;
@@ -483,12 +501,27 @@ namespace tut
             // Hidden parts drawn dimmed, as LLSelectMgr asks of most roles; and a double-sided material.
             bool mShowHidden = true;
             bool mDoubleSided = false;
+            // What it asks for (ALSelectionOutline::EPart), which ALSelectionOutline::add keeps as partsFor gives.
+            U32 mParts = Outline::PART_CONTOUR | Outline::PART_WIREFRAME;
+
+            U32 parts() const { return Outline::partsFor(mPriority, mParts); }
         };
+
+        // A draw of `buffer` as `id` at PRIORITY_HOVER, as ALHoverGlow adds what the pointer is over: hidden parts
+        // left out, as ALSelectionOutline::add leaves them.
+        Draw hoverDraw(LLVertexBuffer* buffer, U32 id) const
+        {
+            Draw draw{ buffer, id, Outline::PRIORITY_HOVER };
+            draw.mShowHidden = false;
+            return draw;
+        }
 
         // The draws into the bound id or wireframe program, as ALSelectionOutline's face walk draws faces: each with its
         // id, alpha test, texture, texture animation and culling. A rigged program takes `joints`: joint 0's three
-        // columns, rotation in .xyz and translation in .w. False where a texture had no unit to go to.
-        bool drawAll(LLGLSLShader& program, const std::vector<Draw>& draws, const F32* joints, bool hidden_only = false)
+        // columns, rotation in .xyz and translation in .w. Only the draws `drawn` passes are drawn. False where a
+        // texture had no unit to go to.
+        template <typename Drawn>
+        bool drawAll(LLGLSLShader& program, const std::vector<Draw>& draws, const F32* joints, Drawn&& drawn)
         {
             bool texture_read = true;
             if (joints)
@@ -499,11 +532,12 @@ namespace tut
             }
             for (const Draw& draw : draws)
             {
-                if (hidden_only && !draw.mShowHidden)
+                if (!drawn(draw))
                 {
                     continue;
                 }
-                Outline::setId(program, draw.mId, draw.mPriority, draw.mShowHidden);
+                Outline::setId(program, draw.mId, draw.mPriority, draw.mShowHidden,
+                               Outline::outlined(draw.parts(), draw.mPriority));
                 Outline::setAlphaTest(program, draw.mCutoff, draw.mTransform ? *draw.mTransform : Outline::IDENTITY_TRANSFORM);
                 const S32 channel = draw.mTexture ? program.enableTexture(LLShaderMgr::DIFFUSE_MAP) : -1;
                 if (channel > -1)
@@ -552,7 +586,10 @@ namespace tut
                 {
                     program.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, unread);
                 }
-                texture_read = drawAll(program, draws, palette);
+                // The HUD's is the pass with no scene.
+                const bool hud = scene == nullptr;
+                texture_read = drawAll(program, draws, palette, [hud](const Draw& draw)
+                                       { return Outline::inIdPass(draw.parts(), draw.mPriority, hud); });
                 program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
                 program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
                 LLGLSLShader::unbind();
@@ -623,6 +660,15 @@ namespace tut
             return lines;
         }
 
+        // view()'s, with a glow reaching `radius` pixels at `brightness`.
+        Outline::View glowView(S32 radius, F32 brightness = Outline::DEFAULT_GLOW_BRIGHTNESS) const
+        {
+            Outline::View lines = view();
+            lines.mGlowRadius = radius;
+            lines.mGlowBrightness = brightness;
+            return lines;
+        }
+
         // The jump and tile passes as ALSelectionOutline::render runs them, over the texels under `rect`, or the
         // whole id target, through `lines`' projection; the tile pass left out when `tiles` is false.
         void markPasses(const Outline::View& lines, const LLRect* rect = nullptr, bool tiles = true)
@@ -638,7 +684,7 @@ namespace tut
             LLGLSLShader::unbind();
         }
 
-        // What the tile pass recorded, four 16-bit values a tile: the lowest and highest id, the jump, and 1.
+        // What the tile pass recorded, four 16-bit values a tile: the lowest and highest id, the jump and the glow.
         std::vector<U16> tileRecords()
         {
             const S32 columns = (S32)Outline::tileCount(W);
@@ -657,10 +703,11 @@ namespace tut
         }
 
         // The edge pass as ALSelectionOutline::render runs it, the jump and tile passes first, over the texels under
-        // `mark_rect` or all of them, then over a cleared frame, scissored when asked. `untiled` holds every id and a
-        // jump in every tile instead, so every pixel searches its whole disk.
+        // `mark_rect` or all of them, then over a cleared frame, scissored when asked, reaching as far as the glow
+        // with `glow`. `untiled` holds every id, a jump and a glowing surface in every tile instead, so every pixel
+        // searches its whole disk.
         std::vector<U8> edgePass(const Outline::View& lines, const LLRect* scissor = nullptr, bool untiled = false,
-                                 const LLRect* mark_rect = nullptr)
+                                 const LLRect* mark_rect = nullptr, bool glow = false)
         {
             Outline::uploadPalette(mPalette, mPaletteRows, mPaletteTexels, mRows);
             markPasses(lines, mark_rect, !untiled);
@@ -681,11 +728,11 @@ namespace tut
                 if (scissor)
                 {
                     LLGLSScissor scissored(scissor->mLeft, scissor->mBottom, scissor->getWidth(), scissor->getHeight());
-                    Outline::drawEdges(mOutlineProgram, mMarked, mIdMap, tiles, mPalette, lines, *mTriangle);
+                    Outline::drawEdges(mOutlineProgram, mMarked, mIdMap, tiles, mPalette, lines, glow, *mTriangle);
                 }
                 else
                 {
-                    Outline::drawEdges(mOutlineProgram, mMarked, mIdMap, tiles, mPalette, lines, *mTriangle);
+                    Outline::drawEdges(mOutlineProgram, mMarked, mIdMap, tiles, mPalette, lines, glow, *mTriangle);
                 }
                 LLGLSLShader::unbind();
                 px = ll_test::readFramebufferRGBA(W, H);
@@ -749,7 +796,9 @@ namespace tut
                     LLGLSLShader& program = joints ? *mWireProgram.mRiggedVariant : mWireProgram;
                     mWireProgram.bind(joints != nullptr);
                     Outline::bindWirePass(program, pass, wire_width, W, H, mPalette, &mIdMap);
-                    texture_read = drawAll(program, draws, joints, pass == Outline::WIRE_HIDDEN) && texture_read;
+                    texture_read = drawAll(program, draws, joints, [pass](const Draw& draw)
+                                           { return Outline::inWirePass(draw.parts(), draw.mShowHidden, pass); }) &&
+                                   texture_read;
                     program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
                     program.unbindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
                     program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
@@ -801,6 +850,7 @@ namespace tut
         U32 mPaletteRows = 0;
         U32 mRows = 0;
         U32 mRamp = 0;
+        U32 mClear = 0;
         std::vector<U8> mPaletteTexels;
         LLPointer<LLVertexBuffer> mTriangle;
         std::vector<LLPointer<LLVertexBuffer>> mBuffers;
@@ -2061,8 +2111,8 @@ namespace tut
         }
     }
 
-    // The wireframe's width, a pixel at a UI scale of 1 and scaled with it, the same for the world and the HUD, and
-    // on only with its setting; and the polygon offset its lines need over a resampled depth.
+    // The wireframe's width, a pixel at a UI scale of 1 and scaled with it, the same for the world and the HUD; and
+    // the polygon offset its lines need over a resampled depth.
     template<> template<>
     void alselectionoutline_object_t::test<30>()
     {
@@ -2070,11 +2120,8 @@ namespace tut
         ensure_equals("two at 2", Outline::lineWidth(Outline::WIRE_WIDTH, 2.f), 2);
         for (bool hud : { false, true })
         {
-            const Outline::View off = Outline::makeView(identity(), identity(), 2.f, 2.f, hud);
-            const Outline::View on = Outline::makeView(identity(), identity(), 2.f, 2.f, hud, true);
-            ensure("off by default", !off.mWireframe);
-            ensure("on with its setting", on.mWireframe);
-            ensure_equals("its width at the UI scale", on.mWireWidth, 2);
+            const Outline::View scaled = Outline::makeView(identity(), identity(), 2.f, 2.f, hud);
+            ensure_equals("its width at the UI scale", scaled.mWireWidth, 2);
         }
         ensure_equals("a window depth at the scene's resolution", Outline::wireOffsetFactor(1.f), 2.f);
         ensure_equals("at half of it", Outline::wireOffsetFactor(2.f), 3.f);
@@ -2136,40 +2183,446 @@ namespace tut
         }
     }
 
-    // The outline and the wireframe are drawn each without the other, and each runs only the passes it reads: the
-    // outline the id pass and the passes after it, the world's wireframe none of them, since it is tested against
-    // the window's depth, and the HUD's the id pass alone, whose depth it is tested against.
+    // The outline, the wireframe and the glow are drawn each without the others, and a frame runs only the passes its
+    // objects ask for: the outline and the glow the id pass and the passes after it, the world's wireframe none of
+    // them, since it is tested against the window's depth, and the HUD's the id pass alone, whose depth it is tested
+    // against. What glows asks for nothing else, and a selection's role keeps its object whatever glows.
     template<> template<>
     void alselectionoutline_object_t::test<32>()
     {
         for (bool hud : { false, true })
         {
             const std::string where = hud ? " on the HUD" : " in the world";
-            Outline::View view = Outline::makeView(identity(), identity(), 2.f, 1.f, hud);
-            ensure("the outline on by default" + where, view.mOutline);
-
-            Outline::Passes passes = Outline::passesFor(view, true);
+            Outline::Wants wants;
+            wants.mContour = true;
+            Outline::Passes passes = Outline::passesFor(wants, hud, true);
             ensure("the outline alone runs the id pass" + where, passes.mIds);
             ensure("and the edge passes" + where, passes.mEdges);
             ensure("and no wireframe" + where, !passes.mWireframe);
 
-            view.mWireframe = true;
-            passes = Outline::passesFor(view, true);
+            wants.mWireframe = true;
+            passes = Outline::passesFor(wants, hud, true);
             ensure("both run everything" + where, passes.mIds && passes.mEdges && passes.mWireframe);
-            passes = Outline::passesFor(view, false);
+            passes = Outline::passesFor(wants, hud, false);
             ensure("a wireframe program that did not load leaves the outline" + where,
                    passes.mIds && passes.mEdges && !passes.mWireframe);
 
-            view.mOutline = false;
-            passes = Outline::passesFor(view, true);
+            wants.mContour = false;
+            passes = Outline::passesFor(wants, hud, true);
             ensure("the wireframe alone is drawn" + where, passes.mWireframe);
             ensure("without the edge passes" + where, !passes.mEdges);
             ensure_equals("with the id pass only on the HUD" + where, passes.mIds, hud);
-            passes = Outline::passesFor(view, false);
+            passes = Outline::passesFor(wants, hud, false);
             ensure("nothing when its program did not load" + where, !passes.any());
 
-            view.mWireframe = false;
-            ensure("nothing with both off" + where, !Outline::passesFor(view, true).any());
+            wants.mGlow = true;
+            passes = Outline::passesFor(wants, hud, true);
+            ensure("a glow beside a wireframe runs everything" + where, passes.mIds && passes.mEdges && passes.mWireframe);
+
+            wants.mWireframe = false;
+            passes = Outline::passesFor(wants, hud, true);
+            ensure("a glow with the outline and the wireframe off runs the id and edge passes" + where,
+                   passes.mIds && passes.mEdges && !passes.mWireframe);
+            ensure("and whether or not the wireframe loaded" + where, Outline::passesFor(wants, hud, false).mEdges);
+
+            wants.mGlow = false;
+            ensure("nothing with all three off" + where, !Outline::passesFor(wants, hud, true).any());
+        }
+
+        const U32 both = Outline::PART_CONTOUR | Outline::PART_WIREFRAME;
+        ensure_equals("what glows has no contour and no wireframe", Outline::partsFor(Outline::PRIORITY_HOVER, both), 0U);
+        ensure_equals("a selection keeps what it asks for", Outline::partsFor(Outline::PRIORITY_ROOT, both), both);
+
+        ensure("what glows is in the id pass", Outline::inIdPass(0, Outline::PRIORITY_HOVER, false));
+        ensure("and drawn there", Outline::outlined(0, Outline::PRIORITY_HOVER));
+        ensure("a contour is", Outline::inIdPass(Outline::PART_CONTOUR, Outline::PRIORITY_ROOT, false));
+        ensure("a world wireframe alone is not", !Outline::inIdPass(Outline::PART_WIREFRAME, Outline::PRIORITY_ROOT, false));
+        ensure("a HUD wireframe alone is, for its depth", Outline::inIdPass(Outline::PART_WIREFRAME, Outline::PRIORITY_ROOT, true));
+        ensure("and drawn nowhere", !Outline::outlined(Outline::PART_WIREFRAME, Outline::PRIORITY_ROOT));
+
+        for (Outline::EWirePass pass : { Outline::WIRE_VISIBLE, Outline::WIRE_HIDDEN, Outline::WIRE_ID_DEPTH })
+        {
+            ensure("what glows has no wireframe in any pass",
+                   !Outline::inWirePass(Outline::partsFor(Outline::PRIORITY_HOVER, both), true, pass));
+            ensure("nor an outline alone", !Outline::inWirePass(Outline::PART_CONTOUR, true, pass));
+        }
+        ensure("a wireframe's visible lines", Outline::inWirePass(Outline::PART_WIREFRAME, false, Outline::WIRE_VISIBLE));
+        ensure("its hidden ones only where hidden parts are drawn",
+               !Outline::inWirePass(Outline::PART_WIREFRAME, false, Outline::WIRE_HIDDEN) &&
+                   Outline::inWirePass(Outline::PART_WIREFRAME, true, Outline::WIRE_HIDDEN));
+
+        ensure("a glow never replaces a selection", !Outline::replaces(Outline::PRIORITY_CONTEXT, Outline::PRIORITY_HOVER));
+        ensure("a selection replaces a glow", Outline::replaces(Outline::PRIORITY_HOVER, Outline::PRIORITY_CHILD));
+        ensure("what a drag takes out replaces a root", Outline::replaces(Outline::PRIORITY_ROOT, Outline::PRIORITY_SUBTRACT));
+        ensure("at one priority the later", Outline::replaces(Outline::PRIORITY_ROOT, Outline::PRIORITY_ROOT));
+    }
+
+    // The glow's reach and profile, the fades of what the pointer is over, and how long the targets are kept: each
+    // object fades in over the fade time while it is named, the one before it fading out as it does, and is dropped
+    // at nothing or when its object is gone.
+    template<> template<>
+    void alselectionoutline_object_t::test<33>()
+    {
+        const F32 nan = std::numeric_limits<F32>::quiet_NaN();
+        ensure_equals("9 pixels at the default thickness", Outline::glowRadius(Outline::DEFAULT_GLOW_THICKNESS, 1.f), 9);
+        ensure_equals("scaled with the UI", Outline::glowRadius(Outline::DEFAULT_GLOW_THICKNESS, 2.f), 18);
+        ensure_equals("held to the widest", Outline::glowRadius(100.f, 1.f), (S32)Outline::MAX_GLOW_RADIUS);
+        ensure_equals("a pixel at least", Outline::glowRadius(-1.f, 1.f), 1);
+        ensure_equals("the default where the setting is not a number", Outline::glowRadius(nan, 1.f), 9);
+        const Outline::View defaults = Outline::makeView(identity(), identity(), 2.f, 1.f, false);
+        ensure_equals("a view's glow by default", defaults.mGlowRadius, 9);
+        ensure_equals("and its brightness", defaults.mGlowBrightness, Outline::DEFAULT_GLOW_BRIGHTNESS);
+        ensure_equals("a brightness that is not a number is the default",
+                      Outline::makeView(identity(), identity(), 2.f, 1.f, false, 0.6f, nan).mGlowBrightness,
+                      Outline::DEFAULT_GLOW_BRIGHTNESS);
+        ensure_equals("and one past the brightest held to it",
+                      Outline::makeView(identity(), identity(), 2.f, 1.f, false, 0.6f, 1000.f).mGlowBrightness,
+                      Outline::MAX_GLOW_BRIGHTNESS);
+
+        // The silhouette is half a texel out from its texel's centre.
+        ensure_approximately_equals_range("opaque at the silhouette at the default brightness",
+                                          Outline::glowOpacity(0.5f, 9, 4.f), 1.f, 1e-6f);
+        ensure_approximately_equals_range("half as opaque at half of it", Outline::glowOpacity(0.5f, 9, 2.f), 0.5f, 1e-6f);
+        ensure_approximately_equals_range("half way out, half of the silhouette's", Outline::glowOpacity(5.f, 9, 4.f), 0.5f,
+                                          1e-6f);
+        ensure_equals("nothing at its reach", Outline::glowOpacity(9.5f, 9, 4.f), 0.f);
+        ensure_equals("nor past it", Outline::glowOpacity(30.f, 9, 4.f), 0.f);
+        ensure_equals("held to opaque", Outline::glowOpacity(2.f, 9, Outline::MAX_GLOW_BRIGHTNESS), 1.f);
+        const F32 last_step = Outline::glowOpacity(9.25f, 9, 4.f);
+        ensure("fading smoothly into nothing: " + std::to_string(last_step), last_step > 0.f && last_step < 0.01f);
+        F32 previous = 2.f;
+        bool falling = true;
+        for (S32 step = 0; step <= 40; ++step)
+        {
+            const F32 opacity = Outline::glowOpacity(0.5f + 0.25f * (F32)step, 9, 1.f);
+            falling = falling && opacity <= previous;
+            previous = opacity;
+        }
+        ensure("falling all the way out", falling);
+
+        ensure_approximately_equals_range("half way in half the fade time", ALHoverGlow::stepFade(0.f, 0.05f, 0.1f, true),
+                                          0.5f, 1e-6f);
+        ensure_approximately_equals_range("out as fast", ALHoverGlow::stepFade(0.5f, 0.05f, 0.1f, false), 0.f, 1e-6f);
+        ensure_equals("held to one", ALHoverGlow::stepFade(0.9f, 1.f, 0.1f, true), 1.f);
+        ensure_equals("and to nothing", ALHoverGlow::stepFade(0.1f, 1.f, 0.1f, false), 0.f);
+        ensure_equals("at once with no fade time", ALHoverGlow::stepFade(0.f, 0.f, 0.f, true), 1.f);
+        ensure_equals("or one that is not a number", ALHoverGlow::stepFade(1.f, 0.f, nan, false), 0.f);
+        ensure_equals("time running back moves nothing", ALHoverGlow::stepFade(0.5f, -1.f, 0.1f, true), 0.5f);
+
+        // Steps of an eighth of a second over a quarter: halves, exactly.
+        const LLUUID a("c0ffee00-0000-4000-8000-00000000000a");
+        const LLUUID b("c0ffee00-0000-4000-8000-00000000000b");
+        std::vector<LLUUID> alive = { a, b };
+        auto is_alive = [&alive](const LLUUID& id) { return std::find(alive.begin(), alive.end(), id) != alive.end(); };
+        // A fresh singleton for this case, given up at its end.
+        ALHoverGlow::deleteSingleton();
+        ALHoverGlow& glow = ALHoverGlow::instance();
+        auto fade = [&glow](const LLUUID& id)
+        {
+            for (const ALHoverGlow::Glow& each : glow.glows())
+            {
+                if (each.mID == id)
+                {
+                    return each.mFade;
+                }
+            }
+            return -1.f;
+        };
+        // A frame an eighth of a second long, the settle time between one and two of them.
+        const F32 fade_time = 0.25f;
+        ensure("the settle time lies between one frame and two",
+               ALHoverGlow::SETTLE_SECONDS > 0.125 && ALHoverGlow::SETTLE_SECONDS <= 0.25);
+        U32 frame = 0;
+        auto at = [&](const LLUUID& id, F64 now)
+        {
+            ++frame;
+            glow.hover(id, frame);
+            glow.update(now, frame, fade_time, is_alive);
+        };
+
+        at(a, 10.0);
+        ensure("named, nothing glows yet", glow.glows().empty());
+        at(a, 10.125);
+        ensure("nor before the name has settled", glow.glows().empty());
+        at(a, 10.25);
+        ensure_equals("settled, it fades in", fade(a), 0.5f);
+        glow.update(10.25, frame, fade_time, is_alive);
+        ensure_equals("a second update in a frame moves nothing", fade(a), 0.5f);
+        at(a, 10.375);
+        ensure_equals("in over the fade time", fade(a), 1.f);
+
+        at(b, 10.5);
+        at(b, 10.625);
+        ensure_equals("the glow stays while the next name settles", fade(a), 1.f);
+        ensure_equals("which does not glow yet", fade(b), -1.f);
+        at(b, 10.75);
+        ensure_equals("then the one before fades out", fade(a), 0.5f);
+        ensure_equals("while the next fades in", fade(b), 0.5f);
+        at(b, 10.875);
+        ensure_equals("dropped at nothing", fade(a), -1.f);
+        ensure_equals("one glows", glow.glows().size(), size_t(1));
+
+        at(LLUUID::null, 11.0);
+        at(b, 11.125);
+        ensure_equals("a frame off it, at its edge or a seam, does not put it out", fade(b), 1.f);
+        at(LLUUID::null, 11.25);
+        at(LLUUID::null, 11.375);
+        ensure_equals("nor does leaving it, until that settles", fade(b), 1.f);
+        at(LLUUID::null, 11.5);
+        ensure_equals("then it fades out", fade(b), 0.5f);
+
+        at(a, 11.625);
+        at(b, 11.75);
+        at(a, 11.875);
+        at(LLUUID::null, 12.0);
+        ensure("a sweep across objects lights none of them", glow.glows().empty());
+
+        at(a, 12.125);
+        at(a, 12.25);
+        at(a, 12.375);
+        ensure_equals("one rested on lights", fade(a), 0.5f);
+        alive.clear();
+        at(a, 12.5);
+        ensure("dropped when its object is gone, named or not", glow.glows().empty());
+        at(LLUUID::null, 12.625);
+        at(LLUUID::null, 12.75);
+        ensure("nothing named, nothing glows", glow.glows().empty());
+
+        glow.hover(b, 100);
+        ensure("named a frame ago, it is still named", glow.hovered(101) == b);
+        ensure("unnamed for longer, the name lapses", glow.hovered(102).isNull());
+        ALHoverGlow::deleteSingleton();
+
+        const F64 kept = Outline::TARGET_KEEP_SECONDS;
+        ensure("a target drawn with this frame is kept", !Outline::stale(5, 100.0, 5, 100.0 + kept * 2.0));
+        ensure("and the next, however long it took", !Outline::stale(5, 100.0, 6, 100.0 + kept * 2.0));
+        ensure("and for its time, however many frames pass", !Outline::stale(5, 100.0, 500, 100.0 + kept * 0.5));
+        ensure("given up after both", Outline::stale(5, 100.0, 7, 100.0 + kept));
+        ensure("across the frame counter's wrap",
+               !Outline::stale(0xFFFFFFFFu, 100.0, 0u, 200.0) && Outline::stale(0xFFFFFFFEu, 100.0, 1u, 200.0));
+    }
+
+    // A glowing object draws a halo around its silhouette in its colour, falling off from the silhouette as
+    // glowOpacity says, as bright as asked, to nothing at its reach; and nothing over itself, its own folds included.
+    template<> template<>
+    void alselectionoutline_object_t::test<34>()
+    {
+        constexpr S32 RADIUS = 6;
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            // Columns 20 to 39 and rows 20 to 43, and a fold of the same object nearer over its middle, columns 25 to
+            // 34: the near side of a jump in its own surface.
+            pixelIds({ hoverDraw(pixels(20, 40, 20, 44), ID_A), hoverDraw(quad(25.f, 35.f, 25.f, 39.f, -1.f, -1.f), ID_A) });
+            palette({ { ID_A, GREEN } }, false);
+
+            for (F32 brightness : { Outline::DEFAULT_GLOW_BRIGHTNESS, 2.f })
+            {
+                const std::string at_brightness = " at brightness " + std::to_string(brightness);
+                const std::vector<U8> px = edgePass(glowView(RADIUS, brightness), nullptr, false, nullptr, true);
+                ensure(named(reverse, "the fold's edge is the near side of a jump"), markedAt(25, 32) && markedAt(34, 32));
+                for (S32 k = 0; k <= RADIUS + 2; ++k)
+                {
+                    // Column 40 + k is k + 1 from the centre of the nearest texel, in column 39.
+                    const F32 expected = 255.f * Outline::glowOpacity((F32)(k + 1), RADIUS, brightness);
+                    const Pixel p = at(px, 40 + k, 32);
+                    ensure(named(reverse, "the glow " + std::to_string(k + 1) + " pixels out" + at_brightness + ": " +
+                                              std::to_string(p.g) + " for " + std::to_string(expected)),
+                           std::fabs((F32)p.g - expected) <= 2.f && p.r == 0 && p.b == 0);
+                }
+                const U8 between = at(px, 43, 32).g;
+                ensure(named(reverse, "soft, not a solid band" + at_brightness), between > 10 && between < 245);
+                ensure(named(reverse, "nothing over the object" + at_brightness),
+                       black(at(px, 30, 32)) && black(at(px, 39, 32)) && black(at(px, 20, 20)));
+                ensure(named(reverse, "nor over its far side beside its fold" + at_brightness),
+                       black(at(px, 24, 32)) && black(at(px, 35, 32)));
+            }
+        }
+    }
+
+    // A selection's contour and the edges between selected objects are laid over the glow; and beside a glowing
+    // object a selection is outlined as though it were not there, except where it stands in front.
+    template<> template<>
+    void alselectionoutline_object_t::test<35>()
+    {
+        constexpr U32 ID_GLOW = 400;
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED }, { ID_B, RED }, { ID_GLOW, GREEN } }, true);
+
+            // A selected object, columns 40 to 54, and a glowing one six columns to its left, 20 to 33.
+            pixelIds({ { pixels(40, 55, 20, 44), ID_A }, hoverDraw(pixels(20, 34, 20, 44), ID_GLOW) });
+            std::vector<U8> px = edgePass(glowView(9), nullptr, false, nullptr, true);
+            for (S32 x : { 38, 39 })
+            {
+                const Pixel p = at(px, x, 32);
+                ensure(named(reverse, "the contour opaque over the glow at column " + std::to_string(x)),
+                       p.r == 255 && p.g == 0);
+            }
+            ensure(named(reverse, "the glow past the contour"), green(at(px, 37, 32)) && green(at(px, 36, 32)));
+
+            // Touching it, at column 40: the selection's contour drawn over the glowing object as over nothing, and
+            // no edge between them.
+            pixelIds({ { pixels(40, 55, 20, 44), ID_A } });
+            const std::vector<U8> alone = edgePass(glowView(9), nullptr, false, nullptr, true);
+            pixelIds({ { pixels(40, 55, 20, 44), ID_A }, hoverDraw(pixels(20, 40, 20, 44), ID_GLOW) });
+            px = edgePass(glowView(9), nullptr, false, nullptr, true);
+            for (S32 x : { 37, 38, 39, 40, 41 })
+            {
+                const Pixel p = at(px, x, 32);
+                const Pixel q = at(alone, x, 32);
+                ensure(named(reverse, "the contour beside it as without it at column " + std::to_string(x)),
+                       p.r == q.r && p.g == q.g && p.b == q.b && p.a == q.a);
+            }
+
+            // Two selected objects touching at column 30, their edge on A's side, and a glowing one nearer below
+            // them, rows 8 to 17: its glow over A's surface, and the edge over the glow.
+            pixelIds({ { pixels(10, 30, 20, 44), ID_A }, { pixels(30, 50, 20, 44), ID_B },
+                       hoverDraw(quad(24.f, 36.f, 8.f, 18.f, -1.f, -1.f), ID_GLOW) });
+            px = edgePass(glowView(9), nullptr, false, nullptr, true);
+            // Pixel (29, 20) is a pixel from B and three from the glowing object's top row.
+            const F32 glow = Outline::glowOpacity(3.f, 9, Outline::DEFAULT_GLOW_BRIGHTNESS);
+            const Pixel edge = at(px, 29, 20);
+            ensure(named(reverse, "the edge over the glow: red " + std::to_string(edge.r)),
+                   std::fabs((F32)edge.r - 255.f * Outline::INNER_OPACITY) <= 2.f);
+            ensure(named(reverse, "the glow under it: green " + std::to_string(edge.g)),
+                   std::fabs((F32)edge.g - 255.f * glow * (1.f - Outline::INNER_OPACITY)) <= 2.f);
+            ensure(named(reverse, "the glow over A's surface, which lies behind it"), green(at(px, 20, 21)));
+        }
+    }
+
+    // A glowing object's hidden parts do not glow: its halo follows the part the scene shows.
+    template<> template<>
+    void alselectionoutline_object_t::test<36>()
+    {
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            // A, columns 9 to 31, behind something in the scene over columns 0 to 20.
+            occlude(3.f, 0, 0, 21, H);
+            idPass({ hoverDraw(quadA(), ID_A) });
+            const std::vector<U8> ids = read(mIdMap);
+            ensure_equals(named(reverse, "its hidden part left out"), (U32)at(ids, 12, 32).b, 0U);
+            palette({ { ID_A, GREEN } }, false);
+            const std::vector<U8> px = edgePass(glowView(6), nullptr, false, nullptr, true);
+            ensure(named(reverse, "a glow past its visible side"), green(at(px, 32, 32)) && at(px, 32, 32).g > 200);
+            ensure(named(reverse, "none past its hidden one"), black(at(px, 8, 32)) && black(at(px, 5, 32)));
+            ensure(named(reverse, "nor above it"), black(at(px, 12, 46)));
+            ensure(named(reverse, "but above the part shown"), green(at(px, 26, 45)));
+        }
+    }
+
+    // The wireframe draws no lines for what glows, beside a selection whose lines it draws.
+    template<> template<>
+    void alselectionoutline_object_t::test<37>()
+    {
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED }, { ID_B, GREEN } }, true);
+            windowDepth(nullptr);
+            const std::vector<U8> px = worldWireframe({ { quadA(), ID_A }, hoverDraw(quadB(), ID_B) });
+            size_t selected = 0;
+            size_t glowing = 0;
+            for (S32 y = 0; y < H; ++y)
+            {
+                for (S32 x = 0; x < W; ++x)
+                {
+                    const Pixel p = at(px, x, y);
+                    selected += (x >= 9 && x <= 30 && red(p)) ? 1 : 0;
+                    glowing += p.g > 0 ? 1 : 0;
+                }
+            }
+            ensure(named(reverse, "the selection's lines"), selected > 20);
+            ensure_equals(named(reverse, "none for what glows"), glowing, size_t(0));
+        }
+    }
+
+    // The tiles change nothing the glow draws, where it reaches past the lines; and a glowing object's glow lies in
+    // its box grown by the glow's reach, which drawObject grows the scissor by.
+    template<> template<>
+    void alselectionoutline_object_t::test<38>()
+    {
+        constexpr U32 ID_GLOW = 400;
+        constexpr U32 ID_FRONT = 401;
+        constexpr S32 RADIUS = 9;
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED }, { ID_B, RED }, { ID_GLOW, GREEN }, { ID_FRONT, GREEN } }, true);
+            // Two selections, a glowing object apart from them, and another nearer, over a corner of one.
+            pixelIds({ { pixels(30, 50, 30, 50), ID_A }, { pixels(8, 22, 40, 56), ID_B }, hoverDraw(pixels(6, 22, 6, 24), ID_GLOW),
+                       hoverDraw(quad(44.f, 58.f, 22.f, 36.f, -1.f, -1.f), ID_FRONT) });
+            const std::vector<U8> tiled = edgePass(glowView(RADIUS), nullptr, false, nullptr, true);
+            const std::vector<U8> untiled = edgePass(glowView(RADIUS), nullptr, true, nullptr, true);
+            ensure(named(reverse, "the glow reaches past the lines"), green(at(tiled, 28, 15)));
+            ensure(named(reverse, "the tiles change nothing it draws"), tiled == untiled);
+
+            const LLVector4a extents[2] = { LLVector4a(6.f, 6.f, PIXEL_Z), LLVector4a(22.f, 24.f, PIXEL_Z) };
+            LLRect rect;
+            ensure(named(reverse, "its box is on screen"),
+                   Outline::scissorRect(pixelProjection(), extents, W, H, Outline::lineReach(RADIUS), rect));
+            pixelIds({ hoverDraw(pixels(6, 22, 6, 24), ID_GLOW) });
+            const std::vector<U8> whole = edgePass(glowView(RADIUS), nullptr, false, nullptr, true);
+            const std::vector<U8> scissored = edgePass(glowView(RADIUS), &rect, false, &rect, true);
+            ensure(named(reverse, "its glow is drawn"), lit(whole) > 100);
+            ensure(named(reverse, "and lies in its box grown by its reach"), whole == scissored);
+        }
+    }
+
+    // A face wearing the library's transparent texture is drawn whole, legacy or GLTF, whatever its alpha mode, so
+    // the invisible prims builders hide roots and touch areas with are outlined; any other texture keeps its alpha cut.
+    template<> template<>
+    void alselectionoutline_object_t::test<39>()
+    {
+        const LLUUID other("c0ffee00-0000-4000-8000-0000000000aa");
+        const F32 blend = Outline::legacyAlphaCutoff(false, 0, 0, true);
+        const F32 mask = Outline::gltfAlphaCutoff(LLGLTFMaterial::ALPHA_MODE_MASK, 0.5f);
+        ensure_equals("the transparent texture is drawn whole", Outline::faceAlphaCutoff(IMG_TRANSPARENT, blend),
+                      Outline::NO_ALPHA_TEST);
+        ensure_equals("as a GLTF base colour too", Outline::faceAlphaCutoff(IMG_TRANSPARENT, mask), Outline::NO_ALPHA_TEST);
+        ensure_equals("any other keeps its cut", Outline::faceAlphaCutoff(other, blend), blend);
+        ensure_equals("a GLTF one too", Outline::faceAlphaCutoff(other, mask), mask);
+
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED } }, true);
+            for (const LLUUID& texture : { IMG_TRANSPARENT, other })
+            {
+                const bool whole = texture == IMG_TRANSPARENT;
+                const std::string which = whole ? "the transparent texture" : "another clear texture";
+                idPass({ { quadA(), ID_A, Outline::PRIORITY_ROOT, Outline::faceAlphaCutoff(texture, blend), clearTexture() } });
+                const std::vector<U8> ids = read(mIdMap);
+                ensure_equals(named(reverse, which + (whole ? " drawn whole" : " cut away")), idAt(ids, 20, 32),
+                              whole ? ID_A : 0U);
+                const std::vector<U8> px = edgePass();
+                ensure(named(reverse, which + (whole ? " outlined" : " not outlined")),
+                       whole ? red(at(px, 8, 32)) : black(at(px, 8, 32)));
+            }
+        }
+    }
+
+    // On the HUD, an object in the id pass for its wireframe's depth alone is drawn nowhere there: its id is in the
+    // target, hiding what lies behind it from the lines, and it has no contour while another object's is drawn.
+    template<> template<>
+    void alselectionoutline_object_t::test<40>()
+    {
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            Draw wire_only{ pixels(36, 50, 20, 44), ID_B };
+            wire_only.mParts = Outline::PART_WIREFRAME;
+            const std::vector<U8> ids = pixelIds({ { pixels(10, 26, 20, 44), ID_A }, wire_only });
+            ensure_equals(named(reverse, "its id is in the target"), idAt(ids, 40, 32), ID_B);
+            ensure_equals(named(reverse, "drawn nowhere"), (U32)at(ids, 40, 32).b, 0U);
+            ensure_equals(named(reverse, "the other drawn"), (U32)at(ids, 20, 32).b, 255U);
+
+            palette({ { ID_A, RED }, { ID_B, GREEN } }, true);
+            const std::vector<U8> px = edgePass(Outline::makeView(identity(), pixelProjection(), TEST_WIDTH, 1.f, true));
+            ensure(named(reverse, "the other's contour"), red(at(px, 9, 32)) && red(at(px, 26, 32)));
+            ensure(named(reverse, "none around it"), black(at(px, 35, 32)) && black(at(px, 50, 32)) && black(at(px, 43, 45)));
         }
     }
 }

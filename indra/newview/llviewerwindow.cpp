@@ -4538,12 +4538,19 @@ void LLViewerWindow::renderSelections( bool for_gl_pick, bool pick_parcel_walls,
         {
             LLViewerParcelMgr::getInstance()->renderParcelCollision();
         }
+        return;
     }
-    else if (( for_hud && selection->getSelectType() == SELECT_TYPE_HUD) ||
-             (!for_hud && selection->getSelectType() != SELECT_TYPE_HUD))
+
+    // The world's outlines every frame, for what the pointer is over glows in the world wherever the selection is;
+    // the HUD's while the selection is on it.
+    if (!for_hud || selection->getSelectType() == SELECT_TYPE_HUD)
     {
         LLSelectMgr::getInstance()->renderSilhouettes(for_hud);
+    }
 
+    if (( for_hud && selection->getSelectType() == SELECT_TYPE_HUD) ||
+        (!for_hud && selection->getSelectType() != SELECT_TYPE_HUD))
+    {
         stop_glerror();
 
         // setup HUD render

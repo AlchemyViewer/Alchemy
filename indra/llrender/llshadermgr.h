@@ -615,6 +615,19 @@ public:
         MOON_QUAD_U,                        //  "moonQuadU"  its right half-extent over its squared length
         MOON_QUAD_V,                        //  "moonQuadV"  its up half-extent over its squared length
 
+        // Selection outlines, hover glow and wireframe (ALSelectionOutline)
+        SELECTION_ID,                       //  "selection_id"  the object's id, 1 to 65535
+        SELECTION_PRIORITY,                 //  "selection_priority"  ALSelectionOutline::EPriority
+        SELECTION_SHOW_HIDDEN,              //  "selection_show_hidden"  1 where hidden parts are drawn dimmed
+        SELECTION_OUTLINED,                 //  "selection_outlined"  0 where the id pass holds it for its wireframe alone
+        SELECTION_SCENE_DEPTH,              //  "selection_scene_depth"  1 where the scene's depth decides what is hidden
+        OUTLINE_WIDTH,                      //  "outline_width"  the contour's width in pixels
+        OUTLINE_INNER_WIDTH,                //  "outline_inner_width"  the edges between objects' width in pixels
+        OUTLINE_GLOW_RADIUS,                //  "outline_glow_radius"  the hover glow's reach in pixels, 0 for none
+        OUTLINE_GLOW_BRIGHTNESS,            //  "outline_glow_brightness"  RenderHighlightBrightness
+        WIREFRAME_PASS,                     //  "wireframe_pass"  ALSelectionOutline::EWirePass
+        WIREFRAME_WIDTH,                    //  "wireframe_width"  the lines' width in pixels
+
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
     // clang-format on

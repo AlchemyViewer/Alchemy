@@ -2132,6 +2132,19 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("moonQuadU");
     mReservedUniforms.push_back("moonQuadV");
 
+    // Selection outlines, hover glow and wireframe (ALSelectionOutline)
+    mReservedUniforms.push_back("selection_id");
+    mReservedUniforms.push_back("selection_priority");
+    mReservedUniforms.push_back("selection_show_hidden");
+    mReservedUniforms.push_back("selection_outlined");
+    mReservedUniforms.push_back("selection_scene_depth");
+    mReservedUniforms.push_back("outline_width");
+    mReservedUniforms.push_back("outline_inner_width");
+    mReservedUniforms.push_back("outline_glow_radius");
+    mReservedUniforms.push_back("outline_glow_brightness");
+    mReservedUniforms.push_back("wireframe_pass");
+    mReservedUniforms.push_back("wireframe_width");
+
     // The enum and this list are parallel, and an entry added or removed on one side only
     // shifts every later uniform index for every shader in the viewer -- silently, since a
     // wrong index still resolves to some other real uniform. Fatal, like the duplicate check

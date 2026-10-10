@@ -8783,7 +8783,7 @@
   <key>RenderHoverGlowEnable</key>
   <map>
     <key>Comment</key>
-    <string>DEPRECATED --- Show glow effect when hovering on interactive objects.</string>
+    <string>Show glow effect when hovering on interactive objects.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>

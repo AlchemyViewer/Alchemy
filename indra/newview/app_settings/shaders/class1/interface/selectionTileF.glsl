@@ -24,7 +24,7 @@
  */
 
 // Into RGBA16: .r and .g the lowest and highest nonzero id the tile holds over 65535, 0 for none; .b 1 where it
-// holds the near side of a jump.
+// holds the near side of a jump; .a 1 where it holds the drawn surface of an object that glows.
 out vec4 frag_color;
 
 // The id target with its jumps marked (selectionJumpF.glsl).
@@ -36,6 +36,8 @@ uniform sampler2D diffuseMap;
 // selectionUtilF.glsl
 int decodeId(vec4 texel);
 bool isJumpFront(vec4 texel);
+bool isGlow(vec4 texel);
+bool isDrawn(vec4 texel);
 
 void main()
 {
@@ -47,6 +49,7 @@ void main()
     int lowest = 65536;
     int highest = 0;
     bool jump = false;
+    bool glow = false;
     for (int y = origin.y; y < end.y; ++y)
     {
         for (int x = origin.x; x < end.x; ++x)
@@ -58,9 +61,11 @@ void main()
                 lowest = min(lowest, id);
                 highest = max(highest, id);
                 jump = jump || isJumpFront(texel);
+                glow = glow || (isGlow(texel) && isDrawn(texel));
             }
         }
     }
 
-    frag_color = vec4(float(highest != 0 ? lowest : 0) / 65535.0, float(highest) / 65535.0, jump ? 1.0 : 0.0, 1.0);
+    frag_color = vec4(float(highest != 0 ? lowest : 0) / 65535.0, float(highest) / 65535.0, jump ? 1.0 : 0.0,
+                      glow ? 1.0 : 0.0);
 }

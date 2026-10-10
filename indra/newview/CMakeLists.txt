@@ -267,6 +267,7 @@ if(AL_BUILD_VIEWER)
     alfloaterxuistudio.cpp
     alviewcapture.cpp
     algradehistory.cpp
+    alhoverglow.cpp
     allegacynotificationwellwindow.cpp
     allightboxdirectory.cpp
     almotionpredictor.cpp
@@ -1145,6 +1146,7 @@ if(AL_BUILD_VIEWER)
     alfloaterxuistudio.h
     alviewcapture.h
     algradehistory.h
+    alhoverglow.h
     alhuddepth.h
     allegacynotificationwellwindow.h
     allightboxdirectory.h

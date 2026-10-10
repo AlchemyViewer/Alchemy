@@ -30,6 +30,7 @@
 #include "lldrawpool.h"
 #include "llface.h"
 #include "llfetchedgltfmaterial.h"
+#include "llframetimer.h"
 #include "llglstates.h"
 #include "lltextureentry.h"
 #include "llui.h"
@@ -58,46 +59,48 @@ namespace
     }
 }
 
-ALSelectionOutline& ALSelectionOutline::instance()
-{
-    static ALSelectionOutline* outline = new ALSelectionOutline();
-    return *outline;
-}
-
 ALSelectionOutline::View ALSelectionOutline::worldView()
 {
     static LLCachedControl<F32> contour_width(gSavedSettings, "AlchemySelectionOutlineWidth", DEFAULT_CONTOUR_WIDTH);
-    static LLCachedControl<bool> wireframe(gSavedSettings, "AlchemySelectionWireframe", false);
     return makeView(LLViewerCamera::getCurrent().getModelview(), gGL.getProjectionMatrix(), contour_width,
-                    LLUI::getScaleFactor().mV[VX], false, wireframe);
+                    LLUI::getScaleFactor().mV[VX], false, LLPipeline::RenderHighlightThickness,
+                    LLPipeline::RenderHighlightBrightness);
 }
 
 bool ALSelectionOutline::hudView(View& view)
 {
     static LLCachedControl<F32> contour_width(gSavedSettings, "AlchemySelectionOutlineWidth", DEFAULT_CONTOUR_WIDTH);
-    static LLCachedControl<bool> wireframe(gSavedSettings, "AlchemySelectionWireframe", false);
     LLMatrix4a projection;
     LLMatrix4a modelview;
     if (!get_hud_matrices(projection, modelview))
     {
         return false;
     }
-    view = makeView(modelview, projection, contour_width, LLUI::getScaleFactor().mV[VX], true, wireframe);
+    view = makeView(modelview, projection, contour_width, LLUI::getScaleFactor().mV[VX], true,
+                    LLPipeline::RenderHighlightThickness, LLPipeline::RenderHighlightBrightness);
     return true;
 }
 
 void ALSelectionOutline::add(LLViewerObject* object, U32 te_mask, const LLColor4& colour, bool show_hidden,
-                             EPriority priority)
+                             EPriority priority, U32 parts)
 {
     if (!object)
     {
         return;
     }
 
+    // What glows is drawn with nothing else, and only where the scene shows it.
+    const Entry entry = { object, te_mask, colour, show_hidden && priority != PRIORITY_HOVER, priority,
+                          partsFor(priority, parts) };
+
     const auto found = mEntryIndex.find(object);
     if (found != mEntryIndex.end())
     {
-        mEntries[found->second] = { object, te_mask, colour, show_hidden, priority };
+        Entry& added = mEntries[found->second];
+        if (replaces(added.mPriority, priority))
+        {
+            added = entry;
+        }
         return;
     }
 
@@ -106,7 +109,7 @@ void ALSelectionOutline::add(LLViewerObject* object, U32 te_mask, const LLColor4
         return;
     }
     mEntryIndex.emplace(object, (U32)mEntries.size());
-    mEntries.push_back({ object, te_mask, colour, show_hidden, priority });
+    mEntries.push_back(entry);
 }
 
 void ALSelectionOutline::clearEntries()
@@ -117,7 +120,6 @@ void ALSelectionOutline::clearEntries()
 
 void ALSelectionOutline::release()
 {
-    // Called every frame nothing is outlined, so it touches nothing that is not there.
     if (mIdMap.isComplete())
     {
         mIdMap.release();
@@ -138,11 +140,38 @@ void ALSelectionOutline::release()
     mPaletteRows = 0;
 }
 
+void ALSelectionOutline::releaseStale(U32 frame, F64 now)
+{
+    // Called every frame, so it touches nothing that is not there.
+    if (mIdMap.isComplete() && stale(mIdUse.mFrame, mIdUse.mTime, frame, now))
+    {
+        mIdMap.release();
+    }
+    if (stale(mEdgeUse.mFrame, mEdgeUse.mTime, frame, now))
+    {
+        if (mMarkedMap.isComplete())
+        {
+            mMarkedMap.release();
+        }
+        if (mTileMap.isComplete())
+        {
+            mTileMap.release();
+        }
+    }
+    if (mPalette && stale(mPaletteUse.mFrame, mPaletteUse.mTime, frame, now))
+    {
+        LLImageGL::deleteTextures(1, &mPalette);
+        mPalette = 0;
+        mPaletteRows = 0;
+    }
+}
+
 void ALSelectionOutline::render(const View& view)
 {
+    const Use use = { LLFrameTimer::getFrameCount(), LLFrameTimer::getTotalSeconds() };
     if (mEntries.empty())
     {
-        release();
+        releaseStale(use.mFrame, use.mTime);
         return;
     }
 
@@ -154,54 +183,50 @@ void ALSelectionOutline::render(const View& view)
     const S32 vp_y = gGLViewport[1];
     const S32 width = gGLViewport[2];
     const S32 height = gGLViewport[3];
-    const Passes passes = passesFor(view, gSelectionWireframeProgram.isComplete() &&
-                                              gSelectionWireframeProgram.mRiggedVariant != nullptr);
-    if (!passes.any())
+
+    Wants wants;
+    for (const Entry& entry : mEntries)
     {
-        release();
-        clearEntries();
-        return;
+        wants.mContour = wants.mContour || (entry.mParts & PART_CONTOUR);
+        wants.mWireframe = wants.mWireframe || (entry.mParts & PART_WIREFRAME);
+        wants.mGlow = wants.mGlow || entry.mPriority == PRIORITY_HOVER;
     }
-    if (width <= 0 || height <= 0 || !gPipeline.mRT || !gPipeline.mScreenTriangleVB ||
+    const Passes passes = passesFor(wants, view.mHUD, gSelectionWireframeProgram.isComplete() &&
+                                                         gSelectionWireframeProgram.mRiggedVariant != nullptr);
+    if (!passes.any() || width <= 0 || height <= 0 || !gPipeline.mRT || !gPipeline.mScreenTriangleVB ||
         (passes.mIds && (!gSelectionIdProgram.isComplete() || !gSelectionIdProgram.mRiggedVariant)) ||
         (passes.mEdges && (!gSelectionJumpProgram.isComplete() || !gSelectionTileProgram.isComplete() ||
                            !gSelectionOutlineProgram.isComplete())))
     {
+        releaseStale(use.mFrame, use.mTime);
         clearEntries();
         return;
     }
 
-    // The targets a pass that does not run reads are given up; the others are made at the window's size.
+    // The targets the passes that run read are made at the window's size; the others are given up once they are
+    // stale.
     bool allocated = true;
-    if (!passes.mIds)
+    if (passes.mIds)
     {
-        if (mIdMap.isComplete())
+        if (!mIdMap.isComplete() || mIdMap.getWidth() != (U32)width || mIdMap.getHeight() != (U32)height)
         {
-            mIdMap.release();
+            allocated = mIdMap.allocate(width, height, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE,
+                                        LLRenderTarget::MIPS_NONE, LLPipeline::mainDepthFormat());
         }
+        mIdUse = use;
     }
-    else if (!mIdMap.isComplete() || mIdMap.getWidth() != (U32)width || mIdMap.getHeight() != (U32)height)
+    if (passes.mEdges)
     {
-        allocated = mIdMap.allocate(width, height, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE,
-                                    LLRenderTarget::MIPS_NONE, LLPipeline::mainDepthFormat());
-    }
-    if (!passes.mEdges)
-    {
-        if (mMarkedMap.isComplete())
+        if (!mMarkedMap.isComplete() || !mTileMap.isComplete() || mMarkedMap.getWidth() != (U32)width ||
+            mMarkedMap.getHeight() != (U32)height)
         {
-            mMarkedMap.release();
+            allocated = allocated && mMarkedMap.allocate(width, height, GL_RGBA8) &&
+                        mTileMap.allocate(tileCount((U32)width), tileCount((U32)height), GL_RGBA16);
         }
-        if (mTileMap.isComplete())
-        {
-            mTileMap.release();
-        }
+        mEdgeUse = use;
     }
-    else if (!mMarkedMap.isComplete() || !mTileMap.isComplete() || mMarkedMap.getWidth() != (U32)width ||
-             mMarkedMap.getHeight() != (U32)height)
-    {
-        allocated = allocated && mMarkedMap.allocate(width, height, GL_RGBA8) &&
-                    mTileMap.allocate(tileCount((U32)width), tileCount((U32)height), GL_RGBA16);
-    }
+    mPaletteUse = use;
+    releaseStale(use.mFrame, use.mTime);
     if (!allocated)
     {
         LL_WARNS_ONCE("Pipeline") << "Could not allocate the selection outline's targets" << LL_ENDL;
@@ -245,22 +270,24 @@ void ALSelectionOutline::render(const View& view)
         drawIds(view, width, height, mvp);
     }
 
-    // What the id pass drew says whether the outline has anything to touch; the world's wireframe, drawn without
-    // it, draws whatever its faces put on screen.
-    if (passes.mIds ? mScissorValid : passes.mWireframe)
+    // What the id pass drew says whether the outline and the glow have anything to touch, and the HUD's wireframe,
+    // whose faces it drew too; the world's wireframe, drawn without it, draws whatever its faces put on screen.
+    const bool edges = passes.mEdges && mScissorValid;
+    const bool wireframe = passes.mWireframe && (!view.mHUD || mScissorValid);
+    if (edges || wireframe)
     {
         uploadPalette(mPalette, mPaletteRows, mPaletteTexels, rows);
 
         // The wireframe first, the outline over it.
-        if (passes.mWireframe)
+        if (wireframe)
         {
             drawWireframes(view, width, height);
         }
 
-        if (passes.mEdges)
+        if (edges)
         {
-            // The scissor holds every selected texel and the contour's reach around them; the edge pass reads no
-            // further, and what it reads past the jump and tile passes' work they clear to nothing, as it is.
+            // The scissor holds every texel drawn and the reach of its line or glow around them; the edge pass reads
+            // no further, and what it reads past the jump and tile passes' work they clear to nothing, as it is.
             gSelectionJumpProgram.bind();
             drawJumps(gSelectionJumpProgram, mIdMap, mMarkedMap, mScissor, view, *gPipeline.mScreenTriangleVB);
             gSelectionTileProgram.bind();
@@ -274,7 +301,7 @@ void ALSelectionOutline::render(const View& view)
                                  mScissor.getHeight());
 
             gSelectionOutlineProgram.bind();
-            drawEdges(gSelectionOutlineProgram, mMarkedMap, mIdMap, mTileMap, mPalette, view,
+            drawEdges(gSelectionOutlineProgram, mMarkedMap, mIdMap, mTileMap, mPalette, view, wants.mGlow,
                       *gPipeline.mScreenTriangleVB);
         }
     }
@@ -325,7 +352,11 @@ void ALSelectionOutline::drawIds(const View& view, S32 width, S32 height, const 
             bindIdPass(program, view.mHUD ? nullptr : &gPipeline.mRT->deferredScreen, width, height);
             for (U32 i = 0; i < count; ++i)
             {
-                drawObject(program, mEntries[mOrder[i]], i + 1, rigged, view, mvp);
+                const Entry& entry = mEntries[mOrder[i]];
+                if (inIdPass(entry.mParts, entry.mPriority, view.mHUD))
+                {
+                    drawObject(program, entry, i + 1, rigged, view, mvp);
+                }
             }
             program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
             program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
@@ -459,8 +490,12 @@ bool ALSelectionOutline::drawFaces(LLGLSLShader& program, const Entry& entry, bo
 void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U32 id, bool rigged, const View& view,
                                     const LLMatrix4a& mvp)
 {
+    // An object drawn for the HUD wireframe's depth alone is not outlined: it hides what lies behind it and draws no
+    // line of its own.
+    const bool drawn = outlined(entry.mParts, entry.mPriority);
     FaceBox box;
-    if (!drawFaces(program, entry, rigged, view, box, [&] { setId(program, id, entry.mPriority, entry.mShowHidden); }))
+    if (!drawFaces(program, entry, rigged, view, box,
+                   [&] { setId(program, id, entry.mPriority, entry.mShowHidden, drawn); }))
     {
         return;
     }
@@ -475,7 +510,8 @@ void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U
     else
     {
         const LLVector4a extents[2] = { box.mLo, box.mHi };
-        if (!scissorRect(mvp, extents, width, height, lineReach(view.mWidth), rect))
+        const S32 reach = lineReach(entry.mPriority == PRIORITY_HOVER ? view.mGlowRadius : view.mWidth);
+        if (!scissorRect(mvp, extents, width, height, reach, rect))
         {
             return;
         }
@@ -507,7 +543,7 @@ void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height)
     bool any_hidden = false;
     for (const Entry& entry : mEntries)
     {
-        any_hidden = any_hidden || entry.mShowHidden;
+        any_hidden = any_hidden || inWirePass(entry.mParts, entry.mShowHidden, WIRE_HIDDEN);
     }
 
     gGL.matrixMode(LLRender::MM_PROJECTION);
@@ -547,8 +583,9 @@ void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height)
             mSkipLastSkin = false;
             for (U32 i = 0; i < (U32)mEntries.size(); ++i)
             {
+                // What glows, or is outlined alone, has no wireframe.
                 const Entry& entry = mEntries[mOrder[i]];
-                if (pass == WIRE_HIDDEN && !entry.mShowHidden)
+                if (!inWirePass(entry.mParts, entry.mShowHidden, pass))
                 {
                     continue;
                 }
@@ -594,15 +631,18 @@ ALSelectionOutline::FaceBinding ALSelectionOutline::bindFace(LLGLSLShader& progr
         }
         if (texture && texture_has_alpha(texture))
         {
-            cutoff = gltfAlphaCutoff(gltf->mAlphaMode, gltf->mAlphaCutoff);
+            cutoff = faceAlphaCutoff(texture->getID(), gltfAlphaCutoff(gltf->mAlphaMode, gltf->mAlphaCutoff));
         }
         gltf->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].getPacked(transform);
     }
     else if (te && texture)
     {
+        // The diffuse map as the face names it, whatever stands in for it while it loads.
         const LLMaterial* material = te->getMaterialParams().get();
-        cutoff = legacyAlphaCutoff(material != nullptr, material ? material->getDiffuseAlphaMode() : 0,
-                                   material ? material->getAlphaMaskCutoff() : 0, texture_has_alpha(texture));
+        cutoff = faceAlphaCutoff(te->getID(),
+                                 legacyAlphaCutoff(material != nullptr, material ? material->getDiffuseAlphaMode() : 0,
+                                                   material ? material->getAlphaMaskCutoff() : 0,
+                                                   texture_has_alpha(texture)));
     }
 
     setAlphaTest(program, cutoff, transform);

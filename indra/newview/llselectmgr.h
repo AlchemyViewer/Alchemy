@@ -842,7 +842,7 @@ private:
     void convertTransient(); // converts temporarily selected objects to full-fledged selections
     ESelectType getSelectTypeForObject(LLViewerObject* object);
     void addAsFamily(std::vector<LLViewerObject*>& objects, bool add_to_end = false);
-    void addOutlines(ALSelectionOutline& outline, bool for_hud);
+    void addOutlines(ALSelectionOutline& outline, bool for_hud, U32 parts);
     // Send one message to each region containing an object on selection list.
     void sendListToRegions( const std::string& message_name,
                             void (*pack_header)(void *user_data),

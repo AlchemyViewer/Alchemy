@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "indra_constants.h"
 #include "llgltfmaterial.h"
 #include "llglslshader.h"
 #include "llglstates.h"
@@ -35,7 +36,8 @@
 #include "llrender.h"
 #include "llrendertarget.h"
 #include "llshadermgr.h"
-#include "llstaticstringtable.h"
+#include "llsingleton.h"
+#include "lluuid.h"
 #include "llvertexbuffer.h"
 #include "v4color.h"
 
@@ -50,10 +52,11 @@ class LLFace;
 class LLViewerObject;
 class LLVOAvatar;
 
-/// Outlines of the selected, rect-highlighted and media-focused objects, drawn by LLSelectMgr::renderSilhouettes
-/// over the window's framebuffer: world objects after the final blit, with the world camera, and HUD objects
-/// after the HUD, with its matrices. A frame outlines one or the other, as the selection is in the world or on
-/// the HUD.
+/// Outlines of the selected, rect-highlighted and media-focused objects, and the glow of what the pointer is over
+/// (ALHoverGlow), drawn by LLSelectMgr::renderSilhouettes over the window's framebuffer: world objects after the
+/// final blit, with the world camera, and HUD objects after the HUD, with its matrices. Each object asks for its
+/// contour, its wireframe or both, as their settings are, or glows (PRIORITY_HOVER); the passes a frame runs are
+/// the ones its objects ask for (passesFor).
 ///
 /// The id pass (interface/selectionIdV.glsl, selectionIdF.glsl) draws each object's selected faces, rigged ones
 /// through the program's rigged variant, into a window-sized RGBA8 target with a depth buffer of its own, which
@@ -62,8 +65,9 @@ class LLVOAvatar;
 /// where they are left out), and in .a its priority. Faces are culled as the scene culls them, back faces unless a
 /// GLTF material is double-sided, so a face the scene does not draw takes no pixel. Where a face's alpha mode cuts
 /// it out by its texture's alpha, the fragments are discarded, so the outline follows what is drawn rather than
-/// the cards it is drawn on; the face's colour, whose alpha makes a prim invisible, is not read. Integer formats
-/// are not used because LLGLSLShader gives integer samplers no unit.
+/// the cards it is drawn on; the face's colour, whose alpha makes a prim invisible, is not read, and a face wearing
+/// the library's transparent texture is drawn whole (faceAlphaCutoff). Integer formats are not used because
+/// LLGLSLShader gives integer samplers no unit.
 ///
 /// Ids are given in priority order, the highest first (EPriority). The jump pass (interface/selectionJumpF.glsl)
 /// copies the id target into another, marking the texels on the near side of a jump: a step in an object's own
@@ -72,7 +76,7 @@ class LLVOAvatar;
 /// each side misses by more than JUMP_MARGIN (in the shader) of the distance.
 ///
 /// The edge pass (interface/selectionOutlineF.glsl) is a full-screen triangle, scissored to the objects' projected
-/// boxes grown by the contour's reach. A pixel draws the contour of the drawn surfaces within its reach that stand
+/// boxes grown by the reach of their contour or glow. A pixel draws the contour of the drawn surfaces within its reach that stand
 /// in front of it: every object, off every object; on an object, another object, or the near side of a jump in its
 /// own, whose surface is nearer than the plane of the pixel's own, read from the id target's depth and carried over
 /// to the other's texel. The contour is a solid line View::mWidth pixels wide ending in a pixel of anti-aliasing,
@@ -82,6 +86,12 @@ class LLVOAvatar;
 /// drawn and on the drawn side if not, in that side's colour. An object over its own surface draws nothing but at
 /// its jumps: anywhere else that would trace the creases of every mesh. Colours come from a palette holding a
 /// visible and a hidden colour per id.
+///
+/// An object at PRIORITY_HOVER is not outlined but glows: a soft halo around its visible surface reaching
+/// View::mGlowRadius pixels past it (glowOpacity), over what lies behind it as the contour is and never over the
+/// object itself, under every other object's contour and edges. Its hidden parts are left out, and it draws no edge
+/// with what it touches: the outline of a selected object beside it is drawn as though it were not there, except
+/// where it stands in front.
 ///
 /// The wireframe (AlchemySelectionWireframe) is drawn first, the outline over it: the same faces through the same
 /// face walk, alpha cut and culling as the id pass (drawFaces), their triangles' edges drawn as lines View::mWireWidth
@@ -93,15 +103,22 @@ class LLVOAvatar;
 ///
 /// The disk a pixel searches grows with the square of the contour's width, and most pixels in the scissor are far
 /// from anything to draw. The tile pass (interface/selectionTileF.glsl) records for each TILE_SIZE square of the
-/// marked target the lowest and highest nonzero id it holds and whether it holds the near side of a jump, and the
-/// edge pass leaves a pixel at once when no tile within its reach holds what it could draw from: any id, off every
-/// object; on one, an id not its own or a jump. Whatever a pixel draws, it draws from such a texel within its reach,
-/// whose own tile records it, so the early out changes nothing it draws.
+/// marked target the lowest and highest nonzero id it holds, whether it holds the near side of a jump and whether
+/// it holds the drawn surface of an object that glows. The edge pass leaves a pixel at once when no tile within its
+/// reach holds what it could draw from: any id, off every object; on one, an id not its own or a jump. It searches
+/// as far as the glow reaches only where a tile within that reach holds a glowing surface other than the pixel's
+/// own. Whatever a pixel draws, it draws from such a texel within its reach, whose own tile records it, so neither
+/// changes anything it draws.
 ///
-/// The targets exist only while something is outlined: they are made the first frame there is, given up the
-/// first frame there is not, and given up with the pipeline's own (LLPipeline::releaseGLBuffers).
-class ALSelectionOutline
+/// The targets exist only while something is drawn: they are made the first frame there is, given up once a frame
+/// and TARGET_KEEP_SECONDS have passed without a call drawing with them (the world calls render every frame and the
+/// HUD while the selection is on it, so one call can have nothing to draw while the other draws; and the pointer
+/// passes from one glowing object to the next with frames between), and given up with the pipeline's own
+/// (LLPipeline::releaseGLBuffers).
+class ALSelectionOutline : public LLSingleton<ALSelectionOutline>
 {
+    LLSINGLETON_EMPTY_CTOR(ALSelectionOutline);
+
 public:
     /// What an outline is for, the highest priority first. Where two objects' outlines meet, the higher one's
     /// contour is laid over the lower one's, and the edge between them is drawn on its side.
@@ -119,7 +136,19 @@ public:
         PRIORITY_CHILD,
         /// A transient selection's.
         PRIORITY_CONTEXT,
+        /// What the pointer is over (ALHoverGlow): it glows instead of being outlined, under every other object's
+        /// lines (PRIORITY_HOVER in selectionUtilF.glsl).
+        PRIORITY_HOVER,
         PRIORITY_COUNT
+    };
+
+    /// What an object outlined above PRIORITY_HOVER is drawn with, as a mask.
+    enum EPart : U32
+    {
+        /// Its contour, and the edges between it and what it touches (RenderHighlightSelections).
+        PART_CONTOUR = 1 << 0,
+        /// Its faces' triangles as lines (AlchemySelectionWireframe).
+        PART_WIREFRAME = 1 << 1,
     };
 
     /// What render() draws with.
@@ -136,30 +165,61 @@ public:
         /// visible; and its rigged faces are left out, since their joints place them about the avatar in the
         /// world, which the HUD's matrices have no place for.
         bool mHUD = false;
-        /// The outline (RenderHighlightSelections), drawn with or without the wireframe.
-        bool mOutline = true;
-        /// The selected faces' triangles drawn as lines under the outline (AlchemySelectionWireframe), mWireWidth
-        /// pixels wide before their pixel of anti-aliasing, with or without the outline.
-        bool mWireframe = false;
+        /// The wireframe's lines' width in pixels before their pixel of anti-aliasing.
         S32 mWireWidth = 1;
+        /// How far in pixels the glow reaches past its object's silhouette (glowRadius), and its brightness
+        /// (RenderHighlightBrightness), which glowOpacity scales it by.
+        S32 mGlowRadius = 1;
+        F32 mGlowBrightness = 0.f;
     };
 
-    /// The passes render() runs for a view.
+    /// What the objects of a frame ask for between them.
+    struct Wants
+    {
+        /// A contour (PART_CONTOUR).
+        bool mContour = false;
+        /// A wireframe (PART_WIREFRAME).
+        bool mWireframe = false;
+        /// A glow (PRIORITY_HOVER).
+        bool mGlow = false;
+    };
+
+    /// The passes render() runs for a frame.
     struct Passes
     {
-        /// The id pass: the outline's ids, and the depth of the selected surfaces the HUD's lines are tested against.
+        /// The id pass: the outline's and the glow's ids, and the depth of the selected surfaces the HUD's lines
+        /// are tested against.
         bool mIds = false;
         /// The wireframe.
         bool mWireframe = false;
-        /// The jump, tile and edge passes, which draw the outline from the ids.
+        /// The jump, tile and edge passes, which draw the outline and the glow from the ids.
         bool mEdges = false;
 
         bool any() const { return mIds || mWireframe || mEdges; }
     };
 
-    /// The passes `view` needs, the wireframe only where its program loaded (`wireframe_ready`). The world's lines
-    /// are tested against the window's depth and need no id pass; the HUD's against the id target's.
-    static Passes passesFor(const View& view, bool wireframe_ready);
+    /// The passes a frame whose objects ask for `wants` needs, in the world or on the HUD (`hud`), the wireframe
+    /// only where its program loaded (`wireframe_ready`). The world's lines are tested against the window's depth
+    /// and need no id pass; the HUD's against the id target's.
+    static Passes passesFor(const Wants& wants, bool hud, bool wireframe_ready);
+
+    /// What an object added asking for `parts` at `priority` is drawn with (add): at PRIORITY_HOVER nothing but its
+    /// glow.
+    static U32 partsFor(EPriority priority, U32 parts) { return priority == PRIORITY_HOVER ? 0u : parts; }
+
+    /// Whether adding an object again at `adding` replaces what it was added with at `added` (add): at a priority as
+    /// high or higher. What the pointer is over glows only where it is not outlined.
+    static bool replaces(EPriority added, EPriority adding) { return adding <= added; }
+
+    /// Whether the outline or the glow draws an object drawn with `parts` (partsFor) at `priority`.
+    static bool outlined(U32 parts, EPriority priority) { return priority == PRIORITY_HOVER || (parts & PART_CONTOUR); }
+
+    /// Whether such an object is drawn into the id pass: where it is outlined or glows, and on the HUD for its
+    /// wireframe, whose lines are tested against the id target's depth.
+    static bool inIdPass(U32 parts, EPriority priority, bool hud)
+    {
+        return outlined(parts, priority) || (hud && (parts & PART_WIREFRAME));
+    }
 
     /// The world camera's, in the UI stage, where the scene's projection is still loaded.
     static View worldView();
@@ -169,9 +229,11 @@ public:
 
     /// A view with these matrices whose contour is `contour_width` pixels wide at a UI scale of 1
     /// (AlchemySelectionOutlineWidth), drawn at `ui_scale`, LLUI's scale factor: the same widths in the world and
-    /// on the HUD.
+    /// on the HUD. Its glow is `glow_thickness` (RenderHighlightThickness, glowRadius) and `glow_brightness`
+    /// (RenderHighlightBrightness), held to 0 to MAX_GLOW_BRIGHTNESS, and to its default where it is not a number.
     static View makeView(const LLMatrix4a& modelview, const LLMatrix4a& projection, F32 contour_width, F32 ui_scale,
-                         bool hud, bool wireframe = false);
+                         bool hud, F32 glow_thickness = DEFAULT_GLOW_THICKNESS,
+                         F32 glow_brightness = DEFAULT_GLOW_BRIGHTNESS);
 
     /// Ids the target can tell apart; 0 is no selected object.
     static constexpr U32 MAX_IDS = 65535;
@@ -204,16 +266,21 @@ public:
     /// How far the wireframe's lines are drawn in front of their own surface beyond its slope, in the depth
     /// buffer's least steps (glPolygonOffset's units).
     static constexpr F32 WIRE_OFFSET_UNITS = 4.f;
-
-    /// The uniforms the passes set beyond LLShaderMgr's reserved ones.
-    static constexpr const char* ID_UNIFORM = "selection_id";
-    static constexpr const char* PRIORITY_UNIFORM = "selection_priority";
-    static constexpr const char* SHOW_HIDDEN_UNIFORM = "selection_show_hidden";
-    static constexpr const char* SCENE_DEPTH_UNIFORM = "selection_scene_depth";
-    static constexpr const char* WIDTH_UNIFORM = "outline_width";
-    static constexpr const char* INNER_WIDTH_UNIFORM = "outline_inner_width";
-    static constexpr const char* WIRE_PASS_UNIFORM = "wireframe_pass";
-    static constexpr const char* WIRE_WIDTH_UNIFORM = "wireframe_width";
+    /// The glow's reach in pixels at a UI scale of 1 for each unit of RenderHighlightThickness: 9 at its default,
+    /// 0.6. LL's glow blurred a 256-texel-wide copy of the object over 8 x 8 taps 3.5 x thickness texels out at
+    /// most, a reach that grew with the window, about 16 pixels across a window 1920 wide; this one keeps its width
+    /// in pixels whatever the window's.
+    static constexpr F32 GLOW_PIXELS = 15.f;
+    /// RenderHighlightThickness's and RenderHighlightBrightness's defaults.
+    static constexpr F32 DEFAULT_GLOW_THICKNESS = 0.6f;
+    static constexpr F32 DEFAULT_GLOW_BRIGHTNESS = 4.f;
+    /// The glow's reach in pixels at a UI scale of 1 is held to this, the contour's widest: the edge pass searches
+    /// a disk that wide around every pixel near a glowing object.
+    static constexpr F32 MAX_GLOW_RADIUS = 16.f;
+    static constexpr F32 MAX_GLOW_BRIGHTNESS = 64.f;
+    /// The glow's profile at its object's silhouette, before the brightness: the default brightness lays it on
+    /// opaque there, as LL's glow did (GLOW_PEAK in selectionOutlineF.glsl).
+    static constexpr F32 GLOW_PEAK = 0.25f;
 
     /// What decides which of the wireframe's lines are hidden (wireframe_pass in selectionWireframeF.glsl).
     enum EWirePass : S32
@@ -227,6 +294,13 @@ public:
         /// depth, the nearest selected surface, decides, and a line behind another selected surface is hidden.
         WIRE_ID_DEPTH = 2,
     };
+
+    /// Whether an object drawn with `parts` (partsFor), its hidden parts dimmed where `show_hidden`, is drawn in
+    /// wireframe pass `pass`: with a wireframe, and in WIRE_HIDDEN only where its hidden parts are drawn.
+    static bool inWirePass(U32 parts, bool show_hidden, EWirePass pass)
+    {
+        return (parts & PART_WIREFRAME) && (pass != WIRE_HIDDEN || show_hidden);
+    }
 
     /// The GL state a wireframe pass draws in while it lives, over the window's framebuffer: colour blended in
     /// over its alpha, no depth written, back faces culled as the id pass culls them (drawFace), and for the
@@ -255,20 +329,32 @@ public:
     /// its slope, and a pixel more for the line's own.
     static F32 wireOffsetFactor(F32 resample) { return llmax(resample, 1.f) + 1.f; }
 
-    /// Lives for the session and is never destroyed: its GL objects go with the pipeline's, and at exit GL is gone.
-    static ALSelectionOutline& instance();
+    /// Outlines `object` this frame with `parts` (EPart): its faces whose bit is set in te_mask, in `colour`, whose
+    /// alpha is the outline's opacity, at `priority`. Parts the scene hides are dimmed when show_hidden and left out
+    /// otherwise. At PRIORITY_HOVER the object glows in `colour` instead, its hidden parts left out, whatever
+    /// `parts` and show_hidden say. Adding an object again keeps what it was added with at the higher priority, and
+    /// at the same priority the later.
+    void add(LLViewerObject* object, U32 te_mask, const LLColor4& colour, bool show_hidden, EPriority priority,
+             U32 parts);
 
-    /// Outlines `object` this frame: its faces whose bit is set in te_mask, in `colour`, whose alpha is the
-    /// outline's opacity, at `priority`. Parts the scene hides are dimmed when show_hidden and left out otherwise.
-    /// Adding an object again replaces what it was added with.
-    void add(LLViewerObject* object, U32 te_mask, const LLColor4& colour, bool show_hidden, EPriority priority);
-
-    /// Draws what was added since the last call over the bound framebuffer, with `view`, and forgets it. With
-    /// nothing added it gives up its targets.
+    /// Draws what was added since the last call over the bound framebuffer, with `view`, and forgets it, giving up
+    /// the targets no call has drawn with since the frame before this one.
     void render(const View& view);
 
     /// Gives up the targets.
     void release();
+
+    /// How long the targets are kept after a call last drew with them: long enough for the pointer to pass from one
+    /// glowing object to the next without their being made again.
+    static constexpr F64 TARGET_KEEP_SECONDS = 2.0;
+
+    /// Whether a target last drawn with in frame `used_frame` (LLFrameTimer::getFrameCount), at `used_at` seconds
+    /// (LLFrameTimer::getTotalSeconds), is given up in frame `frame` at `now`: once a whole frame has passed without
+    /// it, and TARGET_KEEP_SECONDS.
+    static bool stale(U32 used_frame, F64 used_at, U32 frame, F64 now)
+    {
+        return frame - used_frame > 1 && now - used_at >= TARGET_KEEP_SECONDS;
+    }
 
     /// Palette rows for ids 1 to `count`, and the id 0 that is never drawn.
     static U32 paletteRows(U32 count) { return 2 * (count / PALETTE_WIDTH + 1); }
@@ -282,6 +368,27 @@ public:
     /// The contour's width in pixels for the setting `width` at `ui_scale`, the setting held to MIN_CONTOUR_WIDTH
     /// to MAX_CONTOUR_WIDTH, and to the least where it is not a number.
     static S32 contourWidth(F32 width, F32 ui_scale);
+
+    /// How far in pixels the glow reaches past its object's silhouette for RenderHighlightThickness `thickness` at
+    /// `ui_scale`: thickness x GLOW_PIXELS at a UI scale of 1, held to MAX_GLOW_RADIUS, and its default where the
+    /// setting is not a number; a pixel at least.
+    static S32 glowRadius(F32 thickness, F32 ui_scale);
+
+    /// The glow's opacity before its colour's alpha `dist` pixels from the centre of its object's nearest texel, its
+    /// silhouette half a texel out: brightness x GLOW_PEAK x (1 - smoothstep(0, 1, x)), x the distance past the
+    /// silhouette over `radius`, held to 1. It falls smoothly to nothing at `radius` past the silhouette, and the
+    /// brightness keeps a band of it opaque at the silhouette where it is over 1 / GLOW_PEAK. As the edge pass
+    /// computes it, with the brightness in the integer steps the pass is given it in.
+    static F32 glowOpacity(F32 dist, S32 radius, F32 brightness);
+
+    /// The texture alpha below which a face whose texture is `texture_id` is not outlined, from `cutoff`, what its
+    /// alpha mode gives (legacyAlphaCutoff, gltfAlphaCutoff): for the library's transparent texture
+    /// (IMG_TRANSPARENT) NO_ALPHA_TEST, so the face is drawn whole. Builders put it on roots, collision and touch
+    /// prims to hide them while they can still be picked and edited, and its alpha would cut every fragment.
+    static F32 faceAlphaCutoff(const LLUUID& texture_id, F32 cutoff)
+    {
+        return texture_id == IMG_TRANSPARENT ? NO_ALPHA_TEST : cutoff;
+    }
 
     /// Tiles across `pixels` texels of the id target.
     static U32 tileCount(U32 pixels) { return (pixels + TILE_SIZE - 1) / TILE_SIZE; }
@@ -327,8 +434,10 @@ public:
         LLGLDisable mScissor{ GL_SCISSOR_TEST };
     };
 
-    /// The id, priority and hidden parts the bound id program writes for the faces drawn next.
-    static void setId(LLGLSLShader& program, U32 id, EPriority priority, bool show_hidden);
+    /// The id, priority and hidden parts the bound id program writes for the faces drawn next. Faces not
+    /// `outlined`, drawn for the depth of the HUD's wireframe alone, are written as drawn nowhere: in the id target
+    /// they hide what lies behind them, and draw no line and mask no other's.
+    static void setId(LLGLSLShader& program, U32 id, EPriority priority, bool show_hidden, bool outlined = true);
 
     /// Draws a face into the id pass from `buffer`'s bound range, culled as the scene culls it: both sides of a
     /// double-sided GLTF material, the front alone of everything else (LLRenderPass::pushGLTFBatch).
@@ -359,13 +468,12 @@ public:
 
     /// The edge pass with the bound outline program and `view`'s widths, over the viewport and scissor in force:
     /// ids from `marked`, their depth from `ids` through `view`'s projection, which the id pass drew with, and the
-    /// tile pass's record from `tiles`.
+    /// tile pass's record from `tiles`. With `glow`, where an object glows, the pass reaches as far as the glow; and
+    /// only then.
     static void drawEdges(LLGLSLShader& program, LLRenderTarget& marked, LLRenderTarget& ids, LLRenderTarget& tiles,
-                          U32 palette, const View& view, LLVertexBuffer& triangle);
+                          U32 palette, const View& view, bool glow, LLVertexBuffer& triangle);
 
 private:
-    ALSelectionOutline() = default;
-
     // The full-screen triangle with the bound program, `projection` loaded for its draw where given: the triangle
     // takes no matrix, and the passes read depth through the projection's inverse.
     static void drawTriangle(LLVertexBuffer& triangle, const LLMatrix4a* projection);
@@ -381,6 +489,8 @@ private:
         LLColor4        mColour;
         bool            mShowHidden;
         EPriority       mPriority;
+        // EPart; none at PRIORITY_HOVER.
+        U32             mParts;
     };
 
     // The box the faces a walk drew cover, in the frame the view's modelview takes: unbounded where a rigged face's
@@ -399,18 +509,29 @@ private:
     template <typename Begin>
     bool drawFaces(LLGLSLShader& program, const Entry& entry, bool rigged, const View& view, FaceBox& box, Begin&& begin);
 
-    // The faces of `entry` that are rigged (or not) into the bound id program as `id`, and the box they cover into
-    // mScissor.
+    // The faces of `entry` that are rigged (or not) into the bound id program as `id`, and the box they cover grown
+    // by what reaches past it, the contour or the glow, into mScissor.
     void drawObject(LLGLSLShader& program, const Entry& entry, U32 id, bool rigged, const View& view,
                     const LLMatrix4a& mvp);
 
-    // The id pass: what was added into mIdMap, a width x height target, in priority order, and the box it covers,
-    // through `mvp`, into mScissor.
+    // The id pass: what was added and is drawn into it (inIdPass) into mIdMap, a width x height target, in priority
+    // order, and the box it covers, through `mvp`, into mScissor.
     void drawIds(const View& view, S32 width, S32 height, const LLMatrix4a& mvp);
 
-    // The wireframe of what was added, over the bound framebuffer under the outline: the world's visible lines and
-    // its hidden ones against the window's depth, the HUD's against the id target's.
+    // The wireframe of what was added with one, over the bound framebuffer under the outline: the world's visible
+    // lines and its hidden ones against the window's depth, the HUD's against the id target's.
     void drawWireframes(const View& view, S32 width, S32 height);
+
+    // When a target was last drawn with: the frame (LLFrameTimer::getFrameCount) and the time
+    // (LLFrameTimer::getTotalSeconds).
+    struct Use
+    {
+        U32 mFrame = 0;
+        F64 mTime = 0.0;
+    };
+
+    // Gives up the targets stale in frame `frame` at `now`.
+    void releaseStale(U32 frame, F64 now);
 
     // What a face is drawn with beyond its geometry.
     struct FaceBinding
@@ -438,6 +559,11 @@ private:
     LLRenderTarget mTileMap;
     U32 mPalette = 0;
     U32 mPaletteRows = 0;
+
+    // When the id target, the jump and tile targets, and the palette were last drawn with.
+    Use mIdUse;
+    Use mEdgeUse;
+    Use mPaletteUse;
 
     // The pixels this frame's outlines can touch, and whether any can.
     LLRect mScissor;
@@ -477,8 +603,23 @@ inline S32 ALSelectionOutline::contourWidth(F32 width, F32 ui_scale)
     return lineWidth(held, ui_scale);
 }
 
+inline S32 ALSelectionOutline::glowRadius(F32 thickness, F32 ui_scale)
+{
+    // Asked outright: /fp:fast may answer a comparison with a NaN either way.
+    const F32 held = llisnan(thickness) ? DEFAULT_GLOW_THICKNESS : thickness;
+    return lineWidth(llclamp(held * GLOW_PIXELS, 0.f, MAX_GLOW_RADIUS), ui_scale);
+}
+
+inline F32 ALSelectionOutline::glowOpacity(F32 dist, S32 radius, F32 brightness)
+{
+    const F32 x = llclamp(llmax(dist - 0.5f, 0.f) / (F32)llmax(radius, 1), 0.f, 1.f);
+    const F32 falloff = 1.f - x * x * (3.f - 2.f * x);
+    return llclamp(brightness * GLOW_PEAK * falloff, 0.f, 1.f);
+}
+
 inline ALSelectionOutline::View ALSelectionOutline::makeView(const LLMatrix4a& modelview, const LLMatrix4a& projection,
-                                                             F32 contour_width, F32 ui_scale, bool hud, bool wireframe)
+                                                             F32 contour_width, F32 ui_scale, bool hud,
+                                                             F32 glow_thickness, F32 glow_brightness)
 {
     View view;
     view.mModelview = modelview;
@@ -486,17 +627,19 @@ inline ALSelectionOutline::View ALSelectionOutline::makeView(const LLMatrix4a& m
     view.mWidth = contourWidth(contour_width, ui_scale);
     view.mInnerWidth = lineWidth(INNER_WIDTH, ui_scale);
     view.mHUD = hud;
-    view.mWireframe = wireframe;
     view.mWireWidth = lineWidth(WIRE_WIDTH, ui_scale);
+    view.mGlowRadius = glowRadius(glow_thickness, ui_scale);
+    view.mGlowBrightness =
+        llisnan(glow_brightness) ? DEFAULT_GLOW_BRIGHTNESS : llclamp(glow_brightness, 0.f, MAX_GLOW_BRIGHTNESS);
     return view;
 }
 
-inline ALSelectionOutline::Passes ALSelectionOutline::passesFor(const View& view, bool wireframe_ready)
+inline ALSelectionOutline::Passes ALSelectionOutline::passesFor(const Wants& wants, bool hud, bool wireframe_ready)
 {
     Passes passes;
-    passes.mWireframe = view.mWireframe && wireframe_ready;
-    passes.mEdges = view.mOutline;
-    passes.mIds = view.mOutline || (passes.mWireframe && view.mHUD);
+    passes.mWireframe = wants.mWireframe && wireframe_ready;
+    passes.mEdges = wants.mContour || wants.mGlow;
+    passes.mIds = passes.mEdges || (passes.mWireframe && hud);
     return passes;
 }
 
@@ -618,8 +761,6 @@ inline void ALSelectionOutline::uploadPalette(U32& palette, U32& palette_rows, c
 
 inline void ALSelectionOutline::bindIdPass(LLGLSLShader& program, LLRenderTarget* scene, S32 width, S32 height)
 {
-    static const LLStaticHashedString scene_depth_uniform(SCENE_DEPTH_UNIFORM);
-
     if (scene)
     {
         program.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, scene);
@@ -629,18 +770,16 @@ inline void ALSelectionOutline::bindIdPass(LLGLSLShader& program, LLRenderTarget
         // Not read without a scene; left empty rather than holding whatever the unit last had.
         program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
     }
-    program.uniform1i(scene_depth_uniform, scene ? 1 : 0);
+    program.uniform1i(LLShaderMgr::SELECTION_SCENE_DEPTH, scene ? 1 : 0);
     program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)width, (F32)height);
 }
 
-inline void ALSelectionOutline::setId(LLGLSLShader& program, U32 id, EPriority priority, bool show_hidden)
+inline void ALSelectionOutline::setId(LLGLSLShader& program, U32 id, EPriority priority, bool show_hidden, bool outlined)
 {
-    static const LLStaticHashedString id_uniform(ID_UNIFORM);
-    static const LLStaticHashedString priority_uniform(PRIORITY_UNIFORM);
-    static const LLStaticHashedString show_hidden_uniform(SHOW_HIDDEN_UNIFORM);
-    program.uniform1i(id_uniform, (GLint)id);
-    program.uniform1i(priority_uniform, (GLint)priority);
-    program.uniform1i(show_hidden_uniform, show_hidden ? 1 : 0);
+    program.uniform1i(LLShaderMgr::SELECTION_ID, (GLint)id);
+    program.uniform1i(LLShaderMgr::SELECTION_PRIORITY, (GLint)priority);
+    program.uniform1i(LLShaderMgr::SELECTION_SHOW_HIDDEN, show_hidden ? 1 : 0);
+    program.uniform1i(LLShaderMgr::SELECTION_OUTLINED, outlined ? 1 : 0);
 }
 
 inline void ALSelectionOutline::drawFace(LLVertexBuffer& buffer, U32 start, U32 end, U32 count, U32 offset,
@@ -668,11 +807,8 @@ inline ALSelectionOutline::WireState::~WireState()
 inline void ALSelectionOutline::bindWirePass(LLGLSLShader& program, EWirePass pass, S32 wire_width, S32 width, S32 height,
                                              U32 palette, LLRenderTarget* ids)
 {
-    static const LLStaticHashedString pass_uniform(WIRE_PASS_UNIFORM);
-    static const LLStaticHashedString width_uniform(WIRE_WIDTH_UNIFORM);
-
-    program.uniform1i(pass_uniform, (GLint)pass);
-    program.uniform1i(width_uniform, llmax(wire_width, 1));
+    program.uniform1i(LLShaderMgr::WIREFRAME_PASS, (GLint)pass);
+    program.uniform1i(LLShaderMgr::WIREFRAME_WIDTH, llmax(wire_width, 1));
     program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)width, (F32)height);
     const S32 channel = program.enableTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
     if (channel > -1)
@@ -768,11 +904,9 @@ inline void ALSelectionOutline::drawTiles(LLGLSLShader& program, LLRenderTarget&
 }
 
 inline void ALSelectionOutline::drawEdges(LLGLSLShader& program, LLRenderTarget& marked, LLRenderTarget& ids,
-                                          LLRenderTarget& tiles, U32 palette, const View& view, LLVertexBuffer& triangle)
+                                          LLRenderTarget& tiles, U32 palette, const View& view, bool glow,
+                                          LLVertexBuffer& triangle)
 {
-    static const LLStaticHashedString width_uniform(WIDTH_UNIFORM);
-    static const LLStaticHashedString inner_width_uniform(INNER_WIDTH_UNIFORM);
-
     // Point sampled all four: the ids, their depth, the tiles and the palette are data, and texelFetch reads them
     // whatever the filter.
     program.bindTexture(LLShaderMgr::DIFFUSE_MAP, &marked, ALSamplers::PointClamp);
@@ -783,8 +917,11 @@ inline void ALSelectionOutline::drawEdges(LLGLSLShader& program, LLRenderTarget&
     {
         gGL.getTextureSlot(channel)->bindManual(ALTextureSlot::TT_TEXTURE, palette, gGL.getSampler(ALSamplers::PointClamp));
     }
-    program.uniform1i(width_uniform, llmax(view.mWidth, 1));
-    program.uniform1i(inner_width_uniform, llmax(view.mInnerWidth, 1));
+    program.uniform1i(LLShaderMgr::OUTLINE_WIDTH, llmax(view.mWidth, 1));
+    program.uniform1i(LLShaderMgr::OUTLINE_INNER_WIDTH, llmax(view.mInnerWidth, 1));
+    // A radius of 0 is no glow: the pass reaches no further than the lines.
+    program.uniform1i(LLShaderMgr::OUTLINE_GLOW_RADIUS, glow ? llmax(view.mGlowRadius, 1) : 0);
+    program.uniform1f(LLShaderMgr::OUTLINE_GLOW_BRIGHTNESS, view.mGlowBrightness);
 
     drawTriangle(triangle, &view.mProjection);
 

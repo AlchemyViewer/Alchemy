@@ -1391,7 +1391,10 @@ void LLPipeline::releaseGLBuffers()
     }
 
     ALFarPlaneOverlay::release();
-    ALSelectionOutline::instance().release();
+    if (ALSelectionOutline::instanceExists())
+    {
+        ALSelectionOutline::instance().release();
+    }
 
     mHeroProbeManager.cleanup(); // release hero probes
 

@@ -39,6 +39,10 @@ uniform int selection_priority;
 // 1 where the object's hidden parts are drawn dimmed, 0 where they are left out.
 uniform int selection_show_hidden;
 
+// 1 where the outline or the glow draws the object. 0 where it is drawn for the depth of the HUD's wireframe alone:
+// its surface is then drawn nowhere, and hides what lies behind it without drawing a line or masking another's.
+uniform int selection_outlined;
+
 // 1 where the scene's depth decides what is hidden. 0 where it cannot be read, as on the HUD, which is drawn into
 // the window's framebuffer: every surface then counts as visible.
 uniform int selection_scene_depth;
@@ -85,7 +89,7 @@ void main()
         discard;
     }
 
-    float drawn = (visible > 0.5) ? 1.0 : ((selection_show_hidden != 0) ? 0.5 : 0.0);
+    float drawn = (selection_outlined == 0) ? 0.0 : ((visible > 0.5) ? 1.0 : ((selection_show_hidden != 0) ? 0.5 : 0.0));
     frag_color = vec4(float(selection_id & 255) / 255.0, float((selection_id >> 8) & 255) / 255.0, drawn,
                       float(selection_priority) / 255.0);
 }

@@ -51,6 +51,7 @@
 #include "llquaternion.h"
 
 // viewer includes
+#include "alhoverglow.h"
 #include "alobjectproperties.h"
 #include "alselectionoutline.h"
 #include "llagent.h"
@@ -6691,8 +6692,9 @@ void LLSelectMgr::updateHighlightedObjects()
     }
 }
 
-// The selected and highlighted objects in the world, or on the HUD, each in the colour of its role.
-void LLSelectMgr::addOutlines(ALSelectionOutline& outline, bool for_hud)
+// The selected and highlighted objects in the world, or on the HUD, each in the colour of its role, drawn with
+// `parts` (ALSelectionOutline::EPart).
+void LLSelectMgr::addOutlines(ALSelectionOutline& outline, bool for_hud, U32 parts)
 {
     if (mSelectedObjects->getNumNodes())
     {
@@ -6756,7 +6758,7 @@ void LLSelectMgr::addOutlines(ALSelectionOutline& outline, bool for_hud)
                 priority = ALSelectionOutline::PRIORITY_CHILD;
             }
             colour.mV[VALPHA] = sHighlightAlpha;
-            outline.add(objectp, (U32)node->getTESelectMask(), colour, show_hidden, priority);
+            outline.add(objectp, (U32)node->getTESelectMask(), colour, show_hidden, priority, parts);
         }
     }
 
@@ -6791,14 +6793,15 @@ void LLSelectMgr::addOutlines(ALSelectionOutline& outline, bool for_hud)
                 continue;
             }
             colour.mV[VALPHA] = sHighlightAlpha;
-            outline.add(objectp, (U32)node->getTESelectMask(), colour, sRenderHiddenSelections, priority);
+            outline.add(objectp, (U32)node->getTESelectMask(), colour, sRenderHiddenSelections, priority, parts);
         }
     }
 }
 
-// Outlines from an id target (ALSelectionOutline): one id per object, so every prim keeps its own outline. A
-// frame calls this once, for the world or for the HUD as the selection is in one or on the other. The outline
-// (RenderHighlightSelections) and the wireframe (AlchemySelectionWireframe) are drawn each with or without the other.
+// Outlines from an id target (ALSelectionOutline): one id per object, so every prim keeps its own outline. A frame
+// calls this for the world, and for the HUD while the selection is on it. The outline (RenderHighlightSelections) and
+// the wireframe (AlchemySelectionWireframe) are drawn each with or without the other, and in the world the glow of
+// what the pointer is over (ALHoverGlow) with or without either.
 void LLSelectMgr::renderSilhouettes(bool for_hud)
 {
     ALSelectionOutline& outline = ALSelectionOutline::instance();
@@ -6807,17 +6810,19 @@ void LLSelectMgr::renderSilhouettes(bool for_hud)
     if (!for_hud)
     {
         view = ALSelectionOutline::worldView();
+
+        // The fades move with time, whatever hides what they draw.
+        ALHoverGlow::instance().update(LLFrameTimer::getTotalSeconds(), LLFrameTimer::getFrameCount(),
+                                       LLPipeline::RenderHighlightFadeTime,
+                                       [](const LLUUID& id)
+                                       {
+                                           const LLViewerObject* object = gObjectList.findObject(id);
+                                           return object && !object->isDead();
+                                       });
     }
     else if (!ALSelectionOutline::hudView(view))
     {
-        outline.release();
-        return;
-    }
-    view.mOutline = mRenderHighlightSelections;
-
-    if (!view.mOutline && !view.mWireframe)
-    {
-        outline.release();
+        // The world's call, every frame, gives the targets up once no call draws with them.
         return;
     }
 
@@ -6827,7 +6832,17 @@ void LLSelectMgr::renderSilhouettes(bool for_hud)
         return;
     }
 
-    addOutlines(outline, for_hud);
+    static LLCachedControl<bool> wireframe(gSavedSettings, "AlchemySelectionWireframe", false);
+    const U32 parts = (mRenderHighlightSelections ? (U32)ALSelectionOutline::PART_CONTOUR : 0u) |
+                      (wireframe ? (U32)ALSelectionOutline::PART_WIREFRAME : 0u);
+    if (parts)
+    {
+        addOutlines(outline, for_hud, parts);
+    }
+    if (!for_hud)
+    {
+        ALHoverGlow::instance().addTo(outline);
+    }
     outline.render(view);
 }
 
