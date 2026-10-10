@@ -171,6 +171,8 @@ extern LLGLSLShader         gSelectionWireframeProgram;
 extern LLGLSLShader         gSelectionJumpProgram;
 extern LLGLSLShader         gSelectionTileProgram;
 extern LLGLSLShader         gSelectionOutlineProgram;
+extern LLGLSLShader         gSelectionGlowReachProgram;
+extern LLGLSLShader         gSelectionGlowRowProgram;
 
 extern LLGLSLShader         gDeferredHighlightProgram;
 

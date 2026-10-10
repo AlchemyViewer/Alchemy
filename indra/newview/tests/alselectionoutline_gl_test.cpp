@@ -91,6 +91,7 @@ namespace tut
         bool black(const Pixel& p) { return p.r == 0 && p.g == 0 && p.b == 0; }
         bool red(const Pixel& p) { return p.r > 0 && p.g == 0 && p.b == 0; }
         bool green(const Pixel& p) { return p.g > 0 && p.r == 0 && p.b == 0; }
+        bool blue(const Pixel& p) { return p.b > 0 && p.r == 0 && p.g == 0; }
 
         // An id texel the scene hides, its object's hidden parts drawn dimmed: 0.5 in .b.
         bool drawnHidden(const Pixel& p) { return p.b == 127 || p.b == 128; }
@@ -199,17 +200,22 @@ namespace tut
             mCopyDepthProgram.unload();
             mTileProgram.unload();
             mOutlineProgram.unload();
+            mFullSearchProgram.unload();
+            mGlowReachProgram.unload();
+            mGlowRowProgram.unload();
             mShaders.clearShaderObjects();
 
             mIdMap.release();
-            mMarked.release();
+            mJumps.release();
+            mGlowReach.release();
+            mGlowRows.release();
             mWindow.release();
             mTiles.release();
             mAllTiles.release();
             mScene.release();
             mFar.release();
             mFrame.release();
-            for (U32* texture : { &mPalette, &mRamp, &mClear })
+            for (U32* texture : { &mPalette, &mRamp, &mClear, &mGlass })
             {
                 if (*texture)
                 {
@@ -302,21 +308,35 @@ namespace tut
 
             const std::pair<LLGLSLShader*, const char*> passes[] = { { &mJumpProgram, "selectionJumpF.glsl" },
                                                                      { &mTileProgram, "selectionTileF.glsl" },
-                                                                     { &mOutlineProgram, "selectionOutlineF.glsl" } };
+                                                                     { &mOutlineProgram, "selectionOutlineF.glsl" },
+                                                                     { &mFullSearchProgram, "selectionOutlineF.glsl" },
+                                                                     { &mGlowReachProgram, "selectionGlowReachF.glsl" },
+                                                                     { &mGlowRowProgram, "selectionGlowRowF.glsl" } };
             for (const auto& [program, fragment] : passes)
             {
                 program->mName = fragment;
                 program->mShaderFiles.clear();
                 program->mShaderFiles.push_back(std::make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
                 program->mShaderFiles.push_back(std::make_pair(std::string("interface/") + fragment, GL_FRAGMENT_SHADER));
-                program->mShaderFiles.push_back(std::make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
+                if (program != &mGlowReachProgram)
+                {
+                    program->mShaderFiles.push_back(std::make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
+                }
                 program->mShaderLevel = 1;
+                program->clearPermutations();
+                if (program == &mFullSearchProgram)
+                {
+                    // The edge pass searching the disk for the glow too: the full search.
+                    program->addPermutation("GLOW_DISK", "1");
+                }
                 ensure(std::string(fragment) + "'s program builds", program->createShader());
             }
 
             const LLRenderTarget::eDepthFormat depth = mReverse ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
             ensure("id target", mIdMap.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth));
-            ensure("marked target", mMarked.allocate(W, H, GL_RGBA8));
+            ensure("jump target", mJumps.allocate(W, H, GL_R8));
+            ensure("glow reach target", mGlowReach.allocate(Outline::tileCount(W), Outline::tileCount(H), GL_RGBA16));
+            ensure("glow row target", mGlowRows.allocate(W, H, GL_R8));
             ensure("frame target", mFrame.allocate(W, H, GL_RGBA8));
             ensure("window target", mWindow.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth));
             ensure("tile target", mTiles.allocate(Outline::tileCount(W), Outline::tileCount(H), GL_RGBA16));
@@ -473,19 +493,41 @@ namespace tut
             return mRamp;
         }
 
+        // A 4 x 4 texture whose every texel is white with alpha `alpha`.
+        static U32 uniformTexture(U8 alpha)
+        {
+            std::vector<U8> texels(4 * 4 * 4, 255);
+            for (size_t i = 3; i < texels.size(); i += 4)
+            {
+                texels[i] = alpha;
+            }
+            U32 texture = 0;
+            LLImageGL::generateTextures(1, &texture);
+            gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, texture);
+            LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), GL_RGBA8, 4, 4,
+                                         GL_RGBA, GL_UNSIGNED_BYTE, texels.data());
+            gGL.getTextureSlot(0)->unbind();
+            return texture;
+        }
+
         // A texture that is clear everywhere, as the library's transparent texture (IMG_TRANSPARENT) is.
         U32 clearTexture()
         {
             if (!mClear)
             {
-                const std::vector<U8> texels(4 * 4 * 4, 0);
-                LLImageGL::generateTextures(1, &mClear);
-                gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mClear);
-                LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), GL_RGBA8, 4, 4,
-                                             GL_RGBA, GL_UNSIGNED_BYTE, texels.data());
-                gGL.getTextureSlot(0)->unbind();
+                mClear = uniformTexture(0);
             }
             return mClear;
+        }
+
+        // A texture drawn at three tenths everywhere, as a pane of glass is.
+        U32 glassTexture()
+        {
+            if (!mGlass)
+            {
+                mGlass = uniformTexture(77);
+            }
+            return mGlass;
         }
 
         struct Draw
@@ -675,11 +717,11 @@ namespace tut
         {
             const LLRect under = rect ? *rect : LLRect(0, H, W, 0);
             mJumpProgram.bind();
-            Outline::drawJumps(mJumpProgram, mIdMap, mMarked, under, lines, *mTriangle);
+            Outline::drawJumps(mJumpProgram, mIdMap, mJumps, under, lines, *mTriangle);
             if (tiles)
             {
                 mTileProgram.bind();
-                Outline::drawTiles(mTileProgram, mMarked, mTiles, under, *mTriangle);
+                Outline::drawTiles(mTileProgram, mIdMap, mJumps, mTiles, under, *mTriangle);
             }
             LLGLSLShader::unbind();
         }
@@ -696,21 +738,32 @@ namespace tut
             return records;
         }
 
-        // Whether the jump pass marked the texel at (x, y) as the near side of a jump.
+        // Whether the jump pass marked the texel at (x, y) as the near side of a jump: its one channel, read back as red.
         bool markedAt(S32 x, S32 y)
         {
-            return at(read(mMarked), x, y).a >= 128;
+            return at(read(mJumps), x, y).r >= 128;
         }
 
         // The edge pass as ALSelectionOutline::render runs it, the jump and tile passes first, over the texels under
-        // `mark_rect` or all of them, then over a cleared frame, scissored when asked, reaching as far as the glow
-        // with `glow`. `untiled` holds every id, a jump and a glowing surface in every tile instead, so every pixel
-        // searches its whole disk.
+        // `mark_rect` or all of them, and with `glow` the glow reach and row passes, then over a cleared frame,
+        // scissored when asked, drawing the glow with `glow`. `untiled` is the full search: every tile holds every id,
+        // a jump and a glowing surface, and the glow is searched for in the disk (GLOW_DISK), so every pixel searches
+        // its whole disk as far as the lines and the glow reach.
         std::vector<U8> edgePass(const Outline::View& lines, const LLRect* scissor = nullptr, bool untiled = false,
                                  const LLRect* mark_rect = nullptr, bool glow = false)
         {
             Outline::uploadPalette(mPalette, mPaletteRows, mPaletteTexels, mRows);
             markPasses(lines, mark_rect, !untiled);
+            LLRenderTarget& tiles = untiled ? mAllTiles : mTiles;
+            if (glow)
+            {
+                const LLRect under = mark_rect ? *mark_rect : LLRect(0, H, W, 0);
+                mGlowReachProgram.bind();
+                Outline::drawGlowReach(mGlowReachProgram, tiles, mGlowReach, under, lines, *mTriangle);
+                mGlowRowProgram.bind();
+                Outline::drawGlowRows(mGlowRowProgram, mIdMap, mGlowReach, mGlowRows, under, lines, *mTriangle);
+                LLGLSLShader::unbind();
+            }
 
             mFrame.bindTarget();
             std::vector<U8> px;
@@ -723,16 +776,18 @@ namespace tut
                 LLGLEnable blend(GL_BLEND);
                 gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
-                mOutlineProgram.bind();
-                LLRenderTarget& tiles = untiled ? mAllTiles : mTiles;
+                LLGLSLShader& program = untiled ? mFullSearchProgram : mOutlineProgram;
+                program.bind();
+                LLRenderTarget* glow_reach = glow ? &mGlowReach : nullptr;
+                LLRenderTarget* glow_rows = glow ? &mGlowRows : nullptr;
                 if (scissor)
                 {
                     LLGLSScissor scissored(scissor->mLeft, scissor->mBottom, scissor->getWidth(), scissor->getHeight());
-                    Outline::drawEdges(mOutlineProgram, mMarked, mIdMap, tiles, mPalette, lines, glow, *mTriangle);
+                    Outline::drawEdges(program, mIdMap, mJumps, tiles, glow_reach, glow_rows, mPalette, lines, *mTriangle);
                 }
                 else
                 {
-                    Outline::drawEdges(mOutlineProgram, mMarked, mIdMap, tiles, mPalette, lines, glow, *mTriangle);
+                    Outline::drawEdges(program, mIdMap, mJumps, tiles, glow_reach, glow_rows, mPalette, lines, *mTriangle);
                 }
                 LLGLSLShader::unbind();
                 px = ll_test::readFramebufferRGBA(W, H);
@@ -800,7 +855,7 @@ namespace tut
                                            { return Outline::inWirePass(draw.parts(), draw.mShowHidden, pass); }) &&
                                    texture_read;
                     program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
-                    program.unbindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
+                    program.unbindTexture(LLShaderMgr::SELECTION_PALETTE);
                     program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
                     LLGLSLShader::unbind();
                 }
@@ -837,8 +892,15 @@ namespace tut
         LLGLSLShader mCopyDepthProgram;
         LLGLSLShader mTileProgram;
         LLGLSLShader mOutlineProgram;
+        LLGLSLShader mFullSearchProgram;
+        LLGLSLShader mGlowReachProgram;
+        LLGLSLShader mGlowRowProgram;
         LLRenderTarget mIdMap;
-        LLRenderTarget mMarked;
+        // The jump pass's marks, one channel.
+        LLRenderTarget mJumps;
+        // The glow reach and row passes' records.
+        LLRenderTarget mGlowReach;
+        LLRenderTarget mGlowRows;
         // The window's framebuffer: what the wireframe draws over, its depth the scene's.
         LLRenderTarget mWindow;
         LLRenderTarget mTiles;
@@ -851,6 +913,7 @@ namespace tut
         U32 mRows = 0;
         U32 mRamp = 0;
         U32 mClear = 0;
+        U32 mGlass = 0;
         std::vector<U8> mPaletteTexels;
         LLPointer<LLVertexBuffer> mTriangle;
         std::vector<LLPointer<LLVertexBuffer>> mBuffers;
@@ -1327,10 +1390,10 @@ namespace tut
             ensure_equals(named(reverse, "and keeps over it"), idAt(ids, 16, 32), ID_A);
             ensure_equals(named(reverse, "and keeps the opaque end"), idAt(ids, 63, 32), ID_A);
 
-            // Column 31 samples alpha 126, column 32 alpha 130.
+            // Column 5 samples alpha 22, column 6 alpha 26: either side of a tenth.
             ids = pixelIds({ { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, blend, texture } });
-            ensure_equals(named(reverse, "a blend cuts under half"), idAt(ids, 31, 32), 0U);
-            ensure_equals(named(reverse, "and keeps over it"), idAt(ids, 32, 32), ID_A);
+            ensure_equals(named(reverse, "a blend cuts what is all but clear"), idAt(ids, 5, 32), 0U);
+            ensure_equals(named(reverse, "and keeps the faintest it draws"), idAt(ids, 6, 32), ID_A);
 
             ids = pixelIds({ { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, opaque, texture } });
             ensure_equals(named(reverse, "an opaque face keeps its transparent texels"), idAt(ids, 0, 32), ID_A);
@@ -1774,9 +1837,8 @@ namespace tut
                 const std::string at_z = " at " + std::to_string(-near_z) + " m";
                 idPass({ { quad(-2.f, 2.f, -1.5f, 1.5f, -6.f, -6.f), ID_A }, { quad(-half, half, -half, half, near_z, near_z), ID_A } });
                 const std::vector<U8> px = edgePass();
-                const std::vector<U8> marked = read(mMarked);
-                ensure(named(reverse, "the near side of the step marked" + at_z), at(marked, 25, 32).a >= 128 && at(marked, 32, 38).a >= 128);
-                ensure(named(reverse, "not the far side, nor inside" + at_z), at(marked, 24, 32).a < 128 && at(marked, 32, 32).a < 128);
+                ensure(named(reverse, "the near side of the step marked" + at_z), markedAt(25, 32) && markedAt(32, 38));
+                ensure(named(reverse, "not the far side, nor inside" + at_z), !markedAt(24, 32) && !markedAt(32, 32));
 
                 ensure(named(reverse, "the near part's contour over the far part" + at_z),
                        red(at(px, 24, 32)) && at(px, 24, 32).r == 255 && at(px, 23, 32).r == 255 && at(px, 32, 39).r == 255);
@@ -1841,7 +1903,7 @@ namespace tut
                 idPass(draws);
                 const std::vector<U8> ids = read(mIdMap);
                 const std::vector<U8> px = edgePass();
-                const std::vector<U8> marked = read(mMarked);
+                const std::vector<U8> marked = read(mJumps);
                 // Every pixel searching its disk, so what the edge pass would draw is not hidden by the tiles.
                 const std::vector<U8> searched = edgePass(view(), nullptr, true);
                 size_t covered = 0;
@@ -1854,7 +1916,7 @@ namespace tut
                         if (idAt(ids, x, y) == ID_A)
                         {
                             ++covered;
-                            marks += at(marked, x, y).a >= 128 ? 1 : 0;
+                            marks += at(marked, x, y).r >= 128 ? 1 : 0;
                             drawn += (black(at(px, x, y)) && black(at(searched, x, y))) ? 0 : 1;
                         }
                     }
@@ -2403,7 +2465,8 @@ namespace tut
     }
 
     // A glowing object draws a halo around its silhouette in its colour, falling off from the silhouette as
-    // glowOpacity says, as bright as asked, to nothing at its reach; and nothing over itself, its own folds included.
+    // glowOpacity says, as bright as asked, to nothing at its reach; and nothing over itself, its own folds included,
+    // whose jumps the jump pass leaves unmarked.
     template<> template<>
     void alselectionoutline_object_t::test<34>()
     {
@@ -2412,7 +2475,11 @@ namespace tut
         {
             setUp(reverse);
             // Columns 20 to 39 and rows 20 to 43, and a fold of the same object nearer over its middle, columns 25 to
-            // 34: the near side of a jump in its own surface.
+            // 34: selected, the near side of a jump in its own surface.
+            pixelIds({ { pixels(20, 40, 20, 44), ID_A }, { quad(25.f, 35.f, 25.f, 39.f, -1.f, -1.f), ID_A } });
+            markPasses(glowView(RADIUS));
+            ensure(named(reverse, "selected, the fold's edge is the near side of a jump"), markedAt(25, 32) && markedAt(34, 32));
+
             pixelIds({ hoverDraw(pixels(20, 40, 20, 44), ID_A), hoverDraw(quad(25.f, 35.f, 25.f, 39.f, -1.f, -1.f), ID_A) });
             palette({ { ID_A, GREEN } }, false);
 
@@ -2420,7 +2487,7 @@ namespace tut
             {
                 const std::string at_brightness = " at brightness " + std::to_string(brightness);
                 const std::vector<U8> px = edgePass(glowView(RADIUS, brightness), nullptr, false, nullptr, true);
-                ensure(named(reverse, "the fold's edge is the near side of a jump"), markedAt(25, 32) && markedAt(34, 32));
+                ensure(named(reverse, "glowing, its fold's edge is not marked"), !markedAt(25, 32) && !markedAt(34, 32));
                 for (S32 k = 0; k <= RADIUS + 2; ++k)
                 {
                     // Column 40 + k is k + 1 from the centre of the nearest texel, in column 39.
@@ -2623,6 +2690,105 @@ namespace tut
             const std::vector<U8> px = edgePass(Outline::makeView(identity(), pixelProjection(), TEST_WIDTH, 1.f, true));
             ensure(named(reverse, "the other's contour"), red(at(px, 9, 32)) && red(at(px, 26, 32)));
             ensure(named(reverse, "none around it"), black(at(px, 35, 32)) && black(at(px, 50, 32)) && black(at(px, 43, 45)));
+        }
+    }
+
+    // A blended face is cut only where its texture is all but clear: one translucent all over, as a pane of glass is,
+    // is drawn whole, outlined and wireframed, where the same texture under a cutoff of a half is cut away.
+    template<> template<>
+    void alselectionoutline_object_t::test<41>()
+    {
+        const F32 blend = Outline::legacyAlphaCutoff(false, 0, 0, true);
+        const F32 half = Outline::gltfAlphaCutoff(LLGLTFMaterial::ALPHA_MODE_MASK, 0.5f);
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED } }, true);
+            const U32 glass = glassTexture();
+
+            idPass({ { quadA(), ID_A, Outline::PRIORITY_ROOT, blend, glass } });
+            std::vector<U8> ids = read(mIdMap);
+            ensure_equals(named(reverse, "a blended pane of glass drawn whole"), idAt(ids, 20, 32), ID_A);
+            std::vector<U8> px = edgePass();
+            ensure(named(reverse, "and outlined"), red(at(px, 8, 32)));
+
+            windowDepth(nullptr);
+            px = worldWireframe({ { quadA(), ID_A, Outline::PRIORITY_ROOT, blend, glass } });
+            ensure(named(reverse, "and wireframed"), lit(px) > 0);
+
+            idPass({ { quadA(), ID_A, Outline::PRIORITY_ROOT, half, glass } });
+            ids = read(mIdMap);
+            ensure_equals(named(reverse, "under a cutoff of a half it is cut away"), idAt(ids, 20, 32), 0U);
+            px = edgePass();
+            ensure(named(reverse, "and not outlined"), black(at(px, 8, 32)));
+            px = worldWireframe({ { quadA(), ID_A, Outline::PRIORITY_ROOT, half, glass } });
+            ensure_equals(named(reverse, "nor wireframed"), lit(px), size_t(0));
+        }
+    }
+
+    // The glow from the glow reach and row passes is the full search's, pixel for pixel: at reaches short and long,
+    // around shapes thin, slanted and cut off by the target's edges, between two glowing objects, where the lower id's
+    // colour is drawn where both are as near, beside selections and with one in front of it, and around an object
+    // partly hidden.
+    template<> template<>
+    void alselectionoutline_object_t::test<42>()
+    {
+        constexpr U32 ID_GLOW = 400;
+        constexpr U32 ID_OTHER = 401;
+        const LLColor4 BLUE(0.f, 0.f, 1.f, 1.f);
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED }, { ID_B, RED }, { ID_GLOW, GREEN }, { ID_OTHER, BLUE } }, true);
+
+            const LLVector3 diamond[4] = { LLVector3(44.f, 30.f, PIXEL_Z), LLVector3(54.f, 40.f, PIXEL_Z),
+                                           LLVector3(44.f, 50.f, PIXEL_Z), LLVector3(34.f, 40.f, PIXEL_Z) };
+            const std::vector<std::pair<std::string, std::vector<Draw>>> scenes = {
+                { "two glowing objects, columns 10 to 19 and 29 to 38",
+                  { hoverDraw(pixels(10, 20, 20, 44), ID_OTHER), hoverDraw(pixels(29, 39, 20, 44), ID_GLOW) } },
+                { "a line a pixel thin and a slanted square",
+                  { hoverDraw(pixels(8, 9, 10, 54), ID_GLOW), hoverDraw(quadAt(diamond), ID_OTHER) } },
+                { "two cut off by the target's edges",
+                  { hoverDraw(pixels(0, 12, 0, 12), ID_GLOW), hoverDraw(pixels(56, 64, 40, 64), ID_OTHER) } },
+                { "beside selections, one in front of it",
+                  { { pixels(30, 50, 30, 50), ID_A }, { quad(14.f, 26.f, 14.f, 26.f, PIXEL_Z + 1.f, PIXEL_Z + 1.f), ID_B },
+                    hoverDraw(pixels(6, 30, 6, 30), ID_GLOW) } },
+                { "two glowing objects five rows above and five columns right of pixel (30, 30)",
+                  { hoverDraw(pixels(26, 35, 35, 41), ID_GLOW), hoverDraw(pixels(35, 41, 26, 35), ID_OTHER) } },
+            };
+            for (const auto& [name, draws] : scenes)
+            {
+                pixelIds(draws);
+                for (S32 radius : { 1, 6, 9, 17, 33 })
+                {
+                    const std::string at_radius = name + ", a reach of " + std::to_string(radius);
+                    const std::vector<U8> rows = edgePass(glowView(radius), nullptr, false, nullptr, true);
+                    const std::vector<U8> full = edgePass(glowView(radius), nullptr, true, nullptr, true);
+                    ensure(named(reverse, at_radius + ": it glows"), lit(rows) > 0);
+                    ensure(named(reverse, at_radius + ": as the full search draws it"), rows == full);
+                }
+            }
+
+            // Column 24 is five columns from each of the first scene's objects, column 23 four from the one on the left.
+            pixelIds(scenes[0].second);
+            const std::vector<U8> between = edgePass(glowView(9), nullptr, false, nullptr, true);
+            ensure(named(reverse, "as near both along a row, the lower id's colour"), green(at(between, 24, 32)));
+            ensure(named(reverse, "nearer the left, its colour"), blue(at(between, 23, 32)));
+            pixelIds(scenes[4].second);
+            const std::vector<U8> across = edgePass(glowView(9), nullptr, false, nullptr, true);
+            ensure(named(reverse, "as near both along a column and a row, the lower id's colour"), green(at(across, 30, 30)));
+
+            // Behind something in the scene over columns 0 to 20, its hidden part drawing no glow.
+            occlude(3.f, 0, 0, 21, H);
+            idPass({ hoverDraw(quadA(), ID_GLOW) });
+            for (S32 radius : { 6, 17 })
+            {
+                const std::string at_radius = "partly hidden, a reach of " + std::to_string(radius);
+                const std::vector<U8> rows = edgePass(glowView(radius), nullptr, false, nullptr, true);
+                const std::vector<U8> full = edgePass(glowView(radius), nullptr, true, nullptr, true);
+                ensure(named(reverse, at_radius + ": it glows"), lit(rows) > 0);
+                ensure(named(reverse, at_radius + ": as the full search draws it"), rows == full);
+            }
         }
     }
 }

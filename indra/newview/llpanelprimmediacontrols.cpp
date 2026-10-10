@@ -63,10 +63,6 @@
 #include "llfloatertools.h"  // to enable hide if build tools are up
 #include "llvector4a.h"
 
-
-// Functions pulled from llviewerdisplay.cpp
-bool get_hud_matrices(LLMatrix4a& proj, LLMatrix4a& model);
-
 // Warning: make sure these two match!
 const LLPanelPrimMediaControls::EZoomLevel LLPanelPrimMediaControls::kZoomLevels[] = { ZOOM_NONE, ZOOM_MEDIUM };
 const int LLPanelPrimMediaControls::kNumZoomLevels = 2;

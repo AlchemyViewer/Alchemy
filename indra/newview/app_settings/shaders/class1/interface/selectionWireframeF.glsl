@@ -34,7 +34,7 @@ uniform int selection_id;
 
 // Two texels per id, PALETTE_WIDTH ids to a pair of rows: the visible colour above the hidden one. Alpha 0 in the
 // hidden row leaves hidden parts out.
-uniform sampler2D altDiffuseMap;
+uniform sampler2D selectionPalette;
 
 // The id target's depth, the nearest selected surface, which the HUD's lines are tested against.
 uniform sampler2D depthMap;
@@ -93,7 +93,7 @@ void main()
     }
 
     int row = (selection_id / PALETTE_WIDTH) * 2 + (visible ? 0 : 1);
-    vec4 colour = texelFetch(altDiffuseMap, ivec2(selection_id % PALETTE_WIDTH, row), 0);
+    vec4 colour = texelFetch(selectionPalette, ivec2(selection_id % PALETTE_WIDTH, row), 0);
     if (colour.a <= 0.0)
     {
         discard;

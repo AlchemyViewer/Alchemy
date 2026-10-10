@@ -160,6 +160,8 @@ LLGLSLShader        gSelectionWireframeProgram;
 LLGLSLShader        gSelectionJumpProgram;
 LLGLSLShader        gSelectionTileProgram;
 LLGLSLShader        gSelectionOutlineProgram;
+LLGLSLShader        gSelectionGlowReachProgram;
+LLGLSLShader        gSelectionGlowRowProgram;
 
 LLGLSLShader        gDeferredHighlightProgram;
 
@@ -3831,60 +3833,62 @@ bool LLViewerShaderMgr::loadShadersInterface()
 
     if (success)
     {
-        gSelectionIdProgram.mName = "Selection Id Shader";
-        gSelectionIdProgram.mShaderFiles.clear();
-        gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionIdV.glsl", GL_VERTEX_SHADER));
-        gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionIdF.glsl", GL_FRAGMENT_SHADER));
-        gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER));
-        gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
-        gSelectionIdProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gSelectionIdProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
-    }
+        // The selection outline's and wireframe's programs. ALSelectionOutline::render draws only with the ones that
+        // loaded, so a driver that rejects one loses what that one draws and keeps the rest of the interface.
+        const auto load_selection = [this](LLGLSLShader& program, const char* name,
+                                           std::initializer_list<std::pair<const char*, GLenum>> files, U32 variants)
+        {
+            program.mName = name;
+            program.mShaderFiles.clear();
+            for (const auto& [file, stage] : files)
+            {
+                program.mShaderFiles.push_back(make_pair(file, stage));
+            }
+            program.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+            if (!program.createShader(variants))
+            {
+                LL_WARNS("Shader") << "Could not load " << name << "; selections are drawn without it" << LL_ENDL;
+                program.unload();
+            }
+        };
 
-    if (success)
-    {
-        gSelectionWireframeProgram.mName = "Selection Wireframe Shader";
-        gSelectionWireframeProgram.mShaderFiles.clear();
-        gSelectionWireframeProgram.mShaderFiles.push_back(make_pair("interface/selectionIdV.glsl", GL_VERTEX_SHADER));
-        gSelectionWireframeProgram.mShaderFiles.push_back(make_pair("interface/selectionWireframeG.glsl", GL_GEOMETRY_SHADER));
-        gSelectionWireframeProgram.mShaderFiles.push_back(make_pair("interface/selectionWireframeF.glsl", GL_FRAGMENT_SHADER));
-        gSelectionWireframeProgram.mShaderFiles.push_back(make_pair("interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER));
-        gSelectionWireframeProgram.mShaderFiles.push_back(make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
-        gSelectionWireframeProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gSelectionWireframeProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
-    }
-
-    if (success)
-    {
-        gSelectionJumpProgram.mName = "Selection Jump Shader";
-        gSelectionJumpProgram.mShaderFiles.clear();
-        gSelectionJumpProgram.mShaderFiles.push_back(make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
-        gSelectionJumpProgram.mShaderFiles.push_back(make_pair("interface/selectionJumpF.glsl", GL_FRAGMENT_SHADER));
-        gSelectionJumpProgram.mShaderFiles.push_back(make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
-        gSelectionJumpProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gSelectionJumpProgram.createShader();
-    }
-
-    if (success)
-    {
-        gSelectionTileProgram.mName = "Selection Tile Shader";
-        gSelectionTileProgram.mShaderFiles.clear();
-        gSelectionTileProgram.mShaderFiles.push_back(make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
-        gSelectionTileProgram.mShaderFiles.push_back(make_pair("interface/selectionTileF.glsl", GL_FRAGMENT_SHADER));
-        gSelectionTileProgram.mShaderFiles.push_back(make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
-        gSelectionTileProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gSelectionTileProgram.createShader();
-    }
-
-    if (success)
-    {
-        gSelectionOutlineProgram.mName = "Selection Outline Shader";
-        gSelectionOutlineProgram.mShaderFiles.clear();
-        gSelectionOutlineProgram.mShaderFiles.push_back(make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
-        gSelectionOutlineProgram.mShaderFiles.push_back(make_pair("interface/selectionOutlineF.glsl", GL_FRAGMENT_SHADER));
-        gSelectionOutlineProgram.mShaderFiles.push_back(make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
-        gSelectionOutlineProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gSelectionOutlineProgram.createShader();
+        load_selection(gSelectionIdProgram, "Selection Id Shader",
+                       { { "interface/selectionIdV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionIdF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                       LLGLSLShader::VARIANT_RIGGED);
+        load_selection(gSelectionWireframeProgram, "Selection Wireframe Shader",
+                       { { "interface/selectionIdV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionWireframeG.glsl", GL_GEOMETRY_SHADER },
+                         { "interface/selectionWireframeF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                       LLGLSLShader::VARIANT_RIGGED);
+        load_selection(gSelectionJumpProgram, "Selection Jump Shader",
+                       { { "interface/copyV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionJumpF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                       0);
+        load_selection(gSelectionTileProgram, "Selection Tile Shader",
+                       { { "interface/copyV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionTileF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                       0);
+        load_selection(gSelectionOutlineProgram, "Selection Outline Shader",
+                       { { "interface/copyV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionOutlineF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                       0);
+        load_selection(gSelectionGlowReachProgram, "Selection Glow Reach Shader",
+                       { { "interface/copyV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionGlowReachF.glsl", GL_FRAGMENT_SHADER } },
+                       0);
+        load_selection(gSelectionGlowRowProgram, "Selection Glow Row Shader",
+                       { { "interface/copyV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionGlowRowF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                       0);
     }
 
     if (success)

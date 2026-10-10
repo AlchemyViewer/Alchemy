@@ -627,6 +627,12 @@ public:
         OUTLINE_GLOW_BRIGHTNESS,            //  "outline_glow_brightness"  RenderHighlightBrightness
         WIREFRAME_PASS,                     //  "wireframe_pass"  ALSelectionOutline::EWirePass
         WIREFRAME_WIDTH,                    //  "wireframe_width"  the lines' width in pixels
+        SELECTION_ID_MAP,                   //  "selectionIdMap"  the id target, read by the passes after the id pass
+        SELECTION_JUMP_MAP,                 //  "selectionJumpMap"  the near sides of jumps the jump pass marks
+        SELECTION_TILE_MAP,                 //  "selectionTileMap"  the tile pass's record of each tile
+        SELECTION_PALETTE,                  //  "selectionPalette"  each id's visible and hidden colours
+        SELECTION_GLOW_REACH_MAP,           //  "selectionGlowReachMap"  the glowing ids within the glow's reach of each tile
+        SELECTION_GLOW_ROW_MAP,             //  "selectionGlowRowMap"  the nearest glowing texel along each texel's row
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;

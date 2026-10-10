@@ -2144,6 +2144,12 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("outline_glow_brightness");
     mReservedUniforms.push_back("wireframe_pass");
     mReservedUniforms.push_back("wireframe_width");
+    mReservedUniforms.push_back("selectionIdMap");
+    mReservedUniforms.push_back("selectionJumpMap");
+    mReservedUniforms.push_back("selectionTileMap");
+    mReservedUniforms.push_back("selectionPalette");
+    mReservedUniforms.push_back("selectionGlowReachMap");
+    mReservedUniforms.push_back("selectionGlowRowMap");
 
     // The enum and this list are parallel, and an entry added or removed on one side only
     // shifts every later uniform index for every shader in the viewer -- silently, since a

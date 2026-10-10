@@ -27,21 +27,29 @@ in vec2 tc;
 
 out vec4 frag_color;
 
-// The id target with its jumps marked (selectionJumpF.glsl, selectionUtilF.glsl). Ids are given in priority order,
-// so of two objects the lower id is the higher priority.
-uniform sampler2D diffuseMap;
+// The id target (selectionUtilF.glsl). Ids are given in priority order, so of two objects the lower id is the
+// higher priority.
+uniform sampler2D selectionIdMap;
+
+// The jump pass's marks on the id target (selectionJumpF.glsl).
+uniform sampler2D selectionJumpMap;
 
 // The id target's own depth, through the projection loaded for this pass, which the id pass drew with.
 uniform sampler2D depthMap;
 
 // Two texels per id, PALETTE_WIDTH ids to a pair of rows: the visible colour above the hidden one.
-uniform sampler2D altDiffuseMap;
+uniform sampler2D selectionPalette;
 
 // The tile pass's record (selectionTileF.glsl), a texel to each TILE_SIZE square of the id target: the lowest and
 // highest nonzero id in .r and .g over 65535, 1 in .b where it holds the near side of a jump, and 1 in .a where it
-// holds the drawn surface of an object that glows. Bound under a reserved name, the only kind LLGLSLShader gives a
-// texture unit.
-uniform sampler2D specularMap;
+// holds the drawn surface of an object that glows.
+uniform sampler2D selectionTileMap;
+
+// Where something glows: the glow reach pass's record of the glowing ids within the glow's reach of each tile
+// (selectionGlowReachF.glsl), and the glow row pass's distance along each texel's row to the nearest glowing texel
+// (selectionGlowRowF.glsl).
+uniform sampler2D selectionGlowReachMap;
+uniform sampler2D selectionGlowRowMap;
 
 // The widths in pixels of the contour around the objects and of the edges between them, before the pixel each
 // is anti-aliased across.
@@ -78,7 +86,7 @@ const int BEHIND = 2;
 // selectionUtilF.glsl
 int decodeId(vec4 texel);
 int decodePriority(vec4 texel);
-bool isJumpFront(vec4 texel);
+bool isJumpFront(sampler2D jumps, ivec2 pos);
 bool isGlow(vec4 texel);
 bool isDrawn(vec4 texel);
 bool isVisible(vec4 texel);
@@ -87,7 +95,7 @@ float eyeDistance(float depth);
 vec4 paletteColour(int id, bool visible)
 {
     int row = (id / PALETTE_WIDTH) * 2 + (visible ? 0 : 1);
-    return texelFetch(altDiffuseMap, ivec2(id % PALETTE_WIDTH, row), 0);
+    return texelFetch(selectionPalette, ivec2(id % PALETTE_WIDTH, row), 0);
 }
 
 // How much of a pixel a line `width` pixels wide along an object's edge covers, `dist` from the centre of the
@@ -111,7 +119,7 @@ float glowOpacity(float dist)
 
 bool hasId(ivec2 pos, ivec2 size, int id)
 {
-    return all(greaterThanEqual(pos, ivec2(0))) && all(lessThan(pos, size)) && decodeId(texelFetch(diffuseMap, pos, 0)) == id;
+    return all(greaterThanEqual(pos, ivec2(0))) && all(lessThan(pos, size)) && decodeId(texelFetch(selectionIdMap, pos, 0)) == id;
 }
 
 // The change in stored depth across a pixel along `step` of the surface at `pos`, from the neighbour on the side
@@ -133,76 +141,137 @@ float depthSlope(ivec2 pos, ivec2 size, ivec2 step, int id, float depth)
 // Whether a tile under the square of texels within `reach` of `pos` along either axis holds what a pixel of
 // `own_id` could draw from. Whatever a pixel draws, it draws from a texel within its reach: off every object, of
 // any object; on one, of another object, or of its own where the jump pass marked the near side of a jump. The
-// texel's tile records each: without such a tile the disk search finds nothing to draw.
-bool candidateWithin(ivec2 pos, int reach, int own_id)
+// texel's tile records each: without such a tile the disk search finds nothing to draw. `jump` says whether any of
+// those tiles holds the near side of a jump, without which no texel within the reach is one and the jump pass's
+// marks need not be read.
+bool candidateWithin(ivec2 pos, int reach, int own_id, out bool jump)
 {
-    ivec2 last = textureSize(specularMap, 0) - ivec2(1);
+    ivec2 last = textureSize(selectionTileMap, 0) - ivec2(1);
     ivec2 lo = max(pos - ivec2(reach), ivec2(0)) / TILE_SIZE;
     ivec2 hi = min((pos + ivec2(reach)) / TILE_SIZE, last);
+    bool found = false;
+    jump = false;
     for (int y = lo.y; y <= hi.y; ++y)
     {
         for (int x = lo.x; x <= hi.x; ++x)
         {
-            vec4 tile = texelFetch(specularMap, ivec2(x, y), 0);
+            vec4 tile = texelFetch(selectionTileMap, ivec2(x, y), 0);
             int lowest = int(tile.r * 65535.0 + 0.5);
             int highest = int(tile.g * 65535.0 + 0.5);
-            if (own_id == 0 ? (highest != 0)
-                            : ((lowest != 0 && lowest != own_id) || (highest != 0 && highest != own_id) || tile.b > 0.5))
-            {
-                return true;
-            }
+            bool tile_jump = tile.b > 0.5;
+            found = found || (own_id == 0 ? (highest != 0)
+                                          : ((lowest != 0 && lowest != own_id) || (highest != 0 && highest != own_id) || tile_jump));
+            jump = jump || tile_jump;
         }
     }
-    return false;
+    return found;
 }
 
-// Whether a tile under the square of texels within `reach` of `pos` along either axis holds the drawn surface of an
-// object that glows, other than the pixel's own, `own_id`: the glow is never drawn over its own object. A pixel
-// draws a glow only from such a texel within the glow's reach, whose tile records it.
-bool glowWithin(ivec2 pos, int reach, int own_id)
+// Whether a tile within the glow's reach of the tile of `pos` holds the drawn surface of an object that glows, other
+// than the pixel's own, `own_id`: the glow is never drawn over its own object. A pixel draws a glow only from such a
+// texel within the glow's reach, whose tile records it. The glow reach pass gathered the lowest and highest ids
+// those tiles record, and a tile records an id other than `own_id` exactly where they are not both `own_id`.
+bool glowWithin(ivec2 pos, int own_id)
 {
-    ivec2 last = textureSize(specularMap, 0) - ivec2(1);
-    ivec2 lo = max(pos - ivec2(reach), ivec2(0)) / TILE_SIZE;
-    ivec2 hi = min((pos + ivec2(reach)) / TILE_SIZE, last);
-    for (int y = lo.y; y <= hi.y; ++y)
+    vec4 record = texelFetch(selectionGlowReachMap, pos / TILE_SIZE, 0);
+    int lowest = int(record.r * 65535.0 + 0.5);
+    int highest = int(record.g * 65535.0 + 0.5);
+    return highest != 0 && (lowest != own_id || highest != own_id);
+}
+
+// The id of the drawn glowing texel at `pos`, or 65536 where there is none, which every id is lower than.
+int glowIdAt(ivec2 pos, ivec2 size)
+{
+    if (any(lessThan(pos, ivec2(0))) || any(greaterThanEqual(pos, size)))
     {
-        for (int x = lo.x; x <= hi.x; ++x)
+        return 65536;
+    }
+    vec4 texel = texelFetch(selectionIdMap, pos, 0);
+    int id = decodeId(texel);
+    return (id != 0 && isGlow(texel) && isDrawn(texel)) ? id : 65536;
+}
+
+// The glow off every object, where every glowing surface stands in front: the nearest drawn glowing texel within
+// `reach` of `pos`, the lower id where two are as near, from the glow row pass's nearest along each row. Rows are
+// read outward from the pixel's own and stop where none farther can be as near. `glow_d2` is the squared distance,
+// which starts one past the reach's.
+void glowFromRows(ivec2 pos, ivec2 size, int reach, inout int glow_id, inout int glow_d2)
+{
+    for (int dy = 0; dy <= reach && dy * dy <= glow_d2; ++dy)
+    {
+        for (int side = 0; side < ((dy == 0) ? 1 : 2); ++side)
         {
-            vec4 tile = texelFetch(specularMap, ivec2(x, y), 0);
-            int lowest = int(tile.r * 65535.0 + 0.5);
-            int highest = int(tile.g * 65535.0 + 0.5);
-            if (tile.a > 0.5 && (lowest != own_id || highest != own_id))
+            int y = pos.y + ((side == 0) ? dy : -dy);
+            if (y < 0 || y >= size.y)
             {
-                return true;
+                continue;
+            }
+            int code = int(texelFetch(selectionGlowRowMap, ivec2(pos.x, y), 0).r * 255.0 + 0.5);
+            if (code == 0)
+            {
+                continue;
+            }
+            int dx = code - 1;
+            int d2 = dx * dx + dy * dy;
+            if (d2 > glow_d2)
+            {
+                continue;
+            }
+            // The nearest along the row lies one side or both, each its own object's.
+            int id = min(glowIdAt(ivec2(pos.x - dx, y), size), glowIdAt(ivec2(pos.x + dx, y), size));
+            if (d2 < glow_d2 || id < glow_id)
+            {
+                glow_id = id;
+                glow_d2 = d2;
             }
         }
     }
-    return false;
 }
 
 void main()
 {
-    ivec2 size = textureSize(diffuseMap, 0);
+    ivec2 size = textureSize(selectionIdMap, 0);
     ivec2 pos = clamp(ivec2(tc * vec2(size)), ivec2(0), size - ivec2(1));
-    vec4 own = texelFetch(diffuseMap, pos, 0);
+    vec4 own = texelFetch(selectionIdMap, pos, 0);
     int own_id = decodeId(own);
     bool own_drawn = (own_id != 0) && isDrawn(own);
     // A glowing object's surface is not the outline's: the lines of what stands in front of it or touches it are
     // drawn over it as over the space off every object, and it draws no edge of its own.
     bool own_glows = (own_id != 0) && isGlow(own);
 
-    // Every texel in the disk the lines reach, so features thinner than a line are not stepped over, and as far as
-    // the glow reaches where a glowing surface is near. Texels off the target are not there: clamping them would read
-    // the edge's again, nearer than it is.
+    // Every texel in the disk the lines reach, so features thinner than a line are not stepped over. Texels off the
+    // target are not there: clamping them would read the edge's again, nearer than it is.
     int line_reach = max(outline_width, outline_inner_width) + 1;
     int inner_reach = outline_inner_width + 1;
     int glow_reach = (outline_glow_radius > 0) ? outline_glow_radius + 1 : 0;
-    bool glow_near = (glow_reach > 0) && glowWithin(pos, glow_reach, own_id);
-    if (!glow_near && !candidateWithin(pos, line_reach, own_id))
+    bool glow_near = (glow_reach > 0) && glowWithin(pos, own_id);
+    // A texel of the pixel's own object counts only where it is the near side of a jump, and only within the lines'
+    // reach, as a glow is never drawn over its own object: the tiles that reach covers say whether one can be.
+    bool jump_near = false;
+    bool line_near = candidateWithin(pos, line_reach, own_id, jump_near);
+    if (!glow_near && !line_near)
     {
         discard;
     }
-    int reach = glow_near ? max(line_reach, glow_reach) : line_reach;
+
+    // The glow: the nearest drawn texel of a glowing object in front of this pixel, the lower id where two are as
+    // near, and its squared distance. Off every object every glowing surface is in front, and the glow row pass's
+    // nearest along each row give it. On an object, which stand in front depends on its plane, so the disk is searched
+    // as far as the glow reaches. GLOW_DISK searches the disk for every pixel: the full search, which the rows give
+    // the same as.
+#ifdef GLOW_DISK
+    bool glow_rows = false;
+#else
+    bool glow_rows = (own_id == 0);
+#endif
+    bool glow_taps = glow_near && !glow_rows;
+    int glow_id = 0;
+    int glow_d2 = glow_reach * glow_reach + 1;
+    if (glow_near && glow_rows)
+    {
+        glowFromRows(pos, size, glow_reach, glow_id, glow_d2);
+    }
+    int reach = glow_taps ? max(line_reach, glow_reach) : line_reach;
 
     // The plane of this pixel's own surface, found when the first candidate needs it.
     bool planed = false;
@@ -223,34 +292,32 @@ void main()
     // The nearest texel of an object this pixel touches whose edge with it is drawn on this side.
     float inner_dist = float(inner_reach) + 1.0;
 
-    // The glow: the nearest drawn texel of a glowing object in front of this pixel, the lower id where two are as
-    // near.
-    int glow_id = 0;
-    float glow_dist = float(glow_reach) + 1.0;
-
-    for (int dy = -reach; dy <= reach; ++dy)
+    // Without a line within reach the disk holds only what glows, which it is searched for only on an object.
+    int disk = (line_near || glow_taps) ? reach : -1;
+    for (int dy = -disk; dy <= disk; ++dy)
     {
-        for (int dx = -reach; dx <= reach; ++dx)
+        for (int dx = -disk; dx <= disk; ++dx)
         {
             ivec2 tap_pos = pos + ivec2(dx, dy);
             if (dx * dx + dy * dy > reach * reach || any(lessThan(tap_pos, ivec2(0))) || any(greaterThanEqual(tap_pos, size)))
             {
                 continue;
             }
-            vec4 tap = texelFetch(diffuseMap, tap_pos, 0);
+            vec4 tap = texelFetch(selectionIdMap, tap_pos, 0);
             int tap_id = decodeId(tap);
             // An object over its own surface draws only where it steps in front of itself, from the near side of the
             // jump: anywhere else that would trace every crease and curve of a mesh.
             bool own_object = (tap_id == own_id);
-            if (tap_id == 0 || (own_object && !isJumpFront(tap)))
+            if (tap_id == 0 || (own_object && !(jump_near && isJumpFront(selectionJumpMap, tap_pos))))
             {
                 continue;
             }
-            // A glow reaches as far as its radius and never over its own object, jumps and all; a line as far as its
-            // width.
+            // A glow reaches as far as its radius and never over its own object, jumps and all, and is searched for
+            // here only where the rows do not give it; a line as far as its width.
             bool tap_glows = isGlow(tap);
             int tap_reach = tap_glows ? glow_reach : line_reach;
-            if ((tap_glows && own_object) || dx * dx + dy * dy > tap_reach * tap_reach)
+            int d2 = dx * dx + dy * dy;
+            if ((tap_glows && (own_object || !glow_taps)) || d2 > tap_reach * tap_reach)
             {
                 continue;
             }
@@ -279,10 +346,10 @@ void main()
             bool in_front = (relation == IN_FRONT) || (own_glows && relation == TOUCHING);
             if (tap_glows)
             {
-                if (relation == IN_FRONT && tap_drawn && (dist < glow_dist || (dist == glow_dist && tap_id < glow_id)))
+                if (relation == IN_FRONT && tap_drawn && (d2 < glow_d2 || (d2 == glow_d2 && tap_id < glow_id)))
                 {
                     glow_id = tap_id;
-                    glow_dist = dist;
+                    glow_d2 = d2;
                 }
             }
             else if (in_front && tap_drawn)
@@ -319,7 +386,7 @@ void main()
     if (glow_id != 0)
     {
         vec4 glow_colour = paletteColour(glow_id, true);
-        alpha = glow_colour.a * glowOpacity(glow_dist);
+        alpha = glow_colour.a * glowOpacity(sqrt(float(glow_d2)));
         rgb = glow_colour.rgb * alpha;
     }
     if (own_drawn && !own_glows)

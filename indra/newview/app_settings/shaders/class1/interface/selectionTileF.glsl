@@ -27,22 +27,23 @@
 // holds the near side of a jump; .a 1 where it holds the drawn surface of an object that glows.
 out vec4 frag_color;
 
-// The id target with its jumps marked (selectionJumpF.glsl).
-uniform sampler2D diffuseMap;
+// The id target, and the jump pass's marks on it (selectionJumpF.glsl).
+uniform sampler2D selectionIdMap;
+uniform sampler2D selectionJumpMap;
 
 // The side of a tile in texels of the id target (ALSelectionOutline::TILE_SIZE).
 #define TILE_SIZE 8
 
 // selectionUtilF.glsl
 int decodeId(vec4 texel);
-bool isJumpFront(vec4 texel);
+bool isJumpFront(sampler2D jumps, ivec2 pos);
 bool isGlow(vec4 texel);
 bool isDrawn(vec4 texel);
 
 void main()
 {
     // The viewport is the tile target's, a fragment to a tile.
-    ivec2 size = textureSize(diffuseMap, 0);
+    ivec2 size = textureSize(selectionIdMap, 0);
     ivec2 origin = ivec2(gl_FragCoord.xy) * TILE_SIZE;
     ivec2 end = min(origin + ivec2(TILE_SIZE), size);
 
@@ -54,13 +55,14 @@ void main()
     {
         for (int x = origin.x; x < end.x; ++x)
         {
-            vec4 texel = texelFetch(diffuseMap, ivec2(x, y), 0);
+            vec4 texel = texelFetch(selectionIdMap, ivec2(x, y), 0);
             int id = decodeId(texel);
             if (id != 0)
             {
                 lowest = min(lowest, id);
                 highest = max(highest, id);
-                jump = jump || isJumpFront(texel);
+                // The jump pass marks no glowing texel.
+                jump = jump || (!isGlow(texel) && isJumpFront(selectionJumpMap, ivec2(x, y)));
                 glow = glow || (isGlow(texel) && isDrawn(texel));
             }
         }

@@ -27,8 +27,7 @@
 //[ENGINE_BLOCK Matrices]
 
 // An id texel: the id in .rg, low byte then high, 0 for none; in .b whether the outline draws the surface, 1
-// visible, 0.5 hidden and drawn dimmed, 0 hidden and left out; in .a the priority, 0 the highest, below 128, and
-// 128 more on a texel the jump pass marks as the near side of a jump in its object's surface.
+// visible, 0.5 hidden and drawn dimmed, 0 hidden and left out; in .a the priority, 0 the highest.
 
 // The priority of what the pointer is over, which glows instead of being outlined
 // (ALSelectionOutline::PRIORITY_HOVER).
@@ -41,7 +40,7 @@ int decodeId(vec4 texel)
 
 int decodePriority(vec4 texel)
 {
-    return int(texel.a * 255.0 + 0.5) & 127;
+    return int(texel.a * 255.0 + 0.5);
 }
 
 bool isGlow(vec4 texel)
@@ -49,9 +48,11 @@ bool isGlow(vec4 texel)
     return decodePriority(texel) == PRIORITY_HOVER;
 }
 
-bool isJumpFront(vec4 texel)
+// Whether the jump pass (selectionJumpF.glsl) marked the id texel at `pos` as the near side of a jump in its
+// object's surface, in `jumps`, its target: 1 there, 0 elsewhere.
+bool isJumpFront(sampler2D jumps, ivec2 pos)
 {
-    return int(texel.a * 255.0 + 0.5) >= 128;
+    return texelFetch(jumps, pos, 0).r > 0.5;
 }
 
 bool isDrawn(vec4 texel)

@@ -1,6 +1,6 @@
 /**
  * @file selectionJumpF.glsl
- * @brief The selection outline's jump pass (ALSelectionOutline): the id target again, its texels marked where an
+ * @brief The selection outline's jump pass (ALSelectionOutline): a mark on each texel of the id target where an
  *        object's surface steps in front of another part of itself, as one frond of a mesh lies over another.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -23,11 +23,11 @@
  * $/LicenseInfo$
  */
 
-// The id texel (selectionUtilF.glsl), 128 added to its .a where it is the near side of a jump.
+// Into a one-channel target: 1 where the id texel is the near side of a jump, 0 elsewhere.
 out vec4 frag_color;
 
 // The id pass's target, and its depth through the projection loaded for this pass, which the id pass drew with.
-uniform sampler2D diffuseMap;
+uniform sampler2D selectionIdMap;
 uniform sampler2D depthMap;
 
 // How far the surface on each side of a pair of neighbours, carried one texel on at its own slope, must miss the
@@ -36,11 +36,12 @@ const float JUMP_MARGIN = 0.01;
 
 // selectionUtilF.glsl
 int decodeId(vec4 texel);
+bool isGlow(vec4 texel);
 float eyeDistance(float depth);
 
 bool hasId(ivec2 pos, ivec2 size, int id)
 {
-    return all(greaterThanEqual(pos, ivec2(0))) && all(lessThan(pos, size)) && decodeId(texelFetch(diffuseMap, pos, 0)) == id;
+    return all(greaterThanEqual(pos, ivec2(0))) && all(lessThan(pos, size)) && decodeId(texelFetch(selectionIdMap, pos, 0)) == id;
 }
 
 // Whether the surface steps from a texel at stored depth `depth` to its neighbour at `other`, with the texel the
@@ -96,13 +97,14 @@ vec4 gatherDepth(ivec2 corner, vec2 texel_size)
 void main()
 {
     // The viewport is the target's, a fragment to a texel.
-    ivec2 size = textureSize(diffuseMap, 0);
+    ivec2 size = textureSize(selectionIdMap, 0);
     ivec2 pos = ivec2(gl_FragCoord.xy);
-    vec4 texel = texelFetch(diffuseMap, pos, 0);
+    vec4 texel = texelFetch(selectionIdMap, pos, 0);
     int id = decodeId(texel);
 
+    // What glows draws nothing over its own surface, jumps and all, so its jumps are not marked.
     bool front = false;
-    if (id != 0)
+    if (id != 0 && !isGlow(texel))
     {
         // The eight depths two either side along x and y in four gathers; the texels off the target they clamp to
         // are never read as the object's.
@@ -116,5 +118,5 @@ void main()
                 jumpsAlong(pos, size, ivec2(0, 1), id, depth, vec4(below.w, below.x, above.w, above.x));
     }
 
-    frag_color = vec4(texel.rgb, (floor(texel.a * 255.0 + 0.5) + (front ? 128.0 : 0.0)) / 255.0);
+    frag_color = vec4(front ? 1.0 : 0.0);
 }

@@ -35,8 +35,8 @@ class ALSelectionOutline;
 
 /// The glow of what the pointer is over (RenderHoverGlowEnable): the world object LLToolPie's hover names as one a
 /// click does something to, once the name has held for SETTLE_SECONDS, which fades in over RenderHighlightFadeTime
-/// while it glows, while the one before it fades out. ALSelectionOutline draws each at PRIORITY_HOVER, its colour's alpha scaled by its fade, in
-/// the world's call of LLSelectMgr::renderSilhouettes, which advances the fades first.
+/// while it glows, while the one before it fades out. ALSelectionOutline draws each at PRIORITY_HOVER, its colour's
+/// alpha scaled by its fade, in the world's call of LLSelectMgr::renderSilhouettes, which advances the fades first.
 ///
 /// Objects are held by id and looked up as they are drawn, so a glow keeps nothing alive: one whose object is gone
 /// is dropped.

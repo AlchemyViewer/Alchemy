@@ -8831,7 +8831,7 @@
   <key>RenderHighlightColor</key>
   <map>
     <key>Comment</key>
-    <string>Brightness of mouseover highlights.</string>
+    <string>Color of mouseover highlights.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>

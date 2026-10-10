@@ -70,10 +70,10 @@ class LLVOAvatar;
 /// LLGLSLShader gives integer samplers no unit.
 ///
 /// Ids are given in priority order, the highest first (EPriority). The jump pass (interface/selectionJumpF.glsl)
-/// copies the id target into another, marking the texels on the near side of a jump: a step in an object's own
-/// surface between two neighbours, as where one frond of a mesh lies over another. It is told from a crease or a
-/// curve, whose step lies between the slopes either side, by a step outside both, which carried on at its own slope
-/// each side misses by more than JUMP_MARGIN (in the shader) of the distance.
+/// marks, in a one-byte target of its own, the texels of the id target on the near side of a jump: a step in an
+/// object's own surface between two neighbours, as where one frond of a mesh lies over another. It is told from a
+/// crease or a curve, whose step lies between the slopes either side, by a step outside both, which carried on at
+/// its own slope each side misses by more than JUMP_MARGIN (in the shader) of the distance.
 ///
 /// The edge pass (interface/selectionOutlineF.glsl) is a full-screen triangle, scissored to the objects' projected
 /// boxes grown by the reach of their contour or glow. A pixel draws the contour of the drawn surfaces within its reach that stand
@@ -103,12 +103,21 @@ class LLVOAvatar;
 ///
 /// The disk a pixel searches grows with the square of the contour's width, and most pixels in the scissor are far
 /// from anything to draw. The tile pass (interface/selectionTileF.glsl) records for each TILE_SIZE square of the
-/// marked target the lowest and highest nonzero id it holds, whether it holds the near side of a jump and whether
+/// id target the lowest and highest nonzero id it holds, whether it holds the near side of a jump and whether
 /// it holds the drawn surface of an object that glows. The edge pass leaves a pixel at once when no tile within its
-/// reach holds what it could draw from: any id, off every object; on one, an id not its own or a jump. It searches
-/// as far as the glow reaches only where a tile within that reach holds a glowing surface other than the pixel's
-/// own. Whatever a pixel draws, it draws from such a texel within its reach, whose own tile records it, so neither
-/// changes anything it draws.
+/// reach holds what it could draw from: any id, off every object; on one, an id not its own or a jump. Whatever a
+/// pixel draws, it draws from such a texel within its reach, whose own tile records it, so this changes nothing it
+/// draws.
+///
+/// The glow reaches farther than the lines, and its disk would be searched by every pixel near a glowing object.
+/// Where something glows, the glow reach pass (interface/selectionGlowReachF.glsl) records for each tile the
+/// lowest and highest id of the tiles holding a glowing surface within the glow's reach of it, so a pixel learns
+/// from one texel whether a glow other than its own object's can be near; and the glow row pass
+/// (interface/selectionGlowRowF.glsl) records for each texel how far along its row the nearest glowing texel lies.
+/// Off every object, where every glowing surface stands in front, the nearest glowing texel in the disk is the
+/// nearest of those a row, which the edge pass reads up and down its column; on an object, which stand in front
+/// depends on the object's plane, and the disk is searched. Both give what the full search gives (GLOW_DISK in
+/// selectionOutlineF.glsl), and the jump pass leaves out what glows, whose own surface draws nothing.
 ///
 /// The targets exist only while something is drawn: they are made the first frame there is, given up once a frame
 /// and TARGET_KEEP_SECONDS have passed without a call drawing with them (the world calls render every frame and the
@@ -255,8 +264,9 @@ public:
     /// What an edge between two objects keeps of its object's outline opacity (INNER_OPACITY in
     /// selectionOutlineF.glsl).
     static constexpr F32 INNER_OPACITY = 0.6f;
-    /// The texture alpha an alpha-blended face is outlined from: where it is drawn at least half opaque.
-    static constexpr F32 BLEND_ALPHA_CUTOFF = 0.5f;
+    /// The texture alpha an alpha-blended face is outlined from: wherever it is drawn at all, so a uniformly
+    /// translucent texture, as glass is, keeps its face, while the clear texels around a leaf on its card are cut.
+    static constexpr F32 BLEND_ALPHA_CUTOFF = 0.1f;
     /// A face whose texture is not read: every fragment is outlined.
     static constexpr F32 NO_ALPHA_TEST = -1.f;
     /// The base colour transform of a face whose texture coordinates have their transform in them.
@@ -275,8 +285,11 @@ public:
     static constexpr F32 DEFAULT_GLOW_THICKNESS = 0.6f;
     static constexpr F32 DEFAULT_GLOW_BRIGHTNESS = 4.f;
     /// The glow's reach in pixels at a UI scale of 1 is held to this, the contour's widest: the edge pass searches
-    /// a disk that wide around every pixel near a glowing object.
+    /// a disk that wide around the pixels on an object near a glowing one.
     static constexpr F32 MAX_GLOW_RADIUS = 16.f;
+    /// The glow's reach in pixels is held to this at any UI scale: the glow row pass records a distance one past the
+    /// reach, and one more than that, in a byte.
+    static constexpr S32 MAX_GLOW_PIXELS = 253;
     static constexpr F32 MAX_GLOW_BRIGHTNESS = 64.f;
     /// The glow's profile at its object's silhouette, before the brightness: the default brightness lays it on
     /// opaque there, as LL's glow did (GLOW_PEAK in selectionOutlineF.glsl).
@@ -338,7 +351,7 @@ public:
              U32 parts);
 
     /// Draws what was added since the last call over the bound framebuffer, with `view`, and forgets it, giving up
-    /// the targets no call has drawn with since the frame before this one.
+    /// the targets that are stale (stale).
     void render(const View& view);
 
     /// Gives up the targets.
@@ -371,14 +384,14 @@ public:
 
     /// How far in pixels the glow reaches past its object's silhouette for RenderHighlightThickness `thickness` at
     /// `ui_scale`: thickness x GLOW_PIXELS at a UI scale of 1, held to MAX_GLOW_RADIUS, and its default where the
-    /// setting is not a number; a pixel at least.
+    /// setting is not a number; a pixel at least, and MAX_GLOW_PIXELS at most.
     static S32 glowRadius(F32 thickness, F32 ui_scale);
 
     /// The glow's opacity before its colour's alpha `dist` pixels from the centre of its object's nearest texel, its
     /// silhouette half a texel out: brightness x GLOW_PEAK x (1 - smoothstep(0, 1, x)), x the distance past the
     /// silhouette over `radius`, held to 1. It falls smoothly to nothing at `radius` past the silhouette, and the
     /// brightness keeps a band of it opaque at the silhouette where it is over 1 / GLOW_PEAK. As the edge pass
-    /// computes it, with the brightness in the integer steps the pass is given it in.
+    /// computes it.
     static F32 glowOpacity(F32 dist, S32 radius, F32 brightness);
 
     /// The texture alpha below which a face whose texture is `texture_id` is not outlined, from `cutoff`, what its
@@ -449,17 +462,34 @@ public:
     /// identity for a legacy face, whose texture coordinates have their transform in them.
     static void setAlphaTest(LLGLSLShader& program, F32 cutoff, const LLGLTFMaterial::TextureTransform::Pack& transform);
 
-    /// The jump pass with the bound jump program: `ids`, the id target, copied into `marked` with the near sides of
-    /// jumps marked, over the texels under `rect`; the others are cleared, as `ids` holds nothing there when the
-    /// rect covers every selected texel. Its depth is read through `view`'s projection, which the id pass drew with.
-    static void drawJumps(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& marked, const LLRect& rect,
+    /// The jump pass with the bound jump program: into `jumps`, R8 at the size of `ids`, the id target, 1 on the
+    /// texels on the near side of a jump and 0 elsewhere, over the texels under `rect`; the others are cleared, as
+    /// `ids` holds nothing there when the rect covers every selected texel. Its depth is read through `view`'s
+    /// projection, which the id pass drew with.
+    static void drawJumps(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& jumps, const LLRect& rect,
                           const View& view, LLVertexBuffer& triangle);
 
-    /// The tile pass with the bound tile program: into `tiles`, RGBA16, a texel to each TILE_SIZE square of
-    /// `marked`, over the tiles under `rect`, a rect of `marked`; the others are cleared, and hold nothing when the
-    /// rect covers every selected texel.
-    static void drawTiles(LLGLSLShader& program, LLRenderTarget& marked, LLRenderTarget& tiles, const LLRect& rect,
-                          LLVertexBuffer& triangle);
+    /// The tile pass with the bound tile program: into `tiles`, RGBA16, a texel to each TILE_SIZE square of `ids`,
+    /// the id target, and of `jumps`, the jump pass's marks, over the tiles under `rect`, a rect of `ids`; the others
+    /// are cleared, and hold nothing when the rect covers every selected texel.
+    static void drawTiles(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& jumps, LLRenderTarget& tiles,
+                          const LLRect& rect, LLVertexBuffer& triangle);
+
+    /// The tiles of the id target a rect of its texels touches.
+    static LLRect tileRect(const LLRect& rect);
+
+    /// The glow reach pass with the bound glow reach program: into `reach`, RGBA16 at the size of `tiles`, the tile
+    /// pass's record, for each tile the lowest and highest id of the tiles within `view`'s glow radius of it that hold
+    /// a glowing surface, over the tiles under `rect`, a rect of the id target; the others are cleared, and hold no
+    /// glowing surface near them when the rect covers every selected texel and the glow's reach around them.
+    static void drawGlowReach(LLGLSLShader& program, LLRenderTarget& tiles, LLRenderTarget& reach, const LLRect& rect,
+                              const View& view, LLVertexBuffer& triangle);
+
+    /// The glow row pass with the bound glow row program: into `rows`, R8 at the size of `ids`, the id target, for
+    /// each texel how far along its row the nearest glowing texel within `view`'s glow radius lies, with `reach`, the
+    /// glow reach pass's record, over the texels under `rect`; the others are cleared, as for drawGlowReach.
+    static void drawGlowRows(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& reach, LLRenderTarget& rows,
+                             const LLRect& rect, const View& view, LLVertexBuffer& triangle);
 
     /// Binds what a wireframe pass reads to the bound wireframe program: the pass, the lines' width, the viewport's
     /// size, the palette, and for WIRE_ID_DEPTH the depth of `ids`, the id target.
@@ -467,11 +497,13 @@ public:
                              LLRenderTarget* ids);
 
     /// The edge pass with the bound outline program and `view`'s widths, over the viewport and scissor in force:
-    /// ids from `marked`, their depth from `ids` through `view`'s projection, which the id pass drew with, and the
-    /// tile pass's record from `tiles`. With `glow`, where an object glows, the pass reaches as far as the glow; and
-    /// only then.
-    static void drawEdges(LLGLSLShader& program, LLRenderTarget& marked, LLRenderTarget& ids, LLRenderTarget& tiles,
-                          U32 palette, const View& view, bool glow, LLVertexBuffer& triangle);
+    /// ids and their depth from `ids`, the id target, the depth through `view`'s projection, which the id pass drew
+    /// with, the jump pass's marks from `jumps` and the tile pass's record from `tiles`. With `glow_reach` and
+    /// `glow_rows`, the glow reach and row passes' records, where an object glows, the pass draws the glow; and only
+    /// then.
+    static void drawEdges(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& jumps, LLRenderTarget& tiles,
+                          LLRenderTarget* glow_reach, LLRenderTarget* glow_rows, U32 palette, const View& view,
+                          LLVertexBuffer& triangle);
 
 private:
     // The full-screen triangle with the bound program, `projection` loaded for its draw where given: the triangle
@@ -555,14 +587,17 @@ private:
     std::vector<U8> mPaletteTexels;
 
     LLRenderTarget mIdMap;
-    LLRenderTarget mMarkedMap;
+    LLRenderTarget mJumpMap;
     LLRenderTarget mTileMap;
+    LLRenderTarget mGlowReachMap;
+    LLRenderTarget mGlowRowMap;
     U32 mPalette = 0;
     U32 mPaletteRows = 0;
 
-    // When the id target, the jump and tile targets, and the palette were last drawn with.
+    // When the id target, the jump and tile targets, the glow's, and the palette were last drawn with.
     Use mIdUse;
     Use mEdgeUse;
+    Use mGlowUse;
     Use mPaletteUse;
 
     // The pixels this frame's outlines can touch, and whether any can.
@@ -607,7 +642,7 @@ inline S32 ALSelectionOutline::glowRadius(F32 thickness, F32 ui_scale)
 {
     // Asked outright: /fp:fast may answer a comparison with a NaN either way.
     const F32 held = llisnan(thickness) ? DEFAULT_GLOW_THICKNESS : thickness;
-    return lineWidth(llclamp(held * GLOW_PIXELS, 0.f, MAX_GLOW_RADIUS), ui_scale);
+    return llmin(lineWidth(llclamp(held * GLOW_PIXELS, 0.f, MAX_GLOW_RADIUS), ui_scale), MAX_GLOW_PIXELS);
 }
 
 inline F32 ALSelectionOutline::glowOpacity(F32 dist, S32 radius, F32 brightness)
@@ -810,7 +845,7 @@ inline void ALSelectionOutline::bindWirePass(LLGLSLShader& program, EWirePass pa
     program.uniform1i(LLShaderMgr::WIREFRAME_PASS, (GLint)pass);
     program.uniform1i(LLShaderMgr::WIREFRAME_WIDTH, llmax(wire_width, 1));
     program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)width, (F32)height);
-    const S32 channel = program.enableTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
+    const S32 channel = program.enableTexture(LLShaderMgr::SELECTION_PALETTE);
     if (channel > -1)
     {
         gGL.getTextureSlot(channel)->bindManual(ALTextureSlot::TT_TEXTURE, palette, gGL.getSampler(ALSamplers::PointClamp));
@@ -879,40 +914,82 @@ inline void ALSelectionOutline::drawUnder(LLRenderTarget& target, const LLRect& 
     target.flush();
 }
 
-inline void ALSelectionOutline::drawJumps(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& marked,
+inline void ALSelectionOutline::drawJumps(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& jumps,
                                           const LLRect& rect, const View& view, LLVertexBuffer& triangle)
 {
-    program.bindTexture(LLShaderMgr::DIFFUSE_MAP, &ids, ALSamplers::PointClamp);
+    program.bindTexture(LLShaderMgr::SELECTION_ID_MAP, &ids, ALSamplers::PointClamp);
     program.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &ids);
-    drawUnder(marked, rect, triangle, &view.mProjection);
+    drawUnder(jumps, rect, triangle, &view.mProjection);
     program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
-    program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+    program.unbindTexture(LLShaderMgr::SELECTION_ID_MAP);
 }
 
-inline void ALSelectionOutline::drawTiles(LLGLSLShader& program, LLRenderTarget& marked, LLRenderTarget& tiles,
-                                          const LLRect& rect, LLVertexBuffer& triangle)
+inline LLRect ALSelectionOutline::tileRect(const LLRect& rect)
 {
     const S32 left = llmax(rect.mLeft, 0) / (S32)TILE_SIZE;
     const S32 bottom = llmax(rect.mBottom, 0) / (S32)TILE_SIZE;
     const S32 right = (S32)tileCount((U32)llmax(rect.mRight, 0));
     const S32 top = (S32)tileCount((U32)llmax(rect.mTop, 0));
-
-    // The tile program reads no depth, and needs no projection.
-    program.bindTexture(LLShaderMgr::DIFFUSE_MAP, &marked, ALSamplers::PointClamp);
-    drawUnder(tiles, LLRect(left, top, right, bottom), triangle, nullptr);
-    program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+    return LLRect(left, top, right, bottom);
 }
 
-inline void ALSelectionOutline::drawEdges(LLGLSLShader& program, LLRenderTarget& marked, LLRenderTarget& ids,
-                                          LLRenderTarget& tiles, U32 palette, const View& view, bool glow,
-                                          LLVertexBuffer& triangle)
+inline void ALSelectionOutline::drawTiles(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& jumps,
+                                          LLRenderTarget& tiles, const LLRect& rect, LLVertexBuffer& triangle)
 {
-    // Point sampled all four: the ids, their depth, the tiles and the palette are data, and texelFetch reads them
-    // whatever the filter.
-    program.bindTexture(LLShaderMgr::DIFFUSE_MAP, &marked, ALSamplers::PointClamp);
+    // The tile program reads no depth, and needs no projection.
+    program.bindTexture(LLShaderMgr::SELECTION_ID_MAP, &ids, ALSamplers::PointClamp);
+    program.bindTexture(LLShaderMgr::SELECTION_JUMP_MAP, &jumps, ALSamplers::PointClamp);
+    drawUnder(tiles, tileRect(rect), triangle, nullptr);
+    program.unbindTexture(LLShaderMgr::SELECTION_JUMP_MAP);
+    program.unbindTexture(LLShaderMgr::SELECTION_ID_MAP);
+}
+
+inline void ALSelectionOutline::drawGlowReach(LLGLSLShader& program, LLRenderTarget& tiles, LLRenderTarget& reach,
+                                              const LLRect& rect, const View& view, LLVertexBuffer& triangle)
+{
+    // The glow reach program reads no depth, and needs no projection.
+    program.bindTexture(LLShaderMgr::SELECTION_TILE_MAP, &tiles, ALSamplers::PointClamp);
+    program.uniform1i(LLShaderMgr::OUTLINE_GLOW_RADIUS, llclamp(view.mGlowRadius, 1, MAX_GLOW_PIXELS));
+    drawUnder(reach, tileRect(rect), triangle, nullptr);
+    program.unbindTexture(LLShaderMgr::SELECTION_TILE_MAP);
+}
+
+inline void ALSelectionOutline::drawGlowRows(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& reach,
+                                             LLRenderTarget& rows, const LLRect& rect, const View& view,
+                                             LLVertexBuffer& triangle)
+{
+    // The glow row program reads no depth, and needs no projection.
+    program.bindTexture(LLShaderMgr::SELECTION_ID_MAP, &ids, ALSamplers::PointClamp);
+    program.bindTexture(LLShaderMgr::SELECTION_GLOW_REACH_MAP, &reach, ALSamplers::PointClamp);
+    program.uniform1i(LLShaderMgr::OUTLINE_GLOW_RADIUS, llclamp(view.mGlowRadius, 1, MAX_GLOW_PIXELS));
+    drawUnder(rows, rect, triangle, nullptr);
+    program.unbindTexture(LLShaderMgr::SELECTION_GLOW_REACH_MAP);
+    program.unbindTexture(LLShaderMgr::SELECTION_ID_MAP);
+}
+
+inline void ALSelectionOutline::drawEdges(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& jumps,
+                                          LLRenderTarget& tiles, LLRenderTarget* glow_reach, LLRenderTarget* glow_rows,
+                                          U32 palette, const View& view, LLVertexBuffer& triangle)
+{
+    // Point sampled all: the ids, their depth, the jumps, the tiles, the glow's records and the palette are data,
+    // and texelFetch reads them whatever the filter.
+    const bool glow = glow_reach && glow_rows;
+    program.bindTexture(LLShaderMgr::SELECTION_ID_MAP, &ids, ALSamplers::PointClamp);
     program.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &ids);
-    program.bindTexture(LLShaderMgr::SPECULAR_MAP, &tiles, ALSamplers::PointClamp);
-    const S32 channel = program.enableTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
+    program.bindTexture(LLShaderMgr::SELECTION_JUMP_MAP, &jumps, ALSamplers::PointClamp);
+    program.bindTexture(LLShaderMgr::SELECTION_TILE_MAP, &tiles, ALSamplers::PointClamp);
+    if (glow)
+    {
+        program.bindTexture(LLShaderMgr::SELECTION_GLOW_REACH_MAP, glow_reach, ALSamplers::PointClamp);
+        program.bindTexture(LLShaderMgr::SELECTION_GLOW_ROW_MAP, glow_rows, ALSamplers::PointClamp);
+    }
+    else
+    {
+        // Not read without a glow; left empty rather than holding whatever the units last had.
+        program.unbindTexture(LLShaderMgr::SELECTION_GLOW_REACH_MAP);
+        program.unbindTexture(LLShaderMgr::SELECTION_GLOW_ROW_MAP);
+    }
+    const S32 channel = program.enableTexture(LLShaderMgr::SELECTION_PALETTE);
     if (channel > -1)
     {
         gGL.getTextureSlot(channel)->bindManual(ALTextureSlot::TT_TEXTURE, palette, gGL.getSampler(ALSamplers::PointClamp));
@@ -920,13 +997,16 @@ inline void ALSelectionOutline::drawEdges(LLGLSLShader& program, LLRenderTarget&
     program.uniform1i(LLShaderMgr::OUTLINE_WIDTH, llmax(view.mWidth, 1));
     program.uniform1i(LLShaderMgr::OUTLINE_INNER_WIDTH, llmax(view.mInnerWidth, 1));
     // A radius of 0 is no glow: the pass reaches no further than the lines.
-    program.uniform1i(LLShaderMgr::OUTLINE_GLOW_RADIUS, glow ? llmax(view.mGlowRadius, 1) : 0);
+    program.uniform1i(LLShaderMgr::OUTLINE_GLOW_RADIUS, glow ? llclamp(view.mGlowRadius, 1, MAX_GLOW_PIXELS) : 0);
     program.uniform1f(LLShaderMgr::OUTLINE_GLOW_BRIGHTNESS, view.mGlowBrightness);
 
     drawTriangle(triangle, &view.mProjection);
 
-    program.unbindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
-    program.unbindTexture(LLShaderMgr::SPECULAR_MAP);
+    program.unbindTexture(LLShaderMgr::SELECTION_PALETTE);
+    program.unbindTexture(LLShaderMgr::SELECTION_GLOW_ROW_MAP);
+    program.unbindTexture(LLShaderMgr::SELECTION_GLOW_REACH_MAP);
+    program.unbindTexture(LLShaderMgr::SELECTION_TILE_MAP);
+    program.unbindTexture(LLShaderMgr::SELECTION_JUMP_MAP);
     program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
-    program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+    program.unbindTexture(LLShaderMgr::SELECTION_ID_MAP);
 }

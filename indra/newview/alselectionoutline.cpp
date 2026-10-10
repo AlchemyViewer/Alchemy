@@ -36,6 +36,7 @@
 #include "llui.h"
 #include "llviewercamera.h"
 #include "llviewercontrol.h"
+#include "llviewerdisplay.h"
 #include "llviewerobject.h"
 #include "llviewerregion.h"
 #include "llviewershadermgr.h"
@@ -44,9 +45,6 @@
 #include "pipeline.h"
 
 #include <iterator>
-
-// llviewerdisplay.cpp: the matrices the HUD's attachments are drawn with.
-bool get_hud_matrices(LLMatrix4a& proj, LLMatrix4a& model);
 
 namespace
 {
@@ -124,13 +122,21 @@ void ALSelectionOutline::release()
     {
         mIdMap.release();
     }
-    if (mMarkedMap.isComplete())
+    if (mJumpMap.isComplete())
     {
-        mMarkedMap.release();
+        mJumpMap.release();
     }
     if (mTileMap.isComplete())
     {
         mTileMap.release();
+    }
+    if (mGlowReachMap.isComplete())
+    {
+        mGlowReachMap.release();
+    }
+    if (mGlowRowMap.isComplete())
+    {
+        mGlowRowMap.release();
     }
     if (mPalette)
     {
@@ -149,13 +155,24 @@ void ALSelectionOutline::releaseStale(U32 frame, F64 now)
     }
     if (stale(mEdgeUse.mFrame, mEdgeUse.mTime, frame, now))
     {
-        if (mMarkedMap.isComplete())
+        if (mJumpMap.isComplete())
         {
-            mMarkedMap.release();
+            mJumpMap.release();
         }
         if (mTileMap.isComplete())
         {
             mTileMap.release();
+        }
+    }
+    if (stale(mGlowUse.mFrame, mGlowUse.mTime, frame, now))
+    {
+        if (mGlowReachMap.isComplete())
+        {
+            mGlowReachMap.release();
+        }
+        if (mGlowRowMap.isComplete())
+        {
+            mGlowRowMap.release();
         }
     }
     if (mPalette && stale(mPaletteUse.mFrame, mPaletteUse.mTime, frame, now))
@@ -217,13 +234,26 @@ void ALSelectionOutline::render(const View& view)
     }
     if (passes.mEdges)
     {
-        if (!mMarkedMap.isComplete() || !mTileMap.isComplete() || mMarkedMap.getWidth() != (U32)width ||
-            mMarkedMap.getHeight() != (U32)height)
+        if (!mJumpMap.isComplete() || !mTileMap.isComplete() || mJumpMap.getWidth() != (U32)width ||
+            mJumpMap.getHeight() != (U32)height)
         {
-            allocated = allocated && mMarkedMap.allocate(width, height, GL_RGBA8) &&
+            allocated = allocated && mJumpMap.allocate(width, height, GL_R8) &&
                         mTileMap.allocate(tileCount((U32)width), tileCount((U32)height), GL_RGBA16);
         }
         mEdgeUse = use;
+    }
+    // The glow is drawn where its passes' programs loaded; without them what glows is drawn with nothing.
+    const bool glow = passes.mEdges && wants.mGlow && gSelectionGlowReachProgram.isComplete() &&
+                      gSelectionGlowRowProgram.isComplete();
+    if (glow)
+    {
+        if (!mGlowReachMap.isComplete() || !mGlowRowMap.isComplete() || mGlowRowMap.getWidth() != (U32)width ||
+            mGlowRowMap.getHeight() != (U32)height)
+        {
+            allocated = allocated && mGlowReachMap.allocate(tileCount((U32)width), tileCount((U32)height), GL_RGBA16) &&
+                        mGlowRowMap.allocate(width, height, GL_R8);
+        }
+        mGlowUse = use;
     }
     mPaletteUse = use;
     releaseStale(use.mFrame, use.mTime);
@@ -289,9 +319,18 @@ void ALSelectionOutline::render(const View& view)
             // The scissor holds every texel drawn and the reach of its line or glow around them; the edge pass reads
             // no further, and what it reads past the jump and tile passes' work they clear to nothing, as it is.
             gSelectionJumpProgram.bind();
-            drawJumps(gSelectionJumpProgram, mIdMap, mMarkedMap, mScissor, view, *gPipeline.mScreenTriangleVB);
+            drawJumps(gSelectionJumpProgram, mIdMap, mJumpMap, mScissor, view, *gPipeline.mScreenTriangleVB);
             gSelectionTileProgram.bind();
-            drawTiles(gSelectionTileProgram, mMarkedMap, mTileMap, mScissor, *gPipeline.mScreenTriangleVB);
+            drawTiles(gSelectionTileProgram, mIdMap, mJumpMap, mTileMap, mScissor, *gPipeline.mScreenTriangleVB);
+            if (glow)
+            {
+                gSelectionGlowReachProgram.bind();
+                drawGlowReach(gSelectionGlowReachProgram, mTileMap, mGlowReachMap, mScissor, view,
+                              *gPipeline.mScreenTriangleVB);
+                gSelectionGlowRowProgram.bind();
+                drawGlowRows(gSelectionGlowRowProgram, mIdMap, mGlowReachMap, mGlowRowMap, mScissor, view,
+                             *gPipeline.mScreenTriangleVB);
+            }
 
             LLGLSColorMask mask(true, false);
             LLGLDepthTest depth(GL_FALSE);
@@ -301,8 +340,8 @@ void ALSelectionOutline::render(const View& view)
                                  mScissor.getHeight());
 
             gSelectionOutlineProgram.bind();
-            drawEdges(gSelectionOutlineProgram, mMarkedMap, mIdMap, mTileMap, mPalette, view, wants.mGlow,
-                      *gPipeline.mScreenTriangleVB);
+            drawEdges(gSelectionOutlineProgram, mIdMap, mJumpMap, mTileMap, glow ? &mGlowReachMap : nullptr,
+                      glow ? &mGlowRowMap : nullptr, mPalette, view, *gPipeline.mScreenTriangleVB);
         }
     }
 
@@ -593,7 +632,7 @@ void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height)
                 drawFaces(program, entry, rigged, view, box, [&] { setId(program, i + 1, entry.mPriority, entry.mShowHidden); });
             }
             program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
-            program.unbindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
+            program.unbindTexture(LLShaderMgr::SELECTION_PALETTE);
             program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
         }
     }

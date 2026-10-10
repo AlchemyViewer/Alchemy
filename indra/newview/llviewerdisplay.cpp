@@ -141,7 +141,6 @@ void render_hud_attachments();
 void render_ui_3d();
 void render_ui_2d();
 void render_disconnected_background();
-bool get_hud_matrices(LLMatrix4a& proj, LLMatrix4a& model);
 
 void getProfileStatsContext(LLSD& stats);
 std::string getProfileStatsFilename();
