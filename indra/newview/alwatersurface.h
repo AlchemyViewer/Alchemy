@@ -30,6 +30,7 @@
 #include "llpointer.h"
 #include "lluuid.h"
 #include "v2math.h"
+#include "v3math.h"
 #include "v4math.h"
 
 #include <memory>
@@ -53,9 +54,9 @@ class LLViewerTexture;
 class ALWaterSurface
 {
 public:
-    /// Lays the field out around the main camera and refills the map if its key moved. Once a main frame, at its start,
-    /// before anything draws or fits to the water, with the context current; without an agent region nothing changes,
-    /// and with RenderWater off there is no field.
+    /// Lays the field out around the main camera and refills the map if its key moved, and follows the water pool's
+    /// wave normal maps (trackMaps). Once a main frame, at its start, before anything draws or fits to the water, with
+    /// the context current; without an agent region nothing changes, and with RenderWater off there is no field.
     void update();
 
     /// Whether there is a field to draw.
@@ -71,26 +72,39 @@ public:
     void bind(LLGLSLShader& shader) const;
 
     /// Draws the field with `shader`, bound and bound to the field (bind): ALWaterField::fieldDraws, instances whose
-    /// vertices the vertex stage places (water_vertex). Nothing before the first update.
-    void draw(LLGLSLShader& shader) const;
+    /// vertices the vertex stage places (water_vertex). With `patched`, where the waves' patches are drawn too
+    /// (bindWaves with them drawn), the cells beside them are drawn as the fringe. Nothing before the first update.
+    void draw(LLGLSLShader& shader, bool patched) const;
+
+    /// Whether the water is drawn with waves this frame: AlchemyRenderWaterWaves where tessellation is, a cell within
+    /// the reach, and a map whose heights have landed. Captures always draw the field flat.
+    bool wavesDrawn() const { return mWavesDrawn; }
+
+    /// A, the most the waves move the surface this frame, in metres; 0 without waves.
+    F32 maxDisplacement() const { return mWavesDrawn ? mMaxDisplacement : 0.f; }
+
+    /// The waves' patches drawn this frame: PATCHES_PER_CELL squared for each cell within the reach; 0 without waves.
+    S32 patchCount() const;
+
+    /// Sets what the water's own draws need for the waves on `shader`, bound and bound to the field: where this view
+    /// draws them (`drawn`, never without wavesDrawn), the cells the patches cover, which a flat draw then leaves out,
+    /// and for the waves' program (`patches`), their tessellation, cull and heights, the maps bound as the current
+    /// (`a`) and next (`b`) map giving those. Where it does not, no cell is left out.
+    void bindWaves(LLGLSLShader& shader, bool drawn, bool patches, const LLViewerTexture* a, const LLViewerTexture* b) const;
+
+    /// Draws the waves' patches with the waves' program, bound and bound to the field and the waves (bindWaves).
+    void drawPatches(LLGLSLShader& shader) const;
 
     /// The field's outer rectangle, horizontally, relative to `eye` in agent space: the rim each way from the square's
     /// centre. False before the first update.
     bool rim(const LLVector3& eye, LLVector2& lo, LLVector2& hi) const;
 
     /// Whether `camera`'s frustum meets the field at all: its slab, from rim to rim and from its lowest water to its
-    /// highest. False only where the view misses the whole sea, as looking up.
+    /// highest, and A past each for the waves. False only where the view misses the whole sea, as looking up.
     bool inView(LLCamera& camera) const;
 
-    /// Grows `min` and `max` (agent space) to hold the field: its rim, and its lowest and highest water.
+    /// Grows `min` and `max` (agent space) to hold the field: its rim, and its lowest and highest water, A past each.
     void addExtents(LLVector3& min, LLVector3& max) const;
-
-    /// Follows the environment's two wave normal maps, current and next, for what the water's shaders take from their
-    /// pixels: each map's mean slope, and the heights its waves are displaced by (ALWaterHeightBake), both worked on
-    /// the General queue, the heights uploaded here. A map's pixels are asked for while something is still to come
-    /// from them, and read in place; the texture lets them go in its own time. What they gave is kept for the last few
-    /// maps seen. Once a main frame, from the water pool.
-    void trackMaps(LLViewerTexture* current, LLViewerTexture* next);
 
     /// waterSurface.glsl's waterMapMean for the maps bound as the current (`a`) and next (`b`) map: each one's mean
     /// normal xy, zero for a map whose pixels have not arrived or that is null.
@@ -110,6 +124,18 @@ public:
     Heights mapHeights(const LLViewerTexture* map) const;
 
     static constexpr F64 RAMP_SECONDS = 1.0;
+
+    /// The waves' settings, held to their ranges: the wave height dial and the tessellation density.
+    struct WaveSettings
+    {
+        F32 mHeight = 1.f;
+        F32 mDensity = 64.f;
+    };
+    static WaveSettings waveSettings();
+
+    /// Whether the waves are wanted this session: AlchemyRenderWaterWaves, where tessellation is (GL 4.0). The waves'
+    /// programs, and the heights they read, exist only then.
+    static bool wavesWanted();
 
     const ALWaterField::Layout& getLayout() const { return mLayout; }
 
@@ -134,7 +160,8 @@ private:
     {
         LLUUID               mID;
         LLVector2            mMean;
-        bool                 mKnown = false;        ///< the mean and heights have landed
+        bool                 mKnown = false;        ///< the mean has landed
+        bool                 mHeightsBaked = false; ///< the heights have landed, or the map had none to give
         bool                 mBaking = false;       ///< its pixels are on the General queue
         U32                  mUsed = 0;             ///< the frame it was last tracked, for the cache's eviction
         std::shared_ptr<const std::vector<U16>> mTexels; ///< the heights as RG16F texels; null without heights
@@ -150,10 +177,16 @@ private:
     /// What a bake hands back to the main thread.
     struct Baked;
 
+    /// Follows the water pool's two wave normal maps, current and next, for what the water's shaders take from their
+    /// pixels: each map's mean slope, and with `heights` the heights its waves are displaced by (ALWaterHeightBake),
+    /// both worked on the General queue, the heights uploaded here when wanted. A map's pixels are asked for when
+    /// something is still to come from them, and read in place; the texture lets them go in its own time. What they
+    /// gave is kept for the last few maps seen.
+    void            trackMaps(LLViewerTexture* current, LLViewerTexture* next, bool heights);
     MapStats&       mapStats(const LLUUID& id);
     MapStats*       findMapStats(const LLUUID& id);
     const MapStats* findMapStats(const LLUUID& id) const;
-    void            bakeMap(MapStats& stats, LLPointer<LLImageRaw> raw);
+    void            bakeMap(MapStats& stats, LLPointer<LLImageRaw> raw, bool heights);
     void            land(const LLUUID& id, Baked& baked);
     void            uploadHeights(MapStats& stats);
 
@@ -161,11 +194,17 @@ private:
     LLVector4            mSquare;
     LLVector2            mCentre;
     F32                  mDefaultHeight = DEFAULT_WATER_HEIGHT;
+    // The camera the layout is around, in agent space: the waves' fade follows it in every view.
+    LLVector3            mEye;
     F32                  mLowest = DEFAULT_WATER_HEIGHT;
     F32                  mHighest = DEFAULT_WATER_HEIGHT;
     // RENDER_TYPE_VOIDWATER as the frame began: the passes that draw the water run under render-type masks that
     // leave it out.
     bool                 mVoidDrawn = true;
+    bool                 mWavesDrawn = false;
+    F32                  mMaxDisplacement = 0.f;
+    // The maps tracked this frame, current and next, whose heights the waves' bound is taken from.
+    LLUUID               mTracked[2];
     Key                  mKey;
     Key                  mScratch;
     std::vector<F32>     mTexels;

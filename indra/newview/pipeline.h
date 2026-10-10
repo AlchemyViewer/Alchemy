@@ -1028,9 +1028,11 @@ public:
     ALWaterSurface              mWaterSurface;
 
     // Profiling tracks, plotted at the start of each main frame for the frame before: the primitives the main view's
-    // terrain and water passes draw, and the draws of water geometry in every view and pass.
+    // terrain and water passes draw, the water's flat field and its waves' patches apart, and the draws of water
+    // geometry in every view and pass.
     ALPrimitivePlot             mTerrainPrimitives{ "terrain primitives", true };
     ALPrimitivePlot             mWaterPrimitives{ "water primitives", false };
+    ALPrimitivePlot             mWaterPatchPrimitives{ "water patch primitives", true };
     U32                         mWaterDraws = 0;
 
     static const U32 MAX_PREVIEW_WIDTH;

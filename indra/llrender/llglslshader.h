@@ -69,12 +69,10 @@ public:
     bool isPBRTerrain = false;
     bool hasTessellatedTerrain = false; // terrainSurface for the evaluation and fragment stages, and the atmospherics interface the evaluation stage owes the fragment stage
     bool hasWaterSurface = false; // waterSurface for the vertex and fragment stages: the water's field, heights and wave coordinates
+    bool hasWaterWaves = false; // waterSurface and the lattice for the evaluation stage too: the waves' displacement
     bool hasTonemap = false;
     bool hasColorGrade = false;
     bool hasPostEffects = false;
-    // The byte the flags above leave short of the struct's alignment, held at zero for hash(). A flag added above takes
-    // it.
-    U8 mHashFiller = 0;
 };
 // LLGLSLShader::hash() reads these bytes, so every byte must be a member's: padding has no value a copy need keep, and
 // would make a program's binary-cache key differ from run to run. A flag that would leave some needs a filler beside it.

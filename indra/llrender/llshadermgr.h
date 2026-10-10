@@ -643,6 +643,16 @@ public:
         WATER_LATTICE_FRAC,                 //  "waterLatticeFrac"  the camera's place on the tiled layers' lattices, its fraction
         WATER_LATTICE_BASE,                 //  "waterLatticeBase"  and the low 32 bits of its floor
         WATER_MAP_MEAN,                     //  "waterMapMean"  the two wave maps' mean normal xy
+        WATER_PATCH_RECT,                   //  "waterPatchRect"  the cells drawn as wave patches, square-local, max exclusive
+        WATER_TESS_DENSITY,                 //  "waterTessDensity"  the waves' tessellation density
+        WATER_MAX_DISPLACEMENT,             //  "waterMaxDisplacement"  the most the waves move the surface, in metres
+        WATER_CULL_PLANES,                  //  "waterCullPlanes"  the view's frustum planes but the far one, agent space
+        WATER_HEIGHT_MAP,                   //  "waterHeightMap"  the current wave map's baked heights
+        WATER_HEIGHT_MAP2,                  //  "waterHeightMap2"  the next wave map's
+        WATER_WAVE_AMP,                     //  "waterWaveAmp"  each map's wave height: the dial times its rise
+        WATER_WAVE_REACH,                   //  "waterWaveReach"  the tessellation reach, and the most the waves move the surface
+        WATER_WAVE_EYE,                     //  "waterWaveEye"  the camera the waves were laid out around, in agent space
+        WATER_RAISE,                        //  "waterRaise"  how far the field a draw places is raised
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;

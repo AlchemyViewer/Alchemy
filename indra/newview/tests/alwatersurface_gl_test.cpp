@@ -1,8 +1,9 @@
 /**
  * @file alwatersurface_gl_test.cpp
  * @brief The water surface's draws on the hidden window: the water's field as the vertex stage lays it out; whether
- *        any of it shows, and the draws that wait on that; and the water's stencil bits: where the exclusion pass
- *        removes the water, and which pixels the water shades, which the haze pass reads.
+ *        any of it shows, and the draws that wait on that; the water's stencil bits: where the exclusion pass removes
+ *        the water, and which pixels the water shades, which the haze pass reads; and the waves' patches as the
+ *        tessellation stages emit them, displaced by the heights baked from the normal map.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -27,6 +28,7 @@
 #include "linden_common.h"
 
 #include "../alwaterfield.h"
+#include "../alwaterheightbake.h"
 #include "../alwaterstencil.h"
 
 #include "alsamplesquery.h"
@@ -40,14 +42,18 @@
 #include "llrendertarget.h"
 #include "llshadermgr.h"
 #include "llvertexbuffer.h"
+#include "v3dmath.h"
 
 #include "../../llrender/tests/llheadlessgl_fixture.h"
 
 #include "../test/lltut.h"
 
+#include <cfloat>
 #include <cmath>
+#include <cstring>
 #include <map>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace tut
@@ -345,6 +351,10 @@ namespace tut
             return m;
         }
 
+        // The waves' tessellation reach over the field: the patches take the 3 x 3 cells from global (0, 0), and the
+        // square seven cells a side.
+        constexpr F64 REACH = 280.0;
+
     struct alwatersurface_data
     {
         // Each test starts with identity matrices, whatever ran before.
@@ -373,9 +383,12 @@ namespace tut
             mExclusion.unload();
             mField.unload();
             mTiling.unload();
+            mWaves.unload();
+            mFieldCapture.unload();
             mShaders.clearShaderObjects();
             mCellMap = nullptr;
             mNoise = nullptr;
+            mHeights = nullptr;
             mSlopes.release();
             mQuery.release();
             mScene.release();
@@ -418,14 +431,8 @@ namespace tut
             ensure("exclusion program builds", mExclusion.createShader());
 
             // The camera over cell (1, 1), the agent region's origin at the global one.
-            const std::vector<ALWaterField::Region> cells = regions();
-            mLayout = ALWaterField::layout(300.0, 300.0, CELL, 256.f, 256000.0, cells, 0.0);
-            mSquare = ALWaterField::cellSquare(mLayout, 0.0, 0.0);
-            std::vector<F32> texels;
-            ALWaterField::fillCells(mLayout, cells, LOW, texels);
-            mCellMap = new LLImageGL(ALWaterField::MAP_SIZE, ALWaterField::MAP_SIZE, 2, false);
-            mCellMap->setExplicitFormat(GL_RG32F, GL_RG, GL_FLOAT);
-            ensure("cell map", mCellMap->createGLTexture(0, reinterpret_cast<const U8*>(texels.data())));
+            mLayout = ALWaterField::layout(300.0, 300.0, CELL, 256.f, 256000.0, regions(), 0.0);
+            makeCellMap();
 
             ensure("scene allocates", mScene.allocate(W, H, GL_RGBA8, true, true, ALTextureSlot::TT_TEXTURE,
                                                       LLRenderTarget::MIPS_NONE, format));
@@ -433,6 +440,18 @@ namespace tut
             mScene.bindTarget();
             gGL.setClearColor(LLColor4::black);
             mScene.clear();
+        }
+
+        // The cell map ALWaterSurface would make for these regions under mLayout, and the square it covers.
+        void makeCellMap()
+        {
+            mSquare = ALWaterField::cellSquare(mLayout, 0.0, 0.0);
+            std::vector<F32> texels;
+            ALWaterField::fillCells(mLayout, regions(), LOW, texels);
+            mCellMap = new LLImageGL(ALWaterField::MAP_SIZE, ALWaterField::MAP_SIZE, 2, false);
+            mCellMap->setNeedsAlphaAndPickMask(false);
+            mCellMap->setExplicitFormat(GL_RG32F, GL_RG, GL_FLOAT);
+            ensure("cell map", mCellMap->createGLTexture(0, reinterpret_cast<const U8*>(texels.data())));
         }
 
         // The camera both programs draw from.
@@ -567,8 +586,8 @@ namespace tut
         }
 
         // The field program over the cell map, in a FIELD_SIZE target with depth and stencil, cleared, and the
-        // camera above the square's centre.
-        void setUpField()
+        // camera above the square's centre; with a tessellation reach, the waves' patches laid out as well.
+        void setUpField(F64 reach = 0.0)
         {
             setUpWater(LLRenderTarget::DEPTH_FMT_24);
             mScene.flush();
@@ -583,8 +602,8 @@ namespace tut
             ensure("field program builds", mField.createShader());
             ensure_equals("the field program has no vertex inputs", mField.mAttributeMask, 0U);
 
-            mLayout = ALWaterField::layout(300.0, 300.0, CELL, 256.f, FIELD_STRETCH, regions(), 0.0);
-            mSquare = ALWaterField::cellSquare(mLayout, 0.0, 0.0);
+            mLayout = ALWaterField::layout(300.0, 300.0, CELL, 256.f, FIELD_STRETCH, regions(), reach);
+            makeCellMap();
             ensure("the stretch takes two rings", mLayout.mRings == 2);
 
             ensure("field target", mScene.allocate(FIELD_SIZE, FIELD_SIZE, GL_RGBA8, true, true, ALTextureSlot::TT_TEXTURE,
@@ -601,26 +620,64 @@ namespace tut
             gGL.loadMatrix(mView);
         }
 
-        // The field, as ALWaterSurface::bind and ::draw draw it, the void drawn or not.
-        void drawField(bool void_drawn)
+        // `program` bound for the field, as ALWaterSurface::bind binds it: the void drawn or not, raised by `raise`
+        // metres, and the cells beside `patches` fanned onto their corners.
+        void bindField(LLGLSLShader& program, bool void_drawn, F32 raise, const ALWaterField::PatchRect& patches)
         {
-            mField.bind();
-            const S32 channel = mField.enableTexture(LLShaderMgr::WATER_CELL_MAP);
+            program.bind();
+            program.uniform1f(LLShaderMgr::WATER_RAISE, raise);
+            const S32 channel = program.enableTexture(LLShaderMgr::WATER_CELL_MAP);
             if (channel > -1)
             {
                 gGL.getTextureSlot(channel)->bindSampled(mCellMap.get(), ALSamplers::PointClamp);
             }
-            mField.uniform4fv(LLShaderMgr::WATER_CELL_SQUARE, 1, mSquare.mV);
-            mField.uniform1f(LLShaderMgr::WATER_DEFAULT_HEIGHT, LOW);
-            mField.uniform4f(LLShaderMgr::WATER_RINGS, (F32)mLayout.mHalf, (F32)mLayout.mRings, (F32)mLayout.mRim,
-                             void_drawn ? 1.f : 0.f);
+            program.uniform4fv(LLShaderMgr::WATER_CELL_SQUARE, 1, mSquare.mV);
+            program.uniform1f(LLShaderMgr::WATER_DEFAULT_HEIGHT, LOW);
+            program.uniform4f(LLShaderMgr::WATER_RINGS, (F32)mLayout.mHalf, (F32)mLayout.mRings, (F32)mLayout.mRim,
+                              void_drawn ? 1.f : 0.f);
+            const S32 rect[4] = { patches.mMinX, patches.mMinY, patches.mEndX, patches.mEndY };
+            program.uniform4iv(LLShaderMgr::WATER_PATCH_RECT, 1, rect);
+        }
+
+        // The field's draws through `program`, bound by bindField, as ALWaterSurface::draw draws them.
+        void drawFieldParts(LLGLSLShader& program, const ALWaterField::PatchRect& patches)
+        {
             LLGLDisable cull(GL_CULL_FACE);
-            for (const ALWaterField::Draw& draw : ALWaterField::fieldDraws(mLayout))
+            for (const ALWaterField::Draw& draw : ALWaterField::fieldDraws(mLayout, patches))
             {
-                mField.uniform1i(LLShaderMgr::WATER_LAYOUT, (S32)draw.mPart);
+                program.uniform1i(LLShaderMgr::WATER_LAYOUT, (S32)draw.mPart);
                 gGL.drawArraysInstanced(draw.mStrip ? LLRender::TRIANGLE_STRIP : LLRender::TRIANGLES, 0, (U32)draw.mVertices,
                                         (U32)draw.mInstances);
             }
+        }
+
+        // The field, as ALWaterSurface::bind and ::draw draw it.
+        void drawField(bool void_drawn, F32 raise = 0.f, const ALWaterField::PatchRect& patches = {})
+        {
+            bindField(mField, void_drawn, raise, patches);
+            drawFieldParts(mField, patches);
+        }
+
+        // Whether the sky behind's draw over mQuery, ended, runs: mBehind cleared, then cleared red under the query's
+        // condition, as LLDrawPoolWLSky draws the sky behind under it, and read back.
+        bool conditionalClearRan()
+        {
+            mBehind.bindTarget();
+            gGL.setClearColor(LLColor4::black);
+            mBehind.clear();
+            mBehind.flush();
+            {
+                ALSamplesQuery::Conditional if_water(mQuery);
+                mBehind.bindTarget();
+                gGL.setClearColor(LLColor4::red);
+                mBehind.clear();
+                gGL.setClearColor(LLColor4::black);
+                mBehind.flush();
+            }
+            mBehind.bindTarget();
+            const LLColor4U c = pixel(1, 1);
+            mBehind.flush();
+            return c.mV[VRED] == 255;
         }
 
         // Where pixel (x, y) of the field target lies, from the square's centre, in metres.
@@ -637,6 +694,176 @@ namespace tut
             const F32 ndc = depth * 2.f - 1.f;
             const F32 eye_z = -(ndc + (FIELD_FAR + 1.f) / (FIELD_FAR - 1.f)) * (FIELD_FAR - 1.f) / 2.f;
             return eye_z + FIELD_CAMERA_Z;
+        }
+
+        // The field's program as the viewer links it, capturing each vertex's clip position: agent space, under
+        // identity matrices.
+        void setUpFieldCapture()
+        {
+            std::map<std::string, std::string> defines;
+            mFieldCapture.mProgramObject = glCreateProgram();
+            mFieldCapture.mName = "field capture (test)";
+            for (const char* object : { "environment/waterFieldV.glsl", "environment/waterSurface.glsl" })
+            {
+                S32 level = 1;
+                const GLuint handle = mShaders.loadShaderFile(object, level, GL_VERTEX_SHADER, &defines);
+                ensure(std::string("compiled ") + object, handle != 0);
+                mFieldCapture.attachObject(handle);
+            }
+            const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, "#version 400\nout vec4 c;\nvoid main() { c = vec4(1.0); }\n");
+            ensure("fragment compiles", fs != 0);
+            mFieldCapture.attachObject(fs);
+            const char* varyings[] = { "gl_Position" };
+            glTransformFeedbackVaryings(mFieldCapture.mProgramObject, 1, varyings, GL_INTERLEAVED_ATTRIBS);
+            ensure("field capture program links", mFieldCapture.mapAttributes());
+            glDeleteShader(fs);
+            ensure("field capture program maps", mFieldCapture.mapUniforms());
+        }
+
+        // The waves' program as the viewer links it for the patches, its wave layers hex-tiled as `hextile` says, and
+        // capturing the evaluation stage's `captured`: by default its points less the camera (`view`).
+        void setUpWavesCapture(const char* captured = "view", S32 hextile = 1)
+        {
+            std::map<std::string, std::string> defines = { { "WATER_HEXTILE", std::to_string(hextile) } };
+            const std::pair<const char*, GLenum> objects[] = {
+                { "environment/waterPatchV.glsl", GL_VERTEX_SHADER },
+                { "environment/waterSurface.glsl", GL_VERTEX_SHADER },
+                { "environment/waterTC.glsl", GL_TESS_CONTROL_SHADER },
+                { "environment/waterTE.glsl", GL_TESS_EVALUATION_SHADER },
+                { "environment/waterVaryingsV.glsl", GL_TESS_EVALUATION_SHADER },
+                { "environment/waterSurface.glsl", GL_TESS_EVALUATION_SHADER },
+                { "deferred/hexLatticeUtil.glsl", GL_TESS_EVALUATION_SHADER },
+            };
+            mWaves.mProgramObject = glCreateProgram();
+            mWaves.mName = "waves (test)";
+            for (const auto& object : objects)
+            {
+                S32 level = 1;
+                const GLuint handle = mShaders.loadShaderFile(object.first, level, object.second, &defines);
+                ensure(std::string("compiled ") + object.first, handle != 0);
+                mWaves.attachObject(handle);
+            }
+            const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, "#version 400\nout vec4 c;\nvoid main() { c = vec4(1.0); }\n");
+            ensure("fragment compiles", fs != 0);
+            mWaves.attachObject(fs);
+            const char* varyings[] = { captured };
+            glTransformFeedbackVaryings(mWaves.mProgramObject, 1, varyings, GL_INTERLEAVED_ATTRIBS);
+            ensure("waves program links", mWaves.mapAttributes());
+            glDeleteShader(fs);
+            ensure("waves program maps", mWaves.mapUniforms());
+        }
+
+        // The triangles `draw` emits through the bound program, captured from its one feedback varying of `components`
+        // floats: three vertices a triangle, `components` floats each, in the order drawn. Nothing is rasterized.
+        std::vector<F32> captureTriangles(S32 components, const std::function<void()>& draw)
+        {
+            return captureFeedback(GL_TRIANGLES, 3 * (size_t)components, draw);
+        }
+
+        // The `primitive`s `draw` emits through the bound program, `floats` of its feedback varyings each.
+        std::vector<F32> captureFeedback(GLenum primitive, size_t floats, const std::function<void()>& draw)
+        {
+            GLuint buffer = 0;
+            glGenBuffers(1, &buffer);
+            glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, buffer);
+            glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32 << 20, nullptr, GL_DYNAMIC_READ);
+            glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, buffer);
+            GLuint query = 0;
+            glGenQueries(1, &query);
+            glEnable(GL_RASTERIZER_DISCARD);
+            glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, query);
+            glBeginTransformFeedback(primitive);
+            draw();
+            glEndTransformFeedback();
+            glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
+            glDisable(GL_RASTERIZER_DISCARD);
+            GLuint primitives = 0;
+            glGetQueryObjectuiv(query, GL_QUERY_RESULT, &primitives);
+            std::vector<F32> points((size_t)primitives * floats);
+            if (primitives > 0)
+            {
+                glGetBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, 0, points.size() * sizeof(F32), points.data());
+            }
+            glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, 0);
+            glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
+            glDeleteBuffers(1, &buffer);
+            glDeleteQueries(1, &query);
+            return points;
+        }
+
+        // What the waves' draw is given, as ALWaterSurface::bindWaves and the pool give it: the patches of mRect, the
+        // void's drawn where mVoidDrawn, from mEye, the camera the waves were laid out around as well, at mAmp over
+        // mHeights (none, flat), with the reach, A and density, against mPlanes, by default every point inside each.
+        struct WaveDraw
+        {
+            S32             mRect[4] = { 0, 0, 0, 0 };
+            bool            mVoidDrawn = false;
+            LLVector3       mEye;
+            F32             mAmp = 0.f;
+            LLImageGL*      mHeights = nullptr;
+            F32             mReach = 100000.f;
+            F32             mA = 0.f;
+            F32             mDensity = 8.f;
+            F32             mPlanes[20] = { 0.f, 0.f, 0.f, -1.f, 0.f, 0.f, 0.f, -1.f, 0.f, 0.f, 0.f, -1.f,
+                                            0.f, 0.f, 0.f, -1.f, 0.f, 0.f, 0.f, -1.f };
+
+            S32 patches() const
+            {
+                return (mRect[2] - mRect[0]) * (mRect[3] - mRect[1]) * ALWaterField::PATCHES_PER_CELL * ALWaterField::PATCHES_PER_CELL;
+            }
+        };
+
+        // The waves' program bound with `draw`'s uniforms, the wave phases and the lattice at the camera's place.
+        void bindWaves(const WaveDraw& draw)
+        {
+            mWaves.bind();
+            S32 channel = mWaves.enableTexture(LLShaderMgr::WATER_CELL_MAP);
+            ensure("the patches read the cell map", channel > -1);
+            gGL.getTextureSlot(channel)->bindSampled(mCellMap.get(), ALSamplers::PointClamp);
+            if (draw.mHeights)
+            {
+                channel = mWaves.enableTexture(LLShaderMgr::WATER_HEIGHT_MAP);
+                ensure("the patches read the heights", channel > -1);
+                gGL.getTextureSlot(channel)->bindSampled(draw.mHeights, ALSamplers::BilinearWrap);
+            }
+            mWaves.uniform4fv(LLShaderMgr::WATER_CELL_SQUARE, 1, mSquare.mV);
+            mWaves.uniform1f(LLShaderMgr::WATER_DEFAULT_HEIGHT, LOW);
+            mWaves.uniform4f(LLShaderMgr::WATER_RINGS, (F32)mLayout.mHalf, (F32)mLayout.mRings, (F32)mLayout.mRim,
+                             draw.mVoidDrawn ? 1.f : 0.f);
+            mWaves.uniform4iv(LLShaderMgr::WATER_PATCH_RECT, 1, draw.mRect);
+            mWaves.uniform2f(LLShaderMgr::WATER_FAR, 100000.f, 0.f);
+            mWaves.uniform3fv(LLShaderMgr::WATER_EYEVEC, 1, draw.mEye.mV);
+            mWaves.uniform3fv(LLShaderMgr::WATER_WAVE_EYE, 1, draw.mEye.mV);
+            mWaves.uniform2f(LLShaderMgr::WATER_BIG_PHASE, 0.f, 0.f);
+            mWaves.uniform4f(LLShaderMgr::WATER_LITTLE_PHASE, 0.f, 0.f, 0.f, 0.f);
+            mWaves.uniform2f(LLShaderMgr::WATER_SWEEP_PHASE, 0.f, 0.f);
+            const ALWaterField::LatticePlaces places = ALWaterField::latticePlaces(draw.mEye.mV[VX], draw.mEye.mV[VY]);
+            mWaves.uniform4fv(LLShaderMgr::WATER_LATTICE_FRAC, 1, places.mFrac.mV);
+            mWaves.uniform4iv(LLShaderMgr::WATER_LATTICE_BASE, 1, places.mBase);
+            mWaves.uniform1f(LLShaderMgr::BLEND_FACTOR, 0.f);
+            mWaves.uniform2f(LLShaderMgr::WATER_WAVE_AMP, draw.mAmp, 0.f);
+            mWaves.uniform2f(LLShaderMgr::WATER_WAVE_REACH, draw.mReach, draw.mA);
+            mWaves.uniform1f(LLShaderMgr::WATER_TESS_DENSITY, draw.mDensity);
+            mWaves.uniform1f(LLShaderMgr::WATER_MAX_DISPLACEMENT, draw.mA);
+            mWaves.uniform4fv(LLShaderMgr::WATER_CULL_PLANES, 5, draw.mPlanes);
+        }
+
+        // Every patch of `draw`'s rectangle, through the bound waves' program.
+        void drawPatches(const WaveDraw& draw)
+        {
+            gGL.setPatchVertices(4);
+            gGL.drawArraysInstanced(LLRender::PATCHES, 0, 4, (U32)draw.patches());
+            gGL.setPatchVertices(3);
+        }
+
+        // The triangles the evaluation stage emits for `draw`, through the matrices loaded: three vec3s of the varying
+        // the program captures each.
+        std::vector<F32> tessellate(const WaveDraw& draw)
+        {
+            bindWaves(draw);
+            std::vector<F32> points = captureTriangles(3, [&]() { drawPatches(draw); });
+            LLGLSLShader::unbind();
+            return points;
         }
 
         void tearDownWater()
@@ -668,6 +895,11 @@ namespace tut
         LLGLSLShader           mTiling;
         LLPointer<LLImageGL>   mNoise;
         LLRenderTarget         mSlopes;
+
+        LLGLSLShader           mWaves;
+        LLPointer<LLImageGL>   mHeights;
+
+        LLGLSLShader           mFieldCapture;
     };
 
     typedef test_group<alwatersurface_data> alwatersurface_t;
@@ -964,9 +1196,6 @@ namespace tut
         {
             setUpField();
             ensure("behind target", mBehind.allocate(4, 4, GL_RGBA8));
-            mBehind.bindTarget();
-            mBehind.clear();
-            mBehind.flush();
 
             // The world, above the water everywhere in view, or but for one column of pixels over the square's middle.
             {
@@ -985,20 +1214,8 @@ namespace tut
                 mQuery.end();
             }
 
-            {
-                ALSamplesQuery::Conditional if_water(mQuery);
-                mBehind.bindTarget();
-                gGL.setClearColor(LLColor4::red);
-                mBehind.clear();
-                gGL.setClearColor(LLColor4::black);
-                mBehind.flush();
-            }
-
-            mBehind.bindTarget();
-            const LLColor4U c = pixel(1, 1);
-            mBehind.flush();
             ensure_equals(gap ? "water through the gap clears the sky behind" : "water all hidden leaves it",
-                          (U32)c.mV[VRED], gap ? 255U : 0U);
+                          conditionalClearRan(), gap);
             mBehind.release();
             tearDownWater();
             mField.unload();
@@ -1185,5 +1402,570 @@ namespace tut
         }
         ensure("most points lie inside a cell", compared > SIZE * SIZE / 2);
         ensure_equals("no point of the sea changes cell as the camera moves", moved, 0);
+    }
+
+    // The waves' patches over one cell, as the evaluation stage emits them (transform feedback of `view`, the point
+    // less the camera), at fractional levels over a big layer of sines: every point two patches share has one height,
+    // and every point inside the cell is surrounded by triangles, so no edge holds a point only one side has. A patch
+    // outside the frustum emits nothing, and under a camera within A of the plane the surface stays flat.
+    template<> template<>
+    void alwatersurface_object_t::test<15>()
+    {
+        setUpWater(LLRenderTarget::DEPTH_FMT_24);
+        mScene.flush();
+        setUpWavesCapture();
+        ensure_equals("the waves' program has no vertex inputs", mWaves.mAttributeMask, 0U);
+
+        // A big layer of sines in repeats, 0.05 tall, and a mid layer of 0.03: 0.7 m of waves at a height of 1.
+        constexpr S32 MAP = 64;
+        std::vector<F32> heights((size_t)MAP * MAP * 2);
+        for (S32 j = 0; j < MAP; ++j)
+        {
+            for (S32 i = 0; i < MAP; ++i)
+            {
+                const F32 u = (F32)i / MAP;
+                const F32 v = (F32)j / MAP;
+                heights[((size_t)j * MAP + i) * 2] = 0.05f * sinf(F_TWO_PI * (2.f * u + v));
+                heights[((size_t)j * MAP + i) * 2 + 1] = 0.03f * cosf(F_TWO_PI * (u + 3.f * v));
+            }
+        }
+        mHeights = new LLImageGL(MAP, MAP, 2, false);
+        mHeights->setNeedsAlphaAndPickMask(false);
+        mHeights->setExplicitFormat(GL_RG32F, GL_RG, GL_FLOAT);
+        ensure("heights", mHeights->createGLTexture(0, reinterpret_cast<const U8*>(heights.data())));
+
+        // The patches over the camera's cell, texel (2, 2) of the map: global cell (1, 1), at LOW.
+        constexpr F32 A = 2.f;
+        constexpr S32 PATCHES = ALWaterField::PATCHES_PER_CELL * ALWaterField::PATCHES_PER_CELL;
+        const auto capture = [&](const LLVector3& eye, bool inside)
+        {
+            WaveDraw draw;
+            const S32 rect[4] = { 2, 2, 3, 3 };
+            std::copy(std::begin(rect), std::end(rect), draw.mRect);
+            draw.mEye = eye;
+            draw.mAmp = 1.f;
+            draw.mHeights = mHeights.get();
+            draw.mReach = 10000.f;
+            draw.mA = A;
+            draw.mDensity = 64.f;
+            if (!inside)
+            {
+                // Every point outside the first plane.
+                draw.mPlanes[2] = 1.f;
+                draw.mPlanes[3] = 1000000.f;
+            }
+            return tessellate(draw);
+        };
+
+        // Far above the cell, so the camera's fade leaves the waves whole.
+        const LLVector3 high(484.f, 534.f, LOW + 200.f);
+        const std::vector<F32> points = capture(high, true);
+        const size_t triangles = points.size() / 9;
+        ensure("the cell's patches tessellate past one quad each", triangles > (size_t)PATCHES * 2);
+
+        struct Seen
+        {
+            U32 mZ = 0;
+            bool mHeightsAgree = true;
+            F32 mLeft = FLT_MAX;
+            F32 mRight = -FLT_MAX;
+            F32 mBelow = FLT_MAX;
+            F32 mAbove = -FLT_MAX;
+        };
+        std::map<std::pair<U32, U32>, Seen> seen;
+        F32 lo[2] = { FLT_MAX, FLT_MAX };
+        F32 hi[2] = { -FLT_MAX, -FLT_MAX };
+        F32 tallest = 0.f;
+        for (size_t t = 0; t < triangles; ++t)
+        {
+            const F32* tri = points.data() + t * 9;
+            const F32 cx = (tri[0] + tri[3] + tri[6]) / 3.f;
+            const F32 cy = (tri[1] + tri[4] + tri[7]) / 3.f;
+            for (S32 k = 0; k < 3; ++k)
+            {
+                const F32* p = tri + k * 3;
+                U32 bits[3];
+                memcpy(bits, p, sizeof(bits));
+                auto [it, added] = seen.try_emplace(std::make_pair(bits[0], bits[1]));
+                Seen& s = it->second;
+                if (added)
+                {
+                    s.mZ = bits[2];
+                }
+                s.mHeightsAgree = s.mHeightsAgree && s.mZ == bits[2];
+                s.mLeft = llmin(s.mLeft, cx);
+                s.mRight = llmax(s.mRight, cx);
+                s.mBelow = llmin(s.mBelow, cy);
+                s.mAbove = llmax(s.mAbove, cy);
+                for (S32 c = 0; c < 2; ++c)
+                {
+                    lo[c] = llmin(lo[c], p[c]);
+                    hi[c] = llmax(hi[c], p[c]);
+                }
+                tallest = llmax(tallest, fabsf(p[2] + high.mV[VZ] - LOW));
+            }
+        }
+        ensure("the waves move the surface", tallest > 0.1f);
+        S32 split = 0;
+        S32 open = 0;
+        for (const auto& [key, s] : seen)
+        {
+            F32 xy[2];
+            memcpy(&xy[0], &key.first, sizeof(F32));
+            memcpy(&xy[1], &key.second, sizeof(F32));
+            split += s.mHeightsAgree ? 0 : 1;
+            const bool rim = xy[0] == lo[0] || xy[0] == hi[0] || xy[1] == lo[1] || xy[1] == hi[1];
+            const bool surrounded = s.mLeft < xy[0] && s.mRight > xy[0] && s.mBelow < xy[1] && s.mAbove > xy[1];
+            open += (rim || surrounded) ? 0 : 1;
+        }
+        ensure_equals("a point two patches share has one height", split, 0);
+        ensure_equals("no point inside the cell lies on an edge only one side has", open, 0);
+
+        ensure_equals("a patch outside the frustum emits nothing", capture(high, false).size(), (size_t)0);
+
+        // On a deck in waves: within A of the plane, over a corner the patches share.
+        const LLVector3 deck(384.f, 384.f, LOW + 0.5f * A);
+        const std::vector<F32> near_points = capture(deck, true);
+        bool under = false;
+        F32 off = 0.f;
+        for (size_t n = 0; n + 2 < near_points.size(); n += 3)
+        {
+            const F32* p = near_points.data() + n;
+            const F32 rise = p[2] + deck.mV[VZ] - LOW;
+            if (p[0] == 0.f && p[1] == 0.f)
+            {
+                under = true;
+                ensure("the surface under the camera is the plane", fabsf(rise) < 1e-4f);
+            }
+            if (p[0] * p[0] + p[1] * p[1] > 16.f * A * A)
+            {
+                off = llmax(off, fabsf(rise));
+            }
+        }
+        ensure("a point lies under the camera", under);
+        ensure("the waves stand away from it", off > 0.1f);
+    }
+
+    // The sky behind's query with waves: the field raised by A counts a crest over a wall the flat field misses, and
+    // the flat field counts the water under a camera between the plane and A above it, which the raised field, above
+    // the camera, misses.
+    template<> template<>
+    void alwatersurface_object_t::test<16>()
+    {
+        setUpField();
+        mScene.flush();
+        constexpr F32 A = 3.f;
+        const F32 cx = (F32)mLayout.centreX();
+        const F32 cy = (F32)mLayout.centreY();
+        ensure("behind target", mBehind.allocate(4, 4, GL_RGBA8));
+
+        // Whether the query over `raises` lets the conditional clear run, from a camera at `camera_z`, behind a wall at
+        // `wall_z` over the whole view where `wall`.
+        const auto counted = [&](F32 camera_z, bool wall, F32 wall_z, std::initializer_list<F32> raises)
+        {
+            mScene.bindTarget();
+            mScene.clear();
+            mCameraZ = camera_z;
+            mView = view(camera_z, false);
+            gGL.matrixMode(LLRender::MM_PROJECTION);
+            gGL.loadMatrix(fieldOrtho(cx, cy));
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
+            gGL.loadMatrix(mView);
+            if (wall)
+            {
+                opaque(cx - FIELD_VIEW, cx + FIELD_VIEW, cy - FIELD_VIEW, cy + FIELD_VIEW, wall_z);
+            }
+            {
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE);
+                LLGLSColorMask no_color(false, false);
+                mQuery.begin();
+                for (F32 raise : raises)
+                {
+                    drawField(true, raise);
+                }
+                mQuery.end();
+            }
+            mScene.flush();
+            return conditionalClearRan();
+        };
+
+        // The wall stands half A above the highest water, the south-east region's.
+        ensure("a wall over all the water hides the flat field", !counted(FIELD_CAMERA_Z, true, HIGH + 0.5f * A, { 0.f }));
+        ensure("the field raised by A shows over it", counted(FIELD_CAMERA_Z, true, HIGH + 0.5f * A, { 0.f, A }));
+        ensure("from a deck within A of the plane, the raised field alone is missed", !counted(LOW + 0.5f * A, false, 0.f, { A }));
+        ensure("and the flat field counts the water", counted(LOW + 0.5f * A, false, 0.f, { 0.f, A }));
+
+        mBehind.release();
+        // tearDownWater flushes the scene, which setUpField left bound.
+        mScene.bindTarget();
+        tearDownWater();
+        mField.unload();
+        mQuery.release();
+    }
+    // With waves the field leaves the patches' cells to them and fans the cells beside them onto their corners: drawn
+    // alone, it covers every pixel inside the rim once but those over the patches' cells, which it leaves; with the
+    // patches drawn too, flat, every pixel inside the rim is covered once.
+    template<> template<>
+    void alwatersurface_object_t::test<19>()
+    {
+        setUpField(REACH);
+        const ALWaterField::PatchRect rect = ALWaterField::patchRect(mLayout);
+        ensure("the reach takes patches", rect == ALWaterField::PatchRect{ 2, 2, 5, 5 });
+        // The patches' cells, global metres: cells 0 to 2 each way.
+        const F64 cx = mLayout.centreX();
+        const F64 cy = mLayout.centreY();
+        const F32 rim = (F32)mLayout.mRim;
+        const auto patched = [&](S32 x, S32 y)
+        {
+            const F64 gx = cx + fieldX(x);
+            const F64 gy = cy + fieldX(y);
+            return gx >= 0.0 && gx < 3.0 * CELL && gy >= 0.0 && gy < 3.0 * CELL;
+        };
+        const auto within = [&](S32 x, S32 y) { return fabsf(fieldX(x)) < rim && fabsf(fieldX(y)) < rim; };
+
+        {
+            LLGLDepthTest depth(GL_FALSE);
+            ALGLStencil count(GL_ALWAYS, 0, 0xFFu, GL_KEEP, GL_KEEP, GL_INCR, 0xFFu);
+            drawField(true, 0.f, rect);
+        }
+        for (S32 y = 0; y < FIELD_SIZE; ++y)
+        {
+            for (S32 x = 0; x < FIELD_SIZE; ++x)
+            {
+                ensure_equals("pixel " + std::to_string(x) + ", " + std::to_string(y) + " covered by the field but over the patches",
+                              (U32)stencil(x, y), within(x, y) && !patched(x, y) ? 1U : 0U);
+            }
+        }
+
+        setUpWavesCapture();
+        WaveDraw draw;
+        const S32 patches[4] = { rect.mMinX, rect.mMinY, rect.mEndX, rect.mEndY };
+        std::copy(std::begin(patches), std::end(patches), draw.mRect);
+        draw.mVoidDrawn = true;
+        draw.mEye.set(300.f, 300.f, LOW + 200.f);
+        draw.mReach = (F32)mLayout.mReach;
+        {
+            LLGLDepthTest depth(GL_FALSE);
+            ALGLStencil count(GL_ALWAYS, 0, 0xFFu, GL_KEEP, GL_KEEP, GL_INCR, 0xFFu);
+            LLGLDisable cull(GL_CULL_FACE);
+            bindWaves(draw);
+            drawPatches(draw);
+            LLGLSLShader::unbind();
+        }
+        for (S32 y = 0; y < FIELD_SIZE; ++y)
+        {
+            for (S32 x = 0; x < FIELD_SIZE; ++x)
+            {
+                ensure_equals("pixel " + std::to_string(x) + ", " + std::to_string(y) + " covered once with the patches",
+                              (U32)stencil(x, y), within(x, y) ? 1U : 0U);
+            }
+        }
+    }
+
+    // The field and the waves' patches meet without a T-junction: no vertex of either lies inside an edge of a triangle
+    // of either but at its ends, so no crack can open along one. Captured in agent space, the field from its vertex
+    // stage and the patches from their evaluation stage, flat, at the levels a camera over them gives, the edges along
+    // the rectangle past the reach whole. Water at two heights, where regions meet, shares no edge to crack along.
+    template<> template<>
+    void alwatersurface_object_t::test<20>()
+    {
+        setUpField(REACH);
+        mScene.flush();
+        const ALWaterField::PatchRect rect = ALWaterField::patchRect(mLayout);
+        ensure("the reach takes patches", !rect.empty());
+        setUpFieldCapture();
+        setUpWavesCapture("vary_position");
+        // Clip space, and eye space, are agent space.
+        gGL.matrixMode(LLRender::MM_PROJECTION);
+        gGL.loadIdentity();
+        gGL.matrixMode(LLRender::MM_MODELVIEW);
+        gGL.loadIdentity();
+
+        struct Triangle
+        {
+            LLVector3d mCorner[3];
+        };
+        std::vector<Triangle> triangles;
+        const auto add = [&](const std::vector<F32>& points, size_t components)
+        {
+            size_t added = 0;
+            for (size_t t = 0; t + 3 * components <= points.size(); t += 3 * components)
+            {
+                Triangle f;
+                for (size_t k = 0; k < 3; ++k)
+                {
+                    const F32* p = points.data() + t + k * components;
+                    f.mCorner[k].set(p[0], p[1], p[2]);
+                }
+                // An instance not drawn, its vertices at one point, and a ring quad's empty third triangle.
+                const LLVector3d u = f.mCorner[1] - f.mCorner[0];
+                const LLVector3d v = f.mCorner[2] - f.mCorner[0];
+                if (std::fabs(u.mdV[VX] * v.mdV[VY] - v.mdV[VX] * u.mdV[VY]) > 1e-6)
+                {
+                    triangles.push_back(f);
+                    ++added;
+                }
+            }
+            return added;
+        };
+
+        bindField(mFieldCapture, true, 0.f, rect);
+        const std::vector<F32> field = captureTriangles(4, [&]() { drawFieldParts(mFieldCapture, rect); });
+        LLGLSLShader::unbind();
+        ensure("the field is drawn", add(field, 4) > 0);
+
+        WaveDraw draw;
+        const S32 patches[4] = { rect.mMinX, rect.mMinY, rect.mEndX, rect.mEndY };
+        std::copy(std::begin(patches), std::end(patches), draw.mRect);
+        draw.mVoidDrawn = true;
+        draw.mEye.set(300.f, 300.f, LOW + 60.f);
+        draw.mReach = (F32)mLayout.mReach;
+        draw.mDensity = 32.f;
+        const size_t tessellated = add(tessellate(draw), 3);
+        ensure("the patches tessellate past one quad each", tessellated > (size_t)draw.patches() * 2);
+
+        // Every vertex, bucketed by where it is.
+        constexpr F64 TOLERANCE = 1e-3;
+        constexpr F64 BUCKET = 64.0;
+        const auto bucket_of = [](F64 v) { return (S64)std::floor(v / BUCKET); };
+        std::set<std::tuple<F64, F64, F64>> vertices;
+        for (const Triangle& f : triangles)
+        {
+            for (const LLVector3d& c : f.mCorner)
+            {
+                vertices.emplace(c.mdV[VX], c.mdV[VY], c.mdV[VZ]);
+            }
+        }
+        std::map<std::pair<S64, S64>, std::vector<LLVector3d>> buckets;
+        for (const auto& [x, y, z] : vertices)
+        {
+            buckets[{ bucket_of(x), bucket_of(y) }].emplace_back(x, y, z);
+        }
+
+        S32 junctions = 0;
+        std::string first;
+        const auto named = [](const LLVector3d& p)
+        {
+            return "(" + std::to_string(p.mdV[VX]) + ", " + std::to_string(p.mdV[VY]) + ", " + std::to_string(p.mdV[VZ]) + ")";
+        };
+        for (const Triangle& f : triangles)
+        {
+            for (S32 e = 0; e < 3; ++e)
+            {
+                const LLVector3d& a = f.mCorner[e];
+                const LLVector3d& b = f.mCorner[(e + 1) % 3];
+                const LLVector3d ab = b - a;
+                const F64 length = ab.length();
+                const F64 lo_x = llmin(a.mdV[VX], b.mdV[VX]) - TOLERANCE;
+                const F64 hi_x = llmax(a.mdV[VX], b.mdV[VX]) + TOLERANCE;
+                const F64 lo_y = llmin(a.mdV[VY], b.mdV[VY]) - TOLERANCE;
+                const F64 hi_y = llmax(a.mdV[VY], b.mdV[VY]) + TOLERANCE;
+                for (S64 i = bucket_of(lo_x); i <= bucket_of(hi_x); ++i)
+                {
+                    for (S64 j = bucket_of(lo_y); j <= bucket_of(hi_y); ++j)
+                    {
+                        const auto found = buckets.find({ i, j });
+                        if (found == buckets.end())
+                        {
+                            continue;
+                        }
+                        for (const LLVector3d& p : found->second)
+                        {
+                            const LLVector3d ap = p - a;
+                            const F64 along = (ap * ab) / length;
+                            const bool at_end = ap.length() <= TOLERANCE || (p - b).length() <= TOLERANCE;
+                            if (at_end || along <= 0.0 || along >= length)
+                            {
+                                continue;
+                            }
+                            if ((ap % ab).length() / length <= TOLERANCE && junctions++ == 0)
+                            {
+                                first = ": " + named(p) + " inside " + named(a) + " - " + named(b);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        ensure_equals("no vertex lies inside an edge" + first, junctions, 0);
+    }
+
+    // The waves' heights are the field the normal map's slopes integrate to, read where the shading reads the map: a map
+    // of known heights, encoded as normals, baked and uploaded as the viewer bakes and uploads it, displaces the patches
+    // by BIG_METRES times its big layer's field at the big layer's coordinates and MID_METRES times its mid layer's at
+    // the little map's zw read, the heights' sign and axes those the normals tilt by.
+    template<> template<>
+    void alwatersurface_object_t::test<21>()
+    {
+        setUpWater(LLRenderTarget::DEPTH_FMT_24);
+        mScene.flush();
+        setUpWavesCapture("view", 0);
+
+        // The heights, in repeats: sines across the map's axes and along both, at whole cycles a repeat.
+        struct Term
+        {
+            S32 mP;
+            S32 mQ;
+            F64 mAmplitude;
+            F64 mPhase;
+        };
+        const Term terms[] = { { 1, 0, 0.03, 0.3 }, { 1, 2, 0.012, 1.1 }, { 0, 1, 0.02, 2.0 }, { 3, 1, 0.004, 0.7 } };
+        constexpr F64 TWO_PI = 6.283185307179586;
+        constexpr S32 MAP = 64;
+        std::vector<U8> rgb((size_t)MAP * MAP * 3);
+        for (S32 j = 0; j < MAP; ++j)
+        {
+            for (S32 i = 0; i < MAP; ++i)
+            {
+                const F64 u = (F64)i / MAP;
+                const F64 v = (F64)j / MAP;
+                F64 slope_u = 0.0;
+                F64 slope_v = 0.0;
+                for (const Term& t : terms)
+                {
+                    const F64 c = t.mAmplitude * TWO_PI * std::cos(TWO_PI * (t.mP * u + t.mQ * v) + t.mPhase);
+                    slope_u += t.mP * c;
+                    slope_v += t.mQ * c;
+                }
+                // The normal the slopes lean it by, encoded as a normal map's are.
+                const F64 n[3] = { -slope_u, -slope_v, 1.0 };
+                const F64 length = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+                for (S32 c = 0; c < 3; ++c)
+                {
+                    rgb[((size_t)j * MAP + i) * 3 + c] = (U8)llclamp((S32)std::lround((n[c] / length * 0.5 + 0.5) * 255.0), 0, 255);
+                }
+            }
+        }
+        const ALWaterHeightBake::Heights heights = ALWaterHeightBake::bake(rgb.data(), rgb.size(), MAP, MAP, 3);
+        ensure("the map bakes", heights.valid());
+        const std::vector<U16> texels = ALWaterHeightBake::halfTexels(heights);
+        mHeights = new LLImageGL(MAP, MAP, 2, false);
+        mHeights->setNeedsAlphaAndPickMask(false);
+        mHeights->setExplicitFormat(GL_RG16F, GL_RG, GL_HALF_FLOAT);
+        ensure("heights", mHeights->createGLTexture(0, reinterpret_cast<const U8*>(texels.data())));
+
+        // The field a layer recovers at map coordinate (u, v): the big layer's the heights themselves; the mid layer's
+        // each term times (p^2 + a q^2) / (p^2 + a^2 q^2), a = MID_ASPECT. GL samples texel i at its centre,
+        // (i + 1/2) / MAP, where the bake's texel i is the field at i / MAP.
+        const auto field = [&](F64 u, F64 v, bool mid)
+        {
+            u -= 0.5 / MAP;
+            v -= 0.5 / MAP;
+            const F64 a = ALWaterHeightBake::MID_ASPECT;
+            F64 h = 0.0;
+            for (const Term& t : terms)
+            {
+                const F64 p2 = (F64)(t.mP * t.mP);
+                const F64 q2 = (F64)(t.mQ * t.mQ);
+                const F64 c = mid ? (p2 + a * q2) / (p2 + a * a * q2) : 1.0;
+                h += c * t.mAmplitude * std::sin(TWO_PI * (t.mP * u + t.mQ * v) + t.mPhase);
+            }
+            return h;
+        };
+
+        // The patches over cell (1, 1), from high above them, so neither fade touches the waves.
+        WaveDraw draw;
+        const S32 rect[4] = { 2, 2, 3, 3 };
+        std::copy(std::begin(rect), std::end(rect), draw.mRect);
+        draw.mEye.set(384.f, 384.f, LOW + 200.f);
+        draw.mAmp = 1.f;
+        draw.mHeights = mHeights.get();
+        draw.mReach = 10000.f;
+        draw.mA = 1.f;
+        draw.mDensity = 64.f;
+        const std::vector<F32> points = tessellate(draw);
+        ensure("the cell's patches tessellate", points.size() > (size_t)draw.patches() * 18);
+
+        F64 worst = 0.0;
+        F64 tallest = 0.0;
+        for (size_t n = 0; n + 3 <= points.size(); n += 3)
+        {
+            // The point less the camera: the r the wave coordinates are worked from.
+            const F64 rx = points[n];
+            const F64 ry = points[n + 1];
+            const F64 got = (F64)points[n + 2] + draw.mEye.mV[VZ] - LOW;
+            // water_wave_coords: the sweep bends x, then each layer scales it.
+            const F64 vx = rx + (std::cos(rx * ALWaterField::SWEEP_SCALE[0]) + std::sin(ry * ALWaterField::SWEEP_SCALE[1])) *
+                                    ALWaterField::SWEEP_AMPLITUDE;
+            const F64 want = ALWaterHeightBake::BIG_METRES * field(vx * ALWaterField::BIG_SCALE, ry * ALWaterField::BIG_SCALE, false) +
+                             ALWaterHeightBake::MID_METRES *
+                                 field(vx * ALWaterField::LITTLE_ZW_SCALE[0], ry * ALWaterField::LITTLE_ZW_SCALE[1], true);
+            worst = llmax(worst, std::fabs(got - want));
+            tallest = llmax(tallest, std::fabs(want));
+        }
+        ensure("the waves stand", tallest > 0.3);
+        ensure("each point's height is the map's field there, off by up to " + std::to_string(worst) + " m", worst <= 0.01);
+        mScene.bindTarget();
+        tearDownWater();
+    }
+
+    // The waves' program links with a fragment stage that reads the atmospherics' varyings, as the water's does: the
+    // waves' features attach atmosphericsVarsV to the evaluation stage, the stage before the fragment one, where it
+    // declares them.
+    template<> template<>
+    void alwatersurface_object_t::test<22>()
+    {
+        std::map<std::string, std::string> defines = { { "WATER_HEXTILE", "1" } };
+        // The objects the features attach, at the stages the viewer loads them for.
+        const std::pair<const char*, GLenum> shared[] = {
+            { "environment/waterSurface.glsl", GL_VERTEX_SHADER },
+            { "deferred/textureUtilV.glsl", GL_VERTEX_SHADER },
+            { "objects/nonindexedTextureV.glsl", GL_VERTEX_SHADER },
+            { "environment/waterSurface.glsl", GL_TESS_EVALUATION_SHADER },
+            { "deferred/hexLatticeUtil.glsl", GL_TESS_EVALUATION_SHADER },
+            { "windlight/atmosphericsVarsV.glsl", GL_TESS_EVALUATION_SHADER },
+            { "deferred/globalF.glsl", GL_FRAGMENT_SHADER },
+            { "environment/waterSurface.glsl", GL_FRAGMENT_SHADER },
+            { "deferred/hexLatticeUtil.glsl", GL_FRAGMENT_SHADER },
+            { "windlight/atmosphericsVarsF.glsl", GL_FRAGMENT_SHADER },
+        };
+        for (const auto& object : shared)
+        {
+            S32 level = 1;
+            ensure(std::string("compiled ") + object.first, mShaders.loadShaderFile(object.first, level, object.second, &defines) != 0);
+        }
+
+        // The program's own stages as gWaterWavesProgram names them, but a fragment stage of the test's that reads the
+        // atmospherics' varyings through atmosphericsVarsF, as calculatesAtmospherics attaches it.
+        mWaves.mProgramObject = glCreateProgram();
+        mWaves.mName = "Water Waves (test)";
+        mWaves.mFeatures.hasWaterSurface = true;
+        mWaves.mFeatures.hasWaterWaves = true;
+        const std::pair<const char*, GLenum> own[] = {
+            { "environment/waterPatchV.glsl", GL_VERTEX_SHADER },
+            { "environment/waterTC.glsl", GL_TESS_CONTROL_SHADER },
+            { "environment/waterTE.glsl", GL_TESS_EVALUATION_SHADER },
+            { "environment/waterVaryingsV.glsl", GL_TESS_EVALUATION_SHADER },
+        };
+        for (const auto& object : own)
+        {
+            S32 level = 1;
+            const GLuint handle = mShaders.loadShaderFile(object.first, level, object.second, &defines);
+            ensure(std::string("compiled ") + object.first, handle != 0);
+            mWaves.attachObject(handle);
+        }
+        ensure("the waves' features attach", mShaders.attachShaderFeatures(&mWaves));
+        ensure("and the atmospherics' reads", mWaves.attachStageObject(GL_FRAGMENT_SHADER, "windlight/atmosphericsVarsF.glsl"));
+
+        const auto& evaluation = mShaders.mShaderObjects[LLShaderMgr::STAGE_TESS_EVALUATION];
+        const auto vars = evaluation.find("windlight/atmosphericsVarsV.glsl");
+        ensure("atmosphericsVarsV is compiled for the evaluation stage", vars != evaluation.end());
+        GLuint attached[32] = { 0 };
+        GLsizei count = 0;
+        glGetAttachedShaders(mWaves.mProgramObject, 32, &count, attached);
+        ensure("the features attach it to the program",
+               std::find(attached, attached + llmax(count, 0), vars->second) != attached + llmax(count, 0));
+
+        const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER,
+                                                     "#version 400\n"
+                                                     "in vec3 view;\n"
+                                                     "out vec4 frag_color;\n"
+                                                     "vec3 getAdditiveColor();\n"
+                                                     "vec3 getAtmosAttenuation();\n"
+                                                     "void main() { frag_color = vec4(getAdditiveColor() + getAtmosAttenuation() + view, 1.0); }\n");
+        ensure("fragment compiles", fs != 0);
+        mWaves.attachObject(fs);
+        ensure("the waves' program links", mWaves.mapAttributes());
+        glDeleteShader(fs);
     }
 }

@@ -28,6 +28,8 @@
 
 // Placed as the water places them (waterV.glsl): the part of the field (ALWaterField::Draw).
 uniform int waterLayout;
+// Metres the field is raised by: the waves' A, so a crest the flat field would miss behind a wall is counted.
+uniform float waterRaise;
 
 bool water_vertex(int part, int instance, int vertex, out vec3 pos);
 
@@ -35,5 +37,6 @@ void main()
 {
     vec3 position;
     water_vertex(waterLayout, gl_InstanceID, gl_VertexID, position);
+    position.z += waterRaise;
     gl_Position = modelview_projection_matrix * vec4(position, 1.0);
 }

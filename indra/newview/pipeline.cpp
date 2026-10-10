@@ -1314,6 +1314,7 @@ void LLPipeline::releaseGLBuffers()
 
     mTerrainPrimitives.release();
     mWaterPrimitives.release();
+    mWaterPatchPrimitives.release();
     mWaterSurface.release();
     mSkyBehindQuery.release();
 
@@ -4621,8 +4622,12 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
         {
             mTerrainPrimitives.plot();
             mWaterPrimitives.plot();
+            mWaterPatchPrimitives.plot();
             LL_PROFILE_PLOT("water draws", (int64_t)mWaterDraws);
             mWaterDraws = 0;
+            // The waves this frame: their patches before the cull, and A in centimetres.
+            LL_PROFILE_PLOT("water patches", (int64_t)mWaterSurface.patchCount());
+            LL_PROFILE_PLOT("water waves cm", (int64_t)(mWaterSurface.maxDisplacement() * 100.f));
             LL_PROFILE_PLOT("render target MB", (int64_t)(LLRenderTarget::sBytesAllocated >> 20));
         }
     }
@@ -11705,7 +11710,7 @@ void LLPipeline::doWaterHaze()
         }
         else
         {
-            // The field as LLDrawPoolWater draws it.
+            // The field as LLDrawPoolWater draws it, flat.
             // Default LEQUAL auto-translates to GEQUAL under reverse-Z, mirroring the manual
             // above-water depth test in waterHazeF.glsl (which flips its compare direction).
             LLGLDepthTest depth(GL_TRUE, GL_FALSE);
@@ -11717,7 +11722,7 @@ void LLPipeline::doWaterHaze()
             gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
 
             mWaterSurface.bind(haze_shader);
-            mWaterSurface.draw(haze_shader);
+            mWaterSurface.draw(haze_shader, false);
         }
 
         unbindDeferredShader(haze_shader);

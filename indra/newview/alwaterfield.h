@@ -52,6 +52,9 @@ static_assert(2 * MAX_CELLS + 1 <= MAP_SIZE, "the square must fit the cell map")
 /// Quads in a ring: the 4x4 grid without its middle 2x2.
 constexpr S32 RING_QUADS = 12;
 
+/// The waves' tessellation patches along a cell's side (waterSurface.glsl's WATER_PATCHES): 32 m of a 256 m cell.
+constexpr S32 PATCHES_PER_CELL = 8;
+
 /// The tessellation reach is where the vertex spacing, distance over density, reaches half the big layer's
 /// wavelength, held to this range.
 constexpr F64 REACH_SPACING = 12.5;
@@ -124,6 +127,11 @@ S32 cellOf(F64 global, F64 width);
 /// The reach of waves at a tessellation density, before the layout holds it inside the square.
 F64 tessReach(F32 density);
 
+/// The reach across the plane of a camera `height` above (or below) the water: the points of the plane within `reach`
+/// of the camera itself, as the tessellation's levels measure distance, lie within this of the point under it. 0 where
+/// the camera is `reach` or more from the plane: no point is near enough for a wave to be tessellated.
+F64 reachAcross(F64 reach, F64 height);
+
 /// The layout around a camera at global (eye_x, eye_y), for cells `width` wide, a draw distance, an edge stretch, the
 /// loaded regions and a tessellation reach (0 with waves off). The square takes in the draw distance, every loaded
 /// region and, with waves, the reach and a cell past it, up to MAX_CELLS; the reach is then held to (n - 1) cells, so
@@ -132,17 +140,32 @@ F64 tessReach(F32 density);
 Layout layout(F64 eye_x, F64 eye_y, F64 width, F32 draw_distance, F64 stretch, const std::vector<Region>& regions,
               F64 reach);
 
+/// The cells drawn as the waves' patches, counted as the cell map counts them (waterSurface.glsl's waterPatchRect):
+/// min x, min y, then max x and max y plus one. All 0, empty, without waves.
+struct PatchRect
+{
+    S32 mMinX = 0;
+    S32 mMinY = 0;
+    S32 mEndX = 0;
+    S32 mEndY = 0;
+
+    bool empty() const { return mEndX <= mMinX || mEndY <= mMinY; }
+    bool operator==(const PatchRect&) const = default;
+};
+PatchRect patchRect(const Layout& layout);
+
 /// One of the field's draws (waterSurface.glsl's water_vertex): which part of it (waterLayout), whether its vertices
 /// make a strip or triangles, and how many vertices each of how many instances has. Every vertex shared between two
-/// parts is the same point in both, worked from the same exact multiples, and lies on no edge it is not a corner of:
-/// the field has no T-junction a crack could open along.
+/// parts, or between a part and the waves' patches, is the same point in both, worked from the same exact multiples,
+/// and lies on no edge it is not a corner of: the field has no T-junction a crack could open along.
 struct Draw
 {
     enum EPart : S32
     {
-        CELLS = 0,   ///< the square's cells, a quad each: a four-vertex strip
+        CELLS = 0,   ///< the square's cells, a quad each, but those beside the patches: a four-vertex strip
         RINGS = 1,   ///< the rings' quads, RING_QUAD_TRIANGLES each: those along a finer ring split at the edge's middle
         ZIPPERS = 2, ///< ring 0's four sides, each fanned onto the square's cell corners
+        FRINGE = 3,  ///< the cells beside the patches, each fanned onto the patch corners along their shared edge
     };
     EPart mPart = CELLS;
     bool mStrip = false;
@@ -152,21 +175,24 @@ struct Draw
 
 /// A ring quad's triangles: three, the third empty for a quad no finer ring's edge runs along.
 constexpr S32 RING_QUAD_TRIANGLES = 3;
+/// A fringe cell's: one for each patch along its shared edge, and one more.
+constexpr S32 FRINGE_TRIANGLES = PATCHES_PER_CELL + 1;
 /// A side of ring 0's: one for each cell along the square's side, and two more.
 inline S32 zipperTriangles(const Layout& layout) { return layout.side() + 2; }
 
 /// The field's draws, in order, and how many there are.
 struct FieldDraws
 {
-    Draw mDraws[3];
+    Draw mDraws[4];
     S32  mCount = 0;
 
     void add(const Draw& draw) { mDraws[mCount++] = draw; }
     const Draw* begin() const { return mDraws; }
     const Draw* end() const { return mDraws + mCount; }
 };
-/// The draws of the field laid out as `layout`. None for an empty layout.
-FieldDraws fieldDraws(const Layout& layout);
+/// The draws of the field laid out as `layout`, its cells beside `patches` (empty, none) fanned onto their corners.
+/// None for an empty layout.
+FieldDraws fieldDraws(const Layout& layout, const PatchRect& patches);
 
 /// Cell `i`, `j` of the square, counted from its south-west corner.
 Rect cellRect(const Layout& layout, S32 i, S32 j);

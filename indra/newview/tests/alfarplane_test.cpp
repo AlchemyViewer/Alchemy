@@ -29,6 +29,7 @@
 
 #include "../alfarplane.h"
 #include "../alwaterfield.h"
+#include "../alwaterheightbake.h"
 
 #include "llcamera.h"
 
@@ -232,6 +233,10 @@ namespace tut
         const std::string lattice = shader_source("class1/deferred/hexLatticeUtil.glsl");
         ensure_approximately_equals("the lattice's skew", literal_after(lattice, "mat2(1.0, 0.0, "), (F32)ALWaterField::HEX_SKEW_XY, 16);
         ensure_approximately_equals("and its stretch", literal_after(lattice, "mat2(1.0, 0.0, -0.57735027, "), (F32)ALWaterField::HEX_SKEW_YY, 16);
+        // The waves' patches a cell side, which the draw counts, and the heights' metres, which the bake's bound uses.
+        ensure_equals("the patches a cell side", (S32)literal_after(surface, "#define WATER_PATCHES "), ALWaterField::PATCHES_PER_CELL);
+        ensure_equals("the big layer's metres", literal_after(surface, "#define WATER_BIG_METRES "), ALWaterHeightBake::BIG_METRES);
+        ensure_equals("the mid layer's metres", literal_after(surface, "#define WATER_MID_METRES "), ALWaterHeightBake::MID_METRES);
     }
 
     // The eye-to-sky rotation: a level camera's forward, up and right land on the sky's (north, up, east) for its heading,

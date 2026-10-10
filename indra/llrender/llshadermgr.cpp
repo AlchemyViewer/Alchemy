@@ -314,6 +314,20 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         }
     }
 
+    if (features->hasWaterWaves)
+    {
+        // The waves' evaluation stage displaces the surface by heights read through the lattice the fragment stage
+        // reads the normals through. atmosphericsVarsV declares the outputs the fragment side's atmosphericsVarsF
+        // expects to find in the stage before it, which with tessellation is this one, as for the terrain.
+        for (const char* object : { "environment/waterSurface.glsl", "deferred/hexLatticeUtil.glsl", "windlight/atmosphericsVarsV.glsl" })
+        {
+            if (!shader->attachStageObject(GL_TESS_EVALUATION_SHADER, object))
+            {
+                return false;
+            }
+        }
+    }
+
     ///////////////////////////////////////
     // Attach Fragment Shader Features Next
     ///////////////////////////////////////
@@ -2244,6 +2258,16 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterLatticeFrac");
     mReservedUniforms.push_back("waterLatticeBase");
     mReservedUniforms.push_back("waterMapMean");
+    mReservedUniforms.push_back("waterPatchRect");
+    mReservedUniforms.push_back("waterTessDensity");
+    mReservedUniforms.push_back("waterMaxDisplacement");
+    mReservedUniforms.push_back("waterCullPlanes");
+    mReservedUniforms.push_back("waterHeightMap");
+    mReservedUniforms.push_back("waterHeightMap2");
+    mReservedUniforms.push_back("waterWaveAmp");
+    mReservedUniforms.push_back("waterWaveReach");
+    mReservedUniforms.push_back("waterWaveEye");
+    mReservedUniforms.push_back("waterRaise");
 
     // The enum and this list are parallel, and an entry added or removed on one side only
     // shifts every later uniform index for every shader in the viewer -- silently, since a

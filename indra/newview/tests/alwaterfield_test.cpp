@@ -665,6 +665,56 @@ namespace tut
         ensure_equals("a cell east recentres it", next.mCentreX, first.mCentreX + 1);
     }
 
+    // The patches' rectangle in the cell map's cells, its end past the last; empty without waves.
+    template<> template<>
+    void alwaterfield_object::test<15>()
+    {
+        set_test_name("the patch rectangle");
+        const ALWaterField::Layout flat = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0);
+        ensure("no waves, no rectangle", ALWaterField::patchRect(flat).empty());
+        const ALWaterField::Layout waved =
+            ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, ALWaterField::tessReach(64.f));
+        const ALWaterField::PatchRect rect = ALWaterField::patchRect(waved);
+        const S32 west = waved.mCentreX - waved.mCells;
+        const S32 south = waved.mCentreY - waved.mCells;
+        ensure_equals("min x", rect.mMinX, waved.mPatchMinX - west);
+        ensure_equals("min y", rect.mMinY, waved.mPatchMinY - south);
+        ensure_equals("end x, past the last", rect.mEndX, waved.mPatchMaxX - west + 1);
+        ensure_equals("end y, past the last", rect.mEndY, waved.mPatchMaxY - south + 1);
+        ensure("a cell of the square all round it", rect.mMinX >= 1 && rect.mMinY >= 1 &&
+                                                         rect.mEndX <= waved.side() - 1 && rect.mEndY <= waved.side() - 1);
+        ensure("the camera's cell among them", rect.mMinX <= waved.mCells && rect.mEndX > waved.mCells &&
+                                                   rect.mMinY <= waved.mCells && rect.mEndY > waved.mCells);
+    }
+
+    // The reach across the plane of a camera above it: every point of the plane within the reach of the camera itself,
+    // and no other, lies within it of the point below; none at or past the reach's height.
+    template<> template<>
+    void alwaterfield_object::test<16>()
+    {
+        set_test_name("the reach across the plane from a height");
+        ensure_equals("on the plane, the whole reach", ALWaterField::reachAcross(800.0, 0.0), 800.0);
+        ensure_equals("at the reach's height, none", ALWaterField::reachAcross(800.0, 800.0), 0.0);
+        ensure_equals("above it, none", ALWaterField::reachAcross(800.0, 3000.0), 0.0);
+        ensure_equals("below the plane as above it", ALWaterField::reachAcross(800.0, -600.0),
+                      ALWaterField::reachAcross(800.0, 600.0));
+        ensure_equals("no reach, none", ALWaterField::reachAcross(0.0, 0.0), 0.0);
+        for (F64 h : { 0.0, 50.0, 500.0, 799.0 })
+        {
+            const F64 across = ALWaterField::reachAcross(800.0, h);
+            ensure("a point that far across is the reach from the camera", std::fabs(std::sqrt(across * across + h * h) - 800.0) < 1e-9);
+        }
+        // A camera 2 km up lays out no patches; at 300 m, fewer than at the water.
+        const ALWaterField::Layout high = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {},
+                                                               ALWaterField::reachAcross(ALWaterField::tessReach(64.f), 2000.0));
+        ensure("none from 2 km up", ALWaterField::patchRect(high).empty());
+        const ALWaterField::Layout low = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {},
+                                                              ALWaterField::reachAcross(ALWaterField::tessReach(64.f), 0.0));
+        const ALWaterField::Layout mid = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {},
+                                                              ALWaterField::reachAcross(ALWaterField::tessReach(64.f), 700.0));
+        ensure("fewer from 700 m", mid.mReach < low.mReach && mid.mPatchMaxX - mid.mPatchMinX < low.mPatchMaxX - low.mPatchMinX);
+    }
+
     // A camera at no finite place, or cells of no width, lay out nothing; a camera far past any grid is held at the
     // cells' limit; a stretch past any rim takes no more than the most rings; a draw distance or reach that is not a
     // number takes none.
@@ -678,7 +728,7 @@ namespace tut
         ensure_equals("an infinite one", ALWaterField::layout(EYE_X, -inf, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0).mCells, 0);
         ensure_equals("no width", ALWaterField::layout(EYE_X, EYE_Y, 0.0, 512.f, INFINITE_STRETCH, {}, 0.0).mCells, 0);
         ensure_equals("a negative one", ALWaterField::layout(EYE_X, EYE_Y, -WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0).mCells, 0);
-        ensure("nothing to draw for it", ALWaterField::fieldDraws(ALWaterField::Layout()).mCount == 0);
+        ensure("nothing to draw for it", ALWaterField::fieldDraws(ALWaterField::Layout(), ALWaterField::PatchRect()).mCount == 0);
 
         const ALWaterField::Layout distant = ALWaterField::layout(1e300, -1e300, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0);
         ensure_equals("far east, at the limit", distant.mCentreX, ALWaterField::CELL_LIMIT);
@@ -694,15 +744,15 @@ namespace tut
         ensure_equals("and a NaN reach none", odd.mReach, 0.0);
     }
 
-    // The field's draws: the cells, the rings at three triangles a quad, and ring 0's four sides at a triangle a cell
-    // along the square and two more.
+    // The field's draws: the cells, the rings at three triangles a quad, ring 0's four sides at a triangle a cell along
+    // the square and two more, and the fringe, only with patches, a cell along each side of their rectangle.
     template<> template<>
     void alwaterfield_object::test<18>()
     {
         set_test_name("the field's draws");
         const ALWaterField::Layout flat = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0);
-        const ALWaterField::FieldDraws draws = ALWaterField::fieldDraws(flat);
-        ensure_equals("three", draws.mCount, 3);
+        const ALWaterField::FieldDraws draws = ALWaterField::fieldDraws(flat, ALWaterField::PatchRect());
+        ensure_equals("three without patches", draws.mCount, 3);
         ensure_equals("the cells", draws.mDraws[0].mPart, ALWaterField::Draw::CELLS);
         ensure("as strips", draws.mDraws[0].mStrip && draws.mDraws[0].mVertices == 4);
         ensure_equals("a cell an instance", draws.mDraws[0].mInstances, flat.side() * flat.side());
@@ -712,5 +762,16 @@ namespace tut
         ensure_equals("the zippers", draws.mDraws[2].mPart, ALWaterField::Draw::ZIPPERS);
         ensure_equals("four of them", draws.mDraws[2].mInstances, 4);
         ensure_equals("a triangle a cell along the side and two", draws.mDraws[2].mVertices, 3 * (flat.side() + 2));
+
+        const ALWaterField::Layout waved =
+            ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, ALWaterField::tessReach(64.f));
+        const ALWaterField::PatchRect rect = ALWaterField::patchRect(waved);
+        const ALWaterField::FieldDraws fringed = ALWaterField::fieldDraws(waved, rect);
+        ensure_equals("four with patches", fringed.mCount, 4);
+        ensure_equals("the fringe", fringed.mDraws[3].mPart, ALWaterField::Draw::FRINGE);
+        ensure_equals("a triangle a patch along its edge and one", fringed.mDraws[3].mVertices,
+                      3 * (ALWaterField::PATCHES_PER_CELL + 1));
+        ensure_equals("a cell along each side", fringed.mDraws[3].mInstances,
+                      2 * ((rect.mEndX - rect.mMinX) + (rect.mEndY - rect.mMinY)));
     }
 }

@@ -36,6 +36,8 @@
 #include "hbxxh.h"
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
+
+#include "alwatersurface.h"
 #include "llviewercontrol.h"
 #include "llversioninfo.h"
 
@@ -77,6 +79,13 @@ LLVector4           gShinyOrigin;
 static S32 water_hextile()
 {
     return (S32)llmin(gSavedSettings.getU32("AlchemyRenderWaterHextile"), 2U);
+}
+
+bool water_waves_supported()
+{
+    // The effective version, after the feature manager has held a context back (the Intel clamp): tessellation is
+    // GL 4.0.
+    return gGLManager.mGLVersion >= 4.f;
 }
 
 // Whether the session computes: a context with compute, GLSL 4.30 left to it after the feature manager's fallbacks,
@@ -164,6 +173,8 @@ LLGLSLShader        gObjectAlphaMaskNoColorProgram;
 //environment shaders
 LLGLSLShader        gWaterProgram;
 LLGLSLShader        gUnderWaterProgram;
+LLGLSLShader        gWaterWavesProgram;
+LLGLSLShader        gUnderWaterWavesProgram;
 LLGLSLShader        gWaterExclusionProgram;
 LLGLSLShader        gWaterFieldProgram;
 
@@ -1002,6 +1013,25 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         }
     }
 
+    // The water waves' stages, where they are wanted: the evaluation stage's surface and the lattice its heights are read
+    // through. The waves are optional, so these failing leaves only them off: their programs then fail to attach what
+    // is missing.
+    if (ALWaterSurface::wavesWanted())
+    {
+        const std::pair<const char*, GLenum> water_objects[] = {
+            { "environment/waterSurface.glsl", GL_TESS_EVALUATION_SHADER },
+            { "deferred/hexLatticeUtil.glsl", GL_TESS_EVALUATION_SHADER },
+        };
+        for (const auto& object : water_objects)
+        {
+            S32 level = 1;
+            if (loadShaderFile(object.first, level, object.second, &attribs) == 0)
+            {
+                LL_WARNS("Shader") << "Failed to load the water waves' " << object.first << "; the water is drawn flat" << LL_ENDL;
+            }
+        }
+    }
+
     // Load the Basic Fragment Shaders at the appropriate level.
     // (in order of shader function call depth for reference purposes, deepest level first)
 
@@ -1092,6 +1122,8 @@ bool LLViewerShaderMgr::loadShadersWater()
     {
         gWaterProgram.unload();
         gUnderWaterProgram.unload();
+        gWaterWavesProgram.unload();
+        gUnderWaterWavesProgram.unload();
         gWaterExclusionProgram.unload();
         gWaterFieldProgram.unload();
         return true;
@@ -1099,60 +1131,70 @@ bool LLViewerShaderMgr::loadShadersWater()
 
     if (success)
     {
-        // load water shader
-        gWaterProgram.mName = "Water Shader";
-        gWaterProgram.mFeatures.calculatesAtmospherics = true;
-        gWaterProgram.mFeatures.hasAtmospherics = true;
-        gWaterProgram.mFeatures.hasGamma = true;
-        gWaterProgram.mFeatures.hasSrgb = true;
-        gWaterProgram.mFeatures.hasReflectionProbes = true;
-        gWaterProgram.mFeatures.hasTonemap = true;
-        gWaterProgram.mFeatures.hasWaterSurface = true;
-        gWaterProgram.mFeatures.hasShadows = use_sun_shadow;
-        gWaterProgram.mShaderFiles.clear();
-        gWaterProgram.mShaderFiles.push_back(make_pair("environment/waterV.glsl", GL_VERTEX_SHADER));
-        gWaterProgram.mShaderFiles.push_back(make_pair("environment/waterF.glsl", GL_FRAGMENT_SHADER));
-        gWaterProgram.clearPermutations();
-        if (LLPipeline::sRenderTransparentWater)
+        // The surface seen from above and from below, each flat (the cells and rings, from waterV) and, where
+        // tessellation is, waved (the patches within the reach: waterPatchV, waterTC, waterTE). The two share the
+        // fragment stage and what it takes (waterVaryingsV, written once for the stage before it).
+        const auto setup = [&](LLGLSLShader& shader, bool under, bool waves)
         {
-            gWaterProgram.addPermutation("TRANSPARENT_WATER", "1");
-        }
+            shader.mName = std::string(under ? "Underwater" : "Water") + (waves ? " Waves Shader" : " Shader");
+            shader.mFeatures.calculatesAtmospherics = true;
+            shader.mFeatures.hasAtmospherics = true;
+            shader.mFeatures.hasWaterSurface = true;
+            shader.mFeatures.hasWaterWaves = waves;
+            if (!under)
+            {
+                shader.mFeatures.hasGamma = true;
+                shader.mFeatures.hasSrgb = true;
+                shader.mFeatures.hasReflectionProbes = true;
+                shader.mFeatures.hasTonemap = true;
+                shader.mFeatures.hasShadows = use_sun_shadow;
+            }
+            shader.mShaderFiles.clear();
+            if (waves)
+            {
+                shader.mShaderFiles.push_back(make_pair("environment/waterPatchV.glsl", GL_VERTEX_SHADER));
+                shader.mShaderFiles.push_back(make_pair("environment/waterTC.glsl", GL_TESS_CONTROL_SHADER));
+                shader.mShaderFiles.push_back(make_pair("environment/waterTE.glsl", GL_TESS_EVALUATION_SHADER));
+                shader.mShaderFiles.push_back(make_pair("environment/waterVaryingsV.glsl", GL_TESS_EVALUATION_SHADER));
+            }
+            else
+            {
+                shader.mShaderFiles.push_back(make_pair("environment/waterV.glsl", GL_VERTEX_SHADER));
+                shader.mShaderFiles.push_back(make_pair("environment/waterVaryingsV.glsl", GL_VERTEX_SHADER));
+            }
+            shader.mShaderFiles.push_back(make_pair(under ? "environment/underWaterF.glsl" : "environment/waterF.glsl", GL_FRAGMENT_SHADER));
+            shader.mShaderLevel = mShaderLevel[SHADER_WATER];
+            shader.mShaderGroup = LLGLSLShader::SG_WATER;
+            shader.clearPermutations();
+            if (LLPipeline::sRenderTransparentWater)
+            {
+                shader.addPermutation("TRANSPARENT_WATER", "1");
+            }
+            if (!under && use_sun_shadow)
+            {
+                shader.addPermutation("HAS_SUN_SHADOW", "1");
+            }
+            // Read by waterSurface.glsl, a shared object, through the global define; the program's copy keeps its
+            // hash honest.
+            shader.addPermutation("WATER_HEXTILE", std::to_string(water_hextile()));
+            return shader.createShader((under ? 0 : LLGLSLShader::VARIANT_CLASSIC) | mirror_variant());
+        };
 
-        if (use_sun_shadow)
-        {
-            gWaterProgram.addPermutation("HAS_SUN_SHADOW", "1");
-        }
-
-        // Read by waterSurface.glsl, a shared object, through the global define; the program's copy keeps its hash
-        // honest.
-        gWaterProgram.addPermutation("WATER_HEXTILE", std::to_string(water_hextile()));
-
-        gWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
-        gWaterProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
-        success = gWaterProgram.createShader(LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
+        success = setup(gWaterProgram, false, false) && setup(gUnderWaterProgram, true, false);
         llassert(success);
-    }
-
-    if (success)
-    {
-        //load under water vertex shader
-        gUnderWaterProgram.mName = "Underwater Shader";
-        gUnderWaterProgram.mFeatures.calculatesAtmospherics = true;
-        gUnderWaterProgram.mFeatures.hasAtmospherics = true;
-        gUnderWaterProgram.mFeatures.hasWaterSurface = true;
-        gUnderWaterProgram.mShaderFiles.clear();
-        gUnderWaterProgram.mShaderFiles.push_back(make_pair("environment/waterV.glsl", GL_VERTEX_SHADER));
-        gUnderWaterProgram.mShaderFiles.push_back(make_pair("environment/underWaterF.glsl", GL_FRAGMENT_SHADER));
-        gUnderWaterProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
-        gUnderWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
-        gUnderWaterProgram.clearPermutations();
-        if (LLPipeline::sRenderTransparentWater)
+        // The waves are optional: built only where they are wanted, and their failing leaves them off, the water flat,
+        // rather than the water or any shader after it.
+        gWaterWavesProgram.unload();
+        gUnderWaterWavesProgram.unload();
+        if (success && ALWaterSurface::wavesWanted())
         {
-            gUnderWaterProgram.addPermutation("TRANSPARENT_WATER", "1");
+            if (!setup(gWaterWavesProgram, false, true) || !setup(gUnderWaterWavesProgram, true, true))
+            {
+                LL_WARNS("Shader") << "The water waves' programs did not build; the water is drawn flat" << LL_ENDL;
+                gWaterWavesProgram.unload();
+                gUnderWaterWavesProgram.unload();
+            }
         }
-        gUnderWaterProgram.addPermutation("WATER_HEXTILE", std::to_string(water_hextile()));
-        success = gUnderWaterProgram.createShader(mirror_variant());
-        llassert(success);
     }
 
     if (success)
@@ -1172,7 +1214,7 @@ bool LLViewerShaderMgr::loadShadersWater()
 
     if (success)
     {
-        // The field's quads and nothing else: the sky pool's occlusion query over the water (LLPipeline::mSkyBehindQuery).
+        // The field and nothing else: the sky pool's occlusion query over the water (LLPipeline::mSkyBehindQuery).
         gWaterFieldProgram.mName = "Water Field Shader";
         gWaterFieldProgram.mFeatures.hasWaterSurface = true;
         gWaterFieldProgram.mShaderFiles.clear();

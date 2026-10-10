@@ -33,6 +33,10 @@ uniform float waterDefaultHeight;
 // centre; w: 1 where the void (the cells no region holds, and the rings) is drawn, 0 where it is hidden.
 uniform vec4 waterRings;
 
+// The cells drawn as the waves' patches, counted as the cell map counts them: min i, min j, then max i and max j plus
+// one. All 0, empty, but in the water's own draws while it has waves: the other draws of the field want every cell.
+uniform ivec4 waterPatchRect;
+
 // x: the wave clamp, the horizontal distance past which wave coordinates stop following the surface.
 uniform vec2 waterFar;
 // Each layer's phase at the camera: its scroll plus the camera's place in it, and the sweep's (ALWaterField::wavePhases).
@@ -51,9 +55,12 @@ float water_height_at(vec2 xy)
     return texelFetch(waterCellMap, ivec2(cell), 0).r;
 }
 
-// The point of the plane `at` cells from the square's south-west corner, in agent space. Every point of the cells and
-// ring 0's inner edges comes through here from a whole number of cells, and the offset from the centre is then exact,
-// so a point two parts share is the same point in both.
+// The waves' patches a cell side (ALWaterField::PATCHES_PER_CELL): 32 m of a 256 m cell.
+#define WATER_PATCHES 8
+
+// The point of the plane `at` cells from the square's south-west corner, in agent space. Every point of the cells, the
+// fringe, the patches and ring 0's inner edges comes through here from a multiple of an eighth of a cell, and the
+// offset from the centre is then exact, so a point two parts share is the same point in both.
 vec2 water_square_point(vec2 at)
 {
     float side = waterCellSquare.w;
@@ -117,17 +124,53 @@ vec2 water_between(vec2 lo, vec2 hi, vec2 t)
                 t.y <= 0.0 ? lo.y : (t.y >= 1.0 ? hi.y : 0.5 * (lo.y + hi.y)));
 }
 
+// Whether cell `cell` lies beside the patches' rectangle, along one of its sides, and which of its edges faces the
+// rectangle (water_turn's numbering). Never where no patches are drawn.
+bool water_fringe(ivec2 cell, out int edge)
+{
+    edge = 0;
+    if (any(greaterThanEqual(waterPatchRect.xy, waterPatchRect.zw)))
+    {
+        return false;
+    }
+    bool along_x = cell.x >= waterPatchRect.x && cell.x < waterPatchRect.z;
+    bool along_y = cell.y >= waterPatchRect.y && cell.y < waterPatchRect.w;
+    if (along_x && cell.y == waterPatchRect.y - 1)
+    {
+        edge = 2;
+        return true;
+    }
+    if (along_x && cell.y == waterPatchRect.w)
+    {
+        edge = 0;
+        return true;
+    }
+    if (along_y && cell.x == waterPatchRect.x - 1)
+    {
+        edge = 1;
+        return true;
+    }
+    if (along_y && cell.x == waterPatchRect.z)
+    {
+        edge = 3;
+        return true;
+    }
+    return false;
+}
+
 // Vertex `vertex` of part `part` of the field (ALWaterField::Draw), instance `instance`, in agent space; false where the
-// instance is not drawn, all of whose vertices are then one point. Every vertex two parts share is worked from the same
-// exact multiples, and none lies on an edge it is not a corner of, so the field has no T-junction for a crack to open
-// along.
+// instance is not drawn, all of whose vertices are then one point. Every vertex two parts share, or a part and the
+// waves' patches, is worked from the same exact multiples, and none lies on an edge it is not a corner of, so the field
+// has no T-junction for a crack to open along.
 //  0, the cells: cell i + side * j, a four-vertex strip at its region's water height; not a void cell with the void
-//     hidden.
+//     hidden, a cell the patches draw, or one beside them, which the fringe draws.
 //  1, the rings: twelve quads a ring as ALWaterField::ringQuad lays them out, at the agent region's water height, each
 //     three triangles, those along a finer ring's edge split at its middle, where the finer ring has a corner. Ring
 //     0's quads along the square are the zippers'.
 //  2, ring 0's four sides, south, east, north and west: the square's side fanned from the side's outer corners and
 //     middle, so its edge meets every cell corner along the square.
+//  3, the fringe: the cells beside the patches, each fanned from its far corners onto the patch corners along the edge
+//     it shares with them.
 bool water_vertex(int part, int instance, int vertex, out vec3 pos)
 {
     float side = waterCellSquare.w;
@@ -136,9 +179,62 @@ bool water_vertex(int part, int instance, int vertex, out vec3 pos)
     {
         ivec2 cell = ivec2(instance % n, instance / n);
         vec2 texel = texelFetch(waterCellMap, cell, 0).rg;
-        bool drawn = water_cell_drawn(texel);
+        bool patched = all(greaterThanEqual(cell, waterPatchRect.xy)) && all(lessThan(cell, waterPatchRect.zw));
+        int edge;
+        bool drawn = water_cell_drawn(texel) && !patched && !water_fringe(cell, edge);
         vec2 corner = drawn ? vec2(float(vertex & 1), float(vertex >> 1)) : vec2(0.0);
         pos = vec3(water_square_point(vec2(cell) + corner), texel.r);
+        return drawn;
+    }
+
+    if (part == 3)
+    {
+        // Which cell: those south of the rectangle west to east, then north of it, then west of it south to north,
+        // then east of it.
+        int w = waterPatchRect.z - waterPatchRect.x;
+        int h = waterPatchRect.w - waterPatchRect.y;
+        ivec2 cell;
+        if (instance < w)
+        {
+            cell = ivec2(waterPatchRect.x + instance, waterPatchRect.y - 1);
+        }
+        else if (instance < 2 * w)
+        {
+            cell = ivec2(waterPatchRect.x + instance - w, waterPatchRect.w);
+        }
+        else if (instance < 2 * w + h)
+        {
+            cell = ivec2(waterPatchRect.x - 1, waterPatchRect.y + instance - 2 * w);
+        }
+        else
+        {
+            cell = ivec2(waterPatchRect.z, waterPatchRect.y + instance - 2 * w - h);
+        }
+        vec2 texel = texelFetch(waterCellMap, cell, 0).rg;
+        int edge;
+        bool drawn = water_fringe(cell, edge) && water_cell_drawn(texel);
+        // Its shared edge south, its patch corners p_k there: a fan from the south-west far corner over the west half,
+        // a triangle across the middle, and a fan from the north-east far corner over the east half.
+        int tri = vertex / 3;
+        int k = vertex - tri * 3;
+        const int HALF = WATER_PATCHES / 2;
+        vec2 t;
+        if (tri < HALF)
+        {
+            t = k == 0 ? vec2(float(tri), 0.0) : (k == 1 ? vec2(float(tri + 1), 0.0) : vec2(0.0, float(WATER_PATCHES)));
+        }
+        else if (tri == HALF)
+        {
+            t = k == 0 ? vec2(float(HALF), 0.0) : (k == 1 ? vec2(float(WATER_PATCHES)) : vec2(0.0, float(WATER_PATCHES)));
+        }
+        else
+        {
+            int p = tri - 1;
+            t = k == 0 ? vec2(float(p), 0.0) : (k == 1 ? vec2(float(p + 1), 0.0) : vec2(float(WATER_PATCHES)));
+        }
+        t /= float(WATER_PATCHES);
+        vec2 local = drawn ? water_turn(t, edge) : vec2(0.0);
+        pos = vec3(water_square_point(vec2(cell) + local), texel.r);
         return drawn;
     }
 
@@ -246,6 +342,24 @@ bool water_vertex(int part, int instance, int vertex, out vec3 pos)
     return drawn;
 }
 
+// Corner `vertex` of patch `instance` of the cells in waterPatchRect, row by row, WATER_PATCHES x WATER_PATCHES a cell,
+// at the cell's water height. The corners run counter-clockwise from above, (0, 0), (1, 0), (1, 1), (0, 1), and are
+// placed as the cells and the fringe are (water_square_point), so a patch row's outer corners are the cells' corners
+// exactly and the fringe's along their edge. A patch of a cell not drawn, a void one with the void hidden, has its four
+// corners at one point, which the control stage culls.
+void water_patch_corner(int instance, int vertex, out vec3 pos)
+{
+    int per_cell = WATER_PATCHES * WATER_PATCHES;
+    int c = instance / per_cell;
+    int k = instance - c * per_cell;
+    int columns = max(waterPatchRect.z - waterPatchRect.x, 1);
+    ivec2 cell = waterPatchRect.xy + ivec2(c % columns, c / columns);
+    ivec2 square = ivec2(k % WATER_PATCHES, k / WATER_PATCHES);
+    vec2 texel = texelFetch(waterCellMap, cell, 0).rg;
+    ivec2 corner = water_cell_drawn(texel) ? ivec2((vertex == 1 || vertex == 2) ? 1 : 0, vertex >= 2 ? 1 : 0) : ivec2(0);
+    pos = vec3(water_square_point(vec2(cell) + vec2(square + corner) / float(WATER_PATCHES)), texel.r);
+}
+
 // A point `r` from the camera, horizontally, held to the wave clamp: past it the wave coordinates stop following the
 // surface.
 vec2 water_wave_clamp(vec2 r)
@@ -268,7 +382,7 @@ void water_wave_coords(vec2 r, out vec2 big, out vec4 little)
     little.zw = v * vec2(0.1, 0.2) + waterLittlePhase.zw;
 }
 
-#ifdef FRAGMENT_SHADER
+#if defined(FRAGMENT_SHADER) || defined(TESS_EVALUATION_SHADER)
 
 // Which wave layers are hex-tiled (AlchemyRenderWaterHextile, a global define): 0 none, 1 the big layer, whose 25 m
 // repeat is what reads as a grid, 2 the mid layer (the little map's zw read) too. The little map's xy read repeats
@@ -289,8 +403,6 @@ uniform float blend_factor;
 // its floor as int bits, of the big layer (xy) and the mid layer (zw).
 uniform vec4 waterLatticeFrac;
 uniform ivec4 waterLatticeBase;
-// Each map's mean normal xy: the current map's (xy) and the next's (zw), 0 until its pixels have arrived.
-uniform vec4 waterMapMean;
 
 vec2 hex_skew(vec2 p);
 void hex_triangle(vec2 f, out ivec2 corner0, out ivec2 corner1, out ivec2 corner2, out vec3 bary);
@@ -321,14 +433,20 @@ void water_hex_cells(vec2 p, vec2 frac, ivec2 base, out vec2 offset[3], out vec3
 
 // The variance a blend of independent samples loses, given back: one over the root of the squared weights' sum, 1
 // inside a cell and up to sqrt(3) where three cells weigh alike. Faded out as the layer minifies toward a cell spanning
-// four texels of the mip read, where the three samples stop being independent. The mip comes from the plain uv's
-// derivatives, by hand: textureQueryLod is GLSL 4.00.
-float water_hex_gain(vec3 weight, vec2 dx, vec2 dy, vec2 texels)
+// four texels of the mip read, where the three samples stop being independent. `footprint` is the texels of the map's
+// base a step of the read covers: a pixel's, or a vertex's.
+float water_hex_gain(vec3 weight, float footprint, vec2 texels)
 {
-    float footprint = max(max(length(dx * texels), length(dy * texels)), 1.0);
-    float cell_texels = min(texels.x, texels.y) / (WATER_HEX_GRID * footprint);
+    float cell_texels = min(texels.x, texels.y) / (WATER_HEX_GRID * max(footprint, 1.0));
     return mix(1.0, inversesqrt(dot(weight, weight)), smoothstep(4.0, 16.0, cell_texels));
 }
+
+#endif
+
+#ifdef FRAGMENT_SHADER
+
+// Each map's mean normal xy: the current map's (xy) and the next's (zw), 0 until its pixels have arrived.
+uniform vec4 waterMapMean;
 
 // One map's normal over a tiled layer's cells. The xy blend about the map's mean, so the gain scales only what varies
 // and the mean slope the author set stays where it was; z blends plainly. The gradients are the plain uv's: a cell's
@@ -359,7 +477,9 @@ vec3 water_tiled_layer(sampler2D map_a, sampler2D map_b, vec2 uv, vec2 p, vec2 f
     vec2 offset[3];
     vec3 weight;
     water_hex_cells(p, frac, base, offset, weight);
-    float gain = water_hex_gain(weight, dx, dy, vec2(textureSize(map_a, 0)));
+    // The mip by hand, from the plain uv's derivatives: textureQueryLod is GLSL 4.00.
+    vec2 texels = vec2(textureSize(map_a, 0));
+    float gain = water_hex_gain(weight, max(length(dx * texels), length(dy * texels)), texels);
     vec3 n = water_hex_read(map_a, uv, dx, dy, offset, weight, gain, waterMapMean.xy);
     if (blend_factor > 0.0)
     {
@@ -401,6 +521,114 @@ void water_wave_normals(sampler2D map_a, sampler2D map_b, vec2 r, out vec3 big, 
 #else
     little_zw = water_plain_layer(map_a, map_b, little_uv.zw);
 #endif
+}
+
+#endif
+
+#ifdef TESS_EVALUATION_SHADER
+
+uniform vec3 eyeVec;
+// The current and next maps' baked heights (ALWaterHeightBake): the big layer's field in r and the mid layer's in g, in
+// repeats of the map, on their own trilinear sampler.
+uniform sampler2D waterHeightMap;
+uniform sampler2D waterHeightMap2;
+// Each map's wave height, the dial times how far its waves have risen since its bake landed: the current map's (x)
+// and the next's (y); 0 for a map not baked.
+uniform vec2 waterWaveAmp;
+// x: the tessellation reach, by which the waves have faded out; y: A, the most they move the surface.
+uniform vec2 waterWaveReach;
+// The camera the waves were laid out around (ALWaterSurface's layout), in agent space: the main one even in a mirror,
+// whose own eye is eyeVec. Their fade and the flat ground under the camera follow it, as the patches drawn do.
+uniform vec3 waterWaveEye;
+uniform float waterTessDensity;
+
+// A patch's side, a cell's over WATER_PATCHES, and the most its edges are split (waterTC.glsl's WATER_MAX_LEVEL): no
+// vertex step is finer than their ratio, however near the camera.
+#define WATER_PATCH_METRES 32.0
+#define WATER_MAX_LEVEL 64.0
+
+// Metres of height per unit of each field: the layer's weight in the shading over its repeats a metre along x
+// (ALWaterHeightBake::BIG_METRES and MID_METRES).
+#define WATER_BIG_METRES 12.5
+#define WATER_MID_METRES 3.0
+
+// One field of a map over a tiled layer's cells at a mip: the cells' heights by their weights, and the gain. The
+// heights' mean is 0, so nothing is held about it.
+float water_hex_height(sampler2D map, int field, vec2 uv, float lod, vec2 offset[3], vec3 weight, float gain)
+{
+    float h = 0.0;
+    for (int i = 0; i < 3; ++i)
+    {
+        if (weight[i] > 0.0)
+        {
+            h += weight[i] * textureLod(map, uv + offset[i], lod)[field];
+        }
+    }
+    return gain * h;
+}
+
+// A map's height in metres, at the big layer's and the mid layer's coordinates and the lattice point `p`
+// (water_wave_clamp's), each layer read through the lattice the shading reads it through, so a cell's crests lie under
+// its shading, and at the mip whose texels a vertex step covers: sampled sparser than the map, a layer would crawl.
+float water_map_height(sampler2D map, vec2 big_uv, vec2 mid_uv, vec2 p, float spacing)
+{
+    vec2 texels = vec2(textureSize(map, 0));
+    float big_step = spacing * 0.04 * max(texels.x, texels.y);
+    float mid_step = spacing * 0.2 * max(texels.x, texels.y);
+    float big_lod = log2(max(big_step, 1.0));
+    float mid_lod = log2(max(mid_step, 1.0));
+#if WATER_HEXTILE >= 1
+    vec2 offset[3];
+    vec3 weight;
+    water_hex_cells(p * 0.04, waterLatticeFrac.xy, waterLatticeBase.xy, offset, weight);
+    float big = water_hex_height(map, 0, big_uv, big_lod, offset, weight, water_hex_gain(weight, big_step, texels));
+#else
+    float big = textureLod(map, big_uv, big_lod).r;
+#endif
+#if WATER_HEXTILE >= 2
+    water_hex_cells(p * vec2(0.1, 0.2), waterLatticeFrac.zw, waterLatticeBase.zw, offset, weight);
+    float mid = water_hex_height(map, 1, mid_uv, mid_lod, offset, weight, water_hex_gain(weight, mid_step, texels));
+#else
+    float mid = textureLod(map, mid_uv, mid_lod).g;
+#endif
+    return WATER_BIG_METRES * big + WATER_MID_METRES * mid;
+}
+
+// How far the waves move the surface at `p`, a point of the flat field in agent space: the maps' heights at its wave
+// coordinates, faded out by the tessellation reach, and around the camera they were laid out for (waterWaveEye). While
+// that camera is within A of the plane the surface over its xy stays flat, so the plane's underwater test and the
+// surface drawn agree where the camera is.
+float water_displacement(vec3 p)
+{
+    float A = waterWaveReach.y;
+    if (A <= 0.0)
+    {
+        return 0.0;
+    }
+    vec2 r_fade = p.xy - waterWaveEye.xy;
+    float d = length(r_fade);
+    float fade = 1.0 - smoothstep(0.75 * waterWaveReach.x, waterWaveReach.x, d);
+    float level = 1.0 - smoothstep(A, 2.0 * A, abs(waterWaveEye.z - p.z));
+    fade *= mix(1.0, smoothstep(0.0, max(8.0, 4.0 * A), d), level);
+    if (fade <= 0.0)
+    {
+        return 0.0;
+    }
+    // The wave coordinates from the eye drawn from, which their phases are worked for; the vertex step as the patch's
+    // edges are split, distance over density but never finer than the most levels a patch's edge takes.
+    vec2 r = p.xy - eyeVec.xy;
+    float spacing = max(distance(p, eyeVec) / waterTessDensity, WATER_PATCH_METRES / WATER_MAX_LEVEL);
+    vec2 big_uv;
+    vec4 little_uv;
+    water_wave_coords(r, big_uv, little_uv);
+    vec2 q = water_wave_clamp(r);
+    float h = waterWaveAmp.x > 0.0 ? waterWaveAmp.x * water_map_height(waterHeightMap, big_uv, little_uv.zw, q, spacing) : 0.0;
+    if (blend_factor > 0.0)
+    {
+        float next = waterWaveAmp.y > 0.0 ? waterWaveAmp.y * water_map_height(waterHeightMap2, big_uv, little_uv.zw, q, spacing) : 0.0;
+        h = mix(h, next, blend_factor);
+    }
+    return fade * h;
 }
 
 #endif

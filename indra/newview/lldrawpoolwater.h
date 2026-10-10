@@ -53,6 +53,9 @@ public:
     void prerender() override;
 
     void setNormalMaps(const LLUUID& normalMapId, const LLUUID& nextNormalMapId);
+
+    /// The environment's wave normal map `i`: the current one (0) and the next (1), null before either is set.
+    LLViewerTexture* getNormalMap(S32 i) const { return mWaterNormp[i]; }
 };
 
 #endif // LL_LLDRAWPOOLWATER_H

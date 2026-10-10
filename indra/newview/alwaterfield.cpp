@@ -97,6 +97,16 @@ F64 tessReach(F32 density)
     return llclamp(REACH_SPACING * (F64)density, MIN_REACH, MAX_REACH);
 }
 
+F64 reachAcross(F64 reach, F64 height)
+{
+    const F64 h = std::fabs(height);
+    if (!finite(reach) || !finite(h) || reach <= h)
+    {
+        return 0.0;
+    }
+    return std::sqrt((reach - h) * (reach + h));
+}
+
 Layout layout(F64 eye_x, F64 eye_y, F64 width, F32 draw_distance, F64 stretch, const std::vector<Region>& regions,
               F64 reach)
 {
@@ -155,7 +165,23 @@ Layout layout(F64 eye_x, F64 eye_y, F64 width, F32 draw_distance, F64 stretch, c
     return out;
 }
 
-FieldDraws fieldDraws(const Layout& layout)
+PatchRect patchRect(const Layout& layout)
+{
+    PatchRect out;
+    if (layout.mPatchMaxX < layout.mPatchMinX || layout.mPatchMaxY < layout.mPatchMinY)
+    {
+        return out;
+    }
+    const S32 west = layout.mCentreX - layout.mCells;
+    const S32 south = layout.mCentreY - layout.mCells;
+    out.mMinX = layout.mPatchMinX - west;
+    out.mMinY = layout.mPatchMinY - south;
+    out.mEndX = layout.mPatchMaxX - west + 1;
+    out.mEndY = layout.mPatchMaxY - south + 1;
+    return out;
+}
+
+FieldDraws fieldDraws(const Layout& layout, const PatchRect& patches)
 {
     FieldDraws out;
     if (layout.mCells <= 0)
@@ -165,6 +191,11 @@ FieldDraws fieldDraws(const Layout& layout)
     out.add({ Draw::CELLS, true, 4, layout.side() * layout.side() });
     out.add({ Draw::RINGS, false, 3 * RING_QUAD_TRIANGLES, RING_QUADS * layout.mRings });
     out.add({ Draw::ZIPPERS, false, 3 * zipperTriangles(layout), 4 });
+    if (!patches.empty())
+    {
+        out.add({ Draw::FRINGE, false, 3 * FRINGE_TRIANGLES,
+                  2 * ((patches.mEndX - patches.mMinX) + (patches.mEndY - patches.mMinY)) });
+    }
     return out;
 }
 

@@ -138,8 +138,10 @@ static bool use_hdri_sky()
 }
 
 // Whether any of the water lies in front of the depth the world left, the sky drawing last: the frustum can hold the
-// sea (LLPipeline::skyBehindWanted) while land hides all of it. The field's quads, flat, counted by the pipeline's
-// query, writing nothing. False when there is no program to draw them with.
+// sea (LLPipeline::skyBehindWanted) while land hides all of it. The field, counted by the pipeline's query,
+// writing nothing: flat, and with waves raised by A as well, which counts a crest over a wall the flat field misses.
+// The flat copy stays for a camera between the plane and A above it, as on a deck in waves, which sees the raised one
+// from below or not at all. False when there is no program to draw them with.
 static bool query_water_in_view()
 {
     LLGLSLShader& field = gWaterFieldProgram;
@@ -154,7 +156,14 @@ static bool query_water_in_view()
         LLGLSColorMask no_color(false, false);
         LLGLDisable no_cull(GL_CULL_FACE);
         gPipeline.mSkyBehindQuery.begin();
-        gPipeline.mWaterSurface.draw(field);
+        field.uniform1f(LLShaderMgr::WATER_RAISE, 0.f);
+        gPipeline.mWaterSurface.draw(field, false);
+        const F32 raise = gPipeline.mWaterSurface.maxDisplacement();
+        if (raise > 0.f)
+        {
+            field.uniform1f(LLShaderMgr::WATER_RAISE, raise);
+            gPipeline.mWaterSurface.draw(field, false);
+        }
         gPipeline.mSkyBehindQuery.end();
     }
     field.unbind();
