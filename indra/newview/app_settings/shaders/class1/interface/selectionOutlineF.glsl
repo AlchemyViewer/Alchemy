@@ -23,17 +23,12 @@
  * $/LicenseInfo$
  */
 
-// Shared matrix stack + derived matrices, spliced from
-// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
-//[ENGINE_BLOCK Matrices]
-
 in vec2 tc;
 
 out vec4 frag_color;
 
-// The id pass's target (selectionIdF.glsl): the id in .rg, low byte then high, 0 for none; in .b whether the
-// outline draws the surface, 1 visible, 0.5 hidden and drawn dimmed, 0 hidden and left out; the priority in .a, 0
-// the highest. Ids are given in priority order, so of two objects the lower id is the higher priority.
+// The id target with its jumps marked (selectionJumpF.glsl, selectionUtilF.glsl). Ids are given in priority order,
+// so of two objects the lower id is the higher priority.
 uniform sampler2D diffuseMap;
 
 // The id target's own depth, through the projection loaded for this pass, which the id pass drew with.
@@ -42,8 +37,9 @@ uniform sampler2D depthMap;
 // Two texels per id, PALETTE_WIDTH ids to a pair of rows: the visible colour above the hidden one.
 uniform sampler2D altDiffuseMap;
 
-// The tile pass's flags (selectionTileF.glsl), a texel to each TILE_SIZE square of the id target: 1 in .r where the
-// square holds an id change. Bound under a reserved name, the only kind LLGLSLShader gives a texture unit.
+// The tile pass's record (selectionTileF.glsl), a texel to each TILE_SIZE square of the id target: the lowest and
+// highest nonzero id in .r and .g over 65535, and 1 in .b where it holds the near side of a jump. Bound under a
+// reserved name, the only kind LLGLSLShader gives a texture unit.
 uniform sampler2D specularMap;
 
 // The widths in pixels of the contour around the objects and of the edges between them, before the pixel each
@@ -70,25 +66,13 @@ const int IN_FRONT = 0;
 const int TOUCHING = 1;
 const int BEHIND = 2;
 
-int decodeId(vec4 texel)
-{
-    return int(texel.r * 255.0 + 0.5) + (int(texel.g * 255.0 + 0.5) << 8);
-}
-
-int decodePriority(vec4 texel)
-{
-    return int(texel.a * 255.0 + 0.5);
-}
-
-bool isDrawn(vec4 texel)
-{
-    return texel.b > 0.25;
-}
-
-bool isVisible(vec4 texel)
-{
-    return texel.b > 0.75;
-}
+// selectionUtilF.glsl
+int decodeId(vec4 texel);
+int decodePriority(vec4 texel);
+bool isJumpFront(vec4 texel);
+bool isDrawn(vec4 texel);
+bool isVisible(vec4 texel);
+float eyeDistance(float depth);
 
 vec4 paletteColour(int id, bool visible)
 {
@@ -103,18 +87,6 @@ vec4 paletteColour(int id, bool visible)
 float coverage(float dist, float width)
 {
     return 1.0 - smoothstep(width, width + 1.0, dist);
-}
-
-// Distance in front of the eye of a stored depth, as selectionIdF.glsl finds it.
-float eyeDistance(float depth)
-{
-#ifdef REVERSE_Z
-    float ndc_z = depth;
-#else
-    float ndc_z = depth * 2.0 - 1.0;
-#endif
-    vec4 pos = inv_proj * vec4(0.0, 0.0, ndc_z, 1.0);
-    return -pos.z / max(pos.w, 0.000001);
 }
 
 bool hasId(ivec2 pos, ivec2 size, int id)
@@ -138,11 +110,11 @@ float depthSlope(ivec2 pos, ivec2 size, ivec2 step, int id, float depth)
     return back ? to_back : to_ahead;
 }
 
-// Whether a tile under the square of texels within `reach` of `pos` along either axis holds an id change. Whatever
-// a pixel draws, it draws from a texel within its reach whose id is not its own, and between the two, inside that
-// square, two neighbouring texels differ, which the tile of the left or lower one flags: without a flagged tile
-// there the disk search finds nothing to draw.
-bool changeWithin(ivec2 pos, int reach)
+// Whether a tile under the square of texels within `reach` of `pos` along either axis holds what a pixel of
+// `own_id` could draw from. Whatever a pixel draws, it draws from a texel within its reach: off every object, of
+// any object; on one, of another object, or of its own where the jump pass marked the near side of a jump. The
+// texel's tile records each: without such a tile the disk search finds nothing to draw.
+bool candidateWithin(ivec2 pos, int reach, int own_id)
 {
     ivec2 last = textureSize(specularMap, 0) - ivec2(1);
     ivec2 lo = max(pos - ivec2(reach), ivec2(0)) / TILE_SIZE;
@@ -151,7 +123,11 @@ bool changeWithin(ivec2 pos, int reach)
     {
         for (int x = lo.x; x <= hi.x; ++x)
         {
-            if (texelFetch(specularMap, ivec2(x, y), 0).r > 0.5)
+            vec4 tile = texelFetch(specularMap, ivec2(x, y), 0);
+            int lowest = int(tile.r * 65535.0 + 0.5);
+            int highest = int(tile.g * 65535.0 + 0.5);
+            if (own_id == 0 ? (highest != 0)
+                            : ((lowest != 0 && lowest != own_id) || (highest != 0 && highest != own_id) || tile.b > 0.5))
             {
                 return true;
             }
@@ -172,12 +148,12 @@ void main()
     // target are not there: clamping them would read the edge's again, nearer than it is.
     int reach = max(outline_width, outline_inner_width) + 1;
     int inner_reach = outline_inner_width + 1;
-    if (!changeWithin(pos, reach))
+    if (!candidateWithin(pos, reach, own_id))
     {
         discard;
     }
 
-    // The plane of this pixel's own surface, found when the first other object needs it.
+    // The plane of this pixel's own surface, found when the first candidate needs it.
     bool planed = false;
     float own_depth = 0.0;
     vec2 slope = vec2(0.0);
@@ -207,15 +183,18 @@ void main()
             }
             vec4 tap = texelFetch(diffuseMap, tap_pos, 0);
             int tap_id = decodeId(tap);
-            // An object over its own surface draws nothing: that would trace every crease of a mesh.
-            if (tap_id == 0 || tap_id == own_id)
+            // An object over its own surface draws only where it steps in front of itself, from the near side of the
+            // jump: anywhere else that would trace every crease and curve of a mesh.
+            bool own_object = (tap_id == own_id);
+            if (tap_id == 0 || (own_object && !isJumpFront(tap)))
             {
                 continue;
             }
             float dist = length(vec2(dx, dy));
 
-            // Off every object, every object is in front. On one, the other's surface against this one's plane,
-            // carried over to the other's texel.
+            // Off every object, every object is in front. On one, the candidate's surface against this one's plane,
+            // carried over to the candidate's texel: the near side of a jump stands in front of the far side's
+            // pixels, and not of its own surface's.
             int relation = IN_FRONT;
             if (own_id != 0)
             {
@@ -253,7 +232,8 @@ void main()
             }
             // The edge between two objects that touch is drawn once: on the side of the higher priority where that
             // side is drawn, on the drawn side where only one is.
-            else if (relation == TOUCHING && own_drawn && dist <= float(inner_reach) && (!tap_drawn || own_id < tap_id))
+            else if (relation == TOUCHING && !own_object && own_drawn && dist <= float(inner_reach) &&
+                     (!tap_drawn || own_id < tap_id))
             {
                 inner_dist = min(inner_dist, dist);
             }

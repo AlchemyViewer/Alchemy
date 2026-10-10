@@ -156,6 +156,7 @@ LLGLSLShader        gHighlightProgram;
 LLGLSLShader        gHighlightNormalProgram;
 LLGLSLShader        gHighlightSpecularProgram;
 LLGLSLShader        gSelectionIdProgram;
+LLGLSLShader        gSelectionJumpProgram;
 LLGLSLShader        gSelectionTileProgram;
 LLGLSLShader        gSelectionOutlineProgram;
 
@@ -3833,8 +3834,20 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gSelectionIdProgram.mShaderFiles.clear();
         gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionIdV.glsl", GL_VERTEX_SHADER));
         gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionIdF.glsl", GL_FRAGMENT_SHADER));
+        gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
         gSelectionIdProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gSelectionIdProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+    }
+
+    if (success)
+    {
+        gSelectionJumpProgram.mName = "Selection Jump Shader";
+        gSelectionJumpProgram.mShaderFiles.clear();
+        gSelectionJumpProgram.mShaderFiles.push_back(make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
+        gSelectionJumpProgram.mShaderFiles.push_back(make_pair("interface/selectionJumpF.glsl", GL_FRAGMENT_SHADER));
+        gSelectionJumpProgram.mShaderFiles.push_back(make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
+        gSelectionJumpProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        success = gSelectionJumpProgram.createShader();
     }
 
     if (success)
@@ -3843,6 +3856,7 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gSelectionTileProgram.mShaderFiles.clear();
         gSelectionTileProgram.mShaderFiles.push_back(make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
         gSelectionTileProgram.mShaderFiles.push_back(make_pair("interface/selectionTileF.glsl", GL_FRAGMENT_SHADER));
+        gSelectionTileProgram.mShaderFiles.push_back(make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
         gSelectionTileProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gSelectionTileProgram.createShader();
     }
@@ -3853,6 +3867,7 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gSelectionOutlineProgram.mShaderFiles.clear();
         gSelectionOutlineProgram.mShaderFiles.push_back(make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
         gSelectionOutlineProgram.mShaderFiles.push_back(make_pair("interface/selectionOutlineF.glsl", GL_FRAGMENT_SHADER));
+        gSelectionOutlineProgram.mShaderFiles.push_back(make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
         gSelectionOutlineProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gSelectionOutlineProgram.createShader();
     }

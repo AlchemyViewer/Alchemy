@@ -120,6 +120,10 @@ void ALSelectionOutline::release()
     {
         mIdMap.release();
     }
+    if (mMarkedMap.isComplete())
+    {
+        mMarkedMap.release();
+    }
     if (mTileMap.isComplete())
     {
         mTileMap.release();
@@ -149,21 +153,22 @@ void ALSelectionOutline::render(const View& view)
     const S32 width = gGLViewport[2];
     const S32 height = gGLViewport[3];
     if (width <= 0 || height <= 0 || !gSelectionIdProgram.isComplete() || !gSelectionIdProgram.mRiggedVariant ||
-        !gSelectionTileProgram.isComplete() || !gSelectionOutlineProgram.isComplete() || !gPipeline.mRT ||
-        !gPipeline.mScreenTriangleVB)
+        !gSelectionJumpProgram.isComplete() || !gSelectionTileProgram.isComplete() ||
+        !gSelectionOutlineProgram.isComplete() || !gPipeline.mRT || !gPipeline.mScreenTriangleVB)
     {
         clearEntries();
         return;
     }
 
-    if (!mIdMap.isComplete() || !mTileMap.isComplete() || mIdMap.getWidth() != (U32)width ||
-        mIdMap.getHeight() != (U32)height)
+    if (!mIdMap.isComplete() || !mMarkedMap.isComplete() || !mTileMap.isComplete() ||
+        mIdMap.getWidth() != (U32)width || mIdMap.getHeight() != (U32)height)
     {
         if (!mIdMap.allocate(width, height, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE,
                              LLPipeline::mainDepthFormat()) ||
-            !mTileMap.allocate(tileCount((U32)width), tileCount((U32)height), GL_R8))
+            !mMarkedMap.allocate(width, height, GL_RGBA8) ||
+            !mTileMap.allocate(tileCount((U32)width), tileCount((U32)height), GL_RGBA16))
         {
-            LL_WARNS_ONCE("Pipeline") << "Could not allocate the selection outline's id and tile targets" << LL_ENDL;
+            LL_WARNS_ONCE("Pipeline") << "Could not allocate the selection outline's targets" << LL_ENDL;
             release();
             clearEntries();
             return;
@@ -250,10 +255,12 @@ void ALSelectionOutline::render(const View& view)
     {
         uploadPalette(mPalette, mPaletteRows, mPaletteTexels, rows);
 
-        // The scissor holds every selected texel and the contour's reach around them, more than the texel the tile
-        // pass needs.
+        // The scissor holds every selected texel and the contour's reach around them; the edge pass reads no
+        // further, and what it reads past the jump and tile passes' work they clear to nothing, as it is.
+        gSelectionJumpProgram.bind();
+        drawJumps(gSelectionJumpProgram, mIdMap, mMarkedMap, mScissor, view, *gPipeline.mScreenTriangleVB);
         gSelectionTileProgram.bind();
-        drawTiles(gSelectionTileProgram, mIdMap, mTileMap, mScissor, *gPipeline.mScreenTriangleVB);
+        drawTiles(gSelectionTileProgram, mMarkedMap, mTileMap, mScissor, *gPipeline.mScreenTriangleVB);
 
         LLGLSColorMask mask(true, false);
         LLGLDepthTest depth(GL_FALSE);
@@ -262,7 +269,7 @@ void ALSelectionOutline::render(const View& view)
         LLGLSScissor scissor(vp_x + mScissor.mLeft, vp_y + mScissor.mBottom, mScissor.getWidth(), mScissor.getHeight());
 
         gSelectionOutlineProgram.bind();
-        drawEdges(gSelectionOutlineProgram, mIdMap, mTileMap, mPalette, view, *gPipeline.mScreenTriangleVB);
+        drawEdges(gSelectionOutlineProgram, mMarkedMap, mIdMap, mTileMap, mPalette, view, *gPipeline.mScreenTriangleVB);
     }
 
     if (previous)

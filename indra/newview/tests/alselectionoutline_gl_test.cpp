@@ -157,11 +157,13 @@ namespace tut
         {
             LLGLSLShader::unbind();
             mIdProgram.unload();
+            mJumpProgram.unload();
             mTileProgram.unload();
             mOutlineProgram.unload();
             mShaders.clearShaderObjects();
 
             mIdMap.release();
+            mMarked.release();
             mTiles.release();
             mAllTiles.release();
             mScene.release();
@@ -230,30 +232,33 @@ namespace tut
             mIdProgram.mShaderFiles.clear();
             mIdProgram.mShaderFiles.push_back(std::make_pair("interface/selectionIdV.glsl", GL_VERTEX_SHADER));
             mIdProgram.mShaderFiles.push_back(std::make_pair("interface/selectionIdF.glsl", GL_FRAGMENT_SHADER));
+            mIdProgram.mShaderFiles.push_back(std::make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
             mIdProgram.mShaderLevel = 1;
             ensure("id program builds with its rigged variant", mIdProgram.createShader(LLGLSLShader::VARIANT_RIGGED));
             ensure("id program has a rigged variant", mIdProgram.mRiggedVariant && mIdProgram.mRiggedVariant != &mIdProgram);
 
-            mTileProgram.mName = "Selection Tile Shader";
-            mTileProgram.mShaderFiles.clear();
-            mTileProgram.mShaderFiles.push_back(std::make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
-            mTileProgram.mShaderFiles.push_back(std::make_pair("interface/selectionTileF.glsl", GL_FRAGMENT_SHADER));
-            mTileProgram.mShaderLevel = 1;
-            ensure("tile program builds", mTileProgram.createShader());
-
-            mOutlineProgram.mName = "Selection Outline Shader";
-            mOutlineProgram.mShaderFiles.clear();
-            mOutlineProgram.mShaderFiles.push_back(std::make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
-            mOutlineProgram.mShaderFiles.push_back(std::make_pair("interface/selectionOutlineF.glsl", GL_FRAGMENT_SHADER));
-            mOutlineProgram.mShaderLevel = 1;
-            ensure("outline program builds", mOutlineProgram.createShader());
+            const std::pair<LLGLSLShader*, const char*> passes[] = { { &mJumpProgram, "selectionJumpF.glsl" },
+                                                                     { &mTileProgram, "selectionTileF.glsl" },
+                                                                     { &mOutlineProgram, "selectionOutlineF.glsl" } };
+            for (const auto& [program, fragment] : passes)
+            {
+                program->mName = fragment;
+                program->mShaderFiles.clear();
+                program->mShaderFiles.push_back(std::make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
+                program->mShaderFiles.push_back(std::make_pair(std::string("interface/") + fragment, GL_FRAGMENT_SHADER));
+                program->mShaderFiles.push_back(std::make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
+                program->mShaderLevel = 1;
+                ensure(std::string(fragment) + "'s program builds", program->createShader());
+            }
 
             const LLRenderTarget::eDepthFormat depth = mReverse ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
             ensure("id target", mIdMap.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth));
+            ensure("marked target", mMarked.allocate(W, H, GL_RGBA8));
             ensure("frame target", mFrame.allocate(W, H, GL_RGBA8));
-            ensure("tile target", mTiles.allocate(Outline::tileCount(W), Outline::tileCount(H), GL_R8));
-            // Every tile flagged: the edge pass searches every pixel's disk, as it did before the tiles.
-            ensure("all tiles target", mAllTiles.allocate(Outline::tileCount(W), Outline::tileCount(H), GL_R8));
+            ensure("tile target", mTiles.allocate(Outline::tileCount(W), Outline::tileCount(H), GL_RGBA16));
+            // Every tile holding every id and a jump: the edge pass searches every pixel's disk, as it did before
+            // the tiles.
+            ensure("all tiles target", mAllTiles.allocate(Outline::tileCount(W), Outline::tileCount(H), GL_RGBA16));
             mAllTiles.bindTarget();
             gGL.setClearColor(LLColor4(1.f, 1.f, 1.f, 1.f));
             mAllTiles.clear();
@@ -543,37 +548,47 @@ namespace tut
             return lines;
         }
 
-        // The tile pass as ALSelectionOutline::render runs it, over the tiles under `rect`, or the whole id target.
-        void tilePass(const LLRect* rect = nullptr)
+        // The jump and tile passes as ALSelectionOutline::render runs them, over the texels under `rect`, or the
+        // whole id target, through `lines`' projection; the tile pass left out when `tiles` is false.
+        void markPasses(const Outline::View& lines, const LLRect* rect = nullptr, bool tiles = true)
         {
-            mTileProgram.bind();
-            Outline::drawTiles(mTileProgram, mIdMap, mTiles, rect ? *rect : LLRect(0, H, W, 0), *mTriangle);
+            const LLRect under = rect ? *rect : LLRect(0, H, W, 0);
+            mJumpProgram.bind();
+            Outline::drawJumps(mJumpProgram, mIdMap, mMarked, under, lines, *mTriangle);
+            if (tiles)
+            {
+                mTileProgram.bind();
+                Outline::drawTiles(mTileProgram, mMarked, mTiles, under, *mTriangle);
+            }
             LLGLSLShader::unbind();
         }
 
-        // The flags the tile pass left, a byte a tile.
-        std::vector<U8> tileFlags()
+        // What the tile pass recorded, four 16-bit values a tile: the lowest and highest id, the jump, and 1.
+        std::vector<U16> tileRecords()
         {
-            const std::vector<U8> px = read(mTiles);
-            std::vector<U8> flags;
-            for (size_t i = 0; i < px.size(); i += 4)
-            {
-                flags.push_back(px[i] > 127 ? 1 : 0);
-            }
-            return flags;
+            const S32 columns = (S32)Outline::tileCount(W);
+            const S32 rows = (S32)Outline::tileCount(H);
+            std::vector<U16> records((size_t)columns * rows * 4);
+            mTiles.bindTarget();
+            glReadPixels(0, 0, columns, rows, GL_RGBA, GL_UNSIGNED_SHORT, records.data());
+            mTiles.flush();
+            return records;
         }
 
-        // The edge pass as ALSelectionOutline::render runs it, the tile pass first, over the tiles under `tile_rect`
-        // or all of them, then over a cleared frame, scissored when asked. `untiled` flags every tile instead, so
-        // every pixel searches its whole disk.
+        // Whether the jump pass marked the texel at (x, y) as the near side of a jump.
+        bool markedAt(S32 x, S32 y)
+        {
+            return at(read(mMarked), x, y).a >= 128;
+        }
+
+        // The edge pass as ALSelectionOutline::render runs it, the jump and tile passes first, over the texels under
+        // `mark_rect` or all of them, then over a cleared frame, scissored when asked. `untiled` holds every id and a
+        // jump in every tile instead, so every pixel searches its whole disk.
         std::vector<U8> edgePass(const Outline::View& lines, const LLRect* scissor = nullptr, bool untiled = false,
-                                 const LLRect* tile_rect = nullptr)
+                                 const LLRect* mark_rect = nullptr)
         {
             Outline::uploadPalette(mPalette, mPaletteRows, mPaletteTexels, mRows);
-            if (!untiled)
-            {
-                tilePass(tile_rect);
-            }
+            markPasses(lines, mark_rect, !untiled);
 
             mFrame.bindTarget();
             std::vector<U8> px;
@@ -591,11 +606,11 @@ namespace tut
                 if (scissor)
                 {
                     LLGLSScissor scissored(scissor->mLeft, scissor->mBottom, scissor->getWidth(), scissor->getHeight());
-                    Outline::drawEdges(mOutlineProgram, mIdMap, tiles, mPalette, lines, *mTriangle);
+                    Outline::drawEdges(mOutlineProgram, mMarked, mIdMap, tiles, mPalette, lines, *mTriangle);
                 }
                 else
                 {
-                    Outline::drawEdges(mOutlineProgram, mIdMap, tiles, mPalette, lines, *mTriangle);
+                    Outline::drawEdges(mOutlineProgram, mMarked, mIdMap, tiles, mPalette, lines, *mTriangle);
                 }
                 LLGLSLShader::unbind();
                 px = ll_test::readFramebufferRGBA(W, H);
@@ -619,9 +634,11 @@ namespace tut
 
         ll_test::TestShaderMgr mShaders;
         LLGLSLShader mIdProgram;
+        LLGLSLShader mJumpProgram;
         LLGLSLShader mTileProgram;
         LLGLSLShader mOutlineProgram;
         LLRenderTarget mIdMap;
+        LLRenderTarget mMarked;
         LLRenderTarget mTiles;
         LLRenderTarget mAllTiles;
         LLRenderTarget mScene;
@@ -1311,6 +1328,14 @@ namespace tut
                 { "slanted surfaces touching, and one in front", { { quad(8.f, 40.f, 8.f, 30.f, -1.f, -5.f), 1, Outline::PRIORITY_ROOT },
                                                                    { quad(40.f, 56.f, 8.f, 30.f, -5.f, -7.f), 2, Outline::PRIORITY_CHILD },
                                                                    { quad(20.f, 50.f, 24.f, 44.f, -0.5f, -0.5f), 3, Outline::PRIORITY_CHILD } } },
+                { "one object over itself, its jumps on tile borders", { { pixels(8, 56, 8, 56), 1, Outline::PRIORITY_ROOT },
+                                                                         { quad(24.f, 40.f, 24.f, 40.f, PIXEL_Z + 1.f, PIXEL_Z + 1.f), 1, Outline::PRIORITY_ROOT },
+                                                                         { quad(31.f, 50.f, 13.f, 21.f, PIXEL_Z + 0.5f, PIXEL_Z + 0.5f), 1, Outline::PRIORITY_ROOT } } },
+                { "fronds of one mesh over each other and another object", { { quad(4.f, 40.f, 30.f, 34.f, -3.f, -6.f), 1, Outline::PRIORITY_CHILD },
+                                                                            { quad(10.f, 14.f, 4.f, 60.f, -2.f, -2.f), 1, Outline::PRIORITY_CHILD },
+                                                                            { quad(20.f, 60.f, 40.f, 46.f, -1.f, -4.f), 1, Outline::PRIORITY_CHILD },
+                                                                            { quad(30.f, 31.f, 0.f, 64.f, -1.5f, -1.5f), 1, Outline::PRIORITY_CHILD },
+                                                                            { pixels(36, 60, 20, 60), 2, Outline::PRIORITY_ROOT } } },
             };
 
             for (const auto& [name, draws] : scenes)
@@ -1326,25 +1351,34 @@ namespace tut
                     ensure(named(reverse, what + ": tiled as untiled"), tiled == untiled);
                 }
 
-                std::vector<U8> flags = tileFlags();
-                size_t flagged = 0;
-                for (U8 flag : flags)
+                const std::vector<U16> records = tileRecords();
+                size_t empty = 0;
+                for (size_t i = 0; i < records.size(); i += 4)
                 {
-                    flagged += flag;
+                    empty += records[i + 1] == 0 ? 1 : 0;
                 }
-                ensure(named(reverse, name + ": some tiles hold no change"), flagged < flags.size());
+                ensure(named(reverse, name + ": some tiles hold nothing"), empty > 0);
             }
 
-            // The first scene again: the root's left edge, at x = 16, belongs to tile column 1; the tile inside it,
-            // column 2, row 2, flags nothing; its right edge, inside tile column 3, flags that; nothing far away does.
+            // The first scene again, its edges on tile borders: a tile holds the ids of its own texels, and a tile
+            // across the border from another object's holds none of that object's.
             pixelIds(scenes[0].second);
-            tilePass();
-            const std::vector<U8> flags = tileFlags();
+            markPasses(view());
+            std::vector<U16> records = tileRecords();
             const S32 columns = (S32)Outline::tileCount(W);
-            ensure_equals(named(reverse, "the left border's tile"), (U32)flags[2 * columns + 1], 1U);
-            ensure_equals(named(reverse, "the tile inside"), (U32)flags[2 * columns + 2], 0U);
-            ensure_equals(named(reverse, "the right edge's tile"), (U32)flags[2 * columns + 3], 1U);
-            ensure_equals(named(reverse, "a tile far away"), (U32)flags[0], 0U);
+            auto record = [&](S32 column, S32 row, S32 i) { return (U32)records[((size_t)row * columns + column) * 4 + i]; };
+            ensure(named(reverse, "the tile left of the root holds nothing"), record(1, 2, 0) == 0 && record(1, 2, 1) == 0);
+            ensure(named(reverse, "the tile inside the root holds the root alone"), record(2, 2, 0) == 1 && record(2, 2, 1) == 1);
+            ensure(named(reverse, "the tile inside the child beside it, the child alone"), record(4, 2, 0) == 2 && record(4, 2, 1) == 2);
+            ensure(named(reverse, "the tile under the child above, the root alone"), record(2, 4, 0) == 1 && record(2, 4, 1) == 1);
+            ensure(named(reverse, "no jump in it"), record(2, 2, 2) == 0);
+            ensure(named(reverse, "a tile far away holds nothing"), record(0, 0, 1) == 0);
+
+            // The second, across tile borders: the tile at column and row 3 holds both the root and the child.
+            pixelIds(scenes[1].second);
+            markPasses(view());
+            records = tileRecords();
+            ensure(named(reverse, "a tile across the edge holds both"), record(3, 3, 0) == 1 && record(3, 3, 1) == 2);
 
             // The tile pass over the tiles under a rect holding every selected texel and one more around them, as the
             // viewer runs it under its scissor, draws the same.
@@ -1515,6 +1549,117 @@ namespace tut
             const U32 faint = (U32)ll_round(255.f * Outline::INNER_OPACITY);
             ensure(named(reverse, "the edge on the drawn side"), green(edge) && (U32)edge.g + 2 >= faint && (U32)edge.g <= faint + 2);
             ensure(named(reverse, "not on the hidden root's"), black(at(px, 31, 32)));
+        }
+    }
+
+    // One object over itself, as one frond of a mesh lies over another: the jump pass marks the near side of the
+    // step, and the edge pass draws the near part's whole contour over the far part from it, as another object's,
+    // and nothing inside the near part. A gap of three percent of the distance is a jump too. The tile holding the
+    // near side records it.
+    template<> template<>
+    void alselectionoutline_object_t::test<22>()
+    {
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED } }, true);
+            // The far part six metres out over columns 12 to 51; the near part over columns and rows 25 to 38 at
+            // four metres, and at 5.8.
+            for (F32 near_z : { -4.f, -5.8f })
+            {
+                const F32 half = 0.125f * -near_z;
+                const std::string at_z = " at " + std::to_string(-near_z) + " m";
+                idPass({ { quad(-2.f, 2.f, -1.5f, 1.5f, -6.f, -6.f), ID_A }, { quad(-half, half, -half, half, near_z, near_z), ID_A } });
+                const std::vector<U8> px = edgePass();
+                const std::vector<U8> marked = read(mMarked);
+                ensure(named(reverse, "the near side of the step marked" + at_z), at(marked, 25, 32).a >= 128 && at(marked, 32, 38).a >= 128);
+                ensure(named(reverse, "not the far side, nor inside" + at_z), at(marked, 24, 32).a < 128 && at(marked, 32, 32).a < 128);
+
+                ensure(named(reverse, "the near part's contour over the far part" + at_z),
+                       red(at(px, 24, 32)) && at(px, 24, 32).r == 255 && at(px, 23, 32).r == 255 && at(px, 32, 39).r == 255);
+                ensure(named(reverse, "as wide as a contour" + at_z), black(at(px, 21, 32)));
+                ensure(named(reverse, "nothing inside the near part" + at_z), black(at(px, 25, 32)) && black(at(px, 26, 32)) && black(at(px, 32, 32)));
+                ensure(named(reverse, "nothing over the far part away from it" + at_z), black(at(px, 15, 32)));
+            }
+
+            // The near part's edges on tile borders: the tiles holding them record a jump, a tile of the far part alone
+            // none.
+            pixelIds({ { pixels(8, 56, 8, 56), ID_A }, { quad(24.f, 40.f, 24.f, 40.f, PIXEL_Z + 1.f, PIXEL_Z + 1.f), ID_A } });
+            markPasses(view());
+            const std::vector<U16> records = tileRecords();
+            const S32 columns = (S32)Outline::tileCount(W);
+            ensure(named(reverse, "a tile on the near side's edge records the jump"), records[((size_t)3 * columns + 3) * 4 + 2] != 0);
+            ensure(named(reverse, "a tile of the far part alone none"), records[((size_t)1 * columns + 1) * 4 + 2] == 0);
+        }
+    }
+
+    // A surface bending, not stepping, marks no jump and draws nothing across itself: one mesh's inside corner at
+    // 30, 45 and 60 degrees to the view, the outside and the inside of a cylinder out to their rims, and a plane
+    // whose depth changes by three to five percent a pixel, in one piece and in two.
+    template<> template<>
+    void alselectionoutline_object_t::test<23>()
+    {
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED } }, true);
+
+            std::vector<std::pair<std::string, std::vector<Draw>>> surfaces;
+            for (F32 degrees : { 30.f, 45.f, 60.f })
+            {
+                // Two walls 2.5 m long meeting at a right angle six metres out, the corner away from the eye.
+                const F32 angle = degrees * DEG_TO_RAD;
+                surfaces.push_back({ "an inside corner at " + std::to_string((S32)degrees) + " degrees",
+                                     { { quad(-2.5f * cosf(angle), 0.f, -1.f, 1.f, -6.f + 2.5f * sinf(angle), -6.f), ID_A },
+                                       { quad(0.f, 2.5f * sinf(angle), -1.f, 1.f, -6.f, -6.f + 2.5f * cosf(angle)), ID_A } } });
+            }
+            // Half a cylinder of radius 1.5 m in 48 facets: its outside about an axis six metres out, and its inside
+            // about one four metres out.
+            for (bool inside : { false, true })
+            {
+                std::vector<Draw> facets;
+                constexpr S32 FACETS = 48;
+                for (S32 i = 0; i < FACETS; ++i)
+                {
+                    const F32 a0 = F_PI * ((F32)i / FACETS - 0.5f);
+                    const F32 a1 = F_PI * ((F32)(i + 1) / FACETS - 0.5f);
+                    const F32 axis = inside ? -4.f : -6.f;
+                    const F32 bulge = inside ? -1.5f : 1.5f;
+                    facets.push_back({ quad(1.5f * sinf(a0), 1.5f * sinf(a1), -1.f, 1.f, axis + bulge * cosf(a0), axis + bulge * cosf(a1)), ID_A });
+                }
+                surfaces.push_back({ inside ? "a cylinder's inside" : "a cylinder's outside", facets });
+            }
+            surfaces.push_back({ "a slanted plane", { { quad(-1.6f, 1.6f, -1.f, 1.f, -4.f, -12.f), ID_A } } });
+            surfaces.push_back({ "a slanted plane in two", { { quad(-1.6f, 0.f, -1.f, 1.f, -4.f, -8.f), ID_A },
+                                                             { quad(0.f, 1.6f, -1.f, 1.f, -8.f, -12.f), ID_A } } });
+
+            for (const auto& [name, draws] : surfaces)
+            {
+                idPass(draws);
+                const std::vector<U8> ids = read(mIdMap);
+                const std::vector<U8> px = edgePass();
+                const std::vector<U8> marked = read(mMarked);
+                // Every pixel searching its disk, so what the edge pass would draw is not hidden by the tiles.
+                const std::vector<U8> searched = edgePass(view(), nullptr, true);
+                size_t covered = 0;
+                size_t marks = 0;
+                size_t drawn = 0;
+                for (S32 y = 0; y < H; ++y)
+                {
+                    for (S32 x = 0; x < W; ++x)
+                    {
+                        if (idAt(ids, x, y) == ID_A)
+                        {
+                            ++covered;
+                            marks += at(marked, x, y).a >= 128 ? 1 : 0;
+                            drawn += (black(at(px, x, y)) && black(at(searched, x, y))) ? 0 : 1;
+                        }
+                    }
+                }
+                ensure(named(reverse, name + ": it covers pixels"), covered > 200);
+                ensure_equals(named(reverse, name + ": no jump marked"), marks, size_t(0));
+                ensure_equals(named(reverse, name + ": nothing drawn across it"), drawn, size_t(0));
+            }
         }
     }
 }

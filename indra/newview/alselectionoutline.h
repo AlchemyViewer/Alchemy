@@ -65,24 +65,30 @@ class LLVOAvatar;
 /// the cards it is drawn on; the face's colour, whose alpha makes a prim invisible, is not read. Integer formats
 /// are not used because LLGLSLShader gives integer samplers no unit.
 ///
-/// Ids are given in priority order, the highest first (EPriority). The edge pass
-/// (interface/selectionOutlineF.glsl) is a full-screen triangle, scissored to the objects' projected boxes grown
-/// by the contour's reach. A pixel draws the contour of the drawn objects within its reach that stand in front of
-/// it: every object, off every object; on an object, another object whose surface is nearer than the plane of the
-/// pixel's own, read from the id target's depth and carried over to the other's texel. The contour is a solid line
-/// View::mWidth pixels wide ending in a pixel of anti-aliasing, from the distance to the nearest texel of each
-/// object in the disk it reaches: the highest priority's colour within reach over the nearest object's. Where two
-/// objects touch, neither in front, the edge between them is drawn thinner (View::mInnerWidth) and fainter
-/// (INNER_OPACITY), on the side of the one of higher priority if it is drawn and on the drawn side if not, in that
-/// side's colour. An object over its own surface draws nothing: that would trace the creases of every mesh. Colours
-/// come from a palette holding a visible and a hidden colour per id.
+/// Ids are given in priority order, the highest first (EPriority). The jump pass (interface/selectionJumpF.glsl)
+/// copies the id target into another, marking the texels on the near side of a jump: a step in an object's own
+/// surface between two neighbours, as where one frond of a mesh lies over another. It is told from a crease or a
+/// curve, whose step lies between the slopes either side, by a step outside both, which carried on at its own slope
+/// each side misses by more than JUMP_MARGIN (in the shader) of the distance.
+///
+/// The edge pass (interface/selectionOutlineF.glsl) is a full-screen triangle, scissored to the objects' projected
+/// boxes grown by the contour's reach. A pixel draws the contour of the drawn surfaces within its reach that stand
+/// in front of it: every object, off every object; on an object, another object, or the near side of a jump in its
+/// own, whose surface is nearer than the plane of the pixel's own, read from the id target's depth and carried over
+/// to the other's texel. The contour is a solid line View::mWidth pixels wide ending in a pixel of anti-aliasing,
+/// from the distance to the nearest texel of each object in the disk it reaches: the highest priority's colour
+/// within reach over the nearest object's. Where two objects touch, neither in front, the edge between them is
+/// drawn thinner (View::mInnerWidth) and fainter (INNER_OPACITY), on the side of the one of higher priority if it is
+/// drawn and on the drawn side if not, in that side's colour. An object over its own surface draws nothing but at
+/// its jumps: anywhere else that would trace the creases of every mesh. Colours come from a palette holding a
+/// visible and a hidden colour per id.
 ///
 /// The disk a pixel searches grows with the square of the contour's width, and most pixels in the scissor are far
-/// from any edge. The tile pass (interface/selectionTileF.glsl) flags each TILE_SIZE square of the id target that
-/// holds an id change, a texel whose right or upper neighbour has a different id, and the edge pass leaves a pixel
-/// at once when no tile within its reach is flagged. Whatever a pixel draws, it draws from a texel within its reach
-/// whose id is not its own, and between the two, inside the square its reach spans, two neighbouring texels differ,
-/// so the early out changes nothing it draws.
+/// from anything to draw. The tile pass (interface/selectionTileF.glsl) records for each TILE_SIZE square of the
+/// marked target the lowest and highest nonzero id it holds and whether it holds the near side of a jump, and the
+/// edge pass leaves a pixel at once when no tile within its reach holds what it could draw from: any id, off every
+/// object; on one, an id not its own or a jump. Whatever a pixel draws, it draws from such a texel within its reach,
+/// whose own tile records it, so the early out changes nothing it draws.
 ///
 /// The targets exist only while something is outlined: they are made the first frame there is, given up the
 /// first frame there is not, and given up with the pipeline's own (LLPipeline::releaseGLBuffers).
@@ -150,7 +156,7 @@ public:
     /// The width of the edges between objects in pixels at a UI scale of 1. It does not follow the contour's: the
     /// edges mark where prims meet inside a selection, and as wide as the contour they would cover small prims.
     static constexpr F32 INNER_WIDTH = 1.f;
-    /// The side of the id target's squares the tile pass flags, in texels (TILE_SIZE in selectionTileF.glsl and
+    /// The side of the id target's squares the tile pass records, in texels (TILE_SIZE in selectionTileF.glsl and
     /// selectionOutlineF.glsl).
     static constexpr U32 TILE_SIZE = 8;
     /// What an edge between two objects keeps of its object's outline opacity (INNER_OPACITY in
@@ -256,20 +262,34 @@ public:
     /// identity for a legacy face, whose texture coordinates have their transform in them.
     static void setAlphaTest(LLGLSLShader& program, F32 cutoff, const LLGLTFMaterial::TextureTransform::Pack& transform);
 
-    /// The tile pass with the bound tile program: flags into `tiles`, a texel to each TILE_SIZE square of `ids`,
-    /// over the tiles under `rect`, a rect of `ids`; the others are cleared. Every square holding an id change
-    /// lies under the rect when it covers every selected texel and a texel more around them.
-    static void drawTiles(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& tiles, const LLRect& rect,
+    /// The jump pass with the bound jump program: `ids`, the id target, copied into `marked` with the near sides of
+    /// jumps marked, over the texels under `rect`; the others are cleared, as `ids` holds nothing there when the
+    /// rect covers every selected texel. Its depth is read through `view`'s projection, which the id pass drew with.
+    static void drawJumps(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& marked, const LLRect& rect,
+                          const View& view, LLVertexBuffer& triangle);
+
+    /// The tile pass with the bound tile program: into `tiles`, RGBA16, a texel to each TILE_SIZE square of
+    /// `marked`, over the tiles under `rect`, a rect of `marked`; the others are cleared, and hold nothing when the
+    /// rect covers every selected texel.
+    static void drawTiles(LLGLSLShader& program, LLRenderTarget& marked, LLRenderTarget& tiles, const LLRect& rect,
                           LLVertexBuffer& triangle);
 
-    /// The edge pass with the bound outline program and `view`'s widths, over the viewport and scissor in force,
-    /// reading the tile pass's flags from `tiles` and the depth of `ids` through `view`'s projection, which the
-    /// id pass drew it with.
-    static void drawEdges(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& tiles, U32 palette,
-                          const View& view, LLVertexBuffer& triangle);
+    /// The edge pass with the bound outline program and `view`'s widths, over the viewport and scissor in force:
+    /// ids from `marked`, their depth from `ids` through `view`'s projection, which the id pass drew with, and the
+    /// tile pass's record from `tiles`.
+    static void drawEdges(LLGLSLShader& program, LLRenderTarget& marked, LLRenderTarget& ids, LLRenderTarget& tiles,
+                          U32 palette, const View& view, LLVertexBuffer& triangle);
 
 private:
     ALSelectionOutline() = default;
+
+    // The full-screen triangle with the bound program, `projection` loaded for its draw where given: the triangle
+    // takes no matrix, and the passes read depth through the projection's inverse.
+    static void drawTriangle(LLVertexBuffer& triangle, const LLMatrix4a* projection);
+
+    // Clears `target`, then draws the full-screen triangle into its texels under `rect`.
+    static void drawUnder(LLRenderTarget& target, const LLRect& rect, LLVertexBuffer& triangle,
+                          const LLMatrix4a* projection);
 
     struct Entry
     {
@@ -307,6 +327,7 @@ private:
     std::vector<U8> mPaletteTexels;
 
     LLRenderTarget mIdMap;
+    LLRenderTarget mMarkedMap;
     LLRenderTarget mTileMap;
     U32 mPalette = 0;
     U32 mPaletteRows = 0;
@@ -519,46 +540,85 @@ inline void ALSelectionOutline::setAlphaTest(LLGLSLShader& program, F32 cutoff,
     program.uniform4fv(LLShaderMgr::TEXTURE_BASE_COLOR_TRANSFORM, 2, transform);
 }
 
-inline void ALSelectionOutline::drawTiles(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& tiles,
-                                          const LLRect& rect, LLVertexBuffer& triangle)
+inline void ALSelectionOutline::drawTriangle(LLVertexBuffer& triangle, const LLMatrix4a* projection)
 {
-    tiles.bindTarget();
+    if (projection)
+    {
+        gGL.matrixMode(LLRender::MM_PROJECTION);
+        gGL.pushMatrix();
+        gGL.loadMatrix(*projection);
+        gGL.matrixMode(LLRender::MM_MODELVIEW);
+    }
+
+    triangle.setBuffer();
+    triangle.drawArrays(LLRender::TRIANGLES, 0, 3);
+
+    if (projection)
+    {
+        gGL.matrixMode(LLRender::MM_PROJECTION);
+        gGL.popMatrix();
+        gGL.matrixMode(LLRender::MM_MODELVIEW);
+    }
+}
+
+inline void ALSelectionOutline::drawUnder(LLRenderTarget& target, const LLRect& rect, LLVertexBuffer& triangle,
+                                          const LLMatrix4a* projection)
+{
+    target.bindTarget();
     {
         LLGLSColorMask mask(true, true);
         LLGLDepthTest depth(GL_FALSE);
         LLGLDisable blend(GL_BLEND);
         {
-            // The tiles the pass leaves out hold no change, and read as none.
             LLGLDisable scissor(GL_SCISSOR_TEST);
             gGL.setClearColor(LLColor4(0.f, 0.f, 0.f, 0.f));
-            tiles.clear();
+            target.clear();
         }
 
-        const S32 left = llmax(rect.mLeft, 0) / (S32)TILE_SIZE;
-        const S32 bottom = llmax(rect.mBottom, 0) / (S32)TILE_SIZE;
-        const S32 right = (S32)tileCount((U32)llmax(rect.mRight, 0));
-        const S32 top = (S32)tileCount((U32)llmax(rect.mTop, 0));
-        if (right > left && top > bottom)
+        LLRect under = rect;
+        under.intersectWith(LLRect(0, (S32)target.getHeight(), (S32)target.getWidth(), 0));
+        if (under.notEmpty())
         {
-            LLGLSScissor scissor(left, bottom, right - left, top - bottom);
-            program.bindTexture(LLShaderMgr::DIFFUSE_MAP, &ids, ALSamplers::PointClamp);
-            triangle.setBuffer();
-            triangle.drawArrays(LLRender::TRIANGLES, 0, 3);
-            program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+            LLGLSScissor scissor(under.mLeft, under.mBottom, under.getWidth(), under.getHeight());
+            drawTriangle(triangle, projection);
         }
     }
-    tiles.flush();
+    target.flush();
 }
 
-inline void ALSelectionOutline::drawEdges(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& tiles, U32 palette,
-                                          const View& view, LLVertexBuffer& triangle)
+inline void ALSelectionOutline::drawJumps(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& marked,
+                                          const LLRect& rect, const View& view, LLVertexBuffer& triangle)
+{
+    program.bindTexture(LLShaderMgr::DIFFUSE_MAP, &ids, ALSamplers::PointClamp);
+    program.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &ids);
+    drawUnder(marked, rect, triangle, &view.mProjection);
+    program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
+    program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+}
+
+inline void ALSelectionOutline::drawTiles(LLGLSLShader& program, LLRenderTarget& marked, LLRenderTarget& tiles,
+                                          const LLRect& rect, LLVertexBuffer& triangle)
+{
+    const S32 left = llmax(rect.mLeft, 0) / (S32)TILE_SIZE;
+    const S32 bottom = llmax(rect.mBottom, 0) / (S32)TILE_SIZE;
+    const S32 right = (S32)tileCount((U32)llmax(rect.mRight, 0));
+    const S32 top = (S32)tileCount((U32)llmax(rect.mTop, 0));
+
+    // The tile program reads no depth, and needs no projection.
+    program.bindTexture(LLShaderMgr::DIFFUSE_MAP, &marked, ALSamplers::PointClamp);
+    drawUnder(tiles, LLRect(left, top, right, bottom), triangle, nullptr);
+    program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+}
+
+inline void ALSelectionOutline::drawEdges(LLGLSLShader& program, LLRenderTarget& marked, LLRenderTarget& ids,
+                                          LLRenderTarget& tiles, U32 palette, const View& view, LLVertexBuffer& triangle)
 {
     static const LLStaticHashedString width_uniform(WIDTH_UNIFORM);
     static const LLStaticHashedString inner_width_uniform(INNER_WIDTH_UNIFORM);
 
-    // Point sampled all four: the ids, their depth, the flags and the palette are data, and texelFetch reads them
+    // Point sampled all four: the ids, their depth, the tiles and the palette are data, and texelFetch reads them
     // whatever the filter.
-    program.bindTexture(LLShaderMgr::DIFFUSE_MAP, &ids, ALSamplers::PointClamp);
+    program.bindTexture(LLShaderMgr::DIFFUSE_MAP, &marked, ALSamplers::PointClamp);
     program.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &ids);
     program.bindTexture(LLShaderMgr::SPECULAR_MAP, &tiles, ALSamplers::PointClamp);
     const S32 channel = program.enableTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
@@ -569,19 +629,7 @@ inline void ALSelectionOutline::drawEdges(LLGLSLShader& program, LLRenderTarget&
     program.uniform1i(width_uniform, llmax(view.mWidth, 1));
     program.uniform1i(inner_width_uniform, llmax(view.mInnerWidth, 1));
 
-    // The full-screen triangle takes no matrix; the projection is loaded for its inverse, which turns the ids'
-    // depth back into distance.
-    gGL.matrixMode(LLRender::MM_PROJECTION);
-    gGL.pushMatrix();
-    gGL.loadMatrix(view.mProjection);
-    gGL.matrixMode(LLRender::MM_MODELVIEW);
-
-    triangle.setBuffer();
-    triangle.drawArrays(LLRender::TRIANGLES, 0, 3);
-
-    gGL.matrixMode(LLRender::MM_PROJECTION);
-    gGL.popMatrix();
-    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    drawTriangle(triangle, &view.mProjection);
 
     program.unbindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
     program.unbindTexture(LLShaderMgr::SPECULAR_MAP);

@@ -23,10 +23,6 @@
  * $/LicenseInfo$
  */
 
-// Shared matrix stack + derived matrices, spliced from
-// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
-//[ENGINE_BLOCK Matrices]
-
 // .rg: the id, low byte then high byte; .b: whether the outline draws this surface, 1 where the scene shows it,
 // 0.5 where the scene hides it and the object's hidden parts are drawn dimmed, 0 where they are left out; .a: the
 // object's priority.
@@ -64,18 +60,8 @@ uniform vec2 screen_res;
 // surface: float noise between two draws of the same triangle.
 const float VISIBLE_SLACK = 0.001;
 
-// Distance in front of the eye of a stored depth, through the projection the scene and this pass share.
-// The cleared depth of an infinite projection unprojects to w = 0, floored as deferredUtil.glsl floors it.
-float eyeDistance(float depth)
-{
-#ifdef REVERSE_Z
-    float ndc_z = depth;
-#else
-    float ndc_z = depth * 2.0 - 1.0;
-#endif
-    vec4 pos = inv_proj * vec4(0.0, 0.0, ndc_z, 1.0);
-    return -pos.z / max(pos.w, 0.000001);
-}
+// selectionUtilF.glsl, through the projection the scene and this pass share.
+float eyeDistance(float depth);
 
 void main()
 {
