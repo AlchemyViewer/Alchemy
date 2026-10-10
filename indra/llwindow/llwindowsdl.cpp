@@ -196,23 +196,49 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 }
 
 #if LL_LINUX
-// The window icon BMP (res-sdl/) is only shipped in the Linux bundle, so this
-// helper would be unused on the other platforms — and the build is -Werror on
-// unused static functions.
-static SDL_Surface *Load_BMP_Resource(const char *basename)
+// One size of the channel's icon, from the hicolor sizes the tree carries
+// under share/icons for its desktop entry, named for the application ID
+// llappviewersdl.cpp gives SDL.
+static SDL_Surface *loadWindowIcon(S32 size)
 {
-    const int PATH_BUFFER_SIZE=1000;
-    char path_buffer[PATH_BUFFER_SIZE]; /* Flawfinder: ignore */
+    const char *app_id = SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING);
+    if (!app_id || !*app_id)
+    {
+        SDL_SetError("no application ID");
+        return nullptr;
+    }
+    const std::string dims = std::to_string(size) + "x" + std::to_string(size);
+    const std::string path = gDirUtilp->add(gDirUtilp->getAppRODataDir(), "share", "icons",
+                                            "hicolor", dims, "apps", std::string(app_id) + ".png");
+    return SDL_LoadPNG(path.c_str());
+}
 
-    // Figure out where our BMP is living on the disk
-    snprintf(path_buffer, PATH_BUFFER_SIZE-1, "%s%sres-sdl%s%s",
-             gDirUtilp->getAppRODataDir().c_str(),
-             gDirUtilp->getDirDelimiter().c_str(),
-             gDirUtilp->getDirDelimiter().c_str(),
-             basename);
-    path_buffer[PATH_BUFFER_SIZE-1] = '\0';
-
-    return SDL_LoadBMP(path_buffer);
+// The window's icon, which X11 desktops show from _NET_WM_ICON and KDE's
+// Wayland from xdg_toplevel_icon_v1. SDL sends X11 the surface alone, and
+// Wayland its alternates only at whole multiples of its size, so the 256 is
+// the icon and the 512 its 2x; a smaller size would never be sent. A tree
+// without them, a build that was never staged, keeps the desktop's default.
+static void setWindowIcon(SDL_Window *window)
+{
+    SDL_Surface *icon = loadWindowIcon(256);
+    if (!icon)
+    {
+        LL_INFOS() << "No window icon: " << SDL_GetError() << LL_ENDL;
+        return;
+    }
+    if (SDL_Surface *icon_2x = loadWindowIcon(512))
+    {
+        // The icon takes a reference of its own, released with it.
+        SDL_AddSurfaceAlternateImage(icon, icon_2x);
+        SDL_DestroySurface(icon_2x);
+    }
+    if (!SDL_SetWindowIcon(window, icon))
+    {
+        // A compositor without xdg_toplevel_icon_v1 shows the desktop
+        // entry's icon, which it finds by the window's app ID.
+        LL_INFOS() << "Window icon not set: " << SDL_GetError() << LL_ENDL;
+    }
+    SDL_DestroySurface(icon);
 }
 #endif // LL_LINUX
 
@@ -503,14 +529,9 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
 #endif
 
 #if LL_LINUX
-    // Set the application icon.
-    SDL_Surface* bmpsurface = Load_BMP_Resource("ll_icon.BMP");
-    if (bmpsurface)
-    {
-        SDL_SetWindowIcon(mWindow, bmpsurface);
-        SDL_DestroySurface(bmpsurface);
-        bmpsurface = nullptr;
-    }
+    // The channel's icon. Not on macOS, where SDL would put it on the Dock
+    // over the bundle's own, nor Windows, where the exe's icon serves.
+    setWindowIcon(mWindow);
 #endif
 
     // SDL3 ties both committed-text events (SDL_EVENT_TEXT_INPUT) and
