@@ -681,4 +681,74 @@ namespace tut
             ensure_equals(std::string(place.line) + ": over the whole script", stubbed(whole.complete(text, 1, place.column)), place.offered);
         }
     }
+
+    template<> template<>
+    void alluaufragment_object::test<6>()
+    {
+        set_test_name("a local declared again in its own scope is the declaration in effect, offered and called, over a fragment as over the whole script, wherever the parser put each");
+        ensure("definitions loaded: " + error, loaded);
+        // `test` a function, then a number in the same scope, and a line
+        // typed below since the last check: the name alone, and a third
+        // `test` initialized with it. Luau keeps both declarations among the
+        // scope's bindings, a table ordered by where the parser put each,
+        // and took whichever it gave first. And the number declared since
+        // the last check as well, which the fragment declares beside the
+        // function it brings from that check -- with the other locals the
+        // line uses, so that there are enough for that table's order to be
+        // by where they were put too. Each round puts more locals above, so
+        // that everything lands elsewhere.
+        struct Place
+        {
+            const char* checked;
+            const char* typed;
+            S32         column;
+        };
+        const Place places[] = {
+            { "local test = 1\n", "test", 0 },
+            { "local test = 1\n", "local test = test", 13 },
+            { "", "local test = 1\ntest", 0 },
+            { "", "local test = 1\nprint(a, b, c, d, e, f, g, h, test)", 30 },
+        };
+        fragment.setDocument("redeclared");
+        whole.setDocument("redeclared");
+        size_t asked = 0, answered = 0;
+        for (S32 round = 0; round < 24; ++round)
+        {
+            std::string above;
+            for (S32 i = 0; i < round; ++i)
+            {
+                above += llformat("local v%d = %d\n", i, i);
+            }
+            above += "local a, b, c, d, e, f, g, h = 1, 2, 3, 4, 5, 6, 7, 8\nlocal function test()\nend\n";
+            const auto ask = [&](const std::string& base, const std::string& typed, auto question) {
+                const std::string text = base + typed + "\n";
+                const S32         line = static_cast<S32>(std::count(text.begin(), text.end(), '\n')) - 1;
+                fragment.check(base);
+                fragment.warm(base);
+                const size_t before = fragment.fragmentsChecked();
+                question(fragment, text, line, "a fragment");
+                question(whole, text, line, "the whole script");
+                ++asked;
+                answered += fragment.fragmentsChecked() != before;
+            };
+            for (const Place& place : places)
+            {
+                ask(above + place.checked, place.typed, [&](ALLuauService& service, const std::string& text, S32 line, const char* over) {
+                    const std::vector<ALScriptCompletion> found = service.complete(text, line, place.column);
+                    const auto test = std::find_if(found.begin(), found.end(), [](const ALScriptCompletion& c) { return c.text == "test"; });
+                    ensure(llformat("round %d, %s, over %s: the number", round, place.typed, over),
+                           test != found.end() && test->kind == ALScriptSymbolKind::Variable);
+                });
+            }
+            // A function of two strings declared over one of a number: a
+            // call typed below takes the two.
+            ask(above + "local function call(n: number)\nend\nlocal call = function(s: string, t: string)\nend\n", "call(\"x\", \"y\")",
+                [&](ALLuauService& service, const std::string& text, S32 line, const char* over) {
+                    const ALScriptSignature found = service.signature(text, line, 5);
+                    ensure(llformat("round %d, a call, over %s: the two strings, not %s", round, over, found.label.c_str()),
+                           found.found && found.parameters.size() == 2);
+                });
+        }
+        ensure("answered over a fragment", answered * 2 > asked);
+    }
 }
