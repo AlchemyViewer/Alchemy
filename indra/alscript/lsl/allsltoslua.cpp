@@ -7151,7 +7151,14 @@ namespace
         LSLASTNode*       first = handler->getArguments() ? handler->getArguments()->getChild(0) : nullptr;
         if (detectedEvent(event))
         {
-            if (first)
+            // Only where the body names it: a local nothing reads is what a
+            // lint says to take out.
+            LSLSymbol* count = first ? static_cast<LSLIdentifier*>(first)->getSymbol() : nullptr;
+            bool       named = false;
+            walk(handler->getStatements(), [&](LSLASTNode* node) {
+                named = named || (count && node->getNodeType() == NODE_IDENTIFIER && static_cast<LSLIdentifier*>(node)->getSymbol() == count);
+            });
+            if (named)
             {
                 lead.push_back("local " + nameOf(static_cast<LSLIdentifier*>(first)) + typed(LST_INTEGER) + " = #detected");
             }

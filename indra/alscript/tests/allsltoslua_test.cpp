@@ -2836,4 +2836,33 @@ namespace tut
         ensure("one written another way, its comment over it: " + r.text, has(r, "    -- none\n    ll.ParticleSystem({\n"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<83>()
+    {
+        set_test_name("a detected event's count made of the detected table only where the body names it: none that nothing reads, which "
+                      "a lint would ask to take out");
+        const ALLSLToSLua::Result r = convert("selectHorse() {}\n"
+                                              "default {\n"
+                                              "    touch_start (integer num) {\n"
+                                              "        if (llDetectedKey(0) == llGetOwner()) {\n"
+                                              "            selectHorse();\n"
+                                              "        }\n"
+                                              "    }\n"
+                                              "    collision_start(integer n) { llOwnerSay((string)n); }\n"
+                                              "    sensor(integer found) { found = 0; }\n"
+                                              "}\n");
+        ensure("none that nothing reads: " + r.text,
+               has(r, "LLEvents:on(\"touch_start\", function(detected)\n    -- LSL: detected[n]") && !has(r, "local num"));
+        ensure("one read: " + r.text, has(r, "function(detected)\n    local n = #detected\n    print(tostring(n))\n"));
+        ensure("one set, which needs it there: " + r.text, has(r, "    local found = #detected\n    found = 0\n"));
+        // Unused, of what Luau says: only what the LSL itself never read.
+        std::string unused;
+        for (const ALScriptProblem& p : service.check(r.text))
+        {
+            unused += p.code == "LocalUnused" ? p.message + "\n" : std::string();
+        }
+        ensure_equals("unused", unused, std::string("Variable 'found' is never used; prefix with '_' to silence\n"));
+        checksClean(r);
+    }
 }
