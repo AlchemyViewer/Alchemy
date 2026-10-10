@@ -79,7 +79,8 @@ public:
     // The same, as each line of the text in order, one entry a line --
     // and an entry for the empty line after a final newline -- each of
     // those from `first` to `last` broken past the width, its entry
-    // holding the breaks.
+    // holding the breaks. A `first` below nought is the first line: no
+    // line is taken out.
     static std::vector<std::string> formatEach(std::string_view text, const Options& options, S32 first, S32 last);
 
     // Which line breaks stand inside a string, one for each line of `text`:

@@ -331,6 +331,11 @@ namespace tut
         ensure_equals("one a line, and the empty one after the last break", each.size(), size_t(6));
         ensure_equals("the broken line's, breaks and all", each[1] + "\n", want.substr(want.find("    local r"), want.find("    print(string") - want.find("    local r")));
         ensure_equals("a line asked for", ALScriptFormatter::formatEach(in, options, 2, 2)[1], in.substr(in.find("    local r"), in.find(" -- sent") + 8 - in.find("    local r")));
+        // From below the first line: every line still one of its own, the
+        // blank ones that the whole text's runs would take out too.
+        const std::vector<std::string> blanks = ALScriptFormatter::formatEach("\n\n\n\n\nprint(1)\n", options, -1, 5);
+        ensure_equals("a line each, blank or not", blanks.size(), size_t(7));
+        ensure_equals("the code where it was", blanks[5], std::string("print(1)"));
     }
 
     template<> template<>

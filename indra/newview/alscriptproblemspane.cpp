@@ -1036,16 +1036,28 @@ void ALScriptProblemsPane::selectFirstError(bool checkers_only)
     mList->updateSort();
     const std::vector<LLScrollListItem*> rows     = mList->getAllData();
     const std::string                    compiler = mServices->words("OriginCompiler");
+    // One at a line first, which there is somewhere to go to; one at none,
+    // listed first, only where no error names a line.
+    std::optional<size_t> chosen;
     for (size_t i = 0; i < rows.size(); ++i)
     {
         const Doc::Shown* problem = shownOf(rows[i]->getValue());
         if (problem && problem->level == Doc::Level::Error && (!checkers_only || problem->origin != compiler))
         {
-            mList->selectNthItem(static_cast<S32>(i));
-            mList->scrollToShowSelected();
-            choose(true);
-            return;
+            if (problem->line < 0)
+            {
+                chosen = chosen ? chosen : i;
+                continue;
+            }
+            chosen = i;
+            break;
         }
+    }
+    if (chosen)
+    {
+        mList->selectNthItem(static_cast<S32>(*chosen));
+        mList->scrollToShowSelected();
+        choose(true);
     }
 }
 

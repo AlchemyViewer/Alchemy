@@ -1063,7 +1063,9 @@ std::vector<std::string> ALScriptFormatter::formatEach(std::string_view text, co
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);
-    const std::vector<std::optional<std::string>> each = writtenLines(lines, options, first, last, true);
+    // Every line kept, blank or not: from the first where `first` is
+    // below it, which would otherwise ask for the whole text's runs.
+    const std::vector<std::optional<std::string>> each = writtenLines(lines, options, llmax(first, 0), last, true);
     // A line a string or a comment runs on over is as many of the text's;
     // a line broken at the width is still one.
     std::vector<std::string> out;

@@ -898,7 +898,7 @@ namespace tut
     void alscriptproblemspane_object::test<16>()
     {
         set_test_name("what names no line -- a compiler's line of no form it has, a run-time error of no place -- is listed at none, marked "
-                      "nowhere, and chosen at none; one that names a line, at it");
+                      "nowhere, and chosen at none, and gone to as the first error only where no error names a line; one that names a line, at it");
         ALScriptProblemsPane& out = make();
         Doc&                  d   = doc("door");
         d.problems.push_back({ -1, 0, false, std::string(), "ERROR", "the compiler's, nowhere" });
@@ -924,5 +924,15 @@ namespace tut
         choose("the compiler's, at 3");
         out.choose(false);
         ensure_equals("chosen at its line", studio.chosen.back().line, 3);
+
+        // The first error gone to: one at none, listed first, only where no
+        // error names a line.
+        out.selectFirstError(false);
+        ensure_equals("one at none, where no error is at a line", studio.chosen.back().line, -1);
+        d.problems.push_back({ 5, 0, false, std::string(), "ERROR", "the compiler's, at 5" });
+        gather(d);
+        out.fill(&d);
+        out.selectFirstError(false);
+        ensure_equals("one at a line, past those at none", studio.chosen.back().line, 5);
     }
 }
