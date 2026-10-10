@@ -2414,33 +2414,54 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             }
 
             const std::string_view preedit(event.edit.text);
+            const S32 preedit_bytes = static_cast<S32>(preedit.length());
 
-            // event.edit.start is the IME's caret inside the composition
-            // counted in CHARACTERS, or -1 when the IME hasn't reported one.
-            // SDL's own backends settle the unit: fcitx and the Wayland text
-            // input both run their byte position through SDL_utf8strnlen,
-            // which counts codepoints, before dispatching the event. The
-            // preeditor counts bytes, so the caret has to be walked out.
-            // start == 0 is a legitimate "caret at the beginning" value and
-            // must NOT be confused with the -1 default (the earlier `> 0`
-            // check did exactly that and pinned the caret to the end of the
-            // preedit whenever the IME started the cursor at the first
-            // character).
-            S32 caret = static_cast<S32>(preedit.length());
+            // event.edit.start and .length mark the clause the IME has
+            // selected — the one being converted, which it highlights — or,
+            // with no clause (length 0 or -1), start is the IME's caret, and
+            // -1 when it reported none. start == 0 is a legitimate "at the
+            // beginning" value and must NOT be confused with -1.
+            //
+            // SDL settles the unit in each backend: ibus, fcitx, XIM and the
+            // Wayland text input count characters (fcitx and text-input-v3 run
+            // their byte positions through SDL_utf8strnlen), Cocoa counts
+            // UTF-32 units, which are the same, and Windows UTF-16 units, the
+            // same short of the astral planes. None passes a caret on as well
+            // as a clause — ibus and fcitx drop it, XIM sends the clause in
+            // its place — so the caret goes to the clause's start, under which
+            // the candidate window belongs. The preeditor counts bytes, so
+            // both ends are walked out.
+            S32 clause_begin = preedit_bytes;
+            S32 clause_end = preedit_bytes;
             if (event.edit.start >= 0)
             {
-                size_t at = 0;
-                for (S32 remaining = event.edit.start;
-                     remaining > 0 && at < preedit.size();
-                     --remaining)
+                const size_t start = static_cast<size_t>(event.edit.start);
+                clause_begin = static_cast<S32>(utf8str_offset_from_codepoint_index(preedit, start));
+                clause_end = clause_begin;
+                if (event.edit.length > 0)
                 {
-                    at = utf8str_decode_at(preedit, at).next;
+                    clause_end = static_cast<S32>(utf8str_offset_from_codepoint_index(
+                        preedit, start + static_cast<size_t>(event.edit.length)));
                 }
-                caret = static_cast<S32>(at);
             }
-            const LLPreeditor::segment_lengths_t lengths { static_cast<S32>(preedit.length()) };
-            const LLPreeditor::standouts_t standouts { false };
-            mPreeditor->updatePreedit(preedit, lengths, standouts, caret);
+
+            // What comes before the clause, the clause standing out as the
+            // Win32 backend has a target clause stand out, and what comes
+            // after; a part with nothing in it is left out.
+            LLPreeditor::segment_lengths_t lengths;
+            LLPreeditor::standouts_t standouts;
+            const auto add_segment = [&](S32 length, bool standout)
+            {
+                if (length > 0)
+                {
+                    lengths.push_back(length);
+                    standouts.push_back(standout);
+                }
+            };
+            add_segment(clause_begin, false);
+            add_segment(clause_end - clause_begin, true);
+            add_segment(preedit_bytes - clause_end, false);
+            mPreeditor->updatePreedit(preedit, lengths, standouts, clause_begin);
 
             // The composition moved the caret, and with it where the
             // candidate window belongs; the IME is told now rather than at
