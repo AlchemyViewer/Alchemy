@@ -3220,24 +3220,67 @@ namespace
             noteOnce(e, "SluaAbsent", "SLua has no [1], in ll or in llcompat: it is left out.", { lsl });
             return { defaultOf(e->getIType()) };
         }
+        // SLua's word on one it deprecates, what it would use and why: which
+        // says more than how its indexes count. The why is the definitions'
+        // own. But the two XorBase64Strings: SLua names ll.XorBase64 for
+        // both, with no why, and it answers otherwise than either -- said
+        // how, since LSL's is kept.
+        const auto deprecated = [&]() {
+            if (lsl == "llXorBase64Strings")
+            {
+                noteOnce(e, "SluaXorBase64Wrong",
+                         "SLua deprecates ll.XorBase64Strings, for ll.XorBase64, which XORs correctly where this did not, and so answers "
+                         "otherwise: ll.XorBase64Strings is LSL's.");
+            }
+            else if (lsl == "llXorBase64StringsCorrect")
+            {
+                noteOnce(e, "SluaXorBase64Nul",
+                         "SLua deprecates ll.XorBase64StringsCorrect, for ll.XorBase64, which answers otherwise where the second string "
+                         "holds a NUL, which ended it here: ll.XorBase64StringsCorrect is LSL's.");
+            }
+            else if (trait->sluaUse && trait->sluaReason)
+            {
+                noteOnce(e, "SluaDeprecatedForWhy", "SLua deprecates ll.[1], for [2]: [3]", { bare, trait->sluaUse, trait->sluaReason });
+            }
+            else if (trait->sluaUse)
+            {
+                noteOnce(e, "SluaDeprecatedFor", "SLua deprecates ll.[1], for [2].", { bare, trait->sluaUse });
+            }
+            else if (trait->sluaReason)
+            {
+                noteOnce(e, "SluaDeprecatedWhy", "SLua deprecates ll.[1]: [2]", { bare, trait->sluaReason });
+            }
+            else
+            {
+                noteOnce(e, "SluaDeprecated", "SLua deprecates ll.[1].", { bare });
+            }
+        };
         // SLua's ll where it means the same: a boolean answer, which a
         // condition reads as it is and a number takes as 1 or 0; index
         // arguments written out, moved on by one. Not where the list it
         // answers has booleans in LSL's 1 and 0's places, nor one SLua
-        // deprecates, which llcompat keeps LSL's where no way of SLua's
-        // own (Writer::idiom) is sure to mean the same.
+        // deprecates that differs from llcompat's, which keeps LSL's where
+        // no way of SLua's own (Writer::idiom) is sure to mean the same.
+        // One SLua deprecates and nothing else is the one function in both,
+        // deprecated in both, as every llcompat function is: ll's, whose
+        // deprecation names what SLua would use.
         const U8 compat_only =
             ALLSLTraits::SluaRemoved | ALLSLTraits::SluaIndexResult | ALLSLTraits::SluaBoolList | ALLSLTraits::SluaDeprecated;
-        const bool ll_indexes = !(slua & ALLSLTraits::SluaIndexArgs) || constantIndexes(e, indexes);
-        if (slua == 0 || (mOptions.sluaCalls && !(slua & compat_only) && ll_indexes))
+        const bool ll_indexes      = !(slua & ALLSLTraits::SluaIndexArgs) || constantIndexes(e, indexes);
+        const bool only_deprecated = slua == ALLSLTraits::SluaDeprecated;
+        if (slua == 0 || only_deprecated || (mOptions.sluaCalls && !(slua & compat_only) && ll_indexes))
         {
-            if (trait && trait->sluaUse)
+            called = "ll." + bare;
+            if (only_deprecated)
+            {
+                deprecated();
+            }
+            else if (trait && trait->sluaUse)
             {
                 noteOnce(e, "SluaUse", "SLua would use [1] for [2].", { trait->sluaUse, lsl });
             }
             const std::string args_text =
                 (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params, trait ? trait->sluaTextArgs : 0);
-            called = "ll." + bare;
             return { called + "(" + args_text + ")", PRIMARY, (slua & ALLSLTraits::SluaBool) != 0 };
         }
         // An index SLua's ll counts from 1, or nil for none, read as LSL's:
@@ -3267,39 +3310,7 @@ namespace
         }
         else if (slua & ALLSLTraits::SluaDeprecated)
         {
-            // SLua's word on it, what it would use and why: which says more
-            // than how its indexes count. The why is the definitions' own.
-            // But the two XorBase64Strings: SLua names ll.XorBase64 for both,
-            // with no why, and it answers otherwise than either -- said how,
-            // since llcompat's is kept.
-            if (lsl == "llXorBase64Strings")
-            {
-                noteOnce(e, "SluaXorBase64Wrong",
-                         "SLua deprecates ll.XorBase64Strings, for ll.XorBase64, which XORs correctly where this did not, and so answers "
-                         "otherwise: llcompat's is LSL's.");
-            }
-            else if (lsl == "llXorBase64StringsCorrect")
-            {
-                noteOnce(e, "SluaXorBase64Nul",
-                         "SLua deprecates ll.XorBase64StringsCorrect, for ll.XorBase64, which answers otherwise where the second string "
-                         "holds a NUL, which ended it here: llcompat's is LSL's.");
-            }
-            else if (trait->sluaUse && trait->sluaReason)
-            {
-                noteOnce(e, "SluaDeprecatedForWhy", "SLua deprecates ll.[1], for [2]: [3]", { bare, trait->sluaUse, trait->sluaReason });
-            }
-            else if (trait->sluaUse)
-            {
-                noteOnce(e, "SluaDeprecatedFor", "SLua deprecates ll.[1], for [2].", { bare, trait->sluaUse });
-            }
-            else if (trait->sluaReason)
-            {
-                noteOnce(e, "SluaDeprecatedWhy", "SLua deprecates ll.[1]: [2]", { bare, trait->sluaReason });
-            }
-            else
-            {
-                noteOnce(e, "SluaDeprecated", "SLua deprecates ll.[1].", { bare });
-            }
+            deprecated();
         }
         else if (slua & ALLSLTraits::SluaIndexResult)
         {

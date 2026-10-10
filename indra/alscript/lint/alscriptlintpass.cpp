@@ -1850,9 +1850,11 @@ namespace
 
         // What ll's row says of an llcompat call, and the call written as
         // ll's: llcompat put as ll, each index from 0 up moved by one, as
-        // the assistant moves them. Nothing where ll lacks the function or
-        // deprecates it, gives booleans in a list, or an index is not a
-        // number.
+        // the assistant moves them. Nothing where ll lacks the function,
+        // deprecates it and differs from llcompat's too, gives booleans in
+        // a list, or an index is not a number. One ll's only deprecates is
+        // llcompat's, deprecated as every llcompat function is; ll's names
+        // what SLua would use.
         struct Compat
         {
             const ALLSLTraits::Trait* row = nullptr;
@@ -1877,7 +1879,7 @@ namespace
             out.lsl  = "ll" + out.name;
             out.row  = ALLSLTraits::of(out.lsl.c_str());
             constexpr U8 lacking = ALLSLTraits::SluaRemoved | ALLSLTraits::SluaAbsent | ALLSLTraits::SluaDeprecated | ALLSLTraits::SluaBoolList;
-            if (!out.row || (out.row->slua & lacking))
+            if (!out.row || ((out.row->slua & lacking) && out.row->slua != ALLSLTraits::SluaDeprecated))
             {
                 return std::nullopt;
             }

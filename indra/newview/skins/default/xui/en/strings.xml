@@ -1160,8 +1160,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaDeprecatedFor">SLua deprecates ll.[1], for [2].</string>
 	<string name="SluaDeprecatedWhy">SLua deprecates ll.[1]: [2]</string>
 	<string name="SluaDeprecated">SLua deprecates ll.[1].</string>
-	<string name="SluaXorBase64Wrong">SLua deprecates ll.XorBase64Strings, for ll.XorBase64, which XORs correctly where this did not, and so answers otherwise: llcompat's is LSL's.</string>
-	<string name="SluaXorBase64Nul">SLua deprecates ll.XorBase64StringsCorrect, for ll.XorBase64, which answers otherwise where the second string holds a NUL, which ended it here: llcompat's is LSL's.</string>
+	<string name="SluaXorBase64Wrong">SLua deprecates ll.XorBase64Strings, for ll.XorBase64, which XORs correctly where this did not, and so answers otherwise: ll.XorBase64Strings is LSL's.</string>
+	<string name="SluaXorBase64Nul">SLua deprecates ll.XorBase64StringsCorrect, for ll.XorBase64, which answers otherwise where the second string holds a NUL, which ended it here: ll.XorBase64StringsCorrect is LSL's.</string>
 	<string name="SluaIndexFound">llcompat.[1] counts from 0 and says -1 for none, as LSL did; ll.[1] counts from 1 and says nil.</string>
 	<string name="SluaIndex">llcompat.[1] takes indexes from 0, as LSL did; ll.[1] takes them from 1.</string>
 	<string name="SluaBool">llcompat.[1] answers 1 or 0, as LSL did; ll.[1] answers true or false.</string>

@@ -232,7 +232,8 @@ namespace tut
     void object::test<3>()
     {
         set_test_name("SlCompatCall: llcompat's where ll's means the same -- the same function, indexes that are numbers, a boolean against 1 "
-                      "or 0, a find against -1 or 0, an answer unread; not where ll deprecates it, nor an answer read otherwise");
+                      "or 0, a find against -1 or 0, an answer unread, one ll's only deprecates; not where ll deprecates one that differs, nor an "
+                      "answer read otherwise");
         ensure("definitions: " + error, loaded);
         const std::string said = found("local s = \"abc\"\n"
                                        "llcompat.Say(0, s)\n"
@@ -245,7 +246,8 @@ namespace tut
                                        "llcompat.SameGroup(ll.GetOwner())\n"
                                        "local n = llcompat.SubStringIndex(s, \"b\")\n"
                                        "local g = llcompat.SameGroup(ll.GetOwner()) + 1\n"
-                                       "print(n, g, llcompat.ListFindList({1}, {1}) == -1)\n",
+                                       "print(n, g, llcompat.ListFindList({1}, {1}) == -1)\n"
+                                       "print(llcompat.List2Json(JSON_ARRAY, {s}))\n",
                                        "SlCompatCall", ALScriptProblem::Severity::Note);
         ensure_equals("each", said,
                       std::string("1 LuauLintSlCompatCall|llcompat.Say|ll.Say(...)\n"
@@ -254,7 +256,8 @@ namespace tut
                                   "5 LuauLintSlCompatCall|llcompat.SameGroup|not ll.SameGroup(...)\n"
                                   "6 LuauLintSlCompatCall|llcompat.SubStringIndex|ll.SubStringIndex(...) ~= nil\n"
                                   "7 LuauLintSlCompatCall|llcompat.SubStringIndex|ll.SubStringIndex(...) == nil\n"
-                                  "8 LuauLintSlCompatCall|llcompat.SameGroup|ll.SameGroup(...)\n"));
+                                  "8 LuauLintSlCompatCall|llcompat.SameGroup|ll.SameGroup(...)\n"
+                                  "12 LuauLintSlCompatCall|llcompat.List2Json|ll.List2Json(...)\n"));
         ensure_equals("the same", fixed("llcompat.Say(0, \"hi\")\n", "LuauLintSlCompatCall", "Write it ll.Say(...)", true),
                       std::string("ll.Say(0, \"hi\")\n"));
         ensure_equals("indexes", fixed("print(llcompat.GetSubString(\"abc\", 0, 1))\n", "LuauLintSlCompatCall", "Write it ll.GetSubString(\"abc\", 1, 2)", true),

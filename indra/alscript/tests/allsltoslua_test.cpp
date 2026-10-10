@@ -27,6 +27,7 @@
 #include "../lsl/allsltoslua.h"
 #include "../lint/alscriptfixes.h"
 #include "../lsl/allslservice.h"
+#include "../lsl/allsltraits.h"
 #include "../luau/alluauservice.h"
 
 #include "../test/lltut.h"
@@ -92,13 +93,19 @@ namespace tut
 
         // What the converter must not write: an error, what the studio's own
         // lints would have written SLua's way, or a deprecated ll function --
-        // SLua's way where it means the same, llcompat's where not.
+        // SLua's way where it means the same, llcompat's where not. But one
+        // SLua only deprecates, the one function llcompat's is: ll's.
         static bool unwanted(const ALScriptProblem& p)
         {
             static const std::vector<std::string_view> OWN = { "SlCompoundAssign", "SlNumberTruth",    "SlZeroIndex",    "SlParenCondition",
                                                                "SlGeneralizedFor", "SlIndexDivision", "SlVectorProduct" };
+            const auto only_deprecated = [](const std::string& member) {
+                const ALLSLTraits::Trait* trait = ALLSLTraits::of(("ll" + member.substr(3)).c_str());
+                return trait && trait->slua == ALLSLTraits::SluaDeprecated;
+            };
             return p.severity == ALScriptProblem::Severity::Error || std::find(OWN.begin(), OWN.end(), p.code) != OWN.end() ||
-                   (p.key.rfind("LuauLintDeprecatedMember", 0) == 0 && !p.args.empty() && p.args[0].rfind("ll.", 0) == 0);
+                   (p.key.rfind("LuauLintDeprecatedMember", 0) == 0 && !p.args.empty() && p.args[0].rfind("ll.", 0) == 0 &&
+                    !only_deprecated(p.args[0]));
         }
 
         // What SLua's check says of it: nothing unwanted.
@@ -351,7 +358,8 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<7>()
     {
-        set_test_name("close to LSL: llcompat's Detected functions and timer event, as LSL had them, noted with SLua's ways");
+        set_test_name("close to LSL: llcompat's Detected functions and timer event, as LSL had them, noted with SLua's ways; ll's "
+                      "OwnerSay, which only SLua's deprecating sets apart");
         const ALLSLToSLua::Options close = ALLSLToSLua::Options::closeToLSL();
         const ALLSLToSLua::Result  r     = ALLSLToSLua::convert("default {\n"
                                                                 "    state_entry() { llSetTimerEvent(2.0); }\n"
@@ -362,8 +370,8 @@ namespace tut
         ensure("converted", r.converted);
         ensure("llcompat's Detected: " + r.text, has(r, "llcompat.DetectedName(0)") && noted(r, "SluaDetected"));
         ensure("the timer event: " + r.text, has(r, "llcompat.SetTimerEvent(2") && has(r, "LLEvents:on(\"timer\"") && noted(r, "SluaTimer"));
-        ensure("llcompat.OwnerSay, SLua deprecating ll's for print: " + r.text,
-               has(r, "llcompat.OwnerSay(\"tick\")") && noted(r, "SluaDeprecatedFor", "OwnerSay"));
+        ensure("ll.OwnerSay, SLua deprecating it for print: " + r.text,
+               has(r, "ll.OwnerSay(\"tick\")") && !has(r, "llcompat.OwnerSay") && noted(r, "SluaDeprecatedFor", "OwnerSay"));
         checksClean(r);
     }
 
@@ -2004,7 +2012,7 @@ namespace tut
     void allsltoslua_object::test<66>()
     {
         set_test_name("Base64 through llbase64: encode as it is, the same bytes as LSL's; decode noted once, as it keeps a NUL and what is "
-                      "not UTF-8; close to LSL, llcompat's");
+                      "not UTF-8; close to LSL, ll's, which only SLua's deprecating sets apart from llcompat's");
         const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
                                               "    key k = llDetectedKey(0);\n"
                                               "    string s = llStringToBase64(\"hello\");\n"
@@ -2016,14 +2024,15 @@ namespace tut
         ensure("encode: " + r.text, has(r, "local s = llbase64.encode(\"hello\")") && has(r, "local t = llbase64.encode(tostring(k))"));
         ensure("decode: " + r.text, has(r, "local d = llbase64.decode(s)") && has(r, "local e = llbase64.decode(t .. \"=\")"));
         ensure("decode noted once: " + r.text, noted(r, "SluaBase64Decode") && count(r, "-- LSL: llbase64.decode keeps every byte") == 1);
-        ensure("nothing of llcompat's: " + r.text, !has(r, "llcompat.") && !noted(r, "SluaDeprecatedFor", "StringToBase64") &&
-                                                     !noted(r, "SluaDeprecatedFor", "Base64ToString"));
+        ensure("nothing of llcompat's or ll's: " + r.text, !has(r, "llcompat.") && !has(r, "ll.StringToBase64") && !has(r, "ll.Base64ToString") &&
+                                                             !noted(r, "SluaDeprecatedFor", "StringToBase64") &&
+                                                             !noted(r, "SluaDeprecatedFor", "Base64ToString"));
         checksClean(r);
 
         const ALLSLToSLua::Result close =
             ALLSLToSLua::convert("default { state_entry() { llOwnerSay(llBase64ToString(llStringToBase64(\"x\"))); } }\n", ALLSLToSLua::Options::closeToLSL());
         ensure("close to LSL: " + close.text,
-               has(close, "llcompat.Base64ToString(llcompat.StringToBase64(\"x\"))") && !has(close, "llbase64.decode(") &&
+               has(close, "ll.Base64ToString(ll.StringToBase64(\"x\"))") && !has(close, "llcompat.") && !has(close, "llbase64.decode(") &&
                    !has(close, "llbase64.encode(") && !noted(close, "SluaBase64Decode"));
     }
 
@@ -2162,7 +2171,7 @@ namespace tut
     void allsltoslua_object::test<76>()
     {
         set_test_name("a key of no text said to be NULL_KEY, and one with capitals said to be written small, cast or given; other text as "
-                      "it was said; the two XorBase64Strings said to be what ll.XorBase64 is not, llcompat's kept");
+                      "it was said; the two XorBase64Strings said to be what ll.XorBase64 is not, LSL's kept");
         const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
                                               "    key a = (key)\"\"; key c = (key)\"A2E76FCD-9360-4F6D-A924-938F923DF11D\";\n"
                                               "    if ((key)\"\" == NULL_KEY) llOwnerSay(\"same\");\n"
@@ -2175,8 +2184,8 @@ namespace tut
         ensure("capitals, small: " + r.text, has(r, "uuid(\"A2E76FCD-9360-4F6D-A924-938F923DF11D\")") && noted(r, "SluaKeyCase"));
         ensure("other text as it was: " + r.text, has(r, "local d = uuid(s)") && noted(r, "SluaUuid"));
         ensure("ll.XorBase64 as it is: " + r.text, has(r, "ll.XorBase64(\"a\", \"b\")"));
-        ensure("the two, llcompat's: " + r.text,
-               has(r, "llcompat.XorBase64Strings(\"a\", \"b\")") && has(r, "llcompat.XorBase64StringsCorrect(\"a\", \"b\")"));
+        ensure("the two, LSL's: " + r.text,
+               has(r, "ll.XorBase64Strings(\"a\", \"b\")") && has(r, "ll.XorBase64StringsCorrect(\"a\", \"b\")") && !has(r, "llcompat."));
         ensure("said what ll.XorBase64 is not: " + r.text, noted(r, "SluaXorBase64Wrong") && noted(r, "SluaXorBase64Nul") &&
                                                               !noted(r, "SluaDeprecated", "XorBase64Strings") &&
                                                               !noted(r, "SluaDeprecated", "XorBase64StringsCorrect"));
