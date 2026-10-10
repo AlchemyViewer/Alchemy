@@ -429,7 +429,7 @@ bool LLGLTFPreviewTexture::render()
     if (!mShouldRender) { return false; }
 
     gGL.setClearColor(LLColor4::transparent);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    gGL.clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     LLGLDepthTest depth(GL_FALSE);
     LLGLDisable stencil(GL_STENCIL_TEST);
@@ -507,7 +507,7 @@ bool LLGLTFPreviewTexture::render()
         // Alpha blend rendering
 
         screen.bindTarget();
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        gGL.clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         LLGLSLShader& shader = *gDeferredPBRAlphaProgram.selectVariant();
 

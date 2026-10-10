@@ -1825,7 +1825,7 @@ const   S32   max_format  = (S32)num_formats - 1;
     {
         show();
         gGL.setClearColor(LLColor4::transparent);
-        glClear(GL_COLOR_BUFFER_BIT);
+        gGL.clear(GL_COLOR_BUFFER_BIT);
         swapBuffers();
     }
 

@@ -102,9 +102,16 @@ inline void mergeRect(std::vector<LLRect>& rects, LLRect rect)
     rects.push_back(rect);
 }
 
-/// Clears the bound framebuffer's depth within each rect of a viewport whose origin is (x, y).
-inline void clear(const std::vector<LLRect>& rects, S32 x, S32 y)
+/// Clears the bound framebuffer's depth within each rect of a viewport whose origin is (x, y), where `program`, the
+/// copy restore() draws with, is loaded to put the scene's depth back after. Without it the depth is left as the
+/// scene's, which the HUD then tests against, and the 3D UI after it keeps the world's occlusion.
+inline void clear(const LLGLSLShader& program, const std::vector<LLRect>& rects, S32 x, S32 y)
 {
+    if (!program.isComplete())
+    {
+        return;
+    }
+
     // Depth writes on: they mask the clear.
     LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
     for (const LLRect& rect : rects)

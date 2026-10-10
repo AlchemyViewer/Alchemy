@@ -331,10 +331,11 @@ namespace tut
             mWindow.flush();
         }
 
-        void clearUnderHUD()
+        // The clear and the restore as render_hud_attachments runs them, with the copy program, or `copy` in its place.
+        void clearUnderHUD(const LLGLSLShader* copy = nullptr)
         {
             mWindow.bindTarget();
-            ALHUDDepth::clear(mRects, 0, 0);
+            ALHUDDepth::clear(copy ? *copy : mCopyDepthProgram, mRects, 0, 0);
             mWindow.flush();
         }
 
@@ -351,10 +352,10 @@ namespace tut
             mWindow.flush();
         }
 
-        void restoreUnderHUD()
+        void restoreUnderHUD(LLGLSLShader* copy = nullptr)
         {
             mWindow.bindTarget();
-            ALHUDDepth::restore(mCopyDepthProgram, mScene, *mTriangle, mRects, 0, 0);
+            ALHUDDepth::restore(copy ? *copy : mCopyDepthProgram, mScene, *mTriangle, mRects, 0, 0);
             mWindow.flush();
         }
 
@@ -568,5 +569,26 @@ namespace tut
         ALHUDDepth::mergeRect(rects, LLRect(14, 31, 31, 14));
         ensure_equals("bridged, one", rects.size(), size_t(1));
         ensure("around all three", rects[0] == LLRect(0, 40, 40, 0));
+    }
+
+    // Without the copy program to put the scene's depth back, the depth under the HUD is not cleared: the HUD tests
+    // against the scene's as before, and what the world hides from the 3D UI after it stays hidden.
+    template<> template<>
+    void alhuddepth_object_t::test<7>()
+    {
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            LLGLSLShader unloaded;
+            blit();
+            const std::vector<F32> before = depths(mWindow);
+            clearUnderHUD(&unloaded);
+            ensure(named(reverse, "nothing cleared"), depths(mWindow) == before);
+            drawHUD();
+            restoreUnderHUD(&unloaded);
+            overlay(40, 24, 8.f);
+            ensure(named(reverse, "behind the world under the HUD's rect: hidden"), colourAt(40, 24) == unorm(MID_COLOUR));
+            ensure(named(reverse, "the near world still hides the HUD"), colourAt(24, 24) == unorm(NEAR_COLOUR));
+        }
     }
 }

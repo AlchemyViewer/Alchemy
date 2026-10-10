@@ -883,6 +883,11 @@ bool LLToolPie::handleHover(S32 x, S32 y, MASK mask)
         steerCameraWithMouse(x, y);
         gViewerWindow->setCursor(UI_CURSOR_TOOLGRAB);
     }
+    else if (show_highlight)
+    {
+        // The cursor is the media's, which handleMediaHover set.
+        LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
+    }
     else
     {
         // perform a separate pick that detects transparent objects since they respond to 1-click actions
@@ -901,7 +906,6 @@ bool LLToolPie::handleHover(S32 x, S32 y, MASK mask)
         else if ( (object) && (RlvActions::isRlvEnabled()) && (!RlvActions::canTouch(object, mHoverPick.mObjectOffset)) )
         {
             // Block showing the "grab" or "touch" cursor if we can't touch/grab the object
-            show_highlight = false;
             gViewerWindow->setCursor(UI_CURSOR_ARROW);
         }
 // [/RLVa:KB]

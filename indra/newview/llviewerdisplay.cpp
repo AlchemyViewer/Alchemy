@@ -1291,9 +1291,10 @@ void display_cube_face()
 static void hud_screen_rects(std::vector<LLRect>& rects)
 {
     rects.clear();
+    // None without what restore_scene_depth puts the scene's depth back from.
     LLMatrix4a proj;
     LLMatrix4a model;
-    if (!isAgentAvatarValid() || !get_hud_matrices(proj, model))
+    if (!gPipeline.mRT || !gPipeline.mScreenTriangleVB || !isAgentAvatarValid() || !get_hud_matrices(proj, model))
     {
         return;
     }
@@ -1316,10 +1317,11 @@ static void hud_screen_rects(std::vector<LLRect>& rects)
     }
 }
 
-// Writes the scene's depth back under the HUD, as the final blit left it (ALHUDDepth::restore).
+// Writes the scene's depth back under the HUD, as the final blit left it (ALHUDDepth::restore), within `rects`, which
+// hud_screen_rects gives only where it can.
 static void restore_scene_depth(const std::vector<LLRect>& rects)
 {
-    if (!gPipeline.mRT || !gPipeline.mScreenTriangleVB)
+    if (rects.empty())
     {
         return;
     }
@@ -1423,7 +1425,7 @@ void render_hud_attachments()
         // it for the 3D UI that follows, which the world and the HUD both hide.
         static std::vector<LLRect> hud_rects;
         hud_screen_rects(hud_rects);
-        ALHUDDepth::clear(hud_rects, gGLViewport[0], gGLViewport[1]);
+        ALHUDDepth::clear(gCopyDepthProgram, hud_rects, gGLViewport[0], gGLViewport[1]);
 
         gPipeline.renderGeomPostDeferred(hud_cam);
 
