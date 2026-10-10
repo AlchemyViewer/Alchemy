@@ -68,12 +68,15 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct llsettingssky_data
     {
     };
     typedef test_group<llsettingssky_data> llsettingssky_group;
     typedef llsettingssky_group::object llsettingssky_object;
     tut::llsettingssky_group tut_llsettingssky("llsettingssky");
+}
 
     // setMieAnisotropy changes the sky's g and the LLSD it saves.
     template<> template<>
