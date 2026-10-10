@@ -196,11 +196,9 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 }
 
 #if LL_LINUX
-// The BMP cursor/icon tree (res-sdl/) is only shipped in the Linux bundle.
-// macOS loads cursors from cursors_mac/*.tif (makeSDLCursorFromMacTIF) and
-// Windows from the exe's embedded .cur resources (makeSDLCursorFromWin32), so
-// this helper would be unused on those platforms — and the build is -Werror
-// on unused static functions.
+// The window icon BMP (res-sdl/) is only shipped in the Linux bundle, so this
+// helper would be unused on the other platforms — and the build is -Werror on
+// unused static functions.
 static SDL_Surface *Load_BMP_Resource(const char *basename)
 {
     const int PATH_BUFFER_SIZE=1000;
@@ -2818,9 +2816,8 @@ SDL_AppResult LLWindowSDL::handleEvents(const SDL_Event& event)
 
 #if LL_DARWIN
 // On macOS the viewer ships TIFF cursor art in <Bundle>/Contents/Resources/cursors_mac/
-// (see viewer_manifest.py). The legacy res-sdl/*.BMP tree is Linux-only, so on the
-// SDL build for Mac we load the native TIFFs via SDL3_image. The TIFFs already carry
-// proper alpha, so unlike the BMP path we skip the color-key step.
+// (see viewer_manifest.py). The res-sdl/ PNG tree is Linux-only, so on the SDL
+// build for Mac we load the native TIFFs, which carry their own alpha, via SDL3_image.
 static SDL_Cursor *makeSDLCursorFromMacTIF(const char *basename, int hotx, int hoty)
 {
     std::string fullpath = gDirUtilp->add(
@@ -2869,83 +2866,114 @@ static SDL_Cursor *makeSDLCursorFromMacTIF(const char *basename, int hotx, int h
 #endif // LL_DARWIN
 
 #if LL_LINUX
-static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty)
+// The Linux cursors are 32x32 PNGs in res-sdl/, with their alpha. Under
+// Wayland that is the cursor's size in logical pixels, and SDL hands the
+// compositor whichever of the surface's alternate images suits the window's
+// scale, so each cursor carries nearest-neighbour copies of its art at the
+// integer scales up to this one. (SDL 3.4 picks the smallest copy whose area
+// is at least the art's times the scale, not times its square, so a 3x output
+// gets the 2x copy and the compositor scales it the rest of the way.)
+static const int MAX_CURSOR_SCALE = 3;
+
+// The integer scale the cursors are drawn at under X11. SDL gives Xcursor the
+// surface alone, at its own pixel size, and ignores its alternates; the themed
+// cursors beside it are drawn at Xcursor's size (XCURSOR_SIZE, the
+// Xcursor.size resource, or one from Xft.dpi), which is 24 at a scale of 1,
+// where the 32-pixel art belongs. Without XCURSOR_SIZE the display's content
+// scale, which SDL reads from Xft.dpi, stands in for the size: the resource
+// can't be read without Xlib.
+static int x11CursorScale(SDL_Window *window)
 {
-    SDL_Surface *bmpsurface = Load_BMP_Resource(filename);
-    if (!bmpsurface)
+    F32 scale = 0.f;
+    if (const char *size = getenv("XCURSOR_SIZE"))
     {
-        LL_WARNS() << "Cursor BMP failed to load: " << filename << LL_ENDL;
-        return nullptr;
+        scale = (F32)atoi(size) / 24.f;
     }
-
-    LL_DEBUGS() << "Loaded cursor file " << filename << " "
-                << bmpsurface->w << "x" << bmpsurface->h << LL_ENDL;
-
-    // Normalise to RGBA32 (byte order R,G,B,A in memory regardless of
-    // host endianness) so we have a predictable layout to color-key
-    // against, and so SDL_CreateColorCursor gets a surface with alpha.
-    SDL_Surface *rgba = SDL_ConvertSurface(bmpsurface, SDL_PIXELFORMAT_RGBA32);
-    SDL_DestroySurface(bmpsurface);
-    if (!rgba)
+    if (scale <= 0.f && window)
     {
-        LL_WARNS() << "Cursor RGBA conversion failed for " << filename
+        scale = SDL_GetWindowDisplayScale(window);
+    }
+    return llclamp(ll_round(scale), 1, MAX_CURSOR_SCALE);
+}
+
+// x11_scale is x11CursorScale's under X11, and 0 elsewhere, where the cursor
+// takes its scaled copies as alternates instead.
+static SDL_Cursor *makeSDLCursorFromPNG(const char *filename, int hotx, int hoty, int x11_scale)
+{
+    std::string fullpath = gDirUtilp->add(
+        gDirUtilp->getAppRODataDir(),
+        "res-sdl",
+        filename);
+
+    SDL_Surface *png = SDL_LoadPNG(fullpath.c_str());
+    if (!png)
+    {
+        LL_WARNS() << "Cursor PNG failed to load: " << fullpath
                    << ": " << SDL_GetError() << LL_ENDL;
         return nullptr;
     }
 
-    // Color-key the legacy (200,200,200) "background" pixels to fully
-    // transparent. The viewer's cursor BMPs were authored against this
-    // exact gray as the transparency key (same convention the old SDL2
-    // path used), so the assets stay drop-in compatible. Unlike the
-    // legacy path we keep the rest of the pixel data intact — the old
-    // code quantised everything to 1-bit black/white, which is why
-    // multi-colour cursors looked degraded vs Win32.
-    //
-    // A converted SDL3 RGBA32 surface shouldn't need locking, but the
-    // pair is cheap and defends against future SDL changes that flag the
-    // surface as RLE / GPU-backed.
-    const bool must_lock = SDL_MUSTLOCK(rgba);
-    if (must_lock && !SDL_LockSurface(rgba))
+    LL_DEBUGS() << "Loaded cursor file " << fullpath << " "
+                << png->w << "x" << png->h << LL_ENDL;
+
+    // ARGB8888 is what SDL makes every cursor from; converting once here
+    // spares it converting each scaled copy.
+    SDL_Surface *art = SDL_ConvertSurface(png, SDL_PIXELFORMAT_ARGB8888);
+    SDL_DestroySurface(png);
+    if (!art)
     {
-        LL_WARNS() << "SDL_LockSurface failed for cursor " << filename
+        LL_WARNS() << "Cursor ARGB conversion failed for " << fullpath
                    << ": " << SDL_GetError() << LL_ENDL;
-        SDL_DestroySurface(rgba);
         return nullptr;
-    }
-    for (int y = 0; y < rgba->h; ++y)
-    {
-        U8 *row = (U8*)rgba->pixels + (size_t)y * rgba->pitch;
-        for (int x = 0; x < rgba->w; ++x)
-        {
-            U8 *px = row + (size_t)x * 4;
-            if (px[0] == 200 && px[1] == 200 && px[2] == 200)
-            {
-                px[3] = 0;
-            }
-        }
-    }
-    if (must_lock)
-    {
-        SDL_UnlockSurface(rgba);
     }
 
     // Clamp the hot-spot — out-of-range coordinates are undefined behaviour
     // on most platforms and at minimum produce a cursor that "clicks"
     // nowhere near the visible tip.
-    if (hotx < 0 || hotx >= rgba->w || hoty < 0 || hoty >= rgba->h)
+    if (hotx < 0 || hotx >= art->w || hoty < 0 || hoty >= art->h)
     {
-        LL_WARNS() << "Cursor " << filename << " hot-spot ("
+        LL_WARNS() << "Cursor " << fullpath << " hot-spot ("
                    << hotx << "," << hoty << ") is outside "
-                   << rgba->w << "x" << rgba->h << "; clamping." << LL_ENDL;
-        hotx = llclamp(hotx, 0, rgba->w - 1);
-        hoty = llclamp(hoty, 0, rgba->h - 1);
+                   << art->w << "x" << art->h << "; clamping." << LL_ENDL;
+        hotx = llclamp(hotx, 0, art->w - 1);
+        hoty = llclamp(hoty, 0, art->h - 1);
     }
 
-    SDL_Cursor *sdlcursor = SDL_CreateColorCursor(rgba, hotx, hoty);
-    SDL_DestroySurface(rgba);
+    // Nearest-neighbour, so the art's pixels stay hard-edged. A copy that
+    // can't be made leaves the cursor at the scales it has.
+    if (x11_scale > 1)
+    {
+        SDL_Surface *scaled = SDL_ScaleSurface(art, art->w * x11_scale, art->h * x11_scale,
+                                               SDL_SCALEMODE_NEAREST);
+        if (scaled)
+        {
+            SDL_DestroySurface(art);
+            art = scaled;
+            hotx *= x11_scale;
+            hoty *= x11_scale;
+        }
+    }
+    else if (x11_scale == 0)
+    {
+        for (int scale = 2; scale <= MAX_CURSOR_SCALE; ++scale)
+        {
+            SDL_Surface *alternate = SDL_ScaleSurface(art, art->w * scale, art->h * scale,
+                                                      SDL_SCALEMODE_NEAREST);
+            if (!alternate)
+            {
+                break;
+            }
+            // The surface takes a reference of its own, released with it.
+            SDL_AddSurfaceAlternateImage(art, alternate);
+            SDL_DestroySurface(alternate);
+        }
+    }
+
+    SDL_Cursor *sdlcursor = SDL_CreateColorCursor(art, hotx, hoty);
+    SDL_DestroySurface(art);
     if (!sdlcursor)
     {
-        LL_WARNS() << "SDL_CreateColorCursor failed for " << filename
+        LL_WARNS() << "SDL_CreateColorCursor failed for " << fullpath
                    << ": " << SDL_GetError() << LL_ENDL;
     }
     return sdlcursor;
@@ -2956,7 +2984,7 @@ static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty
 // Convert one of the viewer's embedded Win32 cursor resources (the same
 // branded .cur/.ani assets the native backend loads in
 // LLWindowWin32::initCursors) into an SDL color cursor. The hot-spot is taken
-// from the resource itself via GetIconInfo, so — unlike the BMP path — there
+// from the resource itself via GetIconInfo, so — unlike the PNG path — there
 // is no hand-maintained hot-spot table to keep in sync. Returns nullptr if the
 // resource is missing or can't be converted, letting initCursors fall back to
 // the SDL system arrow.
@@ -2983,7 +3011,7 @@ static bool win32ReadDIB32(HBITMAP hbm, int width, int rows, std::vector<U8>& ou
 // Convert one of the viewer's embedded Win32 cursor resources (the same
 // branded .cur/.ani assets the native backend loads in
 // LLWindowWin32::initCursors) into an SDL color cursor. The hot-spot is taken
-// from the resource itself via GetIconInfo, so — unlike the BMP path — there
+// from the resource itself via GetIconInfo, so — unlike the PNG path — there
 // is no hand-maintained hot-spot table to keep in sync. Returns nullptr if the
 // resource is missing or can't be converted, letting initCursors fall back to
 // the SDL system arrow.
@@ -3171,7 +3199,6 @@ void LLWindowSDL::initCursors()
     // Pre-make an SDL cursor for each of the known cursor types.
     // We hardcode the hotspots - to avoid that we'd have to write
     // a .cur file loader.
-    // NOTE: SDL doesn't load RLE-compressed BMP files.
     mSDLCursors[UI_CURSOR_ARROW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
     mSDLCursors[UI_CURSOR_WAIT] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_WAIT);
     mSDLCursors[UI_CURSOR_HAND] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
@@ -3185,7 +3212,7 @@ void LLWindowSDL::initCursors()
     mSDLCursors[UI_CURSOR_NO] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NOT_ALLOWED);
     mSDLCursors[UI_CURSOR_WORKING] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_PROGRESS);
 #if LL_DARWIN
-    // The macOS bundle ships TIFF cursors under cursors_mac/ (not the res-sdl BMP
+    // The macOS bundle ships TIFF cursors under cursors_mac/ (not the res-sdl PNG
     // tree), and uses Mac-specific hot-spots — keep these in sync with
     // LLWindowMacOSX::initCursors() so the SDL build matches the native client.
     // ARROWCOPY/ARROWCOPYMULTI/ARROWDRAGMULTI have no TIF counterpart (the native
@@ -3257,38 +3284,40 @@ void LLWindowSDL::initCursors()
     mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END_ADD] = makeSDLCursorFromWin32("TOOLPATHFINDINGPATHENDADD");
     mSDLCursors[UI_CURSOR_TOOLNO] = makeSDLCursorFromWin32("TOOLNO");
 #else
-    mSDLCursors[UI_CURSOR_TOOLGRAB] = makeSDLCursorFromBMP("lltoolgrab.BMP",2,13);
-    mSDLCursors[UI_CURSOR_TOOLLAND] = makeSDLCursorFromBMP("lltoolland.BMP",1,6);
-    mSDLCursors[UI_CURSOR_TOOLFOCUS] = makeSDLCursorFromBMP("lltoolfocus.BMP",8,5);
-    mSDLCursors[UI_CURSOR_TOOLCREATE] = makeSDLCursorFromBMP("lltoolcreate.BMP",7,7);
-    mSDLCursors[UI_CURSOR_ARROWDRAG] = makeSDLCursorFromBMP("arrowdrag.BMP",0,0);
-    mSDLCursors[UI_CURSOR_ARROWCOPY] = makeSDLCursorFromBMP("arrowcop.BMP",0,0);
-    mSDLCursors[UI_CURSOR_ARROWDRAGMULTI] = makeSDLCursorFromBMP("llarrowdragmulti.BMP",0,0);
-    mSDLCursors[UI_CURSOR_ARROWCOPYMULTI] = makeSDLCursorFromBMP("arrowcopmulti.BMP",0,0);
-    mSDLCursors[UI_CURSOR_NOLOCKED] = makeSDLCursorFromBMP("llnolocked.BMP",8,8);
-    mSDLCursors[UI_CURSOR_ARROWLOCKED] = makeSDLCursorFromBMP("llarrowlocked.BMP",0,0);
-    mSDLCursors[UI_CURSOR_GRABLOCKED] = makeSDLCursorFromBMP("llgrablocked.BMP",2,13);
-    mSDLCursors[UI_CURSOR_TOOLTRANSLATE] = makeSDLCursorFromBMP("lltooltranslate.BMP",0,0);
-    mSDLCursors[UI_CURSOR_TOOLROTATE] = makeSDLCursorFromBMP("lltoolrotate.BMP",0,0);
-    mSDLCursors[UI_CURSOR_TOOLSCALE] = makeSDLCursorFromBMP("lltoolscale.BMP",0,0);
-    mSDLCursors[UI_CURSOR_TOOLCAMERA] = makeSDLCursorFromBMP("lltoolcamera.BMP",7,5);
-    mSDLCursors[UI_CURSOR_TOOLPAN] = makeSDLCursorFromBMP("lltoolpan.BMP",7,5);
-    mSDLCursors[UI_CURSOR_TOOLZOOMIN] = makeSDLCursorFromBMP("lltoolzoomin.BMP",7,5);
-    mSDLCursors[UI_CURSOR_TOOLZOOMOUT] = makeSDLCursorFromBMP("lltoolzoomout.BMP", 7, 5);
-    mSDLCursors[UI_CURSOR_TOOLPICKOBJECT3] = makeSDLCursorFromBMP("toolpickobject3.BMP",0,0);
-    mSDLCursors[UI_CURSOR_TOOLPLAY] = makeSDLCursorFromBMP("toolplay.BMP",0,0);
-    mSDLCursors[UI_CURSOR_TOOLPAUSE] = makeSDLCursorFromBMP("toolpause.BMP",0,0);
-    mSDLCursors[UI_CURSOR_TOOLMEDIAOPEN] = makeSDLCursorFromBMP("toolmediaopen.BMP",0,0);
-    mSDLCursors[UI_CURSOR_PIPETTE] = makeSDLCursorFromBMP("lltoolpipette.BMP",2,28);
-    mSDLCursors[UI_CURSOR_TOOLSIT] = makeSDLCursorFromBMP("toolsit.BMP",20,15);
-    mSDLCursors[UI_CURSOR_TOOLBUY] = makeSDLCursorFromBMP("toolbuy.BMP",20,15);
-    mSDLCursors[UI_CURSOR_TOOLOPEN] = makeSDLCursorFromBMP("toolopen.BMP",20,15);
-    mSDLCursors[UI_CURSOR_TOOLPATHFINDING] = makeSDLCursorFromBMP("lltoolpathfinding.BMP", 16, 16);
-    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_START] = makeSDLCursorFromBMP("lltoolpathfindingpathstart.BMP", 16, 16);
-    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_START_ADD] = makeSDLCursorFromBMP("lltoolpathfindingpathstartadd.BMP", 16, 16);
-    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END] = makeSDLCursorFromBMP("lltoolpathfindingpathend.BMP", 16, 16);
-    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END_ADD] = makeSDLCursorFromBMP("lltoolpathfindingpathendadd.BMP", 16, 16);
-    mSDLCursors[UI_CURSOR_TOOLNO] = makeSDLCursorFromBMP("llno.BMP",8,8);
+    // Hot-spots are in the 32x32 art's pixels, and scale with it under X11.
+    const int x11_scale = mServerProtocol == X11 ? x11CursorScale(mWindow) : 0;
+    mSDLCursors[UI_CURSOR_TOOLGRAB] = makeSDLCursorFromPNG("lltoolgrab.png",2,13,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLLAND] = makeSDLCursorFromPNG("lltoolland.png",1,6,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLFOCUS] = makeSDLCursorFromPNG("lltoolfocus.png",8,5,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLCREATE] = makeSDLCursorFromPNG("lltoolcreate.png",7,7,x11_scale);
+    mSDLCursors[UI_CURSOR_ARROWDRAG] = makeSDLCursorFromPNG("arrowdrag.png",0,0,x11_scale);
+    mSDLCursors[UI_CURSOR_ARROWCOPY] = makeSDLCursorFromPNG("arrowcop.png",0,0,x11_scale);
+    mSDLCursors[UI_CURSOR_ARROWDRAGMULTI] = makeSDLCursorFromPNG("llarrowdragmulti.png",0,0,x11_scale);
+    mSDLCursors[UI_CURSOR_ARROWCOPYMULTI] = makeSDLCursorFromPNG("arrowcopmulti.png",0,0,x11_scale);
+    mSDLCursors[UI_CURSOR_NOLOCKED] = makeSDLCursorFromPNG("llnolocked.png",8,8,x11_scale);
+    mSDLCursors[UI_CURSOR_ARROWLOCKED] = makeSDLCursorFromPNG("llarrowlocked.png",0,0,x11_scale);
+    mSDLCursors[UI_CURSOR_GRABLOCKED] = makeSDLCursorFromPNG("llgrablocked.png",2,13,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLTRANSLATE] = makeSDLCursorFromPNG("lltooltranslate.png",0,0,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLROTATE] = makeSDLCursorFromPNG("lltoolrotate.png",0,0,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLSCALE] = makeSDLCursorFromPNG("lltoolscale.png",0,0,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLCAMERA] = makeSDLCursorFromPNG("lltoolcamera.png",7,5,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLPAN] = makeSDLCursorFromPNG("lltoolpan.png",7,5,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLZOOMIN] = makeSDLCursorFromPNG("lltoolzoomin.png",7,5,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLZOOMOUT] = makeSDLCursorFromPNG("lltoolzoomout.png", 7, 5, x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLPICKOBJECT3] = makeSDLCursorFromPNG("toolpickobject3.png",0,0,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLPLAY] = makeSDLCursorFromPNG("toolplay.png",0,0,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLPAUSE] = makeSDLCursorFromPNG("toolpause.png",0,0,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLMEDIAOPEN] = makeSDLCursorFromPNG("toolmediaopen.png",0,0,x11_scale);
+    mSDLCursors[UI_CURSOR_PIPETTE] = makeSDLCursorFromPNG("lltoolpipette.png",2,28,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLSIT] = makeSDLCursorFromPNG("toolsit.png",20,15,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLBUY] = makeSDLCursorFromPNG("toolbuy.png",20,15,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLOPEN] = makeSDLCursorFromPNG("toolopen.png",20,15,x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING] = makeSDLCursorFromPNG("lltoolpathfinding.png", 16, 16, x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_START] = makeSDLCursorFromPNG("lltoolpathfindingpathstart.png", 16, 16, x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_START_ADD] = makeSDLCursorFromPNG("lltoolpathfindingpathstartadd.png", 16, 16, x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END] = makeSDLCursorFromPNG("lltoolpathfindingpathend.png", 16, 16, x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END_ADD] = makeSDLCursorFromPNG("lltoolpathfindingpathendadd.png", 16, 16, x11_scale);
+    mSDLCursors[UI_CURSOR_TOOLNO] = makeSDLCursorFromPNG("llno.png",8,8,x11_scale);
 #endif // LL_DARWIN
 }
 
