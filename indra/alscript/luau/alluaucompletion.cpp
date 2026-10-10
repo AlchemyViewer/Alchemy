@@ -28,6 +28,7 @@
 
 #include "alluaufragment.h"
 #include "alluaufrontend.h"
+#include "alluaushadowed.h"
 #include "alluautypes.h"
 #include "alscriptlexicon.h"
 
@@ -340,7 +341,12 @@ std::vector<ALScriptCompletion> ALLuauCompletion::complete(std::string_view sour
     {
         return {};
     }
-    return answer(Luau::autocomplete(*mFront.frontend, mFront.moduleName, at, strings), *module, at);
+    Luau::AutocompleteResult found;
+    {
+        const ALLuauShadowed shadowed(*module, at);
+        found = Luau::autocomplete(*mFront.frontend, mFront.moduleName, at, strings);
+    }
+    return answer(found, *module, at);
 }
 
 std::vector<ALScriptCompletion> ALLuauCompletion::answer(const Luau::AutocompleteResult& found, const Luau::Module& module, Luau::Position at) const
