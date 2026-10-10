@@ -1,7 +1,8 @@
 /**
  * @file alselectionoutline_gl_test.cpp
- * @brief ALSelectionOutline's id and edge passes on the hidden window, with the viewer's own shader files:
- *        ids and edges, hidden parts, the scissor, a rigged pose, and the palette, radius and scissor helpers.
+ * @brief ALSelectionOutline's id and edge passes on the hidden window, with the viewer's own shader files: ids,
+ *        cut-out faces, the contour's width and anti-aliasing, priorities and the edges between objects, hidden
+ *        parts, the scissor, a rigged pose, the HUD, and the palette, width and scissor helpers.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -41,6 +42,7 @@
 
 #include "../test/lltut.h"
 
+#include <cmath>
 #include <limits>
 #include <map>
 #include <string>
@@ -50,12 +52,13 @@ namespace tut
 {
     namespace
     {
+        using Outline = ALSelectionOutline;
+
         constexpr S32 W = 64;
         constexpr S32 H = 64;
         constexpr F32 FOV = 1.f;
         constexpr F32 NEAR_PLANE = 0.1f;
         constexpr F32 FORWARD_FAR = 100.f;
-        constexpr S32 RADIUS = 3;
 
         // Two quads meeting at x = 0, five metres down -z: A covers pixel columns 9 to 31, B 32 to 54, and both
         // rows 20 to 43.
@@ -63,6 +66,13 @@ namespace tut
         constexpr U32 ID_A = 1;
         // Past 255, so the high byte and the second pair of palette rows carry it.
         constexpr U32 ID_B = 300;
+
+        // How deep quads lie under the pixel projection, whose units are pixels.
+        constexpr F32 PIXEL_Z = -2.f;
+
+        // The contour width at a UI scale of 1 the cases' pixel positions are laid out for: two pixels and a pixel
+        // of anti-aliasing, reaching three.
+        constexpr F32 TEST_WIDTH = 2.f;
 
         const LLColor4 RED(1.f, 0.f, 0.f, 1.f);
         const LLColor4 GREEN(0.f, 1.f, 0.f, 1.f);
@@ -78,6 +88,9 @@ namespace tut
         bool black(const Pixel& p) { return p.r == 0 && p.g == 0 && p.b == 0; }
         bool red(const Pixel& p) { return p.r > 0 && p.g == 0 && p.b == 0; }
         bool green(const Pixel& p) { return p.g > 0 && p.r == 0 && p.b == 0; }
+
+        // An id texel the scene hides, its object's hidden parts drawn dimmed: 0.5 in .b.
+        bool drawnHidden(const Pixel& p) { return p.b == 127 || p.b == 128; }
 
         U32 idAt(const std::vector<U8>& px, S32 x, S32 y)
         {
@@ -96,6 +109,19 @@ namespace tut
                 }
             }
             return count;
+        }
+
+        LLMatrix4a identity()
+        {
+            LLMatrix4a m;
+            m.setIdentity();
+            return m;
+        }
+
+        // A projection a pixel to the unit over the target, as the HUD's is a projection with no scene behind it.
+        LLMatrix4a pixelProjection()
+        {
+            return al_ortho(0.f, (F32)W, 0.f, (F32)H, 0.f, 10.f);
         }
     }
 
@@ -119,6 +145,8 @@ namespace tut
             setConvention(false);
             gGL.matrixMode(LLRender::MM_PROJECTION);
             gGL.loadIdentity();
+            gGL.matrixMode(LLRender::MM_TEXTURE0);
+            gGL.loadIdentity();
             gGL.matrixMode(LLRender::MM_MODELVIEW);
             gGL.loadIdentity();
             glViewport(0, 0, ll_test::HeadlessGL::WIDTH, ll_test::HeadlessGL::HEIGHT);
@@ -129,17 +157,23 @@ namespace tut
         {
             LLGLSLShader::unbind();
             mIdProgram.unload();
+            mTileProgram.unload();
             mOutlineProgram.unload();
             mShaders.clearShaderObjects();
 
             mIdMap.release();
+            mTiles.release();
+            mAllTiles.release();
             mScene.release();
             mFar.release();
             mFrame.release();
-            if (mPalette)
+            for (U32* texture : { &mPalette, &mRamp })
             {
-                LLImageGL::deleteTextures(1, &mPalette);
-                mPalette = 0;
+                if (*texture)
+                {
+                    LLImageGL::deleteTextures(1, texture);
+                    *texture = 0;
+                }
             }
             mPaletteRows = 0;
             mBuffers.clear();
@@ -194,11 +228,18 @@ namespace tut
 
             mIdProgram.mName = "Selection Id Shader";
             mIdProgram.mShaderFiles.clear();
-            mIdProgram.mShaderFiles.push_back(std::make_pair("interface/debugV.glsl", GL_VERTEX_SHADER));
+            mIdProgram.mShaderFiles.push_back(std::make_pair("interface/selectionIdV.glsl", GL_VERTEX_SHADER));
             mIdProgram.mShaderFiles.push_back(std::make_pair("interface/selectionIdF.glsl", GL_FRAGMENT_SHADER));
             mIdProgram.mShaderLevel = 1;
             ensure("id program builds with its rigged variant", mIdProgram.createShader(LLGLSLShader::VARIANT_RIGGED));
             ensure("id program has a rigged variant", mIdProgram.mRiggedVariant && mIdProgram.mRiggedVariant != &mIdProgram);
+
+            mTileProgram.mName = "Selection Tile Shader";
+            mTileProgram.mShaderFiles.clear();
+            mTileProgram.mShaderFiles.push_back(std::make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
+            mTileProgram.mShaderFiles.push_back(std::make_pair("interface/selectionTileF.glsl", GL_FRAGMENT_SHADER));
+            mTileProgram.mShaderLevel = 1;
+            ensure("tile program builds", mTileProgram.createShader());
 
             mOutlineProgram.mName = "Selection Outline Shader";
             mOutlineProgram.mShaderFiles.clear();
@@ -210,6 +251,14 @@ namespace tut
             const LLRenderTarget::eDepthFormat depth = mReverse ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
             ensure("id target", mIdMap.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth));
             ensure("frame target", mFrame.allocate(W, H, GL_RGBA8));
+            ensure("tile target", mTiles.allocate(Outline::tileCount(W), Outline::tileCount(H), GL_R8));
+            // Every tile flagged: the edge pass searches every pixel's disk, as it did before the tiles.
+            ensure("all tiles target", mAllTiles.allocate(Outline::tileCount(W), Outline::tileCount(H), GL_R8));
+            mAllTiles.bindTarget();
+            gGL.setClearColor(LLColor4(1.f, 1.f, 1.f, 1.f));
+            mAllTiles.clear();
+            gGL.setClearColor(LLColor4(0.f, 0.f, 0.f, 0.f));
+            mAllTiles.flush();
             ensure("far depth", mFar.allocate(W, H, 0, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth));
             clearDepth(mFar);
             sceneAt(W, H);
@@ -226,6 +275,8 @@ namespace tut
             mProjection = al_perspective(FOV, 1.f, NEAR_PLANE, mReverse ? std::numeric_limits<F32>::infinity() : FORWARD_FAR);
             gGL.matrixMode(LLRender::MM_PROJECTION);
             gGL.loadMatrix(mProjection);
+            gGL.matrixMode(LLRender::MM_TEXTURE0);
+            gGL.loadIdentity();
             gGL.matrixMode(LLRender::MM_MODELVIEW);
             gGL.loadIdentity();
         }
@@ -236,6 +287,21 @@ namespace tut
             const LLRenderTarget::eDepthFormat depth = mReverse ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
             ensure("scene depth", mScene.allocate(width, height, 0, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth));
             clearDepth(mScene);
+        }
+
+        // Something in the scene `dist` metres out over the pixels x to x + w - 1 and y to y + h - 1, all of them by
+        // default: the scene's depth there.
+        void occlude(F32 dist, S32 x = 0, S32 y = 0, S32 w = W, S32 h = H)
+        {
+            mScene.bindTarget();
+            {
+                LLGLDepthTest depth(GL_TRUE, GL_TRUE);
+                LLGLSScissor scissor(x, y, w, h);
+                glClearDepth(storedDepth(dist));
+                mScene.clear(GL_DEPTH_BUFFER_BIT);
+                glClearDepth(mReverse ? 0.0 : 1.0);
+            }
+            mScene.flush();
         }
 
         void clearDepth(LLRenderTarget& target)
@@ -255,20 +321,26 @@ namespace tut
             return mReverse ? ndc : ndc * 0.5f + 0.5f;
         }
 
-        // A quad over x0..x1, y0..y1, at depth z0 along its x0 edge and z1 along its x1 edge, every vertex weighted
-        // wholly to joint 0 when `weights`.
-        LLVertexBuffer* quad(F32 x0, F32 x1, F32 y0, F32 y1, F32 z0, F32 z1, bool weights = false)
+        // A quad through four corners, texture coordinates 0 to 1 across it from the first, every vertex weighted
+        // wholly to joint 0 when `weights`, and coloured `colour`, or opaque white, as a face's vertices are.
+        LLVertexBuffer* quadAt(const LLVector3 (&corners)[4], bool weights = false, const LLColor4U* colour = nullptr)
         {
-            LLPointer<LLVertexBuffer> buffer = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | (weights ? LLVertexBuffer::MAP_WEIGHT4 : 0));
+            const U32 mask = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_COLOR |
+                             (weights ? LLVertexBuffer::MAP_WEIGHT4 : 0);
+            LLPointer<LLVertexBuffer> buffer = new LLVertexBuffer(mask);
             ensure("quad", buffer->allocateBuffer(4, 6));
             LLStrider<LLVector3> vert;
+            LLStrider<LLVector2> texcoord;
             LLStrider<U16> index;
             buffer->getVertexStrider(vert);
+            buffer->getTexCoord0Strider(texcoord);
             buffer->getIndexStrider(index);
-            vert[0].set(x0, y0, z0);
-            vert[1].set(x1, y0, z1);
-            vert[2].set(x1, y1, z1);
-            vert[3].set(x0, y1, z0);
+            const LLVector2 uvs[4] = { LLVector2(0.f, 0.f), LLVector2(1.f, 0.f), LLVector2(1.f, 1.f), LLVector2(0.f, 1.f) };
+            for (U32 i = 0; i < 4; ++i)
+            {
+                vert[i] = corners[i];
+                texcoord[i] = uvs[i];
+            }
             const U16 indices[6] = { 0, 1, 2, 0, 2, 3 };
             for (U32 i = 0; i < 6; ++i)
             {
@@ -284,18 +356,67 @@ namespace tut
                     weight[i].set(0.999f, 0.f, 0.f, 0.f);
                 }
             }
+            LLStrider<LLColor4U> colours;
+            buffer->getColorStrider(colours);
+            for (U32 i = 0; i < 4; ++i)
+            {
+                colours[i] = colour ? *colour : LLColor4U(255, 255, 255, 255);
+            }
             buffer->unmapBuffer();
             mBuffers.push_back(buffer);
             return buffer.get();
         }
 
+        // A quad over x0..x1, y0..y1, at depth z0 along its x0 edge and z1 along its x1 edge.
+        LLVertexBuffer* quad(F32 x0, F32 x1, F32 y0, F32 y1, F32 z0, F32 z1, bool weights = false,
+                             const LLColor4U* colour = nullptr)
+        {
+            const LLVector3 corners[4] = { LLVector3(x0, y0, z0), LLVector3(x1, y0, z1), LLVector3(x1, y1, z1), LLVector3(x0, y1, z0) };
+            return quadAt(corners, weights, colour);
+        }
+
         LLVertexBuffer* quadA() { return quad(-2.f, 0.f, -1.f, 1.f, QUAD_Z, QUAD_Z); }
         LLVertexBuffer* quadB() { return quad(0.f, 2.f, -1.f, 1.f, QUAD_Z, QUAD_Z); }
+
+        // Under the pixel projection: pixel columns x0 to x1 - 1 and rows y0 to y1 - 1.
+        LLVertexBuffer* pixels(S32 x0, S32 x1, S32 y0, S32 y1, const LLColor4U* colour = nullptr)
+        {
+            return quad((F32)x0, (F32)x1, (F32)y0, (F32)y1, PIXEL_Z, PIXEL_Z, false, colour);
+        }
+
+        // A texture 256 texels wide whose alpha is its column: white, and opaque at its right end.
+        U32 ramp()
+        {
+            if (!mRamp)
+            {
+                std::vector<U8> texels(256 * 4);
+                for (U32 x = 0; x < 256; ++x)
+                {
+                    texels[x * 4] = texels[x * 4 + 1] = texels[x * 4 + 2] = 255;
+                    texels[x * 4 + 3] = (U8)x;
+                }
+                LLImageGL::generateTextures(1, &mRamp);
+                gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mRamp);
+                LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), GL_RGBA8, 256, 1,
+                                             GL_RGBA, GL_UNSIGNED_BYTE, texels.data());
+                gGL.getTextureSlot(0)->unbind();
+            }
+            return mRamp;
+        }
 
         struct Draw
         {
             LLVertexBuffer* mBuffer;
             U32 mId;
+            Outline::EPriority mPriority = Outline::PRIORITY_ROOT;
+            // The face's alpha test, its texture, its base colour transform and its texture animation.
+            F32 mCutoff = Outline::NO_ALPHA_TEST;
+            U32 mTexture = 0;
+            const LLGLTFMaterial::TextureTransform::Pack* mTransform = nullptr;
+            const LLMatrix4a* mTextureMatrix = nullptr;
+            // Hidden parts drawn dimmed, as LLSelectMgr asks of most roles; and a double-sided material.
+            bool mShowHidden = true;
+            bool mDoubleSided = false;
         };
 
         // The id pass as ALSelectionOutline::render runs it, into `target`, reading `scene`'s depth, or with no
@@ -304,19 +425,19 @@ namespace tut
         void idPass(LLRenderTarget& target, LLRenderTarget* scene, const std::vector<Draw>& draws,
                     const F32* palette = nullptr, LLRenderTarget* unread = nullptr)
         {
+            // Checked once the target is let go, so a failure leaves nothing bound for the tests after it.
+            bool texture_read = true;
+            mIdProjection = gGL.getProjectionMatrix();
             target.bindTarget();
             {
-                LLGLSColorMask mask(true, true);
-                LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_LEQUAL);
-                LLGLDisable cull(GL_CULL_FACE);
-                LLGLDisable blend(GL_BLEND);
-                glClearColor(0.f, 0.f, 0.f, 0.f);
+                Outline::IdPassState state;
+                gGL.setClearColor(LLColor4(0.f, 0.f, 0.f, 0.f));
                 target.clear();
 
                 const bool rigged = palette != nullptr;
                 LLGLSLShader& program = rigged ? *mIdProgram.mRiggedVariant : mIdProgram;
                 mIdProgram.bind(rigged);
-                ALSelectionOutline::bindIdPass(program, scene, (S32)target.getWidth(), (S32)target.getHeight());
+                Outline::bindIdPass(program, scene, (S32)target.getWidth(), (S32)target.getHeight());
                 if (unread)
                 {
                     program.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, unread);
@@ -329,14 +450,35 @@ namespace tut
                 }
                 for (const Draw& draw : draws)
                 {
-                    ALSelectionOutline::setId(program, draw.mId);
-                    draw.mBuffer->setBuffer();
-                    draw.mBuffer->drawRange(LLRender::TRIANGLES, 0, 3, 6, 0);
+                    Outline::setId(program, draw.mId, draw.mPriority, draw.mShowHidden);
+                    Outline::setAlphaTest(program, draw.mCutoff, draw.mTransform ? *draw.mTransform : Outline::IDENTITY_TRANSFORM);
+                    const S32 channel = draw.mTexture ? program.enableTexture(LLShaderMgr::DIFFUSE_MAP) : -1;
+                    if (channel > -1)
+                    {
+                        gGL.getTextureSlot(channel)->bindManual(ALTextureSlot::TT_TEXTURE, draw.mTexture,
+                                                                gGL.getSampler(ALSamplers::PointClamp));
+                    }
+                    texture_read = texture_read && (!draw.mTexture || channel > -1);
+                    if (draw.mTextureMatrix)
+                    {
+                        gGL.matrixMode(LLRender::MM_TEXTURE0);
+                        gGL.loadMatrix(*draw.mTextureMatrix);
+                        gGL.matrixMode(LLRender::MM_MODELVIEW);
+                    }
+                    Outline::drawFace(*draw.mBuffer, 0, 3, 6, 0, draw.mDoubleSided);
+                    if (draw.mTextureMatrix)
+                    {
+                        gGL.matrixMode(LLRender::MM_TEXTURE0);
+                        gGL.loadIdentity();
+                        gGL.matrixMode(LLRender::MM_MODELVIEW);
+                    }
                 }
+                program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
                 program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
                 LLGLSLShader::unbind();
             }
             target.flush();
+            ensure("the id program reads the face's texture", texture_read);
         }
 
         void idPass(const std::vector<Draw>& draws, const F32* palette = nullptr)
@@ -357,6 +499,11 @@ namespace tut
             return read(mIdMap);
         }
 
+        std::vector<U8> pixelIds(const std::vector<Draw>& draws)
+        {
+            return projectedIds(pixelProjection(), draws);
+        }
+
         std::vector<U8> read(LLRenderTarget& target)
         {
             target.bindTarget();
@@ -372,37 +519,84 @@ namespace tut
             {
                 count = llmax(count, id);
             }
-            mRows = ALSelectionOutline::paletteRows(count);
-            mPaletteTexels.assign((size_t)ALSelectionOutline::PALETTE_WIDTH * mRows * 4, 0);
+            mRows = Outline::paletteRows(count);
+            mPaletteTexels.assign((size_t)Outline::PALETTE_WIDTH * mRows * 4, 0);
             for (const auto& [id, colour] : colours)
             {
-                ALSelectionOutline::writePalette(mPaletteTexels, id, colour, show_hidden);
+                Outline::writePalette(mPaletteTexels, id, colour, show_hidden);
             }
         }
 
-        // The edge pass as ALSelectionOutline::render runs it, over a cleared frame, scissored when asked.
-        std::vector<U8> edgePass(S32 radius, const LLRect* scissor = nullptr)
+        // The lines' widths at `ui_scale`, as the world's view has them with a contour TEST_WIDTH wide, which the
+        // cases' pixel positions are laid out for, through the projection the last id pass drew with.
+        Outline::View view(F32 ui_scale = 1.f) const
         {
-            ALSelectionOutline::uploadPalette(mPalette, mPaletteRows, mPaletteTexels, mRows);
+            return Outline::makeView(identity(), mIdProjection, TEST_WIDTH, ui_scale, false);
+        }
+
+        // Lines `width` and `inner_width` pixels wide whatever the UI scale, through the last id pass's projection.
+        Outline::View widths(S32 width, S32 inner_width) const
+        {
+            Outline::View lines = Outline::makeView(identity(), mIdProjection, 1.f, 1.f, false);
+            lines.mWidth = width;
+            lines.mInnerWidth = inner_width;
+            return lines;
+        }
+
+        // The tile pass as ALSelectionOutline::render runs it, over the tiles under `rect`, or the whole id target.
+        void tilePass(const LLRect* rect = nullptr)
+        {
+            mTileProgram.bind();
+            Outline::drawTiles(mTileProgram, mIdMap, mTiles, rect ? *rect : LLRect(0, H, W, 0), *mTriangle);
+            LLGLSLShader::unbind();
+        }
+
+        // The flags the tile pass left, a byte a tile.
+        std::vector<U8> tileFlags()
+        {
+            const std::vector<U8> px = read(mTiles);
+            std::vector<U8> flags;
+            for (size_t i = 0; i < px.size(); i += 4)
+            {
+                flags.push_back(px[i] > 127 ? 1 : 0);
+            }
+            return flags;
+        }
+
+        // The edge pass as ALSelectionOutline::render runs it, the tile pass first, over the tiles under `tile_rect`
+        // or all of them, then over a cleared frame, scissored when asked. `untiled` flags every tile instead, so
+        // every pixel searches its whole disk.
+        std::vector<U8> edgePass(const Outline::View& lines, const LLRect* scissor = nullptr, bool untiled = false,
+                                 const LLRect* tile_rect = nullptr)
+        {
+            Outline::uploadPalette(mPalette, mPaletteRows, mPaletteTexels, mRows);
+            if (!untiled)
+            {
+                tilePass(tile_rect);
+            }
 
             mFrame.bindTarget();
             std::vector<U8> px;
             {
                 LLGLSColorMask mask(true, true);
-                glClearColor(0.f, 0.f, 0.f, 0.f);
+                gGL.setClearColor(LLColor4(0.f, 0.f, 0.f, 0.f));
                 mFrame.clear();
 
                 LLGLDepthTest depth(GL_FALSE);
                 LLGLEnable blend(GL_BLEND);
                 gGL.setSceneBlendType(LLRender::BT_ALPHA);
-                LLGLState scissor_test(GL_SCISSOR_TEST, scissor ? LLGLState::ENABLED_STATE : LLGLState::DISABLED_STATE);
-                if (scissor)
-                {
-                    glScissor(scissor->mLeft, scissor->mBottom, scissor->getWidth(), scissor->getHeight());
-                }
 
                 mOutlineProgram.bind();
-                ALSelectionOutline::drawEdges(mOutlineProgram, mIdMap, mPalette, radius, *mTriangle);
+                LLRenderTarget& tiles = untiled ? mAllTiles : mTiles;
+                if (scissor)
+                {
+                    LLGLSScissor scissored(scissor->mLeft, scissor->mBottom, scissor->getWidth(), scissor->getHeight());
+                    Outline::drawEdges(mOutlineProgram, mIdMap, tiles, mPalette, lines, *mTriangle);
+                }
+                else
+                {
+                    Outline::drawEdges(mOutlineProgram, mIdMap, tiles, mPalette, lines, *mTriangle);
+                }
                 LLGLSLShader::unbind();
                 px = ll_test::readFramebufferRGBA(W, H);
             }
@@ -410,28 +604,39 @@ namespace tut
             return px;
         }
 
-        LLRect boxRect(S32 radius) const
+        std::vector<U8> edgePass(const LLRect* scissor = nullptr)
+        {
+            return edgePass(view(), scissor);
+        }
+
+        LLRect boxRect(S32 reach) const
         {
             const LLVector4a extents[2] = { LLVector4a(-2.f, -1.f, QUAD_Z), LLVector4a(2.f, 1.f, QUAD_Z) };
             LLRect rect;
-            ensure("the quads' box is on screen", ALSelectionOutline::scissorRect(mProjection, extents, W, H, radius, rect));
+            ensure("the quads' box is on screen", Outline::scissorRect(mProjection, extents, W, H, reach, rect));
             return rect;
         }
 
         ll_test::TestShaderMgr mShaders;
         LLGLSLShader mIdProgram;
+        LLGLSLShader mTileProgram;
         LLGLSLShader mOutlineProgram;
         LLRenderTarget mIdMap;
+        LLRenderTarget mTiles;
+        LLRenderTarget mAllTiles;
         LLRenderTarget mScene;
         LLRenderTarget mFar;
         LLRenderTarget mFrame;
         U32 mPalette = 0;
         U32 mPaletteRows = 0;
         U32 mRows = 0;
+        U32 mRamp = 0;
         std::vector<U8> mPaletteTexels;
         LLPointer<LLVertexBuffer> mTriangle;
         std::vector<LLPointer<LLVertexBuffer>> mBuffers;
         LLMatrix4a mProjection;
+        // The projection the last id pass drew with, which the edge pass reads its depth through.
+        LLMatrix4a mIdProjection;
         bool mReverse = false;
     };
 
@@ -439,9 +644,9 @@ namespace tut
     typedef alselectionoutline_t::object alselectionoutline_object_t;
     tut::alselectionoutline_t alselectionoutline_testcase("ALSelectionOutline");
 
-    // Two objects side by side: each has an outline around its outer contour, in its own colour, and the edge
-    // between them is drawn on both sides, each in its own colour. Their insides and the space beyond the radius
-    // are left alone.
+    // Two objects side by side: each is outlined around its outer contour in its own colour, a solid line two
+    // pixels wide at a UI scale of 1. The edge between them is drawn once, thin and faint, on the side of the one
+    // given the lower id. Their insides and the space past the line are left alone.
     template<> template<>
     void alselectionoutline_object_t::test<1>()
     {
@@ -454,24 +659,25 @@ namespace tut
             ensure_equals(named(reverse, "A's id"), idAt(ids, 20, 32), ID_A);
             ensure_equals(named(reverse, "B's id, past one byte"), idAt(ids, 40, 32), ID_B);
             ensure_equals(named(reverse, "nothing selected outside"), idAt(ids, 2, 2), 0U);
+            ensure_equals(named(reverse, "the priority in alpha"), (U32)at(ids, 20, 32).a, (U32)Outline::PRIORITY_ROOT);
 
             palette({ { ID_A, RED }, { ID_B, GREEN } }, true);
-            const std::vector<U8> px = edgePass(RADIUS);
+            const std::vector<U8> px = edgePass();
 
-            const Pixel left = at(px, 8, 32);
-            ensure(named(reverse, "A outlined left of its contour"), red(left));
-            ensure_equals(named(reverse, "at full strength beside it"), (U32)left.r, 255U);
-            ensure(named(reverse, "A outlined above"), red(at(px, 20, 44)));
-            ensure(named(reverse, "A outlined below"), red(at(px, 20, 19)));
-            ensure(named(reverse, "B outlined right of its contour"), green(at(px, 55, 32)));
-            ensure(named(reverse, "B outlined above"), green(at(px, 40, 44)));
-
-            ensure(named(reverse, "fading out to the radius"), at(px, 6, 32).r > 0 && at(px, 6, 32).r < left.r);
-            ensure(named(reverse, "nothing past the radius"), black(at(px, 5, 32)));
+            ensure_equals(named(reverse, "A outlined at full strength beside its contour"), (U32)at(px, 8, 32).r, 255U);
+            ensure_equals(named(reverse, "and a pixel further"), (U32)at(px, 7, 32).r, 255U);
+            ensure(named(reverse, "and in its colour"), red(at(px, 7, 32)));
+            ensure(named(reverse, "nothing past the line"), black(at(px, 6, 32)));
+            ensure(named(reverse, "A outlined above"), red(at(px, 20, 45)) && black(at(px, 20, 46)));
+            ensure(named(reverse, "A outlined below"), red(at(px, 20, 18)) && black(at(px, 20, 17)));
+            ensure(named(reverse, "B outlined right of its contour"), green(at(px, 56, 32)) && black(at(px, 57, 32)));
+            ensure(named(reverse, "B outlined above"), green(at(px, 40, 45)));
             ensure(named(reverse, "nothing far away"), black(at(px, 2, 2)));
 
-            ensure(named(reverse, "A's side of the shared edge in A's colour"), red(at(px, 31, 32)));
-            ensure(named(reverse, "B's side of the shared edge in B's colour"), green(at(px, 32, 32)));
+            const Pixel edge = at(px, 31, 32);
+            ensure(named(reverse, "the shared edge on A's side, in A's colour"), red(edge));
+            ensure(named(reverse, "fainter than the contour"), edge.r >= 150 && edge.r <= 156);
+            ensure(named(reverse, "and not on B's"), black(at(px, 32, 32)));
             ensure(named(reverse, "A's inside left alone"), black(at(px, 20, 32)));
             ensure(named(reverse, "B's inside left alone"), black(at(px, 44, 32)));
         }
@@ -487,7 +693,7 @@ namespace tut
             setUp(reverse);
             idPass({ { quadA(), ID_A }, { quadB(), ID_A } });
             palette({ { ID_A, RED } }, true);
-            const std::vector<U8> px = edgePass(RADIUS);
+            const std::vector<U8> px = edgePass();
 
             ensure(named(reverse, "contour still outlined"), red(at(px, 8, 32)));
             ensure(named(reverse, "contour still outlined on the far side"), red(at(px, 55, 32)));
@@ -509,8 +715,7 @@ namespace tut
             mScene.bindTarget();
             {
                 LLGLDepthTest depth(GL_TRUE, GL_TRUE);
-                LLGLEnable scissor(GL_SCISSOR_TEST);
-                glScissor(0, 0, 20, H);
+                LLGLSScissor scissor(0, 0, 20, H);
                 glClearDepth(storedDepth(3.f));
                 mScene.clear(GL_DEPTH_BUFFER_BIT);
                 glClearDepth(mReverse ? 0.0 : 1.0);
@@ -518,20 +723,26 @@ namespace tut
             mScene.flush();
 
             idPass({ { quadA(), ID_A } });
-            const std::vector<U8> ids = read(mIdMap);
-            ensure_equals(named(reverse, "covered part marked hidden"), (U32)at(ids, 12, 32).b, 0U);
+            std::vector<U8> ids = read(mIdMap);
+            ensure(named(reverse, "covered part marked hidden and drawn"), drawnHidden(at(ids, 12, 32)));
             ensure_equals(named(reverse, "uncovered part marked visible"), (U32)at(ids, 25, 32).b, 255U);
             ensure_equals(named(reverse, "hidden parts keep their id"), idAt(ids, 12, 32), ID_A);
 
             palette({ { ID_A, RED } }, true);
-            std::vector<U8> px = edgePass(RADIUS);
+            std::vector<U8> px = edgePass();
             const U32 hidden = at(px, 8, 32).r;
             const U32 visible = at(px, 25, 44).r;
             ensure_equals(named(reverse, "visible outline at full strength"), visible, 255U);
             ensure(named(reverse, "hidden outline dimmed to the hidden alpha"), hidden >= 90 && hidden <= 115);
 
+            Draw left_out = { quadA(), ID_A };
+            left_out.mShowHidden = false;
+            idPass({ left_out });
+            ids = read(mIdMap);
+            ensure_equals(named(reverse, "covered part marked not drawn"), (U32)at(ids, 12, 32).b, 0U);
+            ensure_equals(named(reverse, "uncovered part still visible"), (U32)at(ids, 25, 32).b, 255U);
             palette({ { ID_A, RED } }, false);
-            px = edgePass(RADIUS);
+            px = edgePass();
             ensure(named(reverse, "hidden outline left out"), black(at(px, 8, 32)));
             ensure_equals(named(reverse, "visible outline kept"), (U32)at(px, 25, 44).r, 255U);
         }
@@ -567,7 +778,7 @@ namespace tut
                         if (idAt(ids, x, y) == ID_A)
                         {
                             ++covered;
-                            hidden += at(ids, x, y).b == 0 ? 1 : 0;
+                            hidden += at(ids, x, y).b != 255 ? 1 : 0;
                         }
                     }
                 }
@@ -578,8 +789,8 @@ namespace tut
         }
     }
 
-    // The scissor is the objects' projected box grown by the radius: the scissored edge pass draws exactly what
-    // the unscissored one does. Without the growth the ring outside the box is clipped.
+    // The scissor is the objects' projected box grown by the contour's reach: the scissored edge pass draws exactly
+    // what the unscissored one does. Without the growth the line outside the box is clipped.
     template<> template<>
     void alselectionoutline_object_t::test<5>()
     {
@@ -589,21 +800,23 @@ namespace tut
             idPass({ { quadA(), ID_A }, { quadB(), ID_B } });
             palette({ { ID_A, RED }, { ID_B, GREEN } }, true);
 
-            const std::vector<U8> full = edgePass(RADIUS);
-            const LLRect rect = boxRect(RADIUS);
-            ensure_equals(named(reverse, "left: column 8.57 floored, less the radius"), rect.mLeft, 8 - RADIUS);
-            ensure_equals(named(reverse, "right: column 55.43 ceiled, plus the radius"), rect.mRight, 56 + RADIUS);
-            ensure_equals(named(reverse, "bottom: row 20.28 floored, less the radius"), rect.mBottom, 20 - RADIUS);
-            ensure_equals(named(reverse, "top: row 43.72 ceiled, plus the radius"), rect.mTop, 44 + RADIUS);
+            const std::vector<U8> full = edgePass();
+            const S32 reach = Outline::lineReach(view().mWidth);
+            ensure_equals(named(reverse, "the contour reaches its width and a pixel"), reach, 3);
+            const LLRect rect = boxRect(reach);
+            ensure_equals(named(reverse, "left: column 8.57 floored, less the reach"), rect.mLeft, 8 - reach);
+            ensure_equals(named(reverse, "right: column 55.43 ceiled, plus the reach"), rect.mRight, 56 + reach);
+            ensure_equals(named(reverse, "bottom: row 20.28 floored, less the reach"), rect.mBottom, 20 - reach);
+            ensure_equals(named(reverse, "top: row 43.72 ceiled, plus the reach"), rect.mTop, 44 + reach);
 
-            const std::vector<U8> scissored = edgePass(RADIUS, &rect);
+            const std::vector<U8> scissored = edgePass(&rect);
             ensure(named(reverse, "something is outlined"), lit(full) > 0);
             ensure(named(reverse, "the scissored pass draws every outline pixel"), scissored == full);
 
             const LLRect tight = boxRect(0);
-            const std::vector<U8> clipped = edgePass(RADIUS, &tight);
-            ensure(named(reverse, "a box without the radius clips the ring"), lit(clipped) < lit(full));
-            ensure(named(reverse, "the ring's outer pixels are what it loses"), !black(at(full, 6, 32)) && black(at(clipped, 6, 32)));
+            const std::vector<U8> clipped = edgePass(&tight);
+            ensure(named(reverse, "a box without the reach clips the line"), lit(clipped) < lit(full));
+            ensure(named(reverse, "the line's outer pixels are what it loses"), !black(at(full, 7, 32)) && black(at(clipped, 7, 32)));
         }
     }
 
@@ -616,14 +829,14 @@ namespace tut
         LLRect rect;
 
         const LLVector4a straddling[2] = { LLVector4a(-1.f, -1.f, -5.f), LLVector4a(1.f, 1.f, 2.f) };
-        ensure("a box reaching behind the eye is drawn", ALSelectionOutline::scissorRect(proj, straddling, W, H, RADIUS, rect));
+        ensure("a box reaching behind the eye is drawn", Outline::scissorRect(proj, straddling, W, H, 3, rect));
         ensure("over the whole target", rect == LLRect(0, H, W, 0));
 
         const LLVector4a behind[2] = { LLVector4a(-1.f, -1.f, 2.f), LLVector4a(1.f, 1.f, 5.f) };
-        ensure("a box behind the eye is not", !ALSelectionOutline::scissorRect(proj, behind, W, H, RADIUS, rect));
+        ensure("a box behind the eye is not", !Outline::scissorRect(proj, behind, W, H, 3, rect));
 
         const LLVector4a aside[2] = { LLVector4a(30.f, -1.f, -5.f), LLVector4a(32.f, 1.f, -5.f) };
-        ensure("a box off to the side is not", !ALSelectionOutline::scissorRect(proj, aside, W, H, RADIUS, rect));
+        ensure("a box off to the side is not", !Outline::scissorRect(proj, aside, W, H, 3, rect));
     }
 
     // A rigged object's id lands where its joint palette puts it, not at its bind pose, and moves with the pose.
@@ -652,7 +865,7 @@ namespace tut
 
             // Posed, it covers columns 9 to 20 and rows 26 to 37.
             palette({ { ID_A, RED } }, true);
-            const std::vector<U8> px = edgePass(RADIUS);
+            const std::vector<U8> px = edgePass();
             ensure(named(reverse, "outlined above where it is posed"), red(at(px, 14, 39)));
             ensure(named(reverse, "outlined below where it is posed"), red(at(px, 14, 24)));
             ensure(named(reverse, "not where it is not"), black(at(px, 49, 39)) && black(at(px, 49, 24)));
@@ -664,36 +877,57 @@ namespace tut
     template<> template<>
     void alselectionoutline_object_t::test<8>()
     {
-        ensure_equals("one pair of rows up to 255", ALSelectionOutline::paletteRows(255), 2U);
-        ensure_equals("two from 256", ALSelectionOutline::paletteRows(256), 4U);
+        ensure_equals("one pair of rows up to 255", Outline::paletteRows(255), 2U);
+        ensure_equals("two from 256", Outline::paletteRows(256), 4U);
 
-        std::vector<U8> texels((size_t)ALSelectionOutline::PALETTE_WIDTH * 4 * 4, 0);
-        ALSelectionOutline::writePalette(texels, 300, LLColor4(1.f, 0.5f, 0.f, 0.8f), true);
-        const size_t visible = ((size_t)2 * ALSelectionOutline::PALETTE_WIDTH + 44) * 4;
-        const size_t hidden = ((size_t)3 * ALSelectionOutline::PALETTE_WIDTH + 44) * 4;
+        std::vector<U8> texels((size_t)Outline::PALETTE_WIDTH * 4 * 4, 0);
+        Outline::writePalette(texels, 300, LLColor4(1.f, 0.5f, 0.f, 0.8f), true);
+        const size_t visible = ((size_t)2 * Outline::PALETTE_WIDTH + 44) * 4;
+        const size_t hidden = ((size_t)3 * Outline::PALETTE_WIDTH + 44) * 4;
         ensure_equals("visible red", (U32)texels[visible], 255U);
         ensure_equals("visible green", (U32)texels[visible + 1], 128U);
         ensure_equals("visible alpha", (U32)texels[visible + 3], 204U);
         ensure_equals("hidden keeps the colour", (U32)texels[hidden + 1], 128U);
-        ensure_equals("hidden alpha dimmed", (U32)texels[hidden + 3], (U32)ll_round(0.8f * ALSelectionOutline::HIDDEN_ALPHA * 255.f));
+        ensure_equals("hidden alpha dimmed", (U32)texels[hidden + 3], (U32)ll_round(0.8f * Outline::HIDDEN_ALPHA * 255.f));
 
-        ALSelectionOutline::writePalette(texels, 300, LLColor4(1.f, 0.5f, 0.f, 0.8f), false);
+        Outline::writePalette(texels, 300, LLColor4(1.f, 0.5f, 0.f, 0.8f), false);
         ensure_equals("hidden transparent with hidden parts off", (U32)texels[hidden + 3], 0U);
     }
 
-    // The radius: thickness times distance times the zoom, seen from that distance, so no distance changes it; it
-    // grows with the window and is at least a pixel.
+    // The widths: the contour AlchemySelectionOutlineWidth wide, held to 1 to 16, and the edges between objects a
+    // pixel, at a UI scale of 1; both scaled with it and rounded, never under a pixel; the world and the HUD alike.
     template<> template<>
     void alselectionoutline_object_t::test<9>()
     {
-        const F32 fov = 60.f * DEG_TO_RAD;
-        ensure_equals("1080 rows at the default view", ALSelectionOutline::radiusPixels(0.01f, 1080.f, fov, fov), 9);
-        ensure_equals("2160 rows", ALSelectionOutline::radiusPixels(0.01f, 2160.f, fov, fov), 19);
-        ensure_equals("zoomed in to half the view", ALSelectionOutline::radiusPixels(0.01f, 1080.f, fov * 0.5f, fov), 10);
-        ensure_equals("never under a pixel", ALSelectionOutline::radiusPixels(0.01f, 10.f, fov, fov), 1);
-        ensure_equals("no view, a pixel", ALSelectionOutline::radiusPixels(0.01f, 1080.f, 0.f, fov), 1);
-        ensure_equals("rings: one a pixel", ALSelectionOutline::ringCount(3), 3);
-        ensure_equals("rings: at most MAX_RINGS", ALSelectionOutline::ringCount(19), ALSelectionOutline::MAX_RINGS);
+        ensure_equals("the setting's default", Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 1.f), 4);
+        ensure_equals("the default at 1.5", Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 1.5f), 6);
+        ensure_equals("the default at 2", Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 2.f), 8);
+        ensure_equals("a setting between pixels rounds", Outline::contourWidth(2.5f, 1.f), 3);
+        ensure_equals("a setting under 1 held to 1", Outline::contourWidth(0.25f, 1.f), 1);
+        ensure_equals("a setting over 16 held to 16", Outline::contourWidth(40.f, 1.f), 16);
+        ensure_equals("and scaled after", Outline::contourWidth(40.f, 2.f), 32);
+        ensure_equals("a setting that is not a number held to 1", Outline::contourWidth(std::numeric_limits<F32>::quiet_NaN(), 1.f), 1);
+        ensure_equals("never under a pixel", Outline::contourWidth(1.f, 0.2f), 1);
+        ensure_equals("edges at 1", Outline::lineWidth(Outline::INNER_WIDTH, 1.f), 1);
+        ensure_equals("edges at 2", Outline::lineWidth(Outline::INNER_WIDTH, 2.f), 2);
+        ensure_equals("a line reaches its width and a pixel", Outline::lineReach(4), 5);
+
+        const LLMatrix4a hud = al_ortho(-0.5f, 0.5f, -0.5f, 0.5f, 0.f, 10.f);
+        const LLMatrix4a world = al_perspective(FOV, 1.f, NEAR_PLANE, FORWARD_FAR);
+        for (F32 setting : { 1.f, Outline::DEFAULT_CONTOUR_WIDTH, 16.f, 40.f })
+        {
+            for (F32 ui_scale : { 1.f, 1.5f, 2.f })
+            {
+                const Outline::View in_world = Outline::makeView(identity(), world, setting, ui_scale, false);
+                const Outline::View on_hud = Outline::makeView(identity(), hud, setting, ui_scale, true);
+                const std::string with = " for " + std::to_string(setting) + " at UI scale " + std::to_string(ui_scale);
+                ensure_equals("the contour" + with, in_world.mWidth, Outline::contourWidth(setting, ui_scale));
+                ensure_equals("the edges" + with, in_world.mInnerWidth, Outline::lineWidth(Outline::INNER_WIDTH, ui_scale));
+                ensure_equals("the HUD's contour as the world's" + with, on_hud.mWidth, in_world.mWidth);
+                ensure_equals("the HUD's edges as the world's" + with, on_hud.mInnerWidth, in_world.mInnerWidth);
+                ensure("the HUD's view is the HUD's" + with, on_hud.mHUD && !in_world.mHUD);
+            }
+        }
     }
 
     // On the HUD the scene's depth is not read: a surface behind something nearer, in a depth bound where the
@@ -716,7 +950,7 @@ namespace tut
             mScene.flush();
 
             idPass({ { quadA(), ID_A } });
-            ensure_equals(named(reverse, "the world's pass hides A behind it"), (U32)at(read(mIdMap), 20, 32).b, 0U);
+            ensure(named(reverse, "the world's pass hides A behind it"), drawnHidden(at(read(mIdMap), 20, 32)));
 
             idPass(mIdMap, nullptr, { { quadA(), ID_A } }, nullptr, &mScene);
             const std::vector<U8> ids = read(mIdMap);
@@ -737,7 +971,7 @@ namespace tut
             ensure_equals(named(reverse, "and hides none of it"), hidden, size_t(0));
 
             palette({ { ID_A, RED } }, false);
-            const std::vector<U8> px = edgePass(RADIUS);
+            const std::vector<U8> px = edgePass();
             ensure_equals(named(reverse, "outlined at full strength"), (U32)at(px, 8, 32).r, 255U);
         }
     }
@@ -788,25 +1022,499 @@ namespace tut
         }
     }
 
-    // The HUD's radius: its projection is a unit high and its zoom scales objects and thickness alike, so the
-    // outline is `thickness` of the view's height whatever the zoom. A band a tenth of that projection high covers
-    // the rows a thickness of a tenth gives.
+    // The contour is drawn as wide as the setting and the UI scale make it, held to the setting's range, and as many
+    // pixels wide in the world, through a perspective with the scene's depth read, as on the HUD, through an
+    // orthographic projection with none: its width is in pixels.
     template<> template<>
     void alselectionoutline_object_t::test<12>()
     {
-        ensure_equals("1080 rows", ALSelectionOutline::hudRadiusPixels(0.01f, 1080.f), 11);
-        ensure_equals("2160 rows", ALSelectionOutline::hudRadiusPixels(0.01f, 2160.f), 22);
-        ensure_equals("never under a pixel", ALSelectionOutline::hudRadiusPixels(0.01f, 10.f), 1);
-
-        setUp(false);
-        const LLMatrix4a hud = al_ortho(-0.5f, 0.5f, -0.5f, 0.5f, 0.f, 10.f);
-        LLVertexBuffer* band = quad(-0.4f, 0.4f, 0.f, 0.1f, -2.f, -2.f);
-        const std::vector<U8> ids = projectedIds(hud, { { band, ID_A } });
-        S32 rows = 0;
-        for (S32 y = 0; y < H; ++y)
+        const std::pair<F32, F32> settings[] = { { Outline::DEFAULT_CONTOUR_WIDTH, 1.f }, { Outline::DEFAULT_CONTOUR_WIDTH, 2.f },
+                                                 { 1.f, 1.f }, { 2.5f, 1.f }, { 0.25f, 1.f }, { 40.f, 1.f } };
+        for (bool reverse : conventions())
         {
-            rows += idAt(ids, 32, y) == ID_A ? 1 : 0;
+            setUp(reverse);
+            palette({ { ID_A, RED } }, true);
+            for (const auto& [setting, ui_scale] : settings)
+            {
+                const std::string with = " for " + std::to_string(setting) + " at UI scale " + std::to_string((S32)ui_scale);
+                const S32 width = Outline::contourWidth(setting, ui_scale);
+
+                // The HUD's: its left edge is column 20.
+                pixelIds({ { pixels(20, 52, 16, 48), ID_A } });
+                std::vector<U8> px = edgePass(Outline::makeView(identity(), pixelProjection(), setting, ui_scale, true));
+                S32 hud_band = 0;
+                for (S32 x = 19; x >= 0 && at(px, x, 32).r == 255; --x)
+                {
+                    ++hud_band;
+                }
+                ensure_equals(named(reverse, "the HUD's contour is the setting's width" + with), hud_band, width);
+                ensure(named(reverse, "nothing past it" + with), black(at(px, 19 - width - 1, 32)));
+
+                // The world's: A's left edge is column 9, room for a line eight pixels wide.
+                if (width <= 8)
+                {
+                    idPass({ { quadA(), ID_A } });
+                    px = edgePass(Outline::makeView(identity(), mProjection, setting, ui_scale, false));
+                    S32 world_band = 0;
+                    for (S32 x = 8; x >= 0 && at(px, x, 32).r == 255; --x)
+                    {
+                        ++world_band;
+                    }
+                    ensure_equals(named(reverse, "the world's is the same" + with), world_band, hud_band);
+                }
+            }
         }
-        ensure_equals("a band a tenth of the projection high", rows, ALSelectionOutline::hudRadiusPixels(0.1f, (F32)H));
+    }
+
+    // A face's texture alpha cuts it out of the id target: a mask at its cutoff, a blend at BLEND_ALPHA_CUTOFF,
+    // through the base colour's transform and the face's texture animation; an opaque face is not cut at all, and
+    // the face's colour, transparent or not, never is. The ramp's alpha is its column, and pixel column c samples
+    // column 4c + 2 of it.
+    template<> template<>
+    void alselectionoutline_object_t::test<13>()
+    {
+        ensure_equals("a mask at its cutoff", Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_MASK, 64, true), 64.f / 255.f);
+        ensure_equals("a blend at the blend cutoff", Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_BLEND, 64, true), Outline::BLEND_ALPHA_CUTOFF);
+        ensure_equals("no material blends", Outline::legacyAlphaCutoff(false, 0, 0, true), Outline::BLEND_ALPHA_CUTOFF);
+        ensure_equals("opaque", Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_NONE, 64, true), Outline::NO_ALPHA_TEST);
+        ensure_equals("emissive", Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_EMISSIVE, 64, true), Outline::NO_ALPHA_TEST);
+        ensure_equals("a texture without alpha", Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_MASK, 64, false), Outline::NO_ALPHA_TEST);
+        ensure_equals("GLTF mask", Outline::gltfAlphaCutoff(LLGLTFMaterial::ALPHA_MODE_MASK, 0.25f), 0.25f);
+        ensure_equals("GLTF blend", Outline::gltfAlphaCutoff(LLGLTFMaterial::ALPHA_MODE_BLEND, 0.25f), Outline::BLEND_ALPHA_CUTOFF);
+        ensure_equals("GLTF opaque", Outline::gltfAlphaCutoff(LLGLTFMaterial::ALPHA_MODE_OPAQUE, 0.25f), Outline::NO_ALPHA_TEST);
+
+        // Halved along u, as a GLTF transform and as a texture animation: column c samples 2c + 1. The transform is
+        // packed as LLGLTFMaterial::TextureTransform::getPacked packs a scale of (0.5, 1).
+        const LLGLTFMaterial::TextureTransform::Pack halved_pack = { 0.5f, 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+        LLMatrix4a halved_matrix;
+        halved_matrix.setIdentity();
+        halved_matrix.mMatrix[0].getF32ptr()[0] = 0.5f;
+
+        // A transparent face colour, as a prim made invisible has.
+        const LLColor4U invisible(255, 255, 255, 0);
+
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            const U32 texture = ramp();
+            const F32 mask = Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_MASK, 64, true);
+            const F32 blend = Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_BLEND, 0, true);
+            const F32 opaque = Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_NONE, 64, true);
+
+            // Column 15 samples alpha 62, column 16 alpha 66.
+            std::vector<U8> ids = pixelIds({ { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, mask, texture } });
+            ensure_equals(named(reverse, "a mask cuts under its cutoff"), idAt(ids, 15, 32), 0U);
+            ensure_equals(named(reverse, "and keeps over it"), idAt(ids, 16, 32), ID_A);
+            ensure_equals(named(reverse, "and keeps the opaque end"), idAt(ids, 63, 32), ID_A);
+
+            // Column 31 samples alpha 126, column 32 alpha 130.
+            ids = pixelIds({ { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, blend, texture } });
+            ensure_equals(named(reverse, "a blend cuts under half"), idAt(ids, 31, 32), 0U);
+            ensure_equals(named(reverse, "and keeps over it"), idAt(ids, 32, 32), ID_A);
+
+            ids = pixelIds({ { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, opaque, texture } });
+            ensure_equals(named(reverse, "an opaque face keeps its transparent texels"), idAt(ids, 0, 32), ID_A);
+            ensure_equals(named(reverse, "and the rest"), idAt(ids, 40, 32), ID_A);
+
+            ids = pixelIds({ { pixels(0, W, 16, 48, &invisible), ID_A, Outline::PRIORITY_ROOT, mask, texture } });
+            ensure_equals(named(reverse, "a transparent face colour cuts nothing more"), idAt(ids, 16, 32), ID_A);
+            ensure_equals(named(reverse, "and its texture still cuts"), idAt(ids, 15, 32), 0U);
+
+            // Column 20 samples alpha 41 halved, 82 not; column 40 81 halved.
+            Draw transformed = { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, mask, texture };
+            transformed.mTransform = &halved_pack;
+            ids = pixelIds({ transformed });
+            ensure_equals(named(reverse, "the base colour transform moves the cut"), idAt(ids, 20, 32), 0U);
+            ensure_equals(named(reverse, "and keeps past it"), idAt(ids, 40, 32), ID_A);
+
+            Draw animated = { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, mask, texture };
+            animated.mTextureMatrix = &halved_matrix;
+            ids = pixelIds({ animated });
+            ensure_equals(named(reverse, "the texture animation moves the cut"), idAt(ids, 20, 32), 0U);
+            ensure_equals(named(reverse, "and keeps past it"), idAt(ids, 40, 32), ID_A);
+
+            // A cut-out face shows what is behind it: here another object, which is outlined through the hole.
+            ids = pixelIds({ { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, mask, texture },
+                             { quad(0.f, (F32)W, 0.f, (F32)H, PIXEL_Z - 1.f, PIXEL_Z - 1.f), ID_B } });
+            ensure_equals(named(reverse, "the one behind shows through the cut"), idAt(ids, 15, 32), ID_B);
+            ensure_equals(named(reverse, "and not through the rest"), idAt(ids, 16, 32), ID_A);
+        }
+    }
+
+    // The contour's anti-aliasing: across a diagonal edge, walking away from it along a row, the line's coverage
+    // never rises, starts solid, takes values between and ends at nothing. Along a row the distance from a
+    // 45-degree edge grows by sqrt(1/2) a pixel a pixel, so the walk takes twice the line's reach.
+    template<> template<>
+    void alselectionoutline_object_t::test<14>()
+    {
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            // A diamond about (32.25, 32.25), 24 pixels to each point: its edge from (32.25, 8.25) to
+            // (8.25, 32.25) runs through x = 40 - y, between pixel centres, so the pixels it covers are not left to
+            // the rasteriser's tie rule.
+            const LLVector3 diamond[4] = { LLVector3(32.25f, 8.25f, PIXEL_Z), LLVector3(56.25f, 32.25f, PIXEL_Z),
+                                           LLVector3(32.25f, 56.25f, PIXEL_Z), LLVector3(8.25f, 32.25f, PIXEL_Z) };
+            const std::vector<U8> ids = pixelIds({ { quadAt(diamond), ID_A } });
+            palette({ { ID_A, RED } }, true);
+            const Outline::View lines = view();
+            const std::vector<U8> px = edgePass(lines);
+            const S32 walk = 2 * Outline::lineReach(lines.mWidth);
+
+            S32 between = 0;
+            for (S32 y = 14; y <= 28; ++y)
+            {
+                const std::string row = ", row " + std::to_string(y);
+                S32 first = -1;
+                for (S32 x = 0; x < W && first < 0; ++x)
+                {
+                    first = idAt(ids, x, y) == ID_A ? x : -1;
+                }
+                ensure_equals(named(reverse, "the diamond's edge" + row), first, 40 - y);
+
+                U32 last = 255;
+                for (S32 x = first - 1; x >= first - walk; --x)
+                {
+                    const U32 r = at(px, x, y).r;
+                    ensure(named(reverse, "coverage never rises away from the edge" + row), r <= last);
+                    between += (r > 0 && r < 255) ? 1 : 0;
+                    last = r;
+                }
+                ensure_equals(named(reverse, "solid beside the edge" + row), (U32)at(px, first - 1, y).r, 255U);
+                ensure_equals(named(reverse, "nothing past the reach" + row), last, 0U);
+            }
+            ensure(named(reverse, "the edge is anti-aliased"), between >= 15);
+        }
+    }
+
+    // A feature a pixel across is outlined all the way round: every pixel in the disk the line covers is drawn,
+    // including those no straight or diagonal line from the feature passes through.
+    template<> template<>
+    void alselectionoutline_object_t::test<15>()
+    {
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            pixelIds({ { pixels(32, 33, 32, 33), ID_A } });
+            palette({ { ID_A, RED } }, true);
+            const Outline::View lines = view();
+            const std::vector<U8> px = edgePass(lines);
+
+            const S32 reach = Outline::lineReach(lines.mWidth);
+            for (S32 dy = -reach - 1; dy <= reach + 1; ++dy)
+            {
+                for (S32 dx = -reach - 1; dx <= reach + 1; ++dx)
+                {
+                    if (dx == 0 && dy == 0)
+                    {
+                        continue;
+                    }
+                    const F32 dist = sqrtf((F32)(dx * dx + dy * dy));
+                    const U32 r = at(px, 32 + dx, 32 + dy).r;
+                    const std::string where = " at (" + std::to_string(dx) + ", " + std::to_string(dy) + ")";
+                    if (dist <= (F32)lines.mWidth)
+                    {
+                        ensure_equals(named(reverse, "solid within the width" + where), r, 255U);
+                    }
+                    else if (dist < (F32)lines.mWidth + 0.9f)
+                    {
+                        ensure(named(reverse, "anti-aliased past it" + where), r > 0 && r < 255);
+                    }
+                    else if (dist >= (F32)reach)
+                    {
+                        ensure_equals(named(reverse, "nothing at the reach" + where), r, 0U);
+                    }
+                }
+            }
+            // Two across and one up: off every line of taps in eight directions.
+            ensure(named(reverse, "the knight's move is outlined"), at(px, 34, 33).r > 0);
+        }
+    }
+
+    // Priorities: ids are given the highest priority first, and in the order they were added within one.
+    // Where a root and a child meet, the root's contour is laid over the child's, which shows under it only where
+    // the root's fades; the edge between them is drawn on the root's side, a pixel wide, at INNER_OPACITY, and not
+    // on the child's.
+    template<> template<>
+    void alselectionoutline_object_t::test<16>()
+    {
+        const std::vector<Outline::EPriority> priorities = { Outline::PRIORITY_CHILD, Outline::PRIORITY_ROOT,
+                                                             Outline::PRIORITY_CONTEXT, Outline::PRIORITY_SUBTRACT,
+                                                             Outline::PRIORITY_CHILD, Outline::PRIORITY_FOCUS,
+                                                             Outline::PRIORITY_INSPECT };
+        std::vector<U32> order;
+        Outline::priorityOrder(priorities, order);
+        ensure("the highest priority first, in the order added within one", order == std::vector<U32>({ 3, 5, 6, 1, 0, 4, 2 }));
+
+        constexpr U32 ROOT = 1;
+        constexpr U32 CHILD = 2;
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            // The root over columns 16 to 31, the child 32 to 47, both rows 16 to 47.
+            const std::vector<U8> ids = pixelIds({ { pixels(16, 32, 16, 48), ROOT, Outline::PRIORITY_ROOT },
+                                                   { pixels(32, 48, 16, 48), CHILD, Outline::PRIORITY_CHILD } });
+            ensure_equals(named(reverse, "the child's priority in alpha"), (U32)at(ids, 40, 32).a, (U32)Outline::PRIORITY_CHILD);
+            palette({ { ROOT, RED }, { CHILD, GREEN } }, true);
+            const std::vector<U8> px = edgePass();
+
+            // Above the child, a pixel from it and the root's corner a knight's move away.
+            const Pixel over = at(px, 33, 48);
+            ensure(named(reverse, "the root's contour over the child's"), over.r > over.g && over.r > 200);
+            ensure(named(reverse, "the child's under it where it fades"), over.g > 0);
+            ensure(named(reverse, "the root's alone beside it"), red(at(px, 31, 48)) && at(px, 31, 48).r == 255);
+            ensure(named(reverse, "the child's alone past the root's reach"), green(at(px, 36, 48)) && at(px, 36, 48).g == 255);
+
+            const Pixel edge = at(px, 31, 32);
+            const U32 faint = (U32)ll_round(255.f * Outline::INNER_OPACITY);
+            ensure(named(reverse, "the edge on the root's side, in its colour"), red(edge));
+            ensure(named(reverse, "at INNER_OPACITY"), (U32)edge.r + 2 >= faint && (U32)edge.r <= faint + 2);
+            ensure(named(reverse, "a pixel wide, where the contour is two"), black(at(px, 30, 32)));
+            ensure(named(reverse, "and not on the child's side"), black(at(px, 32, 32)));
+            ensure(named(reverse, "the insides left alone"), black(at(px, 20, 32)) && black(at(px, 40, 32)));
+        }
+    }
+
+    // The tile pass's early out draws exactly what searching every pixel's disk draws: with edges along tile
+    // borders and across them, features a pixel thin at tile corners, objects at the target's edges, an island
+    // inside another, both priorities, and lines from one pixel wide to sixteen, whose reach spans five tiles. A
+    // change along a tile's left or lower border belongs to the tile beyond it, which flags it; a tile inside an
+    // object flags nothing.
+    template<> template<>
+    void alselectionoutline_object_t::test<17>()
+    {
+        const std::pair<S32, S32> line_widths[] = { { 1, 1 }, { 2, 1 }, { 4, 1 }, { 8, 2 }, { 16, 2 } };
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { 1, RED }, { 2, GREEN }, { 3, LLColor4(0.f, 0.f, 1.f, 1.f) }, { 4, LLColor4(1.f, 1.f, 0.f, 0.5f) } }, true);
+
+            // A strip a pixel and a half across, running up and to the right at 45 degrees.
+            const LLVector3 strip[4] = { LLVector3(4.f, 30.f, PIXEL_Z), LLVector3(5.5f, 30.f, PIXEL_Z),
+                                         LLVector3(21.5f, 46.f, PIXEL_Z), LLVector3(20.f, 46.f, PIXEL_Z) };
+            const std::vector<std::pair<std::string, std::vector<Draw>>> scenes = {
+                { "edges on tile borders", { { pixels(16, 32, 16, 40), 1, Outline::PRIORITY_ROOT },
+                                             { pixels(32, 48, 16, 40), 2, Outline::PRIORITY_CHILD },
+                                             { pixels(16, 48, 40, 48), 3, Outline::PRIORITY_CHILD } } },
+                { "edges across tile borders", { { pixels(13, 29, 21, 37), 1, Outline::PRIORITY_ROOT },
+                                                 { pixels(29, 45, 21, 37), 2, Outline::PRIORITY_CHILD },
+                                                 { pixels(50, 53, 50, 61), 3, Outline::PRIORITY_CHILD } } },
+                { "thin features", { { pixels(23, 24, 23, 24), 1, Outline::PRIORITY_ROOT },
+                                     { pixels(40, 41, 40, 41), 2, Outline::PRIORITY_CHILD },
+                                     { pixels(39, 40, 8, 56), 3, Outline::PRIORITY_CHILD },
+                                     { pixels(0, W, 7, 8), 4, Outline::PRIORITY_CHILD },
+                                     { quadAt(strip), 1, Outline::PRIORITY_ROOT } } },
+                { "objects at the target's corners", { { pixels(0, 10, 54, H), 1, Outline::PRIORITY_ROOT },
+                                                       { pixels(58, W, 0, 5), 2, Outline::PRIORITY_CHILD } } },
+                { "an island", { { pixels(20, 44, 20, 44), 2, Outline::PRIORITY_CHILD },
+                                 { pixels(28, 36, 28, 36), 1, Outline::PRIORITY_ROOT } } },
+                { "slanted surfaces touching, and one in front", { { quad(8.f, 40.f, 8.f, 30.f, -1.f, -5.f), 1, Outline::PRIORITY_ROOT },
+                                                                   { quad(40.f, 56.f, 8.f, 30.f, -5.f, -7.f), 2, Outline::PRIORITY_CHILD },
+                                                                   { quad(20.f, 50.f, 24.f, 44.f, -0.5f, -0.5f), 3, Outline::PRIORITY_CHILD } } },
+            };
+
+            for (const auto& [name, draws] : scenes)
+            {
+                pixelIds(draws);
+                for (const auto& [width, inner_width] : line_widths)
+                {
+                    const Outline::View lines = widths(width, inner_width);
+                    const std::string what = name + ", lines " + std::to_string(width) + " and " + std::to_string(inner_width);
+                    const std::vector<U8> untiled = edgePass(lines, nullptr, true);
+                    const std::vector<U8> tiled = edgePass(lines);
+                    ensure(named(reverse, what + ": something is drawn"), lit(untiled) > 0);
+                    ensure(named(reverse, what + ": tiled as untiled"), tiled == untiled);
+                }
+
+                std::vector<U8> flags = tileFlags();
+                size_t flagged = 0;
+                for (U8 flag : flags)
+                {
+                    flagged += flag;
+                }
+                ensure(named(reverse, name + ": some tiles hold no change"), flagged < flags.size());
+            }
+
+            // The first scene again: the root's left edge, at x = 16, belongs to tile column 1; the tile inside it,
+            // column 2, row 2, flags nothing; its right edge, inside tile column 3, flags that; nothing far away does.
+            pixelIds(scenes[0].second);
+            tilePass();
+            const std::vector<U8> flags = tileFlags();
+            const S32 columns = (S32)Outline::tileCount(W);
+            ensure_equals(named(reverse, "the left border's tile"), (U32)flags[2 * columns + 1], 1U);
+            ensure_equals(named(reverse, "the tile inside"), (U32)flags[2 * columns + 2], 0U);
+            ensure_equals(named(reverse, "the right edge's tile"), (U32)flags[2 * columns + 3], 1U);
+            ensure_equals(named(reverse, "a tile far away"), (U32)flags[0], 0U);
+
+            // The tile pass over the tiles under a rect holding every selected texel and one more around them, as the
+            // viewer runs it under its scissor, draws the same.
+            pixelIds(scenes[1].second);
+            const LLRect around(12, 62, 54, 20);
+            for (const auto& [width, inner_width] : line_widths)
+            {
+                const Outline::View lines = widths(width, inner_width);
+                const std::string what = "under a rect, lines " + std::to_string(width);
+                ensure(named(reverse, what), edgePass(lines, nullptr, false, &around) == edgePass(lines, nullptr, true));
+            }
+        }
+    }
+
+    // Faces are culled as the scene culls them: a single-sided face seen from behind, which the scene does not draw,
+    // takes no pixel from the object behind it, whose contour stays whole; a double-sided one is drawn, and outlined.
+    template<> template<>
+    void alselectionoutline_object_t::test<18>()
+    {
+        constexpr U32 FRONT = 1;
+        constexpr U32 REAR = 2;
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { FRONT, RED }, { REAR, GREEN } }, true);
+            // The rear over columns and rows 16 to 47; the front over 24 to 39, nearer, wound clockwise: its back.
+            const LLVector3 back_on[4] = { LLVector3(24.f, 24.f, PIXEL_Z + 1.f), LLVector3(24.f, 40.f, PIXEL_Z + 1.f),
+                                           LLVector3(40.f, 40.f, PIXEL_Z + 1.f), LLVector3(40.f, 24.f, PIXEL_Z + 1.f) };
+            LLVertexBuffer* rear = pixels(16, 48, 16, 48);
+            LLVertexBuffer* front = quadAt(back_on);
+
+            std::vector<U8> ids = pixelIds({ { rear, REAR, Outline::PRIORITY_CHILD }, { front, FRONT, Outline::PRIORITY_ROOT } });
+            ensure_equals(named(reverse, "a single-sided face from behind takes no pixel"), idAt(ids, 32, 32), REAR);
+            std::vector<U8> px = edgePass();
+            ensure(named(reverse, "nothing traces it"), black(at(px, 23, 32)) && black(at(px, 24, 32)) && black(at(px, 40, 32)));
+            ensure_equals(named(reverse, "the rear's contour is whole"), (U32)at(px, 15, 32).g, 255U);
+
+            Draw double_sided = { front, FRONT, Outline::PRIORITY_ROOT };
+            double_sided.mDoubleSided = true;
+            ids = pixelIds({ { rear, REAR, Outline::PRIORITY_CHILD }, double_sided });
+            ensure_equals(named(reverse, "a double-sided face from behind is drawn"), idAt(ids, 32, 32), FRONT);
+            px = edgePass();
+            ensure(named(reverse, "and outlined over the rear"), red(at(px, 23, 32)) && at(px, 23, 32).r == 255);
+        }
+    }
+
+    // A visible object in front of a selected one the scene hides is outlined in full over it: its contour neither
+    // turns into an edge between the two nor goes on the hidden one's side. With hidden parts drawn, the visible
+    // object's contour is still drawn at full strength, and the hidden one's own dimmed.
+    template<> template<>
+    void alselectionoutline_object_t::test<19>()
+    {
+        constexpr U32 ROOT = 1;
+        constexpr U32 FROND = 2;
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            // The root, six metres out over columns 12 to 51 and rows 18 to 46, behind something five metres out;
+            // the frond four metres out over columns and rows 25 to 38, in front of it.
+            occlude(5.f);
+            LLVertexBuffer* root = quad(-2.f, 2.f, -1.5f, 1.5f, -6.f, -6.f);
+            LLVertexBuffer* frond = quad(-0.5f, 0.5f, -0.5f, 0.5f, -4.f, -4.f);
+
+            for (bool show_hidden : { false, true })
+            {
+                const std::string hidden_parts = show_hidden ? ", hidden parts drawn" : ", hidden parts left out";
+                Draw hidden_root = { root, ROOT, Outline::PRIORITY_ROOT };
+                hidden_root.mShowHidden = show_hidden;
+                idPass({ hidden_root, { frond, FROND, Outline::PRIORITY_CHILD } });
+                palette({ { ROOT, RED }, { FROND, GREEN } }, show_hidden);
+                const std::vector<U8> px = edgePass();
+
+                ensure(named(reverse, "the frond's contour over the root" + hidden_parts),
+                       green(at(px, 24, 32)) && at(px, 24, 32).g == 255 && green(at(px, 23, 32)) && at(px, 23, 32).g == 255);
+                ensure(named(reverse, "above it too" + hidden_parts), green(at(px, 32, 39)) && at(px, 32, 39).g == 255);
+                ensure(named(reverse, "as wide as a contour" + hidden_parts), black(at(px, 21, 32)));
+                ensure(named(reverse, "nothing inside the frond" + hidden_parts), black(at(px, 32, 32)) && black(at(px, 25, 32)));
+                if (show_hidden)
+                {
+                    const U32 dimmed = at(px, 11, 32).r;
+                    ensure(named(reverse, "the hidden root's contour dimmed"), red(at(px, 11, 32)) && dimmed >= 90 && dimmed <= 115);
+                }
+                else
+                {
+                    ensure(named(reverse, "the hidden root's contour left out"), black(at(px, 11, 32)));
+                }
+            }
+        }
+    }
+
+    // A child in front of another draws its whole contour over it; two surfaces that touch on one plane, here a
+    // wall seen at a slant, whose depth changes by some percent a pixel, draw only the thin edge between them, on
+    // the side of the higher priority.
+    template<> template<>
+    void alselectionoutline_object_t::test<20>()
+    {
+        const LLColor4 BLUE(0.f, 0.f, 1.f, 1.f);
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+
+            // Six metres out over columns 12 to 51, and four metres out over columns and rows 25 to 38.
+            idPass({ { quad(-2.f, 2.f, -1.5f, 1.5f, -6.f, -6.f), 2, Outline::PRIORITY_CHILD },
+                     { quad(-0.5f, 0.5f, -0.5f, 0.5f, -4.f, -4.f), 3, Outline::PRIORITY_CHILD } });
+            palette({ { 2, GREEN }, { 3, BLUE } }, true);
+            std::vector<U8> px = edgePass();
+            const Pixel over = at(px, 24, 32);
+            ensure(named(reverse, "the front child's contour over the rear"), over.b == 255 && over.r == 0 && over.g == 0);
+            ensure(named(reverse, "its full width"), at(px, 23, 32).b == 255 && at(px, 32, 39).b == 255);
+            ensure(named(reverse, "nothing inside it"), black(at(px, 32, 32)));
+
+            // A wall from four metres out at the left to twelve at the right, split at eight, columns 31 and 32.
+            idPass({ { quad(-1.6f, 0.f, -1.f, 1.f, -4.f, -8.f), ID_A, Outline::PRIORITY_ROOT },
+                     { quad(0.f, 1.6f, -1.f, 1.f, -8.f, -12.f), ID_B, Outline::PRIORITY_CHILD } });
+            palette({ { ID_A, RED }, { ID_B, GREEN } }, true);
+            px = edgePass();
+            const Pixel edge = at(px, 31, 32);
+            const U32 faint = (U32)ll_round(255.f * Outline::INNER_OPACITY);
+            ensure(named(reverse, "the edge on the root's side"), red(edge) && (U32)edge.r + 2 >= faint && (U32)edge.r <= faint + 2);
+            ensure(named(reverse, "no contour on the child's side"), black(at(px, 32, 32)) && black(at(px, 33, 32)));
+            ensure(named(reverse, "none on the root's"), black(at(px, 30, 32)));
+        }
+    }
+
+    // A selected object behind one the scene hides, its hidden parts left out, does not trace the hidden one's shape:
+    // a frond behind a rock, in front of the visible root. And an object not drawn neither draws nor masks the
+    // contour of one that is, though it is the nearer and of the higher priority.
+    template<> template<>
+    void alselectionoutline_object_t::test<21>()
+    {
+        constexpr U32 ROOT = 1;
+        constexpr U32 FROND = 2;
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            // The root six metres out over columns 12 to 51; the frond five metres out over columns and rows 26 to
+            // 37, behind a rock four and a half metres out over exactly those.
+            occlude(4.5f, 26, 26, 12, 12);
+            Draw frond = { quad(-0.5f, 0.5f, -0.5f, 0.5f, -5.f, -5.f), FROND, Outline::PRIORITY_CHILD };
+            frond.mShowHidden = false;
+            idPass({ { quad(-2.f, 2.f, -1.5f, 1.5f, -6.f, -6.f), ROOT, Outline::PRIORITY_ROOT }, frond });
+            const std::vector<U8> ids = read(mIdMap);
+            ensure_equals(named(reverse, "the frond is over the root"), idAt(ids, 32, 32), FROND);
+            ensure_equals(named(reverse, "and not drawn"), (U32)at(ids, 32, 32).b, 0U);
+            palette({ { ROOT, RED }, { FROND, GREEN } }, false);
+            std::vector<U8> px = edgePass();
+            for (const auto& [x, y] : { std::pair<S32, S32>{ 25, 32 }, { 24, 32 }, { 38, 32 }, { 39, 32 }, { 32, 25 }, { 32, 38 }, { 31, 31 } })
+            {
+                ensure(named(reverse, "nothing traces the frond at (" + std::to_string(x) + ", " + std::to_string(y) + ")"), black(at(px, x, y)));
+            }
+            ensure_equals(named(reverse, "the root's own contour drawn"), (U32)at(px, 11, 32).r, 255U);
+
+            // A root five metres out over columns 9 to 31, hidden, and a child beside it over 32 to 54, visible, both
+            // rows 21 to 43. Above the root, a pixel from it and a knight's move from the child.
+            setUp(reverse);
+            occlude(4.f, 0, 0, 32, H);
+            Draw root = { quad(-2.f, 0.f, -1.f, 1.f, -5.f, -5.f), ROOT, Outline::PRIORITY_ROOT };
+            root.mShowHidden = false;
+            idPass({ root, { quad(0.f, 2.f, -1.f, 1.f, -5.f, -5.f), FROND, Outline::PRIORITY_CHILD } });
+            palette({ { ROOT, RED }, { FROND, GREEN } }, false);
+            px = edgePass();
+            const Pixel above = at(px, 30, 44);
+            ensure(named(reverse, "the child's contour where the hidden root is nearer"), green(above) && above.g > 200);
+
+            // The two touch: the edge between them goes on the drawn side, the child's, though the root's is the
+            // higher priority.
+            const Pixel edge = at(px, 32, 32);
+            const U32 faint = (U32)ll_round(255.f * Outline::INNER_OPACITY);
+            ensure(named(reverse, "the edge on the drawn side"), green(edge) && (U32)edge.g + 2 >= faint && (U32)edge.g <= faint + 2);
+            ensure(named(reverse, "not on the hidden root's"), black(at(px, 31, 32)));
+        }
     }
 }

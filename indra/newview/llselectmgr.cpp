@@ -230,7 +230,6 @@ constexpr S32 MAX_CHILDREN_PER_TASK = 255;
 bool LLSelectMgr::sRectSelectInclusive = true;
 bool LLSelectMgr::sRenderHiddenSelections = true;
 bool LLSelectMgr::sRenderLightRadius = false;
-F32 LLSelectMgr::sHighlightThickness = 0.f;
 F32 LLSelectMgr::sHighlightAlpha = 0.f;
 LLUIColor LLSelectMgr::sSilhouetteParentColor;
 LLUIColor LLSelectMgr::sSilhouetteChildColor;
@@ -326,7 +325,6 @@ LLSelectMgr::LLSelectMgr()
     mTEMode = false;
     mTextureChannel = LLRender::DIFFUSE_MAP;
 
-    sHighlightThickness = gSavedSettings.getF32("SelectionHighlightThickness");
     sHighlightAlpha     = gSavedSettings.getF32("SelectionHighlightAlpha") * 2;
 
     sSilhouetteParentColor =LLUIColorTable::instance().getColor("SilhouetteParentColor");
@@ -6730,29 +6728,35 @@ void LLSelectMgr::addOutlines(ALSelectionOutline& outline, bool for_hud)
 
             LLColor4 colour;
             bool show_hidden = sRenderHiddenSelections;
+            ALSelectionOutline::EPriority priority;
             if (objectp->getID() == focus_item_id)
             {
                 colour = gFocusMgr.getFocusColor();
+                priority = ALSelectionOutline::PRIORITY_FOCUS;
             }
             else if (objectp->getID() == inspect_item_id)
             {
                 colour = sHighlightInspectColor;
+                priority = ALSelectionOutline::PRIORITY_INSPECT;
             }
             else if (node->isTransient())
             {
                 colour = sContextSilhouetteColor;
                 show_hidden = false;
+                priority = ALSelectionOutline::PRIORITY_CONTEXT;
             }
             else if (objectp->isRootEdit())
             {
                 colour = sSilhouetteParentColor;
+                priority = ALSelectionOutline::PRIORITY_ROOT;
             }
             else
             {
                 colour = sSilhouetteChildColor;
+                priority = ALSelectionOutline::PRIORITY_CHILD;
             }
             colour.mV[VALPHA] = sHighlightAlpha;
-            outline.add(objectp, (U32)node->getTESelectMask(), colour, show_hidden);
+            outline.add(objectp, (U32)node->getTESelectMask(), colour, show_hidden, priority);
         }
     }
 
@@ -6771,20 +6775,23 @@ void LLSelectMgr::addOutlines(ALSelectionOutline& outline, bool for_hud)
             }
 
             LLColor4 colour;
+            ALSelectionOutline::EPriority priority;
             if (subtracting_from_selection)
             {
                 colour = LLColor4::red;
+                priority = ALSelectionOutline::PRIORITY_SUBTRACT;
             }
             else if (!objectp->isSelected())
             {
                 colour = objectp->isRoot() ? sHighlightParentColor : sHighlightChildColor;
+                priority = objectp->isRoot() ? ALSelectionOutline::PRIORITY_ROOT : ALSelectionOutline::PRIORITY_CHILD;
             }
             else
             {
                 continue;
             }
             colour.mV[VALPHA] = sHighlightAlpha;
-            outline.add(objectp, (U32)node->getTESelectMask(), colour, sRenderHiddenSelections);
+            outline.add(objectp, (U32)node->getTESelectMask(), colour, sRenderHiddenSelections, priority);
         }
     }
 }

@@ -156,6 +156,7 @@ LLGLSLShader        gHighlightProgram;
 LLGLSLShader        gHighlightNormalProgram;
 LLGLSLShader        gHighlightSpecularProgram;
 LLGLSLShader        gSelectionIdProgram;
+LLGLSLShader        gSelectionTileProgram;
 LLGLSLShader        gSelectionOutlineProgram;
 
 LLGLSLShader        gDeferredHighlightProgram;
@@ -3830,10 +3831,20 @@ bool LLViewerShaderMgr::loadShadersInterface()
     {
         gSelectionIdProgram.mName = "Selection Id Shader";
         gSelectionIdProgram.mShaderFiles.clear();
-        gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/debugV.glsl", GL_VERTEX_SHADER));
+        gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionIdV.glsl", GL_VERTEX_SHADER));
         gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionIdF.glsl", GL_FRAGMENT_SHADER));
         gSelectionIdProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gSelectionIdProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+    }
+
+    if (success)
+    {
+        gSelectionTileProgram.mName = "Selection Tile Shader";
+        gSelectionTileProgram.mShaderFiles.clear();
+        gSelectionTileProgram.mShaderFiles.push_back(make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
+        gSelectionTileProgram.mShaderFiles.push_back(make_pair("interface/selectionTileF.glsl", GL_FRAGMENT_SHADER));
+        gSelectionTileProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        success = gSelectionTileProgram.createShader();
     }
 
     if (success)

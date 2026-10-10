@@ -24,8 +24,11 @@
 
 #pragma once
 
+#include "llgltfmaterial.h"
 #include "llglslshader.h"
+#include "llglstates.h"
 #include "llimagegl.h"
+#include "llmaterial.h"
 #include "llmath.h"
 #include "llmatrix4a.h"
 #include "llrect.h"
@@ -38,10 +41,12 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <vector>
 
+class LLFace;
 class LLViewerObject;
 class LLVOAvatar;
 
@@ -50,30 +55,69 @@ class LLVOAvatar;
 /// after the HUD, with its matrices. A frame outlines one or the other, as the selection is in the world or on
 /// the HUD.
 ///
-/// The id pass (interface/selectionIdF.glsl) draws each object's selected faces, rigged ones through the
-/// program's rigged variant, into a window-sized RGBA8 target with a depth buffer of its own, which keeps the
-/// nearest selected surface: the object's id in .rg, 16 bits with 0 for none, and in .b whether the scene's
-/// depth shows the surface. Integer formats are not used because LLGLSLShader gives integer samplers no unit.
+/// The id pass (interface/selectionIdV.glsl, selectionIdF.glsl) draws each object's selected faces, rigged ones
+/// through the program's rigged variant, into a window-sized RGBA8 target with a depth buffer of its own, which
+/// keeps the nearest selected surface: the object's id in .rg, 16 bits with 0 for none, in .b whether the outline
+/// draws the surface (1 where the scene shows it, 0.5 where the scene hides it and hidden parts are drawn dimmed, 0
+/// where they are left out), and in .a its priority. Faces are culled as the scene culls them, back faces unless a
+/// GLTF material is double-sided, so a face the scene does not draw takes no pixel. Where a face's alpha mode cuts
+/// it out by its texture's alpha, the fragments are discarded, so the outline follows what is drawn rather than
+/// the cards it is drawn on; the face's colour, whose alpha makes a prim invisible, is not read. Integer formats
+/// are not used because LLGLSLShader gives integer samplers no unit.
 ///
-/// The edge pass (interface/selectionOutlineF.glsl) is a full-screen triangle, scissored to the objects'
-/// projected boxes grown by the outline's radius. It colours every pixel within the radius of a different id
-/// from a palette holding a visible and a hidden colour per id: outside an object along its contour, and on both
-/// sides of the edge between two objects, so every prim keeps its own outline. Hidden parts are dimmed or left
-/// out per object.
+/// Ids are given in priority order, the highest first (EPriority). The edge pass
+/// (interface/selectionOutlineF.glsl) is a full-screen triangle, scissored to the objects' projected boxes grown
+/// by the contour's reach. A pixel draws the contour of the drawn objects within its reach that stand in front of
+/// it: every object, off every object; on an object, another object whose surface is nearer than the plane of the
+/// pixel's own, read from the id target's depth and carried over to the other's texel. The contour is a solid line
+/// View::mWidth pixels wide ending in a pixel of anti-aliasing, from the distance to the nearest texel of each
+/// object in the disk it reaches: the highest priority's colour within reach over the nearest object's. Where two
+/// objects touch, neither in front, the edge between them is drawn thinner (View::mInnerWidth) and fainter
+/// (INNER_OPACITY), on the side of the one of higher priority if it is drawn and on the drawn side if not, in that
+/// side's colour. An object over its own surface draws nothing: that would trace the creases of every mesh. Colours
+/// come from a palette holding a visible and a hidden colour per id.
+///
+/// The disk a pixel searches grows with the square of the contour's width, and most pixels in the scissor are far
+/// from any edge. The tile pass (interface/selectionTileF.glsl) flags each TILE_SIZE square of the id target that
+/// holds an id change, a texel whose right or upper neighbour has a different id, and the edge pass leaves a pixel
+/// at once when no tile within its reach is flagged. Whatever a pixel draws, it draws from a texel within its reach
+/// whose id is not its own, and between the two, inside the square its reach spans, two neighbouring texels differ,
+/// so the early out changes nothing it draws.
 ///
 /// The targets exist only while something is outlined: they are made the first frame there is, given up the
 /// first frame there is not, and given up with the pipeline's own (LLPipeline::releaseGLBuffers).
 class ALSelectionOutline
 {
 public:
+    /// What an outline is for, the highest priority first. Where two objects' outlines meet, the higher one's
+    /// contour is laid over the lower one's, and the edge between them is drawn on its side.
+    enum EPriority : U8
+    {
+        /// What a control-drag takes out of the selection.
+        PRIORITY_SUBTRACT = 0,
+        /// The object media is focused on.
+        PRIORITY_FOCUS,
+        /// The object picked in the inspect floater or the object panel's contents.
+        PRIORITY_INSPECT,
+        /// A selected root, or a root a drag would select.
+        PRIORITY_ROOT,
+        /// A selected child, or a child a drag would select.
+        PRIORITY_CHILD,
+        /// A transient selection's.
+        PRIORITY_CONTEXT,
+        PRIORITY_COUNT
+    };
+
     /// What render() draws with.
     struct View
     {
         /// From the frame object positions are in to the eye, and the eye to clip space.
         LLMatrix4a mModelview;
         LLMatrix4a mProjection;
-        /// The outline's width in pixels.
-        S32 mRadius = 1;
+        /// The widths in pixels of the contour around the objects and of the edges between them, each ending in a
+        /// further pixel of anti-aliasing.
+        S32 mWidth = 1;
+        S32 mInnerWidth = 1;
         /// The HUD: drawn into the window's framebuffer, whose depth cannot be read, so every surface counts as
         /// visible; and its rigged faces are left out, since their joints place them about the avatar in the
         /// world, which the HUD's matrices have no place for.
@@ -86,28 +130,54 @@ public:
     /// The HUD's, as its attachments were drawn with. False without a HUD to draw.
     static bool hudView(View& view);
 
+    /// A view with these matrices whose contour is `contour_width` pixels wide at a UI scale of 1
+    /// (AlchemySelectionOutlineWidth), drawn at `ui_scale`, LLUI's scale factor: the same widths in the world and
+    /// on the HUD.
+    static View makeView(const LLMatrix4a& modelview, const LLMatrix4a& projection, F32 contour_width, F32 ui_scale,
+                         bool hud);
+
     /// Ids the target can tell apart; 0 is no selected object.
     static constexpr U32 MAX_IDS = 65535;
     /// Ids to a pair of palette rows: their visible colours, then their hidden ones.
     static constexpr U32 PALETTE_WIDTH = 256;
-    /// Most rings of eight taps the edge pass reaches its radius with, however wide the outline.
-    static constexpr S32 MAX_RINGS = 8;
     /// What a hidden part keeps of its outline's opacity.
     static constexpr F32 HIDDEN_ALPHA = 0.4f;
+    /// The contour's width in pixels at a UI scale of 1: AlchemySelectionOutlineWidth's default, and the range it
+    /// is held to.
+    static constexpr F32 DEFAULT_CONTOUR_WIDTH = 4.f;
+    static constexpr F32 MIN_CONTOUR_WIDTH = 1.f;
+    static constexpr F32 MAX_CONTOUR_WIDTH = 16.f;
+    /// The width of the edges between objects in pixels at a UI scale of 1. It does not follow the contour's: the
+    /// edges mark where prims meet inside a selection, and as wide as the contour they would cover small prims.
+    static constexpr F32 INNER_WIDTH = 1.f;
+    /// The side of the id target's squares the tile pass flags, in texels (TILE_SIZE in selectionTileF.glsl and
+    /// selectionOutlineF.glsl).
+    static constexpr U32 TILE_SIZE = 8;
+    /// What an edge between two objects keeps of its object's outline opacity (INNER_OPACITY in
+    /// selectionOutlineF.glsl).
+    static constexpr F32 INNER_OPACITY = 0.6f;
+    /// The texture alpha an alpha-blended face is outlined from: where it is drawn at least half opaque.
+    static constexpr F32 BLEND_ALPHA_CUTOFF = 0.5f;
+    /// A face whose texture is not read: every fragment is outlined.
+    static constexpr F32 NO_ALPHA_TEST = -1.f;
+    /// The base colour transform of a face whose texture coordinates have their transform in them.
+    static constexpr LLGLTFMaterial::TextureTransform::Pack IDENTITY_TRANSFORM = { 1.f, 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 
     /// The uniforms the passes set beyond LLShaderMgr's reserved ones.
     static constexpr const char* ID_UNIFORM = "selection_id";
+    static constexpr const char* PRIORITY_UNIFORM = "selection_priority";
+    static constexpr const char* SHOW_HIDDEN_UNIFORM = "selection_show_hidden";
     static constexpr const char* SCENE_DEPTH_UNIFORM = "selection_scene_depth";
-    static constexpr const char* RADIUS_UNIFORM = "outline_radius";
-    static constexpr const char* RINGS_UNIFORM = "outline_rings";
+    static constexpr const char* WIDTH_UNIFORM = "outline_width";
+    static constexpr const char* INNER_WIDTH_UNIFORM = "outline_inner_width";
 
     /// Lives for the session and is never destroyed: its GL objects go with the pipeline's, and at exit GL is gone.
     static ALSelectionOutline& instance();
 
     /// Outlines `object` this frame: its faces whose bit is set in te_mask, in `colour`, whose alpha is the
-    /// outline's opacity. Parts the scene hides are dimmed when show_hidden and left out otherwise. Adding an
-    /// object again replaces what it was added with.
-    void add(LLViewerObject* object, U32 te_mask, const LLColor4& colour, bool show_hidden);
+    /// outline's opacity, at `priority`. Parts the scene hides are dimmed when show_hidden and left out otherwise.
+    /// Adding an object again replaces what it was added with.
+    void add(LLViewerObject* object, U32 te_mask, const LLColor4& colour, bool show_hidden, EPriority priority);
 
     /// Draws what was added since the last call over the bound framebuffer, with `view`, and forgets it. With
     /// nothing added it gives up its targets.
@@ -122,21 +192,36 @@ public:
     /// Writes id's visible and hidden texels into an RGBA8 palette PALETTE_WIDTH texels wide.
     static void writePalette(std::vector<U8>& texels, U32 id, const LLColor4& colour, bool show_hidden);
 
-    /// The outline's width in pixels for a view `view_height` pixels tall: `thickness` of the distance across the
-    /// line of sight, widened by the zoom (fov / default_fov), seen from that distance, so no distance changes it.
-    static S32 radiusPixels(F32 thickness, F32 view_height, F32 fov, F32 default_fov);
+    /// A line `width` pixels wide at a UI scale of 1, at `ui_scale`: at least a pixel.
+    static S32 lineWidth(F32 width, F32 ui_scale) { return llmax(1, ll_round(width * ui_scale)); }
 
-    /// The outline's width in pixels on the HUD, whose projection is a unit high and whose zoom scales its
-    /// objects: `thickness` of the view's height.
-    static S32 hudRadiusPixels(F32 thickness, F32 view_height) { return llmax(1, ll_round(thickness * view_height)); }
+    /// The contour's width in pixels for the setting `width` at `ui_scale`, the setting held to MIN_CONTOUR_WIDTH
+    /// to MAX_CONTOUR_WIDTH, and to the least where it is not a number.
+    static S32 contourWidth(F32 width, F32 ui_scale);
 
-    /// Rings the edge pass taps to reach `radius`: one a pixel up to MAX_RINGS.
-    static S32 ringCount(S32 radius) { return llclamp(radius, 1, MAX_RINGS); }
+    /// Tiles across `pixels` texels of the id target.
+    static U32 tileCount(U32 pixels) { return (pixels + TILE_SIZE - 1) / TILE_SIZE; }
+
+    /// How far a line `width` pixels wide reaches from the edge it is drawn along: its width and the pixel its
+    /// anti-aliasing takes.
+    static S32 lineReach(S32 width) { return llmax(width, 1) + 1; }
+
+    /// The order ids are given in, as indices into `priorities`: the highest priority first, and in the order
+    /// they were added within one.
+    static void priorityOrder(const std::vector<EPriority>& priorities, std::vector<U32>& order);
+
+    /// The texture alpha below which a legacy face is not outlined, or NO_ALPHA_TEST. Its material's alpha mode
+    /// decides: masks at their cutoff (0 to 255), blends at BLEND_ALPHA_CUTOFF, none and emissive not at all.
+    /// Without a material, a texture with alpha is blended, as the face is drawn.
+    static F32 legacyAlphaCutoff(bool has_material, U8 diffuse_alpha_mode, U8 mask_cutoff, bool texture_alpha);
+
+    /// The same for a GLTF face from its material's alpha mode and cutoff.
+    static F32 gltfAlphaCutoff(S32 alpha_mode, F32 alpha_cutoff);
 
     /// The pixels of a width x height target the outline of a box can touch: its projection through `mvp` grown
-    /// by `radius`, clipped to the target. A box reaching behind the eye takes the whole target.
+    /// by `reach`, clipped to the target. A box reaching behind the eye takes the whole target.
     /// False when the box cannot touch the target.
-    static bool scissorRect(const LLMatrix4a& mvp, const LLVector4a extents[2], S32 width, S32 height, S32 radius,
+    static bool scissorRect(const LLMatrix4a& mvp, const LLVector4a extents[2], S32 width, S32 height, S32 reach,
                             LLRect& rect);
 
     /// Makes `palette` hold at least `rows` rows, recreating it when it holds fewer, and uploads them.
@@ -146,12 +231,42 @@ public:
     /// decides what is hidden; with no scene every surface counts as visible.
     static void bindIdPass(LLGLSLShader& program, LLRenderTarget* scene, S32 width, S32 height);
 
-    /// The id the bound id program writes for the faces drawn next.
-    static void setId(LLGLSLShader& program, U32 id);
+    /// The GL state the id pass draws in while it lives: colour and depth written, the depth test keeping the
+    /// nearest surface, back faces culled as the scene culls them (the main view keeps GL_BACK and
+    /// counter-clockwise fronts), no blending and no scissor.
+    struct IdPassState
+    {
+        LLGLSColorMask mMask{ true, true };
+        LLGLDepthTest mDepth{ GL_TRUE, GL_TRUE, GL_LEQUAL };
+        LLGLEnable mCull{ GL_CULL_FACE };
+        LLGLDisable mBlend{ GL_BLEND };
+        LLGLDisable mScissor{ GL_SCISSOR_TEST };
+    };
 
-    /// The edge pass with the bound outline program, over the viewport and scissor in force.
-    static void drawEdges(LLGLSLShader& program, LLRenderTarget& ids, U32 palette, S32 radius,
+    /// The id, priority and hidden parts the bound id program writes for the faces drawn next.
+    static void setId(LLGLSLShader& program, U32 id, EPriority priority, bool show_hidden);
+
+    /// Draws a face into the id pass from `buffer`'s bound range, culled as the scene culls it: both sides of a
+    /// double-sided GLTF material, the front alone of everything else (LLRenderPass::pushGLTFBatch).
+    static void drawFace(LLVertexBuffer& buffer, U32 start, U32 end, U32 count, U32 offset, bool double_sided);
+
+    /// How the bound id program tests the alpha of the face drawn next, whose texture is bound as its diffuse map:
+    /// fragments under `cutoff` are discarded, and with NO_ALPHA_TEST the texture is not read. `transform` is the
+    /// base colour's texture transform, packed as LLGLTFMaterial::TextureTransform::getPacked packs it, the
+    /// identity for a legacy face, whose texture coordinates have their transform in them.
+    static void setAlphaTest(LLGLSLShader& program, F32 cutoff, const LLGLTFMaterial::TextureTransform::Pack& transform);
+
+    /// The tile pass with the bound tile program: flags into `tiles`, a texel to each TILE_SIZE square of `ids`,
+    /// over the tiles under `rect`, a rect of `ids`; the others are cleared. Every square holding an id change
+    /// lies under the rect when it covers every selected texel and a texel more around them.
+    static void drawTiles(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& tiles, const LLRect& rect,
                           LLVertexBuffer& triangle);
+
+    /// The edge pass with the bound outline program and `view`'s widths, over the viewport and scissor in force,
+    /// reading the tile pass's flags from `tiles` and the depth of `ids` through `view`'s projection, which the
+    /// id pass drew it with.
+    static void drawEdges(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& tiles, U32 palette,
+                          const View& view, LLVertexBuffer& triangle);
 
 private:
     ALSelectionOutline() = default;
@@ -162,20 +277,37 @@ private:
         U32             mTEMask;
         LLColor4        mColour;
         bool            mShowHidden;
+        EPriority       mPriority;
     };
 
-    // The faces of entry id - 1 that are rigged (or not) into the bound id program, and the box they cover into
+    // The faces of `entry` that are rigged (or not) into the bound id program as `id`, and the box they cover into
     // mScissor.
     void drawObject(LLGLSLShader& program, const Entry& entry, U32 id, bool rigged, const View& view,
                     const LLMatrix4a& mvp);
+
+    // What the id pass draws a face with beyond its geometry.
+    struct FaceBinding
+    {
+        // A texture animation was loaded, which the caller unloads after the draw.
+        bool mAnimated = false;
+        // Its GLTF material is double-sided: the scene culls neither side.
+        bool mDoubleSided = false;
+    };
+
+    // Binds `face`'s texture and alpha test to the bound id program and loads its texture animation, if it is drawn
+    // with one.
+    static FaceBinding bindFace(LLGLSLShader& program, LLFace* face);
 
     void clearEntries();
 
     std::vector<Entry> mEntries;
     boost::unordered_flat_map<const LLViewerObject*, U32> mEntryIndex;
+    std::vector<EPriority> mPriorities;
+    std::vector<U32> mOrder;
     std::vector<U8> mPaletteTexels;
 
     LLRenderTarget mIdMap;
+    LLRenderTarget mTileMap;
     U32 mPalette = 0;
     U32 mPaletteRows = 0;
 
@@ -210,20 +342,71 @@ inline void ALSelectionOutline::writePalette(std::vector<U8>& texels, U32 id, co
     texels[hidden + 3] = show_hidden ? unorm(colour.mV[VALPHA] * HIDDEN_ALPHA) : 0;
 }
 
-inline S32 ALSelectionOutline::radiusPixels(F32 thickness, F32 view_height, F32 fov, F32 default_fov)
+inline S32 ALSelectionOutline::contourWidth(F32 width, F32 ui_scale)
 {
-    // thickness * distance * (fov / default_fov) across the line of sight, and the projection puts
-    // view_height / (2 tan(fov / 2)) pixels to a unit of that at unit distance.
-    if (!(fov > 0.f) || !(default_fov > 0.f))
+    // Asked outright: /fp:fast may answer a comparison with a NaN either way.
+    const F32 held = llisnan(width) ? MIN_CONTOUR_WIDTH : llclamp(width, MIN_CONTOUR_WIDTH, MAX_CONTOUR_WIDTH);
+    return lineWidth(held, ui_scale);
+}
+
+inline ALSelectionOutline::View ALSelectionOutline::makeView(const LLMatrix4a& modelview, const LLMatrix4a& projection,
+                                                             F32 contour_width, F32 ui_scale, bool hud)
+{
+    View view;
+    view.mModelview = modelview;
+    view.mProjection = projection;
+    view.mWidth = contourWidth(contour_width, ui_scale);
+    view.mInnerWidth = lineWidth(INNER_WIDTH, ui_scale);
+    view.mHUD = hud;
+    return view;
+}
+
+inline void ALSelectionOutline::priorityOrder(const std::vector<EPriority>& priorities, std::vector<U32>& order)
+{
+    order.resize(priorities.size());
+    for (U32 i = 0; i < (U32)order.size(); ++i)
     {
-        return 1;
+        order[i] = i;
     }
-    const F32 width = thickness * view_height * fov / (default_fov * 2.f * tanf(fov * 0.5f));
-    return llmax(1, ll_round(width));
+    std::stable_sort(order.begin(), order.end(), [&priorities](U32 a, U32 b) { return priorities[a] < priorities[b]; });
+}
+
+inline F32 ALSelectionOutline::legacyAlphaCutoff(bool has_material, U8 diffuse_alpha_mode, U8 mask_cutoff, bool texture_alpha)
+{
+    if (!texture_alpha)
+    {
+        return NO_ALPHA_TEST;
+    }
+    if (!has_material)
+    {
+        return BLEND_ALPHA_CUTOFF;
+    }
+    switch (diffuse_alpha_mode)
+    {
+        case LLMaterial::DIFFUSE_ALPHA_MODE_BLEND:
+            return BLEND_ALPHA_CUTOFF;
+        case LLMaterial::DIFFUSE_ALPHA_MODE_MASK:
+            return (F32)mask_cutoff / 255.f;
+        default:
+            return NO_ALPHA_TEST;
+    }
+}
+
+inline F32 ALSelectionOutline::gltfAlphaCutoff(S32 alpha_mode, F32 alpha_cutoff)
+{
+    switch (alpha_mode)
+    {
+        case LLGLTFMaterial::ALPHA_MODE_BLEND:
+            return BLEND_ALPHA_CUTOFF;
+        case LLGLTFMaterial::ALPHA_MODE_MASK:
+            return alpha_cutoff;
+        default:
+            return NO_ALPHA_TEST;
+    }
 }
 
 inline bool ALSelectionOutline::scissorRect(const LLMatrix4a& mvp, const LLVector4a extents[2], S32 width, S32 height,
-                                            S32 radius, LLRect& rect)
+                                            S32 reach, LLRect& rect)
 {
     const LLRect target(0, height, width, 0);
     F32 min_x = FLT_MAX;
@@ -260,13 +443,13 @@ inline bool ALSelectionOutline::scissorRect(const LLMatrix4a& mvp, const LLVecto
     }
 
     // Projections far off screen are clamped before they become integers.
-    const F32 limit = (F32)(llmax(width, height) + radius + 1);
+    const F32 limit = (F32)(llmax(width, height) + reach + 1);
     min_x = llclamp(min_x, -limit, limit);
     min_y = llclamp(min_y, -limit, limit);
     max_x = llclamp(max_x, -limit, limit);
     max_y = llclamp(max_y, -limit, limit);
 
-    rect.set(llfloor(min_x) - radius, llceil(max_y) + radius, llceil(max_x) + radius, llfloor(min_y) - radius);
+    rect.set(llfloor(min_x) - reach, llceil(max_y) + reach, llceil(max_x) + reach, llfloor(min_y) - reach);
     rect.intersectWith(target);
     return rect.notEmpty();
 }
@@ -311,31 +494,97 @@ inline void ALSelectionOutline::bindIdPass(LLGLSLShader& program, LLRenderTarget
     program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)width, (F32)height);
 }
 
-inline void ALSelectionOutline::setId(LLGLSLShader& program, U32 id)
+inline void ALSelectionOutline::setId(LLGLSLShader& program, U32 id, EPriority priority, bool show_hidden)
 {
     static const LLStaticHashedString id_uniform(ID_UNIFORM);
+    static const LLStaticHashedString priority_uniform(PRIORITY_UNIFORM);
+    static const LLStaticHashedString show_hidden_uniform(SHOW_HIDDEN_UNIFORM);
     program.uniform1i(id_uniform, (GLint)id);
+    program.uniform1i(priority_uniform, (GLint)priority);
+    program.uniform1i(show_hidden_uniform, show_hidden ? 1 : 0);
 }
 
-inline void ALSelectionOutline::drawEdges(LLGLSLShader& program, LLRenderTarget& ids, U32 palette, S32 radius,
-                                          LLVertexBuffer& triangle)
+inline void ALSelectionOutline::drawFace(LLVertexBuffer& buffer, U32 start, U32 end, U32 count, U32 offset,
+                                         bool double_sided)
 {
-    static const LLStaticHashedString radius_uniform(RADIUS_UNIFORM);
-    static const LLStaticHashedString rings_uniform(RINGS_UNIFORM);
+    LLGLDisable no_cull(double_sided ? GL_CULL_FACE : 0);
+    buffer.setBuffer();
+    buffer.drawRange(LLRender::TRIANGLES, start, end, count, offset);
+}
 
-    // Point sampled both: the ids and the palette are data, and texelFetch reads them whatever the filter.
+inline void ALSelectionOutline::setAlphaTest(LLGLSLShader& program, F32 cutoff,
+                                             const LLGLTFMaterial::TextureTransform::Pack& transform)
+{
+    program.setMinimumAlpha(cutoff);
+    program.uniform4fv(LLShaderMgr::TEXTURE_BASE_COLOR_TRANSFORM, 2, transform);
+}
+
+inline void ALSelectionOutline::drawTiles(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& tiles,
+                                          const LLRect& rect, LLVertexBuffer& triangle)
+{
+    tiles.bindTarget();
+    {
+        LLGLSColorMask mask(true, true);
+        LLGLDepthTest depth(GL_FALSE);
+        LLGLDisable blend(GL_BLEND);
+        {
+            // The tiles the pass leaves out hold no change, and read as none.
+            LLGLDisable scissor(GL_SCISSOR_TEST);
+            gGL.setClearColor(LLColor4(0.f, 0.f, 0.f, 0.f));
+            tiles.clear();
+        }
+
+        const S32 left = llmax(rect.mLeft, 0) / (S32)TILE_SIZE;
+        const S32 bottom = llmax(rect.mBottom, 0) / (S32)TILE_SIZE;
+        const S32 right = (S32)tileCount((U32)llmax(rect.mRight, 0));
+        const S32 top = (S32)tileCount((U32)llmax(rect.mTop, 0));
+        if (right > left && top > bottom)
+        {
+            LLGLSScissor scissor(left, bottom, right - left, top - bottom);
+            program.bindTexture(LLShaderMgr::DIFFUSE_MAP, &ids, ALSamplers::PointClamp);
+            triangle.setBuffer();
+            triangle.drawArrays(LLRender::TRIANGLES, 0, 3);
+            program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+        }
+    }
+    tiles.flush();
+}
+
+inline void ALSelectionOutline::drawEdges(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& tiles, U32 palette,
+                                          const View& view, LLVertexBuffer& triangle)
+{
+    static const LLStaticHashedString width_uniform(WIDTH_UNIFORM);
+    static const LLStaticHashedString inner_width_uniform(INNER_WIDTH_UNIFORM);
+
+    // Point sampled all four: the ids, their depth, the flags and the palette are data, and texelFetch reads them
+    // whatever the filter.
     program.bindTexture(LLShaderMgr::DIFFUSE_MAP, &ids, ALSamplers::PointClamp);
+    program.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &ids);
+    program.bindTexture(LLShaderMgr::SPECULAR_MAP, &tiles, ALSamplers::PointClamp);
     const S32 channel = program.enableTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
     if (channel > -1)
     {
         gGL.getTextureSlot(channel)->bindManual(ALTextureSlot::TT_TEXTURE, palette, gGL.getSampler(ALSamplers::PointClamp));
     }
-    program.uniform1i(radius_uniform, llmax(radius, 1));
-    program.uniform1i(rings_uniform, ringCount(radius));
+    program.uniform1i(width_uniform, llmax(view.mWidth, 1));
+    program.uniform1i(inner_width_uniform, llmax(view.mInnerWidth, 1));
+
+    // The full-screen triangle takes no matrix; the projection is loaded for its inverse, which turns the ids'
+    // depth back into distance.
+    gGL.matrixMode(LLRender::MM_PROJECTION);
+    gGL.pushMatrix();
+    gGL.loadMatrix(view.mProjection);
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
 
     triangle.setBuffer();
     triangle.drawArrays(LLRender::TRIANGLES, 0, 3);
 
+    gGL.matrixMode(LLRender::MM_PROJECTION);
+    gGL.popMatrix();
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+
     program.unbindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
+    program.unbindTexture(LLShaderMgr::SPECULAR_MAP);
+    program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
     program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
 }

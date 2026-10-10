@@ -2550,6 +2550,7 @@ if(AL_BUILD_TESTS)
     GL
     PROJECT ${test_project}
     LIBRARIES llrender
+    INCLUDES ${INDRA_SOURCE_DIR}/llprimitive
     DEFINES "AL_TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders\""
   )
   # The window's depth under the HUD: cleared in the HUD's rects, then the

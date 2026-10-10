@@ -1,7 +1,7 @@
 /**
  * @file selectionIdF.glsl
- * @brief The selection outline's id pass (ALSelectionOutline): a selected object's id, and whether the scene
- *        shows the surface.
+ * @brief The selection outline's id pass (ALSelectionOutline): a selected object's id and priority, and whether
+ *        the scene shows the surface, where the face's texture does not cut it out.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -27,11 +27,28 @@
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
 //[ENGINE_BLOCK Matrices]
 
-// .rg: the id, low byte then high byte; .b: 1 where the scene shows this surface, 0 where it hides it.
+// .rg: the id, low byte then high byte; .b: whether the outline draws this surface, 1 where the scene shows it,
+// 0.5 where the scene hides it and the object's hidden parts are drawn dimmed, 0 where they are left out; .a: the
+// object's priority.
 out vec4 frag_color;
+
+in vec2 vary_texcoord0;
 
 // The object's id, 1 to 65535. 0 is what the target is cleared to: no selected object.
 uniform int selection_id;
+
+// The object's priority (ALSelectionOutline::EPriority), 0 the highest.
+uniform int selection_priority;
+
+// 1 where the object's hidden parts are drawn dimmed, 0 where they are left out.
+uniform int selection_show_hidden;
+
+// The face's texture: a legacy face's diffuse map, a GLTF face's base colour.
+uniform sampler2D diffuseMap;
+
+// The texture alpha under which the face is cut out and the fragment left out of the target. At or under 0 the
+// face is opaque and its texture is not read.
+uniform float minimum_alpha;
 
 // 1 where the scene's depth decides what is hidden. 0 where it cannot be read, as on the HUD, which is drawn into
 // the window's framebuffer: every surface then counts as visible.
@@ -66,6 +83,14 @@ void main()
     float own = eyeDistance(gl_FragCoord.z);
     float slope = fwidth(own);
 
+    // Only the texture's alpha: the face's colour, whose alpha can make a prim invisible, does not cut it out.
+    // Read before anything is discarded, while the derivatives its level of detail is chosen from are defined.
+    float alpha = 1.0;
+    if (minimum_alpha > 0.0)
+    {
+        alpha = texture(diffuseMap, vary_texcoord0).a;
+    }
+
     float visible = 1.0;
     if (selection_scene_depth != 0)
     {
@@ -79,5 +104,12 @@ void main()
         visible = (own <= scene + reach + own * VISIBLE_SLACK) ? 1.0 : 0.0;
     }
 
-    frag_color = vec4(float(selection_id & 255) / 255.0, float((selection_id >> 8) & 255) / 255.0, visible, 1.0);
+    if (alpha < minimum_alpha)
+    {
+        discard;
+    }
+
+    float drawn = (visible > 0.5) ? 1.0 : ((selection_show_hidden != 0) ? 0.5 : 0.0);
+    frag_color = vec4(float(selection_id & 255) / 255.0, float((selection_id >> 8) & 255) / 255.0, drawn,
+                      float(selection_priority) / 255.0);
 }

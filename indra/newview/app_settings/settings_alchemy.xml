@@ -2405,6 +2405,17 @@
             <key>Value</key>
             <real>0.5</real>
         </map>
+        <key>AlchemySelectionOutlineWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width in pixels of the outline around selected objects, in the world and on the HUD, at a UI scale of 1; it grows with the UI scale. Range 1 to 16. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>4.0</real>
+        </map>
         <key>AlchemyRenderUBOUpdateMode</key>
         <map>
             <key>Comment</key>
