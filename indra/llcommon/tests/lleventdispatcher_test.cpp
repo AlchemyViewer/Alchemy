@@ -175,7 +175,9 @@ struct Vars
         const_cast<Vars*>(this)->method1(obj);
     }
 
-    static void smethod1(const LLSD& obj);
+    // Nothing registers it, but it keeps the set of three whole; internal
+    // now, and so unused as far as GCC's -Wunused-function is concerned.
+    [[maybe_unused]] static void smethod1(const LLSD& obj);
 
     /*-------- Arbitrary-params (non-const, const, static) methods ---------*/
     void methodna(NPARAMSa)

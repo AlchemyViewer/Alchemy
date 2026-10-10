@@ -67,30 +67,37 @@ namespace tut
         }
     } // anonymous namespace
 
-    struct SDTestData {
-        template<class T>
-        static void ensureTypeAndValue(const char* msg, const LLSD& actual,
-            T expectedValue)
-        {
-            LLSDTraits<T> traits;
+    // Free functions rather than members of SDTestData: the tests call
+    // them inside the bodies they hand the checks above, and MSVC does
+    // not find a member of the data struct by its bare name in a lambda.
+    // Static in tut rather than in the anonymous namespace, whose TUT
+    // ensure_equals would hide lltut.h's overloads for LLSD's types.
+    template<class T>
+    static void ensureTypeAndValue(const char* msg, const LLSD& actual,
+        T expectedValue)
+    {
+        LLSDTraits<T> traits;
 
-            std::string s(msg);
+        std::string s(msg);
 
-            ensure(         s + " type",    traits.checkType(actual));
-            ensure_equals(  s + " value",   traits.get(actual), expectedValue);
-        }
+        ensure(         s + " type",    traits.checkType(actual));
+        ensure_equals(  s + " value",   traits.get(actual), expectedValue);
+    }
 
-        template<class T>
-        static void ensureTypeAndRefValue(const char* msg, const LLSD& actual,
-            const T& expectedValue)
-        {
-            LLSDTraits<const T&> traits;
+    template<class T>
+    static void ensureTypeAndRefValue(const char* msg, const LLSD& actual,
+        const T& expectedValue)
+    {
+        LLSDTraits<const T&> traits;
 
-            std::string s(msg);
+        std::string s(msg);
 
-            ensure(         s + " type",    traits.checkType(actual));
-            ensure_equals(  s + " value",   traits.get(actual), expectedValue);
-        }
+        ensure(         s + " type",    traits.checkType(actual));
+        ensure_equals(  s + " value",   traits.get(actual), expectedValue);
+    }
+
+    struct SDTestData
+    {
     };
 
     typedef test_group<SDTestData>  SDTestGroup;
