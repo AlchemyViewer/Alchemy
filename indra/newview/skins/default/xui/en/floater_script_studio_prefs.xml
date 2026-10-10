@@ -550,6 +550,31 @@ end</floater.string>
              tool_tip="Formatting puts one space around operators and after commas; off, it only fixes indentation"
              top_pad="6"
              width="370" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="format_width_label"
+             top_pad="8"
+             width="170">
+                Break lines longer than:
+            </text>
+            <spinner
+             control_name="ALScriptFormatWidth"
+             decimal_digits="0"
+             follows="left|top"
+             height="20"
+             increment="10"
+             label_width="0"
+             layout="topleft"
+             left_pad="4"
+             max_val="400"
+             min_val="0"
+             name="format_width"
+             tool_tip="Formatting breaks a line with more columns than this at the commas of a bracket on it, each part on a line of its own; 0 never breaks a line"
+             top_delta="-2"
+             width="60" />
 
             <!-- The right column: the studio, the caret, the hover card. -->
             <text

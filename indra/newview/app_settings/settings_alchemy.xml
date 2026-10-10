@@ -882,6 +882,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALScriptFormatWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>How many columns a line may take before Script Studio's formatter breaks it, at the commas of a bracket on it; 0 never breaks a line.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>120</integer>
+        </map>
         <key>ALScriptFixOnSave</key>
         <map>
             <key>Comment</key>

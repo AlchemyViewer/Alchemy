@@ -91,7 +91,7 @@ namespace
         "ALScriptStudioAutoClose",
         "ALScriptStudioCaretStyle",  "ALScriptStudioCaretBlink",   "ALScriptStudioHoverCards",  "ALScriptStudioHoverDelay",
         "ALScriptStudioVimClipboard",
-        "ALScriptFormatBlankLines",  "ALScriptFormatSpacing",      "ALScriptFormatOnSave",      "ALScriptTrimOnSave",        "ALScriptFixOnSave",
+        "ALScriptFormatBlankLines",  "ALScriptFormatSpacing",      "ALScriptFormatWidth",       "ALScriptFormatOnSave",      "ALScriptTrimOnSave",        "ALScriptFixOnSave",
         "ALScriptTemplateLSL",       "ALScriptTemplateSLua",       "ALScriptPreprocDefines",    "ExternalEditor",
         "ALScriptConvertLLTimers",   "ALScriptConvertDetectedTable", "ALScriptConvertSLuaCalls", "ALScriptConvertIdioms",
         "ALScriptConvertHandlerFields", "ALScriptConvertTypes",    "ALScriptConvertComments",   "ALScriptConvertKeepComments",

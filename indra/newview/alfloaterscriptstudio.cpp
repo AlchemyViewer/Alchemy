@@ -7625,26 +7625,13 @@ void ALFloaterScriptStudio::format(Doc& doc, bool selection_only)
     options.tabs          = !doc.editor->getSoftTabs();
     options.maxBlankLines = llclamp(gSavedSettings.getS32("ALScriptFormatBlankLines"), 0, 10);
     options.spacing       = gSavedSettings.getBOOL("ALScriptFormatSpacing");
-    const std::string text      = document.text();
-    const std::string formatted = ALScriptFormatter::formatLines(text, options, first, last);
-    // Line for line, since only some lines were asked for and the
-    // formatter keeps every line's number that way; each line that
-    // changed is one edit, and the whole one step.
-    std::vector<std::string> lines;
-    {
-        size_t at = 0;
-        while (at <= formatted.size())
-        {
-            const size_t nl = formatted.find('\n', at);
-            if (nl == std::string::npos)
-            {
-                lines.push_back(formatted.substr(at));
-                break;
-            }
-            lines.push_back(formatted.substr(at, nl - at));
-            at = nl + 1;
-        }
-    }
+    options.width         = llmax(0, gSavedSettings.getS32("ALScriptFormatWidth"));
+    const std::string text = document.text();
+    // Line for line, since only some lines may be asked for and the
+    // formatter gives each line's as one, a line broken at the width
+    // and all; each line that changed is one edit, and the whole one
+    // step.
+    const std::vector<std::string> lines = ALScriptFormatter::formatEach(text, options, first, last);
     if (static_cast<S32>(lines.size()) != count)
     {
         // Said, rather than the command doing nothing where it was asked.
