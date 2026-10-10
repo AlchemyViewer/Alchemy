@@ -136,7 +136,7 @@ namespace tut
     template<> template<>
     void alkeymap_object::test<5>()
     {
-        set_test_name("the slash key is heard as the SDL windows name it: KEY_DIVIDE comments as '/' does, and binds as '/'");
+        set_test_name("the keypad's slash is heard as the slash key: KEY_DIVIDE comments as '/' does, and binds as '/'");
         ALKeymap map = ALKeymap::standard();
         ensure("Control with the slash key as '/'", map.lookup('/', MASK_CONTROL) == C::ToggleComment);
         ensure("and as KEY_DIVIDE", map.lookup(KEY_DIVIDE, MASK_CONTROL) == C::ToggleComment);

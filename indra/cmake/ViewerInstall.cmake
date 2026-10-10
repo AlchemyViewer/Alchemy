@@ -693,7 +693,15 @@ if(LINUX)
     DESTINATION etc
     COMPONENT viewer
   )
-  install(DIRECTORY "${al_newview_dir}/res-sdl" DESTINATION . COMPONENT viewer)
+  # The window's cursors, and not the ll_icon.BMP older configures copied in
+  # beside them: the window's icon is the desktop entry's now, below.
+  install(
+    DIRECTORY "${al_newview_dir}/res-sdl"
+    DESTINATION .
+    COMPONENT viewer
+    FILES_MATCHING
+    PATTERN "*.png"
+  )
 
   # The desktop entry, its AppStream data and its icons, laid out under share/
   # as they go under /usr/share. The entry runs the launcher by the package

@@ -108,26 +108,12 @@ if(AL_BUILD_VIEWER)
 
   find_package(unofficial-alchemy-branding CONFIG REQUIRED)
   set(BRANDING_SOURCE_DIR "${ALCHEMY_BRANDING_DIR}")
+  # Linux's window takes the hicolor PNGs installed for the desktop entry
+  # (ViewerInstall.cmake), and macOS's the bundle's alchemy.icns.
   if(WINDOWS)
     file(
       COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.ico"
       "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.ico"
-      ONLY_IF_DIFFERENT
-    )
-    file(
-      COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
-      "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.BMP"
-      ONLY_IF_DIFFERENT
-    )
-    file(
-      COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
-      "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
-      ONLY_IF_DIFFERENT
-    )
-  elseif(LINUX)
-    file(
-      COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
-      "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
       ONLY_IF_DIFFERENT
     )
   endif()
@@ -1999,8 +1985,6 @@ if(AL_BUILD_VIEWER)
       res/lltooltranslate.cur
       res/lltoolzoomin.cur
       res/lltoolzoomout.cur
-      res-sdl/ll_icon.BMP
-      res/ll_icon.BMP
       res/ll_icon.ico
       res/resource.h
       res/toolpickobject.cur
