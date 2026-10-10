@@ -195,6 +195,7 @@ public:
     void bringToFront(const std::string& activation_token);
 
     void setLanguageTextInput(const LLCoordGL& pos) override;
+    void updateLanguageTextInputArea() override;
     void allowLanguageTextInput(LLPreeditor* preeditor, bool b) override;
 
     void spawnWebBrowser(const std::string &escaped_url, bool async) override;
@@ -473,6 +474,12 @@ private:
     // delivery on regardless of composition state, there is no way to get
     // just-the-commits from SDL3.
     LLPreeditor* mPreeditor = nullptr;
+
+    // Hand the platform IME the text input area of mPreeditor, the caret
+    // and the preedit around it, as the preeditor places them, so the IME's
+    // candidate window opens under the caret. False when there is no
+    // preeditor or it cannot place its caret (scrolled out of sight).
+    bool placeLanguageTextInputArea();
 
     enum EServerProtocol{ X11, Wayland, Unknown };
     EServerProtocol mServerProtocol = Unknown;

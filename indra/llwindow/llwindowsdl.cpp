@@ -2405,9 +2405,11 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             mPreeditor->resetPreedit();
 
             // An empty composition string means the IME cancelled or cleared
-            // the preedit; the reset above is the entire job.
+            // the preedit; the reset above did that, and the IME's area goes
+            // back to the caret the reset left.
             if (empty)
             {
+                placeLanguageTextInputArea();
                 break;
             }
 
@@ -2439,6 +2441,12 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             const LLPreeditor::segment_lengths_t lengths { static_cast<S32>(preedit.length()) };
             const LLPreeditor::standouts_t standouts { false };
             mPreeditor->updatePreedit(preedit, lengths, standouts, caret);
+
+            // The composition moved the caret, and with it where the
+            // candidate window belongs; the IME is told now rather than at
+            // the preeditor's next draw, as the Win32 backend does after every
+            // WM_IME_COMPOSITION.
+            placeLanguageTextInputArea();
             break;
         }
 
@@ -4182,6 +4190,74 @@ LLFontFallbackMatch LLWindowSDL::findFallbackFontForChar(llwchar wch)
     return result;
 }
 
+bool LLWindowSDL::placeLanguageTextInputArea()
+{
+    if (!mWindow || !mPreeditor)
+    {
+        return false;
+    }
+
+    // The preeditor's own caret and bounds — the line of text the caret is
+    // on, across the preedit, or at the caret itself when nothing is being
+    // composed — so the platform IME anchors its candidate window to the
+    // real text rather than a box guessed at the caret. Mirrors how the
+    // Win32 backend builds CANDIDATEFORM from the same query, in its own
+    // updateLanguageTextInputArea.
+    LLCoordGL caret_gl;
+    LLRect bounds_gl;
+    if (!mPreeditor->getPreeditLocation(-1, &caret_gl, &bounds_gl, nullptr))
+    {
+        return false;
+    }
+
+    // LLRect uses GL convention (Y up, mTop > mBottom). convertCoords
+    // flips Y so the GL-top-left maps to the window-top-left (the
+    // corner with the smaller window-Y), and likewise GL-bottom-right
+    // maps to window-bottom-right.
+    LLCoordWindow top_left;
+    LLCoordWindow bottom_right;
+    LLCoordWindow caret_win;
+    convertCoords(LLCoordGL(bounds_gl.mLeft, bounds_gl.mTop), &top_left);
+    convertCoords(LLCoordGL(bounds_gl.mRight, bounds_gl.mBottom), &bottom_right);
+    convertCoords(caret_gl, &caret_win);
+
+    // SDL_SetTextInputArea wants the rect and cursor offset in screen-coord
+    // (logical) units, not pixels — that's the unit the IME backends
+    // (ibus / fcitx / text-input-v3 / XIM / Cocoa) speak. LLCoordWindow on
+    // this backend is in PIXELS (see the coord-space contract above), so we
+    // divide by pixel density at the boundary.
+    const float density = SDL_GetWindowPixelDensity(mWindow);
+    const float div = density > 0.f ? density : 1.f;
+
+    SDL_Rect rect;
+    rect.x = llfloor(top_left.mX / div);
+    rect.y = llfloor(top_left.mY / div);
+    rect.w = llfloor((bottom_right.mX - top_left.mX) / div);
+    rect.h = llfloor((bottom_right.mY - top_left.mY) / div);
+
+    // A widget that's still being laid out can return a default-
+    // constructed LLRect (all zeros), which would anchor the IME popup to
+    // the window origin. No width is fine, though: it is what every
+    // preeditor gives for a bare caret, before anything is composed, which
+    // is just when the IME first needs to know.
+    if (rect.h <= 0 || rect.w < 0)
+    {
+        return false;
+    }
+
+    // The cursor is the caret's offset from rect.x. ibus, fcitx and XIM put
+    // the candidate window at rect.x + cursor, under the rect; text-input-v3
+    // clamps that to the rect's right edge; Cocoa takes the rect alone.
+    const int cursor_x = llfloor((caret_win.mX - top_left.mX) / div);
+    SDL_SetTextInputArea(mWindow, &rect, cursor_x);
+    return true;
+}
+
+void LLWindowSDL::updateLanguageTextInputArea()
+{
+    placeLanguageTextInputArea();
+}
+
 void LLWindowSDL::setLanguageTextInput(const LLCoordGL& position)
 {
     if (!mWindow)
@@ -4189,61 +4265,19 @@ void LLWindowSDL::setLanguageTextInput(const LLCoordGL& position)
         return;
     }
 
-    // SDL_SetTextInputArea wants the rect and cursor offset in screen-coord
-    // (logical) units, not pixels — that's the unit the IME backends
-    // (ibus / fcitx / IMM via SDL) speak. LLCoordWindow on this backend is
-    // in PIXELS (see the coord-space contract above), so we divide by
-    // pixel density at the boundary.
-    const float density = SDL_GetWindowPixelDensity(mWindow);
-    const float div = density > 0.f ? density : 1.f;
-
-    // If the active preeditor can give us its actual bounds + caret, feed
-    // those to SDL so the platform IME anchors its candidate-list popup to
-    // the real text input area (rather than a magic 500x16 box guessed at
-    // the caret). Mirrors how the Win32 backend builds CANDIDATEFORM from
-    // the same LLPreeditor::getPreeditLocation query — see
-    // llwindowwin32.cpp:4164.
-    if (mPreeditor)
+    // The active preeditor's caret and bounds where it can give them.
+    if (placeLanguageTextInputArea())
     {
-        LLCoordGL caret_gl;
-        LLRect bounds_gl;
-        if (mPreeditor->getPreeditLocation(-1, &caret_gl, &bounds_gl, nullptr))
-        {
-            // LLRect uses GL convention (Y up, mTop > mBottom). convertCoords
-            // flips Y so the GL-top-left maps to the window-top-left (the
-            // corner with the smaller window-Y), and likewise GL-bottom-right
-            // maps to window-bottom-right.
-            LLCoordWindow top_left;
-            LLCoordWindow bottom_right;
-            convertCoords(LLCoordGL(bounds_gl.mLeft, bounds_gl.mTop), &top_left);
-            convertCoords(LLCoordGL(bounds_gl.mRight, bounds_gl.mBottom), &bottom_right);
-
-            LLCoordWindow caret_win;
-            convertCoords(caret_gl, &caret_win);
-
-            SDL_Rect rect;
-            rect.x = llfloor(top_left.mX / div);
-            rect.y = llfloor(top_left.mY / div);
-            rect.w = llfloor((bottom_right.mX - top_left.mX) / div);
-            rect.h = llfloor((bottom_right.mY - top_left.mY) / div);
-
-            // A widget that's still being laid out can return a default-
-            // constructed LLRect (all zeros); SDL_SetTextInputArea with a
-            // zero-sized rect would anchor the IME popup to the window
-            // origin. Fall through to the caret-based fallback instead.
-            if (rect.w > 0 && rect.h > 0)
-            {
-                const int cursor_x = llfloor((caret_win.mX - top_left.mX) / div);
-                SDL_SetTextInputArea(mWindow, &rect, cursor_x);
-                return;
-            }
-        }
+        return;
     }
 
     // Fallback: no preeditor (or it couldn't compute its bounds). Use a
     // single-line guess centred at the supplied caret position, in line with
     // the pre-improvement behaviour — enough for the IME to place its popup
     // roughly under the cursor.
+    const float density = SDL_GetWindowPixelDensity(mWindow);
+    const float div = density > 0.f ? density : 1.f;
+
     LLCoordWindow caret_win;
     convertCoords(position, &caret_win);
 
@@ -4276,6 +4310,10 @@ void LLWindowSDL::allowLanguageTextInput(LLPreeditor* preeditor, bool b)
     if (b)
     {
         mPreeditor = preeditor;
+        // Tell the IME where the new owner's caret is now rather than at its
+        // next draw: the first key composed can open the candidate window
+        // before then.
+        placeLanguageTextInputArea();
         return;
     }
 

@@ -4395,12 +4395,20 @@ bool ALTextView::getPreeditLocation(S32 query_offset, LLCoordGL* coord, LLRect* 
     }
     if (bounds)
     {
-        S32       row_begin, row_end;
-        const F32 x0 = lay().xOf(begin.line, begin.column, &row_begin);
-        F32       x1 = lay().xOf(begin.line, begin.column + mPreeditLength, &row_end);
-        if (row_end != row_begin)
+        // The preedit's span on the query's row, which is the row the top
+        // is of: from the row's start where the preedit began on a row
+        // before, to its end where it goes on to a row after.
+        S32 row_begin, row_end, row_at;
+        F32 x0 = lay().xOf(begin.line, begin.column, &row_begin);
+        F32 x1 = lay().xOf(begin.line, begin.column + mPreeditLength, &row_end);
+        lay().xOf(query.line, query.column, &row_at);
+        if (row_begin != row_at)
         {
-            x1 = lay().line(begin.line).rows[row_begin].width;
+            x0 = 0.f;
+        }
+        if (row_end != row_at)
+        {
+            x1 = lay().line(begin.line).rows[row_at].width;
         }
         LLRect local(static_cast<S32>(left + x0), top, static_cast<S32>(left + x1), top - row_h);
         LLRect screen;
@@ -5651,6 +5659,20 @@ void ALTextView::draw()
             const F32 baseline = static_cast<F32>(text.mTop - llround(mFont->getAscenderHeight()));
             mFont->renderUTF8(mPlaceholder, 0, static_cast<F32>(text.mLeft), baseline, lerp(backgroundColor(), textColor(), 0.5f) % alpha, LLFontGL::LEFT,
                               LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, text.getWidth(), nullptr, true);
+        }
+    }
+    // The input method's window at the caret, kept there as the caret, the
+    // scroll and the view move, as a text field keeps it from where it draws
+    // its caret: the caret's x, at the top of its row. Not while the caret
+    // is out of sight, where the window has nowhere to put it.
+    if (mLanguageInput && gFocusMgr.getAppHasFocus())
+    {
+        LLCoordGL caret;
+        LLRect    row;
+        LLWindow* window = getWindow();
+        if (window && getPreeditLocation(-1, &caret, &row, nullptr))
+        {
+            window->setLanguageTextInput(LLCoordGL(caret.mX, row.mTop));
         }
     }
     drawBars(alpha);
