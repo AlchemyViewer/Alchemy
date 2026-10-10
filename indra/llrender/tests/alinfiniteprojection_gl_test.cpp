@@ -93,34 +93,18 @@ namespace tut
         {
             return llmax(4.0 * depthStep(d), 4.0 * (F64)(std::nextafter(dist, 2.f * dist) - dist));
         }
-    }
 
     struct alinfiniteprojection_data
     {
-        static ll_test::HeadlessGL& gl()
-        {
-            static ll_test::HeadlessGL instance(true, true, true, false);
-            return instance;
-        }
-
         alinfiniteprojection_data()
         {
-            gl();
             LLRender::sReverseZ = true;
         }
 
+        // The convention, clip control, depth state, viewport, target and
+        // program the tests change go back with mGL.
         ~alinfiniteprojection_data()
         {
-            LLRender::sReverseZ = false;
-            if (mReady)
-            {
-                glClipControl(GL_LOWER_LEFT, GL_NEGATIVE_ONE_TO_ONE);
-                glClearDepth(1.0);
-                glDepthFunc(GL_LESS);
-                glDisable(GL_DEPTH_TEST);
-                glViewport(0, 0, ll_test::HeadlessGL::WIDTH, ll_test::HeadlessGL::HEIGHT);
-                glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            }
             if (mFBO)
             {
                 glDeleteFramebuffers(1, &mFBO);
@@ -135,7 +119,6 @@ namespace tut
             }
             if (mProgram)
             {
-                glUseProgram(0);
                 glDeleteProgram(mProgram);
             }
         }
@@ -175,7 +158,6 @@ namespace tut
             glReadBuffer(GL_NONE);
             ensure_equals("complete", (U32)glCheckFramebufferStatus(GL_FRAMEBUFFER), (U32)GL_FRAMEBUFFER_COMPLETE);
 
-            mReady = true;
             glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
             glViewport(0, 0, SIZE, SIZE);
             glEnable(GL_DEPTH_TEST);
@@ -206,16 +188,17 @@ namespace tut
             return d;
         }
 
+        ll_test::SharedGLScope mGL;
         GLuint mFBO = 0;
         GLuint mDepth = 0;
         GLuint mVAO = 0;
         GLuint mProgram = 0;
-        bool mReady = false;
     };
 
     typedef test_group<alinfiniteprojection_data> alinfiniteprojection_t;
     typedef alinfiniteprojection_t::object alinfiniteprojection_object_t;
     tut::alinfiniteprojection_t tut_alinfiniteprojection("alinfiniteprojection_gl");
+    }
 
     // The matrix: recognised as infinite, stores near / distance, and its inverse gives w = 0 at the cleared
     // depth, which the reconstruction floor turns into MAX_RECONSTRUCT_DISTANCE. Finite and forward matrices are not.
