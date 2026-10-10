@@ -188,6 +188,13 @@ Rect ringQuad(const Layout& layout, S32 ring, S32 quad)
              llclamp((F64)(col - 1) * side, -rim, rim), llclamp((F64)(row - 1) * side, -rim, rim) };
 }
 
+LLVector4 cellSquare(const Layout& layout, F64 origin_x, F64 origin_y)
+{
+    const F64 x = (F64)(layout.mCentreX - layout.mCells) * layout.mWidth;
+    const F64 y = (F64)(layout.mCentreY - layout.mCells) * layout.mWidth;
+    return LLVector4((F32)(x - origin_x), (F32)(y - origin_y), (F32)layout.mWidth, (F32)layout.side());
+}
+
 void fillCells(const Layout& layout, const std::vector<Region>& regions, F32 default_height, std::vector<F32>& texels)
 {
     texels.resize((size_t)MAP_SIZE * MAP_SIZE * 2);

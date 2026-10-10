@@ -139,6 +139,10 @@ Rect cellRect(const Layout& layout, S32 i, S32 j);
 /// middle rows, bottom first, and 8 to 11 the top row.
 Rect ringQuad(const Layout& layout, S32 ring, S32 quad);
 
+/// What waterSurface.glsl's waterCellSquare holds: the square's south-west corner relative to a global origin (the
+/// agent region's, for agent space), a cell's width, and the cells a side.
+LLVector4 cellSquare(const Layout& layout, F64 origin_x, F64 origin_y);
+
 /// The cell map: MAP_SIZE x MAP_SIZE texels of (water height, flags), rows along y, texel (i, j) the square's cell
 /// (i, j). Flag bit 0 says a region is there; a cell with none takes `default_height`, the agent region's. Where two
 /// regions claim a cell the first listed has it. Texels past the square are filled the same way and never read.

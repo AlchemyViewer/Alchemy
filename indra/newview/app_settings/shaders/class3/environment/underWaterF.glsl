@@ -26,7 +26,8 @@
 out vec4 frag_color;
 
 uniform sampler2D bumpMap;
-uniform sampler2D exclusionTex;
+// 1 where the surface is drawn distorted, 0 where an exclusion prim covers it (the stencil's exclude bit).
+uniform float exclusionDistort;
 
 #ifdef TRANSPARENT_WATER
 uniform sampler2D screenTex;
@@ -59,7 +60,6 @@ void main()
 {
     mirrorClip(vary_position);
     vec2 screen_tc = (refCoord.xy/refCoord.z) * 0.5 + 0.5;
-    float water_mask = texture(exclusionTex, screen_tc).r;
 
     vec4 color;
 
@@ -71,7 +71,7 @@ void main()
 
     //figure out distortion vector (ripply)
     vec2 distort = screen_tc;
-    distort = mix(distort, distort+wavef.xy*refScale, water_mask);
+    distort = mix(distort, distort+wavef.xy*refScale, exclusionDistort);
 
 #ifdef TRANSPARENT_WATER
     vec4 fb = texture(screenTex, distort);

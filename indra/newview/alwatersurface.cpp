@@ -29,9 +29,11 @@
 #include "alfarplane.h"
 #include "llagent.h"
 #include "llagentcamera.h"
+#include "llglslshader.h"
 #include "llimagegl.h"
 #include "llregionhandle.h"
 #include "llrender.h"
+#include "llshadermgr.h"
 #include "llviewercamera.h"
 #include "llviewerregion.h"
 #include "llworld.h"
@@ -71,10 +73,14 @@ void ALWaterSurface::update()
     }
     mLayout = layout;
 
+    const LLVector3d agent_origin = agent_region->getOriginGlobal();
+    mSquare = ALWaterField::cellSquare(mLayout, agent_origin.mdV[VX], agent_origin.mdV[VY]);
+    mDefaultHeight = agent_region->getWaterHeight();
+
     mScratch.mCentreX = mLayout.mCentreX;
     mScratch.mCentreY = mLayout.mCentreY;
     mScratch.mCells = mLayout.mCells;
-    mScratch.mDefaultHeight = agent_region->getWaterHeight();
+    mScratch.mDefaultHeight = mDefaultHeight;
     if (mCellMap.notNull() && mScratch == mKey)
     {
         return;
@@ -101,4 +107,24 @@ void ALWaterSurface::release()
 {
     mCellMap = nullptr;
     mKey = Key();
+}
+
+void ALWaterSurface::bind(LLGLSLShader& shader) const
+{
+    if (mCellMap.notNull())
+    {
+        const S32 channel = shader.enableTexture(LLShaderMgr::WATER_CELL_MAP);
+        if (channel > -1)
+        {
+            gGL.getTextureSlot(channel)->bindSampled(mCellMap.get(), ALSamplers::PointClamp);
+        }
+        shader.uniform4fv(LLShaderMgr::WATER_CELL_SQUARE, 1, mSquare.mV);
+    }
+    else
+    {
+        // No cells: the square has none a side, so every point is past it.
+        const LLVector4 none(0.f, 0.f, REGION_WIDTH_METERS, 0.f);
+        shader.uniform4fv(LLShaderMgr::WATER_CELL_SQUARE, 1, none.mV);
+    }
+    shader.uniform1f(LLShaderMgr::WATER_DEFAULT_HEIGHT, mDefaultHeight);
 }

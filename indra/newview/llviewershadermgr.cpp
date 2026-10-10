@@ -158,6 +158,7 @@ LLGLSLShader        gObjectAlphaMaskNoColorProgram;
 //environment shaders
 LLGLSLShader        gWaterProgram;
 LLGLSLShader        gUnderWaterProgram;
+LLGLSLShader        gWaterExclusionProgram;
 
 //interface shaders
 LLGLSLShader        gHighlightProgram;
@@ -210,6 +211,7 @@ LLGLSLShader            gDeferredMultiSpotLightProgram;
 LLGLSLShader            gDeferredSunProgram;
 LLGLSLShader            gDeferredSunProbeProgram;
 LLGLSLShader            gHazeProgram;
+LLGLSLShader            gHazeOnWaterProgram;
 LLGLSLShader            gHazeWaterProgram;
 LLGLSLShader            gDeferredBlurLightProgram;
 LLGLSLShader            gDeferredSoftenProgram;
@@ -1014,6 +1016,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/shadowUtil.glsl",                      1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/aoUtil.glsl",                          1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/terrainSurface.glsl",                  1) );
+    index_channels.push_back(-1);    shaders.push_back( make_pair( "environment/waterSurface.glsl",                 1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/pbrterrainUtilF.glsl",                 1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/tonemapUtilF.glsl",                    1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "alchemy/colorGradeUtilF.glsl",                 1) );
@@ -1077,6 +1080,7 @@ bool LLViewerShaderMgr::loadShadersWater()
     {
         gWaterProgram.unload();
         gUnderWaterProgram.unload();
+        gWaterExclusionProgram.unload();
         return true;
     }
 
@@ -1128,6 +1132,21 @@ bool LLViewerShaderMgr::loadShadersWater()
             gUnderWaterProgram.addPermutation("TRANSPARENT_WATER", "1");
         }
         success = gUnderWaterProgram.createShader(mirror_variant());
+        llassert(success);
+    }
+
+    if (success)
+    {
+        // The exclusion pass's stencil write (LLDrawPoolWaterExclusion).
+        gWaterExclusionProgram.mName = "Water Exclusion Shader";
+        gWaterExclusionProgram.mFeatures.hasWaterSurface = true;
+        gWaterExclusionProgram.mShaderFiles.clear();
+        gWaterExclusionProgram.mShaderFiles.push_back(make_pair("environment/waterExclusionV.glsl", GL_VERTEX_SHADER));
+        gWaterExclusionProgram.mShaderFiles.push_back(make_pair("environment/waterExclusionF.glsl", GL_FRAGMENT_SHADER));
+        gWaterExclusionProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
+        gWaterExclusionProgram.mShaderGroup = LLGLSLShader::SG_WATER;
+        gWaterExclusionProgram.clearPermutations();
+        success = gWaterExclusionProgram.createShader();
         llassert(success);
     }
 
@@ -2516,26 +2535,37 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        gHazeProgram.mName = "Haze Shader";
-        gHazeProgram.mShaderFiles.clear();
-        gHazeProgram.mFeatures.hasSrgb                = true;
-        gHazeProgram.mFeatures.calculatesAtmospherics = true;
-        gHazeProgram.mFeatures.hasAtmospherics        = true;
-        gHazeProgram.mFeatures.hasGamma               = true;
-        gHazeProgram.mFeatures.isDeferred             = true;
-        gHazeProgram.mFeatures.hasShadows             = use_sun_shadow;
-        gHazeProgram.mFeatures.hasReflectionProbes    = mShaderLevel[SHADER_DEFERRED] > 2;
+        // The haze pass, and its variant for the water's pixels, which converges on the sky behind the water.
+        const auto load_haze = [&](LLGLSLShader& program, const char* name, bool on_water)
+        {
+            program.mName = name;
+            program.mShaderFiles.clear();
+            program.mFeatures.hasSrgb                = true;
+            program.mFeatures.calculatesAtmospherics = true;
+            program.mFeatures.hasAtmospherics        = true;
+            program.mFeatures.hasGamma               = true;
+            program.mFeatures.isDeferred             = true;
+            program.mFeatures.hasShadows             = use_sun_shadow;
+            program.mFeatures.hasReflectionProbes    = mShaderLevel[SHADER_DEFERRED] > 2;
 
-        gHazeProgram.clearPermutations();
-        gHazeProgram.mShaderFiles.push_back(make_pair("deferred/hazeV.glsl", GL_VERTEX_SHADER));
-        gHazeProgram.mShaderFiles.push_back(make_pair("deferred/hazeF.glsl", GL_FRAGMENT_SHADER));
+            program.clearPermutations();
+            program.mShaderFiles.push_back(make_pair("deferred/hazeV.glsl", GL_VERTEX_SHADER));
+            program.mShaderFiles.push_back(make_pair("deferred/hazeF.glsl", GL_FRAGMENT_SHADER));
 
-        add_common_permutations(&gHazeProgram);
+            add_common_permutations(&program);
+            if (on_water)
+            {
+                program.addPermutation("HAZE_ON_WATER", "1");
+            }
 
-        gHazeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            program.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
-        success = gHazeProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
-        llassert(success);
+            const bool loaded = program.createShader(LLGLSLShader::VARIANT_CLASSIC);
+            llassert(loaded);
+            return loaded;
+        };
+        success = load_haze(gHazeProgram, "Haze Shader", false) &&
+                  load_haze(gHazeOnWaterProgram, "Haze On Water Shader", true);
     }
 
 

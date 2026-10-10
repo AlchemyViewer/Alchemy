@@ -428,8 +428,9 @@ public:
     // should be called just before rendering pre-water alpha objects
     void doWaterHaze();
 
-    // Generate the water exclusion surface mask.
-    void doWaterExclusionMask();
+    // Mark where the PASS_INVISIBLE prims remove the water in the bound screen target's stencil
+    // (ALWaterStencil::EXCLUDE_BIT), against the scene's depth, before the water draws.
+    void doWaterExclusion();
 
     void postDeferredGammaCorrect(LLRenderTarget* screen_target);
 
@@ -885,7 +886,6 @@ public:
     LLRenderTarget          mSpotShadow[2];
 
     LLRenderTarget          mPbrBrdfLut;
-    LLRenderTarget          mWaterExclusionMask;
 
     // copy of the color/depth buffer just before gamma correction
     // for use by SSR

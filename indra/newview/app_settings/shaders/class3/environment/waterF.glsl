@@ -50,7 +50,6 @@ uniform sampler2D screenTex;
 uniform sampler2D depthMap;
 #endif
 
-uniform sampler2D exclusionTex;
 
 // Classic (legacy pre-PBR) sky lighting is a per-program compile-time variant, not a runtime
 // uniform: the two paths differ by whole blocks of maths and a probe sample, and only one of
@@ -249,8 +248,6 @@ void main()
 
     float shadow = 1.0f;
 
-    float water_mask = texture(exclusionTex, distort).r;
-
 #ifdef HAS_SUN_SHADOW
     shadow = sampleDirectionalShadow(pos.xyz, norm.xyz, distort);
 #endif
@@ -268,7 +265,6 @@ void main()
 #else
     fade = 1;
 #endif
-    fade *= water_mask;
     distort2 = mix(distort, distort2, min(1, fade * 10));
     depth = texture(depthMap, distort2).r;
 
@@ -283,9 +279,6 @@ void main()
 
 #else
     vec4 fb = applyWaterFogViewLinear(viewVec*2048.0, vec4(1.0));
-
-    if (water_mask < 1)
-        discard;
 #endif
 
     // The environment's blur, for the reflections and refractions alone.

@@ -325,6 +325,14 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         }
     }
 
+    if (features->hasWaterSurface)
+    {
+        if (!shader->attachFragmentObject("environment/waterSurface.glsl"))
+        {
+            return false;
+        }
+    }
+
     if(features->calculatesAtmospherics || features->hasGamma || features->isDeferred)
     {
         if (!shader->attachFragmentObject("windlight/atmosphericsVarsF.glsl"))
@@ -1822,7 +1830,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("skin_origin");
 
     mReservedUniforms.push_back("screenTex");
-    mReservedUniforms.push_back("exclusionTex");
+    mReservedUniforms.push_back("exclusionDistort");
     mReservedUniforms.push_back("eyeVec");
     mReservedUniforms.push_back("time");
     mReservedUniforms.push_back("bigWaveScroll");
@@ -2187,7 +2195,6 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("eyeToSky");
     mReservedUniforms.push_back("skyBehindMap");
-    mReservedUniforms.push_back("skyBehindWeight");
 
     mReservedUniforms.push_back("moonQuadCenter");
     mReservedUniforms.push_back("moonQuadU");
@@ -2212,6 +2219,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("selectionGlowReachMap");
     mReservedUniforms.push_back("selectionGlowRowMap");
 
+    mReservedUniforms.push_back("waterCellMap");
+    mReservedUniforms.push_back("waterCellSquare");
+    mReservedUniforms.push_back("waterDefaultHeight");
     mReservedUniforms.push_back("waterGlintRoughness");
 
     // The enum and this list are parallel, and an entry added or removed on one side only

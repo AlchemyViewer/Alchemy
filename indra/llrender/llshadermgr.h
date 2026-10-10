@@ -242,7 +242,7 @@ public:
         SKIN_ORIGIN,                        //  "skin_origin" (rigged path: agent-space rebase origin the palette translations were made relative to)
 
         WATER_SCREENTEX,                    //  "screenTex"
-        WATER_EXCLUSIONTEX,                 //  "exclusionTex"
+        WATER_EXCLUSION_DISTORT,            //  "exclusionDistort"  1 where the water below is distorted, 0 where an exclusion prim covers it
         WATER_EYEVEC,                       //  "eyeVec"
         WATER_TIME,                         //  "time"
         WATER_BIG_WAVE_SCROLL,              //  "bigWaveScroll"
@@ -609,7 +609,6 @@ public:
 
         EYE_TO_SKY,                         //  "eyeToSky"  eye space to the sky dome's (north, up, east)
         SKY_BEHIND_MAP,                     //  "skyBehindMap"  the sky dome behind everything, for the haze pass
-        SKY_BEHIND_WEIGHT,                  //  "skyBehindWeight"  1 while skyBehindMap holds this view's sky
 
         MOON_QUAD_CENTER,                   //  "moonQuadCenter"  the moon quad's centre direction, for the stars it covers
         MOON_QUAD_U,                        //  "moonQuadU"  its right half-extent over its squared length
@@ -634,6 +633,9 @@ public:
         SELECTION_GLOW_REACH_MAP,           //  "selectionGlowReachMap"  the glowing ids within the glow's reach of each tile
         SELECTION_GLOW_ROW_MAP,             //  "selectionGlowRowMap"  the nearest glowing texel along each texel's row
 
+        WATER_CELL_MAP,                     //  "waterCellMap"  the cells' water heights and flags (ALWaterSurface)
+        WATER_CELL_SQUARE,                  //  "waterCellSquare"  the cell square: its south-west corner in agent space, a cell's width, the cells a side
+        WATER_DEFAULT_HEIGHT,               //  "waterDefaultHeight"  the water height past the cell square, the agent region's
         WATER_GLINT_ROUGHNESS,              //  "waterGlintRoughness"  the roughness of the sun's reflection on each wave face
 
         END_RESERVED_UNIFORMS

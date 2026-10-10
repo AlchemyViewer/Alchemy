@@ -50,6 +50,7 @@
 #include "llsettingswater.h"
 #include "alfarplane.h"
 #include "alwaterfield.h"
+#include "alwaterstencil.h"
 
 bool LLDrawPoolWater::sSkipScreenCopy = false;
 bool LLDrawPoolWater::sNeedsReflectionUpdate = true;
@@ -210,8 +211,6 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         shader->bindTexture(LLViewerShaderMgr::BUMP_MAP2, tex_b, water_normal_sampler);
     }
 
-    shader->bindTexture(LLShaderMgr::WATER_EXCLUSIONTEX, &gPipeline.mWaterExclusionMask);
-
     shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
 
     F32      fog_density = pwater->getModifiedWaterFogDensity(underwater);
@@ -300,7 +299,19 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     {
         gPipeline.mWaterPrimitives.begin();
     }
-    pushWaterPlanes(0);
+    {
+        // Not where an exclusion prim removed the water (LLPipeline::doWaterExclusion), and marking where it is.
+        ALWaterStencil::Surface stencil;
+        shader->uniform1f(LLShaderMgr::WATER_EXCLUSION_DISTORT, 1.f);
+        pushWaterPlanes(0);
+    }
+    if (underwater)
+    {
+        // From below, the surface stays where an exclusion prim covers it, undistorted.
+        ALWaterStencil::Excluded stencil;
+        shader->uniform1f(LLShaderMgr::WATER_EXCLUSION_DISTORT, 0.f);
+        pushWaterPlanes(0);
+    }
     if (count_primitives)
     {
         gPipeline.mWaterPrimitives.end();

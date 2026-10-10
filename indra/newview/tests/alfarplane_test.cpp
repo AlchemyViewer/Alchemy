@@ -179,7 +179,8 @@ namespace tut
         // Opaque geometry in the haze pass takes the in-scatter blended geometry takes in its own shading, and the
         // water surface alone converges on the sky behind it.
         ensure("the haze pass's in-scatter is alpha's", haze.find("atmosFragLighting(vec3(0), additive, atten)") != std::string::npos);
-        ensure("water converges on the sky behind", haze.find("if (on_water && skyBehindWeight > 0.0)") != std::string::npos);
+        ensure("water converges on the sky behind", haze.find("#ifdef HAZE_ON_WATER") != std::string::npos &&
+               haze.find("additive = mix(additive, sky * (vec3(1.0) - atten), vec3(1.0) - atten);") != std::string::npos);
         ensure("the sky behind is sampled for water", haze.find("texture(skyBehindMap, tc)") != std::string::npos);
         // The farthest geometry: a top corner of the edge water's extent, from as high above it as the water shows.
         const F64 edge = (F64)ALFarPlane::edgeWaterStretch(true) + MAX_FAR_CLIP;

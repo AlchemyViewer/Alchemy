@@ -2574,6 +2574,16 @@ if(AL_BUILD_TESTS)
     LIBRARIES llrender
     DEFINES "AL_TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders\""
   )
+  # The water surface's draws: the viewer's own water shaders read from the
+  # source tree over the cells the field lays out.
+  al_add_test(
+    alwatersurface_gl
+    GL
+    PROJECT ${test_project}
+    LIBRARIES llrender
+    SOURCES alwaterfield.cpp
+    DEFINES "AL_TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders\""
+  )
   # The outbox keeps what the pure feedback code makes.
   al_add_test(
     alfeedbackoutbox

@@ -28,11 +28,12 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "lldrawpoolwaterexclusion.h"
+
+#include "alwaterstencil.h"
+#include "llglstates.h"
+#include "llviewercamera.h"
 #include "llviewershadermgr.h"
 #include "pipeline.h"
-#include "llglcommonfunc.h"
-#include "llvoavatar.h"
-#include "lldrawpoolwater.h"
 
 LLDrawPoolWaterExclusion::LLDrawPoolWaterExclusion() : LLRenderPass(LLDrawPool::POOL_WATEREXCLUSION)
 {
@@ -40,38 +41,34 @@ LLDrawPoolWaterExclusion::LLDrawPoolWaterExclusion() : LLRenderPass(LLDrawPool::
 }
 
 
+// The PASS_INVISIBLE prims into the bound screen target's stencil: the exclude bit wherever one lies in front of the
+// scene and on the camera's side of the water surface (waterExclusionF.glsl). No colour and no depth.
 void LLDrawPoolWaterExclusion::render(S32 pass)
-{                                             // render invisiprims
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; // LL_RECORD_BLOCK_TIME(FTM_RENDER_INVISIBLE);
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
-    if (gPipeline.shadersLoaded())
+    LLGLSLShader& shader = gWaterExclusionProgram;
+    if (!shader.isComplete())
     {
-        gDrawColorProgram.bind();
+        return;
     }
 
+    shader.bind();
+    gPipeline.mWaterSurface.bind(shader);
 
-    LLGLDepthTest depth(GL_TRUE);
-    gDrawColorProgram.uniform4f(LLShaderMgr::DIFFUSE_COLOR, 1, 1, 1, 1);
+    // The camera the batches are drawn from, whose view the modelview starts at.
+    const LLCamera& camera = LLViewerCamera::getCurrent();
+    LLMatrix4a eye_to_agent;
+    eye_to_agent.setAffineInverse(camera.getModelview());
+    shader.uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_MATRIX, eye_to_agent);
+    shader.uniform3fv(LLShaderMgr::WL_CAMPOSLOCAL, 1, camera.getOrigin().mV);
 
-    LLDrawPoolWater* pwaterpool = (LLDrawPoolWater*)gPipeline.getPool(LLDrawPool::POOL_WATER);
-    if (pwaterpool)
     {
-        // Just treat our water planes as double sided for the purposes of generating the exclusion mask.
-        LLGLDisable cullface(GL_CULL_FACE);
-        pwaterpool->pushWaterPlanes(0);
-
-        // Take care of the edge water tiles.
-        pwaterpool->pushWaterPlanes(1);
+        LLGLDepthTest depth(GL_TRUE, GL_FALSE);
+        LLGLSColorMask no_color(false, false);
+        ALWaterStencil::Exclude stencil;
+        pushBatches(LLRenderPass::PASS_INVISIBLE, false, false);
     }
 
-    gDrawColorProgram.uniform4f(LLShaderMgr::DIFFUSE_COLOR, 0, 0, 0, 1);
-    gDrawColorProgram.uniform1f(LLShaderMgr::WATER_WATERSIGN, 1.f);
-
-    pushBatches(LLRenderPass::PASS_INVISIBLE, false, false);
-
-
-    if (gPipeline.shadersLoaded())
-    {
-        gDrawColorProgram.unbind();
-    }
+    shader.unbind();
 }

@@ -60,6 +60,7 @@
 #include "alfarplane.h"
 #include "alfarplaneoverlay.h"
 #include "alselectionoutline.h"
+#include "alwaterstencil.h"
 #include "llrender.h"
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
@@ -962,8 +963,10 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
     //allocate deferred rendering color buffers
     // Main scene depth flips to float32 under reverse-Z (mRT->screen inherits it below via
-    // shareDepthBuffer); same 4 bytes/px as DEPTH24 on desktop GPUs.
-    if (!mRT->deferredScreen.allocate(resX, resY, GL_SRGB8_ALPHA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat())) return false;
+    // shareDepthBuffer). It carries stencil, where the water keeps its per-pixel facts
+    // (alwaterstencil.h): DEPTH32F_STENCIL8, 8 bytes/px, under reverse-Z, DEPTH24_STENCIL8 under
+    // forward-Z. The G-buffer clear empties it each frame.
+    if (!mRT->deferredScreen.allocate(resX, resY, GL_SRGB8_ALPHA8, true, true, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat())) return false;
     if (!addDeferredAttachments(mRT->deferredScreen)) return false;
 
     GLuint screenFormat = hdr ? GL_RGBA16F : GL_RGBA8;
@@ -1061,9 +1064,9 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         }
 
         //water reflection texture (always needed as scratch space whether or not transparent water is enabled)
-        // mWaterDis and mSceneMap receive depth blits from mRT->screen, so their depth format
-        // must match it -- flip together via mainDepthFormat().
-        mWaterDis.allocate(resX, resY, screenFormat, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
+        // mWaterDis and mSceneMap receive depth blits from every pack's mRT->screen, so their depth
+        // format must match it, stencil included -- flip together via mainDepthFormat().
+        mWaterDis.allocate(resX, resY, screenFormat, true, true, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
 
         // The format the sky's colour lands in (addDeferredAttachments), so the sky behind clamps and quantizes as the sky
         // does: the emissive attachment's float with HDR, and 8 bits otherwise, the emissive attachment's or the albedo's,
@@ -1074,21 +1077,12 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
         if(RenderScreenSpaceReflections)
         {
-            mSceneMap.allocate(resX, resY, screenFormat, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
+            mSceneMap.allocate(resX, resY, screenFormat, true, true, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
         }
         else
         {
             mSceneMap.release();
         }
-
-        // The water exclusion mask needs its own depth buffer so we can take care of the problem of multiple water planes.
-        // Should we ever make water not just a plane, it also aids with that as well as the water planes will be rendered into the mask.
-        // Why do we do this? Because it saves us some janky logic in the exclusion shader when we generate the mask.
-        // Regardless, this should always only be an R8 texture unless we choose to start having multiple kinds of exclusion that 8 bits can't handle.
-        // - Geenz 2025-02-06
-        bool success = mWaterExclusionMask.allocate(resX, resY, GL_R8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
-
-        assert(success);
 
         // used to scale down textures
         // See LLViwerTextureList::updateImagesCreateTextures and LLImageGL::scaleDown
@@ -1365,8 +1359,6 @@ void LLPipeline::releaseGLBuffers()
     mSkyBehindFrame = 0;
 
     mSceneMap.release();
-
-    mWaterExclusionMask.release();
 
     mFXAAMap.release();
     mSMAABlendBuffer.release();
@@ -4806,7 +4798,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
 
         if (cur_type >= water_exclusion_pass && !done_water_exclusion)
         { // do water exclusion against depth buffer before rendering alpha
-            doWaterExclusionMask();
+            doWaterExclusion();
             done_water_exclusion = true;
         }
 
@@ -11599,38 +11591,58 @@ void LLPipeline::doAtmospherics()
         // The caller's mask comes back for the pools drawn after the haze.
         LLGLSColorMask color_mask(true, true);
 
-        // apply haze
-        LLGLSLShader& haze_shader = *gHazeProgram.selectVariant();
-
         LL_PROFILE_GPU_ZONE("haze");
-        bindDeferredShader(haze_shader, nullptr, &mWaterDis);
-
-        LLEnvironment& environment = LLEnvironment::instance();
-        haze_shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
-        haze_shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
-
-        haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
-
-        // Far water converges on the sky drawn behind it when this view's is there: the main view's alone, once the
-        // sky pool has drawn it this frame (HDRI skies and probe captures keep WindLight's own limit).
-        const bool sky_behind = !gCubeSnapshot && mRT == &mMainRT && mSkyBehind.isComplete() && mSkyBehindFrame == gFrameCount;
-        haze_shader.uniform1f(LLShaderMgr::SKY_BEHIND_WEIGHT, sky_behind ? 1.f : 0.f);
-        if (sky_behind)
-        {
-            haze_shader.bindTexture(LLShaderMgr::SKY_BEHIND_MAP, &mSkyBehind, ALSamplers::BilinearClamp);
-        }
 
         // The triangle lies on the far plane (hazeV.glsl), level with the depth the sky leaves cleared: the test
         // passes only where the world drew something, so the sky is rejected before it is shaded. The screen
         // target shares the G-buffer's depth; the shader reads its copy in mWaterDis.
         LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
 
-        // full screen blit
-        mScreenTriangleVB->setBuffer();
-        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+        const auto apply_haze = [this](LLGLSLShader& haze_shader, bool on_water)
+        {
+            bindDeferredShader(haze_shader, nullptr, &mWaterDis);
 
-        haze_shader.disableTexture(LLShaderMgr::SKY_BEHIND_MAP);
-        unbindDeferredShader(haze_shader);
+            LLEnvironment& environment = LLEnvironment::instance();
+            haze_shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
+            haze_shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
+
+            haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
+
+            if (on_water)
+            {
+                haze_shader.bindTexture(LLShaderMgr::SKY_BEHIND_MAP, &mSkyBehind, ALSamplers::BilinearClamp);
+            }
+
+            // full screen blit
+            mScreenTriangleVB->setBuffer();
+            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+            if (on_water)
+            {
+                haze_shader.disableTexture(LLShaderMgr::SKY_BEHIND_MAP);
+            }
+            unbindDeferredShader(haze_shader);
+        };
+
+        // Far water converges on the sky drawn behind it when this view's is there: the main view's alone, once the
+        // sky pool has drawn it this frame (HDRI skies and probe captures keep WindLight's own limit). The water
+        // marked its own pixels in the stencil, so the two draws shade each pixel once.
+        const bool sky_behind = !gCubeSnapshot && mRT == &mMainRT && mSkyBehind.isComplete() && mSkyBehindFrame == gFrameCount;
+        if (sky_behind)
+        {
+            {
+                ALWaterStencil::OffWater stencil;
+                apply_haze(*gHazeProgram.selectVariant(), false);
+            }
+            {
+                ALWaterStencil::OnWater stencil;
+                apply_haze(*gHazeOnWaterProgram.selectVariant(), true);
+            }
+        }
+        else
+        {
+            apply_haze(*gHazeProgram.selectVariant(), false);
+        }
 
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
@@ -11673,7 +11685,6 @@ void LLPipeline::doWaterHaze()
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
         haze_shader.uniform1i(LLShaderMgr::WATER_ABOVE_WATER, sUnderWaterRender ? -1 : 1);
-        haze_shader.bindTexture(LLShaderMgr::WATER_EXCLUSIONTEX, &mWaterExclusionMask);
 
         if (LLPipeline::sUnderWaterRender)
         {
@@ -11690,6 +11701,8 @@ void LLPipeline::doWaterHaze()
             // above-water depth test in waterHazeF.glsl (which flips its compare direction).
             LLGLDepthTest depth(GL_TRUE, GL_FALSE);
             LLGLDisable   cull(GL_CULL_FACE);
+            // Not where an exclusion prim removed the water.
+            ALWaterStencil::NotExcluded stencil;
 
             gGLLastMatrix = NULL;
             gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
@@ -11708,7 +11721,7 @@ void LLPipeline::doWaterHaze()
     }
 }
 
-void LLPipeline::doWaterExclusionMask()
+void LLPipeline::doWaterExclusion()
 {
     if (sImpostorRender)
     {   // No water in an impostor bake -- generateImpostor clears every water render type --
@@ -11720,17 +11733,11 @@ void LLPipeline::doWaterExclusionMask()
     }
 
     LL_PROFILE_GPU_ZONE("water exclusion");
-    mWaterExclusionMask.bindTarget();
-    gGL.setClearColor(LLColor4::white);
-    mWaterExclusionMask.clear();
-    // Made in init and kept to cleanup. Without it the mask stays cleared, excluding nothing.
+    // Made in init and kept to cleanup. Without it nothing marks the stencil, which excludes nothing.
     if (mWaterExclusionPool)
     {
         mWaterExclusionPool->render();
     }
-
-    mWaterExclusionMask.flush();
-    gGL.setClearColor(LLColor4::transparent);
 }
 
 // The map from clip space to a texture: x and y from [-1, 1] to [0, 1], z by

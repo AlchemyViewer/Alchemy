@@ -26,10 +26,12 @@
 
 #include "alwaterfield.h"
 
+#include "indra_constants.h"
 #include "llpointer.h"
 
 #include <vector>
 
+class LLGLSLShader;
 class LLImageGL;
 
 /// The water's field for the frame: ALWaterField's layout around the main camera, and the cell map the water's shaders
@@ -50,6 +52,10 @@ public:
     /// Releases the map's texture.
     void release();
 
+    /// Binds the cell map and sets the uniforms environment/waterSurface.glsl reads on `shader`, bound. Before the
+    /// first update with an agent region, every point takes the agent region's height.
+    void bind(LLGLSLShader& shader) const;
+
     const ALWaterField::Layout& getLayout() const { return mLayout; }
 
     /// The cell map, null until the first update with an agent region.
@@ -68,6 +74,8 @@ private:
     };
 
     ALWaterField::Layout mLayout;
+    LLVector4            mSquare;
+    F32                  mDefaultHeight = DEFAULT_WATER_HEIGHT;
     Key                  mKey;
     Key                  mScratch;
     std::vector<F32>     mTexels;
