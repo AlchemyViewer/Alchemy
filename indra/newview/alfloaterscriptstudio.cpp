@@ -4240,7 +4240,7 @@ std::vector<ALTextPos> ALFloaterScriptStudio::problemPlaces(const Doc& doc, bool
     std::vector<ALTextPos> places;
     for (const Doc::Shown& row : doc.shown())
     {
-        if (row.file.empty() && row.origin != definitions && row.origin != weight && (!migration || row.migration))
+        if (row.file.empty() && row.line >= 0 && row.origin != definitions && row.origin != weight && (!migration || row.migration))
         {
             places.push_back(doc.editor->document().clamp(ALTextPos(row.line, row.hasColumn ? row.column : 0)));
         }
@@ -4518,7 +4518,7 @@ void ALFloaterScriptStudio::problemChosen(const ALScriptProblemsPane::Place& pla
         }
         else
         {
-            const bool at = place.file.empty();
+            const bool at = place.file.empty() && place.line >= 0;
             goToPlace(place.ref, place.name, at ? place.line : 0, at && place.hasColumn ? place.column : 0, 0);
         }
         --mHoldPanes;
@@ -4551,6 +4551,14 @@ void ALFloaterScriptStudio::problemChosen(const ALScriptProblemsPane::Place& pla
         // In an include: opened in a tab of its own where it is a script
         // or a notecard in the world, or a file on disk.
         openIncludeAt(place.file, place.fileName, line, has_column ? column : -1, 0);
+    }
+    else if (line < 0)
+    {
+        // About no place in it: its tab, the caret where it was.
+        if (index != mActive)
+        {
+            activate(index);
+        }
     }
     else
     {

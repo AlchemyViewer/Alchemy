@@ -39,23 +39,39 @@
 // can hold them still.
 namespace ALScriptMessages
 {
+    // A place the words of a message name, as `previously declared at
+    // (345, 1)`: where it stands in them, and the line and column it
+    // names, zero-based. Written again as the source counts, where the
+    // text the compiler had is not the source's.
+    struct Mention
+    {
+        size_t at     = 0;
+        size_t length = 0;
+        S32    line   = 0;
+        S32    column = 0;
+    };
+
     // Zero-based line and column, as everything in the studio counts.
     struct Place
     {
         S32         line      = 0;
         S32         column    = 0;
         bool        hasColumn = false;
-        // A line named at all: not by what matched neither compiler's form.
+        // A line named at all: not by what matched no compiler's form.
         bool        hasLine   = false;
-        // The compiler's own word: ERROR or WARNING.
+        // The compiler's own word: ERROR, WARNING, or WARN.
         std::string level;
         std::string message;
+        std::vector<Mention> mentions;
     };
 
     // One line of what a compiler said. Luau names the chunk and a
     // one-based line; LSL gives a zero-based line and column in
-    // brackets with its level between colons; anything else is an error
-    // with no place. The language's form is tried first, then the other's.
+    // brackets with its level between colons; the grid's LSL compiler
+    // for Luau's VM, which is Tailslide, says `Line 320: WARN: words`,
+    // its line and the places its words name, `(345, 1)`, one-based;
+    // anything else is an error with no place. The language's form is
+    // tried first, then the other's, then Tailslide's.
     Place readDiagnostic(const std::string& line, bool lua);
     // Every line of them.
     std::vector<Place> readDiagnostics(const LLSD& errors, bool lua);

@@ -46,6 +46,8 @@
 #include "lldate.h"
 #include "llfocusmgr.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <utility>
 
@@ -244,12 +246,12 @@ std::vector<ALScriptStudioDoc::Compiled> ALScriptStudioDoc::compiledOf(const std
     for (const ALScriptDiagnostic& each : said)
     {
         Compiled one;
-        one.line      = each.line;
+        one.line      = each.hasLine ? each.line : -1;
         one.column    = each.column;
         one.hasColumn = each.hasColumn;
         one.level     = each.level;
-        one.message   = each.message;
-        if (map)
+        one.message   = mentionsMapped(each, map, under);
+        if (map && each.hasLine)
         {
             const ALSourceMap::Loc loc = map->toSource(each.line - under, each.column);
             if (loc.found())
@@ -271,6 +273,32 @@ std::vector<ALScriptStudioDoc::Compiled> ALScriptStudioDoc::compiledOf(const std
         out.push_back(std::move(one));
     }
     return out;
+}
+
+// static
+std::string ALScriptStudioDoc::mentionsMapped(const ALScriptDiagnostic& said, const ALSourceMap* map, S32 under)
+{
+    std::string message = said.message;
+    if (!map)
+    {
+        return message;
+    }
+    // From the last, so that each before it is still where it was.
+    for (auto it = said.mentions.rbegin(); it != said.mentions.rend(); ++it)
+    {
+        const ALSourceMap::Loc loc = map->toSource(it->line - under, it->column);
+        if (!loc.found() || it->at + it->length > message.size())
+        {
+            continue;
+        }
+        std::string place = fmt::format("({}, {})", loc.line + 1, loc.column + 1);
+        if (loc.file > 0)
+        {
+            place += " in " + map->files()[loc.file].name;
+        }
+        message.replace(it->at, it->length, place);
+    }
+    return message;
 }
 
 std::string ALScriptStudioDoc::headerFor(const std::string& expanded_text, const Header& header) const

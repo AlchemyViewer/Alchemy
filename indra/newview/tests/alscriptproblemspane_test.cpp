@@ -892,4 +892,37 @@ namespace tut
         out.act("fix_migration");
         ensure("asked", !studio.kinds.empty() && studio.kinds.back() == "door:from LSL");
     }
+
+    template <>
+    template <>
+    void alscriptproblemspane_object::test<16>()
+    {
+        set_test_name("what names no line -- a compiler's line of no form it has, a run-time error of no place -- is listed at none, marked "
+                      "nowhere, and chosen at none; one that names a line, at it");
+        ALScriptProblemsPane& out = make();
+        Doc&                  d   = doc("door");
+        d.problems.push_back({ -1, 0, false, std::string(), "ERROR", "the compiler's, nowhere" });
+        d.problems.push_back({ 3, 0, false, std::string(), "WARN", "the compiler's, at 3" });
+        d.runtime.push_back({ -1, -1, std::string(), "Stack-Heap Collision", 1 });
+        const ALScriptProblemsPane::Made made = gather(d);
+        ensure_equals("all three", made.rows.size(), size_t(3));
+        ensure("at none, first", made.rows[0].line == -1 && made.rows[1].line == -1 && made.rows[2].line == 3);
+        ensure("a warning said WARN", made.rows[2].level == Doc::Level::Warning);
+        ensure("marked at its line alone", made.marks.size() == 1 && made.marks[0].first == 3);
+        ensure("waved at its line alone", made.decorations.size() == 1 && made.decorations[0].range.begin.line == 3);
+        out.fill(&d);
+        list()->updateSort();
+        for (const LLScrollListItem* item : list()->getAllData())
+        {
+            const std::string message = item->getColumn(1)->getValue().asString();
+            const std::string where   = item->getColumn(3)->getValue().asString();
+            ensure("where: " + message + " " + where, message == "the compiler's, at 3" ? where == "4" : where.empty());
+        }
+        choose("the compiler's, nowhere");
+        out.choose(false);
+        ensure_equals("chosen at none", studio.chosen.back().line, -1);
+        choose("the compiler's, at 3");
+        out.choose(false);
+        ensure_equals("chosen at its line", studio.chosen.back().line, 3);
+    }
 }

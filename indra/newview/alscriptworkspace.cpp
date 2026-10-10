@@ -659,6 +659,7 @@ std::vector<ALScriptDiagnostic> ALScriptWorkspace::parseDiagnostics(const LLSD& 
         diagnostic.hasLine   = place.hasLine;
         diagnostic.level     = place.level;
         diagnostic.message   = place.message;
+        diagnostic.mentions  = place.mentions;
         out.push_back(std::move(diagnostic));
     }
     return out;

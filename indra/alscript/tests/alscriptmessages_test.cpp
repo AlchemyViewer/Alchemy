@@ -218,4 +218,33 @@ namespace tut
         const ALScriptMessages::Place lsl = ALScriptMessages::readDiagnostic("(4, 2) : ERROR : Syntax error", true);
         ensure("LSL's, for SLua", lsl.hasLine && lsl.line == 4 && lsl.hasColumn && lsl.column == 2 && lsl.message == "Syntax error");
     }
+
+    template<> template<>
+    void alscriptmessages_object::test<11>()
+    {
+        set_test_name("Tailslide's line, as the grid's LSL compiler for Luau's VM says it: its line and the places its words name "
+                      "count from one, which the viewer counts from zero; its level as it says it");
+        const std::string said = "Line 320: WARN: Declaration of `activeRequest' in this scope shadows previous declaration at (345, 1)";
+        for (const bool lua : { false, true })
+        {
+            const ALScriptMessages::Place place = ALScriptMessages::readDiagnostic(said, lua);
+            ensure("a line named", place.hasLine && !place.hasColumn);
+            ensure_equals("one off the line", place.line, 319);
+            ensure_equals("its level", place.level, std::string("WARN"));
+            ensure_equals("the words past the level",
+                          place.message, std::string("Declaration of `activeRequest' in this scope shadows previous declaration at (345, 1)"));
+            ensure_equals("the place the words name", place.mentions.size(), size_t(1));
+            const ALScriptMessages::Mention& named = place.mentions.front();
+            ensure_equals("where it stands", place.message.substr(named.at, named.length), std::string("(345, 1)"));
+            ensure("one off each", named.line == 344 && named.column == 0);
+        }
+        const ALScriptMessages::Place error = ALScriptMessages::readDiagnostic("Line 1: ERROR: Duplicate declaration of `x'; previously "
+                                                                               "declared at (1, 9). And (2, 3).", false);
+        ensure("an error on the first line", error.hasLine && error.line == 0 && error.level == "ERROR");
+        ensure_equals("each place named", error.mentions.size(), size_t(2));
+        ensure("in order", error.mentions[0].line == 0 && error.mentions[0].column == 8 && error.mentions[1].line == 1 &&
+                               error.mentions[1].column == 2);
+        // Words with a place in them, in LSL's own form, are LSL's.
+        ensure("no Tailslide in LSL's", ALScriptMessages::readDiagnostic("(4, 2) : ERROR : at (1, 1)", false).mentions.empty());
+    }
 }

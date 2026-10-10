@@ -277,4 +277,64 @@ namespace tut
         run.recompile({}, {}, "auto");
         ensure("nothing: done at once", window.done.size() == 2 && window.done[1].compiled == 0 && !run.running());
     }
+
+    template<> template<>
+    void alscriptrecompile_object::test<5>()
+    {
+        set_test_name("the places a compiler's words name are read back as its line is, the script's own or an include's by name; one "
+                      "that names no line is at none");
+        ALPreprocessor::Options options;
+        options.fileName = "main.lsl";
+        options.resolve  = [](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
+            out.name = ask.name;
+            out.text = "integer a;\ninteger b;\n";
+            return ALPreprocessor::Found::Yes;
+        };
+        const ALPreprocessor::Result expanded = ALPreprocessor::run("#include \"lib.lsl\"\ndefault\n{\nstate_entry() { x; }\n}\n", options);
+        ensure("expanded", expanded.problems.empty());
+        S32 entry = -1, second = -1, line = 0;
+        for (size_t at = 0, next; at < expanded.text.size(); at = next + 1, ++line)
+        {
+            next                    = expanded.text.find('\n', at);
+            const std::string piece = expanded.text.substr(at, next == std::string::npos ? std::string::npos : next - at);
+            entry                   = piece.find("state_entry") != std::string::npos ? line : entry;
+            second                  = piece.find("integer b") != std::string::npos ? line : second;
+            if (next == std::string::npos)
+            {
+                break;
+            }
+        }
+        ensure("found in the expansion", entry >= 0 && second >= 0);
+
+        // As Tailslide says it, one-based, under the envelope's seven lines.
+        LLSD said;
+        said.append(llformat("Line %d: WARN: x shadows previous declaration at (%d, 1)", entry + 8, entry + 8));
+        said.append(llformat("Line %d: ERROR: b previously declared at (%d, 9). Again at (5000, 1).", entry + 8, second + 8));
+        said.append("Math Error");
+        Result result;
+        result.codeLine  = 7;
+        result.sourceMap = std::make_shared<const ALSourceMap>(expanded.map);
+        for (const ALScriptMessages::Place& place : ALScriptMessages::readDiagnostics(said, false))
+        {
+            ALScriptDiagnostic one;
+            one.line     = place.line;
+            one.column   = place.column;
+            one.hasLine  = place.hasLine;
+            one.level    = place.level;
+            one.message  = place.message;
+            one.mentions = place.mentions;
+            result.diagnostics.push_back(one);
+        }
+        const std::vector<ALScriptStudioDoc::Shown> rows = Recompile::rowsOf(result, "Compiler", "made");
+        ensure_equals("three", rows.size(), size_t(3));
+        ensure("the line, the source's", rows[0].line == 3 && rows[0].level == ALScriptStudioDoc::Level::Warning);
+        ensure_equals("the place named, the source's", rows[0].message, std::string("x shadows previous declaration at (4, 1)"));
+        ensure_equals("an include's, by its name; one made, as said", rows[1].message,
+                      std::string("b previously declared at (2, 9) in lib.lsl. Again at (5000, 1)."));
+        ensure("no line named, none", rows[2].line == -1 && rows[2].file.empty() && rows[2].message == "Math Error");
+
+        // A tab's, the same.
+        const std::vector<ALScriptStudioDoc::Compiled> tab = ALScriptStudioDoc::compiledOf(result.diagnostics, result.sourceMap.get(), 7);
+        ensure("a tab's", tab.size() == 3 && tab[0].line == 3 && tab[0].message == rows[0].message && tab[2].line == -1);
+    }
 }

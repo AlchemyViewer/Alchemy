@@ -201,13 +201,13 @@ std::vector<ALScriptRecompile::Doc::Shown> ALScriptRecompile::rowsOf(const ALScr
         Doc::Shown row;
         row.level     = Doc::levelOf(said.level);
         row.origin    = origin;
-        row.message   = said.message;
-        row.line      = said.line;
+        row.message   = Doc::mentionsMapped(said, map, result.codeLine);
+        row.line      = said.hasLine ? said.line : -1;
         row.column    = said.column;
         row.hasColumn = said.hasColumn;
         // The region counts the envelope's lines above the code; the map
         // is of the code.
-        if (map)
+        if (map && said.hasLine)
         {
             const ALSourceMap::Loc loc = map->toSource(said.line - result.codeLine, said.column);
             if (loc.found())
