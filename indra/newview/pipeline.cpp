@@ -1318,6 +1318,9 @@ void LLPipeline::releaseGLBuffers()
 {
     assertInitialized();
 
+    mTerrainPrimitives.release();
+    mWaterPrimitives.release();
+
     if (mNoiseMap)
     {
         LLImageGL::deleteTextures(1, &mNoiseMap);
@@ -4608,6 +4611,17 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
     {   // the start of the main render frame: from the last frame's camera
         // space to this one's
         LLViewerCamera::getInstance()->calcDeltaModelview();
+
+        // Probe and mirror captures move the camera singleton and come through here too; the frame starts with the
+        // main view.
+        if (!gCubeSnapshot)
+        {
+            mTerrainPrimitives.plot();
+            mWaterPrimitives.plot();
+            LL_PROFILE_PLOT("water draws", (int64_t)mWaterDraws);
+            mWaterDraws = 0;
+            LL_PROFILE_PLOT("render target MB", (int64_t)(LLRenderTarget::sBytesAllocated >> 20));
+        }
     }
 
     bool occlude = LLPipeline::sUseOcclusion > 1 && do_occlusion && !LLGLSLShader::sProfileEnabled;
@@ -11653,7 +11667,7 @@ void LLPipeline::doWaterHaze()
         // apply haze
         LLGLSLShader& haze_shader = gHazeWaterProgram;
 
-        LL_PROFILE_GPU_ZONE("haze");
+        LL_PROFILE_GPU_ZONE("water haze");
         bindDeferredShader(haze_shader, nullptr, &mWaterDis);
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
@@ -11682,6 +11696,7 @@ void LLPipeline::doWaterHaze()
             if (mWaterPool)
             {
                 mWaterPool->pushFaceGeometry();
+                mWaterDraws += (U32)static_cast<LLFacePool*>(mWaterPool)->mDrawFace.size();
             }
         }
 
@@ -11703,6 +11718,7 @@ void LLPipeline::doWaterExclusionMask()
         return;
     }
 
+    LL_PROFILE_GPU_ZONE("water exclusion");
     mWaterExclusionMask.bindTarget();
     gGL.setClearColor(LLColor4::white);
     mWaterExclusionMask.clear();

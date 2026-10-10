@@ -40,6 +40,7 @@
 #include "lldrawpoolmaterials.h"
 #include "llgl.h"
 #include "lldrawable.h"
+#include "alprimitiveplot.h"
 #include "altexture3d.h"
 #include "aluniformbuffer.h"
 #include "llrendertarget.h"
@@ -1018,6 +1019,12 @@ public:
     // haze pass converges far water on it (hazeF.glsl). Holds the main view's sky for mSkyBehindFrame only.
     LLRenderTarget              mSkyBehind;
     U32                         mSkyBehindFrame = 0;
+
+    // Profiling tracks, plotted at the start of each main frame for the frame before: the primitives the main view's
+    // terrain and water passes draw, and the draws of water geometry in every view and pass.
+    ALPrimitivePlot             mTerrainPrimitives{ "terrain primitives", true };
+    ALPrimitivePlot             mWaterPrimitives{ "water primitives", false };
+    U32                         mWaterDraws = 0;
 
     static const U32 MAX_PREVIEW_WIDTH;
 

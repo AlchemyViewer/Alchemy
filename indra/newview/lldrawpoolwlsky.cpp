@@ -206,8 +206,14 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
         // the world hides: the haze pass converges far water on it (hazeF.glsl). The main view's only, and only when
         // water is in it; an HDRI sky is colour already shaded, which the haze cannot take the same way.
         LLRenderTarget& behind = gPipeline.mSkyBehind;
-        if (!use_hdri_sky() && gPipeline.skyBehindWanted())
+        const bool sky_behind = !use_hdri_sky() && gPipeline.skyBehindWanted();
+        if (!gCubeSnapshot && gPipeline.mRT == &gPipeline.mMainRT)
         {
+            LL_PROFILE_PLOT("sky behind", (int64_t)sky_behind);
+        }
+        if (sky_behind)
+        {
+            LL_PROFILE_GPU_ZONE("sky behind");
             behind.bindTarget();
             behind.clear();
             // skyF writes its colour to frag_data[3] with the emissive buffer, and to frag_data[0] without it.

@@ -128,6 +128,7 @@ void LLDrawPoolWater::beginPostDeferredPass(S32 pass)
 void LLDrawPoolWater::renderPostDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    LL_PROFILE_GPU_ZONE("water");
 
     LLEnvironment& environment = LLEnvironment::instance();
     LLSettingsWater::ptr_t pwater = environment.getCurrentWater();
@@ -300,7 +301,17 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     // They also had the same exact state with the sole exception setting an edge water flag.
     // That flag was not actually used anywhere in the shaders.
     // - Geenz 2025-02-11
+    // Probe and hero captures render the water too; only the main view's primitives are counted.
+    const bool count_primitives = gPipeline.mRT == &gPipeline.mMainRT;
+    if (count_primitives)
+    {
+        gPipeline.mWaterPrimitives.begin();
+    }
     pushWaterPlanes(0);
+    if (count_primitives)
+    {
+        gPipeline.mWaterPrimitives.end();
+    }
 
     // clean up
     gPipeline.unbindDeferredShader(*shader);
@@ -314,6 +325,8 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
 void LLDrawPoolWater::pushWaterPlanes(int pass)
 {
+    gPipeline.mWaterDraws += (U32)mDrawFace.size();
+
     LLVOWater* water = nullptr;
     for (LLFace* const& face : mDrawFace)
     {

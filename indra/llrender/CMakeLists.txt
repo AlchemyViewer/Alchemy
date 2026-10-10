@@ -4,6 +4,7 @@ set(
   llrender_SOURCES
   algpubuffer.cpp
   alimageslot.cpp
+  alprimitiveplot.cpp
   alsamplerstate.cpp
   altexture3d.cpp
   altextureslot.cpp
@@ -39,6 +40,7 @@ set(
   llrender_HEADERS
   algpubuffer.h
   alimageslot.h
+  alprimitiveplot.h
   alsamplerstate.h
   altexture3d.h
   altextureslot.h
