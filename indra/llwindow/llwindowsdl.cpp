@@ -2572,13 +2572,24 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
             mCallbacks->handleFocusLost(this);
-            // Drop the IME preeditor reference defensively. The viewer's
-            // focus manager normally clears keyboard focus on app focus
-            // loss, which triggers allowLanguageTextInput(nullptr) — but
-            // if any path leaves mPreeditor pointing at a widget that
-            // thinks it's defocused, a stray TEXT_EDITING event would
-            // update a non-active widget.
-            mPreeditor = nullptr;
+            // The preeditor keeps language input: keyboard focus stays on
+            // its widget while the window is away (setAppHasFocus leaves it),
+            // and nothing allows language input again when the window comes
+            // back, so forgetting it here dropped every composition after an
+            // Alt-Tab until the widget was focused anew. As on Win32, only
+            // what is being composed goes. SDL stops text input as the window
+            // loses focus, and what the IME then does with the composition
+            // reaches no window, so the preedit would stay in the text. Win32
+            // commits it (interruptLanguageTextInput); SDL can only cancel.
+            if (mPreeditor)
+            {
+                S32 preedit_pos = 0, preedit_len = 0;
+                mPreeditor->getPreeditRange(&preedit_pos, &preedit_len);
+                if (preedit_len > 0)
+                {
+                    mPreeditor->resetPreedit();
+                }
+            }
             // Sync our relative-mode state to SDL3's. SDL3's keyboard
             // layer auto-disables relative mode on focus loss; if we don't
             // mirror that, our member stays true and setCursorPosition
