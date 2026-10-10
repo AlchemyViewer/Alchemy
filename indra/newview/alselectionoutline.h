@@ -83,6 +83,14 @@ class LLVOAvatar;
 /// its jumps: anywhere else that would trace the creases of every mesh. Colours come from a palette holding a
 /// visible and a hidden colour per id.
 ///
+/// The wireframe (AlchemySelectionWireframe) is drawn first, the outline over it: the same faces through the same
+/// face walk, alpha cut and culling as the id pass (drawFaces), their triangles' edges drawn as lines View::mWireWidth
+/// pixels wide from window-space edge distances a geometry stage gives each fragment (selectionWireframeG.glsl,
+/// selectionWireframeF.glsl). In the world the window's depth is the scene's, which the final blit wrote: lines in
+/// front of it are drawn, pulled in front of their own surface by a polygon offset, and lines behind it in the
+/// hidden colour. On the HUD the window's depth also holds the scene's wherever that is the nearer, so the lines
+/// are tested against the id target's depth instead, and a line behind another selected surface is hidden.
+///
 /// The disk a pixel searches grows with the square of the contour's width, and most pixels in the scissor are far
 /// from anything to draw. The tile pass (interface/selectionTileF.glsl) records for each TILE_SIZE square of the
 /// marked target the lowest and highest nonzero id it holds and whether it holds the near side of a jump, and the
@@ -128,7 +136,30 @@ public:
         /// visible; and its rigged faces are left out, since their joints place them about the avatar in the
         /// world, which the HUD's matrices have no place for.
         bool mHUD = false;
+        /// The outline (RenderHighlightSelections), drawn with or without the wireframe.
+        bool mOutline = true;
+        /// The selected faces' triangles drawn as lines under the outline (AlchemySelectionWireframe), mWireWidth
+        /// pixels wide before their pixel of anti-aliasing, with or without the outline.
+        bool mWireframe = false;
+        S32 mWireWidth = 1;
     };
+
+    /// The passes render() runs for a view.
+    struct Passes
+    {
+        /// The id pass: the outline's ids, and the depth of the selected surfaces the HUD's lines are tested against.
+        bool mIds = false;
+        /// The wireframe.
+        bool mWireframe = false;
+        /// The jump, tile and edge passes, which draw the outline from the ids.
+        bool mEdges = false;
+
+        bool any() const { return mIds || mWireframe || mEdges; }
+    };
+
+    /// The passes `view` needs, the wireframe only where its program loaded (`wireframe_ready`). The world's lines
+    /// are tested against the window's depth and need no id pass; the HUD's against the id target's.
+    static Passes passesFor(const View& view, bool wireframe_ready);
 
     /// The world camera's, in the UI stage, where the scene's projection is still loaded.
     static View worldView();
@@ -140,7 +171,7 @@ public:
     /// (AlchemySelectionOutlineWidth), drawn at `ui_scale`, LLUI's scale factor: the same widths in the world and
     /// on the HUD.
     static View makeView(const LLMatrix4a& modelview, const LLMatrix4a& projection, F32 contour_width, F32 ui_scale,
-                         bool hud);
+                         bool hud, bool wireframe = false);
 
     /// Ids the target can tell apart; 0 is no selected object.
     static constexpr U32 MAX_IDS = 65535;
@@ -168,6 +199,11 @@ public:
     static constexpr F32 NO_ALPHA_TEST = -1.f;
     /// The base colour transform of a face whose texture coordinates have their transform in them.
     static constexpr LLGLTFMaterial::TextureTransform::Pack IDENTITY_TRANSFORM = { 1.f, 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+    /// The wireframe's lines' width in pixels at a UI scale of 1.
+    static constexpr F32 WIRE_WIDTH = 1.f;
+    /// How far the wireframe's lines are drawn in front of their own surface beyond its slope, in the depth
+    /// buffer's least steps (glPolygonOffset's units).
+    static constexpr F32 WIRE_OFFSET_UNITS = 4.f;
 
     /// The uniforms the passes set beyond LLShaderMgr's reserved ones.
     static constexpr const char* ID_UNIFORM = "selection_id";
@@ -176,6 +212,48 @@ public:
     static constexpr const char* SCENE_DEPTH_UNIFORM = "selection_scene_depth";
     static constexpr const char* WIDTH_UNIFORM = "outline_width";
     static constexpr const char* INNER_WIDTH_UNIFORM = "outline_inner_width";
+    static constexpr const char* WIRE_PASS_UNIFORM = "wireframe_pass";
+    static constexpr const char* WIRE_WIDTH_UNIFORM = "wireframe_width";
+
+    /// What decides which of the wireframe's lines are hidden (wireframe_pass in selectionWireframeF.glsl).
+    enum EWirePass : S32
+    {
+        /// In the world, the lines the window's depth, the scene's, passes as in front: drawn in their visible
+        /// colour.
+        WIRE_VISIBLE = 0,
+        /// In the world, the lines it passes as behind: drawn in their hidden colour, dimmed or left out.
+        WIRE_HIDDEN = 1,
+        /// On the HUD, where the window's depth also holds the scene's, wherever it is the nearer: the id target's
+        /// depth, the nearest selected surface, decides, and a line behind another selected surface is hidden.
+        WIRE_ID_DEPTH = 2,
+    };
+
+    /// The GL state a wireframe pass draws in while it lives, over the window's framebuffer: colour blended in
+    /// over its alpha, no depth written, back faces culled as the id pass culls them (drawFace), and for the
+    /// world's passes the depth test, with the lines pulled in front of their own surface by `offset_factor`
+    /// (glPolygonOffset's factor, wireOffsetFactor) and WIRE_OFFSET_UNITS. gGL.setPolygonOffset turns the pull
+    /// toward the eye under either depth convention.
+    class WireState
+    {
+    public:
+        WireState(EWirePass pass, F32 offset_factor);
+        ~WireState();
+
+        WireState(const WireState&) = delete;
+        WireState& operator=(const WireState&) = delete;
+
+    private:
+        LLGLSColorMask mMask{ true, false };
+        LLGLEnable mCull{ GL_CULL_FACE };
+        LLGLEnable mBlend{ GL_BLEND };
+        LLGLDepthTest mDepth;
+        LLGLEnable mOffset;
+    };
+
+    /// The polygon offset factor the wireframe's lines need in front of a window depth point-sampled from a scene
+    /// `resample` window pixels to its texel: a surface's depth there was taken up to that many pixels away along
+    /// its slope, and a pixel more for the line's own.
+    static F32 wireOffsetFactor(F32 resample) { return llmax(resample, 1.f) + 1.f; }
 
     /// Lives for the session and is never destroyed: its GL objects go with the pipeline's, and at exit GL is gone.
     static ALSelectionOutline& instance();
@@ -274,6 +352,11 @@ public:
     static void drawTiles(LLGLSLShader& program, LLRenderTarget& marked, LLRenderTarget& tiles, const LLRect& rect,
                           LLVertexBuffer& triangle);
 
+    /// Binds what a wireframe pass reads to the bound wireframe program: the pass, the lines' width, the viewport's
+    /// size, the palette, and for WIRE_ID_DEPTH the depth of `ids`, the id target.
+    static void bindWirePass(LLGLSLShader& program, EWirePass pass, S32 wire_width, S32 width, S32 height, U32 palette,
+                             LLRenderTarget* ids);
+
     /// The edge pass with the bound outline program and `view`'s widths, over the viewport and scissor in force:
     /// ids from `marked`, their depth from `ids` through `view`'s projection, which the id pass drew with, and the
     /// tile pass's record from `tiles`.
@@ -300,12 +383,36 @@ private:
         EPriority       mPriority;
     };
 
+    // The box the faces a walk drew cover, in the frame the view's modelview takes: unbounded where a rigged face's
+    // joints have not been measured yet.
+    struct FaceBox
+    {
+        LLVector4a mLo{ FLT_MAX, FLT_MAX, FLT_MAX };
+        LLVector4a mHi{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
+        bool mBounded = true;
+    };
+
+    // The faces of `entry` that are rigged (or not) drawn into the bound program as the scene draws them, for the id
+    // pass and the wireframe alike: each in the frame LLVolumeGeometryManager::registerFace places it, a rigged one
+    // through its joint palette, with its alpha cut and culling (bindFace, drawFace). `begin` is called once,
+    // before the first face, with the object's matrices loaded. False when no face was drawn.
+    template <typename Begin>
+    bool drawFaces(LLGLSLShader& program, const Entry& entry, bool rigged, const View& view, FaceBox& box, Begin&& begin);
+
     // The faces of `entry` that are rigged (or not) into the bound id program as `id`, and the box they cover into
     // mScissor.
     void drawObject(LLGLSLShader& program, const Entry& entry, U32 id, bool rigged, const View& view,
                     const LLMatrix4a& mvp);
 
-    // What the id pass draws a face with beyond its geometry.
+    // The id pass: what was added into mIdMap, a width x height target, in priority order, and the box it covers,
+    // through `mvp`, into mScissor.
+    void drawIds(const View& view, S32 width, S32 height, const LLMatrix4a& mvp);
+
+    // The wireframe of what was added, over the bound framebuffer under the outline: the world's visible lines and
+    // its hidden ones against the window's depth, the HUD's against the id target's.
+    void drawWireframes(const View& view, S32 width, S32 height);
+
+    // What a face is drawn with beyond its geometry.
     struct FaceBinding
     {
         // A texture animation was loaded, which the caller unloads after the draw.
@@ -314,7 +421,7 @@ private:
         bool mDoubleSided = false;
     };
 
-    // Binds `face`'s texture and alpha test to the bound id program and loads its texture animation, if it is drawn
+    // Binds `face`'s texture and alpha test to the bound program and loads its texture animation, if it is drawn
     // with one.
     static FaceBinding bindFace(LLGLSLShader& program, LLFace* face);
 
@@ -371,7 +478,7 @@ inline S32 ALSelectionOutline::contourWidth(F32 width, F32 ui_scale)
 }
 
 inline ALSelectionOutline::View ALSelectionOutline::makeView(const LLMatrix4a& modelview, const LLMatrix4a& projection,
-                                                             F32 contour_width, F32 ui_scale, bool hud)
+                                                             F32 contour_width, F32 ui_scale, bool hud, bool wireframe)
 {
     View view;
     view.mModelview = modelview;
@@ -379,7 +486,18 @@ inline ALSelectionOutline::View ALSelectionOutline::makeView(const LLMatrix4a& m
     view.mWidth = contourWidth(contour_width, ui_scale);
     view.mInnerWidth = lineWidth(INNER_WIDTH, ui_scale);
     view.mHUD = hud;
+    view.mWireframe = wireframe;
+    view.mWireWidth = lineWidth(WIRE_WIDTH, ui_scale);
     return view;
+}
+
+inline ALSelectionOutline::Passes ALSelectionOutline::passesFor(const View& view, bool wireframe_ready)
+{
+    Passes passes;
+    passes.mWireframe = view.mWireframe && wireframe_ready;
+    passes.mEdges = view.mOutline;
+    passes.mIds = view.mOutline || (passes.mWireframe && view.mHUD);
+    return passes;
 }
 
 inline void ALSelectionOutline::priorityOrder(const std::vector<EPriority>& priorities, std::vector<U32>& order)
@@ -531,6 +649,45 @@ inline void ALSelectionOutline::drawFace(LLVertexBuffer& buffer, U32 start, U32 
     LLGLDisable no_cull(double_sided ? GL_CULL_FACE : 0);
     buffer.setBuffer();
     buffer.drawRange(LLRender::TRIANGLES, start, end, count, offset);
+}
+
+inline ALSelectionOutline::WireState::WireState(EWirePass pass, F32 offset_factor)
+:   mDepth(pass != WIRE_ID_DEPTH ? GL_TRUE : GL_FALSE, GL_FALSE, pass == WIRE_HIDDEN ? GL_GREATER : GL_LEQUAL),
+    mOffset(pass != WIRE_ID_DEPTH ? GL_POLYGON_OFFSET_FILL : 0)
+{
+    gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    // Toward the eye in forward depth's terms, which gGL turns for reverse-Z.
+    gGL.setPolygonOffset(-offset_factor, -WIRE_OFFSET_UNITS);
+}
+
+inline ALSelectionOutline::WireState::~WireState()
+{
+    gGL.setPolygonOffset(0.f, 0.f);
+}
+
+inline void ALSelectionOutline::bindWirePass(LLGLSLShader& program, EWirePass pass, S32 wire_width, S32 width, S32 height,
+                                             U32 palette, LLRenderTarget* ids)
+{
+    static const LLStaticHashedString pass_uniform(WIRE_PASS_UNIFORM);
+    static const LLStaticHashedString width_uniform(WIRE_WIDTH_UNIFORM);
+
+    program.uniform1i(pass_uniform, (GLint)pass);
+    program.uniform1i(width_uniform, llmax(wire_width, 1));
+    program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)width, (F32)height);
+    const S32 channel = program.enableTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
+    if (channel > -1)
+    {
+        gGL.getTextureSlot(channel)->bindManual(ALTextureSlot::TT_TEXTURE, palette, gGL.getSampler(ALSamplers::PointClamp));
+    }
+    if (ids && pass == WIRE_ID_DEPTH)
+    {
+        program.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, ids);
+    }
+    else
+    {
+        // Not read; left empty rather than holding whatever the unit last had.
+        program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
+    }
 }
 
 inline void ALSelectionOutline::setAlphaTest(LLGLSLShader& program, F32 cutoff,

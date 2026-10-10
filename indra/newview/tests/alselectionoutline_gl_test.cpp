@@ -111,6 +111,40 @@ namespace tut
             return count;
         }
 
+        // Of the frame `px`, the sum of a column's coverage in red from row `y0` to `y1` - 1, in pixels: the width
+        // of a line across it.
+        // The rows a column's runs of drawn pixels cover, bottom up, each as its first row and one past its last.
+        std::vector<std::pair<S32, S32>> columnRuns(const std::vector<U8>& px, S32 x)
+        {
+            std::vector<std::pair<S32, S32>> found;
+            for (S32 y = 0; y < H; ++y)
+            {
+                if (black(at(px, x, y)))
+                {
+                    continue;
+                }
+                if (!found.empty() && found.back().second == y)
+                {
+                    found.back().second = y + 1;
+                }
+                else
+                {
+                    found.push_back({ y, y + 1 });
+                }
+            }
+            return found;
+        }
+
+        F32 ink(const std::vector<U8>& px, S32 x, S32 y0, S32 y1)
+        {
+            F32 sum = 0.f;
+            for (S32 y = y0; y < y1; ++y)
+            {
+                sum += (F32)at(px, x, y).r / 255.f;
+            }
+            return sum;
+        }
+
         LLMatrix4a identity()
         {
             LLMatrix4a m;
@@ -158,12 +192,15 @@ namespace tut
             LLGLSLShader::unbind();
             mIdProgram.unload();
             mJumpProgram.unload();
+            mWireProgram.unload();
+            mCopyDepthProgram.unload();
             mTileProgram.unload();
             mOutlineProgram.unload();
             mShaders.clearShaderObjects();
 
             mIdMap.release();
             mMarked.release();
+            mWindow.release();
             mTiles.release();
             mAllTiles.release();
             mScene.release();
@@ -232,10 +269,33 @@ namespace tut
             mIdProgram.mShaderFiles.clear();
             mIdProgram.mShaderFiles.push_back(std::make_pair("interface/selectionIdV.glsl", GL_VERTEX_SHADER));
             mIdProgram.mShaderFiles.push_back(std::make_pair("interface/selectionIdF.glsl", GL_FRAGMENT_SHADER));
+            mIdProgram.mShaderFiles.push_back(std::make_pair("interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER));
             mIdProgram.mShaderFiles.push_back(std::make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
             mIdProgram.mShaderLevel = 1;
             ensure("id program builds with its rigged variant", mIdProgram.createShader(LLGLSLShader::VARIANT_RIGGED));
             ensure("id program has a rigged variant", mIdProgram.mRiggedVariant && mIdProgram.mRiggedVariant != &mIdProgram);
+
+            mWireProgram.mName = "Selection Wireframe Shader";
+            mWireProgram.mShaderFiles.clear();
+            mWireProgram.mShaderFiles.push_back(std::make_pair("interface/selectionIdV.glsl", GL_VERTEX_SHADER));
+            mWireProgram.mShaderFiles.push_back(std::make_pair("interface/selectionWireframeG.glsl", GL_GEOMETRY_SHADER));
+            mWireProgram.mShaderFiles.push_back(std::make_pair("interface/selectionWireframeF.glsl", GL_FRAGMENT_SHADER));
+            mWireProgram.mShaderFiles.push_back(std::make_pair("interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER));
+            mWireProgram.mShaderFiles.push_back(std::make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
+            mWireProgram.mShaderLevel = 1;
+            ensure("wireframe program builds with its rigged variant", mWireProgram.createShader(LLGLSLShader::VARIANT_RIGGED));
+            ensure("wireframe program has a rigged variant", mWireProgram.mRiggedVariant && mWireProgram.mRiggedVariant != &mWireProgram);
+
+            // The final blit's depth copy, as LLViewerShaderMgr builds gCopyDepthProgram.
+            mCopyDepthProgram.mName = "Copy Depth Shader";
+            mCopyDepthProgram.mShaderFiles.clear();
+            mCopyDepthProgram.mShaderFiles.push_back(std::make_pair("interface/copyV.glsl", GL_VERTEX_SHADER));
+            mCopyDepthProgram.mShaderFiles.push_back(std::make_pair("interface/copyF.glsl", GL_FRAGMENT_SHADER));
+            mCopyDepthProgram.clearPermutations();
+            mCopyDepthProgram.addPermutation("COPY_DEPTH", "1");
+            mCopyDepthProgram.addPermutation("DEPTH_ONLY", "1");
+            mCopyDepthProgram.mShaderLevel = 1;
+            ensure("copy depth program builds", mCopyDepthProgram.createShader());
 
             const std::pair<LLGLSLShader*, const char*> passes[] = { { &mJumpProgram, "selectionJumpF.glsl" },
                                                                      { &mTileProgram, "selectionTileF.glsl" },
@@ -255,6 +315,7 @@ namespace tut
             ensure("id target", mIdMap.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth));
             ensure("marked target", mMarked.allocate(W, H, GL_RGBA8));
             ensure("frame target", mFrame.allocate(W, H, GL_RGBA8));
+            ensure("window target", mWindow.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth));
             ensure("tile target", mTiles.allocate(Outline::tileCount(W), Outline::tileCount(H), GL_RGBA16));
             // Every tile holding every id and a jump: the edge pass searches every pixel's disk, as it did before
             // the tiles.
@@ -424,6 +485,50 @@ namespace tut
             bool mDoubleSided = false;
         };
 
+        // The draws into the bound id or wireframe program, as ALSelectionOutline's face walk draws faces: each with its
+        // id, alpha test, texture, texture animation and culling. A rigged program takes `joints`: joint 0's three
+        // columns, rotation in .xyz and translation in .w. False where a texture had no unit to go to.
+        bool drawAll(LLGLSLShader& program, const std::vector<Draw>& draws, const F32* joints, bool hidden_only = false)
+        {
+            bool texture_read = true;
+            if (joints)
+            {
+                const F32 origin[3] = { 0.f, 0.f, 0.f };
+                program.uniformMatrix3x4fv(LLShaderMgr::AVATAR_MATRIX, 1, GL_FALSE, joints);
+                program.uniform3fv(LLShaderMgr::SKIN_ORIGIN, 1, origin);
+            }
+            for (const Draw& draw : draws)
+            {
+                if (hidden_only && !draw.mShowHidden)
+                {
+                    continue;
+                }
+                Outline::setId(program, draw.mId, draw.mPriority, draw.mShowHidden);
+                Outline::setAlphaTest(program, draw.mCutoff, draw.mTransform ? *draw.mTransform : Outline::IDENTITY_TRANSFORM);
+                const S32 channel = draw.mTexture ? program.enableTexture(LLShaderMgr::DIFFUSE_MAP) : -1;
+                if (channel > -1)
+                {
+                    gGL.getTextureSlot(channel)->bindManual(ALTextureSlot::TT_TEXTURE, draw.mTexture,
+                                                            gGL.getSampler(ALSamplers::PointClamp));
+                }
+                texture_read = texture_read && (!draw.mTexture || channel > -1);
+                if (draw.mTextureMatrix)
+                {
+                    gGL.matrixMode(LLRender::MM_TEXTURE0);
+                    gGL.loadMatrix(*draw.mTextureMatrix);
+                    gGL.matrixMode(LLRender::MM_MODELVIEW);
+                }
+                Outline::drawFace(*draw.mBuffer, 0, 3, 6, 0, draw.mDoubleSided);
+                if (draw.mTextureMatrix)
+                {
+                    gGL.matrixMode(LLRender::MM_TEXTURE0);
+                    gGL.loadIdentity();
+                    gGL.matrixMode(LLRender::MM_MODELVIEW);
+                }
+            }
+            return texture_read;
+        }
+
         // The id pass as ALSelectionOutline::render runs it, into `target`, reading `scene`'s depth, or with no
         // scene as it runs for the HUD; `unread` is then bound where the scene's depth would be, which the pass must
         // ignore. A rigged pass takes `palette`: joint 0's three columns, rotation in .xyz and translation in .w.
@@ -447,37 +552,7 @@ namespace tut
                 {
                     program.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, unread);
                 }
-                if (rigged)
-                {
-                    const F32 origin[3] = { 0.f, 0.f, 0.f };
-                    program.uniformMatrix3x4fv(LLShaderMgr::AVATAR_MATRIX, 1, GL_FALSE, palette);
-                    program.uniform3fv(LLShaderMgr::SKIN_ORIGIN, 1, origin);
-                }
-                for (const Draw& draw : draws)
-                {
-                    Outline::setId(program, draw.mId, draw.mPriority, draw.mShowHidden);
-                    Outline::setAlphaTest(program, draw.mCutoff, draw.mTransform ? *draw.mTransform : Outline::IDENTITY_TRANSFORM);
-                    const S32 channel = draw.mTexture ? program.enableTexture(LLShaderMgr::DIFFUSE_MAP) : -1;
-                    if (channel > -1)
-                    {
-                        gGL.getTextureSlot(channel)->bindManual(ALTextureSlot::TT_TEXTURE, draw.mTexture,
-                                                                gGL.getSampler(ALSamplers::PointClamp));
-                    }
-                    texture_read = texture_read && (!draw.mTexture || channel > -1);
-                    if (draw.mTextureMatrix)
-                    {
-                        gGL.matrixMode(LLRender::MM_TEXTURE0);
-                        gGL.loadMatrix(*draw.mTextureMatrix);
-                        gGL.matrixMode(LLRender::MM_MODELVIEW);
-                    }
-                    Outline::drawFace(*draw.mBuffer, 0, 3, 6, 0, draw.mDoubleSided);
-                    if (draw.mTextureMatrix)
-                    {
-                        gGL.matrixMode(LLRender::MM_TEXTURE0);
-                        gGL.loadIdentity();
-                        gGL.matrixMode(LLRender::MM_MODELVIEW);
-                    }
-                }
+                texture_read = drawAll(program, draws, palette);
                 program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
                 program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
                 LLGLSLShader::unbind();
@@ -624,6 +699,80 @@ namespace tut
             return edgePass(view(), scissor);
         }
 
+        // The window's depth: the far value, and the scene's from `scene` over it, point-sampled as the final blit
+        // copies it.
+        void windowDepth(LLRenderTarget* scene)
+        {
+            mWindow.bindTarget();
+            {
+                LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
+                mWindow.clear(GL_DEPTH_BUFFER_BIT);
+                if (scene)
+                {
+                    LLGLSColorMask mask(false, false);
+                    mCopyDepthProgram.bind();
+                    mCopyDepthProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, scene);
+                    mTriangle->setBuffer();
+                    mTriangle->drawArrays(LLRender::TRIANGLES, 0, 3);
+                    mCopyDepthProgram.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
+                    LLGLSLShader::unbind();
+                }
+            }
+            mWindow.flush();
+        }
+
+        // The wireframe as ALSelectionOutline::drawWireframes draws it, over the window stand-in, its colour cleared
+        // and its depth kept: `passes` in turn, through `projection`, the window's depth `resample` window pixels to
+        // the scene's texel, lines `wire_width` pixels wide. A rigged draw takes `joints` as idPass does.
+        std::vector<U8> wireframe(const std::vector<Outline::EWirePass>& passes, const LLMatrix4a& projection,
+                                  const std::vector<Draw>& draws, S32 wire_width = 1, F32 resample = 1.f,
+                                  const F32* joints = nullptr)
+        {
+            Outline::uploadPalette(mPalette, mPaletteRows, mPaletteTexels, mRows);
+            gGL.matrixMode(LLRender::MM_PROJECTION);
+            gGL.loadMatrix(projection);
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
+
+            bool texture_read = true;
+            std::vector<U8> px;
+            mWindow.bindTarget();
+            {
+                {
+                    LLGLSColorMask mask(true, true);
+                    LLGLDisable scissor(GL_SCISSOR_TEST);
+                    gGL.setClearColor(LLColor4(0.f, 0.f, 0.f, 0.f));
+                    mWindow.clear(GL_COLOR_BUFFER_BIT);
+                }
+                for (Outline::EWirePass pass : passes)
+                {
+                    Outline::WireState state(pass, Outline::wireOffsetFactor(resample));
+                    LLGLSLShader& program = joints ? *mWireProgram.mRiggedVariant : mWireProgram;
+                    mWireProgram.bind(joints != nullptr);
+                    Outline::bindWirePass(program, pass, wire_width, W, H, mPalette, &mIdMap);
+                    texture_read = drawAll(program, draws, joints, pass == Outline::WIRE_HIDDEN) && texture_read;
+                    program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+                    program.unbindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
+                    program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
+                    LLGLSLShader::unbind();
+                }
+                px = ll_test::readFramebufferRGBA(W, H);
+            }
+            mWindow.flush();
+
+            gGL.matrixMode(LLRender::MM_PROJECTION);
+            gGL.loadMatrix(mProjection);
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
+            ensure("the wireframe program reads the face's texture", texture_read);
+            return px;
+        }
+
+        // The world's two passes, visible lines then hidden ones.
+        std::vector<U8> worldWireframe(const std::vector<Draw>& draws, S32 wire_width = 1, F32 resample = 1.f,
+                                       const F32* joints = nullptr)
+        {
+            return wireframe({ Outline::WIRE_VISIBLE, Outline::WIRE_HIDDEN }, mProjection, draws, wire_width, resample, joints);
+        }
+
         LLRect boxRect(S32 reach) const
         {
             const LLVector4a extents[2] = { LLVector4a(-2.f, -1.f, QUAD_Z), LLVector4a(2.f, 1.f, QUAD_Z) };
@@ -635,10 +784,14 @@ namespace tut
         ll_test::TestShaderMgr mShaders;
         LLGLSLShader mIdProgram;
         LLGLSLShader mJumpProgram;
+        LLGLSLShader mWireProgram;
+        LLGLSLShader mCopyDepthProgram;
         LLGLSLShader mTileProgram;
         LLGLSLShader mOutlineProgram;
         LLRenderTarget mIdMap;
         LLRenderTarget mMarked;
+        // The window's framebuffer: what the wireframe draws over, its depth the scene's.
+        LLRenderTarget mWindow;
         LLRenderTarget mTiles;
         LLRenderTarget mAllTiles;
         LLRenderTarget mScene;
@@ -1660,6 +1813,363 @@ namespace tut
                 ensure_equals(named(reverse, name + ": no jump marked"), marks, size_t(0));
                 ensure_equals(named(reverse, name + ": nothing drawn across it"), drawn, size_t(0));
             }
+        }
+    }
+
+    // The wireframe's lines are as wide in the window wherever they are: along an edge receding from four to twelve
+    // metres, on the same quad four times as far, and twice as wide at twice the width. The width across a line is
+    // read as the sum of its coverage down a column, the line's width over the cosine of its slope.
+    template<> template<>
+    void alselectionoutline_object_t::test<24>()
+    {
+        // The rows a column's runs of drawn pixels cover, bottom up.
+        // The width down column x of the quad's diagonal, the middle of the three lines a column crosses.
+        auto diagonal = [&](const std::vector<U8>& px, S32 x)
+        {
+            const std::vector<std::pair<S32, S32>> found = columnRuns(px, x);
+            ensure_equals("a column crosses the bottom edge, the diagonal and the top edge", found.size(), size_t(3));
+            return ink(px, x, found[1].first, found[1].second);
+        };
+
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED } }, true);
+            windowDepth(nullptr);
+
+            // From three metres out at its left edge to twelve at its right, columns 13 to 39; its diagonal runs
+            // from the near lower corner to the far upper one, about five metres out at column 26 and eight at 34.
+            const std::vector<U8> near_px = worldWireframe({ { quad(-1.f, 1.5f, -1.f, 1.f, -3.f, -12.f), ID_A } });
+            const F32 near_end = diagonal(near_px, 26);
+            const F32 far_end = diagonal(near_px, 34);
+            // The line's slope down the screen is about 0.91: a width of 1 reads as about 1.35 down a column.
+            ensure(named(reverse, "the width down the diagonal, near: " + std::to_string(near_end)), near_end > 1.15f && near_end < 1.55f);
+            ensure(named(reverse, "the same along the receding edge, far: " + std::to_string(far_end)), fabsf(far_end - near_end) < 0.1f);
+
+            const std::vector<U8> far_px = worldWireframe({ { quad(-4.f, 6.f, -4.f, 4.f, -12.f, -48.f), ID_A } });
+            ensure(named(reverse, "the same four times as far"), fabsf(diagonal(far_px, 26) - near_end) < 0.1f && fabsf(diagonal(far_px, 34) - far_end) < 0.1f);
+
+            const std::vector<U8> wide_px = worldWireframe({ { quad(-1.f, 1.5f, -1.f, 1.f, -3.f, -12.f), ID_A } }, 2);
+            const F32 narrow = diagonal(near_px, 30);
+            const F32 wide = diagonal(wide_px, 30);
+            ensure(named(reverse, "twice as wide at twice the width: " + std::to_string(wide)), wide > 1.8f * narrow && wide < 2.2f * narrow);
+        }
+    }
+
+    // Across a line, coverage falls from its middle on either side, and is gone within a pixel and a half.
+    template<> template<>
+    void alselectionoutline_object_t::test<25>()
+    {
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED } }, true);
+            windowDepth(nullptr);
+            // A square from 8 to 56 each way: its diagonal, through x = y, crosses each row between them.
+            const std::vector<U8> px = wireframe({ Outline::WIRE_VISIBLE }, pixelProjection(), { { pixels(8, 56, 8, 56), ID_A } });
+            for (S32 y = 16; y < 48; ++y)
+            {
+                const std::string row = ", row " + std::to_string(y);
+                ensure(named(reverse, "the line is drawn" + row), at(px, y, y).r > 127);
+                for (S32 step : { -1, 1 })
+                {
+                    U32 last = at(px, y, y).r;
+                    for (S32 x = y + step; x != y + 4 * step; x += step)
+                    {
+                        const U32 r = at(px, x, y).r;
+                        ensure(named(reverse, "coverage falls away from the line" + row), r <= last);
+                        last = r;
+                    }
+                    ensure_equals(named(reverse, "and is gone" + row), last, 0U);
+                }
+            }
+        }
+    }
+
+    // Lines behind something in the scene are drawn in the hidden colour with hidden selections shown, and not at
+    // all without; the lines in front keep their colour.
+    template<> template<>
+    void alselectionoutline_object_t::test<26>()
+    {
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+
+            // The brightest of a row's pixels between two columns.
+            auto brightest = [](const std::vector<U8>& px, S32 y, S32 x0, S32 x1)
+            {
+                U32 most = 0;
+                for (S32 x = x0; x < x1; ++x)
+                {
+                    most = llmax(most, (U32)at(px, x, y).r);
+                }
+                return most;
+            };
+
+            // A's diagonal crosses row 25 at about column 14 and row 38 at about 26: first with nothing in front.
+            palette({ { ID_A, RED } }, true);
+            windowDepth(nullptr);
+            std::vector<U8> px = worldWireframe({ { quadA(), ID_A } });
+            const U32 open = brightest(px, 25, 11, 18);
+            ensure(named(reverse, "the line drawn with nothing in front"), open > 127);
+
+            // Then with something three metres out over columns 0 to 19, in front of A's left part.
+            occlude(3.f, 0, 0, 20, H);
+            windowDepth(&mScene);
+            px = worldWireframe({ { quadA(), ID_A } });
+            const U32 hidden = brightest(px, 25, 11, 18);
+            ensure(named(reverse, "the line in front drawn"), brightest(px, 38, 22, 30) > 127);
+            ensure(named(reverse, "the line behind dimmed: " + std::to_string(hidden) + " of " + std::to_string(open)),
+                   hidden * 100 >= open * 35 && hidden * 100 <= open * 45);
+
+            Draw left_out = { quadA(), ID_A };
+            left_out.mShowHidden = false;
+            palette({ { ID_A, RED } }, false);
+            px = worldWireframe({ left_out });
+            ensure_equals(named(reverse, "the line behind left out"), brightest(px, 25, 11, 18), 0U);
+            ensure(named(reverse, "the line in front kept"), brightest(px, 38, 22, 30) > 127);
+        }
+    }
+
+    // Lines on their own surface, which the scene's depth holds, are all drawn: the window's depth is the scene's
+    // point-sampled from half the resolution, as with RenderResolutionDivisor 2, nearer than the lines over half
+    // their pixels on a surface turned away, and the polygon offset pulls them in front of it under either depth
+    // convention. None is taken for hidden.
+    template<> template<>
+    void alselectionoutline_object_t::test<27>()
+    {
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED } }, true);
+            // Turned about 60 degrees from the eye, five metres deep across its width.
+            LLVertexBuffer* tilted = quad(-1.5f, 1.5f, -1.f, 1.f, -3.5f, -8.5f);
+
+            windowDepth(nullptr);
+            const std::vector<U8> alone = worldWireframe({ { tilted, ID_A } }, 1, 2.f);
+
+            sceneAt(W / 2, H / 2);
+            idPass(mScene, &mFar, { { tilted, ID_A } });
+            windowDepth(&mScene);
+            const std::vector<U8> on_surface = worldWireframe({ { tilted, ID_A } }, 1, 2.f);
+
+            size_t drawn = 0;
+            size_t lost = 0;
+            for (S32 y = 0; y < H; ++y)
+            {
+                for (S32 x = 0; x < W; ++x)
+                {
+                    drawn += black(at(alone, x, y)) ? 0 : 1;
+                    lost += at(alone, x, y).r != at(on_surface, x, y).r ? 1 : 0;
+                }
+            }
+            ensure(named(reverse, "lines are drawn"), drawn > 100);
+            ensure_equals(named(reverse, "every line pixel drawn on its own surface as on nothing"), lost, size_t(0));
+        }
+    }
+
+    // A face's cut-out texels draw no lines, its kept ones do; a rigged face's lines are where its joints put it; a
+    // face the scene culls draws none.
+    template<> template<>
+    void alselectionoutline_object_t::test<28>()
+    {
+        // Joint 0 moved 1.5 m along +x.
+        const F32 right[12] = { 1.f, 0.f, 0.f, 1.5f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f };
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED } }, true);
+            windowDepth(nullptr);
+
+            // The ramp's alpha masked at 64: columns up to 15 cut out, 16 on kept. The diagonal, from (0, 16) to
+            // (64, 48), crosses column 8 at row 20 and column 40 at row 36.
+            const F32 mask = Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_MASK, 64, true);
+            std::vector<U8> px = wireframe({ Outline::WIRE_VISIBLE }, pixelProjection(),
+                                           { { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, mask, ramp() } });
+            ensure_equals(named(reverse, "no line across the cut-out texels"), ink(px, 8, 17, 24), 0.f);
+            ensure(named(reverse, "nor along their edge"), black(at(px, 8, 16)));
+            ensure(named(reverse, "lines across the kept ones"), ink(px, 40, 33, 40) > 0.5f && !black(at(px, 40, 16)));
+
+            // Posed, the quad covers columns 43 to 54 and rows 26 to 37.
+            LLVertexBuffer* bound = quad(-0.5f, 0.5f, -0.5f, 0.5f, QUAD_Z, QUAD_Z, true);
+            px = worldWireframe({ { bound, ID_A } }, 1, 1.f, right);
+            ensure(named(reverse, "the rigged face's lines where it is posed"), ink(px, 49, 26, 38) > 0.5f);
+            ensure(named(reverse, "not at its bind pose"), ink(px, 32, 26, 38) == 0.f);
+
+            // A face seen from behind, wound clockwise, as the id pass culls it: no lines unless double-sided.
+            const LLVector3 back_on[4] = { LLVector3(16.f, 16.f, PIXEL_Z), LLVector3(16.f, 48.f, PIXEL_Z),
+                                           LLVector3(48.f, 48.f, PIXEL_Z), LLVector3(48.f, 16.f, PIXEL_Z) };
+            Draw back = { quadAt(back_on), ID_A };
+            px = wireframe({ Outline::WIRE_VISIBLE }, pixelProjection(), { back });
+            ensure_equals(named(reverse, "no lines on a face from behind"), lit(px), size_t(0));
+            back.mDoubleSided = true;
+            px = wireframe({ Outline::WIRE_VISIBLE }, pixelProjection(), { back });
+            ensure(named(reverse, "lines on a double-sided one"), lit(px) > 50);
+        }
+    }
+
+    // On the HUD the window's depth also holds the scene's, wherever that is the nearer, so the HUD's lines are
+    // tested against the id target's depth instead: drawn whatever the window's depth holds, here the nearest value,
+    // and hidden where they lie behind another selected surface.
+    template<> template<>
+    void alselectionoutline_object_t::test<29>()
+    {
+        constexpr U32 REAR = 1;
+        constexpr U32 FRONT = 2;
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            // The rear from 16 to 47 each way, its diagonal through x = y; the front nearer, over columns 28 to 43
+            // and rows 20 to 35, its diagonal through x = y + 8. The rear's diagonal passes behind the front at
+            // (32, 32), four pixels from its nearest edge.
+            const std::vector<Draw> draws = { { pixels(16, 48, 16, 48), REAR, Outline::PRIORITY_ROOT },
+                                              { quad(28.f, 44.f, 20.f, 36.f, PIXEL_Z + 1.f, PIXEL_Z + 1.f), FRONT, Outline::PRIORITY_CHILD } };
+            pixelIds(draws);
+            mWindow.bindTarget();
+            {
+                LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
+                glClearDepth(reverse ? 1.0 : 0.0);
+                mWindow.clear(GL_DEPTH_BUFFER_BIT);
+                glClearDepth(reverse ? 0.0 : 1.0);
+            }
+            mWindow.flush();
+
+            for (bool show_hidden : { false, true })
+            {
+                const std::string hidden_parts = show_hidden ? ", hidden parts drawn" : ", hidden parts left out";
+                std::vector<Draw> shown = draws;
+                for (Draw& draw : shown)
+                {
+                    draw.mShowHidden = show_hidden;
+                }
+                palette({ { REAR, RED }, { FRONT, GREEN } }, show_hidden);
+                const std::vector<U8> px = wireframe({ Outline::WIRE_ID_DEPTH }, pixelProjection(), shown);
+                ensure(named(reverse, "the rear's line in the open" + hidden_parts), red(at(px, 20, 20)) && at(px, 20, 20).r > 200);
+                ensure(named(reverse, "the front's line" + hidden_parts), green(at(px, 40, 32)) && at(px, 40, 32).g > 200);
+                if (show_hidden)
+                {
+                    const U32 dimmed = at(px, 32, 32).r;
+                    const U32 open = at(px, 20, 20).r;
+                    ensure(named(reverse, "the rear's line behind the front dimmed: " + std::to_string(dimmed)),
+                           red(at(px, 32, 32)) && dimmed * 100 >= open * 35 && dimmed * 100 <= open * 45);
+                }
+                else
+                {
+                    ensure(named(reverse, "the rear's line behind the front left out"), black(at(px, 32, 32)));
+                }
+            }
+        }
+    }
+
+    // The wireframe's width, a pixel at a UI scale of 1 and scaled with it, the same for the world and the HUD, and
+    // on only with its setting; and the polygon offset its lines need over a resampled depth.
+    template<> template<>
+    void alselectionoutline_object_t::test<30>()
+    {
+        ensure_equals("a pixel at 1", Outline::lineWidth(Outline::WIRE_WIDTH, 1.f), 1);
+        ensure_equals("two at 2", Outline::lineWidth(Outline::WIRE_WIDTH, 2.f), 2);
+        for (bool hud : { false, true })
+        {
+            const Outline::View off = Outline::makeView(identity(), identity(), 2.f, 2.f, hud);
+            const Outline::View on = Outline::makeView(identity(), identity(), 2.f, 2.f, hud, true);
+            ensure("off by default", !off.mWireframe);
+            ensure("on with its setting", on.mWireframe);
+            ensure_equals("its width at the UI scale", on.mWireWidth, 2);
+        }
+        ensure_equals("a window depth at the scene's resolution", Outline::wireOffsetFactor(1.f), 2.f);
+        ensure_equals("at half of it", Outline::wireOffsetFactor(2.f), 3.f);
+        ensure_equals("never under the window's", Outline::wireOffsetFactor(0.5f), 2.f);
+    }
+
+    // A triangle reaching behind the eye, as a floor or a wall a builder stands at has, is clipped at the near plane
+    // where GL clips it: its edges' parts in front are drawn at their width, the cut along the near plane draws no
+    // line, and its texture coordinates are carried to the cut, so the alpha cut still follows the texture.
+    template<> template<>
+    void alselectionoutline_object_t::test<31>()
+    {
+        for (bool reverse : conventions())
+        {
+            setUp(reverse);
+            palette({ { ID_A, RED } }, true);
+            windowDepth(nullptr);
+
+            // One corner a metre behind the eye, the other three six metres out: on screen, the bottom edge from the
+            // bottom of the window to (61, 22), the diagonal from its left side to (61, 42), and the top edge along
+            // row 42. Both triangles hold the corner behind, and the diagonal is the edge between them.
+            const LLVector3 one_behind[4] = { LLVector3(-3.f, -1.f, 1.f), LLVector3(3.f, -1.f, -6.f),
+                                              LLVector3(3.f, 1.f, -6.f), LLVector3(-3.f, 1.f, -6.f) };
+            LLVertexBuffer* reaching = quadAt(one_behind);
+            std::vector<U8> px = worldWireframe({ { reaching, ID_A } });
+            std::vector<std::pair<S32, S32>> found = columnRuns(px, 40);
+            ensure_equals(named(reverse, "column 40 crosses the bottom edge, the diagonal and the top edge"), found.size(), size_t(3));
+            // The diagonal's slope down the screen is about a third: a width of 1 reads as about 1.05 down a column.
+            const F32 across = ink(px, 40, found[1].first, found[1].second);
+            ensure(named(reverse, "the diagonal at its width: " + std::to_string(across)), across > 0.9f && across < 1.25f);
+            // The top edge, along row 41.8, has one triangle, which draws the half of its line inside the quad.
+            ensure(named(reverse, "the top edge drawn inside the quad"), at(px, 40, 41).r > 127 && black(at(px, 40, 42)));
+
+            // Two corners behind the eye: a wall crossing the near plane at the middle of the view, column 32, and
+            // reaching ten metres out at column 43. Its edges all run near column 43; the cut at column 32 is no edge.
+            px = worldWireframe({ { quad(-0.5f, 2.f, -1.f, 1.f, 2.4f, -10.1f), ID_A } });
+            size_t at_cut = 0;
+            size_t at_edges = 0;
+            for (S32 y = 0; y < H; ++y)
+            {
+                for (S32 x = 32; x <= 38; ++x)
+                {
+                    at_cut += black(at(px, x, y)) ? 0 : 1;
+                }
+                for (S32 x = 41; x <= 45; ++x)
+                {
+                    at_edges += black(at(px, x, y)) ? 0 : 1;
+                }
+            }
+            ensure_equals(named(reverse, "no line along the near plane's cut"), at_cut, size_t(0));
+            ensure(named(reverse, "the edges in front drawn: " + std::to_string(at_edges)), at_edges > 40);
+
+            // The first quad textured with the ramp, masked at half: its diagonal's texture coordinate runs from 0
+            // behind the eye to 1, about 0.43 at column 20 and 0.57 at column 40.
+            const F32 mask = Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_MASK, 128, true);
+            px = worldWireframe({ { reaching, ID_A, Outline::PRIORITY_ROOT, mask, ramp() } });
+            ensure_equals(named(reverse, "no line where the clipped triangle's texture is cut"), ink(px, 20, 24, 32), 0.f);
+            ensure(named(reverse, "a line where it is kept"), ink(px, 40, 32, 38) > 0.5f);
+        }
+    }
+
+    // The outline and the wireframe are drawn each without the other, and each runs only the passes it reads: the
+    // outline the id pass and the passes after it, the world's wireframe none of them, since it is tested against
+    // the window's depth, and the HUD's the id pass alone, whose depth it is tested against.
+    template<> template<>
+    void alselectionoutline_object_t::test<32>()
+    {
+        for (bool hud : { false, true })
+        {
+            const std::string where = hud ? " on the HUD" : " in the world";
+            Outline::View view = Outline::makeView(identity(), identity(), 2.f, 1.f, hud);
+            ensure("the outline on by default" + where, view.mOutline);
+
+            Outline::Passes passes = Outline::passesFor(view, true);
+            ensure("the outline alone runs the id pass" + where, passes.mIds);
+            ensure("and the edge passes" + where, passes.mEdges);
+            ensure("and no wireframe" + where, !passes.mWireframe);
+
+            view.mWireframe = true;
+            passes = Outline::passesFor(view, true);
+            ensure("both run everything" + where, passes.mIds && passes.mEdges && passes.mWireframe);
+            passes = Outline::passesFor(view, false);
+            ensure("a wireframe program that did not load leaves the outline" + where,
+                   passes.mIds && passes.mEdges && !passes.mWireframe);
+
+            view.mOutline = false;
+            passes = Outline::passesFor(view, true);
+            ensure("the wireframe alone is drawn" + where, passes.mWireframe);
+            ensure("without the edge passes" + where, !passes.mEdges);
+            ensure_equals("with the id pass only on the HUD" + where, passes.mIds, hud);
+            passes = Outline::passesFor(view, false);
+            ensure("nothing when its program did not load" + where, !passes.any());
+
+            view.mWireframe = false;
+            ensure("nothing with both off" + where, !Outline::passesFor(view, true).any());
         }
     }
 }

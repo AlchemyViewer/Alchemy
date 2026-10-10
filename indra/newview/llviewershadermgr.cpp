@@ -156,6 +156,7 @@ LLGLSLShader        gHighlightProgram;
 LLGLSLShader        gHighlightNormalProgram;
 LLGLSLShader        gHighlightSpecularProgram;
 LLGLSLShader        gSelectionIdProgram;
+LLGLSLShader        gSelectionWireframeProgram;
 LLGLSLShader        gSelectionJumpProgram;
 LLGLSLShader        gSelectionTileProgram;
 LLGLSLShader        gSelectionOutlineProgram;
@@ -3834,9 +3835,23 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gSelectionIdProgram.mShaderFiles.clear();
         gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionIdV.glsl", GL_VERTEX_SHADER));
         gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionIdF.glsl", GL_FRAGMENT_SHADER));
+        gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER));
         gSelectionIdProgram.mShaderFiles.push_back(make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
         gSelectionIdProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gSelectionIdProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+    }
+
+    if (success)
+    {
+        gSelectionWireframeProgram.mName = "Selection Wireframe Shader";
+        gSelectionWireframeProgram.mShaderFiles.clear();
+        gSelectionWireframeProgram.mShaderFiles.push_back(make_pair("interface/selectionIdV.glsl", GL_VERTEX_SHADER));
+        gSelectionWireframeProgram.mShaderFiles.push_back(make_pair("interface/selectionWireframeG.glsl", GL_GEOMETRY_SHADER));
+        gSelectionWireframeProgram.mShaderFiles.push_back(make_pair("interface/selectionWireframeF.glsl", GL_FRAGMENT_SHADER));
+        gSelectionWireframeProgram.mShaderFiles.push_back(make_pair("interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER));
+        gSelectionWireframeProgram.mShaderFiles.push_back(make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
+        gSelectionWireframeProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        success = gSelectionWireframeProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
     }
 
     if (success)

@@ -67,20 +67,22 @@ ALSelectionOutline& ALSelectionOutline::instance()
 ALSelectionOutline::View ALSelectionOutline::worldView()
 {
     static LLCachedControl<F32> contour_width(gSavedSettings, "AlchemySelectionOutlineWidth", DEFAULT_CONTOUR_WIDTH);
+    static LLCachedControl<bool> wireframe(gSavedSettings, "AlchemySelectionWireframe", false);
     return makeView(LLViewerCamera::getCurrent().getModelview(), gGL.getProjectionMatrix(), contour_width,
-                    LLUI::getScaleFactor().mV[VX], false);
+                    LLUI::getScaleFactor().mV[VX], false, wireframe);
 }
 
 bool ALSelectionOutline::hudView(View& view)
 {
     static LLCachedControl<F32> contour_width(gSavedSettings, "AlchemySelectionOutlineWidth", DEFAULT_CONTOUR_WIDTH);
+    static LLCachedControl<bool> wireframe(gSavedSettings, "AlchemySelectionWireframe", false);
     LLMatrix4a projection;
     LLMatrix4a modelview;
     if (!get_hud_matrices(projection, modelview))
     {
         return false;
     }
-    view = makeView(modelview, projection, contour_width, LLUI::getScaleFactor().mV[VX], true);
+    view = makeView(modelview, projection, contour_width, LLUI::getScaleFactor().mV[VX], true, wireframe);
     return true;
 }
 
@@ -152,27 +154,60 @@ void ALSelectionOutline::render(const View& view)
     const S32 vp_y = gGLViewport[1];
     const S32 width = gGLViewport[2];
     const S32 height = gGLViewport[3];
-    if (width <= 0 || height <= 0 || !gSelectionIdProgram.isComplete() || !gSelectionIdProgram.mRiggedVariant ||
-        !gSelectionJumpProgram.isComplete() || !gSelectionTileProgram.isComplete() ||
-        !gSelectionOutlineProgram.isComplete() || !gPipeline.mRT || !gPipeline.mScreenTriangleVB)
+    const Passes passes = passesFor(view, gSelectionWireframeProgram.isComplete() &&
+                                              gSelectionWireframeProgram.mRiggedVariant != nullptr);
+    if (!passes.any())
+    {
+        release();
+        clearEntries();
+        return;
+    }
+    if (width <= 0 || height <= 0 || !gPipeline.mRT || !gPipeline.mScreenTriangleVB ||
+        (passes.mIds && (!gSelectionIdProgram.isComplete() || !gSelectionIdProgram.mRiggedVariant)) ||
+        (passes.mEdges && (!gSelectionJumpProgram.isComplete() || !gSelectionTileProgram.isComplete() ||
+                           !gSelectionOutlineProgram.isComplete())))
     {
         clearEntries();
         return;
     }
 
-    if (!mIdMap.isComplete() || !mMarkedMap.isComplete() || !mTileMap.isComplete() ||
-        mIdMap.getWidth() != (U32)width || mIdMap.getHeight() != (U32)height)
+    // The targets a pass that does not run reads are given up; the others are made at the window's size.
+    bool allocated = true;
+    if (!passes.mIds)
     {
-        if (!mIdMap.allocate(width, height, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE,
-                             LLPipeline::mainDepthFormat()) ||
-            !mMarkedMap.allocate(width, height, GL_RGBA8) ||
-            !mTileMap.allocate(tileCount((U32)width), tileCount((U32)height), GL_RGBA16))
+        if (mIdMap.isComplete())
         {
-            LL_WARNS_ONCE("Pipeline") << "Could not allocate the selection outline's targets" << LL_ENDL;
-            release();
-            clearEntries();
-            return;
+            mIdMap.release();
         }
+    }
+    else if (!mIdMap.isComplete() || mIdMap.getWidth() != (U32)width || mIdMap.getHeight() != (U32)height)
+    {
+        allocated = mIdMap.allocate(width, height, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE,
+                                    LLRenderTarget::MIPS_NONE, LLPipeline::mainDepthFormat());
+    }
+    if (!passes.mEdges)
+    {
+        if (mMarkedMap.isComplete())
+        {
+            mMarkedMap.release();
+        }
+        if (mTileMap.isComplete())
+        {
+            mTileMap.release();
+        }
+    }
+    else if (!mMarkedMap.isComplete() || !mTileMap.isComplete() || mMarkedMap.getWidth() != (U32)width ||
+             mMarkedMap.getHeight() != (U32)height)
+    {
+        allocated = allocated && mMarkedMap.allocate(width, height, GL_RGBA8) &&
+                    mTileMap.allocate(tileCount((U32)width), tileCount((U32)height), GL_RGBA16);
+    }
+    if (!allocated)
+    {
+        LL_WARNS_ONCE("Pipeline") << "Could not allocate the selection outline's targets" << LL_ENDL;
+        release();
+        clearEntries();
+        return;
     }
 
     LL_PROFILE_GPU_ZONE("selection outline");
@@ -205,6 +240,60 @@ void ALSelectionOutline::render(const View& view)
     mLastMeshId = 0;
     mSkipLastSkin = false;
 
+    if (passes.mIds)
+    {
+        drawIds(view, width, height, mvp);
+    }
+
+    // What the id pass drew says whether the outline has anything to touch; the world's wireframe, drawn without
+    // it, draws whatever its faces put on screen.
+    if (passes.mIds ? mScissorValid : passes.mWireframe)
+    {
+        uploadPalette(mPalette, mPaletteRows, mPaletteTexels, rows);
+
+        // The wireframe first, the outline over it.
+        if (passes.mWireframe)
+        {
+            drawWireframes(view, width, height);
+        }
+
+        if (passes.mEdges)
+        {
+            // The scissor holds every selected texel and the contour's reach around them; the edge pass reads no
+            // further, and what it reads past the jump and tile passes' work they clear to nothing, as it is.
+            gSelectionJumpProgram.bind();
+            drawJumps(gSelectionJumpProgram, mIdMap, mMarkedMap, mScissor, view, *gPipeline.mScreenTriangleVB);
+            gSelectionTileProgram.bind();
+            drawTiles(gSelectionTileProgram, mMarkedMap, mTileMap, mScissor, *gPipeline.mScreenTriangleVB);
+
+            LLGLSColorMask mask(true, false);
+            LLGLDepthTest depth(GL_FALSE);
+            LLGLEnable blend(GL_BLEND);
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
+            LLGLSScissor scissor(vp_x + mScissor.mLeft, vp_y + mScissor.mBottom, mScissor.getWidth(),
+                                 mScissor.getHeight());
+
+            gSelectionOutlineProgram.bind();
+            drawEdges(gSelectionOutlineProgram, mMarkedMap, mIdMap, mTileMap, mPalette, view,
+                      *gPipeline.mScreenTriangleVB);
+        }
+    }
+
+    if (previous)
+    {
+        previous->bind();
+    }
+    else
+    {
+        LLGLSLShader::unbind();
+    }
+
+    clearEntries();
+}
+
+void ALSelectionOutline::drawIds(const View& view, S32 width, S32 height, const LLMatrix4a& mvp)
+{
+    const U32 count = (U32)mEntries.size();
     mIdMap.bindTarget();
     {
         // Depth writes on before the clear, which they mask.
@@ -250,48 +339,17 @@ void ALSelectionOutline::render(const View& view)
         gGL.popMatrix();
     }
     mIdMap.flush();
-
-    if (mScissorValid)
-    {
-        uploadPalette(mPalette, mPaletteRows, mPaletteTexels, rows);
-
-        // The scissor holds every selected texel and the contour's reach around them; the edge pass reads no
-        // further, and what it reads past the jump and tile passes' work they clear to nothing, as it is.
-        gSelectionJumpProgram.bind();
-        drawJumps(gSelectionJumpProgram, mIdMap, mMarkedMap, mScissor, view, *gPipeline.mScreenTriangleVB);
-        gSelectionTileProgram.bind();
-        drawTiles(gSelectionTileProgram, mMarkedMap, mTileMap, mScissor, *gPipeline.mScreenTriangleVB);
-
-        LLGLSColorMask mask(true, false);
-        LLGLDepthTest depth(GL_FALSE);
-        LLGLEnable blend(GL_BLEND);
-        gGL.setSceneBlendType(LLRender::BT_ALPHA);
-        LLGLSScissor scissor(vp_x + mScissor.mLeft, vp_y + mScissor.mBottom, mScissor.getWidth(), mScissor.getHeight());
-
-        gSelectionOutlineProgram.bind();
-        drawEdges(gSelectionOutlineProgram, mMarkedMap, mIdMap, mTileMap, mPalette, view, *gPipeline.mScreenTriangleVB);
-    }
-
-    if (previous)
-    {
-        previous->bind();
-    }
-    else
-    {
-        LLGLSLShader::unbind();
-    }
-
-    clearEntries();
 }
 
-void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U32 id, bool rigged, const View& view,
-                                    const LLMatrix4a& mvp)
+template <typename Begin>
+bool ALSelectionOutline::drawFaces(LLGLSLShader& program, const Entry& entry, bool rigged, const View& view, FaceBox& box,
+                                   Begin&& begin)
 {
     LLViewerObject* object = entry.mObject;
     LLDrawable* drawable = object->mDrawable;
     if (!drawable || drawable->isDead() || !drawable->getVOVolume())
     {
-        return;
+        return false;
     }
 
     // The frame each face's vertex buffer is in, as LLVolumeGeometryManager::registerFace places it. Rigged faces
@@ -316,13 +374,10 @@ void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U
         }
         else
         {
-            return;
+            return false;
         }
     }
 
-    LLVector4a lo(FLT_MAX, FLT_MAX, FLT_MAX);
-    LLVector4a hi(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-    bool bounded = true;
     bool drawn = false;
 
     // The TE mask holds 32 faces, more than a volume has.
@@ -346,7 +401,7 @@ void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U
             continue;
         }
 
-        LLVector4a box[2];
+        LLVector4a extents[2];
         if (rigged)
         {
             if (!face->mAvatar || !face->mSkinInfo ||
@@ -355,26 +410,26 @@ void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U
                 continue;
             }
             // Joint boxes, refreshed while the face is in view (LLFace::calcPixelArea); empty until they are.
-            box[0] = face->mRiggedExtents[0];
-            box[1] = face->mRiggedExtents[1];
+            extents[0] = face->mRiggedExtents[0];
+            extents[1] = face->mRiggedExtents[1];
             LLVector4a size;
-            size.setSub(box[1], box[0]);
+            size.setSub(extents[1], extents[0]);
             if (!(size[0] > 0.f && size[1] > 0.f && size[2] > 0.f))
             {
-                bounded = false;
+                box.mBounded = false;
             }
         }
         else if (agent_extents)
         {
-            box[0] = face->mExtents[0];
-            box[1] = face->mExtents[1];
+            extents[0] = face->mExtents[0];
+            extents[1] = face->mExtents[1];
         }
         else
         {
-            matMulBoundBox(*model, face->mExtents, box);
+            matMulBoundBox(*model, face->mExtents, extents);
         }
-        lo.setMin(lo, box[0]);
-        hi.setMax(hi, box[1]);
+        box.mLo.setMin(box.mLo, extents[0]);
+        box.mHi.setMax(box.mHi, extents[1]);
 
         if (!drawn)
         {
@@ -383,7 +438,7 @@ void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U
             {
                 gGL.multMatrix(model->getF32ptr());
             }
-            setId(program, id, entry.mPriority, entry.mShowHidden);
+            begin();
             drawn = true;
         }
 
@@ -398,8 +453,14 @@ void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U
             gGL.matrixMode(LLRender::MM_MODELVIEW);
         }
     }
+    return drawn;
+}
 
-    if (!drawn)
+void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U32 id, bool rigged, const View& view,
+                                    const LLMatrix4a& mvp)
+{
+    FaceBox box;
+    if (!drawFaces(program, entry, rigged, view, box, [&] { setId(program, id, entry.mPriority, entry.mShowHidden); }))
     {
         return;
     }
@@ -407,13 +468,13 @@ void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U
     const S32 width = (S32)mIdMap.getWidth();
     const S32 height = (S32)mIdMap.getHeight();
     LLRect rect;
-    if (!bounded)
+    if (!box.mBounded)
     {
         rect.set(0, height, width, 0);
     }
     else
     {
-        const LLVector4a extents[2] = { lo, hi };
+        const LLVector4a extents[2] = { box.mLo, box.mHi };
         if (!scissorRect(mvp, extents, width, height, lineReach(view.mWidth), rect))
         {
             return;
@@ -429,6 +490,83 @@ void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U
         mScissor = rect;
         mScissorValid = true;
     }
+}
+
+void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height)
+{
+    LL_PROFILE_GPU_ZONE("selection wireframe");
+
+    // The window's depth is the final blit's point-sampled copy of the scene's, taken a render texel at a time.
+    F32 resample = 1.f;
+    if (!view.mHUD && gPipeline.mRT->deferredScreen.getWidth() > 0)
+    {
+        resample = (F32)width / (F32)gPipeline.mRT->deferredScreen.getWidth();
+    }
+    const F32 offset_factor = wireOffsetFactor(resample);
+
+    bool any_hidden = false;
+    for (const Entry& entry : mEntries)
+    {
+        any_hidden = any_hidden || entry.mShowHidden;
+    }
+
+    gGL.matrixMode(LLRender::MM_PROJECTION);
+    gGL.pushMatrix();
+    gGL.loadMatrix(view.mProjection);
+    gGL.matrixMode(LLRender::MM_TEXTURE0);
+    gGL.pushMatrix();
+    gGL.loadIdentity();
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    gGL.pushMatrix();
+
+    const EWirePass world_passes[] = { WIRE_VISIBLE, WIRE_HIDDEN };
+    const EWirePass hud_passes[] = { WIRE_ID_DEPTH };
+    const EWirePass* passes = view.mHUD ? hud_passes : world_passes;
+    const U32 pass_count = view.mHUD ? 1 : 2;
+    for (U32 p = 0; p < pass_count; ++p)
+    {
+        const EWirePass pass = passes[p];
+        if (pass == WIRE_HIDDEN && !any_hidden)
+        {
+            continue;
+        }
+
+        WireState state(pass, offset_factor);
+        for (bool rigged : { false, true })
+        {
+            if (rigged && view.mHUD)
+            {
+                break;
+            }
+            LLGLSLShader& program = rigged ? *gSelectionWireframeProgram.mRiggedVariant : gSelectionWireframeProgram;
+            gSelectionWireframeProgram.bind(rigged);
+            bindWirePass(program, pass, view.mWireWidth, width, height, mPalette, &mIdMap);
+            // Joint palettes are uploaded to the bound program, which this one is not yet.
+            mLastAvatar = nullptr;
+            mLastMeshId = 0;
+            mSkipLastSkin = false;
+            for (U32 i = 0; i < (U32)mEntries.size(); ++i)
+            {
+                const Entry& entry = mEntries[mOrder[i]];
+                if (pass == WIRE_HIDDEN && !entry.mShowHidden)
+                {
+                    continue;
+                }
+                FaceBox box;
+                drawFaces(program, entry, rigged, view, box, [&] { setId(program, i + 1, entry.mPriority, entry.mShowHidden); });
+            }
+            program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+            program.unbindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP);
+            program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
+        }
+    }
+
+    gGL.matrixMode(LLRender::MM_PROJECTION);
+    gGL.popMatrix();
+    gGL.matrixMode(LLRender::MM_TEXTURE0);
+    gGL.popMatrix();
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    gGL.popMatrix();
 }
 
 ALSelectionOutline::FaceBinding ALSelectionOutline::bindFace(LLGLSLShader& program, LLFace* face)

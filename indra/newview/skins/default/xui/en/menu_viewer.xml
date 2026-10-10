@@ -1839,6 +1839,15 @@ function="World.EnvPreset"
                      function="Tools.ShowHiddenSelection" />
                 </menu_item_check>
                 <menu_item_check
+                 label="Show Selection Wireframe"
+                 name="Show Selection Wireframe">
+                    <menu_item_check.on_check
+                     control="AlchemySelectionWireframe" />
+                    <menu_item_check.on_click
+                     function="ToggleControl"
+                     parameter="AlchemySelectionWireframe" />
+                </menu_item_check>
+                <menu_item_check
                  label="Show Light Radius for Selection"
                  name="Show Light Radius for Selection">
                     <menu_item_check.on_check

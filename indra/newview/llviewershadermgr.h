@@ -163,9 +163,11 @@ extern LLGLSLShader         gLensDirtGenProgram;
 extern LLGLSLShader         gHighlightProgram;
 extern LLGLSLShader         gHighlightNormalProgram;
 extern LLGLSLShader         gHighlightSpecularProgram;
-// Selection outlines (ALSelectionOutline): the id pass, with a rigged variant, the jump pass, the tile pass and the
-// edge pass, each linked with interface/selectionUtilF.glsl.
+// Selection outlines (ALSelectionOutline): the id pass and the wireframe, with rigged variants and linked with
+// interface/selectionAlphaF.glsl, the jump pass, the tile pass and the edge pass, each linked with
+// interface/selectionUtilF.glsl.
 extern LLGLSLShader         gSelectionIdProgram;
+extern LLGLSLShader         gSelectionWireframeProgram;
 extern LLGLSLShader         gSelectionJumpProgram;
 extern LLGLSLShader         gSelectionTileProgram;
 extern LLGLSLShader         gSelectionOutlineProgram;

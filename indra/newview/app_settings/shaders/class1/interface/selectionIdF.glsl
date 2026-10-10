@@ -39,13 +39,6 @@ uniform int selection_priority;
 // 1 where the object's hidden parts are drawn dimmed, 0 where they are left out.
 uniform int selection_show_hidden;
 
-// The face's texture: a legacy face's diffuse map, a GLTF face's base colour.
-uniform sampler2D diffuseMap;
-
-// The texture alpha under which the face is cut out and the fragment left out of the target. At or under 0 the
-// face is opaque and its texture is not read.
-uniform float minimum_alpha;
-
 // 1 where the scene's depth decides what is hidden. 0 where it cannot be read, as on the HUD, which is drawn into
 // the window's framebuffer: every surface then counts as visible.
 uniform int selection_scene_depth;
@@ -63,19 +56,16 @@ const float VISIBLE_SLACK = 0.001;
 // selectionUtilF.glsl, through the projection the scene and this pass share.
 float eyeDistance(float depth);
 
+// selectionAlphaF.glsl
+float faceAlpha(vec2 texcoord);
+bool isCutOut(float alpha);
+
 void main()
 {
     // The slope is taken outside the branch, where derivatives are defined whatever it does.
     float own = eyeDistance(gl_FragCoord.z);
     float slope = fwidth(own);
-
-    // Only the texture's alpha: the face's colour, whose alpha can make a prim invisible, does not cut it out.
-    // Read before anything is discarded, while the derivatives its level of detail is chosen from are defined.
-    float alpha = 1.0;
-    if (minimum_alpha > 0.0)
-    {
-        alpha = texture(diffuseMap, vary_texcoord0).a;
-    }
+    float alpha = faceAlpha(vary_texcoord0);
 
     float visible = 1.0;
     if (selection_scene_depth != 0)
@@ -90,7 +80,7 @@ void main()
         visible = (own <= scene + reach + own * VISIBLE_SLACK) ? 1.0 : 0.0;
     }
 
-    if (alpha < minimum_alpha)
+    if (isCutOut(alpha))
     {
         discard;
     }

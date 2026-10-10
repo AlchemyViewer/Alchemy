@@ -6797,22 +6797,11 @@ void LLSelectMgr::addOutlines(ALSelectionOutline& outline, bool for_hud)
 }
 
 // Outlines from an id target (ALSelectionOutline): one id per object, so every prim keeps its own outline. A
-// frame calls this once, for the world or for the HUD as the selection is in one or on the other.
+// frame calls this once, for the world or for the HUD as the selection is in one or on the other. The outline
+// (RenderHighlightSelections) and the wireframe (AlchemySelectionWireframe) are drawn each with or without the other.
 void LLSelectMgr::renderSilhouettes(bool for_hud)
 {
     ALSelectionOutline& outline = ALSelectionOutline::instance();
-
-    if (!mRenderHighlightSelections)
-    {
-        outline.release();
-        return;
-    }
-
-    // A manipulator's drag hides the outlines without giving up their targets for the drag.
-    if (!mRenderSilhouettes)
-    {
-        return;
-    }
 
     ALSelectionOutline::View view;
     if (!for_hud)
@@ -6822,6 +6811,19 @@ void LLSelectMgr::renderSilhouettes(bool for_hud)
     else if (!ALSelectionOutline::hudView(view))
     {
         outline.release();
+        return;
+    }
+    view.mOutline = mRenderHighlightSelections;
+
+    if (!view.mOutline && !view.mWireframe)
+    {
+        outline.release();
+        return;
+    }
+
+    // A manipulator's drag hides the outlines without giving up their targets for the drag.
+    if (!mRenderSilhouettes)
+    {
         return;
     }
 
