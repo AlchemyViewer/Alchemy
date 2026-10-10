@@ -2521,7 +2521,6 @@ if(AL_BUILD_TESTS)
     alsceneexplorerpredicate
     alwhitebalancesolver
     lldateutil
-    llremoteparcelrequest
     llviewerhelputil
     llversioninfo
     llvocache
@@ -2530,6 +2529,14 @@ if(AL_BUILD_TESTS)
   )
     al_add_test(${test} UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
   endforeach()
+  # A parcel's information handed to its observers and to the URL entries
+  # that name it: llui's own, rather than stubs of them.
+  al_add_test(
+    llremoteparcelrequest
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES newview_test_fakes llui ${test_libs}
+  )
   # The agent's maturity, read and written through a settings group of each
   # test's own.
   al_add_test(llagentaccess UNIT PROJECT ${test_project} LIBRARIES llxml ${test_libs})
