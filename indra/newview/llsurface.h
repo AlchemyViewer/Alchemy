@@ -133,7 +133,7 @@ public:
     F32 getMaxZ() const                             { return mMaxZ; }
 
     void setWaterHeight(F32 height);
-    F32 getWaterHeight() const;
+    F32 getWaterHeight() const                      { return mWaterHeight; }
 
     LLViewerTexture *getSTexture();
 
@@ -204,6 +204,10 @@ private:
     LLPointer<LLViewerTexture> mSTexturep;      // Texture for surface
 
     LLPointer<LLVOWater>    mWaterObjp;
+
+    // The region's water height, as the sim last gave it; DEFAULT_WATER_HEIGHT until it does. The water object, when
+    // RenderWater made one, is moved to it.
+    F32                     mWaterHeight = DEFAULT_WATER_HEIGHT;
 
     U32         mGridsPerPatchEdge;         // Number of grid points on a side of a patch
     F32         mMetersPerGrid;             // Converts (i,j) indecies to distance

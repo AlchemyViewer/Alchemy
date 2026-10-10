@@ -41,6 +41,7 @@
 #include "llgl.h"
 #include "lldrawable.h"
 #include "alprimitiveplot.h"
+#include "alwatersurface.h"
 #include "altexture3d.h"
 #include "aluniformbuffer.h"
 #include "llrendertarget.h"
@@ -1019,6 +1020,9 @@ public:
     // haze pass converges far water on it (hazeF.glsl). Holds the main view's sky for mSkyBehindFrame only.
     LLRenderTarget              mSkyBehind;
     U32                         mSkyBehindFrame = 0;
+
+    // The water's layout around the main camera and its map of cell heights, laid out at the start of each main frame.
+    ALWaterSurface              mWaterSurface;
 
     // Profiling tracks, plotted at the start of each main frame for the frame before: the primitives the main view's
     // terrain and water passes draw, and the draws of water geometry in every view and pass.

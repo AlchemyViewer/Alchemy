@@ -49,6 +49,7 @@
 #include "llsettingssky.h"
 #include "llsettingswater.h"
 #include "alfarplane.h"
+#include "alwaterfield.h"
 
 bool LLDrawPoolWater::sSkipScreenCopy = false;
 bool LLDrawPoolWater::sNeedsReflectionUpdate = true;
@@ -164,20 +165,12 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
     LLGLSLShader *shader     = nullptr;
 
-    // Each wave layer's scroll, the wave direction times the time times the layer's rate, taken
-    // in F64 and kept to its fraction: the normal maps wrap, so the fraction is all that shows,
-    // and the product taken in the shader's float stepped once the session was a day or two old.
-    const F64 phase_time = LLFrameTimer::getUptimeSeconds() * 0.5;
-    const auto wave_scroll = [phase_time](F32 direction, F64 rate)
-    {
-        const F64 scroll = direction * phase_time * rate;
-        return (F32)(scroll - floor(scroll));
-    };
-    const LLVector2 wave1_dir = pwater->getWave1Dir();
-    const LLVector2 wave2_dir = pwater->getWave2Dir();
-    const LLVector2 big_wave_scroll(wave_scroll(wave1_dir.mV[VX], 0.055), wave_scroll(wave1_dir.mV[VY], 0.055));
-    const LLVector4 little_wave_scroll(wave_scroll(wave2_dir.mV[VX], 0.13), wave_scroll(wave2_dir.mV[VY], 0.13),
-                                       wave_scroll(wave1_dir.mV[VX], 0.1), wave_scroll(wave1_dir.mV[VY], 0.1));
+    // Each wave layer's scroll, taken in F64 and kept to its fraction: the normal maps wrap, so the fraction is all
+    // that shows, and the product taken in the shader's float stepped once the session was a day or two old.
+    const ALWaterField::WaveScrolls scrolls =
+        ALWaterField::waveScrolls(LLFrameTimer::getUptimeSeconds(), pwater->getWave1Dir(), pwater->getWave2Dir());
+    const LLVector2& big_wave_scroll = scrolls.mBig;
+    const LLVector4& little_wave_scroll = scrolls.mLittle;
 
     // One pass, one of two shaders.  Void water and region water share state.
     // There isn't a good reason anymore to really have void water run in a separate pass.

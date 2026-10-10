@@ -247,6 +247,8 @@ if(AL_BUILD_VIEWER)
     alscriptweightspane.cpp
     alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
+    alwaterfield.cpp
+    alwatersurface.cpp
     alfloaterscriptstudio.cpp
     alfloaterwebprofile.cpp
     alfloaterxuilibrary.cpp
@@ -1125,6 +1127,8 @@ if(AL_BUILD_VIEWER)
     alscriptweightspane.h
     alscriptworkspace.h
     alterrainsurfacemaps.h
+    alwaterfield.h
+    alwatersurface.h
     altexturetable.h
     alfloaterscriptstudio.h
     alfloaterwebprofile.h
@@ -2519,6 +2523,7 @@ if(AL_BUILD_TESTS)
     algradehistory
     almotionpredictor
     alsceneexplorerpredicate
+    alwaterfield
     alwhitebalancesolver
     lldateutil
     llviewerhelputil

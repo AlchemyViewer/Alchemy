@@ -733,6 +733,9 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     if (!gDisconnected && !LLApp::isExiting())
     {
+        // The water's field around the main camera, before the mirrors, the shadow fit and the probes read it.
+        gPipeline.mWaterSurface.update();
+
         // Render mirrors and associated hero probes before we render the rest of the scene.
         // This ensures the scene state in the hero probes are exactly the same as the rest of the scene before we render it.
         if (gPipeline.RenderMirrors && !gSnapshot)

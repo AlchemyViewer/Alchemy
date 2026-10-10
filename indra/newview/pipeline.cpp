@@ -1320,6 +1320,7 @@ void LLPipeline::releaseGLBuffers()
 
     mTerrainPrimitives.release();
     mWaterPrimitives.release();
+    mWaterSurface.release();
 
     if (mNoiseMap)
     {
@@ -4613,7 +4614,7 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
         LLViewerCamera::getInstance()->calcDeltaModelview();
 
         // Probe and mirror captures move the camera singleton and come through here too; the frame starts with the
-        // main view.
+        // main view. The water's field was laid out as the frame began (display).
         if (!gCubeSnapshot)
         {
             mTerrainPrimitives.plot();

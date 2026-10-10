@@ -233,7 +233,7 @@ void LLSurface::initTextures()
         mWaterObjp = (LLVOWater *)gObjectList.createObjectViewer(LLViewerObject::LL_VO_WATER, mRegionp);
         gPipeline.createObject(mWaterObjp);
         LLVector3d water_pos_global = from_region_handle(mRegionp->getHandle());
-        water_pos_global += LLVector3d(128.0, 128.0, DEFAULT_WATER_HEIGHT);     // region doesn't have a valid water height yet
+        water_pos_global += LLVector3d(128.0, 128.0, mWaterHeight);
         mWaterObjp->setPositionGlobal(water_pos_global);
     }
 }
@@ -1169,33 +1169,18 @@ void LLSurface::dirtySurfaceMaps()
 
 void LLSurface::setWaterHeight(F32 height)
 {
-    if (!mWaterObjp.isNull())
+    const bool changed = mWaterHeight != height;
+    mWaterHeight = height;
+    if (mWaterObjp.notNull())
     {
         LLVector3 water_pos_region = mWaterObjp->getPositionRegion();
-        bool changed = water_pos_region.mV[VZ] != height;
         water_pos_region.mV[VZ] = height;
         mWaterObjp->setPositionRegion(water_pos_region);
-        if (changed)
-        {
-            LLWorld::getInstance()->requestWaterObjectsUpdate();
-        }
     }
-    else
+    if (changed)
     {
-        LL_WARNS() << "LLSurface::setWaterHeight with no water object!" << LL_ENDL;
+        LLWorld::getInstance()->requestWaterObjectsUpdate();
     }
 }
 
-F32 LLSurface::getWaterHeight() const
-{
-    if (!mWaterObjp.isNull())
-    {
-        // we have a water object, the usual case
-        return mWaterObjp->getPositionRegion().mV[VZ];
-    }
-    else
-    {
-        return DEFAULT_WATER_HEIGHT;
-    }
-}
 
