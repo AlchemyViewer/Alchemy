@@ -530,9 +530,12 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 
             float w = 1.0;
             w -= max(spos.z - far_split.z, 0.0) / transition_domain.z;
-            shadow += filterShadow(shadowMap3, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) * w;
+            // Toward the far split the last cascade fades to lit, where the shadows end. A blend: added on top, it
+            // lifted a lit receiver up to twice its light there and dropped it back at the split, which sunLightF's
+            // clamp hides on opaque surfaces and the water and alpha, reading this raw, showed as a line.
+            float to_lit = clamp((pos.z + shadow_clip.z) / (shadow_clip.z - shadow_clip.w) * 2.0 - 1.0, 0.0, 1.0);
+            shadow += mix(filterShadow(shadowMap3, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen), 1.0, to_lit) * w;
             weight += w;
-            shadow += max((pos.z + shadow_clip.z) / (shadow_clip.z - shadow_clip.w) * 2.0 - 1.0, 0.0);
         }
 
         if (spos.z < near_split.y && spos.z > far_split.z)
@@ -603,37 +606,29 @@ float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
     {
         vec4 lpos;
 
-        vec4 near_split = shadow_clip * -0.75;
-        vec4 far_split = shadow_clip * -1.25;
-        vec4 transition_domain = near_split - far_split;
-        float weight = 0.0;
-
+        // A sampler2DShadow cannot live in a local or a ternary (GLSL opaque type), so pick
+        // the map by branch and pass it straight in.
+        float filtered;
+        if (index == 0)
         {
-            float w = 1.0;
-            w -= max(spos.z - far_split.z, 0.0) / transition_domain.z;
-
-            // A sampler2DShadow cannot live in a local or a ternary (GLSL opaque type), so pick
-            // the map by branch and pass it straight in.
-            if (index == 0)
-            {
-                lpos = shadow_matrix[4] * spos;
-                vec4 dLdx = shadow_matrix[4] * ddx4;
-                vec4 dLdy = shadow_matrix[4] * ddy4;
-                shadow += filterShadow(shadowMap4, lpos, dLdx, dLdy, proj_shadow_res, const_bias, pos_screen) * w;
-            }
-            else
-            {
-                lpos = shadow_matrix[5] * spos;
-                vec4 dLdx = shadow_matrix[5] * ddx4;
-                vec4 dLdy = shadow_matrix[5] * ddy4;
-                shadow += filterShadow(shadowMap5, lpos, dLdx, dLdy, proj_shadow_res, const_bias, pos_screen) * w;
-            }
-
-            weight += w;
-            shadow += max((pos.z + shadow_clip.z) / (shadow_clip.z - shadow_clip.w) * 2.0 - 1.0, 0.0);
+            lpos = shadow_matrix[4] * spos;
+            vec4 dLdx = shadow_matrix[4] * ddx4;
+            vec4 dLdy = shadow_matrix[4] * ddy4;
+            filtered = filterShadow(shadowMap4, lpos, dLdx, dLdy, proj_shadow_res, const_bias, pos_screen);
+        }
+        else
+        {
+            lpos = shadow_matrix[5] * spos;
+            vec4 dLdx = shadow_matrix[5] * ddx4;
+            vec4 dLdy = shadow_matrix[5] * ddy4;
+            filtered = filterShadow(shadowMap5, lpos, dLdx, dLdy, proj_shadow_res, const_bias, pos_screen);
         }
 
-        shadow /= weight;
+        // One map, so no cascade weight to blend by: a cascade's weight here would cancel, and is zero three quarters
+        // of the way to shadow_clip.z, where dividing by it gives NaN. Faded to lit toward the far split, as the sun's
+        // last cascade is (sampleDirectionalShadow).
+        float to_lit = clamp((pos.z + shadow_clip.z) / (shadow_clip.z - shadow_clip.w) * 2.0 - 1.0, 0.0, 1.0);
+        shadow = mix(filtered, 1.0, to_lit);
     }
     else
     {
