@@ -27,6 +27,7 @@
 #include "alwatersurface.h"
 
 #include "alfarplane.h"
+#include "alwaterheightbake.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llappviewer.h"
@@ -43,6 +44,10 @@
 #include "llviewertexture.h"
 #include "llworld.h"
 #include "pipeline.h"
+#include "workqueue.h"
+
+#include <cmath>
+#include <memory>
 
 void ALWaterSurface::update()
 {
@@ -129,6 +134,12 @@ void ALWaterSurface::release()
 {
     mCellMap = nullptr;
     mKey = Key();
+    // The maps' heights are GL textures; their texels stay, and are uploaded again when next wanted. A bake still
+    // running lands on its map as before.
+    for (MapStats& stats : mMaps)
+    {
+        stats.mHeights = nullptr;
+    }
 }
 
 void ALWaterSurface::bind(LLGLSLShader& shader) const
@@ -221,7 +232,11 @@ void ALWaterSurface::trackMaps(LLViewerTexture* current, LLViewerTexture* next)
         }
         MapStats& stats = mapStats(map->getID());
         stats.mUsed = gFrameCount;
-        if (stats.mKnown)
+        if (stats.mTexels && stats.mHeights.isNull())
+        {
+            uploadHeights(stats);
+        }
+        if (stats.mKnown || stats.mBaking)
         {
             continue;
         }
@@ -230,19 +245,159 @@ void ALWaterSurface::trackMaps(LLViewerTexture* current, LLViewerTexture* next)
         {
             continue;
         }
-        // The full-resolution pixels, saved by the fetch when asked for; let go once read.
+        // The full-resolution pixels, saved by the fetch when asked for, read where they are.
         if (fetched->hasSavedRawImage() && fetched->getSavedRawImageLevel() == 0)
         {
-            const LLImageRaw* raw = fetched->getSavedRawImage();
-            stats.mMean = ALWaterField::meanNormal(raw->getData(), raw->getWidth(), raw->getHeight(), raw->getComponents());
-            stats.mKnown = true;
-            fetched->destroySavedRawImage();
+            bakeMap(stats, fetched->getSavedRawImage());
         }
         else
         {
             fetched->forceToSaveRawImage(0);
         }
     }
+}
+
+struct ALWaterSurface::Baked
+{
+    LLVector2                               mMean;
+    std::shared_ptr<const std::vector<U16>> mTexels;
+    S32                                     mWidth = 0;
+    S32                                     mHeight = 0;
+    F32                                     mMaxBig = 0.f;
+    F32                                     mMaxMid = 0.f;
+    F64                                     mRmsBig = 0.0;
+    F64                                     mRmsMid = 0.0;
+    F64                                     mSeconds = 0.0;
+};
+
+void ALWaterSurface::bakeMap(MapStats& stats, LLPointer<LLImageRaw> raw)
+{
+    if (raw.isNull())
+    {
+        return;
+    }
+    // The saved pixels are the texture's own copy, never written once saved, and counted thread-safely: the worker
+    // reads them under the image's shared lock, and nothing is copied here.
+    const auto bake = [raw]()
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("water height bake");
+        auto baked = std::make_shared<Baked>();
+        LLTimer timer;
+        LLImageDataSharedLock lock(raw);
+        const U8* data = raw->getData();
+        const S32 width = raw->getWidth();
+        const S32 height = raw->getHeight();
+        const S32 components = raw->getComponents();
+        baked->mMean = ALWaterField::meanNormal(data, width, height, components);
+        // A map past the bake's size is halved until it fits, first.
+        std::vector<U8> fitted;
+        const U8* pixels = data;
+        size_t size = (size_t)raw->getDataSize();
+        S32 bake_width = width;
+        S32 bake_height = height;
+        if ((width > ALWaterHeightBake::MAX_BAKE_SIZE || height > ALWaterHeightBake::MAX_BAKE_SIZE) &&
+            ALWaterHeightBake::fitToSize(data, width, height, components, ALWaterHeightBake::MAX_BAKE_SIZE, fitted,
+                                         bake_width, bake_height))
+        {
+            pixels = fitted.data();
+            size = fitted.size();
+        }
+        const ALWaterHeightBake::Heights field = ALWaterHeightBake::bake(pixels, size, bake_width, bake_height, components);
+        if (field.valid())
+        {
+            baked->mTexels = std::make_shared<const std::vector<U16>>(ALWaterHeightBake::halfTexels(field));
+            baked->mWidth = field.mWidth;
+            baked->mHeight = field.mHeight;
+            baked->mMaxBig = field.mMaxBig;
+            baked->mMaxMid = field.mMaxMid;
+            const size_t count = (size_t)field.mWidth * (size_t)field.mHeight;
+            F64 square[2] = {};
+            for (size_t n = 0; n < count; ++n)
+            {
+                square[0] += (F64)field.mBig[n] * field.mBig[n];
+                square[1] += (F64)field.mMid[n] * field.mMid[n];
+            }
+            baked->mRmsBig = ALWaterHeightBake::BIG_METRES * std::sqrt(square[0] / (F64)count);
+            baked->mRmsMid = ALWaterHeightBake::MID_METRES * std::sqrt(square[1] / (F64)count);
+        }
+        baked->mSeconds = timer.getElapsedTimeF64();
+        return baked;
+    };
+
+    stats.mBaking = true;
+    const LLUUID id = stats.mID;
+    LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
+    LL::WorkQueue::ptr_t general_queue = LL::WorkQueue::getInstance("General");
+    // Landing looks the map up again: the cache may have let it go meanwhile.
+    if (!main_queue || !general_queue ||
+        !main_queue->postTo(general_queue, bake, [id](std::shared_ptr<Baked> baked) { gPipeline.mWaterSurface.land(id, *baked); }))
+    {
+        // No queue to take it, as the viewer shuts down: the map is left as it was.
+        stats.mBaking = false;
+    }
+}
+
+void ALWaterSurface::land(const LLUUID& id, Baked& baked)
+{
+    MapStats* stats = findMapStats(id);
+    if (!stats || !stats->mBaking)
+    {
+        return;
+    }
+    stats->mBaking = false;
+    stats->mKnown = true;
+    stats->mMean = baked.mMean;
+    // Without heights the map's waves stay flat.
+    if (!baked.mTexels)
+    {
+        return;
+    }
+    // Uploaded at the next track, on the main thread with the context current.
+    stats->mTexels = std::move(baked.mTexels);
+    stats->mTexelsWidth = baked.mWidth;
+    stats->mTexelsHeight = baked.mHeight;
+    stats->mHeights = nullptr;
+    stats->mMaxBig = baked.mMaxBig;
+    stats->mMaxMid = baked.mMaxMid;
+    stats->mLanded = LLFrameTimer::getTotalSeconds();
+    LL_INFOS("Water") << "Wave heights of " << id << ", " << baked.mWidth << "x" << baked.mHeight << ", baked in "
+                      << baked.mSeconds * 1000.0 << " ms: big layer rms " << baked.mRmsBig << " m, max " << baked.mMaxBig
+                      << " m; mid layer rms " << baked.mRmsMid << " m, max " << baked.mMaxMid << " m" << LL_ENDL;
+}
+
+void ALWaterSurface::uploadHeights(MapStats& stats)
+{
+    if (!stats.mTexels || stats.mTexelsWidth <= 0 || stats.mTexelsHeight <= 0)
+    {
+        return;
+    }
+    // The two fields side by side in a texel, and every mip, box-averaged as GL generates them: a layer seen far off
+    // reads its heights averaged toward the plane.
+    LLPointer<LLImageGL> texture = new LLImageGL(stats.mTexelsWidth, stats.mTexelsHeight, 2, true);
+    texture->setNeedsAlphaAndPickMask(false);
+    texture->setExplicitFormat(GL_RG16F, GL_RG, GL_HALF_FLOAT);
+    if (!texture->createGLTexture(0, reinterpret_cast<const U8*>(stats.mTexels->data())))
+    {
+        // Not tried again: the map's waves stay flat.
+        LL_WARNS("Water") << "The wave heights of " << stats.mID << " did not upload" << LL_ENDL;
+        stats.mTexels.reset();
+        return;
+    }
+    stats.mHeights = texture;
+}
+
+ALWaterSurface::Heights ALWaterSurface::mapHeights(const LLViewerTexture* map) const
+{
+    Heights out;
+    const MapStats* stats = map ? findMapStats(map->getID()) : nullptr;
+    if (stats && stats->mHeights.notNull())
+    {
+        out.mTexture = stats->mHeights;
+        out.mMaxBig = stats->mMaxBig;
+        out.mMaxMid = stats->mMaxMid;
+        out.mRise = (F32)llclamp((LLFrameTimer::getTotalSeconds() - stats->mLanded) / RAMP_SECONDS, 0.0, 1.0);
+    }
+    return out;
 }
 
 LLVector4 ALWaterSurface::mapMeans(const LLViewerTexture* a, const LLViewerTexture* b) const
@@ -288,6 +443,18 @@ ALWaterSurface::MapStats& ALWaterSurface::mapStats(const LLUUID& id)
     *oldest = MapStats();
     oldest->mID = id;
     return *oldest;
+}
+
+ALWaterSurface::MapStats* ALWaterSurface::findMapStats(const LLUUID& id)
+{
+    for (MapStats& stats : mMaps)
+    {
+        if (stats.mID == id)
+        {
+            return &stats;
+        }
+    }
+    return nullptr;
 }
 
 const ALWaterSurface::MapStats* ALWaterSurface::findMapStats(const LLUUID& id) const

@@ -32,11 +32,13 @@
 #include "v2math.h"
 #include "v4math.h"
 
+#include <memory>
 #include <vector>
 
 class LLCamera;
 class LLGLSLShader;
 class LLImageGL;
+class LLImageRaw;
 class LLVector3;
 class LLViewerTexture;
 
@@ -59,7 +61,8 @@ public:
     /// Whether there is a field to draw.
     bool exists() const { return mCellMap.notNull(); }
 
-    /// Releases the map's texture.
+    /// Releases the GL textures: the cell map and the maps' heights. What the maps' pixels gave is kept, and their
+    /// heights are uploaded again when next wanted.
     void release();
 
     /// Binds the cell map and sets the uniforms environment/waterSurface.glsl reads on `shader`, bound: the square,
@@ -83,13 +86,30 @@ public:
     void addExtents(LLVector3& min, LLVector3& max) const;
 
     /// Follows the environment's two wave normal maps, current and next, for what the water's shaders take from their
-    /// pixels: each map's mean slope. A map's pixels are asked for once and let go when read; what they gave is kept
-    /// for the last few maps seen. Once a main frame, from the water pool.
+    /// pixels: each map's mean slope, and the heights its waves are displaced by (ALWaterHeightBake), both worked on
+    /// the General queue, the heights uploaded here. A map's pixels are asked for while something is still to come
+    /// from them, and read in place; the texture lets them go in its own time. What they gave is kept for the last few
+    /// maps seen. Once a main frame, from the water pool.
     void trackMaps(LLViewerTexture* current, LLViewerTexture* next);
 
     /// waterSurface.glsl's waterMapMean for the maps bound as the current (`a`) and next (`b`) map: each one's mean
     /// normal xy, zero for a map whose pixels have not arrived or that is null.
     LLVector4 mapMeans(const LLViewerTexture* a, const LLViewerTexture* b) const;
+
+    /// A wave map's baked heights: the big layer's field in r and the mid layers' in g, in repeats of the map, RG16F
+    /// with every mip; the largest each displaces the surface by, in metres, at a wave height of 1; and how far its
+    /// waves have risen since the bake landed, 0 to 1 over RAMP_SECONDS, so a late bake does not pop. A null texture,
+    /// maxima of 0 and no rise until then.
+    struct Heights
+    {
+        LLImageGL* mTexture = nullptr;
+        F32        mMaxBig = 0.f;
+        F32        mMaxMid = 0.f;
+        F32        mRise = 0.f;
+    };
+    Heights mapHeights(const LLViewerTexture* map) const;
+
+    static constexpr F64 RAMP_SECONDS = 1.0;
 
     const ALWaterField::Layout& getLayout() const { return mLayout; }
 
@@ -108,18 +128,34 @@ private:
         bool operator==(const Key&) const = default;
     };
 
-    /// What a wave normal map's pixels gave, by asset id.
+    /// What a wave normal map's pixels gave, by asset id. The heights' texels outlive a release of the GL textures, which
+    /// are uploaded from them again.
     struct MapStats
     {
-        LLUUID    mID;
-        LLVector2 mMean;
-        bool      mKnown = false;
-        U32       mUsed = 0; ///< the frame it was last tracked, for the cache's eviction
+        LLUUID               mID;
+        LLVector2            mMean;
+        bool                 mKnown = false;        ///< the mean and heights have landed
+        bool                 mBaking = false;       ///< its pixels are on the General queue
+        U32                  mUsed = 0;             ///< the frame it was last tracked, for the cache's eviction
+        std::shared_ptr<const std::vector<U16>> mTexels; ///< the heights as RG16F texels; null without heights
+        S32                  mTexelsWidth = 0;
+        S32                  mTexelsHeight = 0;
+        LLPointer<LLImageGL> mHeights;              ///< the texels uploaded; null until uploaded, and after a release
+        F32                  mMaxBig = 0.f;
+        F32                  mMaxMid = 0.f;
+        F64                  mLanded = 0.0;         ///< LLFrameTimer::getTotalSeconds() when the heights landed
     };
     static constexpr size_t MAP_CACHE = 4;
 
+    /// What a bake hands back to the main thread.
+    struct Baked;
+
     MapStats&       mapStats(const LLUUID& id);
+    MapStats*       findMapStats(const LLUUID& id);
     const MapStats* findMapStats(const LLUUID& id) const;
+    void            bakeMap(MapStats& stats, LLPointer<LLImageRaw> raw);
+    void            land(const LLUUID& id, Baked& baked);
+    void            uploadHeights(MapStats& stats);
 
     ALWaterField::Layout mLayout;
     LLVector4            mSquare;

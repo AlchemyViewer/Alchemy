@@ -248,6 +248,7 @@ if(AL_BUILD_VIEWER)
     alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
     alwaterfield.cpp
+    alwaterheightbake.cpp
     alwatersurface.cpp
     alfloaterscriptstudio.cpp
     alfloaterwebprofile.cpp
@@ -1127,6 +1128,7 @@ if(AL_BUILD_VIEWER)
     alscriptworkspace.h
     alterrainsurfacemaps.h
     alwaterfield.h
+    alwaterheightbake.h
     alwatersurface.h
     altexturetable.h
     alfloaterscriptstudio.h
@@ -2132,6 +2134,7 @@ if(AL_BUILD_VIEWER)
       ll::nvapi
       ll::tinygltf
       ll::tinyexr
+      ll::pocketfft
       ll::minizip
       ll::pugixml
       ll::velopack
@@ -2553,6 +2556,9 @@ if(AL_BUILD_TESTS)
     LIBRARIES ${test_libs}
     SOURCES alcolorwheelmodel.cpp
   )
+  # The water's height bake transforms by pocketfft, a header the viewer links
+  # privately, so its test links it too.
+  al_add_test(alwaterheightbake UNIT PROJECT ${test_project} LIBRARIES ${test_libs} ll::pocketfft)
   # The selection outline's id and edge passes, the viewer's own shader files
   # read from the source tree, on LLWindowManager's hidden window.
   al_add_test(
