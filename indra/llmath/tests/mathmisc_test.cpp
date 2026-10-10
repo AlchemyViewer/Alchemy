@@ -28,6 +28,7 @@
 
 #include "linden_common.h"
 #include "../test/lltut.h"
+#include "../test/alrandomreseed.h"
 
 #include "llcrc.h"
 #include "llrand.h"
@@ -298,6 +299,8 @@ namespace
 
     struct line_data
     {
+        // Tests 1 and 3 seed the main thread's generator.
+        ~line_data() { ll_test::reseedRandomFromEntropy(); }
     };
     typedef test_group<line_data> line_test;
     typedef line_test::object line_object;

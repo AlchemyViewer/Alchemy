@@ -27,6 +27,7 @@
 
 #include "linden_common.h"
 #include "../test/lltut.h"
+#include "../test/alrandomreseed.h"
 
 #include "../llrand.h"
 #include "../alrandmap.h"
@@ -133,6 +134,8 @@ namespace tut
 {
     struct random
     {
+        // Tests here seed the main thread's generator.
+        ~random() { ll_test::reseedRandomFromEntropy(); }
     };
 
     typedef test_group<random> random_t;
