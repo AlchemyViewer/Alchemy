@@ -267,6 +267,7 @@ if(AL_BUILD_VIEWER)
     alfloaterxuistudio.cpp
     alviewcapture.cpp
     algradehistory.cpp
+    alhoverglow.cpp
     allegacynotificationwellwindow.cpp
     allightboxdirectory.cpp
     almotionpredictor.cpp
@@ -301,6 +302,7 @@ if(AL_BUILD_VIEWER)
     alpanelstreaminfo.cpp
     alpickitem.cpp
     alsceneexplorermodel.cpp
+    alselectionoutline.cpp
     alstreaminfo.cpp
     altoolalign.cpp
     altoolscenepicker.cpp
@@ -1144,6 +1146,8 @@ if(AL_BUILD_VIEWER)
     alfloaterxuistudio.h
     alviewcapture.h
     algradehistory.h
+    alhoverglow.h
+    alhuddepth.h
     allegacynotificationwellwindow.h
     allightboxdirectory.h
     almotionpredictor.h
@@ -1176,6 +1180,7 @@ if(AL_BUILD_VIEWER)
     alpanelstreaminfo.h
     alpickitem.h
     alsceneexplorermodel.h
+    alselectionoutline.h
     alstreaminfo.h
     altoolalign.h
     altoolscenepicker.h
@@ -2539,6 +2544,25 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES ${test_libs}
     SOURCES alcolorwheelmodel.cpp
+  )
+  # The selection outline's id and edge passes, the viewer's own shader files
+  # read from the source tree, on LLWindowManager's hidden window.
+  al_add_test(
+    alselectionoutline_gl
+    GL
+    PROJECT ${test_project}
+    LIBRARIES llrender
+    INCLUDES ${INDRA_SOURCE_DIR}/llprimitive
+    DEFINES "AL_TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders\""
+  )
+  # The window's depth under the HUD: cleared in the HUD's rects, then the
+  # scene's written back with the viewer's own copy shader.
+  al_add_test(
+    alhuddepth_gl
+    GL
+    PROJECT ${test_project}
+    LIBRARIES llrender
+    DEFINES "AL_TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders\""
   )
   # The outbox keeps what the pure feedback code makes.
   al_add_test(

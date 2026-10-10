@@ -10054,6 +10054,37 @@ bool LLVOAvatar::hasHUDAttachment() const
     return false;
 }
 
+static void add_hud_attachment_bbox(LLBBox& bbox, const LLViewerJointAttachment* attachment)
+{
+    for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator attachment_iter = attachment->mAttachedObjects.begin();
+         attachment_iter != attachment->mAttachedObjects.end();
+         ++attachment_iter)
+    {
+        const LLViewerObject* attached_object = attachment_iter->get();
+        if (attached_object == NULL)
+        {
+            LL_WARNS() << "HUD attached object is NULL!" << LL_ENDL;
+            continue;
+        }
+        // A point added first fixes the box's frame at the HUD's origin with no rotation, so the rotated boxes below
+        // land in the HUD's own frame. The point is the object's centre on the HUD, inside the box added next, so it
+        // widens nothing. (The object's position is its offset from the attachment point, another frame: a corner
+        // HUD's box seeded with it reached towards the middle of the screen.)
+        const LLBBox object_bbox = attached_object->getBoundingBoxAgent();
+        bbox.addPointLocal(object_bbox.getCenterAgent());
+        // add rotated bounding box for attached object
+        bbox.addBBoxAgent(object_bbox);
+        LLViewerObject::const_child_list_t& child_list = attached_object->getChildren();
+        for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
+             iter != child_list.end();
+             ++iter)
+        {
+            const LLViewerObject* child_objectp = *iter;
+            bbox.addBBoxAgent(child_objectp->getBoundingBoxAgent());
+        }
+    }
+}
+
 LLBBox LLVOAvatar::getHUDBBox() const
 {
     LLBBox bbox;
@@ -10061,35 +10092,21 @@ LLBBox LLVOAvatar::getHUDBBox() const
          iter != mAttachmentPoints.end();
          ++iter)
     {
-        LLViewerJointAttachment* attachment = iter->second;
+        const LLViewerJointAttachment* attachment = iter->second;
         if (attachment->getIsHUDAttachment())
         {
-            for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-                 attachment_iter != attachment->mAttachedObjects.end();
-                 ++attachment_iter)
-            {
-                const LLViewerObject* attached_object = attachment_iter->get();
-                if (attached_object == NULL)
-                {
-                    LL_WARNS() << "HUD attached object is NULL!" << LL_ENDL;
-                    continue;
-                }
-                // initialize bounding box to contain identity orientation and center point for attached object
-                bbox.addPointLocal(attached_object->getPosition());
-                // add rotated bounding box for attached object
-                bbox.addBBoxAgent(attached_object->getBoundingBoxAgent());
-                LLViewerObject::const_child_list_t& child_list = attached_object->getChildren();
-                for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
-                     iter != child_list.end();
-                     ++iter)
-                {
-                    const LLViewerObject* child_objectp = *iter;
-                    bbox.addBBoxAgent(child_objectp->getBoundingBoxAgent());
-                }
-            }
+            add_hud_attachment_bbox(bbox, attachment);
         }
     }
 
+    return bbox;
+}
+
+// static
+LLBBox LLVOAvatar::getHUDBBox(const LLViewerJointAttachment* attachment)
+{
+    LLBBox bbox;
+    add_hud_attachment_bbox(bbox, attachment);
     return bbox;
 }
 

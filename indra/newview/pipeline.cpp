@@ -59,6 +59,7 @@
 #include "alcurvemodel.h"
 #include "alfarplane.h"
 #include "alfarplaneoverlay.h"
+#include "alselectionoutline.h"
 #include "llrender.h"
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
@@ -976,6 +977,9 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
     if (shadow_detail > 0 || ssao)
     { //only need mRT->deferredLight for shadows OR ssao
         if (!mRT->deferredLight.allocate(resX, resY, screenFormat)) return false;
+        // The scene's depth, for the far-plane test that keeps the light map's passes off the sky
+        // (renderDeferredLighting).
+        mRT->deferredScreen.shareDepthBuffer(mRT->deferredLight);
     }
     else
     {
@@ -1387,6 +1391,10 @@ void LLPipeline::releaseGLBuffers()
     }
 
     ALFarPlaneOverlay::release();
+    if (ALSelectionOutline::instanceExists())
+    {
+        ALSelectionOutline::instance().release();
+    }
 
     mHeroProbeManager.cleanup(); // release hero probes
 
@@ -1688,9 +1696,9 @@ void LLPipeline::createLUTBuffers()
     // Scale 1 at EV 0: the first frame adapts from no exposure at all.
     mExposureMap.allocate(1, 1, GL_RGBA16F);
     mExposureMap.bindTarget();
-    glClearColor(1, 0, 0, 1);
+    gGL.setClearColor(LLColor4::red);
     mExposureMap.clear();
-    glClearColor(0, 0, 0, 0);
+    gGL.setClearColor(LLColor4::transparent);
     mExposureMap.flush();
 
     mLuminanceMap.allocate(EXPOSURE_METER_WIDTH, EXPOSURE_METER_HEIGHT, GL_RGBA16F);
@@ -3595,7 +3603,7 @@ void LLPipeline::markShift(LLDrawable *drawablep)
 
     if (!drawablep->isState(LLDrawable::ON_SHIFT_LIST))
     {
-        drawablep->getVObj()->setChanged(LLXform::SHIFTED | LLXform::SILHOUETTE);
+        drawablep->getVObj()->setChanged(LLXform::SHIFTED);
         if (drawablep->getParent())
         {
             markShift(drawablep->getParent());
@@ -3741,10 +3749,6 @@ void LLPipeline::markRebuild(LLDrawable *drawablep, LLDrawable::EDrawableFlags f
             drawablep->setState(LLDrawable::IN_REBUILD_Q); // mark drawable as being in priority queue
         }
 
-        if (flag & (LLDrawable::REBUILD_VOLUME | LLDrawable::REBUILD_POSITION))
-        {
-            drawablep->getVObj()->setChanged(LLXform::SILHOUETTE);
-        }
         drawablep->setState(flag);
     }
 }
@@ -5106,7 +5110,7 @@ void LLPipeline::renderDebug()
                     {
                         const LLColor4 clearColor = gSavedSettings.getColor4("PathfindingNavMeshClear");
                         gGL.setColorMask(true, true);
-                        glClearColor(clearColor.mV[0],clearColor.mV[1],clearColor.mV[2],0);
+                        gGL.setClearColor(LLColor4(clearColor.mV[0], clearColor.mV[1], clearColor.mV[2], 0.f));
                         glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // no stencil -- deprecated | GL_STENCIL_BUFFER_BIT);
                         gGL.setColorMask(true, false);
                         glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
@@ -10102,7 +10106,7 @@ void LLPipeline::renderFinalize()
     enableLightsFullbright();
 
     gGL.setColorMask(true, true);
-    glClearColor(0, 0, 0, 0);
+    gGL.setClearColor(LLColor4::transparent);
 
     static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
     bool hdr = gGLManager.mGLVersion > 4.05f && has_hdr();
@@ -11068,17 +11072,20 @@ void LLPipeline::renderDeferredLighting()
                 LLGLSLShader& sun_shader = gCubeSnapshot ? gDeferredSunProbeProgram : gDeferredSunProgram;
                 bindDeferredShader(sun_shader, deferred_light_target);
                 mScreenTriangleVB->setBuffer();
-                glClearColor(1, 1, 1, 1);
+                gGL.setClearColor(LLColor4::white);
                 deferred_light_target->clear(GL_COLOR_BUFFER_BIT);
-                glClearColor(0, 0, 0, 0);
+                gGL.setClearColor(LLColor4::transparent);
 
                 sun_shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
                                               (GLfloat)deferred_light_target->getWidth(),
                                               (GLfloat)deferred_light_target->getHeight());
 
                 {
+                    // The triangle lies on the far plane (sunLightV.glsl) and the target shares the scene's
+                    // depth: only geometry is shadowed and occluded, and the sky keeps the clear's white, which
+                    // nothing reads there (the soften pass's sky program lights nothing).
                     LLGLDisable   blend(GL_BLEND);
-                    LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_ALWAYS);
+                    LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
                     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                 }
 
@@ -11094,9 +11101,9 @@ void LLPipeline::renderDeferredLighting()
             LL_PROFILE_GPU_ZONE("soften shadow");
             // blur lightmap
             screen_target->bindTarget();
-            glClearColor(1, 1, 1, 1);
+            gGL.setClearColor(LLColor4::white);
             screen_target->clear(GL_COLOR_BUFFER_BIT);
-            glClearColor(0, 0, 0, 0);
+            gGL.setClearColor(LLColor4::transparent);
 
             bindDeferredShader(gDeferredBlurLightProgram);
 
@@ -11123,9 +11130,11 @@ void LLPipeline::renderDeferredLighting()
             gDeferredBlurLightProgram.uniform3fv(LLShaderMgr::KERN, kern_length, gauss[0].mV);
             gDeferredBlurLightProgram.uniform1f(LLShaderMgr::KERN_SCALE, blur_size * (kern_length / 2.f - 0.5f));
 
+            // Both blurs on the far plane (blurLightV.glsl), over geometry alone: the sky stays the clear's white
+            // in either target.
             {
                 LLGLDisable   blend(GL_BLEND);
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_ALWAYS);
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
@@ -11141,7 +11150,7 @@ void LLPipeline::renderDeferredLighting()
 
             {
                 LLGLDisable   blend(GL_BLEND);
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_ALWAYS);
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
@@ -11151,7 +11160,7 @@ void LLPipeline::renderDeferredLighting()
 
         screen_target->bindTarget();
         // clear color buffer here - zeroing alpha (glow) is important or it will accumulate against sky
-        glClearColor(0, 0, 0, 0);
+        gGL.setClearColor(LLColor4::transparent);
         screen_target->clear(GL_COLOR_BUFFER_BIT);
 
         if (RenderDeferredAtmospheric)
@@ -11174,16 +11183,28 @@ void LLPipeline::renderDeferredLighting()
 
             soften_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
 
+            // The triangle lies on the far plane (softenLightV.glsl), level with the depth the sky leaves cleared:
+            // this draw passes only where the world drew something, and the sky's draw below only where it did
+            // not, so no sky pixel pays for the G-buffer decode and atmospherics it would throw away.
+            LLGLDisable blend(GL_BLEND);
             {
-                LLGLDepthTest depth(GL_FALSE);
-                LLGLDisable   blend(GL_BLEND);
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
 
-                // full screen blit
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
 
             unbindDeferredShader(soften_shader);
+
+            LLGLSLShader& sky_shader = *gDeferredSoftenSkyProgram.selectVariant();
+            bindDeferredShader(sky_shader);
+            {
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_EQUAL);
+
+                mScreenTriangleVB->setBuffer();
+                mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+            }
+            unbindDeferredShader(sky_shader);
         }
 
         static LLCachedControl<S32> local_light_count(gSavedSettings, "RenderLocalLightCount", 256);
@@ -11372,7 +11393,9 @@ void LLPipeline::renderDeferredLighting()
 
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - fullscreen lights");
-                LLGLDepthTest depth(GL_FALSE);
+                // On the far plane (multiPointLightV.glsl): only where the world drew something, so no light is
+                // shaded over the sky.
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
                 LL_PROFILE_GPU_ZONE("fullscreen lights");
 
                 U32 count = 0;
@@ -11664,12 +11687,12 @@ void LLPipeline::doWaterExclusionMask()
     }
 
     mWaterExclusionMask.bindTarget();
-    glClearColor(1, 1, 1, 1);
+    gGL.setClearColor(LLColor4::white);
     mWaterExclusionMask.clear();
     mWaterExclusionPool->render();
 
     mWaterExclusionMask.flush();
-    glClearColor(0, 0, 0, 0);
+    gGL.setClearColor(LLColor4::transparent);
 }
 
 // The map from clip space to a texture: x and y from [-1, 1] to [0, 1], z by
@@ -13514,7 +13537,7 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
     // generateImpostor's clear colour is its own business everywhere else, because display()
     // sets one before each clear it cares about. Nothing does that on the way back into a UI
     // draw, so put it back to the ambient here.
-    glClearColor(0.f, 0.f, 0.f, 0.f);
+    gGL.setClearColor(LLColor4::transparent);
 
     if (cur_shader)
     {
@@ -13771,7 +13794,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
             avatar->setImpostorViewRotation(bake_rot);
         }
 
-        glClearColor(0.0f,0.0f,0.0f,0.0f);
+        gGL.setClearColor(LLColor4::transparent);
         gGL.setColorMask(true, true);
 
         // get the number of pixels per angle

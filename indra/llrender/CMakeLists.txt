@@ -176,4 +176,6 @@ if(AL_BUILD_TESTS)
   al_add_test(alinfiniteprojection_gl GL PROJECT llrender LIBRARIES llrender)
   # Which fragment output reaches a render target's colour attachment.
   al_add_test(llrendertarget_gl GL PROJECT llrender LIBRARIES llrender)
+  # LLRender's cached clear colour and scissor box, and LLGLSScissor.
+  al_add_test(alrenderstate_gl GL PROJECT llrender LIBRARIES llrender)
 endif()

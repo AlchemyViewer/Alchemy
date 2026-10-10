@@ -32,6 +32,7 @@
 #include "llclickaction.h"
 #include "llparcel.h"
 
+#include "alhoverglow.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llavatarnamecache.h"
@@ -84,6 +85,15 @@ extern bool gDebugClicks;
 static void handle_click_action_play();
 static void handle_click_action_open_media(LLPointer<LLViewerObject> objectp);
 static ECursorType cursor_from_parcel_media(U8 click_action);
+
+// Names `object` to the hover glow (RenderHoverGlowEnable) as what the pointer is over this frame, or nothing: a world
+// object, not an avatar or a HUD attachment.
+static void hover_glow(const LLViewerObject* object)
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "RenderHoverGlowEnable", false);
+    const bool glows = enabled && object && !object->isAvatar() && !object->isHUDAttachment();
+    ALHoverGlow::instance().hover(glows ? object->getID() : LLUUID::null, LLFrameTimer::getFrameCount());
+}
 
 LLToolPie::LLToolPie()
 :   LLTool(std::string("Pie")),
@@ -837,6 +847,7 @@ bool LLToolPie::handleHover(S32 x, S32 y, MASK mask)
     if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canInteract(object, mHoverPick.mObjectOffset)) )
     {
         gViewerWindow->setCursor(UI_CURSOR_ARROW);
+        hover_glow(nullptr);
         return true;
     }
 // [/RLVa:KB]
@@ -846,7 +857,9 @@ bool LLToolPie::handleHover(S32 x, S32 y, MASK mask)
         parent = object->getRootEdit();
     }
 
-    if (!handleMediaHover(mHoverPick)
+    // What the pointer is over glows where it plays media or a click does something to it.
+    bool show_highlight = handleMediaHover(mHoverPick);
+    if (!show_highlight
         && !mMouseOutsideSlop
         && mMouseButtonDown
         // disable camera steering if click on land is not used for moving
@@ -870,6 +883,11 @@ bool LLToolPie::handleHover(S32 x, S32 y, MASK mask)
         steerCameraWithMouse(x, y);
         gViewerWindow->setCursor(UI_CURSOR_TOOLGRAB);
     }
+    else if (show_highlight)
+    {
+        // The cursor is the media's, which handleMediaHover set.
+        LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
+    }
     else
     {
         // perform a separate pick that detects transparent objects since they respond to 1-click actions
@@ -879,6 +897,7 @@ bool LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 
         if (click_action_object && useClickAction(mask, click_action_object, click_action_object->getRootEdit()))
         {
+            show_highlight = true;
             ECursorType cursor = cursorFromObject(click_action_object);
             gViewerWindow->setCursor(cursor);
             LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
@@ -893,6 +912,7 @@ bool LLToolPie::handleHover(S32 x, S32 y, MASK mask)
         else if ((object && !object->isAvatar() && object->flagUsePhysics())
                  || (parent && !parent->isAvatar() && parent->flagUsePhysics()))
         {
+            show_highlight = true;
             gViewerWindow->setCursor(UI_CURSOR_TOOLGRAB);
             LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
         }
@@ -900,6 +920,7 @@ bool LLToolPie::handleHover(S32 x, S32 y, MASK mask)
                  && ((object && object->flagHandleTouch()) || (parent && parent->flagHandleTouch()))
                  && (!object || !object->isAvatar()))
         {
+            show_highlight = true;
             gViewerWindow->setCursor(UI_CURSOR_HAND);
             LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
         }
@@ -914,6 +935,8 @@ bool LLToolPie::handleHover(S32 x, S32 y, MASK mask)
     {
         LLViewerMediaFocus::getInstance()->clearHover();
     }
+
+    hover_glow(show_highlight ? object : nullptr);
 
     return true;
 }

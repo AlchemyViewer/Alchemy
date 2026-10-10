@@ -51,8 +51,7 @@ public:
         GEOMETRY    = 0x10,
         TEXTURE     = 0x20,
         MOVED       = TRANSLATED|ROTATED|SCALED,
-        SILHOUETTE  = 0x40,
-        ALL_CHANGED = 0x7f
+        ALL_CHANGED = 0x3f
     }EChangedFlags;
 
 protected:

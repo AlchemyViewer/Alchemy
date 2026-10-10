@@ -138,7 +138,6 @@ public:
     bool isRootEdit() const override; // overridden for sake of attachments treating themselves as a root object
     bool isHUDAttachment() const override;
 
-                void    generateSilhouette(LLSelectNode* nodep, const LLVector3& view_point);
     /*virtual*/ bool    setParent(LLViewerObject* parent) override;
                 S32     getLOD() const override             { return mLOD; }
                 void    setNoLOD()                          { mLOD = NO_LOD; mLODChanged = true; }

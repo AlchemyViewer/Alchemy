@@ -187,7 +187,6 @@ public:
     void        renderSelectedUV();
 
     void        renderSelected(LLViewerTexture *image, const LLColor4 &color);
-    void        renderOneWireframe(const LLColor4 &color, F32 fogCfx, bool wireframe_selection, bool bRenderHiddenSelections, bool shader);
 
     F32         getKey()                    const   { return mDistance; }
 

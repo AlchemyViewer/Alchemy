@@ -152,9 +152,44 @@ float ssaoVisibility(float ambocc)
 #endif
 }
 
+// The colour the sky family wrote, which nothing lights: an HDRI sky's as it is, WindLight's scaled for fake HDR.
+vec3 skyColor(GBufferInfo gb)
+{
+    if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI))
+    {
+        // actual HDRI sky, just copy color value
+        return gb.emissive.rgb;
+    }
+
+    //should only be true of WL sky, port over base color value and scale for fake HDR
+#if defined(HAS_EMISSIVE)
+    vec3 color = srgb_to_linear(gb.emissive.rgb);
+#else
+    // the sky wrote display-encoded values raw into the sRGB albedo target, and this pass reads it
+    // with hardware decode, so baseColor is already linear; decoding again darkened the vintage sky
+    vec3 color = gb.albedo.rgb;
+#endif
+    return color * sky_hdr_scale;
+}
+
+void writeColor(vec3 color)
+{
+    float final_scale = 1;
+    if (classic_mode > 0)
+        final_scale = 1.1;
+
+    frag_color.rgb = clampHDRRange(color.rgb * final_scale); //output linear since local lights will be added to this shader's results
+    frag_color.a = 0.0;
+}
+
 void main()
 {
     vec2  tc           = vary_fragcoord.xy;
+#ifdef SOFTEN_SKY
+    // This variant's draw passes only at the cleared depth, where nothing but the sky family draws, so nothing here
+    // is lit or hazed: the sky's colour goes through as it was written (LLPipeline::renderDeferredLighting).
+    writeColor(skyColor(getGBuffer(tc)));
+#else
     float depth        = getDepth(tc.xy);
     vec4  pos          = getPositionWithDepth(tc, depth);
 
@@ -237,22 +272,10 @@ void main()
         vec3 v = -normalize(pos.xyz);
         color = pbrBaseLight(diffuseColor, specularColor, metallic, v, gb.normal, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, visibility, additive, atten);
     }
-    else if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI))
+    else if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI) || GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_SKIP_ATMOS))
     {
-        // actual HDRI sky, just copy color value
-        color = colorEmissive.rgb;
-    }
-    else if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_SKIP_ATMOS))
-    {
-        //should only be true of WL sky, port over base color value and scale for fake HDR
-#if defined(HAS_EMISSIVE)
-        color = srgb_to_linear(colorEmissive.rgb);
-#else
-        // the sky wrote display-encoded values raw into the sRGB albedo target, and this pass reads it
-        // with hardware decode, so baseColor is already linear; decoding again darkened the vintage sky
-        color = baseColor.rgb;
-#endif
-        color *= sky_hdr_scale;
+        // unlit in front of the far plane, where the sky's own draw does not reach: a debug highlight writes SKIP_ATMOS
+        color = skyColor(gb);
     }
     else
     {
@@ -336,10 +359,6 @@ void main()
    }
 
     //color.r = classic_mode > 0 ? 1.0 : 0.0;
-    float final_scale = 1;
-    if (classic_mode > 0)
-        final_scale = 1.1;
-
-    frag_color.rgb = clampHDRRange(color.rgb * final_scale); //output linear since local lights will be added to this shader's results
-    frag_color.a = 0.0;
+    writeColor(color);
+#endif
 }

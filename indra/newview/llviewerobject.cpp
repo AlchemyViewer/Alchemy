@@ -1612,7 +1612,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     mHudText = temp_string;
                     mHudTextColor = LLColor4(coloru);
 
-                    setChanged(MOVED | SILHOUETTE);
+                    setChanged(MOVED);
                 }
                 else
                 {
@@ -2156,7 +2156,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     // Show particles, icon and HUD
                     hideExtraDisplayItems( false );
 
-                    setChanged(MOVED | SILHOUETTE);
+                    setChanged(MOVED);
                 }
                 else
                 {
@@ -2295,8 +2295,8 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     }
                     cur_parentp->removeChild(this);
                     sent_parentp->addChild(this);
-                    setChanged(MOVED | SILHOUETTE);
-                    sent_parentp->setChanged(MOVED | SILHOUETTE);
+                    setChanged(MOVED);
+                    sent_parentp->setChanged(MOVED);
                     if (sent_parentp->mDrawable.notNull())
                     {
                         gPipeline.markMoved(sent_parentp->mDrawable, false); // undamped
@@ -2330,7 +2330,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
                         cur_parentp->removeChild(this);
 
-                        setChanged(MOVED | SILHOUETTE);
+                        setChanged(MOVED);
 
                         if (mDrawable.notNull())
                         {
@@ -2383,7 +2383,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     // Set the change flags for scale
     if (new_scale != getScale())
     {
-        setChanged(SCALED | SILHOUETTE);
+        setChanged(SCALED);
         setScale(new_scale);  // Must follow setting permYouOwner()
     }
 
@@ -2460,7 +2460,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
             gAgent.rotate(new_rot);
             gAgentCamera.resetView();
         }
-        setChanged(ROTATED | SILHOUETTE);
+        setChanged(ROTATED);
     }
 
     if ( gShowObjectUpdates )
@@ -2686,7 +2686,7 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
             setVelocity(vel + accel*dt);
 
             // for objects that are spinning but not translating, make sure to flag them as having moved
-            setChanged(MOVED | SILHOUETTE);
+            setChanged(MOVED);
         }
     }
     else if (!accel.isExactlyZero() || !vel.isExactlyZero())        // object is moving
@@ -2860,7 +2860,7 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
         }
 
         // for objects that are spinning but not translating, make sure to flag them as having moved
-        setChanged(MOVED | SILHOUETTE);
+        setChanged(MOVED);
     }
 
     // Update the last time we did anything
@@ -4951,7 +4951,7 @@ void LLViewerObject::setPosition(const LLVector3 &pos, bool damped)
 {
     if (getPosition() != pos)
     {
-        setChanged(TRANSLATED | SILHOUETTE);
+        setChanged(TRANSLATED);
     }
 
     LLXform::setPosition(pos);
@@ -4994,7 +4994,7 @@ void LLViewerObject::setPositionGlobal(const LLVector3d &pos_global, bool damped
             // LLViewerObject version of setPosition?
             LLVector3 old_pos = mDrawable->mXform.getParent()->getPosition();
             mDrawable->mXform.getParent()->setPosition(old_pos + delta_pos);
-            setChanged(TRANSLATED | SILHOUETTE);
+            setChanged(TRANSLATED);
         }
         if (mParent && ((LLViewerObject*)mParent)->isAvatar())
         {
@@ -7246,7 +7246,7 @@ void LLViewerObject::setRegion(LLViewerRegion *regionp)
         mControlAvatar->setRegion(regionp);
     }
 
-    setChanged(MOVED | SILHOUETTE);
+    setChanged(MOVED);
     updateDrawable(false);
 }
 
@@ -7410,7 +7410,7 @@ void LLViewerObject::applyAngularVelocity(F32 dt)
         new_rot.normalize();
         setRotation(new_rot);
 
-        setChanged(MOVED | SILHOUETTE);
+        setChanged(MOVED);
     }
 }
 

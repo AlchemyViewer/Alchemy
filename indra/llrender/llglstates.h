@@ -171,6 +171,35 @@ private:
     bool mPrev[4];
 };
 
+// Scoped scissor: the test enabled and the box set, both handed back on exit as they were
+// found. A box never set in this context is left as the scope set it, since GL takes no
+// negative size to restore it with.
+class LLGLSScissor
+{
+public:
+    LLGLSScissor(S32 x, S32 y, S32 width, S32 height)
+    :   mTest(GL_SCISSOR_TEST)
+    {
+        gGL.getScissor(mPrev);
+        gGL.setScissor(x, y, width, height);
+    }
+
+    ~LLGLSScissor()
+    {
+        if (mPrev[2] >= 0 && mPrev[3] >= 0)
+        {
+            gGL.setScissor(mPrev[0], mPrev[1], mPrev[2], mPrev[3]);
+        }
+    }
+
+    LLGLSScissor(const LLGLSScissor&) = delete;
+    LLGLSScissor& operator=(const LLGLSScissor&) = delete;
+
+private:
+    LLGLEnable mTest;
+    S32 mPrev[4];
+};
+
 class LLGLSTracker
 {
 protected:

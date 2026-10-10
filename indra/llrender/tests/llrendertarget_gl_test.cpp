@@ -114,7 +114,7 @@ namespace tut
         LLColor4U drawn(S32 output)
         {
             mTarget.bindTarget();
-            glClearColor(0.f, 0.f, 0.f, 0.f);
+            gGL.setClearColor(LLColor4::transparent);
             mTarget.clear();
             if (output >= 0)
             {

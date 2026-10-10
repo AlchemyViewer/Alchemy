@@ -1090,14 +1090,14 @@ public:
 inline void LLViewerObject::setRotation(const LLQuaternion& quat, bool damped)
 {
     LLPrimitive::setRotation(quat);
-    setChanged(ROTATED | SILHOUETTE);
+    setChanged(ROTATED);
     updateDrawable(damped);
 }
 
 inline void LLViewerObject::setRotation(const F32 x, const F32 y, const F32 z, bool damped)
 {
     LLPrimitive::setRotation(x, y, z);
-    setChanged(ROTATED | SILHOUETTE);
+    setChanged(ROTATED);
     updateDrawable(damped);
 }
 

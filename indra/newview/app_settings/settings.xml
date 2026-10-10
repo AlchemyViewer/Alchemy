@@ -8783,7 +8783,7 @@
   <key>RenderHoverGlowEnable</key>
   <map>
     <key>Comment</key>
-    <string>DEPRECATED --- Show glow effect when hovering on interactive objects.</string>
+    <string>Show glow effect when hovering on interactive objects.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
@@ -8831,7 +8831,7 @@
   <key>RenderHighlightColor</key>
   <map>
     <key>Comment</key>
-    <string>Brightness of mouseover highlights.</string>
+    <string>Color of mouseover highlights.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>

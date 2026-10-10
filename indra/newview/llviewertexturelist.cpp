@@ -169,12 +169,7 @@ void LLViewerTextureList::doPreloadImages()
     //uv_test->setClamp(false, false);
     //uv_test->setMipFilterNearest(true, true);
 
-    LLViewerFetchedTexture* image = LLViewerTextureManager::getFetchedTextureFromFile("silhouette.j2c", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
-    if (image)
-    {
-        mImagePreloads.insert(image);
-    }
-    image = LLViewerTextureManager::getFetchedTextureFromFile("world/NoEntryLines.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
+    LLViewerFetchedTexture* image = LLViewerTextureManager::getFetchedTextureFromFile("world/NoEntryLines.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
     if (image)
     {
         mImagePreloads.insert(image);

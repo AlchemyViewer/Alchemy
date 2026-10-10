@@ -381,6 +381,31 @@ public:
     // Redundant sets are dropped without a flush.
     void setPatchVertices(U32 count);
 
+    // The colour glClear fills colour buffers with. Every writer in the tree goes through
+    // here, so the cache is the state. Redundant sets are dropped; nothing batched reads it,
+    // so a change needs no flush.
+    void setClearColor(const LLColor4& color);
+    const LLColor4& getClearColor() const { return mClearColor; }
+
+    // Clears the bound framebuffer's buffers named in mask (GL_COLOR_BUFFER_BIT and the rest)
+    // through the write masks, scissor box and clear values in force, after what is batched
+    // has been drawn.
+    void clear(U32 mask);
+
+    // The scissor box, in pixels of the bound framebuffer, that GL_SCISSOR_TEST (an
+    // LLGLState) cuts to. Every writer goes through here; a change flushes what is batched
+    // under the old box, and redundant sets are dropped without one. See LLGLSScissor.
+    void setScissor(S32 x, S32 y, S32 width, S32 height);
+    // The box in force: x, y, width, height. Width is negative until a box is set in this
+    // context, which GL starts at the size of the window it was made for.
+    void getScissor(S32 (&box)[4]) const
+    {
+        box[0] = mScissor[0];
+        box[1] = mScissor[1];
+        box[2] = mScissor[2];
+        box[3] = mScissor[3];
+    }
+
     ALTextureSlot* getTextureSlot(U32 index);
 
     // Drop these texture names, about to be deleted in this context, from every slot's
@@ -514,6 +539,8 @@ private:
     F32             mPolygonOffsetFactor = 0.f;
     F32             mPolygonOffsetUnits = 0.f;
     U32             mPatchVertices = 3; // GL's initial GL_PATCH_VERTICES
+    LLColor4        mClearColor = LLColor4(0.f, 0.f, 0.f, 0.f); // GL's initial GL_COLOR_CLEAR_VALUE
+    S32             mScissor[4] = { 0, 0, -1, -1 };              // unknown until set (see getScissor)
 
     LLPointer<LLVertexBuffer>   mBuffer;
     LLStrider<LLVector4a>       mVerticesp;

@@ -1107,6 +1107,8 @@ public:
 public:
     bool                hasHUDAttachment() const;
     LLBBox              getHUDBBox() const;
+    // One HUD attachment point's share of getHUDBBox, in the same frame.
+    static LLBBox       getHUDBBox(const LLViewerJointAttachment* attachment);
     void                resetHUDAttachments();
     S32                 getMaxAttachments() const;
     bool                canAttachMoreObjects(U32 n=1) const;

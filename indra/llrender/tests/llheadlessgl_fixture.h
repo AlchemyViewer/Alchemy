@@ -53,6 +53,8 @@
 #include "llwindowcallbacks.h"
 
 #include <cstring>
+#include <string>
+#include <utility>
 
 namespace ll_test
 {
@@ -103,19 +105,29 @@ namespace ll_test
         FontStateScope& operator=(const FontStateScope&) = delete;
     };
 
-    // Concrete LLShaderMgr for render-output tests. The tests never load real
-    // shaders from disk and don't pump the per-frame uniform updates the viewer
-    // does, so getShaderDirPrefix returns empty and updateShaderUniforms is a
+    // Concrete LLShaderMgr for render-output tests. They don't pump the
+    // per-frame uniform updates the viewer does, so updateShaderUniforms is a
     // no-op. LLRender::syncMatrices still pushes matrix uniforms directly each
     // draw — that path lives in llrender.cpp and doesn't go through the mgr.
+    // A test that loads the viewer's own shader files passes the tree's class
+    // prefix ("<app_settings>/shaders/class"), which loadShaderFile completes
+    // with the class number and the file's path; the rest load none.
     class TestShaderMgr : public LLShaderMgr
     {
     public:
-        TestShaderMgr() { sInstance = this; initAttribsAndUniforms(); }
+        explicit TestShaderMgr(std::string dir_prefix = std::string())
+        : mDirPrefix(std::move(dir_prefix))
+        {
+            sInstance = this;
+            initAttribsAndUniforms();
+        }
         ~TestShaderMgr() override { if (sInstance == this) sInstance = nullptr; }
 
-        std::string getShaderDirPrefix() override { return std::string(); }
+        std::string getShaderDirPrefix() override { return mDirPrefix; }
         void updateShaderUniforms(LLGLSLShader* /*shader*/) override {}
+
+    private:
+        std::string mDirPrefix;
     };
 
     // GL 3.3 core pass-through UI vertex shader. Same uniform / attribute
@@ -439,7 +451,7 @@ namespace ll_test
         // reflects only what the test rendered this turn.
         void clearFramebuffer()
         {
-            glClearColor(0.f, 0.f, 0.f, 1.f);
+            gGL.setClearColor(LLColor4::black);
             glClear(GL_COLOR_BUFFER_BIT);
         }
 

@@ -2405,6 +2405,28 @@
             <key>Value</key>
             <real>0.5</real>
         </map>
+        <key>AlchemySelectionOutlineWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width in pixels of the outline around selected objects, in the world and on the HUD, at a UI scale of 1; it grows with the UI scale. Range 1 to 16. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>2.0</real>
+        </map>
+        <key>AlchemySelectionWireframe</key>
+        <map>
+            <key>Comment</key>
+            <string>Draw the triangles of selected objects as lines under their outline, in the world and on the HUD, with hidden lines dimmed while hidden selections are shown. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRenderUBOUpdateMode</key>
         <map>
             <key>Comment</key>
