@@ -43,7 +43,6 @@
 #include "lldir.h"
 #include "lldrawpoolalpha.h"
 #include "lldrawpoolbump.h"
-#include "lldrawpoolwater.h"
 #include "lldynamictexture.h"
 #include "llenvironment.h"
 #include "llfasttimer.h"
@@ -242,11 +241,11 @@ void display_update_camera()
     static LLCachedControl<S32> force_projection(gSavedSettings, "AlchemyRenderFarPlaneForce", ALFarPlane::FORCE_AUTOMATIC);
     LLViewerCamera* camera = LLViewerCamera::getInstance();
     camera->setProjectionFar(ALFarPlane::projectionFar(reverse_z, gCubeSnapshot, force_projection(), gAgentCamera.mDrawDistance));
-    // Edge water stretches with the main view's projection, which reverse-Z or the debug force can switch at runtime.
+    // The water's rim stretches with the main view's projection, which reverse-Z or the debug force can switch at
+    // runtime; the field lays itself out from this each frame (ALWaterSurface::update).
     if (!gCubeSnapshot && ALFarPlane::isInfinite(camera->getProjectionFar()) != camera->isMainViewInfinite())
     {
         camera->setMainViewInfinite(!camera->isMainViewInfinite());
-        LLWorld::getInstance()->updateWaterObjects();
     }
     LLVOAvatar::sRenderDistance = llclamp(final_far, 16.f, 256.f);
     gViewerWindow->setup3DRender();

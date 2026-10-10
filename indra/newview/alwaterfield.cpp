@@ -155,6 +155,19 @@ Layout layout(F64 eye_x, F64 eye_y, F64 width, F32 draw_distance, F64 stretch, c
     return out;
 }
 
+FieldDraws fieldDraws(const Layout& layout)
+{
+    FieldDraws out;
+    if (layout.mCells <= 0)
+    {
+        return out;
+    }
+    out.add({ Draw::CELLS, true, 4, layout.side() * layout.side() });
+    out.add({ Draw::RINGS, false, 3 * RING_QUAD_TRIANGLES, RING_QUADS * layout.mRings });
+    out.add({ Draw::ZIPPERS, false, 3 * zipperTriangles(layout), 4 });
+    return out;
+}
+
 Rect cellRect(const Layout& layout, S32 i, S32 j)
 {
     const F64 w = layout.mWidth;

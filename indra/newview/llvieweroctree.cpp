@@ -32,7 +32,6 @@
 #include "llappviewer.h"
 #include "llglslshader.h"
 #include "llviewershadermgr.h"
-#include "lldrawpoolwater.h"
 
 //-----------------------------------------------------------------------------------
 //static variables definitions
@@ -1186,10 +1185,6 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
         }
 
         F32 OCCLUSION_FUDGE_Z = SG_OCCLUSION_FUDGE; //<-- #Solution #2
-        if (LLPipeline::RENDER_TYPE_VOIDWATER == mSpatialPartition->mDrawableType)
-        {
-            OCCLUSION_FUDGE_Z = 1.;
-        }
 
         if (earlyFail(camera, bounds))
         {
@@ -1210,14 +1205,6 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
                     {
                         mOcclusionQuery[LLViewerCamera::sCurCameraID] = getNewOcclusionQueryObjectName();
                     }
-
-                    // Depth clamp all water to avoid it being culled as a result of being
-                    // behind the far clip plane, and in the case of edge water to avoid
-                    // it being culled while still visible.
-                    bool const use_depth_clamp = (mSpatialPartition->mDrawableType == LLPipeline::RENDER_TYPE_WATER ||
-                                                mSpatialPartition->mDrawableType == LLPipeline::RENDER_TYPE_VOIDWATER);
-
-                    LLGLEnable clamp(use_depth_clamp ? GL_DEPTH_CLAMP : 0);
 
                     U32 mode = gGLManager.mGLVersion >= 3.3f ? GL_ANY_SAMPLES_PASSED : GL_SAMPLES_PASSED;
 

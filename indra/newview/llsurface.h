@@ -31,7 +31,6 @@
 #include "v3dmath.h"
 
 #include "lltimer.h"
-#include "llvowater.h"
 #include "llviewertexture.h"
 
 #include <memory>
@@ -142,7 +141,6 @@ public:
     void dirtyAllPatches(); // Use this to dirty all patches when changing terrain parameters
 
     void dirtySurfacePatch(LLSurfacePatch *patchp);
-    LLVOWater *getWaterObj()                        { return mWaterObjp; }
 
     ALTerrainSurfaceMaps& getSurfaceMaps()          { return *mSurfaceMaps; }
 
@@ -203,10 +201,8 @@ private:
     // The textures should never be directly initialized - use the setter methods!
     LLPointer<LLViewerTexture> mSTexturep;      // Texture for surface
 
-    LLPointer<LLVOWater>    mWaterObjp;
-
-    // The region's water height, as the sim last gave it; DEFAULT_WATER_HEIGHT until it does. The water object, when
-    // RenderWater made one, is moved to it.
+    // The region's water height, as the sim last gave it; DEFAULT_WATER_HEIGHT until it does. The water drawn over the
+    // region's cell (ALWaterSurface) lies at it.
     F32                     mWaterHeight = DEFAULT_WATER_HEIGHT;
 
     U32         mGridsPerPatchEdge;         // Number of grid points on a side of a patch

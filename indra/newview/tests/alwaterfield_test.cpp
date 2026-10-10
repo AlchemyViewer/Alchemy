@@ -399,6 +399,32 @@ namespace tut
         ensure_equals("past the 512 m region", at(3, -2).first, 19.f);
     }
 
+    // The square's corner the GPU places the cells from, relative to an origin (the agent region's): the corner's global
+    // position less the origin, near and far from the grid's origin and with the origin a region off the camera's.
+    template<> template<>
+    void alwaterfield_object::test<11>()
+    {
+        set_test_name("the cell square relative to the agent region");
+        const F64 eyes[3][2] = { { EYE_X, EYE_Y }, { 97.3, 201.9 }, { 1048576.0 * WIDTH + 97.3, 1048000.0 * WIDTH + 3.1 } };
+        for (const auto& eye : eyes)
+        {
+            const ALWaterField::Layout layout = ALWaterField::layout(eye[0], eye[1], WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0);
+            for (F64 off : { 0.0, WIDTH, -3.0 * WIDTH })
+            {
+                // The agent region's south-west corner: the camera's cell's, moved `off`.
+                const F64 origin_x = layout.mCentreX * WIDTH + off;
+                const F64 origin_y = layout.mCentreY * WIDTH - off;
+                const LLVector4 square = ALWaterField::cellSquare(layout, origin_x, origin_y);
+                ensure_equals("x from the origin", (F64)square.mV[VX],
+                              (F64)(layout.mCentreX - layout.mCells) * WIDTH - origin_x);
+                ensure_equals("y from the origin", (F64)square.mV[VY],
+                              (F64)(layout.mCentreY - layout.mCells) * WIDTH - origin_y);
+                ensure_equals("a cell's width", (F64)square.mV[VZ], WIDTH);
+                ensure_equals("the cells a side", (S32)square.mV[VW], layout.side());
+            }
+        }
+    }
+
     // Negative global coordinates: the cell holding a point is its floor's, and the square, its patches and the camera's
     // cell work as they do anywhere.
     template<> template<>
@@ -540,6 +566,7 @@ namespace tut
         ensure_equals("an infinite one", ALWaterField::layout(EYE_X, -inf, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0).mCells, 0);
         ensure_equals("no width", ALWaterField::layout(EYE_X, EYE_Y, 0.0, 512.f, INFINITE_STRETCH, {}, 0.0).mCells, 0);
         ensure_equals("a negative one", ALWaterField::layout(EYE_X, EYE_Y, -WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0).mCells, 0);
+        ensure("nothing to draw for it", ALWaterField::fieldDraws(ALWaterField::Layout()).mCount == 0);
 
         const ALWaterField::Layout distant = ALWaterField::layout(1e300, -1e300, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0);
         ensure_equals("far east, at the limit", distant.mCentreX, ALWaterField::CELL_LIMIT);
@@ -553,5 +580,25 @@ namespace tut
                                                               INFINITE_STRETCH, {}, nan);
         ensure_equals("a NaN draw distance takes the fewest cells", odd.mCells, ALWaterField::MIN_CELLS);
         ensure_equals("and a NaN reach none", odd.mReach, 0.0);
+    }
+
+    // The field's draws: the cells, the rings at three triangles a quad, and ring 0's four sides at a triangle a cell
+    // along the square and two more.
+    template<> template<>
+    void alwaterfield_object::test<18>()
+    {
+        set_test_name("the field's draws");
+        const ALWaterField::Layout flat = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0);
+        const ALWaterField::FieldDraws draws = ALWaterField::fieldDraws(flat);
+        ensure_equals("three", draws.mCount, 3);
+        ensure_equals("the cells", draws.mDraws[0].mPart, ALWaterField::Draw::CELLS);
+        ensure("as strips", draws.mDraws[0].mStrip && draws.mDraws[0].mVertices == 4);
+        ensure_equals("a cell an instance", draws.mDraws[0].mInstances, flat.side() * flat.side());
+        ensure_equals("the rings", draws.mDraws[1].mPart, ALWaterField::Draw::RINGS);
+        ensure("three triangles a quad", !draws.mDraws[1].mStrip && draws.mDraws[1].mVertices == 9);
+        ensure_equals("twelve quads a ring", draws.mDraws[1].mInstances, ALWaterField::RING_QUADS * flat.mRings);
+        ensure_equals("the zippers", draws.mDraws[2].mPart, ALWaterField::Draw::ZIPPERS);
+        ensure_equals("four of them", draws.mDraws[2].mInstances, 4);
+        ensure_equals("a triangle a cell along the side and two", draws.mDraws[2].mVertices, 3 * (flat.side() + 2));
     }
 }

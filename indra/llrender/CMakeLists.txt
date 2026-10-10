@@ -6,6 +6,7 @@ set(
   alimageslot.cpp
   alprimitiveplot.cpp
   alsamplerstate.cpp
+  alsamplesquery.cpp
   altexture3d.cpp
   altextureslot.cpp
   alfontcolrv1.cpp
@@ -42,6 +43,7 @@ set(
   alimageslot.h
   alprimitiveplot.h
   alsamplerstate.h
+  alsamplesquery.h
   altexture3d.h
   altextureslot.h
   alfontcolrv1.h

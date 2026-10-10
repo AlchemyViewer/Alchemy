@@ -5884,7 +5884,6 @@ void LLAppViewer::idle()
 
         average_wind = regionp->mWind.getAverage();
         gSky.setWind(average_wind);
-        //LLVOWater::setWind(average_wind);
     }
     else
     {

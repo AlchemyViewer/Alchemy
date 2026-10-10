@@ -88,8 +88,6 @@ public:
     {
         PARTITION_HUD=0,
         PARTITION_TERRAIN,
-        PARTITION_VOIDWATER,
-        PARTITION_WATER,
         PARTITION_TREE,
         PARTITION_PARTICLE,
         PARTITION_GRASS,
@@ -402,7 +400,6 @@ public:
     //update object cache if the object receives a full-update or terse update
     LLViewerObject* updateCacheEntry(U32 local_id, LLViewerObject* objectp);
     void findOrphans(U32 parent_id);
-    void clearCachedVisibleObjects();
     void dumpCache  ();
     void clearVOCacheFromMemory();
 

@@ -26,6 +26,8 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llgltfmateriallist.h"
+#include "llappviewer.h"
+#include "pipeline.h"
 
 #include "llagent.h"
 #include "llassetstorage.h"

@@ -245,8 +245,8 @@ public:
         WATER_EXCLUSION_DISTORT,            //  "exclusionDistort"  1 where the water below is distorted, 0 where an exclusion prim covers it
         WATER_EYEVEC,                       //  "eyeVec"
         WATER_TIME,                         //  "time"
-        WATER_BIG_WAVE_SCROLL,              //  "bigWaveScroll"
-        WATER_LITTLE_WAVE_SCROLL,           //  "littleWaveScroll"
+        WATER_BIG_PHASE,                    //  "waterBigPhase"  the big wave layer's phase at the camera (ALWaterField::wavePhases)
+        WATER_LITTLE_PHASE,                 //  "waterLittlePhase"  the little map's two reads' phases at the camera
         WATER_LIGHT_DIR,                    //  "lightDir"
         WATER_SPECULAR,                     //  "specular"
         WATER_SPECULAR_EXP,                 //  "lightExp"
@@ -636,6 +636,9 @@ public:
         WATER_CELL_MAP,                     //  "waterCellMap"  the cells' water heights and flags (ALWaterSurface)
         WATER_CELL_SQUARE,                  //  "waterCellSquare"  the cell square: its south-west corner in agent space, a cell's width, the cells a side
         WATER_DEFAULT_HEIGHT,               //  "waterDefaultHeight"  the water height past the cell square, the agent region's
+        WATER_RINGS,                        //  "waterRings"  the rings: the square's half-size, their count, the rim, and whether the void is drawn
+        WATER_SWEEP_PHASE,                  //  "waterSweepPhase"  LL's wave sweep's phase at the camera
+        WATER_LAYOUT,                       //  "waterLayout"  which part of the field a draw places (ALWaterField::Draw)
         WATER_GLINT_ROUGHNESS,              //  "waterGlintRoughness"  the roughness of the sun's reflection on each wave face
 
         END_RESERVED_UNIFORMS

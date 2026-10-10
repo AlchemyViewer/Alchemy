@@ -29,18 +29,28 @@
 #include "alfarplane.h"
 #include "llagent.h"
 #include "llagentcamera.h"
+#include "llcamera.h"
 #include "llglslshader.h"
 #include "llimagegl.h"
 #include "llregionhandle.h"
 #include "llrender.h"
 #include "llshadermgr.h"
+#include "llviewercontrol.h"
 #include "llviewercamera.h"
 #include "llviewerregion.h"
 #include "llworld.h"
+#include "pipeline.h"
 
 void ALWaterSurface::update()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+
+    static LLCachedControl<bool> render_water(gSavedSettings, "RenderWater", true);
+    if (!render_water)
+    {
+        release();
+        return;
+    }
 
     LLViewerRegion* agent_region = gAgent.getRegion();
     if (!agent_region)
@@ -72,10 +82,19 @@ void ALWaterSurface::update()
         return;
     }
     mLayout = layout;
+    mVoidDrawn = gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_VOIDWATER);
 
     const LLVector3d agent_origin = agent_region->getOriginGlobal();
     mSquare = ALWaterField::cellSquare(mLayout, agent_origin.mdV[VX], agent_origin.mdV[VY]);
+    mCentre.set(mSquare.mV[VX] + 0.5f * mSquare.mV[VW] * mSquare.mV[VZ], mSquare.mV[VY] + 0.5f * mSquare.mV[VW] * mSquare.mV[VZ]);
     mDefaultHeight = agent_region->getWaterHeight();
+    mLowest = mDefaultHeight;
+    mHighest = mDefaultHeight;
+    for (const ALWaterField::Region& region : mScratch.mRegions)
+    {
+        mLowest = llmin(mLowest, region.mWaterHeight);
+        mHighest = llmax(mHighest, region.mWaterHeight);
+    }
 
     mScratch.mCentreX = mLayout.mCentreX;
     mScratch.mCentreY = mLayout.mCentreY;
@@ -127,4 +146,64 @@ void ALWaterSurface::bind(LLGLSLShader& shader) const
         shader.uniform4fv(LLShaderMgr::WATER_CELL_SQUARE, 1, none.mV);
     }
     shader.uniform1f(LLShaderMgr::WATER_DEFAULT_HEIGHT, mDefaultHeight);
+
+    shader.uniform4f(LLShaderMgr::WATER_RINGS, (F32)mLayout.mHalf, (F32)mLayout.mRings, (F32)mLayout.mRim, mVoidDrawn ? 1.f : 0.f);
+}
+
+void ALWaterSurface::draw(LLGLSLShader& shader) const
+{
+    if (mCellMap.isNull())
+    {
+        return;
+    }
+    for (const ALWaterField::Draw& draw : ALWaterField::fieldDraws(mLayout))
+    {
+        if (draw.mInstances <= 0)
+        {
+            continue;
+        }
+        shader.uniform1i(LLShaderMgr::WATER_LAYOUT, (S32)draw.mPart);
+        gGL.drawArraysInstanced(draw.mStrip ? LLRender::TRIANGLE_STRIP : LLRender::TRIANGLES, 0, (U32)draw.mVertices,
+                                (U32)draw.mInstances);
+        ++gPipeline.mWaterDraws;
+    }
+}
+
+bool ALWaterSurface::rim(const LLVector3& eye, LLVector2& lo, LLVector2& hi) const
+{
+    if (mCellMap.isNull())
+    {
+        return false;
+    }
+    const F32 rim = (F32)mLayout.mRim;
+    lo.set(mCentre.mV[VX] - rim - eye.mV[VX], mCentre.mV[VY] - rim - eye.mV[VY]);
+    hi.set(mCentre.mV[VX] + rim - eye.mV[VX], mCentre.mV[VY] + rim - eye.mV[VY]);
+    return true;
+}
+
+bool ALWaterSurface::inView(LLCamera& camera) const
+{
+    if (mCellMap.isNull())
+    {
+        return false;
+    }
+    const F32 rim = (F32)mLayout.mRim;
+    const LLVector4a centre(mCentre.mV[VX], mCentre.mV[VY], 0.5f * (mLowest + mHighest));
+    const LLVector4a radius(rim, rim, 0.5f * (mHighest - mLowest) + 0.01f);
+    return camera.AABBInFrustumNoFarClip(centre, radius) != 0;
+}
+
+void ALWaterSurface::addExtents(LLVector3& min, LLVector3& max) const
+{
+    if (mCellMap.isNull())
+    {
+        return;
+    }
+    const F32 rim = (F32)mLayout.mRim;
+    min.mV[VX] = llmin(min.mV[VX], mCentre.mV[VX] - rim);
+    min.mV[VY] = llmin(min.mV[VY], mCentre.mV[VY] - rim);
+    min.mV[VZ] = llmin(min.mV[VZ], mLowest);
+    max.mV[VX] = llmax(max.mV[VX], mCentre.mV[VX] + rim);
+    max.mV[VY] = llmax(max.mV[VY], mCentre.mV[VY] + rim);
+    max.mV[VZ] = llmax(max.mV[VZ], mHighest);
 }

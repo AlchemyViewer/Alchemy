@@ -132,6 +132,42 @@ F64 tessReach(F32 density);
 Layout layout(F64 eye_x, F64 eye_y, F64 width, F32 draw_distance, F64 stretch, const std::vector<Region>& regions,
               F64 reach);
 
+/// One of the field's draws (waterSurface.glsl's water_vertex): which part of it (waterLayout), whether its vertices
+/// make a strip or triangles, and how many vertices each of how many instances has. Every vertex shared between two
+/// parts is the same point in both, worked from the same exact multiples, and lies on no edge it is not a corner of:
+/// the field has no T-junction a crack could open along.
+struct Draw
+{
+    enum EPart : S32
+    {
+        CELLS = 0,   ///< the square's cells, a quad each: a four-vertex strip
+        RINGS = 1,   ///< the rings' quads, RING_QUAD_TRIANGLES each: those along a finer ring split at the edge's middle
+        ZIPPERS = 2, ///< ring 0's four sides, each fanned onto the square's cell corners
+    };
+    EPart mPart = CELLS;
+    bool mStrip = false;
+    S32 mVertices = 0;
+    S32 mInstances = 0;
+};
+
+/// A ring quad's triangles: three, the third empty for a quad no finer ring's edge runs along.
+constexpr S32 RING_QUAD_TRIANGLES = 3;
+/// A side of ring 0's: one for each cell along the square's side, and two more.
+inline S32 zipperTriangles(const Layout& layout) { return layout.side() + 2; }
+
+/// The field's draws, in order, and how many there are.
+struct FieldDraws
+{
+    Draw mDraws[3];
+    S32  mCount = 0;
+
+    void add(const Draw& draw) { mDraws[mCount++] = draw; }
+    const Draw* begin() const { return mDraws; }
+    const Draw* end() const { return mDraws + mCount; }
+};
+/// The draws of the field laid out as `layout`. None for an empty layout.
+FieldDraws fieldDraws(const Layout& layout);
+
 /// Cell `i`, `j` of the square, counted from its south-west corner.
 Rect cellRect(const Layout& layout, S32 i, S32 j);
 

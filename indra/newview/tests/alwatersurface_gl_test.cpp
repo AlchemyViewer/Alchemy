@@ -1,6 +1,7 @@
 /**
  * @file alwatersurface_gl_test.cpp
- * @brief The water surface's draws on the hidden window, and the water's stencil bits: where the exclusion pass
+ * @brief The water surface's draws on the hidden window: the water's field as the vertex stage lays it out; whether
+ *        any of it shows, and the draws that wait on that; and the water's stencil bits: where the exclusion pass
  *        removes the water, and which pixels the water shades, which the haze pass reads.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -27,6 +28,8 @@
 
 #include "../alwaterfield.h"
 #include "../alwaterstencil.h"
+
+#include "alsamplesquery.h"
 
 #include "llgl.h"
 #include "llglheaders.h"
@@ -116,6 +119,31 @@ namespace tut
             return { { 0, 0, 1, LOW }, { 1, 0, 1, HIGH }, { 0, 1, 1, LOW }, { 1, 1, 1, LOW } };
         }
 
+        // The field seen whole from above: a stretch short enough that two rings reach the rim, and a view a little
+        // wider than the rim, 64 pixels across.
+        constexpr S32 FIELD_SIZE = 64;
+        constexpr F64 FIELD_STRETCH = 1500.0;
+        constexpr F32 FIELD_VIEW = 2400.f;
+        constexpr F32 FIELD_CAMERA_Z = 1000.f;
+        constexpr F32 FIELD_FAR = 2000.f;
+
+        LLMatrix4a fieldView()
+        {
+            return view(FIELD_CAMERA_Z, false);
+        }
+
+        // [centre - FIELD_VIEW, centre + FIELD_VIEW] square onto the target, depth over [1, FIELD_FAR] metres below the
+        // camera.
+        LLMatrix4a fieldOrtho(F32 cx, F32 cy)
+        {
+            LLMatrix4a m;
+            m.setRow<0>(LLVector4a(1.f / FIELD_VIEW, 0.f, 0.f, 0.f));
+            m.setRow<1>(LLVector4a(0.f, 1.f / FIELD_VIEW, 0.f, 0.f));
+            m.setRow<2>(LLVector4a(0.f, 0.f, -2.f / (FIELD_FAR - 1.f), 0.f));
+            m.setRow<3>(LLVector4a(-cx / FIELD_VIEW, -cy / FIELD_VIEW, -(FIELD_FAR + 1.f) / (FIELD_FAR - 1.f), 1.f));
+            return m;
+        }
+
     struct alwatersurface_data
     {
         // Each test starts with identity matrices, whatever ran before.
@@ -138,9 +166,12 @@ namespace tut
             LLGLSLShader::unbind();
             mColour.unload();
             mExclusion.unload();
+            mField.unload();
             mShaders.clearShaderObjects();
             mCellMap = nullptr;
+            mQuery.release();
             mScene.release();
+            mBehind.release();
         }
 
         // The water scene in a target whose depth carries stencil, cleared: the colour program, the viewer's own
@@ -160,7 +191,7 @@ namespace tut
             ensure("colour program maps", mColour.mapUniforms());
 
             std::map<std::string, std::string> defines;
-            for (const char* object : { "deferred/textureUtilV.glsl", "objects/nonindexedTextureV.glsl" })
+            for (const char* object : { "deferred/textureUtilV.glsl", "objects/nonindexedTextureV.glsl", "environment/waterSurface.glsl" })
             {
                 S32 level = 1;
                 ensure(std::string("compiled ") + object, mShaders.loadShaderFile(object, level, GL_VERTEX_SHADER, &defines) != 0);
@@ -327,6 +358,79 @@ namespace tut
             return what + (format == LLRenderTarget::DEPTH_FMT_32F ? " (32F)" : " (24)");
         }
 
+        // The field program over the cell map, in a FIELD_SIZE target with depth and stencil, cleared, and the
+        // camera above the square's centre.
+        void setUpField()
+        {
+            setUpWater(LLRenderTarget::DEPTH_FMT_24);
+            mScene.flush();
+            mScene.release();
+
+            mField.mName = "Water Field Shader";
+            mField.mFeatures.hasWaterSurface = true;
+            mField.mShaderFiles.clear();
+            mField.mShaderFiles.push_back(std::make_pair("environment/waterFieldV.glsl", GL_VERTEX_SHADER));
+            mField.mShaderFiles.push_back(std::make_pair("environment/waterFieldF.glsl", GL_FRAGMENT_SHADER));
+            mField.mShaderLevel = 1;
+            ensure("field program builds", mField.createShader());
+            ensure_equals("the field program has no vertex inputs", mField.mAttributeMask, 0U);
+
+            mLayout = ALWaterField::layout(300.0, 300.0, CELL, 256.f, FIELD_STRETCH, regions(), 0.0);
+            mSquare = ALWaterField::cellSquare(mLayout, 0.0, 0.0);
+            ensure("the stretch takes two rings", mLayout.mRings == 2);
+
+            ensure("field target", mScene.allocate(FIELD_SIZE, FIELD_SIZE, GL_RGBA8, true, true, ALTextureSlot::TT_TEXTURE,
+                                                   LLRenderTarget::MIPS_NONE, LLRenderTarget::DEPTH_FMT_24));
+            mScene.bindTarget();
+            gGL.setClearColor(LLColor4::black);
+            mScene.clear();
+
+            mCameraZ = FIELD_CAMERA_Z;
+            mView = fieldView();
+            gGL.matrixMode(LLRender::MM_PROJECTION);
+            gGL.loadMatrix(fieldOrtho((F32)mLayout.centreX(), (F32)mLayout.centreY()));
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
+            gGL.loadMatrix(mView);
+        }
+
+        // The field, as ALWaterSurface::bind and ::draw draw it, the void drawn or not.
+        void drawField(bool void_drawn)
+        {
+            mField.bind();
+            const S32 channel = mField.enableTexture(LLShaderMgr::WATER_CELL_MAP);
+            if (channel > -1)
+            {
+                gGL.getTextureSlot(channel)->bindSampled(mCellMap.get(), ALSamplers::PointClamp);
+            }
+            mField.uniform4fv(LLShaderMgr::WATER_CELL_SQUARE, 1, mSquare.mV);
+            mField.uniform1f(LLShaderMgr::WATER_DEFAULT_HEIGHT, LOW);
+            mField.uniform4f(LLShaderMgr::WATER_RINGS, (F32)mLayout.mHalf, (F32)mLayout.mRings, (F32)mLayout.mRim,
+                             void_drawn ? 1.f : 0.f);
+            LLGLDisable cull(GL_CULL_FACE);
+            for (const ALWaterField::Draw& draw : ALWaterField::fieldDraws(mLayout))
+            {
+                mField.uniform1i(LLShaderMgr::WATER_LAYOUT, (S32)draw.mPart);
+                gGL.drawArraysInstanced(draw.mStrip ? LLRender::TRIANGLE_STRIP : LLRender::TRIANGLES, 0, (U32)draw.mVertices,
+                                        (U32)draw.mInstances);
+            }
+        }
+
+        // Where pixel (x, y) of the field target lies, from the square's centre, in metres.
+        F32 fieldX(S32 x) const
+        {
+            return ((F32)x + 0.5f) / (F32)FIELD_SIZE * 2.f * FIELD_VIEW - FIELD_VIEW;
+        }
+
+        // The height the depth buffer holds at a pixel of the field target.
+        F32 heightAt(S32 x, S32 y)
+        {
+            F32 depth = 0.f;
+            glReadPixels(x, y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &depth);
+            const F32 ndc = depth * 2.f - 1.f;
+            const F32 eye_z = -(ndc + (FIELD_FAR + 1.f) / (FIELD_FAR - 1.f)) * (FIELD_FAR - 1.f) / 2.f;
+            return eye_z + FIELD_CAMERA_Z;
+        }
+
         void tearDownWater()
         {
             mScene.flush();
@@ -343,7 +447,10 @@ namespace tut
 
         LLGLSLShader           mColour;
         LLGLSLShader           mExclusion;
+        LLGLSLShader           mField;
+        ALSamplesQuery         mQuery;
         LLRenderTarget         mScene;
+        LLRenderTarget         mBehind;
         LLPointer<LLImageGL>   mCellMap;
         ALWaterField::Layout   mLayout;
         LLVector4              mSquare;
@@ -559,6 +666,131 @@ namespace tut
                 ensure_equals(column + " converged where the water is", on_water, x >= 8);
             }
             tearDownWater();
+        }
+    }
+
+    // The vertex stage lays the cells and rings out as ALWaterField does, without a crack or an overlap: every pixel
+    // inside the rim takes one fragment, and none past it.
+    template<> template<>
+    void alwatersurface_object_t::test<9>()
+    {
+        setUpField();
+        {
+            LLGLDepthTest depth(GL_FALSE);
+            ALGLStencil count(GL_ALWAYS, 0, 0xFFu, GL_KEEP, GL_KEEP, GL_INCR, 0xFFu);
+            drawField(true);
+        }
+        const F32 rim = (F32)mLayout.mRim;
+        for (S32 y = 0; y < FIELD_SIZE; ++y)
+        {
+            for (S32 x = 0; x < FIELD_SIZE; ++x)
+            {
+                const F32 px = fieldX(x);
+                const F32 py = fieldX(y);
+                const bool within = fabsf(px) < rim && fabsf(py) < rim;
+                ensure_equals("pixel " + std::to_string(x) + ", " + std::to_string(y) + " covered once inside the rim",
+                              (U32)stencil(x, y), within ? 1U : 0U);
+            }
+        }
+    }
+
+    // With the void hidden only the cells a region holds are drawn: none of the square's empty cells, and no ring.
+    template<> template<>
+    void alwatersurface_object_t::test<10>()
+    {
+        setUpField();
+        {
+            LLGLDepthTest depth(GL_FALSE);
+            ALGLStencil count(GL_ALWAYS, 0, 0xFFu, GL_KEEP, GL_KEEP, GL_INCR, 0xFFu);
+            drawField(false);
+        }
+        const F64 cx = mLayout.centreX();
+        const F64 cy = mLayout.centreY();
+        for (S32 y = 0; y < FIELD_SIZE; ++y)
+        {
+            for (S32 x = 0; x < FIELD_SIZE; ++x)
+            {
+                const F64 gx = cx + fieldX(x);
+                const F64 gy = cy + fieldX(y);
+                const bool region = gx >= 0.0 && gx < 2.0 * CELL && gy >= 0.0 && gy < 2.0 * CELL;
+                ensure_equals("pixel " + std::to_string(x) + ", " + std::to_string(y) + " drawn only over a region",
+                              (U32)stencil(x, y), region ? 1U : 0U);
+            }
+        }
+    }
+
+    // Each cell lies at its own region's water height, and the rings at the agent region's.
+    template<> template<>
+    void alwatersurface_object_t::test<11>()
+    {
+        setUpField();
+        {
+            LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_LESS);
+            drawField(true);
+        }
+        const F64 cx = mLayout.centreX();
+        const F64 cy = mLayout.centreY();
+        const auto pixel_of = [&](F64 gx, F64 gy)
+        {
+            return std::make_pair((S32)((gx - cx + FIELD_VIEW) / (2.0 * FIELD_VIEW) * FIELD_SIZE),
+                                  (S32)((gy - cy + FIELD_VIEW) / (2.0 * FIELD_VIEW) * FIELD_SIZE));
+        };
+        const auto [hx, hy] = pixel_of(1.5 * CELL, 0.5 * CELL);
+        ensure("the 30 m region", fabsf(heightAt(hx, hy) - HIGH) < 0.05f);
+        const auto [lx, ly] = pixel_of(0.5 * CELL, 1.5 * CELL);
+        ensure("a 20 m region", fabsf(heightAt(lx, ly) - LOW) < 0.05f);
+        const auto [rx, ry] = pixel_of(cx + 1800.0, cy);
+        ensure("a ring", fabsf(heightAt(rx, ry) - LOW) < 0.05f);
+    }
+
+    // The sky behind: the field's samples against the world's depth decide whether the target is cleared and drawn,
+    // on the GPU. Behind an occluder everywhere, it is left as it was; through one gap, it is cleared.
+    template<> template<>
+    void alwatersurface_object_t::test<12>()
+    {
+        for (bool gap : { false, true })
+        {
+            setUpField();
+            ensure("behind target", mBehind.allocate(4, 4, GL_RGBA8));
+            mBehind.bindTarget();
+            mBehind.clear();
+            mBehind.flush();
+
+            // The world, above the water everywhere in view, or but for one column of pixels over the square's middle.
+            {
+                const F32 cx = (F32)mLayout.centreX();
+                const F32 cy = (F32)mLayout.centreY();
+                const F32 column = gap ? 2.f * FIELD_VIEW / FIELD_SIZE : 0.f;
+                opaque(cx - FIELD_VIEW, cx, cy - FIELD_VIEW, cy + FIELD_VIEW, 50.f);
+                opaque(cx + column, cx + FIELD_VIEW, cy - FIELD_VIEW, cy + FIELD_VIEW, 50.f);
+            }
+
+            {
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE);
+                LLGLSColorMask no_color(false, false);
+                mQuery.begin();
+                drawField(true);
+                mQuery.end();
+            }
+
+            {
+                ALSamplesQuery::Conditional if_water(mQuery);
+                mBehind.bindTarget();
+                gGL.setClearColor(LLColor4::red);
+                mBehind.clear();
+                gGL.setClearColor(LLColor4::black);
+                mBehind.flush();
+            }
+
+            mBehind.bindTarget();
+            const LLColor4U c = pixel(1, 1);
+            mBehind.flush();
+            ensure_equals(gap ? "water through the gap clears the sky behind" : "water all hidden leaves it",
+                          (U32)c.mV[VRED], gap ? 255U : 0U);
+            mBehind.release();
+            tearDownWater();
+            mField.unload();
+            mQuery.release();
         }
     }
 }

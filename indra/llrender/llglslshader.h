@@ -68,7 +68,7 @@ public:
     bool hasHeroProbes = false;
     bool isPBRTerrain = false;
     bool hasTessellatedTerrain = false; // terrainSurface for the evaluation and fragment stages, and the atmospherics interface the evaluation stage owes the fragment stage
-    bool hasWaterSurface = false; // waterSurface for the fragment stage: the water's cells and their heights
+    bool hasWaterSurface = false; // waterSurface for the vertex and fragment stages: the water's field, heights and wave coordinates
     bool hasTonemap = false;
     bool hasColorGrade = false;
     bool hasPostEffects = false;

@@ -34,15 +34,9 @@
 #include "m3math.h"
 #include "llrender.h"
 
-#include "llagent.h"        // for gAgent for getRegion for getWaterHeight
+#include "llagent.h"
 #include "llcubemap.h"
-#include "lldrawable.h"
-#include "llface.h"
-#include "llsky.h"
 #include "llviewertexturelist.h"
-#include "llviewerregion.h"
-#include "llvowater.h"
-#include "llworld.h"
 #include "pipeline.h"
 #include "llviewershadermgr.h"
 #include "llenvironment.h"
@@ -52,35 +46,10 @@
 #include "alwaterfield.h"
 #include "alwaterstencil.h"
 
-bool LLDrawPoolWater::sSkipScreenCopy = false;
-bool LLDrawPoolWater::sNeedsReflectionUpdate = true;
-bool LLDrawPoolWater::sNeedsDistortionUpdate = true;
-F32 LLDrawPoolWater::sWaterFogEnd = 0.f;
-
 extern bool gCubeSnapshot;
 
-LLDrawPoolWater::LLDrawPoolWater() : LLFacePool(POOL_WATER)
+LLDrawPoolWater::LLDrawPoolWater() : LLDrawPool(POOL_WATER)
 {
-}
-
-LLDrawPoolWater::~LLDrawPoolWater()
-{
-}
-
-void LLDrawPoolWater::setTransparentTextures(const LLUUID& transparentTextureId, const LLUUID& nextTransparentTextureId)
-{
-    LLSettingsWater::ptr_t pwater = LLEnvironment::instance().getCurrentWater();
-    mWaterImagep[0] = LLViewerTextureManager::getFetchedTexture(!transparentTextureId.isNull() ? transparentTextureId : pwater->GetDefaultTransparentTextureAssetId());
-    mWaterImagep[1] = LLViewerTextureManager::getFetchedTexture(!nextTransparentTextureId.isNull() ? nextTransparentTextureId : (!transparentTextureId.isNull() ? transparentTextureId : pwater->GetDefaultTransparentTextureAssetId()));
-    mWaterImagep[0]->addTextureStats(1024.f*1024.f);
-    mWaterImagep[1]->addTextureStats(1024.f*1024.f);
-}
-
-void LLDrawPoolWater::setOpaqueTexture(const LLUUID& opaqueTextureId)
-{
-    LLSettingsWater::ptr_t pwater = LLEnvironment::instance().getCurrentWater();
-    mOpaqueWaterImagep = LLViewerTextureManager::getFetchedTexture(opaqueTextureId);
-    mOpaqueWaterImagep->addTextureStats(1024.f*1024.f);
 }
 
 void LLDrawPoolWater::setNormalMaps(const LLUUID& normalMapId, const LLUUID& nextNormalMapId)
@@ -99,6 +68,11 @@ void LLDrawPoolWater::prerender()
 
 S32 LLDrawPoolWater::getNumPostDeferredPasses()
 {
+    if (!gPipeline.mWaterSurface.exists())
+    {
+        return 0;
+    }
+
     const LLViewerCamera* camera = LLViewerCamera::getInstance();
     if (ALFarPlane::waterVisibleFrom(camera->getOrigin().mV[2], LLEnvironment::instance().getWaterHeight(), camera->getProjectionFar()))
     {
@@ -166,12 +140,13 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
     LLGLSLShader *shader     = nullptr;
 
-    // Each wave layer's scroll, taken in F64 and kept to its fraction: the normal maps wrap, so the fraction is all
-    // that shows, and the product taken in the shader's float stepped once the session was a day or two old.
-    const ALWaterField::WaveScrolls scrolls =
-        ALWaterField::waveScrolls(LLFrameTimer::getUptimeSeconds(), pwater->getWave1Dir(), pwater->getWave2Dir());
-    const LLVector2& big_wave_scroll = scrolls.mBig;
-    const LLVector4& little_wave_scroll = scrolls.mLittle;
+    // Each wave layer's phase at the camera, taken in F64 from its global position and kept to the fraction: the
+    // normal maps wrap, so the fraction is all that shows, and the products taken in the shader's float would step
+    // once the session was a day or two old or the camera a few regions from the grid's origin.
+    const LLVector3 eye = LLViewerCamera::getInstance()->getOrigin();
+    const LLVector3d eye_global = gAgent.getPosGlobalFromAgent(eye);
+    const ALWaterField::WavePhases phases = ALWaterField::wavePhases(eye_global.mdV[VX], eye_global.mdV[VY], LLFrameTimer::getUptimeSeconds(),
+                                                                     pwater->getWave1Dir(), pwater->getWave2Dir());
 
     // One pass, one of two shaders.  Void water and region water share state.
     // There isn't a good reason anymore to really have void water run in a separate pass.
@@ -228,8 +203,9 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     shader->uniform3fv(LLShaderMgr::WATER_EYEVEC, 1, LLViewerCamera::getInstance()->getOrigin().mV);
 
 
-    shader->uniform2fv(LLShaderMgr::WATER_BIG_WAVE_SCROLL, 1, big_wave_scroll.mV);
-    shader->uniform4fv(LLShaderMgr::WATER_LITTLE_WAVE_SCROLL, 1, little_wave_scroll.mV);
+    shader->uniform2fv(LLShaderMgr::WATER_BIG_PHASE, 1, phases.mBig.mV);
+    shader->uniform4fv(LLShaderMgr::WATER_LITTLE_PHASE, 1, phases.mLittle.mV);
+    shader->uniform2fv(LLShaderMgr::WATER_SWEEP_PHASE, 1, phases.mSweep.mV);
 
     shader->uniform3fv(LLShaderMgr::WATER_LIGHT_DIR, 1, light_dir.mV);
 
@@ -263,14 +239,12 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
     shader->uniform3fv(LLShaderMgr::WL_CAMPOSLOCAL, 1, LLViewerCamera::getInstance()->getOrigin().mV);
 
-    // The wave clamp, and the edge water's outer rectangle relative to the camera for its fade. The whole rim,
-    // not the patches in view: a culled side would pull the rectangle in over interior water.
+    // The wave clamp, and the field's outer rectangle relative to the camera for its fade.
+    const ALWaterSurface& surface = gPipeline.mWaterSurface;
+    surface.bind(*shader);
     {
-        LLVector3 rim_min, rim_max;
-        const bool have_rim = LLWorld::getInstance()->getEdgeWaterBounds(rim_min, rim_max);
-        const LLVector3& eye = LLViewerCamera::getInstance()->getOrigin();
-        const LLVector2 rim_lo(rim_min.mV[VX] - eye.mV[VX], rim_min.mV[VY] - eye.mV[VY]);
-        const LLVector2 rim_hi(rim_max.mV[VX] - eye.mV[VX], rim_max.mV[VY] - eye.mV[VY]);
+        LLVector2 rim_lo, rim_hi;
+        const bool have_rim = surface.rim(eye, rim_lo, rim_hi);
         const ALFarPlane::WaterFar water_far = ALFarPlane::waterFar(LLViewerCamera::getInstance()->getProjectionFar(), have_rim, rim_lo, rim_hi);
         shader->uniform2f(LLShaderMgr::WATER_FAR, water_far.mWaveClamp, water_far.mEdgeFade);
         shader->uniform4f(LLShaderMgr::WATER_RIM, rim_lo.mV[VX], rim_lo.mV[VY], rim_hi.mV[VX], rim_hi.mV[VY]);
@@ -287,12 +261,6 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
     LLGLDisable cullface(GL_CULL_FACE);
 
-    // Only push the water planes once.
-    // Previously we did this twice: once for void water and one for region water.
-    // However, the void water and region water shaders are the same exact shader.
-    // They also had the same exact state with the sole exception setting an edge water flag.
-    // That flag was not actually used anywhere in the shaders.
-    // - Geenz 2025-02-11
     // Probe and hero captures render the water too; only the main view's primitives are counted.
     const bool count_primitives = gPipeline.mRT == &gPipeline.mMainRT;
     if (count_primitives)
@@ -303,14 +271,14 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         // Not where an exclusion prim removed the water (LLPipeline::doWaterExclusion), and marking where it is.
         ALWaterStencil::Surface stencil;
         shader->uniform1f(LLShaderMgr::WATER_EXCLUSION_DISTORT, 1.f);
-        pushWaterPlanes(0);
+        surface.draw(*shader);
     }
     if (underwater)
     {
         // From below, the surface stays where an exclusion prim covers it, undistorted.
         ALWaterStencil::Excluded stencil;
         shader->uniform1f(LLShaderMgr::WATER_EXCLUSION_DISTORT, 0.f);
-        pushWaterPlanes(0);
+        surface.draw(*shader);
     }
     if (count_primitives)
     {
@@ -325,37 +293,4 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
     gGL.setColorMask(true, false);
-}
-
-void LLDrawPoolWater::pushWaterPlanes(int pass)
-{
-    gPipeline.mWaterDraws += (U32)mDrawFace.size();
-
-    LLVOWater* water = nullptr;
-    for (LLFace* const& face : mDrawFace)
-    {
-        water = static_cast<LLVOWater*>(face->getViewerObject());
-
-        face->renderIndexed();
-
-        // Note non-void water being drawn, updates required
-        // Previously we had some logic to determine if this pass was also our water edge pass.
-        // Now we only have one pass.  Check if we're doing a region water plane or void water plane.
-        // - Geenz 2025-02-11
-        if (!water->getIsEdgePatch())
-        {
-            sNeedsReflectionUpdate = true;
-            sNeedsDistortionUpdate = true;
-        }
-    }
-}
-
-LLViewerTexture *LLDrawPoolWater::getDebugTexture()
-{
-    return LLViewerTextureManager::getFetchedTexture(IMG_SMOKE);
-}
-
-LLColor3 LLDrawPoolWater::getDebugColor() const
-{
-    return LLColor3(0.f, 1.f, 1.f);
 }

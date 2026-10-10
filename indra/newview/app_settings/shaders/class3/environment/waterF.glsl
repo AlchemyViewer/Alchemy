@@ -70,20 +70,13 @@ uniform float fresnelScale;
 uniform float waterGlintRoughness;
 uniform float fresnelOffset;
 
-// waterFar.x is the wave clamp distance and .y the edge water stretch, 0 unless the projection is infinite
-// (ALFarPlane::WaterFar); waterRim is the edge water's outer rectangle relative to the camera, min xy then max xy.
+// waterFar.x is the wave clamp distance and .y the edge stretch, 0 unless the projection is infinite
+// (ALFarPlane::WaterFar); waterRim is the field's outer rectangle relative to the camera, min xy then max xy.
 uniform vec2 waterFar;
 uniform vec4 waterRim;
-// The wave coordinates, rebuilt per fragment under the infinite projection: interpolated from edge water vertices
-// hundreds of km out, waterV's world-space coordinates lose the precision the normal maps need, and far water goes flat.
-uniform vec3 eyeVec;
-uniform vec2 bigWaveScroll;
-uniform vec4 littleWaveScroll;
 
-//bigWave is (refCoord.w, view.w);
-in vec4 refCoord;
-in vec4 littleWave;
-in vec4 view;
+in vec3 refCoord;
+in vec3 view;
 in vec3 vary_position;
 in vec3 vary_normal;
 in vec3 vary_tangent;
@@ -118,25 +111,17 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
 vec3 getPositionWithNDC(vec3 ndc);
 float ndcZFromScreenDepth(float d);   // deferredUtil.glsl -- depth-convention aware
 
+void water_wave_coords(vec2 r, out vec2 big, out vec4 little);
+
 void generateWaveNormals(out vec3 wave1, out vec3 wave2, out vec3 wave3)
 {
     // Generate all of our wave normals.
     // We layer these back and forth.
 
-    vec2 bigwave = vec2(refCoord.w, view.w);
-    vec4 little = littleWave;
-
-    // waterV's wave coordinates from the camera-relative view vector, which interpolates precisely, and the eye
-    // position (see eyeVec above).
-    if (waterFar.y > 0.0)
-    {
-        float d = max(length(view.xy), 0.001);
-        vec2 v = eyeVec.xy + view.xy / d * min(d, waterFar.x);
-        v.x += (cos(v.x*0.08)+sin(v.y*0.02))*6.0;
-        bigwave = v * vec2(0.04,0.04) + bigWaveScroll;
-        little.xy = v * vec2(0.45, 0.9) + littleWaveScroll.xy;
-        little.zw = v * vec2(0.1, 0.2) + littleWaveScroll.zw;
-    }
+    // From the camera-relative view vector, which interpolates precisely however far the quad reaches.
+    vec2 bigwave;
+    vec4 little;
+    water_wave_coords(view.xy, bigwave, little);
 
     vec3 wave1_a = texture(bumpMap, bigwave).xyz * 2.0 - 1.0;
     vec3 wave2_a = texture(bumpMap, little.xy).xyz * 2.0 - 1.0;

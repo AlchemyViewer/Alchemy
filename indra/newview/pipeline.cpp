@@ -109,7 +109,6 @@
 #include "llvotree.h"
 #include "llvovolume.h"
 #include "llvosurfacepatch.h"
-#include "llvowater.h"
 #include "llvotree.h"
 #include "llvopartgroup.h"
 #include "llworld.h"
@@ -477,6 +476,7 @@ void LLPipeline::init()
 
     //create render pass pools
     getPool(LLDrawPool::POOL_WATEREXCLUSION);
+    getPool(LLDrawPool::POOL_WATER);
     getPool(LLDrawPool::POOL_ALPHA_PRE_WATER);
     getPool(LLDrawPool::POOL_ALPHA_POST_WATER);
     getPool(LLDrawPool::POOL_SIMPLE);
@@ -1315,6 +1315,7 @@ void LLPipeline::releaseGLBuffers()
     mTerrainPrimitives.release();
     mWaterPrimitives.release();
     mWaterSurface.release();
+    mSkyBehindQuery.release();
 
     if (mNoiseMap)
     {
@@ -3024,6 +3025,15 @@ bool LLPipeline::getVisibleExtents(LLCamera& camera, LLVector3& min, LLVector3& 
                 }
             }
         }
+    }
+
+    // The water has no partition: its field, whole, with its lowest and highest water, and a receiver wherever the
+    // camera meets it. Left out, a view of open sea, or a shadow split holding nothing but water, finds no receivers
+    // and its split is left empty.
+    if (hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterSurface.inView(camera))
+    {
+        mWaterSurface.addExtents(min, max);
+        res = false;
     }
 
     LLViewerCamera::sCurCameraID = saved_camera_id;
@@ -11557,9 +11567,9 @@ bool LLPipeline::skyBehindWanted() const
     {
         return false;
     }
-    // stateSort fills the water pool with this view's visible water, edge water included, before the sky pool draws.
-    const LLFacePool* water = static_cast<const LLFacePool*>(mWaterPool);
-    return water && !water->mDrawFace.empty();
+    // The water's slab, rim to rim, against the frustum. What the frustum holds but the world hides, as water under the
+    // land, the sky pool's query finds (LLDrawPoolWLSky::renderSkyHazeDeferred).
+    return mWaterPool && hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterSurface.inView(*LLViewerCamera::getInstance());
 }
 
 void LLPipeline::doAtmospherics()
@@ -11690,13 +11700,12 @@ void LLPipeline::doWaterHaze()
         {
             LLGLDepthTest depth(GL_FALSE);
 
-            // full screen blit
-            mScreenTriangleVB->setBuffer();
-            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+            // full screen blit, the triangle worked from the vertex id (waterHazeV.glsl)
+            gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
         }
         else
         {
-            //render water patches like LLDrawPoolWater does
+            // The field as LLDrawPoolWater draws it.
             // Default LEQUAL auto-translates to GEQUAL under reverse-Z, mirroring the manual
             // above-water depth test in waterHazeF.glsl (which flips its compare direction).
             LLGLDepthTest depth(GL_TRUE, GL_FALSE);
@@ -11707,11 +11716,8 @@ void LLPipeline::doWaterHaze()
             gGLLastMatrix = NULL;
             gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
 
-            if (mWaterPool)
-            {
-                mWaterPool->pushFaceGeometry();
-                mWaterDraws += (U32)static_cast<LLFacePool*>(mWaterPool)->mDrawFace.size();
-            }
+            mWaterSurface.bind(haze_shader);
+            mWaterSurface.draw(haze_shader);
         }
 
         unbindDeferredShader(haze_shader);

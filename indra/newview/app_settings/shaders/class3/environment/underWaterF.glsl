@@ -47,14 +47,13 @@ uniform vec3 eyeVec;
 // and bound at UB_ENVIRONMENT. Members are read by bare name.
 //[ENGINE_BLOCK Environment]
 
-//bigWave is (refCoord.w, view.w);
-in vec4 refCoord;
-in vec4 littleWave;
-in vec4 view;
+in vec3 refCoord;
+in vec3 view;
 in vec3 vary_position;
 
 vec4 applyWaterFogViewLinearNoClip(vec3 pos, vec4 color);
 void mirrorClip(vec3 position);
+void water_wave_coords(vec2 r, out vec2 big, out vec4 little);
 
 void main()
 {
@@ -64,9 +63,12 @@ void main()
     vec4 color;
 
     //get detail normals
-    vec3 wave1 = texture(bumpMap, vec2(refCoord.w, view.w)).xyz*2.0-1.0;
-    vec3 wave2 = texture(bumpMap, littleWave.xy).xyz*2.0-1.0;
-    vec3 wave3 = texture(bumpMap, littleWave.zw).xyz*2.0-1.0;
+    vec2 bigwave;
+    vec4 little;
+    water_wave_coords(view.xy, bigwave, little);
+    vec3 wave1 = texture(bumpMap, bigwave).xyz*2.0-1.0;
+    vec3 wave2 = texture(bumpMap, little.xy).xyz*2.0-1.0;
+    vec3 wave3 = texture(bumpMap, little.zw).xyz*2.0-1.0;
     vec3 wavef = normalize(wave1+wave2+wave3);
 
     //figure out distortion vector (ripply)

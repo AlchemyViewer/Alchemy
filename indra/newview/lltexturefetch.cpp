@@ -32,6 +32,7 @@
 #include <atomic>
 
 #include "lltexturefetch.h"
+#include "llappviewer.h"
 
 #include "lldir.h"
 #include "llhttpconstants.h"

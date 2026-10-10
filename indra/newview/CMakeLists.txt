@@ -969,7 +969,6 @@ if(AL_BUILD_VIEWER)
     llvosurfacepatch.cpp
     llvotree.cpp
     llvovolume.cpp
-    llvowater.cpp
     llvowlsky.cpp
     llwearableitemslist.cpp
     llwearablelist.cpp
@@ -1845,7 +1844,6 @@ if(AL_BUILD_VIEWER)
     llvosurfacepatch.h
     llvotree.h
     llvovolume.h
-    llvowater.h
     llvowlsky.h
     llwearableitemslist.h
     llwearablelist.h

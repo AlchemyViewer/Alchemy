@@ -208,17 +208,21 @@ namespace tut
         ensure_equals("no rim, no fade", rimless.mEdgeFade, 0.f);
         ensure("no rim, waves past the regions", rimless.mWaveClamp >= EDGE_WATER_STRETCH);
 
-        const std::string water_f = shader_source("class3/environment/waterF.glsl");
         const std::string haze = shader_source("class3/deferred/waterHazeF.glsl");
         ensure("sky behind water is held past the surface", haze.find("entry + VOID_WATER_FOG_DEPTH") != std::string::npos);
-        const std::string water_v = shader_source("class1/environment/waterV.glsl");
-        ensure("wave clamp from the uniform", water_v.find("min(d, waterFar.x)") != std::string::npos);
-        ensure("no literal wave clamp", water_v.find("min(d, 2560.0)") == std::string::npos);
-        // The per-fragment rebuild scrolls by the offsets waterV takes from the CPU, which sets no wave direction or time.
-        for (const char* scroll : { "+ bigWaveScroll;", "+ littleWaveScroll.xy;", "+ littleWaveScroll.zw;" })
+        const std::string surface = shader_source("class1/environment/waterSurface.glsl");
+        ensure("wave clamp from the uniform", surface.find("min(d, waterFar.x)") != std::string::npos);
+        ensure("no literal wave clamp", surface.find("2560.0") == std::string::npos);
+        // The waves follow the phases the CPU takes, the camera and the scroll folded in, which sets no wave direction
+        // or time; both water programs work them per fragment through the one function.
+        for (const char* phase : { "+ waterBigPhase;", "+ waterLittlePhase.xy;", "+ waterLittlePhase.zw;" })
         {
-            ensure(std::string("waterV scrolls by ") + scroll, water_v.find(scroll) != std::string::npos);
-            ensure(std::string("rebuilt waves scroll by ") + scroll, water_f.find(scroll) != std::string::npos);
+            ensure(std::string("waves take ") + phase, surface.find(phase) != std::string::npos);
+        }
+        for (const char* path : { "class3/environment/waterF.glsl", "class3/environment/underWaterF.glsl" })
+        {
+            ensure(std::string(path) + " works the waves per fragment",
+                   shader_source(path).find("water_wave_coords(view.xy, bigwave, little);") != std::string::npos);
         }
     }
 

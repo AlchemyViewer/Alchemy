@@ -78,6 +78,7 @@
 #include "llvieweroctree.h"
 #include "llviewerdisplay.h"
 #include "llviewerwindow.h"
+#include "pipeline.h"
 #include "llprogressview.h"
 #include "llcoros.h"
 #include "lleventcoro.h"
@@ -689,8 +690,6 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
     //MUST MATCH declaration of eObjectPartitions
     mImpl->mObjectPartition.push_back(new LLHUDPartition(this));        //PARTITION_HUD
     mImpl->mObjectPartition.push_back(new LLTerrainPartition(this));    //PARTITION_TERRAIN
-    mImpl->mObjectPartition.push_back(new LLVoidWaterPartition(this));  //PARTITION_VOIDWATER
-    mImpl->mObjectPartition.push_back(new LLWaterPartition(this));      //PARTITION_WATER
     mImpl->mObjectPartition.push_back(new LLTreePartition(this));       //PARTITION_TREE
     mImpl->mObjectPartition.push_back(new LLParticlePartition(this));   //PARTITION_PARTICLE
     mImpl->mObjectPartition.push_back(new LLGrassPartition(this));      //PARTITION_GRASS
@@ -1632,70 +1631,6 @@ void LLViewerRegion::createVisibleObjects(F32 max_time)
     return;
 }
 
-void LLViewerRegion::clearCachedVisibleObjects()
-{
-    mImpl->mWaitingList.clear();
-    mImpl->mVisibleGroups.clear();
-
-    //reset all occluders
-    mImpl->mVOCachePartition->resetOccluders();
-    mPaused = true;
-
-    //clean visible entries
-    for(LLVOCacheEntry::vocache_entry_set_t::iterator iter = mImpl->mVisibleEntries.begin(); iter != mImpl->mVisibleEntries.end();)
-    {
-        LLVOCacheEntry* entry = *iter;
-        LLVOCacheEntry* parent = getCacheEntry(entry->getParentID());
-
-        if(!entry->getParentID() || parent) //no child or parent is cache-able
-        {
-            if(parent) //has a cache-able parent
-            {
-                parent->addChild(entry);
-            }
-
-            LLVOCacheEntry::vocache_entry_set_t::iterator next_iter = iter;
-            ++next_iter;
-            mImpl->mVisibleEntries.erase(iter);
-            iter = next_iter;
-        }
-        else //parent is not cache-able, leave it.
-        {
-            ++iter;
-        }
-    }
-
-    //remove all visible entries.
-    mLastVisitedEntry = NULL;
-    std::vector<LLDrawable*> delete_list;
-    for(LLVOCacheEntry::vocache_entry_set_t::iterator iter = mImpl->mActiveSet.begin();
-        iter != mImpl->mActiveSet.end(); ++iter)
-    {
-        LLVOCacheEntry* vo_entry = *iter;
-        if (!vo_entry || !vo_entry->getEntry())
-        {
-            continue;
-        }
-        LLDrawable* drawablep = (LLDrawable*)vo_entry->getEntry()->getDrawable();
-
-        if(drawablep && !drawablep->getParent())
-        {
-            delete_list.push_back(drawablep);
-        }
-    }
-
-    if(!delete_list.empty())
-    {
-        for(S32 i = 0; i < delete_list.size(); i++)
-        {
-            gObjectList.killObject(delete_list[i]->getVObj());
-        }
-        delete_list.clear();
-    }
-
-    return;
-}
-
 //perform some necessary but very light updates.
 //to replace the function idleUpdate(...) in case there is no enough time.
 void LLViewerRegion::lightIdleUpdate()
@@ -1892,9 +1827,8 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
                 break;
             }
         }
-        // An entry can lose its octree entry while it is still in the active set
-        // -- clearCachedVisibleObjects walks this same set and skips those -- and
-        // a child is removed with its parent rather than on its own. Neither is a
+        // An entry can lose its octree entry while it is still in the active set,
+        // and a child is removed with its parent rather than on its own. Neither is a
         // reason to stop reading the clock, so the deadline is checked below for
         // every entry the walk visits, skipped or not.
         LLVOCacheEntry* vo_entry = *iter;

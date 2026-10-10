@@ -49,6 +49,10 @@
 #include "llviewercontrol.h"
 #include "llappviewer.h" // gFrameIntervalSeconds
 
+#include "llglstates.h"
+
+#include <optional>
+
 extern bool gCubeSnapshot;
 
 static LLGLSLShader* cloud_shader = NULL;
@@ -133,6 +137,30 @@ static bool use_hdri_sky()
 
 }
 
+// Whether any of the water lies in front of the depth the world left, the sky drawing last: the frustum can hold the
+// sea (LLPipeline::skyBehindWanted) while land hides all of it. The field's quads, flat, counted by the pipeline's
+// query, writing nothing. False when there is no program to draw them with.
+static bool query_water_in_view()
+{
+    LLGLSLShader& field = gWaterFieldProgram;
+    if (!field.isComplete())
+    {
+        return false;
+    }
+    field.bind();
+    gPipeline.mWaterSurface.bind(field);
+    {
+        LLGLDepthTest depth(GL_TRUE, GL_FALSE);
+        LLGLSColorMask no_color(false, false);
+        LLGLDisable no_cull(GL_CULL_FACE);
+        gPipeline.mSkyBehindQuery.begin();
+        gPipeline.mWaterSurface.draw(field);
+        gPipeline.mSkyBehindQuery.end();
+    }
+    field.unbind();
+    return true;
+}
+
 void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 camHeightLocal) const
 {
     if (!gSky.mVOSkyp)
@@ -144,6 +172,16 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
 
     if (gPipeline.canUseWindLightShaders() && gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_SKY))
     {
+        // The sky again, behind everything, for the haze pass to converge far water on (hazeF.glsl): the main view's
+        // only, and only when water is in it; an HDRI sky is colour already shaded, which the haze cannot take the
+        // same way. Whether any water shows is asked first, before the sky binds its textures.
+        const bool sky_behind = !use_hdri_sky() && gPipeline.skyBehindWanted();
+        if (!gCubeSnapshot && gPipeline.mRT == &gPipeline.mMainRT)
+        {
+            LL_PROFILE_PLOT("sky behind", (int64_t)sky_behind);
+        }
+        const bool queried = sky_behind && query_water_in_view();
+
         if (use_hdri_sky())
         {
             sky_shader = &gEnvironmentMapProgram;
@@ -202,18 +240,19 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
         /// Render the skydome
         renderDome(origin, camHeightLocal, sky_shader);
 
-        // Again into the sky behind everything, with the same program and uniforms and no depth, so it covers what
-        // the world hides: the haze pass converges far water on it (hazeF.glsl). The main view's only, and only when
-        // water is in it; an HDRI sky is colour already shaded, which the haze cannot take the same way.
+        // Again into the sky behind, with the same program and uniforms and no depth, so it covers what the world hides.
+        // The GPU clears and draws it only if the query saw water, with no readback: a frame late, the far water would
+        // show WindLight's seam for a frame whenever the camera turned onto the sea. The frame is stamped either way;
+        // with no water in view no pixel is marked as water, so the haze never reads the target.
         LLRenderTarget& behind = gPipeline.mSkyBehind;
-        const bool sky_behind = !use_hdri_sky() && gPipeline.skyBehindWanted();
-        if (!gCubeSnapshot && gPipeline.mRT == &gPipeline.mMainRT)
-        {
-            LL_PROFILE_PLOT("sky behind", (int64_t)sky_behind);
-        }
         if (sky_behind)
         {
             LL_PROFILE_GPU_ZONE("sky behind");
+            std::optional<ALSamplesQuery::Conditional> if_water;
+            if (queried)
+            {
+                if_water.emplace(gPipeline.mSkyBehindQuery);
+            }
             behind.bindTarget();
             behind.clear();
             // skyF writes its colour to frag_data[3] with the emissive buffer, and to frag_data[0] without it.

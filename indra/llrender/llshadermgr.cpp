@@ -277,6 +277,14 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         }
     }
 
+    if (features->hasWaterSurface)
+    {
+        if (!shader->attachVertexObject("environment/waterSurface.glsl"))
+        {
+            return false;
+        }
+    }
+
     if (!shader->attachVertexObject("deferred/textureUtilV.glsl"))
     {
         return false;
@@ -1833,8 +1841,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("exclusionDistort");
     mReservedUniforms.push_back("eyeVec");
     mReservedUniforms.push_back("time");
-    mReservedUniforms.push_back("bigWaveScroll");
-    mReservedUniforms.push_back("littleWaveScroll");
+    mReservedUniforms.push_back("waterBigPhase");
+    mReservedUniforms.push_back("waterLittlePhase");
     mReservedUniforms.push_back("lightDir");
     mReservedUniforms.push_back("specular");
     mReservedUniforms.push_back("lightExp");
@@ -2222,6 +2230,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterCellMap");
     mReservedUniforms.push_back("waterCellSquare");
     mReservedUniforms.push_back("waterDefaultHeight");
+    mReservedUniforms.push_back("waterRings");
+    mReservedUniforms.push_back("waterSweepPhase");
+    mReservedUniforms.push_back("waterLayout");
     mReservedUniforms.push_back("waterGlintRoughness");
 
     // The enum and this list are parallel, and an entry added or removed on one side only

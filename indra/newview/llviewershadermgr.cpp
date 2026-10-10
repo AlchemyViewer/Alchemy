@@ -159,6 +159,7 @@ LLGLSLShader        gObjectAlphaMaskNoColorProgram;
 LLGLSLShader        gWaterProgram;
 LLGLSLShader        gUnderWaterProgram;
 LLGLSLShader        gWaterExclusionProgram;
+LLGLSLShader        gWaterFieldProgram;
 
 //interface shaders
 LLGLSLShader        gHighlightProgram;
@@ -854,6 +855,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     shaders.push_back( make_pair( "avatar/avatarSkinV.glsl",                1 ) );
     shaders.push_back( make_pair( "avatar/objectSkinV.glsl",                1 ) );
     shaders.push_back( make_pair( "deferred/textureUtilV.glsl",             1 ) );
+    shaders.push_back( make_pair( "environment/waterSurface.glsl",          1 ) );
     if (gGLManager.mGLSLVersionMajor >= 2 || gGLManager.mGLSLVersionMinor >= 30)
     {
         shaders.push_back( make_pair( "objects/indexedTextureV.glsl",           1 ) );
@@ -1081,6 +1083,7 @@ bool LLViewerShaderMgr::loadShadersWater()
         gWaterProgram.unload();
         gUnderWaterProgram.unload();
         gWaterExclusionProgram.unload();
+        gWaterFieldProgram.unload();
         return true;
     }
 
@@ -1094,6 +1097,7 @@ bool LLViewerShaderMgr::loadShadersWater()
         gWaterProgram.mFeatures.hasSrgb = true;
         gWaterProgram.mFeatures.hasReflectionProbes = true;
         gWaterProgram.mFeatures.hasTonemap = true;
+        gWaterProgram.mFeatures.hasWaterSurface = true;
         gWaterProgram.mFeatures.hasShadows = use_sun_shadow;
         gWaterProgram.mShaderFiles.clear();
         gWaterProgram.mShaderFiles.push_back(make_pair("environment/waterV.glsl", GL_VERTEX_SHADER));
@@ -1121,6 +1125,7 @@ bool LLViewerShaderMgr::loadShadersWater()
         gUnderWaterProgram.mName = "Underwater Shader";
         gUnderWaterProgram.mFeatures.calculatesAtmospherics = true;
         gUnderWaterProgram.mFeatures.hasAtmospherics = true;
+        gUnderWaterProgram.mFeatures.hasWaterSurface = true;
         gUnderWaterProgram.mShaderFiles.clear();
         gUnderWaterProgram.mShaderFiles.push_back(make_pair("environment/waterV.glsl", GL_VERTEX_SHADER));
         gUnderWaterProgram.mShaderFiles.push_back(make_pair("environment/underWaterF.glsl", GL_FRAGMENT_SHADER));
@@ -1150,6 +1155,21 @@ bool LLViewerShaderMgr::loadShadersWater()
         llassert(success);
     }
 
+    if (success)
+    {
+        // The field's quads and nothing else: the sky pool's occlusion query over the water (LLPipeline::mSkyBehindQuery).
+        gWaterFieldProgram.mName = "Water Field Shader";
+        gWaterFieldProgram.mFeatures.hasWaterSurface = true;
+        gWaterFieldProgram.mShaderFiles.clear();
+        gWaterFieldProgram.mShaderFiles.push_back(make_pair("environment/waterFieldV.glsl", GL_VERTEX_SHADER));
+        gWaterFieldProgram.mShaderFiles.push_back(make_pair("environment/waterFieldF.glsl", GL_FRAGMENT_SHADER));
+        gWaterFieldProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
+        gWaterFieldProgram.mShaderGroup = LLGLSLShader::SG_WATER;
+        gWaterFieldProgram.clearPermutations();
+        success = gWaterFieldProgram.createShader();
+        llassert(success);
+    }
+
     /// Keep track of water shader levels
     if (gWaterProgram.mShaderLevel != mShaderLevel[SHADER_WATER]
         || gUnderWaterProgram.mShaderLevel != mShaderLevel[SHADER_WATER])
@@ -1169,11 +1189,6 @@ bool LLViewerShaderMgr::loadShadersWater()
     {
         mShaderLevel[SHADER_WATER]--;
         return loadShadersWater();
-    }
-
-    if (LLWorld::instanceExists())
-    {
-        LLWorld::getInstance()->updateWaterObjects();
     }
 
     return true;
@@ -2581,6 +2596,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gHazeWaterProgram.mFeatures.isDeferred             = true;
         gHazeWaterProgram.mFeatures.hasShadows             = use_sun_shadow;
         gHazeWaterProgram.mFeatures.hasReflectionProbes    = mShaderLevel[SHADER_DEFERRED] > 2;
+        gHazeWaterProgram.mFeatures.hasWaterSurface        = true;
 
         gHazeWaterProgram.clearPermutations();
         gHazeWaterProgram.mShaderFiles.push_back(make_pair("deferred/waterHazeV.glsl", GL_VERTEX_SHADER));
