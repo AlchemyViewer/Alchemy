@@ -309,14 +309,16 @@ def check(args):
         seen_cases = set()
         for e in entries:
             key = (e["group"], e["n"])
-            t = tut_results.pop(key, None)
             name = e["catch2_name"]
-            if e.get("not_compiled_here") or (e.get("past_group_limit") and t is None):
+            # Before taking TUT's result: a test<N> defined in both branches
+            # of an #if is two entries, and the result is the active twin's.
+            if e.get("not_compiled_here") or (e.get("past_group_limit") and key not in tut_results):
                 listed.append(f"{e['group']} {e['n']}: " +
                               ("not compiled here" if e.get("not_compiled_here") else "past its group's limit"))
                 if name in cases:
                     seen_cases.add(name)
                 continue
+            t = tut_results.pop(key, None)
             if t is None:
                 problems.append(f"{path}: {e['group']} test<{e['n']}> did not run under TUT")
                 continue
