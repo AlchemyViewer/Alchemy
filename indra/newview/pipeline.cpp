@@ -12629,7 +12629,9 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                     LLPipeline::RENDER_TYPE_PASS_GLTF_PBR_ALPHA_MASK_RIGGED,
                     END_RENDER_TYPES);
 
-    gGL.setColorMask(false, false);
+    // The caller's mask comes back on every exit, the early one for an empty point cloud
+    // included.
+    LLGLSColorMask color_mask(false, false);
 
     LLEnvironment& environment = LLEnvironment::instance();
 
@@ -13415,7 +13417,6 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         gGL.loadMatrix(proj[1]);
         gGL.matrixMode(LLRender::MM_MODELVIEW);
     }
-    gGL.setColorMask(true, true);
 
     gGLViewport[0] = saved_gl_viewport[0];
     gGLViewport[1] = saved_gl_viewport[1];
