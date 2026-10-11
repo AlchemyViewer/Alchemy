@@ -160,6 +160,9 @@ namespace
         // statement, spaced from it; what follows a cast's is its operand.
         std::vector<bool> brackets;
         bool              conditionClosed = false;
+        // Whether the token before is a < that opened an LSL vector, not
+        // a comparison: a sign after it is the first part's.
+        bool              vectorOpened    = false;
         for (const Token& t : line.tokens)
         {
             if (t.kind == Kind::Space)
@@ -169,6 +172,8 @@ namespace
             }
             const bool closedCondition = conditionClosed;
             conditionClosed            = false;
+            const bool openedVector    = vectorOpened;
+            vectorOpened               = false;
             if (t.kind == Kind::Punct && t.text == "(")
             {
                 brackets.push_back(prev && prev->kind == Kind::Ident && (prev->text == "if" || prev->text == "while" || prev->text == "for"));
@@ -185,6 +190,7 @@ namespace
                 if (!lua && t.kind == Kind::Punct && t.text == "<")
                 {
                     ++vector;
+                    vectorOpened = true;
                 }
                 out += t.text;
                 prev = &t;
@@ -234,7 +240,8 @@ namespace
                     }
                     else if (a.kind == Kind::Punct && isOperator(lua, a.text))
                     {
-                        say(true);
+                        // After a sign, nothing: -(a), #(t), !(b).
+                        say(!(isUnary(lua, a.text) && (!earlier || !operand(lua, *earlier))));
                     }
                 }
                 else if (p == "[")
@@ -249,6 +256,11 @@ namespace
                     }
                     else if (lua && a.kind == Kind::Ident && !isKeyword(lua, a))
                     {
+                        say(false);
+                    }
+                    else if (a.kind == Kind::Punct && isUnary(lua, a.text) && (!earlier || !operand(lua, *earlier)))
+                    {
+                        // A length of a table written out: #{1, 2}.
                         say(false);
                     }
                     else
@@ -271,6 +283,7 @@ namespace
                     if (!aOperand)
                     {
                         ++vector;
+                        vectorOpened = true;
                         say(!(a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == "<" || a.text == "{")));
                     }
                     else
@@ -290,7 +303,9 @@ namespace
                         // A sign or a not: spaced before as its neighbour
                         // asks, and nothing after, which the next token's
                         // turn will see to.
-                        if (a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == "<" || a.text == "{" || a.text == "!" || a.text == "~" || a.text == "#"))
+                        // Not after a < that compares: LSL's where an operand
+                        // stood before it, and Luau's everywhere.
+                        if (a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || (a.text == "<" && openedVector) || a.text == "{" || a.text == "!" || a.text == "~" || a.text == "#"))
                         {
                             say(false);
                         }
@@ -298,8 +313,10 @@ namespace
                         {
                             say(true);
                         }
-                        else if (a.kind == Kind::Punct && isUnary(lua, a.text))
+                        else if (a.kind == Kind::Punct && isUnary(lua, a.text) && (!earlier || !operand(lua, *earlier)))
                         {
+                            // A sign after a sign: -#t. Not after a minus
+                            // that subtracts, x - #t.
                             say(false);
                         }
                         else

@@ -415,4 +415,18 @@ namespace tut
         ensure_equals("LSL's braces", ALScriptFormatter::format("default { state_entry() { llSay(0, \"a\"); } }\n", lsl_none),
                       std::string("default { state_entry() { llSay(0, \"a\"); } }\n"));
     }
+
+    template<> template<>
+    void alscriptformatter_object::test<13>()
+    {
+        set_test_name("a sign against the bracket or brace after it, and after a < that compares or a minus that subtracts, spaced "
+                      "from it: -(a), #{ 1 }, i < -1, x - #t, in Luau and in LSL; LSL's vector's first sign still against its <");
+        ensure_equals("Luau", lua("local x = - (a)\nlocal y = # (t)\nlocal z = # {1}\nif i <#t and i <-1 and i > - (2) then end\n"
+                                  "local w = not (a)\nlocal q = a - (b)\nreturn -(x)\nlocal d = #{1} -#{2} - -#t + -#t\n"),
+                      std::string("local x = -(a)\nlocal y = #(t)\nlocal z = #{ 1 }\nif i < #t and i < -1 and i > -(2) then end\n"
+                                  "local w = not (a)\nlocal q = a - (b)\nreturn -(x)\nlocal d = #{ 1 } - #{ 2 } - -#t + -#t\n"));
+        ensure_equals("LSL", lsl("default { state_entry() { integer x = - (a); vector v = < -1, 0, 0 >; if (i <-1) x = ! (b); } }\n"),
+                      std::string("default { state_entry() { integer x = -(a); vector v = <-1, 0, 0>; if (i < -1) x = !(b); } }\n"));
+        ensure_equals("a list of vectors", lsl("list l = [<-1, 0, 0>, < -2, 0, 0 >];\n"), std::string("list l = [<-1, 0, 0>, <-2, 0, 0>];\n"));
+    }
 }
