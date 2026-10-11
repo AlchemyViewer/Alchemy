@@ -752,7 +752,9 @@ void LLDrawPoolAvatar::renderAvatars(LLVOAvatar* single_avatar, S32 pass)
         {
             // debug code to draw a sphere in place of avatar
             gGL.getTextureSlot(0)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap);
-            gGL.setColorMask(true, true);
+            // Scoped: pass 0 runs for every avatar pool before pass 1 does, and the G-buffer
+            // passes behind this one write their flags to alpha.
+            LLGLSColorMask mask(true, true);
             LLVector3 pos = avatarp->getPositionAgent();
             gGL.color4f(1.0f, 1.0f, 1.0f, 0.7f);
 
@@ -765,7 +767,6 @@ void LLDrawPoolAvatar::renderAvatars(LLVOAvatar* single_avatar, S32 pass)
              gSphere.renderGGL();
 
              gGL.popMatrix();
-             gGL.setColorMask(true, false);
         }
         // don't render please
         return;
