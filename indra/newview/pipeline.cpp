@@ -11574,7 +11574,8 @@ void LLPipeline::doAtmospherics()
 
         LLGLEnable blend(GL_BLEND);
         gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_SOURCE_ALPHA, LLRender::BF_ZERO, LLRender::BF_SOURCE_ALPHA);
-        gGL.setColorMask(true, true);
+        // The caller's mask comes back for the pools drawn after the haze.
+        LLGLSColorMask color_mask(true, true);
 
         // apply haze
         LLGLSLShader& haze_shader = *gHazeProgram.selectVariant();
@@ -11639,7 +11640,8 @@ void LLPipeline::doWaterHaze()
         LLGLEnable blend(GL_BLEND);
         gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_SOURCE_ALPHA, LLRender::BF_ZERO, LLRender::BF_SOURCE_ALPHA);
 
-        gGL.setColorMask(true, true);
+        // The caller's mask comes back for the pools drawn after the haze.
+        LLGLSColorMask color_mask(true, true);
 
         // apply haze
         LLGLSLShader& haze_shader = gHazeWaterProgram;
