@@ -194,8 +194,8 @@ endfunction()
 #              [INCLUDES <dir>...] [DEFINES <define>...])
 #
 # Builds tests/<name>_bench.cpp, which brings its own main, into
-# BENCH_<name> and registers it as a test labelled benchmark. The default
-# test run leaves that label out; BUILD_AND_RUN_BENCHMARKS runs it, verbose,
+# BENCH_<name> and registers it as a test labelled benchmark and manual. The
+# default test run leaves manual out; BUILD_AND_RUN_BENCHMARKS runs it, verbose,
 # since the numbers are the output. A benchmark exits 125, which CTest reads
 # as skipped, from a build whose numbers would say nothing.
 function(al_add_bench name)
@@ -232,7 +232,7 @@ function(al_add_bench name)
     ${target}
     PROPERTIES
       ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
-      LABELS benchmark
+      LABELS "benchmark;manual"
       SKIP_RETURN_CODE 125
   )
 

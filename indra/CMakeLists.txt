@@ -417,18 +417,19 @@ if(AL_BUILD_TESTS)
   include(ProcessorCount)
   ProcessorCount(NUM_CORES)
 
-  # Set parallel level to decrease test runtime. Benchmarks are registered
-  # as tests under their own label and left out of the default run, since
-  # their numbers are their output and a shared parallel run would ruin them.
-  # A Catch2 binary's run of all its tests in one process stays out too until
-  # they are known to share one (combined_pending; see ALAddTestBinary.cmake).
+  # Set parallel level to decrease test runtime. What is labelled manual runs
+  # only when asked for by its own label: benchmarks, since their numbers are
+  # their output and a shared parallel run would ruin them, and a Catch2
+  # binary's run of all its tests in one process until they are known to
+  # share one (combined_pending; see ALAddTestBinary.cmake). One label, since
+  # these arguments reach a shell, which would take a | in a regex for a pipe.
   # Each run also writes its results as JUnit, which CI keeps.
   set(
     CMAKE_CTEST_ARGUMENTS
     -j${NUM_CORES}
     --output-on-failure
     -LE
-    "benchmark|combined_pending"
+    manual
     --output-junit
     "${CMAKE_BINARY_DIR}/Testing/test-results.xml"
   )

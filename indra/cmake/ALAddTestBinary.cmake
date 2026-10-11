@@ -32,10 +32,10 @@ endif()
 # file belongs to one binary, or to one at each ISA tier.
 #
 # <name>/combined runs all of them in one process. It is labelled
-# combined_pending, which the default run leaves out, until the binary's tests
-# are known to share a process: then COMBINED labels it combined, and it runs
-# with the rest. With AL_TEST_PER_CASE, each test case is an entry of its own
-# instead, found when ctest runs.
+# combined_pending and manual, which the default run leaves out, until the
+# binary's tests are known to share a process: then COMBINED labels it
+# combined, and it runs with the rest. With AL_TEST_PER_CASE, each test case is
+# an entry of its own instead, found when ctest runs.
 #
 # ENVIRONMENT sets variables for the runs, VAR=value each. GL, PYTHON and
 # ISA_TIER mean what they mean to al_add_test: a GL binary is labelled gl and
@@ -207,7 +207,7 @@ function(al_add_test_binary name)
 
     list(LENGTH stems file_count)
     math(EXPR combined_timeout "${timeout} * ${file_count}")
-    set(combined_label combined_pending)
+    set(combined_label "combined_pending;manual")
     if(arg_COMBINED)
       set(combined_label combined)
     endif()
