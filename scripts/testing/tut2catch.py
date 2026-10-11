@@ -19,7 +19,9 @@ decided by the types clang resolved, not by its text:
                TUT's numeric order are moved later in the file, never
                earlier, so that declaration order, Catch2's, is TUT's. The
                group's typedefs, its test_group object and a class derived
-               from test_group only to name it go. namespace tut, once
+               from test_group only to name it go; a class derived from it
+               that holds more (a constructor's body, a destructor,
+               members) stays, with its object, marked. namespace tut, once
                nothing names tut:: and no type production code befriends as
                tut:: is in it, becomes an anonymous namespace, taking in one
                directly inside it.
@@ -1051,13 +1053,14 @@ class Converter:
         derived = self.derived_groups.get(full) or self.derived_groups.get(full.rpartition("::")[2])
         if not m and derived is None:
             return
+        plain = True
         if m:
             args = split_template_args(m.group(1))
             data, limit = args[0], int(args[1]) if len(args) > 1 else 50
             literal = find_kind(node, "StringLiteral")
             name = literal.get("value") if literal else None
         else:
-            data, limit, name = derived
+            data, limit, name, plain = derived
         where = self.node_range(node)[0] if self.node_range(node) else 0
         if not name or not name.startswith('"'):
             self.check(where, "a test_group whose name is not a string literal")
@@ -1066,11 +1069,15 @@ class Converter:
         if data in self.groups:
             self.check(where, f"two groups run the tests of {data}")
         self.groups[data] = Group(name, data, limit)
-        self.remove_decl(node)
+        if plain:
+            self.remove_decl(node)
 
     def on_record(self, node, parents):
-        """A class derived from test_group only to name the group in its
-        constructor, as llvocache's is."""
+        """A class derived from test_group: one that only names the group in
+        its constructor, as llvocache's does, goes with the group; one that
+        holds more (a constructor's body, a destructor, members), which TUT
+        ran around the group's tests, stays, and its object with it, marked
+        for converting by hand."""
         for base in node.get("bases", []):
             t = base.get("type", {})
             full = t.get("desugaredQualType") or t.get("qualType") or ""
@@ -1081,10 +1088,17 @@ class Converter:
             data = args[0] if "::" in args[0] else "tut::" + args[0]
             literal = find_kind(node, "StringLiteral")
             name = literal.get("value") if literal else None
+            plain = names_only(node)
             qualified = "::".join([n for n in self.namespaces_of(parents) if n] + [node.get("name", "")])
             for key in (qualified, node.get("name", "")):
-                self.derived_groups[key] = (data, int(args[1]) if len(args) > 1 else 50, name)
-            self.remove_decl(node)
+                self.derived_groups[key] = (data, int(args[1]) if len(args) > 1 else 50, name, plain)
+            if plain:
+                self.remove_decl(node)
+            else:
+                rng = self.node_range(node)
+                self.check(rng[0] if rng else 0,
+                           f"{node.get('name')} derives from test_group and holds more than the group's name, "
+                           f"which TUT ran around the group's tests: convert it by hand")
 
     def remove_decl(self, node):
         rng = self.node_range(node)
@@ -2446,6 +2460,23 @@ def dead_regions(masked):
             else:
                 stack[-1] = [m.end(), kw == "elif" and re.fullmatch(r"\(?\s*(0|false)\s*\)?", rest) is not None]
     return regions
+
+
+def names_only(record):
+    """Whether a class derived from test_group holds nothing but a
+    constructor, taking nothing and doing nothing, that passes the group its
+    name: nothing TUT ran around the group's tests goes with it."""
+    own = [c for c in record.get("inner", []) if "kind" in c and not c.get("isImplicit")
+           and c.get("kind") != "AccessSpecDecl"]
+    if len(own) != 1 or own[0].get("kind") != "CXXConstructorDecl":
+        return False
+    parts = [c for c in own[0].get("inner", []) if "kind" in c]
+    inits = [c for c in parts if c.get("kind") == "CXXCtorInitializer"]
+    rest = [c for c in parts if c.get("kind") != "CXXCtorInitializer"]
+    if len(inits) != 1 or "baseInit" not in inits[0]:
+        return False
+    return len(rest) == 1 and rest[0].get("kind") == "CompoundStmt" and \
+        not [c for c in rest[0].get("inner", []) if "kind" in c]
 
 
 def exclusive(a, b):
