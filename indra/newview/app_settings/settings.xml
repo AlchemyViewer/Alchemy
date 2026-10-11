@@ -8595,28 +8595,6 @@
     <key>Value</key>
     <real>4.0</real>
   </map>
-  <key>RenderDeferredSpotShadowBias</key>
-  <map>
-    <key>Comment</key>
-    <string>Bias value for spot shadows (prevent shadow acne).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>-64.0</real>
-  </map>
-  <key>RenderDeferredSpotShadowOffset</key>
-  <map>
-    <key>Comment</key>
-    <string>Offset value for spot shadows (prevent shadow acne).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>0.8</real>
-  </map>
 
   <key>RenderShadowBias</key>
   <map>
@@ -8750,28 +8728,6 @@
   <map>
     <key>Comment</key>
     <string>Scale of shadow map resolution vs. screen resolution (only positivie values are allowed)</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>1.0</real>
-  </map>
-  <key>RenderDeferredTreeShadowBias</key>
-  <map>
-    <key>Comment</key>
-    <string>Bias value for tree shadows (prevent shadow acne).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>1.0</real>
-  </map>
-  <key>RenderDeferredTreeShadowOffset</key>
-  <map>
-    <key>Comment</key>
-    <string>Offset value for tree shadows (prevent shadow acne).</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
