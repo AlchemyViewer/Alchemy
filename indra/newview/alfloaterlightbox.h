@@ -91,6 +91,13 @@ public:
     /// The notecard window calls this with the text it has, from a button
     /// the user pressed: opening a notecard applies nothing by itself.
     static void importSharedLookFromText(const std::string& notecard_text, const std::string& notecard_name, SharedLookImport what);
+    /// Neutral put on after the Look in use, @a deleted_name, was deleted:
+    /// otherwise the settings stay that Look's, under a bar naming another.
+    /// One undo step where the Lightbox is open, so that Ctrl+Z brings back
+    /// the settings the deleted Look had -- to be saved again, if deleting
+    /// it was a mistake. Neutral is put back from the bundled copy first
+    /// where the Looks folder has lost it.
+    static void putOnNeutralForDeletedLook(const std::string& deleted_name);
     /// A Look notecard dropped anywhere on the window is imported.
     bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept,
                            std::string& tooltip_msg) override;

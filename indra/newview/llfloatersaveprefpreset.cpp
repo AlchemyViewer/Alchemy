@@ -133,6 +133,13 @@ void LLFloaterSavePrefPreset::onBtnSave()
             LLNotificationsUtil::add("LightBoxLookNameRefused");
             return;
         }
+        // Neutral is what the Lightbox falls back to; saved over, it would
+        // not be neutral any more.
+        if (LLPresetsManager::isProtectedLookName(held))
+        {
+            LLNotificationsUtil::add("LightBoxLookNeutralProtected");
+            return;
+        }
         name = held;
     }
 

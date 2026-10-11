@@ -95,7 +95,11 @@ namespace
             const auto taken = held.find(ALLookFormat::lookNameKey(candidate));
             if (taken == held.end())
             {
-                if (LLFile::isfile(LLPresetsManager::getPresetFilePath(PRESETS_LOOKS, candidate)))
+                // Nor is Neutral made from outside where the folder has
+                // lost it: the Lightbox falls back to it, and puts back the
+                // bundled one where there is none.
+                if (LLPresetsManager::isProtectedLookName(candidate) ||
+                    LLFile::isfile(LLPresetsManager::getPresetFilePath(PRESETS_LOOKS, candidate)))
                 {
                     continue;
                 }

@@ -60,6 +60,7 @@
 #include "llnotificationsutil.h"
 #include "llpanel.h"
 #include "llpresetsmanager.h"
+#include "llscrolllistitem.h"
 #include "llsdutil.h"
 #include "llsettingsvo.h"
 #include "llsliderctrl.h"
@@ -2306,7 +2307,36 @@ void ALFloaterLightBox::onClickLookSave()
         onClickLookSaveAs();
         return;
     }
+    if (LLPresetsManager::isProtectedLookName(name))
+    {
+        // Neutral is what deleting the Look in use falls back to, and has to
+        // stay neutral: changes made on top of it are a new Look.
+        LLNotificationsUtil::add("LightBoxLookNeutralProtected");
+        onClickLookSaveAs();
+        return;
+    }
     LLPresetsManager::getInstance()->savePreset(PRESETS_LOOKS, name);
+}
+
+// static
+void ALFloaterLightBox::putOnNeutralForDeletedLook(const std::string& deleted_name)
+{
+    LLPresetsManager& presets = LLPresetsManager::instance();
+    if (!presets.ensureNeutralLook())
+    {
+        return;
+    }
+    if (ALFloaterLightBox* lightbox = LLFloaterReg::findTypedInstance<ALFloaterLightBox>("lightbox"))
+    {
+        // A colour picker or the history up would be left holding what the
+        // settings were before Neutral.
+        lightbox->closePopover(false);
+        LLStringUtil::format_map_t label;
+        label["[NAME]"] = deleted_name;
+        lightbox->applyLookAsOneUndoStep(LOOK_NEUTRAL, lightbox->getString("history_look_deleted", label));
+        return;
+    }
+    presets.loadLooksPreset(LOOK_NEUTRAL);
 }
 
 void ALFloaterLightBox::onClickLookSaveAs()
@@ -2542,13 +2572,24 @@ void ALFloaterLightBox::refreshLooksBar()
         args["[NAME]"] = last;
         mLooksCombo->setLabel(getString("look_name_modified", args));
     }
+    else
+    {
+        // No Look in use. Filling the combo selected its first entry, which
+        // would name a Look the settings are not.
+        mLooksCombo->clear();
+        mLooksCombo->setLabel(getString("look_none"));
+    }
     if (mLookSave)
     {
         mLookSave->setEnabled(!active.empty() || !last.empty());
     }
     if (mLookDelete)
     {
-        mLookDelete->setEnabled(mLooksCombo->getItemCount() > 0);
+        // Any Look but Neutral, which is not offered for deleting.
+        const std::vector<LLScrollListItem*> items = mLooksCombo->getAllData();
+        mLookDelete->setEnabled(std::any_of(items.begin(), items.end(), [](const LLScrollListItem* item) {
+            return item && !LLPresetsManager::isProtectedLookName(item->getValue().asString());
+        }));
     }
     if (mLookRevert)
     {

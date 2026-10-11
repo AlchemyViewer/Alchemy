@@ -49,6 +49,14 @@
 	 name="history_look_import">
 		Imported Look: [NAME]
 	</floater.string>
+	<floater.string
+	 name="history_look_deleted">
+		Neutral, for deleted Look: [NAME]
+	</floater.string>
+	<floater.string
+	 name="look_none">
+		No Look
+	</floater.string>
 	<!-- A Look shared as a notecard: what the settings are called in it
 	     when they have moved since a Look was applied (the state the bar
 	     marks with a *) or no Look was ever applied, and what a notecard

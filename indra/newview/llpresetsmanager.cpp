@@ -779,6 +779,15 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
         return false;
     }
 
+    // Neutral is what the Lightbox falls back to, and has to stay neutral.
+    // The Lightbox and Save As say so before they get here; this is the
+    // backstop for anything that does not.
+    if (IS_LOOKS && isProtectedLookName(name))
+    {
+        LL_WARNS("Presets") << "Not saving over the Look '" << name << "', which is protected" << LL_ENDL;
+        return false;
+    }
+
     bool saved = false;
     std::vector<std::string> name_list;
 
@@ -1101,6 +1110,28 @@ bool LLPresetsManager::isReservedPresetName(const std::string& name)
     return upper == PRESETS_DEFAULT_UPPER || name == LLTrans::getString(PRESETS_DEFAULT);
 }
 
+// static
+bool LLPresetsManager::isProtectedLookName(const std::string& name)
+{
+    return ALLookFormat::lookNameKey(name) == ALLookFormat::lookNameKey(LOOK_NEUTRAL);
+}
+
+bool LLPresetsManager::ensureNeutralLook()
+{
+    if (LLFile::isfile(getPresetFilePath(PRESETS_LOOKS, LOOK_NEUTRAL)))
+    {
+        return true;
+    }
+    const std::string bundled = gDirUtilp->add(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, PRESETS_LOOKS), LOOK_NEUTRAL + ".xml");
+    if (!LLFile::copy(bundled, getPresetFilePath(PRESETS_LOOKS, LOOK_NEUTRAL)))
+    {
+        LL_WARNS("Presets") << "Could not put the bundled Look '" << LOOK_NEUTRAL << "' back from " << bundled << LL_ENDL;
+        return false;
+    }
+    LL_INFOS("Presets") << "Put the bundled Look '" << LOOK_NEUTRAL << "' back" << LL_ENDL;
+    return true;
+}
+
 bool LLPresetsManager::presetExists(const std::string& subdirectory, const std::string& name)
 {
     preset_name_list_t names;
@@ -1398,6 +1429,14 @@ bool LLPresetsManager::deletePreset(const std::string& subdirectory, std::string
         // This code should never execute
         LL_WARNS("Presets") << "You are not allowed to delete the default preset." << LL_ENDL;
         sts = false;
+    }
+
+    // Nor Neutral, which is what deleting the Look in use falls back to.
+    // The delete floater does not offer it; this is the backstop.
+    if (PRESETS_LOOKS == subdirectory && isProtectedLookName(name))
+    {
+        LL_WARNS("Presets") << "Not deleting the Look '" << name << "', which is protected" << LL_ENDL;
+        return false;
     }
 
     if (gDirUtilp->deleteFilesInDir(getPresetsDir(subdirectory), LLURI::escape(name) + ".xml") < 1)

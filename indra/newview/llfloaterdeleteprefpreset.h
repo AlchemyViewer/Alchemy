@@ -48,6 +48,9 @@ public:
 
 private:
     void onPresetsListChange();
+    // The presets that may be deleted, into the combo, and the Delete button
+    // enabled where there is one.
+    void fillPresetCombo();
 
     std::string mSubdirectory;
 };

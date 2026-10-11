@@ -1411,6 +1411,23 @@ the looks directory — anything `*.xml` in there is enumerated as a Look), so a
 Look bundled in a later release still reaches an existing user while one they
 deleted stays deleted. Nothing is ever copied over a file that already exists.
 
+With no Look in use (nothing active and nothing last applied) the combo is
+cleared to `look_none` rather than left on the first entry its filling selects,
+which would name a Look the settings are not.
+
+**Neutral is protected** (`LOOK_NEUTRAL`, `isProtectedLookName`). It is what the
+Lightbox falls back to when the Look in use — active or last applied — is
+deleted (`putOnNeutralForDeletedLook`, called by the delete floater), so that
+the settings do not stay the deleted Look's under a bar naming another. That
+apply is one undo step, and Ctrl+Z brings the deleted Look's settings back to be
+saved again. Neutral therefore may be neither saved over nor deleted: the bar's
+Save opens Save As with a note instead (`LightBoxLookNeutralProtected`), Save As
+refuses the name, the delete floater leaves it out, an import never makes a
+Look called Neutral, and `savePreset`/`deletePreset` refuse it as a backstop.
+Where the Looks folder has lost it all the same — deleted before it was
+protected — `ensureNeutralLook` copies the bundled one back before falling back
+to it, the one exception to "deleted stays deleted".
+
 ### 9b. Looks as notecards
 
 A Look is given to someone else as a notecard: an inventory item, handed over

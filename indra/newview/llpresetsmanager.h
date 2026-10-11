@@ -38,6 +38,10 @@ static const std::string PRESETS_DIR = "presets";
 static const std::string PRESETS_GRAPHIC = "graphic";
 static const std::string PRESETS_CAMERA = "camera";
 static const std::string PRESETS_LOOKS = "looks";
+/// The Look the Lightbox falls back to -- when the Look in use is deleted --
+/// and so the one Look that may be neither saved over nor deleted: it has to
+/// stay neutral. Bundled in app_settings/looks as "Neutral.xml".
+static const std::string LOOK_NEUTRAL = "Neutral";
 /// Which bundled Looks have already been copied into the user's directory, so a
 /// Look added in a later release still reaches an existing user while one they
 /// deleted stays deleted. Lives in the user settings root and NOT in the looks
@@ -102,6 +106,13 @@ public:
     /// in any case and as translated -- the rule the Save As dialog refuses
     /// by, and the one a Look from outside is held to.
     static bool isReservedPresetName(const std::string& name);
+    /// Whether a Look of that name may be neither saved over nor deleted:
+    /// LOOK_NEUTRAL, matched as ALLookFormat::lookNameKey matches names.
+    static bool isProtectedLookName(const std::string& name);
+    /// The bundled Neutral copied back into the Looks folder where there is
+    /// none there -- one deleted before it was protected, or never seeded.
+    /// False where there is none and it could not be copied.
+    bool ensureNeutralLook();
 
     /// What a Look's map says about one setting: nothing; a value that is
     /// refused (ALLookFormat::sanitizeLookValue, by the setting's own type,

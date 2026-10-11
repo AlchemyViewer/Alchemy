@@ -9778,6 +9778,13 @@ Can not overwrite default preset.
 
   <notification
     icon="notifytip.tga"
+    name="LightBoxLookNeutralProtected"
+    type="notifytip">
+Neutral can&apos;t be saved over: it is what the Lightbox goes back to when the Look in use is deleted. Save your changes as a new Look instead.
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
     name="LightBoxLookNameRefused"
     type="notifytip">
 That name cannot be used for a Look. A Look needs a name with something visible in it besides dots and spaces, and Windows keeps names such as CON, NUL and COM1 for devices.
