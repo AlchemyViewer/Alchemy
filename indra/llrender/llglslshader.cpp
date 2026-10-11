@@ -731,6 +731,12 @@ void LLGLSLShader::unloadInternal()
         mSamplesQuery = 0;
     }
 
+    if (mPrimitivesQuery)
+    {
+        glDeleteQueries(1, &mPrimitivesQuery);
+        mPrimitivesQuery = 0;
+    }
+
     stop_glerror();
 }
 
