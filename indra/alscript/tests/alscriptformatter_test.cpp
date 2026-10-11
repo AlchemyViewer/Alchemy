@@ -429,4 +429,30 @@ namespace tut
                       std::string("default { state_entry() { integer x = -(a); vector v = <-1, 0, 0>; if (i < -1) x = !(b); } }\n"));
         ensure_equals("a list of vectors", lsl("list l = [<-1, 0, 0>, < -2, 0, 0 >];\n"), std::string("list l = [<-1, 0, 0>, <-2, 0, 0>];\n"));
     }
+
+    template<> template<>
+    void alscriptformatter_object::test<15>()
+    {
+        set_test_name("a comment the author wrote out of the block over an elseif, else, until or end stays as far in as that line; one "
+                      "written in the block stays in it; in an empty block, as written where the text is indented; flat text, in");
+        const std::string chain = "if a then\n"
+                                  "    x()\n"
+                                  "-- about b\n"
+                                  "elseif b then\n"
+                                  "    y()\n"
+                                  "    -- the end of y\n"
+                                  "else\n"
+                                  "    z()\n"
+                                  "end\n";
+        ensure_equals("as written", lua(chain), chain);
+        const std::string repeat = "local function f()\n"
+                                   "    repeat\n"
+                                   "    -- why\n"
+                                   "    until x\n"
+                                   "end\n";
+        ensure_equals("an empty block, indented", lua(repeat), repeat);
+        ensure_equals("flat", lua("if a then\nx()\n-- note\nend\n"), std::string("if a then\n    x()\n    -- note\nend\n"));
+        ensure_equals("LSL", lsl("default\n{\n    touch_start(integer n)\n    {\n        x();\n    // about the end\n    }\n}\n"),
+                      std::string("default\n{\n    touch_start(integer n)\n    {\n        x();\n    // about the end\n    }\n}\n"));
+    }
 }

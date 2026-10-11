@@ -954,6 +954,90 @@ namespace
         return out;
     }
 
+    // How far in the author wrote a line, tabs to their stops.
+    S32 writtenIndent(const Line& line, S32 tab)
+    {
+        S32 column = 0;
+        if (!line.tokens.empty() && line.tokens.front().kind == Kind::Space)
+        {
+            for (const char c : line.tokens.front().text)
+            {
+                column = c == '\t' ? (column / tab + 1) * tab : column + 1;
+            }
+        }
+        return column;
+    }
+
+    // Whether a line holds a comment and nothing else.
+    bool commentOnly(const Line& line)
+    {
+        bool comment = false;
+        for (const Token& t : line.tokens)
+        {
+            if (t.kind == Kind::Comment)
+            {
+                comment = true;
+            }
+            else if (t.kind != Kind::Space)
+            {
+                return false;
+            }
+        }
+        return comment && !line.directive && line.first == line.last;
+    }
+
+    // A comment over a line that goes back out -- `elseif`, `else`,
+    // `until`, `end`, `}` -- is about that line where the author wrote it
+    // out of the block: no further in than that line, and less far than
+    // the code over it in the block, or, in a block with none, in text
+    // the author indented. It goes in as far as the line. One written as
+    // far in as the block, or in text with no indentation to tell, is the
+    // end of the block, and stays in it.
+    void overWhatFollows(std::vector<Line>& lines, const ALScriptFormatter::Options& options)
+    {
+        const S32  tab      = options.indent > 0 ? options.indent : 4;
+        const auto code     = [&](const Line& line) { return !line.blank && !line.directive && !commentOnly(line); };
+        const bool indented = std::any_of(lines.begin(), lines.end(),
+                                          [&](const Line& line) { return code(line) && line.indent > 0 && writtenIndent(line, tab) > 0; });
+        for (size_t i = 1; i < lines.size(); ++i)
+        {
+            const Line& next = lines[i];
+            if (!code(next))
+            {
+                continue;
+            }
+            size_t top = i;
+            while (top > 0 && commentOnly(lines[top - 1]))
+            {
+                --top;
+            }
+            if (top == i)
+            {
+                continue;
+            }
+            size_t over = top;
+            while (over > 0 && !code(lines[over - 1]))
+            {
+                --over;
+            }
+            if (over == 0)
+            {
+                continue;
+            }
+            // The code over them, in the block or the line that opens it.
+            const Line& above   = lines[over - 1];
+            const S32   written = writtenIndent(next, tab);
+            const auto  out     = [&](const Line& comment) {
+                const S32 at = writtenIndent(comment, tab);
+                return at <= written && (above.indent < comment.indent ? indented : at < writtenIndent(above, tab));
+            };
+            for (size_t j = i; j > top && lines[j - 1].indent > next.indent && out(lines[j - 1]); --j)
+            {
+                lines[j - 1].indent = next.indent;
+            }
+        }
+    }
+
     // Each line as written out, or none for a blank line past a run's
     // length where the whole text is asked for; past the width broken
     // where `wrap`.
@@ -1069,6 +1153,7 @@ std::string ALScriptFormatter::format(std::string_view text, const Options& opti
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);
+    overWhatFollows(lines, options);
     return emit(lines, options, endsWithNewline, -1, -1, true);
 }
 
@@ -1079,6 +1164,7 @@ std::string ALScriptFormatter::formatLines(std::string_view text, const Options&
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);
+    overWhatFollows(lines, options);
     return emit(lines, options, endsWithNewline, first, last, false);
 }
 
@@ -1089,6 +1175,7 @@ std::vector<std::string> ALScriptFormatter::formatEach(std::string_view text, co
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);
+    overWhatFollows(lines, options);
     // Every line kept, blank or not: from the first where `first` is
     // below it, which would otherwise ask for the whole text's runs.
     const std::vector<std::optional<std::string>> each = writtenLines(lines, options, llmax(first, 0), last, true);
