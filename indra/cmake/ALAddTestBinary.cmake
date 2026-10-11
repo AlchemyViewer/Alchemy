@@ -202,9 +202,15 @@ function(al_add_test_binary name)
     if(arg_RESOURCE_LOCK)
       string(APPEND case_properties " RESOURCE_LOCK [==[${arg_RESOURCE_LOCK}]==]")
     endif()
+    # The list holds each name as Catch2 escaped it for a list: [ and ] as
+    # the bytes 2 and 3. The test is registered under the name itself.
     file(
       WRITE "${case_script}"
+      "string(ASCII 2 open)\n"
+      "string(ASCII 3 close)\n"
       "foreach(case IN LISTS ${target}_cases)\n"
+      "  string(REPLACE \"\${open}\" \"[\" case \"\${case}\")\n"
+      "  string(REPLACE \"\${close}\" \"]\" case \"\${case}\")\n"
       "  set_tests_properties(\"\${case}\" PROPERTIES ${case_properties})\n"
       "endforeach()\n"
     )
