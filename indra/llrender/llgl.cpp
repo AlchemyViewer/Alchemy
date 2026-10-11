@@ -99,11 +99,12 @@ namespace
     struct ProgramSampler
     {
         std::string mName;
-        GLenum      mType     = 0;
-        GLint       mUnit     = -1;
-        GLenum      mTarget   = 0;
-        GLenum      mBinding  = 0;
-        bool        mIsShadow = false;
+        GLenum      mType      = 0;
+        GLint       mUnit      = -1;
+        GLenum      mTarget    = 0;
+        GLenum      mBinding   = 0;
+        bool        mIsShadow  = false;
+        bool        mIsInteger = false;
     };
 
     struct ProgramSamplerCache
@@ -116,35 +117,83 @@ namespace
 
     std::map<GLuint, ProgramSamplerCache> sProgramSamplerCache;
 
-    bool sampler_target_for_type(GLenum type, GLenum& target, GLenum& binding, bool& is_shadow)
+    // Every sampler type GL has, as mapUniformTextureChannel gives each a unit: the texture target it reads, the binding
+    // naming the texture bound there, whether it compares, and whether it returns integers.
+    struct SamplerType
     {
-        switch (type)
+        GLenum mType;
+        GLenum mTarget;
+        GLenum mBinding;
+        bool   mIsShadow;
+        bool   mIsInteger;
+    };
+
+    constexpr SamplerType sSamplerTypes[] =
+    {
+        { GL_SAMPLER_1D,                                   GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   false, false },
+        { GL_SAMPLER_1D_SHADOW,                            GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   true,  false },
+        { GL_INT_SAMPLER_1D,                               GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_1D,                      GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   false, true  },
+        { GL_SAMPLER_2D,                                   GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   false, false },
+        { GL_SAMPLER_2D_SHADOW,                            GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   true,  false },
+        { GL_INT_SAMPLER_2D,                               GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D,                      GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   false, true  },
+        { GL_SAMPLER_3D,                                   GL_TEXTURE_3D,                   GL_TEXTURE_BINDING_3D,                   false, false },
+        { GL_INT_SAMPLER_3D,                               GL_TEXTURE_3D,                   GL_TEXTURE_BINDING_3D,                   false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_3D,                      GL_TEXTURE_3D,                   GL_TEXTURE_BINDING_3D,                   false, true  },
+        { GL_SAMPLER_CUBE,                                 GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             false, false },
+        { GL_SAMPLER_CUBE_SHADOW,                          GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             true,  false },
+        { GL_INT_SAMPLER_CUBE,                             GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_CUBE,                    GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             false, true  },
+        { GL_SAMPLER_1D_ARRAY,                             GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             false, false },
+        { GL_SAMPLER_1D_ARRAY_SHADOW,                      GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             true,  false },
+        { GL_INT_SAMPLER_1D_ARRAY,                         GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_1D_ARRAY,                GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             false, true  },
+        { GL_SAMPLER_2D_ARRAY,                             GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             false, false },
+        { GL_SAMPLER_2D_ARRAY_SHADOW,                      GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             true,  false },
+        { GL_INT_SAMPLER_2D_ARRAY,                         GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D_ARRAY,                GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             false, true  },
+        { GL_SAMPLER_CUBE_MAP_ARRAY,                       GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       false, false },
+        { GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW,                GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       true,  false },
+        { GL_INT_SAMPLER_CUBE_MAP_ARRAY,                   GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY,          GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       false, true  },
+        { GL_SAMPLER_2D_RECT,                              GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            false, false },
+        { GL_SAMPLER_2D_RECT_SHADOW,                       GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            true,  false },
+        { GL_INT_SAMPLER_2D_RECT,                          GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D_RECT,                 GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            false, true  },
+        { GL_SAMPLER_2D_MULTISAMPLE,                       GL_TEXTURE_2D_MULTISAMPLE,       GL_TEXTURE_BINDING_2D_MULTISAMPLE,       false, false },
+        { GL_INT_SAMPLER_2D_MULTISAMPLE,                   GL_TEXTURE_2D_MULTISAMPLE,       GL_TEXTURE_BINDING_2D_MULTISAMPLE,       false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE,          GL_TEXTURE_2D_MULTISAMPLE,       GL_TEXTURE_BINDING_2D_MULTISAMPLE,       false, true  },
+        { GL_SAMPLER_2D_MULTISAMPLE_ARRAY,                 GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY, false, false },
+        { GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY,             GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY, false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY,    GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY, false, true  },
+        { GL_SAMPLER_BUFFER,                               GL_TEXTURE_BUFFER,               GL_TEXTURE_BINDING_BUFFER,               false, false },
+        { GL_INT_SAMPLER_BUFFER,                           GL_TEXTURE_BUFFER,               GL_TEXTURE_BINDING_BUFFER,               false, true  },
+        { GL_UNSIGNED_INT_SAMPLER_BUFFER,                  GL_TEXTURE_BUFFER,               GL_TEXTURE_BINDING_BUFFER,               false, true  },
+    };
+
+    bool sampler_target_for_type(GLenum type, GLenum& target, GLenum& binding, bool& is_shadow, bool& is_integer)
+    {
+        for (const SamplerType& entry : sSamplerTypes)
         {
-            case GL_SAMPLER_2D:
-            case GL_INT_SAMPLER_2D:
-            case GL_UNSIGNED_INT_SAMPLER_2D:
-                target = GL_TEXTURE_2D;             binding = GL_TEXTURE_BINDING_2D;             is_shadow = false; return true;
-            case GL_SAMPLER_2D_SHADOW:
-                target = GL_TEXTURE_2D;             binding = GL_TEXTURE_BINDING_2D;             is_shadow = true;  return true;
-            case GL_SAMPLER_3D:
-                target = GL_TEXTURE_3D;             binding = GL_TEXTURE_BINDING_3D;             is_shadow = false; return true;
-            case GL_SAMPLER_CUBE:
-                target = GL_TEXTURE_CUBE_MAP;       binding = GL_TEXTURE_BINDING_CUBE_MAP;       is_shadow = false; return true;
-            case GL_SAMPLER_CUBE_SHADOW:
-                target = GL_TEXTURE_CUBE_MAP;       binding = GL_TEXTURE_BINDING_CUBE_MAP;       is_shadow = true;  return true;
-            case GL_SAMPLER_CUBE_MAP_ARRAY:
-                target = GL_TEXTURE_CUBE_MAP_ARRAY; binding = GL_TEXTURE_BINDING_CUBE_MAP_ARRAY; is_shadow = false; return true;
-            case GL_SAMPLER_2D_ARRAY:
-                target = GL_TEXTURE_2D_ARRAY;       binding = GL_TEXTURE_BINDING_2D_ARRAY;       is_shadow = false; return true;
-            case GL_SAMPLER_2D_ARRAY_SHADOW:
-                target = GL_TEXTURE_2D_ARRAY;       binding = GL_TEXTURE_BINDING_2D_ARRAY;       is_shadow = true;  return true;
-            case GL_SAMPLER_2D_RECT:
-                target = GL_TEXTURE_RECTANGLE;      binding = GL_TEXTURE_BINDING_RECTANGLE;      is_shadow = false; return true;
-            case GL_SAMPLER_2D_MULTISAMPLE:
-                target = GL_TEXTURE_2D_MULTISAMPLE; binding = GL_TEXTURE_BINDING_2D_MULTISAMPLE; is_shadow = false; return true;
-            default:
-                return false;
+            if (entry.mType == type)
+            {
+                target     = entry.mTarget;
+                binding    = entry.mBinding;
+                is_shadow  = entry.mIsShadow;
+                is_integer = entry.mIsInteger;
+                return true;
+            }
         }
+        return false;
+    }
+
+    // Sampler state means nothing to a buffer texture, which has none, or to a multisample one, read only by
+    // texelFetch; nor does a buffer texture have the levels the format query asks about.
+    bool target_has_sampler_state(GLenum target)
+    {
+        return target != GL_TEXTURE_BUFFER && target != GL_TEXTURE_2D_MULTISAMPLE
+            && target != GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
     }
 
     // Re-entrancy latch for gl_debug_callback; see the guard there for why.
@@ -217,7 +266,7 @@ namespace
             }
 
             ProgramSampler sampler;
-            if (!sampler_target_for_type(type, sampler.mTarget, sampler.mBinding, sampler.mIsShadow))
+            if (!sampler_target_for_type(type, sampler.mTarget, sampler.mBinding, sampler.mIsShadow, sampler.mIsInteger))
             {
                 continue;
             }
@@ -291,12 +340,17 @@ static void log_texture_unit_state()
 
     static const struct { GLenum mTarget; GLenum mBinding; const char* mName; } targets[] =
     {
-        { GL_TEXTURE_2D,               GL_TEXTURE_BINDING_2D,               "2D"         },
-        { GL_TEXTURE_3D,               GL_TEXTURE_BINDING_3D,               "3D"         },
-        { GL_TEXTURE_CUBE_MAP,         GL_TEXTURE_BINDING_CUBE_MAP,         "CUBE"       },
-        { GL_TEXTURE_CUBE_MAP_ARRAY,   GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,   "CUBE_ARRAY" },
-        { GL_TEXTURE_RECTANGLE,        GL_TEXTURE_BINDING_RECTANGLE,        "RECT"       },
-        { GL_TEXTURE_2D_MULTISAMPLE,   GL_TEXTURE_BINDING_2D_MULTISAMPLE,   "2D_MS"      },
+        { GL_TEXTURE_1D,                   GL_TEXTURE_BINDING_1D,                   "1D"          },
+        { GL_TEXTURE_1D_ARRAY,             GL_TEXTURE_BINDING_1D_ARRAY,             "1D_ARRAY"    },
+        { GL_TEXTURE_2D,                   GL_TEXTURE_BINDING_2D,                   "2D"          },
+        { GL_TEXTURE_2D_ARRAY,             GL_TEXTURE_BINDING_2D_ARRAY,             "2D_ARRAY"    },
+        { GL_TEXTURE_3D,                   GL_TEXTURE_BINDING_3D,                   "3D"          },
+        { GL_TEXTURE_CUBE_MAP,             GL_TEXTURE_BINDING_CUBE_MAP,             "CUBE"        },
+        { GL_TEXTURE_CUBE_MAP_ARRAY,       GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,       "CUBE_ARRAY"  },
+        { GL_TEXTURE_RECTANGLE,            GL_TEXTURE_BINDING_RECTANGLE,            "RECT"        },
+        { GL_TEXTURE_2D_MULTISAMPLE,       GL_TEXTURE_BINDING_2D_MULTISAMPLE,       "2D_MS"       },
+        { GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY, "2D_MS_ARRAY" },
+        { GL_TEXTURE_BUFFER,               GL_TEXTURE_BINDING_BUFFER,               "BUFFER"      },
     };
 
     LL_WARNS() << "Texture units:" << LL_ENDL;
@@ -321,7 +375,7 @@ static void log_texture_unit_state()
             // a bound sampler wins, so print both -- disagreement is the usual culprit.
             GLint internal_format = 0;
             GLint tex_compare     = GL_NONE;
-            if (target.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
+            if (target_has_sampler_state(target.mTarget))
             {
                 glGetTexLevelParameteriv(level_query_target(target.mTarget), 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
                 glGetTexParameteriv(target.mTarget, GL_TEXTURE_COMPARE_MODE, &tex_compare);
@@ -440,6 +494,12 @@ bool validate_bound_samplers()
             continue;
         }
 
+        // Nothing below applies to a texture with no sampler state, which reads as it is whatever is bound.
+        if (!target_has_sampler_state(sampler.mTarget))
+        {
+            continue;
+        }
+
         // A bound sampler object overrides the texture's own compare state, so it decides.
         GLint bound_sampler = 0;
         glGetIntegerv(GL_SAMPLER_BINDING, &bound_sampler);
@@ -449,16 +509,13 @@ bool validate_bound_samplers()
         {
             glGetSamplerParameteriv((GLuint)bound_sampler, GL_TEXTURE_COMPARE_MODE, &compare_mode);
         }
-        else if (sampler.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
+        else
         {
             glGetTexParameteriv(sampler.mTarget, GL_TEXTURE_COMPARE_MODE, &compare_mode);
         }
 
         GLint internal_format = 0;
-        if (sampler.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
-        {
-            glGetTexLevelParameteriv(level_query_target(sampler.mTarget), 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
-        }
+        glGetTexLevelParameteriv(level_query_target(sampler.mTarget), 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
         const bool is_depth = is_depth_format(internal_format);
 
         // The two pairings GL calls undefined, in both directions.

@@ -376,6 +376,8 @@ public:
     bool hasUniform(U32 index) const;
 
     GLint getAttribLocation(U32 attrib);
+    // The texture unit a sampler uniform gets -- any of GL's sampler types, float, int or unsigned -- the next free
+    // one, an array taking consecutive units; -1 for any other type.
     GLint mapUniformTextureChannel(GLint location, GLenum type, GLint size);
 
     void clearPermutations();

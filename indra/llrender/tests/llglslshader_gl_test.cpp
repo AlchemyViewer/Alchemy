@@ -1,8 +1,9 @@
 /**
  * @file llglslshader_gl_test.cpp
  * @brief LLGLSLShader on the hidden window. Its uniform value cache: what a program holds, read back from GL, after
- *        each kind of set, across a relink, and where two setters write one location. And who owns a shader object:
- *        a program its own, deleted once it links, the manager the shared ones.
+ *        each kind of set, across a relink, and where two setters write one location. The units every kind of
+ *        sampler gets. And who owns a shader object: a program its own, deleted once it links, the manager the shared
+ *        ones.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -87,6 +88,26 @@ namespace tut
 
         // ---- Programs built through the shader manager ------------------------------------------------------------
 
+        // Reserved uniform names only the tests use, appended past the product's, in this order: the samplers take
+        // their units in it.
+        enum ETestReserved : S32
+        {
+            TEST_SAMPLERS = LLShaderMgr::END_RESERVED_UNIFORMS,
+            TEST_SOURCE_MAP,
+            TEST_UINT_MAP,
+            TEST_INT_MAP,
+            TEST_RESERVED_END
+        };
+
+        const char* const kTestReservedNames[] =
+        {
+            "testSamplers",
+            "testSourceMap",
+            "testUintMap",
+            "testIntMap",
+        };
+        static_assert(std::size(kTestReservedNames) == TEST_RESERVED_END - TEST_SAMPLERS, "one name per test entry");
+
         // The shared objects every graphics program attaches, as the viewer's would be, each a function nothing
         // calls.
         const std::pair<const char*, GLenum> kStubObjects[] =
@@ -118,6 +139,23 @@ namespace tut
               "void main()\n"
               "{\n"
               "    frag_color = vec4(1.0);\n"
+              "}\n" },
+
+            // A sampler of each kind under a reserved name: an array of two, an array texture, an unsigned one and an
+            // integer buffer, each read so it stays active.
+            { "test/samplerTypesF.glsl",
+              "uniform sampler2D testSamplers[2];\n"
+              "uniform sampler2DArray testSourceMap;\n"
+              "uniform usampler2D testUintMap;\n"
+              "uniform isamplerBuffer testIntMap;\n"
+              "out vec4 frag_color;\n"
+              "void main()\n"
+              "{\n"
+              "    vec4 sum = texture(testSamplers[0], vec2(0.5)) + texture(testSamplers[1], vec2(0.5));\n"
+              "    sum += texture(testSourceMap, vec3(0.5, 0.5, 0.0));\n"
+              "    sum += vec4(texelFetch(testUintMap, ivec2(0), 0));\n"
+              "    sum += vec4(texelFetch(testIntMap, 0));\n"
+              "    frag_color = sum;\n"
               "}\n" },
 
             // A call into the stub deferred/globalF.glsl defines, which links only with that object attached.
@@ -212,9 +250,16 @@ namespace tut
             mShaders.clearShaderObjects();
         }
 
-        // The shared objects compiled, as the viewer has them before it builds a program.
+        // The test's names in the reserved list and the shared objects compiled, as the viewer has them before it
+        // builds a program.
         void setUpShaders()
         {
+            ensure_equals("the test's names follow the product's", mShaders.mReservedUniforms.size(),
+                          size_t(LLShaderMgr::END_RESERVED_UNIFORMS));
+            for (const char* name : kTestReservedNames)
+            {
+                mShaders.mReservedUniforms.push_back(name);
+            }
             for (const auto& object : kStubObjects)
             {
                 S32 level = 1;
@@ -699,6 +744,29 @@ namespace tut
         ensure("and one programs linked with", glIsShader(shared) == GL_FALSE);
         ensure_equals("none counted live", LLShaderMgr::sLiveObjects, live + 1 - (U32)held);
         ensureDraws("C still draws", mDraw3);
+        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+    }
+
+    // Every kind of sampler takes a texture unit, in reserved order, an array included under its bare name though GL
+    // names it by its first element: the two-element array first, then the array texture, the unsigned sampler and
+    // the integer buffer.
+    template<> template<>
+    void llglslshader_object_t::test<26>()
+    {
+        setUpShaders();
+        ensure("sampler types build",
+               buildProgram(mDraw, "sampler types (test)",
+                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/samplerTypesF.glsl", GL_FRAGMENT_SHADER } }));
+        ensure_equals("the array first", mDraw.getTextureChannel(TEST_SAMPLERS), 0);
+        ensure_equals("the array texture after its two units", mDraw.getTextureChannel(TEST_SOURCE_MAP), 2);
+        ensure_equals("the unsigned sampler next", mDraw.getTextureChannel(TEST_UINT_MAP), 3);
+        ensure_equals("the integer buffer last", mDraw.getTextureChannel(TEST_INT_MAP), 4);
+
+        GLint units[2] = { -1, -1 };
+        glGetUniformiv(mDraw.mProgramObject, glGetUniformLocation(mDraw.mProgramObject, "testSamplers[1]"), &units[1]);
+        glGetUniformiv(mDraw.mProgramObject, glGetUniformLocation(mDraw.mProgramObject, "testSamplers[0]"), &units[0]);
+        ensure_equals("the array's first element at its unit", units[0], 0);
+        ensure_equals("its second at the next", units[1], 1);
         ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
     }
 }

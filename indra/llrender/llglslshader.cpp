@@ -39,6 +39,7 @@
 #include "llsdserialize.h"
 
 #include <bit>
+#include <string_view>
 
 #if LL_DARWIN
 #include "OpenGL/OpenGL.h"
@@ -101,6 +102,57 @@ namespace
     inline U32 uniform_bits(GLint v)   { return std::bit_cast<U32>(v); }
     inline U32 uniform_bits(GLuint v)  { return v; }
     inline U32 uniform_bits(GLfloat v) { return std::bit_cast<U32>(v); }
+
+    // Every sampler type GL has: the float ones, shadow included, and the int and unsigned forms of each dimension.
+    bool is_sampler_type(GLenum type)
+    {
+        switch (type)
+        {
+        case GL_SAMPLER_1D:
+        case GL_SAMPLER_2D:
+        case GL_SAMPLER_3D:
+        case GL_SAMPLER_CUBE:
+        case GL_SAMPLER_1D_SHADOW:
+        case GL_SAMPLER_2D_SHADOW:
+        case GL_SAMPLER_1D_ARRAY:
+        case GL_SAMPLER_2D_ARRAY:
+        case GL_SAMPLER_1D_ARRAY_SHADOW:
+        case GL_SAMPLER_2D_ARRAY_SHADOW:
+        case GL_SAMPLER_2D_MULTISAMPLE:
+        case GL_SAMPLER_2D_MULTISAMPLE_ARRAY:
+        case GL_SAMPLER_CUBE_SHADOW:
+        case GL_SAMPLER_BUFFER:
+        case GL_SAMPLER_2D_RECT:
+        case GL_SAMPLER_2D_RECT_SHADOW:
+        case GL_SAMPLER_CUBE_MAP_ARRAY:
+        case GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW:
+        case GL_INT_SAMPLER_1D:
+        case GL_INT_SAMPLER_2D:
+        case GL_INT_SAMPLER_3D:
+        case GL_INT_SAMPLER_CUBE:
+        case GL_INT_SAMPLER_1D_ARRAY:
+        case GL_INT_SAMPLER_2D_ARRAY:
+        case GL_INT_SAMPLER_2D_MULTISAMPLE:
+        case GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY:
+        case GL_INT_SAMPLER_BUFFER:
+        case GL_INT_SAMPLER_2D_RECT:
+        case GL_INT_SAMPLER_CUBE_MAP_ARRAY:
+        case GL_UNSIGNED_INT_SAMPLER_1D:
+        case GL_UNSIGNED_INT_SAMPLER_2D:
+        case GL_UNSIGNED_INT_SAMPLER_3D:
+        case GL_UNSIGNED_INT_SAMPLER_CUBE:
+        case GL_UNSIGNED_INT_SAMPLER_1D_ARRAY:
+        case GL_UNSIGNED_INT_SAMPLER_2D_ARRAY:
+        case GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE:
+        case GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY:
+        case GL_UNSIGNED_INT_SAMPLER_BUFFER:
+        case GL_UNSIGNED_INT_SAMPLER_2D_RECT:
+        case GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY:
+            return true;
+        default:
+            return false;
+        }
+    }
 }
 
 #if !LL_RELEASE_FOR_DOWNLOAD
@@ -1164,9 +1216,7 @@ GLint LLGLSLShader::mapUniformTextureChannel(GLint location, GLenum type, GLint 
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
-    if ((type >= GL_SAMPLER_1D && type <= GL_SAMPLER_2D_RECT_SHADOW) ||
-        type == GL_SAMPLER_2D_MULTISAMPLE ||
-        type == GL_SAMPLER_CUBE_MAP_ARRAY)
+    if (is_sampler_type(type))
     {   //this here is a texture
         GLint ret = mActiveTextureChannels;
         if (size == 1)
@@ -1221,10 +1271,11 @@ bool LLGLSLShader::mapUniforms()
     // mapUniformTextureChannel / mActiveTextureChannels), and the engine is
     // sensitive to that order -- e.g. "diffuseMap" must win channel 0 so the
     // texture matrix is applied to the right unit. The GLSL compiler does not
-    // guarantee any particular ordering of glGetActiveUniform() indices, so we
-    // The analytic font glyph buffer (isamplerBuffer) is now an auto-channeled
-    // diffuseMap still wins texture channel 0 if the compiler orders the buffer
-    // sampler first (it is declared earlier, in the injected lib).
+    // guarantee any particular ordering of glGetActiveUniform() indices, so the
+    // uniforms are sorted by texunit_priority before any is mapped, whatever
+    // order the source declares them in and whatever kind of sampler each is
+    // (float, int, unsigned, shadow, array, buffer):
+    //   [0, mIndexedTextureChannels)   -> tex0..texN, by index
     //   [mIndexedTextureChannels, ...) -> reserved uniforms, in mReservedUniforms order
     //   UINT_MAX                       -> everything else (order irrelevant; non-samplers)
     const auto& reservedUniforms = LLShaderMgr::instance()->mReservedUniforms;
@@ -1254,8 +1305,14 @@ bool LLGLSLShader::mapUniforms()
         // with indexed textures (they share texture channel 0).
         has_diffuse |= gl_uniform.name == "diffuseMap";
 
-        // Reserved uniforms keep their relative order, offset past the indexed range.
-        auto it = std::find(reservedUniforms.cbegin(), reservedUniforms.cend(), gl_uniform.name);
+        // Reserved uniforms keep their relative order, offset past the indexed range. GL names an array by its first
+        // element, and the table names it bare, as mapUniform matches it.
+        std::string_view bare = gl_uniform.name;
+        if (bare.ends_with("[0]"))
+        {
+            bare.remove_suffix(3);
+        }
+        auto it = std::find(reservedUniforms.cbegin(), reservedUniforms.cend(), bare);
         if (it != reservedUniforms.cend())
         {
             gl_uniform.texunit_priority = max_index + (U32)std::distance(reservedUniforms.cbegin(), it);
