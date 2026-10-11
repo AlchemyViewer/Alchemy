@@ -55,13 +55,14 @@ namespace
 
 TEST_CASE("WithinBits holds to the bits asked for, and no further", "[altestsupport]")
 {
-    // 2^-20 apart: equal to 16 bits of the fraction, not to 24.
+    // 2^-20 apart: equal to 16 bits of the fraction, not to 24. (Not "near":
+    // windows.h defines that, and far, as nothing.)
     const F32 one = 1.f;
-    const F32 near = 1.f + 1.f / (1 << 20);
-    CHECK_THAT(near, ll_test::WithinBits(one, 16));
-    CHECK_FALSE(ll_test::WithinBits(one, 24).match(near));
+    const F32 just_off = 1.f + 1.f / (1 << 20);
+    CHECK_THAT(just_off, ll_test::WithinBits(one, 16));
+    CHECK_FALSE(ll_test::WithinBits(one, 24).match(just_off));
     CHECK_FALSE(ll_test::WithinBits(one, 16).match(1.01f));
-    CHECK_THAT(F64(near), ll_test::WithinBits(F64(one), 16));
+    CHECK_THAT(F64(just_off), ll_test::WithinBits(F64(one), 16));
 }
 
 TEST_CASE("LLSDEquals compares all the way down and says where two differ", "[altestsupport]")
