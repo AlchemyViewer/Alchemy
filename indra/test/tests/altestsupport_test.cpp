@@ -65,6 +65,15 @@ TEST_CASE("WithinBits holds to the bits asked for, and no further", "[altestsupp
     CHECK_THAT(F64(just_off), ll_test::WithinBits(F64(one), 16));
 }
 
+TEST_CASE("WithinDistance holds strictly inside the distance, as ensure_distance did", "[altestsupport]")
+{
+    CHECK_THAT(11, ll_test::WithinDistance(12, 2));
+    CHECK_FALSE(ll_test::WithinDistance(12, 2).match(10));
+    CHECK_FALSE(ll_test::WithinDistance(12, 2).match(14));
+    CHECK_THAT(0.5, ll_test::WithinDistance(1.0, 0.75));
+    CHECK_FALSE(ll_test::WithinDistance(1.0, 0.5).match(0.5));
+}
+
 TEST_CASE("LLSDEquals compares all the way down and says where two differ", "[altestsupport]")
 {
     CHECK_THAT(nested(1.5), ll_test::LLSDEquals(nested(1.5)));

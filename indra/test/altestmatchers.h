@@ -29,6 +29,7 @@
 #include "llmath.h"
 #include "llsd.h"
 
+#include <catch2/catch_tostring.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
 
 #include <cstddef>
@@ -74,6 +75,42 @@ namespace ll_test
     inline WithinBitsMatcher<F64> WithinBits(F64 expected, U32 frac_bits)
     {
         return WithinBitsMatcher<F64>(expected, frac_bits);
+    }
+
+    // ensure_distance: strictly less than distance from expected, worked in
+    // T as TUT worked it, so a value on the border fails, where Catch2's
+    // WithinAbs, worked in double, would pass it.
+    template <typename T>
+    class WithinDistanceMatcher : public Catch::Matchers::MatcherBase<T>
+    {
+    public:
+        WithinDistanceMatcher(T expected, T distance)
+            : mExpected(expected), mDistance(distance)
+        {
+        }
+
+        bool match(const T& actual) const override
+        {
+            return mExpected - mDistance < actual && actual < mExpected + mDistance;
+        }
+
+        std::string describe() const override
+        {
+            std::ostringstream out;
+            out << "is strictly between " << Catch::Detail::stringify(T(mExpected - mDistance)) << " and "
+                << Catch::Detail::stringify(T(mExpected + mDistance));
+            return out.str();
+        }
+
+    private:
+        T mExpected;
+        T mDistance;
+    };
+
+    template <typename T>
+    WithinDistanceMatcher<T> WithinDistance(T expected, T distance)
+    {
+        return WithinDistanceMatcher<T>(expected, distance);
     }
 
     // ensure_equals on LLSD: the same type, and the same value all the way
