@@ -35,6 +35,11 @@ Parity holds for a file when:
     hand past what the converter wrote, --recounted lists the counts
     instead of holding them to the mapping; names and results must still
     agree, and a case whose TUT test asserted anything must still assert;
+  - the assertions outside every case (helpers, fixtures) number what the
+    mapping's record of the file says those outside every TUT test became
+    (catch2_outside_expected); under --recounted, listed, but none where
+    TUT had some is still a problem. A mapping in its first form, a bare
+    list of tests, has no file records: that is listed;
   - every assertion counted in a passing case's body ran: the run keeps its
     passing assertions (-s), and each CHECK, REQUIRE and _THAT site must
     report from at least one line it spans. A FAIL or SKIP that ran would
@@ -356,9 +361,18 @@ def unescape(body):
     return "".join(out)
 
 
-def check(args):
-    with open(args.mapping) as f:
+def read_mapping(path):
+    """tut2catch.py's mapping: its tests, and its records of the files by path
+    -- None for a mapping in the first form it took, a bare list of tests."""
+    with open(path) as f:
         mapping = json.load(f)
+    if isinstance(mapping, list):
+        return mapping, None
+    return mapping["tests"], {record["file"]: record for record in mapping.get("files", [])}
+
+
+def check(args):
+    mapping, file_records = read_mapping(args.mapping)
     with open(args.tut) as f:
         tut = json.load(f)
     tests = ctest_tests(args.build_dir, args.config)
@@ -421,11 +435,27 @@ def check(args):
             for first, last, macro in body["sites"] if body else []:
                 if macro not in REPORTING_ONLY and not any(first <= n <= last for n in ran):
                     problems.append(f"{path}: {case['name']!r} passed without running the {macro} on line {first}")
-        never = [f"the {macro} on line {first}, outside every case, never ran"
+        # Listed for the file, apart from the tests listed.
+        notes = [f"the {macro} on line {first}, outside every case, never ran"
                  for first, last, macro in outside
                  if macro not in REPORTING_ONLY and not any(first <= n <= last for n in ran_anywhere)]
         matched = agree = counts_ok = 0
         listed = []
+        # What no test's count holds: the assertions outside every test body
+        # (helpers, fixtures), which the mapping totals for the file.
+        record = (file_records or {}).get(path)
+        if file_records is None:
+            notes.append("no file totals in the mapping")
+        elif record is None:
+            problems.append(f"{path}: the mapping has no record of the file")
+        elif len(outside) != record["catch2_outside_expected"]:
+            if args.recounted and (outside or not record["tut_outside_calls"]):
+                notes.append(f"{record['catch2_outside_expected']} assertions outside every case converted, "
+                             f"{len(outside)} in the file now")
+            else:
+                problems.append(f"{path}: {record['tut_outside_calls']} TUT assertion calls outside every test, "
+                                f"{record['catch2_outside_expected']} Catch2 assertions they became, "
+                                f"{len(outside)} outside every case in the file")
         seen_cases = set()
         paired = {}
         for e in entries:
@@ -491,7 +521,7 @@ def check(args):
         clean = not any(p.startswith(path + ":") for p in problems)
         rows.append((path, len(recorded["results"]), len(cases), matched, agree, counts_ok, len(listed), code,
                      "ok" if clean else "MISMATCH"))
-        for line in listed + never + guard:
+        for line in listed + notes + guard:
             print(f"{path}: listed: {line}")
 
     header = ("file", "TUT", "Catch2", "matched", "agree", "counts", "listed", "exit", "parity")
