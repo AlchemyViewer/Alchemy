@@ -13473,6 +13473,14 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
     // on a partially clipped draw, which is the one thing it must not be.
     LLGLDisable no_scissor(GL_SCISSOR_TEST);
 
+    // The depth and colour state display() gives a world render. No caller has it: the UI's
+    // LLGLSUIDefault turns depth testing and depth writes off, and the autotune caller runs
+    // from the main loop's work queue, outside display(), where neither is on. Without it
+    // the clear below leaves depth alone and the opaque pools draw untested, so the time
+    // measured is not the avatar's.
+    LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_LEQUAL);
+    LLGLSColorMask color_mask(true, true);
+
     // The globals generateImpostor overwrites are saved here rather than there, because the
     // display() path repairs them itself immediately afterwards and this path does not: it
     // returns into the middle of a UI draw. sCull in particular is left pointing at
