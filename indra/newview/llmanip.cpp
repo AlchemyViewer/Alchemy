@@ -594,6 +594,9 @@ LLColor4 LLManip::setupSnapGuideRenderPass(S32 pass)
     LLColor4 line_color;
     F32 line_alpha = gSavedSettings.getF32("GridOpacity");
 
+    // The last pass's lines go out under its viewport; setup3DViewport sets the next one raw.
+    gGL.flush();
+
     switch(pass)
     {
     case 0:
