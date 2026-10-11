@@ -40,6 +40,8 @@
 
 namespace tut
 {
+namespace
+{
     // What the lanes answered, in the order they did, from their threads.
     struct Answers
     {
@@ -149,6 +151,7 @@ namespace tut
         bool                  mStops   = false;
         bool                  mStopped = false;
     };
+} // anonymous namespace
 
     struct alscriptanalysislane_data
     {

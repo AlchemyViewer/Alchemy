@@ -82,9 +82,19 @@ namespace ll_test
     public:
         // With `gl_textures`, the fonts put their glyphs in GL textures, for
         // a caller that has a context up and draws; the first call decides.
+        // A later call that asks for the other is an error rather than
+        // handed what it did not ask for: fonts without GL textures draw
+        // nothing, and fonts with them need the context to stay current,
+        // so tests of the two kinds cannot share a process.
         static HeadlessUI& get(bool gl_textures = false)
         {
             static HeadlessUI ui(gl_textures);
+            if (gl_textures != ui.mGLTextures)
+            {
+                LL_ERRS("HeadlessUI") << "HeadlessUI::get(gl_textures=" << gl_textures
+                                      << ") after the process's UI was made with gl_textures="
+                                      << ui.mGLTextures << LL_ENDL;
+            }
             return ui;
         }
 
@@ -98,7 +108,8 @@ namespace ll_test
     private:
         explicit HeadlessUI(bool gl_textures)
         :   mDir(LLUI_TEST_APP_DIR),
-            mConfig("config")
+            mConfig("config"),
+            mGLTextures(gl_textures)
         {
             const std::string fonts_xml = mDir.add(std::string(LLUI_TEST_APP_DIR), "skins/default/xui/en/fonts.xml");
             if (std::string(LLUI_TEST_APP_DIR).empty() || !LLFile::isfile(fonts_xml))
@@ -153,6 +164,7 @@ namespace ll_test
 
         UIDir mDir;
         LLControlGroup mConfig;
+        const bool mGLTextures;
         bool mOk { false };
     };
 

@@ -53,6 +53,9 @@ using namespace llcoro;
 /*****************************************************************************
 *   Test helpers
 *****************************************************************************/
+namespace
+{
+
 /// Simulate an event API whose response is immediate: sent on receipt of the
 /// initial request, rather than after some delay. This is the case that
 /// distinguishes postAndSuspend() from calling post(), then calling
@@ -85,19 +88,48 @@ private:
     Sync& mSync;
 };
 
+/// The coroutines need LLApp::isRunning(), and on Windows LLCoros hands an
+/// exception escaping one to LLApp::instance(). An app per test, as this had,
+/// ran ~LLApp after each, and that ends LLCommon -- the APR pool, the LLTrace
+/// master recorder -- for every test after it in the process. So there is one
+/// app for the process, never destroyed, which each test sees start running
+/// and stop.
+class CoroTestApp: public LLTestApp
+{
+public:
+    struct Running
+    {
+        Running()
+        {
+            app();
+            setStatus(APP_STATUS_RUNNING);
+        }
+        ~Running() { setStopped(); }
+    };
+
+private:
+    static CoroTestApp& app()
+    {
+        static CoroTestApp* sApp = new CoroTestApp;
+        return *sApp;
+    }
+};
+
+} // anonymous namespace
+
 /*****************************************************************************
 *   TUT
 *****************************************************************************/
 namespace tut
 {
-    struct test_data
+    struct lleventcoro_data
     {
         Sync mSync;
         ImmediateAPI immediateAPI{mSync};
         std::string replyName, errorName, threw, stringdata;
         LLSD result, errordata;
         int which;
-        LLTestApp testApp;
+        CoroTestApp::Running running;
 
         void explicit_wait(std::shared_ptr<LLCoros::Promise<std::string>>& cbp);
         void waitForEventOn1();
@@ -105,11 +137,11 @@ namespace tut
         void postAndWait1();
         void coroPumpPost();
     };
-    typedef test_group<test_data> coroutine_group;
+    typedef test_group<lleventcoro_data> coroutine_group;
     typedef coroutine_group::object object;
     coroutine_group coroutinegrp("coroutine");
 
-    void test_data::explicit_wait(std::shared_ptr<LLCoros::Promise<std::string>>& cbp)
+    void lleventcoro_data::explicit_wait(std::shared_ptr<LLCoros::Promise<std::string>>& cbp)
     {
         BEGIN
         {
@@ -159,7 +191,7 @@ namespace tut
         ensure_equals(stringdata, "received");
     }
 
-    void test_data::waitForEventOn1()
+    void lleventcoro_data::waitForEventOn1()
     {
         BEGIN
         {
@@ -185,7 +217,7 @@ namespace tut
         ensure_equals(result.asString(), "received");
     }
 
-    void test_data::coroPump()
+    void lleventcoro_data::coroPump()
     {
         BEGIN
         {
@@ -213,7 +245,7 @@ namespace tut
         ensure_equals(result.asString(), "received");
     }
 
-    void test_data::postAndWait1()
+    void lleventcoro_data::postAndWait1()
     {
         BEGIN
         {
@@ -236,7 +268,7 @@ namespace tut
         ensure_equals(result.asInteger(), 18);
     }
 
-    void test_data::coroPumpPost()
+    void lleventcoro_data::coroPumpPost()
     {
         BEGIN
         {
@@ -258,8 +290,9 @@ namespace tut
         ensure_equals(result.asInteger(), 18);
     }
 
+    // A coroutine consumes what a PUMP holds for it, one value a wait.
     template <class PUMP>
-    void test()
+    static void check_coro_consumes()
     {
         PUMP pump(typeid(PUMP).name());
         bool running{false};
@@ -324,13 +357,13 @@ namespace tut
     void object::test<6>()
     {
         set_test_name("LLEventMailDrop");
-        tut::test<LLEventMailDrop>();
+        check_coro_consumes<LLEventMailDrop>();
     }
 
     template<> template<>
     void object::test<7>()
     {
         set_test_name("LLEventLogProxyFor<LLEventMailDrop>");
-        tut::test< LLEventLogProxyFor<LLEventMailDrop> >();
+        check_coro_consumes< LLEventLogProxyFor<LLEventMailDrop> >();
     }
 }

@@ -488,6 +488,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct llkeyframemotion_data
     {
         ALTestCharacter mCharacter;
@@ -521,6 +523,7 @@ namespace tut
     typedef test_group<llkeyframemotion_data> llkeyframemotion_test;
     typedef llkeyframemotion_test::object llkeyframemotion_object;
     tut::llkeyframemotion_test llkeyframemotion_testcase("LLKeyframeMotion");
+}
 
     template<> template<>
     void llkeyframemotion_object::test<1>()

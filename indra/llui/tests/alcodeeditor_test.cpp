@@ -39,6 +39,8 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
+#include "altextviewprobe.h"
 
 #include "../test/lltut.h"
 
@@ -46,41 +48,22 @@
 #include <string>
 #include <vector>
 
-class LLAvatarName;
-const std::string gCodeTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gCodeTestAnonName;
-}
-
-namespace ll_test
-{
-    // The colours the view works out for a row's glyphs, as it draws them.
-    struct TextViewProbe
-    {
-        static std::vector<LLColor4U> colours(ALTextView& view, S32 line, const ALTextLayout::Row& row)
-        {
-            const ALTextLayout::Line& laid = view.layout().line(line);
-            view.colorRow(line, laid, row, 1.f);
-            view.tintRow(line, laid, row, 1.f, view.mColorScratch);
-            return view.mColorScratch;
-        }
-    };
-}
-
 namespace tut
 {
     struct alcodeeditor_data
     {
         ll_test::HeadlessUI& ui     = ll_test::HeadlessUI::get();
         ALCodeEditor*        editor = nullptr;
+        // Every editor a test made, the last of them being editor: a test
+        // that makes more than one leaves none of them behind alive.
+        std::vector<ALCodeEditor*> made;
 
         ~alcodeeditor_data()
         {
             gFocusMgr.setKeyboardFocus(nullptr);
-            if (editor)
+            for (ALCodeEditor* each : made)
             {
-                editor->die();
+                each->die();
             }
         }
 
@@ -96,6 +79,7 @@ namespace tut
             p.default_text = text;
             p.syntax       = syntax;
             editor         = LLUICtrlFactory::create<ALCodeEditor>(p);
+            made.push_back(editor);
             editor->setFont(LLFontGL::getFontMonospace());
             editor->setFocus(true);
             return *editor;
@@ -3625,7 +3609,9 @@ namespace tut
     {
         set_test_name("a fix previewed inside a block comment colours what it makes as the comment it is in, not as code");
         // The skin's colours for the kinds, told before the editor reads
-        // them: nothing loads a skin's colours in a test.
+        // them: nothing loads a skin's colours in a test. Taken back after,
+        // since every editor made later would read them.
+        ll_test::ColorTableScope colours;
         LLUIColorTable& table = LLUIColorTable::instance();
         table.setColor("SyntaxComment", LLColor4(0.f, 0.5f, 0.f, 1.f));
         table.setColor("SyntaxNumber", LLColor4(0.f, 0.f, 0.8f, 1.f));

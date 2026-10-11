@@ -35,13 +35,6 @@
 
 #include <string>
 
-class LLAvatarName;
-const std::string gChoiceTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gChoiceTestAnonName;
-}
-
 namespace tut
 {
     struct alchoicelist_data

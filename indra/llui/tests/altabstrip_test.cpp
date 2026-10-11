@@ -33,21 +33,18 @@
 #include "llfontgl.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
-
-class LLAvatarName;
-const std::string gTabStripTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gTabStripTestAnonName;
-}
 
 namespace tut
 {
     struct altabstrip_data
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
+        // Focus and capture as the test found them, whatever it leaves
+        // them on.
+        ll_test::FocusScope  focus;
 
         static constexpr S32 WIDTH = 300;
         static constexpr S32 HEIGHT = 24;
@@ -639,6 +636,7 @@ namespace tut
         strip->handleMouseUp(strip->rectOf(2).getCenterX() + 10, second.getCenterY(), MASK_NONE);
         ensure_equals("not torn", torn.size(), size_t(1));
         ensure("moved along instead", !orders.empty() && orders.back() == std::vector<std::string>({ "a", "c", "b" }));
+        strip->die();
     }
 
     // With no tab at all, an arrow walks nowhere and is still the strip's:
@@ -659,6 +657,7 @@ namespace tut
         ensure("another key not", !strip->handleKeyHere('X', MASK_NONE));
         strip->setTabs(three(), "");
         ensure("with tabs, the walk starts", strip->handleKeyHere(KEY_RIGHT, MASK_NONE) && strip->chosen() == "a");
+        strip->die();
     }
 
     // One tab made again by its value: its dot and its tip change where it

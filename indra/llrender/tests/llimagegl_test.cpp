@@ -50,6 +50,8 @@
 
 namespace tut
 {
+namespace
+{
     struct llimagegl_data
     {
         std::unique_ptr<ll_test::HeadlessGL> gl = std::make_unique<ll_test::HeadlessGL>();
@@ -97,6 +99,7 @@ namespace tut
     typedef test_group<llimagegl_data> llimagegl_test;
     typedef llimagegl_test::object     llimagegl_object;
     tut::llimagegl_test llimagegl_testcase("LLImageGL");
+}
 
     // createGLTexture(LLImageRaw) allocates immutable storage under a
     // fresh GL name. After it succeeds the instance reports
@@ -813,7 +816,16 @@ namespace tut
         // The queue the upload thread hands its results back on, as the viewer's.
         // It has to exist before the image, which looks it up when built.
         LL::WorkQueue mainloop("mainloop");
+        std::atomic<bool> worker_done{ false };
+        std::atomic<bool> worker_ok{ false };
         LLImageGLThread::createInstance(gl->window());
+        // The thread ends with the test however the test ends: left running
+        // after a failure, it would outlive the window its context shares,
+        // and the flags its work writes to.
+        struct ThreadEnd
+        {
+            ~ThreadEnd() { LLImageGLThread::deleteSingleton(); }
+        } thread_end;
 
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
         ensure("createGLTexture succeeded",
@@ -821,8 +833,6 @@ namespace tut
         const U32 old_name = img->getTexName();
 
         LLPointer<LLImageRaw> raw = makeRaw(32, 32, 4, 0x55);
-        std::atomic<bool> worker_done{ false };
-        std::atomic<bool> worker_ok{ false };
 
         img->beginUpload();
         LLImageGLThread::instance().post(

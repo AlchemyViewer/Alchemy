@@ -37,6 +37,9 @@
 
 #include "../test/lltut.h"
 
+namespace
+{
+
 enum LogFieldIndex
 {
     TIME_FIELD,
@@ -56,6 +59,8 @@ static const char* FieldName[] =
     "FUNCTION",
     "MSG"
 };
+
+} // anonymous namespace
 
 namespace
 {
@@ -98,38 +103,41 @@ namespace
 
 namespace tut
 {
-    class TestRecorder : public LLError::Recorder
+    namespace
     {
-    public:
-        TestRecorder()
+        class TestRecorder : public LLError::Recorder
+        {
+        public:
+            TestRecorder()
+                {
+                    showTime(false);
+                }
+            virtual ~TestRecorder()
+                {}
+
+            virtual void recordMessage(LLError::ELevel level,
+                               const std::string& message)
             {
-                showTime(false);
+                mMessages.push_back(message);
             }
-        virtual ~TestRecorder()
-            {}
 
-        virtual void recordMessage(LLError::ELevel level,
-                           const std::string& message)
-        {
-            mMessages.push_back(message);
-        }
+            int countMessages()         { return (int) mMessages.size(); }
+            void clearMessages()        { mMessages.clear(); }
 
-        int countMessages()         { return (int) mMessages.size(); }
-        void clearMessages()        { mMessages.clear(); }
+            std::string message(int n)
+            {
+                std::ostringstream test_name;
+                test_name << "testing message " << n << ", not enough messages";
 
-        std::string message(int n)
-        {
-            std::ostringstream test_name;
-            test_name << "testing message " << n << ", not enough messages";
+                tut::ensure(test_name.str(), n < countMessages());
+                return mMessages[n];
+            }
 
-            tut::ensure(test_name.str(), n < countMessages());
-            return mMessages[n];
-        }
-
-    private:
-        typedef std::vector<std::string> MessageVector;
-        MessageVector mMessages;
-    };
+        private:
+            typedef std::vector<std::string> MessageVector;
+            MessageVector mMessages;
+        };
+    } // anonymous namespace
 
     struct ErrorTestData
     {

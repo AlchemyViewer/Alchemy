@@ -37,12 +37,15 @@
 
 namespace tut
 {
+namespace
+{
     struct lljoint_data
     {
     };
     typedef test_group<lljoint_data> lljoint_test;
     typedef lljoint_test::object lljoint_object;
     tut::lljoint_test lljoint_testcase("LLJoint");
+}
 
     template<> template<>
     void lljoint_object::test<1>()

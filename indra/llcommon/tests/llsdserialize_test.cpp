@@ -65,7 +65,7 @@ typedef U32 uint32_t;
 typedef std::function<void(const LLSD& data, std::ostream& str)> FormatterFunction;
 typedef std::function<bool(std::istream& istr, LLSD& data, llssize max_bytes)> ParserFunction;
 
-std::vector<U8> string_to_vector(const std::string& str)
+static std::vector<U8> string_to_vector(const std::string& str)
 {
     return std::vector<U8>(str.begin(), str.end());
 }
@@ -2259,8 +2259,8 @@ namespace tut
 
     // helper for TestPythonCompatible
     template <typename CONTENT, typename... ARGS>
-    void python_expect(const std::string& desc, const CONTENT& script, int expect=0,
-                       ARGS&&... args)
+    static void python_expect(const std::string& desc, const CONTENT& script, int expect=0,
+                              ARGS&&... args)
     {
         auto PYTHON(LLStringUtil::getenv("PYTHON"));
         ensure("Set $PYTHON to the Python interpreter", !PYTHON.empty());
@@ -2328,7 +2328,7 @@ namespace tut
 
     // helper for TestPythonCompatible
     template <typename CONTENT, typename... ARGS>
-    void python(const std::string& desc, const CONTENT& script, ARGS&&... args)
+    static void python(const std::string& desc, const CONTENT& script, ARGS&&... args)
     {
         // plain python() expects rc 0
         python_expect(desc, script, 0, std::forward<ARGS>(args)...);
@@ -2528,7 +2528,7 @@ namespace tut
 |*==========================================================================*/
 
     // helper for test<8> - test<12>
-    bool itemFromStream(std::istream& istr, LLSD& item, const ParserFunction& parse)
+    static bool itemFromStream(std::istream& istr, LLSD& item, const ParserFunction& parse)
     {
         // reset the output value for debugging clarity
         item.clear();
@@ -2548,10 +2548,10 @@ namespace tut
     }
 
     // helper for test<8> - test<12>
-    void fromPythonUsing(const std::string& pyformatter,
-                         const ParserFunction& parse=
-                         [](std::istream& istr, LLSD& data, llssize max_bytes)
-                         { return LLSDSerialize::deserialize(data, istr, max_bytes); })
+    static void fromPythonUsing(const std::string& pyformatter,
+                                const ParserFunction& parse=
+                                [](std::istream& istr, LLSD& data, llssize max_bytes)
+                                { return LLSDSerialize::deserialize(data, istr, max_bytes); })
     {
         // Create an empty data file. This is just a placeholder for our
         // script to write into. Create it to establish a unique name that

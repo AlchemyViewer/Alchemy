@@ -111,6 +111,12 @@ namespace tut
                       LLVersionInfo::instance().getChannelAndVersion(),
                       mVersionAndChannel);
 
+        // The channel is the process's: put back however this ends.
+        struct ChannelBack
+        {
+            const std::string was = LLVersionInfo::instance().getChannel();
+            ~ChannelBack() { LLVersionInfo::instance().resetChannel(was); }
+        } channel_back;
         LLVersionInfo::instance().resetChannel(mResetChannel);
         ensure_equals("Reset channel version",
                       LLVersionInfo::instance().getChannel(),

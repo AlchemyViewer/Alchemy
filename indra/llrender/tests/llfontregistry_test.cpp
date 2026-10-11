@@ -56,6 +56,9 @@ namespace tut
     // construction-time side-effect is caching LLWindow's dynamic fallback
     // list, which is a static query that's safe to run anywhere llwindow is
     // linked. We skip LLFontManager::initClass() entirely.
+    //
+    // The fixture keeps its name and namespace, outside the anonymous one:
+    // llfontregistry.h friends it by name.
     struct llfontregistry_data
     {
         // create_gl_textures=false matches the llui_libtest path: createFont
@@ -164,7 +167,10 @@ namespace tut
     // headroom before the silent-drop threshold bites again.
     typedef test_group<llfontregistry_data, 128> llfontregistry_test;
     typedef llfontregistry_test::object     llfontregistry_object;
+namespace
+{
     tut::llfontregistry_test llfontregistry_testcase("LLFontRegistry");
+}
 
     // ===================================================================
     // Group 1: LLFontDescriptor (pure)

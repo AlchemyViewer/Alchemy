@@ -35,16 +35,6 @@
 #include <string>
 #include <vector>
 
-// llui reaches the viewer for this one, and linking ALTextView, whose colour
-// names are tested here, pulls the object that calls it. Nothing under test
-// goes near it.
-class LLAvatarName;
-const std::string gSyntaxGrammarsTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gSyntaxGrammarsTestAnonName;
-}
-
 namespace tut
 {
     struct alsyntaxgrammars_data

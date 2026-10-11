@@ -44,6 +44,9 @@
 /*****************************************************************************
 *   Display helpers: must be defined BEFORE lltut.h!
 *****************************************************************************/
+namespace
+{
+
 // Display an arbitary value as itself...
 template<typename T>
 std::ostream& display(std::ostream& out, const T& value)
@@ -97,6 +100,8 @@ std::ostream& operator<<(std::ostream& out, const std::set<ENTRY>& set)
     return out;
 }
 
+} // anonymous namespace
+
 /*****************************************************************************
 *   Now we can #include lltut.h
 *****************************************************************************/
@@ -105,6 +110,9 @@ std::ostream& operator<<(std::ostream& out, const std::set<ENTRY>& set)
 /*****************************************************************************
 *   Other helpers
 *****************************************************************************/
+namespace
+{
+
 typedef LLDependencies<> StringDeps;
 typedef StringDeps::KeyList StringList;
 
@@ -141,6 +149,8 @@ bool is_empty(const RANGE& range)
 {
     return boost::begin(range) == boost::end(range);
 }
+
+} // anonymous namespace
 
 /*****************************************************************************
 *   tut test group

@@ -25,7 +25,7 @@ target_precompile_headers(llxml REUSE_FROM llprecompiled)
 
 # tests
 if(AL_BUILD_TESTS)
-  al_add_test(llxmlnode UNIT PROJECT llxml SOURCES alxmldocument.cpp LIBRARIES ll::pugixml)
+  al_add_test(llxmlnode PROJECT llxml LIBRARIES llxml llmath llcommon)
   al_add_test(llcontrol PROJECT llxml LIBRARIES llxml llmath llcommon)
   al_add_test(alxmllayermerge PROJECT llxml LIBRARIES llxml llmath llcommon)
 endif()

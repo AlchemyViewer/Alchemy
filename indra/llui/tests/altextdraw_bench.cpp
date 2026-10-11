@@ -59,13 +59,6 @@
 #include <memory>
 #include <string>
 
-class LLAvatarName;
-const std::string gBenchAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gBenchAnonName;
-}
-
 #if defined(LL_RELEASE)
 namespace
 {

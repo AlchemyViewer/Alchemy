@@ -65,6 +65,8 @@
 /*****************************************************************************
 *   Helper classes
 *****************************************************************************/
+namespace
+{
 // This is a listener to receive results from lllogin.
 class LoginListener: public LLEventTrackable
 {
@@ -137,7 +139,8 @@ public:
     }
 };
 
-class LLXMLRPCListener: public LLEventTrackable
+// Answers on the XMLRPC transaction pump in place of the viewer's XMLRPC code.
+class FakeXMLRPCListener: public LLEventTrackable
 {
     std::string mName;
     LLSD mEvent;
@@ -146,10 +149,10 @@ class LLXMLRPCListener: public LLEventTrackable
     Debug mDebug;
 
 public:
-    LLXMLRPCListener(const std::string& name,
-                     bool i = false,
-                     const LLSD& response = LLSD()
-                     ) :
+    FakeXMLRPCListener(const std::string& name,
+                       bool i = false,
+                       const LLSD& response = LLSD()
+                       ) :
         mName(name),
         mImmediateResponse(i),
         mResponse(response),
@@ -172,7 +175,7 @@ public:
 
     bool handle_event(const LLSD& event)
     {
-        mDebug(STRINGIZE("LLXMLRPCListener called!: " << event));
+        mDebug(STRINGIZE("FakeXMLRPCListener called!: " << event));
         mEvent = event;
         if(mImmediateResponse)
         {
@@ -188,19 +191,22 @@ public:
 
     LLBoundListener listenTo(LLEventPump& pump)
     {
-        return pump.listen(mName, boost::bind(&LLXMLRPCListener::handle_event, this, _1));
+        return pump.listen(mName, boost::bind(&FakeXMLRPCListener::handle_event, this, _1));
     }
 
-    friend std::ostream& operator<<(std::ostream& out, const LLXMLRPCListener& listener)
+    friend std::ostream& operator<<(std::ostream& out, const FakeXMLRPCListener& listener)
     {
-        return out << "LLXMLRPCListener(" << listener.mName << ')';
+        return out << "FakeXMLRPCListener(" << listener.mName << ')';
     }
 };
+}
 
 /*****************************************************************************
 *   TUT
 *****************************************************************************/
 namespace tut
+{
+namespace
 {
     struct llviewerlogin_data
     {
@@ -218,6 +224,7 @@ namespace tut
     typedef test_group<llviewerlogin_data> llviewerlogin_group;
     typedef llviewerlogin_group::object llviewerlogin_object;
     llviewerlogin_group llviewerlogingrp("LLViewerLogin");
+}
 
     template<> template<>
     void llviewerlogin_object::test<1>()
@@ -231,7 +238,7 @@ namespace tut
         bool respond_immediately = true;
 
         // Have dummy XMLRPC respond immediately.
-        LLXMLRPCListener dummyXMLRPC("dummy_xmlrpc", respond_immediately);
+        FakeXMLRPCListener dummyXMLRPC("dummy_xmlrpc", respond_immediately);
         LLTempBoundListener conn1 = dummyXMLRPC.listenTo(xmlrpcPump);
 
         LLLogin login;
@@ -260,7 +267,7 @@ namespace tut
         // Testing normal login procedure.
         LLEventStream xmlrpcPump("LLXMLRPCTransaction"); // Dummy XMLRPC pump
 
-        LLXMLRPCListener dummyXMLRPC("dummy_xmlrpc");
+        FakeXMLRPCListener dummyXMLRPC("dummy_xmlrpc");
         LLTempBoundListener conn1 = dummyXMLRPC.listenTo(xmlrpcPump);
 
         LLLogin login;
@@ -306,7 +313,7 @@ namespace tut
         // Testing normal login procedure.
         LLEventStream xmlrpcPump("LLXMLRPCTransaction"); // Dummy XMLRPC pump
 
-        LLXMLRPCListener dummyXMLRPC("dummy_xmlrpc");
+        FakeXMLRPCListener dummyXMLRPC("dummy_xmlrpc");
         LLTempBoundListener conn1 = dummyXMLRPC.listenTo(xmlrpcPump);
 
         LLLogin login;

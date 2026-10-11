@@ -46,15 +46,6 @@
 #include <string>
 #include <vector>
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gPropertyGridTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gPropertyGridTestAnonName;
-}
-
 namespace tut
 {
     struct alpropertygrid_data

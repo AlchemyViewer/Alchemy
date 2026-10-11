@@ -26,23 +26,20 @@
 
 #include "../lluicolortable.h"
 
+#include "aluistatescope.h"
+
 #include "../test/lltut.h"
 
 #include <sstream>
 
-class LLAvatarName;
-const std::string gColorTableTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gColorTableTestAnonName;
-}
-
 namespace tut
 {
     // The table is a singleton and lives across the tests; each uses names
-    // of its own.
+    // of its own, and what it loads and sets is put back as it found it.
     struct lluicolortable_data
     {
+        ll_test::ColorTableScope colours{ ll_test::ColorTableScope::USER_AND_LOADED };
+
         static LLXMLNodePtr parse(const std::string& body)
         {
             const std::string xml = "<colors>\n" + body + "</colors>\n";

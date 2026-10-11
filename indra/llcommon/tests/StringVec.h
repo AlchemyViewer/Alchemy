@@ -18,7 +18,7 @@
 
 typedef std::vector<std::string> StringVec;
 
-std::ostream& operator<<(std::ostream& out, const StringVec& strings)
+inline std::ostream& operator<<(std::ostream& out, const StringVec& strings)
 {
     out << '(';
     StringVec::const_iterator begin(strings.begin()), end(strings.end());

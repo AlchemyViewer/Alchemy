@@ -33,62 +33,6 @@
 #include "../llrender/lluiimage.h"
 #include "../llmessage/llexperiencecache.h"
 
-
-// namespace LLExperienceCache
-// {
-//     const LLSD& get( const LLUUID& key)
-//     {
-//      static LLSD boo;
-//         return boo;
-//     }
-//
-//     void get( const LLUUID& key, callback_slot_t slot ){}
-//
-// }
-
-/*==========================================================================*|
-typedef std::map<std::string, LLControlGroup*> settings_map_t;
-settings_map_t LLUI::sSettingGroups;
-
-bool LLControlGroup::getBOOL(const std::string& name)
-{
-    return false;
-}
-
-LLUIColor LLUIColorTable::getColor(const std::string& name, const LLColor4& default_color) const
-{
-    return LLUIColor();
-}
-
-LLUIColor::LLUIColor() : mColorPtr(NULL) {}
-
-LLUIImage::LLUIImage(const std::string& name, LLPointer<LLTexture> image)
-{
-}
-
-LLUIImage::~LLUIImage()
-{
-}
-
-//virtual
-S32 LLUIImage::getWidth() const
-{
-    return 0;
-}
-
-//virtual
-S32 LLUIImage::getHeight() const
-{
-    return 0;
-}
-|*==========================================================================*/
-
-const std::string anonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& avName)
-{
-    return anonName;
-}
-
 namespace tut
 {
     struct LLUrlEntryData
@@ -106,54 +50,56 @@ namespace
 
 namespace tut
 {
-    void testRegex(const std::string &testname, LLUrlEntryBase &entry,
-                   const char *text, const std::string &expected)
+    namespace
     {
-        std::string url = "";
-        ALRegexMatch result;
-        const U32 group = entry.getUrlGroup();
-        bool found = entry.getPattern().search(text, &result) && result.matched(group);
-        if (found)
+        void testRegex(const std::string &testname, LLUrlEntryBase &entry,
+                       const char *text, const std::string &expected)
         {
-            url = entry.getUrl(result.str(group));
+            std::string url = "";
+            ALRegexMatch result;
+            const U32 group = entry.getUrlGroup();
+            bool found = entry.getPattern().search(text, &result) && result.matched(group);
+            if (found)
+            {
+                url = entry.getUrl(result.str(group));
+            }
+            ensure_equals(testname, url, expected);
         }
-        ensure_equals(testname, url, expected);
-    }
 
-    void dummyCallback(const std::string &url, const std::string &label, const std::string& icon)
-    {
-    }
-
-    void testLabel(const std::string &testname, LLUrlEntryBase &entry,
-                   const char *text, const std::string &expected)
-    {
-        std::string label = "";
-        ALRegexMatch result;
-        const U32 group = entry.getUrlGroup();
-        bool found = entry.getPattern().search(text, &result) && result.matched(group);
-        if (found)
+        void dummyCallback(const std::string &url, const std::string &label, const std::string& icon)
         {
-            std::string url = result.str(group);
-            label = entry.getLabel(url, boost::bind(dummyCallback, _1, _2, _3));
         }
-        ensure_equals(testname, label, expected);
-    }
 
-    void testLocation(const std::string &testname, LLUrlEntryBase &entry,
-                      const char *text, const std::string &expected)
-    {
-        std::string location = "";
-        ALRegexMatch result;
-        const U32 group = entry.getUrlGroup();
-        bool found = entry.getPattern().search(text, &result) && result.matched(group);
-        if (found)
+        void testLabel(const std::string &testname, LLUrlEntryBase &entry,
+                       const char *text, const std::string &expected)
         {
-            std::string url = result.str(group);
-            location = entry.getLocation(url);
+            std::string label = "";
+            ALRegexMatch result;
+            const U32 group = entry.getUrlGroup();
+            bool found = entry.getPattern().search(text, &result) && result.matched(group);
+            if (found)
+            {
+                std::string url = result.str(group);
+                label = entry.getLabel(url, boost::bind(dummyCallback, _1, _2, _3));
+            }
+            ensure_equals(testname, label, expected);
         }
-        ensure_equals(testname, location, expected);
-    }
 
+        void testLocation(const std::string &testname, LLUrlEntryBase &entry,
+                          const char *text, const std::string &expected)
+        {
+            std::string location = "";
+            ALRegexMatch result;
+            const U32 group = entry.getUrlGroup();
+            bool found = entry.getPattern().search(text, &result) && result.matched(group);
+            if (found)
+            {
+                std::string url = result.str(group);
+                location = entry.getLocation(url);
+            }
+            ensure_equals(testname, location, expected);
+        }
+    }
 
     template<> template<>
     void object::test<1>()

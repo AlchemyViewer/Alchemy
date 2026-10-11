@@ -34,22 +34,16 @@
 
 #include "../test/lltut.h"
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gResizeBarTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gResizeBarTestAnonName;
-}
-
 namespace tut
 {
     // LLView's constructor is protected, for LLUICtrlFactory.
-    struct TestView : public LLView
+    namespace
     {
-        TestView(const LLView::Params& p) : LLView(p) {}
-    };
+        struct TestView : public LLView
+        {
+            TestView(const LLView::Params& p) : LLView(p) {}
+        };
+    }
 
     struct llresizebar_data
     {
@@ -174,10 +168,13 @@ namespace tut
     // Being disabled is a reason focus cannot arrive, not a reason it cannot
     // leave. A control disabled while it held focus would otherwise keep it,
     // with nothing able to ask for it back.
-    struct PlainCtrl : public LLUICtrl
+    namespace
     {
-        PlainCtrl(const LLUICtrl::Params& p) : LLUICtrl(p) {}
-    };
+        struct PlainCtrl : public LLUICtrl
+        {
+            PlainCtrl(const LLUICtrl::Params& p) : LLUICtrl(p) {}
+        };
+    }
 
     template<> template<>
     void llresizebar_object::test<5>()
@@ -217,6 +214,12 @@ namespace tut
         }
 
         LLUICtrlFactory::instance().pushFileName("panel_people.xml");
+        // Popped however the test ends: the factory's stack of file names
+        // is the process's, and the next file built would be named by this.
+        struct Popped
+        {
+            ~Popped() { LLUICtrlFactory::instance().popFileName(); }
+        } popped;
         const std::string before = LLUICtrlFactory::instance().getCurFileName();
 
         LLXMLNodePtr node;
@@ -230,7 +233,6 @@ namespace tut
                !panel->initPanelXML(node, nullptr, LLUICtrlFactory::getDefaultParams<LLPanel>()));
 
         const std::string after = LLUICtrlFactory::instance().getCurFileName();
-        LLUICtrlFactory::instance().popFileName();
         ensure_equals("and left the file name where it found it", after, before);
     }
 }

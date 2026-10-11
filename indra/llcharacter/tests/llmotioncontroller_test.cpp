@@ -40,12 +40,15 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct llmotioncontroller_data
     {
     };
     typedef test_group<llmotioncontroller_data> llmotioncontroller_test;
     typedef llmotioncontroller_test::object llmotioncontroller_object;
     tut::llmotioncontroller_test llmotioncontroller_testcase("LLMotionController");
+}
 
     typedef LLMotionController::QuantumStep QuantumStep;
 

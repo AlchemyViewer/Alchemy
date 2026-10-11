@@ -43,6 +43,8 @@
 // other Linden headers
 #include "lltut.h"
 
+namespace
+{
 
 /*---------------------------- Class hierarchy -----------------------------*/
 // All objects are GameObjects.
@@ -117,6 +119,8 @@ std::string asteroidStation(Asteroid& rock, SpaceStation& dock)
 //  std::cout << rock.stringize() << " has damaged " << dock.stringize() << std::endl;
     return "asteroidStation";
 }
+
+} // anonymous namespace
 
 /*------------------------------- Test code --------------------------------*/
 namespace tut

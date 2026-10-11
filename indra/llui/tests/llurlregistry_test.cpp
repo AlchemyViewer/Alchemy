@@ -30,13 +30,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gUrlRegistryTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gUrlRegistryTestAnonName;
-}
-
 namespace tut
 {
     struct llurlregistry_data

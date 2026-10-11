@@ -33,12 +33,15 @@
 
 namespace tut
 {
+namespace
+{
     struct llsaleinfo_tut
     {
     };
     typedef test_group<llsaleinfo_tut> llsaleinfo_tut_t;
     typedef llsaleinfo_tut_t::object llsaleinfo_test_t;
     tut::llsaleinfo_tut_t tut_llsaleinfo_test("llsaleinfo");
+}
 
     template<> template<>
     void llsaleinfo_test_t::test<1>()

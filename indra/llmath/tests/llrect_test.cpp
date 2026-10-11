@@ -32,12 +32,15 @@
 
 namespace tut
 {
+namespace
+{
     struct LLRectData
     {
     };
 
     typedef test_group<LLRectData> factory;
     typedef factory::object object;
+}
 }
 
 namespace

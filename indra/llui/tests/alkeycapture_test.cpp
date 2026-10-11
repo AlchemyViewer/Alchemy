@@ -36,18 +36,12 @@
 #include "llkeyboard.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
 #include <string>
 #include <vector>
-
-class LLAvatarName;
-const std::string gKeyCaptureTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gKeyCaptureTestAnonName;
-}
 
 namespace tut
 {
@@ -62,12 +56,24 @@ namespace tut
 
         std::vector<ALKeyChord> chosen;
         std::vector<ALKeyChord> asked;
+        // The keys named as they are, for these tests and no others.
+        ll_test::KeyNamesScope  key_names{ [](std::string_view name) { return std::string(name); } };
+        std::vector<LLHandle<LLView>> anchors;
 
-        alkeycapture_data() { LLKeyboard::setStringTranslatorFunc([](std::string_view name) { return std::string(name); }); }
         ~alkeycapture_data()
         {
             ALKeyChords::stop();
             gFocusMgr.setKeyboardFocus(nullptr);
+            // What each capture was shown over, out of the floater view
+            // every later test builds its floaters in.
+            for (const LLHandle<LLView>& handle : anchors)
+            {
+                if (LLView* view = handle.get())
+                {
+                    gFloaterView->removeChild(view);
+                    view->die();
+                }
+            }
         }
 
         LLPanel* anchor()
@@ -77,6 +83,7 @@ namespace tut
             p.rect = LLRect(200, 320, 320, 300);
             LLPanel* view = LLUICtrlFactory::create<TestPanel>(p);
             gFloaterView->addChild(view);
+            anchors.push_back(view->getHandle());
             return view;
         }
 

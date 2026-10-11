@@ -96,15 +96,25 @@ LLEmojiDescriptor make_astronaut_descriptor()
 
 namespace tut
 {
+    // A dictionary for each test, and none left after it -- unless one was
+    // there already, which is used as it is and left.
     struct llemojidictionary_data
     {
+        const bool mOwn = !LLEmojiDictionary::instanceExists();
+
         llemojidictionary_data()
         {
-            LLEmojiDictionary::initParamSingleton();
+            if (mOwn)
+            {
+                LLEmojiDictionary::initParamSingleton();
+            }
         }
         ~llemojidictionary_data()
         {
-            LLEmojiDictionary::deleteSingleton();
+            if (mOwn)
+            {
+                LLEmojiDictionary::deleteSingleton();
+            }
         }
     };
     typedef test_group<llemojidictionary_data> factory;

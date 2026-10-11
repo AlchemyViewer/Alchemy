@@ -36,6 +36,8 @@
 #include "lluuid.h"
 #include "v4color.h"
 
+#include "altesttempdir.h"
+
 #include "../test/lltut.h"
 
 #include <filesystem>
@@ -47,75 +49,72 @@
 // could only be checked by reading it.
 //
 
-struct XuiLeaf : public LLInitParam::Block<XuiLeaf>
-{
-    Optional<S32>           depth;
-    Optional<std::string>   label;
-
-    XuiLeaf()
-    :   depth("depth", 0),
-        label("label", "")
-    {}
-};
-
-struct XuiMiddle : public LLInitParam::Block<XuiMiddle>
-{
-    Optional<XuiLeaf>   leaf;
-    Optional<S32>       depth;
-
-    XuiMiddle()
-    :   leaf("leaf"),
-        depth("depth", 0)
-    {}
-};
-
-struct XuiRoot : public LLInitParam::Block<XuiRoot>
-{
-    Optional<XuiMiddle>     middle;
-    Optional<bool>          flag;
-    Optional<std::string>   text;
-    Optional<U8>            small;
-    Optional<S32>           count;
-    Optional<F32>           ratio;
-    Optional<LLColor4>      tint;
-    Optional<LLUUID>        id;
-
-    XuiRoot()
-    :   middle("middle"),
-        flag("flag", false),
-        text("text", ""),
-        small("small", 0),
-        count("count", 0),
-        ratio("ratio", 0.f),
-        tint("tint", LLColor4::black),
-        id("id")
-    {}
-};
-
 namespace
 {
+    struct XuiLeaf : public LLInitParam::Block<XuiLeaf>
+    {
+        Optional<S32>           depth;
+        Optional<std::string>   label;
+
+        XuiLeaf()
+        :   depth("depth", 0),
+            label("label", "")
+        {}
+    };
+
+    struct XuiMiddle : public LLInitParam::Block<XuiMiddle>
+    {
+        Optional<XuiLeaf>   leaf;
+        Optional<S32>       depth;
+
+        XuiMiddle()
+        :   leaf("leaf"),
+            depth("depth", 0)
+        {}
+    };
+
+    struct XuiRoot : public LLInitParam::Block<XuiRoot>
+    {
+        Optional<XuiMiddle>     middle;
+        Optional<bool>          flag;
+        Optional<std::string>   text;
+        Optional<U8>            small_number;
+        Optional<S32>           count;
+        Optional<F32>           ratio;
+        Optional<LLColor4>      tint;
+        Optional<LLUUID>        id;
+
+        XuiRoot()
+        :   middle("middle"),
+            flag("flag", false),
+            text("text", ""),
+            small_number("small", 0),
+            count("count", 0),
+            ratio("ratio", 0.f),
+            tint("tint", LLColor4::black),
+            id("id")
+        {}
+    };
+
     // LLSimpleXUIParser reads a file rather than a buffer, so every case here
-    // needs one on disk. Named per case so a crashed run leaves something
-    // identifiable behind rather than clobbering the next test's input.
+    // needs one on disk: in a directory of its own, since a fixed name is
+    // shared by two runs at once. Named per case within it, so a crashed run
+    // leaves something identifiable behind.
     class ScratchXui
     {
     public:
         ScratchXui(const char* tag, const std::string& contents)
-        :   mPath(std::filesystem::temp_directory_path() / (std::string("al_xuiparser_") + tag + ".xml"))
+        :   mDir("al_xuiparser"),
+            mPath(mDir.path() / (std::string("al_xuiparser_") + tag + ".xml"))
         {
             std::ofstream out(mPath, std::ios::binary);
             out << contents;
         }
 
-        ~ScratchXui()
-        {
-            std::error_code ignored;
-            std::filesystem::remove(mPath, ignored);
-        }
-
         std::string name() const { return mPath.string(); }
 
     private:
+        ll_test::TempDir      mDir;
         std::filesystem::path mPath;
     };
 
@@ -158,7 +157,7 @@ namespace tut
         ensure("flag provided", block.flag.isProvided());
         ensure_equals("flag", block.flag(), true);
         ensure_equals("text", block.text(), std::string("hello"));
-        ensure_equals("small", (S32)block.small(), 200);
+        ensure_equals("small", (S32)block.small_number(), 200);
         ensure_equals("count", block.count(), -17);
         ensure_equals("ratio", block.ratio(), 0.5f);
         ensure_equals("tint red", block.tint().mV[VRED], 1.f);
@@ -195,8 +194,8 @@ namespace tut
         XuiRoot block;
         parse("narrow", "<root small=\"300\"/>", block, true);
 
-        ensure("out of range is refused", !block.small.isProvided());
-        ensure_equals("and the default stands", (S32)block.small(), 0);
+        ensure("out of range is refused", !block.small_number.isProvided());
+        ensure_equals("and the default stands", (S32)block.small_number(), 0);
     }
 
     template<> template<>
@@ -272,9 +271,12 @@ namespace tut
     {
         set_test_name("a missing file is reported, not assumed empty");
 
+        // In a directory of the test's own, not the working one, where a
+        // file of that name could be.
+        const ll_test::TempDir dir("al_xuiparser");
         XuiRoot block;
         LLSimpleXUIParser parser;
         ensure("reading a file that is not there fails",
-               !parser.readXUI("al_xuiparser_no_such_file.xml", block, true));
+               !parser.readXUI((dir.path() / "al_xuiparser_no_such_file.xml").string(), block, true));
     }
 }

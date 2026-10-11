@@ -40,6 +40,9 @@
 // other Linden headers
 #include "../test/lltut.h"
 
+namespace
+{
+
 struct Badness: public std::runtime_error
 {
     Badness(const std::string& what): std::runtime_error(what) {}
@@ -68,6 +71,8 @@ struct Unkeyed: public LLInstanceTracker<Unkeyed>
         }
     }
 };
+
+} // anonymous namespace
 
 /*****************************************************************************
 *   TUT

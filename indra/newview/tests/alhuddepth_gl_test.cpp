@@ -93,27 +93,21 @@ namespace tut
             return LLColor4U((U8)ll_round(c.mV[0] * 255.f), (U8)ll_round(c.mV[1] * 255.f), (U8)ll_round(c.mV[2] * 255.f),
                              (U8)ll_round(c.mV[3] * 255.f));
         }
-    }
 
     struct alhuddepth_data
     {
-        static ll_test::HeadlessGL& gl()
-        {
-            static ll_test::HeadlessGL instance(true, true, true, false);
-            return instance;
-        }
-
+        // Each test starts forward, as the window does, whatever ran before.
         alhuddepth_data()
         : mShaders(std::string(AL_TEST_SHADER_DIR) + "/class")
         {
-            gl();
+            setConvention(false);
         }
 
+        // The convention, viewport, shader and clear colour the tests set go
+        // back with mGL.
         ~alhuddepth_data()
         {
             tearDown();
-            setConvention(false);
-            glViewport(0, 0, ll_test::HeadlessGL::WIDTH, ll_test::HeadlessGL::HEIGHT);
         }
 
         void tearDown()
@@ -390,6 +384,7 @@ namespace tut
             return false;
         }
 
+        ll_test::SharedGLScope mGL;
         ll_test::TestShaderMgr mShaders;
         LLGLSLShader mBlitProgram;
         LLGLSLShader mCopyDepthProgram;
@@ -408,6 +403,7 @@ namespace tut
     typedef test_group<alhuddepth_data> alhuddepth_t;
     typedef alhuddepth_t::object alhuddepth_object_t;
     tut::alhuddepth_t alhuddepth_testcase("ALHUDDepth");
+    }
 
     // The final blit's copy fills the window's depth with the scene's, as the window's 24 bits hold it.
     template<> template<>

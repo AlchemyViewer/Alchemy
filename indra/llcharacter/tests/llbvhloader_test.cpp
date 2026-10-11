@@ -319,6 +319,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct llbvhloader_data
     {
         ALTestCharacter mCharacter;
@@ -410,6 +412,7 @@ namespace tut
     typedef test_group<llbvhloader_data> llbvhloader_test;
     typedef llbvhloader_test::object llbvhloader_object;
     tut::llbvhloader_test llbvhloader_testcase("LLBVHLoader");
+}
 
     template<> template<>
     void llbvhloader_object::test<1>()

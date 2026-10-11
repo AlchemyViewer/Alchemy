@@ -63,10 +63,9 @@ target_link_libraries(
 target_precompile_headers(llcharacter REUSE_FROM llprecompiled)
 
 if(AL_BUILD_TESTS)
-  al_add_test(lljoint PROJECT llcharacter SOURCES lljoint.cpp LIBRARIES llcommon llmath)
-
   foreach(
     test
+    lljoint
     llpose
     llcharacter
     llmotioncontroller

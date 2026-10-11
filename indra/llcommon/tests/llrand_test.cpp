@@ -27,6 +27,7 @@
 
 #include "linden_common.h"
 #include "../test/lltut.h"
+#include "../test/alrandomreseed.h"
 
 #include "../llrand.h"
 #include "../alrandmap.h"
@@ -45,8 +46,8 @@
 // testing extent < 0, negate the return value and the extent before passing
 // into ensure_in_range().
 template <typename NUMBER>
-void ensure_in_range(const std::string_view& name,
-                     NUMBER value, NUMBER low, NUMBER high)
+static void ensure_in_range(const std::string_view& name,
+                            NUMBER value, NUMBER low, NUMBER high)
 {
     auto failmsg{ stringize(name, " >= ", low, " (", value, ')') };
     tut::ensure(failmsg, (value >= low));
@@ -133,6 +134,8 @@ namespace tut
 {
     struct random
     {
+        // Tests here seed the main thread's generator.
+        ~random() { ll_test::reseedRandomFromEntropy(); }
     };
 
     typedef test_group<random> random_t;

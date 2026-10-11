@@ -41,13 +41,6 @@
 
 #include <algorithm>
 
-class LLAvatarName;
-const std::string gXUIServiceTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gXUIServiceTestAnonName;
-}
-
 namespace tut
 {
     struct alxuiservice_data

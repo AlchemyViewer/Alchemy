@@ -103,6 +103,8 @@ target_precompile_headers(llmath REUSE_FROM llprecompiled)
 
 # Add tests
 if(AL_BUILD_TESTS)
+  # Each links the library rather than compiling a copy of the file it
+  # tests, so the code under test is the code the viewer runs.
   foreach(
     test
     llbboxlocal
@@ -112,12 +114,6 @@ if(AL_BUILD_TESTS)
     v3color
     v4color
     v4coloru
-  )
-    al_add_test(${test} UNIT PROJECT llmath)
-  endforeach()
-
-  foreach(
-    test
     alignment
     alplaneset
     llsdutil_math
@@ -126,16 +122,16 @@ if(AL_BUILD_TESTS)
     llmatrix3a
     llmatrix4a
     llvector4a
+    llbbox
+    llquaternion
+    llquaternion2
+    v3dmath
+    v3math
+    v4math
+    xform
   )
     al_add_test(${test} PROJECT llmath LIBRARIES llmath llcommon)
   endforeach()
-  al_add_test(llbbox PROJECT llmath SOURCES llbbox.cpp LIBRARIES llmath llcommon)
-  al_add_test(llquaternion PROJECT llmath SOURCES llquaternion.cpp LIBRARIES llmath llcommon)
-  al_add_test(llquaternion2 PROJECT llmath SOURCES llquaternion.cpp LIBRARIES llmath llcommon)
-  al_add_test(v3dmath PROJECT llmath SOURCES v3dmath.cpp LIBRARIES llmath llcommon)
-  al_add_test(v3math PROJECT llmath SOURCES v3math.cpp LIBRARIES llmath llcommon)
-  al_add_test(v4math PROJECT llmath SOURCES v4math.cpp LIBRARIES llmath llcommon)
-  al_add_test(xform PROJECT llmath SOURCES xform.cpp LIBRARIES llmath llcommon)
 
   # The batch kernels at every width, at the tree's tier and, where the
   # tiers differ, at each of them; a variant the host cannot run skips.

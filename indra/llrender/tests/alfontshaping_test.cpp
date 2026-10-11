@@ -62,6 +62,8 @@ extern FT_Library gFTLibrary;
 
 namespace tut
 {
+namespace
+{
     using namespace ll_test;
 
     // Per-test init/cleanup. LLFontManager is process-scoped but
@@ -86,6 +88,7 @@ namespace tut
     typedef test_group<alfontshaping_data> alfontshaping_test;
     typedef alfontshaping_test::object     alfontshaping_object;
     tut::alfontshaping_test alfontshaping_testcase("ALFontShaping");
+}
 
     // Null root face and empty/inverted ranges all produce empty
     // output. The header documents these as the safe-fallback

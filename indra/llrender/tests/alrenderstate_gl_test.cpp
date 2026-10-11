@@ -67,21 +67,10 @@ namespace tut
                 box[i] = value[i];
             }
         }
-    }
 
+    // The clear colour and scissor box the tests set go back with mGL.
     struct alrenderstate_data
     {
-        static ll_test::HeadlessGL& gl()
-        {
-            static ll_test::HeadlessGL instance(true, true, true, false);
-            return instance;
-        }
-
-        alrenderstate_data()
-        {
-            gl();
-        }
-
         ~alrenderstate_data()
         {
             // A failed check throws out of a test with the target still bound, and a bound target cannot be released.
@@ -90,7 +79,6 @@ namespace tut
                 mTarget.flush();
             }
             mTarget.release();
-            gGL.setClearColor(LLColor4::transparent);
         }
 
         void setUp()
@@ -98,12 +86,14 @@ namespace tut
             ensure("target allocates", mTarget.allocate(SIZE, SIZE, GL_RGBA8));
         }
 
+        ll_test::SharedGLScope mGL;
         LLRenderTarget mTarget;
     };
 
     typedef test_group<alrenderstate_data> alrenderstate_t;
     typedef alrenderstate_t::object alrenderstate_object_t;
     tut::alrenderstate_t tut_alrenderstate("alrenderstate_gl");
+    }
 
     // The clear colour a target's clear fills with is the one gGL was given, and GL holds what gGL says it does.
     template<> template<>

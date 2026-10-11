@@ -60,13 +60,6 @@
 #include <functional>
 #include <string>
 
-class LLAvatarName;
-const std::string gBenchAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gBenchAnonName;
-}
-
 // Only an optimised build measures, and only it has a use for these: an
 // unoptimised one would say they are unused.
 #if defined(LL_RELEASE)

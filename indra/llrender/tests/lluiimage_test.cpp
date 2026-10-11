@@ -90,17 +90,15 @@ namespace ll_test
 
 namespace tut
 {
+namespace
+{
     struct lluiimage_data
     {
         // One context for the binary: standing it up is the expensive part,
         // and LLImageGL's class state does not survive a re-init.
         static ll_test::HeadlessGL& gl()
         {
-            static ll_test::HeadlessGL instance(/*needs_vbos=*/true,
-                                                /*needs_imagegl=*/true,
-                                                /*needs_llrender=*/true,
-                                                /*needs_render=*/true);
-            return instance;
+            return ll_test::sharedHeadlessGL();
         }
 
         lluiimage_data()
@@ -149,6 +147,7 @@ namespace tut
     typedef test_group<lluiimage_data> lluiimage_test;
     typedef lluiimage_test::object     lluiimage_object;
     tut::lluiimage_test lluiimage_testcase("LLUIImage");
+}
 
     // One recording serves every position the image is drawn at. A floater
     // being dragged is this test run at frame rate.

@@ -34,6 +34,7 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
@@ -41,15 +42,10 @@
 #include <string>
 #include <vector>
 
-class LLAvatarName;
-const std::string gGoToLineTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gGoToLineTestAnonName;
-}
-
-// A place, as a failed check says it.
-std::ostream& operator<<(std::ostream& out, const ALTextPos& pos)
+// A place, as a failed check says it. Static rather than in the anonymous
+// namespace: tut's ensure_equals finds it by argument-dependent lookup,
+// which looks in ALTextPos's namespace and not in a nested one.
+static std::ostream& operator<<(std::ostream& out, const ALTextPos& pos)
 {
     return out << pos.line << ":" << pos.column;
 }
@@ -69,6 +65,9 @@ namespace tut
     struct altextgotoline_data
     {
         ll_test::HeadlessUI& ui     = ll_test::HeadlessUI::get();
+        // Focus and capture as the test found them, whatever it leaves
+        // them on.
+        ll_test::FocusScope  focus;
         Window*              window = nullptr;
         ALTextView*          view   = nullptr;
         ALQuickAsk           asker;

@@ -95,22 +95,24 @@ namespace tut
         const std::array<F32, 8> kCW  = { -1.f, -1.f, -1.f,  1.f,  1.f, 1.f,  1.f, -1.f };
 
         struct Vertex { F32 x, y, z, w; };
-    }
 
     struct altessellation_data
     {
         static ll_test::HeadlessGL& gl()
         {
-            static ll_test::HeadlessGL instance(/*needs_vbos=*/true,
-                                                /*needs_imagegl=*/false,
-                                                /*needs_llrender=*/true,
-                                                /*needs_render=*/false);
-            return instance;
+            return ll_test::sharedHeadlessGL();
         }
 
         altessellation_data()
         {
             gl();
+            // The shared context has gUIProgram bound, with LLVertexBuffer's
+            // arrays enabled for it, and a draw with an array enabled that no
+            // buffer stands behind fails. The fixture turns them off for the
+            // tests, and puts them, the program and the buffer binding back.
+            glGetIntegerv(GL_CURRENT_PROGRAM, &mPriorProgram);
+            mPriorArrays = LLVertexBuffer::sLastMask;
+            LLVertexBuffer::setupClientArrays(0);
             mProgram = glCreateProgram();
             const std::array<std::pair<GLenum, const char*>, 4> stages = {{
                 { GL_VERTEX_SHADER,          kVertex },
@@ -156,9 +158,12 @@ namespace tut
 
         ~altessellation_data()
         {
-            glUseProgram(0);
+            glUseProgram(mPriorProgram);
             glDisableVertexAttribArray(0);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            LLVertexBuffer::setupClientArrays(mPriorArrays);
+            // Through LLVertexBuffer, so that its next draw binds its buffer
+            // and points the arrays at it again rather than at ours.
+            LLVertexBuffer::unbind();
             glDeleteQueries(1, &mQuery);
             glDeleteBuffers(1, &mCapture);
             glDeleteBuffers(1, &mCorners);
@@ -264,11 +269,14 @@ namespace tut
         GLint  mInner = -1;
         bool   mCompiled = true;
         bool   mLinked = false;
+        GLint  mPriorProgram = 0;
+        U32    mPriorArrays = 0;
     };
 
     typedef test_group<altessellation_data> altessellation_test;
     typedef altessellation_test::object     altessellation_object;
     tut::altessellation_test altessellation_testcase("ALTessellation");
+    }
 
     // The context compiles both tessellation stages and links them with a
     // vertex and fragment shader. Everything below assumes this.

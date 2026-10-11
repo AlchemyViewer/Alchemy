@@ -38,12 +38,15 @@
 
 namespace tut
 {
+namespace
+{
     struct LLBBoxData
     {
     };
 
     typedef test_group<LLBBoxData> factory;
     typedef factory::object object;
+}
 }
 
 namespace

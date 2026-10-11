@@ -2476,8 +2476,8 @@ if(AL_BUILD_TESTS)
     alscriptstudioviewer.cpp
     alscriptstudioweighing.cpp
     alscriptstudiowords.cpp
+    alscripttypes.cpp
     alscriptweightspane.cpp
-    tests/alscriptpaths_stub.cpp
     tests/alscriptstudio_stubs.cpp
   )
   get_property(studio_test_includes TARGET ${test_project} PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
@@ -2491,6 +2491,18 @@ if(AL_BUILD_TESTS)
   )
   target_link_libraries(al_studio_test_common PRIVATE al::flags PUBLIC llui alscript ${test_libs})
   set_target_properties(al_studio_test_common PROPERTIES FOLDER "Tests/${test_project}")
+
+  # What the tests take of the rest of the viewer, faked once. Objects, which
+  # a test links whole, since what reaches for them is a library the linker
+  # may read after an archive of them; a test names them where it needs them.
+  add_library(newview_test_fakes OBJECT tests/newview_test_fakes.cpp)
+  target_link_libraries(newview_test_fakes PRIVATE al::flags llcommon)
+  set_target_properties(newview_test_fakes PROPERTIES FOLDER "Tests/${test_project}")
+  # The viewer's settings group, gSavedSettings, for a test whose code reads
+  # it: a group made as the process starts, so linked by those tests alone.
+  add_library(newview_test_settings OBJECT tests/newview_test_settings.cpp)
+  target_link_libraries(newview_test_settings PRIVATE al::flags llxml)
+  set_target_properties(newview_test_settings PROPERTIES FOLDER "Tests/${test_project}")
 
   # A unit test compiles one viewer source file on its own. Each line is one
   # such file and its test under tests/.
@@ -2508,9 +2520,7 @@ if(AL_BUILD_TESTS)
     almotionpredictor
     alsceneexplorerpredicate
     alwhitebalancesolver
-    llagentaccess
     lldateutil
-    llremoteparcelrequest
     llviewerhelputil
     llversioninfo
     llvocache
@@ -2519,6 +2529,17 @@ if(AL_BUILD_TESTS)
   )
     al_add_test(${test} UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
   endforeach()
+  # A parcel's information handed to its observers and to the URL entries
+  # that name it: llui's own, rather than stubs of them.
+  al_add_test(
+    llremoteparcelrequest
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES newview_test_fakes llui ${test_libs}
+  )
+  # The agent's maturity, read and written through a settings group of each
+  # test's own.
+  al_add_test(llagentaccess UNIT PROJECT ${test_project} LIBRARIES llxml ${test_libs})
   # The vectorscope bins on the colour wheels' own chroma plane, so the scope
   # data test links the model that defines it rather than keeping a second copy
   # of the basis that could drift from it.
@@ -2584,7 +2605,7 @@ if(AL_BUILD_TESTS)
     alscriptitemdrop
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2593,7 +2614,7 @@ if(AL_BUILD_TESTS)
     alnotecardembedded
     UNIT
     PROJECT ${test_project}
-    LIBRARIES llui alscript ${test_libs}
+    LIBRARIES newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2616,7 +2637,7 @@ if(AL_BUILD_TESTS)
     alscriptexplorermodel
     UNIT
     PROJECT ${test_project}
-    LIBRARIES llui alscript ${test_libs}
+    LIBRARIES newview_test_fakes llui alscript ${test_libs}
     SOURCES alscriptcontentsindex.cpp
   )
 
@@ -2626,7 +2647,7 @@ if(AL_BUILD_TESTS)
     alscriptexplorertree
     UNIT
     PROJECT ${test_project}
-    LIBRARIES llui alscript ${test_libs}
+    LIBRARIES newview_test_fakes llui alscript ${test_libs}
     SOURCES alscriptexplorermodel.cpp alscriptcontentsindex.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
@@ -2637,7 +2658,7 @@ if(AL_BUILD_TESTS)
     alscriptoutputpane
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2647,7 +2668,7 @@ if(AL_BUILD_TESTS)
     alscriptproblemspane
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2657,7 +2678,7 @@ if(AL_BUILD_TESTS)
     alscriptsearchpane
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     SOURCES alscriptsearch.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
@@ -2667,7 +2688,7 @@ if(AL_BUILD_TESTS)
     alrecoverykeeper
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
   )
 
   # A Script Studio window's saves kept in a history of the test's, listed,
@@ -2676,7 +2697,7 @@ if(AL_BUILD_TESTS)
     alscriptstudiohistory
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2687,7 +2708,7 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     SOURCES alscriptstudiohistory.cpp
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2698,7 +2719,7 @@ if(AL_BUILD_TESTS)
     alscriptstudiocomparepairs
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2708,7 +2729,7 @@ if(AL_BUILD_TESTS)
     alscriptstudioexpandedcompare
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2718,7 +2739,7 @@ if(AL_BUILD_TESTS)
     alscriptstudiomerging
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2728,7 +2749,7 @@ if(AL_BUILD_TESTS)
     alscriptstudioselections
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2738,7 +2759,7 @@ if(AL_BUILD_TESTS)
     alscriptstudiorecovery
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2758,7 +2779,7 @@ if(AL_BUILD_TESTS)
     alscripttheme
     UNIT
     PROJECT ${test_project}
-    LIBRARIES llui ${test_libs}
+    LIBRARIES newview_test_fakes llui ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2772,7 +2793,7 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     SOURCES alscriptkeypresets.cpp
-    LIBRARIES llui ${test_libs}
+    LIBRARIES newview_test_fakes newview_test_settings llui ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2786,7 +2807,7 @@ if(AL_BUILD_TESTS)
     alscriptstudiosaving
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2796,7 +2817,7 @@ if(AL_BUILD_TESTS)
     alscriptstudiofiles
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2808,7 +2829,7 @@ if(AL_BUILD_TESTS)
     alscriptstudiomasters
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2822,7 +2843,7 @@ if(AL_BUILD_TESTS)
     alscriptnavigation
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2832,7 +2853,7 @@ if(AL_BUILD_TESTS)
     alscriptlookup
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2842,7 +2863,7 @@ if(AL_BUILD_TESTS)
     alscriptreferencespane
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2852,7 +2873,7 @@ if(AL_BUILD_TESTS)
     alscriptoutlinepane
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2862,7 +2883,7 @@ if(AL_BUILD_TESTS)
     alscriptcrumbsbar
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2872,7 +2893,7 @@ if(AL_BUILD_TESTS)
     alscriptinspectorpane
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2882,7 +2903,7 @@ if(AL_BUILD_TESTS)
     alscriptstudiocaret
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2906,7 +2927,7 @@ if(AL_BUILD_TESTS)
     alscriptanalyzers
     UNIT
     PROJECT ${test_project}
-    LIBRARIES alscript llui ${test_libs}
+    LIBRARIES newview_test_fakes alscript llui ${test_libs}
     DEFINES "AL_LSL_DEFINITIONS_DIR=\"${LSL_DEFINITIONS_DIR}\""
   )
 
@@ -2916,7 +2937,7 @@ if(AL_BUILD_TESTS)
     alscriptstudiochecking
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2926,7 +2947,7 @@ if(AL_BUILD_TESTS)
     alscriptobjectcheck
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     SOURCES alscriptstudiochecking.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
@@ -2942,7 +2963,7 @@ if(AL_BUILD_TESTS)
     alscriptrecompile
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2952,7 +2973,7 @@ if(AL_BUILD_TESTS)
     alscriptstudioorphans
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2962,7 +2983,7 @@ if(AL_BUILD_TESTS)
     alscriptstudiowords
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2972,7 +2993,7 @@ if(AL_BUILD_TESTS)
     alscriptstudioweighing
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2982,7 +3003,7 @@ if(AL_BUILD_TESTS)
     alscriptexternaleditor
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2992,7 +3013,7 @@ if(AL_BUILD_TESTS)
     alscriptstudiovim
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     SOURCES alscriptstudiocommands.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
@@ -3003,7 +3024,7 @@ if(AL_BUILD_TESTS)
     alscriptstudiodoc
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -3013,7 +3034,7 @@ if(AL_BUILD_TESTS)
     alscriptweightspane
     UNIT
     PROJECT ${test_project}
-    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common newview_test_fakes llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -3038,13 +3059,8 @@ if(AL_BUILD_TESTS)
   al_add_test(
     llviewercontrollistener
     PROJECT ${test_project}
-    LIBRARIES ${test_libs}
-    SOURCES
-      llviewercontrollistener.cpp
-      ../llxml/llcontrol.cpp
-      ../llxml/llxmltree.cpp
-      ../llxml/alxmldocument.cpp
-      ../llcommon/commoncontrol.cpp
+    LIBRARIES llxml ${test_libs}
+    SOURCES llviewercontrollistener.cpp
   )
   al_add_test(
     llviewernetwork
@@ -3067,12 +3083,7 @@ if(AL_BUILD_TESTS)
   al_add_test(
     lltextureinfo
     PROJECT ${test_project}
-    LIBRARIES ${test_libs}
-    SOURCES
-      lltextureinfo.cpp
-      ../llxml/llcontrol.cpp
-      ../llxml/llxmltree.cpp
-      ../llxml/alxmldocument.cpp
-      ../llcommon/commoncontrol.cpp
+    LIBRARIES newview_test_settings llxml ${test_libs}
+    SOURCES lltextureinfo.cpp
   )
 endif()

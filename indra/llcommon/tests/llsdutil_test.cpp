@@ -77,7 +77,7 @@ namespace tut
     };
     typedef test_group<llsdutil_data> llsdutil_test;;
     typedef llsdutil_test::object llsdutil_object;
-    tut::llsdutil_test tutil("llsdutil");
+    tut::llsdutil_test tut_llsdutil("llsdutil");
 
     template<> template<>
     void llsdutil_object::test<1>()

@@ -37,15 +37,6 @@
 
 #include "../test/lltut.h"
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gSpinCtrlTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gSpinCtrlTestAnonName;
-}
-
 namespace tut
 {
     struct llspinctrl_data

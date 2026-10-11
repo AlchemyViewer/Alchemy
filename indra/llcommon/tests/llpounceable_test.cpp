@@ -20,6 +20,9 @@
 // other Linden headers
 #include "../test/lltut.h"
 
+namespace
+{
+
 /*----------------------------- string testing -----------------------------*/
 void append(std::string* dest, const std::string& src)
 {
@@ -42,8 +45,8 @@ void setter(Data** dest, Data* ptr)
 
 static Data* static_check = 0;
 
-// Set up an extern pointer to an LLPounceableStatic so the linker will fill
-// in the forward reference from below, before runtime.
+// Declare an LLPounceableStatic ahead of its definition below, so the
+// forward reference is resolved before runtime.
 extern LLPounceable<Data*, LLPounceableStatic> gForward;
 
 struct EnqueueCall
@@ -65,6 +68,8 @@ struct EnqueueCall
 
 // Now declare gForward. Its constructor should not run until after nqcall's.
 LLPounceable<Data*, LLPounceableStatic> gForward;
+
+} // anonymous namespace
 
 /*****************************************************************************
 *   TUT
@@ -88,6 +93,16 @@ namespace tut
         // LLPounceableStatic<LLMessageSystem*, LLPounceableStatic>.
         ensure("static_check should still be null", ! static_check);
         Data myData("test<1>");
+        // gForward and static_check let go of myData with the test, however
+        // it ends, rather than point past it at whatever runs next.
+        struct LetGo
+        {
+            ~LetGo()
+            {
+                gForward = nullptr;
+                static_check = nullptr;
+            }
+        } let_go;
         gForward = &myData;         // should run setter
         ensure_equals("static_check should be &myData", static_check, &myData);
     }

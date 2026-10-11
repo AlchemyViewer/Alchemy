@@ -40,11 +40,13 @@
 
 namespace tut
 {
+namespace
+{
     using namespace ll_test;
 
     // -------------------------------------------------------------
-    // GL-backed group: rasterizer-touching paths. The HeadlessGl
-    // singleton supplies the GL context so addGlyph's
+    // GL-backed group: rasterizer-touching paths. Each test's own
+    // HeadlessGL supplies the GL context so addGlyph's
     // gGL.bind(image_gl) call lands on a live GL state.
     // -------------------------------------------------------------
 
@@ -57,6 +59,7 @@ namespace tut
     typedef test_group<llfontfreetype_render_data> llfontfreetype_render_test;
     typedef llfontfreetype_render_test::object     llfontfreetype_render_object;
     tut::llfontfreetype_render_test llfontfreetype_render_testcase("LLFontFreetypeRender");
+}
 
     // After getGlyphInfo for an ASCII glyph, the bitmap cache has at
     // least one Grayscale page, and the returned info has positive

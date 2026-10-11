@@ -30,6 +30,8 @@ public:
 
 namespace tut
 {
+namespace
+{
     struct JSONRPCWSTestData
     {
     };
@@ -37,6 +39,7 @@ namespace tut
     typedef test_group<JSONRPCWSTestData> JSONRPCWSTestGroupType;
     typedef JSONRPCWSTestGroupType::object JSONRPCWSTestObjectType;
     JSONRPCWSTestGroupType JSONRPCWSTestGroup("LLJSONRPCConnection Tests");
+}
 
     template<> template<>
     void JSONRPCWSTestObjectType::test<1>()

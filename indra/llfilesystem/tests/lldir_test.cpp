@@ -46,6 +46,8 @@
 #include <unistd.h>
 #endif
 
+namespace
+{
 // For some tests, use a dummy LLDir that uses memory data instead of touching
 // the filesystem
 struct LLDir_Dummy: public LLDir
@@ -192,6 +194,7 @@ struct LLDir_Relocated: public LLDir_Dummy
         mDefaultCacheDir = "cachedir";
     }
 };
+}
 
 #if LL_LINUX
 namespace
@@ -271,12 +274,15 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct LLDirTest
         {
         };
         typedef test_group<LLDirTest> LLDirTest_t;
         typedef LLDirTest_t::object LLDirTest_object_t;
         tut::LLDirTest_t tut_LLDirTest("LLDir");
+}
 
     template<> template<>
     void LLDirTest_object_t::test<1>()
@@ -494,6 +500,8 @@ namespace tut
                   "ext");
     }
 
+namespace
+{
    std::string makeTestFile( const std::string& dir, const std::string& file )
    {
       std::string path = dir + file;
@@ -564,6 +572,7 @@ namespace tut
          }
       }
    }
+}
 
    template<> template<>
    void LLDirTest_object_t::test<5>()

@@ -31,6 +31,8 @@
 
 namespace tut
 {
+namespace
+{
     struct lluitransform_data
     {
         // The shadow of the UI transform is global, so each test says what it
@@ -62,6 +64,7 @@ namespace tut
     typedef test_group<lluitransform_data> lluitransform_test;
     typedef lluitransform_test::object     lluitransform_object;
     tut::lluitransform_test lluitransform_testgroup("lluitransform");
+}
 
     // With nothing pushed, a local rect is where it says it is.
     template<> template<>

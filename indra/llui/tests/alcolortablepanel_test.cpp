@@ -33,15 +33,11 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gColorTablePanelTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gColorTablePanelTestAnonName;
-}
+#include <optional>
 
 namespace tut
 {
@@ -58,7 +54,12 @@ namespace tut
             {
                 loaded = LLUIColorTable::instance().loadFromSettings();
             }
+            colours.emplace();
         }
+
+        // What a test sets in the table, set back when it ends; begun once
+        // the skin's colours are in, which every test here reads.
+        std::optional<ll_test::ColorTableScope> colours;
 
         static ALColorTablePanel* make()
         {

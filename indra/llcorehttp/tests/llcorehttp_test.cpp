@@ -75,6 +75,9 @@ int main()
 
 #endif // 0
 
+namespace
+{
+
 void init_curl()
 {
     curl_global_init(CURL_GLOBAL_ALL);
@@ -121,4 +124,6 @@ void stop_thread(LLCore::HttpRequest * req)
             usleep(100000);
         }
     }
+}
+
 }

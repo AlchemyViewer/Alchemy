@@ -428,23 +428,26 @@ namespace tut
     // the code still, which keeps it for a require found nowhere, for each
     // name it took; an alias's it read through the `.luaurc`, which is gone,
     // and is kept as it found it.
-    struct RequireCase
+    namespace
     {
-        // What it shows, and whose case it is.
-        const char* what;
-        // The file asking, under the tree; "object" for a script in an
-        // object, which with world includes off reads nothing of the world.
-        const char* from;
-        const char* name;
-        // What it finds, under the tree, or nothing: what the search found
-        // before the navigator, and what it finds now, as LAD9 has it.
-        const char* before;
-        const char* chosen;
-        // Whose rule LAD9 picks, where the references or we disagree: and
-        // what Luau's navigator answers, where it differs from the choice.
-        const char* rule;
-        const char* luau;
-    };
+        struct RequireCase
+        {
+            // What it shows, and whose case it is.
+            const char* what;
+            // The file asking, under the tree; "object" for a script in an
+            // object, which with world includes off reads nothing of the world.
+            const char* from;
+            const char* name;
+            // What it finds, under the tree, or nothing: what the search found
+            // before the navigator, and what it finds now, as LAD9 has it.
+            const char* before;
+            const char* chosen;
+            // Whose rule LAD9 picks, where the references or we disagree: and
+            // what Luau's navigator answers, where it differs from the choice.
+            const char* rule;
+            const char* luau;
+        };
+    } // anonymous namespace
 
     template<> template<>
     void alincludesearch_object::test<7>()

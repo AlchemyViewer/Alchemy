@@ -562,103 +562,21 @@ if(AL_BUILD_TESTS)
     llcommon
     ${spellcheck_lib}
   )
-  al_add_test(llchatautocompletemodel UNIT PROJECT llui LIBRARIES ${test_libs})
-  al_add_test(llurlmatch UNIT PROJECT llui LIBRARIES ${test_libs})
-  al_add_test(alkeymap UNIT PROJECT llui DIR code LIBRARIES ${test_libs})
-  # What comparing two texts is made of, compiled in, below the view.
-  set(
-    diff_sources
-    diff/aldiffedit.cpp
-    diff/aldiffmoves.cpp
-    diff/aldiffrangesame.cpp
-    diff/aldiffsame.cpp
-    diff/aldiffsplice.cpp
-    diff/aldifftokens.cpp
-    diff/allinediff.cpp
-    diff/allinepairs.cpp
-    diff/alstructuraldiff.cpp
-    diff/altextmerge.cpp
-    diff/alworddiff.cpp
-  )
-  al_add_test(altextdiff UNIT PROJECT llui DIR diff SOURCES ${diff_sources} LIBRARIES ${test_libs})
-  # Two texts' differences written as a unified diff.
-  al_add_test(
-    alunifieddiff
-    UNIT
-    PROJECT llui
-    DIR diff
-    SOURCES diff/altextdiff.cpp ${diff_sources}
-    LIBRARIES ${test_libs}
-  )
-  # A merge settled in a comparison, and lines of a text put in place of
-  # others as one edit of it.
-  al_add_test(
-    aldiffmerge
-    UNIT
-    PROJECT llui
-    DIR diff
-    SOURCES diff/altextdiff.cpp diff/aldifflexer.cpp code/alsyntaxgrammar.cpp ${diff_sources}
-    LIBRARIES ${test_libs}
-    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
-  )
-  al_add_test(
-    aldiffmodel
-    UNIT
-    PROJECT llui
-    DIR diff
-    SOURCES
-      diff/altextdiff.cpp
-      diff/aldiffmerge.cpp
-      diff/aldifflexer.cpp
-      code/alsyntaxgrammar.cpp
-      ${diff_sources}
-    LIBRARIES ${test_libs}
-    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
-  )
-  # A grammar's regions for a comparison, read again only where a text
-  # changed: over the grammars the viewer ships.
-  al_add_test(
-    aldifflexer
-    UNIT
-    PROJECT llui
-    DIR diff
-    SOURCES code/alsyntaxgrammar.cpp diff/altextdiff.cpp ${diff_sources}
-    LIBRARIES ${test_libs}
-    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
-  )
-  al_add_test(alanchoredranges PROJECT llui SOURCES text/altextdocument.cpp LIBRARIES ${test_libs})
+  # Four that test templates whole in their headers, and need nothing
+  # compiled of llui's.
   al_add_test(alfenwicktree PROJECT llui LIBRARIES ${test_libs})
   al_add_test(allinetable PROJECT llui LIBRARIES ${test_libs})
   al_add_test(almaxima PROJECT llui LIBRARIES ${test_libs})
   al_add_test(alprefixsums PROJECT llui LIBRARIES ${test_libs})
-  al_add_test(altextdocument UNIT PROJECT llui DIR text LIBRARIES ${test_libs})
-  al_add_test(
-    altextcarets
-    UNIT
-    PROJECT llui
-    DIR text
-    SOURCES text/altextdocument.cpp
-    LIBRARIES ${test_libs}
-  )
-  al_add_test(
-    altextundo
-    UNIT
-    PROJECT llui
-    DIR text
-    SOURCES text/altextdocument.cpp
-    LIBRARIES ${test_libs}
-  )
-  al_add_test(alnotecarditems UNIT PROJECT llui DIR text LIBRARIES ${test_libs})
-  al_add_test(
-    alsyntaxhighlighter
-    UNIT
-    PROJECT llui
-    DIR code
-    SOURCES code/alsyntaxgrammar.cpp text/altextdocument.cpp
-    LIBRARIES ${test_libs}
-  )
 
-  set(test_libs llui ${test_libs})
+  # What llui asks the viewer for, defined once: compiled here and linked
+  # into every test and benchmark below, which link the library. A test
+  # file holds no copy of its own, since two in one binary would not link.
+  add_library(llui_test_fakes OBJECT tests/llui_test_fakes.cpp)
+  target_link_libraries(llui_test_fakes PRIVATE al::flags llcommon)
+  set_target_properties(llui_test_fakes PROPERTIES FOLDER "Tests/llui")
+
+  set(test_libs llui llui_test_fakes ${test_libs})
   foreach(
     test
     llstatbar
@@ -674,13 +592,55 @@ if(AL_BUILD_TESTS)
   )
     al_add_test(${test} PROJECT llui LIBRARIES ${test_libs})
   endforeach()
-  al_add_test(llurlentry PROJECT llui SOURCES llurlentry.cpp LIBRARIES ${test_libs})
-  al_add_test(llemojidictionary PROJECT llui SOURCES llemojidictionary.cpp LIBRARIES ${test_libs})
+  # Tests of one of llui's files each, linked against the library that
+  # holds it rather than compiling a copy of their own.
+  foreach(
+    test
+    llchatautocompletemodel
+    alkeymap
+    alanchoredranges
+    altextdocument
+    altextcarets
+    altextundo
+    alnotecarditems
+    alsyntaxhighlighter
+    llurlentry
+    llemojidictionary
+  )
+    al_add_test(${test} PROJECT llui LIBRARIES ${test_libs})
+  endforeach()
+  # What comparing two texts is made of, below the view.
+  al_add_test(altextdiff PROJECT llui LIBRARIES ${test_libs})
+  # Two texts' differences written as a unified diff.
+  al_add_test(alunifieddiff PROJECT llui LIBRARIES ${test_libs})
+  # A merge settled in a comparison, and lines of a text put in place of
+  # others as one edit of it.
+  al_add_test(
+    aldiffmerge
+    PROJECT llui
+    LIBRARIES ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+  al_add_test(
+    aldiffmodel
+    PROJECT llui
+    LIBRARIES ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+  # A grammar's regions for a comparison, read again only where a text
+  # changed: over the grammars the viewer ships.
+  al_add_test(
+    aldifflexer
+    PROJECT llui
+    LIBRARIES ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
 
   # Tests that build widgets above LLView stand up a UI over the source
   # tree's skins and fonts; this is where it is.
   foreach(
     test
+    llurlmatch
     lllayoutstack
     llresizebar
     llaccordionctrltab

@@ -107,6 +107,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct llcharacter_data
     {
         ALTestCharacter mCharacter;
@@ -162,6 +164,7 @@ namespace tut
     typedef test_group<llcharacter_data> llcharacter_test;
     typedef llcharacter_test::object llcharacter_object;
     tut::llcharacter_test llcharacter_testcase("LLCharacter");
+}
 
     template<> template<>
     void llcharacter_object::test<1>()

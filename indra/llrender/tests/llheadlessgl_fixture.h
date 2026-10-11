@@ -8,10 +8,10 @@
  * Linux -- and where Linux has no display, SDL's offscreen driver.
  *
  * Standing the context up is the expensive part — TUT spins a fresh
- * fixture per test method, so we hide a static-local instance
- * behind getHeadlessGl() and let every fixture struct embed a
- * reference. That keeps each test isolated against its own state
- * (font registry, atlas pages) while reusing the GL context.
+ * fixture per test method, so a test that can share one takes the
+ * static-local instance behind sharedHeadlessGL() and keeps its own
+ * state (font registry, atlas pages) in the fixture. A test that
+ * needs a context of its own makes a HeadlessGL per test instead.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -52,7 +52,9 @@
 #include "llwindow.h"
 #include "llwindowcallbacks.h"
 
+#include <algorithm>
 #include <cstring>
+#include <iterator>
 #include <string>
 #include <utility>
 
@@ -81,7 +83,7 @@ namespace ll_test
     };
 
     // Drop transient font caches that would otherwise leak between tests
-    // sharing this binary's HeadlessGl singleton. Safe to call repeatedly;
+    // sharing sharedHeadlessGL(). Safe to call repeatedly;
     // does NOT touch LLFontManager / LLImageGL / GL state — those stay
     // alive for the whole binary because LLFontGL's static fontp caches
     // (getFontSansSerif et al.) dangle across a re-init cycle (see
@@ -115,19 +117,23 @@ namespace ll_test
     class TestShaderMgr : public LLShaderMgr
     {
     public:
+        // One made over another, as a test's own over the shared context's,
+        // stands in for it while it lives and hands the instance back.
         explicit TestShaderMgr(std::string dir_prefix = std::string())
-        : mDirPrefix(std::move(dir_prefix))
+        : mDirPrefix(std::move(dir_prefix)),
+          mPrevious(sInstance)
         {
             sInstance = this;
             initAttribsAndUniforms();
         }
-        ~TestShaderMgr() override { if (sInstance == this) sInstance = nullptr; }
+        ~TestShaderMgr() override { if (sInstance == this) sInstance = mPrevious; }
 
         std::string getShaderDirPrefix() override { return mDirPrefix; }
         void updateShaderUniforms(LLGLSLShader* /*shader*/) override {}
 
     private:
         std::string mDirPrefix;
+        LLShaderMgr* mPrevious;
     };
 
     // GL 3.3 core pass-through UI vertex shader. Same uniform / attribute
@@ -369,6 +375,13 @@ namespace ll_test
 
             installDebugMessageCallback();
 
+            // The window's viewport, as the viewer's window records it: what a
+            // render target's flush puts back when no outer target is bound.
+            gGLViewport[0] = 0;
+            gGLViewport[1] = 0;
+            gGLViewport[2] = WIDTH;
+            gGLViewport[3] = HEIGHT;
+
             // Both of these take an LLWindow only to hand to worker threads
             // they are not being asked to start: ENABLE_GL_WORK_QUEUE is 0,
             // and the texture and media threads are off below.
@@ -438,6 +451,7 @@ namespace ll_test
             ALUniformBuffer::cleanupClass();
 
             LLWindowManager::destroyWindow(mWindow);
+            std::fill(std::begin(gGLViewport), std::end(gGLViewport), 0);
         }
 
         void swapBuffer()
@@ -462,6 +476,155 @@ namespace ll_test
         LLWindowCallbacks mCallbacks;
         LLWindow* mWindow = nullptr;
         std::unique_ptr<TestShaderMgr> mShaderMgr;
+    };
+
+    // The one context of the tests that share theirs: made by the first test
+    // to ask and kept for the rest of the process, so a binary of them has
+    // one window. Every part of the fixture is up, the union of what those
+    // tests need, so each must leave the image, render and shader state as
+    // it found it. Tests that make a HeadlessGL of their own per test end
+    // the GL classes under it, and are never linked beside a caller of this.
+    inline HeadlessGL& sharedHeadlessGL()
+    {
+        static HeadlessGL gl(/*needs_vbos=*/true,
+                             /*needs_imagegl=*/true,
+                             /*needs_llrender=*/true,
+                             /*needs_render=*/true);
+        return gl;
+    }
+
+    // A test's hold on the shared context. It takes sharedHeadlessGL() as it
+    // is made and reads what a test may change of the context, then puts that
+    // back as it goes, whether the test changed it through gGL's and the
+    // shader's caches or behind them, so the next test finds the context as
+    // the fixture left it. The first member of a test's fixture, so that it
+    // goes after the fixture's own GL objects. A test that leaves a matrix
+    // pushed (only one that failed between a push and its pop) leaves the
+    // stack deeper; the matrices themselves are put back regardless.
+    class SharedGLScope
+    {
+    public:
+        SharedGLScope()
+        : mGL(sharedHeadlessGL())
+        {
+            mShader = LLGLSLShader::sCurBoundShaderPtr;
+            glGetIntegerv(GL_CURRENT_PROGRAM, &mProgram);
+            glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &mVertexArray);
+            glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &mDrawFramebuffer);
+            glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &mReadFramebuffer);
+            glGetIntegerv(GL_VIEWPORT, mViewport);
+            glGetIntegerv(GL_SCISSOR_BOX, mScissor);
+            mScissorTest = glIsEnabled(GL_SCISSOR_TEST);
+            mDepthTest = glIsEnabled(GL_DEPTH_TEST);
+            glGetIntegerv(GL_DEPTH_FUNC, &mDepthFunc);
+            glGetBooleanv(GL_DEPTH_WRITEMASK, &mDepthMask);
+            glGetDoublev(GL_DEPTH_CLEAR_VALUE, &mClearDepth);
+            if (gGLManager.mHasClipControl)
+            {
+                glGetIntegerv(GL_CLIP_ORIGIN, &mClipOrigin);
+                glGetIntegerv(GL_CLIP_DEPTH_MODE, &mClipDepthMode);
+            }
+            mClearColor = gGL.getClearColor();
+            mReverseZ = LLRender::sReverseZ;
+            mMatrixMode = gGL.getMatrixMode();
+            mModelview = gGL.getModelviewMatrix();
+            mProjection = gGL.getProjectionMatrix();
+        }
+
+        ~SharedGLScope()
+        {
+            // The shader through its own cache, then the program behind it.
+            if (LLGLSLShader::sCurBoundShaderPtr != mShader)
+            {
+                if (mShader)
+                {
+                    mShader->bind();
+                }
+                else
+                {
+                    LLGLSLShader::unbind();
+                }
+            }
+            glUseProgram(mProgram);
+            // LLRender's own vertex array, and LLVertexBuffer's buffers
+            // through it, so that its next draw binds and points them again.
+            glBindVertexArray(mVertexArray);
+            LLVertexBuffer::unbind();
+
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mDrawFramebuffer);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, mReadFramebuffer);
+            glViewport(mViewport[0], mViewport[1], mViewport[2], mViewport[3]);
+
+            S32 scissor[4];
+            gGL.getScissor(scissor);
+            if (scissor[2] >= 0)
+            {
+                gGL.setScissor(mScissor[0], mScissor[1], mScissor[2], mScissor[3]);
+            }
+            glScissor(mScissor[0], mScissor[1], mScissor[2], mScissor[3]);
+            setEnabled(GL_SCISSOR_TEST, mScissorTest);
+
+            setEnabled(GL_DEPTH_TEST, mDepthTest);
+            glDepthFunc(mDepthFunc);
+            glDepthMask(mDepthMask);
+            glClearDepth(mClearDepth);
+            if (gGLManager.mHasClipControl)
+            {
+                glClipControl(mClipOrigin, mClipDepthMode);
+            }
+            LLRender::sReverseZ = mReverseZ;
+
+            gGL.setClearColor(mClearColor);
+            gGL.matrixMode(LLRender::MM_TEXTURE0);
+            gGL.loadIdentity();
+            gGL.matrixMode(LLRender::MM_PROJECTION);
+            gGL.loadMatrix(mProjection);
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
+            gGL.loadMatrix(mModelview);
+            gGL.matrixMode(mMatrixMode);
+            // The texture slots, colour mask and the rest gGL keeps, issued
+            // again from its cache over whatever was bound behind it.
+            gGL.refreshState();
+        }
+
+        HeadlessGL& gl() const { return mGL; }
+
+        SharedGLScope(const SharedGLScope&)            = delete;
+        SharedGLScope& operator=(const SharedGLScope&) = delete;
+
+    private:
+        static void setEnabled(GLenum cap, GLboolean enabled)
+        {
+            if (enabled)
+            {
+                glEnable(cap);
+            }
+            else
+            {
+                glDisable(cap);
+            }
+        }
+
+        HeadlessGL& mGL;
+        LLGLSLShader* mShader = nullptr;
+        GLint mProgram = 0;
+        GLint mVertexArray = 0;
+        GLint mDrawFramebuffer = 0;
+        GLint mReadFramebuffer = 0;
+        GLint mViewport[4] = { 0, 0, 0, 0 };
+        GLint mScissor[4] = { 0, 0, 0, 0 };
+        GLboolean mScissorTest = GL_FALSE;
+        GLboolean mDepthTest = GL_FALSE;
+        GLint mDepthFunc = GL_LESS;
+        GLboolean mDepthMask = GL_TRUE;
+        GLdouble mClearDepth = 1.0;
+        GLint mClipOrigin = GL_LOWER_LEFT;
+        GLint mClipDepthMode = GL_NEGATIVE_ONE_TO_ONE;
+        LLColor4 mClearColor;
+        bool mReverseZ = false;
+        LLRender::eMatrixMode mMatrixMode = LLRender::MM_MODELVIEW;
+        LLMatrix4a mModelview;
+        LLMatrix4a mProjection;
     };
 }
 

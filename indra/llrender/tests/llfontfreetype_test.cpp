@@ -44,6 +44,8 @@
 
 namespace tut
 {
+namespace
+{
     using namespace ll_test;
 
     // Per-test init/cleanup. LLFontManager is process-scoped but we
@@ -58,6 +60,7 @@ namespace tut
     typedef test_group<llfontfreetype_data> llfontfreetype_test;
     typedef llfontfreetype_test::object     llfontfreetype_object;
     tut::llfontfreetype_test llfontfreetype_testcase("LLFontFreetype");
+}
 
     // initClass is idempotent — repeat calls don't replace gFontManagerp.
     template<> template<>
@@ -356,6 +359,8 @@ namespace tut
     // cmap cache, refcount sharing semantics.
     // -------------------------------------------------------------
 
+namespace
+{
     struct alfontface_data
     {
         alfontface_data()  { LLFontManager::initClass(); }
@@ -365,6 +370,7 @@ namespace tut
     typedef test_group<alfontface_data> alfontface_test;
     typedef alfontface_test::object     alfontface_object;
     tut::alfontface_test alfontface_testcase("ALFontFace");
+}
 
     // ALFontFaceKey equality + hash: equal keys equal+hash-equal;
     // any single-field difference produces unequal keys.

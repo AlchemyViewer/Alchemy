@@ -33,6 +33,8 @@
 
 namespace tut
 {
+namespace
+{
     struct user_relationship
     {
         LLRelationship mRelationship;
@@ -40,6 +42,7 @@ namespace tut
     typedef test_group<user_relationship> user_relationship_t;
     typedef user_relationship_t::object user_relationship_object_t;
     tut::user_relationship_t tut_user_relationship("relationships");
+}
 
     template<> template<>
     void user_relationship_object_t::test<1>()

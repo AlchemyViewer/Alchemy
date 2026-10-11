@@ -61,21 +61,11 @@ namespace tut
 
         const LLColor4U OUTPUT_COLOURS[] = { LLColor4U(255, 0, 0, 255), LLColor4U(0, 255, 0, 255),
                                              LLColor4U(0, 0, 255, 255), LLColor4U(255, 255, 0, 255) };
-    }
 
+    // The program, vertex array and clear colour the test sets go back with
+    // mGL.
     struct llrendertarget_data
     {
-        static ll_test::HeadlessGL& gl()
-        {
-            static ll_test::HeadlessGL instance(true, true, true, false);
-            return instance;
-        }
-
-        llrendertarget_data()
-        {
-            gl();
-        }
-
         ~llrendertarget_data()
         {
             mTarget.release();
@@ -85,7 +75,6 @@ namespace tut
             }
             if (mProgram)
             {
-                glUseProgram(0);
                 glDeleteProgram(mProgram);
             }
         }
@@ -131,6 +120,7 @@ namespace tut
             return LLColor4U(pixel[0], pixel[1], pixel[2], pixel[3]);
         }
 
+        ll_test::SharedGLScope mGL;
         LLRenderTarget mTarget;
         GLuint mVAO = 0;
         GLuint mProgram = 0;
@@ -139,6 +129,7 @@ namespace tut
     typedef test_group<llrendertarget_data> llrendertarget_t;
     typedef llrendertarget_t::object llrendertarget_object_t;
     tut::llrendertarget_t tut_llrendertarget("llrendertarget_gl");
+    }
 
     // setDrawOutput: a single-attachment target takes the output it names and none of the others, and the next
     // bindTarget gives it output 0 again.

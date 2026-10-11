@@ -66,6 +66,26 @@ namespace
         gSaid.emplace_back(args[1].mString ? args[1].mString : "");
     }
 
+    // A library function answered by a stand-in while this lives, and as it
+    // was after, however the test ends: the library is the process's.
+    struct StandIn
+    {
+        using exec_t = decltype(LLScriptLibraryFunction::mExecFunc);
+
+        StandIn(LLScriptLibraryFunction& function, exec_t by)
+            : mFunction(function),
+              mWas(function.mExecFunc)
+        {
+            mFunction.mExecFunc = by;
+        }
+        ~StandIn() { mFunction.mExecFunc = mWas; }
+        StandIn(const StandIn&)            = delete;
+        StandIn& operator=(const StandIn&) = delete;
+
+        LLScriptLibraryFunction& mFunction;
+        const exec_t             mWas;
+    };
+
     // Where LSO keeps the version, the top of memory and the default
     // state's handlers (gLSCRIPTRegisterAddresses).
     constexpr size_t TM  = 0;
@@ -218,20 +238,19 @@ namespace tut
         const ALLSLReference::Result lso = ALLSLReference::compile(text, Target::LSO);
         ensure("LSO: " + lso.messages, lso.ok);
 
-        // llSay is function 23: heard here for the test, as it was.
-        LLScriptLibraryFunction& say  = gScriptLibrary.mFunctions[23];
-        const auto               was  = say.mExecFunc;
-        say.mExecFunc                 = heardSay;
+        // llSay is function 23: heard here for the run, as it was after.
         gSaid.clear();
-        LLScriptExecuteLSL2 vm(lso.image.data(), static_cast<U32>(lso.image.size()));
-        LLTimer             timer;
-        const char*         error  = nullptr;
-        U32                 events = 0;
-        for (S32 quanta = 0; quanta < 100 && gSaid.empty() && !error; ++quanta)
+        const char* error  = nullptr;
+        U32         events = 0;
         {
-            vm.runQuanta(FALSE, LLUUID::null, &error, 1.f, events, timer);
+            const StandIn       heard(gScriptLibrary.mFunctions[23], heardSay);
+            LLScriptExecuteLSL2 vm(lso.image.data(), static_cast<U32>(lso.image.size()));
+            LLTimer             timer;
+            for (S32 quanta = 0; quanta < 100 && gSaid.empty() && !error; ++quanta)
+            {
+                vm.runQuanta(FALSE, LLUUID::null, &error, 1.f, events, timer);
+            }
         }
-        say.mExecFunc = was;
         ensure("no fault: " + std::string(error ? error : ""), !error);
         ensure_equals("one handler run", events, (U32)1);
         ensure_equals("said once", gSaid.size(), (size_t)1);

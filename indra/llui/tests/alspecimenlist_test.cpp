@@ -34,13 +34,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gSpecimenTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gSpecimenTestAnonName;
-}
-
 namespace tut
 {
     struct alspecimenlist_data

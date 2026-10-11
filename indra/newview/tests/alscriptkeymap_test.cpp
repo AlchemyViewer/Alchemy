@@ -26,6 +26,9 @@
 
 #include "../alscriptkeymap.h"
 #include "../alscriptkeypresets.h"
+// The settings the keymap is kept in, the viewer's group, which the test
+// links (newview_test_settings.cpp).
+#include "../llviewercontrol.h"
 
 #include "llcontrol.h"
 #include "llkeyboard.h"
@@ -37,16 +40,14 @@
 #include <string>
 #include <tuple>
 
-// The setting the keymap is kept in, in a group of the test's own.
-LLControlGroup gSavedSettings("Global");
-
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it.
-class LLAvatarName;
-const std::string gKeymapTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
+namespace
 {
-    return gKeymapTestAnonName;
+    // What names keys as a person reads them, which LLKeyboard keeps
+    // without saying.
+    struct KeyTranslator : LLKeyboard
+    {
+        static LLKeyStringTranslatorFunc* current() { return mStringTranslator; }
+    };
 }
 
 namespace tut
@@ -54,6 +55,12 @@ namespace tut
     struct alscriptkeymap_data
     {
         typedef ALEditorCommand C;
+
+        // What the fixture sets, as it was: put back as each test ends, for
+        // whatever runs after it.
+        LLKeyStringTranslatorFunc* translatorWas = KeyTranslator::current();
+        LLSD                       keysWas;
+        std::string                presetWas;
 
         alscriptkeymap_data()
         {
@@ -66,8 +73,18 @@ namespace tut
             {
                 gSavedSettings.declareString("ALScriptStudioKeymapPreset", "studio", "another editor's keys", LLControlVariable::PERSIST_NO);
             }
+            keysWas   = gSavedSettings.getLLSD("ALScriptStudioKeymap");
+            presetWas = gSavedSettings.getString("ALScriptStudioKeymapPreset");
             ALScriptKeymap::setPreset(ALScriptKeyPresets::STANDARD);
             ALScriptKeymap::restoreAll();
+        }
+        ~alscriptkeymap_data()
+        {
+            // The keymap hears its settings change, and builds again from
+            // them when next asked.
+            gSavedSettings.setString("ALScriptStudioKeymapPreset", presetWas);
+            gSavedSettings.setLLSD("ALScriptStudioKeymap", keysWas);
+            LLKeyboard::setStringTranslatorFunc(translatorWas);
         }
 
         static bool has(const ALScriptKeymap::chords_t& keys, const ALKeyChord& chord)

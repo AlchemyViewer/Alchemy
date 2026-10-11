@@ -41,13 +41,6 @@
 #include <fstream>
 #include <iterator>
 
-class LLAvatarName;
-const std::string gScriptThemeTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gScriptThemeTestAnonName;
-}
-
 namespace tut
 {
     struct alscripttheme_data
@@ -121,6 +114,13 @@ namespace tut
         {
             config->declareString("ALScriptStudioTheme", std::string(), "The script editor's theme");
         }
+        // The UI's settings are every UI test's: the theme chosen before put
+        // back however this ends.
+        struct ChosenBack
+        {
+            const std::string was = ALScriptTheme::chosen();
+            ~ChosenBack() { ALScriptTheme::setChosen(was); }
+        } chosen_back;
         ALScriptTheme::setChosen("Monokai");
         ensure_equals("the setting says it", config->getString("ALScriptStudioTheme"), std::string("Monokai"));
         ensure_equals("and so does the theme", ALScriptTheme::chosen(), std::string("Monokai"));

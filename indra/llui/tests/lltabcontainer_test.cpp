@@ -37,25 +37,20 @@
 #include "lluiimage.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
 #include <string>
-
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gTabContainerTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gTabContainerTestAnonName;
-}
 
 namespace tut
 {
     struct lltabcontainer_data
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
+        // Focus and capture as the test found them, whatever it leaves
+        // them on.
+        ll_test::FocusScope  focus;
 
         static LLTabContainer* build(LLTabContainer::TabPosition position = LLTabContainer::TOP)
         {

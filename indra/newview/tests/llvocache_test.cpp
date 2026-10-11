@@ -278,7 +278,7 @@ namespace tut
     };
 
     typedef vocacheTestFactory::object vocacheTestObject;
-    tut::vocacheTestFactory tut_test;
+    tut::vocacheTestFactory tut_vocache;
 
     // ---------------------------------------------------------------------------------------
     // Test functions

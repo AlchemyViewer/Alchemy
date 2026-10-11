@@ -31,6 +31,8 @@
 
 namespace tut
 {
+namespace
+{
     struct LLMessageTemplateParserTestData {
         LLMessageTemplateParserTestData() : mMessage("unset message")
         {
@@ -93,6 +95,7 @@ namespace tut
     typedef test_group<LLMessageTemplateParserTestData> LLMessageTemplateParserTestGroup;
     typedef LLMessageTemplateParserTestGroup::object LLMessageTemplateParserTestObject;
     LLMessageTemplateParserTestGroup llMessageTemplateParserTestGroup("LLMessageTemplateParser");
+}
 
     template<> template<>
     void LLMessageTemplateParserTestObject::test<1>()

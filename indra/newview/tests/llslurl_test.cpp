@@ -102,11 +102,11 @@ LLControlVariable* LLControlGroup::declareString(const std::string& name,
                                    LLControlVariable::ePersist persist) {return NULL;}
 void LLControlGroup::setString(std::string_view name, const std::string& val){}
 
-std::string gCmdLineLoginURI;
-std::string gCmdLineGridChoice;
-std::string gCmdLineHelperURI;
-std::string gLoginPage;
-std::string gCurrentGrid;
+static std::string gCmdLineLoginURI;
+static std::string gCmdLineGridChoice;
+static std::string gCmdLineHelperURI;
+static std::string gLoginPage;
+static std::string gCurrentGrid;
 std::string LLControlGroup::getString(std::string_view name)
 {
     if (name == "CmdLineGridChoice")
@@ -138,8 +138,8 @@ LLPointer<LLControlVariable> LLControlGroup::getControl(std::string_view name)
     return iter == mNameTable.end() ? LLPointer<LLControlVariable>() : iter->second;
 }
 
-LLControlGroup gSavedSettings("test");
-const char *gSampleGridFile =
+LLControlGroup gSavedSettings("llslurl");
+static const char *gSampleGridFile =
     "<?xml version=\"1.0\"?>"
     "<llsd>"
     "  <map>"
@@ -195,7 +195,7 @@ namespace tut
     // Tut templating thingamagic: test group, object and test instance
     typedef test_group<slurlTest> slurlTestFactory;
     typedef slurlTestFactory::object slurlTestObject;
-    tut::slurlTestFactory tut_test("LLSlurl");
+    tut::slurlTestFactory tut_slurl("LLSlurl");
 
     // ---------------------------------------------------------------------------------------
     // Test functions

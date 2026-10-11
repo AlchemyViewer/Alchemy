@@ -36,21 +36,28 @@
 #include "llmortician.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
-
-class LLAvatarName;
-const std::string gImageFieldTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gImageFieldTestAnonName;
-}
 
 namespace tut
 {
     struct alimagefield_data
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
+        // Focus and capture as the test found them, whatever it leaves
+        // them on.
+        ll_test::FocusScope  focus;
+
+        // Each test's popovers escaped and its dead views reaped as it ends,
+        // as the next frame would: a test that empties the graveyard itself
+        // then finds only its own views there, and a popover left open
+        // holds the keys and is what the next test would find showing.
+        ~alimagefield_data()
+        {
+            ll_test::escapePopovers();
+            LLMortician::updateClass();
+        }
 
         static ALImageField* make()
         {

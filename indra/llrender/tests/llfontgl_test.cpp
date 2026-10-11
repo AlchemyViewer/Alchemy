@@ -73,29 +73,22 @@ namespace
 
 namespace tut
 {
-    // Shared GL fixture. TUT spins fixtures per-test method, but
+namespace
+{
+    // The shared GL context. TUT spins fixtures per-test method, but
     // per-fixture HeadlessGL recreation poisons LLFontGL's per-getter
     // static fontp caches after ~10 cycles (the per-test new GL
     // context invalidates LLImageGL textures the fontps reference).
     // Sharing the GL context for the binary's lifetime keeps font
     // state coherent across all tests.
     //
-    // needs_render=true so the render group can drive gGL.beginList /
-    // flush against a real bound gUIProgram. Layout-only tests (which
+    // It binds gUIProgram, so the render group can drive gGL.beginList /
+    // flush against a real shader. Layout-only tests (which
     // never issue a draw) still work fine — the bound shader is harmless
     // when no draw call is in flight.
-    inline ll_test::HeadlessGL& getSharedFontGL()
-    {
-        static ll_test::HeadlessGL gl(/*needs_vbos=*/true,
-                                      /*needs_imagegl=*/true,
-                                      /*needs_llrender=*/true,
-                                      /*needs_render=*/true);
-        return gl;
-    }
-
     struct llfontgl_data
     {
-        ll_test::HeadlessGL& gl = getSharedFontGL();
+        ll_test::HeadlessGL& gl = ll_test::sharedHeadlessGL();
         llfontgl_data() = default;
         ~llfontgl_data() = default;
     };
@@ -103,6 +96,7 @@ namespace tut
     typedef test_group<llfontgl_data> llfontgl_test;
     typedef llfontgl_test::object     llfontgl_object;
     tut::llfontgl_test llfontgl_testcase("LLFontGL");
+}
 
     // initClass through the explicit-path overload should bring up a
     // working font registry under a real GL context. loadDefaultFonts
@@ -991,6 +985,8 @@ namespace tut
     // static fontp cache after a few cycles (see vertexbuffer fixture).
     // ===================================================================
 
+namespace
+{
     inline void ensureRenderLLFontGL()
     {
         static bool initialized = false;
@@ -1004,7 +1000,7 @@ namespace tut
 
     struct llfontgl_render_data
     {
-        ll_test::HeadlessGL& gl = getSharedFontGL();
+        ll_test::HeadlessGL& gl = ll_test::sharedHeadlessGL();
         llfontgl_render_data() { ensureRenderLLFontGL(); }
         ~llfontgl_render_data() = default;
     };
@@ -1012,6 +1008,7 @@ namespace tut
     typedef test_group<llfontgl_render_data> llfontgl_render_test;
     typedef llfontgl_render_test::object     llfontgl_render_object;
     tut::llfontgl_render_test llfontgl_render_testcase("LLFontGLRender");
+}
 
     // First end-to-end render() call with LEFT/BASELINE places glyph
     // pixels into the framebuffer at the requested x. Pins the full

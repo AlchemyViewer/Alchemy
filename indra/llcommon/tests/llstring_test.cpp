@@ -919,12 +919,12 @@ namespace tut
     // don't pass a string of escape characters, when you pass an empty string
     // (different overloads), and when you pass a string of characters that
     // aren't actually present.
-    void ensure_getTokens(const std::string& desc,
-                          const std::string& string,
-                          const std::string& drop_delims,
-                          const std::string& keep_delims,
-                          const std::string& quotes,
-                          const std::vector<std::string>& expect)
+    static void ensure_getTokens(const std::string& desc,
+                                 const std::string& string,
+                                 const std::string& drop_delims,
+                                 const std::string& keep_delims,
+                                 const std::string& quotes,
+                                 const std::vector<std::string>& expect)
     {
         ensure_equals(desc + " - no esc",
                       LLStringUtil::getTokens(string, drop_delims, keep_delims, quotes),
@@ -937,11 +937,11 @@ namespace tut
                       expect);
     }
 
-    void ensure_getTokens(const std::string& desc,
-                          const std::string& string,
-                          const std::string& drop_delims,
-                          const std::string& keep_delims,
-                          const std::vector<std::string>& expect)
+    static void ensure_getTokens(const std::string& desc,
+                                 const std::string& string,
+                                 const std::string& drop_delims,
+                                 const std::string& keep_delims,
+                                 const std::vector<std::string>& expect)
     {
         ensure_getTokens(desc, string, drop_delims, keep_delims, "", expect);
     }

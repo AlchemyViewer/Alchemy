@@ -28,6 +28,8 @@
 #include "../luau/alluauconfigscript.h"
 #include "../lint/alscriptlintpass.h"
 
+#include "lluuid.h"
+
 #include "../test/lltut.h"
 
 #include <chrono>
@@ -298,12 +300,16 @@ namespace tut
         ensure("an __index that would loop is never asked",
                ALLuauConfigScript::asLuaurc("return setmetatable({}, { __index = function() while true do end end })", json, error) && json == "{}");
 
-        const auto started = std::chrono::steady_clock::now();
-        ensure_equals("a loop that never ends, stopped", (ALLuauConfigScript::asLuaurc("while true do end", json, error), error),
+        // A run stopped by the deadline is kept a while, by its text: a text
+        // of this run's own is run, not answered from what another test, or
+        // this one before, asked.
+        const std::string forever = "while true do end -- " + LLUUID::generateNewID().asString();
+        const auto        started = std::chrono::steady_clock::now();
+        ensure_equals("a loop that never ends, stopped", (ALLuauConfigScript::asLuaurc(forever, json, error), error),
                       std::string("configuration execution timed out"));
         const F64 took = std::chrono::duration<F64>(std::chrono::steady_clock::now() - started).count();
         ensure(llformat("stopped at its time, not long after: %.2f s", took), took >= ALLuauConfigScript::MOST_SECONDS && took < ALLuauConfigScript::MOST_SECONDS + 2.0);
-        ensure("asked again at once, kept for a while: no second wait", (ALLuauConfigScript::asLuaurc("while true do end", json, error),
+        ensure("asked again at once, kept for a while: no second wait", (ALLuauConfigScript::asLuaurc(forever, json, error),
                                                                          std::chrono::duration<F64>(std::chrono::steady_clock::now() - started).count() < took + 0.1));
         // table.move's copy is a loop in C the deadline does not reach, and
         // nils moved into a table that holds none take no memory: held to so

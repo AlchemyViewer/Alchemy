@@ -38,12 +38,6 @@
 #include <filesystem>
 #include <fstream>
 
-// A script's id is the bridge's name for it, and the bridge is the viewer's.
-std::string ALScriptRef::id() const
-{
-    return object.asString() + "_" + item.asString();
-}
-
 namespace
 {
     typedef ALScriptStudioDoc        Doc;

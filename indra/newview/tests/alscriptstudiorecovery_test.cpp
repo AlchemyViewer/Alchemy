@@ -666,6 +666,19 @@ namespace tut
         const std::string folder =
             fsyspath(std::filesystem::temp_directory_path() / fsyspath("alsavehistory_" + LLUUID::generateNewID().asString())).string();
         auto history = std::make_shared<ALSaveHistory>(folder);
+        // The history is the process's: the one before put back, and the
+        // folder taken out of the way, however this ends.
+        struct HistoryBack
+        {
+            std::shared_ptr<ALSaveHistory> was;
+            std::string                    folder;
+            ~HistoryBack()
+            {
+                ALRecovery::useHistory(was);
+                std::error_code ec;
+                std::filesystem::remove_all(fsyspath(folder), ec);
+            }
+        } history_back{ ALRecovery::history(), folder };
         ALRecovery::useHistory(history);
         // Everything posted before this, done: the writer is one thread.
         const auto written = []() {
@@ -694,8 +707,5 @@ namespace tut
         ensure_equals("behind the new one's", moved.size(), 2U);
         ALRecovery::keepSaved(save("", "nobody's", 5.0));
         written();
-        ALRecovery::useHistory(nullptr);
-        std::error_code ec;
-        std::filesystem::remove_all(fsyspath(folder), ec);
     }
 }

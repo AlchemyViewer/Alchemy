@@ -70,6 +70,10 @@ public:
     bool searching() const { return mWorking != nullptr; }
     // Past this many bytes, a text is looked through on a worker.
     static constexpr size_t ON_A_WORKER = 256 * 1024;
+    // The worker's thread closed and waited for, as the viewer going closes
+    // it; the next search to need it starts another. For whoever must leave
+    // nothing of its own running when it is done: a test.
+    static void closeWorker();
     // Nothing found, and nothing to look through again: the find put away,
     // and with it the stretch a find in a selection kept to.
     void clear();

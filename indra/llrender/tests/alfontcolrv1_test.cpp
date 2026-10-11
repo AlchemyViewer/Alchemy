@@ -63,6 +63,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     using namespace ll_test;
 
     // Each test_group<>::object spins up a fresh fixture for every test<N>,
@@ -84,6 +86,7 @@ namespace tut
     typedef test_group<alfontcolrv1_data> alfontcolrv1_test;
     typedef alfontcolrv1_test::object     alfontcolrv1_object;
     tut::alfontcolrv1_test alfontcolrv1_testcase("ALFontColrV1");
+}
 
     // Painter input validation: null hb_font fails cleanly without a crash.
     // Doesn't need a real font, so this test runs even when the test data

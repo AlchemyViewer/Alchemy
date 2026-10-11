@@ -24,6 +24,9 @@
 // observable side effect, solely for testing
 static LLSD data;
 
+namespace
+{
+
 // LLEventAPI listener subclass
 class MyListener: public LLEventAPI
 {
@@ -56,6 +59,9 @@ public:
         add("set", "This is a set operation", &listener::set_data);
     }
 };
+
+} // anonymous namespace
+
 // Normally we'd declare a static instance of MyRegistrar -- but because we
 // want to test both with and without, defer declaration to individual test
 // methods.

@@ -40,13 +40,6 @@
 #include <string>
 #include <vector>
 
-class LLAvatarName;
-const std::string gPaneListTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gPaneListTestAnonName;
-}
-
 namespace tut
 {
     struct alpanelist_data

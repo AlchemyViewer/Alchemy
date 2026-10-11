@@ -59,12 +59,17 @@ namespace tut
         ensure("didn't return result", result);
     }
 
-    struct StaticData
+    namespace
     {
-        std::mutex mMutex;          // LockStatic looks for mMutex
-        bool ran{false};
-    };
-    typedef llthread::LockStatic<StaticData> LockStatic;
+        // LockStatic finds its one instance a process by the type's name, even
+        // in an anonymous namespace, so the name is this test's own.
+        struct MainThreadTaskStatic
+        {
+            std::mutex mMutex;          // LockStatic looks for mMutex
+            bool ran{false};
+        };
+        typedef llthread::LockStatic<MainThreadTaskStatic> LockStatic;
+    } // anonymous namespace
 
     template<> template<>
     void object::test<2>()

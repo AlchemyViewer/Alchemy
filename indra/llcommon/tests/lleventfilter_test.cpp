@@ -45,6 +45,9 @@
 /*****************************************************************************
 *   Test classes
 *****************************************************************************/
+namespace
+{
+
 // Strictly speaking, we're testing LLEventTimeoutBase rather than the
 // production LLEventTimeout (using LLTimer) because we don't want every test
 // run to pause for some number of seconds until we reach a real timeout. But
@@ -151,6 +154,8 @@ public:
     F32 mAlarmRemaining, mTimerRemaining;
     LLEventTimeoutBase::Action mAlarmAction;
 };
+
+} // anonymous namespace
 
 /*****************************************************************************
 *   TUT
@@ -405,8 +410,9 @@ namespace tut
         ensure_equals("17", cat.result, "136;12;17"); // "17" delivered
     }
 
+    // A PUMP keeps what no listener consumed, and replays it on the next listen().
     template<class PUMP>
-    void test()
+    static void check_mail_drop_replay()
     {
         PUMP pump(typeid(PUMP).name());
         LLSD data{LLSD::emptyArray()};
@@ -467,14 +473,14 @@ namespace tut
     void filter_object::test<6>()
     {
         set_test_name("LLEventMailDrop");
-        tut::test<LLEventMailDrop>();
+        check_mail_drop_replay<LLEventMailDrop>();
     }
 
     template<> template<>
     void filter_object::test<7>()
     {
         set_test_name("LLEventLogProxyFor<LLEventMailDrop>");
-        tut::test< LLEventLogProxyFor<LLEventMailDrop> >();
+        check_mail_drop_replay< LLEventLogProxyFor<LLEventMailDrop> >();
     }
 } // namespace tut
 

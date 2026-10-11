@@ -29,19 +29,11 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
 #include <cstring>
-
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gDiagTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gDiagTestAnonName;
-}
 
 namespace tut
 {
@@ -127,7 +119,7 @@ namespace tut
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
 
         {
             ALXUIDiagnostics sink;
@@ -164,7 +156,6 @@ namespace tut
         ensure("the sink detaches when it dies", ALXUIDiagnostics::active() == nullptr);
 
         fv.reset();
-        gFloaterView = nullptr;
     }
 
     // The attributes of a child widget fail against the parent's parameter
@@ -180,7 +171,7 @@ namespace tut
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
 
         ALXUIDiagnostics sink;
         LLFloater* view = build(fv.get());
@@ -192,6 +183,5 @@ namespace tut
                !has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 0, "name"));
 
         fv.reset();
-        gFloaterView = nullptr;
     }
 }

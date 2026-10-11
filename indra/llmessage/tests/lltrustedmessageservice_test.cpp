@@ -37,6 +37,15 @@
 
 LLPounceable<LLMessageSystem*, LLPounceableStatic> gMessageSystem;
 
+// What the test doubles below record.
+namespace
+{
+bool messageDispatched = false;
+bool messageDispatchedAsBinary = false;
+LLSD lastLLSD;
+std::string lastMessageName;
+}
+
 LLMessageConfig::SenderTrust
 LLMessageConfig::getSenderTrustedness(const std::string& msg_name)
 {
@@ -56,11 +65,6 @@ bool LLMessageSystem::isTrustedMessage(const std::string& name) const
 {
     return false;
 }
-
-bool messageDispatched = false;
-bool messageDispatchedAsBinary = false;
-LLSD lastLLSD;
-std::string lastMessageName;
 
 void LLMessageSystem::dispatch(const std::string& msg_name,
                                const LLSD& message,
@@ -82,6 +86,8 @@ void LLMessageSystem::dispatchTemplate(const std::string& msg_name,
 
 namespace tut
 {
+namespace
+{
         struct LLTrustedMessageServiceData
         {
             LLTrustedMessageServiceData()
@@ -96,6 +102,7 @@ namespace tut
 
     typedef test_group<LLTrustedMessageServiceData> factory;
     typedef factory::object object;
+}
 }
 
 namespace

@@ -37,12 +37,15 @@
 
 namespace tut
 {
+namespace
+{
     struct permission
     {
     };
     typedef test_group<permission> permission_t;
     typedef permission_t::object permission_object_t;
     tut::permission_t tut_permission("permission");
+}
 
     template<> template<>
     void permission_object_t::test<1>()

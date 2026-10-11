@@ -42,50 +42,45 @@
 #include <type_traits>
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gViewKindTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gViewKindTestAnonName;
-}
-
 namespace tut
 {
-    struct TestView : public LLView
+    namespace
     {
-        TestView(const LLView::Params& p) : LLView(p) {}
-    };
-
-    struct TestCtrl : public LLUICtrl
-    {
-        AL_VIEW_TYPE(TestCtrl, LLUICtrl);
-        TestCtrl(const LLUICtrl::Params& p) : LLUICtrl(p) {}
-    };
-
-    struct TestFloater : public LLFloater
-    {
-        TestFloater(const LLFloater::Params& p) : LLFloater(LLSD(), p) {}
-    };
-
-    // A parent that asks what a child is as it leaves. ~LLView removes a
-    // child from its parent after every derived destructor has run.
-    struct AskingView : public LLView
-    {
-        AskingView(const LLView::Params& p) : LLView(p) {}
-
-        bool mLeaverWasCtrl { false };
-
-        void removeChild(LLView* child) override
+        struct TestView : public LLView
         {
-            mLeaverWasCtrl = child->as<LLUICtrl>() != nullptr;
-            LLView::removeChild(child);
-        }
-    };
+            TestView(const LLView::Params& p) : LLView(p) {}
+        };
+
+        struct TestCtrl : public LLUICtrl
+        {
+            AL_VIEW_TYPE(TestCtrl, LLUICtrl);
+            TestCtrl(const LLUICtrl::Params& p) : LLUICtrl(p) {}
+        };
+
+        struct TestFloater : public LLFloater
+        {
+            TestFloater(const LLFloater::Params& p) : LLFloater(LLSD(), p) {}
+        };
+
+        // A parent that asks what a child is as it leaves. ~LLView removes a
+        // child from its parent after every derived destructor has run.
+        struct AskingView : public LLView
+        {
+            AskingView(const LLView::Params& p) : LLView(p) {}
+
+            bool mLeaverWasCtrl { false };
+
+            void removeChild(LLView* child) override
+            {
+                mLeaverWasCtrl = child->as<LLUICtrl>() != nullptr;
+                LLView::removeChild(child);
+            }
+        };
+    }
 
     struct alviewtype_data
     {
@@ -156,7 +151,7 @@ namespace tut
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
         TestFloater* f = floater();     // parents itself into gFloaterView
 
         ensure("a floater is a floater", f->as<LLFloater>() == f);
@@ -194,7 +189,6 @@ namespace tut
         ensure("its parent is its stack", lp->getParentAs<LLLayoutStack>() == s.get());
 
         fv.reset();
-        gFloaterView = nullptr;
     }
 
     // The parent as a kind, and the nearest ancestor of a kind.
@@ -207,7 +201,7 @@ namespace tut
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
         TestFloater* f = floater();
         TestView* inner = view("inner");
         f->addChild(inner);
@@ -221,7 +215,6 @@ namespace tut
         ensure("no ancestor is a type with no kind", inner->getParentByType<TestCtrl>() == nullptr);
 
         fv.reset();
-        gFloaterView = nullptr;
     }
 
     // A view being destroyed answers for the base that is left, as

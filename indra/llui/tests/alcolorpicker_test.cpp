@@ -30,21 +30,18 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
-
-class LLAvatarName;
-const std::string gColorPickerTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gColorPickerTestAnonName;
-}
 
 namespace tut
 {
     struct alcolorpicker_data
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
+        // Focus and capture as the test found them, whatever it leaves
+        // them on.
+        ll_test::FocusScope  focus;
 
         // The layout the picker works out for itself: the ring takes a square
         // at the left as tall as the widget, the channels what is right of it

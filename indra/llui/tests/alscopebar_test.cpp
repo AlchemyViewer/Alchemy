@@ -37,13 +37,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gScopeTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gScopeTestAnonName;
-}
-
 namespace tut
 {
     struct alscopebar_data

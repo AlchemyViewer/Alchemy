@@ -29,7 +29,7 @@
 #include "linden_common.h"
 #include "lltut.h"
 
-#include "llapr.h"
+#include "llmessagesystem_fixture.h"
 #include "llmessagetemplate.h"
 #include "llmath.h"
 #include "llquaternion.h"
@@ -43,33 +43,19 @@
 
 namespace tut
 {
+namespace
+{
     static LLTemplateMessageBuilder::message_template_name_map_t nameMap;
     static LLTemplateMessageReader::message_template_number_map_t numberMap;
 
     struct LLTemplateMessageBuilderTestData
     {
+        // The reader hands what it reads to gMessageSystem, so each test has
+        // one, and leaves gMessageSystem as it found it.
+        ll_test::MessageSystemScope mMessageSystem;
+
         static LLMessageTemplate defaultTemplate()
         {
-            static bool init = false;
-            if(! init)
-            {
-                ll_init_apr();
-                const F32 circuit_heartbeat_interval=5;
-                const F32 circuit_timeout=100;
-
-                start_messaging_system("notafile", 13035,
-                                       1,
-                                       0,
-                                       0,
-                                       false,
-                                       "notasharedsecret",
-                                       NULL,
-                                       false,
-                                       circuit_heartbeat_interval,
-                                       circuit_timeout);
-                //init_prehash_data();
-                init = true;
-            }
             return LLMessageTemplate(_PREHASH_TestMessage, 1, MFT_HIGH);
         }
 
@@ -121,6 +107,7 @@ namespace tut
     typedef test_group<LLTemplateMessageBuilderTestData, 60>    LLTemplateMessageBuilderTestGroup;
     typedef LLTemplateMessageBuilderTestGroup::object       LLTemplateMessageBuilderTestObject;
     LLTemplateMessageBuilderTestGroup templateMessageBuilderTestGroup("LLTemplateMessageBuilder");
+}
 
     template<> template<>
     void LLTemplateMessageBuilderTestObject::test<1>()

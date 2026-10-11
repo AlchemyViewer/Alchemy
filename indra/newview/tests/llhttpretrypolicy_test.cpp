@@ -30,11 +30,11 @@
 
 namespace tut
 {
-struct TestData
+struct llhttpretrypolicy_data
 {
 };
 
-typedef test_group<TestData>    RetryPolicyTestGroup;
+typedef test_group<llhttpretrypolicy_data> RetryPolicyTestGroup;
 typedef RetryPolicyTestGroup::object        RetryPolicyTestObject;
 RetryPolicyTestGroup retryPolicyTestGroup("retry_policy");
 

@@ -742,7 +742,9 @@ namespace tut
             all << in.rdbuf();
             text = all.str();
         }
-        const std::string path = (std::filesystem::temp_directory_path() / "alscript-test-builtins-newer.txt").string();
+        // a name of its own, so two runs at once never write one file
+        const std::string path =
+            (std::filesystem::temp_directory_path() / ("alscript-test-builtins-newer-" + LLUUID::generateNewID().asString() + ".txt")).string();
         {
             llofstream out(path, std::ios::out | std::ios::binary | std::ios::trunc);
             out << text << "integer llBrandNewThing( integer Value )\n";

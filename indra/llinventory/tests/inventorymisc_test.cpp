@@ -32,6 +32,7 @@
 
 #include "../llinventory.h"
 #include "../test/lltut.h"
+#include "../test/namedtempfile.h"
 
 
 #if LL_WINDOWS
@@ -39,6 +40,8 @@
 #pragma warning(disable: 4702)
 #endif
 
+namespace
+{
 void set_random_inventory_metadata(LLInventoryObject* obj)
 {
     S32 extra = rand() % 4;
@@ -122,8 +125,11 @@ LLPointer<LLInventoryCategory> create_random_inventory_cat()
     set_random_inventory_metadata(cat);
     return cat;
 }
+}
 
 namespace tut
+{
+namespace
 {
     struct inventory_data
     {
@@ -131,6 +137,7 @@ namespace tut
     typedef test_group<inventory_data> inventory_test;
     typedef inventory_test::object inventory_object;
     tut::inventory_test inv("LLInventory");
+}
 
 //***class LLInventoryType***//
 
@@ -351,7 +358,8 @@ namespace tut
     template<> template<>
     void inventory_object::test<7>()
     {
-        std::string filename("linden_file.dat");
+        NamedTempFile temp_file("linden_file", "", ".dat");
+        std::string filename(temp_file.getPath().string());
         llofstream fileXML(filename.c_str());
         if (!fileXML.is_open())
         {
@@ -484,7 +492,8 @@ namespace tut
     template<> template<>
     void inventory_object::test<13>()
     {
-        std::string filename("linden_file.dat");
+        NamedTempFile temp_file("linden_file", "", ".dat");
+        std::string filename(temp_file.getPath().string());
         llofstream fileXML(filename.c_str());
         if (!fileXML.is_open())
         {

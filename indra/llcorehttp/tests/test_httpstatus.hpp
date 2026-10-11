@@ -36,6 +36,8 @@ using namespace LLCore;
 
 namespace tut
 {
+namespace
+{
 
 struct HttpStatusTestData
 {
@@ -47,6 +49,7 @@ typedef test_group<HttpStatusTestData> HttpStatusTestGroupType;
 typedef HttpStatusTestGroupType::object HttpStatusTestObjectType;
 
 HttpStatusTestGroupType HttpStatusTestGroup("HttpStatus Tests");
+}
 
 template <> template <>
 void HttpStatusTestObjectType::test<1>()

@@ -32,26 +32,11 @@
 
 #include "llsd.h"
 #include "alheadlessui_fixture.h"
+#include "altextviewprobe.h"
 
 #include "../test/lltut.h"
 
 #include <string>
-
-class LLAvatarName;
-const std::string gVimTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gVimTestAnonName;
-}
-
-namespace ll_test
-{
-    // How long a search for a misspelling may check lines for.
-    struct TextViewProbe
-    {
-        static void misspellingBudget(ALTextView& view, F32 seconds) { view.mMisspellingBudget = seconds; }
-    };
-}
 
 namespace tut
 {
@@ -67,6 +52,14 @@ namespace tut
             if (editor)
             {
                 editor->die();
+            }
+            // Reaped now, as the next frame would: test 73 empties the
+            // graveyard itself, and then finds only its own views there.
+            LLMortician::updateClass();
+            // What a test yanked or deleted is not the next one's to put.
+            if (LLClipboard::instanceExists())
+            {
+                LLClipboard::instance().reset();
             }
         }
 

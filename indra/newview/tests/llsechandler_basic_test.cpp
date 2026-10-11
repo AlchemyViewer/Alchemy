@@ -70,8 +70,8 @@ extern bool _cert_hostname_wildcard_match(const std::string& hostname, const std
 //----------------------------------------------------------------------------
 // Mock objects for the dependencies of the code we're testing
 
-std::string gFirstName;
-std::string gLastName;
+static std::string gFirstName;
+static std::string gLastName;
 LLControlGroup::LLControlGroup(const std::string& name)
 : LLInstanceTracker<LLControlGroup, std::string>(name) {}
 LLControlGroup::~LLControlGroup() {}
@@ -113,7 +113,7 @@ void LLCredential::authenticatorType(std::string &idType)
 }
 
 
-LLControlGroup gSavedSettings("test");
+LLControlGroup gSavedSettings("llsechandler_basic");
 unsigned char gMACAddress[MAC_ADDRESS_BYTES] = {77,21,46,31,89,2};
 
 
@@ -705,7 +705,7 @@ namespace tut
     // Tut templating thingamagic: test group, object and test instance
     typedef test_group<sechandler_basic_test> sechandler_basic_test_factory;
     typedef sechandler_basic_test_factory::object sechandler_basic_test_object;
-    tut::sechandler_basic_test_factory tut_test("LLSecHandler");
+    tut::sechandler_basic_test_factory tut_sechandler_basic("LLSecHandler");
 
     // ---------------------------------------------------------------------------------------
     // Test functions

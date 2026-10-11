@@ -100,6 +100,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct alplaneset_data
     {
         LLCamera mCamera;
@@ -123,6 +125,7 @@ namespace tut
     typedef test_group<alplaneset_data> alplaneset_test;
     typedef alplaneset_test::object alplaneset_object;
     tut::alplaneset_test alplaneset_testcase("ALPlaneSet");
+}
 
     // An empty set contains everything; a set with one plane splits space.
     template<> template<>

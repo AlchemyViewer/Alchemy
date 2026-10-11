@@ -38,13 +38,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gJumpTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gJumpTestAnonName;
-}
-
 namespace tut
 {
     struct aljumpbar_data

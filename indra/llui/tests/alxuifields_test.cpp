@@ -33,13 +33,6 @@
 
 #include <algorithm>
 
-class LLAvatarName;
-const std::string gXUIFieldsTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gXUIFieldsTestAnonName;
-}
-
 namespace tut
 {
     struct alxuifields_data

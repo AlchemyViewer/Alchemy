@@ -358,9 +358,16 @@ if(AL_BUILD_TESTS)
 
   # These drive a Python peer: LEAP's protocol is to an external script,
   # llprocess spawns one, and llsdserialize round-trips through the llsd
-  # package as an independent implementation.
+  # package as an independent implementation. A peer that imports a script a
+  # test wrote to the temp folder would leave its bytecode there.
   foreach(test llleap llprocess llsdserialize)
-    al_add_test(${test} PROJECT llcommon LIBRARIES llcommon PYTHON)
+    al_add_test(
+      ${test}
+      PROJECT llcommon
+      LIBRARIES llcommon
+      PYTHON
+      ENVIRONMENT PYTHONDONTWRITEBYTECODE=1
+    )
   endforeach()
 
   # The SIMD ops layer, at the tree's tier and, where the tiers differ, at

@@ -40,6 +40,8 @@
 
 namespace tut
 {
+namespace
+{
     struct LLSDMessageReaderTestData {
         static void ensureMessageName(const std::string& msg_name,
                                     const LLSD& msg_data,
@@ -86,6 +88,7 @@ namespace tut
     typedef test_group<LLSDMessageReaderTestData>   LLSDMessageReaderTestGroup;
     typedef LLSDMessageReaderTestGroup::object      LLSDMessageReaderTestObject;
     LLSDMessageReaderTestGroup llsdMessageReaderTestGroup("LLSDMessageReader");
+}
 
     template<> template<>
     void LLSDMessageReaderTestObject::test<1>()
@@ -134,6 +137,8 @@ namespace tut
         ensureMessageSize(message, 0);
     }
 
+namespace
+{
     template<typename T>
     LLSDMessageReader testType(const T& value)
     {
@@ -143,6 +148,7 @@ namespace tut
         msg.setMessage("fakename", message);
         return msg;
     }
+}
 
     template<> template<>
     void LLSDMessageReaderTestObject::test<4>()

@@ -32,15 +32,6 @@
 
 #include <cmath>
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gStatBarAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gStatBarAnonName;
-}
-
 namespace tut
 {
     struct llstatbar_data

@@ -51,7 +51,7 @@ runs:
           libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
           libthai-dev libtool libudev-dev libunwind-dev liburing-dev libwayland-dev \
           libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
-          libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev mold \
+          libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev \
           nasm ninja-build pkgconf rpm tar tex-common texinfo unzip zip
 
         sudo locale-gen en_US.UTF-8
@@ -65,6 +65,28 @@ runs:
         sudo rm -rf /opt/ghc
         sudo rm -rf /usr/local/.ghcup
         df -h
+
+    # mold from its release rather than the image's 2.40: before 2.42.1 it
+    # can leave a function with no unwind entry the unwinder finds, so that
+    # an exception thrown through it ends the program (rui314/mold#1648).
+    # Pinned by digest, under /usr/local, which the path puts first.
+    - name: Linux mold install
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        version=2.42.1
+        case "$(uname -m)" in
+          x86_64) arch=x86_64 sha256=6ff270c9bf07d2bec5c98aa324eb7c4daf6a1a4d815c05ff1708049616047855 ;;
+          aarch64) arch=aarch64 sha256=16b025652d3d7456689e6025a77e1903bb2a15e7630877c26cc133f5df95b9c6 ;;
+          *) echo "::error::No mold release pinned for $(uname -m)"; exit 1 ;;
+        esac
+        archive="$RUNNER_TEMP/mold.tar.gz"
+        curl -fsSL -o "$archive" \
+          "https://github.com/rui314/mold/releases/download/v$version/mold-$version-$arch-linux.tar.gz"
+        echo "$sha256  $archive" | sha256sum -c -
+        sudo tar -xzf "$archive" -C /usr/local --strip-components=1 --no-same-owner
+        rm "$archive"
+        mold --version
 
     - name: macOS Homebrew dependency install
       if: runner.os == 'macOS'

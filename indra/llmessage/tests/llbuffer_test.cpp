@@ -36,6 +36,8 @@
 
 namespace tut
 {
+namespace
+{
     struct buffer
     {
     };
@@ -43,6 +45,7 @@ namespace tut
     typedef test_group<buffer> buffer_t;
     typedef buffer_t::object buffer_object_t;
     tut::buffer_t tut_buffer("buffer");
+}
 
     template<> template<>
     void buffer_object_t::test<1>()

@@ -99,8 +99,29 @@ namespace tut
         ensure("Current time in RFC 1123", (strcmp(expected, actual.c_str()) == 0));
     }
 
-    void test_date_string(const std::string &locale, struct tm *t,
-                          const std::string &fmt, const std::string &expected)
+    namespace
+    {
+        // LC_TIME, LLStringUtil's locale and the one LLDate last set LC_TIME
+        // to, put back as they were however the test ends. LLDate sets LC_TIME
+        // itself when the locale it saw last changes, so one date formatted in
+        // the restored locale brings it up to date before LC_TIME is restored.
+        struct TimeLocaleRestore
+        {
+            std::string mLocale{ LLStringUtil::getLocale() };
+            std::string mTimeLocale{ setlocale(LC_TIME, NULL) };
+
+            ~TimeLocaleRestore()
+            {
+                LLStringUtil::setLocale(mLocale);
+                struct tm any{};
+                LLDate::toHTTPDateString(&any, "%Y");
+                setlocale(LC_TIME, mTimeLocale.c_str());
+            }
+        };
+    } // anonymous namespace
+
+    static void test_date_string(const std::string &locale, struct tm *t,
+                                 const std::string &fmt, const std::string &expected)
     {
         std::string result = LLDate::toHTTPDateString(t, fmt);
         LLStringUtil::toLower(result);
@@ -115,15 +136,13 @@ namespace tut
         const char *en_locale = "en_US.UTF-8";
         const char *fr_locale = "fr_FR.UTF-8";
 
-        std::string prev_locale = LLStringUtil::getLocale();
-        std::string prev_clocale = std::string(setlocale(LC_TIME, NULL));
+        TimeLocaleRestore restore;
         time_t test_time = 1252374030;  // 8 Sep 2009 01:40:01
         struct tm *t = gmtime(&test_time);
 
         setlocale(LC_TIME, en_locale);
         if (strcmp(setlocale(LC_TIME, NULL), en_locale) != 0)
         {
-            setlocale(LC_TIME, prev_clocale.c_str());
             skip("Cannot set English locale");
         }
 
@@ -141,8 +160,6 @@ namespace tut
         setlocale(LC_TIME, fr_locale);
         if (strcmp(setlocale(LC_TIME, NULL), fr_locale) != 0)
         {
-            LLStringUtil::setLocale(prev_locale);
-            setlocale(LC_TIME, prev_clocale.c_str());
             skip("Cannot set French locale");
         }
 
@@ -155,8 +172,5 @@ namespace tut
         test_date_string(fr_locale, t, "%Y", "2009");
         test_date_string(fr_locale, t, "%A", "mardi");
         test_date_string(fr_locale, t, "%B", "septembre");
-
-        LLStringUtil::setLocale(prev_locale);
-        setlocale(LC_TIME, prev_clocale.c_str());
     }
 }

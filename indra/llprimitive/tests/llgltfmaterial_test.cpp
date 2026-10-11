@@ -53,6 +53,8 @@
 
 namespace tut
 {
+namespace
+{
     struct llgltfmaterial
     {
     };
@@ -135,6 +137,7 @@ namespace tut
     {
         ensure("LLGLTFMaterial serialization trims property '" + must_not_contain + "'", material_json.find(must_not_contain) == std::string::npos);
     }
+}
 
     // Test that GLTF material fields have not changed since these tests were
     // written. The previous sizeof(LLGLTFMaterial) tripwire was removed when
@@ -366,6 +369,8 @@ namespace tut
         }
     }
 
+namespace
+{
     template<typename T>
     void ensure_material_hash_pre(LLGLTFMaterial& material, T& material_field, const T new_value, const std::string& field_name)
     {
@@ -397,6 +402,7 @@ namespace tut
         // If this test fails, consult LLGLTFMaterial::getHash, and optionally consult http://www.catb.org/esr/structure-packing/ for guidance on optimal memory packing (effectiveness is platform-dependent)
         ensure_not_equals(("LLGLTFMaterial: Hash: Perturbing " + field_name + " to new value changes the hash").c_str(), material.getHash(), old_material.getHash());
     }
+}
 
 #define ENSURE_HASH_NOT_CHANGED(HASH_MAT, SOURCE_MAT, FIELD) ensure_material_hash_not_changed(HASH_MAT, HASH_MAT.FIELD, SOURCE_MAT.FIELD, #FIELD)
 #define ENSURE_HASH_CHANGED(HASH_MAT, SOURCE_MAT, FIELD) ensure_material_hash_changed(HASH_MAT, HASH_MAT.FIELD, SOURCE_MAT.FIELD, #FIELD)

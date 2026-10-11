@@ -33,6 +33,8 @@
 namespace tut
 {
 
+namespace
+{
     struct LLDirIteratorFixture
     {
         LLDirIteratorFixture()
@@ -55,6 +57,7 @@ namespace tut
         LLDirIterator iter1(".","))--@---bad-group-name2((?\?-??.*\\.txt");
         LLDirIterator iter2(".","__^v--x)Cuide d sua vida(x--v^__?\?-??.*");
     }
+}
 
     template<> template<>
     void LLDirIteratorTest_t::test<1>()

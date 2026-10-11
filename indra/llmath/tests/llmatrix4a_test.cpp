@@ -71,6 +71,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct llmatrix4a_data
     {
     };
@@ -307,6 +309,7 @@ namespace tut
     {
         return LLVector4a(v.mV[0], v.mV[1], v.mV[2], 0.f);
     }
+}
 
     template<> template<>
     void llmatrix4a_object::test<1>()

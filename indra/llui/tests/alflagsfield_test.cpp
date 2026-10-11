@@ -33,13 +33,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gFlagsFieldTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gFlagsFieldTestAnonName;
-}
-
 namespace tut
 {
     struct alflagsfield_data

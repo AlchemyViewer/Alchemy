@@ -425,13 +425,24 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct WebsocketMgrTestData
     {
+        // Each test adds its servers to the manager and removes them, and one
+        // that fails first would leave them listening into the next. The
+        // manager goes with the test, as it was not there before it, and
+        // stops whatever servers it still holds as it goes.
+        ~WebsocketMgrTestData()
+        {
+            LLWebsocketMgr::deleteSingleton();
+        }
     };
 
     typedef test_group<WebsocketMgrTestData> WebsocketMgrTestGroupType;
     typedef WebsocketMgrTestGroupType::object WebsocketMgrTestObjectType;
     WebsocketMgrTestGroupType WebsocketMgrTestGroup("LLWebsocketMgr Tests");
+}
 
     template<> template<>
     void WebsocketMgrTestObjectType::test<1>()
