@@ -4756,11 +4756,6 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LL_PROFILE_GPU_ZONE("renderGeomPostDeferred");
 
-    if (gUseWireframe)
-    {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    }
-
     U32 cur_type = 0;
 
     LLGLEnable cull(GL_CULL_FACE);
@@ -4832,6 +4827,15 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_DRAWPOOL("deferred poolrender");
 
+            // Wireframe is for the pools' geometry alone. The passes run between pools above
+            // are full-screen triangles, which in line mode shade only their edges, and the
+            // water exclusion would stencil only the outlines of its prims.
+            if (gUseWireframe)
+            {
+                gGL.flush();
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            }
+
             gGLLastMatrix = NULL;
             gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
 
@@ -4856,6 +4860,12 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
                 {
                     LLGLState::checkStates(GL_FALSE);
                 }
+            }
+
+            if (gUseWireframe)
+            {
+                gGL.flush();
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             }
         }
         else
@@ -4893,11 +4903,6 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
         {
             ALFarPlaneOverlay::render();
         }
-    }
-
-    if (gUseWireframe)
-    {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
 }
 
