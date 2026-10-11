@@ -3061,6 +3061,60 @@ namespace tut
     }
 
     template<> template<>
+    void allsltoslua_object::test<89>()
+    {
+        set_test_name("converted SLua is as format on save leaves it: a comment after an unbraced body trails it, after the line that "
+                      "opens it where the body is empty; what the LSL lined up, lined up; one line break at the end; either brace spacing");
+        const std::string lsl = "integer CHANNEL    = 1;    // channel\n"
+                                "integer OWNER_ONLY = 0;    // owner\n"
+                                "float   TIMEOUT    = 2.5;  // seconds\n"
+                                "integer asInt(string s) { return (integer)s; }\n"
+                                "default {\n"
+                                "    touch_start(integer n) {\n"
+                                "        integer b;\n"
+                                "        if (n == 1)\n"
+                                "            llOwnerSay(\"a\"); // after a\n"
+                                "        else if (n == 2)\n"
+                                "            llOwnerSay(\"b\"); // after b\n"
+                                "        else\n"
+                                "            llOwnerSay(\"c\"); // after c\n"
+                                "        if ((b = 1) == 2);    // an empty body\n"
+                                "        else llOwnerSay(\"f\"); // after f\n"
+                                "        while (n > 5)\n"
+                                "            n = n - 1; // after the step\n"
+                                "        if (n) {\n"
+                                "            llOwnerSay(\"d\");\n"
+                                "        }\n"
+                                "        // over the else\n"
+                                "        else {\n"
+                                "            llOwnerSay(\"e\");\n"
+                                "        }\n"
+                                "        do ; while ((b = b - 1) > 0);\n"
+                                "        llOwnerSay((string)asInt(\"3\") + (string)CHANNEL + (string)OWNER_ONLY + (string)TIMEOUT);\n"
+                                "    }\n"
+                                "}\n";
+        for (bool spaces : { true, false })
+        {
+            ALLSLToSLua::Options options;
+            options.braceSpaces         = spaces;
+            const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, options);
+            ensure("converted", r.converted);
+            ensure("each after its own: " + r.text, has(r, "        print(\"a\") -- after a\n    elseif") && has(r, "        print(\"b\") -- after b\n    else") &&
+                                                       has(r, "        print(\"c\") -- after c\n    end"));
+            ensure("an empty body's, after the line that opens it: " + r.text, has(r, " == 2 then -- an empty body\n    else\n        print(\"f\") -- after f\n"));
+            ensure("a loop's body's: " + r.text, has(r, "        n -= 1 -- after the step\n    end"));
+            ensure("between a block and its else, over what the else runs: " + r.text, has(r, "    else\n        -- over the else\n        print(\"e\")\n"));
+            ensure("lined up: " + r.text, has(r, "local CHANNEL    = 1   -- channel\nlocal OWNER_ONLY = 0   -- owner\nlocal TIMEOUT    = 2.5 -- seconds\n"));
+            ensure("one line break at the end: " + r.text, r.text.size() > 2 && r.text.compare(r.text.size() - 2, 2, "\n\n") != 0 && r.text.back() == '\n');
+            ALScriptFormatter::Options formatter;
+            formatter.lua         = true;
+            formatter.braceSpaces = spaces;
+            ensure_equals(spaces ? "formatted, spaced" : "formatted, none", ALScriptFormatter::format(r.text, formatter), r.text);
+            checksClean(r);
+        }
+    }
+
+    template<> template<>
     void allsltoslua_object::test<95>()
     {
         set_test_name("a comment after an unbraced body, on the line it ends, trails the statement that ends that line: a then's, an "

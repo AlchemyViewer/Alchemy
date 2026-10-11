@@ -7709,7 +7709,7 @@ end
             out += R"LUA(-- LSL's (integer) of a string: the whole number it starts with, in
 -- decimal or 0x hexadecimal, after any spaces; 0 where it starts with none.
 local function lslInteger(s: string): number
-    return llcompat.List2Integer({ s }, 0)
+    return llcompat.List2Integer()LUA" + braced("s") + R"LUA(, 0)
 end
 
 )LUA";
@@ -7719,7 +7719,7 @@ end
             out += R"LUA(-- LSL's (float) of a string: the number it starts with; 0 where it
 -- starts with none.
 local function lslFloat(s: string): number
-    return llcompat.List2Float({ s }, 0)
+    return llcompat.List2Float()LUA" + braced("s") + R"LUA(, 0)
 end
 
 )LUA";
@@ -7800,6 +7800,11 @@ end
         for (Comment& c : mComments)
         {
             writeComment(c);
+        }
+        // Ending with one line break, as format on save leaves it.
+        while (mText.size() >= 2 && mText.compare(mText.size() - 2, 2, "\n\n") == 0)
+        {
+            mText.pop_back();
         }
         // Each of its lines a comment, whatever language the studio says
         // it in.
