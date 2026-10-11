@@ -9228,6 +9228,16 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
                                                   1.f / (F32)streak_h);
                     gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_PASS_SCALE, scales[pass]);
 
+                    // Passes 1 and 2 sample a quadrant the previous draw wrote while
+                    // mWaterDis is still attached to the bound framebuffer, a read GL
+                    // defines only across a texture barrier. The same barriers put each
+                    // arm's reads of a scratch quadrant before the next arm's write to it.
+                    // The entry point is loaded only on GL 4.5 and up.
+                    if (src == &mWaterDis && glTextureBarrier)
+                    {
+                        glTextureBarrier();
+                    }
+
                     mScreenTriangleVB->setBuffer();
                     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                 };
