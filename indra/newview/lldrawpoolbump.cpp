@@ -941,7 +941,9 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
             LLGLDepthTest depth(GL_FALSE);
             LLGLDisable cull(GL_CULL_FACE);
             LLGLDisable blend(GL_BLEND);
-            gGL.setColorMask(true, true);
+            // Scoped: this is reached from the post-deferred bump pass too, where the passes
+            // after it keep alpha writes off.
+            LLGLSColorMask mask(true, true);
 
             LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
             gNormalMapGenProgram.bind();
