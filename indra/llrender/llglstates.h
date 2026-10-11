@@ -40,6 +40,10 @@ public:
 
     ~LLGLDepthTest();
 
+    // A copy would restore the depth state a second time.
+    LLGLDepthTest(const LLGLDepthTest&) = delete;
+    LLGLDepthTest& operator=(const LLGLDepthTest&) = delete;
+
     void checkState();
 
     // Take the tracked state back to a fresh context's: test off, writes on, GL_LESS, with the
