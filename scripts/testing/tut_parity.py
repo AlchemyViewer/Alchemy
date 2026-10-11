@@ -8,12 +8,18 @@ Two steps, either side of scripts/testing/tut2catch.py:
            entries give, and keeps every line a test's end prints:
              [group, N: name] ok | fail | exception: ... | skipped known failure | ...
            A test TUT never reported (a dummy test<N> slot) is not a test.
+           With them it keeps the sha256 of the TUT source, the one
+           indra/**/tests/<stem>.cpp git tracks.
   check    after converting and building: runs each converted file's CTest
            entry, <binary>/<file stem>, as XML, and matches the cases to the
            TUT results through tut2catch.py's mapping. tut2catch.py must be
            beside this script: the converted file is read as it reads one.
 
 Parity holds for a file when:
+  - its inputs are the ones the run is of: the converted file is no newer
+    than the executable its entry runs, and where the recorded results
+    and the mapping both have the TUT source's sha256, the two agree (where
+    either has none, that is listed);
   - every TUT test it reported has exactly one Catch2 case, and every case
     of the file is one of its TUT tests;
   - each pair agrees: ok is a pass, a TUT skip is a Catch2 skip, and every
@@ -62,6 +68,7 @@ file, and exits 1 on any mismatch, listing each.
 """
 import argparse
 import bisect
+import hashlib
 import importlib.util
 import json
 import os
@@ -150,6 +157,22 @@ def stem_of_tut(name):
     return re.sub(r"_(?:baseline|v2|v3|v4)$", "", m.group(1)) + "_test"
 
 
+def tut_source(stem):
+    """The TUT source a stem names, as git tracks it under ROOT, and the
+    sha256 of its bytes: (None, None) unless exactly one
+    indra/**/tests/<stem>.cpp is tracked."""
+    try:
+        listing = subprocess.run(["git", "-C", ROOT, "ls-files", "-z", "--", f":(glob)indra/**/tests/{stem}.cpp"],
+                                 capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None, None
+    paths = [p.decode("utf-8", "surrogateescape") for p in listing.split(b"\0") if p]
+    if len(paths) != 1:
+        return None, None
+    with open(os.path.join(ROOT, paths[0]), "rb") as f:
+        return paths[0], hashlib.sha256(f.read()).hexdigest()
+
+
 # --------------------------------------------------------------------------
 # record
 # --------------------------------------------------------------------------
@@ -174,7 +197,14 @@ def record(args):
             results.append({"group": m.group("group"), "n": int(m.group("n")), "name": m.group("name") or "",
                             "result": {"ok": "ok", "skipped known failure": "skip"}.get(result, "fail"),
                             "said": line[m.start("result"):].strip()})
-        out[stem_of_tut(name)] = {"ctest": name, "exit": code, "results": results}
+        stem = stem_of_tut(name)
+        # What the results are of, so that check can tell they are of the
+        # source the mapping was made from.
+        source, digest = tut_source(stem)
+        if source is None:
+            print(f"{name}: not exactly one tracked indra/**/tests/{stem}.cpp, so no source hash kept",
+                  file=sys.stderr)
+        out[stem] = {"ctest": name, "exit": code, "tut_file": source, "tut_sha256": digest, "results": results}
         counts = {}
         for r in results:
             counts[r["result"]] = counts.get(r["result"], 0) + 1
@@ -394,6 +424,13 @@ def check(args):
         if len(entry_names) != 1:
             problems.append(f"{path}: {len(entry_names)} Catch2 CTest entries end in /{stem}")
             continue
+        # A converted file changed since its binary was built is not what
+        # the binary runs: its cases, lines and counts would not be the run's.
+        command = tests[entry_names[0]]["command"]
+        if command and os.path.isfile(command[0]) and \
+                os.path.getmtime(os.path.join(ROOT, path)) > os.path.getmtime(command[0]):
+            problems.append(f"{path}: changed since {command[0]} was built; build it again to check it")
+            continue
         code, cases, output = catch2_results(tests[entry_names[0]], args.timeout)
         if cases is None:
             problems.append(f"{path}: {entry_names[0]} gave no XML (exit {code}):\n{output[-2000:]}")
@@ -441,9 +478,19 @@ def check(args):
                  if macro not in REPORTING_ONLY and not any(first <= n <= last for n in ran_anywhere)]
         matched = agree = counts_ok = 0
         listed = []
+        record = (file_records or {}).get(path)
+        # The TUT results must be of the source the mapping was made from.
+        hashes = {"the recorded results": recorded.get("tut_sha256"), "the mapping": (record or {}).get("tut_sha256")}
+        if all(hashes.values()):
+            if len(set(hashes.values())) > 1:
+                problems.append(f"{path}: TUT's results were recorded from another {stem}.cpp than the one "
+                                f"converted (sha256 {hashes['the recorded results'][:12]}, the mapping's "
+                                f"{hashes['the mapping'][:12]})")
+        else:
+            notes.append(f"no TUT source hash in {' or '.join(k for k, v in hashes.items() if not v)}, "
+                         f"so the two are not known to be of one source")
         # What no test's count holds: the assertions outside every test body
         # (helpers, fixtures), which the mapping totals for the file.
-        record = (file_records or {}).get(path)
         if file_records is None:
             notes.append("no file totals in the mapping")
         elif record is None:
