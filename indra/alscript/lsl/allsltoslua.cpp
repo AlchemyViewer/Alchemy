@@ -665,6 +665,9 @@ namespace
         std::string llArgs(LSLFunctionExpression* e, U16 indexes);
         // `: type` for an LSL type, where types are written.
         std::string typed(LSLIType type) const;
+        // A table's braces round what it holds, or a table type's: spaced
+        // inside or not as Options::braceSpaces asks; {} round nothing.
+        std::string braced(const std::string& inside) const;
 
         // --- statements -------------------------------------------------------------
 
@@ -2009,7 +2012,7 @@ namespace
                 {
                     out += (out.empty() ? "" : ", ") + constant(item).text;
                 }
-                return { "{" + out + "}" };
+                return { braced(out) };
             }
             default:
                 return { "nil" };
@@ -2674,6 +2677,11 @@ namespace
         return static_cast<LSLExpression*>(arg);
     }
 
+    std::string Writer::braced(const std::string& inside) const
+    {
+        return inside.empty() ? "{}" : mOptions.braceSpaces ? "{ " + inside + " }" : "{" + inside + "}";
+    }
+
     std::string Writer::typed(LSLIType type) const
     {
         if (!mOptions.types)
@@ -2688,7 +2696,7 @@ namespace
             case LST_KEY: return ": uuid";
             case LST_VECTOR: return ": vector";
             case LST_QUATERNION: return ": quaternion";
-            case LST_LIST: return ": { any }";
+            case LST_LIST: return ": " + braced("any");
             default: return std::string();
         }
     }
@@ -3166,11 +3174,12 @@ namespace
                     // rule for a loop's range keeps alive, and not every
                     // compiler has that rule.
                     const std::optional<std::vector<std::string_view>> pieces = whitelistPieces(*textWritten(v));
+                    std::string                                        each;
                     for (std::string_view piece : *pieces)
                     {
-                        text += (text.empty() ? "{ " : ", ") + luaString(piece);
+                        each += (each.empty() ? "" : ", ") + luaString(piece);
                     }
-                    text += " }";
+                    text = braced(each);
                     break;
                 }
                 case Takes::Headers:
@@ -3195,7 +3204,7 @@ namespace
         }
         for (const Gathered& g : gathered)
         {
-            fields[g.at] += "{ " + g.all + " }";
+            fields[g.at] += braced(g.all);
         }
         // The serializer sends headers sorted by name: said where that is
         // not the order they were written in.
@@ -3207,12 +3216,12 @@ namespace
         }
         // A key to a line where the LSL's list had more than one.
         const bool  lines = list->getLoc()->first_line != list->getLoc()->last_line;
-        std::string table = lines ? "{\n" : "{ ";
+        std::string table;
         for (size_t i = 0; i < fields.size(); ++i)
         {
             table += lines ? listIndent(1) + fields[i] + ",\n" : (i ? ", " : "") + fields[i];
         }
-        table += lines ? listIndent(0) + "}" : " }";
+        table = lines ? "{\n" + table + listIndent(0) + "}" : braced(table);
         called = "ll." + lsl.substr(2);
         LSLParamList* params = e->getIdentifier()->getSymbol()->getFunctionDecl();
         return Expr{ called + "(" + args(e->getArguments(), params, 0, call->at, table, true) + ")" };
@@ -3762,13 +3771,13 @@ namespace
                     std::string    first = madeHere(lhs) ? anyItems(lhs, a) : "table.clone(" + a.text + ")";
                     if (lt != LST_LIST)
                     {
-                        first = "{" + a.text + "} :: { any }";
+                        first = braced(a.text) + " :: " + braced("any");
                     }
                     else if (left->getNodeSubType() == NODE_BINARY_EXPRESSION && left->getOperation() == OP_PLUS)
                     {
                         first = a.text;
                     }
-                    return { "table.extend(" + first + ", " + (rt == LST_LIST ? b.text : "{" + b.text + "}") + ")" };
+                    return { "table.extend(" + first + ", " + (rt == LST_LIST ? b.text : braced(b.text)) + ")" };
                 }
                 if (lt == LST_STRING || lt == LST_KEY || rt == LST_STRING || rt == LST_KEY)
                 {
@@ -4008,7 +4017,7 @@ namespace
                         noteOnce(e, "SluaVectorText",
                                  "ll.DumpList2String writes a vector's or a rotation's parts as LSL did, with five places; SLua's tostring "
                                  "writes as few as each needs, <1, 2, 3>, which tovector reads back the same.");
-                        return { "ll.DumpList2String({" + v.text + "}, \"\")" };
+                        return { "ll.DumpList2String(" + braced(v.text) + ", \"\")" };
                     default: return { "tostring(" + v.text + ")" };
                 }
             case LST_KEY:
@@ -4028,7 +4037,7 @@ namespace
             // only where an operator around it binds more tightly than or.
             case LST_VECTOR: return { "tovector(" + v.text + ") or ZERO_VECTOR", OR };
             case LST_QUATERNION: return { "toquaternion(" + v.text + ") or ZERO_ROTATION", OR };
-            case LST_LIST: return { "{" + v.text + "}" };
+            case LST_LIST: return { braced(v.text) };
             default: return v;
         }
     }
@@ -4127,7 +4136,7 @@ namespace
                     auto* each = static_cast<LSLExpression*>(item);
                     out += (out.empty() ? "" : ", ") + coerced(each, each->getIType()).text;
                 }
-                return { "{" + out + "}" };
+                return { braced(out) };
             }
             default:
                 return { "nil" };
@@ -4204,12 +4213,12 @@ namespace
             {
                 out += ",";
             }
-            to(begins(item), listIndent(0), i > 0);
+            to(begins(item), listIndent(0), i > 0 || mOptions.braceSpaces);
             // As LSL typed it: NULL_KEY in a list is LSL's string.
             out += coerced(item, item->getIType()).text;
             line = item->getLoc()->last_line;
         }
-        to(close, listIndent(-1), false);
+        to(close, listIndent(-1), mOptions.braceSpaces);
         out += "}";
         --mListDepth;
         return out;
@@ -4241,7 +4250,7 @@ namespace
                     if (t == LST_LIST)
                     {
                         // Something else may hold the list: a new one.
-                        return "table.extend(table.clone(" + old + "), " + (rhs && rhs->getIType() == LST_LIST ? v.text : "{" + v.text + "}") + ")";
+                        return "table.extend(table.clone(" + old + "), " + (rhs && rhs->getIType() == LST_LIST ? v.text : braced(v.text)) + ")";
                     }
                     return old + " + " + bracketed(v, ADD + 1);
                 case OP_SUB_ASSIGN:
@@ -6019,7 +6028,7 @@ namespace
 
     std::string Writer::anyItems(LSLExpression* e, const Expr& written) const
     {
-        return madeHere(e) ? bracketed(written, PRIMARY) + " :: { any }" : written.text;
+        return madeHere(e) ? bracketed(written, PRIMARY) + " :: " + braced("any") : written.text;
     }
 
     LSLASTNode* Writer::soleItem(LSLExpression* e) const
@@ -6415,7 +6424,7 @@ namespace
             }
             else if (values.size() > 32)
             {
-                line("table.extend(" + name + ", {" + all + "})");
+                line("table.extend(" + name + ", " + braced(all) + ")");
             }
             else if (!values.empty())
             {
@@ -6657,7 +6666,7 @@ namespace
         {
             const std::string name  = mNames.contains(var) ? mNames[var] : nameOf(var->getName());
             const std::string parts = freshName(name + "Parts");
-            line("local " + parts + (mOptions.types ? ": { string }" : "") + " = {}");
+            line("local " + parts + (mOptions.types ? ": " + braced("string") : "") + " = {}");
             mBuilding[var] = parts;
             joins.push_back({ name, parts, mDeclaredAtJoin.contains({ loop, var }) });
         }
@@ -7304,7 +7313,7 @@ namespace
             {
                 lead.push_back("local " + nameOf(static_cast<LSLIdentifier*>(first)) + typed(LST_INTEGER) + " = #detected");
             }
-            return mOptions.types ? "detected: { DetectedEvent }" : "detected";
+            return mOptions.types ? "detected: " + braced("DetectedEvent") : "detected";
         }
         int at = 0;
         for (LSLASTNode* p = first; p; p = p->getNext(), ++at)
@@ -7407,7 +7416,7 @@ namespace
         note(nullptr, "SluaStates",
              "LSL let go of a state's listens, sensor repeats and targets as it left the state; setState does not. Remove them "
              "yourself where the script relied on it.");
-        line("local states: { [string]: { [string]: (...any) -> () } } = {}");
+        line("local states: " + braced("[string]: " + braced("[string]: (...any) -> ()")) + " = {}");
         line("local currentState: string? = nil");
         line("");
         line("local function setState(name: string)");
