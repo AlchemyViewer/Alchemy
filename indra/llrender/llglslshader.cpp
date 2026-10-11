@@ -484,6 +484,14 @@ LLGLSLShader::~LLGLSLShader()
     // than a leak. Recursion covers the subtree: each child erases itself on the way out.
     sInstances.erase(this);
 
+    // Nor may the bound-program statics name this object. They are cleared without a GL call,
+    // for the reason below.
+    if (sCurBoundShaderPtr == this)
+    {
+        sCurBoundShaderPtr = nullptr;
+        sCurBoundShader = 0;
+    }
+
     // Free the owned subtree's OBJECTS, so a program destroyed without unload() does not leak
     // them. Deliberately not unload(): a global program's destructor runs at static destruction
     // with no GL context, where deleting program objects is undefined -- and the driver reclaims
@@ -644,19 +652,28 @@ bool LLGLSLShader::createVariant(EVariant axis)
 
 void LLGLSLShader::unload()
 {
+    freeOwnedVariants();
+
+    unloadInternal();
+
+    // After unloadInternal: unbinding a bound program ends its profile queries by the
+    // features they were begun with.
     mShaderFiles.clear();
     mDefines.clear();
     mPermutationsAdded = false;
     mFeatures = LLShaderFeatures();
-
-    freeOwnedVariants();
-
-    unloadInternal();
 }
 
 void LLGLSLShader::unloadInternal()
 {
     sInstances.erase(this);
+
+    // A bound program is unbound before it is deleted, so the bound-program statics never
+    // name a dead program, or an owned variant freed right after this.
+    if (sCurBoundShaderPtr == this || (mProgramObject != 0 && sCurBoundShader == mProgramObject))
+    {
+        unbind();
+    }
 
     stop_glerror();
     mAttribute.clear();
