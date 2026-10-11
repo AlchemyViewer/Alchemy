@@ -39,8 +39,6 @@ using namespace LLCoreInt;
 
 namespace tut
 {
-namespace
-{
 
 struct HttpRequestqueueTestData
 {
@@ -51,7 +49,6 @@ struct HttpRequestqueueTestData
 typedef test_group<HttpRequestqueueTestData> HttpRequestqueueTestGroupType;
 typedef HttpRequestqueueTestGroupType::object HttpRequestqueueTestObjectType;
 HttpRequestqueueTestGroupType HttpRequestqueueTestGroup("HttpRequestqueue Tests");
-}
 
 template <> template <>
 void HttpRequestqueueTestObjectType::test<1>()

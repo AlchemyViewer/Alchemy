@@ -36,8 +36,6 @@ using namespace LLCoreInt;
 
 namespace tut
 {
-namespace
-{
 
 struct HttpHeadersTestData
 {
@@ -48,7 +46,6 @@ struct HttpHeadersTestData
 typedef test_group<HttpHeadersTestData> HttpHeadersTestGroupType;
 typedef HttpHeadersTestGroupType::object HttpHeadersTestObjectType;
 HttpHeadersTestGroupType HttpHeadersTestGroup("HttpHeaders Tests");
-}
 
 template <> template <>
 void HttpHeadersTestObjectType::test<1>()

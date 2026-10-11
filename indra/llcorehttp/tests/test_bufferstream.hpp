@@ -39,8 +39,6 @@ using namespace LLCore;
 
 namespace tut
 {
-namespace
-{
 
 struct BufferStreamTestData
 {
@@ -52,7 +50,6 @@ typedef test_group<BufferStreamTestData> BufferStreamTestGroupType;
 typedef BufferStreamTestGroupType::object BufferStreamTestObjectType;
 BufferStreamTestGroupType BufferStreamTestGroup("BufferStream Tests");
 typedef BufferArrayStreamBuf::traits_type tst_traits_t;
-}
 
 
 template <> template <>

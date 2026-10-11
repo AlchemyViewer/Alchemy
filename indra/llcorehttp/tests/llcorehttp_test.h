@@ -36,20 +36,15 @@
 
 #include "httprequest.h"
 
-// The suites and these helpers are one translation unit,
-// llcorehttp_test.cpp, so the helpers have internal linkage.
-namespace
-{
-
 // Initialization and cleanup for libcurl.  Mainly provides
 // a mutex callback for SSL and a thread ID hash for libcurl.
 // If you don't use these (or equivalent) and do use libcurl,
 // you'll see stalls and other anomalies when performing curl
 // operations.
-void init_curl();
-void term_curl();
-std::string get_base_url();
-void stop_thread(LLCore::HttpRequest * req);
+extern void init_curl();
+extern void term_curl();
+extern std::string get_base_url();
+extern void stop_thread(LLCore::HttpRequest * req);
 
 class ScopedCurlInit
 {
@@ -64,8 +59,6 @@ public:
             term_curl();
         }
 };
-
-}
 
 
 #endif  // _LLCOREHTTP_TEST_H_
