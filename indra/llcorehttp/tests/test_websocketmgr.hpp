@@ -425,6 +425,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct WebsocketMgrTestData
     {
     };
@@ -432,6 +434,7 @@ namespace tut
     typedef test_group<WebsocketMgrTestData> WebsocketMgrTestGroupType;
     typedef WebsocketMgrTestGroupType::object WebsocketMgrTestObjectType;
     WebsocketMgrTestGroupType WebsocketMgrTestGroup("LLWebsocketMgr Tests");
+}
 
     template<> template<>
     void WebsocketMgrTestObjectType::test<1>()
