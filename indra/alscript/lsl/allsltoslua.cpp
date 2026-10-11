@@ -7249,14 +7249,15 @@ namespace
             std::vector<std::string> lead;
             const std::string        params = handlerParams(handler, lead);
             // The timer's handler, which LLTimers calls, where the script's
-            // timer is on LLTimers.
+            // timer is on LLTimers: the local timersPreamble declared, which
+            // a function statement of its name assigns.
             const bool timer = event == "timer" && mTimers;
             if (event == "timer" && !mTimers)
             {
                 noteOnce(handler, "SluaTimer", "the timer event, set going by llcompat.SetTimerEvent; LLTimers:every is SLua's own.");
             }
             const bool field = mOptions.handlers == ALLSLToSLua::Options::Handlers::Field;
-            line(timer   ? "timerHandler = function()"
+            line(timer   ? "function timerHandler()"
                  : field ? "function LLEvents." + event + "(" + params + ")"
                          : "LLEvents:on(" + luaString(event) + ", function(" + params + ")");
             trail(handler->getStatements());

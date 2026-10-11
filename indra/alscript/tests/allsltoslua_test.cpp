@@ -2081,8 +2081,17 @@ namespace tut
         ensure("once: " + r.text, has(r, "timerHandle = LLTimers:once(seconds, function()") && !has(r, "LLTimers:every(seconds, function"));
         ensure("said so: " + r.text, has(r, "-- time it is set, as its handler turns it off before anything else."));
         ensure("the handler's own off kept, and set again: " + r.text,
-               has(r, "timerHandler = function()\n    setTimer(0.0)\n") && has(r, "setTimer(2)") && has(r, "setTimer(1)"));
+               has(r, "function timerHandler()\n    setTimer(0.0)\n") && has(r, "setTimer(2)") && has(r, "setTimer(1)"));
         checksClean(r);
+        // Tapple's: the local the preamble declared, assigned by a function
+        // statement of its name, which types as it is declared.
+        ALLSLToSLua::Options typed;
+        typed.types                     = true;
+        const ALLSLToSLua::Result types = ALLSLToSLua::convert("default { state_entry() { llSetTimerEvent(5); } timer() { llOwnerSay(\"t\"); } }\n", typed);
+        ensure("a function statement, typed: " + types.text,
+               has(types, "local timerHandler: (() -> ())? = nil\n") && has(types, "\nfunction timerHandler()\n    print(\"t\")\nend\n") &&
+                   !has(types, "timerHandler = function"));
+        checksClean(types);
 
         const ALLSLToSLua::Result states = convert("default {\n"
                                                    "    state_entry() { llSetTimerEvent(1); }\n"
