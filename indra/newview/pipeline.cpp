@@ -9088,7 +9088,11 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
     const F32  streak_strength = (no_post || bloom_strength_gate() <= 0.f)
                                ? 0.f
                                : llclamp(streak_strength_setting(), 0.f, CROSS_FILTER_MAX_STRENGTH);
-    const bool streaks_on      = (streak_strength > 0.f) && gCrossFilterProgram.isComplete();
+    // And only with a texture barrier: the chain reads quadrants of mWaterDis that the draw
+    // before it wrote while the texture is still attached, which GL defines only across one.
+    // glTextureBarrier is null where the driver has neither GL 4.5 nor a texture barrier
+    // extension, and there the streaks are off rather than undefined.
+    const bool streaks_on      = (streak_strength > 0.f) && gCrossFilterProgram.isComplete() && glTextureBarrier;
     bool       streaks_ready   = false;
 
     if (streaks_on)
@@ -9230,9 +9234,8 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
                     // mWaterDis is still attached to the bound framebuffer, a read GL
                     // defines only across a texture barrier. The same barriers put each
                     // arm's reads of a scratch quadrant before the next arm's write to it.
-                    // Null where the driver has neither GL 4.5 nor a texture barrier
-                    // extension.
-                    if (src == &mWaterDis && glTextureBarrier)
+                    // Never null here: streaks_on requires it.
+                    if (src == &mWaterDis)
                     {
                         glTextureBarrier();
                     }
