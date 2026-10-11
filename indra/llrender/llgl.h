@@ -338,6 +338,9 @@ public:
     enum { CURRENT_STATE = -2, DISABLED_STATE = 0, ENABLED_STATE = 1 };
     LLGLState(LLGLenum state, S32 enabled = CURRENT_STATE);
     ~LLGLState();
+    // A copy would restore the cap a second time.
+    LLGLState(const LLGLState&) = delete;
+    LLGLState& operator=(const LLGLState&) = delete;
     void setEnabled(S32 enabled);
     void enable() { setEnabled(ENABLED_STATE); }
     void disable() { setEnabled(DISABLED_STATE); }
