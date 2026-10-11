@@ -10,7 +10,8 @@ Two steps, either side of scripts/testing/tut2catch.py:
            A test TUT never reported (a dummy test<N> slot) is not a test.
   check    after converting and building: runs each converted file's CTest
            entry, <binary>/<file stem>, as XML, and matches the cases to the
-           TUT results through tut2catch.py's mapping.
+           TUT results through tut2catch.py's mapping. tut2catch.py must be
+           beside this script: the converted file is read as it reads one.
 
 Parity holds for a file when:
   - every TUT test it reported has exactly one Catch2 case, and every case
@@ -26,15 +27,23 @@ Parity holds for a file when:
     case whatever it does, and the run's exit code fits its cases: 0 when
     some passed and none failed, 125 when all skipped, neither when any
     failed;
-  - each case's assertions, counted in the converted file, number its
-    TUT test's ensure, fail and skip calls, as the mapping counted them in
-    the TUT file, where a && chain the converter split counts one a term
-    (catch2_expected). After a file has been edited by hand past what the
-    converter wrote, --recounted lists the counts instead of holding them
-    to the mapping; names and results must still agree.
+  - each case's assertions, counted in the converted file (read as
+    tut2catch.py reads it: comments, literals and #if 0 code left out),
+    number its TUT test's ensure, fail and skip calls, as the mapping
+    counted them in the TUT file, where a && chain the converter split
+    counts one a term (catch2_expected). After a file has been edited by
+    hand past what the converter wrote, --recounted lists the counts
+    instead of holding them to the mapping; names and results must still
+    agree;
+  - every assertion counted in a passing case's body ran: the run keeps its
+    passing assertions (-s), and each CHECK, REQUIRE and _THAT site must
+    report from at least one line it spans. A FAIL or SKIP that ran would
+    have failed or skipped the case, and a case that failed or skipped may
+    have stopped early, so neither is held to it.
 
 A test the mapping says TUT never ran (past its group's limit) or this host
-does not compile is listed, not counted against parity. So is what the
+does not compile is listed, not counted against parity, as is an assertion
+outside every case (a helper's) that no case ran. So is what the
 Catch2 harness's state guard says a case left changed: TUT never looked, so
 it is a finding about the test, not a difference the conversion made; the
 table's exit column shows the run's exit code. It prints a table, one row a
@@ -47,6 +56,8 @@ file, and exits 1 on any mismatch, listing each.
     python3 -I scripts/testing/tut_parity.py check --tut /tmp/tut.json --mapping /tmp/map.json
 """
 import argparse
+import bisect
+import importlib.util
 import json
 import os
 import re
@@ -66,8 +77,11 @@ FORGIVING_TAGS = ("[!mayfail]", "[!shouldfail]")
 RESULT_LINE = re.compile(
     r"^\[(?P<group>.+?), (?P<n>\d+)(?:: (?P<name>.*?))?\] "
     r"(?P<result>ok|fail|exception|test destructor throw|abnormal termination|skipped known failure|unknown)\b")
-CATCH_ASSERTION = re.compile(
-    r"(?<![\w.>:])(?:REQUIRE|REQUIRE_FALSE|REQUIRE_THAT|CHECK|CHECK_FALSE|CHECK_THAT|FAIL|FAIL_CHECK|SKIP)\s*\(")
+# Assertions that report only when they run, and then fail or skip the case:
+# in a case that passed, one of these not running is the pass.
+REPORTING_ONLY = {"FAIL", "FAIL_CHECK", "SKIP"}
+# What a run's XML says an assertion ran with, and where.
+RAN_ELEMENTS = {"Expression", "Failure", "Skip"}
 
 
 # --------------------------------------------------------------------------
@@ -170,26 +184,42 @@ def record(args):
 # check
 # --------------------------------------------------------------------------
 def catch2_results(test, timeout):
-    """The cases a Catch2 entry ran, as XML, in the order it ran them: each
-    {name, tags, result: ok | skip | fail}. A list, not a dict by name: Catch2
-    takes two cases of one name that differ in their tags."""
+    """The cases a Catch2 entry ran, as XML with its passing assertions too
+    (-s), in the order it ran them: each {name, tags, line, result: ok | skip
+    | fail, ran: {(file, line) of each assertion that ran}}. A list, not a
+    dict by name: Catch2 takes two cases of one name that differ in their
+    tags. Read as it streams: a case that loops over its checks writes
+    megabytes."""
     with tempfile.TemporaryDirectory() as tmp:
         report = os.path.join(tmp, "report.xml")
-        code, text = run(test, ["-r", f"xml::out={report}"], timeout)
+        code, text = run(test, ["-s", "-r", f"xml::out={report}"], timeout)
         cases = []
+        case = None
         try:
-            root = ElementTree.parse(report).getroot()
+            for event, element in ElementTree.iterparse(report, events=("start", "end")):
+                if event == "start":
+                    if element.tag == "TestCase":
+                        case = {"name": element.get("name"), "tags": element.get("tags", ""),
+                                "line": int(element.get("line", "0")), "result": "fail", "ran": set()}
+                    continue
+                if case is None:
+                    continue
+                if element.tag in RAN_ELEMENTS:
+                    case["ran"].add((element.get("filename", ""), int(element.get("line", "0"))))
+                    element.clear()
+                elif element.tag == "OverallResult":
+                    if element.get("success") != "true":
+                        case["result"] = "fail"
+                    elif int(element.get("skips", "0")) > 0:
+                        case["result"] = "skip"
+                    else:
+                        case["result"] = "ok"
+                elif element.tag == "TestCase":
+                    cases.append(case)
+                    case = None
+                    element.clear()
         except (ElementTree.ParseError, FileNotFoundError):
             return code, None, text
-        for case in root.iter("TestCase"):
-            result = case.find("OverallResult")
-            if result is None or result.get("success") != "true":
-                outcome = "fail"
-            elif int(result.get("skips", "0")) > 0:
-                outcome = "skip"
-            else:
-                outcome = "ok"
-            cases.append({"name": case.get("name"), "tags": case.get("tags", ""), "result": outcome})
         return code, cases, text
 
 
@@ -206,16 +236,54 @@ def exit_fits(code, cases, output):
     return code == 0 or (code == 1 and "The state guard found" in output)
 
 
-def recount(path, cases):
-    """The Catch2 assertions in each named case's body, from the file itself."""
+_CONVERTER = None
+
+
+def converter():
+    """tut2catch.py, beside this script: the file is read with the masking
+    and the #if 0 regions the mapping's counts were made with. By path, as
+    python -I puts no script's directory on sys.path."""
+    global _CONVERTER
+    if _CONVERTER is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tut2catch.py")
+        spec = importlib.util.spec_from_file_location("tut2catch", path)
+        _CONVERTER = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_CONVERTER)
+    return _CONVERTER
+
+
+def read_cases(path):
+    """The converted file's test cases and assertion sites, read from the file
+    as tut2catch.py reads it: comments and literals masked, #if 0 branches
+    left out. A site is (first line, last line, macro), the lines its call
+    spans; returns ([{name, lines, sites}], the sites outside every case)."""
+    tc = converter()
     with open(path, "rb") as f:
-        text = f.read().decode("utf-8", "surrogateescape")
-    masked = mask(text)
-    counts = {}
-    for m in re.finditer(r'\bTEST_CASE(_METHOD)?\s*\(', masked):
+        data = f.read()
+    masked = tc.mask_source(data)
+    dead = tc.dead_regions(masked)
+    newlines = [m.start() for m in re.finditer(rb"\n", masked)]
+
+    def live(at):
+        return not any(start <= at < end for start, end in dead)
+
+    def line(at):
+        return bisect.bisect_left(newlines, at) + 1
+
+    sites = []
+    for m in tc.CATCH_ASSERTION.finditer(masked):
+        if live(m.start()):
+            close = matching(masked, m.end() - 1)
+            macro = m.group(0).rstrip(b"( \t\r\n").decode()
+            sites.append((m.start(), (line(m.start()), line(close), macro)))
+    cases = []
+    inside = set()
+    for m in re.finditer(rb"\bTEST_CASE(_METHOD)?\s*\(", masked):
+        if not live(m.start()):
+            continue
         open_paren = m.end() - 1
         close = matching(masked, open_paren)
-        header = text[open_paren + 1:close]
+        header = data[open_paren + 1:close].decode("utf-8", "surrogateescape")
         # The name is the first argument of a TEST_CASE, the second of a
         # TEST_CASE_METHOD.
         literal = re.search(r',\s*((?:"(?:[^"\\]|\\.)*"\s*)+),' if m.group(1) else
@@ -223,52 +291,41 @@ def recount(path, cases):
         if not literal:
             continue
         name = "".join(unescape(p) for p in re.findall(r'"((?:[^"\\]|\\.)*)"', literal.group(1)))
-        brace = masked.find("{", close)
+        brace = masked.find(b"{", close)
         end = matching(masked, brace)
-        counts[name] = len(CATCH_ASSERTION.findall(masked, brace, end))
-    return {name: counts.get(name) for name in cases}
+        body = [(at, site) for at, site in sites if brace < at < end]
+        inside.update(at for at, _ in body)
+        cases.append({"name": name, "lines": (line(m.start()), line(brace)), "sites": [site for _, site in body]})
+    return cases, [site for at, site in sites if at not in inside]
 
 
-def mask(text):
-    """Comments blanked and literals' insides replaced, offsets kept."""
-    out = list(text)
-    i, n = 0, len(text)
-    while i < n:
-        if text.startswith("//", i):
-            j = text.find("\n", i)
-            j = n if j < 0 else j
-            out[i:j] = " " * (j - i)
-            i = j
-        elif text.startswith("/*", i):
-            j = text.find("*/", i + 2)
-            j = n if j < 0 else j + 2
-            out[i:j] = [c if c == "\n" else " " for c in text[i:j]]
-            i = j
-        elif text[i] in "\"'":
-            if text[i] == "'" and i > 0 and text[i - 1].isalnum() and re.match(r"\d", text[i - 1]):
-                i += 1
-                continue
-            q = text[i]
-            j = i + 1
-            while j < n and text[j] != q and text[j] != "\n":
-                j += 2 if text[j] == "\\" else 1
-            out[i + 1:j] = "_" * (j - i - 1)
-            i = j + 1
-        else:
-            i += 1
-    return "".join(out)
-
-
-def matching(text, at):
+def matching(masked, at):
+    """Where the bracket at at closes, in masked text."""
     depth = 0
-    for i in range(at, len(text)):
-        if text[i] in "({[":
+    for i in range(at, len(masked)):
+        c = masked[i]
+        if c in b"({[":
             depth += 1
-        elif text[i] in ")}]":
+        elif c in b")}]":
             depth -= 1
             if depth == 0:
                 return i
-    return len(text)
+    return len(masked)
+
+
+def ran_here(case, path):
+    """The lines of path a case's run reported an assertion from."""
+    suffix = "/" + path.replace("\\", "/")
+    return {line for file, line in case["ran"] if ("/" + file.replace("\\", "/")).endswith(suffix)}
+
+
+def body_of(case, file_cases):
+    """The file's case a run's case is: by name, and by the line Catch2 says
+    it starts on where two have one name."""
+    named = [c for c in file_cases if c["name"] == case["name"]]
+    if len(named) > 1:
+        named = [c for c in named if c["lines"][0] <= case["line"] <= c["lines"][1]]
+    return named[0] if len(named) == 1 else None
 
 
 def unescape(body):
@@ -347,7 +404,26 @@ def check(args):
             problems.append(f"{path}: {entry_names[0]} exited {code}, which does not fit its cases ("
                             + (", ".join(f"{v} {k}" for k, v in sorted(counts.items())) or "none") + ")")
         tut_results = {(r["group"], r["n"]): r for r in recorded["results"]}
-        counted = recount(os.path.join(ROOT, path), [e["catch2_name"] for e in entries if e["catch2_name"]])
+        file_cases, outside = read_cases(os.path.join(ROOT, path))
+        counted = {}
+        for c in file_cases:
+            counted.setdefault(c["name"], len(c["sites"]))
+        # An assertion counted is not one that ran: a case passes as well
+        # when a loop around its CHECK never turns. Each site in a passing
+        # case's body must have reported at least once.
+        ran_anywhere = set()
+        for case in cases:
+            ran = ran_here(case, path)
+            ran_anywhere |= ran
+            if case["result"] != "ok":
+                continue
+            body = body_of(case, file_cases)
+            for first, last, macro in body["sites"] if body else []:
+                if macro not in REPORTING_ONLY and not any(first <= n <= last for n in ran):
+                    problems.append(f"{path}: {case['name']!r} passed without running the {macro} on line {first}")
+        never = [f"the {macro} on line {first}, outside every case, never ran"
+                 for first, last, macro in outside
+                 if macro not in REPORTING_ONLY and not any(first <= n <= last for n in ran_anywhere)]
         matched = agree = counts_ok = 0
         listed = []
         seen_cases = set()
@@ -412,7 +488,7 @@ def check(args):
         clean = not any(p.startswith(path + ":") for p in problems)
         rows.append((path, len(recorded["results"]), len(cases), matched, agree, counts_ok, len(listed), code,
                      "ok" if clean else "MISMATCH"))
-        for line in listed + guard:
+        for line in listed + never + guard:
             print(f"{path}: listed: {line}")
 
     header = ("file", "TUT", "Catch2", "matched", "agree", "counts", "listed", "exit", "parity")
