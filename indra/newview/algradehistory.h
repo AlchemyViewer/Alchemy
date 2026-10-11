@@ -110,6 +110,9 @@ public:
     /// @{
     void beginGroup(const std::string& label = std::string());
     void endGroup();
+    /// Whether the last group to close left a step on the stack: one that
+    /// changed nothing leaves none, and there is then nothing to undo.
+    bool lastGroupMadeStep() const { return mSteps.closedWithStep(); }
     /// @}
 
     bool canUndo() const { return mSteps.canUndo(); }

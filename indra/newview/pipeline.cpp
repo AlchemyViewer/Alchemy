@@ -8015,7 +8015,13 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
         }
 
         const F32 bins_per_ev = (F32)EXPOSURE_HISTOGRAM_BINS / (EXPOSURE_HISTOGRAM_MAX_EV - EXPOSURE_HISTOGRAM_MIN_EV);
-        gExposureHistogramProgram.uniform4f(LLShaderMgr::METER_PARAMS, (F32)metering_mode(), llmax(sky_weight(), 0.f),
+        // The slider runs 0..1; the cap leaves Debug Settings room to weigh
+        // the sky above the ground while keeping a weight a Look carries in
+        // from outside from overflowing the histogram's float sums -- which
+        // would leave nothing kept, or an inf - inf where the EV is taken.
+        // check_exposure.py mirrors it.
+        constexpr F32 EXPOSURE_SKY_WEIGHT_MAX = 16.f;
+        gExposureHistogramProgram.uniform4f(LLShaderMgr::METER_PARAMS, (F32)metering_mode(), llclamp(sky_weight(), 0.f, EXPOSURE_SKY_WEIGHT_MAX),
                                             EXPOSURE_HISTOGRAM_MIN_EV, bins_per_ev);
 
         mExposureHistogramVB->setBuffer();

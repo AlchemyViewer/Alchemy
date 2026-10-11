@@ -1438,14 +1438,24 @@ so that the part fed text from strangers can be tested without the viewer:
   `<nolink>` a notification shows it in; see the rules below), the U+100000+
   characters the notecard editor shows as embedded items, the bidi overrides,
   embeddings and isolates (one could make one Look's name read as another's)
-  and the zero-width space — the joiner, the non-joiner and the bidi marks
-  stay, being load-bearing in the scripts and emoji that use them — and
-  anything malformed come out, and
-  a name is cut on a character boundary to 63 bytes and trimmed again after
-  the cut — `DB_INV_ITEM_NAME_STR_LEN`, and also what keeps `LLURI::escape`
-  of a CJK name inside a file system's path limit. A name Windows would open
-  as a device (`NUL`, `COM1`, `CON.anything`) is no name at all, since a Look
-  is a file called after it (`isWindowsDeviceName`). Well-formed matters more
+  and the zero-width space, and the characters that only ever draw as
+  nothing (the soft hyphen, the combining grapheme joiner, the Hangul fillers
+  and their kin) — the joiner, the non-joiner and the bidi marks stay, being
+  load-bearing in the scripts and emoji that use them, but count for nothing
+  when two names are compared (`lookNameKey`), so that a name that reads as
+  another Look's is numbered rather than listed twice — and anything
+  malformed come out, and a name is cut on a character boundary to 63 bytes
+  (`DB_INV_ITEM_NAME_STR_LEN`) and trimmed again after the cut. A name loses
+  the dots it begins with, since the Looks are listed from `*.xml`, which
+  leaves out a file whose name begins with one. A name with nothing that
+  draws in it, or one Windows would open as a device (`NUL`, `COM1`,
+  `CON.anything`), is no name at all, since a Look is a file called after it
+  (`isWindowsDeviceName`). The 63 bytes keep a name inside the 255 a file
+  name holds, but not inside Windows' 260-character path once
+  `LLURI::escape` has made three of each byte of a CJK name, so a name is cut
+  further where the Looks folder's path leaves less
+  (`LLPresetsManager::escapedPresetNameLimit`, through `numberedLookName`).
+  Save As holds a typed Look name to the same rules. Well-formed matters more
   than it looks: the applied Look's name is written into `settings.xml` as
   `PresetLooksActive`, and a surrogate in it — which a character reference in
   the XML could spell, until `LLSDXMLParser` was made to refuse those — would
@@ -1466,7 +1476,10 @@ so that the part fed text from strangers can be tested without the viewer:
   overwriting a different Look**, and a name whose Look is identical is simply
   found — names matched without regard to case, as the file systems of
   Windows and macOS match them, and the spelling on disk kept, with the Looks
-  folder read once for the whole search — and writes it through
+  folder read once for the whole search; and a name the list does not have
+  is still taken where a file answers to it, since Windows opens a file by
+  its 8.3 short name too and a Look called `GOLDEN~1` would otherwise be
+  written over "Golden Hour" — and writes it through
   `LLPresetsManager::saveSharedLook`, which normalises it to a Look file like
   any other (live `Comment`, `Persist`, `Type`), holding the values that
   passed and each setting's own default where a value was refused, so that

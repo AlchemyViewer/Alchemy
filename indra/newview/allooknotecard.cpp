@@ -55,31 +55,35 @@ namespace
     // The name a Look from outside is saved under: the first of its own
     // name, "name (2)", "name (3)" and so on that no Look has, or that an
     // identical Look already holds -- then that Look's name as it is spelt
-    // here. Names are matched without regard to case, as the file systems
-    // of Windows and macOS match them (LLPresetsManager::presetExists says
-    // why), and the spelling on disk is the one the list and the bar know.
+    // here. Names are matched as ALLookFormat::lookNameKey has them: without
+    // regard to case, as the file systems of Windows and macOS match them
+    // (LLPresetsManager::presetExists says why), and without the marks that
+    // draw nothing, so that a name that reads as another Look's is numbered
+    // rather than shown twice. The spelling on disk is the one the list and
+    // the bar know. A name no Look in the list has is still taken where a
+    // file answers to it: Windows also opens a file by its 8.3 short name,
+    // so a Look called "GOLDEN~1" would be written over "Golden Hour".
     // Empty where none could be found, which takes a thousand Looks of one
-    // name.
+    // name, or where the Looks folder's path leaves no room for a name.
     std::string chooseImportedLookName(const std::string& wanted, const LLSD& settings, bool& already_had)
     {
         LLPresetsManager& presets = LLPresetsManager::instance();
         already_had               = false;
 
-        // The Looks there are, read from the folder once: lower-cased, to
+        // The Looks there are, read from the folder once: by their keys, to
         // the spelling on disk.
         LLPresetsManager::preset_name_list_t names;
         presets.loadPresetNamesFromDir(PRESETS_LOOKS, names, DEFAULT_HIDE);
         std::map<std::string, std::string> held;
         for (const std::string& existing : names)
         {
-            std::string lower(existing);
-            LLStringUtil::toLower(lower);
-            held.emplace(lower, existing);
+            held.emplace(ALLookFormat::lookNameKey(existing), existing);
         }
 
+        const size_t escaped_limit = LLPresetsManager::escapedPresetNameLimit(PRESETS_LOOKS);
         for (S32 n = 1; n < 1000; ++n)
         {
-            const std::string candidate = ALLookFormat::numberedLookName(wanted, n);
+            const std::string candidate = ALLookFormat::numberedLookName(wanted, n, escaped_limit);
             if (candidate.empty())
             {
                 return std::string();
@@ -88,11 +92,13 @@ namespace
             {
                 continue;
             }
-            std::string lower(candidate);
-            LLStringUtil::toLower(lower);
-            const auto taken = held.find(lower);
+            const auto taken = held.find(ALLookFormat::lookNameKey(candidate));
             if (taken == held.end())
             {
+                if (LLFile::isfile(LLPresetsManager::getPresetFilePath(PRESETS_LOOKS, candidate)))
+                {
+                    continue;
+                }
                 return candidate;
             }
             if (presets.lookHoldsSameSettings(taken->second, settings))

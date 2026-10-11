@@ -986,6 +986,26 @@ std::string LLPresetsManager::getPresetFilePath(const std::string& subdirectory,
     return getPresetsDir(subdirectory) + gDirUtilp->getDirDelimiter() + LLURI::escape(name) + ".xml";
 }
 
+// static
+size_t LLPresetsManager::escapedPresetNameLimit(const std::string& subdirectory)
+{
+    // writePresetFile writes "<name>.xml.tmp" and renames it.
+    constexpr size_t TEMP_SUFFIX = sizeof(".xml.tmp") - 1;
+#if LL_WINDOWS
+    // Windows opens nothing whose whole path is longer than MAX_PATH less
+    // its terminator, and the viewer does not ask for long paths. The
+    // folder's path is measured in UTF-8 bytes, which are never fewer than
+    // the UTF-16 units Windows counts.
+    constexpr size_t PATH_LIMIT = 259;
+    const size_t     used       = getPresetsDir(subdirectory).size() + gDirUtilp->getDirDelimiter().size() + TEMP_SUFFIX;
+    return used < PATH_LIMIT ? PATH_LIMIT - used : 0;
+#else
+    // Elsewhere it is the file name alone that is limited.
+    constexpr size_t NAME_LIMIT = 255;
+    return NAME_LIMIT - TEMP_SUFFIX;
+#endif
+}
+
 bool LLPresetsManager::readPresetFile(const std::string& subdirectory, const std::string& name, LLSD& params)
 {
     const std::string full_path = getPresetFilePath(subdirectory, name);
@@ -1094,10 +1114,17 @@ bool LLPresetsManager::presetExists(const std::string& subdirectory, const std::
     // coexist, which errs the survivable way round.
     std::string wanted(name);
     LLStringUtil::toLower(wanted);
-    return std::any_of(names.begin(), names.end(), [&wanted](std::string existing) {
-        LLStringUtil::toLower(existing);
-        return existing == wanted;
-    });
+    if (std::any_of(names.begin(), names.end(), [&wanted](std::string existing) {
+            LLStringUtil::toLower(existing);
+            return existing == wanted;
+        }))
+    {
+        return true;
+    }
+    // And whatever the file system itself would open under that name, which
+    // the list does not show: on Windows a file answers to its 8.3 short
+    // name too, so "SUNSET~1" would be written over "Sunset Glow".
+    return LLFile::isfile(getPresetFilePath(subdirectory, name));
 }
 
 // static
@@ -1199,9 +1226,11 @@ LLPresetsManager::LookSettingCounts LLPresetsManager::applyLookSettings(const LL
     // nothing else. A key that is present but malformed is skipped, as it
     // always was, rather than reset -- and it still counts as carried. And
     // the master switch is left alone: a file that omits it was edited by
-    // hand, and its other keys are evidently meant to be seen.
-    // resetToDefault fires only on a real change.
-    const bool snapshot = (counts.accepted + counts.rejected) * 2 >= static_cast<S32>(allowed.size());
+    // hand, and its other keys are evidently meant to be seen. And a file
+    // that applied nothing at all resets nothing either: loadLooksPreset
+    // reports it as not loaded, and a Look that did not load must not have
+    // changed the grade. resetToDefault fires only on a real change.
+    const bool snapshot = counts.accepted > 0 && (counts.accepted + counts.rejected) * 2 >= static_cast<S32>(allowed.size());
     if (snapshot)
     {
         for (const std::string& ctrl_name : allowed)

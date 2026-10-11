@@ -9760,10 +9760,11 @@ Click to open folder.
   </notification>
 
   <!-- [NAME] can be a Look's, and so a stranger's: see the Lightbox Looks
-       further down. -->
+       further down. Not copied to nearby chat for the same reason. -->
   <notification
     icon="notifytip.tga"
     name="PresetNotSaved"
+    log_to_chat="false"
     type="notifytip">
 Error saving preset &lt;nolink&gt;[NAME]&lt;/nolink&gt;.
   </notification>
@@ -9773,6 +9774,13 @@ Error saving preset &lt;nolink&gt;[NAME]&lt;/nolink&gt;.
     name="DefaultPresetNotSaved"
     type="notifytip">
 Can not overwrite default preset.
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookNameRefused"
+    type="notifytip">
+That name cannot be used for a Look. A Look needs a name with something visible in it besides dots and spaces, and Windows keeps names such as CON, NUL and COM1 for devices.
   </notification>
 
   <notification
@@ -9867,7 +9875,7 @@ The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; could not be saved to y
     name="LightBoxLookImported"
     log_to_chat="false"
     type="notifytip">
-Applied the Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; and added it to your Looks. Ctrl+Z in the Lightbox takes it back.[NOTE]
+Applied the Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; and added it to your Looks.[NOTE]
   </notification>
 
   <notification
@@ -9875,7 +9883,7 @@ Applied the Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; and added it to
     name="LightBoxLookApplied"
     log_to_chat="false"
     type="notifytip">
-Applied the Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos;, which you already had. Ctrl+Z in the Lightbox takes it back.[NOTE]
+Applied the Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos;, which you already had.[NOTE]
   </notification>
 
   <notification
@@ -9915,10 +9923,11 @@ this preset or choose another name.
   </notification>
 
   <!-- [NAME] can be a Look's, and so a stranger's: see the Lightbox Looks
-       above. -->
+       above. Not copied to nearby chat for the same reason. -->
   <notification
     icon="notifytip.tga"
     name="PresetNotDeleted"
+    log_to_chat="false"
     type="notifytip">
 Error deleting preset &lt;nolink&gt;[NAME]&lt;/nolink&gt;.
   </notification>

@@ -28,6 +28,7 @@
 #include "llsd.h"
 #include "stdtypes.h"
 
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -158,10 +159,19 @@ namespace ALLookFormat
     // character boundary.
     std::string cleanMetadataText(const std::string& raw, size_t byte_limit);
     // A Look's name from a text from outside: cleaned to LOOK_NAME_BYTE_LIMIT,
-    // and empty where nothing but dots and spaces is left, or where the
-    // name is a device's (isWindowsDeviceName) -- a Look is a file called
-    // after it.
+    // without the dots and spaces it may begin with (the Looks are listed
+    // from "*.xml", which leaves out a file whose name begins with a dot),
+    // and empty where nothing that draws is left but dots and spaces, or
+    // where the name is a device's (isWindowsDeviceName) -- a Look is a file
+    // called after it.
     std::string lookNameFromUntrustedText(const std::string& raw);
+    // What two names are compared by, to tell whether they name the same
+    // Look: ASCII letters in lower case, as the file systems of Windows and
+    // macOS match file names, and without the characters a name may keep
+    // that draw nothing of their own (the zero-width joiner and non-joiner,
+    // and the bidi marks) -- so that "Neutral" and "Neutral" with a mark
+    // after it, which read the same in the list, are taken for one name.
+    std::string lookNameKey(const std::string& name);
     // What a Look's notecard is called: NOTECARD_NAME_PREFIX and the name,
     // within what an item's name holds.
     std::string notecardNameForLook(const std::string& look_name);
@@ -170,7 +180,10 @@ namespace ALLookFormat
     std::string lookNameFromNotecardName(const std::string& notecard_name);
     // The n-th name tried for a Look called `wanted`: the name itself for 1,
     // then "wanted (2)", "wanted (3)" and so on, each within
-    // LOOK_NAME_BYTE_LIMIT with the name cut to make room. Empty for n
-    // below 1, and for a name that is nothing.
-    std::string numberedLookName(const std::string& wanted, S32 n);
+    // LOOK_NAME_BYTE_LIMIT with the name cut to make room -- and cut further,
+    // where it is given, until the name escaped as a file name
+    // (LLURI::escape, which makes three of a byte outside ASCII) is no
+    // longer than `escaped_limit`. Empty for n below 1, for a name that is
+    // nothing, and where the limit leaves no room for any of the name.
+    std::string numberedLookName(const std::string& wanted, S32 n, size_t escaped_limit = std::numeric_limits<size_t>::max());
 }

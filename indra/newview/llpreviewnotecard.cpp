@@ -442,20 +442,21 @@ void LLPreviewNotecard::offerSharedLookImport(const std::string& notecard_text)
         return;
     }
     // The text as it was saved, which is what was shared, rather than
-    // whatever is typed over it here afterwards.
-    const std::string text = notecard_text;
+    // whatever is typed over it here afterwards -- read when the button is
+    // pressed, since a save from this window since then is the text now.
+    mLookOfferText = notecard_text;
     showNotice(getString("LookOffer"),
                { { getString("LookApply"),
-                   [this, text]() {
+                   [this]() {
                        mLookOfferAnswered = true;
                        hideNotice();
-                       ALFloaterLightBox::importSharedLookFromText(text, mNoteName, ALFloaterLightBox::SharedLookImport::SaveAndApply);
+                       ALFloaterLightBox::importSharedLookFromText(mLookOfferText, mNoteName, ALFloaterLightBox::SharedLookImport::SaveAndApply);
                    } },
                  { getString("LookAdd"),
-                   [this, text]() {
+                   [this]() {
                        mLookOfferAnswered = true;
                        hideNotice();
-                       ALFloaterLightBox::importSharedLookFromText(text, mNoteName, ALFloaterLightBox::SharedLookImport::SaveOnly);
+                       ALFloaterLightBox::importSharedLookFromText(mLookOfferText, mNoteName, ALFloaterLightBox::SharedLookImport::SaveOnly);
                    } },
                  { getString("LookNotNow"), [this]() {
                       mLookOfferAnswered = true;
@@ -525,6 +526,7 @@ bool LLPreviewNotecard::saveIfNeeded()
     ALScriptWorkspace& workspace = ALScriptWorkspace::instance();
     mSaveRequest                 = workspace.newRequest();
     mSavePoint                   = mText->savePoint();
+    mSentText                    = mText->wholeText();
     LLHandle<LLFloater> handle   = getHandle();
     std::string         error;
     const bool          sent = workspace.saveNotecard(
@@ -632,6 +634,9 @@ void LLPreviewNotecard::savedHere(const ALScriptCompileResult& result)
     }
     mText->markSavedAt(mSavePoint);
     mItems->saved(mSentItems);
+    // The Look an offer still up would import is the one just saved.
+    mLookOfferText = std::move(mSentText);
+    mSentText.clear();
     if (result.newAssetId.notNull())
     {
         mAssetID = result.newAssetId;

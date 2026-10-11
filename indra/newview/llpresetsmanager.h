@@ -83,6 +83,11 @@ public:
     /// Where a preset of that name lives: its subdirectory, and its name
     /// escaped as a file name.
     static std::string getPresetFilePath(const std::string& subdirectory, const std::string& name);
+    /// How long a preset's name may be once escaped as a file name, for it
+    /// to be written (through "<name>.xml.tmp") in that subdirectory: on
+    /// Windows, what MAX_PATH leaves after the folder's path; elsewhere, what
+    /// a file name holds. 0 where the folder's path leaves nothing.
+    static size_t escapedPresetNameLimit(const std::string& subdirectory);
     /// A preset file read as the settings map it holds. False, with a
     /// warning, where there is no such file or it is not a map.
     bool readPresetFile(const std::string& subdirectory, const std::string& name, LLSD& params);

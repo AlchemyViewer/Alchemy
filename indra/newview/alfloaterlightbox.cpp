@@ -72,6 +72,7 @@
 #include "llviewerinventory.h"
 #include "pipeline.h"
 #include "rlvactions.h"
+#include "roles_constants.h"
 
 #include <fmt/format.h>
 
@@ -2267,13 +2268,18 @@ void ALFloaterLightBox::onWhiteBalancePicked(const LLColor3& sample)
     gSavedSettings.setF32("RenderColorGradeWhiteBalanceDuv", solved.mDuv);
 }
 
-bool ALFloaterLightBox::applyLookAsOneUndoStep(const std::string& look_name, const std::string& history_label)
+ALFloaterLightBox::LookApplied ALFloaterLightBox::applyLookAsOneUndoStep(const std::string& look_name, const std::string& history_label)
 {
     // Applying a Look writes every whitelisted key it carries. That is one
     // choice, so it is one undo step -- and it is the step a user most
     // wants back, having tried a Look on top of work they liked.
-    ScopedHistoryGroup group(mHistory, history_label);
-    return LLPresetsManager::getInstance()->loadLooksPreset(look_name);
+    LookApplied applied;
+    {
+        ScopedHistoryGroup group(mHistory, history_label);
+        applied.loaded = LLPresetsManager::getInstance()->loadLooksPreset(look_name);
+    }
+    applied.undoable = applied.loaded && mHistory.lastGroupMadeStep();
+    return applied;
 }
 
 void ALFloaterLightBox::onLookSelected()
@@ -2370,6 +2376,15 @@ bool ALFloaterLightBox::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, ED
         tooltip_msg = getString("look_drop_inventory_only");
         return true;
     }
+    // Refused on the way over, not after the drop: a notecard is read only
+    // with Copy (ALScriptWorkspace::load), and one without it would be
+    // taken and then fail with an alert.
+    if (!gAgent.allowOperation(PERM_COPY, held->getPermissions(), GP_OBJECT_MANIPULATE))
+    {
+        *accept     = ACCEPT_NO;
+        tooltip_msg = getString("look_drop_no_copy");
+        return true;
+    }
     *accept     = ACCEPT_YES_SINGLE;
     tooltip_msg = getString("look_drop_tooltip");
     if (drop)
@@ -2431,7 +2446,7 @@ void ALFloaterLightBox::finishSharedLookImport(const ALLookNotecard::ImportedLoo
             break;
     }
 
-    bool applied = false;
+    LookApplied applied;
     if (what == SharedLookImport::SaveAndApply)
     {
         // In the Lightbox, opened if need be, so that the apply is one undo
@@ -2459,6 +2474,13 @@ void ALFloaterLightBox::finishSharedLookImport(const ALLookNotecard::ImportedLoo
     LLStringUtil::format_map_t words;
     words["[NAME]"]   = imported.lookName;
     words["[WANTED]"] = imported.wantedName;
+    // Ctrl+Z is promised only where there is a step for it to take back: a
+    // Look the same as the settings it was applied over changed nothing,
+    // and Ctrl+Z would undo whatever was done before it.
+    if (applied.undoable)
+    {
+        say(LLTrans::getString("LightBoxLookImportUndoNote"));
+    }
     if (!imported.alreadyHad && imported.lookName != imported.wantedName)
     {
         say(LLTrans::getString("LightBoxLookImportRenamedNote", words));
@@ -2478,8 +2500,8 @@ void ALFloaterLightBox::finishSharedLookImport(const ALLookNotecard::ImportedLoo
     // Said as it went: applied and new here, applied and already here, added
     // and not applied, or already here and left as it was -- which is also
     // what an apply that failed comes to, the Look being in the list still.
-    const char* const outcome = applied ? (imported.alreadyHad ? "LightBoxLookApplied" : "LightBoxLookImported")
-                                        : (imported.alreadyHad ? "LightBoxLookAlreadyHad" : "LightBoxLookAdded");
+    const char* const outcome = applied.loaded ? (imported.alreadyHad ? "LightBoxLookApplied" : "LightBoxLookImported")
+                                               : (imported.alreadyHad ? "LightBoxLookAlreadyHad" : "LightBoxLookAdded");
     LLNotificationsUtil::add(outcome, args);
 
     if (!imported.missingLut.empty())

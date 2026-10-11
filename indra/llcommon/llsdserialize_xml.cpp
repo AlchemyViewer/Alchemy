@@ -28,8 +28,10 @@
 #include "llsdserialize_xml.h"
 
 #include <charconv>
+#include <cmath>
 #include <deque>
 #include <iostream>
+#include <limits>
 #include <string_view>
 #include <vector>
 
@@ -608,6 +610,10 @@ static bool resolve_entity(const char* p, size_t len, std::string& out)
         // surrogate in particular would be written as three bytes no UTF-8
         // reader takes, and would ride in the text into whatever file the
         // text is saved to -- the settings file, if it is a preset's name.
+        // (A raw surrogate is refused with the document's UTF-8. U+FFFE and
+        // U+FFFF written as their own bytes are well-formed UTF-8 and pass
+        // here as text; a caller that keeps them out of a name does so
+        // itself, as ALLookFormat::cleanMetadataText does.)
         if (cp == 0 || cp > 0x10FFFF || (cp < 0x20 && cp != 0x9 && cp != 0xA && cp != 0xD) || (cp >= 0xD800 && cp <= 0xDFFF) || cp == 0xFFFE ||
             cp == 0xFFFF)
         {
@@ -1333,8 +1339,10 @@ void LLSDXMLParser::Impl::endElement(Element element)
         // The element that crossed the limit was never started -- nothing
         // was pushed for it -- so there is nothing to end. A self-closing
         // tag reaches here in the same scan that started it, before the
-        // run loop sees mTooDeep; popping would take its parent's slot, or
-        // an empty stack's back.
+        // run loop sees mTooDeep. Popping would take its parent's slot --
+        // harmless, the parse failing and its result being thrown away --
+        // or, where nothing was pushed at all (a cap of 1 and an element
+        // inside <llsd>), the back of an empty stack, which is undefined.
         return;
     }
     if (mSkipping)
@@ -1406,8 +1414,28 @@ void LLSDXMLParser::Impl::endElement(Element element)
                     // std::istringstream::operator>>(int&), which would not consume the
                     // ".23" portion.
 
-                    // Utilizes implementation used internally by LLSD::ImplString::asInteger
-                    value = (int)llsd::string_to_real(content);
+                    // Utilizes implementation used internally by LLSD::ImplString::asInteger --
+                    // but held to what an integer holds first: "1e300", "nan" or a decimal
+                    // past 2^31 cast as it is would be undefined, and a document from
+                    // outside may hold any of them. Past either end it is that end; not a
+                    // number at all, it is 0.
+                    const LLSD::Real real = llsd::string_to_real(content);
+                    if (std::isnan(real))
+                    {
+                        value = 0;
+                    }
+                    else if (real >= static_cast<LLSD::Real>(std::numeric_limits<LLSD::Integer>::max()))
+                    {
+                        value = std::numeric_limits<LLSD::Integer>::max();
+                    }
+                    else if (real <= static_cast<LLSD::Real>(std::numeric_limits<LLSD::Integer>::min()))
+                    {
+                        value = std::numeric_limits<LLSD::Integer>::min();
+                    }
+                    else
+                    {
+                        value = static_cast<LLSD::Integer>(real);
+                    }
                 }
             }
             break;

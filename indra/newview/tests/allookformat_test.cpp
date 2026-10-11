@@ -22,6 +22,7 @@
 #include "llsdserialize.h"
 #include "llsdutil.h"
 #include "llstring.h"
+#include "lluri.h"
 
 #include <algorithm>
 #include <cmath>
@@ -681,6 +682,23 @@ namespace tut
         ensure_equals("spaces alone are nothing", ALLookFormat::lookNameFromUntrustedText("   "), "");
         ensure_equals("dots alone are nothing", ALLookFormat::lookNameFromUntrustedText(". . ."), "");
         ensure_equals("nothing is nothing", ALLookFormat::lookNameFromUntrustedText(""), "");
+        // The Looks are listed from "*.xml", which leaves out a file whose
+        // name begins with a dot: such a Look could be saved, and never
+        // chosen or deleted again.
+        ensure_equals("no dot first", ALLookFormat::lookNameFromUntrustedText(".Neutral"), "Neutral");
+        ensure_equals("nor dots and spaces first", ALLookFormat::lookNameFromUntrustedText(". . .Neutral"), "Neutral");
+        ensure_equals("a dot further in stays", ALLookFormat::lookNameFromUntrustedText("v1.2"), "v1.2");
+        // What draws as nothing at all is not a name, nor part of one.
+        ensure_equals("a soft hyphen goes", ALLookFormat::lookNameFromUntrustedText("Soft\xC2\xAD" "Film"), "SoftFilm");
+        ensure_equals("a Hangul filler goes", ALLookFormat::lookNameFromUntrustedText("Soft\xE3\x85\xA4" "Film"), "SoftFilm");
+        ensure_equals("a combining grapheme joiner goes", ALLookFormat::lookNameFromUntrustedText("Soft\xCD\x8F" "Film"), "SoftFilm");
+        ensure_equals("joiners alone are nothing", ALLookFormat::lookNameFromUntrustedText("\xE2\x80\x8D\xE2\x80\x8D"), "");
+        ensure_equals("marks and dots alone are nothing", ALLookFormat::lookNameFromUntrustedText("\xE2\x80\x8E.\xE2\x80\x8F"), "");
+        // Compared, a name that reads as another is that other.
+        ensure_equals("a key is in lower case", ALLookFormat::lookNameKey("Soft Film"), "soft film");
+        ensure_equals("a mark counts for nothing in a key", ALLookFormat::lookNameKey("Neutral\xE2\x80\x8E"), ALLookFormat::lookNameKey("neutral"));
+        ensure_equals("nor does a joiner", ALLookFormat::lookNameKey("Soft\xE2\x80\x8D" "Film"), "softfilm");
+        ensure_equals("letters outside ASCII are left as they are", ALLookFormat::lookNameKey("\xC3\x89t\xC3\xA9"), "\xC3\x89t\xC3\xA9");
 
         const std::string notecard = ALLookFormat::notecardNameForLook(std::string(70, 'L'));
         ensure("the notecard's name fits an item", notecard.size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
@@ -738,6 +756,17 @@ namespace tut
         const std::string cjk_second = ALLookFormat::numberedLookName(cjk, 2);
         ensure("a wide name makes room on a boundary", utf8str_is_valid(cjk_second) && cjk_second.size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
         ensure("and ends with its number", cjk_second.size() >= 4 && cjk_second.compare(cjk_second.size() - 4, 4, " (2)") == 0);
+
+        // Within a length escaped as a file name, as a path that Windows can
+        // open needs: a byte outside ASCII escapes to three.
+        const std::string fitted = ALLookFormat::numberedLookName(cjk, 1, 30);
+        ensure("cut to fit escaped", LLURI::escape(fitted).size() <= 30);
+        ensure_equals("whole characters only", fitted, std::string("\xE3\x81\x82\xE3\x81\x82\xE3\x81\x82"));
+        const std::string fitted_second = ALLookFormat::numberedLookName(cjk, 2, 30);
+        ensure("numbered and cut to fit escaped", LLURI::escape(fitted_second).size() <= 30);
+        ensure("and still ends with its number", fitted_second.size() >= 4 && fitted_second.compare(fitted_second.size() - 4, 4, " (2)") == 0);
+        ensure_equals("an ASCII name fits as it is", ALLookFormat::numberedLookName("Sunset", 1, 6), "Sunset");
+        ensure_equals("no room for any of it is nothing", ALLookFormat::numberedLookName("Sunset", 2, 8), "");
     }
 
     // The shapes a Look written by the viewer actually carries, as the first

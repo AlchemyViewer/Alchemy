@@ -1260,6 +1260,7 @@ floats were single precision; SLua's numbers are doubles, which do neither.</str
 	     in the notifications these sentences go into. -->
 	<string name="LightBoxLookNotecardDescription">Lightbox Look</string>
 	<string name="LightBoxLookImportFallbackName">Shared Look</string>
+	<string name="LightBoxLookImportUndoNote">Ctrl+Z in the Lightbox takes it back.</string>
 	<string name="LightBoxLookImportRenamedNote">You already had a different Look called '&lt;nolink&gt;[WANTED]&lt;/nolink&gt;', so this one is called '&lt;nolink&gt;[NAME]&lt;/nolink&gt;'.</string>
 	<string name="LightBoxLookImportUnknownNote">[COUNT] settings this viewer does not have were left out.</string>
 	<string name="LightBoxLookImportIgnoredNote">[COUNT] settings were not valid and were ignored.</string>

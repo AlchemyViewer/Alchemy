@@ -225,6 +225,12 @@ private:
     // The offer to import the Look this notecard holds, answered one way or
     // another: not made again for a load of a save heard from elsewhere.
     bool                       mLookOfferAnswered = false;
+    // The text the offer imports: the notecard as it was loaded, and then
+    // as it is saved from here -- a save made in this window loads nothing,
+    // and the offer would otherwise import the text from before it.
+    std::string                mLookOfferText;
+    // The text a save from here sent, for mLookOfferText once it is saved.
+    std::string                mSentText;
     // Where the caret and the view were, for a load of a save heard from
     // elsewhere to put them back.
     std::optional<std::pair<ALTextPos, S32>> mKeepPlace;

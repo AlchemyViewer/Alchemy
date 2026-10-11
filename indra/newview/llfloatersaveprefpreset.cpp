@@ -28,6 +28,7 @@
 
 #include "llfloatersaveprefpreset.h"
 
+#include "allookformat.h"
 #include "llbutton.h"
 #include "llcombobox.h"
 #include "llfloaterpreference.h"
@@ -117,6 +118,23 @@ void LLFloaterSavePrefPreset::onOpen(const LLSD& key)
 void LLFloaterSavePrefPreset::onBtnSave()
 {
     std::string name = mPresetCombo->getSimple();
+
+    // A Look is held to the rule a Look from outside is: a file is named
+    // after it, so no name that begins with a dot (the list would never show
+    // it), draws nothing, names a Windows device, or makes a path longer
+    // than Windows opens. What can be kept of a name is; a name with nothing
+    // to keep is refused, and the floater stays up for another.
+    if (PRESETS_LOOKS == mSubdirectory)
+    {
+        const std::string held = ALLookFormat::numberedLookName(ALLookFormat::lookNameFromUntrustedText(name), 1,
+                                                                LLPresetsManager::escapedPresetNameLimit(PRESETS_LOOKS));
+        if (held.empty())
+        {
+            LLNotificationsUtil::add("LightBoxLookNameRefused");
+            return;
+        }
+        name = held;
+    }
 
     if (LLPresetsManager::isReservedPresetName(name))
     {

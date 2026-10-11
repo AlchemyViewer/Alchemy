@@ -21,8 +21,9 @@ What is checked, because each is easy to get subtly wrong and hard to see on scr
       and 144 fps, and a brighter scene is followed faster than a darker one.
   (e) Nothing lit: a black frame opens up to the minimum EV rather than dividing by nothing.
   (f) Bounds: the upload clamps hold absurd settings inside what the exposure map can store, a
-      history read as an infinity or a NaN starts over from the target, and a finite history
-      outside a narrowed range eases in rather than jumping.
+      history read as an infinity or a NaN starts over from the target, a finite history
+      outside a narrowed range eases in rather than jumping, and an absurd sky weight meters as
+      the largest one the upload allows.
 
 If the shaders' binning, trim, target or adaptation change, change them here in the same commit.
 
@@ -42,6 +43,7 @@ HISTOGRAM_MAX_EV = 12.0
 KEY = 0.18
 METER_WIDTH = 128
 METER_HEIGHT = 72
+SKY_WEIGHT_MAX = 16.0
 
 DEFAULTS = {
     "compensation": 0.0,
@@ -74,6 +76,8 @@ def meter_weight(u, v, mode):
 def histogram(grid, settings):
     """grid: {(x, y): (ground luminance, sky luminance, sky share)}; returns [(weight, weight * ev)]."""
     bins_per_ev = BINS / (HISTOGRAM_MAX_EV - HISTOGRAM_MIN_EV)
+    # As pipeline.cpp uploads it: no less than nothing, and no more than its float sums can hold.
+    sky_weight = min(max(settings["sky_weight"], 0.0), SKY_WEIGHT_MAX)
     bins = [[0.0, 0.0] for _ in range(BINS)]
     for (x, y), (ground, sky, sky_share) in grid.items():
         for is_sky in (False, True):
@@ -81,7 +85,7 @@ def histogram(grid, settings):
             share = sky_share if is_sky else 1.0 - sky_share
             u = (x + 0.5) / METER_WIDTH
             v = (y + 0.5) / METER_HEIGHT
-            w = share * meter_weight(u, v, settings["metering_mode"]) * (settings["sky_weight"] if is_sky else 1.0)
+            w = share * meter_weight(u, v, settings["metering_mode"]) * (sky_weight if is_sky else 1.0)
             ev = min(max(math.log2(max(L, 1e-10)), HISTOGRAM_MIN_EV), HISTOGRAM_MIN_EV + BINS / bins_per_ev)
             b = min(math.floor((ev - HISTOGRAM_MIN_EV) * bins_per_ev), BINS - 1)
             if w > 0.0 and L > 0.0:
@@ -274,6 +278,10 @@ def check_bounds(ck):
         ck.expect("a history of %s starts over from the target" % broken, ev == target, "EV %.4f, target %.4f" % (ev, target))
     _, ev, target = exposure(bins, params, params2, prev=-20.0, dt=1.0 / 60)
     ck.expect("a finite history past the range eases toward it", -20.0 < ev < target, "EV %.4f from -20 toward %.4f" % (ev, target))
+    grid = uniform_grid(KEY, sky_share=0.5, sky=KEY * 4.0)
+    _, ev_huge, _ = meter(grid, dict(DEFAULTS, sky_weight=1e38))
+    _, ev_max, _ = meter(grid, dict(DEFAULTS, sky_weight=SKY_WEIGHT_MAX))
+    ck.expect("an absurd sky weight meters as the largest one", ev_huge == ev_max and math.isfinite(ev_huge), "EV %.4f vs %.4f" % (ev_huge, ev_max))
 
 
 def main():

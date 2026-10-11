@@ -29,6 +29,7 @@
 #include "alcurvemodel.h"
 #include "llsdserialize.h"
 #include "llstring.h"
+#include "lluri.h"
 
 #include <algorithm>
 #include <cmath>
@@ -473,11 +474,16 @@ namespace
     // yet change how what is around them reads: the bidi embeddings,
     // overrides and isolates, which could make one Look's name read as
     // another's in the list, the zero-width space, the word joiner and its
-    // kin, the byte-order mark, the annotation marks and the tags. The
-    // zero-width joiner and non-joiner stay, and so do the bidi marks
-    // (U+061C, U+200E, U+200F): a Persian name needs its non-joiner, a
-    // family emoji its joiner, and a mark only sets the direction of what
-    // stands next to it.
+    // kin, the byte-order mark, the annotation marks and the tags. So do the
+    // characters that only ever draw as nothing: the soft hyphen (which
+    // shows only where a line breaks, and a name never breaks), the
+    // combining grapheme joiner, the Mongolian vowel separator, the Khmer
+    // inherent vowels and the Hangul fillers -- a name could be made of
+    // them and draw as a blank. The zero-width joiner and non-joiner stay,
+    // and so do the bidi marks (U+061C, U+200E, U+200F): a Persian name
+    // needs its non-joiner, a family emoji its joiner, and a mark only sets
+    // the direction of what stands next to it. Those count for nothing when
+    // names are compared (lookNameKey).
     bool drawsInName(llwchar cp)
     {
         if (LLStringOps::isNonprintable(cp) || cp == '|' || cp == '<' || cp == '>' || cp >= 0x100000 || cp == 0xFFFD)
@@ -489,9 +495,44 @@ namespace
         {
             return false;
         }
+        if (cp == 0x00AD || cp == 0x034F || cp == 0x115F || cp == 0x1160 || cp == 0x17B4 || cp == 0x17B5 || cp == 0x180E || cp == 0x3164 ||
+            cp == 0xFFA0)
+        {
+            return false;
+        }
         return true;
     }
+
+    // The characters a name may keep that draw nothing of their own
+    // (drawsInName says why they are kept).
+    bool invisibleInName(llwchar cp)
+    {
+        return cp == 0x200C || cp == 0x200D || cp == 0x061C || cp == 0x200E || cp == 0x200F;
+    }
 } // namespace
+
+std::string ALLookFormat::lookNameKey(const std::string& name)
+{
+    std::string key;
+    key.reserve(name.size());
+    for (size_t i = 0; i < name.size();)
+    {
+        const LLCodepointAt at = utf8str_decode_at(name, i);
+        if (!invisibleInName(at.cp))
+        {
+            if (at.cp >= 'A' && at.cp <= 'Z')
+            {
+                key.push_back(static_cast<char>(at.cp - 'A' + 'a'));
+            }
+            else
+            {
+                key.append(name, i, at.next - i);
+            }
+        }
+        i = at.next;
+    }
+    return key;
+}
 
 std::string ALLookFormat::cleanMetadataText(const std::string& raw, size_t byte_limit)
 {
@@ -531,10 +572,16 @@ std::string ALLookFormat::cleanMetadataText(const std::string& raw, size_t byte_
 std::string ALLookFormat::lookNameFromUntrustedText(const std::string& raw)
 {
     std::string name = cleanMetadataText(raw, LOOK_NAME_BYTE_LIMIT);
-    // Nothing worth calling a name: dots and spaces alone, or a name that
-    // Windows would open as a device once it is a file -- a Look is saved
-    // as its name and ".xml", and LLURI::escape leaves letters as they are.
-    if (name.find_first_not_of(". ") == std::string::npos || isWindowsDeviceName(name))
+    // No dot first: a Look is a file named after it, and the Looks are
+    // listed from "*.xml", which leaves out a file whose name begins with
+    // one -- such a Look would be saved, applied, and then never seen again
+    // to be chosen or deleted.
+    name.erase(0, name.find_first_not_of(". "));
+    // Nothing worth calling a name: dots, spaces and characters that draw
+    // nothing, or a name that Windows would open as a device once it is a
+    // file -- a Look is saved as its name and ".xml", and LLURI::escape
+    // leaves letters as they are.
+    if (lookNameKey(name).find_first_not_of(". ") == std::string::npos || isWindowsDeviceName(name))
     {
         return std::string();
     }
@@ -557,18 +604,28 @@ std::string ALLookFormat::lookNameFromNotecardName(const std::string& notecard_n
     return lookNameFromUntrustedText(notecard_name);
 }
 
-std::string ALLookFormat::numberedLookName(const std::string& wanted, S32 n)
+std::string ALLookFormat::numberedLookName(const std::string& wanted, S32 n, size_t escaped_limit)
 {
     if (n < 1 || wanted.empty())
     {
         return std::string();
     }
-    if (n == 1)
-    {
-        return utf8str_truncate(wanted, static_cast<S32>(LOOK_NAME_BYTE_LIMIT));
-    }
-    const std::string suffix = " (" + std::to_string(n) + ")";
+    const std::string suffix = n == 1 ? std::string() : " (" + std::to_string(n) + ")";
     std::string       base   = utf8str_truncate(wanted, static_cast<S32>(LOOK_NAME_BYTE_LIMIT - suffix.size()));
-    LLStringUtil::trimTail(base);
+    if (!suffix.empty())
+    {
+        LLStringUtil::trimTail(base);
+    }
+    // Shorter still, a character at a time, until the name as a file name
+    // fits: escaped, a byte outside ASCII is three.
+    while (!base.empty() && LLURI::escape(base + suffix).size() > escaped_limit)
+    {
+        base = utf8str_truncate(base, static_cast<S32>(base.size()) - 1);
+        LLStringUtil::trimTail(base);
+    }
+    if (base.empty())
+    {
+        return std::string();
+    }
     return base + suffix;
 }

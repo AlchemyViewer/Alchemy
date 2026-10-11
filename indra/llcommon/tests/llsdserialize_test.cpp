@@ -48,6 +48,9 @@ typedef U32 uint32_t;
 
 #include <zlib.h>
 
+#include <limits>
+#include <utility>
+
 #include "llsd.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
@@ -1171,8 +1174,17 @@ namespace tut
             LLSD(),
             LLSDParser::PARSE_FAILURE,
             1);
+        // Inside an array, where a self-closing value is the first element
+        // past the limit (inside a map a key always reaches that depth
+        // first), and so where a wrong pop would take its parent's slot.
         ensureParse(
-            "a self-closing element past the limit inside a map",
+            "a self-closing element past the limit inside an array",
+            "<llsd><array><undef/></array></llsd>",
+            LLSD(),
+            LLSDParser::PARSE_FAILURE,
+            2);
+        ensureParse(
+            "a key past the limit inside a map",
             "<llsd><map><key>a</key><map><key>b</key><undef/></map></map></llsd>",
             LLSD(),
             LLSDParser::PARSE_FAILURE,
@@ -1221,7 +1233,7 @@ namespace tut
             "<llsd><string>&#x1F305;</string></llsd>",
             LLSD("\xF0\x9F\x8C\x85"),
             1);
-        for (const char* reference : { "&#xD800;", "&#xDFFF;", "&#xFFFE;", "&#xFFFF;", "&#x1;", "&#0;", "&#x110000;" })
+        for (const char* reference : { "&#xD800;", "&#xDFFF;", "&#xFFFE;", "&#xFFFF;", "&#x1;", "&#0;", "&#x110000;", "&#x1F;", "&#55296;", "&#57343;" })
         {
             ensureParse(
                 std::string("not a Char: ") + reference,
@@ -1229,6 +1241,47 @@ namespace tut
                 LLSD(),
                 LLSDParser::PARSE_FAILURE);
         }
+        // Each end of each range the production allows, so that a bound off
+        // by one shows: the first after the C0 controls, the last before the
+        // surrogates, the first after them, the last before the
+        // non-characters, and the first and last astral ones.
+        const std::pair<const char*, const char*> edges[] = {
+            { "&#x20;", " " },
+            { "&#xD7FF;", "\xED\x9F\xBF" },
+            { "&#xE000;", "\xEE\x80\x80" },
+            { "&#xFFFD;", "\xEF\xBF\xBD" },
+            { "&#x10000;", "\xF0\x90\x80\x80" },
+            { "&#x10FFFF;", "\xF4\x8F\xBF\xBF" },
+            { "&#65;", "A" },
+        };
+        for (const auto& [reference, utf8] : edges)
+        {
+            ensureParse(
+                std::string("a Char: ") + reference,
+                std::string("<llsd><string>") + reference + "</string></llsd>",
+                LLSD(std::string(utf8)),
+                1);
+        }
+    }
+
+    template<> template<>
+    void TestLLSDXMLParsingObject::test<9>()
+    {
+        // An integer element that does not begin with decimal digits is read
+        // through a real (digits first stop at the first thing that is not
+        // one, so "1.75" and "1e300" are both 1, and a '+' is skipped before
+        // them): what an integer cannot hold is held to its ends, and what is
+        // no number is 0, rather than cast as it is, which is undefined.
+        const LLSD::Integer top    = std::numeric_limits<LLSD::Integer>::max();
+        const LLSD::Integer bottom = std::numeric_limits<LLSD::Integer>::min();
+        ensureParse("a fraction is truncated", "<llsd><integer>.75</integer></llsd>", LLSD(0), 1);
+        ensureParse("digits first stop where the digits do", "<llsd><integer>1e300</integer></llsd>", LLSD(1), 1);
+        ensureParse("past the top", "<llsd><integer>.5e300</integer></llsd>", LLSD(top), 1);
+        ensureParse("past the bottom", "<llsd><integer>-.5e300</integer></llsd>", LLSD(bottom), 1);
+        ensureParse("a decimal past 2^31", "<llsd><integer>99999999999999999999</integer></llsd>", LLSD(top), 1);
+        ensureParse("infinity", "<llsd><integer>inf</integer></llsd>", LLSD(top), 1);
+        ensureParse("minus infinity", "<llsd><integer>-inf</integer></llsd>", LLSD(bottom), 1);
+        ensureParse("not a number", "<llsd><integer>nan</integer></llsd>", LLSD(0), 1);
     }
 
     /*
