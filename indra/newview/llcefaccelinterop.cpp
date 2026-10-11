@@ -30,6 +30,7 @@
 
 #include "llgl.h"          // viewer GL entry points + the global wglDX* pointers
 #include "llrender.h"
+#include "llrendertarget.h"
 #include "lldxhardware.h"  // shared D3D11 device + GL interop device (gDXHardware)
 
 #include <windows.h>
@@ -231,10 +232,6 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
     if (!w->read_fbo) glGenFramebuffers(1, &w->read_fbo);
     if (!w->draw_fbo) glGenFramebuffers(1, &w->draw_fbo);
 
-    GLint prev_read = 0, prev_draw = 0;
-    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev_read);
-    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prev_draw);
-
     glBindFramebuffer(GL_READ_FRAMEBUFFER, w->read_fbo);
     glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, w->local_gl, 0);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, w->draw_fbo);
@@ -246,8 +243,7 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
 
     glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, prev_read);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prev_draw);
+    glBindFramebuffer(GL_FRAMEBUFFER, LLRenderTarget::sCurFBO);
 
     wglDXUnlockObjectsNV(gl_dx, 1, &w->local_obj);
     return true;
@@ -257,6 +253,7 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
 
 #include "llgl.h"
 #include "llrender.h"
+#include "llrendertarget.h"
 #include <OpenGL/CGLCurrent.h>
 #include <OpenGL/CGLIOSurface.h>
 #include <IOSurface/IOSurface.h>
@@ -383,10 +380,6 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
     if (!m->read_fbo) glGenFramebuffers(1, &m->read_fbo);
     if (!m->draw_fbo) glGenFramebuffers(1, &m->draw_fbo);
 
-    GLint prev_read = 0, prev_draw = 0;
-    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev_read);
-    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prev_draw);
-
     glBindFramebuffer(GL_READ_FRAMEBUFFER, m->read_fbo);
     glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE_ARB, m->tex, 0);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m->draw_fbo);
@@ -398,8 +391,7 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
 
     glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE_ARB, 0, 0);
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, prev_read);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prev_draw);
+    glBindFramebuffer(GL_FRAMEBUFFER, LLRenderTarget::sCurFBO);
     return true;
 }
 
@@ -407,6 +399,7 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
 
 #include "llgl.h"
 #include "llrender.h"
+#include "llrendertarget.h"
 #include <SDL3/SDL.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -626,10 +619,6 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
     if (!l->read_fbo) glGenFramebuffers(1, &l->read_fbo);
     if (!l->draw_fbo) glGenFramebuffers(1, &l->draw_fbo);
 
-    GLint prev_read = 0, prev_draw = 0;
-    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev_read);
-    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prev_draw);
-
     glBindFramebuffer(GL_READ_FRAMEBUFFER, l->read_fbo);
     glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, l->tex, 0);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, l->draw_fbo);
@@ -641,8 +630,7 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
 
     glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, prev_read);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prev_draw);
+    glBindFramebuffer(GL_FRAMEBUFFER, LLRenderTarget::sCurFBO);
     return true;
 }
 
