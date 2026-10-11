@@ -200,8 +200,6 @@ void display_startup()
 
     if (gViewerWindow && gViewerWindow->getWindow())
     gViewerWindow->getWindow()->swapBuffers();
-
-    glClear(GL_DEPTH_BUFFER_BIT);
 }
 
 void display_update_camera()
@@ -841,7 +839,6 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
                 LLGLState::checkStates();
 
                 const LLCamera saved_camera = LLViewerCamera::getCurrent();
-                glViewport(0,0,512,512);
 
                 LLVOAvatar::updateImpostors();
 
