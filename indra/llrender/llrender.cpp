@@ -1752,6 +1752,18 @@ void LLRender::clear(U32 mask)
     glClear(mask);
 }
 
+void LLRender::drawArraysInstanced(eGeomModes mode, U32 first, U32 count, U32 instances)
+{
+    // An input left in the program would read whatever buffer the last vertex buffer left on its array.
+    llassert(LLGLSLShader::sCurBoundShaderPtr && LLGLSLShader::sCurBoundShaderPtr->mAttributeMask == 0);
+    flush();
+    syncMatrices();
+    llassert(validate_bound_samplers());
+    STOP_GLERROR;
+    glDrawArraysInstanced(LLVertexBuffer::sGLMode[mode], first, count, instances);
+    STOP_GLERROR;
+}
+
 void LLRender::setScissor(S32 x, S32 y, S32 width, S32 height)
 {
     llassert(width >= 0 && height >= 0);

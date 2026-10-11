@@ -180,4 +180,6 @@ if(AL_BUILD_TESTS)
   al_add_test(alrenderstate_gl GL PROJECT llrender LIBRARIES llrender)
   # LLGLSLShader's uniform value cache: what a program holds after each kind of set, and across a relink.
   al_add_test(llglslshader_gl GL PROJECT llrender LIBRARIES llrender)
+  # LLRender::drawArraysInstanced: attribute-less instanced geometry, placed by the matrices the draw syncs.
+  al_add_test(alinstanceddraw_gl GL PROJECT llrender LIBRARIES llrender)
 endif()

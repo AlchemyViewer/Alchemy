@@ -392,6 +392,11 @@ public:
     // has been drawn.
     void clear(U32 mask);
 
+    // Draws `instances` copies of `count` vertices from `first` with no vertex arrays: the bound program builds every
+    // position from gl_VertexID and gl_InstanceID and declares no inputs, so binding it enabled none. What is batched
+    // is drawn first, and the matrices are synced as LLVertexBuffer's draws sync them.
+    void drawArraysInstanced(eGeomModes mode, U32 first, U32 count, U32 instances);
+
     // The scissor box, in pixels of the bound framebuffer, that GL_SCISSOR_TEST (an
     // LLGLState) cuts to. Every writer goes through here; a change flushes what is batched
     // under the old box, and redundant sets are dropped without one. See LLGLSScissor.
