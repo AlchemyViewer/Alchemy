@@ -1,7 +1,8 @@
 /**
  * @file llglslshader_gl_test.cpp
- * @brief LLGLSLShader's uniform value cache on the hidden window: what a program holds, read back from GL, after
- *        each kind of set, across a relink, and where two setters write one location.
+ * @brief LLGLSLShader on the hidden window. Its uniform value cache: what a program holds, read back from GL, after
+ *        each kind of set, across a relink, and where two setters write one location. And who owns a shader object:
+ *        a program its own, deleted once it links, the manager the shared ones.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -28,6 +29,7 @@
 #include "../llgl.h"
 #include "../llglheaders.h"
 #include "../llglslshader.h"
+#include "../llrendertarget.h"
 #include "../llshadermgr.h"
 
 #include "llheadlessgl_fixture.h"
@@ -39,6 +41,8 @@
 #include <climits>
 #include <initializer_list>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace tut
 {
@@ -81,6 +85,111 @@ namespace tut
         // 2^24: past it a float cannot hold every int, and BIG + 1 rounds to BIG.
         constexpr GLint BIG = 1 << 24;
 
+        // ---- Programs built through the shader manager ------------------------------------------------------------
+
+        // The shared objects every graphics program attaches, as the viewer's would be, each a function nothing
+        // calls.
+        const std::pair<const char*, GLenum> kStubObjects[] =
+        {
+            { "deferred/globalF.glsl",           GL_FRAGMENT_SHADER },
+            { "deferred/textureUtilV.glsl",      GL_VERTEX_SHADER },
+            { "objects/nonindexedTextureV.glsl", GL_VERTEX_SHADER },
+        };
+
+        // Every file the cases build programs from. No #version: loadShaderFile writes it.
+        const std::pair<const char*, const char*> kShaderFiles[] =
+        {
+            { "deferred/globalF.glsl",
+              "vec4 test_global_stub(vec4 c) { return c; }\n" },
+            { "deferred/textureUtilV.glsl",
+              "vec2 test_texture_util_stub(vec2 t) { return t; }\n" },
+            { "objects/nonindexedTextureV.glsl",
+              "vec2 test_nonindexed_stub(vec2 t) { return t; }\n" },
+
+            // A triangle over the viewport.
+            { "test/fullscreenV.glsl",
+              "void main()\n"
+              "{\n"
+              "    vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0;\n"
+              "    gl_Position = vec4(p, 0.0, 1.0);\n"
+              "}\n" },
+            { "test/solidF.glsl",
+              "out vec4 frag_color;\n"
+              "void main()\n"
+              "{\n"
+              "    frag_color = vec4(1.0);\n"
+              "}\n" },
+
+            // A call into the stub deferred/globalF.glsl defines, which links only with that object attached.
+            { "test/globalCallF.glsl",
+              "vec4 test_global_stub(vec4 c);\n"
+              "out vec4 frag_color;\n"
+              "void main()\n"
+              "{\n"
+              "    frag_color = test_global_stub(vec4(0.25, 0.5, 0.75, 1.0));\n"
+              "}\n" },
+        };
+
+        bool writeShaderFiles(const ll_test::TestShaderDir& dir)
+        {
+            bool ok = true;
+            for (const auto& file : kShaderFiles)
+            {
+                ok = dir.write(file.first, file.second) && ok;
+            }
+            return ok;
+        }
+
+        // The files above on disk, once for the binary.
+        const ll_test::TestShaderDir& testShaderDir()
+        {
+            static const ll_test::TestShaderDir dir;
+            static const bool written = writeShaderFiles(dir);
+            llassert_always(written);
+            return dir;
+        }
+
+        // Configure `shader` from `files` and build it through createShader, as the viewer builds its programs: the
+        // files at class 1, the default features unless `attach_nothing`.
+        bool buildProgram(LLGLSLShader& shader, const std::string& name,
+                          std::initializer_list<std::pair<std::string, GLenum>> files, bool attach_nothing = false)
+        {
+            shader.unload();
+            shader.mName = name;
+            shader.mShaderLevel = 1;
+            for (const auto& file : files)
+            {
+                shader.mShaderFiles.push_back(file);
+            }
+            shader.mFeatures.attachNothing = attach_nothing;
+            return shader.createShader();
+        }
+
+        // The shader objects attached to `program`.
+        std::vector<GLuint> attachedNames(GLuint program)
+        {
+            GLuint shaders[16] = { 0 };
+            GLsizei count = 0;
+            glGetAttachedShaders(program, 16, &count, shaders);
+            return std::vector<GLuint>(shaders, shaders + llmax(count, 0));
+        }
+
+        // Whether a live shader object has been deleted and waits only for the last program holding it to let go.
+        bool flaggedForDeletion(GLuint object)
+        {
+            GLint status = GL_FALSE;
+            glGetShaderiv(object, GL_DELETE_STATUS, &status);
+            return status == GL_TRUE;
+        }
+
+        // What the bound target holds, as floats.
+        std::vector<F32> readBoundTarget(U32 width, U32 height, U32 channels, GLenum format)
+        {
+            std::vector<F32> pixels((size_t)width * height * channels, 0.f);
+            glReadPixels(0, 0, width, height, format, GL_FLOAT, pixels.data());
+            return pixels;
+        }
+
     // The program the test binds goes back with mGL, and the test's shader manager hands back the shared context's.
     struct llglslshader_data
     {
@@ -88,6 +197,30 @@ namespace tut
         {
             LLGLSLShader::unbind();
             mShader.unload();
+            mDraw.unload();
+            mDraw2.unload();
+            mDraw3.unload();
+            // A case that failed between a bindTarget and its flush left a target bound, which release refuses.
+            while (LLRenderTarget::getCurrentBoundTarget())
+            {
+                LLRenderTarget::getCurrentBoundTarget()->flush();
+            }
+            for (LLRenderTarget& target : mTargets)
+            {
+                target.release();
+            }
+            mShaders.clearShaderObjects();
+        }
+
+        // The shared objects compiled, as the viewer has them before it builds a program.
+        void setUpShaders()
+        {
+            for (const auto& object : kStubObjects)
+            {
+                S32 level = 1;
+                ensure(std::string("compiled ") + object.first,
+                       mShaders.loadShaderFile(object.first, level, object.second) != 0);
+            }
         }
 
         // The test program, compiled and linked through LLGLSLShader's own path, mapped and bound.
@@ -186,9 +319,14 @@ namespace tut
         }
 
         ll_test::SharedGLScope mGL;
-        // Made before the program and gone after it: mapUniforms reads its reserved names.
-        ll_test::TestShaderMgr mShaders;
+        // Made before the programs and gone after them: mapUniforms reads its reserved names. Its files are the
+        // ones above.
+        ll_test::TestShaderMgr mShaders{ testShaderDir().prefix() };
         LLGLSLShader mShader;
+        LLGLSLShader mDraw;
+        LLGLSLShader mDraw2;
+        LLGLSLShader mDraw3;
+        LLRenderTarget mTargets[3];
     };
 
     typedef test_group<llglslshader_data> llglslshader_t;
@@ -467,6 +605,100 @@ namespace tut
         ensureFloats("element 1 by an array whose element 0 did not change", "light_diffuse[1]",
                      { 0.25f, 0.25f, 0.25f, 0.25f });
 
+        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+    }
+
+    // A shared object is the shader manager's, not the programs' that attach it. Two programs built through
+    // createShader attach the same one, as every program with a feature attaches its object, and call into it. Once
+    // linked a program holds no object, and its own are deleted: the count of live objects is what it was before the
+    // two built, and the shared one is alive and not even flagged. Unloading one leaves the other drawing; a third
+    // built after both are gone attaches the shared object again and links. One that fails to link deletes its own
+    // objects all the same. clearShaderObjects deletes every shared object at once, as no linked program holds one,
+    // and the programs draw on without them.
+    template<> template<>
+    void llglslshader_object_t::test<20>()
+    {
+        setUpShaders();
+        constexpr U32 SIDE = 4;
+        ensure("output target allocates", mTargets[0].allocate(SIDE, SIDE, GL_RGBA32F));
+
+        const auto& fragments = mShaders.mShaderObjects[LLShaderMgr::STAGE_FRAGMENT];
+        const auto found = fragments.find("deferred/globalF.glsl");
+        ensure("the shared object compiled", found != fragments.end());
+        const GLuint shared = found->second;
+
+        const std::initializer_list<std::pair<std::string, GLenum>> files =
+        {
+            { "test/fullscreenV.glsl", GL_VERTEX_SHADER },
+            { "test/globalCallF.glsl", GL_FRAGMENT_SHADER },
+        };
+        const U32 live = LLShaderMgr::sLiveObjects;
+
+        // What `program` draws, every pixel the colour the stub passes through.
+        LLGLDisable blend(GL_BLEND);
+        auto ensureDraws = [&](const std::string& what, LLGLSLShader& program)
+        {
+            mTargets[0].bindTarget();
+            gGL.setClearColor(LLColor4::transparent);
+            mTargets[0].clear();
+            program.bind();
+            gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
+            const std::vector<F32> drawn = readBoundTarget(SIDE, SIDE, 4, GL_RGBA);
+            mTargets[0].flush();
+            LLGLSLShader::unbind();
+            const F32 expected[4] = { 0.25f, 0.5f, 0.75f, 1.f };
+            for (size_t i = 0; i < drawn.size(); ++i)
+            {
+                ensure_equals(what + ", component " + std::to_string(i), drawn[i], expected[i % 4]);
+            }
+        };
+
+        ensure("A builds", buildProgram(mDraw, "shared A (test)", files));
+        ensure("B builds", buildProgram(mDraw2, "shared B (test)", files));
+        ensure("A holds no object once linked", attachedNames(mDraw.mProgramObject).empty());
+        ensure("nor does B", attachedNames(mDraw2.mProgramObject).empty());
+        ensure_equals("their own objects deleted", LLShaderMgr::sLiveObjects, live);
+        ensure("a program's own stage is not shared", !fragments.contains("test/globalCallF.glsl"));
+        ensure("the shared object stays", glIsShader(shared) == GL_TRUE);
+        ensure("not even flagged for deletion", !flaggedForDeletion(shared));
+        ensureDraws("A draws", mDraw);
+
+        mDraw.unload();
+        ensure("unloading A leaves the shared object", glIsShader(shared) == GL_TRUE && !flaggedForDeletion(shared));
+        glValidateProgram(mDraw2.mProgramObject);
+        GLint valid = GL_FALSE;
+        glGetProgramiv(mDraw2.mProgramObject, GL_VALIDATE_STATUS, &valid);
+        ensure("B validates", valid == GL_TRUE);
+        ensureDraws("B draws", mDraw2);
+
+        mDraw2.unload();
+        ensure("C builds afterwards", buildProgram(mDraw3, "shared C (test)", files));
+        ensure("C holds no object once linked", attachedNames(mDraw3.mProgramObject).empty());
+        ensureDraws("C draws", mDraw3);
+
+        // Without the shared object to call into, the stage cannot link, at any class.
+        ensure("D does not link", !buildProgram(mDraw, "unlinked D (test)", files, /*attach_nothing=*/true));
+        ensure_equals("and its own objects are deleted all the same", LLShaderMgr::sLiveObjects, live);
+
+        S32 level = 1;
+        const GLuint loose = mShaders.loadShaderFile("test/solidF.glsl", level, GL_FRAGMENT_SHADER);
+        ensure("an object no program holds", loose != 0 && glIsShader(loose) == GL_TRUE);
+        ensure_equals("counted live", LLShaderMgr::sLiveObjects, live + 1);
+
+        size_t held = 0;
+        for (const auto& stage : mShaders.mShaderObjects)
+        {
+            held += stage.size();
+        }
+        mShaders.clearShaderObjects();
+        for (const auto& stage : mShaders.mShaderObjects)
+        {
+            ensure("the manager holds no object", stage.empty());
+        }
+        ensure("one no program ever held goes at once", glIsShader(loose) == GL_FALSE);
+        ensure("and one programs linked with", glIsShader(shared) == GL_FALSE);
+        ensure_equals("none counted live", LLShaderMgr::sLiveObjects, live + 1 - (U32)held);
+        ensureDraws("C still draws", mDraw3);
         ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
     }
 }

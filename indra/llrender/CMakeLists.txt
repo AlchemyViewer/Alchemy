@@ -178,7 +178,8 @@ if(AL_BUILD_TESTS)
   al_add_test(llrendertarget_gl GL PROJECT llrender LIBRARIES llrender)
   # LLRender's cached clear colour and scissor box, and LLGLSScissor.
   al_add_test(alrenderstate_gl GL PROJECT llrender LIBRARIES llrender)
-  # LLGLSLShader's uniform value cache: what a program holds after each kind of set, and across a relink.
+  # LLGLSLShader's uniform value cache: what a program holds after each kind of set, and across a relink; and which
+  # shader objects a program owns and which the manager does.
   al_add_test(llglslshader_gl GL PROJECT llrender LIBRARIES llrender)
   # LLRender::drawArraysInstanced: attribute-less instanced geometry, placed by the matrices the draw syncs.
   al_add_test(alinstanceddraw_gl GL PROJECT llrender LIBRARIES llrender)

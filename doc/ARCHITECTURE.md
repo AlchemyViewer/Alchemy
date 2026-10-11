@@ -140,6 +140,8 @@ Shader management has two layers:
 - `LLShaderMgr` (`indra/llrender/llshadermgr.h/.cpp`) — Base shader manager with uniform enums, binding, and feature defines
 - `LLViewerShaderMgr` (`indra/newview/llviewershadermgr.h/.cpp`) — Viewer-specific shader loading, program definitions, and quality class selection
 
+**Shader objects** have one owner each. A program owns the objects it compiles from its own files and deletes them once it links, detaching every object then, since a linked program needs none. The shared objects every program attaches by name are `LLShaderMgr`'s, deleted by `clearShaderObjects`, so unloading or rebuilding one program leaves the rest whole. `LLShaderMgr::sLiveObjects` counts what is compiled and not yet deleted.
+
 GLSL shaders live in `indra/newview/app_settings/shaders/` organized by quality class and category:
 - **`class1/`** — Base shaders (all hardware)
 - **`class2/`** — Mid-tier features

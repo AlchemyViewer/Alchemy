@@ -796,6 +796,8 @@ void LLViewerShaderMgr::unloadShaders()
         LLGLSLShader* shader = *(LLGLSLShader::sInstances.begin());
         shader->unload();
     }
+    // The shared objects are the manager's, so they go here rather than with the programs that attached them.
+    clearShaderObjects();
 
     mShaderLevel[SHADER_LIGHTING] = 0;
     mShaderLevel[SHADER_OBJECT] = 0;

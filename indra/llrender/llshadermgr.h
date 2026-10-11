@@ -650,10 +650,23 @@ public:
     void dumpShaderSource(U32 shader_code_count, GLchar** shader_code_text);
     bool    linkProgramObject(GLuint obj, bool suppress_errors = false, const std::string& shader_name = "unknown");
     bool    validateProgramObject(GLuint obj);
+    // Compile a shared object into mShaderObjects, which owns it from then on: programs attach it by name and never
+    // delete it, and an object it replaces under the same key is deleted. Returns the object, or 0.
     // `cache_key` overrides the map key the compiled object is stored under; empty means the
     // path. Shared objects are compiled once and attached by name, so a source that keys on a
     // compile-time variant axis is compiled once per axis value under distinct keys.
     GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, const std::string& cache_key = std::string());
+    // Compile a stage the caller owns and deletes, stored nowhere: what a program compiles of its own files. As
+    // loadShaderFile otherwise, from the class `shader_level` names down to the first that compiles.
+    GLuint compileShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1);
+
+    // Delete a shader object. One still attached to a program is only flagged, and goes when the last program
+    // holding it detaches it.
+    static void deleteShaderObject(GLuint object);
+
+    // Shader objects compileShaderFile has made and deleteShaderObject has not yet deleted: the shared ones, plus any
+    // a program is still linking. A count that only grows is a leak.
+    static U32 sLiveObjects;
 
     // Suffixes marking the axis copies of a shared object. Not legal path character sequences,
     // so they cannot collide with a real file.
@@ -708,11 +721,14 @@ public:
     // The "#define <STAGE>_SHADER 1" line loadShaderFile prepends for a stage.
     static const char* stageDefine(GLenum type);
 
+    // Delete every shared object and forget it. A program built on them goes on drawing, as a linked program needs
+    // none of its objects; one built afterwards needs them compiled again.
     void clearShaderObjects();
 
 public:
     // Compiled shared shader objects per stage, keyed by path -- or by the
-    // distinct key an axis copy was stored under (see loadShaderFile).
+    // distinct key an axis copy was stored under (see loadShaderFile). The
+    // manager owns them: unloading a program that attached one leaves it here.
     boost::unordered_flat_map<std::string, GLuint> mShaderObjects[STAGE_COUNT];
 
     //global (reserved slot) shader parameters

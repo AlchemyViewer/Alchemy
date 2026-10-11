@@ -129,8 +129,32 @@ void LLShaderMgr::clearShaderObjects()
 {
     for (auto& objects : mShaderObjects)
     {
+        for (const auto& object : objects)
+        {
+            deleteShaderObject(object.second);
+        }
         objects.clear();
     }
+}
+
+U32 LLShaderMgr::sLiveObjects = 0;
+
+// static
+void LLShaderMgr::deleteShaderObject(GLuint object)
+{
+    if (object == 0)
+    {
+        return;
+    }
+    llassert(sLiveObjects > 0);
+    sLiveObjects -= sLiveObjects > 0 ? 1 : 0;
+    glDeleteShader(object);
+#if LL_DARWIN
+    // Apple's GL 4.1 core driver spuriously raises GL_INVALID_OPERATION on glDeleteShader of a
+    // just-detached, valid shader. Drain it. Commit 7e9bf817a7 removed the original sweep on the
+    // belief that the driver had been fixed; empirically it has not been.
+    flush_glerror();
+#endif
 }
 
 bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
@@ -565,12 +589,31 @@ void LLShaderMgr::dumpObjectLog(GLuint ret, bool warns, const std::string& filen
 
 GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels, const std::string& cache_key)
 {
+    const GLuint object = compileShaderFile(filename, shader_level, type, defines, texture_index_channels);
+    if (object)
+    {
+        // Into the map, which owns it. The key is the path unless the caller asked for a distinct
+        // one -- a shared object compiled a second time under different defines needs its own
+        // entry, since attach is by key (see variantObjectKey). An object already under the key is
+        // the manager's too, and goes.
+        GLuint& slot = mShaderObjects[stageIndex(type)][cache_key.empty() ? filename : cache_key];
+        if (slot != 0 && slot != object)
+        {
+            deleteShaderObject(slot);
+        }
+        slot = object;
+    }
+    return object;
+}
+
+GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels)
+{
     GLenum error = GL_NO_ERROR;
 
     error = glGetError();
     if (error != GL_NO_ERROR)
     {
-        LL_SHADER_LOADING_WARNS() << "GL ERROR entering loadShaderFile(): " << error << " for file: " << filename << LL_ENDL;
+        LL_SHADER_LOADING_WARNS() << "GL ERROR entering compileShaderFile(): " << error << " for file: " << filename << LL_ENDL;
     }
 
     if (filename.empty())
@@ -1053,6 +1096,10 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 
     //create shader object
     GLuint ret = glCreateShader(type);
+    if (ret)
+    {
+        ++sLiveObjects;
+    }
 
     error = glGetError();
     if (error != GL_NO_ERROR)
@@ -1060,7 +1107,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         LL_WARNS("ShaderLoading") << "GL ERROR in glCreateShader: " << error << " for file: " << open_file_name << LL_ENDL;
         if (ret)
         {
-            glDeleteShader(ret); //no longer need handle
+            deleteShaderObject(ret); //no longer need handle
             ret = 0;
         }
     }
@@ -1075,7 +1122,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         if (error != GL_NO_ERROR)
         {
             LL_WARNS("ShaderLoading") << "GL ERROR in glShaderSource: " << error << " for file: " << open_file_name << LL_ENDL;
-            glDeleteShader(ret); //no longer need handle
+            deleteShaderObject(ret); //no longer need handle
             ret = 0;
         }
     }
@@ -1090,7 +1137,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         if (error != GL_NO_ERROR)
         {
             LL_WARNS("ShaderLoading") << "GL ERROR in glCompileShader: " << error << " for file: " << open_file_name << LL_ENDL;
-            glDeleteShader(ret); //no longer need handle
+            deleteShaderObject(ret); //no longer need handle
             ret = 0;
         }
     }
@@ -1109,7 +1156,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
             LL_WARNS("ShaderLoading") << "GLSL Compilation Error:" << LL_ENDL;
             dumpObjectLog(ret, true, open_file_name);
             dumpShaderSource(shader_code_count, shader_code_text);
-            glDeleteShader(ret); //no longer need handle
+            deleteShaderObject(ret); //no longer need handle
             ret = 0;
         }
         else
@@ -1122,7 +1169,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     }
     else
     {
-        LL_DEBUGS("ShaderLoading") << "loadShaderFile() completed, ret: " << U32(ret) << LL_ENDL;
+        LL_DEBUGS("ShaderLoading") << "compileShaderFile() completed, ret: " << U32(ret) << LL_ENDL;
         ret = 0;
     }
     stop_glerror();
@@ -1133,14 +1180,8 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         free(shader_code_text[i]);
     }
 
-    //successfully loaded, save results
     if (ret)
     {
-        // Add shader file to map. The key is the path unless the caller asked for a distinct
-        // one -- a shared object compiled a second time under different defines needs its own
-        // entry, since attach is by key (see variantObjectKey).
-        const std::string& key = cache_key.empty() ? filename : cache_key;
-        mShaderObjects[stageIndex(type)][key] = ret;
         shader_level = try_gpu_class;
     }
     else
@@ -1148,12 +1189,12 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         if (shader_level > 1)
         {
             shader_level--;
-            return loadShaderFile(filename, shader_level, type, defines, texture_index_channels, cache_key);
+            return compileShaderFile(filename, shader_level, type, defines, texture_index_channels);
         }
         LL_WARNS("ShaderLoading") << "Failed to load " << filename << LL_ENDL;
     }
 
-    LL_DEBUGS("ShaderLoading") << "loadShaderFile() completed, ret: " << U32(ret) << LL_ENDL;
+    LL_DEBUGS("ShaderLoading") << "compileShaderFile() completed, ret: " << U32(ret) << LL_ENDL;
     return ret;
 }
 

@@ -326,6 +326,8 @@ public:
     bool attachStageObject(GLenum stage, const std::string& object);
     bool attachFragmentObject(const std::string& object) { return attachStageObject(GL_FRAGMENT_SHADER, object); }
     bool attachVertexObject(const std::string& object) { return attachStageObject(GL_VERTEX_SHADER, object); }
+    // Attach an object whoever compiled it keeps: the program detaches it, after a link through createShader or at
+    // unload, and leaves deleting it to them.
     void attachObject(GLuint object);
     void attachObjects(GLuint* objects = NULL, S32 count = 0);
     bool mapAttributes();
@@ -594,6 +596,14 @@ public:
 
 private:
     void unloadInternal();
+
+    // The stage objects createShader compiled of mShaderFiles, which this program owns: deleted once it links, or at
+    // unload where it never did. The shared objects attachShaderFeatures attaches by name are LLShaderMgr's.
+    std::vector<GLuint> mOwnObjects;
+
+    // Detach every object, deleting this program's own: a linked program needs none of them, and an object no program
+    // holds is freed when its owner deletes it rather than when the last program holding it goes.
+    void releaseObjects();
 
     // What this program holds at each uniform location, as the setters last uploaded it, so a set of the value a
     // location already holds skips its glUniform* call. Every setter but the matrices' comes through here, on the

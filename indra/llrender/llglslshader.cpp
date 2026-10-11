@@ -688,34 +688,11 @@ void LLGLSLShader::unloadInternal()
     mUniformCache.clear();
     mMinimumAlpha = MINIMUM_ALPHA_UNSET;
 
+    // A program that never linked still holds its objects, and its own are still to delete.
+    releaseObjects();
+
     if (mProgramObject)
     {
-        GLuint obj[1024];
-        GLsizei count = 0;
-        glGetAttachedShaders(mProgramObject, 1024, &count, obj);
-
-        for (GLsizei i = 0; i < count; i++)
-        {
-            glDetachShader(mProgramObject, obj[i]);
-        }
-
-        for (GLsizei i = 0; i < count; i++)
-        {
-            if (glIsShader(obj[i]))
-            {
-                glDeleteShader(obj[i]);
-#if LL_DARWIN
-                // Apple's GL 4.1 core driver spuriously raises
-                // GL_INVALID_OPERATION on glDeleteShader of a just-detached,
-                // valid shader (already vetted by glIsShader above). Drain
-                // it. Commit 7e9bf817a7 removed the original sweep on the
-                // belief that the driver had been fixed; empirically it has
-                // not been.
-                flush_glerror();
-#endif
-            }
-        }
-
         // GL may hand this name straight back out, and the debug validator's per-program
         // sampler cache revalidates only on active-uniform count -- a recreated program
         // matching both would be checked against this one's samplers.
@@ -745,6 +722,28 @@ void LLGLSLShader::unloadInternal()
     }
 
     stop_glerror();
+}
+
+void LLGLSLShader::releaseObjects()
+{
+    if (mProgramObject)
+    {
+        GLuint obj[1024];
+        GLsizei count = 0;
+        glGetAttachedShaders(mProgramObject, 1024, &count, obj);
+        for (GLsizei i = 0; i < count; i++)
+        {
+            glDetachShader(mProgramObject, obj[i]);
+        }
+    }
+
+    // Only this program's own objects are deleted. A shared one is LLShaderMgr's: programs built later attach it by
+    // name.
+    for (GLuint object : mOwnObjects)
+    {
+        LLShaderMgr::deleteShaderObject(object);
+    }
+    mOwnObjects.clear();
 }
 
 bool LLGLSLShader::createShader(U32 variants)
@@ -802,15 +801,16 @@ bool LLGLSLShader::createShader(U32 variants)
         fprintf(stderr, "--- %s ---\n", mName.c_str());
 #endif // DEBUG_SHADER_INCLUDES
 
-        //compile new source
+        //compile new source, into objects this program owns
         vector< pair<string, GLenum> >::iterator fileIter = mShaderFiles.begin();
         for (; fileIter != mShaderFiles.end(); fileIter++)
         {
-            GLuint shaderhandle = LLShaderMgr::instance()->loadShaderFile((*fileIter).first, mShaderLevel, (*fileIter).second, &mDefines, mFeatures.mIndexedTextureChannels);
+            GLuint shaderhandle = LLShaderMgr::instance()->compileShaderFile((*fileIter).first, mShaderLevel, (*fileIter).second, &mDefines, mFeatures.mIndexedTextureChannels);
             LL_DEBUGS("ShaderLoading") << "SHADER FILE: " << (*fileIter).first << " mShaderLevel=" << mShaderLevel << LL_ENDL;
             if (shaderhandle)
             {
                 attachObject(shaderhandle);
+                mOwnObjects.push_back(shaderhandle);
             }
             else
             {
@@ -833,6 +833,11 @@ bool LLGLSLShader::createShader(U32 variants)
     if (success)
     {
         success = mapUniforms();
+    }
+    if (success)
+    {
+        // Linked, and saved to the binary cache where that is on: the objects have nothing left to give it.
+        releaseObjects();
     }
     if (!success)
     {

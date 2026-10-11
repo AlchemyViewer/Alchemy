@@ -52,8 +52,13 @@
 #include "llwindow.h"
 #include "llwindowcallbacks.h"
 
+#include "fsyspath.h"
+#include "llfile.h"
+#include "lluuid.h"
+
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -134,6 +139,50 @@ namespace ll_test
     private:
         std::string mDirPrefix;
         LLShaderMgr* mPrevious;
+    };
+
+    // A shader tree on disk for programs built through LLGLSLShader::createShader, which reads its
+    // stage files as the viewer reads its own: <root>/class1/<path>, found by a TestShaderMgr given
+    // prefix(). Made empty in the system's temporary directory, and removed with the object.
+    class TestShaderDir
+    {
+    public:
+        TestShaderDir()
+        {
+            std::filesystem::path tmp = fsyspath(LLFile::tmpdir());
+            mRoot = tmp / fsyspath("llrender-gl-test-" + LLUUID::generateNewID().asString());
+            std::error_code ec;
+            std::filesystem::create_directories(mRoot / "class1", ec);
+        }
+
+        ~TestShaderDir()
+        {
+            std::error_code ec;
+            std::filesystem::remove_all(mRoot, ec);
+        }
+
+        // Write `source` to class1/<path>, making its folders. False if it could not be written.
+        bool write(const std::string& path, const std::string& source) const
+        {
+            const std::filesystem::path file = mRoot / "class1" / fsyspath(path);
+            std::error_code ec;
+            std::filesystem::create_directories(file.parent_path(), ec);
+            llofstream out(fsyspath(file).string(), std::ios::out | std::ios::binary);
+            out << source;
+            return out.good();
+        }
+
+        // What getShaderDirPrefix() returns: loadShaderFile appends the class number and the path.
+        std::string prefix() const
+        {
+            return fsyspath(mRoot / "class").string();
+        }
+
+        TestShaderDir(const TestShaderDir&)            = delete;
+        TestShaderDir& operator=(const TestShaderDir&) = delete;
+
+    private:
+        std::filesystem::path mRoot;
     };
 
     // GL 3.3 core pass-through UI vertex shader. Same uniform / attribute
