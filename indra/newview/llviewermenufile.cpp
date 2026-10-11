@@ -1064,8 +1064,8 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
 
         // A cutout while the snapshot window's Cutout box is on, whether or
         // not the window is open -- the same cutout the window would take.
-        const std::optional<ALSnapshotCutout> cutout = ALSnapshotCutout::current(LLSnapshotModel::SNAPSHOT_LOCAL, fmt);
-        if (cutout && !ALRenderIsolation::findArmed())
+        const std::optional<ALSnapshotCutout> cutout = ALSnapshotCutout::fromSettings(LLSnapshotModel::SNAPSHOT_LOCAL, fmt);
+        if (cutout && !ALRenderIsolation::findArmedObject())
         {
             // A snapshot of nothing, on a fill, is not what was asked for.
             LLNotificationsUtil::add("CutoutTargetMissing");

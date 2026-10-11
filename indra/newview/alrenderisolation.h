@@ -48,7 +48,7 @@ class LLVOAvatar;
  * occlusion off, and answers includes() for the cull choke points.
  *
  * Everything outside the subject is dropped from the main camera's pass only
- * (LLPipeline::cutoutFiltering). Shadows, probes and impostor bakes in the
+ * (LLPipeline::cullingToCutoutSubject). Shadows, probes and impostor bakes in the
  * same frame still see the whole world, which is what keeps the subject lit
  * the way it is where it stands.
  */
@@ -74,13 +74,13 @@ public:
     static const LLUUID& armedTarget() { return sArmed; }
 
     /// Whether @a avatar is the armed subject, or sits on it while the cutout
-    /// takes seated avatars along. Such an avatar is never impostored for
+    /// takes seated avatars along, while the Cutout box is on. Such an avatar is never impostored for
     /// being one too many (LLVOAvatar::computeUpdatePeriod): an impostor drops
     /// the attachments and draws a billboard.
     static bool isArmedAvatar(const LLVOAvatar* avatar);
 
     /// The armed subject if it is in the scene now, or null.
-    static LLViewerObject* findArmed();
+    static LLViewerObject* findArmedObject();
 
     class Scope
     {
@@ -112,9 +112,9 @@ public:
 
 private:
     /// Gives a static linkset a spatial bridge of its own (see arm()).
-    static void separate(LLViewerObject* object);
+    static void giveOwnSpatialBridge(LLViewerObject* object);
     static bool includesAvatar(const LLVOAvatar* avatar);
-    static void collectSeated(LLViewerObject* object);
+    static void collectSeatedAvatars(LLViewerObject* object);
 
     static LLUUID                   sArmed;
     // Resolved by a Scope for its frames only.

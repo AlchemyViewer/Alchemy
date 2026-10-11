@@ -491,7 +491,7 @@ bool LLSnapshotLivePreview::setThumbnailImageSize()
     {
         return false ;
     }
-    const bool from_preview = thumbnailFromPreview();
+    const bool from_preview = thumbnailScaledFromPreview();
     S32 width  = (from_preview ? mPreviewImage->getWidth()  : gViewerWindow->getWindowWidthRaw());
     S32 height = (from_preview ? mPreviewImage->getHeight() : gViewerWindow->getWindowHeightRaw()) ;
 
@@ -546,7 +546,7 @@ bool LLSnapshotLivePreview::setThumbnailImageSize()
     return true ;
 }
 
-bool LLSnapshotLivePreview::thumbnailFromPreview() const
+bool LLSnapshotLivePreview::thumbnailScaledFromPreview() const
 {
     // A cutout's thumbnail is the cutout made smaller, not a render of its
     // own: that would reallocate every screen buffer a second time for the
@@ -590,7 +590,7 @@ void LLSnapshotLivePreview::generateThumbnailImage(bool force_update)
 
     LLPointer<LLImageRaw> raw = new LLImageRaw;
 
-    if (thumbnailFromPreview())
+    if (thumbnailScaledFromPreview())
     {
         // The thumbnail is be a subsampled version of the preview (used in SL Share previews, i.e. Flickr, Twitter)
         raw->resize( mPreviewImage->getWidth(),
@@ -599,7 +599,7 @@ void LLSnapshotLivePreview::generateThumbnailImage(bool force_update)
         raw->copy(mPreviewImage);
         // Scale to the thumbnail size. Straight alpha, as a cutout's is, is
         // scaled without averaging what its empty texels hold into its edges.
-        if (!ALCutoutImage::scaleStraight(*raw, mThumbnailWidth, mThumbnailHeight))
+        if (!ALCutoutImage::scaleStraightAlpha(*raw, mThumbnailWidth, mThumbnailHeight))
         {
             raw = NULL ;
         }

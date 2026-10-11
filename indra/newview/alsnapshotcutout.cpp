@@ -36,8 +36,8 @@ bool ALSnapshotCutout::blockedByRlv()
 }
 
 // static
-std::optional<ALSnapshotCutout> ALSnapshotCutout::current(LLSnapshotModel::ESnapshotType type,
-                                                          LLSnapshotModel::ESnapshotFormat format)
+std::optional<ALSnapshotCutout> ALSnapshotCutout::fromSettings(LLSnapshotModel::ESnapshotType type,
+                                                               LLSnapshotModel::ESnapshotFormat format)
 {
     static LLCachedControl<bool>     enabled(gSavedSettings, "ALSnapshotCutout", false);
     static LLCachedControl<bool>     include_seated(gSavedSettings, "ALSnapshotCutoutIncludeSeated", false);

@@ -83,11 +83,11 @@ LLUUID ALRenderIsolation::targetFromPick(const LLUUID& picked_id)
 void ALRenderIsolation::arm(const LLUUID& target_id)
 {
     sArmed = target_id;
-    separate(findArmed());
+    giveOwnSpatialBridge(findArmedObject());
 }
 
 // static
-void ALRenderIsolation::separate(LLViewerObject* object)
+void ALRenderIsolation::giveOwnSpatialBridge(LLViewerObject* object)
 {
     if (object && !object->asAvatar() && object->getPCode() == LL_PCODE_VOLUME)
     {
@@ -108,7 +108,10 @@ void ALRenderIsolation::disarm()
 // static
 bool ALRenderIsolation::isArmedAvatar(const LLVOAvatar* avatar)
 {
-    if (!avatar || sArmed.isNull())
+    // Armed is not the same as waiting: the Cutout box can be cleared without
+    // disarming, from Debug Settings, and nothing will cut the avatar out then.
+    static LLCachedControl<bool> cutout_on(gSavedSettings, "ALSnapshotCutout", false);
+    if (!avatar || sArmed.isNull() || !cutout_on())
     {
         return false;
     }
@@ -124,7 +127,7 @@ bool ALRenderIsolation::isArmedAvatar(const LLVOAvatar* avatar)
 }
 
 // static
-LLViewerObject* ALRenderIsolation::findArmed()
+LLViewerObject* ALRenderIsolation::findArmedObject()
 {
     if (sArmed.isNull())
     {
@@ -150,10 +153,10 @@ ALRenderIsolation::Scope::Scope(const LLUUID& target_id, bool include_seated)
         {
             sRoot = object->getRootEdit();
             // Made anew since it was armed, it is static again.
-            separate(sRoot);
+            giveOwnSpatialBridge(sRoot);
             if (include_seated)
             {
-                collectSeated(sRoot);
+                collectSeatedAvatars(sRoot);
             }
         }
         mHasSubject = true;
@@ -176,7 +179,7 @@ ALRenderIsolation::Scope::~Scope()
 }
 
 // static
-void ALRenderIsolation::collectSeated(LLViewerObject* object)
+void ALRenderIsolation::collectSeatedAvatars(LLViewerObject* object)
 {
     // A seated avatar is a child of the prim it sits on, wherever in the
     // linkset that is.
@@ -188,7 +191,7 @@ void ALRenderIsolation::collectSeated(LLViewerObject* object)
         }
         else
         {
-            collectSeated(child);
+            collectSeatedAvatars(child);
         }
     }
 }

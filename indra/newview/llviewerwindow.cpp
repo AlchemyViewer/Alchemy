@@ -5531,7 +5531,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     // A cutout is colour without the interface. It renders offscreen, always:
     // the tiled path reads the window's back buffer, which may have no alpha
     // or two bits of it. It renders a whole multiple larger than the image it
-    // makes, and averages down after (ALCutoutImage::resolve) -- its edges
+    // makes, and averages down after (ALCutoutImage::resolveOverFill) -- its edges
     // cannot come from anti-aliasing, which blends the subject into what is
     // to be left empty without telling the coverage.
     S32 cutout_width = 0;
@@ -5882,7 +5882,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                 {
                     // The colour is the subject premultiplied by its coverage;
                     // the coverage itself goes into alpha here.
-                    gPipeline.writeCutoutCoverage();
+                    gPipeline.copyCutoutCoverageToAlpha();
                 }
 
                 if (!LLPipeline::sRenderDeferred)
@@ -5996,7 +5996,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         {
             cutout_width += (cutout_width * 3) % 4;
         }
-        ret = ALCutoutImage::resolve(*raw, cutout_width, cutout_height, cutout->mFill, cutout->mKeepAlpha, cutout_drawn);
+        ret = ALCutoutImage::resolveOverFill(*raw, cutout_width, cutout_height, cutout->mFill, cutout->mKeepAlpha, cutout_drawn);
     }
     else
     {

@@ -28,7 +28,6 @@
 #include "llimage.h"
 
 #include <algorithm>
-#include <vector>
 
 namespace
 {
@@ -38,7 +37,7 @@ namespace
     }
 }
 
-bool ALCutoutImage::resolve(LLImageRaw& raw, S32 width, S32 height, const LLColor4& fill, bool keep_alpha, bool* drawn)
+bool ALCutoutImage::resolveOverFill(LLImageRaw& raw, S32 width, S32 height, const LLColor4& fill, bool keep_alpha, bool* drawn)
 {
     LLImageDataLock lock(&raw);
 
@@ -77,49 +76,56 @@ bool ALCutoutImage::resolve(LLImageRaw& raw, S32 width, S32 height, const LLColo
 
     const F32 fill_alpha = llclamp(fill.mV[VALPHA], 0.f, 1.f);
     const S32 texels = width * height;
-    const U8* in = raw.getData();
 
-    std::vector<U8> out((size_t)texels * (keep_alpha ? 4 : 3));
-    U8* dst = out.data();
-    for (S32 i = 0; i < texels; ++i, in += 4)
+    // Composited in place: each texel is read whole before it is written, and
+    // three components written never pass the four being read.
+    U8* data = raw.getData();
+    const U8* in = data;
+    U8* dst = data;
+    if (keep_alpha)
     {
-        const F32 coverage = in[3] / 255.f;
-        const F32 uncovered = 1.f - coverage;
-
-        if (keep_alpha)
+        for (S32 i = 0; i < texels; ++i, in += 4, dst += 4)
         {
+            const F32 coverage = in[3] / 255.f;
+            const F32 uncovered = 1.f - coverage;
             // Premultiplied "over": the fill contributes what the subject
             // leaves uncovered, in proportion to how much fill there is.
-            const F32 alpha = coverage + fill_alpha * uncovered;
             const F32 fill_weight = fill_alpha * uncovered;
+            const F32 alpha = coverage + fill_weight;
+            const F32 premultiplied[3] = { in[0] / 255.f + fill.mV[0] * fill_weight,
+                                           in[1] / 255.f + fill.mV[1] * fill_weight,
+                                           in[2] / 255.f + fill.mV[2] * fill_weight };
             for (S32 c = 0; c < 3; ++c)
             {
-                const F32 premultiplied = in[c] / 255.f + fill.mV[c] * fill_weight;
-                dst[c] = to_byte(alpha > 0.f ? premultiplied / alpha : 0.f);
+                dst[c] = to_byte(alpha > 0.f ? premultiplied[c] / alpha : 0.f);
             }
             dst[3] = to_byte(alpha);
-            dst += 4;
         }
-        else
-        {
-            // Nowhere to put alpha: the fill is the background, whole.
-            for (S32 c = 0; c < 3; ++c)
-            {
-                dst[c] = to_byte(in[c] / 255.f + fill.mV[c] * uncovered);
-            }
-            dst += 3;
-        }
+        return true;
     }
 
-    if (!raw.resize((U16)width, (U16)height, (S8)(keep_alpha ? 4 : 3)) || raw.isBufferInvalid())
+    // Nowhere to put alpha: the fill is the background, whole.
+    for (S32 i = 0; i < texels; ++i, in += 4, dst += 3)
+    {
+        const F32 uncovered = 1.f - in[3] / 255.f;
+        const F32 colour[3] = { in[0] / 255.f + fill.mV[0] * uncovered,
+                                in[1] / 255.f + fill.mV[1] * uncovered,
+                                in[2] / 255.f + fill.mV[2] * uncovered };
+        for (S32 c = 0; c < 3; ++c)
+        {
+            dst[c] = to_byte(colour[c]);
+        }
+    }
+    // Shrunk to the three components now packed at its start.
+    if (!raw.reallocateData(texels * 3))
     {
         return false;
     }
-    memcpy(raw.getData(), out.data(), out.size());
+    raw.setSize(width, height, 3);
     return true;
 }
 
-bool ALCutoutImage::scaleStraight(LLImageRaw& raw, S32 width, S32 height)
+bool ALCutoutImage::scaleStraightAlpha(LLImageRaw& raw, S32 width, S32 height)
 {
     LLImageDataLock lock(&raw);
 
@@ -138,5 +144,5 @@ bool ALCutoutImage::scaleStraight(LLImageRaw& raw, S32 width, S32 height)
             data[c] = (U8)((data[c] * alpha + 127) / 255);
         }
     }
-    return resolve(raw, width, height, LLColor4::transparent, true);
+    return resolveOverFill(raw, width, height, LLColor4::transparent, true);
 }

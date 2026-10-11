@@ -108,7 +108,7 @@ public:
     void setFilter(std::string filter_name) { mFilterName = filter_name; }
     std::string  getFilter() const { return mFilterName; }
     /// The cutout this preview takes, or none. Set by whoever owns the preview
-    /// (ALSnapshotCutout::current), never read from settings here: previews of
+    /// (ALSnapshotCutout::fromSettings), never read from settings here: previews of
     /// other floaters share the list and the settings.
     void setCutout(const std::optional<ALSnapshotCutout>& cutout);
     bool hasCutout() const { return mCutout.has_value(); }
@@ -127,7 +127,7 @@ public:
     bool setThumbnailImageSize() ;
     /// True if the thumbnail is the preview made smaller, rather than a
     /// screen grab of its own -- and so sized from the preview too.
-    bool thumbnailFromPreview() const;
+    bool thumbnailScaledFromPreview() const;
     void generateThumbnailImage(bool force_update = false) ;
     void resetThumbnailImage() { mThumbnailImage = NULL ; }
     void drawPreviewRect(S32 offset_x, S32 offset_y, LLColor4 alpha_color = LLColor4(0.5f, 0.5f, 0.5f, 0.8f));

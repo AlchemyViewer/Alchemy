@@ -151,12 +151,12 @@ public:
     // opaque forward pools have drawn and before the blended ones, as an
     // impostor bake lays its own: nothing over the background, colour and
     // alpha both, and full coverage wherever opaque geometry sits.
-    void stampCutoutCoverage();
+    void seedCutoutCoverageFromDepth();
     // After the frame is finished: the scene target's alpha -- the cutout's
     // coverage -- into the alpha of whatever is bound, colour untouched. The
     // post chain carries no alpha a cutout could use (glow tags, FXAA luma,
     // 2-bit ping-pong buffers), so it comes from the scene target directly.
-    void writeCutoutCoverage();
+    void copyCutoutCoverageToAlpha();
     // The screen-space reflection source emptied: no colour, depth at the far
     // plane, so a march through it finds nothing.
     void clearSceneMap();
@@ -829,18 +829,18 @@ public:
     /// cut down to the cutout's subject. Shadows, impostor bakes, probes and
     /// HUDs in the same frame still see the whole world, which is what keeps
     /// the subject lit where it stands.
-    static bool cutoutFiltering() { return sCutoutRender && cutoutMainPass(); }
+    static bool cullingToCutoutSubject() { return sCutoutRender && isMainWorldPass(); }
 
     /// Whether the alpha channel accumulates coverage rather than glow: in an
     /// impostor bake, and in a cutout frame's main pass. Blended geometry adds
     /// its coverage and glow writes are left out.
-    static bool alphaWritesCoverage() { return sImpostorRender || cutoutFiltering(); }
+    static bool alphaWritesCoverage() { return sImpostorRender || cullingToCutoutSubject(); }
 
     /// A frame without the lens and print effects: a "No post-processing"
     /// snapshot, and every cutout frame, since each of those effects reaches
     /// past the subject's edge into what is to be left empty. Grading is not
     /// part of this -- only "No post-processing" drops the grade.
-    static bool cleanPlate();
+    static bool suppressesLensAndPrintEffects();
 
     /// One bit per grading group, for comparing a single section against the
     /// rest of the grade rather than against nothing at all.
@@ -1440,7 +1440,9 @@ public:
     static bool RenderAvatarCloth;
 
 private:
-    static bool cutoutMainPass();
+    // The main camera's view of the world: not a shadow map, an impostor
+    // bake, the HUD or a probe's cube face.
+    static bool isMainWorldPass();
 };
 
 // Occlusion culling off for as long as this lives.

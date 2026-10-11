@@ -297,7 +297,7 @@ void LLFloaterSnapshot::Impl::updateControls(LLFloaterSnapshotBase* floater)
     LLSnapshotModel::ESnapshotType shot_type = getActiveSnapshotType(floater);
     LLSnapshotModel::ESnapshotFormat shot_format = (LLSnapshotModel::ESnapshotFormat)gSavedSettings.getS32("SnapshotFormat");
     LLSnapshotModel::ESnapshotLayerType layer_type = getLayerType(floater);
-    const std::optional<ALSnapshotCutout> cutout = ALSnapshotCutout::current(shot_type, shot_format);
+    const std::optional<ALSnapshotCutout> cutout = ALSnapshotCutout::fromSettings(shot_type, shot_format);
 
     floater->getChild<LLComboBox>("local_format_combo")->selectNthItem(gSavedSettings.getS32("SnapshotFormat"));
     floater->getChildView("layer_types")->setEnabled(shot_type == LLSnapshotModel::SNAPSHOT_LOCAL);
@@ -886,7 +886,7 @@ void LLFloaterSnapshot::Impl::updateCutoutControls(LLFloaterSnapshotBase* floate
     const bool rlv_blocked = ALSnapshotCutout::blockedByRlv();
     const bool freeze_frame = gSavedSettings.getBOOL("UseFreezeFrame");
     const bool cutout_on = gSavedSettings.getBOOL("ALSnapshotCutout") && !rlv_blocked;
-    LLViewerObject* subject = ALRenderIsolation::findArmed();
+    LLViewerObject* subject = ALRenderIsolation::findArmedObject();
 
     floater->getChild<LLUICtrl>("cutout_check")->setEnabled(!rlv_blocked);
     floater->getChild<LLUICtrl>("cutout_check")->setValue(cutout_on);

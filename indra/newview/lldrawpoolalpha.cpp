@@ -266,8 +266,9 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
     // surface's coverage). Depth writing is untouched by any of that -- the stamp runs before
     // this pass, so blended geometry occludes normally again.
     //
-    // A snapshot cutout's main pass keeps coverage the same way, from a stamp of its own,
-    // so its subject can be lifted off the frame.
+    // A snapshot cutout's main pass keeps coverage the same way, seeded by a pass of its
+    // own (LLPipeline::seedCutoutCoverageFromDepth), so its subject can be lifted off the
+    // frame.
     //
     // Everywhere else the alpha channel carries glow, and this suppresses source alpha so a
     // blended surface does not erase the glow already accumulated behind it.

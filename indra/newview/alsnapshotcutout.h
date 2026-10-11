@@ -32,7 +32,7 @@
 #include <optional>
 
 /// One snapshot cutout, as asked for: which subject, what fills the rest of
-/// the frame, and what the image is going to. Built in one place, current(),
+/// the frame, and what the image is going to. Built in one place, fromSettings(),
 /// for both of the ways a cutout is taken -- the snapshot floater's preview and
 /// File > Take Snapshot to Disk -- so the two cannot disagree about it.
 struct ALSnapshotCutout
@@ -47,8 +47,8 @@ struct ALSnapshotCutout
     /// nothing: while the Cutout box is off, while no subject is armed, and
     /// while RLVa restricts what may be seen -- a cutout of one subject would
     /// show it clear of a vision sphere or an overlay.
-    static std::optional<ALSnapshotCutout> current(LLSnapshotModel::ESnapshotType type,
-                                                   LLSnapshotModel::ESnapshotFormat format);
+    static std::optional<ALSnapshotCutout> fromSettings(LLSnapshotModel::ESnapshotType type,
+                                                        LLSnapshotModel::ESnapshotFormat format);
 
     /// Whether RLVa restricts vision now, which rules cutouts out.
     static bool blockedByRlv();

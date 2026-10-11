@@ -165,17 +165,17 @@ void ALPopover::adopt(const LLView* anchor)
     }
 }
 
-LLFloaterView* ALPopover::floaterView() const
+LLFloaterView* ALPopover::homeFloaterView() const
 {
     LLFloater* home = mHome.get();
     LLFloaterView* view = home ? home->getParentByType<LLFloaterView>() : nullptr;
     return view ? view : gFloaterView;
 }
 
-LLRect ALPopover::inView(const LLRect& screen) const
+LLRect ALPopover::screenRectToView(const LLRect& screen) const
 {
     LLRect local = screen;
-    if (const LLFloaterView* view = floaterView())
+    if (const LLFloaterView* view = homeFloaterView())
     {
         view->screenRectToLocal(screen, &local);
     }
@@ -193,7 +193,7 @@ void ALPopover::openAt(LLRect where)
     {
         home->addDependentFloater(this, /*reposition*/ false);
     }
-    LLFloaterView* view = floaterView();
+    LLFloaterView* view = homeFloaterView();
     setRect(where);
     if (view && getParent() == view)
     {
@@ -225,9 +225,9 @@ void ALPopover::openBeside(const LLRect& screen, const LLView* anchor)
     }
     // The floater view is the screen a popover has; without one, only the
     // screen's bottom is known.
-    const LLFloaterView* view = floaterView();
+    const LLFloaterView* view = homeFloaterView();
     const LLRect bounds = view ? view->getLocalRect() : LLRect(S32_MIN / 2, S32_MAX / 2, S32_MAX / 2, 0);
-    openAt(ALPlace::under(inView(screen), getRect().getWidth(), getRect().getHeight(), bounds));
+    openAt(ALPlace::under(screenRectToView(screen), getRect().getWidth(), getRect().getHeight(), bounds));
 }
 
 void ALPopover::openOver(const LLView* anchor)
@@ -237,7 +237,7 @@ void ALPopover::openOver(const LLView* anchor)
     if (anchor)
     {
         adopt(anchor);
-        const LLRect anchor_rect = inView(anchor->calcScreenRect());
+        const LLRect anchor_rect = screenRectToView(anchor->calcScreenRect());
         where.setLeftTopAndSize(anchor_rect.getCenterX() - where.getWidth() / 2, anchor_rect.mTop - BELOW_TOP, where.getWidth(), where.getHeight());
     }
     openAt(where);

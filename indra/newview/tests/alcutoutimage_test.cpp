@@ -69,7 +69,7 @@ namespace tut
     void cutout_object::test<1>()
     {
         LLPointer<LLImageRaw> raw = image(2, 1, { { 255, 0, 0, 255 }, { 0, 0, 0, 0 } });
-        ensure("resolves", ALCutoutImage::resolve(*raw, 2, 1, LLColor4(0.f, 1.f, 0.f, 0.f), true));
+        ensure("resolves", ALCutoutImage::resolveOverFill(*raw, 2, 1, LLColor4(0.f, 1.f, 0.f, 0.f), true));
         ensure_equals("four components", (S32)raw->getComponents(), 4);
 
         const std::vector<U8> subject = texel(raw, 0);
@@ -91,7 +91,7 @@ namespace tut
     void cutout_object::test<2>()
     {
         LLPointer<LLImageRaw> raw = image(2, 1, { { 255, 0, 0, 255 }, { 0, 0, 0, 0 } });
-        ensure("resolves", ALCutoutImage::resolve(*raw, 1, 1, LLColor4(0.f, 0.f, 0.f, 0.f), true));
+        ensure("resolves", ALCutoutImage::resolveOverFill(*raw, 1, 1, LLColor4(0.f, 0.f, 0.f, 0.f), true));
 
         const std::vector<U8> edge = texel(raw, 0);
         close_to("edge keeps its red", edge[0], 255, 3);
@@ -111,7 +111,7 @@ namespace tut
     void cutout_object::test<3>()
     {
         LLPointer<LLImageRaw> raw = image(1, 1, { { 128, 0, 0, 128 } });
-        ensure("resolves", ALCutoutImage::resolve(*raw, 1, 1, LLColor4(1.f, 1.f, 1.f, 1.f), true));
+        ensure("resolves", ALCutoutImage::resolveOverFill(*raw, 1, 1, LLColor4(1.f, 1.f, 1.f, 1.f), true));
 
         const std::vector<U8> t = texel(raw, 0);
         close_to("red", t[0], 255);
@@ -126,7 +126,7 @@ namespace tut
     void cutout_object::test<4>()
     {
         LLPointer<LLImageRaw> raw = image(1, 1, { { 0, 0, 0, 0 } });
-        ensure("resolves", ALCutoutImage::resolve(*raw, 1, 1, LLColor4(0.f, 0.f, 1.f, 0.5f), true));
+        ensure("resolves", ALCutoutImage::resolveOverFill(*raw, 1, 1, LLColor4(0.f, 0.f, 1.f, 0.5f), true));
 
         const std::vector<U8> t = texel(raw, 0);
         close_to("blue, straight", t[2], 255);
@@ -139,7 +139,7 @@ namespace tut
     void cutout_object::test<5>()
     {
         LLPointer<LLImageRaw> raw = image(1, 1, { { 128, 0, 0, 128 } });
-        ensure("resolves", ALCutoutImage::resolve(*raw, 1, 1, LLColor4(0.f, 0.f, 1.f, 0.f), false));
+        ensure("resolves", ALCutoutImage::resolveOverFill(*raw, 1, 1, LLColor4(0.f, 0.f, 1.f, 0.f), false));
         ensure_equals("three components", (S32)raw->getComponents(), 3);
 
         const std::vector<U8> t = texel(raw, 0);
@@ -153,11 +153,11 @@ namespace tut
     void cutout_object::test<6>()
     {
         LLPointer<LLImageRaw> kept = image(1, 1, { { 10, 10, 10, 0 } });
-        ensure("resolves kept", ALCutoutImage::resolve(*kept, 1, 1, LLColor4(0.f, 0.f, 0.f, 0.f), true));
+        ensure("resolves kept", ALCutoutImage::resolveOverFill(*kept, 1, 1, LLColor4(0.f, 0.f, 0.f, 0.f), true));
         close_to("kept: nothing", texel(kept, 0)[3], 0, 0);
 
         LLPointer<LLImageRaw> flat = image(1, 1, { { 10, 10, 10, 0 } });
-        ensure("resolves flat", ALCutoutImage::resolve(*flat, 1, 1, LLColor4(0.f, 0.f, 0.f, 1.f), false));
+        ensure("resolves flat", ALCutoutImage::resolveOverFill(*flat, 1, 1, LLColor4(0.f, 0.f, 0.f, 1.f), false));
         close_to("flat: the fill, black", texel(flat, 0)[0], 0, 0);
     }
 
@@ -166,7 +166,7 @@ namespace tut
     void cutout_object::test<7>()
     {
         LLPointer<LLImageRaw> rgb = new LLImageRaw(1, 1, 3);
-        ensure("three components refused", !ALCutoutImage::resolve(*rgb, 1, 1, LLColor4::black, true));
+        ensure("three components refused", !ALCutoutImage::resolveOverFill(*rgb, 1, 1, LLColor4::black, true));
     }
 
     // A resolved cutout -- straight RGBA -- made smaller, as its thumbnail is,
@@ -176,7 +176,7 @@ namespace tut
     void cutout_object::test<8>()
     {
         LLPointer<LLImageRaw> raw = image(2, 1, { { 255, 0, 0, 255 }, { 0, 255, 0, 0 } });
-        ensure("scales", ALCutoutImage::scaleStraight(*raw, 1, 1));
+        ensure("scales", ALCutoutImage::scaleStraightAlpha(*raw, 1, 1));
         ensure_equals("still four components", (S32)raw->getComponents(), 4);
 
         const std::vector<U8> edge = texel(raw, 0);
@@ -194,12 +194,41 @@ namespace tut
     {
         bool drawn = true;
         LLPointer<LLImageRaw> empty = image(2, 2, { { 10, 10, 10, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 255, 255, 255, 0 } });
-        ensure("resolves empty", ALCutoutImage::resolve(*empty, 1, 1, LLColor4(1.f, 1.f, 1.f, 1.f), false, &drawn));
+        ensure("resolves empty", ALCutoutImage::resolveOverFill(*empty, 1, 1, LLColor4(1.f, 1.f, 1.f, 1.f), false, &drawn));
         ensure("nothing covered: not drawn", !drawn);
 
         drawn = false;
         LLPointer<LLImageRaw> faint = image(2, 2, { { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 1, 0, 0, 1 } });
-        ensure("resolves faint", ALCutoutImage::resolve(*faint, 1, 1, LLColor4(0.f, 0.f, 0.f, 0.f), true, &drawn));
+        ensure("resolves faint", ALCutoutImage::resolveOverFill(*faint, 1, 1, LLColor4(0.f, 0.f, 0.f, 0.f), true, &drawn));
         ensure("one faint texel: drawn", drawn);
+    }
+
+    // Composited in place, a row packed down to three components keeps every
+    // texel its own: a write behind the read must not reach a texel not yet
+    // read. Unscaled, so each texel is checked as it went in.
+    template<> template<>
+    void cutout_object::test<10>()
+    {
+        LLPointer<LLImageRaw> raw = image(4, 1, { { 255, 0, 0, 255 }, { 0, 255, 0, 255 }, { 0, 0, 0, 0 }, { 0, 0, 128, 128 } });
+        ensure("resolves", ALCutoutImage::resolveOverFill(*raw, 4, 1, LLColor4(1.f, 1.f, 1.f, 0.f), false));
+        ensure_equals("three components", (S32)raw->getComponents(), 3);
+        ensure_equals("still four wide", (S32)raw->getWidth(), 4);
+        ensure("sized to three components", raw->getDataSize() == 4 * 3);
+
+        const std::vector<U8> red = texel(raw, 0);
+        close_to("red stays red", red[0], 255);
+        close_to("red has no green", red[1], 0);
+
+        const std::vector<U8> green = texel(raw, 1);
+        close_to("green has no red", green[0], 0);
+        close_to("green stays green", green[1], 255);
+
+        const std::vector<U8> empty = texel(raw, 2);
+        close_to("empty is the fill", empty[0], 255);
+        close_to("empty is the fill, green", empty[1], 255);
+
+        const std::vector<U8> half = texel(raw, 3);
+        close_to("half blue: the fill's red through it", half[0], 127);
+        close_to("half blue: blue on the fill", half[2], 255);
     }
 }
