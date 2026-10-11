@@ -179,4 +179,48 @@ namespace tut
 
         spin->die();
     }
+
+    // A number typed into a box nobody wrote is the number committed, the
+    // first time as every time after: leaving the unset state must not put
+    // the number in force in over it before it is read.
+    template<> template<>
+    void llspinctrl_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        // As the property grid builds a real number's box.
+        LLSpinCtrl::Params p(LLUICtrlFactory::getDefaultParams<LLSpinCtrl>());
+        p.name = "spin";
+        p.rect = LLRect(0, 20, 120, 0);
+        p.label_width = 0;
+        p.decimal_digits = 3;
+        p.min_value = -100000.f;
+        p.max_value = 100000.f;
+        p.initial_value = 1.0;
+        LLSpinCtrl* spin = LLUICtrlFactory::create<LLSpinCtrl>(p);
+        LLLineEditor* editor = spin->getChild<LLLineEditor>("SpinCtrl Editor");
+
+        F32 committed = -1.f;
+        spin->setCommitCallback([&committed](LLUICtrl* ctrl, const LLSD&) { committed = (F32)ctrl->getValue().asReal(); });
+
+        spin->setUnset(true);
+        // A whole number is a real number too.
+        editor->setText(std::string("2"));
+        spin->forceEditorCommit();
+        ensure_equals("what was typed is what is committed", committed, 2.f);
+        ensure_equals("and what the spinner holds", spin->getValueF32(), 2.f);
+        ensure_equals("shown as the spinner shows a number", editor->getText(), std::string("2.000"));
+        ensure("which somebody chose", !spin->isUnset());
+
+        // Leaving the unset state with nothing typed still shows the number
+        // in force, as choosing it by a step or a drag needs.
+        spin->setUnset(true);
+        spin->setUnset(false);
+        ensure_equals("nothing typed, the number in force", editor->getText(), std::string("2.000"));
+
+        spin->die();
+    }
 }
