@@ -18,6 +18,9 @@ Parity holds for a file when:
   - each pair agrees: ok is a pass, a TUT skip is a Catch2 skip, and every
     TUT failure (fail, exception, abnormal end) is a Catch2 failure; and the
     name TUT printed is the one the mapping folded into the case's;
+  - the cases run in the order TUT ran their tests, groups by name and
+    each group's tests by number, since a test may lean on what the ones
+    before it left;
   - no two cases share a name (Catch2 takes two that differ in their tags),
     none is tagged [!mayfail] or [!shouldfail], under which Catch2 passes a
     case whatever it does, and the run's exit code fits its cases: 0 when
@@ -348,6 +351,7 @@ def check(args):
         matched = agree = counts_ok = 0
         listed = []
         seen_cases = set()
+        paired = {}
         for e in entries:
             key = (e["group"], e["n"])
             name = e["catch2_name"]
@@ -368,6 +372,7 @@ def check(args):
                                 + (f" ({name!r})" if name else ""))
                 continue
             seen_cases.add(name)
+            paired[name] = key
             matched += 1
             if e.get("tut_name") is not None and e["tut_name"] != t["name"]:
                 problems.append(f"{path}: {e['group']} test<{e['n']}>: TUT named it {t['name']!r}, "
@@ -393,6 +398,17 @@ def check(args):
             problems.append(f"{path}: TUT ran [{key[0]}, {key[1]}], which the mapping does not have")
         for name in sorted(set(by_name) - seen_cases):
             problems.append(f"{path}: Catch2 case {name!r} is no TUT test of the mapping")
+        # TUT ran a file's groups by name and each group's tests by number,
+        # and a test may lean on what the ones before it left.
+        keys = set(paired.values())
+        tut_order = [(r["group"], r["n"]) for r in recorded["results"] if (r["group"], r["n"]) in keys]
+        catch2_order = [(paired[c["name"]], c["name"]) for c in cases
+                        if c["name"] in paired and by_name[c["name"]] is c]
+        for at, (tut_key, (key, name)) in enumerate(zip(tut_order, catch2_order)):
+            if tut_key != key:
+                problems.append(f"{path}: Catch2 runs {name!r}, [{key[0]}, {key[1]}], as test {at + 1} of "
+                                f"{len(tut_order)}, where TUT ran [{tut_key[0]}, {tut_key[1]}]: not TUT's order")
+                break
         clean = not any(p.startswith(path + ":") for p in problems)
         rows.append((path, len(recorded["results"]), len(cases), matched, agree, counts_ok, len(listed), code,
                      "ok" if clean else "MISMATCH"))
