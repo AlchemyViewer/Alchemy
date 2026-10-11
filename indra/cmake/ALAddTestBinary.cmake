@@ -29,7 +29,11 @@ endif()
 # benchmarks, so the filter leaves those out, as a run with no filter does. A
 # filter that matches nothing exits 2, so a file whose test cases went missing
 # fails rather than passing empty. A stem names one file in a binary, and a
-# file belongs to one binary, or to one at each ISA tier.
+# file belongs to one binary, or to one at each ISA tier. The tag is the
+# file's name less its last extension, the stem here too. A case written in a
+# header, or in a SUPPORT library, is tagged with that file's name and no
+# file's entry would run it, so <name>/stray_cases fails when the binary has
+# one: it runs whatever no file's tag names, and expects nothing to run.
 #
 # <name>/combined runs all of them in one process. It is labelled
 # combined_pending and manual, which the default run leaves out, until the
@@ -79,7 +83,7 @@ function(al_add_test_binary name)
 
   set(stems)
   foreach(source IN LISTS arg_SOURCES)
-    get_filename_component(stem "${source}" NAME_WE)
+    get_filename_component(stem "${source}" NAME_WLE)
     if(stem IN_LIST stems)
       message(
         FATAL_ERROR
@@ -137,7 +141,9 @@ function(al_add_test_binary name)
     if(tree_level GREATER level)
       set(level ${tree_level})
     endif()
-    list(APPEND arguments --isa-level ${level})
+    # One argument, not two: catch_discover_tests hands EXTRA_ARGS to each
+    # case as one, joined with ;.
+    list(APPEND arguments --isa-level=${level})
     list(APPEND labels isa)
   endif()
   if(arg_PYTHON)
@@ -189,15 +195,12 @@ function(al_add_test_binary name)
     # CTest script cannot append to a property: a script run after the
     # discovery sets them on each case whole. The labels are a file entry's,
     # not the cases' Catch2 tags, so that -L and -LE choose alike either way.
-    # The library path is DL_PATHS', where AL_TEST_ENVIRONMENT has nothing
-    # more to say.
+    # The library path is DL_PATHS', and not AL_TEST_ENVIRONMENT's, whose
+    # generator expressions a script written here would leave unevaluated.
     set(case_script "${CMAKE_CURRENT_BINARY_DIR}/${target}_cases.cmake")
     set(case_properties "LABELS [==[${labels}]==]")
     if(environment)
       string(APPEND case_properties " ENVIRONMENT [==[${environment}]==]")
-    endif()
-    if(AL_TEST_ENVIRONMENT)
-      string(APPEND case_properties " ENVIRONMENT_MODIFICATION [==[${AL_TEST_ENVIRONMENT}]==]")
     endif()
     if(arg_RESOURCE_LOCK)
       string(APPEND case_properties " RESOURCE_LOCK [==[${arg_RESOURCE_LOCK}]==]")
@@ -237,8 +240,33 @@ function(al_add_test_binary name)
       endif()
     endforeach()
 
+    # Every case no file's tag names: a filter of nothing but exclusions
+    # leaves the hidden cases out, as the files' entries do, and one that
+    # matches nothing exits 2. The ISA gate is not asked: nothing runs, and a
+    # listing already needs the binary to start on any host.
+    set(strays)
+    foreach(stem IN LISTS stems)
+      string(APPEND strays "~[#${stem}]")
+    endforeach()
+    add_test(
+      NAME ${target}/stray_cases
+      COMMAND
+        ${CMAKE_COMMAND} "-DEXE=$<TARGET_FILE:${target}>" "-DARGS=--filenames-as-tags|${strays}~[.]"
+        -DEXPECT_EXIT=2 -P ${INDRA_SOURCE_DIR}/test/run_and_expect.cmake
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
+    set_tests_properties(
+      ${target}/stray_cases
+      PROPERTIES ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}" LABELS "${labels}" TIMEOUT 60
+    )
+
+    # As long as the files take, but no longer than an hour: a hang, which
+    # the combined run is there to find, holds one CI row only so long.
     list(LENGTH stems file_count)
     math(EXPR combined_timeout "${timeout} * ${file_count}")
+    if(combined_timeout GREATER 3600)
+      set(combined_timeout 3600)
+    endif()
     set(combined_label "combined_pending;manual")
     if(arg_COMBINED)
       set(combined_label combined)
