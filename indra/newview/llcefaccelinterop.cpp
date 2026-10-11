@@ -256,6 +256,7 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
 #elif LL_DARWIN  // macOS: bind the shared IOSurface to a GL texture, blit to media
 
 #include "llgl.h"
+#include "llrender.h"
 #include <OpenGL/CGLCurrent.h>
 #include <OpenGL/CGLIOSurface.h>
 #include <IOSurface/IOSurface.h>
@@ -341,11 +342,13 @@ bool LLCEFAccelInterop::setStableTexture(unsigned long long handle, int width, i
     const int new_height = (int)IOSurfaceGetHeight(surf);
 
     CGLContextObj cgl = CGLGetCurrentContext();
-    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, m->tex);
+    // Through the slot, so its record of what is bound stays true (see the Linux import).
+    ALTextureSlot* slot = gGL.getTextureSlot(0);
+    slot->bindManual(ALTextureSlot::TT_RECT_TEXTURE, m->tex);
     CGLError err = CGLTexImageIOSurface2D(cgl, GL_TEXTURE_RECTANGLE_ARB, GL_RGBA,
                                           new_width, new_height, GL_BGRA,
                                           GL_UNSIGNED_INT_8_8_8_8_REV, surf, 0);
-    glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
+    slot->unbind();
     if (err != kCGLNoError)
     {
         CFRelease(surf);
@@ -403,6 +406,7 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
 #elif LL_LINUX  // import the plugin's dma-buf via EGL, blit to the media texture
 
 #include "llgl.h"
+#include "llrender.h"
 #include <SDL3/SDL.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -592,9 +596,12 @@ bool LLCEFAccelInterop::setStableTexture(unsigned long long handle, int width, i
     l->image = new_image;
     l->width = width;
     l->height = height;
-    glBindTexture(GL_TEXTURE_2D, l->tex);
+    // Through the slot, so its record of what is bound stays true: a raw bind left it naming a
+    // texture this replaced, and its next bind of that texture was skipped.
+    ALTextureSlot* slot = gGL.getTextureSlot(0);
+    slot->bindManual(ALTextureSlot::TT_TEXTURE, l->tex);
     glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, l->image);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    slot->unbind();
     return true;
 }
 
