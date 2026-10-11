@@ -42,6 +42,7 @@
 #include "llgl.h"
 #include "llglslshader.h"
 #include "llrender.h"
+#include "llrendertarget.h"
 #include "llwindow.h"
 #include "llframetimer.h"
 #include <atomic>
@@ -3221,6 +3222,24 @@ bool LLImageGL::scaleDown(S32 desired_discard)
     S32 desired_width = getWidth(desired_discard);
     S32 desired_height = getHeight(desired_discard);
 
+    // A deprecated source format is held under a swizzle, and the FBO path cannot carry
+    // one: it samples the old texture THROUGH the swizzle and copies the result back by
+    // position, so luminance-alpha's alpha comes back as luminance and alpha-only loses
+    // its alpha entirely. The PBO path copies the stored channels as they are.
+    //
+    // The FBO path also draws into the target the caller bound -- the texture list's
+    // 1024x1024 scratch -- and copies back out of it, so a result larger than that target
+    // copies undefined pixels from outside the framebuffer. Such a texture takes the PBO
+    // path, which reads the level out of the texture's own mip chain; without one there
+    // is nothing it can read, so the downscale is refused.
+    const bool fits_target = desired_width <= (S32)LLRenderTarget::sCurResX
+                          && desired_height <= (S32)LLRenderTarget::sCurResY;
+    const bool use_fbo = gGLManager.mDownScaleMethod == 0 && mDeprecatedSourceFormat == 0 && fits_target;
+    if (gGLManager.mDownScaleMethod == 0 && !fits_target && !mHasMipMaps)
+    {
+        return false;
+    }
+
     // Downscale into a NEW texture object rather than reallocating this one in place.
     // glTexImage2D on the live name is illegal once the texture has immutable storage
     // (GL_INVALID_OPERATION, silently leaving it at the old size), and it has no D3D11
@@ -3234,12 +3253,6 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         LL_WARNS_ONCE("LLImageGL") << "Failed to allocate a texture name for downscaling." << LL_ENDL;
         return false;
     }
-
-    // A deprecated source format is held under a swizzle, and the FBO path cannot carry
-    // one: it samples the old texture THROUGH the swizzle and copies the result back by
-    // position, so luminance-alpha's alpha comes back as luminance and alpha-only loses
-    // its alpha entirely. The PBO path copies the stored channels as they are.
-    const bool use_fbo = gGLManager.mDownScaleMethod == 0 && mDeprecatedSourceFormat == 0;
 
     if (use_fbo)
     { // use an FBO to downscale the texture
