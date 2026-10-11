@@ -14,14 +14,15 @@ decided by the types clang resolved, not by its text:
                set_test_name literal; then the first sentence of the
                comment written above the test, where that is prose; else
                #N. " #N" is added to a name another case of the file has
-               (ignoring case). Tests declared out of TUT's numeric order
-               are moved later in the file, never earlier, so that
-               declaration order, Catch2's, is TUT's. The group's typedefs,
-               its test_group object and a class derived from test_group
-               only to name it go. namespace tut, once nothing names tut::
-               and no type production code befriends as tut:: is in it,
-               becomes an anonymous namespace, taking in one directly inside
-               it.
+               (ignoring case), unless the two are in different branches
+               of one #if, never compiled together. Tests declared out of
+               TUT's numeric order are moved later in the file, never
+               earlier, so that declaration order, Catch2's, is TUT's. The
+               group's typedefs, its test_group object and a class derived
+               from test_group only to name it go. namespace tut, once
+               nothing names tut:: and no type production code befriends as
+               tut:: is in it, becomes an anonymous namespace, taking in one
+               directly inside it.
   assertions   CHECK, which lets a case go on and so reports every failure
                of a run; REQUIRE where going on could only crash or bury the
                first failure: a condition that guards what follows (a
@@ -324,6 +325,21 @@ class Source:
                     return i
             i += 1
         return -1
+
+    def conditionals_at(self, off):
+        """The #if chains around off, outermost first: each as (where its #if
+        is, which of its branches holds off, counting from 0)."""
+        stack = []
+        for start, end, kw, _ in self.directives:
+            if start > off:
+                break
+            if kw in ("if", "ifdef", "ifndef"):
+                stack.append((start, 0))
+            elif kw in ("elif", "else", "elifdef", "elifndef") and stack:
+                stack[-1] = (stack[-1][0], stack[-1][1] + 1)
+            elif kw == "endif" and stack:
+                stack.pop()
+        return tuple(stack)
 
     def state(self, off):
         """dead (under #if 0), inactive (a branch this host does not compile) or active."""
@@ -1962,7 +1978,7 @@ class Converter:
 
     def name_tests(self):
         for data, group in self.groups.items():
-            seen = set()
+            seen = []  # (the #if branches around a case, its name)
             for test in sorted(group.tests, key=lambda t: t.n):
                 if test.macro:
                     test.tut_name = None  # left as it is: no case, and parity says so
@@ -1995,13 +2011,14 @@ class Converter:
                     text_name = given
                     test.name_literal_inner = c_escape(given)
                 base = f"{group.name}: {text_name}" if text_name is not None else f"{group.name}: #{test.n}"
-                # Tests in different branches of an #if are never compiled
-                # together, so their names cannot clash.
-                branch = tuple((a, b) for a, b, what in self.src.regions if a <= test.start < b)
+                # Only tests in different branches of one #if are never
+                # compiled together; any other two may be, so their names
+                # must differ.
+                where = self.src.conditionals_at(test.start)
                 name = base
-                if (branch, name.lower()) in seen:
+                if any(other == name.lower() and not exclusive(where, at) for at, other in seen):
                     name = f"{base} #{test.n}"
-                seen.add((branch, name.lower()))
+                seen.append((where, name.lower()))
                 test.catch2_name = name
                 if text_name is not None and name == base:
                     test.catch2_literal = '"' + c_escape(group.name + ": ") + test.name_literal_inner + '"'
@@ -2429,6 +2446,18 @@ def dead_regions(masked):
             else:
                 stack[-1] = [m.end(), kw == "elif" and re.fullmatch(r"\(?\s*(0|false)\s*\)?", rest) is not None]
     return regions
+
+
+def exclusive(a, b):
+    """Whether code at two places, given by Source.conditionals_at, is never
+    compiled together: only where they lie in different branches of one
+    #if. Different #ifs may both hold, whatever their conditions say."""
+    for (chain_a, branch_a), (chain_b, branch_b) in zip(a, b):
+        if chain_a != chain_b:
+            return False
+        if branch_a != branch_b:
+            return True
+    return False
 
 
 def test_body(test):
