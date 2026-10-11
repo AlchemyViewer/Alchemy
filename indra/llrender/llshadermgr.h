@@ -654,6 +654,18 @@ public:
         WATER_WAVE_EYE,                     //  "waterWaveEye"  the camera the waves were laid out around, in agent space
         WATER_RAISE,                        //  "waterRaise"  how far the field a draw places is raised
 
+        // The depth pyramid (ALDepthPyramid): each level the farthest scene depth under its texels
+        DEPTH_PYRAMID,                      //  "depthPyramid"  sampler2D, a built pyramid for its readers
+        DEPTH_PYRAMID_SOURCE,               //  "depthPyramidSource"  sampler2D the build reads: scene depth for level 0, the pyramid's previous level after
+        DEPTH_PYRAMID_TARGET,               //  "depthPyramidTarget"  image2D[5] (r32f), the levels a build dispatch writes
+        DEPTH_PYRAMID_LEVEL,                //  "depthPyramidLevel"  int, the pyramid lod a build dispatch reads, -1 for the depth
+        DEPTH_PYRAMID_SIZE,                 //  "depthPyramidSize"  ivec4, the depth's size in pixels (xy) and the pyramid's levels (z)
+        DEPTH_PYRAMID_COUNT,                //  "depthPyramidCount"  int, the levels a build dispatch writes
+
+        // The waves' patches
+        WATER_OCCLUSION,                    //  "waterOcclusion"  int, whether the control stage culls against the depth pyramid
+        WATER_PATCH_ORDER,                  //  "waterPatchOrder"  ivec4, the order the patches are drawn in
+
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
 

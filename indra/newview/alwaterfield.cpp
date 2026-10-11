@@ -181,6 +181,19 @@ PatchRect patchRect(const Layout& layout)
     return out;
 }
 
+PatchOrder patchOrder(F32 at_x, F32 at_y)
+{
+    // The slow axis the one the view looks along most, run from the end behind the camera, and the fast axis likewise.
+    const bool slow_x = std::fabs(at_x) > std::fabs(at_y);
+    const F32 along = slow_x ? at_x : at_y;
+    const F32 across = slow_x ? at_y : at_x;
+    PatchOrder out;
+    out.mOrder[0] = slow_x ? 1 : 0;
+    out.mOrder[1] = along < 0.f ? 1 : 0;
+    out.mOrder[2] = across < 0.f ? 1 : 0;
+    return out;
+}
+
 FieldDraws fieldDraws(const Layout& layout, const PatchRect& patches)
 {
     FieldDraws out;

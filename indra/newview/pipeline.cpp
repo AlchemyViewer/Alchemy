@@ -1316,6 +1316,7 @@ void LLPipeline::releaseGLBuffers()
     mWaterPrimitives.release();
     mWaterPatchPrimitives.release();
     mWaterSurface.release();
+    mDepthPyramid.release();
     mSkyBehindQuery.release();
 
     if (mNoiseMap)

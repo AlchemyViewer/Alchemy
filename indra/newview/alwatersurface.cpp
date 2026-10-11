@@ -274,6 +274,23 @@ bool ALWaterSurface::inView(LLCamera& camera) const
     return camera.AABBInFrustumNoFarClip(centre, radius) != 0;
 }
 
+bool ALWaterSurface::patchesInView(LLCamera& camera) const
+{
+    if (!mWavesDrawn || mCellMap.isNull())
+    {
+        return false;
+    }
+    const ALWaterField::PatchRect rect = ALWaterField::patchRect(mLayout);
+    const F32 width = mSquare.mV[VZ];
+    const F32 x0 = mSquare.mV[VX] + (F32)rect.mMinX * width;
+    const F32 y0 = mSquare.mV[VY] + (F32)rect.mMinY * width;
+    const F32 x1 = mSquare.mV[VX] + (F32)rect.mEndX * width;
+    const F32 y1 = mSquare.mV[VY] + (F32)rect.mEndY * width;
+    const LLVector4a centre(0.5f * (x0 + x1), 0.5f * (y0 + y1), 0.5f * (mLowest + mHighest));
+    const LLVector4a radius(0.5f * (x1 - x0), 0.5f * (y1 - y0), 0.5f * (mHighest - mLowest) + mMaxDisplacement + 0.01f);
+    return camera.AABBInFrustumNoFarClip(centre, radius) != 0;
+}
+
 void ALWaterSurface::addExtents(LLVector3& min, LLVector3& max) const
 {
     if (mCellMap.isNull())
@@ -323,6 +340,12 @@ void ALWaterSurface::bindWaves(LLGLSLShader& shader, bool drawn, bool patches, c
         }
     }
     shader.uniform4fv(LLShaderMgr::WATER_CULL_PLANES, CULL_PLANES, cull);
+
+    // The patches front to back, as nearly as rows of them allow. The water shades only what the depth test lets
+    // through, so a crest drawn first spares the troughs it hides behind it.
+    const LLVector3 at = camera->getAtAxis();
+    const ALWaterField::PatchOrder order = ALWaterField::patchOrder(at.mV[VX], at.mV[VY]);
+    shader.uniform4iv(LLShaderMgr::WATER_PATCH_ORDER, 1, order.mOrder);
 
     // Each map's heights on their own trilinear sampler, whatever RenderWaterMipNormal puts the normal maps on, and
     // its wave height; a map not baked has none, and its sampler reads black rather than whatever the unit held.

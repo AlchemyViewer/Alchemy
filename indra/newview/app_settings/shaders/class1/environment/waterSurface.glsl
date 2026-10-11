@@ -342,19 +342,30 @@ bool water_vertex(int part, int instance, int vertex, out vec3 pos)
     return drawn;
 }
 
-// Corner `vertex` of patch `instance` of the cells in waterPatchRect, row by row, WATER_PATCHES x WATER_PATCHES a cell,
-// at the cell's water height. The corners run counter-clockwise from above, (0, 0), (1, 0), (1, 1), (0, 1), and are
-// placed as the cells and the fringe are (water_square_point), so a patch row's outer corners are the cells' corners
-// exactly and the fringe's along their edge. A patch of a cell not drawn, a void one with the void hidden, has its four
-// corners at one point, which the control stage culls.
+// The order the waves' patches are drawn in: x, 1 where the patches run along y fastest and x slowest, 0 the other
+// way about; y and z, 1 where the slow and the fast axis run from their high end. Chosen from the view so the patches
+// come front to back (ALWaterSurface::bindWaves), which lets the depth test turn away the water a nearer crest hides
+// before it is shaded. All 0, rows of x from the south-west.
+uniform ivec4 waterPatchOrder;
+
+// Corner `vertex` of patch `instance` of the cells in waterPatchRect, WATER_PATCHES x WATER_PATCHES a cell, at the
+// cell's water height: the rectangle's patches in rows, as waterPatchOrder runs them. The corners run counter-clockwise
+// from above, (0, 0), (1, 0), (1, 1), (0, 1), and are placed as the cells and the fringe are (water_square_point), so a
+// patch row's outer corners are the cells' corners exactly and the fringe's along their edge. Where a patch is depends
+// only on which it is, never on its instance. A patch of a cell not drawn, a void one with the void hidden, has its
+// four corners at one point, which the control stage culls.
 void water_patch_corner(int instance, int vertex, out vec3 pos)
 {
-    int per_cell = WATER_PATCHES * WATER_PATCHES;
-    int c = instance / per_cell;
-    int k = instance - c * per_cell;
-    int columns = max(waterPatchRect.z - waterPatchRect.x, 1);
-    ivec2 cell = waterPatchRect.xy + ivec2(c % columns, c / columns);
-    ivec2 square = ivec2(k % WATER_PATCHES, k / WATER_PATCHES);
+    ivec2 patches = max(waterPatchRect.zw - waterPatchRect.xy, ivec2(1)) * WATER_PATCHES;
+    bool slow_x = waterPatchOrder.x != 0;
+    int run = slow_x ? patches.y : patches.x;
+    int slow = instance / run;
+    int fast = instance - slow * run;
+    slow = waterPatchOrder.y != 0 ? (slow_x ? patches.x : patches.y) - 1 - slow : slow;
+    fast = waterPatchOrder.z != 0 ? run - 1 - fast : fast;
+    ivec2 at_patch = slow_x ? ivec2(slow, fast) : ivec2(fast, slow);
+    ivec2 cell = waterPatchRect.xy + at_patch / WATER_PATCHES;
+    ivec2 square = at_patch - (at_patch / WATER_PATCHES) * WATER_PATCHES;
     vec2 texel = texelFetch(waterCellMap, cell, 0).rg;
     ivec2 corner = water_cell_drawn(texel) ? ivec2((vertex == 1 || vertex == 2) ? 1 : 0, vertex >= 2 ? 1 : 0) : ivec2(0);
     pos = vec3(water_square_point(vec2(cell) + vec2(square + corner) / float(WATER_PATCHES)), texel.r);

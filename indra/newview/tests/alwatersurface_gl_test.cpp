@@ -3,7 +3,8 @@
  * @brief The water surface's draws on the hidden window: the water's field as the vertex stage lays it out; whether
  *        any of it shows, and the draws that wait on that; the water's stencil bits: where the exclusion pass removes
  *        the water, and which pixels the water shades, which the haze pass reads; and the waves' patches as the
- *        tessellation stages emit them, displaced by the heights baked from the normal map.
+ *        tessellation stages emit them, displaced by the heights baked from the normal map, and the depth pyramid
+ *        that culls those the scene hides.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -27,6 +28,7 @@
 
 #include "linden_common.h"
 
+#include "../aldepthpyramid.h"
 #include "../alwaterfield.h"
 #include "../alwaterheightbake.h"
 #include "../alwaterstencil.h"
@@ -48,10 +50,15 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
+#include <functional>
+#include <limits>
 #include <map>
+#include <set>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -351,25 +358,168 @@ namespace tut
             return m;
         }
 
+        // The compute cull's patches: the cells of the map's texels 0 to 2 each way, global cells -1 to 1, 576
+        // patches, their boxes A above and below the water.
+        constexpr S32 CULL_RECT[4] = { 0, 0, 3, 3 };
+        constexpr S32 CULL_PATCHES = 9 * ALWaterField::PATCHES_PER_CELL * ALWaterField::PATCHES_PER_CELL;
+        constexpr F32 CULL_A = 2.f;
+
+        // The pyramid's scene: odd both ways, so every level's last texel takes an odd row and column somewhere.
+        constexpr S32 PYRAMID_W = 255;
+        constexpr S32 PYRAMID_H = 191;
+
+        // The box patch boxPatch can occupy, as the cull tests it: its square's corners, waterMaxDisplacement above
+        // and below its cell's water, twelve triangles from gl_VertexID.
+        const char* kBoxVertex =
+            "#version 400\n"
+            "layout (std140) uniform Matrices\n"
+            "{\n"
+            "    mat4 modelview_matrix;\n"
+            "    mat4 projection_matrix;\n"
+            "    mat4 modelview_projection_matrix;\n"
+            "    mat4 inv_proj;\n"
+            "    mat4 texture_matrix0;\n"
+            "    mat3 normal_matrix;\n"
+            "};\n"
+            "uniform float waterMaxDisplacement;\n"
+            "uniform int boxPatch;\n"
+            "void water_patch_corner(int instance, int vertex, out vec3 pos);\n"
+            "const int CORNER[36] = int[36](0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 4, 5, 0, 5, 1,\n"
+            "                               1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0);\n"
+            "void main()\n"
+            "{\n"
+            "    vec3 c0;\n"
+            "    vec3 c2;\n"
+            "    water_patch_corner(boxPatch, 0, c0);\n"
+            "    water_patch_corner(boxPatch, 2, c2);\n"
+            "    int corner = CORNER[gl_VertexID];\n"
+            "    int ring = corner & 3;\n"
+            "    vec2 xy = vec2((ring == 1 || ring == 2) ? c2.x : c0.x, ring >= 2 ? c2.y : c0.y);\n"
+            "    float z = c0.z + (corner >= 4 ? waterMaxDisplacement : -waterMaxDisplacement);\n"
+            "    gl_Position = modelview_projection_matrix * vec4(xy, z, 1.0);\n"
+            "}\n";
+
+        const char* kBoxFragment =
+            "#version 400\n"
+            "out vec4 frag_color;\n"
+            "void main() { frag_color = vec4(1.0); }\n";
+
+        // The pyramid's box test alone, a box a vertex: 1 where depth_pyramid_box_visible keeps box gl_VertexID, taken
+        // to clip space by probeToClip.
+        const char* kProbeVertex =
+            "#version 400\n"
+            "uniform vec3 probeLo[4];\n"
+            "uniform vec3 probeHi[4];\n"
+            "uniform mat4 probeToClip;\n"
+            "out float probeVisible;\n"
+            "bool depth_pyramid_box_visible(vec3 lo, vec3 hi, mat4 to_clip);\n"
+            "void main()\n"
+            "{\n"
+            "    probeVisible = depth_pyramid_box_visible(probeLo[gl_VertexID], probeHi[gl_VertexID], probeToClip) ? 1.0 : 0.0;\n"
+            "    gl_Position = vec4(0.0, 0.0, 0.0, 1.0);\n"
+            "}\n";
+
         // The waves' tessellation reach over the field: the patches take the 3 x 3 cells from global (0, 0), and the
         // square seven cells a side.
         constexpr F64 REACH = 280.0;
 
+        // A depth of its own at every pixel, hashed from where it is.
+        const char* kNoiseDepthFragment =
+            "#version 400\n"
+            "out vec4 frag_color;\n"
+            "void main()\n"
+            "{\n"
+            "    uint h = uint(gl_FragCoord.x) * 73856093u ^ uint(gl_FragCoord.y) * 19349663u;\n"
+            "    h = (h ^ (h >> 13u)) * 0x5bd1e995u;\n"
+            "    h ^= h >> 15u;\n"
+            "    gl_FragDepth = float(h & 0xFFFFFFu) / 16777216.0;\n"
+            "    frag_color = vec4(1.0);\n"
+            "}\n";
+
+        // GL's column-major product a b.
+        LLMatrix4a product(const LLMatrix4a& a, const LLMatrix4a& b)
+        {
+            const F32* pa = a.getF32ptr();
+            const F32* pb = b.getF32ptr();
+            F32 out[16];
+            for (S32 c = 0; c < 4; ++c)
+            {
+                for (S32 r = 0; r < 4; ++r)
+                {
+                    F32 sum = 0.f;
+                    for (S32 k = 0; k < 4; ++k)
+                    {
+                        sum += pa[k * 4 + r] * pb[c * 4 + k];
+                    }
+                    out[c * 4 + r] = sum;
+                }
+            }
+            LLMatrix4a m;
+            m.loadu(out);
+            return m;
+        }
+
+        // A camera at `eye` looking at `target`, z up.
+        LLMatrix4a lookAt(const LLVector3& eye, const LLVector3& target)
+        {
+            LLVector3 f = target - eye;
+            f.normalize();
+            LLVector3 s = f % LLVector3::z_axis;
+            s.normalize();
+            const LLVector3 u = s % f;
+            const F32 m[16] = { s.mV[0], u.mV[0], -f.mV[0], 0.f,
+                                s.mV[1], u.mV[1], -f.mV[1], 0.f,
+                                s.mV[2], u.mV[2], -f.mV[2], 0.f,
+                                -(s * eye), -(u * eye), f * eye, 1.f };
+            LLMatrix4a out;
+            out.loadu(m);
+            return out;
+        }
+
+        // The planes of the frustum `mvp` gives but the far one, in the order and sense the water's cull takes them:
+        // left, right, near, bottom, top, a point outside a plane where dot(n, p) + d > 0. The near plane is clip
+        // z = -w forward and z = w under reverse-Z's zero-to-one.
+        void cullPlanes(const LLMatrix4a& mvp, bool reverse, F32 (&planes)[20])
+        {
+            const F32* m = mvp.getF32ptr();
+            const auto row = [m](S32 r, S32 c) { return m[c * 4 + r]; };
+            for (S32 c = 0; c < 4; ++c)
+            {
+                planes[0 * 4 + c] = -(row(0, c) + row(3, c));
+                planes[1 * 4 + c] = row(0, c) - row(3, c);
+                planes[2 * 4 + c] = reverse ? row(2, c) - row(3, c) : -(row(2, c) + row(3, c));
+                planes[3 * 4 + c] = -(row(1, c) + row(3, c));
+                planes[4 * 4 + c] = row(1, c) - row(3, c);
+            }
+        }
+
     struct alwatersurface_data
     {
-        // Each test starts with identity matrices, whatever ran before.
+        // Each test starts forward, as the window does, and with identity matrices, whatever ran before.
         alwatersurface_data()
         : mShaders(std::string(AL_TEST_SHADER_DIR) + "/class")
         {
+            forwardZ();
             gGL.matrixMode(LLRender::MM_PROJECTION);
             gGL.loadIdentity();
             gGL.matrixMode(LLRender::MM_MODELVIEW);
             gGL.loadIdentity();
         }
 
-        // The viewport, the matrices, the shader and the clear colour the tests set go back with mGL.
+        // The convention, compute's switch, the viewport, the matrices, the shader and the clear colour the tests set
+        // go back with mGL; the depth test's cache is rebased here, under the convention put back.
         ~alwatersurface_data()
         {
+            if (LLRender::sReverseZ)
+            {
+                forwardZ();
+            }
+            mPyramidProgram.unload();
+            mBoxes.unload();
+            mNoiseDepth.unload();
+            mProbe.unload();
+            mFieldCapture.unload();
+            mPyramid.release();
             if (mScene.isBoundInStack())
             {
                 mScene.flush();
@@ -384,7 +534,6 @@ namespace tut
             mField.unload();
             mTiling.unload();
             mWaves.unload();
-            mFieldCapture.unload();
             mShaders.clearShaderObjects();
             mCellMap = nullptr;
             mNoise = nullptr;
@@ -696,6 +845,38 @@ namespace tut
             return eye_z + FIELD_CAMERA_Z;
         }
 
+        // Reverse-Z as the viewer runs it: zero-to-one clip control, depth cleared to 0, nearer is greater. Shaders
+        // compiled after this take REVERSE_Z.
+        void reverseZ()
+        {
+            LLRender::sReverseZ = true;
+            glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+            glClearDepth(0.0);
+            LLGLDepthTest::rebase();
+        }
+
+        void forwardZ()
+        {
+            LLRender::sReverseZ = false;
+            if (gGLManager.mHasClipControl)
+            {
+                glClipControl(GL_LOWER_LEFT, GL_NEGATIVE_ONE_TO_ONE);
+            }
+            glClearDepth(1.0);
+            LLGLDepthTest::rebase();
+        }
+
+        // The depth pyramid's program, built as the viewer builds it.
+        void setUpPyramid()
+        {
+            mPyramidProgram.mName = "Depth Pyramid Shader";
+            mPyramidProgram.mShaderFiles.clear();
+            mPyramidProgram.mShaderFiles.push_back(std::make_pair("deferred/depthPyramidC.glsl", GL_COMPUTE_SHADER));
+            mPyramidProgram.mShaderLevel = 1;
+            ensure("pyramid program builds", mPyramidProgram.createShader());
+            ensure("the pyramid is built by compute", mPyramidProgram.isCompute());
+        }
+
         // The field's program as the viewer links it, capturing each vertex's clip position: agent space, under
         // identity matrices.
         void setUpFieldCapture()
@@ -720,6 +901,61 @@ namespace tut
             ensure("field capture program maps", mFieldCapture.mapUniforms());
         }
 
+        // The pyramid's box test alone (kProbeVertex), each box's answer captured.
+        void setUpProbe()
+        {
+            const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kProbeVertex);
+            const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kBoxFragment);
+            ensure("probe shaders compile", vs && fs);
+            std::map<std::string, std::string> defines;
+            S32 level = 1;
+            const GLuint util = mShaders.loadShaderFile("deferred/depthPyramidUtil.glsl", level, GL_VERTEX_SHADER, &defines);
+            ensure("the pyramid's box test compiles", util != 0);
+            mProbe.mProgramObject = glCreateProgram();
+            mProbe.mName = "pyramid probe (test)";
+            mProbe.attachObject(vs);
+            mProbe.attachObject(fs);
+            mProbe.attachObject(util);
+            const char* varyings[] = { "probeVisible" };
+            glTransformFeedbackVaryings(mProbe.mProgramObject, 1, varyings, GL_INTERLEAVED_ATTRIBS);
+            ensure("probe program links", mProbe.mapAttributes());
+            glDeleteShader(vs);
+            glDeleteShader(fs);
+            ensure("probe program maps", mProbe.mapUniforms());
+        }
+
+        // Whether depth_pyramid_box_visible keeps each of up to four `boxes`, lo and hi, against mPyramid, taken to clip
+        // space by `to_clip`.
+        std::vector<bool> probe(const std::vector<std::pair<LLVector3, LLVector3>>& boxes, const LLMatrix4a& to_clip)
+        {
+            ensure("a probe takes up to four boxes", !boxes.empty() && boxes.size() <= 4);
+            F32 lo[12] = {};
+            F32 hi[12] = {};
+            for (size_t i = 0; i < boxes.size(); ++i)
+            {
+                for (S32 c = 0; c < 3; ++c)
+                {
+                    lo[i * 3 + c] = boxes[i].first.mV[c];
+                    hi[i * 3 + c] = boxes[i].second.mV[c];
+                }
+            }
+            mProbe.bind();
+            mPyramid.bind(mProbe);
+            glUniform3fv(glGetUniformLocation(mProbe.mProgramObject, "probeLo"), (GLsizei)boxes.size(), lo);
+            glUniform3fv(glGetUniformLocation(mProbe.mProgramObject, "probeHi"), (GLsizei)boxes.size(), hi);
+            glUniformMatrix4fv(glGetUniformLocation(mProbe.mProgramObject, "probeToClip"), 1, GL_FALSE, to_clip.getF32ptr());
+            const std::vector<F32> answers = captureFeedback(GL_POINTS, 1, [&]()
+                                                             { gGL.drawArraysInstanced(LLRender::POINTS, 0, (U32)boxes.size(), 1); });
+            LLGLSLShader::unbind();
+            ensure_equals("each box answered", answers.size(), boxes.size());
+            std::vector<bool> kept;
+            for (F32 answer : answers)
+            {
+                kept.push_back(answer > 0.5f);
+            }
+            return kept;
+        }
+
         // The waves' program as the viewer links it for the patches, its wave layers hex-tiled as `hextile` says, and
         // capturing the evaluation stage's `captured`: by default its points less the camera (`view`).
         void setUpWavesCapture(const char* captured = "view", S32 hextile = 1)
@@ -729,6 +965,7 @@ namespace tut
                 { "environment/waterPatchV.glsl", GL_VERTEX_SHADER },
                 { "environment/waterSurface.glsl", GL_VERTEX_SHADER },
                 { "environment/waterTC.glsl", GL_TESS_CONTROL_SHADER },
+                { "deferred/depthPyramidUtil.glsl", GL_TESS_CONTROL_SHADER },
                 { "environment/waterTE.glsl", GL_TESS_EVALUATION_SHADER },
                 { "environment/waterVaryingsV.glsl", GL_TESS_EVALUATION_SHADER },
                 { "environment/waterSurface.glsl", GL_TESS_EVALUATION_SHADER },
@@ -791,12 +1028,14 @@ namespace tut
             return points;
         }
 
-        // What the waves' draw is given, as ALWaterSurface::bindWaves and the pool give it: the patches of mRect, the
-        // void's drawn where mVoidDrawn, from mEye, the camera the waves were laid out around as well, at mAmp over
-        // mHeights (none, flat), with the reach, A and density, against mPlanes, by default every point inside each.
+        // What the waves' draw is given, as ALWaterSurface::bindWaves and the pool give it: the patches of mRect in
+        // mOrder, the void's drawn where mVoidDrawn, from mEye, the camera the waves were laid out around as well, at
+        // mAmp over mHeights (none, flat), with the reach, A and density, against mPlanes, by default every point inside
+        // each, and with mPyramid against the depth it was built from.
         struct WaveDraw
         {
             S32             mRect[4] = { 0, 0, 0, 0 };
+            S32             mOrder[4] = { 0, 0, 0, 0 };
             bool            mVoidDrawn = false;
             LLVector3       mEye;
             F32             mAmp = 0.f;
@@ -806,6 +1045,7 @@ namespace tut
             F32             mDensity = 8.f;
             F32             mPlanes[20] = { 0.f, 0.f, 0.f, -1.f, 0.f, 0.f, 0.f, -1.f, 0.f, 0.f, 0.f, -1.f,
                                             0.f, 0.f, 0.f, -1.f, 0.f, 0.f, 0.f, -1.f };
+            ALDepthPyramid* mPyramid = nullptr;
 
             S32 patches() const
             {
@@ -831,6 +1071,7 @@ namespace tut
             mWaves.uniform4f(LLShaderMgr::WATER_RINGS, (F32)mLayout.mHalf, (F32)mLayout.mRings, (F32)mLayout.mRim,
                              draw.mVoidDrawn ? 1.f : 0.f);
             mWaves.uniform4iv(LLShaderMgr::WATER_PATCH_RECT, 1, draw.mRect);
+            mWaves.uniform4iv(LLShaderMgr::WATER_PATCH_ORDER, 1, draw.mOrder);
             mWaves.uniform2f(LLShaderMgr::WATER_FAR, 100000.f, 0.f);
             mWaves.uniform3fv(LLShaderMgr::WATER_EYEVEC, 1, draw.mEye.mV);
             mWaves.uniform3fv(LLShaderMgr::WATER_WAVE_EYE, 1, draw.mEye.mV);
@@ -846,6 +1087,11 @@ namespace tut
             mWaves.uniform1f(LLShaderMgr::WATER_TESS_DENSITY, draw.mDensity);
             mWaves.uniform1f(LLShaderMgr::WATER_MAX_DISPLACEMENT, draw.mA);
             mWaves.uniform4fv(LLShaderMgr::WATER_CULL_PLANES, 5, draw.mPlanes);
+            mWaves.uniform1i(LLShaderMgr::WATER_OCCLUSION, draw.mPyramid ? 1 : 0);
+            if (draw.mPyramid)
+            {
+                draw.mPyramid->bind(mWaves);
+            }
         }
 
         // Every patch of `draw`'s rectangle, through the bound waves' program.
@@ -864,6 +1110,228 @@ namespace tut
             std::vector<F32> points = captureTriangles(3, [&]() { drawPatches(draw); });
             LLGLSLShader::unbind();
             return points;
+        }
+
+        // The patches of CULL_RECT, flat, from `eye`, against `planes`, in `order` (waterPatchOrder), and with
+        // `pyramid` against the depth it was built from, as WaveDraw names them.
+        WaveDraw cullDraw(const F32 (&planes)[20], const LLVector3& eye, ALDepthPyramid* pyramid, const S32 (&order)[4])
+        {
+            WaveDraw draw;
+            std::copy(std::begin(CULL_RECT), std::end(CULL_RECT), draw.mRect);
+            std::copy(std::begin(order), std::end(order), draw.mOrder);
+            std::copy(std::begin(planes), std::end(planes), draw.mPlanes);
+            draw.mEye = eye;
+            draw.mA = CULL_A;
+            draw.mPyramid = pyramid;
+            return draw;
+        }
+
+        // The triangles the evaluation stage emits for the patches of CULL_RECT, flat, from `eye`, against `planes`, in
+        // `order` (waterPatchOrder), and with `pyramid` against the depth it was built from, through the matrices
+        // loaded: each one's centroid, in the order drawn.
+        std::vector<LLVector2> tessellatedCentroids(const F32 (&planes)[20], const LLVector3& eye, ALDepthPyramid* pyramid,
+                                                    const S32 (&order)[4])
+        {
+            const std::vector<F32> points = tessellate(cullDraw(planes, eye, pyramid, order));
+            std::vector<LLVector2> centroids;
+            centroids.reserve(points.size() / 9);
+            for (size_t t = 0; t + 9 <= points.size(); t += 9)
+            {
+                const F32* tri = points.data() + t;
+                centroids.emplace_back((tri[0] + tri[3] + tri[6]) / 3.f + eye.mV[VX], (tri[1] + tri[4] + tri[7]) / 3.f + eye.mV[VY]);
+            }
+            return centroids;
+        }
+
+        // The patches of CULL_RECT the control stage tessellates, named as water_patch_corner names them in its first
+        // order, rows of x from the south-west: patch (i, j) of the rectangle is i + j * the patches across. Each
+        // triangle lies inside its patch, which its centroid names.
+        std::set<S32> tessellated(const F32 (&planes)[20], const LLVector3& eye, ALDepthPyramid* pyramid)
+        {
+            constexpr S32 FIRST_ORDER[4] = { 0, 0, 0, 0 };
+            const S32 across = (CULL_RECT[2] - CULL_RECT[0]) * ALWaterField::PATCHES_PER_CELL;
+            const F32 width = mSquare.mV[VZ] / (F32)ALWaterField::PATCHES_PER_CELL;
+            const F32 x0 = mSquare.mV[VX] + (F32)CULL_RECT[0] * mSquare.mV[VZ];
+            const F32 y0 = mSquare.mV[VY] + (F32)CULL_RECT[1] * mSquare.mV[VZ];
+            std::set<S32> drawn;
+            for (const LLVector2& c : tessellatedCentroids(planes, eye, pyramid, FIRST_ORDER))
+            {
+                const S32 i = (S32)floorf((c.mV[VX] - x0) / width);
+                const S32 j = (S32)floorf((c.mV[VY] - y0) / width);
+                drawn.insert(i + j * across);
+            }
+            return drawn;
+        }
+
+        // The boxes' program: the box each patch can occupy, one a draw, over the field's cells.
+        void setUpBoxes()
+        {
+            const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kBoxVertex);
+            const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kBoxFragment);
+            ensure("box shaders compile", vs && fs);
+            mBoxes.mProgramObject = glCreateProgram();
+            mBoxes.mName = "patch boxes (test)";
+            mBoxes.attachObject(vs);
+            mBoxes.attachObject(fs);
+            ensure("the boxes place patches", mBoxes.attachStageObject(GL_VERTEX_SHADER, "environment/waterSurface.glsl"));
+            ensure("box program links", mBoxes.mapAttributes());
+            glDeleteShader(vs);
+            glDeleteShader(fs);
+            ensure("box program maps", mBoxes.mapUniforms());
+        }
+
+        // The patches of CULL_RECT any of whose box passes the depth test against the bound scene's depth: what a cull
+        // that never hides a patch in view keeps, at least.
+        std::set<S32> visibleBoxes()
+        {
+            mBoxes.bind();
+            const S32 channel = mBoxes.enableTexture(LLShaderMgr::WATER_CELL_MAP);
+            ensure("the boxes read the cell map", channel > -1);
+            gGL.getTextureSlot(channel)->bindSampled(mCellMap.get(), ALSamplers::PointClamp);
+            mBoxes.uniform4fv(LLShaderMgr::WATER_CELL_SQUARE, 1, mSquare.mV);
+            mBoxes.uniform4iv(LLShaderMgr::WATER_PATCH_RECT, 1, CULL_RECT);
+            mBoxes.uniform1f(LLShaderMgr::WATER_MAX_DISPLACEMENT, CULL_A);
+            const GLint at = glGetUniformLocation(mBoxes.mProgramObject, "boxPatch");
+            ensure("the boxes take a patch", at > -1);
+
+            std::set<S32> visible;
+            GLuint query = 0;
+            glGenQueries(1, &query);
+            {
+                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_LEQUAL);
+                LLGLSColorMask no_color(false, false);
+                LLGLDisable cull(GL_CULL_FACE);
+                for (S32 i = 0; i < CULL_PATCHES; ++i)
+                {
+                    glUniform1i(at, i);
+                    glBeginQuery(GL_ANY_SAMPLES_PASSED, query);
+                    gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 36, 1);
+                    glEndQuery(GL_ANY_SAMPLES_PASSED);
+                    GLuint passed = 0;
+                    glGetQueryObjectuiv(query, GL_QUERY_RESULT, &passed);
+                    if (passed)
+                    {
+                        visible.insert(i);
+                    }
+                }
+            }
+            glDeleteQueries(1, &query);
+            LLGLSLShader::unbind();
+            return visible;
+        }
+
+        // Every level of the pyramid read back against the same reduction worked here from the bound scene's depth:
+        // level 0 two by two of the depth's pixels, clamped to its edge, over the depth halved, rounded up and then up
+        // to a whole 2^(LEVELS - 1); each level after two by two of the one before. Exactly, or within `tolerance`
+        // where the depth is fixed point and a sampler may convert it to float otherwise than a read does.
+        void checkPyramid(const std::string& what, F32 tolerance = 0.f)
+        {
+            const S32 w = (S32)mScene.getWidth();
+            const S32 h = (S32)mScene.getHeight();
+            std::vector<F32> depth((size_t)w * h);
+            glReadPixels(0, 0, w, h, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
+            // The build's last barrier is for the pyramid's readers' fetches; a read back is a texture update.
+            gGL.memoryBarrier(LLRender::BARRIER_TEXTURE_UPDATE);
+            const auto farthest = [](F32 a, F32 b) { return LLRender::sReverseZ ? llmin(a, b) : llmax(a, b); };
+
+            constexpr S32 ALIGN = 1 << (ALDepthPyramid::LEVELS - 1);
+            S32 lw = ((w + 1) / 2 + ALIGN - 1) / ALIGN * ALIGN;
+            S32 lh = ((h + 1) / 2 + ALIGN - 1) / ALIGN * ALIGN;
+            ensure_equals(what + ": the levels built", mPyramid.getLevels(), ALDepthPyramid::LEVELS);
+            ensure_equals(what + ": level 0's width", (S32)mPyramid.getTarget().getWidth(), lw);
+            ensure_equals(what + ": level 0's height", (S32)mPyramid.getTarget().getHeight(), lh);
+
+            std::vector<F32> expected((size_t)lw * lh);
+            for (S32 y = 0; y < lh; ++y)
+            {
+                for (S32 x = 0; x < lw; ++x)
+                {
+                    F32 d = depth[(size_t)llmin(2 * y, h - 1) * w + llmin(2 * x, w - 1)];
+                    for (S32 j = 0; j < 2; ++j)
+                    {
+                        for (S32 i = 0; i < 2; ++i)
+                        {
+                            d = farthest(d, depth[(size_t)llmin(2 * y + j, h - 1) * w + llmin(2 * x + i, w - 1)]);
+                        }
+                    }
+                    expected[(size_t)y * lw + x] = d;
+                }
+            }
+
+            gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mPyramid.getTarget().getTexture());
+            for (U32 level = 0; level < ALDepthPyramid::LEVELS; ++level)
+            {
+                if (level > 0)
+                {
+                    const S32 pw = lw;
+                    lw /= 2;
+                    lh /= 2;
+                    std::vector<F32> coarser((size_t)lw * lh);
+                    for (S32 y = 0; y < lh; ++y)
+                    {
+                        for (S32 x = 0; x < lw; ++x)
+                        {
+                            const F32* row0 = expected.data() + (size_t)(2 * y) * pw + 2 * x;
+                            const F32* row1 = row0 + pw;
+                            coarser[(size_t)y * lw + x] = farthest(farthest(row0[0], row0[1]), farthest(row1[0], row1[1]));
+                        }
+                    }
+                    expected.swap(coarser);
+                }
+                std::vector<F32> got((size_t)lw * lh);
+                glGetTexImage(GL_TEXTURE_2D, (GLint)level, GL_RED, GL_FLOAT, got.data());
+                F32 off = 0.f;
+                for (size_t n = 0; n < got.size(); ++n)
+                {
+                    // A NaN read back is as far off as can be.
+                    const F32 d = fabsf(got[n] - expected[n]);
+                    off = std::isnan(d) ? FLT_MAX : llmax(off, d);
+                }
+                ensure(what + ": level " + std::to_string(level) + " holds the farthest depth under each texel, off by "
+                       + std::to_string(off), off <= tolerance);
+            }
+            gGL.getTextureSlot(0)->unbind();
+        }
+
+        // A depth of its own at every pixel of the bound target, whatever was there.
+        void noiseDepth()
+        {
+            if (!mNoiseDepth.isComplete())
+            {
+                const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kScreenVertex);
+                const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kNoiseDepthFragment);
+                ensure("noise shaders compile", vs && fs);
+                mNoiseDepth.mProgramObject = glCreateProgram();
+                mNoiseDepth.mName = "noise depth (test)";
+                mNoiseDepth.attachObject(vs);
+                mNoiseDepth.attachObject(fs);
+                ensure("noise program links", mNoiseDepth.mapAttributes());
+                glDeleteShader(vs);
+                glDeleteShader(fs);
+                ensure("noise program maps", mNoiseDepth.mapUniforms());
+            }
+            LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
+            mNoiseDepth.bind();
+            gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
+            LLGLSLShader::unbind();
+        }
+
+        // An opaque wall standing in the plane y = `y`, over x in [x0, x1] and z in [z0, z1].
+        void wall(F32 x0, F32 x1, F32 y, F32 z0, F32 z1)
+        {
+            LLGLDepthTest depth(GL_TRUE, GL_TRUE);
+            LLGLDisable cull(GL_CULL_FACE);
+            mColour.bind();
+            mColour.uniform4fv(LLShaderMgr::DIFFUSE_COLOR, 1, GROUND.mV);
+            gGL.begin(LLRender::TRIANGLES);
+            gGL.vertex3f(x0, y, z0);
+            gGL.vertex3f(x1, y, z0);
+            gGL.vertex3f(x1, y, z1);
+            gGL.vertex3f(x0, y, z0);
+            gGL.vertex3f(x1, y, z1);
+            gGL.vertex3f(x0, y, z1);
+            gGL.end();
+            gGL.flush();
         }
 
         void tearDownWater()
@@ -898,6 +1366,12 @@ namespace tut
 
         LLGLSLShader           mWaves;
         LLPointer<LLImageGL>   mHeights;
+
+        LLGLSLShader           mPyramidProgram;
+        LLGLSLShader           mBoxes;
+        LLGLSLShader           mNoiseDepth;
+        LLGLSLShader           mProbe;
+        ALDepthPyramid         mPyramid;
 
         LLGLSLShader           mFieldCapture;
     };
@@ -1602,6 +2076,167 @@ namespace tut
         mField.unload();
         mQuery.release();
     }
+
+    // Whatever order the waves' patches are drawn in, each is drawn once and in the same place, and the order a view
+    // asks for runs from its near end: every order the flags give tessellates the same triangles, and the slow axis run
+    // from its high end draws the patches there first.
+    template<> template<>
+    void alwatersurface_object_t::test<17>()
+    {
+        setUpWater(LLRenderTarget::DEPTH_FMT_24);
+        mScene.flush();
+        ensure("the square holds the patches' cells", mLayout.side() >= CULL_RECT[2]);
+        setUpWavesCapture();
+
+        // Every point inside each plane.
+        F32 planes[20] = {};
+        for (S32 i = 0; i < 5; ++i)
+        {
+            planes[i * 4 + 3] = -1.f;
+        }
+        const LLVector3 eye(128.f, 128.f, LOW + 200.f);
+        const auto before = [](const LLVector2& a, const LLVector2& b)
+        {
+            return a.mV[VX] != b.mV[VX] ? a.mV[VX] < b.mV[VX] : a.mV[VY] < b.mV[VY];
+        };
+
+        std::vector<LLVector2> first_order;
+        for (S32 flags = 0; flags < 8; ++flags)
+        {
+            const S32 order[4] = { flags & 1, (flags >> 1) & 1, (flags >> 2) & 1, 0 };
+            std::vector<LLVector2> drawn = tessellatedCentroids(planes, eye, nullptr, order);
+            const std::string what = "order " + std::to_string(flags);
+            ensure(what + ": the patches tessellate", drawn.size() > (size_t)CULL_PATCHES);
+
+            // The first triangle drawn lies on the slow axis's starting end, the last on its other.
+            const S32 slow = order[0] ? VX : VY;
+            const bool from_high = order[1] != 0;
+            const F32 first = drawn.front().mV[slow];
+            const F32 last = drawn.back().mV[slow];
+            ensure(what + ": the slow axis runs from its " + (from_high ? "high" : "low") + " end",
+                   from_high ? first > last : first < last);
+
+            std::sort(drawn.begin(), drawn.end(), before);
+            if (flags == 0)
+            {
+                first_order = drawn;
+            }
+            else
+            {
+                ensure(what + ": the same triangles as the first order", drawn == first_order);
+            }
+        }
+
+        mScene.bindTarget();
+        tearDownWater();
+    }
+
+    // The patches the scene hides are culled against the depth pyramid, under both depth conventions and over an
+    // odd-sized depth: every level of the pyramid is the farthest depth under its texels, exactly; and the control
+    // stage, given it, tessellates every patch any of whose box shows past the scene and drops some it hides -- seen
+    // from above a wall, through only the last column of a roof's view, and over ground within A of the water.
+    template<> template<>
+    void alwatersurface_object_t::test<18>()
+    {
+        if (!gGLManager.mHasCompute)
+        {
+            skip("no compute");
+        }
+        LLRender::sCompute = true;
+
+        std::vector<bool> conventions = { false };
+        if (gGLManager.mHasClipControl)
+        {
+            conventions.push_back(true);
+        }
+        for (bool reverse : conventions)
+        {
+            reverse ? reverseZ() : forwardZ();
+            const std::string convention = reverse ? "reverse-Z" : "forward-Z";
+            setUpWater(LLRenderTarget::DEPTH_FMT_32F);
+            mScene.flush();
+            mScene.release();
+            ensure("the square holds the patches' cells", mLayout.side() >= CULL_RECT[2]);
+            setUpPyramid();
+            setUpWavesCapture();
+            setUpBoxes();
+            ensure("odd scene allocates", mScene.allocate(PYRAMID_W, PYRAMID_H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE,
+                                                          LLRenderTarget::MIPS_NONE, LLRenderTarget::DEPTH_FMT_32F));
+
+            // A depth of its own at every pixel, so each texel of every level answers for all four of its own.
+            mScene.bindTarget();
+            mScene.clear();
+            noiseDepth();
+            ensure(convention + ", noise: the pyramid builds", mPyramid.build(mPyramidProgram, mScene));
+            checkPyramid(convention + ", noise");
+            mScene.flush();
+
+            const auto check = [&](const std::string& what, const LLMatrix4a& proj, const LLMatrix4a& view_matrix,
+                                   const LLVector3& eye, const std::function<void()>& occluders)
+            {
+                mScene.bindTarget();
+                mScene.clear();
+                gGL.matrixMode(LLRender::MM_PROJECTION);
+                gGL.loadMatrix(proj);
+                gGL.matrixMode(LLRender::MM_MODELVIEW);
+                gGL.loadMatrix(view_matrix);
+                occluders();
+
+                ensure(what + ": the pyramid builds", mPyramid.build(mPyramidProgram, mScene));
+                ensure_equals(what + ": from the depth's size", mPyramid.getDepthWidth(), (U32)PYRAMID_W);
+                checkPyramid(what);
+
+                F32 planes[20];
+                cullPlanes(product(proj, view_matrix), reverse, planes);
+                const std::set<S32> in_view = tessellated(planes, eye, nullptr);
+                const std::set<S32> kept = tessellated(planes, eye, &mPyramid);
+                const std::set<S32> visible = visibleBoxes();
+                mScene.flush();
+
+                ensure(what + ": some patches show", !visible.empty());
+                ensure(what + ": the depth culls only patches in view", std::includes(in_view.begin(), in_view.end(), kept.begin(), kept.end()));
+                ensure(what + ": every patch whose box shows is kept (" + std::to_string(visible.size()) + " shown, "
+                       + std::to_string(kept.size()) + " kept)", std::includes(kept.begin(), kept.end(), visible.begin(), visible.end()));
+                ensure(what + ": the depth hides some of the patches in view (" + std::to_string(in_view.size()) + " in view, "
+                       + std::to_string(kept.size()) + " kept)", kept.size() + 64 <= in_view.size());
+            };
+
+            // From above and behind a wall: the near half of the water hidden, the sightline over the wall's top
+            // reaching the waves' box at y = 250, and the far half over it, each a band some tens of pixels tall.
+            const F32 aspect = (F32)PYRAMID_W / (F32)PYRAMID_H;
+            const F32 far_plane = reverse ? std::numeric_limits<F32>::infinity() : 4000.f;
+            const LLVector3 behind(128.f, -200.f, LOW + 160.f);
+            check(convention + ", over a wall", al_perspective(60.f * DEG_TO_RAD, aspect, 1.f, far_plane),
+                  lookAt(behind, LLVector3(128.f, 200.f, LOW)), behind,
+                  [&]() { wall(-3000.f, 3000.f, -100.f, LOW - 500.f, LOW + 125.f); });
+
+            // Straight down on the cells under a roof that leaves the view's last column of pixels open: only the
+            // patches under that column show.
+            const F32 span = 768.f;
+            const F32 pixel = span / (F32)PYRAMID_W;
+            const LLVector3 above(128.f, 128.f, LOW + 100.f);
+            check(convention + ", through the last column", al_ortho(-256.f, 512.f, -256.f, 512.f, 1.f, 200.f), view(above.mV[VZ], false), above,
+                  [&]() { opaque(-300.f, -256.f + pixel * (F32)(PYRAMID_W - 1), -300.f, 560.f, LOW + 50.f); });
+
+            // Straight down on ground within A of the water, as at a shore: west of x = 128 a metre above the low
+            // water, which the waves' box reaches over, and east of it a metre above the box, which hides it. The
+            // high region's water stands over both.
+            check(convention + ", over a shore", al_ortho(-256.f, 512.f, -256.f, 512.f, 1.f, 200.f), view(above.mV[VZ], false), above,
+                  [&]()
+                  {
+                      opaque(-300.f, 128.f, -300.f, 560.f, LOW + 0.5f * CULL_A);
+                      opaque(128.f, 560.f, -300.f, 560.f, LOW + 1.5f * CULL_A);
+                  });
+
+            mPyramid.release();
+            mPyramidProgram.unload();
+            mWaves.unload();
+            mBoxes.unload();
+            mScene.bindTarget();
+            tearDownWater();
+        }
+        forwardZ();
+    }
     // With waves the field leaves the patches' cells to them and fans the cells beside them onto their corners: drawn
     // alone, it covers every pixel inside the rim once but those over the patches' cells, which it leaves; with the
     // patches drawn too, flat, every pixel inside the rim is covered once.
@@ -1911,6 +2546,7 @@ namespace tut
             { "environment/waterSurface.glsl", GL_VERTEX_SHADER },
             { "deferred/textureUtilV.glsl", GL_VERTEX_SHADER },
             { "objects/nonindexedTextureV.glsl", GL_VERTEX_SHADER },
+            { "deferred/depthPyramidUtil.glsl", GL_TESS_CONTROL_SHADER },
             { "environment/waterSurface.glsl", GL_TESS_EVALUATION_SHADER },
             { "deferred/hexLatticeUtil.glsl", GL_TESS_EVALUATION_SHADER },
             { "windlight/atmosphericsVarsV.glsl", GL_TESS_EVALUATION_SHADER },
@@ -1967,5 +2603,137 @@ namespace tut
         mWaves.attachObject(fs);
         ensure("the waves' program links", mWaves.mapAttributes());
         glDeleteShader(fs);
+    }
+
+    // The pyramid builds from a depth that carries stencil, as the screen's does where the water keeps its bits, under
+    // both conventions: 24-bit depth with 8 of stencil, and 32-bit float depth with 8 of stencil.
+    template<> template<>
+    void alwatersurface_object_t::test<23>()
+    {
+        if (!gGLManager.mHasCompute)
+        {
+            skip("no compute");
+        }
+        LLRender::sCompute = true;
+
+        std::vector<bool> conventions = { false };
+        if (gGLManager.mHasClipControl)
+        {
+            conventions.push_back(true);
+        }
+        for (bool reverse : conventions)
+        {
+            reverse ? reverseZ() : forwardZ();
+            setUpPyramid();
+            for (LLRenderTarget::eDepthFormat format : formats())
+            {
+                const std::string what = named(format, reverse ? "reverse-Z" : "forward-Z");
+                ensure(what + ": the scene allocates", mScene.allocate(PYRAMID_W, PYRAMID_H, GL_RGBA8, true, true, ALTextureSlot::TT_TEXTURE,
+                                                                       LLRenderTarget::MIPS_NONE, format));
+                ensure(what + ": with stencil", mScene.hasStencil());
+                mScene.bindTarget();
+                mScene.clear();
+                noiseDepth();
+                ensure(what + ": the pyramid builds", mPyramid.build(mPyramidProgram, mScene));
+                // A 24-bit depth's unit, near enough: a sampler and a read may each round its conversion to float.
+                checkPyramid(what, format == LLRenderTarget::DEPTH_FMT_24 ? 2.f / 16777215.f : 0.f);
+                mScene.flush();
+                mScene.release();
+            }
+            mPyramid.release();
+            mPyramidProgram.unload();
+            mNoiseDepth.unload();
+            mShaders.clearShaderObjects();
+        }
+        forwardZ();
+    }
+
+    // The pyramid's box test keeps what it cannot see behind, under both conventions: a box behind a wall is hidden and
+    // one before it kept; a box reaching the eye's plane is kept, whatever its image; and a box under more of the
+    // coarsest level's texels than are read is kept unread, while one under as many as are read is read, and hidden.
+    template<> template<>
+    void alwatersurface_object_t::test<24>()
+    {
+        if (!gGLManager.mHasCompute)
+        {
+            skip("no compute");
+        }
+        LLRender::sCompute = true;
+
+        std::vector<bool> conventions = { false };
+        if (gGLManager.mHasClipControl)
+        {
+            conventions.push_back(true);
+        }
+        for (bool reverse : conventions)
+        {
+            reverse ? reverseZ() : forwardZ();
+            const std::string convention = reverse ? "reverse-Z" : "forward-Z";
+            setUpWater(LLRenderTarget::DEPTH_FMT_32F);
+            mScene.flush();
+            mScene.release();
+            setUpPyramid();
+            setUpProbe();
+
+            // Looking along y from 50 m up, a wall 10 m off over the whole view.
+            ensure("the scene allocates", mScene.allocate(PYRAMID_W, PYRAMID_H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE,
+                                                          LLRenderTarget::MIPS_NONE, LLRenderTarget::DEPTH_FMT_32F));
+            const F32 far_plane = reverse ? std::numeric_limits<F32>::infinity() : 4000.f;
+            const LLMatrix4a proj = al_perspective(60.f * DEG_TO_RAD, (F32)PYRAMID_W / (F32)PYRAMID_H, 1.f, far_plane);
+            const LLMatrix4a along = lookAt(LLVector3(0.f, 0.f, 50.f), LLVector3(0.f, 100.f, 50.f));
+            mScene.bindTarget();
+            mScene.clear();
+            gGL.matrixMode(LLRender::MM_PROJECTION);
+            gGL.loadMatrix(proj);
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
+            gGL.loadMatrix(along);
+            wall(-1000.f, 1000.f, 10.f, -1000.f, 1000.f);
+            ensure(convention + ": the pyramid builds", mPyramid.build(mPyramidProgram, mScene));
+            // The third box runs from behind the camera to past the wall, off to the side: the part of it in view lies
+            // behind the wall.
+            const std::vector<bool> walled = probe({ { LLVector3(-1.f, 100.f, 49.f), LLVector3(1.f, 102.f, 51.f) },
+                                                     { LLVector3(-1.f, 5.f, 49.f), LLVector3(1.f, 6.f, 51.f) },
+                                                     { LLVector3(50.f, -5.f, 49.f), LLVector3(60.f, 100.f, 51.f) } },
+                                                   product(proj, along));
+            mScene.flush();
+            mScene.release();
+            ensure(convention + ": a box behind the wall is hidden", !walled[0]);
+            ensure(convention + ": one before it is kept", walled[1]);
+            ensure(convention + ": one reaching the eye's plane is kept", walled[2]);
+
+            // Straight down on a roof over a view 1280 pixels wide, a metre a pixel: the coarsest level's texels are 256
+            // pixels, five across it.
+            ensure("the wide scene allocates", mScene.allocate(1280, 16, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE,
+                                                               LLRenderTarget::MIPS_NONE, LLRenderTarget::DEPTH_FMT_32F));
+            const LLMatrix4a wide = al_ortho(0.f, 1280.f, 0.f, 16.f, 1.f, 200.f);
+            const LLMatrix4a down = view(LOW + 100.f, false);
+            mScene.bindTarget();
+            mScene.clear();
+            gGL.matrixMode(LLRender::MM_PROJECTION);
+            gGL.loadMatrix(wide);
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
+            gGL.loadMatrix(down);
+            opaque(-10.f, 1290.f, -10.f, 26.f, LOW + 50.f);
+            ensure(convention + ": the wide pyramid builds", mPyramid.build(mPyramidProgram, mScene));
+            const std::vector<bool> roofed = probe({ { LLVector3(0.5f, 4.f, LOW - 1.f), LLVector3(1279.5f, 12.f, LOW + 1.f) },
+                                                     { LLVector3(0.5f, 4.f, LOW - 1.f), LLVector3(959.5f, 12.f, LOW + 1.f) },
+                                                     { LLVector3(0.5f, 4.f, LOW + 60.f), LLVector3(959.5f, 12.f, LOW + 62.f) } },
+                                                   product(wide, down));
+            mScene.flush();
+            mScene.release();
+            ensure(convention + ": a box under five of the coarsest texels is kept unread", roofed[0]);
+            ensure(convention + ": one under four is read, and hidden under the roof", !roofed[1]);
+            ensure(convention + ": and above the roof, kept", roofed[2]);
+
+            mPyramid.release();
+            mPyramidProgram.unload();
+            mProbe.unload();
+            LLGLSLShader::unbind();
+            mColour.unload();
+            mExclusion.unload();
+            mShaders.clearShaderObjects();
+            mCellMap = nullptr;
+        }
+        forwardZ();
     }
 }

@@ -2295,6 +2295,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyRenderWaterOcclusionCull</key>
+        <map>
+            <key>Comment</key>
+            <string>Cull the water's wave patches the scene hides, against a depth pyramid of the main view built with compute, so they are never tessellated. Needs compute (OpenGL 4.3).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderWaterHextile</key>
         <map>
             <key>Comment</key>

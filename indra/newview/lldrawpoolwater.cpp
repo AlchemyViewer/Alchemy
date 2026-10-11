@@ -73,8 +73,8 @@ S32 LLDrawPoolWater::getNumPostDeferredPasses()
         return 0;
     }
 
-    // Not where the view misses the whole sea, as looking up: nothing would be drawn, and the screen's copy would be
-    // made for nothing.
+    // Not where the view misses the whole sea, as looking up: nothing would be drawn, and the screen's copy and the
+    // depth pyramid would be made for nothing.
     LLViewerCamera* camera = LLViewerCamera::getInstance();
     if (ALFarPlane::waterVisibleFrom(camera->getOrigin().mV[2], LLEnvironment::instance().getWaterHeight(), camera->getProjectionFar())
         && gPipeline.mWaterSurface.inView(*camera))
@@ -187,8 +187,29 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     const ALFarPlane::WaterFar water_far = ALFarPlane::waterFar(LLViewerCamera::getInstance()->getProjectionFar(), have_rim, rim_lo, rim_hi);
 
     // The waves are drawn in the main view and in mirrors, which draw what it does; probe captures, at their size,
-    // could not resolve them and draw the field flat.
-    const bool waves = surface.wavesDrawn() && (!gCubeSnapshot || LLRender::sMirrorPass);
+    // could not resolve them and draw the field flat. Not where this view misses every patch.
+    const bool waves = surface.wavesDrawn() && (!gCubeSnapshot || LLRender::sMirrorPass)
+                       && surface.patchesInView(*LLViewerCamera::getInstance());
+
+    // Probe and hero captures render the water too; only the main view's primitives are counted, and only its waves'
+    // patches are culled against the scene's depth, through a depth pyramid built from the depth the water pass copied
+    // (beginPostDeferredPass) rather than the one it is drawn into. While the main view culls none, the pyramid is let
+    // go.
+    const bool main_view = gPipeline.mRT == &gPipeline.mMainRT;
+    static LLCachedControl<bool> occlusion_cull(gSavedSettings, "AlchemyRenderWaterOcclusionCull", true);
+    bool occlusion = false;
+    if (main_view)
+    {
+        if (waves && occlusion_cull && LLRender::sCompute)
+        {
+            LLRenderTarget& depth = LLPipeline::sRenderTransparentWater ? gPipeline.mWaterDis : gPipeline.mRT->deferredScreen;
+            occlusion = gPipeline.mDepthPyramid.build(gDepthPyramidProgram, depth);
+        }
+        else if (!occlusion_cull || !surface.wavesDrawn())
+        {
+            gPipeline.mDepthPyramid.release();
+        }
+    }
 
     static LLCachedControl<F32> glint_roughness(gSavedSettings, "AlchemyRenderWaterGlintRoughness", 0.35f);
     static LLCachedControl<F32> exposure(gSavedSettings, "RenderExposure", 1.f);
@@ -250,8 +271,16 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         shader->uniform2f(LLShaderMgr::WATER_FAR, water_far.mWaveClamp, water_far.mEdgeFade);
         shader->uniform4f(LLShaderMgr::WATER_RIM, rim_lo.mV[VX], rim_lo.mV[VY], rim_hi.mV[VX], rim_hi.mV[VY]);
         // The cells the waves' patches cover, which the flat field then leaves out, and for the patches their
-        // tessellation, cull and heights.
+        // tessellation, cull, order and heights, and the scene's depth they are culled against.
         surface.bindWaves(*shader, waves, patches, bound_a, bound_b);
+        if (patches)
+        {
+            shader->uniform1i(LLShaderMgr::WATER_OCCLUSION, occlusion ? 1 : 0);
+            if (occlusion)
+            {
+                gPipeline.mDepthPyramid.bind(*shader);
+            }
+        }
 
         shader->uniform1f(LLShaderMgr::WATER_REFSCALE, underwater ? pwater->getScaleBelow() : pwater->getScaleAbove());
     };
@@ -276,10 +305,9 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
     LLGLDisable cullface(GL_CULL_FACE);
 
-    // Probe and hero captures render the water too; only the main view's primitives are counted, the flat field's and
-    // the patches' apart: a primitives query may not span a tessellated draw on every driver (ALPrimitivePlot).
-    const bool count_primitives = gPipeline.mRT == &gPipeline.mMainRT;
-    if (count_primitives)
+    // The flat field's primitives and the patches' apart: a primitives query may not span a tessellated draw on every
+    // driver (ALPrimitivePlot).
+    if (main_view)
     {
         gPipeline.mWaterPrimitives.begin();
     }
@@ -289,7 +317,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     draw(flat, false);
     gPipeline.unbindDeferredShader(*flat);
 
-    if (count_primitives)
+    if (main_view)
     {
         gPipeline.mWaterPrimitives.end();
     }
@@ -297,7 +325,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     if (waves)
     {
         LL_PROFILE_GPU_ZONE("water waves");
-        if (count_primitives)
+        if (main_view)
         {
             gPipeline.mWaterPatchPrimitives.begin();
         }
@@ -305,7 +333,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         setup(patches, true);
         draw(patches, true);
         gPipeline.unbindDeferredShader(*patches);
-        if (count_primitives)
+        if (main_view)
         {
             gPipeline.mWaterPatchPrimitives.end();
         }

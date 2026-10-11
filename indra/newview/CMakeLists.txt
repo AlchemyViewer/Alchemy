@@ -146,6 +146,7 @@ if(AL_BUILD_VIEWER)
     alcurveeditorctrl.cpp
     alcurvemodel.cpp
     aldaycyclelandmarks.cpp
+    aldepthpyramid.cpp
     alderenderlist.cpp
     aldroptarget.cpp
     alfarplane.cpp
@@ -1019,6 +1020,7 @@ if(AL_BUILD_VIEWER)
     alcurveeditorctrl.h
     alcurvemodel.h
     aldaycyclelandmarks.h
+    aldepthpyramid.h
     alderenderlist.h
     aldroptarget.h
     alfarplane.h
@@ -2579,14 +2581,15 @@ if(AL_BUILD_TESTS)
     DEFINES "AL_TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders\""
   )
   # The water surface's draws: the viewer's own water shaders read from the
-  # source tree over the cells the field lays out, and the waves displaced by
-  # heights the bake integrates from a normal map.
+  # source tree over the cells the field lays out, with the compute cull and
+  # the depth pyramid it reads, and the waves displaced by heights the bake
+  # integrates from a normal map.
   al_add_test(
     alwatersurface_gl
     GL
     PROJECT ${test_project}
     LIBRARIES llrender ll::pocketfft
-    SOURCES alwaterfield.cpp alwaterheightbake.cpp
+    SOURCES alwaterfield.cpp aldepthpyramid.cpp alwaterheightbake.cpp
     DEFINES "AL_TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders\""
   )
   # The outbox keeps what the pure feedback code makes.

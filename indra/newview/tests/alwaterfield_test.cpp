@@ -665,11 +665,12 @@ namespace tut
         ensure_equals("a cell east recentres it", next.mCentreX, first.mCentreX + 1);
     }
 
-    // The patches' rectangle in the cell map's cells, its end past the last; empty without waves.
+    // The patches' rectangle in the cell map's cells, its end past the last; empty without waves. And the order the
+    // patches run in: along the axis the camera looks along most, from the end behind it.
     template<> template<>
     void alwaterfield_object::test<15>()
     {
-        set_test_name("the patch rectangle");
+        set_test_name("the patch rectangle and order");
         const ALWaterField::Layout flat = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0);
         ensure("no waves, no rectangle", ALWaterField::patchRect(flat).empty());
         const ALWaterField::Layout waved =
@@ -685,6 +686,22 @@ namespace tut
                                                          rect.mEndX <= waved.side() - 1 && rect.mEndY <= waved.side() - 1);
         ensure("the camera's cell among them", rect.mMinX <= waved.mCells && rect.mEndX > waved.mCells &&
                                                    rect.mMinY <= waved.mCells && rect.mEndY > waved.mCells);
+
+        const S32 east[4] = { 1, 0, 0, 0 };
+        const S32 north_west[4] = { 0, 0, 1, 0 };
+        const S32 south_east[4] = { 0, 1, 0, 0 };
+        const S32 west_south[4] = { 1, 1, 1, 0 };
+        const auto same = [](const ALWaterField::PatchOrder& order, const S32 (&expected)[4])
+        {
+            return order.mOrder[0] == expected[0] && order.mOrder[1] == expected[1] && order.mOrder[2] == expected[2] &&
+                   order.mOrder[3] == expected[3];
+        };
+        ensure("looking east: x slow, from the west, y from the south", same(ALWaterField::patchOrder(1.f, 0.2f), east));
+        ensure("looking north, a little west: y slow, from the south, x from the east",
+               same(ALWaterField::patchOrder(-0.3f, 0.9f), north_west));
+        ensure("looking south, a little east: y slow, from the north", same(ALWaterField::patchOrder(0.2f, -0.9f), south_east));
+        ensure("looking west, a little south: x slow, from the east, y from the north",
+               same(ALWaterField::patchOrder(-0.9f, -0.3f), west_south));
     }
 
     // The reach across the plane of a camera above it: every point of the plane within the reach of the camera itself,

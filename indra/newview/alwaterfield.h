@@ -154,6 +154,15 @@ struct PatchRect
 };
 PatchRect patchRect(const Layout& layout);
 
+/// The order the patches are drawn in for a camera looking along (at_x, at_y) (waterSurface.glsl's waterPatchOrder):
+/// the slow axis the one it looks along most, x (1) or y (0), then whether the slow and the fast axis run from their
+/// high end, so the patches come front to back as nearly as rows of them allow.
+struct PatchOrder
+{
+    S32 mOrder[4] = { 0, 0, 0, 0 };
+};
+PatchOrder patchOrder(F32 at_x, F32 at_y);
+
 /// One of the field's draws (waterSurface.glsl's water_vertex): which part of it (waterLayout), whether its vertices
 /// make a strip or triangles, and how many vertices each of how many instances has. Every vertex shared between two
 /// parts, or between a part and the waves' patches, is the same point in both, worked from the same exact multiples,

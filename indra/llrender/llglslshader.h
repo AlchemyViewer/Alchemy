@@ -69,7 +69,7 @@ public:
     bool isPBRTerrain = false;
     bool hasTessellatedTerrain = false; // terrainSurface for the evaluation and fragment stages, and the atmospherics interface the evaluation stage owes the fragment stage
     bool hasWaterSurface = false; // waterSurface for the vertex and fragment stages: the water's field, heights and wave coordinates
-    bool hasWaterWaves = false; // waterSurface and the lattice for the evaluation stage too: the waves' displacement
+    bool hasWaterWaves = false; // waterSurface and the lattice for the evaluation stage too: the waves' displacement; and depthPyramidUtil for the control stage: their occlusion cull
     bool hasTonemap = false;
     bool hasColorGrade = false;
     bool hasPostEffects = false;

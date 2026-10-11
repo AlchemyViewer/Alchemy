@@ -1063,11 +1063,28 @@ namespace tut
         ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
     }
 
-    // Where the context has compute, its limits are at least what GL 4.3 promises, which is what the features size
-    // themselves by.
+    // The reserved names the compute features use sit where their enum entries say. And where the context has
+    // compute, its limits are at least what GL 4.3 promises, which is what the features size themselves by.
     template<> template<>
     void llglslshader_object_t::test<10>()
     {
+        const std::pair<S32, const char*> names[] =
+        {
+            { LLShaderMgr::DEPTH_PYRAMID,        "depthPyramid" },
+            { LLShaderMgr::DEPTH_PYRAMID_SOURCE, "depthPyramidSource" },
+            { LLShaderMgr::DEPTH_PYRAMID_TARGET, "depthPyramidTarget" },
+            { LLShaderMgr::DEPTH_PYRAMID_LEVEL,  "depthPyramidLevel" },
+            { LLShaderMgr::DEPTH_PYRAMID_SIZE,   "depthPyramidSize" },
+            { LLShaderMgr::DEPTH_PYRAMID_COUNT,  "depthPyramidCount" },
+            { LLShaderMgr::WATER_OCCLUSION,      "waterOcclusion" },
+            { LLShaderMgr::WATER_PATCH_ORDER,    "waterPatchOrder" },
+        };
+        for (const auto& entry : names)
+        {
+            ensure_equals(std::string("reserved ") + entry.second, mShaders.mReservedUniforms[entry.first],
+                          std::string(entry.second));
+        }
+
         if (!gGLManager.mHasCompute)
         {
             skip("the context has no compute");

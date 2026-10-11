@@ -26,6 +26,8 @@
 
 layout(vertices = 4) out;
 
+//[ENGINE_BLOCK Matrices]
+
 uniform vec3 eyeVec;
 // Level = edge length * density / distance, held to [1, WATER_MAX_LEVEL] (AlchemyRenderWaterTessDensity).
 uniform float waterTessDensity;
@@ -34,6 +36,8 @@ uniform float waterMaxDisplacement;
 // The view's frustum planes in agent space, but the far one: a point is outside a plane where dot(n, p) + d > 0. The
 // patches stay within the tessellation reach, which the draw distance does not bound.
 uniform vec4 waterCullPlanes[5];
+// 1 where the scene's depth hides patches too: the depth pyramid, built from this view's depth, is bound.
+uniform int waterOcclusion;
 // x: the tessellation reach, past which the waves have faded out (waterSurface.glsl's water_displacement).
 uniform vec2 waterWaveReach;
 // The camera the waves were laid out around, in agent space, which their fade is measured from.
@@ -41,6 +45,9 @@ uniform vec3 waterWaveEye;
 
 // waterSurface.glsl's WATER_MAX_LEVEL.
 const float WATER_MAX_LEVEL = 64.0;
+
+// depthPyramidUtil.glsl
+bool depth_pyramid_box_visible(vec3 lo, vec3 hi, mat4 to_clip);
 
 // The horizontal distance from the camera the waves were laid out around to the nearest point of the edge ab.
 float edgeReach(vec3 a, vec3 b)
@@ -66,7 +73,7 @@ float edgeLevel(vec3 a, vec3 b)
 }
 
 // Whether any of the box [lo, hi] lies inside every plane: the corner furthest inside each is tested.
-bool boxVisible(vec3 lo, vec3 hi)
+bool boxInFrustum(vec3 lo, vec3 hi)
 {
     vec3 centre = 0.5 * (lo + hi);
     vec3 radius = 0.5 * (hi - lo);
@@ -93,9 +100,11 @@ void main()
         vec3 c3 = gl_in[3].gl_Position.xyz;
         vec3 lo = min(min(c0, c1), min(c2, c3)) - vec3(0.0, 0.0, waterMaxDisplacement);
         vec3 hi = max(max(c0, c1), max(c2, c3)) + vec3(0.0, 0.0, waterMaxDisplacement);
-        // A patch of a cell not drawn, its corners at one point (water_patch_corner), or out of the view: the patch is
-        // never tessellated.
-        if (c0 == c2 || !boxVisible(lo, hi))
+        // A patch of a cell not drawn, its corners at one point (water_patch_corner); out of the view; or wholly behind
+        // the scene's depth: the patch is never tessellated.
+        if (c0 == c2
+            || !boxInFrustum(lo, hi)
+            || (waterOcclusion != 0 && !depth_pyramid_box_visible(lo, hi, modelview_projection_matrix)))
         {
             // Every outer level 0: the patch is discarded.
             gl_TessLevelOuter[0] = 0.0;

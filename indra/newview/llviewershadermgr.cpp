@@ -177,6 +177,7 @@ LLGLSLShader        gWaterWavesProgram;
 LLGLSLShader        gUnderWaterWavesProgram;
 LLGLSLShader        gWaterExclusionProgram;
 LLGLSLShader        gWaterFieldProgram;
+LLGLSLShader        gDepthPyramidProgram;
 
 //interface shaders
 LLGLSLShader        gHighlightProgram;
@@ -1014,13 +1015,14 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     }
 
     // The water waves' stages, where they are wanted: the evaluation stage's surface and the lattice its heights are read
-    // through. The waves are optional, so these failing leaves only them off: their programs then fail to attach what
-    // is missing.
+    // through, and the control stage's depth pyramid test, which culls the patches the scene hides. The waves are
+    // optional, so these failing leaves only them off: their programs then fail to attach what is missing.
     if (ALWaterSurface::wavesWanted())
     {
         const std::pair<const char*, GLenum> water_objects[] = {
             { "environment/waterSurface.glsl", GL_TESS_EVALUATION_SHADER },
             { "deferred/hexLatticeUtil.glsl", GL_TESS_EVALUATION_SHADER },
+            { "deferred/depthPyramidUtil.glsl", GL_TESS_CONTROL_SHADER },
         };
         for (const auto& object : water_objects)
         {
@@ -1483,6 +1485,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         gNormalMapGenProgram.unload();
         gDeferredGenBrdfLutProgram.unload();
+        gDepthPyramidProgram.unload();
         gDeferredBufferVisualProgram.unload();
 
         for (U32 i = 0; i < LLMaterial::SHADER_COUNT; ++i)
@@ -3493,6 +3496,23 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredGenBrdfLutProgram.mShaderFiles.push_back(make_pair("deferred/genbrdflutF.glsl", GL_FRAGMENT_SHADER));
         gDeferredGenBrdfLutProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gDeferredGenBrdfLutProgram.createShader();
+    }
+
+    // The depth pyramid's levels, where the session computes and the water's waves, its reader, are wanted. Optional,
+    // like them: its failing leaves the cull off (ALDepthPyramid::build), not the shaders after it.
+    gDepthPyramidProgram.unload();
+    if (success && LLRender::sCompute && ALWaterSurface::wavesWanted())
+    {
+        gDepthPyramidProgram.mName = "Depth Pyramid Shader";
+        gDepthPyramidProgram.mShaderFiles.clear();
+        gDepthPyramidProgram.mShaderFiles.push_back(make_pair("deferred/depthPyramidC.glsl", GL_COMPUTE_SHADER));
+        gDepthPyramidProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDepthPyramidProgram.clearPermutations();
+        if (!gDepthPyramidProgram.createShader())
+        {
+            LL_WARNS("Shader") << "The depth pyramid's program did not build; the water's patches are not culled by depth" << LL_ENDL;
+            gDepthPyramidProgram.unload();
+        }
     }
 
     if (success) {

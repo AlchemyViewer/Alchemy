@@ -40,6 +40,7 @@
 #include "lldrawpoolmaterials.h"
 #include "llgl.h"
 #include "lldrawable.h"
+#include "aldepthpyramid.h"
 #include "alprimitiveplot.h"
 #include "alsamplesquery.h"
 #include "alwatersurface.h"
@@ -1026,6 +1027,9 @@ public:
 
     // The water's layout around the main camera and its map of cell heights, laid out at the start of each main frame.
     ALWaterSurface              mWaterSurface;
+
+    // The farthest depth under each texel of the main view's depth, built where a GPU cull asks for it.
+    ALDepthPyramid              mDepthPyramid;
 
     // Profiling tracks, plotted at the start of each main frame for the frame before: the primitives the main view's
     // terrain and water passes draw, the water's flat field and its waves' patches apart, and the draws of water
