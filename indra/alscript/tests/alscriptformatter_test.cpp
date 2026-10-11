@@ -431,6 +431,31 @@ namespace tut
     }
 
     template<> template<>
+    void alscriptformatter_object::test<14>()
+    {
+        set_test_name("what the author lined up stays lined up: a run's =, at the author's column or past the longest, a comment on a line "
+                      "of its own going on past; a run's trailing comments where its code changed; not equal columns by chance; tabs to "
+                      "their stops");
+        const std::string lined = "local CHANNEL       = 1 -- channel\n"
+                                  "local OWNER_ONLY    = true -- owner\n"
+                                  "-- a note over the next\n"
+                                  "local USE_OWNER_SAY = true -- say\n";
+        ensure_equals("as it was", lua(lined), lined);
+        ensure_equals("spaced afresh, lined up again", lua("local a   =1      -- one\nlocal bbb = {2,3} -- two\n"),
+                      std::string("local a   = 1        -- one\nlocal bbb = { 2, 3 } -- two\n"));
+        ensure_equals("the author's column", lua("local a     = 1\nlocal bb    = 2\n"), std::string("local a     = 1\nlocal bb    = 2\n"));
+        ensure_equals("past the longest", lua("t[i+1]  = 1\nt[ii]   = 2\n"), std::string("t[i + 1] = 1\nt[ii]    = 2\n"));
+        ensure_equals("not by chance", lua("ab=1\nc = 2\n"), std::string("ab = 1\nc = 2\n"));
+        ensure_equals("not across a blank line", lua("local a  = 1\n\nlocal bb = 2\n"), std::string("local a = 1\n\nlocal bb = 2\n"));
+        const std::string fields = "local t = {\n    alpha   = 1,\n    b       = 2,\n}\n";
+        ensure_equals("a table's fields", lua(fields), fields);
+        ensure_equals("LSL, by tabs", lsl("integer a\t= 1;\ninteger bb\t= 2;\n"), std::string("integer a   = 1;\ninteger bb  = 2;\n"));
+        // The formatter's own, again: the same.
+        ensure_equals("again", lua(lua("local a   =1      -- one\nlocal bbb = {2,3} -- two\n")),
+                      std::string("local a   = 1        -- one\nlocal bbb = { 2, 3 } -- two\n"));
+    }
+
+    template<> template<>
     void alscriptformatter_object::test<15>()
     {
         set_test_name("a comment the author wrote out of the block over an elseif, else, until or end stays as far in as that line; one "
