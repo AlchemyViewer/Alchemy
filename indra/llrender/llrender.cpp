@@ -526,7 +526,7 @@ void LLRender::refreshState(void)
     mDirty = true;
 
     // Called when GL state may have been changed behind our back, so re-assert the shared
-    // blocks' bindings along with the texture units and colour mask.
+    // blocks' bindings along with the texture units and the state the setters cache.
     mLightsUBOBound   = false;
     mMatricesUBOBound = false;
 
@@ -539,10 +539,23 @@ void LLRender::refreshState(void)
 
     mTextureSlots[active_unit].activate();
 
-    setColorMask(mCurrColorMask[0], mCurrColorMask[1], mCurrColorMask[2], mCurrColorMask[3]);
+    // The cached state below is issued straight to GL: each setter would see its cache
+    // agreeing with the value asked for and skip the call.
+    glColorMask(mCurrColorMask[0] ? GL_TRUE : GL_FALSE,
+                mCurrColorMask[1] ? GL_TRUE : GL_FALSE,
+                mCurrColorMask[2] ? GL_TRUE : GL_FALSE,
+                mCurrColorMask[3] ? GL_TRUE : GL_FALSE);
 
-    // Unconditional re-issue: setPolygonOffset would see the cache already agreeing with the
-    // requested value and skip the GL call, leaving the fresh context at its 0,0 default.
+    // Blend factors still unknown since init have nothing to put back.
+    if (mCurrBlendColorSFactor != BF_UNDEF && mCurrBlendColorDFactor != BF_UNDEF &&
+        mCurrBlendAlphaSFactor != BF_UNDEF && mCurrBlendAlphaDFactor != BF_UNDEF)
+    {
+        glBlendFuncSeparate(sGLBlendFactor[mCurrBlendColorSFactor], sGLBlendFactor[mCurrBlendColorDFactor],
+                            sGLBlendFactor[mCurrBlendAlphaSFactor], sGLBlendFactor[mCurrBlendAlphaDFactor]);
+    }
+
+    glLineWidth(mLineWidth);
+
     rebasePolygonOffset();
 
     // The same for the clear colour and a scissor box that was ever set.
