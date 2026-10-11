@@ -2923,4 +2923,55 @@ namespace tut
         ensure("llcompat's the same: " + close.text, close.converted && close.text.find(":: any)") != std::string::npos);
         checksClean(close);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<86>()
+    {
+        set_test_name("a find's place compared with a whole number written out is compared in SLua's count, from 1 or nil, on either side: "
+                      "x == 1 where LSL said == 0; a place below -1 left as written, and one read as a number kept LSL's");
+        const std::string lsl = "string P = \"cfg\";\n"
+                                "list L;\n"
+                                "check(string item) {\n"
+                                "    if (P != \"\" && llSubStringIndex(item, P) == 0) llOwnerSay(\"a\");\n"
+                                "    if (0 == llSubStringIndex(item, P)) llOwnerSay(\"b\");\n"
+                                "    if (llSubStringIndex(item, P) != 2) llOwnerSay(\"c\");\n"
+                                "    if (llSubStringIndex(item, P) > 0) llOwnerSay(\"d\");\n"
+                                "    if (3 < llSubStringIndex(item, P)) llOwnerSay(\"e\");\n"
+                                "    if (llSubStringIndex(item, P) == -2) llOwnerSay(\"f\");\n"
+                                "    if (!(llSubStringIndex(item, P) == 0)) llOwnerSay(\"g\");\n"
+                                "    if (llListFindList(L, [item]) == 0) llOwnerSay(\"h\");\n"
+                                "    integer at = llSubStringIndex(item, P);\n"
+                                "    llOwnerSay((string)at);\n"
+                                "}\n"
+                                "default { touch_start(integer n) { check(\"x\"); } }\n";
+        const ALLSLToSLua::Result r = convert(lsl);
+        ensure("Tapple's: " + r.text, has(r, "if P ~= \"\" and ll.SubStringIndex(item, P) == 1 then"));
+        ensure("the number on the left: " + r.text, has(r, "if ll.SubStringIndex(item, P) == 1 then print(\"b\")"));
+        ensure("~=: " + r.text, has(r, "if ll.SubStringIndex(item, P) ~= 3 then"));
+        ensure("an order, nil read as LSL's -1: " + r.text, has(r, "if (ll.SubStringIndex(item, P) or 0) > 1 then"));
+        ensure("an order the other way round: " + r.text, has(r, "if (ll.SubStringIndex(item, P) or 0) > 4 then"));
+        ensure("below -1, as written: " + r.text, has(r, "if (ll.SubStringIndex(item, P) or 0) - 1 == -2 then"));
+        ensure("under a not: " + r.text, has(r, "if ll.SubStringIndex(item, P) ~= 1 then print(\"g\")"));
+        ensure("table.find's: " + r.text, has(r, "if table.find(L, item) == 1 then"));
+        ensure("a number, LSL's: " + r.text, has(r, "local at = (ll.SubStringIndex(item, P) or 0) - 1"));
+        checksClean(r);
+
+        // table.find's alone, without SLua's ll: whether it found, against nil.
+        ALLSLToSLua::Options idioms = ALLSLToSLua::Options::closeToLSL();
+        idioms.idioms               = true;
+        const ALLSLToSLua::Result found =
+            ALLSLToSLua::convert("list L;\ndefault { touch_start(integer n) {\n"
+                                 "    if (llListFindList(L, [n]) == -1) llOwnerSay(\"none\");\n"
+                                 "    if (llListFindList(L, [n]) >= 0) llOwnerSay(\"some\");\n"
+                                 "    if (llListFindList(L, [n]) == 2) llOwnerSay(\"third\");\n"
+                                 "} }\n",
+                                 idioms);
+        ensure("found, against nil: " + found.text, found.converted && has(found, "if table.find(L, n) == nil then") &&
+                                                        has(found, "if table.find(L, n) ~= nil then") && has(found, "if table.find(L, n) == 3 then"));
+        checksClean(found);
+
+        const ALLSLToSLua::Result close = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
+        ensure("llcompat's, LSL's count: " + close.text, close.converted && has(close, "llcompat.SubStringIndex(item, P) == 0"));
+        checksClean(close);
+    }
 }

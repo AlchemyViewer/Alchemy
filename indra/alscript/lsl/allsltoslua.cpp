@@ -182,12 +182,15 @@ namespace
     };
 
     // An expression as written: its text, how tightly it binds, and whether
-    // it is a Luau boolean where LSL has 1 or 0.
+    // it is a Luau boolean where LSL has 1 or 0. Where it is a find's
+    // place counted as LSL's, `(x or 0) - 1`: x, SLua's place, counted
+    // from 1 or nil.
     struct Expr
     {
         std::string text;
         int         prec    = PRIMARY;
         bool        boolean = false;
+        std::string place;
     };
 
     // Pairs of words, looked for by views of them without a copy.
@@ -2550,6 +2553,47 @@ namespace
         return false;
     }
 
+    // A find's place counted as LSL's, compared with a whole number
+    // written out, on either side: compared in SLua's count instead, the
+    // number moved on by one -- `x == 1` -- or against nil where all it
+    // asks is whether anything was found. The same test whatever x is.
+    // Not an == or ~= with a number below -1, which no place is.
+    std::optional<Expr> placeCompared(std::string_view word, const Expr& a, const Expr& b, LSLExpression* lhs, LSLExpression* rhs)
+    {
+        int        v     = 0;
+        const bool left  = !a.place.empty() && wholeNumber(rhs, v);
+        const bool right = !left && !b.place.empty() && wholeNumber(lhs, v);
+        if (!left && !right)
+        {
+            return std::nullopt;
+        }
+        // With the place on the left.
+        std::string_view as = word;
+        if (right)
+        {
+            as = word == "<" ? ">" : word == ">" ? "<" : word == "<=" ? ">=" : word == ">=" ? "<=" : word;
+        }
+        const std::string& x = left ? a.place : b.place;
+        if ((as == "==" && v == -1) || (as == "<" && v == 0) || (as == "<=" && v == -1))
+        {
+            return Expr{ x + " == nil", COMPARE, true };
+        }
+        if ((as == "~=" && v == -1) || (as == ">=" && v == 0) || (as == ">" && v == -1))
+        {
+            return Expr{ x + " ~= nil", COMPARE, true };
+        }
+        const std::string n = std::to_string(static_cast<S64>(v) + 1);
+        if ((as == "==" || as == "~=") && v >= 0)
+        {
+            return Expr{ x + " " + std::string(as) + " " + n, COMPARE, true };
+        }
+        if (as == "<" || as == ">" || as == "<=" || as == ">=")
+        {
+            return Expr{ "(" + x + " or 0) " + std::string(as) + " " + n, COMPARE, true };
+        }
+        return std::nullopt;
+    }
+
     // A number written out, an integer or a float, and whether it is
     // nought; or one with a minus before it.
     bool numberWritten(LSLExpression* e, bool& nought)
@@ -3168,7 +3212,8 @@ namespace
             if (LSLASTNode* sought = soleItem(argumentAt(e, 1)))
             {
                 called = "table.find";
-                return Expr{ "(table.find(" + anyItems(argumentAt(e, 0), arg(0)) + ", " + itemText(sought) + ") or 0) - 1", ADD };
+                const std::string found = "table.find(" + anyItems(argumentAt(e, 0), arg(0)) + ", " + itemText(sought) + ")";
+                return Expr{ "(" + found + " or 0) - 1", ADD, false, found };
             }
         }
         // A part of a list between two places written out, from its start
@@ -3483,7 +3528,7 @@ namespace
         {
             const std::string args_text = (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params, 0, -1, {}, true);
             called                      = "ll." + bare;
-            return { "(" + called + "(" + args_text + ") or 0) - 1", ADD };
+            return { "(" + called + "(" + args_text + ") or 0) - 1", ADD, false, called + "(" + args_text + ")" };
         }
         if (slua & ALLSLTraits::SluaRemoved)
         {
@@ -3580,6 +3625,13 @@ namespace
         const auto        infix = [&](const char* word, int prec, bool boolean = false, bool right_assoc = false) -> Expr {
             const Expr a = value(lhs);
             const Expr b = value(rhs);
+            if (prec == COMPARE && boolean)
+            {
+                if (std::optional<Expr> compared = placeCompared(word, a, b, lhs, rhs))
+                {
+                    return *compared;
+                }
+            }
             return { bracketed(a, right_assoc ? prec + 1 : prec) + " " + word + " " + bracketed(b, right_assoc ? prec : prec + 1), prec, boolean };
         };
         // A find's answer asked only whether it found: against nil, as ll
