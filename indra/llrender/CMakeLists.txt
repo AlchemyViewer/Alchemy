@@ -178,4 +178,6 @@ if(AL_BUILD_TESTS)
   al_add_test(llrendertarget_gl GL PROJECT llrender LIBRARIES llrender)
   # LLRender's cached clear colour and scissor box, and LLGLSScissor.
   al_add_test(alrenderstate_gl GL PROJECT llrender LIBRARIES llrender)
+  # LLGLSLShader's uniform value cache: what a program holds after each kind of set, and across a relink.
+  al_add_test(llglslshader_gl GL PROJECT llrender LIBRARIES llrender)
 endif()
