@@ -59,7 +59,7 @@ namespace
     // A store that stays mapped: GL 4.4's immutable storage, and a map of it.
     bool can_map_persistent(bool dsa)
     {
-        return glBufferStorage && (dsa ? glNamedBufferStorage && glMapNamedBufferRange : glMapBufferRange);
+        return glBufferStorage && (dsa ? glNamedBufferStorage && glMapNamedBufferRange : glMapBufferRange != nullptr);
     }
 
     // Make a store of `size` bytes in buffer `name`, mapped persistently with `map_flags` unless they are 0. Returns the
