@@ -2197,8 +2197,6 @@
   <string>Renderizar a água como transparente. Definir como falso renderiza a água como opaca com uma textura simples aplicada.</string>
   <key>RenderTreeLODFactor</key>
   <string>Controla o nível de detalhe da vegetação (multiplicador para a área de tela atual ao calcular o nível de detalhe).</string>
-  <key>RenderUIBuffer</key>
-  <string>Armazenar em cache a renderização da interface em um buffer alinhado à tela.</string>
   <key>RenderUIInSnapshot</key>
   <string>Exibir a interface do usuário na captura.</string>
   <key>RenderUnloadedAvatar</key>

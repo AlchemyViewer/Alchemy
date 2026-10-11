@@ -1821,69 +1821,7 @@ void render_ui_2d()
         stop_glerror();
     }
 
-
-    if (LLPipeline::RenderUIBuffer)
-    {
-        if (LLView::sIsRectDirty)
-        {
-            LLView::sIsRectDirty = false;
-            LLRect t_rect;
-
-            gPipeline.mUIScreen.bindTarget();
-            gGL.setColorMask(true, true);
-            {
-                constexpr S32 pad = 8;
-
-                LLView::sDirtyRect.mLeft -= pad;
-                LLView::sDirtyRect.mRight += pad;
-                LLView::sDirtyRect.mBottom -= pad;
-                LLView::sDirtyRect.mTop += pad;
-
-                LLGLEnable scissor(GL_SCISSOR_TEST);
-                static LLRect last_rect = LLView::sDirtyRect;
-
-                //union with last rect to avoid mouse poop
-                last_rect.unionWith(LLView::sDirtyRect);
-
-                t_rect = LLView::sDirtyRect;
-                LLView::sDirtyRect = last_rect;
-                last_rect = t_rect;
-
-                last_rect.mLeft = LLRect::tCoordType(last_rect.mLeft / LLUI::getScaleFactor().mV[0]);
-                last_rect.mRight = LLRect::tCoordType(last_rect.mRight / LLUI::getScaleFactor().mV[0]);
-                last_rect.mTop = LLRect::tCoordType(last_rect.mTop / LLUI::getScaleFactor().mV[1]);
-                last_rect.mBottom = LLRect::tCoordType(last_rect.mBottom / LLUI::getScaleFactor().mV[1]);
-
-                LLRect clip_rect(last_rect);
-
-                glClear(GL_COLOR_BUFFER_BIT);
-
-                gViewerWindow->draw();
-            }
-
-            gPipeline.mUIScreen.flush();
-            gGL.setColorMask(true, false);
-
-            LLView::sDirtyRect = t_rect;
-        }
-
-        LLGLDisable cull(GL_CULL_FACE);
-        LLGLDisable blend(GL_BLEND);
-        S32 width = gViewerWindow->getWindowWidthScaled();
-        S32 height = gViewerWindow->getWindowHeightScaled();
-        gGL.getTextureSlot(0)->bind(&gPipeline.mUIScreen);
-        gGL.begin(LLRender::TRIANGLE_STRIP);
-        gGL.color4f(1.f,1.f,1.f,1.f);
-        gGL.texCoord2f(0.f, 0.f);                 gGL.vertex2i(0, 0);
-        gGL.texCoord2f((F32)width, 0.f);          gGL.vertex2i(width, 0);
-        gGL.texCoord2f(0.f, (F32)height);         gGL.vertex2i(0, height);
-        gGL.texCoord2f((F32)width, (F32)height);  gGL.vertex2i(width, height);
-        gGL.end();
-    }
-    else
-    {
-        gViewerWindow->draw();
-    }
+    gViewerWindow->draw();
 
     // reset current origin for font rendering, in case of tiling render
     LLFontGL::sCurOrigin.set(0, 0);

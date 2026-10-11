@@ -10234,17 +10234,6 @@
         <key>Value</key>
         <integer>0</integer>
     </map>
-    <key>RenderUIBuffer</key>
-    <map>
-      <key>Comment</key>
-      <string>Cache ui render in a screen aligned buffer.</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
     <key>RenderUnloadedAvatar</key>
     <map>
       <key>Comment</key>
