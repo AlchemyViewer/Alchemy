@@ -2595,7 +2595,7 @@ def tut_friends():
             for f in files:
                 if f.endswith((".h", ".hpp", ".inl")):
                     with open(os.path.join(top, f), "rb") as fh:
-                        for m in re.finditer(rb"friend\s+(?:struct|class)\s+tut\s*::\s*(\w+)", fh.read()):
+                        for m in re.finditer(rb"friend\s+(?:struct|class)\s+(?:::\s*)?tut\s*::\s*(\w+)", fh.read()):
                             _FRIENDS.add(m.group(1).decode())
     return _FRIENDS
 
