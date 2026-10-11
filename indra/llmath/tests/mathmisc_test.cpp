@@ -154,55 +154,34 @@ namespace
         CHECK(angle <=F_PI);
         CHECK(angle >= -F_PI);
     }
-}
 
-namespace
-{
-    struct uuid_data
+    // The floating-point environment this executable was linked with. The
+    // build sets flush-to-zero and denormals-are-zero per thread on purpose,
+    // in code; nothing may impose them on the whole process from the link
+    // line. A denormal that survives a multiply here means no crtfastmath.o
+    // was linked.
+    TEST_CASE("BasicLindenMath: the process default keeps denormals", "[BasicLindenMath]")
     {
-        LLUUID id;
-    };
-
-    TEST_CASE_METHOD(uuid_data, "mathmisc LLUUID: isNull by default and after setNull but not after generate", "[mathmisc_LLUUID]")
-    {
-        CHECK(id.isNull());
-        id.generate();
-        CHECK(id.notNull());
-        id.setNull();
-        CHECK(id.isNull());
+        volatile float denormal = 1.0e-40f;
+        volatile float one = 1.0f;
+        float product = denormal * one;
+        UNSCOPED_INFO("denormals are not flushed by the process default");
+        CHECK(product != 0.0f);
+        UNSCOPED_INFO("a denormal is still a denormal");
+        CHECK(product == 1.0e-40f);
     }
 
-    TEST_CASE_METHOD(uuid_data, "mathmisc LLUUID: copies and assignments compare equal", "[mathmisc_LLUUID]")
+    // Optimised builds relax floating-point semantics to MSVC's /fp:fast
+    // contract, which keeps NaN and infinity. -ffinite-math-only would fold
+    // both of these guards to a constant.
+    TEST_CASE("BasicLindenMath: optimised builds keep NaN and infinity", "[BasicLindenMath]")
     {
-        id.generate();
-        LLUUID a(id);
-        CHECK(id == a);
-        a.generate();
-        CHECK(id != a);
-        a = id;
-        CHECK(id == a);
+        volatile float zero = 0.0f;
+        float nan = zero / zero;
+        float inf = 1.0f / zero;
+        CHECK(std::isnan(nan));
+        CHECK(std::isinf(inf));
     }
-
-    TEST_CASE_METHOD(uuid_data, "mathmisc LLUUID: xor with a mask twice restores the id", "[mathmisc_LLUUID]")
-    {
-        id.generate();
-        LLUUID copy(id);
-        LLUUID mask;
-        mask.generate();
-        copy ^= mask;
-        CHECK(id != copy);
-        copy ^= mask;
-        CHECK(id == copy);
-    }
-
-    TEST_CASE_METHOD(uuid_data, "mathmisc LLUUID: asString round-trips through the string constructor", "[mathmisc_LLUUID]")
-    {
-        id.generate();
-        std::string id_str = id.asString();
-        LLUUID copy(id_str.c_str());
-        CHECK(id == copy);
-    }
-
 }
 
 namespace
@@ -550,33 +529,52 @@ namespace
             REQUIRE(measured_intersection.intersects(some_point, LARGE_RADIUS * allowable_relative_error));
         }
     }
-
-    // The floating-point environment this executable was linked with. The
-    // build sets flush-to-zero and denormals-are-zero per thread on purpose,
-    // in code; nothing may impose them on the whole process from the link
-    // line. A denormal that survives a multiply here means no crtfastmath.o
-    // was linked.
-    TEST_CASE("BasicLindenMath: the process default keeps denormals", "[BasicLindenMath]")
-    {
-        volatile float denormal = 1.0e-40f;
-        volatile float one = 1.0f;
-        float product = denormal * one;
-        UNSCOPED_INFO("denormals are not flushed by the process default");
-        CHECK(product != 0.0f);
-        UNSCOPED_INFO("a denormal is still a denormal");
-        CHECK(product == 1.0e-40f);
-    }
-
-    // Optimised builds relax floating-point semantics to MSVC's /fp:fast
-    // contract, which keeps NaN and infinity. -ffinite-math-only would fold
-    // both of these guards to a constant.
-    TEST_CASE("BasicLindenMath: optimised builds keep NaN and infinity", "[BasicLindenMath]")
-    {
-        volatile float zero = 0.0f;
-        float nan = zero / zero;
-        float inf = 1.0f / zero;
-        CHECK(std::isnan(nan));
-        CHECK(std::isinf(inf));
-    }
 }
 
+namespace
+{
+    struct uuid_data
+    {
+        LLUUID id;
+    };
+
+    TEST_CASE_METHOD(uuid_data, "mathmisc LLUUID: isNull by default and after setNull but not after generate", "[mathmisc_LLUUID]")
+    {
+        CHECK(id.isNull());
+        id.generate();
+        CHECK(id.notNull());
+        id.setNull();
+        CHECK(id.isNull());
+    }
+
+    TEST_CASE_METHOD(uuid_data, "mathmisc LLUUID: copies and assignments compare equal", "[mathmisc_LLUUID]")
+    {
+        id.generate();
+        LLUUID a(id);
+        CHECK(id == a);
+        a.generate();
+        CHECK(id != a);
+        a = id;
+        CHECK(id == a);
+    }
+
+    TEST_CASE_METHOD(uuid_data, "mathmisc LLUUID: xor with a mask twice restores the id", "[mathmisc_LLUUID]")
+    {
+        id.generate();
+        LLUUID copy(id);
+        LLUUID mask;
+        mask.generate();
+        copy ^= mask;
+        CHECK(id != copy);
+        copy ^= mask;
+        CHECK(id == copy);
+    }
+
+    TEST_CASE_METHOD(uuid_data, "mathmisc LLUUID: asString round-trips through the string constructor", "[mathmisc_LLUUID]")
+    {
+        id.generate();
+        std::string id_str = id.asString();
+        LLUUID copy(id_str.c_str());
+        CHECK(id == copy);
+    }
+}

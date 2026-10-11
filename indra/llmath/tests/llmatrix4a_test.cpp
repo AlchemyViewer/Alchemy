@@ -489,7 +489,7 @@ namespace
         CHECK(turned[2] == 3.f);
     }
 
-    TEST_CASE("LLMatrix4a: setTranslation and setRow change only what they name", "[LLMatrix4a]")
+    TEST_CASE("LLMatrix4a: setTranslation writes the translation and keeps row 0, and setRow writes its row", "[LLMatrix4a]")
     {
         LLMatrix4a m;
         m.initAll(LLVector3(2.f, 2.f, 2.f),
@@ -799,7 +799,7 @@ namespace
         LLMatrix4a far_away;
         far_away.initAll(LLVector3(1.f, 1.f, 1.f), ROTATIONS[5], LLVector3(-256.f, 4096.f, 0.125f));
         LLMatrix4a far_inv;
-        CHECK(far_inv.setInverse(far_away));
+        REQUIRE(far_inv.setInverse(far_away));
         require_product_is_identity("far M * inverse(M)", far_away, far_inv, 1e-6f);
         require_product_is_identity("far inverse(M) * M", far_inv, far_away, 1e-6f);
 
