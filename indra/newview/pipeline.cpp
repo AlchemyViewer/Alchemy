@@ -4745,7 +4745,9 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
 
     bool done_atmospherics = LLPipeline::sRenderingHUDs; //skip atmospherics on huds
     bool done_water_haze = done_atmospherics;
-    bool done_water_exclusion = false;
+    // and the water exclusion mask: the water pool and water haze, which read it, do not run
+    // on huds, and every pass that runs them builds the mask first
+    bool done_water_exclusion = LLPipeline::sRenderingHUDs;
 
     // do water exclusion just before water pass.
     U32 water_exclusion_pass = LLDrawPool::POOL_WATEREXCLUSION;
