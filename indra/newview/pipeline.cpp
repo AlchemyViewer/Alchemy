@@ -9230,7 +9230,8 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
                     // mWaterDis is still attached to the bound framebuffer, a read GL
                     // defines only across a texture barrier. The same barriers put each
                     // arm's reads of a scratch quadrant before the next arm's write to it.
-                    // The entry point is loaded only on GL 4.5 and up.
+                    // Null where the driver has neither GL 4.5 nor a texture barrier
+                    // extension.
                     if (src == &mWaterDis && glTextureBarrier)
                     {
                         glTextureBarrier();

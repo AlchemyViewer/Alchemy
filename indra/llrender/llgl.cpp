@@ -2420,6 +2420,18 @@ void LLGLManager::initExtensions()
         glGetnUniformuiv         = (PFNGLGETNUNIFORMUIVPROC)LL_GET_PROC_ADDRESS("glGetnUniformuiv");
     }
 
+    // Texture barrier. Core in 4.5, and GL_ARB_texture_barrier names it without a suffix on a
+    // lower context, so it is resolved here for the GL_VERSION_4_5 ladder's early-out as above.
+    // GL_NV_texture_barrier, which ARB's took over unchanged, names it glTextureBarrierNV.
+    if (mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_texture_barrier"))
+    {
+        glTextureBarrier = (PFNGLTEXTUREBARRIERPROC)LL_GET_PROC_ADDRESS("glTextureBarrier");
+    }
+    if (!glTextureBarrier && mGLExtensions.contains("GL_NV_texture_barrier"))
+    {
+        glTextureBarrier = (PFNGLTEXTUREBARRIERPROC)LL_GET_PROC_ADDRESS("glTextureBarrierNV");
+    }
+
     // GL_EXT_memory_object
     if (mHasEXTMemoryObject)
     {
