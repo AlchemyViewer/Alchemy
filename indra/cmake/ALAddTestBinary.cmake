@@ -35,7 +35,8 @@ endif()
 # combined_pending and manual, which the default run leaves out, until the
 # binary's tests are known to share a process: then COMBINED labels it
 # combined, and it runs with the rest. With AL_TEST_PER_CASE, each test case is
-# an entry of its own instead, found when ctest runs.
+# an entry of its own instead, found when ctest runs, with the environment and
+# labels a file's entry would have.
 #
 # ENVIRONMENT sets variables for the runs, VAR=value each. GL, PYTHON and
 # ISA_TIER mean what they mean to al_add_test: a GL binary is labelled gl and
@@ -156,11 +157,13 @@ function(al_add_test_binary name)
   endif()
 
   if(AL_TEST_PER_CASE)
-    include(Catch)
+    # Beside Catch2's package config, where vcpkg puts it, and not on the
+    # module path.
+    include("${Catch2_DIR}/Catch.cmake")
+    # WORKING_DIRECTORY is catch_discover_tests' own: among the PROPERTIES it
+    # would end them, and what came after would go unset.
     set(
       per_case_properties
-      WORKING_DIRECTORY
-      ${CMAKE_CURRENT_BINARY_DIR}
       TIMEOUT
       ${timeout}
       SKIP_RETURN_CODE
@@ -168,21 +171,44 @@ function(al_add_test_binary name)
       DISABLED
       ${disabled}
     )
-    if(arg_RESOURCE_LOCK)
-      list(APPEND per_case_properties RESOURCE_LOCK "${arg_RESOURCE_LOCK}")
-    endif()
     # The main makes Catch2's "all skipped" CTest's 125, so a skip is not
     # left to the discovery's own code for it.
     catch_discover_tests(
       ${target}
       TEST_PREFIX "${target}/"
+      TEST_LIST ${target}_cases
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
       EXTRA_ARGS ${arguments}
       DISCOVERY_MODE PRE_TEST
       SKIP_IS_FAILURE
-      ADD_TAGS_AS_LABELS
       DL_PATHS ${SHARED_LIB_STAGING_DIR}
       PROPERTIES ${per_case_properties}
     )
+    # The environment, labels and lock a file's entry has are lists, which
+    # catch_discover_tests flattens with the rest of its PROPERTIES, and a
+    # CTest script cannot append to a property: a script run after the
+    # discovery sets them on each case whole. The labels are a file entry's,
+    # not the cases' Catch2 tags, so that -L and -LE choose alike either way.
+    # The library path is DL_PATHS', where AL_TEST_ENVIRONMENT has nothing
+    # more to say.
+    set(case_script "${CMAKE_CURRENT_BINARY_DIR}/${target}_cases.cmake")
+    set(case_properties "LABELS [==[${labels}]==]")
+    if(environment)
+      string(APPEND case_properties " ENVIRONMENT [==[${environment}]==]")
+    endif()
+    if(AL_TEST_ENVIRONMENT)
+      string(APPEND case_properties " ENVIRONMENT_MODIFICATION [==[${AL_TEST_ENVIRONMENT}]==]")
+    endif()
+    if(arg_RESOURCE_LOCK)
+      string(APPEND case_properties " RESOURCE_LOCK [==[${arg_RESOURCE_LOCK}]==]")
+    endif()
+    file(
+      WRITE "${case_script}"
+      "foreach(case IN LISTS ${target}_cases)\n"
+      "  set_tests_properties(\"\${case}\" PROPERTIES ${case_properties})\n"
+      "endforeach()\n"
+    )
+    set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${case_script}")
   else()
     foreach(stem IN LISTS stems)
       add_test(
