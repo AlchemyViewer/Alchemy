@@ -73,6 +73,12 @@ bool                LLViewerShaderMgr::sSkipReload = false;
 
 LLVector4           gShinyOrigin;
 
+// The water's hex-tiled wave layers: 0 none, 1 the big layer, 2 the mid layer too (waterSurface.glsl's WATER_HEXTILE).
+static S32 water_hextile()
+{
+    return (S32)llmin(gSavedSettings.getU32("AlchemyRenderWaterHextile"), 2U);
+}
+
 // Whether the session computes: a context with compute, GLSL 4.30 left to it after the feature manager's fallbacks,
 // and AlchemyRenderDisableCompute off. Read at shader load, as everything built on it is.
 static bool compute_enabled()
@@ -952,6 +958,9 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         }
     }
 
+    // The water's wave layers that hex-tile, read in waterSurface.glsl, a shared object.
+    attribs["WATER_HEXTILE"] = std::to_string(water_hextile());
+
     LLGLSLShader::sGlobalDefines = attribs;
 
     // Shared objects are compiled once and attached by name, so a per-program permutation
@@ -1020,6 +1029,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/terrainSurface.glsl",                  1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "environment/waterSurface.glsl",                 1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/pbrterrainUtilF.glsl",                 1) );
+    index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/hexLatticeUtil.glsl",                  1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/tonemapUtilF.glsl",                    1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "alchemy/colorGradeUtilF.glsl",                 1) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "alchemy/postEffectUtilsF.glsl",                 1) );
@@ -1113,6 +1123,10 @@ bool LLViewerShaderMgr::loadShadersWater()
             gWaterProgram.addPermutation("HAS_SUN_SHADOW", "1");
         }
 
+        // Read by waterSurface.glsl, a shared object, through the global define; the program's copy keeps its hash
+        // honest.
+        gWaterProgram.addPermutation("WATER_HEXTILE", std::to_string(water_hextile()));
+
         gWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
         gWaterProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
         success = gWaterProgram.createShader(LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
@@ -1136,6 +1150,7 @@ bool LLViewerShaderMgr::loadShadersWater()
         {
             gUnderWaterProgram.addPermutation("TRANSPARENT_WATER", "1");
         }
+        gUnderWaterProgram.addPermutation("WATER_HEXTILE", std::to_string(water_hextile()));
         success = gUnderWaterProgram.createShader(mirror_variant());
         llassert(success);
     }

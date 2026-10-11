@@ -28,6 +28,7 @@
 #include "../test/lltut.h"
 
 #include "../alfarplane.h"
+#include "../alwaterfield.h"
 
 #include "llcamera.h"
 
@@ -222,8 +223,15 @@ namespace tut
         for (const char* path : { "class3/environment/waterF.glsl", "class3/environment/underWaterF.glsl" })
         {
             ensure(std::string(path) + " works the waves per fragment",
-                   shader_source(path).find("water_wave_coords(view.xy, bigwave, little);") != std::string::npos);
+                   shader_source(path).find("water_wave_normals(bumpMap, bumpMap2, view.xy, wave1, wave2, wave3);") != std::string::npos);
         }
+        ensure("the wave reads work the coordinates", surface.find("water_wave_coords(r, big_uv, little_uv);") != std::string::npos);
+        // The CPU places the camera on the tiled layers' lattices; the shader adds the rest of the way to a point, on
+        // the same lattice.
+        ensure_equals("the lattice's density", (F64)literal_after(surface, "#define WATER_HEX_GRID "), ALWaterField::HEX_GRID);
+        const std::string lattice = shader_source("class1/deferred/hexLatticeUtil.glsl");
+        ensure_approximately_equals("the lattice's skew", literal_after(lattice, "mat2(1.0, 0.0, "), (F32)ALWaterField::HEX_SKEW_XY, 16);
+        ensure_approximately_equals("and its stretch", literal_after(lattice, "mat2(1.0, 0.0, -0.57735027, "), (F32)ALWaterField::HEX_SKEW_YY, 16);
     }
 
     // The eye-to-sky rotation: a level camera's forward, up and right land on the sky's (north, up, east) for its heading,

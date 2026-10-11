@@ -168,25 +168,38 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     LLViewerTexture* tex_a = mWaterNormp[0];
     LLViewerTexture* tex_b = mWaterNormp[1];
 
+    if (!gCubeSnapshot)
+    {
+        gPipeline.mWaterSurface.trackMaps(tex_a, tex_b);
+    }
+
     F32 blend_factor = (F32)pwater->getBlendFactor();
 
+    // The maps bound as the current and next, whose means the tiled reads blend about.
+    LLViewerTexture* bound_a = nullptr;
+    LLViewerTexture* bound_b = nullptr;
     if (tex_a && (!tex_b || (tex_a == tex_b)))
     {
         shader->bindTexture(LLViewerShaderMgr::BUMP_MAP, tex_a, water_normal_sampler);
+        bound_a = tex_a;
         blend_factor = 0; // only one tex provided, no blending
     }
     else if (tex_b && !tex_a)
     {
         shader->bindTexture(LLViewerShaderMgr::BUMP_MAP, tex_b, water_normal_sampler);
+        bound_a = tex_b;
         blend_factor = 0; // only one tex provided, no blending
     }
     else if (tex_b != tex_a)
     {
         shader->bindTexture(LLViewerShaderMgr::BUMP_MAP, tex_a, water_normal_sampler);
         shader->bindTexture(LLViewerShaderMgr::BUMP_MAP2, tex_b, water_normal_sampler);
+        bound_a = tex_a;
+        bound_b = tex_b;
     }
 
     shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
+    shader->uniform4fv(LLShaderMgr::WATER_MAP_MEAN, 1, gPipeline.mWaterSurface.mapMeans(bound_a, bound_b).mV);
 
     F32      fog_density = pwater->getModifiedWaterFogDensity(underwater);
 
@@ -206,6 +219,12 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     shader->uniform2fv(LLShaderMgr::WATER_BIG_PHASE, 1, phases.mBig.mV);
     shader->uniform4fv(LLShaderMgr::WATER_LITTLE_PHASE, 1, phases.mLittle.mV);
     shader->uniform2fv(LLShaderMgr::WATER_SWEEP_PHASE, 1, phases.mSweep.mV);
+
+    // The camera's place on the tiled layers' lattices, split in F64 the same way, so a point of the sea keeps its
+    // cell wherever the camera is.
+    const ALWaterField::LatticePlaces lattice = ALWaterField::latticePlaces(eye_global.mdV[VX], eye_global.mdV[VY]);
+    shader->uniform4fv(LLShaderMgr::WATER_LATTICE_FRAC, 1, lattice.mFrac.mV);
+    shader->uniform4iv(LLShaderMgr::WATER_LATTICE_BASE, 1, lattice.mBase);
 
     shader->uniform3fv(LLShaderMgr::WATER_LIGHT_DIR, 1, light_dir.mV);
 

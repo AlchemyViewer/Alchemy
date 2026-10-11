@@ -53,7 +53,7 @@ void main()
     vary_normal = normal_matrix * vec3(0, 0, 1);
     vary_tangent = normal_matrix * vec3(1, 0, 0);
 
-    // Relative to the camera: the fragment stages work the wave coordinates from it (water_wave_coords).
+    // Relative to the camera: the fragment stages work the wave coordinates from it (water_wave_normals).
     view = position - eyeVec;
 
     vec4 clip = modelview_projection_matrix * pos;

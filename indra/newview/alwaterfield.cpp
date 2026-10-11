@@ -261,4 +261,47 @@ WavePhases wavePhases(F64 eye_x, F64 eye_y, F64 uptime, const LLVector2& wave1, 
     return out;
 }
 
+namespace
+{
+// One layer's lattice place for a position already scaled to the layer: its skewed coordinates' floor, as the low 32
+// bits a shader's ivec2 holds, and their fraction, held below 1 in float.
+void latticePlace(F64 x, F64 y, S32* base, F32* fraction)
+{
+    const F64 q[2] = { HEX_GRID * (x + HEX_SKEW_XY * y), HEX_GRID * (HEX_SKEW_YY * y) };
+    for (S32 i = 0; i < 2; ++i)
+    {
+        const F64 whole = std::floor(q[i]);
+        base[i] = (S32)(U32)(U64)(S64)whole;
+        fraction[i] = llmin((F32)(q[i] - whole), 0.99999994f);
+    }
+}
+} // namespace
+
+LatticePlaces latticePlaces(F64 eye_x, F64 eye_y)
+{
+    LatticePlaces out;
+    F32 fraction[4];
+    latticePlace(BIG_SCALE * eye_x, BIG_SCALE * eye_y, out.mBase, fraction);
+    latticePlace(LITTLE_ZW_SCALE[0] * eye_x, LITTLE_ZW_SCALE[1] * eye_y, out.mBase + 2, fraction + 2);
+    out.mFrac.set(fraction[0], fraction[1], fraction[2], fraction[3]);
+    return out;
+}
+
+LLVector2 meanNormal(const U8* pixels, S32 width, S32 height, S32 components)
+{
+    if (!pixels || width <= 0 || height <= 0 || components < 3)
+    {
+        return LLVector2::zero;
+    }
+    U64 sum[2] = {};
+    const size_t count = (size_t)width * (size_t)height;
+    for (size_t i = 0; i < count; ++i)
+    {
+        sum[0] += pixels[i * components];
+        sum[1] += pixels[i * components + 1];
+    }
+    const F64 scale = 2.0 / (255.0 * (F64)count);
+    return LLVector2((F32)((F64)sum[0] * scale - 1.0), (F32)((F64)sum[1] * scale - 1.0));
+}
+
 } // namespace ALWaterField

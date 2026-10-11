@@ -44,7 +44,6 @@ vec2 BRDF(float NoV, float roughness);
 
 uniform sampler2D bumpMap;
 uniform sampler2D bumpMap2;
-uniform float     blend_factor;
 #ifdef TRANSPARENT_WATER
 uniform sampler2D screenTex;
 uniform sampler2D depthMap;
@@ -82,12 +81,6 @@ in vec3 vary_normal;
 in vec3 vary_tangent;
 in vec3 vary_light_dir;
 
-vec3 BlendNormal(vec3 bump1, vec3 bump2)
-{
-    vec3 n = mix(bump1, bump2, blend_factor);
-    return n;
-}
-
 vec3 srgb_to_linear(vec3 col);
 vec3 linear_to_srgb(vec3 col);
 
@@ -111,30 +104,7 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
 vec3 getPositionWithNDC(vec3 ndc);
 float ndcZFromScreenDepth(float d);   // deferredUtil.glsl -- depth-convention aware
 
-void water_wave_coords(vec2 r, out vec2 big, out vec4 little);
-
-void generateWaveNormals(out vec3 wave1, out vec3 wave2, out vec3 wave3)
-{
-    // Generate all of our wave normals.
-    // We layer these back and forth.
-
-    // From the camera-relative view vector, which interpolates precisely however far the quad reaches.
-    vec2 bigwave;
-    vec4 little;
-    water_wave_coords(view.xy, bigwave, little);
-
-    vec3 wave1_a = texture(bumpMap, bigwave).xyz * 2.0 - 1.0;
-    vec3 wave2_a = texture(bumpMap, little.xy).xyz * 2.0 - 1.0;
-    vec3 wave3_a = texture(bumpMap, little.zw).xyz * 2.0 - 1.0;
-
-    vec3 wave1_b = texture(bumpMap2, bigwave).xyz * 2.0 - 1.0;
-    vec3 wave2_b = texture(bumpMap2, little.xy).xyz * 2.0 - 1.0;
-    vec3 wave3_b = texture(bumpMap2, little.zw).xyz * 2.0 - 1.0;
-
-    wave1 = BlendNormal(wave1_a, wave1_b);
-    wave2 = BlendNormal(wave2_a, wave2_b);
-    wave3 = BlendNormal(wave3_a, wave3_b);
-}
+void water_wave_normals(sampler2D map_a, sampler2D map_b, vec2 r, out vec3 big, out vec3 little_xy, out vec3 little_zw);
 
 void calculateFresnelFactors(out vec3 df3, out vec2 df2, vec3 viewVec, vec3 wave1, vec3 wave2, vec3 wave3, vec3 wavef)
 {
@@ -169,13 +139,11 @@ void main()
     //normalize view vector
     vec3 viewVec = normalize(pos.xyz);
 
-    // Setup our waves.
-
-    vec3 wave1 = vec3(0, 0, 1);
-    vec3 wave2 = vec3(0, 0, 1);
-    vec3 wave3 = vec3(0, 0, 1);
-
-    generateWaveNormals(wave1, wave2, wave3);
+    // The wave layers, from the camera-relative view vector, which interpolates precisely however far the quad reaches.
+    vec3 wave1;
+    vec3 wave2;
+    vec3 wave3;
+    water_wave_normals(bumpMap, bumpMap2, view.xy, wave1, wave2, wave3);
 
     vec2 distort = (refCoord.xy/refCoord.z) * 0.5 + 0.5;
 

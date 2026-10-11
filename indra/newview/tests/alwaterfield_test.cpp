@@ -399,6 +399,118 @@ namespace tut
         ensure_equals("past the 512 m region", at(3, -2).first, 19.f);
     }
 
+    namespace
+    {
+        // The tiled layers' scales, as waterSurface.glsl's water_wave_normals scales a point for each lattice.
+        constexpr F64 LAYER_SCALE[2][2] = { { ALWaterField::BIG_SCALE, ALWaterField::BIG_SCALE },
+                                            { ALWaterField::LITTLE_ZW_SCALE[0], ALWaterField::LITTLE_ZW_SCALE[1] } };
+
+        // A point's skewed lattice coordinates on a layer, in double from its global position.
+        void latticeCoords(S32 layer, F64 x, F64 y, F64& qx, F64& qy)
+        {
+            const F64 px = x * LAYER_SCALE[layer][0];
+            const F64 py = y * LAYER_SCALE[layer][1];
+            qx = ALWaterField::HEX_GRID * (px + ALWaterField::HEX_SKEW_XY * py);
+            qy = ALWaterField::HEX_GRID * (ALWaterField::HEX_SKEW_YY * py);
+        }
+
+        // The cell id water_hex_cells works for a point `r` from the camera, in float as the shader does: the camera's
+        // place from the CPU, and the skewed offset of the point added to its fraction.
+        std::pair<U32, U32> shaderCell(const ALWaterField::LatticePlaces& places, S32 layer, F32 rx, F32 ry)
+        {
+            const F32 px = rx * (F32)LAYER_SCALE[layer][0] * (F32)ALWaterField::HEX_GRID;
+            const F32 py = ry * (F32)LAYER_SCALE[layer][1] * (F32)ALWaterField::HEX_GRID;
+            const F32 qx = places.mFrac.mV[2 * layer] + (px - 0.57735027f * py);
+            const F32 qy = places.mFrac.mV[2 * layer + 1] + 1.15470054f * py;
+            return { (U32)places.mBase[2 * layer] + (U32)(S32)std::floor(qx),
+                     (U32)places.mBase[2 * layer + 1] + (U32)(S32)std::floor(qy) };
+        }
+
+        // The cell holding a skewed coordinate, its floor's low 32 bits; false within `margin` of a cell's edge, where
+        // float rounding may land either side.
+        bool trueCell(F64 q, F64 margin, U32& cell)
+        {
+            const F64 whole = std::floor(q);
+            cell = (U32)(U64)(S64)whole;
+            return q - whole > margin && whole + 1.0 - q > margin;
+        }
+    }
+
+    // A point of the sea keeps its lattice cell however far the camera goes: the cell the shader works from the
+    // camera's place and the point's offset is the cell its global position is in, from a camera beside it and from one
+    // 10 km off, at the grid's far corner, and where the 32-bit ids wrap. A camera's place split in float misses at the
+    // far corner.
+    template<> template<>
+    void alwaterfield_object::test<9>()
+    {
+        set_test_name("the tiled layers' lattice");
+        // Far corner: a million regions out. Wrap: the big layer's skewed y crosses 2^32 among the points.
+        const F64 far_corner = 1048576.0 * WIDTH;
+        const F64 wrap_y = 4294967296.0 / (ALWaterField::BIG_SCALE * ALWaterField::HEX_SKEW_YY * ALWaterField::HEX_GRID);
+        const F64 eyes[3][2] = { { EYE_X, EYE_Y }, { far_corner + 97.3, far_corner + 201.9 }, { EYE_X, wrap_y + 3.1 } };
+        S32 checked = 0;
+        S32 wrapped = 0;
+        for (const auto& eye : eyes)
+        {
+            const ALWaterField::LatticePlaces near_places = ALWaterField::latticePlaces(eye[0], eye[1]);
+            const ALWaterField::LatticePlaces far_places = ALWaterField::latticePlaces(eye[0] + 7071.0, eye[1] - 7071.0);
+            for (S32 layer = 0; layer < 2; ++layer)
+            {
+                for (S32 i = -20; i <= 20; ++i)
+                {
+                    for (S32 j = -20; j <= 20; ++j)
+                    {
+                        const F64 x = eye[0] + 4.9 * i;
+                        const F64 y = eye[1] + 4.7 * j;
+                        F64 qx = 0.0;
+                        F64 qy = 0.0;
+                        latticeCoords(layer, x, y, qx, qy);
+                        U32 cx = 0;
+                        U32 cy = 0;
+                        if (!trueCell(qx, 1e-3, cx) || !trueCell(qy, 1e-3, cy))
+                        {
+                            continue;
+                        }
+                        const std::pair<U32, U32> from_near = shaderCell(near_places, layer, (F32)(x - eye[0]), (F32)(y - eye[1]));
+                        const std::pair<U32, U32> from_far =
+                            shaderCell(far_places, layer, (F32)(x - eye[0] - 7071.0), (F32)(y - eye[1] + 7071.0));
+                        ensure_equals("the cell beside the camera", from_near.first, cx);
+                        ensure_equals("the cell beside the camera, y", from_near.second, cy);
+                        ensure_equals("the cell from 10 km off", from_far.first, cx);
+                        ensure_equals("the cell from 10 km off, y", from_far.second, cy);
+                        ++checked;
+                        wrapped += cy < 16 ? 1 : 0;
+                    }
+                }
+            }
+        }
+        ensure("most points are away from a cell's edge", checked > 5000);
+        ensure("the wrap's points include ids past it", wrapped > 0);
+
+        const ALWaterField::LatticePlaces places = ALWaterField::latticePlaces(-EYE_X, EYE_Y);
+        for (F32 f : { places.mFrac.mV[0], places.mFrac.mV[1], places.mFrac.mV[2], places.mFrac.mV[3] })
+        {
+            ensure("a fraction in [0, 1)", f >= 0.f && f < 1.f);
+        }
+    }
+
+    // A normal map's mean decoded slope: the first two channels over every pixel, and nothing without three.
+    template<> template<>
+    void alwaterfield_object::test<10>()
+    {
+        set_test_name("a normal map's mean");
+        const U8 rgba[4 * 4] = { 255, 0, 255, 9, 0, 0, 255, 9, 255, 255, 255, 9, 255, 255, 255, 9 };
+        const LLVector2 mean = ALWaterField::meanNormal(rgba, 2, 2, 4);
+        ensure_approximately_equals("x: three of four at 1", mean.mV[VX], 0.5f, 20);
+        ensure_approximately_equals("y: two of four at 1", mean.mV[VY], 0.f, 20);
+        const U8 rgb[3] = { 128, 64, 255 };
+        const LLVector2 one = ALWaterField::meanNormal(rgb, 1, 1, 3);
+        ensure_approximately_equals("one pixel, x", one.mV[VX], 128.f / 255.f * 2.f - 1.f, 20);
+        ensure_approximately_equals("one pixel, y", one.mV[VY], 64.f / 255.f * 2.f - 1.f, 20);
+        ensure("two channels have no mean", ALWaterField::meanNormal(rgb, 1, 1, 2) == LLVector2::zero);
+        ensure("no pixels have no mean", ALWaterField::meanNormal(nullptr, 4, 4, 3) == LLVector2::zero);
+    }
+
     // The square's corner the GPU places the cells from, relative to an origin (the agent region's): the corner's global
     // position less the origin, near and far from the grid's origin and with the origin a region off the camera's.
     template<> template<>

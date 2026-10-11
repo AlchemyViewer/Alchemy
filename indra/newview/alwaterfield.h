@@ -205,4 +205,29 @@ struct WavePhases
 };
 WavePhases wavePhases(F64 eye_x, F64 eye_y, F64 uptime, const LLVector2& wave1, const LLVector2& wave2);
 
+/// The hex lattice a wave layer is tiled on (waterSurface.glsl's WATER_HEX_GRID): its points one repeat of the layer
+/// apart, so a cell holds about one whole tile of the author's map. The lattice lies in the layer's scaled coordinates
+/// before the sweep and the scroll, still in the world while the waves scroll through it.
+constexpr F64 HEX_GRID = 1.0;
+
+/// The lattice's skew, hexLatticeUtil.glsl's hex_skew: (x, y) to (x - y / sqrt(3), 2 y / sqrt(3)), where every
+/// triangle is half of a unit square.
+constexpr F64 HEX_SKEW_XY = -0.57735026918962576;
+constexpr F64 HEX_SKEW_YY = 1.1547005383792515;
+
+/// The camera's place on the lattices of the tiled layers, the big layer and the mid one (the little map's zw read):
+/// skew(position scaled to the layer, times HEX_GRID), split into the low 32 bits of its floor and its fraction. A shader
+/// adds the skewed offset of a point from the camera to the fraction, and the floor of that to the bits, so a point of
+/// the sea keeps its cell's id however far the camera goes, and no large number reaches it.
+struct LatticePlaces
+{
+    S32       mBase[4] = {}; ///< big x, y, mid x, y: the floor's low 32 bits, as a shader's ivec4 holds them
+    LLVector4 mFrac;         ///< big x, y, mid x, y: the fraction, below 1
+};
+LatticePlaces latticePlaces(F64 eye_x, F64 eye_y);
+
+/// The mean of a normal map's decoded x and y (each channel / 255 * 2 - 1), over `width` x `height` pixels of
+/// `components` bytes, x the first channel and y the second. Zero for fewer than three components or no pixels.
+LLVector2 meanNormal(const U8* pixels, S32 width, S32 height, S32 components);
+
 } // namespace ALWaterField

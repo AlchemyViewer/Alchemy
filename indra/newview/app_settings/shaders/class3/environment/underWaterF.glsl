@@ -26,6 +26,7 @@
 out vec4 frag_color;
 
 uniform sampler2D bumpMap;
+uniform sampler2D bumpMap2;
 // 1 where the surface is drawn distorted, 0 where an exclusion prim covers it (the stencil's exclude bit).
 uniform float exclusionDistort;
 
@@ -53,7 +54,7 @@ in vec3 vary_position;
 
 vec4 applyWaterFogViewLinearNoClip(vec3 pos, vec4 color);
 void mirrorClip(vec3 position);
-void water_wave_coords(vec2 r, out vec2 big, out vec4 little);
+void water_wave_normals(sampler2D map_a, sampler2D map_b, vec2 r, out vec3 big, out vec3 little_xy, out vec3 little_zw);
 
 void main()
 {
@@ -63,12 +64,10 @@ void main()
     vec4 color;
 
     //get detail normals
-    vec2 bigwave;
-    vec4 little;
-    water_wave_coords(view.xy, bigwave, little);
-    vec3 wave1 = texture(bumpMap, bigwave).xyz*2.0-1.0;
-    vec3 wave2 = texture(bumpMap, little.xy).xyz*2.0-1.0;
-    vec3 wave3 = texture(bumpMap, little.zw).xyz*2.0-1.0;
+    vec3 wave1;
+    vec3 wave2;
+    vec3 wave3;
+    water_wave_normals(bumpMap, bumpMap2, view.xy, wave1, wave2, wave3);
     vec3 wavef = normalize(wave1+wave2+wave3);
 
     //figure out distortion vector (ripply)

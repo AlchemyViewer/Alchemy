@@ -640,6 +640,9 @@ public:
         WATER_SWEEP_PHASE,                  //  "waterSweepPhase"  LL's wave sweep's phase at the camera
         WATER_LAYOUT,                       //  "waterLayout"  which part of the field a draw places (ALWaterField::Draw)
         WATER_GLINT_ROUGHNESS,              //  "waterGlintRoughness"  the roughness of the sun's reflection on each wave face
+        WATER_LATTICE_FRAC,                 //  "waterLatticeFrac"  the camera's place on the tiled layers' lattices, its fraction
+        WATER_LATTICE_BASE,                 //  "waterLatticeBase"  and the low 32 bits of its floor
+        WATER_MAP_MEAN,                     //  "waterMapMean"  the two wave maps' mean normal xy
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;

@@ -174,7 +174,7 @@ Key shader groups: GBuffer write (`gDeferredDiffuseProgram`, `gDeferredPBROpaque
 
 Environment selection priority (highest to lowest): edit environment → local → parcel → region → default.
 
-Sky rendering: `gDeferredWLSkyProgram` (sky dome), `gDeferredWLCloudProgram` (clouds), `gDeferredWLSunProgram`/`gDeferredWLMoonProgram` (celestial bodies), `gDeferredStarProgram` (stars). Water: `gWaterProgram` (surface with reflections/refractions), `gUnderWaterProgram` (underwater fog), wave normals from the environment's normal maps, their coordinates worked per fragment from phases the CPU takes in double (`ALWaterField::wavePhases`). The screen's depth carries stencil, where the water keeps two bits (`alwaterstencil.h`): where an exclusion prim removed it, and its own pixels.
+Sky rendering: `gDeferredWLSkyProgram` (sky dome), `gDeferredWLCloudProgram` (clouds), `gDeferredWLSunProgram`/`gDeferredWLMoonProgram` (celestial bodies), `gDeferredStarProgram` (stars). Water: `gWaterProgram` (surface with reflections/refractions), `gUnderWaterProgram` (underwater fog), wave normals from the environment's normal maps, their coordinates worked per fragment from phases the CPU takes in double (`ALWaterField::wavePhases`). Every read of the maps goes through `water_wave_normals` in `waterSurface.glsl`, which hex-tiles the layers `AlchemyRenderWaterHextile` names on a lattice still in the world, the one terrain's hex tiling uses (`class1/deferred/hexLatticeUtil.glsl`), the CPU placing the camera on it in double (`ALWaterField::latticePlaces`). The screen's depth carries stencil, where the water keeps two bits (`alwaterstencil.h`): where an exclusion prim removed it, and its own pixels.
 
 ### UI Framework
 

@@ -335,9 +335,13 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasWaterSurface)
     {
-        if (!shader->attachFragmentObject("environment/waterSurface.glsl"))
+        // The water's wave reads hex-tile on the lattice terrain shares.
+        for (const char* object : { "environment/waterSurface.glsl", "deferred/hexLatticeUtil.glsl" })
         {
-            return false;
+            if (!shader->attachFragmentObject(object))
+            {
+                return false;
+            }
         }
     }
 
@@ -420,9 +424,12 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->isPBRTerrain)
     {
-        if (!shader->attachFragmentObject("deferred/pbrterrainUtilF.glsl"))
+        for (const char* object : { "deferred/pbrterrainUtilF.glsl", "deferred/hexLatticeUtil.glsl" })
         {
-            return false;
+            if (!shader->attachFragmentObject(object))
+            {
+                return false;
+            }
         }
     }
 
@@ -2234,6 +2241,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterSweepPhase");
     mReservedUniforms.push_back("waterLayout");
     mReservedUniforms.push_back("waterGlintRoughness");
+    mReservedUniforms.push_back("waterLatticeFrac");
+    mReservedUniforms.push_back("waterLatticeBase");
+    mReservedUniforms.push_back("waterMapMean");
 
     // The enum and this list are parallel, and an entry added or removed on one side only
     // shifts every later uniform index for every shader in the viewer -- silently, since a

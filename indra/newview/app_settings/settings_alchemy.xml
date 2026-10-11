@@ -2262,6 +2262,17 @@
             <key>Value</key>
             <real>0.35</real>
         </map>
+        <key>AlchemyRenderWaterHextile</key>
+        <map>
+            <key>Comment</key>
+            <string>Which of the water's wave layers are hex-tiled, so their repeat does not show: each cell of a hexagonal lattice fixed in the world shows the normal map at its own offset, never turned. 0 none, 1 the large waves, 2 the large and medium waves. Up to three reads per tiled layer instead of one. Change triggers a shader rebuild.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderTonemapType</key>
         <map>
             <key>Comment</key>

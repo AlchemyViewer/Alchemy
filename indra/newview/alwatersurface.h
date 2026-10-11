@@ -28,6 +28,9 @@
 
 #include "indra_constants.h"
 #include "llpointer.h"
+#include "lluuid.h"
+#include "v2math.h"
+#include "v4math.h"
 
 #include <vector>
 
@@ -35,6 +38,7 @@ class LLCamera;
 class LLGLSLShader;
 class LLImageGL;
 class LLVector3;
+class LLViewerTexture;
 
 /// The water's field for the frame: ALWaterField's layout around the main camera, and the cell map the water's shaders
 /// read the heights from, ALWaterField::MAP_SIZE texels a side of RG32F (height, flags) as fillCells lays them out.
@@ -78,6 +82,15 @@ public:
     /// Grows `min` and `max` (agent space) to hold the field: its rim, and its lowest and highest water.
     void addExtents(LLVector3& min, LLVector3& max) const;
 
+    /// Follows the environment's two wave normal maps, current and next, for what the water's shaders take from their
+    /// pixels: each map's mean slope. A map's pixels are asked for once and let go when read; what they gave is kept
+    /// for the last few maps seen. Once a main frame, from the water pool.
+    void trackMaps(LLViewerTexture* current, LLViewerTexture* next);
+
+    /// waterSurface.glsl's waterMapMean for the maps bound as the current (`a`) and next (`b`) map: each one's mean
+    /// normal xy, zero for a map whose pixels have not arrived or that is null.
+    LLVector4 mapMeans(const LLViewerTexture* a, const LLViewerTexture* b) const;
+
     const ALWaterField::Layout& getLayout() const { return mLayout; }
 
     /// The cell map, null until the first update with an agent region.
@@ -95,6 +108,19 @@ private:
         bool operator==(const Key&) const = default;
     };
 
+    /// What a wave normal map's pixels gave, by asset id.
+    struct MapStats
+    {
+        LLUUID    mID;
+        LLVector2 mMean;
+        bool      mKnown = false;
+        U32       mUsed = 0; ///< the frame it was last tracked, for the cache's eviction
+    };
+    static constexpr size_t MAP_CACHE = 4;
+
+    MapStats&       mapStats(const LLUUID& id);
+    const MapStats* findMapStats(const LLUUID& id) const;
+
     ALWaterField::Layout mLayout;
     LLVector4            mSquare;
     LLVector2            mCentre;
@@ -108,4 +134,5 @@ private:
     Key                  mScratch;
     std::vector<F32>     mTexels;
     LLPointer<LLImageGL> mCellMap;
+    std::vector<MapStats> mMaps;
 };

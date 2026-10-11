@@ -246,17 +246,161 @@ bool water_vertex(int part, int instance, int vertex, out vec3 pos)
     return drawn;
 }
 
+// A point `r` from the camera, horizontally, held to the wave clamp: past it the wave coordinates stop following the
+// surface.
+vec2 water_wave_clamp(vec2 r)
+{
+    float d = max(length(r), 0.001);
+    return r * (min(d, waterFar.x) / d);
+}
+
 // The wave coordinates of a point `r` from the camera, horizontally, as far as the wave clamp: the big layer's, and
 // the little map's xy and zw reads. LL's sweep bends x before the layers scale it. The phases hold every term of the
 // camera's own position, so nothing large is worked here, and a point keeps its coordinates however the camera and the
 // agent's region move.
 void water_wave_coords(vec2 r, out vec2 big, out vec4 little)
 {
-    float d = max(length(r), 0.001);
-    r *= min(d, waterFar.x) / d;
+    r = water_wave_clamp(r);
     vec2 v = r;
     v.x += (cos(r.x*0.08 + waterSweepPhase.x) + sin(r.y*0.02 + waterSweepPhase.y))*6.0;
     big = v * vec2(0.04,0.04) + waterBigPhase;
     little.xy = v * vec2(0.45, 0.9) + waterLittlePhase.xy;
     little.zw = v * vec2(0.1, 0.2) + waterLittlePhase.zw;
 }
+
+#ifdef FRAGMENT_SHADER
+
+// Which wave layers are hex-tiled (AlchemyRenderWaterHextile, a global define): 0 none, 1 the big layer, whose 25 m
+// repeat is what reads as a grid, 2 the mid layer (the little map's zw read) too. The little map's xy read repeats
+// every 2 m, lost under the others' structure a few metres out, and is never tiled.
+#ifndef WATER_HEXTILE
+#define WATER_HEXTILE 0
+#endif
+
+// The lattice's points one repeat of the layer apart, so a cell holds about a whole tile of the author's map
+// (ALWaterField::HEX_GRID).
+#define WATER_HEX_GRID 1.0
+// The blend's contrast between cells, and the weight under which a cell is not read, as terrain's.
+#define WATER_HEX_CONTRAST 7.0
+#define WATER_HEX_THRESHOLD 0.01
+
+uniform float blend_factor;
+// The camera's place on each tiled layer's lattice (ALWaterField::latticePlaces): its fraction, and the low 32 bits of
+// its floor as int bits, of the big layer (xy) and the mid layer (zw).
+uniform vec4 waterLatticeFrac;
+uniform ivec4 waterLatticeBase;
+// Each map's mean normal xy: the current map's (xy) and the next's (zw), 0 until its pixels have arrived.
+uniform vec4 waterMapMean;
+
+vec2 hex_skew(vec2 p);
+void hex_triangle(vec2 f, out ivec2 corner0, out ivec2 corner1, out ivec2 corner2, out vec3 bary);
+int hex_sharpen(vec3 bary, float contrast, float threshold, out vec3 weight);
+uint hex_hash(uvec2 id);
+
+// The cells of a tiled layer's lattice that reach `p`, a point from the camera in the layer's own scaled coordinates,
+// before the sweep and the scroll, so the lattice never moves while the waves scroll through it: each cell's offset in
+// the map, a whole repeat's worth of choice, and its weight, 0 for a cell not read. Cells are only shifted, never
+// turned, so the waves keep the direction they scroll in. A cell's id is the camera's place plus the cell's from the
+// camera, wrapping in 32 bits, so a point of the sea keeps its cell however far the camera goes.
+void water_hex_cells(vec2 p, vec2 frac, ivec2 base, out vec2 offset[3], out vec3 weight)
+{
+    vec2 q = frac + hex_skew(p * WATER_HEX_GRID);
+    vec2 cell = floor(q);
+    ivec2 corner[3];
+    vec3 bary;
+    hex_triangle(q - cell, corner[0], corner[1], corner[2], bary);
+    hex_sharpen(bary, WATER_HEX_CONTRAST, WATER_HEX_THRESHOLD, weight);
+    // Through ivec2: a negative float converts to no uint.
+    uvec2 id = uvec2(base) + uvec2(ivec2(cell));
+    for (int i = 0; i < 3; ++i)
+    {
+        uint h = hex_hash(id + uvec2(corner[i]));
+        offset[i] = vec2(h & 0x7ffu, (h >> 11) & 0x7ffu) * (1.0 / 2048.0);
+    }
+}
+
+// The variance a blend of independent samples loses, given back: one over the root of the squared weights' sum, 1
+// inside a cell and up to sqrt(3) where three cells weigh alike. Faded out as the layer minifies toward a cell spanning
+// four texels of the mip read, where the three samples stop being independent. The mip comes from the plain uv's
+// derivatives, by hand: textureQueryLod is GLSL 4.00.
+float water_hex_gain(vec3 weight, vec2 dx, vec2 dy, vec2 texels)
+{
+    float footprint = max(max(length(dx * texels), length(dy * texels)), 1.0);
+    float cell_texels = min(texels.x, texels.y) / (WATER_HEX_GRID * footprint);
+    return mix(1.0, inversesqrt(dot(weight, weight)), smoothstep(4.0, 16.0, cell_texels));
+}
+
+// One map's normal over a tiled layer's cells. The xy blend about the map's mean, so the gain scales only what varies
+// and the mean slope the author set stays where it was; z blends plainly. The gradients are the plain uv's: a cell's
+// offset jumps at its edge, and implicit derivatives there would pick the smallest mip.
+vec3 water_hex_read(sampler2D map, vec2 uv, vec2 dx, vec2 dy, vec2 offset[3], vec3 weight, float gain, vec2 mean)
+{
+    vec2 xy = vec2(0.0);
+    float z = 0.0;
+    for (int i = 0; i < 3; ++i)
+    {
+        if (weight[i] > 0.0)
+        {
+            vec3 n = textureGrad(map, uv + offset[i], dx, dy).xyz * 2.0 - 1.0;
+            xy += weight[i] * (n.xy - mean);
+            z += weight[i] * n.z;
+        }
+    }
+    return vec3(mean + gain * xy, z);
+}
+
+// A tiled layer's normal at map coordinate `uv` and lattice point `p` (water_hex_cells), from the current map and,
+// while a transition runs, the next, at the same cells and weights: two arrangements cross-fading would crawl. With no
+// transition the next map is not read at all.
+vec3 water_tiled_layer(sampler2D map_a, sampler2D map_b, vec2 uv, vec2 p, vec2 frac, ivec2 base)
+{
+    vec2 dx = dFdx(uv);
+    vec2 dy = dFdy(uv);
+    vec2 offset[3];
+    vec3 weight;
+    water_hex_cells(p, frac, base, offset, weight);
+    float gain = water_hex_gain(weight, dx, dy, vec2(textureSize(map_a, 0)));
+    vec3 n = water_hex_read(map_a, uv, dx, dy, offset, weight, gain, waterMapMean.xy);
+    if (blend_factor > 0.0)
+    {
+        n = mix(n, water_hex_read(map_b, uv, dx, dy, offset, weight, gain, waterMapMean.zw), blend_factor);
+    }
+    return n;
+}
+
+// A layer read plainly, from the current map and, while a transition runs, the next.
+vec3 water_plain_layer(sampler2D map_a, sampler2D map_b, vec2 uv)
+{
+    vec2 dx = dFdx(uv);
+    vec2 dy = dFdy(uv);
+    vec3 n = textureGrad(map_a, uv, dx, dy).xyz * 2.0 - 1.0;
+    if (blend_factor > 0.0)
+    {
+        n = mix(n, textureGrad(map_b, uv, dx, dy).xyz * 2.0 - 1.0, blend_factor);
+    }
+    return n;
+}
+
+// The wave layers' normals at a point `r` from the camera, horizontally, decoded but not normalised: the big layer,
+// and the little map's xy and zw reads, each blended between the environment's two maps by its transition. Every read
+// of the water's normal maps comes through here. In uniform control flow: it takes derivatives.
+void water_wave_normals(sampler2D map_a, sampler2D map_b, vec2 r, out vec3 big, out vec3 little_xy, out vec3 little_zw)
+{
+    vec2 big_uv;
+    vec4 little_uv;
+    water_wave_coords(r, big_uv, little_uv);
+#if WATER_HEXTILE >= 1
+    vec2 p = water_wave_clamp(r);
+    big = water_tiled_layer(map_a, map_b, big_uv, p * 0.04, waterLatticeFrac.xy, waterLatticeBase.xy);
+#else
+    big = water_plain_layer(map_a, map_b, big_uv);
+#endif
+    little_xy = water_plain_layer(map_a, map_b, little_uv.xy);
+#if WATER_HEXTILE >= 2
+    little_zw = water_tiled_layer(map_a, map_b, little_uv.zw, p * vec2(0.1, 0.2), waterLatticeFrac.zw, waterLatticeBase.zw);
+#else
+    little_zw = water_plain_layer(map_a, map_b, little_uv.zw);
+#endif
+}
+
+#endif

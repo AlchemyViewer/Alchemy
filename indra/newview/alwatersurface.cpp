@@ -29,8 +29,10 @@
 #include "alfarplane.h"
 #include "llagent.h"
 #include "llagentcamera.h"
+#include "llappviewer.h"
 #include "llcamera.h"
 #include "llglslshader.h"
+#include "llimage.h"
 #include "llimagegl.h"
 #include "llregionhandle.h"
 #include "llrender.h"
@@ -38,6 +40,7 @@
 #include "llviewercontrol.h"
 #include "llviewercamera.h"
 #include "llviewerregion.h"
+#include "llviewertexture.h"
 #include "llworld.h"
 #include "pipeline.h"
 
@@ -206,4 +209,95 @@ void ALWaterSurface::addExtents(LLVector3& min, LLVector3& max) const
     max.mV[VX] = llmax(max.mV[VX], mCentre.mV[VX] + rim);
     max.mV[VY] = llmax(max.mV[VY], mCentre.mV[VY] + rim);
     max.mV[VZ] = llmax(max.mV[VZ], mHighest);
+}
+
+void ALWaterSurface::trackMaps(LLViewerTexture* current, LLViewerTexture* next)
+{
+    for (LLViewerTexture* map : { current, next })
+    {
+        if (!map)
+        {
+            continue;
+        }
+        MapStats& stats = mapStats(map->getID());
+        stats.mUsed = gFrameCount;
+        if (stats.mKnown)
+        {
+            continue;
+        }
+        LLViewerFetchedTexture* fetched = LLViewerTextureManager::staticCastToFetchedTexture(map);
+        if (!fetched)
+        {
+            continue;
+        }
+        // The full-resolution pixels, saved by the fetch when asked for; let go once read.
+        if (fetched->hasSavedRawImage() && fetched->getSavedRawImageLevel() == 0)
+        {
+            const LLImageRaw* raw = fetched->getSavedRawImage();
+            stats.mMean = ALWaterField::meanNormal(raw->getData(), raw->getWidth(), raw->getHeight(), raw->getComponents());
+            stats.mKnown = true;
+            fetched->destroySavedRawImage();
+        }
+        else
+        {
+            fetched->forceToSaveRawImage(0);
+        }
+    }
+}
+
+LLVector4 ALWaterSurface::mapMeans(const LLViewerTexture* a, const LLViewerTexture* b) const
+{
+    LLVector4 means(0.f, 0.f, 0.f, 0.f);
+    const LLViewerTexture* maps[2] = { a, b };
+    for (S32 i = 0; i < 2; ++i)
+    {
+        const MapStats* stats = maps[i] ? findMapStats(maps[i]->getID()) : nullptr;
+        if (stats && stats->mKnown)
+        {
+            means.mV[2 * i] = stats->mMean.mV[VX];
+            means.mV[2 * i + 1] = stats->mMean.mV[VY];
+        }
+    }
+    return means;
+}
+
+ALWaterSurface::MapStats& ALWaterSurface::mapStats(const LLUUID& id)
+{
+    for (MapStats& stats : mMaps)
+    {
+        if (stats.mID == id)
+        {
+            return stats;
+        }
+    }
+    if (mMaps.size() < MAP_CACHE)
+    {
+        mMaps.emplace_back();
+        mMaps.back().mID = id;
+        return mMaps.back();
+    }
+    // The least recently tracked map makes way.
+    MapStats* oldest = &mMaps.front();
+    for (MapStats& stats : mMaps)
+    {
+        if (stats.mUsed < oldest->mUsed)
+        {
+            oldest = &stats;
+        }
+    }
+    *oldest = MapStats();
+    oldest->mID = id;
+    return *oldest;
+}
+
+const ALWaterSurface::MapStats* ALWaterSurface::findMapStats(const LLUUID& id) const
+{
+    for (const MapStats& stats : mMaps)
+    {
+        if (stats.mID == id)
+        {
+            return &stats;
+        }
+    }
+    return nullptr;
 }

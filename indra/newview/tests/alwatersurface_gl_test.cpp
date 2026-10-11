@@ -45,6 +45,7 @@
 
 #include "../test/lltut.h"
 
+#include <cmath>
 #include <map>
 #include <string>
 #include <vector>
@@ -132,6 +133,206 @@ namespace tut
             return view(FIELD_CAMERA_Z, false);
         }
 
+        // The anti-repeat statistics: one wave layer over 16 x 16 repeats of a synthetic map, TILE_TEXELS a side and as
+        // many pixels a repeat, so the plain read is the map texel for texel.
+        constexpr S32 TILE_TEXELS = 64;
+        constexpr S32 TILING_SIZE = 16 * TILE_TEXELS;
+
+        // A triangle over the whole target, with no inputs.
+        const char* kScreenVertex =
+            "#version 330\n"
+            "void main()\n"
+            "{\n"
+            "    vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);\n"
+            "    gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);\n"
+            "}\n";
+
+        // The layer through the viewer's own reads, plain (tilingMode 0) or hex-tiled (1), at a repeat a tile: its
+        // normal's xy, the largest of the lattice's weights there, and its z.
+        const char* kTilingFragment =
+            "#version 330\n"
+            "uniform sampler2D tilingMap;\n"
+            "uniform int tilingMode;\n"
+            "uniform float tilingRepeat;\n"
+            "uniform vec4 waterLatticeFrac;\n"
+            "uniform ivec4 waterLatticeBase;\n"
+            "out vec4 frag_color;\n"
+            "void water_hex_cells(vec2 p, vec2 frac, ivec2 base, out vec2 offset[3], out vec3 weight);\n"
+            "vec3 water_tiled_layer(sampler2D map_a, sampler2D map_b, vec2 uv, vec2 p, vec2 frac, ivec2 base);\n"
+            "vec3 water_plain_layer(sampler2D map_a, sampler2D map_b, vec2 uv);\n"
+            "void main()\n"
+            "{\n"
+            "    vec2 uv = gl_FragCoord.xy / tilingRepeat;\n"
+            "    vec3 n = tilingMode == 0 ? water_plain_layer(tilingMap, tilingMap, uv)\n"
+            "                             : water_tiled_layer(tilingMap, tilingMap, uv, uv, waterLatticeFrac.xy, waterLatticeBase.xy);\n"
+            "    vec2 offset[3];\n"
+            "    vec3 weight;\n"
+            "    water_hex_cells(uv, waterLatticeFrac.xy, waterLatticeBase.xy, offset, weight);\n"
+            "    frag_color = vec4(n.xy, max(weight.x, max(weight.y, weight.z)), n.z);\n"
+            "}\n";
+
+        // The cell of the big layer's lattice that holds most of each pixel's point of the sea: its offset and weight.
+        // The pixel's point is a repeat a tile from the target's corner, and latticeFromCamera is that corner's point
+        // less the camera's, in repeats, as the viewer's camera-relative points are.
+        const char* kLatticeFragment =
+            "#version 330\n"
+            "uniform float tilingRepeat;\n"
+            "uniform vec2 latticeFromCamera;\n"
+            "uniform vec4 waterLatticeFrac;\n"
+            "uniform ivec4 waterLatticeBase;\n"
+            "out vec4 frag_color;\n"
+            "void water_hex_cells(vec2 p, vec2 frac, ivec2 base, out vec2 offset[3], out vec3 weight);\n"
+            "void main()\n"
+            "{\n"
+            "    vec2 p = gl_FragCoord.xy / tilingRepeat + latticeFromCamera;\n"
+            "    vec2 offset[3];\n"
+            "    vec3 weight;\n"
+            "    water_hex_cells(p, waterLatticeFrac.xy, waterLatticeBase.xy, offset, weight);\n"
+            "    int top = weight.x >= weight.y ? (weight.x >= weight.z ? 0 : 2) : (weight.y >= weight.z ? 1 : 2);\n"
+            "    frag_color = vec4(offset[top], weight[top], 0.0);\n"
+            "}\n";
+
+        // A tiling normal map whose slopes run mostly along one oblique direction, about 27 degrees off x, with a mean
+        // tilt: a height field of sines at whole cycles a repeat, near (2, 1) multiples, its normals encoded as a
+        // normal map's are.
+        std::vector<U8> noiseMap()
+        {
+            constexpr F64 TWO_PI = 6.283185307179586;
+            struct Term
+            {
+                F64 kx;
+                F64 ky;
+                F64 amp;
+                F64 phase;
+            };
+            std::vector<Term> terms;
+            U32 seed = 12345;
+            const auto next = [&seed]()
+            {
+                seed = seed * 1664525u + 1013904223u;
+                return (F64)(seed >> 8) / 16777216.0;
+            };
+            for (S32 m = 1; m <= 4; ++m)
+            {
+                for (S32 e = -1; e <= 1; ++e)
+                {
+                    const F64 kx = 2.0 * m + e;
+                    const F64 ky = (F64)m - e;
+                    terms.push_back({ kx, ky, (0.5 + next()) / std::sqrt(kx * kx + ky * ky), TWO_PI * next() });
+                }
+            }
+            std::vector<U8> rgba((size_t)TILE_TEXELS * TILE_TEXELS * 4);
+            for (S32 y = 0; y < TILE_TEXELS; ++y)
+            {
+                for (S32 x = 0; x < TILE_TEXELS; ++x)
+                {
+                    F64 sx = 0.0;
+                    F64 sy = 0.0;
+                    for (const Term& t : terms)
+                    {
+                        const F64 c = t.amp * std::cos(TWO_PI * (t.kx * x + t.ky * y) / TILE_TEXELS + t.phase);
+                        sx += t.kx * c;
+                        sy += t.ky * c;
+                    }
+                    // Slopes of about 0.47 and 0.25 rms along x and y, and a tilt.
+                    F64 n[3] = { -0.2 * sx + 0.15, -0.2 * sy - 0.1, 1.0 };
+                    const F64 len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+                    U8* texel = rgba.data() + ((size_t)y * TILE_TEXELS + x) * 4;
+                    for (S32 c = 0; c < 3; ++c)
+                    {
+                        texel[c] = (U8)llclamp((S32)std::lround((n[c] / len * 0.5 + 0.5) * 255.0), 0, 255);
+                    }
+                    texel[3] = 255;
+                }
+            }
+            return rgba;
+        }
+
+        // A render of the layer's normals, xy each, with the largest lattice weight at each pixel.
+        struct SlopeField
+        {
+            std::vector<F32> rgba;
+
+            F32 x(S32 i, S32 j) const { return rgba[((size_t)j * TILING_SIZE + i) * 4]; }
+            F32 y(S32 i, S32 j) const { return rgba[((size_t)j * TILING_SIZE + i) * 4 + 1]; }
+            F32 weight(S32 i, S32 j) const { return rgba[((size_t)j * TILING_SIZE + i) * 4 + 2]; }
+        };
+
+        struct SlopeStats
+        {
+            F64 mean[2] = {};
+            F64 var[2] = {};
+            F64 cov = 0.0;
+
+            F64 axis() const { return 0.5 * std::atan2(2.0 * cov, var[0] - var[1]); }
+            F64 major() const { return 0.5 * (var[0] + var[1]) + std::sqrt(0.25 * (var[0] - var[1]) * (var[0] - var[1]) + cov * cov); }
+            F64 minor() const { return 0.5 * (var[0] + var[1]) - std::sqrt(0.25 * (var[0] - var[1]) * (var[0] - var[1]) + cov * cov); }
+        };
+
+        // The field's statistics, over every pixel or over those the lattice blends, where its largest weight is under 1.
+        SlopeStats slopeStats(const SlopeField& f, bool blended_only = false)
+        {
+            SlopeStats s;
+            F64 sum[2] = {};
+            F64 sq[2] = {};
+            F64 xy = 0.0;
+            F64 n = 0.0;
+            for (S32 j = 0; j < TILING_SIZE; ++j)
+            {
+                for (S32 i = 0; i < TILING_SIZE; ++i)
+                {
+                    if (blended_only && f.weight(i, j) > 0.999f)
+                    {
+                        continue;
+                    }
+                    n += 1.0;
+                    const F64 a = f.x(i, j);
+                    const F64 b = f.y(i, j);
+                    sum[0] += a;
+                    sum[1] += b;
+                    sq[0] += a * a;
+                    sq[1] += b * b;
+                    xy += a * b;
+                }
+            }
+            for (S32 c = 0; c < 2; ++c)
+            {
+                s.mean[c] = sum[c] / n;
+                s.var[c] = sq[c] / n - s.mean[c] * s.mean[c];
+            }
+            s.cov = xy / n - s.mean[0] * s.mean[1];
+            return s;
+        }
+
+        // The correlation of the field's x slope with itself `dx`, `dy` pixels over.
+        F64 correlation(const SlopeField& f, S32 dx, S32 dy)
+        {
+            F64 sa = 0.0;
+            F64 sb = 0.0;
+            F64 saa = 0.0;
+            F64 sbb = 0.0;
+            F64 sab = 0.0;
+            F64 n = 0.0;
+            for (S32 j = 0; j + dy < TILING_SIZE; ++j)
+            {
+                for (S32 i = 0; i + dx < TILING_SIZE; ++i)
+                {
+                    const F64 a = f.x(i, j);
+                    const F64 b = f.x(i + dx, j + dy);
+                    sa += a;
+                    sb += b;
+                    saa += a * a;
+                    sbb += b * b;
+                    sab += a * b;
+                    n += 1.0;
+                }
+            }
+            const F64 cov = sab / n - (sa / n) * (sb / n);
+            const F64 va = saa / n - (sa / n) * (sa / n);
+            const F64 vb = sbb / n - (sb / n) * (sb / n);
+            return cov / std::sqrt(va * vb);
+        }
+
         // [centre - FIELD_VIEW, centre + FIELD_VIEW] square onto the target, depth over [1, FIELD_FAR] metres below the
         // camera.
         LLMatrix4a fieldOrtho(F32 cx, F32 cy)
@@ -163,12 +364,19 @@ namespace tut
             {
                 mScene.flush();
             }
+            if (mSlopes.isBoundInStack())
+            {
+                mSlopes.flush();
+            }
             LLGLSLShader::unbind();
             mColour.unload();
             mExclusion.unload();
             mField.unload();
+            mTiling.unload();
             mShaders.clearShaderObjects();
             mCellMap = nullptr;
+            mNoise = nullptr;
+            mSlopes.release();
             mQuery.release();
             mScene.release();
             mBehind.release();
@@ -196,7 +404,7 @@ namespace tut
                 S32 level = 1;
                 ensure(std::string("compiled ") + object, mShaders.loadShaderFile(object, level, GL_VERTEX_SHADER, &defines) != 0);
             }
-            for (const char* object : { "deferred/globalF.glsl", "environment/waterSurface.glsl" })
+            for (const char* object : { "deferred/globalF.glsl", "environment/waterSurface.glsl", "deferred/hexLatticeUtil.glsl" })
             {
                 S32 level = 1;
                 ensure(std::string("compiled ") + object, mShaders.loadShaderFile(object, level, GL_FRAGMENT_SHADER, &defines) != 0);
@@ -456,6 +664,10 @@ namespace tut
         LLVector4              mSquare;
         LLMatrix4a             mView;
         F32                    mCameraZ = 0.f;
+
+        LLGLSLShader           mTiling;
+        LLPointer<LLImageGL>   mNoise;
+        LLRenderTarget         mSlopes;
     };
 
     typedef test_group<alwatersurface_data> alwatersurface_t;
@@ -792,5 +1004,186 @@ namespace tut
             mField.unload();
             mQuery.release();
         }
+    }
+
+    // Anti-repeat: the big layer hex-tiled through the viewer's own reads breaks its repeat and keeps what the author
+    // set. One repeat over, its slopes no longer match themselves, where the plain read matches exactly; their mean,
+    // variance, and principal axis and spread are the plain read's; and most of the sea is one cell's sample, unblended.
+    template<> template<>
+    void alwatersurface_object_t::test<13>()
+    {
+        const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kScreenVertex);
+        const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kTilingFragment);
+        ensure("tiling shaders compile", vs && fs);
+        std::map<std::string, std::string> defines;
+        S32 level = 1;
+        const GLuint surface = mShaders.loadShaderFile("environment/waterSurface.glsl", level, GL_FRAGMENT_SHADER, &defines);
+        level = 1;
+        const GLuint lattice = mShaders.loadShaderFile("deferred/hexLatticeUtil.glsl", level, GL_FRAGMENT_SHADER, &defines);
+        ensure("the viewer's reads compile", surface != 0 && lattice != 0);
+        mTiling.mProgramObject = glCreateProgram();
+        mTiling.mName = "anti-repeat (test)";
+        mTiling.attachObject(vs);
+        mTiling.attachObject(fs);
+        mTiling.attachObject(surface);
+        mTiling.attachObject(lattice);
+        ensure("tiling program links", mTiling.mapAttributes());
+        glDeleteShader(vs);
+        glDeleteShader(fs);
+        ensure("tiling program maps", mTiling.mapUniforms());
+
+        const std::vector<U8> rgba = noiseMap();
+        mNoise = new LLImageGL(TILE_TEXELS, TILE_TEXELS, 4, false);
+        mNoise->setExplicitFormat(GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
+        ensure("noise map", mNoise->createGLTexture(0, rgba.data()));
+        const LLVector2 mean = ALWaterField::meanNormal(rgba.data(), TILE_TEXELS, TILE_TEXELS, 4);
+
+        ensure("slopes target", mSlopes.allocate(TILING_SIZE, TILING_SIZE, GL_RGBA32F));
+        const ALWaterField::LatticePlaces places = ALWaterField::latticePlaces(1234.5, 6789.1);
+
+        const auto render = [&](S32 mode)
+        {
+            SlopeField field;
+            mSlopes.bindTarget();
+            mSlopes.clear();
+            mTiling.bind();
+            glUniform1i(glGetUniformLocation(mTiling.mProgramObject, "tilingMap"), 0);
+            glUniform1i(glGetUniformLocation(mTiling.mProgramObject, "tilingMode"), mode);
+            glUniform1f(glGetUniformLocation(mTiling.mProgramObject, "tilingRepeat"), (F32)TILE_TEXELS);
+            // Point-sampled: the plain read lands on texel centres, the cells at their offsets between them, and a
+            // bilinear read there would smooth the tiled slopes alone.
+            gGL.getTextureSlot(0)->bindSampled(mNoise.get(), ALSamplers::PointWrap);
+            mTiling.uniform1f(LLShaderMgr::BLEND_FACTOR, 0.f);
+            const LLVector4 means(mean.mV[VX], mean.mV[VY], 0.f, 0.f);
+            mTiling.uniform4fv(LLShaderMgr::WATER_MAP_MEAN, 1, means.mV);
+            mTiling.uniform4fv(LLShaderMgr::WATER_LATTICE_FRAC, 1, places.mFrac.mV);
+            mTiling.uniform4iv(LLShaderMgr::WATER_LATTICE_BASE, 1, places.mBase);
+            {
+                LLGLDisable cull(GL_CULL_FACE);
+                LLGLDepthTest depth(GL_FALSE);
+                gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
+            }
+            field.rgba.resize((size_t)TILING_SIZE * TILING_SIZE * 4);
+            glReadPixels(0, 0, TILING_SIZE, TILING_SIZE, GL_RGBA, GL_FLOAT, field.rgba.data());
+            gGL.getTextureSlot(0)->unbind();
+            mSlopes.flush();
+            return field;
+        };
+
+        const SlopeField plain = render(0);
+        const SlopeField tiled = render(1);
+
+        ensure("the plain read repeats", correlation(plain, TILE_TEXELS, 0) > 0.99 && correlation(plain, 0, TILE_TEXELS) > 0.99);
+        const F64 across = correlation(tiled, TILE_TEXELS, 0);
+        const F64 along = correlation(tiled, 0, TILE_TEXELS);
+        ensure("hex-tiled, a repeat across matches no more than by chance", std::fabs(across) <= 0.2);
+        ensure("nor a repeat along", std::fabs(along) <= 0.2);
+
+        const SlopeStats p = slopeStats(plain);
+        const SlopeStats t = slopeStats(tiled);
+        for (S32 c = 0; c < 2; ++c)
+        {
+            const F64 shift = (t.mean[c] - p.mean[c]) / std::sqrt(p.var[c]);
+            ensure("the slopes' mean, off by " + std::to_string(shift) + " sigma", std::fabs(shift) <= 0.05);
+            const F64 ratio = t.var[c] / p.var[c];
+            ensure("their variance, at " + std::to_string(ratio) + " of the plain read's", std::fabs(ratio - 1.0) <= 0.05);
+        }
+        const F64 turned = (t.axis() - p.axis()) * RAD_TO_DEG;
+        ensure("the slopes' principal axis, turned " + std::to_string(turned) + " degrees", std::fabs(turned) <= 2.0);
+        const F64 spread = (t.major() / t.minor()) / (p.major() / p.minor());
+        ensure("their spread along and across it, at " + std::to_string(spread), std::fabs(spread - 1.0) <= 0.05);
+
+        // Where cells blend, the same: the bands lie where the lattice says, whatever the map shows there, so the plain
+        // read's statistics are theirs too. A weighting that favours one sample over another shows only here.
+        const SlopeStats b = slopeStats(tiled, true);
+        for (S32 c = 0; c < 2; ++c)
+        {
+            const F64 shift = (b.mean[c] - p.mean[c]) / std::sqrt(p.var[c]);
+            ensure("the bands' mean, off by " + std::to_string(shift) + " sigma", std::fabs(shift) <= 0.01);
+            const F64 ratio = b.var[c] / p.var[c];
+            ensure("the bands' variance, at " + std::to_string(ratio) + " of the plain read's", std::fabs(ratio - 1.0) <= 0.1);
+        }
+
+        S32 single = 0;
+        for (S32 j = 0; j < TILING_SIZE; ++j)
+        {
+            for (S32 i = 0; i < TILING_SIZE; ++i)
+            {
+                single += tiled.weight(i, j) > 0.999f ? 1 : 0;
+            }
+        }
+        ensure("most of the sea is one cell's sample", single > TILING_SIZE * TILING_SIZE / 2);
+    }
+
+    // The lattice stays in the world: every point of the sea shows the same cell of the big layer's lattice from two
+    // cameras several cells apart, their places on it reaching the shader through the program's uniforms as the
+    // water's do. A place whose floor never arrives shifts every cell by the camera's moves across the lattice.
+    template<> template<>
+    void alwatersurface_object_t::test<14>()
+    {
+        constexpr S32 SIZE = 256;
+        constexpr F32 REPEAT = 16.f;
+        const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kScreenVertex);
+        const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kLatticeFragment);
+        ensure("lattice shaders compile", vs && fs);
+        std::map<std::string, std::string> defines;
+        S32 level = 1;
+        const GLuint surface = mShaders.loadShaderFile("environment/waterSurface.glsl", level, GL_FRAGMENT_SHADER, &defines);
+        level = 1;
+        const GLuint lattice = mShaders.loadShaderFile("deferred/hexLatticeUtil.glsl", level, GL_FRAGMENT_SHADER, &defines);
+        ensure("the viewer's reads compile", surface != 0 && lattice != 0);
+        mTiling.mProgramObject = glCreateProgram();
+        mTiling.mName = "lattice (test)";
+        mTiling.attachObject(vs);
+        mTiling.attachObject(fs);
+        mTiling.attachObject(surface);
+        mTiling.attachObject(lattice);
+        ensure("lattice program links", mTiling.mapAttributes());
+        glDeleteShader(vs);
+        glDeleteShader(fs);
+        ensure("lattice program maps", mTiling.mapUniforms());
+        ensure("cells target", mSlopes.allocate(SIZE, SIZE, GL_RGBA32F));
+
+        // The target's corner and the two cameras, in repeats of the big layer, well out on the grid.
+        const F64 corner[2] = { 1000.37, 2000.61 };
+        const F64 cameras[2][2] = { { corner[0] + 3.3, corner[1] + 4.1 }, { corner[0] + 15.0, corner[1] - 3.8 } };
+        std::vector<F32> cells[2];
+        for (S32 k = 0; k < 2; ++k)
+        {
+            const ALWaterField::LatticePlaces places = ALWaterField::latticePlaces(cameras[k][0] / ALWaterField::BIG_SCALE,
+                                                                                    cameras[k][1] / ALWaterField::BIG_SCALE);
+            mSlopes.bindTarget();
+            mSlopes.clear();
+            mTiling.bind();
+            glUniform1f(glGetUniformLocation(mTiling.mProgramObject, "tilingRepeat"), REPEAT);
+            glUniform2f(glGetUniformLocation(mTiling.mProgramObject, "latticeFromCamera"), (F32)(corner[0] - cameras[k][0]),
+                        (F32)(corner[1] - cameras[k][1]));
+            mTiling.uniform4fv(LLShaderMgr::WATER_LATTICE_FRAC, 1, places.mFrac.mV);
+            mTiling.uniform4iv(LLShaderMgr::WATER_LATTICE_BASE, 1, places.mBase);
+            {
+                LLGLDisable cull(GL_CULL_FACE);
+                LLGLDepthTest depth(GL_FALSE);
+                gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
+            }
+            cells[k].resize((size_t)SIZE * SIZE * 4);
+            glReadPixels(0, 0, SIZE, SIZE, GL_RGBA, GL_FLOAT, cells[k].data());
+            mSlopes.flush();
+        }
+
+        // Points well inside a cell from both cameras; on a band's edge float rounding may tip either way.
+        S32 compared = 0;
+        S32 moved = 0;
+        for (size_t n = 0; n < (size_t)SIZE * SIZE; ++n)
+        {
+            const F32* a = cells[0].data() + n * 4;
+            const F32* b = cells[1].data() + n * 4;
+            if (a[2] > 0.999f && b[2] > 0.999f)
+            {
+                ++compared;
+                moved += (a[0] != b[0] || a[1] != b[1]) ? 1 : 0;
+            }
+        }
+        ensure("most points lie inside a cell", compared > SIZE * SIZE / 2);
+        ensure_equals("no point of the sea changes cell as the camera moves", moved, 0);
     }
 }
