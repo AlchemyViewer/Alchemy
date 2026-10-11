@@ -11703,7 +11703,11 @@ void LLPipeline::doWaterExclusionMask()
     mWaterExclusionMask.bindTarget();
     gGL.setClearColor(LLColor4::white);
     mWaterExclusionMask.clear();
-    mWaterExclusionPool->render();
+    // Made in init and kept to cleanup. Without it the mask stays cleared, excluding nothing.
+    if (mWaterExclusionPool)
+    {
+        mWaterExclusionPool->render();
+    }
 
     mWaterExclusionMask.flush();
     gGL.setClearColor(LLColor4::transparent);
