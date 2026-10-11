@@ -3059,4 +3059,38 @@ namespace tut
             ensure_equals(spaces ? "formatted, spaced" : "formatted, none", ALScriptFormatter::format(same.text, formatter), same.text);
         }
     }
+
+    template<> template<>
+    void allsltoslua_object::test<95>()
+    {
+        set_test_name("a comment after an unbraced body, on the line it ends, trails the statement that ends that line: a then's, an "
+                      "elseif's, an else's, a loop's; an empty body's the line that opens it; a one-line if's, the whole if");
+        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
+                                              "    integer a; integer b;\n"
+                                              "    if (n == 1)\n"
+                                              "        llOwnerSay(\"a\"); // after a\n"
+                                              "    else if (n == 2)\n"
+                                              "        llOwnerSay(\"b\"); // after b\n"
+                                              "    else\n"
+                                              "        llOwnerSay(\"c\"); // after c\n"
+                                              "    if ( (b = 1) == 2 );    // empty\n"
+                                              "    else if ( b == 2 );     // empty too\n"
+                                              "    else a = 2;             // after a = 2\n"
+                                              "    if (a)\n"
+                                              "        if (b) llOwnerSay(\"x\"); // inner, one line\n"
+                                              "    while (n > 5)\n"
+                                              "        n = n - 1; // after the step\n"
+                                              "    while (a) ; // an empty loop\n"
+                                              "    if (n == 5) llOwnerSay(\"h\"); // after h\n"
+                                              "} }\n");
+        ensure("a then's, an elseif's, an else's: " + r.text,
+               has(r, "    if n == 1 then\n        print(\"a\") -- after a\n    elseif n == 2 then\n        print(\"b\") -- after b\n"
+                      "    else\n        print(\"c\") -- after c\n    end\n"));
+        ensure("an empty body's, the line that opens it: " + r.text,
+               has(r, " == 2 then -- empty\n    elseif b == 2 then -- empty too\n    else\n        a = true -- after a = 2\n    end\n"));
+        ensure("an if on one line inside another: " + r.text, has(r, "        if b ~= 0 then print(\"x\") end -- inner, one line\n"));
+        ensure("a loop's body's: " + r.text, has(r, "        n -= 1 -- after the step\n    end\n") && has(r, "    while a do -- an empty loop\n    end\n"));
+        ensure("a one-line if, as before: " + r.text, has(r, "    if n == 5 then print(\"h\") end -- after h\n"));
+        checksClean(r);
+    }
 }

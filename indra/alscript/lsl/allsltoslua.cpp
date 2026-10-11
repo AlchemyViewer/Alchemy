@@ -455,6 +455,12 @@ namespace
         void findComments();
         void place(size_t k, const std::vector<LSLASTNode*>& children, LSLASTNode* holder);
         bool placeInside(size_t k, LSLASTNode* node);
+        // A comment of one line after a bare statement, on the line it
+        // ends: given to the statement that ends that line (trailedBare),
+        // after it, or, where that is an empty body, after the line that
+        // opens it. Not where that is an if or a loop over lines, whose
+        // own line is its first. Whether it was.
+        bool trailBare(size_t k, LSLASTNode* statement, bool body);
         void placeIn(size_t k, LSLASTNode* compound);
         // Those given to a node, written over it; those at a holder's end,
         // with any of what it held that nothing wrote, at its end. Those
@@ -1539,6 +1545,69 @@ namespace
                 default: return true;
             }
         }
+
+        // The statement that ends a bare one's last line: down an if's last
+        // branch, a while's or a for's body. Not into an if with no else on
+        // one line, which is written on one (Writer::onOneLine), but for an
+        // else's, which is an elseif.
+        LSLASTNode* trailedBare(LSLASTNode* node)
+        {
+            bool elseif = false;
+            while (!isNull(node) && node->getNodeType() == NODE_STATEMENT)
+            {
+                switch (node->getNodeSubType())
+                {
+                    case NODE_IF_STATEMENT:
+                    {
+                        LSLASTNode* no = node->getChild(2);
+                        if (isNull(no) && !elseif && node->getLoc()->first_line == node->getLoc()->last_line)
+                        {
+                            return node;
+                        }
+                        elseif = !isNull(no) && no->getNodeSubType() == NODE_IF_STATEMENT;
+                        node   = isNull(no) ? node->getChild(1) : no;
+                        continue;
+                    }
+                    case NODE_WHILE_STATEMENT:
+                        elseif = false;
+                        node   = node->getChild(1);
+                        continue;
+                    case NODE_FOR_STATEMENT:
+                        elseif = false;
+                        node   = node->getChild(3);
+                        continue;
+                    default: return node;
+                }
+            }
+            return node;
+        }
+    }
+
+    bool Writer::trailBare(size_t k, LSLASTNode* statement, bool body)
+    {
+        const Pos at = mComments[k].at;
+        if (isNull(statement) || !endsBare(statement) || mComments[k].endLine != at.line || at.line != statement->getLoc()->last_line)
+        {
+            return false;
+        }
+        LSLASTNode*          trailed = trailedBare(statement);
+        const LSLNodeSubType type    = trailed->getNodeSubType();
+        const bool control = type == NODE_IF_STATEMENT || type == NODE_WHILE_STATEMENT || type == NODE_FOR_STATEMENT || type == NODE_DO_STATEMENT;
+        if (control && trailed->getLoc()->first_line != trailed->getLoc()->last_line)
+        {
+            return false;
+        }
+        // An empty body writes no line of its own: the comment trails the
+        // one that opens it, `if c then -- why`.
+        if (type == NODE_NOP_STATEMENT && (body || trailed != statement))
+        {
+            mCommentsOpening[trailed].push_back(k);
+        }
+        else
+        {
+            mCommentsAfter[trailed].push_back(k);
+        }
+        return true;
     }
 
     void Writer::place(size_t k, const std::vector<LSLASTNode*>& children, LSLASTNode* holder)
@@ -1567,19 +1636,11 @@ namespace
             break;
         }
         // On the line a bare statement ends, after it: about that statement,
-        // and after it too, where it is one line of the comment's and the
-        // statement one line, or no if or loop, whose first line is not
-        // where the comment was.
+        // and after the one that ends the line (trailBare), or over it where
+        // it does not trail one.
         if (prev && endsBare(prev) && at.line == prev->getLoc()->last_line)
         {
-            const LSLNodeSubType type    = prev->getNodeSubType();
-            const bool           control = type == NODE_IF_STATEMENT || type == NODE_WHILE_STATEMENT || type == NODE_FOR_STATEMENT ||
-                                 type == NODE_DO_STATEMENT;
-            if (mComments[k].endLine == at.line && (!control || prev->getLoc()->first_line == prev->getLoc()->last_line))
-            {
-                mCommentsAfter[prev].push_back(k);
-            }
-            else
+            if (!trailBare(k, prev, false))
             {
                 mCommentsBefore[prev].push_back(k);
             }
@@ -1663,6 +1724,14 @@ namespace
                     case NODE_IF_STATEMENT:
                     {
                         if (within(node->getChild(1)) || within(node->getChild(2)))
+                        {
+                            return true;
+                        }
+                        // On the line a bare branch ends, after it: after
+                        // what ends that line, not over the else.
+                        if (LSLASTNode* yes = node->getChild(1); !isNull(yes) &&
+                                                                  !(at < Pos{ yes->getLoc()->last_line, yes->getLoc()->last_column }) &&
+                                                                  trailBare(k, yes, true))
                         {
                             return true;
                         }
