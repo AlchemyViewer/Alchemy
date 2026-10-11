@@ -607,9 +607,17 @@ namespace
         Expr sideEffect(LSLExpression* e);
         // The arguments, each as its parameter's type -- but those SLua takes
         // either text or a uuid for (`text`, a bit for each by its place),
-        // as they are.
+        // as they are; and, for ll's or llcompat's (`builtin`), text given
+        // for a key (Writer::textAsKey).
         // One may be given written already: its place, and its text.
-        std::string args(LSLASTNode* list, LSLParamList* params, U16 text = 0, int put = -1, const std::string& put_text = {});
+        std::string args(LSLASTNode* list, LSLParamList* params, U16 text = 0, int put = -1, const std::string& put_text = {},
+                         bool builtin = false);
+        // Text given where ll or llcompat takes a key: as it is, which they
+        // take as LSL's functions did, where uuid() would stop the script
+        // on text that is no UUID, which LSL's function answered as it
+        // answers a key of nothing; `:: any` tells the type checker, which
+        // asks for a uuid. A UUID written out is a uuid, as anywhere.
+        std::string textAsKey(LSLExpression* given);
         // What SLua has in a library call's stead, where it means the same;
         // nothing where it has nothing.
         std::optional<Expr> idiom(LSLFunctionExpression* e, const std::string& lsl, std::string& called);
@@ -2391,7 +2399,23 @@ namespace
         return out;
     }
 
-    std::string Writer::args(LSLASTNode* list, LSLParamList* params, U16 text, int put, const std::string& put_text)
+    std::string Writer::textAsKey(LSLExpression* given)
+    {
+        LSLExpression* inner = unbracketed(given);
+        const bool     uuid  = inner && inner->getNodeSubType() == NODE_CONSTANT_EXPRESSION &&
+                          inner->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT &&
+                          ALLSLTraits::isUuid(static_cast<LSLStringConstant*>(inner->getChild(0))->getValue());
+        if (slType(given) != LST_STRING || uuid)
+        {
+            return coerced(given, LST_KEY).text;
+        }
+        noteOnce(given, "SluaKeyAsText",
+                 "SLua's ll takes a key as text, as LSL's functions did, so text is given as it is; `:: any` tells the type checker, which "
+                 "asks for a uuid. uuid() would stop the script on text that is no UUID.");
+        return bracketed(value(given), PRIMARY) + " :: any";
+    }
+
+    std::string Writer::args(LSLASTNode* list, LSLParamList* params, U16 text, int put, const std::string& put_text, bool builtin)
     {
         std::string out;
         LSLASTNode* param = params ? params->getChild(0) : nullptr;
@@ -2406,7 +2430,10 @@ namespace
                 to = slType(given);
             }
             // A parameter the script only reads as a truth is given one.
-            out += (out.empty() ? "" : ", ") + (at == put ? put_text : boolean(taken) ? truthOf(given) : coerced(given, to).text);
+            out += (out.empty() ? "" : ", ") + (at == put                 ? put_text
+                                                : boolean(taken)            ? truthOf(given)
+                                                : builtin && to == LST_KEY ? textAsKey(given)
+                                                                            : coerced(given, to).text);
             param = param ? param->getNext() : nullptr;
         }
         return out;
@@ -2663,7 +2690,7 @@ namespace
             else
             {
                 const LSLIType to = param ? param->getIType() : static_cast<LSLExpression*>(arg)->getIType();
-                one               = coerced(static_cast<LSLExpression*>(arg), to).text;
+                one               = to == LST_KEY ? textAsKey(static_cast<LSLExpression*>(arg)) : coerced(static_cast<LSLExpression*>(arg), to).text;
             }
             out += (out.empty() ? "" : ", ") + one;
             param = param ? param->getNext() : nullptr;
@@ -3117,7 +3144,7 @@ namespace
         table += lines ? listIndent(0) + "}" : " }";
         called = "ll." + lsl.substr(2);
         LSLParamList* params = e->getIdentifier()->getSymbol()->getFunctionDecl();
-        return Expr{ called + "(" + args(e->getArguments(), params, 0, call->at, table) + ")" };
+        return Expr{ called + "(" + args(e->getArguments(), params, 0, call->at, table, true) + ")" };
     }
 
     std::optional<Expr> Writer::idiom(LSLFunctionExpression* e, const std::string& lsl, std::string& called)
@@ -3446,7 +3473,7 @@ namespace
                 noteOnce(e, "SluaUse", "SLua would use [1] for [2].", { trait->sluaUse, lsl });
             }
             const std::string args_text =
-                (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params, trait ? trait->sluaTextArgs : 0);
+                (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params, trait ? trait->sluaTextArgs : 0, -1, {}, true);
             return { called + "(" + args_text + ")", PRIMARY, (slua & ALLSLTraits::SluaBool) != 0 };
         }
         // An index SLua's ll counts from 1, or nil for none, read as LSL's:
@@ -3454,7 +3481,7 @@ namespace
         const U8 not_ll = compat_only & ~ALLSLTraits::SluaIndexResult;
         if (mOptions.sluaCalls && (slua & ALLSLTraits::SluaIndexResult) && !(slua & not_ll) && ll_indexes)
         {
-            const std::string args_text = (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params);
+            const std::string args_text = (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params, 0, -1, {}, true);
             called                      = "ll." + bare;
             return { "(" + called + "(" + args_text + ") or 0) - 1", ADD };
         }
@@ -3499,7 +3526,7 @@ namespace
             noteOnce(e, "SluaUse", "SLua would use [1] for [2].", { trait->sluaUse, lsl });
         }
         called = "llcompat." + bare;
-        return { called + "(" + args(e->getArguments(), params) + ")" };
+        return { called + "(" + args(e->getArguments(), params, 0, -1, {}, true) + ")" };
     }
 
     Expr Writer::signedUnless(bool same, const std::string& call, LSLASTNode* at)
