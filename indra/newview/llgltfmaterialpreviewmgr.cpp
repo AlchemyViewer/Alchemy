@@ -428,6 +428,11 @@ bool LLGLTFPreviewTexture::render()
 
     if (!mShouldRender) { return false; }
 
+    // The swatch's alpha is its coverage, drawn over a checkerboard. Without this the
+    // preview takes whatever mask the last frame ended on, and after a HUD pass that leaves
+    // alpha unwritten from the clears through the final blit.
+    LLGLSColorMask color_mask(true, true);
+
     gGL.setClearColor(LLColor4::transparent);
     gGL.clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -507,7 +512,9 @@ bool LLGLTFPreviewTexture::render()
         // Alpha blend rendering
 
         screen.bindTarget();
-        gGL.clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // Colour only: the sphere draws with the depth test off, and depth writes are off
+        // with it, so a depth clear here would do nothing.
+        gGL.clear(GL_COLOR_BUFFER_BIT);
 
         LLGLSLShader& shader = *gDeferredPBRAlphaProgram.selectVariant();
 
