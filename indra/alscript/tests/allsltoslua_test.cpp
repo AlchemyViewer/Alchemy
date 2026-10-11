@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../lsl/allsltoslua.h"
+#include "../core/alscriptformatter.h"
 #include "../lint/alscriptfixes.h"
 #include "../lsl/allslservice.h"
 #include "../lsl/allsltraits.h"
@@ -264,12 +265,12 @@ namespace tut
         ensure("a float as LSL writes it: " + r.text, has(r, "string.format(\"%.6f\", f)"));
         ensure("a string as an integer, as a list's item converts it: " + r.text,
                has(r, "lslInteger(\"12abc\")") && has(r, "return llcompat.List2Integer({ s }, 0)"));
-        ensure("lists compared by length: " + r.text, has(r, "#l == #{1}") && noted(r, "SluaListCompare"));
+        ensure("lists compared by length: " + r.text, has(r, "#l == #{ 1 }") && noted(r, "SluaListCompare"));
         // bit32 answers 0 to 4294967295: made LSL's signed integer, but where
         // bit32 takes it again.
         ensure("bits: " + r.text, has(r, "bit32.s32(bit32.bor(bit32.band(a, b), 4))") && !has(r, "local function int32"));
         ensure("a vector's part set: " + r.text, has(r, "v = vector(4, v.y, v.z)") && has(r, "v = vector(v.x, v.y, v.z + 1)"));
-        ensure("a vector as LSL writes it: " + r.text, has(r, "ll.DumpList2String({v}, \"\")"));
+        ensure("a vector as LSL writes it: " + r.text, has(r, "ll.DumpList2String({ v }, \"\")"));
         checksClean(r);
     }
 
@@ -407,7 +408,7 @@ namespace tut
         ensure("one thing found in a list: " + r.text, has(r, "if table.find(l, \"a\") ~= nil then"));
         ensure("~ of a find: " + r.text, has(r, "if string.find(s, \"c\", 1, true) ~= nil then"));
         ensure("< 0 of one: " + r.text, has(r, "if string.find(s, \"z\", 1, true) == nil then"));
-        ensure("a find's index as a number, through llcompat: " + r.text, has(r, "llcompat.ListFindList(l, {\"a\", \"b\"})"));
+        ensure("a find's index as a number, through llcompat: " + r.text, has(r, "llcompat.ListFindList(l, { \"a\", \"b\" })"));
         ensure("^, math and vector: " + r.text, has(r, "2.0 ^ 3.0") && has(r, "math.abs(-1.0)") && has(r, "vector.magnitude(vector(1, 2, 3) - ZERO_VECTOR)"));
         ensure("half up, as LSL rounds, not math.round: " + r.text, has(r, "math.floor(2.5 + 0.5)"));
         ensure("os.time and print: " + r.text, has(r, "os.time()") && has(r, "print("));
@@ -535,7 +536,7 @@ namespace tut
         ensure("a global toggled: " + r.text, has(r, "local gOn = false") && has(r, "gOn = not gOn") && has(r, "if gOn then"));
         ensure("compared with FALSE: " + r.text, has(r, "local gSeen = false") && has(r, "if not gSeen and isOwner(") && has(r, "gSeen = true"));
         ensure("a function that answers one: " + r.text, has(r, "return k == ll.GetOwner()"));
-        ensure("a length, as a truth: " + r.text, has(r, "return #l ~= 0") && has(r, "local busy = anyOf({1})") && has(r, "while not busy do"));
+        ensure("a length, as a truth: " + r.text, has(r, "return #l ~= 0") && has(r, "local busy = anyOf({ 1 })") && has(r, "while not busy do"));
         ensure("stepped: " + r.text, has(r, "local count = 0") && has(r, "count += 1"));
         ensure("printed: " + r.text, has(r, "local shown = 1"));
         ensure("more than TRUE, compared with it: " + r.text, has(r, "local loose = 5") && has(r, "if loose == 1 then"));
@@ -629,19 +630,19 @@ namespace tut
                                               "    show(llListInsertList(gGrown, [addOne()], 0));\n"
                                               "    show(kept() + b + a + gAll + gStored);\n"
                                               "} }\n");
-        ensure("a local returned, grown in place: " + r.text, has(r, "local out = ll.ParseString2List(s, {\",\"}, {})") && has(r, "table.insert(out, \"end\")"));
+        ensure("a local returned, grown in place: " + r.text, has(r, "local out = ll.ParseString2List(s, { \",\" }, {})") && has(r, "table.insert(out, \"end\")"));
         ensure("a call's list, put on the end: " + r.text, has(r, "gAll = parts(\"a,b\")") && has(r, "table.extend(gAll, parts(\"c\"))"));
         ensure("prepended: " + r.text, has(r, "table.insert(gAll, 1, \"first\")"));
         ensure("a list by its name: " + r.text, has(r, "table.extend(gAll, more)"));
         ensure("several that do not run apart, each had before any is added: " + r.text, has(r, "table.append(gAll, ll.GetTime(), ll.Frand(1.0))"));
         ensure("passed to a function that only reads it: " + r.text, has(r, "table.insert(gSeen, n)"));
         ensure("passed to one that keeps it: " + r.text,
-               has(r, "gPassed = table.extend(table.clone(gPassed), {n})") &&
+               has(r, "gPassed = table.extend(table.clone(gPassed), { n })") &&
                    has(r, "-- LSL: LSL's lists were values, and gPassed is passed to a function of the script's that keeps it"));
-        ensure("returned: " + r.text, has(r, "gKept = table.extend(table.clone(gKept), {2})") && has(r, "gKept is returned by a function"));
-        ensure("given to another: " + r.text, has(r, "a = table.extend(table.clone(a), {2})") && has(r, "a is given to another variable"));
+        ensure("returned: " + r.text, has(r, "gKept = table.extend(table.clone(gKept), { 2 })") && has(r, "gKept is returned by a function"));
+        ensure("given to another: " + r.text, has(r, "a = table.extend(table.clone(a), { 2 })") && has(r, "a is given to another variable"));
         ensure("read where a call in the statement grows it: " + r.text,
-               has(r, "gGrown = table.extend(table.clone(gGrown), {1})") &&
+               has(r, "gGrown = table.extend(table.clone(gGrown), { 1 })") &&
                    has(r, "gGrown is read where a call of the script's in the same statement changes it"));
         ensure("said once for each: " + r.text, count(r, "and gPassed is") == 1);
         checksClean(r);
@@ -712,7 +713,7 @@ namespace tut
         ensure("not where the left of the operator is more than x: " + r.text, has(r, "b = b - c - 1") && has(r, "c = c * 2 + b"));
         ensure("a string's pieces, joined: " + r.text, has(r, "s ..= `y{b}`"));
         ensure("a float's and a vector's as LSL writes them, in one interpolated string: " + r.text,
-               has(r, "print(`{a}{string.format(\"%.6f\", f)}{ll.DumpList2String({v}, \"\")}{s}{b + c}`)"));
+               has(r, "print(`{a}{string.format(\"%.6f\", f)}{ll.DumpList2String({ v }, \"\")}{s}{b + c}`)"));
         checksClean(r);
     }
 
@@ -749,7 +750,7 @@ namespace tut
                                               "} }\n");
         ensure("left out: " + r.text, !has(r, "PointAt(") && has(r, "-- llPointAt, left out") && noted(r, "SluaAbsent", "llPointAt"));
         ensure("its empty value where read: " + r.text, has(r, "local e = {}") && noted(r, "SluaAbsent", "llGetExperienceList"));
-        ensure("llcompat, said: " + r.text, has(r, "llcompat.GetPrimitiveParams({PRIM_FULLBRIGHT, 0})") && noted(r, "SluaBoolList", "GetPrimitiveParams"));
+        ensure("llcompat, said: " + r.text, has(r, "llcompat.GetPrimitiveParams({ PRIM_FULLBRIGHT, 0 })") && noted(r, "SluaBoolList", "GetPrimitiveParams"));
         ensure("not a truth: " + r.text, !has(r, "if llcompat.GetPrimitiveParams"));
         checksClean(r);
     }
@@ -770,7 +771,7 @@ namespace tut
                                               "} }\n");
         ensure("a key against a key: " + r.text, has(r, "if k ~= NULL_KEY then"));
         ensure("a string where LSL's string was: " + r.text, has(r, "tostring(NULL_KEY) ~= \"\"") && has(r, "ll.GetSubString(tostring(NULL_KEY), 1, 8)"));
-        ensure("in a list, as LSL had it: " + r.text, has(r, "{tostring(NULL_KEY), tostring(TEXTURE_BLANK)}"));
+        ensure("in a list, as LSL had it: " + r.text, has(r, "{ tostring(NULL_KEY), tostring(TEXTURE_BLANK) }"));
         ensure("a string's truth: " + r.text, has(r, "if tostring(NULL_KEY) ~= \"\" then print("));
         ensure("given to a string and a key: " + r.text, has(r, "local gName = tostring(NULL_KEY)") && has(r, "local gKey = NULL_KEY"));
         ensure("returned as a string function's: " + r.text, has(r, "return tostring(NULL_KEY)"));
@@ -1332,7 +1333,7 @@ namespace tut
         ensure("over the function it stood over: " + r.text, at("--[[ old code:") > at("local NAMES") && at("--[[ old code:") < at("-- Turns the door."));
         ensure("a brace's, after the line that opens it: " + r.text, has(r, "-- Turns the door.\nlocal function swing(by) -- by degrees\n"));
         ensure("over a statement: " + r.text, has(r, "    -- the rotation it turns by\n    local r = "));
-        ensure("a trailing one, after its statement: " + r.text, has(r, "    ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_ROT_LOCAL, r * ll.GetLocalRot()}) -- turn\n"));
+        ensure("a trailing one, after its statement: " + r.text, has(r, "    ll.SetLinkPrimitiveParamsFast(LINK_THIS, { PRIM_ROT_LOCAL, r * ll.GetLocalRot() }) -- turn\n"));
         ensure("between branches, over the elseif: " + r.text, has(r, "    -- when it shuts\n    elseif by < 0 then\n"));
         ensure("an empty branch's, in it: " + r.text, has(r, "    if false then\n        --[[ left off ]]\n    elseif by == 0 then\n"));
         ensure("at a block's end: " + r.text, has(r, "    -- done\nend\n"));
@@ -1634,8 +1635,8 @@ namespace tut
                                               "    llOwnerSay((string)ZERO_ROTATION);\n"
                                               "} }\n");
         ensure("converted", r.converted);
-        ensure("LSL's text kept: " + r.text, has(r, "set(7, `{SEAT_NUM};{ll.DumpList2String({offset}, \"\")}`)"));
-        ensure("a rotation's too: " + r.text, has(r, "ll.DumpList2String({ZERO_ROTATION}, \"\")"));
+        ensure("LSL's text kept: " + r.text, has(r, "set(7, `{SEAT_NUM};{ll.DumpList2String({ offset }, \"\")}`)"));
+        ensure("a rotation's too: " + r.text, has(r, "ll.DumpList2String({ ZERO_ROTATION }, \"\")"));
         ensure("said why, once: " + r.text, noted(r, "SluaVectorText") && r.text.find("-- LSL: ll.DumpList2String writes") != std::string::npos &&
                                                  r.text.find("-- LSL: ll.DumpList2String writes") == r.text.rfind("-- LSL: ll.DumpList2String writes"));
         checksClean(r);
@@ -2433,15 +2434,15 @@ namespace tut
         ensure("a list by its name: " + r.text, has(r, "table.extend(all, more)"));
         ensure("itself: " + r.text, has(r, "table.extend(all, all)"));
         ensure("a call's, run once: " + r.text, has(r, "table.extend(all, llcompat.List2List(more, 0, n))") && !has(r, "for _, item in"));
-        ensure("many values: " + r.text, has(r, "table.extend(all, {0, 1, 2,") && has(r, "32, \"x\"})"));
+        ensure("many values: " + r.text, has(r, "table.extend(all, { 0, 1, 2,") && has(r, "32, \"x\" })"));
         ensure("one copy, of the variable a call answers: " + r.text,
                has(r, "show(table.extend(table.extend(table.clone(kept()), more), all))"));
-        ensure("a variable copied: " + r.text, has(r, "show(table.extend(table.clone(more), {n}))"));
-        ensure("a value: " + r.text, has(r, "show(table.extend({n} :: { any }, more))"));
-        ensure("written out: " + r.text, has(r, "show(table.extend({PRIM_NAME, \"x\"} :: { any }, more))") &&
-                                             has(r, "table.extend({PRIM_COLOR, ALL_SIDES, vector(1, 1, 1), 1.0} :: { any }, more)"));
+        ensure("a variable copied: " + r.text, has(r, "show(table.extend(table.clone(more), { n }))"));
+        ensure("a value: " + r.text, has(r, "show(table.extend({ n } :: { any }, more))"));
+        ensure("written out: " + r.text, has(r, "show(table.extend({ PRIM_NAME, \"x\" } :: { any }, more))") &&
+                                             has(r, "table.extend({ PRIM_COLOR, ALL_SIDES, vector(1, 1, 1), 1.0 } :: { any }, more)"));
         ensure("a library call's: " + r.text,
-               has(r, "show(table.extend(table.extend(ll.ParseString2List(\"c\", {}, {}) :: { any }, {1}), {vector(1, 2, 3)}))"));
+               has(r, "show(table.extend(table.extend(ll.ParseString2List(\"c\", {}, {}) :: { any }, { 1 }), { vector(1, 2, 3) }))"));
         ensure("no helper, nor a move: " + r.text, !has(r, "joinLists") && !has(r, "table.move("));
         checksClean(r);
     }
@@ -2487,22 +2488,22 @@ namespace tut
                                               "} }\n");
         ensure("replaced in place, in Luau's numeric for: " + r.text, has(r, "for i = 0, #l - 1 do\n        l[i + 1] = l[i + 1] * 2\n"));
         ensure("a list held elsewhere, replaced as LSL's: " + r.text,
-               has(r, "for j = 0, #held - 1 do\n") && has(r, "        held = llcompat.ListReplaceList(held, {j}, j, j)\n"));
+               has(r, "for j = 0, #held - 1 do\n") && has(r, "        held = llcompat.ListReplaceList(held, { j }, j, j)\n"));
         ensure("a global a call of the script's could change: " + r.text, has(r, "while k < #gL do") &&
-                                                                            has(r, "gL = llcompat.ListReplaceList(gL, {bump()}, k, k)"));
-        ensure("the last of a list that could be empty: " + r.text, has(r, "l = llcompat.ListReplaceList(l, {7}, -1, -1)"));
+                                                                            has(r, "gL = llcompat.ListReplaceList(gL, { bump() }, k, k)"));
+        ensure("the last of a list that could be empty: " + r.text, has(r, "l = llcompat.ListReplaceList(l, { 7 }, -1, -1)"));
         ensure("on the end: " + r.text, has(r, "table.insert(l, 9)"));
         ensure("a part, and all of it: " + r.text, has(r, "local part = table.move(l, 2, 3, 1, {})") && has(r, "local all = table.clone(l)"));
         ensure("to the end, and the part left out, as LSL's: " + r.text,
                has(r, "local rest = llcompat.List2List(l, 2, -1)") && has(r, "local wrapped = llcompat.List2List(l, 3, 1)"));
         ensure("whole numbers joined: " + r.text, has(r, "print(table.concat(l, \",\"))") && has(r, "print(table.concat(l))"));
-        ensure("and text: " + r.text, has(r, "print(table.concat(table.extend(table.clone(gNames), {n}), \", \"))"));
-        ensure("a float as LSL writes one: " + r.text, has(r, "print(ll.DumpList2String(table.extend(table.clone(l), {1.5}), \",\"))"));
+        ensure("and text: " + r.text, has(r, "print(table.concat(table.extend(table.clone(gNames), { n }), \", \"))"));
+        ensure("a float as LSL writes one: " + r.text, has(r, "print(ll.DumpList2String(table.extend(table.clone(l), { 1.5 }), \",\"))"));
         ensure("found, its place: " + r.text, has(r, "local at = (table.find(gNames, \"b\") or 0) - 1"));
         ensure("NULL_KEY as LSL's string, as its place and found: " + r.text,
                has(r, "local none = (table.find(gNames, tostring(NULL_KEY)) or 0) - 1") &&
                    has(r, "if table.find(gNames, tostring(NULL_KEY)) ~= nil then"));
-        ensure("in a library call's list: " + r.text, has(r, "local parsed = (table.find(ll.ParseString2List(\"a,b\", {\",\"}, {}) :: { any }, \"b\") or 0) - 1"));
+        ensure("in a library call's list: " + r.text, has(r, "local parsed = (table.find(ll.ParseString2List(\"a,b\", { \",\" }, {}) :: { any }, \"b\") or 0) - 1"));
         ensure("no llcompat but those: " + r.text, count(r, "llcompat.") == 5);
         checksClean(r);
     }
@@ -2602,10 +2603,10 @@ namespace tut
         // The join leaves a first piece of none out, escapes a \, and sends
         // no rule at all for no text.
         ensure("a whitelist the join would change, a list: " + r.text,
-               has(r, "ll.SetPrimMediaParams(1, {PRIM_MEDIA_WHITELIST, \",a.com\"})") && has(r, "ll.SetPrimMediaParams(2, {PRIM_MEDIA_WHITELIST, \"a") &&
-                   has(r, "ll.SetPrimMediaParams(3, {PRIM_MEDIA_WHITELIST, \"\"})"));
+               has(r, "ll.SetPrimMediaParams(1, { PRIM_MEDIA_WHITELIST, \",a.com\" })") && has(r, "ll.SetPrimMediaParams(2, { PRIM_MEDIA_WHITELIST, \"a") &&
+                   has(r, "ll.SetPrimMediaParams(3, { PRIM_MEDIA_WHITELIST, \"\" })"));
         ensure("a truth not written out as one, a list: " + r.text,
-               has(r, "ll.SetPrimMediaParams(4, {PRIM_MEDIA_AUTO_PLAY, on})") && has(r, "ll.SetPrimMediaParams(5, {PRIM_MEDIA_AUTO_ZOOM, 2})"));
+               has(r, "ll.SetPrimMediaParams(4, { PRIM_MEDIA_AUTO_PLAY, on })") && has(r, "ll.SetPrimMediaParams(5, { PRIM_MEDIA_AUTO_ZOOM, 2 })"));
         checksClean(r);
     }
 
@@ -2650,9 +2651,9 @@ namespace tut
                                                   "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_METHOD, \"GET\", HTTP_CUSTOM_HEADER, \"B\", counted()], \"\");\n"
                                                   "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_CUSTOM_HEADER, \"B\", counted()], \"\");\n"
                                                   "} }\n");
-        ensure("a name twice, a list: " + lists.text, has(lists, "ll.HTTPRequest(\"https://z\", {HTTP_CUSTOM_HEADER, \"A\", \"1\", HTTP_CUSTOM_HEADER, \"A\", \"2\"}, \"\")"));
-        ensure("a name not written out, a list: " + lists.text, has(lists, "ll.HTTPRequest(\"https://z\", {HTTP_CUSTOM_HEADER, token, \"1\"}, \"\")"));
-        ensure("moved past another, a list: " + lists.text, has(lists, "{HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_METHOD, \"GET\", HTTP_CUSTOM_HEADER, \"B\", counted()}"));
+        ensure("a name twice, a list: " + lists.text, has(lists, "ll.HTTPRequest(\"https://z\", { HTTP_CUSTOM_HEADER, \"A\", \"1\", HTTP_CUSTOM_HEADER, \"A\", \"2\" }, \"\")"));
+        ensure("a name not written out, a list: " + lists.text, has(lists, "ll.HTTPRequest(\"https://z\", { HTTP_CUSTOM_HEADER, token, \"1\" }, \"\")"));
+        ensure("moved past another, a list: " + lists.text, has(lists, "{ HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_METHOD, \"GET\", HTTP_CUSTOM_HEADER, \"B\", counted() }"));
         ensure("one after another, run in their order: " + lists.text, has(lists, "{ custom_header = { [\"A\"] = counted(), [\"B\"] = counted() } }"));
         checksClean(lists);
     }
@@ -2677,18 +2678,18 @@ namespace tut
                                    "} }\n";
         const ALLSLToSLua::Result r = convert(script);
         ensure("not written out: " + r.text, has(r, "ll.ParticleSystem(gRules)"));
-        ensure("a key twice: " + r.text, has(r, "ll.ParticleSystem({PSYS_PART_MAX_AGE, 2.0, PSYS_PART_MAX_AGE, 3.0})"));
-        ensure("another table's rule: " + r.text, has(r, "ll.ParticleSystem({PRIM_MEDIA_AUTO_PLAY, 1})"));
-        ensure("a number for a rule: " + r.text, has(r, "ll.ParticleSystem({7, 2.0})"));
-        ensure("a value of another shape: " + r.text, has(r, "ll.ParticleSystem({PSYS_PART_START_ALPHA, vector(1, 0, 0)})"));
-        ensure("no value: " + r.text, has(r, "ll.ParticleSystem({PSYS_PART_MAX_AGE})"));
+        ensure("a key twice: " + r.text, has(r, "ll.ParticleSystem({ PSYS_PART_MAX_AGE, 2.0, PSYS_PART_MAX_AGE, 3.0 })"));
+        ensure("another table's rule: " + r.text, has(r, "ll.ParticleSystem({ PRIM_MEDIA_AUTO_PLAY, 1 })"));
+        ensure("a number for a rule: " + r.text, has(r, "ll.ParticleSystem({ 7, 2.0 })"));
+        ensure("a value of another shape: " + r.text, has(r, "ll.ParticleSystem({ PSYS_PART_START_ALPHA, vector(1, 0, 0) })"));
+        ensure("no value: " + r.text, has(r, "ll.ParticleSystem({ PSYS_PART_MAX_AGE })"));
         ensure("flags as they are: " + r.text, has(r, "ll.LinkParticleSystem(1, { flags = PSYS_PART_WIND_MASK + PSYS_PART_BOUNCE_MASK })") &&
                                                    has(r, "ll.LinkParticleSystem(2, { flags = bit32.bor(PSYS_PART_WIND_MASK, PSYS_PART_WIND_MASK) })"));
         ensure("masks bracketed, each true: " + r.text, has(r, "ll.LinkParticleSystem(3, { wind = true, bounce = true, ribbon = true })"));
         ALLSLToSLua::Options plain;
         plain.idioms                    = false;
         const ALLSLToSLua::Result lists = ALLSLToSLua::convert(script, plain);
-        ensure("no idioms, no tables: " + lists.text, has(lists, "ll.LinkParticleSystem(3, {PSYS_PART_FLAGS, ") && !has(lists, "wind = true"));
+        ensure("no idioms, no tables: " + lists.text, has(lists, "ll.LinkParticleSystem(3, { PSYS_PART_FLAGS, ") && !has(lists, "wind = true"));
     }
 
     template<> template<>
@@ -2832,12 +2833,12 @@ namespace tut
         ensure("a global's, its comments where they were: " + r.text,
                has(r, "local gColours = {\n    -- warm\n    \"red\", \"orange\",\n    --[[ cool ]] \"blue\" -- last\n}\n"));
         ensure("closed on the line it closed on, a comment after it trailing that: " + r.text,
-               has(r, "local gTwo = {1, 2,\n    3} -- three\n"));
+               has(r, "local gTwo = { 1, 2,\n    3 } -- three\n"));
         ensure("Tapple's, as the LSL had it: " + r.text,
                has(r, "    local activeRequest = ll.List2Json(JSON_OBJECT, {\n"
                       "        \"fn\", \"SELECT\",\n"
                       "        \"radius\", 10,\n"
-                      "        \"ima\", ll.List2Json(JSON_ARRAY, {\"Ungulate\"}),\n"
+                      "        \"ima\", ll.List2Json(JSON_ARRAY, { \"Ungulate\" }),\n"
                       "        \"ownerOnly\", 1, -- only the owner\n"
                       "        \"toucher\", ll.GetOwner(),\n"
                       "        \"requestor\", ll.List2Json(JSON_OBJECT, {\n"
@@ -2848,8 +2849,8 @@ namespace tut
                       "        \"responders\", \"[]\"\n"
                       "    }) -- sent\n"));
         ensure("each comment once: " + r.text, count(r, "only the owner") == 1 && count(r, "-- sent") == 1 && count(r, "-- first") == 1);
-        ensure("in a line made inside an expression, one line: " + r.text, has(r, "(function() m = {3, 4} return m end)()"));
-        ensure("in a condition: " + r.text, has(r, "    if table.find({\"a\", -- first\n        \"b\"}"));
+        ensure("in a line made inside an expression, one line: " + r.text, has(r, "(function() m = { 3, 4 } return m end)()"));
+        ensure("in a condition: " + r.text, has(r, "    if table.find({ \"a\", -- first\n        \"b\" }"));
         ensure("one written another way, its comment over it: " + r.text, has(r, "    -- none\n    ll.ParticleSystem({\n"));
         checksClean(r);
     }
@@ -2897,10 +2898,10 @@ namespace tut
                                 "    if (mine(llJsonGetValue(gJson, [\"owner\"]))) llOwnerSay(\"mine\");\n"
                                 "} }\n";
         const ALLSLToSLua::Result r = convert(lsl);
-        ensure("Tapple's, as it is: " + r.text, has(r, "ll.Key2Name(ll.JsonGetValue(gJson, {\"selected\"}) :: any)"));
+        ensure("Tapple's, as it is: " + r.text, has(r, "ll.Key2Name(ll.JsonGetValue(gJson, { \"selected\" }) :: any)"));
         ensure("bracketed where it must be: " + r.text, has(r, "ll.Key2Name((\"a2e76fcd-9360-4f6d-a924-\" .. \"938f923df11d\") :: any)"));
         ensure("a UUID written out, a uuid: " + r.text, has(r, "ll.Key2Name(uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\"))"));
-        ensure("the script's own function's key, uuid(): " + r.text, has(r, "mine(uuid(ll.JsonGetValue(gJson, {\"owner\"})))") &&
+        ensure("the script's own function's key, uuid(): " + r.text, has(r, "mine(uuid(ll.JsonGetValue(gJson, { \"owner\" })))") &&
                                                                         noted(r, "SluaUuidText"));
         ensure("said once: " + r.text, count(r, "-- LSL: SLua's ll takes a key as text") == 1);
         checksClean(r);
@@ -3012,5 +3013,50 @@ namespace tut
         ensure("one over a comment kept apart: " + r.text, has(r, "    end\n\n    -- said apart\n    print(tostring(c))\n"));
         ensure("never two: " + r.text, !has(r, "\n\n\n"));
         checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<88>()
+    {
+        set_test_name("tables and table types spaced inside their braces as asked, as the formatter spaces them: StyLua's by default, "
+                      "Tapple's line; none where asked; an interpolated string's braces and {} never");
+        const std::string lsl = "list gTwo = [1, 2,\n    3];\n"
+                                "default {\n"
+                                "    state_entry() { state two; }\n"
+                                "}\n"
+                                "state two {\n"
+                                "    listen(integer c, string name, key id, string msg) {\n"
+                                "        list params = llParseStringKeepNulls(msg, [\"\\n\"], []);\n"
+                                "        llSetPrimMediaParams(0, [PRIM_MEDIA_AUTO_PLAY, TRUE, PRIM_MEDIA_WHITELIST, \"a.com,b.com\"]);\n"
+                                "        llOwnerSay(\"n=\" + (string)llGetListLength(params) + \" \" + (string)<1, 2, 3>);\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLToSLua::Options typed;
+        typed.types                 = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, typed);
+        ensure("Tapple's: " + r.text, r.converted && has(r, "local params: { any } = ll.ParseStringKeepNulls(msg, { \"\\n\" }, {})"));
+        ensure("a rule table: " + r.text, has(r, "ll.SetPrimMediaParams(0, { auto_play = true, whitelist = { \"a.com\", \"b.com\" } })"));
+        ensure("the states' type: " + r.text, has(r, "local states: { [string]: { [string]: (...any) -> () } } = {}"));
+        ensure("over lines: " + r.text, has(r, "local gTwo: { any } = { 1, 2,\n    3 }\n"));
+        ensure("an interpolated string's: " + r.text, has(r, "`n={#params} {ll.DumpList2String({ vector(1, 2, 3) }, \"\")}`"));
+        checksClean(r);
+
+        typed.braceSpaces              = false;
+        const ALLSLToSLua::Result none = ALLSLToSLua::convert(lsl, typed);
+        ensure("none: " + none.text, none.converted && has(none, "local params: {any} = ll.ParseStringKeepNulls(msg, {\"\\n\"}, {})") &&
+                                         has(none, "ll.SetPrimMediaParams(0, {auto_play = true, whitelist = {\"a.com\", \"b.com\"}})") &&
+                                         has(none, "local states: {[string]: {[string]: (...any) -> ()}} = {}") &&
+                                         has(none, "local gTwo: {any} = {1, 2,\n    3}\n") && !has(none, "{ "));
+        checksClean(none);
+
+        // As the formatter would leave them, either way.
+        for (bool spaces : { true, false })
+        {
+            ALScriptFormatter::Options formatter;
+            formatter.lua                  = true;
+            formatter.braceSpaces          = spaces;
+            const ALLSLToSLua::Result same = spaces ? r : none;
+            ensure_equals(spaces ? "formatted, spaced" : "formatted, none", ALScriptFormatter::format(same.text, formatter), same.text);
+        }
     }
 }

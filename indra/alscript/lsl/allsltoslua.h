@@ -87,6 +87,10 @@ public:
         // Each place noted as a "-- LSL:" comment over its line, as well as
         // in the notes.
         bool comments = true;
+        // A space inside a table's braces, and a table type's, as StyLua
+        // and the studio's formatter write them by default -- { "a", 1 },
+        // { any } -- or none: {"a", 1}. Nothing inside, {} either way.
+        bool braceSpaces = true;
         // The script's own comments, each over what it stood over, after it
         // where it was after it on its line, or at the end of what held it:
         // // as --, and /* */ as --[[ ]]; a rule of stars or slashes as one of
