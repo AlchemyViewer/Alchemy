@@ -575,6 +575,17 @@ end</floater.string>
              tool_tip="Formatting breaks a line with more columns than this at the commas of a bracket on it, each part on a line of its own; 0 never breaks a line"
              top_delta="-2"
              width="60" />
+            <check_box
+             control_name="ALScriptFormatBraceSpaces"
+             follows="left|top"
+             height="20"
+             label="Spaces inside SLua's braces: { 1, 2 }"
+             layout="topleft"
+             left="12"
+             name="format_brace_spaces"
+             tool_tip="Formatting and Convert to SLua put a space inside a table's braces, and a table type's, as StyLua does: { 1, 2 }, { any }. Off, {1, 2}"
+             top_pad="6"
+             width="370" />
 
             <!-- The right column: the studio, the caret, the hover card. -->
             <text

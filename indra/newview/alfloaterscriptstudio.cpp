@@ -7625,6 +7625,7 @@ void ALFloaterScriptStudio::format(Doc& doc, bool selection_only)
     options.tabs          = !doc.editor->getSoftTabs();
     options.maxBlankLines = llclamp(gSavedSettings.getS32("ALScriptFormatBlankLines"), 0, 10);
     options.spacing       = gSavedSettings.getBOOL("ALScriptFormatSpacing");
+    options.braceSpaces   = gSavedSettings.getBOOL("ALScriptFormatBraceSpaces");
     options.width         = llmax(0, gSavedSettings.getS32("ALScriptFormatWidth"));
     const std::string text = document.text();
     // Line for line, since only some lines may be asked for and the
@@ -8193,6 +8194,8 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     options.types         = gSavedSettings.getBOOL("ALScriptConvertTypes");
     options.comments      = gSavedSettings.getBOOL("ALScriptConvertComments");
     options.keepComments  = gSavedSettings.getBOOL("ALScriptConvertKeepComments");
+    // Its tables' braces as the formatter writes them.
+    options.braceSpaces   = gSavedSettings.getBOOL("ALScriptFormatBraceSpaces");
     // Its notes, and its comments, in the skin's words.
     options.words = alScriptKeyedWords;
     const std::string   source    = doc.editor->wholeText();

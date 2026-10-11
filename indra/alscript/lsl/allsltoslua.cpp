@@ -182,12 +182,15 @@ namespace
     };
 
     // An expression as written: its text, how tightly it binds, and whether
-    // it is a Luau boolean where LSL has 1 or 0.
+    // it is a Luau boolean where LSL has 1 or 0. Where it is a find's
+    // place counted as LSL's, `(x or 0) - 1`: x, SLua's place, counted
+    // from 1 or nil.
     struct Expr
     {
         std::string text;
         int         prec    = PRIMARY;
         bool        boolean = false;
+        std::string place;
     };
 
     // Pairs of words, looked for by views of them without a copy.
@@ -452,6 +455,12 @@ namespace
         void findComments();
         void place(size_t k, const std::vector<LSLASTNode*>& children, LSLASTNode* holder);
         bool placeInside(size_t k, LSLASTNode* node);
+        // A comment of one line after a bare statement, on the line it
+        // ends: given to the statement that ends that line (trailedBare),
+        // after it, or, where that is an empty body, after the line that
+        // opens it. Not where that is an if or a loop over lines, whose
+        // own line is its first. Whether it was.
+        bool trailBare(size_t k, LSLASTNode* statement, bool body);
         void placeIn(size_t k, LSLASTNode* compound);
         // Those given to a node, written over it; those at a holder's end,
         // with any of what it held that nothing wrote, at its end. Those
@@ -582,6 +591,9 @@ namespace
         // Where each of the LSL's lines starts, from the first.
         const std::vector<size_t>& lineStarts();
         std::vector<size_t>        mLineStarts;
+        // Whether a line of the LSL lies blank between two others, counted
+        // from one, neither of them itself.
+        bool blankBetween(S32 after, S32 before);
         Expr lvalue(LSLLValueExpression* e);
         Expr call(LSLFunctionExpression* e);
         // The call as written, and the name SLua calls it by where it is
@@ -659,12 +671,21 @@ namespace
         std::string llArgs(LSLFunctionExpression* e, U16 indexes);
         // `: type` for an LSL type, where types are written.
         std::string typed(LSLIType type) const;
+        // A table's braces round what it holds, or a table type's: spaced
+        // inside or not as Options::braceSpaces asks; {} round nothing.
+        std::string braced(const std::string& inside) const;
 
         // --- statements -------------------------------------------------------------
 
         void statement(LSLASTNode* s, bool last);
         void statementBody(LSLASTNode* s, bool last);
         void block(LSLASTNode* s);
+        // A blank line over a statement or a global, where the LSL had one
+        // or more between it and the one written before it, which grouped
+        // them: one, and not where nothing has been written since `opened`
+        // -- a block's start -- nor where a comment over it keeps the
+        // blank line over itself (Comment::apart).
+        void keepApart(LSLASTNode* before, LSLASTNode* node, size_t opened);
         // An if written from `at` in the text, `lines` lines down, its
         // stretches from `spans`, put on one line where it is one statement
         // and nothing said over it: if c then s end. Not called where a
@@ -904,6 +925,9 @@ namespace
         // What each part of the script may change, for LSL's order.
         ALLSLEffects                                     mEffects;
         std::string                                      mText;
+        // Where the block being written began in mText: no blank line kept
+        // over what is written first in it.
+        size_t                                           mBlockStart = std::string::npos;
         // The LSL's stretches beside the SLua's made of them, the SLua's
         // counted in mText until the head goes over it, and its last lines
         // worked out once all is written (endSpans); the LSL lines of the
@@ -1521,6 +1545,69 @@ namespace
                 default: return true;
             }
         }
+
+        // The statement that ends a bare one's last line: down an if's last
+        // branch, a while's or a for's body. Not into an if with no else on
+        // one line, which is written on one (Writer::onOneLine), but for an
+        // else's, which is an elseif.
+        LSLASTNode* trailedBare(LSLASTNode* node)
+        {
+            bool elseif = false;
+            while (!isNull(node) && node->getNodeType() == NODE_STATEMENT)
+            {
+                switch (node->getNodeSubType())
+                {
+                    case NODE_IF_STATEMENT:
+                    {
+                        LSLASTNode* no = node->getChild(2);
+                        if (isNull(no) && !elseif && node->getLoc()->first_line == node->getLoc()->last_line)
+                        {
+                            return node;
+                        }
+                        elseif = !isNull(no) && no->getNodeSubType() == NODE_IF_STATEMENT;
+                        node   = isNull(no) ? node->getChild(1) : no;
+                        continue;
+                    }
+                    case NODE_WHILE_STATEMENT:
+                        elseif = false;
+                        node   = node->getChild(1);
+                        continue;
+                    case NODE_FOR_STATEMENT:
+                        elseif = false;
+                        node   = node->getChild(3);
+                        continue;
+                    default: return node;
+                }
+            }
+            return node;
+        }
+    }
+
+    bool Writer::trailBare(size_t k, LSLASTNode* statement, bool body)
+    {
+        const Pos at = mComments[k].at;
+        if (isNull(statement) || !endsBare(statement) || mComments[k].endLine != at.line || at.line != statement->getLoc()->last_line)
+        {
+            return false;
+        }
+        LSLASTNode*          trailed = trailedBare(statement);
+        const LSLNodeSubType type    = trailed->getNodeSubType();
+        const bool control = type == NODE_IF_STATEMENT || type == NODE_WHILE_STATEMENT || type == NODE_FOR_STATEMENT || type == NODE_DO_STATEMENT;
+        if (control && trailed->getLoc()->first_line != trailed->getLoc()->last_line)
+        {
+            return false;
+        }
+        // An empty body writes no line of its own: the comment trails the
+        // one that opens it, `if c then -- why`.
+        if (type == NODE_NOP_STATEMENT && (body || trailed != statement))
+        {
+            mCommentsOpening[trailed].push_back(k);
+        }
+        else
+        {
+            mCommentsAfter[trailed].push_back(k);
+        }
+        return true;
     }
 
     void Writer::place(size_t k, const std::vector<LSLASTNode*>& children, LSLASTNode* holder)
@@ -1549,19 +1636,11 @@ namespace
             break;
         }
         // On the line a bare statement ends, after it: about that statement,
-        // and after it too, where it is one line of the comment's and the
-        // statement one line, or no if or loop, whose first line is not
-        // where the comment was.
+        // and after the one that ends the line (trailBare), or over it where
+        // it does not trail one.
         if (prev && endsBare(prev) && at.line == prev->getLoc()->last_line)
         {
-            const LSLNodeSubType type    = prev->getNodeSubType();
-            const bool           control = type == NODE_IF_STATEMENT || type == NODE_WHILE_STATEMENT || type == NODE_FOR_STATEMENT ||
-                                 type == NODE_DO_STATEMENT;
-            if (mComments[k].endLine == at.line && (!control || prev->getLoc()->first_line == prev->getLoc()->last_line))
-            {
-                mCommentsAfter[prev].push_back(k);
-            }
-            else
+            if (!trailBare(k, prev, false))
             {
                 mCommentsBefore[prev].push_back(k);
             }
@@ -1648,6 +1727,14 @@ namespace
                         {
                             return true;
                         }
+                        // On the line a bare branch ends, after it: after
+                        // what ends that line, not over the else.
+                        if (LSLASTNode* yes = node->getChild(1); !isNull(yes) &&
+                                                                  !(at < Pos{ yes->getLoc()->last_line, yes->getLoc()->last_column }) &&
+                                                                  trailBare(k, yes, true))
+                        {
+                            return true;
+                        }
                         // Between the branches: over what the else runs -- an
                         // elseif's line, or the else's first statement.
                         LSLASTNode* no = node->getChild(2);
@@ -1691,7 +1778,7 @@ namespace
             putTrailing(mText.size() - 1, indent() + c.text + "\n");
             return;
         }
-        if (c.apart && !mText.empty() && !blank_over)
+        if (c.apart && !mText.empty() && !blank_over && mText.size() != mBlockStart)
         {
             mText += "\n";
         }
@@ -1994,7 +2081,7 @@ namespace
                 {
                     out += (out.empty() ? "" : ", ") + constant(item).text;
                 }
-                return { "{" + out + "}" };
+                return { braced(out) };
             }
             default:
                 return { "nil" };
@@ -2015,6 +2102,21 @@ namespace
             }
         }
         return mLineStarts;
+    }
+
+    bool Writer::blankBetween(S32 after, S32 before)
+    {
+        const std::vector<size_t>& starts = lineStarts();
+        for (S32 line = std::max(after + 1, 1); line < before && static_cast<size_t>(line) <= starts.size(); ++line)
+        {
+            const size_t from = starts[static_cast<size_t>(line) - 1];
+            const size_t to   = std::min(mSource.find('\n', from), mSource.size());
+            if (mSource.substr(from, to - from).find_first_not_of(" \t\r") == std::string_view::npos)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     std::vector<std::pair<std::string, unsigned long long>> Writer::numbersNear(LSLConstant* c)
@@ -2550,6 +2652,47 @@ namespace
         return false;
     }
 
+    // A find's place counted as LSL's, compared with a whole number
+    // written out, on either side: compared in SLua's count instead, the
+    // number moved on by one -- `x == 1` -- or against nil where all it
+    // asks is whether anything was found. The same test whatever x is.
+    // Not an == or ~= with a number below -1, which no place is.
+    std::optional<Expr> placeCompared(std::string_view word, const Expr& a, const Expr& b, LSLExpression* lhs, LSLExpression* rhs)
+    {
+        int        v     = 0;
+        const bool left  = !a.place.empty() && wholeNumber(rhs, v);
+        const bool right = !left && !b.place.empty() && wholeNumber(lhs, v);
+        if (!left && !right)
+        {
+            return std::nullopt;
+        }
+        // With the place on the left.
+        std::string_view as = word;
+        if (right)
+        {
+            as = word == "<" ? ">" : word == ">" ? "<" : word == "<=" ? ">=" : word == ">=" ? "<=" : word;
+        }
+        const std::string& x = left ? a.place : b.place;
+        if ((as == "==" && v == -1) || (as == "<" && v == 0) || (as == "<=" && v == -1))
+        {
+            return Expr{ x + " == nil", COMPARE, true };
+        }
+        if ((as == "~=" && v == -1) || (as == ">=" && v == 0) || (as == ">" && v == -1))
+        {
+            return Expr{ x + " ~= nil", COMPARE, true };
+        }
+        const std::string n = std::to_string(static_cast<S64>(v) + 1);
+        if ((as == "==" || as == "~=") && v >= 0)
+        {
+            return Expr{ x + " " + std::string(as) + " " + n, COMPARE, true };
+        }
+        if (as == "<" || as == ">" || as == "<=" || as == ">=")
+        {
+            return Expr{ "(" + x + " or 0) " + std::string(as) + " " + n, COMPARE, true };
+        }
+        return std::nullopt;
+    }
+
     // A number written out, an integer or a float, and whether it is
     // nought; or one with a minus before it.
     bool numberWritten(LSLExpression* e, bool& nought)
@@ -2603,6 +2746,11 @@ namespace
         return static_cast<LSLExpression*>(arg);
     }
 
+    std::string Writer::braced(const std::string& inside) const
+    {
+        return inside.empty() ? "{}" : mOptions.braceSpaces ? "{ " + inside + " }" : "{" + inside + "}";
+    }
+
     std::string Writer::typed(LSLIType type) const
     {
         if (!mOptions.types)
@@ -2617,7 +2765,7 @@ namespace
             case LST_KEY: return ": uuid";
             case LST_VECTOR: return ": vector";
             case LST_QUATERNION: return ": quaternion";
-            case LST_LIST: return ": { any }";
+            case LST_LIST: return ": " + braced("any");
             default: return std::string();
         }
     }
@@ -3095,11 +3243,12 @@ namespace
                     // rule for a loop's range keeps alive, and not every
                     // compiler has that rule.
                     const std::optional<std::vector<std::string_view>> pieces = whitelistPieces(*textWritten(v));
+                    std::string                                        each;
                     for (std::string_view piece : *pieces)
                     {
-                        text += (text.empty() ? "{ " : ", ") + luaString(piece);
+                        each += (each.empty() ? "" : ", ") + luaString(piece);
                     }
-                    text += " }";
+                    text = braced(each);
                     break;
                 }
                 case Takes::Headers:
@@ -3124,7 +3273,7 @@ namespace
         }
         for (const Gathered& g : gathered)
         {
-            fields[g.at] += "{ " + g.all + " }";
+            fields[g.at] += braced(g.all);
         }
         // The serializer sends headers sorted by name: said where that is
         // not the order they were written in.
@@ -3136,12 +3285,12 @@ namespace
         }
         // A key to a line where the LSL's list had more than one.
         const bool  lines = list->getLoc()->first_line != list->getLoc()->last_line;
-        std::string table = lines ? "{\n" : "{ ";
+        std::string table;
         for (size_t i = 0; i < fields.size(); ++i)
         {
             table += lines ? listIndent(1) + fields[i] + ",\n" : (i ? ", " : "") + fields[i];
         }
-        table += lines ? listIndent(0) + "}" : " }";
+        table = lines ? "{\n" + table + listIndent(0) + "}" : braced(table);
         called = "ll." + lsl.substr(2);
         LSLParamList* params = e->getIdentifier()->getSymbol()->getFunctionDecl();
         return Expr{ called + "(" + args(e->getArguments(), params, 0, call->at, table, true) + ")" };
@@ -3168,7 +3317,8 @@ namespace
             if (LSLASTNode* sought = soleItem(argumentAt(e, 1)))
             {
                 called = "table.find";
-                return Expr{ "(table.find(" + anyItems(argumentAt(e, 0), arg(0)) + ", " + itemText(sought) + ") or 0) - 1", ADD };
+                const std::string found = "table.find(" + anyItems(argumentAt(e, 0), arg(0)) + ", " + itemText(sought) + ")";
+                return Expr{ "(" + found + " or 0) - 1", ADD, false, found };
             }
         }
         // A part of a list between two places written out, from its start
@@ -3483,7 +3633,7 @@ namespace
         {
             const std::string args_text = (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params, 0, -1, {}, true);
             called                      = "ll." + bare;
-            return { "(" + called + "(" + args_text + ") or 0) - 1", ADD };
+            return { "(" + called + "(" + args_text + ") or 0) - 1", ADD, false, called + "(" + args_text + ")" };
         }
         if (slua & ALLSLTraits::SluaRemoved)
         {
@@ -3580,6 +3730,13 @@ namespace
         const auto        infix = [&](const char* word, int prec, bool boolean = false, bool right_assoc = false) -> Expr {
             const Expr a = value(lhs);
             const Expr b = value(rhs);
+            if (prec == COMPARE && boolean)
+            {
+                if (std::optional<Expr> compared = placeCompared(word, a, b, lhs, rhs))
+                {
+                    return *compared;
+                }
+            }
             return { bracketed(a, right_assoc ? prec + 1 : prec) + " " + word + " " + bracketed(b, right_assoc ? prec : prec + 1), prec, boolean };
         };
         // A find's answer asked only whether it found: against nil, as ll
@@ -3683,13 +3840,13 @@ namespace
                     std::string    first = madeHere(lhs) ? anyItems(lhs, a) : "table.clone(" + a.text + ")";
                     if (lt != LST_LIST)
                     {
-                        first = "{" + a.text + "} :: { any }";
+                        first = braced(a.text) + " :: " + braced("any");
                     }
                     else if (left->getNodeSubType() == NODE_BINARY_EXPRESSION && left->getOperation() == OP_PLUS)
                     {
                         first = a.text;
                     }
-                    return { "table.extend(" + first + ", " + (rt == LST_LIST ? b.text : "{" + b.text + "}") + ")" };
+                    return { "table.extend(" + first + ", " + (rt == LST_LIST ? b.text : braced(b.text)) + ")" };
                 }
                 if (lt == LST_STRING || lt == LST_KEY || rt == LST_STRING || rt == LST_KEY)
                 {
@@ -3929,7 +4086,7 @@ namespace
                         noteOnce(e, "SluaVectorText",
                                  "ll.DumpList2String writes a vector's or a rotation's parts as LSL did, with five places; SLua's tostring "
                                  "writes as few as each needs, <1, 2, 3>, which tovector reads back the same.");
-                        return { "ll.DumpList2String({" + v.text + "}, \"\")" };
+                        return { "ll.DumpList2String(" + braced(v.text) + ", \"\")" };
                     default: return { "tostring(" + v.text + ")" };
                 }
             case LST_KEY:
@@ -3949,7 +4106,7 @@ namespace
             // only where an operator around it binds more tightly than or.
             case LST_VECTOR: return { "tovector(" + v.text + ") or ZERO_VECTOR", OR };
             case LST_QUATERNION: return { "toquaternion(" + v.text + ") or ZERO_ROTATION", OR };
-            case LST_LIST: return { "{" + v.text + "}" };
+            case LST_LIST: return { braced(v.text) };
             default: return v;
         }
     }
@@ -4048,7 +4205,7 @@ namespace
                     auto* each = static_cast<LSLExpression*>(item);
                     out += (out.empty() ? "" : ", ") + coerced(each, each->getIType()).text;
                 }
-                return { "{" + out + "}" };
+                return { braced(out) };
             }
             default:
                 return { "nil" };
@@ -4125,12 +4282,12 @@ namespace
             {
                 out += ",";
             }
-            to(begins(item), listIndent(0), i > 0);
+            to(begins(item), listIndent(0), i > 0 || mOptions.braceSpaces);
             // As LSL typed it: NULL_KEY in a list is LSL's string.
             out += coerced(item, item->getIType()).text;
             line = item->getLoc()->last_line;
         }
-        to(close, listIndent(-1), false);
+        to(close, listIndent(-1), mOptions.braceSpaces);
         out += "}";
         --mListDepth;
         return out;
@@ -4162,7 +4319,7 @@ namespace
                     if (t == LST_LIST)
                     {
                         // Something else may hold the list: a new one.
-                        return "table.extend(table.clone(" + old + "), " + (rhs && rhs->getIType() == LST_LIST ? v.text : "{" + v.text + "}") + ")";
+                        return "table.extend(table.clone(" + old + "), " + (rhs && rhs->getIType() == LST_LIST ? v.text : braced(v.text)) + ")";
                     }
                     return old + " + " + bracketed(v, ADD + 1);
                 case OP_SUB_ASSIGN:
@@ -4439,17 +4596,47 @@ namespace
         if (s->getNodeSubType() == NODE_COMPOUND_STATEMENT)
         {
             // What was after its brace that no line opening it took.
+            mBlockStart = mText.size();
             commentsOpening(s);
+            const size_t opened = mText.size();
+            LSLASTNode*  before = nullptr;
             for (LSLASTNode* child = s->getChild(0); child; child = child->getNext())
             {
+                keepApart(before, child, opened);
                 statement(child, !child->getNext());
+                before = isNull(child) || !child->getLoc() ? before : child;
             }
             lineUp();
             commentsAtEnd(s);
             return;
         }
+        mBlockStart = mText.size();
         statement(s, true);
         lineUp();
+    }
+
+    void Writer::keepApart(LSLASTNode* before, LSLASTNode* node, size_t opened)
+    {
+        if (!before || isNull(node) || !node->getLoc() || mText.size() == opened ||
+            (mText.size() >= 2 && mText.compare(mText.size() - 2, 2, "\n\n") == 0))
+        {
+            return;
+        }
+        const Pos begins = { node->getLoc()->first_line, node->getLoc()->first_column };
+        if (const auto found = mCommentsBefore.find(node); found != mCommentsBefore.end())
+        {
+            for (size_t k : found->second)
+            {
+                if (mComments[k].at < begins)
+                {
+                    return;
+                }
+            }
+        }
+        if (blankBetween(before->getLoc()->last_line, begins.line))
+        {
+            mText += "\n";
+        }
     }
 
     void Writer::statement(LSLASTNode* s, bool last)
@@ -5910,7 +6097,7 @@ namespace
 
     std::string Writer::anyItems(LSLExpression* e, const Expr& written) const
     {
-        return madeHere(e) ? bracketed(written, PRIMARY) + " :: { any }" : written.text;
+        return madeHere(e) ? bracketed(written, PRIMARY) + " :: " + braced("any") : written.text;
     }
 
     LSLASTNode* Writer::soleItem(LSLExpression* e) const
@@ -6306,7 +6493,7 @@ namespace
             }
             else if (values.size() > 32)
             {
-                line("table.extend(" + name + ", {" + all + "})");
+                line("table.extend(" + name + ", " + braced(all) + ")");
             }
             else if (!values.empty())
             {
@@ -6548,7 +6735,7 @@ namespace
         {
             const std::string name  = mNames.contains(var) ? mNames[var] : nameOf(var->getName());
             const std::string parts = freshName(name + "Parts");
-            line("local " + parts + (mOptions.types ? ": { string }" : "") + " = {}");
+            line("local " + parts + (mOptions.types ? ": " + braced("string") : "") + " = {}");
             mBuilding[var] = parts;
             joins.push_back({ name, parts, mDeclaredAtJoin.contains({ loop, var }) });
         }
@@ -7065,7 +7252,9 @@ namespace
 
     void Writer::globals()
     {
-        bool any = false;
+        bool         any    = false;
+        const size_t opened = mText.size();
+        LSLASTNode*  before = nullptr;
         for (LSLASTNode* g = mScript->getGlobals()->getChild(0); g; g = g->getNext())
         {
             if (g->getNodeType() != NODE_GLOBAL_VARIABLE)
@@ -7075,6 +7264,10 @@ namespace
             auto*          global = static_cast<LSLGlobalVariable*>(g);
             LSLIdentifier* id     = global->getIdentifier();
             LSLExpression* init   = global->getInitializer();
+            // Apart from the one before it as the LSL had them, or a
+            // function the LSL had between them, which is written later.
+            keepApart(before, global, opened);
+            before = global;
             commentsBefore(global);
             const size_t from = mText.size();
             if (boolean(id->getSymbol()))
@@ -7189,7 +7382,7 @@ namespace
             {
                 lead.push_back("local " + nameOf(static_cast<LSLIdentifier*>(first)) + typed(LST_INTEGER) + " = #detected");
             }
-            return mOptions.types ? "detected: { DetectedEvent }" : "detected";
+            return mOptions.types ? "detected: " + braced("DetectedEvent") : "detected";
         }
         int at = 0;
         for (LSLASTNode* p = first; p; p = p->getNext(), ++at)
@@ -7249,14 +7442,15 @@ namespace
             std::vector<std::string> lead;
             const std::string        params = handlerParams(handler, lead);
             // The timer's handler, which LLTimers calls, where the script's
-            // timer is on LLTimers.
+            // timer is on LLTimers: the local timersPreamble declared, which
+            // a function statement of its name assigns.
             const bool timer = event == "timer" && mTimers;
             if (event == "timer" && !mTimers)
             {
                 noteOnce(handler, "SluaTimer", "the timer event, set going by llcompat.SetTimerEvent; LLTimers:every is SLua's own.");
             }
             const bool field = mOptions.handlers == ALLSLToSLua::Options::Handlers::Field;
-            line(timer   ? "timerHandler = function()"
+            line(timer   ? "function timerHandler()"
                  : field ? "function LLEvents." + event + "(" + params + ")"
                          : "LLEvents:on(" + luaString(event) + ", function(" + params + ")");
             trail(handler->getStatements());
@@ -7291,7 +7485,7 @@ namespace
         note(nullptr, "SluaStates",
              "LSL let go of a state's listens, sensor repeats and targets as it left the state; setState does not. Remove them "
              "yourself where the script relied on it.");
-        line("local states: { [string]: { [string]: (...any) -> () } } = {}");
+        line("local states: " + braced("[string]: " + braced("[string]: (...any) -> ()")) + " = {}");
         line("local currentState: string? = nil");
         line("");
         line("local function setState(name: string)");
@@ -7304,8 +7498,16 @@ namespace
         // a field assigned nil.
         const std::string off = "LLEvents:off(event :: any, handler)";
         const std::string on  = field ? "(LLEvents :: any)[event] = handler" : "LLEvents:on(event :: any, handler)";
+        // The state entered looked up before the one left is, so that a
+        // name with none -- which LSL's compiler refused, but an edit
+        // afterwards may write -- stops the script saying so, at the call
+        // that named it, and leaves it in the state it was in.
         mText += "    if name == currentState then\n"
                  "        return\n"
+                 "    end\n"
+                 "    local entering = states[name]\n"
+                 "    if not entering then\n"
+                 "        error(\"unknown state: \" .. name, 2)\n"
                  "    end\n"
                  "    local leaving = currentState and states[currentState]\n"
                  "    if leaving then\n"
@@ -7319,7 +7521,6 @@ namespace
                  "        end\n"
                  "    end\n"
                  "    currentState = name\n"
-                 "    local entering = states[name]\n"
                  "    for event, handler in entering do\n"
                  "        if " + own + " then\n"
                  "            " + on + "\n"
@@ -7508,7 +7709,7 @@ end
             out += R"LUA(-- LSL's (integer) of a string: the whole number it starts with, in
 -- decimal or 0x hexadecimal, after any spaces; 0 where it starts with none.
 local function lslInteger(s: string): number
-    return llcompat.List2Integer({ s }, 0)
+    return llcompat.List2Integer()LUA" + braced("s") + R"LUA(, 0)
 end
 
 )LUA";
@@ -7518,7 +7719,7 @@ end
             out += R"LUA(-- LSL's (float) of a string: the number it starts with; 0 where it
 -- starts with none.
 local function lslFloat(s: string): number
-    return llcompat.List2Float({ s }, 0)
+    return llcompat.List2Float()LUA" + braced("s") + R"LUA(, 0)
 end
 
 )LUA";
@@ -7599,6 +7800,11 @@ end
         for (Comment& c : mComments)
         {
             writeComment(c);
+        }
+        // Ending with one line break, as format on save leaves it.
+        while (mText.size() >= 2 && mText.compare(mText.size() - 2, 2, "\n\n") == 0)
+        {
+            mText.pop_back();
         }
         // Each of its lines a comment, whatever language the studio says
         // it in.

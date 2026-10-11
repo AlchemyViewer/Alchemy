@@ -382,4 +382,102 @@ namespace tut
         tabs.width = 99;
         ensure("does not", ALScriptFormatter::format(tabbed, tabs).find("\t\tllSay(\n\t\t\t0,\n") != std::string::npos);
     }
+
+    template<> template<>
+    void alscriptformatter_object::test<12>()
+    {
+        set_test_name("Luau's braces spaced inside as asked, whatever stands next to them, a table type's too; never {} nor an "
+                      "interpolated string's; a type's colon before a bracket spaced as written; LSL's braces as they were");
+        const std::string in   = "local states: {[string]: {[string]:(...any) -> ()}} = {}\n"
+                                 "local t = {{1}, {2, 3}, [k] = v, -1, #t}\n"
+                                 "local params: { any } = ll.ParseStringKeepNulls(msg, { \"\\n\" }, {})\n"
+                                 "print(`a {b} c {{d}}`, `{ {1} }`)\n"
+                                 "local f: (number) -> () = obj:method(1)\n";
+        const std::string want = "local states: { [string]: { [string]:(...any) -> () } } = {}\n"
+                                 "local t = { { 1 }, { 2, 3 }, [k] = v, -1, #t }\n"
+                                 "local params: { any } = ll.ParseStringKeepNulls(msg, { \"\\n\" }, {})\n"
+                                 "print(`a {b} c {{d}}`, `{ {1} }`)\n"
+                                 "local f: (number) -> () = obj:method(1)\n";
+        ensure_equals("StyLua's, by default", lua(in), want);
+        ALScriptFormatter::Options none;
+        none.lua         = true;
+        none.braceSpaces = false;
+        ensure_equals("none", ALScriptFormatter::format(in, none),
+                      std::string("local states: {[string]: {[string]:(...any) -> ()}} = {}\n"
+                                  "local t = {{1}, {2, 3}, [k] = v, -1, #t}\n"
+                                  "local params: {any} = ll.ParseStringKeepNulls(msg, {\"\\n\"}, {})\n"
+                                  "print(`a {b} c {{d}}`, `{ {1} }`)\n"
+                                  "local f: (number) -> () = obj:method(1)\n"));
+        ensure_equals("a type's colon, spaced", lua("local states: {[string]: (...any) -> ()} = {}\n"),
+                      std::string("local states: { [string]: (...any) -> () } = {}\n"));
+        ALScriptFormatter::Options lsl_none;
+        lsl_none.braceSpaces = false;
+        ensure_equals("LSL's braces", ALScriptFormatter::format("default { state_entry() { llSay(0, \"a\"); } }\n", lsl_none),
+                      std::string("default { state_entry() { llSay(0, \"a\"); } }\n"));
+    }
+
+    template<> template<>
+    void alscriptformatter_object::test<13>()
+    {
+        set_test_name("a sign against the bracket or brace after it, and after a < that compares or a minus that subtracts, spaced "
+                      "from it: -(a), #{ 1 }, i < -1, x - #t, in Luau and in LSL; LSL's vector's first sign still against its <");
+        ensure_equals("Luau", lua("local x = - (a)\nlocal y = # (t)\nlocal z = # {1}\nif i <#t and i <-1 and i > - (2) then end\n"
+                                  "local w = not (a)\nlocal q = a - (b)\nreturn -(x)\nlocal d = #{1} -#{2} - -#t + -#t\n"),
+                      std::string("local x = -(a)\nlocal y = #(t)\nlocal z = #{ 1 }\nif i < #t and i < -1 and i > -(2) then end\n"
+                                  "local w = not (a)\nlocal q = a - (b)\nreturn -(x)\nlocal d = #{ 1 } - #{ 2 } - -#t + -#t\n"));
+        ensure_equals("LSL", lsl("default { state_entry() { integer x = - (a); vector v = < -1, 0, 0 >; if (i <-1) x = ! (b); } }\n"),
+                      std::string("default { state_entry() { integer x = -(a); vector v = <-1, 0, 0>; if (i < -1) x = !(b); } }\n"));
+        ensure_equals("a list of vectors", lsl("list l = [<-1, 0, 0>, < -2, 0, 0 >];\n"), std::string("list l = [<-1, 0, 0>, <-2, 0, 0>];\n"));
+    }
+
+    template<> template<>
+    void alscriptformatter_object::test<14>()
+    {
+        set_test_name("what the author lined up stays lined up: a run's =, at the author's column or past the longest, a comment on a line "
+                      "of its own going on past; a run's trailing comments where its code changed; not equal columns by chance; tabs to "
+                      "their stops");
+        const std::string lined = "local CHANNEL       = 1 -- channel\n"
+                                  "local OWNER_ONLY    = true -- owner\n"
+                                  "-- a note over the next\n"
+                                  "local USE_OWNER_SAY = true -- say\n";
+        ensure_equals("as it was", lua(lined), lined);
+        ensure_equals("spaced afresh, lined up again", lua("local a   =1      -- one\nlocal bbb = {2,3} -- two\n"),
+                      std::string("local a   = 1        -- one\nlocal bbb = { 2, 3 } -- two\n"));
+        ensure_equals("the author's column", lua("local a     = 1\nlocal bb    = 2\n"), std::string("local a     = 1\nlocal bb    = 2\n"));
+        ensure_equals("past the longest", lua("t[i+1]  = 1\nt[ii]   = 2\n"), std::string("t[i + 1] = 1\nt[ii]    = 2\n"));
+        ensure_equals("not by chance", lua("ab=1\nc = 2\n"), std::string("ab = 1\nc = 2\n"));
+        ensure_equals("not across a blank line", lua("local a  = 1\n\nlocal bb = 2\n"), std::string("local a = 1\n\nlocal bb = 2\n"));
+        const std::string fields = "local t = {\n    alpha   = 1,\n    b       = 2,\n}\n";
+        ensure_equals("a table's fields", lua(fields), fields);
+        ensure_equals("LSL, by tabs", lsl("integer a\t= 1;\ninteger bb\t= 2;\n"), std::string("integer a   = 1;\ninteger bb  = 2;\n"));
+        // The formatter's own, again: the same.
+        ensure_equals("again", lua(lua("local a   =1      -- one\nlocal bbb = {2,3} -- two\n")),
+                      std::string("local a   = 1        -- one\nlocal bbb = { 2, 3 } -- two\n"));
+    }
+
+    template<> template<>
+    void alscriptformatter_object::test<15>()
+    {
+        set_test_name("a comment the author wrote out of the block over an elseif, else, until or end stays as far in as that line; one "
+                      "written in the block stays in it; in an empty block, as written where the text is indented; flat text, in");
+        const std::string chain = "if a then\n"
+                                  "    x()\n"
+                                  "-- about b\n"
+                                  "elseif b then\n"
+                                  "    y()\n"
+                                  "    -- the end of y\n"
+                                  "else\n"
+                                  "    z()\n"
+                                  "end\n";
+        ensure_equals("as written", lua(chain), chain);
+        const std::string repeat = "local function f()\n"
+                                   "    repeat\n"
+                                   "    -- why\n"
+                                   "    until x\n"
+                                   "end\n";
+        ensure_equals("an empty block, indented", lua(repeat), repeat);
+        ensure_equals("flat", lua("if a then\nx()\n-- note\nend\n"), std::string("if a then\n    x()\n    -- note\nend\n"));
+        ensure_equals("LSL", lsl("default\n{\n    touch_start(integer n)\n    {\n        x();\n    // about the end\n    }\n}\n"),
+                      std::string("default\n{\n    touch_start(integer n)\n    {\n        x();\n    // about the end\n    }\n}\n"));
+    }
 }
