@@ -517,10 +517,12 @@ jobs:
       # Each Catch2 binary's run of all its tests in one process, while it is
       # still combined_pending: the default run leaves those out until they
       # are known to share a process, and this is where that is learned, on
-      # every row. It reports, and never fails the job.
+      # every row. It reports, and never fails the job; an hour bounds it, as
+      # CTest bounds each run, should one hang.
       - name: Run pending combined tests
         if: ${{ !cancelled() && matrix.build_variant == 'Tests' }}
         continue-on-error: true
+        timeout-minutes: 60
         shell: bash
         env:
           BUILD_DIRECTORY: ${{ steps.configure.outputs.build_directory }}
@@ -531,9 +533,16 @@ jobs:
             optdebug) cmake_config=OptDebug ;;
             *) cmake_config=Debug ;;
           esac
+          # This run writes LastTest.log over the build's; the build's is kept
+          # under a name the upload below still takes.
+          log="$BUILD_DIRECTORY/Testing/Temporary/LastTest.log"
+          if [[ -f "$log" ]]; then
+            cp "$log" "$BUILD_DIRECTORY/Testing/Temporary/LastTest-build.log"
+          fi
+          # CTest reads a relative --output-junit from the test directory.
           ctest --test-dir "$BUILD_DIRECTORY" -C "$cmake_config" -L combined_pending \
             --output-on-failure --no-tests=ignore \
-            --output-junit "$BUILD_DIRECTORY/Testing/combined-pending-results.xml"
+            --output-junit Testing/combined-pending-results.xml
 
       # What each test did, on a row whose tests failed as much as on one
       # whose tests passed: the JUnit file CTest writes and its own log. The
