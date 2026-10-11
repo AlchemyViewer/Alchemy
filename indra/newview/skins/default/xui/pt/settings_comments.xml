@@ -1839,18 +1839,10 @@
   <string>Escalar de ruído para esconder banding na renderização diferida.</string>
   <key>RenderDeferredSSAO</key>
   <string>Executar o shader de oclusão de ambiente em espaço de tela no renderizador diferido.</string>
-  <key>RenderDeferredSpotShadowBias</key>
-  <string>Valor de viés para sombras de spot (previne shadow acne).</string>
-  <key>RenderDeferredSpotShadowOffset</key>
-  <string>Valor de deslocamento para sombras de spot (previne shadow acne).</string>
   <key>RenderDeferredSun</key>
   <string>Executar o shader de luz solar no renderizador diferido.</string>
   <key>RenderDeferredSunWash</key>
   <string>Quanto as luzes locais são apagadas pelo sol.</string>
-  <key>RenderDeferredTreeShadowBias</key>
-  <string>Valor de viés para sombras de árvores (previne shadow acne).</string>
-  <key>RenderDeferredTreeShadowOffset</key>
-  <string>Valor de deslocamento para sombras de árvores (previne shadow acne).</string>
   <key>RenderDelayCreation</key>
   <string>Limitar a criação de drawables.</string>
   <key>RenderDelayVBUpdate</key>
