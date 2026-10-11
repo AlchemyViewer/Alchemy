@@ -82,6 +82,13 @@ namespace tut
             return name;
         }
 
+        // Whether clearRange clears on the GPU, as it does where GL 4.3's clear resolved, for a store of any flags.
+        // Elsewhere it uploads the pattern, which only a DYNAMIC or STREAM store takes.
+        bool clearsOnGPU()
+        {
+            return glClearBufferSubData || (gGLManager.mHasDirectStateAccess && glClearNamedBufferSubData);
+        }
+
     // The program the tests bind, and compute's switch, go back with mGL.
     struct algpubuffer_data
     {
@@ -160,21 +167,20 @@ namespace tut
         ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
     }
 
-    // A buffer that is not DYNAMIC clears on the GPU, and copies between buffers and within one go where they are
-    // told.
+    // Copies between buffers that are not DYNAMIC, and within one, go where they are told; and such a buffer clears
+    // where the clear is the GPU's. Below GL 4.3 the clear is an upload, which a static store does not take, and is
+    // asserted: the buffers a clear is for are compute's, and compute needs 4.3.
     template<> template<>
     void algpubuffer_object_t::test<2>()
     {
         const std::vector<U32> source_words = pattern(WORDS, 5u);
+        std::vector<U32> expected(WORDS, 0u);
         ALGPUBuffer source;
         ALGPUBuffer target;
         ensure("source allocates", source.allocate(WORDS * sizeof(U32), 0, source_words.data(), "source (test)"));
-        ensure("target allocates", target.allocate(WORDS * sizeof(U32), 0, nullptr, "target (test)"));
-        target.clear(0u);
-        ensure("a static buffer clears", readAll(target) == std::vector<U32>(WORDS, 0u));
+        ensure("target allocates", target.allocate(WORDS * sizeof(U32), 0, expected.data(), "target (test)"));
 
         target.copyFrom(source, 4 * sizeof(U32), 32 * sizeof(U32), 10 * sizeof(U32));
-        std::vector<U32> expected(WORDS, 0u);
         std::copy(source_words.begin() + 4, source_words.begin() + 14, expected.begin() + 32);
         ensure("copied between buffers", readAll(target) == expected);
 
@@ -182,6 +188,12 @@ namespace tut
         std::copy(expected.begin() + 32, expected.begin() + 42, expected.begin());
         ensure("copied within one", readAll(target) == expected);
         ensure("the source untouched", readAll(source) == source_words);
+
+        if (clearsOnGPU())
+        {
+            target.clear(0xA5A5A5A5u);
+            ensure("a static buffer clears", readAll(target) == std::vector<U32>(WORDS, 0xA5A5A5A5u));
+        }
         ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
     }
 
