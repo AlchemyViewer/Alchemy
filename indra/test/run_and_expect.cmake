@@ -9,6 +9,8 @@
 #         [-DEXPECT_OUTPUT=<regex>] [-DREJECT_OUTPUT=<regex>] -P run_and_expect.cmake
 #
 # ARGS separates its arguments with |, since CTest would split them on ;.
+# EXPECT_EXIT nonzero takes any end but a clean exit, a crash included, whose
+# code a signal decides on one platform and the system on another.
 
 string(REPLACE "|" ";" arguments "${ARGS}")
 execute_process(
@@ -19,7 +21,11 @@ execute_process(
 )
 message("${output}")
 
-if(NOT exit_code STREQUAL EXPECT_EXIT)
+if(EXPECT_EXIT STREQUAL "nonzero")
+  if(exit_code STREQUAL "0")
+    message(FATAL_ERROR "Expected the run to fail, and it exited 0")
+  endif()
+elseif(NOT exit_code STREQUAL EXPECT_EXIT)
   message(FATAL_ERROR "Expected exit code ${EXPECT_EXIT}, got ${exit_code}")
 endif()
 if(DEFINED EXPECT_OUTPUT AND NOT output MATCHES "${EXPECT_OUTPUT}")

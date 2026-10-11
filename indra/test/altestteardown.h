@@ -35,15 +35,18 @@ namespace ll_test
     // and registers its end here. The main runs the ends after the last test
     // case, newest first, while APR and LLError are still up. Left to static
     // destruction, they would run in whatever order the linker chose, after
-    // the main had already let APR go.
+    // the main had already let APR go. A fixture that changes process state
+    // on purpose as it is made tells the state guard (StateGuard::accept).
     class Teardown
     {
     public:
         static void add(std::function<void()> step);
 
         // The main's: runs each step once, newest first. A step that throws
-        // is reported and the rest still run.
-        static void runAll();
+        // is reported and the rest still run; the count of those that threw
+        // is returned, and the main fails the run on any, as a check at
+        // static destruction ended a TUT process.
+        static int runAll();
     };
 }
 

@@ -71,7 +71,9 @@ namespace ll_test
                     same = actual.asUUID() == expected.asUUID();
                     break;
                 case LLSD::TypeDate:
-                    same = actual.asDate() == expected.asDate();
+                    // Not LLDate's ==, which is made of < and so holds a NaN
+                    // date equal to every date; TUT compared the seconds.
+                    same = actual.asDate().secondsSinceEpoch() == expected.asDate().secondsSinceEpoch();
                     break;
                 case LLSD::TypeURI:
                     same = actual.asURI().asString() == expected.asURI().asString();

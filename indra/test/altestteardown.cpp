@@ -48,8 +48,9 @@ namespace ll_test
         steps().push_back(std::move(step));
     }
 
-    void Teardown::runAll()
+    int Teardown::runAll()
     {
+        int failed = 0;
         std::vector<std::function<void()>>& pending = steps();
         while (!pending.empty())
         {
@@ -61,12 +62,15 @@ namespace ll_test
             }
             catch (const std::exception& e)
             {
+                ++failed;
                 std::cerr << "Teardown step threw: " << e.what() << std::endl;
             }
             catch (...)
             {
+                ++failed;
                 std::cerr << "Teardown step threw a non-standard exception" << std::endl;
             }
         }
+        return failed;
     }
 }

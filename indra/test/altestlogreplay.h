@@ -47,9 +47,10 @@ namespace ll_test
         static void install(LLError::ELevel level);
 
         // The listener's, around each test case. Both do nothing when LOGFAIL
-        // was not set.
+        // was not set. After a crash, the thread that crashed may hold the
+        // log as it writes to it: then a replay says so rather than wait.
         static void clear();
-        static void replay(std::ostream& out, const std::string& test_case);
+        static void replay(std::ostream& out, const std::string& test_case, bool after_crash = false);
 
         void recordMessage(LLError::ELevel level, const std::string& message) override;
 

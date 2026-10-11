@@ -30,6 +30,7 @@
 #include "altestfatal.h"
 #include "altestmatchers.h"
 #include "altestname.h"
+#include "alteststateguard.h"
 #include "altestteardown.h"
 
 #include "llerror.h"
@@ -40,6 +41,8 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <cstdlib>
+#include <limits>
+#include <thread>
 #include <vector>
 
 namespace
@@ -50,6 +53,15 @@ namespace
         sd["a"][2] = leaf;
         sd["b"] = "text";
         return sd;
+    }
+
+    void setLeak(const char* name)
+    {
+#if LL_WINDOWS
+        _putenv_s(name, "1");
+#else
+        setenv(name, "1", 1);
+#endif
     }
 }
 
@@ -85,6 +97,11 @@ TEST_CASE("LLSDEquals compares all the way down and says where two differ", "[al
     const ll_test::LLSDEqualsMatcher top = ll_test::LLSDEquals(LLSD("1"));
     CHECK_FALSE(top.match(LLSD(1)));
     CHECK_THAT(top.describe(), Catch::Matchers::ContainsSubstring("the top: type"));
+
+    // LLDate's own == holds a NaN date equal to any.
+    const LLSD nan_date = LLDate(std::numeric_limits<F64>::quiet_NaN());
+    CHECK_FALSE(ll_test::LLSDEquals(LLDate(0.0)).match(nan_date));
+    CHECK_THAT(LLSD(LLDate(1.0)), ll_test::LLSDEquals(LLDate(1.0)));
 }
 
 TEST_CASE("MemoryMatches compares byte for byte and says where two part", "[altestsupport]")
@@ -119,10 +136,10 @@ TEST_CASE("Teardown runs each step once, newest first", "[altestsupport]")
     std::vector<int> order;
     ll_test::Teardown::add([&order] { order.push_back(1); });
     ll_test::Teardown::add([&order] { order.push_back(2); });
-    ll_test::Teardown::runAll();
+    CHECK(ll_test::Teardown::runAll() == 0);
     const std::vector<int> newest_first{ 2, 1 };
     CHECK(order == newest_first);
-    ll_test::Teardown::runAll();
+    CHECK(ll_test::Teardown::runAll() == 0);
     CHECK(order.size() == 2);
 }
 
@@ -131,11 +148,7 @@ TEST_CASE("Teardown runs each step once, newest first", "[altestsupport]")
 
 TEST_CASE("a test case that leaves the environment changed", "[.guard-leak]")
 {
-#if LL_WINDOWS
-    _putenv_s("AL_TEST_SUPPORT_LEAK", "1");
-#else
-    setenv("AL_TEST_SUPPORT_LEAK", "1", 1);
-#endif
+    setLeak("AL_TEST_SUPPORT_LEAK");
     SUCCEED();
 }
 
@@ -154,4 +167,36 @@ TEST_CASE("a passing test case that logged", "[.replay-pass]")
 TEST_CASE("a test case that skips", "[.skip]")
 {
     SKIP("deliberately");
+}
+
+TEST_CASE("a test case that leaves the environment changed, then skips", "[.skip-leak]")
+{
+    setLeak("AL_TEST_SUPPORT_SKIP_LEAK");
+    SKIP("deliberately");
+}
+
+TEST_CASE("a test case whose fixture sets a variable and says so", "[.guard-accept]")
+{
+    setLeak("AL_TEST_SUPPORT_ACCEPTED");
+    ll_test::StateGuard::accept("the environment");
+    SUCCEED();
+}
+
+TEST_CASE("a test case whose fixture's end fails", "[.teardown-fails]")
+{
+    ll_test::Teardown::add([] { LL_ERRS("altestsupport") << "a teardown step that fails" << LL_ENDL; });
+    SUCCEED();
+}
+
+TEST_CASE("a test case that logged, then crashes", "[.crash-replay]")
+{
+    LL_INFOS("altestsupport") << "the line a crashing case logged" << LL_ENDL;
+    // Through a volatile pointer, so no compiler can know it is null.
+    volatile int* volatile nowhere = nullptr;
+    *nowhere = 1;
+}
+
+TEST_CASE("a test case whose thread hits an LL_ERRS", "[.thread-errs]")
+{
+    std::thread([] { LL_ERRS("altestsupport") << "an error off the main thread" << LL_ENDL; }).join();
 }

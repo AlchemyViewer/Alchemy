@@ -43,10 +43,20 @@ namespace ll_test
     };
 
     // Makes every LL_ERRS from here on throw FatalError, on whichever thread
-    // it happens. Off the main thread nothing catches it, so the process
-    // ends there, and Catch2's signal handler names the test case that was
-    // running.
+    // it happens. Off the main thread, on a thread of the test's own, nothing
+    // catches it and the process ends through std::terminate; see
+    // installTerminateHandler. An LLThread is different: outside Windows it
+    // catches what its run() throws and posts it to the "mainloop" WorkQueue,
+    // to be thrown again there, so a test of one sees its LL_ERRS only by
+    // servicing that queue.
     void installFatalFunction();
+
+    // Makes std::terminate, before it aborts, name the test case that was
+    // running and what the exception in flight said. Catch2's own report of
+    // the abort that follows names the case outside Windows, but not what was
+    // thrown; on Windows, where it handles no SIGABRT, nothing else would say
+    // either.
+    void installTerminateHandler();
 }
 
 #endif // AL_ALTESTFATAL_H

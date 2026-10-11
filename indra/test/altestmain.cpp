@@ -39,11 +39,9 @@
 #include "lltracethreadrecorder.h"
 
 #include <catch2/catch_session.hpp>
-#include <catch2/catch_tostring.hpp>
 
 #include <cstdlib>
 #include <iostream>
-#include <limits>
 
 namespace
 {
@@ -114,17 +112,12 @@ int main(int argc, char* argv[])
                       "exit 125, which CTest reads as skipped, unless the host runs this x86-64 "
                       "level: 2 for SSE4.2, 3 for AVX2, 4 for AVX-512")
                 | Opt(log_to_file)["--al-log"](
-                      "also log everything, at DEBUG, to <executable>.<pid>.log"));
+                      "also log to <executable>.<pid>.log, at the level LOGTEST or LOGFAIL "
+                      "names, else DEBUG"));
 
     // Declared order, as TUT ran a group's tests, until no test leans on the
     // ones before it. --order on the command line still wins.
     session.configData().runOrder = Catch::TestRunOrder::Declared;
-
-    // Every digit a float or double holds, where Catch2 prints 5 and 10: two
-    // values a failure prints alike are then alike, which matters to tests
-    // that compare to the last bit.
-    Catch::StringMaker<float>::precision  = std::numeric_limits<float>::max_digits10;
-    Catch::StringMaker<double>::precision = std::numeric_limits<double>::max_digits10;
 
     if (const int result = session.applyCommandLine(argc, argv); result != 0)
     {
@@ -149,6 +142,7 @@ int main(int argc, char* argv[])
     ll_init_apr();
     setUpLogging(argv[0], log_to_file);
     ll_test::installFatalFunction();
+    ll_test::installTerminateHandler();
 
     // LLTrace needs a master recorder before any thread records. Never freed,
     // as the TUT runner never freed it: static destructors that record would
@@ -159,20 +153,32 @@ int main(int argc, char* argv[])
 
     int result = session.run();
 
-    ll_test::Teardown::runAll();
+    const int teardown_failures = ll_test::Teardown::runAll();
     ll_cleanup_apr();
 
+    // A run that failed no case can still fail: a case left process state
+    // changed, or a fixture's end found something wrong. Skipped cases ran
+    // too, as far as they got, so a run of nothing but skips is held to the
+    // same.
+    if (result == 0 || result == Catch::AllTestsSkippedExitCode)
+    {
+        if (ll_test::StateGuard::changes() > 0)
+        {
+            std::cerr << "The state guard found " << ll_test::StateGuard::changes()
+                      << " change(s) a test case left behind; see above." << std::endl;
+            result = 1;
+        }
+        if (teardown_failures > 0)
+        {
+            std::cerr << teardown_failures << " teardown step(s) threw; see above." << std::endl;
+            result = 1;
+        }
+    }
     // Every test file is a CTest entry of its own, all with 125 as their skip
     // code; Catch2 says "all skipped" with 4.
     if (result == Catch::AllTestsSkippedExitCode)
     {
         result = 125;
-    }
-    if (result == 0 && ll_test::StateGuard::changes() > 0)
-    {
-        std::cerr << "The state guard found " << ll_test::StateGuard::changes()
-                  << " change(s) a test case left behind; see above." << std::endl;
-        result = 1;
     }
     return result;
 }

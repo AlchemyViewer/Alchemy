@@ -243,6 +243,17 @@ namespace ll_test
         }
     }
 
+    void StateGuard::accept(const std::string& check_name)
+    {
+        for (Check& check : checks())
+        {
+            if (check_name.empty() || check.name == check_name)
+            {
+                check.last = check.describe();
+            }
+        }
+    }
+
     void StateGuard::check(const std::string& test_case)
     {
         for (Check& check : checks())

@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "altestlogreplay.h"
+#include "altestname.h"
 
 #include <catch2/catch_test_case_info.hpp>
 #include <catch2/reporters/catch_reporter_event_listener.hpp>
@@ -60,6 +61,14 @@ namespace ll_test
                     LogReplay::replay(std::cerr, stats.testInfo->name);
                 }
             }
+
+            // A crash -- a signal, or on Windows a structured exception -- ends
+            // the case without a testCasePartialEnded, at the moment its log
+            // is wanted most.
+            void fatalErrorEncountered(Catch::StringRef) override
+            {
+                LogReplay::replay(std::cerr, currentTestName(), true);
+            }
         };
     }
 
@@ -82,13 +91,26 @@ namespace ll_test
         }
     }
 
-    void LogReplay::replay(std::ostream& out, const std::string& test_case)
+    void LogReplay::replay(std::ostream& out, const std::string& test_case, bool after_crash)
     {
         if (!sReplay)
         {
             return;
         }
-        std::lock_guard<std::mutex> lock(sReplay->mMutex);
+        std::unique_lock<std::mutex> lock(sReplay->mMutex, std::defer_lock);
+        if (after_crash)
+        {
+            if (!lock.try_lock())
+            {
+                out << "---- log of \"" << test_case << "\" not replayed: it was being written ----"
+                    << std::endl;
+                return;
+            }
+        }
+        else
+        {
+            lock.lock();
+        }
         out << "---- log of \"" << test_case << "\" ----\n";
         for (const std::string& line : sReplay->mLines)
         {

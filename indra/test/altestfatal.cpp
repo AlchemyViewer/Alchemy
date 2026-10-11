@@ -25,8 +25,13 @@
 #include "linden_common.h"
 
 #include "altestfatal.h"
+#include "altestname.h"
 
 #include "llerrorcontrol.h"
+
+#include <cstdlib>
+#include <exception>
+#include <iostream>
 
 namespace ll_test
 {
@@ -46,5 +51,35 @@ namespace ll_test
     void installFatalFunction()
     {
         LLError::setFatalFunction(throwFatalError);
+    }
+
+    void installTerminateHandler()
+    {
+        std::set_terminate(
+            []
+            {
+                std::cerr << "std::terminate in test case \"" << currentTestName() << "\"";
+                if (std::exception_ptr in_flight = std::current_exception())
+                {
+                    try
+                    {
+                        std::rethrow_exception(in_flight);
+                    }
+                    catch (const std::exception& e)
+                    {
+                        std::cerr << ": " << e.what();
+                    }
+                    catch (...)
+                    {
+                        std::cerr << ": a non-standard exception";
+                    }
+                }
+                std::cerr << std::endl;
+#if LL_WINDOWS
+                // No abort dialog for CTest to wait out.
+                _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif
+                std::abort();
+            });
     }
 }

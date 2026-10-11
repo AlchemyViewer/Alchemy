@@ -67,8 +67,10 @@ set_target_properties(al_test_support PROPERTIES FOLDER "Tests")
 
 # The harness's own tests, the first Catch2 binary. Its hidden test cases are
 # run one at a time by the entries below, which check the exit code and the
-# output CTest sees from the harness: the state guard, LOGFAIL's replay, the
-# skip and no-match codes, the ISA gate, and a listing needing no setup.
+# output CTest sees from the harness: the state guard and what a fixture may
+# tell it, LOGFAIL's replay, a crash and an uncaught LL_ERRS, a fixture's end
+# failing, the skip and no-match codes, the ISA gate, and a listing needing no
+# setup.
 al_add_test_binary(
   test_support_tests
   PROJECT test
@@ -126,7 +128,37 @@ al_expect_from_test_support(
   EXIT 0
   REJECT "the line a passing case logged"
 )
+al_expect_from_test_support(
+  guard_accepts_a_fixture
+  ARGS "[.guard-accept]"
+  EXIT 0
+  REJECT "State guard"
+)
+al_expect_from_test_support(
+  replay_on_crash
+  ARGS "[.crash-replay]"
+  EXIT nonzero
+  OUTPUT "log of .a test case that logged, then crashes.*the line a crashing case logged"
+)
+al_expect_from_test_support(
+  terminate_names_the_case
+  ARGS "[.thread-errs]"
+  EXIT nonzero
+  OUTPUT "std::terminate in test case .a test case whose thread hits an LL_ERRS.: LL_ERRS: .*an error off the main thread"
+)
+al_expect_from_test_support(
+  teardown_failure_fails
+  ARGS "[.teardown-fails]"
+  EXIT 1
+  OUTPUT "Teardown step threw: LL_ERRS: .*a teardown step that fails"
+)
 al_expect_from_test_support(all_skipped_is_125 ARGS "[.skip]" EXIT 125)
+al_expect_from_test_support(
+  guard_fails_a_skipped_run
+  ARGS "[.skip-leak]"
+  EXIT 1
+  OUTPUT "left the environment changed.*AL_TEST_SUPPORT_SKIP_LEAK=1"
+)
 al_expect_from_test_support(nothing_matched_fails ARGS "no such test case" EXIT 2)
 al_expect_from_test_support(
   isa_gate_skips
@@ -134,9 +166,11 @@ al_expect_from_test_support(
   EXIT 125
   OUTPUT "does not run x86-64 level 9"
 )
+# The ISA level is one no host runs: a listing that set up first, or held to
+# the gate, would skip rather than list.
 al_expect_from_test_support(
   listing_needs_no_setup
-  ARGS "--list-tests"
+  ARGS "--list-tests|--isa-level|9"
   EXIT 0
   OUTPUT "LLSDEquals compares all the way down"
 )

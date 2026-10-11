@@ -58,6 +58,15 @@ namespace ll_test
         static void snapshot();
         static void check(const std::string& test_case);
 
+        // A process-wide fixture's, once it is made (see Teardown): what it
+        // changed on purpose -- a variable it set, the LLApp it made, the
+        // floating-point mode a GL driver chose -- becomes the state to
+        // compare with, so the test case that first asked for the fixture is
+        // not blamed for it. Names one check, as add() named it ("the
+        // environment"), or every check when empty. Whatever that case had
+        // itself changed of the same state is accepted with it.
+        static void accept(const std::string& check_name = {});
+
         // How many times a case left something changed. The main fails the run
         // if any did, since a listener cannot fail a test case of its own.
         static int changes();
