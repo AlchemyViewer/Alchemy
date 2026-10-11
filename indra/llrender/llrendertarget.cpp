@@ -536,6 +536,8 @@ void LLRenderTarget::release()
 void LLRenderTarget::bindTarget()
 {
     LL_PROFILE_GPU_ZONE("bindTarget");
+    // What gGL has batched belongs to the framebuffer bound before this one.
+    gGL.flush();
     llassert(mFBO);
     llassert(!isBoundInStack());
 
@@ -571,6 +573,8 @@ void LLRenderTarget::bindTarget()
 void LLRenderTarget::clear(U32 mask_in)
 {
     LL_PROFILE_GPU_ZONE("clear");
+    // What gGL has batched is drawn before the clear, not after it.
+    gGL.flush();
     llassert(mFBO);
     U32 mask = GL_COLOR_BUFFER_BIT;
     if (mUseDepth)
@@ -750,6 +754,9 @@ void LLRenderTarget::copyContents(LLRenderTarget& source, S32 srcX0, S32 srcY0, 
 void LLRenderTarget::copyContentsToFramebuffer(LLRenderTarget& source, S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0,
                                                S32 dstX1, S32 dstY1, U32 mask, U32 filter)
 {
+    // What gGL has batched is drawn before the blit reads or overwrites it.
+    gGL.flush();
+
     if (!source.mFBO)
     {
         LL_WARNS() << "Cannot copy framebuffer contents for non FBO render targets." << LL_ENDL;
@@ -808,6 +815,8 @@ void LLRenderTarget::setDrawBuffers(U32 count)
 
     const U32 wanted = (count == 0) ? attachments : llmin(count, attachments);
 
+    // What gGL has batched goes to the attachments selected when it was drawn.
+    gGL.flush();
     glDrawBuffers(static_cast<GLsizei>(wanted), drawbuffers);
 }
 
@@ -822,6 +831,7 @@ void LLRenderTarget::setDrawOutput(U32 output)
     output = llmin(output, (U32)LL_ARRAY_SIZE(drawbuffers) - 1);
     drawbuffers[output] = GL_COLOR_ATTACHMENT0;
 
+    gGL.flush();
     glDrawBuffers(static_cast<GLsizei>(output + 1), drawbuffers);
 }
 
