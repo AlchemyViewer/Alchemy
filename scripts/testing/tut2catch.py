@@ -65,7 +65,8 @@ production code names as a friend.
 
 What it cannot decide it leaves unconverted, marked // TM-CHECK: <why> (or
 /* TM-CHECK: */ inside a macro), and it exits 1 listing every mark; 2 if a
-file could not be read at all. It never
+file could not be read at all, or the converter itself failed on one (its
+traceback is that file's error, and the other files go on). It never
 drops a test or an assertion: --mapping writes one entry per test, with the
 TUT-side assertion calls in its body and the Catch2 assertions now in it,
 which scripts/testing/tut_parity.py checks.
@@ -93,6 +94,7 @@ import shlex
 import subprocess
 import sys
 import threading
+import traceback
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DEFAULT_BUILD = "build-Darwin-ninja-os"
@@ -2684,6 +2686,11 @@ def convert_one(args):
         except ConvertError as e:
             result["value"] = {"file": os.path.relpath(path, ROOT), "error": str(e), "tests": [], "checks": [],
                                "notes": []}
+        except Exception:
+            # A bug of the converter's own, met in one file: it is that
+            # file's error, traceback and all, and the others go on.
+            result["value"] = {"file": os.path.relpath(path, ROOT), "error": traceback.format_exc().rstrip(),
+                               "tests": [], "checks": [], "notes": []}
     # Deep ASTs recurse deeply.
     threading.stack_size(512 * 1024 * 1024)
     t = threading.Thread(target=work)
