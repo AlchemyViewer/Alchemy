@@ -1307,7 +1307,10 @@ bool LLPresetsManager::loadLooksPreset(std::string name)
 bool LLPresetsManager::saveSharedLook(const std::string& name, const LLSD& shared_settings, LookSettingCounts& counts)
 {
     counts = LookSettingCounts();
-    if (name.empty() || isReservedPresetName(name))
+    // Nor over Neutral, the Look the Lightbox falls back to. The import
+    // never asks for it (chooseImportedLookName); this is the backstop,
+    // as savePreset and deletePreset have.
+    if (name.empty() || isReservedPresetName(name) || isProtectedLookName(name))
     {
         LL_WARNS("Presets") << "A shared Look cannot be saved as '" << name << "'" << LL_ENDL;
         return false;
