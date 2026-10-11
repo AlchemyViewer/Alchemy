@@ -373,6 +373,77 @@ void LLImageGL::cleanupClass()
 }
 
 
+namespace
+{
+    // An integer internal format's pixel format and sign; a pixel format of 0 for any other format. isIntegerFormat,
+    // isSignedIntegerFormat and integerPixelFormat all answer from it, so the three cannot disagree.
+    struct IntegerFormatInfo
+    {
+        U32  mPixelFormat = 0;
+        bool mSigned      = false;
+    };
+
+    IntegerFormatInfo integer_format_info(S32 internal_format)
+    {
+        switch (internal_format)
+        {
+        case GL_R8I:
+        case GL_R16I:
+        case GL_R32I:
+            return { GL_RED_INTEGER, true };
+        case GL_R8UI:
+        case GL_R16UI:
+        case GL_R32UI:
+            return { GL_RED_INTEGER, false };
+        case GL_RG8I:
+        case GL_RG16I:
+        case GL_RG32I:
+            return { GL_RG_INTEGER, true };
+        case GL_RG8UI:
+        case GL_RG16UI:
+        case GL_RG32UI:
+            return { GL_RG_INTEGER, false };
+        case GL_RGB8I:
+        case GL_RGB16I:
+        case GL_RGB32I:
+            return { GL_RGB_INTEGER, true };
+        case GL_RGB8UI:
+        case GL_RGB16UI:
+        case GL_RGB32UI:
+            return { GL_RGB_INTEGER, false };
+        case GL_RGBA8I:
+        case GL_RGBA16I:
+        case GL_RGBA32I:
+            return { GL_RGBA_INTEGER, true };
+        case GL_RGBA8UI:
+        case GL_RGBA16UI:
+        case GL_RGBA32UI:
+        case GL_RGB10_A2UI:
+            return { GL_RGBA_INTEGER, false };
+        default:
+            return {};
+        }
+    }
+}
+
+//static
+bool LLImageGL::isIntegerFormat(S32 internal_format)
+{
+    return integer_format_info(internal_format).mPixelFormat != 0;
+}
+
+//static
+bool LLImageGL::isSignedIntegerFormat(S32 internal_format)
+{
+    return integer_format_info(internal_format).mSigned;
+}
+
+//static
+U32 LLImageGL::integerPixelFormat(S32 internal_format)
+{
+    return integer_format_info(internal_format).mPixelFormat;
+}
+
 // Whether an internal format is *sized*, i.e. legal for glTexStorage2D. Unsized
 // formats (GL_RGBA, GL_RGB, GL_RED, the legacy GL_LUMINANCE family, generic
 // GL_COMPRESSED_*) let the driver choose the actual storage, which immutable
@@ -419,7 +490,8 @@ static bool isSizedInternalFormat(S32 intformat)
     case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT:
         return true;
     default:
-        return false;
+        // Every integer format is sized.
+        return LLImageGL::isIntegerFormat(intformat);
     }
 }
 
@@ -522,6 +594,31 @@ S32 LLImageGL::dataFormatBits(S32 dataformat)
     case GL_RG32F:                                  return 64;
     case GL_RGB32F:                                 return 96;
     case GL_RGBA32F:                                return 128;
+    case GL_R8I:                                    return 8;
+    case GL_R8UI:                                   return 8;
+    case GL_R16I:                                   return 16;
+    case GL_R16UI:                                  return 16;
+    case GL_R32I:                                   return 32;
+    case GL_R32UI:                                  return 32;
+    case GL_RG8I:                                   return 16;
+    case GL_RG8UI:                                  return 16;
+    case GL_RG16I:                                  return 32;
+    case GL_RG16UI:                                 return 32;
+    case GL_RG32I:                                  return 64;
+    case GL_RG32UI:                                 return 64;
+    case GL_RGB8I:                                  return 24;
+    case GL_RGB8UI:                                 return 24;
+    case GL_RGB16I:                                 return 48;
+    case GL_RGB16UI:                                return 48;
+    case GL_RGB32I:                                 return 96;
+    case GL_RGB32UI:                                return 96;
+    case GL_RGBA8I:                                 return 32;
+    case GL_RGBA8UI:                                return 32;
+    case GL_RGBA16I:                                return 64;
+    case GL_RGBA16UI:                               return 64;
+    case GL_RGBA32I:                                return 128;
+    case GL_RGBA32UI:                               return 128;
+    case GL_RGB10_A2UI:                             return 32;
     default:
         LL_ERRS() << "LLImageGL::Unknown format: " << std::hex << dataformat << std::dec << LL_ENDL;
         return 0;
@@ -561,8 +658,14 @@ S32 LLImageGL::dataFormatVRAMBits(S32 dataformat)
     {
     case GL_RGB8:                   return 32;  // padded to RGBX
     case GL_SRGB8:                  return 32;  // padded, as GL_RGB8
+    case GL_RGB8I:                  return 32;  // padded, as GL_RGB8
+    case GL_RGB8UI:                 return 32;  // padded, as GL_RGB8
     case GL_RGB16F:                 return 64;  // padded to RGBA16F
+    case GL_RGB16I:                 return 64;  // padded, as GL_RGB16F
+    case GL_RGB16UI:                return 64;  // padded, as GL_RGB16F
     case GL_RGB32F:                 return 128; // padded to RGBA32F
+    case GL_RGB32I:                 return 128; // padded, as GL_RGB32F
+    case GL_RGB32UI:                return 128; // padded, as GL_RGB32F
     case GL_DEPTH_COMPONENT24:      return 32;  // padded to 32-bit
     default:                        return dataFormatBits(dataformat);
     }
@@ -612,6 +715,12 @@ S32 LLImageGL::dataFormatComponents(S32 dataformat)
       case GL_RGBA:                             return 4;
       case GL_SRGB_ALPHA:                       return 4;
       case GL_BGRA:                             return 4;       // Used for QuickTime media textures on the Mac
+      case GL_RED_INTEGER:                      return 1;
+      case GL_RG_INTEGER:                       return 2;
+      case GL_RGB_INTEGER:                      return 3;
+      case GL_BGR_INTEGER:                      return 3;
+      case GL_RGBA_INTEGER:                     return 4;
+      case GL_BGRA_INTEGER:                     return 4;
       default:
         LL_ERRS() << "LLImageGL::Unknown format: " << std::hex << dataformat << std::dec << LL_ENDL;
         return 0;
@@ -945,6 +1054,13 @@ void LLImageGL::setExplicitFormat( LLGLint internal_format, LLGLenum primary_for
     else
         mFormatType = type_format;
     mFormatSwapBytes = swap_bytes;
+
+    // GL neither builds nor filters an integer texture's mips, and the box filter setImage builds them with by hand
+    // would average the bits of its values: an integer texture holds level 0 alone.
+    if (isIntegerFormat(internal_format))
+    {
+        mUseMipMaps = false;
+    }
 
     // Order matters: alpha-stride/offset depends on the deprecated format
     // names (LUMINANCE_ALPHA → stride 2, etc.). Compute that first, then
@@ -2393,6 +2509,15 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
     }
     else
     {
+        // An LLImageRaw holds a byte a component. A wider texel -- R32UI's, a float format's -- would not fit, and GL
+        // would write past the end of it.
+        if (!isCompressed() && pixel_bytes(mFormatPrimary, mFormatType) != (U32)ncomponents)
+        {
+            LL_WARNS() << "readBackRaw: a texel of format 0x" << std::hex << mFormatPrimary << " type 0x" << mFormatType
+                       << std::dec << " is wider than an image's " << ncomponents << " bytes" << LL_ENDL;
+            return false;
+        }
+
         if(!imageraw->allocateDataSize(width, height, ncomponents))
         {
             constexpr F32 MAX_IMAGE_SIZE = 2048 * 2048;
@@ -2536,7 +2661,7 @@ S64 LLImageGL::getBytes(S32 discard_level) const
     S32 h = mHeight>>discard_level;
     if (w == 0) w = 1;
     if (h == 0) h = 1;
-    return dataFormatBytes(mFormatPrimary, w, h);
+    return levelBytes(w, h);
 }
 
 S64 LLImageGL::getMipBytes(S32 discard_level) const
@@ -2550,17 +2675,27 @@ S64 LLImageGL::getMipBytes(S32 discard_level) const
     }
     S32 w = mWidth>>discard_level;
     S32 h = mHeight>>discard_level;
-    S64 res = dataFormatBytes(mFormatPrimary, w, h);
+    S64 res = levelBytes(w, h);
     if (mUseMipMaps)
     {
         while (w > 1 && h > 1)
         {
             w >>= 1; if (w == 0) w = 1;
             h >>= 1; if (h == 0) h = 1;
-            res += dataFormatBytes(mFormatPrimary, w, h);
+            res += levelBytes(w, h);
         }
     }
     return res;
+}
+
+S64 LLImageGL::levelBytes(S32 width, S32 height) const
+{
+    if (!isIntegerFormat(mFormatInternal))
+    {
+        return dataFormatBytes(mFormatPrimary, width, height);
+    }
+    const S64 bytes = (S64)width * (S64)height * (S64)pixel_bytes(mFormatPrimary, mFormatType);
+    return (bytes + 3) & ~3;
 }
 
 bool LLImageGL::isJustBound() const
@@ -2630,6 +2765,16 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
         mNeedsAlphaAndPickMask = false;
         mIsMask = false;
         return; //no alpha channel.
+    case GL_RED_INTEGER:
+    case GL_RG_INTEGER:
+    case GL_RGB_INTEGER:
+    case GL_BGR_INTEGER:
+    case GL_RGBA_INTEGER:
+    case GL_BGRA_INTEGER:
+        // Integers: even a fourth channel is a value, not coverage.
+        mNeedsAlphaAndPickMask = false;
+        mIsMask = false;
+        return;
     case GL_RGBA:
     case GL_SRGB_ALPHA:
         mAlphaStride = 4;
@@ -3196,6 +3341,9 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         || isCompressed()        // neither path can work on block-compressed data:
                                  // the FBO path cannot render into it and the PBO path
                                  // cannot re-upload it as loose pixels
+        || isIntegerFormat(mFormatInternal) // nor on integers: the FBO path filters, which
+                                            // GL does not do to them, and the PBO path reads
+                                            // a mip level GL never built
         )
     {
         return false;

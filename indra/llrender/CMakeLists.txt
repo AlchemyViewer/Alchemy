@@ -2,6 +2,8 @@
 
 set(
   llrender_SOURCES
+  algpubuffer.cpp
+  alimageslot.cpp
   alsamplerstate.cpp
   altexture3d.cpp
   altextureslot.cpp
@@ -35,6 +37,8 @@ set(
 
 set(
   llrender_HEADERS
+  algpubuffer.h
+  alimageslot.h
   alsamplerstate.h
   altexture3d.h
   altextureslot.h
@@ -174,10 +178,19 @@ if(AL_BUILD_TESTS)
   al_add_test(altessellation_gl GL PROJECT llrender LIBRARIES llrender)
   # Infinite reverse-Z projection: stored depth, round trip and depth order out to 100 km.
   al_add_test(alinfiniteprojection_gl GL PROJECT llrender LIBRARIES llrender)
-  # Which fragment output reaches a render target's colour attachment.
+  # Which fragment output reaches a render target's colour attachment, and integer attachments cleared and drawn.
   al_add_test(llrendertarget_gl GL PROJECT llrender LIBRARIES llrender)
   # LLRender's cached clear colour and scissor box, and LLGLSScissor.
   al_add_test(alrenderstate_gl GL PROJECT llrender LIBRARIES llrender)
-  # LLGLSLShader's uniform value cache: what a program holds after each kind of set, and across a relink.
+  # LLGLSLShader's uniform value cache: what a program holds after each kind of set, and across a relink; the
+  # compute path: programs built through the shader manager, their images, storage blocks and dispatches; integer
+  # textures through reserved samplers; what the debug validator says of images and stencil reads; and which shader
+  # objects a program owns and which the manager does.
   al_add_test(llglslshader_gl GL PROJECT llrender LIBRARIES llrender)
+  # LLRender::drawArraysInstanced: attribute-less instanced geometry, placed by the matrices the draw syncs.
+  al_add_test(alinstanceddraw_gl GL PROJECT llrender LIBRARIES llrender)
+  # ALGPUBuffer's store, and LLRender's indirect buffer bindings over its lifetime; the readback and stream rings.
+  al_add_test(algpubuffer_gl GL PROJECT llrender LIBRARIES llrender)
+  # ALImageSlot: what a unit issues, re-issues and forgets as LLRender keeps it, and integer images.
+  al_add_test(alimageslot_gl GL PROJECT llrender LIBRARIES llrender)
 endif()

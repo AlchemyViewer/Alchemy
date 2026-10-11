@@ -62,6 +62,8 @@ public:
     U32   getWidth() const { return mWidth; }
     U32   getHeight() const { return mHeight; }
     U32   getDepth() const { return mDepth; }
+    // The sized internal format allocate() was given; 0 while empty.
+    U32   getInternalFormat() const { return mInternalFormat; }
     GLuint getGLName() const;
 
 protected:
@@ -72,4 +74,5 @@ protected:
     U32 mWidth = 0;
     U32 mHeight = 0;
     U32 mDepth = 0;
+    U32 mInternalFormat = 0;
 };

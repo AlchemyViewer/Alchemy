@@ -6,8 +6,8 @@
  * the GL context plus LLImageGL/LLFontManager init. Tests cover the
  * core texture lifecycle, the setSubImage bind-preservation
  * invariant, the deprecated-format resolution path, downscaling,
- * the published view of an upload in flight, and the bind state
- * edits rely on.
+ * the published view of an upload in flight, the bind state
+ * edits rely on, and the integer formats.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -45,7 +45,9 @@
 #include <atomic>
 #include <chrono>
 #include <cstring>
+#include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace tut
@@ -954,6 +956,144 @@ namespace
         catch (const std::exception& e)
         {
             fail(std::string("the next window: ") + e.what());
+        }
+    }
+
+    // The integer formats through LLImageGL. R32UI, RG16I and RGBA32UI allocate as themselves, hold what was uploaded
+    // bit for bit -- past 2^24, and below 0 -- and take a partial update; each is accounted at its texels' size; and
+    // the one asked for with mips holds level 0 alone, since GL neither builds nor filters an integer texture's mips.
+    template<> template<>
+    void llimagegl_object::test<26>()
+    {
+        constexpr U16 W = 13, H = 7;
+        constexpr size_t N = (size_t)W * H;
+
+        std::vector<U32> uints(N);
+        for (size_t i = 0; i < N; ++i)
+        {
+            uints[i] = 0x01000001u + (U32)i * 0x10001u;
+        }
+        LLPointer<LLImageGL> r32ui = new LLImageGL(W, H, 1, /*usemipmaps=*/true);
+        r32ui->setExplicitFormat(GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT);
+        U64 before = LLImageGL::getTextureBytesAllocated();
+        ensure("R32UI created", r32ui->createGLTexture(0, reinterpret_cast<const U8*>(uints.data())));
+        ensure_equals("R32UI accounted at four bytes a texel",
+                      (S64)(LLImageGL::getTextureBytesAllocated() - before), (S64)N * 4);
+        ensure_equals("and its host bytes", (S64)r32ui->getMipBytes(0), (S64)N * 4);
+        ensure("no mips asked of it", !r32ui->getUseMipMaps());
+
+        bindForRead(r32ui);
+        GLint format = 0;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
+        ensure_equals("R32UI storage", (S32)format, (S32)GL_R32UI);
+        GLint level1_width = -1;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 1, GL_TEXTURE_WIDTH, &level1_width);
+        ensure_equals("no level past the first", (S32)level1_width, 0);
+
+        std::vector<U32> got_uints(N, 0);
+        readTexture(r32ui, GL_RED_INTEGER, GL_UNSIGNED_INT, got_uints.data());
+        ensure("R32UI holds the upload", got_uints == uints);
+
+        // A partial update, its rows read from a wider source as the glyph atlas updates.
+        std::vector<U32> patch(N);
+        for (size_t i = 0; i < N; ++i)
+        {
+            patch[i] = 0xF0000000u + (U32)i;
+        }
+        ensure("R32UI partial update",
+               r32ui->setSubImage(reinterpret_cast<const U8*>(patch.data()), W, H, 2, 1, 4, 3, /*force_fast_update=*/true));
+        readTexture(r32ui, GL_RED_INTEGER, GL_UNSIGNED_INT, got_uints.data());
+        for (U32 y = 0; y < H; ++y)
+        {
+            for (U32 x = 0; x < W; ++x)
+            {
+                const size_t i = (size_t)y * W + x;
+                const bool in_patch = x >= 2 && x < 6 && y >= 1 && y < 4;
+                ensure_equals("R32UI texel " + std::to_string(x) + "," + std::to_string(y), got_uints[i],
+                              in_patch ? patch[i] : uints[i]);
+            }
+        }
+
+        std::vector<S16> shorts(N * 2);
+        for (size_t i = 0; i < N; ++i)
+        {
+            shorts[i * 2]     = (S16)(-1 - (S32)i * 300);
+            shorts[i * 2 + 1] = (S16)((S32)i * 251 - 12000);
+        }
+        LLPointer<LLImageGL> rg16i = new LLImageGL(W, H, 2, /*usemipmaps=*/false);
+        rg16i->setExplicitFormat(GL_RG16I, GL_RG_INTEGER, GL_SHORT);
+        before = LLImageGL::getTextureBytesAllocated();
+        ensure("RG16I created", rg16i->createGLTexture(0, reinterpret_cast<const U8*>(shorts.data())));
+        ensure_equals("RG16I accounted at four bytes a texel",
+                      (S64)(LLImageGL::getTextureBytesAllocated() - before), (S64)N * 4);
+        bindForRead(rg16i);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
+        ensure_equals("RG16I storage", (S32)format, (S32)GL_RG16I);
+        std::vector<S16> got_shorts(N * 2, 0);
+        readTexture(rg16i, GL_RG_INTEGER, GL_SHORT, got_shorts.data());
+        ensure("RG16I holds the upload", got_shorts == shorts);
+
+        std::vector<U32> wide(N * 4);
+        for (size_t i = 0; i < N; ++i)
+        {
+            wide[i * 4]     = (U32)i;
+            wide[i * 4 + 1] = 0x80000000u | (U32)i;
+            wide[i * 4 + 2] = ~(U32)i;
+            wide[i * 4 + 3] = 0xDEADBEEFu ^ (U32)i;
+        }
+        LLPointer<LLImageGL> rgba32ui = new LLImageGL(W, H, 4, /*usemipmaps=*/false);
+        rgba32ui->setExplicitFormat(GL_RGBA32UI, GL_RGBA_INTEGER, GL_UNSIGNED_INT);
+        before = LLImageGL::getTextureBytesAllocated();
+        ensure("RGBA32UI created", rgba32ui->createGLTexture(0, reinterpret_cast<const U8*>(wide.data())));
+        ensure_equals("RGBA32UI accounted at sixteen bytes a texel",
+                      (S64)(LLImageGL::getTextureBytesAllocated() - before), (S64)N * 16);
+        bindForRead(rgba32ui);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
+        ensure_equals("RGBA32UI storage", (S32)format, (S32)GL_RGBA32UI);
+        std::vector<U32> got_wide(N * 4, 0);
+        readTexture(rgba32ui, GL_RGBA_INTEGER, GL_UNSIGNED_INT, got_wide.data());
+        ensure("RGBA32UI holds the upload", got_wide == wide);
+
+        // What an LLImageRaw cannot hold, readBackRaw does not read: it has a byte a component.
+        LLPointer<LLImageRaw> raw = new LLImageRaw();
+        ensure("no byte image of R32UI", !r32ui->readBackRaw(0, raw.get(), /*compressed_ok=*/false));
+        ensure("nor a downscale", !r32ui->scaleDown(1));
+
+        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+    }
+
+    // The integer formats in the size and channel tables: the sized ones at their texels' bits, the three-channel ones
+    // padded in VRAM as RGB8 is, and the pixel formats their data comes in at their channel counts.
+    template<> template<>
+    void llimagegl_object::test<27>()
+    {
+        const std::pair<GLenum, S32> bits[] =
+        {
+            { GL_R8I, 8 },      { GL_R8UI, 8 },      { GL_R16I, 16 },     { GL_R16UI, 16 },
+            { GL_R32I, 32 },    { GL_R32UI, 32 },    { GL_RG8I, 16 },     { GL_RG8UI, 16 },
+            { GL_RG16I, 32 },   { GL_RG16UI, 32 },   { GL_RG32I, 64 },    { GL_RG32UI, 64 },
+            { GL_RGB8I, 24 },   { GL_RGB8UI, 24 },   { GL_RGB16I, 48 },   { GL_RGB16UI, 48 },
+            { GL_RGB32I, 96 },  { GL_RGB32UI, 96 },  { GL_RGBA8I, 32 },   { GL_RGBA8UI, 32 },
+            { GL_RGBA16I, 64 }, { GL_RGBA16UI, 64 }, { GL_RGBA32I, 128 }, { GL_RGBA32UI, 128 },
+            { GL_RGB10_A2UI, 32 },
+        };
+        for (const auto& entry : bits)
+        {
+            const std::string name = "format " + std::to_string(entry.first);
+            ensure_equals(name + " host bits", LLImageGL::dataFormatBits(entry.first), entry.second);
+            const S32 vram = entry.second == 24 ? 32 : entry.second == 48 ? 64 : entry.second == 96 ? 128 : entry.second;
+            ensure_equals(name + " VRAM bits", LLImageGL::dataFormatVRAMBits(entry.first), vram);
+        }
+
+        const std::pair<GLenum, S32> components[] =
+        {
+            { GL_RED_INTEGER, 1 }, { GL_RG_INTEGER, 2 },   { GL_RGB_INTEGER, 3 },
+            { GL_BGR_INTEGER, 3 }, { GL_RGBA_INTEGER, 4 }, { GL_BGRA_INTEGER, 4 },
+        };
+        for (const auto& entry : components)
+        {
+            ensure_equals("pixel format " + std::to_string(entry.first) + " components",
+                          LLImageGL::dataFormatComponents(entry.first), entry.second);
         }
     }
 }

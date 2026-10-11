@@ -32,10 +32,19 @@
 #include "llsd.h"
 #include "llstaticstringtable.h"
 
+#include <type_traits>
+
+class ALGPUBuffer;
+class ALTexture3D;
+
 class LLShaderFeatures
 {
 public:
     S32 mIndexedTextureChannels = 0;
+    // The least #version this program's own stage files compile at (430 for a stage that reads storage buffers or
+    // images); 0 the context's usual. A compute stage always compiles at 430. The shared objects a program attaches
+    // keep their own version: GL links stages of different versions.
+    U32 mMinGLSLVersion = 0;
     bool calculatesLighting = false;
     bool calculatesAtmospherics = false;
     bool hasLighting = false; // implies no transport (it's possible to have neither though)
@@ -62,7 +71,13 @@ public:
     bool hasTonemap = false;
     bool hasColorGrade = false;
     bool hasPostEffects = false;
+    // The two bytes the flags above leave short of the struct's alignment, held at zero for hash(). A flag added above
+    // takes one of them.
+    U8 mHashFiller[2] = {};
 };
+// LLGLSLShader::hash() reads these bytes, so every byte must be a member's: padding has no value a copy need keep, and
+// would make a program's binary-cache key differ from run to run. A flag that would leave some needs a filler beside it.
+static_assert(std::has_unique_object_representations_v<LLShaderFeatures>, "LLShaderFeatures is hashed by its bytes");
 
 // ============= Structure for caching shader uniforms ===============
 class LLGLSLShader;
@@ -326,6 +341,8 @@ public:
     bool attachStageObject(GLenum stage, const std::string& object);
     bool attachFragmentObject(const std::string& object) { return attachStageObject(GL_FRAGMENT_SHADER, object); }
     bool attachVertexObject(const std::string& object) { return attachStageObject(GL_VERTEX_SHADER, object); }
+    // Attach an object whoever compiled it keeps: the program detaches it, after a link through createShader or at
+    // unload, and leaves deleting it to them.
     void attachObject(GLuint object);
     void attachObjects(GLuint* objects = NULL, S32 count = 0);
     bool mapAttributes();
@@ -374,7 +391,11 @@ public:
     bool hasUniform(U32 index) const;
 
     GLint getAttribLocation(U32 attrib);
+    // The texture unit a sampler uniform gets -- any of GL's sampler types, float, int or unsigned -- the next free
+    // one, an array taking consecutive units; -1 for any other type.
     GLint mapUniformTextureChannel(GLint location, GLenum type, GLint size);
+    // The same for an image uniform and the image units, which are counted apart from the texture units.
+    GLint mapUniformImageUnit(GLint location, GLenum type, GLint size);
 
     void clearPermutations();
     void addPermutation(std::string name, std::string value);
@@ -407,7 +428,7 @@ public:
     // had chosen; it was deleted once that count reached zero, so it cannot come back by habit.
     S32 bindTexture(S32 uniform, LLTexture* texture, ALSampler key);
     // An unnamed key resolves to the target's per-attachment default (bilinear for
-    // attachment 0, point for data attachments) -- see LLRenderTarget::bindTexture.
+    // attachment 0, point for data attachments and integer ones) -- see LLRenderTarget::bindTexture.
     S32 bindTexture(S32 uniform, LLRenderTarget* texture, ALSampler key = ALSamplers::TargetDefault, U32 index = 0);
 
     // Colour and depth attachments are separate calls rather than one with a bool.
@@ -423,6 +444,51 @@ public:
     // silhouette edges it averages foreground and background into a depth no surface has.
     S32 bindDepthTexture(S32 uniform, LLRenderTarget* texture, ALSampler key = ALSamplers::PointClamp);
     S32 unbindTexture(S32 uniform);
+
+    // ---- Images ------------------------------------------------------------------------------------------------------
+    // Image uniforms get image units in mapUniforms, separately from texture units, in reserved-uniform order (only
+    // reserved uniforms get one, as only reserved samplers get a texture unit); arrays take consecutive units.
+
+    // The image unit of a reserved image uniform, or of `element` of an image array, or -1 if this program has no such
+    // image.
+    S32 getImageUnit(S32 uniform, U32 element = 0) const;
+
+    // Bind `level` of a texture to the image unit of the uniform, or of `element` of an image array (ALImageSlot::bind),
+    // at the texture's own format. Returns the unit, or -1 if the program has no such image or the texture cannot be
+    // one.
+    S32 bindImage(S32 uniform, LLRenderTarget* target, ALImageSlot::eAccess access, U32 attachment = 0, U32 level = 0,
+                  U32 element = 0);
+    S32 bindImage(S32 uniform, LLImageGL* image, ALImageSlot::eAccess access, U32 level = 0, U32 element = 0);
+    S32 bindImage(S32 uniform, ALTexture3D* texture, ALImageSlot::eAccess access, U32 level = 0, U32 element = 0);
+    // Unbind every unit the uniform has, an array's elements all.
+    S32 unbindImage(S32 uniform);
+
+    // ---- Storage blocks ----------------------------------------------------------------------------------------------
+    // A storage block in LLShaderMgr's reserved table (eGLSLReservedStorageBlocks) is given its fixed binding point at
+    // mapUniforms, the same in every program, and an array of blocks one for each element. A buffer bound at a point
+    // stays there across program switches (LLRender::bindStorageBuffer). A block not in the table keeps the binding
+    // its source gave it, which must lie past the table's points.
+
+    // The binding point of `element` of a reserved storage block, or -1 if this program does not declare the block.
+    S32 getStorageBinding(S32 block, U32 element = 0) const;
+
+    // Attach `buffer`, whole or [offset, offset + bytes), at the binding point of `element` of the block. Nothing if
+    // the program does not declare it.
+    void bindStorageBuffer(S32 block, const ALGPUBuffer& buffer, U32 element = 0);
+    void bindStorageBuffer(S32 block, const ALGPUBuffer& buffer, size_t offset, size_t bytes, U32 element = 0);
+
+    // ---- Compute -----------------------------------------------------------------------------------------------------
+
+    // This is a compute program: its stage files are compute, which createShader reads off mShaderFiles.
+    bool isCompute() const { return mIsCompute; }
+
+    // Run this program, bound, over groups_x * groups_y * groups_z work groups (LLRender::dispatchCompute).
+    void dispatch(U32 groups_x, U32 groups_y = 1, U32 groups_z = 1);
+    // Enough groups of mComputeLocalSize to cover x * y * z invocations, the last group in each direction partly
+    // past the end: the kernel bounds-checks its gl_GlobalInvocationID.
+    void dispatchThreads(U32 x, U32 y = 1, U32 z = 1);
+    // The group counts read on the GPU from the ALDispatchIndirectCommand at `offset` in `buffer`.
+    void dispatchIndirect(const ALGPUBuffer& buffer, size_t offset = 0);
 
     bool link(bool suppress_errors = false);
     void bind();
@@ -477,6 +543,9 @@ public:
     // cached in mapUniforms(); see declaresShadowSamplers()
     bool mDeclaresShadowSamplers = false;
     LLShaderFeatures mFeatures;
+    // A compute program's work group size, its `layout(local_size_x = ...) in`, read back after it links or loads
+    // from the binary cache. Zero for any other program.
+    U32 mComputeLocalSize[3] = { 0, 0, 0 };
     std::vector< std::pair< std::string, GLenum > > mShaderFiles;
     std::string mName;
     typedef std::map<std::string, std::string> defines_map_t; //NOTE: this must be an ordered map to maintain hash consistency
@@ -594,6 +663,30 @@ public:
 
 private:
     void unloadInternal();
+
+    // The stage objects createShader compiled of mShaderFiles, which this program owns: deleted once it links, or at
+    // unload where it never did. The shared objects attachShaderFeatures attaches by name are LLShaderMgr's.
+    std::vector<GLuint> mOwnObjects;
+
+    // Detach every object, deleting this program's own: a linked program needs none of them, and an object no program
+    // holds is freed when its owner deletes it rather than when the last program holding it goes.
+    void releaseObjects();
+
+    // Image units per reserved uniform, -1 where this program declares none; filled by mapUniforms, emptied with
+    // mTexture. An image array has its elements' units from mFirst on.
+    struct ImageUnits
+    {
+        GLint mFirst = -1;
+        GLint mCount = 0;
+    };
+    std::vector<ImageUnits> mImage;
+    // Per reserved storage block, whether this program declares it.
+    std::vector<bool> mStorage;
+    S32 mActiveImageUnits = 0;
+    bool mIsCompute = false;
+
+    // Give the reserved storage blocks this program declares their binding points; see getStorageBinding.
+    void mapStorageBlocks();
 
     // What this program holds at each uniform location, as the setters last uploaded it, so a set of the value a
     // location already holds skips its glUniform* call. Every setter but the matrices' comes through here, on the
