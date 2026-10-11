@@ -7305,8 +7305,16 @@ namespace
         // a field assigned nil.
         const std::string off = "LLEvents:off(event :: any, handler)";
         const std::string on  = field ? "(LLEvents :: any)[event] = handler" : "LLEvents:on(event :: any, handler)";
+        // The state entered looked up before the one left is, so that a
+        // name with none -- which LSL's compiler refused, but an edit
+        // afterwards may write -- stops the script saying so, at the call
+        // that named it, and leaves it in the state it was in.
         mText += "    if name == currentState then\n"
                  "        return\n"
+                 "    end\n"
+                 "    local entering = states[name]\n"
+                 "    if not entering then\n"
+                 "        error(\"unknown state: \" .. name, 2)\n"
                  "    end\n"
                  "    local leaving = currentState and states[currentState]\n"
                  "    if leaving then\n"
@@ -7320,7 +7328,6 @@ namespace
                  "        end\n"
                  "    end\n"
                  "    currentState = name\n"
-                 "    local entering = states[name]\n"
                  "    for event, handler in entering do\n"
                  "        if " + own + " then\n"
                  "            " + on + "\n"
