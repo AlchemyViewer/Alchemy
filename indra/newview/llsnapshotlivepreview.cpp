@@ -552,7 +552,10 @@ bool LLSnapshotLivePreview::thumbnailScaledFromPreview() const
     // own: that would reallocate every screen buffer a second time for the
     // same frame. Its shape is the cutout's, then, not the window's -- a
     // square texture's preview drawn to the window's shape is stretched.
-    return mThumbnailSubsampled || (mCutout && mPreviewImage.notNull());
+    // Not before a cutout has been drawn, though: a preview made but never
+    // filled, by a cutout that failed, is 0x0 and has no shape to take.
+    return mThumbnailSubsampled
+        || (mCutout && mPreviewImage.notNull() && mPreviewImage->getWidth() > 0 && mPreviewImage->getHeight() > 0);
 }
 
 void LLSnapshotLivePreview::generateThumbnailImage(bool force_update)

@@ -1072,7 +1072,11 @@ void LLFloaterSnapshot::Impl::updateResolution(LLUICtrl* ctrl, void* data, bool 
         S32 original_width = 0, original_height = 0;
         previewp->getSize(original_width, original_height);
 
-        if (gSavedSettings.getBOOL("RenderUIInSnapshot") || gSavedSettings.getBOOL("RenderHUDInSnapshot"))
+        // A cutout shows neither the UI nor the HUD, whatever the boxes it
+        // greys out still say (as in updateControls).
+        const std::optional<ALSnapshotCutout> cutout = ALSnapshotCutout::fromSettings(
+            getActiveSnapshotType(view), (LLSnapshotModel::ESnapshotFormat)gSavedSettings.getS32("SnapshotFormat"));
+        if (!cutout && (gSavedSettings.getBOOL("RenderUIInSnapshot") || gSavedSettings.getBOOL("RenderHUDInSnapshot")))
         { //clamp snapshot resolution to window size when showing UI or HUD in snapshot
             width = llmin(width, gViewerWindow->getWindowWidthRaw());
             height = llmin(height, gViewerWindow->getWindowHeightRaw());
