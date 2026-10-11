@@ -185,6 +185,14 @@ namespace ll_test
         std::filesystem::path mRoot;
     };
 
+    // Whether the context runs compute: what LLRender::sCompute needs, less the user's setting,
+    // which a test does not have.
+    inline bool contextHasCompute()
+    {
+        return gGLManager.mHasCompute
+            && gGLManager.mGLSLVersionMajor * 100 + gGLManager.mGLSLVersionMinor >= 430;
+    }
+
     // GL 3.3 core pass-through UI vertex shader. Same uniform / attribute
     // shape as indra/newview/app_settings/shaders/class1/interface/uiV.glsl:
     // the matrices are read from the Matrices block, laid out as
@@ -575,6 +583,7 @@ namespace ll_test
             }
             mClearColor = gGL.getClearColor();
             mReverseZ = LLRender::sReverseZ;
+            mCompute = LLRender::sCompute;
             mMatrixMode = gGL.getMatrixMode();
             mModelview = gGL.getModelviewMatrix();
             mProjection = gGL.getProjectionMatrix();
@@ -622,6 +631,8 @@ namespace ll_test
                 glClipControl(mClipOrigin, mClipDepthMode);
             }
             LLRender::sReverseZ = mReverseZ;
+            // The compute cases turn compute on where the context has it.
+            LLRender::sCompute = mCompute;
 
             gGL.setClearColor(mClearColor);
             gGL.matrixMode(LLRender::MM_TEXTURE0);
@@ -671,6 +682,7 @@ namespace ll_test
         GLint mClipDepthMode = GL_NEGATIVE_ONE_TO_ONE;
         LLColor4 mClearColor;
         bool mReverseZ = false;
+        bool mCompute = false;
         LLRender::eMatrixMode mMatrixMode = LLRender::MM_MODELVIEW;
         LLMatrix4a mModelview;
         LLMatrix4a mProjection;

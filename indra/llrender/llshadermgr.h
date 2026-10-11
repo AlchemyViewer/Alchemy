@@ -638,6 +638,15 @@ public:
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
+
+    // Shader storage blocks, by block name, set in initAttribsAndUniforms beside the uniforms. Each has fixed binding
+    // points, the same in every program that declares it, as the engine's uniform blocks have theirs: the entries
+    // take them in this order, an array of blocks one for each of its elements. A buffer bound at a block's point is
+    // there for every program, so a pass binds it once whatever it draws or dispatches between.
+    typedef enum
+    {                                       // Block name, element count
+        END_RESERVED_STORAGE_BLOCKS
+    } eGLSLReservedStorageBlocks;
     // clang-format on
 
     // singleton pattern implementation
@@ -655,10 +664,12 @@ public:
     // `cache_key` overrides the map key the compiled object is stored under; empty means the
     // path. Shared objects are compiled once and attached by name, so a source that keys on a
     // compile-time variant axis is compiled once per axis value under distinct keys.
-    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, const std::string& cache_key = std::string());
+    // `min_glsl_version` is the least #version the stage compiles at (430 to read storage blocks or images); 0 is the
+    // context's usual, and a compute stage is always 430. A context whose GLSL is below it fails the stage.
+    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, const std::string& cache_key = std::string(), U32 min_glsl_version = 0);
     // Compile a stage the caller owns and deletes, stored nowhere: what a program compiles of its own files. As
     // loadShaderFile otherwise, from the class `shader_level` names down to the first that compiles.
-    GLuint compileShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1);
+    GLuint compileShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, U32 min_glsl_version = 0);
 
     // Delete a shader object. One still attached to a program is only flagged, and goes when the last program
     // holding it detaches it.
@@ -667,6 +678,10 @@ public:
     // Shader objects compileShaderFile has made and deleteShaderObject has not yet deleted: the shared ones, plus any
     // a program is still linking. A count that only grows is a leak.
     static U32 sLiveObjects;
+
+    // The binding point of `element` of a reserved storage block (eGLSLReservedStorageBlocks), the same in every
+    // program; -1 for an index or element the table does not have.
+    S32 getStorageBlockBinding(S32 block, U32 element = 0) const;
 
     // Suffixes marking the axis copies of a shared object. Not legal path character sequences,
     // so they cannot collide with a real file.
@@ -735,6 +750,15 @@ public:
     std::vector<std::string> mReservedAttribs;
 
     std::vector<std::string> mReservedUniforms;
+
+    // The storage blocks, in eGLSLReservedStorageBlocks order: a block's name, and how many elements an array of it
+    // has (1 for a single block). Their binding points together stay within AL_NUM_STORAGE_BINDINGS.
+    struct ReservedStorageBlock
+    {
+        std::string mName;
+        U32         mCount = 1;
+    };
+    std::vector<ReservedStorageBlock> mReservedStorageBlocks;
 
     struct ProgramBinaryData
     {

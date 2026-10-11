@@ -28,6 +28,7 @@
 
 #include "llglslshader.h"
 
+#include "algpubuffer.h"
 #include "llshadermgr.h"
 #include "llfile.h"
 #include "alsamplerstate.h"
@@ -38,6 +39,7 @@
 #include "hbxxh.h"
 #include "llsdserialize.h"
 
+#include <algorithm>
 #include <bit>
 #include <string_view>
 
@@ -148,6 +150,50 @@ namespace
         case GL_UNSIGNED_INT_SAMPLER_BUFFER:
         case GL_UNSIGNED_INT_SAMPLER_2D_RECT:
         case GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    // Every image type GL has, float, int and unsigned.
+    bool is_image_type(GLenum type)
+    {
+        switch (type)
+        {
+        case GL_IMAGE_1D:
+        case GL_IMAGE_2D:
+        case GL_IMAGE_3D:
+        case GL_IMAGE_2D_RECT:
+        case GL_IMAGE_CUBE:
+        case GL_IMAGE_BUFFER:
+        case GL_IMAGE_1D_ARRAY:
+        case GL_IMAGE_2D_ARRAY:
+        case GL_IMAGE_CUBE_MAP_ARRAY:
+        case GL_IMAGE_2D_MULTISAMPLE:
+        case GL_IMAGE_2D_MULTISAMPLE_ARRAY:
+        case GL_INT_IMAGE_1D:
+        case GL_INT_IMAGE_2D:
+        case GL_INT_IMAGE_3D:
+        case GL_INT_IMAGE_2D_RECT:
+        case GL_INT_IMAGE_CUBE:
+        case GL_INT_IMAGE_BUFFER:
+        case GL_INT_IMAGE_1D_ARRAY:
+        case GL_INT_IMAGE_2D_ARRAY:
+        case GL_INT_IMAGE_CUBE_MAP_ARRAY:
+        case GL_INT_IMAGE_2D_MULTISAMPLE:
+        case GL_INT_IMAGE_2D_MULTISAMPLE_ARRAY:
+        case GL_UNSIGNED_INT_IMAGE_1D:
+        case GL_UNSIGNED_INT_IMAGE_2D:
+        case GL_UNSIGNED_INT_IMAGE_3D:
+        case GL_UNSIGNED_INT_IMAGE_2D_RECT:
+        case GL_UNSIGNED_INT_IMAGE_CUBE:
+        case GL_UNSIGNED_INT_IMAGE_BUFFER:
+        case GL_UNSIGNED_INT_IMAGE_1D_ARRAY:
+        case GL_UNSIGNED_INT_IMAGE_2D_ARRAY:
+        case GL_UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY:
+        case GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE:
+        case GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE_ARRAY:
             return true;
         default:
             return false;
@@ -735,6 +781,14 @@ void LLGLSLShader::unloadInternal()
     stop_glerror();
     mAttribute.clear();
     mTexture.clear();
+    mImage.clear();
+    mStorage.clear();
+    mActiveImageUnits = 0;
+    mIsCompute = false;
+    for (U32& size : mComputeLocalSize)
+    {
+        size = 0;
+    }
     mUniform.clear();
     // program state is going away with the program
     mUniformCache.clear();
@@ -827,6 +881,12 @@ bool LLGLSLShader::createShader(U32 variants)
 
     llassert_always(!mShaderFiles.empty());
 
+    // GL links a compute shader with nothing else, so a program with a compute file is all compute files.
+    mIsCompute = std::any_of(mShaderFiles.begin(), mShaderFiles.end(),
+                             [](const auto& file) { return file.second == GL_COMPUTE_SHADER; });
+    llassert(!mIsCompute || std::all_of(mShaderFiles.begin(), mShaderFiles.end(),
+                                        [](const auto& file) { return file.second == GL_COMPUTE_SHADER; }));
+
     mShaderHash = hash();
 
     // this program's configuration is settled; a permutation added after this point belongs to
@@ -857,7 +917,7 @@ bool LLGLSLShader::createShader(U32 variants)
         vector< pair<string, GLenum> >::iterator fileIter = mShaderFiles.begin();
         for (; fileIter != mShaderFiles.end(); fileIter++)
         {
-            GLuint shaderhandle = LLShaderMgr::instance()->compileShaderFile((*fileIter).first, mShaderLevel, (*fileIter).second, &mDefines, mFeatures.mIndexedTextureChannels);
+            GLuint shaderhandle = LLShaderMgr::instance()->compileShaderFile((*fileIter).first, mShaderLevel, (*fileIter).second, &mDefines, mFeatures.mIndexedTextureChannels, mFeatures.mMinGLSLVersion);
             LL_DEBUGS("ShaderLoading") << "SHADER FILE: " << (*fileIter).first << " mShaderLevel=" << mShaderLevel << LL_ENDL;
             if (shaderhandle)
             {
@@ -1176,6 +1236,12 @@ void LLGLSLShader::mapUniform(const gl_uniform_data_t& gl_uniform)
                 {
                     LL_DEBUGS("GLSLTextureChannels") << name << " assigned to texture channel " << mTexture[i] << LL_ENDL;
                 }
+                const GLint image_unit = mapUniformImageUnit(location, type, size);
+                if (image_unit != -1)
+                {
+                    mImage[i] = { image_unit, llmax(size, 1) };
+                    LL_DEBUGS("GLSLTextureChannels") << name << " assigned to image unit " << image_unit << LL_ENDL;
+                }
                 return;
             }
         }
@@ -1242,6 +1308,105 @@ GLint LLGLSLShader::mapUniformTextureChannel(GLint location, GLenum type, GLint 
     return -1;
 }
 
+GLint LLGLSLShader::mapUniformImageUnit(GLint location, GLenum type, GLint size)
+{
+    if (!is_image_type(type))
+    {
+        return -1;
+    }
+
+    // Past the units LLRender tracks an image could not be bound through it, so it is given none: a program that
+    // needs more has outgrown AL_NUM_IMAGE_SLOTS, not the hardware.
+    const GLint count = llmax(size, 1);
+    if (mActiveImageUnits + count > (S32)AL_NUM_IMAGE_SLOTS)
+    {
+        LL_WARNS("Shader") << mName << " declares more than " << AL_NUM_IMAGE_SLOTS << " image units" << LL_ENDL;
+        llassert(false);
+        return -1;
+    }
+
+    const GLint first = mActiveImageUnits;
+    GLint units[AL_NUM_IMAGE_SLOTS];
+    for (GLint i = 0; i < count; ++i)
+    {
+        units[i] = mActiveImageUnits++;
+    }
+    glUniform1iv(location, count, units);
+    return first;
+}
+
+void LLGLSLShader::mapStorageBlocks()
+{
+    const LLShaderMgr* mgr = LLShaderMgr::instance();
+    const auto& table = mgr->mReservedStorageBlocks;
+    mStorage.assign(table.size(), false);
+
+    // The block interface is GL 4.3's, and a context without it has no storage blocks to map.
+    if (!gGLManager.mHasCompute)
+    {
+        return;
+    }
+
+    GLint block_count = 0;
+    glGetProgramInterfaceiv(mProgramObject, GL_SHADER_STORAGE_BLOCK, GL_ACTIVE_RESOURCES, &block_count);
+
+    // The table's points run from 0 to here; a block it does not name must be bound past them.
+    U32 reserved_points = 0;
+    for (const LLShaderMgr::ReservedStorageBlock& entry : table)
+    {
+        reserved_points += entry.mCount;
+    }
+
+    for (GLint b = 0; b < block_count; ++b)
+    {
+        // An array of blocks is one block per element, each named with its subscript, and an element the program
+        // never reads may not be among them.
+        char name[256] = { 0 };
+        GLsizei length = 0;
+        glGetProgramResourceName(mProgramObject, GL_SHADER_STORAGE_BLOCK, (GLuint)b, sizeof(name), &length, name);
+        if (length <= 0)
+        {
+            continue;
+        }
+        std::string block_name(name, (size_t)llmin(length, (GLsizei)sizeof(name) - 1));
+        U32 element = 0;
+        if (const size_t bracket = block_name.find('['); bracket != std::string::npos)
+        {
+            element = (U32)llmax(atoi(block_name.c_str() + bracket + 1), 0);
+            block_name.resize(bracket);
+        }
+
+        const auto it = std::find_if(table.begin(), table.end(),
+                                     [&block_name](const LLShaderMgr::ReservedStorageBlock& entry)
+                                     { return entry.mName == block_name; });
+        if (it == table.end())
+        {
+            const GLenum property = GL_BUFFER_BINDING;
+            GLint binding = 0;
+            glGetProgramResourceiv(mProgramObject, GL_SHADER_STORAGE_BLOCK, (GLuint)b, 1, &property, 1, nullptr,
+                                   &binding);
+            if ((U32)binding < reserved_points)
+            {
+                LL_WARNS("Shader") << mName << ": storage block " << name << " is not in the reserved table and binds at "
+                                   << binding << ", a point the table's blocks hold (0 to " << reserved_points - 1
+                                   << ")" << LL_ENDL;
+            }
+            continue;
+        }
+
+        const S32 block = (S32)std::distance(table.begin(), it);
+        const S32 binding = mgr->getStorageBlockBinding(block, element);
+        if (binding < 0)
+        {
+            LL_WARNS("Shader") << mName << ": storage block " << name << " is past the " << it->mCount
+                               << " elements the reserved table gives " << block_name << LL_ENDL;
+            continue;
+        }
+        glShaderStorageBlockBinding(mProgramObject, (GLuint)b, (GLuint)binding);
+        mStorage[block] = true;
+    }
+}
+
 bool LLGLSLShader::mapUniforms()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
@@ -1250,9 +1415,12 @@ bool LLGLSLShader::mapUniforms()
 
     mTotalUniformSize = 0;
     mActiveTextureChannels = 0;
+    mActiveImageUnits = 0;
     mUniform.clear();
     mUniformMap.clear();
     mTexture.clear();
+    mImage.clear();
+    mStorage.clear();
     // Fresh mapping: GPU-side values are the defaults again. The cache stays empty while the samplers below are
     // given their units, and is sized once every location is known.
     mUniformCache.clear();
@@ -1260,6 +1428,23 @@ bool LLGLSLShader::mapUniforms()
     //initialize arrays
     mUniform.resize(LLShaderMgr::instance()->mReservedUniforms.size(), -1);
     mTexture.resize(LLShaderMgr::instance()->mReservedUniforms.size(), -1);
+    mImage.resize(LLShaderMgr::instance()->mReservedUniforms.size());
+
+    // The work group size is the linked program's, so it is read here, where a program from the binary cache arrives
+    // too.
+    for (U32& size : mComputeLocalSize)
+    {
+        size = 0;
+    }
+    if (mIsCompute)
+    {
+        GLint local_size[3] = { 0, 0, 0 };
+        glGetProgramiv(mProgramObject, GL_COMPUTE_WORK_GROUP_SIZE, local_size);
+        for (U32 i = 0; i < 3; ++i)
+        {
+            mComputeLocalSize[i] = (U32)llmax(local_size[i], 0);
+        }
+    }
 
     bind();
 
@@ -1381,6 +1566,9 @@ bool LLGLSLShader::mapUniforms()
         }
     }
 
+    // Storage blocks the same way, at points per program rather than fixed ones.
+    mapStorageBlocks();
+
 #if !LL_RELEASE_FOR_DOWNLOAD
     // Bindings are live now, so the block a mismatch would be reported against is the one
     // the engine will actually upload to.
@@ -1468,12 +1656,20 @@ void LLGLSLShader::bind()
         {
             sCurBoundShaderPtr->readProfileQuery();
         }
-        LLVertexBuffer::unbind();
+        // A compute program reads no vertex arrays, so the ones the last draw set up stay for the next: the program
+        // bound for it sets up its own whatever this one did.
+        if (!mIsCompute)
+        {
+            LLVertexBuffer::unbind();
+        }
         glUseProgram(mProgramObject);
         sCurBoundShader = mProgramObject;
         sCurBoundShaderPtr = this;
         placeProfileQuery();
-        LLVertexBuffer::setupClientArrays(mAttributeMask);
+        if (!mIsCompute)
+        {
+            LLVertexBuffer::setupClientArrays(mAttributeMask);
+        }
 
         // Shadow maps ride compare samplers on units this program may map to ordinary
         // sampler2Ds -- a pairing GL calls undefined even where the shader never reads the
@@ -1647,6 +1843,112 @@ S32 LLGLSLShader::unbindTexture(S32 uniform)
 S32 LLGLSLShader::getTextureChannel(S32 uniform) const
 {
     return mTexture[uniform];
+}
+
+S32 LLGLSLShader::getImageUnit(S32 uniform, U32 element) const
+{
+    if (uniform < 0 || uniform >= (S32)mImage.size() || mImage[uniform].mFirst < 0)
+    {
+        return -1;
+    }
+    // An element past the array's end would name another image's unit.
+    llassert(element < (U32)mImage[uniform].mCount);
+    return element < (U32)mImage[uniform].mCount ? mImage[uniform].mFirst + (S32)element : -1;
+}
+
+S32 LLGLSLShader::bindImage(S32 uniform, LLRenderTarget* target, ALImageSlot::eAccess access, U32 attachment, U32 level,
+                            U32 element)
+{
+    const S32 unit = getImageUnit(uniform, element);
+    if (unit < 0 || !gGL.getImageSlot(unit)->bind(target, attachment, access, level))
+    {
+        return -1;
+    }
+    return unit;
+}
+
+S32 LLGLSLShader::bindImage(S32 uniform, LLImageGL* image, ALImageSlot::eAccess access, U32 level, U32 element)
+{
+    const S32 unit = getImageUnit(uniform, element);
+    if (unit < 0 || !gGL.getImageSlot(unit)->bind(image, access, level))
+    {
+        return -1;
+    }
+    return unit;
+}
+
+S32 LLGLSLShader::bindImage(S32 uniform, ALTexture3D* texture, ALImageSlot::eAccess access, U32 level, U32 element)
+{
+    const S32 unit = getImageUnit(uniform, element);
+    if (unit < 0 || !gGL.getImageSlot(unit)->bind(texture, access, level))
+    {
+        return -1;
+    }
+    return unit;
+}
+
+S32 LLGLSLShader::unbindImage(S32 uniform)
+{
+    const S32 unit = getImageUnit(uniform);
+    if (unit >= 0)
+    {
+        for (GLint i = 0; i < mImage[uniform].mCount; ++i)
+        {
+            gGL.getImageSlot(unit + i)->unbind();
+        }
+    }
+    return unit;
+}
+
+S32 LLGLSLShader::getStorageBinding(S32 block, U32 element) const
+{
+    if (block < 0 || block >= (S32)mStorage.size() || !mStorage[block])
+    {
+        return -1;
+    }
+    return LLShaderMgr::instance()->getStorageBlockBinding(block, element);
+}
+
+void LLGLSLShader::bindStorageBuffer(S32 block, const ALGPUBuffer& buffer, U32 element)
+{
+    const S32 binding = getStorageBinding(block, element);
+    if (binding >= 0)
+    {
+        gGL.bindStorageBuffer((U32)binding, buffer);
+    }
+}
+
+void LLGLSLShader::bindStorageBuffer(S32 block, const ALGPUBuffer& buffer, size_t offset, size_t bytes, U32 element)
+{
+    const S32 binding = getStorageBinding(block, element);
+    if (binding >= 0)
+    {
+        gGL.bindStorageBuffer((U32)binding, buffer, offset, bytes);
+    }
+}
+
+void LLGLSLShader::dispatch(U32 groups_x, U32 groups_y, U32 groups_z)
+{
+    llassert(sCurBoundShaderPtr == this && mIsCompute);
+    gGL.dispatchCompute(groups_x, groups_y, groups_z);
+}
+
+void LLGLSLShader::dispatchThreads(U32 x, U32 y, U32 z)
+{
+    llassert(mComputeLocalSize[0] > 0 && mComputeLocalSize[1] > 0 && mComputeLocalSize[2] > 0);
+    if (mComputeLocalSize[0] == 0 || mComputeLocalSize[1] == 0 || mComputeLocalSize[2] == 0)
+    {
+        return;
+    }
+    // Rounded up, in 64 bits so a count near the top of a U32 does not wrap to a handful of groups.
+    auto groups = [](U32 threads, U32 local) { return (U32)(((U64)threads + local - 1) / local); };
+    dispatch(groups(x, mComputeLocalSize[0]), groups(y, mComputeLocalSize[1]), groups(z, mComputeLocalSize[2]));
+}
+
+void LLGLSLShader::dispatchIndirect(const ALGPUBuffer& buffer, size_t offset)
+{
+    llassert(sCurBoundShaderPtr == this && mIsCompute);
+    gGL.dispatchComputeIndirect(buffer, offset);
 }
 
 // Resolve the texture channel a uniform is bound to. Nothing more: this used to also activate

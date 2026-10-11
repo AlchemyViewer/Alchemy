@@ -29,11 +29,14 @@
 
 #include "linden_common.h"
 #include "llshadermgr.h"
+#include "algpubuffer.h"
 #include "llrender.h"
 #include "llfile.h"
 #include "lldir.h"
 #include "llsdutil.h"
 #include "llsdserialize.h"
+
+#include <fmt/format.h>
 
 #if LL_DARWIN
 #include "OpenGL/OpenGL.h"
@@ -166,6 +169,14 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
     {
         return true;
     }
+
+    // A compute program is its one stage, and GL links a compute shader with no other: nothing below, all of it
+    // vertex, tessellation and fragment objects, may reach it. No feature has a compute object to give it.
+    if (shader->isCompute())
+    {
+        return true;
+    }
+
     //////////////////////////////////////
     // Attach Vertex Shader Features First
     //////////////////////////////////////
@@ -587,9 +598,9 @@ void LLShaderMgr::dumpObjectLog(GLuint ret, bool warns, const std::string& filen
     }
 }
 
-GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels, const std::string& cache_key)
+GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels, const std::string& cache_key, U32 min_glsl_version)
 {
-    const GLuint object = compileShaderFile(filename, shader_level, type, defines, texture_index_channels);
+    const GLuint object = compileShaderFile(filename, shader_level, type, defines, texture_index_channels, min_glsl_version);
     if (object)
     {
         // Into the map, which owns it. The key is the path unless the caller asked for a distinct
@@ -606,7 +617,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     return object;
 }
 
-GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels)
+GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels, U32 min_glsl_version)
 {
     GLenum error = GL_NO_ERROR;
 
@@ -619,6 +630,21 @@ GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_
     if (filename.empty())
     {
         LL_WARNS("ShaderLoading") << "tried loading empty filename" << LL_ENDL;
+        return 0;
+    }
+
+    // A compute stage, and a stage that reads storage blocks or images, compiles at GLSL 4.30 -- the version that
+    // makes `buffer` and `shared` keywords, which is why no other stage is raised to it. The context's GLSL is what the
+    // feature manager left it at, and a stage it cannot give its version to fails here rather than compiling at one it
+    // was not written for. No lower class can do better, so there is nothing to retry.
+    const U32 required_version = llmax(min_glsl_version, type == GL_COMPUTE_SHADER ? 430u : 0u);
+    const U32 context_version  = (U32)(gGLManager.mGLSLVersionMajor * 100 + gGLManager.mGLSLVersionMinor);
+    llassert(required_version % 10 == 0);
+    if (required_version > context_version)
+    {
+        LL_WARNS("ShaderLoading") << filename << " needs GLSL " << required_version / 100 << "."
+                                  << required_version % 100 << "; the context gives " << gGLManager.mGLSLVersionMajor
+                                  << "." << gGLManager.mGLSLVersionMinor << LL_ENDL;
         return 0;
     }
 
@@ -715,15 +741,9 @@ GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_
     {
         if (major_version >= 4)
         {
-            //set version to 400 or 420
-            if (minor_version >= 20)
-            {
-                shader_code_text[shader_code_count++] = strdup("#version 420\n");
-            }
-            else
-            {
-                shader_code_text[shader_code_count++] = strdup("#version 400\n");
-            }
+            //set version to 400 or 420, or to what the stage requires past that
+            const U32 version = llmax(minor_version >= 20 ? 420u : 400u, required_version);
+            shader_code_text[shader_code_count++] = strdup(fmt::format("#version {}\n", version).c_str());
         }
         else if (major_version == 3)
         {
@@ -1189,7 +1209,7 @@ GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_
         if (shader_level > 1)
         {
             shader_level--;
-            return compileShaderFile(filename, shader_level, type, defines, texture_index_channels);
+            return compileShaderFile(filename, shader_level, type, defines, texture_index_channels, min_glsl_version);
         }
         LL_WARNS("ShaderLoading") << "Failed to load " << filename << LL_ENDL;
     }
@@ -2227,5 +2247,50 @@ void LLShaderMgr::initAttribsAndUniforms()
                       << "array uniforms are declared here by their bare name" << LL_ENDL;
         }
     }
+
+    // The storage blocks, each with its element count, in eGLSLReservedStorageBlocks order.
+    mReservedStorageBlocks.clear();
+
+    // The same three checks, and that every block's points fit the ones every compute context has.
+    if (mReservedStorageBlocks.size() != END_RESERVED_STORAGE_BLOCKS)
+    {
+        LL_ERRS() << "Reserved storage block table has " << mReservedStorageBlocks.size()
+                  << " entries but eGLSLReservedStorageBlocks declares " << (U32)END_RESERVED_STORAGE_BLOCKS
+                  << " -- the enum and the table are out of sync" << LL_ENDL;
+    }
+    std::set<std::string> block_check;
+    U32 points = 0;
+    for (const ReservedStorageBlock& block : mReservedStorageBlocks)
+    {
+        if (!block_check.insert(block.mName).second)
+        {
+            LL_ERRS() << "Duplicate reserved storage block name found: " << block.mName << LL_ENDL;
+        }
+        if (block.mName.find('[') != std::string::npos || block.mCount == 0)
+        {
+            LL_ERRS() << "Reserved storage block '" << block.mName << "' carries a subscript or no elements; "
+                      << "an array of blocks is declared by its bare name and its count" << LL_ENDL;
+        }
+        points += block.mCount;
+    }
+    if (points > AL_NUM_STORAGE_BINDINGS)
+    {
+        LL_ERRS() << "The reserved storage blocks take " << points << " binding points; every compute context has "
+                  << AL_NUM_STORAGE_BINDINGS << LL_ENDL;
+    }
+}
+
+S32 LLShaderMgr::getStorageBlockBinding(S32 block, U32 element) const
+{
+    if (block < 0 || block >= (S32)mReservedStorageBlocks.size() || element >= mReservedStorageBlocks[block].mCount)
+    {
+        return -1;
+    }
+    U32 binding = element;
+    for (S32 i = 0; i < block; ++i)
+    {
+        binding += mReservedStorageBlocks[i].mCount;
+    }
+    return binding < AL_NUM_STORAGE_BINDINGS ? (S32)binding : -1;
 }
 

@@ -110,12 +110,28 @@ namespace
         bool        mIsInteger = false;
     };
 
+    // The kind of texel an image uniform reads and writes, and so the kind of format its unit must hold.
+    enum class TexelKind : U8
+    {
+        FLOAT,      // float and normalized formats
+        SIGNED,     // the signed integer formats
+        UNSIGNED,   // the unsigned integer formats
+    };
+
+    struct ProgramImage
+    {
+        std::string mName;
+        GLint       mUnit = -1;
+        TexelKind   mKind = TexelKind::FLOAT;
+    };
+
     struct ProgramSamplerCache
     {
         // Revalidation key: a relinked program can reuse its name, and GL is free to hand a
         // deleted name back out. Cheap enough to re-check every call.
         GLint                      mUniformCount = -1;
         std::vector<ProgramSampler> mSamplers;
+        std::vector<ProgramImage>   mImages;
     };
 
     std::map<GLuint, ProgramSamplerCache> sProgramSamplerCache;
@@ -189,6 +205,84 @@ namespace
             }
         }
         return false;
+    }
+
+    // Every image type GL has, and the kind of texel each reads and writes.
+    struct ImageType
+    {
+        GLenum    mType;
+        TexelKind mKind;
+    };
+
+    constexpr ImageType sImageTypes[] =
+    {
+        { GL_IMAGE_1D,                                   TexelKind::FLOAT    },
+        { GL_IMAGE_2D,                                   TexelKind::FLOAT    },
+        { GL_IMAGE_3D,                                   TexelKind::FLOAT    },
+        { GL_IMAGE_2D_RECT,                              TexelKind::FLOAT    },
+        { GL_IMAGE_CUBE,                                 TexelKind::FLOAT    },
+        { GL_IMAGE_BUFFER,                               TexelKind::FLOAT    },
+        { GL_IMAGE_1D_ARRAY,                             TexelKind::FLOAT    },
+        { GL_IMAGE_2D_ARRAY,                             TexelKind::FLOAT    },
+        { GL_IMAGE_CUBE_MAP_ARRAY,                       TexelKind::FLOAT    },
+        { GL_IMAGE_2D_MULTISAMPLE,                       TexelKind::FLOAT    },
+        { GL_IMAGE_2D_MULTISAMPLE_ARRAY,                 TexelKind::FLOAT    },
+        { GL_INT_IMAGE_1D,                               TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D,                               TexelKind::SIGNED   },
+        { GL_INT_IMAGE_3D,                               TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D_RECT,                          TexelKind::SIGNED   },
+        { GL_INT_IMAGE_CUBE,                             TexelKind::SIGNED   },
+        { GL_INT_IMAGE_BUFFER,                           TexelKind::SIGNED   },
+        { GL_INT_IMAGE_1D_ARRAY,                         TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D_ARRAY,                         TexelKind::SIGNED   },
+        { GL_INT_IMAGE_CUBE_MAP_ARRAY,                   TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D_MULTISAMPLE,                   TexelKind::SIGNED   },
+        { GL_INT_IMAGE_2D_MULTISAMPLE_ARRAY,             TexelKind::SIGNED   },
+        { GL_UNSIGNED_INT_IMAGE_1D,                      TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D,                      TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_3D,                      TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D_RECT,                 TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_CUBE,                    TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_BUFFER,                  TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_1D_ARRAY,                TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D_ARRAY,                TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY,          TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE,          TexelKind::UNSIGNED },
+        { GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE_ARRAY,    TexelKind::UNSIGNED },
+    };
+
+    bool image_kind_for_type(GLenum type, TexelKind& kind)
+    {
+        for (const ImageType& entry : sImageTypes)
+        {
+            if (entry.mType == type)
+            {
+                kind = entry.mKind;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // The kind of texel a sized format holds.
+    TexelKind texel_kind_of_format(GLint internal_format)
+    {
+        if (!LLImageGL::isIntegerFormat(internal_format))
+        {
+            return TexelKind::FLOAT;
+        }
+        return LLImageGL::isSignedIntegerFormat(internal_format) ? TexelKind::SIGNED : TexelKind::UNSIGNED;
+    }
+
+    const char* texel_kind_name(TexelKind kind)
+    {
+        switch (kind)
+        {
+        case TexelKind::SIGNED:   return "signed integer";
+        case TexelKind::UNSIGNED: return "unsigned integer";
+        case TexelKind::FLOAT:
+        default:                  return "float";
+        }
     }
 
     // Sampler state means nothing to a buffer texture, which has none, or to a multisample one, read only by
@@ -271,27 +365,27 @@ namespace
         return mag_filter == GL_NEAREST && (min_filter == GL_NEAREST || min_filter == GL_NEAREST_MIPMAP_NEAREST);
     }
 
-    const std::vector<ProgramSampler>& get_program_samplers(GLuint program)
+    // The samplers and images `program` declares, each with the unit its uniform holds.
+    const ProgramSamplerCache& get_program_bindings(GLuint program)
     {
-        static const std::vector<ProgramSampler> empty;
-
         GLint uniform_count = 0;
         glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &uniform_count);
 
         ProgramSamplerCache& cached = sProgramSamplerCache[program];
         if (cached.mUniformCount == uniform_count)
         {
-            return cached.mSamplers;
+            return cached;
         }
 
         cached.mUniformCount = uniform_count;
         cached.mSamplers.clear();
+        cached.mImages.clear();
 
         GLint max_name_len = 0;
         glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_name_len);
         if (max_name_len <= 0)
         {
-            return cached.mSamplers;
+            return cached;
         }
         std::vector<GLchar> name_buf((size_t)max_name_len);
 
@@ -307,25 +401,37 @@ namespace
             }
 
             ProgramSampler sampler;
-            if (!sampler_target_for_type(type, sampler.mTarget, sampler.mBinding, sampler.mIsShadow, sampler.mIsInteger))
+            ProgramImage   image;
+            const bool is_sampler =
+                sampler_target_for_type(type, sampler.mTarget, sampler.mBinding, sampler.mIsShadow, sampler.mIsInteger);
+            if (!is_sampler && !image_kind_for_type(type, image.mKind))
             {
                 continue;
             }
 
-            sampler.mName = std::string(name_buf.data(), (size_t)written);
-            sampler.mType = type;
-
-            const GLint location = glGetUniformLocation(program, sampler.mName.c_str());
+            const std::string name(name_buf.data(), (size_t)written);
+            const GLint location = glGetUniformLocation(program, name.c_str());
             if (location < 0)
             {
                 continue;
             }
-            glGetUniformiv(program, location, &sampler.mUnit);
 
-            cached.mSamplers.push_back(sampler);
+            if (is_sampler)
+            {
+                sampler.mName = name;
+                sampler.mType = type;
+                glGetUniformiv(program, location, &sampler.mUnit);
+                cached.mSamplers.push_back(sampler);
+            }
+            else
+            {
+                image.mName = name;
+                glGetUniformiv(program, location, &image.mUnit);
+                cached.mImages.push_back(image);
+            }
         }
 
-        return cached.mSamplers;
+        return cached;
     }
 }
 
@@ -357,7 +463,7 @@ static void log_texture_unit_state()
     GLint saved_active_unit = GL_TEXTURE0;
     glGetIntegerv(GL_ACTIVE_TEXTURE, &saved_active_unit);
 
-    // What the PROGRAM declares, per unit. See get_program_samplers.
+    // What the PROGRAM declares, per unit. See get_program_bindings.
     struct UnitUniform
     {
         std::string mName;
@@ -370,7 +476,7 @@ static void log_texture_unit_state()
     glGetIntegerv(GL_CURRENT_PROGRAM, &program);
     if (program != 0 && glGetActiveUniform && glGetUniformiv)
     {
-        for (const ProgramSampler& sampler : get_program_samplers((GLuint)program))
+        for (const ProgramSampler& sampler : get_program_bindings((GLuint)program).mSamplers)
         {
             if (sampler.mUnit >= 0 && sampler.mUnit < max_units)
             {
@@ -481,7 +587,7 @@ static void log_texture_unit_state()
 }
 
 
-// Check every sampler the bound program declares against what is actually bound.
+// Check every sampler and image the bound program declares against what is actually bound.
 //
 // Catches the mismatch AT THE DRAW THAT CAUSES IT, naming the uniform -- rather than via a
 // driver warning that reports two object names and leaves you inferring which bind site was
@@ -516,7 +622,8 @@ bool validate_bound_samplers()
                                   : "<unknown>";
     std::string failure;
 
-    for (const ProgramSampler& sampler : get_program_samplers((GLuint)program))
+    const ProgramSamplerCache& bindings = get_program_bindings((GLuint)program);
+    for (const ProgramSampler& sampler : bindings.mSamplers)
     {
         if (sampler.mUnit < 0)
         {
@@ -607,6 +714,36 @@ bool validate_bound_samplers()
     }
 
     glActiveTexture(saved_active_unit);
+
+    // An image reads and writes a texel's bits as its unit's format lays them out, and the uniform's type says which
+    // kind of value that is: a float image over an integer format, or the reverse, is undefined. An empty unit is not
+    // -- its loads read 0 and its stores go nowhere.
+    if (failure.empty() && gGLManager.mHasCompute)
+    {
+        for (const ProgramImage& image : bindings.mImages)
+        {
+            if (image.mUnit < 0)
+            {
+                continue;
+            }
+            GLint texture = 0;
+            glGetIntegeri_v(GL_IMAGE_BINDING_NAME, (GLuint)image.mUnit, &texture);
+            if (texture == 0)
+            {
+                continue;
+            }
+            GLint format = 0;
+            glGetIntegeri_v(GL_IMAGE_BINDING_FORMAT, (GLuint)image.mUnit, &format);
+            const TexelKind bound = texel_kind_of_format(format);
+            if (bound != image.mKind)
+            {
+                failure = fmt::format("'{}' (image unit {}) is a {} image over texture {} bound as {} format {:#x}",
+                                      image.mName, image.mUnit, texel_kind_name(image.mKind), texture,
+                                      texel_kind_name(bound), format);
+                break;
+            }
+        }
+    }
 
     if (failure.empty())
     {
@@ -2134,9 +2271,84 @@ bool LLGLManager::initGL()
         glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &mMaxAnisotropy);
     }
 
+    initCompute();
+
     initGLStates();
 
     return true;
+}
+
+// Here rather than in initExtensions, whose version ladder returns before its end on any context below 4.6: this
+// reads what the 4.3 rung resolved.
+void LLGLManager::initCompute()
+{
+    mHasCompute = mGLVersion >= 4.29f
+               && glDispatchCompute && glDispatchComputeIndirect && glMemoryBarrier && glBindImageTexture
+               && glShaderStorageBlockBinding && glGetProgramResourceIndex && glGetProgramInterfaceiv
+               && glGetProgramResourceName && glGetProgramResourceiv && glClearBufferSubData && glDrawArraysIndirect
+               && glGetIntegeri_v;
+
+    for (U32 i = 0; i < 3; ++i)
+    {
+        mMaxComputeWorkGroupCount[i] = 0;
+        mMaxComputeWorkGroupSize[i]  = 0;
+    }
+    mMaxComputeWorkGroupInvocations     = 0;
+    mMaxComputeSharedMemorySize         = 0;
+    mMaxImageUnits                      = 0;
+    mMaxShaderStorageBufferBindings     = 0;
+    mMaxVertexShaderStorageBlocks       = 0;
+    mMaxFragmentShaderStorageBlocks     = 0;
+    mMaxComputeShaderStorageBlocks      = 0;
+    mMaxShaderStorageBlockSize          = 0;
+    mShaderStorageBufferOffsetAlignment = 0;
+
+    if (!mHasCompute)
+    {
+        LL_INFOS("RenderInit") << "Compute unavailable (GL " << mGLVersion
+                               << (mGLVersion >= 4.29f ? ": its entry points did not resolve)" : ", needs 4.3)")
+                               << LL_ENDL;
+        return;
+    }
+
+    for (U32 i = 0; i < 3; ++i)
+    {
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, i, &mMaxComputeWorkGroupCount[i]);
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, i, &mMaxComputeWorkGroupSize[i]);
+    }
+    glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &mMaxComputeWorkGroupInvocations);
+    glGetIntegerv(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE, &mMaxComputeSharedMemorySize);
+    glGetIntegerv(GL_MAX_IMAGE_UNITS, &mMaxImageUnits);
+    glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &mMaxShaderStorageBufferBindings);
+    glGetIntegerv(GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS, &mMaxVertexShaderStorageBlocks);
+    glGetIntegerv(GL_MAX_FRAGMENT_SHADER_STORAGE_BLOCKS, &mMaxFragmentShaderStorageBlocks);
+    glGetIntegerv(GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS, &mMaxComputeShaderStorageBlocks);
+    glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &mShaderStorageBufferOffsetAlignment);
+    // A block may be larger than an int can say.
+    if (glGetInteger64v)
+    {
+        GLint64 block_size = 0;
+        glGetInteger64v(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &block_size);
+        mMaxShaderStorageBlockSize = block_size;
+    }
+    else
+    {
+        GLint block_size = 0;
+        glGetIntegerv(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &block_size);
+        mMaxShaderStorageBlockSize = block_size;
+    }
+    mShaderStorageBufferOffsetAlignment = llmax(mShaderStorageBufferOffsetAlignment, 1);
+
+    LL_INFOS("RenderInit") << "Compute available (GL " << mGLVersion << "): work groups up to "
+                           << mMaxComputeWorkGroupCount[0] << "x" << mMaxComputeWorkGroupCount[1] << "x"
+                           << mMaxComputeWorkGroupCount[2] << " of " << mMaxComputeWorkGroupSize[0] << "x"
+                           << mMaxComputeWorkGroupSize[1] << "x" << mMaxComputeWorkGroupSize[2] << ", "
+                           << mMaxComputeWorkGroupInvocations << " invocations, " << mMaxComputeSharedMemorySize
+                           << " bytes shared; " << mMaxImageUnits << " image units; storage blocks "
+                           << mMaxVertexShaderStorageBlocks << " vertex, " << mMaxFragmentShaderStorageBlocks
+                           << " fragment, " << mMaxComputeShaderStorageBlocks << " compute, at "
+                           << mMaxShaderStorageBufferBindings << " bindings, up to " << mMaxShaderStorageBlockSize
+                           << " bytes each, offsets aligned to " << mShaderStorageBufferOffsetAlignment << LL_ENDL;
 }
 
 void LLGLManager::getGLInfo(LLSD& info)
@@ -2211,6 +2423,15 @@ void LLGLManager::asLLSD(LLSD& info)
     info["max_vertex_range"] = mGLMaxVertexRange;
     info["max_index_range"] = mGLMaxIndexRange;
     info["max_texture_size"] = mGLMaxTextureSize;
+
+    // Compute, and the limits a compute feature sizes itself by
+    info["has_compute"] = mHasCompute;
+    info["max_compute_work_group_invocations"] = mMaxComputeWorkGroupInvocations;
+    info["max_compute_shared_memory_size"] = mMaxComputeSharedMemorySize;
+    info["max_image_units"] = mMaxImageUnits;
+    info["max_vertex_shader_storage_blocks"] = mMaxVertexShaderStorageBlocks;
+    info["max_fragment_shader_storage_blocks"] = mMaxFragmentShaderStorageBlocks;
+    info["max_compute_shader_storage_blocks"] = mMaxComputeShaderStorageBlocks;
 
     // Which vendor
     info["is_ati"] = mIsAMD;  // note, do not rename is_ati to is_amd without coordinating with DW
@@ -2453,6 +2674,11 @@ void LLGLManager::initExtensions()
         {
             glNamedBufferStorage = (PFNGLNAMEDBUFFERSTORAGEPROC)LL_GET_PROC_ADDRESS("glNamedBufferStorage");
         }
+        // And the ones ALGPUBuffer makes. Not part of the check below: glClearNamedBufferSubData exists only beside
+        // GL_ARB_clear_buffer_object, and that class checks each before it uses it.
+        glCopyNamedBufferSubData  = (PFNGLCOPYNAMEDBUFFERSUBDATAPROC)LL_GET_PROC_ADDRESS("glCopyNamedBufferSubData");
+        glGetNamedBufferSubData   = (PFNGLGETNAMEDBUFFERSUBDATAPROC)LL_GET_PROC_ADDRESS("glGetNamedBufferSubData");
+        glClearNamedBufferSubData = (PFNGLCLEARNAMEDBUFFERSUBDATAPROC)LL_GET_PROC_ADDRESS("glClearNamedBufferSubData");
 
         if (!glBindTextureUnit || !glCreateSamplers || !glCreateBuffers || !glNamedBufferData ||
             !glNamedBufferSubData || !glMapNamedBufferRange || !glUnmapNamedBuffer ||

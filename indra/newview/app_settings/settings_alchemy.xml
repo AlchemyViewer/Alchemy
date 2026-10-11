@@ -2119,6 +2119,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyRenderDisableCompute</key>
+        <map>
+            <key>Comment</key>
+            <string>Use no compute shaders even where the GPU has them (OpenGL 4.3): everything built on compute takes its other path or is off. For diagnosing a driver. Change triggers a shader rebuild.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRenderFarPlaneForce</key>
         <map>
             <key>Comment</key>

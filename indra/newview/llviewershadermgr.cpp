@@ -73,6 +73,14 @@ bool                LLViewerShaderMgr::sSkipReload = false;
 
 LLVector4           gShinyOrigin;
 
+// Whether the session computes: a context with compute, GLSL 4.30 left to it after the feature manager's fallbacks,
+// and AlchemyRenderDisableCompute off. Read at shader load, as everything built on it is.
+static bool compute_enabled()
+{
+    const S32 glsl = gGLManager.mGLSLVersionMajor * 100 + gGLManager.mGLSLVersionMinor;
+    return gGLManager.mHasCompute && glsl >= 430 && !gSavedSettings.getBOOL("AlchemyRenderDisableCompute");
+}
+
 S32 clamp_terrain_mapping(S32 mapping)
 {
     // 1 = "flat", 2 not implemented, 3 = triplanar mapping
@@ -562,6 +570,10 @@ void LLViewerShaderMgr::setShaders()
     // call, so clip control, clear depth, depth format and the shader define agree for the
     // whole next frame.
     LLPipeline::updateReverseZ();
+
+    // The same for compute: the shared objects compiled for its stage and every program built on it follow the switch
+    // as it stands for this load.
+    LLRender::sCompute = compute_enabled();
 
     {
         static LLCachedControl<bool> shader_cache_enabled(gSavedSettings, "RenderShaderCacheEnabled", true);
