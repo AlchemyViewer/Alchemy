@@ -3292,6 +3292,11 @@ GLboolean LLGLDepthTest::sWriteEnabled = GL_TRUE; // OpenGL default
 //static
 void LLGLState::initClass()
 {
+    // Runs per context, from initGL: the map and the depth state describe this context, and
+    // GL starts every context at its defaults.
+    sStateMap.clear();
+    LLGLDepthTest::initClass();
+
     sStateMap[GL_DITHER] = GL_TRUE;
     // sStateMap[GL_TEXTURE_2D] = GL_TRUE;
 
@@ -3675,6 +3680,15 @@ GLenum LLGLDepthTest::remap(GLenum func)
         // depth remap and must NOT flip.
         default:          return func;
     }
+}
+
+//static
+void LLGLDepthTest::initClass()
+{
+    sDepthEnabled = GL_FALSE;
+    sDepthFunc = GL_LESS;
+    sWriteEnabled = GL_TRUE;
+    glDepthFunc(remap(sDepthFunc));
 }
 
 void LLGLDepthTest::rebase()
