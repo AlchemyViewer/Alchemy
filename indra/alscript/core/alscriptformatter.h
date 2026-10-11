@@ -39,7 +39,7 @@
 // or `else` without braces -- and within a line the spaces are put
 // where the language reads best: one around a binary operator, none
 // around a unary one or inside brackets, one after a comma, none
-// before it. What the author spaced deliberately is left alone: the
+// before it, and inside Luau's braces as asked. What the author spaced deliberately is left alone: the
 // gap before a trailing comment, a preprocessor line, anything inside
 // a string or a comment. Runs of blank lines are shortened and trailing
 // whitespace dropped, unless only some lines are asked for, in which
@@ -59,6 +59,10 @@ public:
         // Whether the spaces within a line are touched at all, or only
         // the indentation.
         bool spacing = true;
+        // Luau: a space inside a table's braces, and a table type's, as
+        // StyLua writes them -- { 1, 2 }, { any } -- or none, {1, 2}.
+        // Never inside {}, nor an interpolated string's.
+        bool braceSpaces = true;
         // How many columns a line may take before it is broken, a tab as
         // wide as a level: at the commas of the widest bracket on it that
         // has any, or of the table or list a call ends with, which stays

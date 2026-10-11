@@ -882,6 +882,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALScriptFormatBraceSpaces</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio writes a space inside SLua's braces, { 1, 2 } and { any }, as StyLua does: its formatter, and Convert to SLua; off, {1, 2}.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptFormatWidth</key>
         <map>
             <key>Comment</key>
