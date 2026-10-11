@@ -34,7 +34,7 @@ Parity holds for a file when:
     counts one a term (catch2_expected). After a file has been edited by
     hand past what the converter wrote, --recounted lists the counts
     instead of holding them to the mapping; names and results must still
-    agree;
+    agree, and a case whose TUT test asserted anything must still assert;
   - every assertion counted in a passing case's body ran: the run keeps its
     passing assertions (-s), and each CHECK, REQUIRE and _THAT site must
     report from at least one line it spans. A FAIL or SKIP that ran would
@@ -463,6 +463,9 @@ def check(args):
             expected = e.get("catch2_expected", e["tut_assertions"])
             if expected == e["catch2_assertions"] == static:
                 counts_ok += 1
+            elif args.recounted and static == 0 and e["tut_assertions"] > 0:
+                problems.append(f"{path}: {name!r}: {e['tut_assertions']} TUT assertion calls, "
+                                f"none in the file")
             elif args.recounted and static is not None:
                 counts_ok += 1
                 print(f"{path}: listed: {name!r}: {expected} assertions converted, {static} in the file now")
