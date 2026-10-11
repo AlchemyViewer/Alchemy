@@ -572,6 +572,12 @@ void LLRender::refreshState(void)
 
     glLineWidth(mLineWidth);
 
+    // Loaded only on a context with tessellation, the one that has a patch size.
+    if (glPatchParameteri)
+    {
+        glPatchParameteri(GL_PATCH_VERTICES, mPatchVertices);
+    }
+
     rebasePolygonOffset();
 
     // The same for the clear colour and a scissor box that was ever set.
