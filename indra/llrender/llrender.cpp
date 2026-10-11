@@ -1017,13 +1017,13 @@ void LLRender::setColorMask(bool writeColor, bool writeAlpha)
 
 void LLRender::setColorMask(bool writeColorR, bool writeColorG, bool writeColorB, bool writeAlpha)
 {
-    flush();
-
     if (mCurrColorMask[0] != writeColorR ||
         mCurrColorMask[1] != writeColorG ||
         mCurrColorMask[2] != writeColorB ||
         mCurrColorMask[3] != writeAlpha)
     {
+        flush();
+
         mCurrColorMask[0] = writeColorR;
         mCurrColorMask[1] = writeColorG;
         mCurrColorMask[2] = writeColorB;
@@ -1683,11 +1683,10 @@ void LLRender::diffuseColor4ub(U8 r, U8 g, U8 b, U8 a)
 
 void LLRender::setLineWidth(F32 width)
 {
-    gGL.flush();
-
     width = llclamp(width, gGLManager.mAliasedLineRange[0], gGLManager.mAliasedLineRange[1]);
     if(mLineWidth != width)
     {
+        flush();
         mLineWidth = width;
         glLineWidth(width);
     }
