@@ -634,6 +634,8 @@ public:
         SELECTION_GLOW_REACH_MAP,           //  "selectionGlowReachMap"  the glowing ids within the glow's reach of each tile
         SELECTION_GLOW_ROW_MAP,             //  "selectionGlowRowMap"  the nearest glowing texel along each texel's row
 
+        WATER_GLINT_ROUGHNESS,              //  "waterGlintRoughness"  the roughness of the sun's reflection on each wave face
+
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
     // clang-format on
