@@ -382,4 +382,37 @@ namespace tut
         tabs.width = 99;
         ensure("does not", ALScriptFormatter::format(tabbed, tabs).find("\t\tllSay(\n\t\t\t0,\n") != std::string::npos);
     }
+
+    template<> template<>
+    void alscriptformatter_object::test<12>()
+    {
+        set_test_name("Luau's braces spaced inside as asked, whatever stands next to them, a table type's too; never {} nor an "
+                      "interpolated string's; a type's colon before a bracket spaced as written; LSL's braces as they were");
+        const std::string in   = "local states: {[string]: {[string]:(...any) -> ()}} = {}\n"
+                                 "local t = {{1}, {2, 3}, [k] = v, -1, #t}\n"
+                                 "local params: { any } = ll.ParseStringKeepNulls(msg, { \"\\n\" }, {})\n"
+                                 "print(`a {b} c {{d}}`, `{ {1} }`)\n"
+                                 "local f: (number) -> () = obj:method(1)\n";
+        const std::string want = "local states: { [string]: { [string]:(...any) -> () } } = {}\n"
+                                 "local t = { { 1 }, { 2, 3 }, [k] = v, -1, #t }\n"
+                                 "local params: { any } = ll.ParseStringKeepNulls(msg, { \"\\n\" }, {})\n"
+                                 "print(`a {b} c {{d}}`, `{ {1} }`)\n"
+                                 "local f: (number) -> () = obj:method(1)\n";
+        ensure_equals("StyLua's, by default", lua(in), want);
+        ALScriptFormatter::Options none;
+        none.lua         = true;
+        none.braceSpaces = false;
+        ensure_equals("none", ALScriptFormatter::format(in, none),
+                      std::string("local states: {[string]: {[string]:(...any) -> ()}} = {}\n"
+                                  "local t = {{1}, {2, 3}, [k] = v, -1, #t}\n"
+                                  "local params: {any} = ll.ParseStringKeepNulls(msg, {\"\\n\"}, {})\n"
+                                  "print(`a {b} c {{d}}`, `{ {1} }`)\n"
+                                  "local f: (number) -> () = obj:method(1)\n"));
+        ensure_equals("a type's colon, spaced", lua("local states: {[string]: (...any) -> ()} = {}\n"),
+                      std::string("local states: { [string]: (...any) -> () } = {}\n"));
+        ALScriptFormatter::Options lsl_none;
+        lsl_none.braceSpaces = false;
+        ensure_equals("LSL's braces", ALScriptFormatter::format("default { state_entry() { llSay(0, \"a\"); } }\n", lsl_none),
+                      std::string("default { state_entry() { llSay(0, \"a\"); } }\n"));
+    }
 }
