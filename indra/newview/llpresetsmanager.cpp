@@ -1193,7 +1193,8 @@ LLSD LLPresetsManager::captureLookSettings()
     return params;
 }
 
-LLPresetsManager::LookEntry LLPresetsManager::judgeLookEntry(const LLSD& settings, const std::string& ctrl_name, LLSD& clean, LLControlVariable** ctrl)
+LLPresetsManager::LookEntry LLPresetsManager::judgeLookEntry(const LLSD& settings, const std::string& ctrl_name, LLSD& clean, LLControlVariable** ctrl,
+                                                             bool* adjusted)
 {
     LLControlVariable* control = gSavedSettings.getControl(ctrl_name).get();
     if (ctrl)
@@ -1209,7 +1210,7 @@ LLPresetsManager::LookEntry LLPresetsManager::judgeLookEntry(const LLSD& setting
     // Look file is written by hand or shared as readily as a notecard is.
     const LLSD& entry = settings[ctrl_name];
     if (!control || !entry.isMap() || !entry.has("Value") ||
-        !ALLookFormat::sanitizeLookValue(ctrl_name, LLControlGroup::typeEnumToString(control->type()), entry["Value"], clean))
+        !ALLookFormat::sanitizeLookValue(ctrl_name, LLControlGroup::typeEnumToString(control->type()), entry["Value"], clean, adjusted))
     {
         return LookEntry::Refused;
     }
@@ -1228,8 +1229,9 @@ LLPresetsManager::LookSettingCounts LLPresetsManager::applyLookSettings(const LL
     for (const std::string& ctrl_name : allowed)
     {
         LLSD               clean;
-        LLControlVariable* ctrl = nullptr;
-        switch (judgeLookEntry(params, ctrl_name, clean, &ctrl))
+        LLControlVariable* ctrl     = nullptr;
+        bool               adjusted = false;
+        switch (judgeLookEntry(params, ctrl_name, clean, &ctrl, &adjusted))
         {
             case LookEntry::Absent:
                 break;
@@ -1243,6 +1245,7 @@ LLPresetsManager::LookSettingCounts LLPresetsManager::applyLookSettings(const LL
             case LookEntry::Taken:
                 ctrl->set(clean);
                 ++counts.accepted;
+                counts.adjusted += adjusted ? 1 : 0;
                 break;
         }
     }
@@ -1304,7 +1307,7 @@ bool LLPresetsManager::loadLooksPreset(std::string name)
     return true;
 }
 
-bool LLPresetsManager::saveSharedLook(const std::string& name, const LLSD& shared_settings, LookSettingCounts& counts)
+LLPresetsManager::SharedLookSave LLPresetsManager::saveSharedLook(const std::string& name, const LLSD& shared_settings, LookSettingCounts& counts)
 {
     counts = LookSettingCounts();
     // Nor over Neutral, the Look the Lightbox falls back to. The import
@@ -1313,11 +1316,11 @@ bool LLPresetsManager::saveSharedLook(const std::string& name, const LLSD& share
     if (name.empty() || isReservedPresetName(name) || isProtectedLookName(name))
     {
         LL_WARNS("Presets") << "A shared Look cannot be saved as '" << name << "'" << LL_ENDL;
-        return false;
+        return SharedLookSave::NotWritten;
     }
     if (!shared_settings.isMap())
     {
-        return false;
+        return SharedLookSave::NothingUsable;
     }
 
     std::vector<std::string> allowed;
@@ -1336,8 +1339,9 @@ bool LLPresetsManager::saveSharedLook(const std::string& name, const LLSD& share
     for (const std::string& ctrl_name : allowed)
     {
         LLSD               clean;
-        LLControlVariable* ctrl = nullptr;
-        switch (judgeLookEntry(shared_settings, ctrl_name, clean, &ctrl))
+        LLControlVariable* ctrl     = nullptr;
+        bool               adjusted = false;
+        switch (judgeLookEntry(shared_settings, ctrl_name, clean, &ctrl, &adjusted))
         {
             case LookEntry::Absent:
                 break;
@@ -1353,6 +1357,11 @@ bool LLPresetsManager::saveSharedLook(const std::string& name, const LLSD& share
             case LookEntry::Taken:
                 params[ctrl_name] = describeSetting(*ctrl, clean);
                 ++counts.accepted;
+                if (adjusted)
+                {
+                    LL_INFOS("Presets") << "Shared Look '" << name << "': setting '" << ctrl_name << "' moved into its range" << LL_ENDL;
+                    ++counts.adjusted;
+                }
                 break;
         }
     }
@@ -1369,14 +1378,14 @@ bool LLPresetsManager::saveSharedLook(const std::string& name, const LLSD& share
     if (counts.accepted == 0)
     {
         LL_WARNS("Presets") << "Shared Look '" << name << "' holds no usable settings" << LL_ENDL;
-        return false;
+        return SharedLookSave::NothingUsable;
     }
     if (!writePresetFile(PRESETS_LOOKS, name, params))
     {
-        return false;
+        return SharedLookSave::NotWritten;
     }
     triggerChangeLooksSignal();
-    return true;
+    return SharedLookSave::Saved;
 }
 
 bool LLPresetsManager::lookHoldsSameSettings(const std::string& name, const LLSD& shared_settings)
@@ -1388,12 +1397,42 @@ bool LLPresetsManager::lookHoldsSameSettings(const std::string& name, const LLSD
     }
     std::vector<std::string> allowed;
     getLooksControlNames(allowed);
+
+    // Whether a side is a full snapshot, which applying resets every setting
+    // it lacks to the default for (applyLookSettings, by the same count).
+    const auto snapshot = [this, &allowed](const LLSD& settings) {
+        S32 taken   = 0;
+        S32 carried = 0;
+        for (const std::string& ctrl_name : allowed)
+        {
+            LLSD value;
+            switch (judgeLookEntry(settings, ctrl_name, value))
+            {
+                case LookEntry::Taken:
+                    ++taken;
+                    ++carried;
+                    break;
+                case LookEntry::Refused:
+                    ++carried;
+                    break;
+                case LookEntry::Absent:
+                    break;
+            }
+        }
+        return taken > 0 && carried * 2 >= static_cast<S32>(allowed.size());
+    };
+    const bool mine_whole   = snapshot(params);
+    const bool theirs_whole = snapshot(shared_settings);
+
     for (const std::string& ctrl_name : allowed)
     {
         // Each side's value as it would be written: a refused value as the
-        // default saveSharedLook writes in its place, and none where the
-        // side lacks the setting.
-        const auto written = [this, &ctrl_name](const LLSD& settings, LLSD& value) {
+        // default saveSharedLook writes in its place; and where the side
+        // lacks the setting, the default too where applying it would put
+        // that there -- a Look saved before a setting joined the list
+        // renders the same as one that carries its default -- and none
+        // where it would not.
+        const auto written = [this, &ctrl_name](const LLSD& settings, bool whole, LLSD& value) {
             LLControlVariable* ctrl = nullptr;
             switch (judgeLookEntry(settings, ctrl_name, value, &ctrl))
             {
@@ -1402,14 +1441,18 @@ bool LLPresetsManager::lookHoldsSameSettings(const std::string& name, const LLSD
                 case LookEntry::Refused:
                     return ctrl && ALLookFormat::sanitizeLookValue(ctrl_name, LLControlGroup::typeEnumToString(ctrl->type()), ctrl->getDefault(), value);
                 case LookEntry::Absent:
+                    if (whole && ctrl_name != "RenderColorGrade" && ctrl)
+                    {
+                        return ALLookFormat::sanitizeLookValue(ctrl_name, LLControlGroup::typeEnumToString(ctrl->type()), ctrl->getDefault(), value);
+                    }
                     break;
             }
             return false;
         };
         LLSD       mine;
         LLSD       theirs;
-        const bool have_mine   = written(params, mine);
-        const bool have_theirs = written(shared_settings, theirs);
+        const bool have_mine   = written(params, mine_whole, mine);
+        const bool have_theirs = written(shared_settings, theirs_whole, theirs);
         if (have_mine != have_theirs || (have_mine && !llsd_equals(mine, theirs)))
         {
             return false;

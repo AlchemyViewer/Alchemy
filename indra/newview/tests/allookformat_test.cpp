@@ -1116,4 +1116,50 @@ namespace tut
                            "</string></map></map></llsd>",
                        parsed);
     }
+
+    // Every number is held to its row's range, so that a Look from outside
+    // renders nothing the Lightbox could not show, and is said to have been
+    // moved where it was.
+    template<> template<> void object::test<20>()
+    {
+        set_test_name("values held to their rows' ranges");
+        LLSD out;
+        bool adjusted = true;
+        ensure("in range taken", ALLookFormat::sanitizeLookValue("RenderBloomStrength", "F32", 1.5, out, &adjusted));
+        ensure("and as it was", out.asReal() == 1.5 && !adjusted);
+        ensure("past the top taken", ALLookFormat::sanitizeLookValue("RenderBloomStrength", "F32", 3.0e38, out, &adjusted));
+        ensure("at the slider's top, and said to be moved", out.asReal() == 2.0 && adjusted);
+        ensure("below the bottom", ALLookFormat::sanitizeLookValue("AlchemyExposureMinEV", "F32", -15.0, out, &adjusted) && out.asReal() == -8.0 && adjusted);
+
+        // A dropdown's setting goes to the nearest value it has, the lower
+        // of two as near.
+        ensure("a blade count the dropdown has", ALLookFormat::sanitizeLookValue("RenderBokehApertureBlades", "S32", 7, out, &adjusted) &&
+                                                     out.asInteger() == 7 && !adjusted);
+        ensure("between two, the lower", ALLookFormat::sanitizeLookValue("RenderBokehApertureBlades", "S32", 4, out, &adjusted) &&
+                                              out.asInteger() == 3 && adjusted);
+        ensure("past the last, the last", ALLookFormat::sanitizeLookValue("RenderBokehApertureBlades", "S32", 40, out, &adjusted) &&
+                                                out.asInteger() == 11 && adjusted);
+        ensure("a dropdown's text value too", ALLookFormat::sanitizeLookValue("RenderCrossFilterPoints", "S32", "5", out, &adjusted) &&
+                                                   out.asInteger() == 4 && adjusted);
+        ensure("a slider's whole number clamped", ALLookFormat::sanitizeLookValue("RenderGlowIterations", "S32", 1000000, out, &adjusted) &&
+                                                       out.asInteger() == 8 && adjusted);
+
+        // Each channel of a colour on its own.
+        LLSD tint = LLSD::emptyArray();
+        tint.append(2.0);
+        tint.append(0.5);
+        tint.append(-1.0);
+        ensure("a tint taken", ALLookFormat::sanitizeLookValue("RenderBloomHalationTint", "Color3", tint, out, &adjusted));
+        ensure("each channel held", out[0].asReal() == 1.0 && out[1].asReal() == 0.5 && out[2].asReal() == 0.0 && adjusted);
+        ensure("a wheel's own range", ALLookFormat::sanitizeLookValue("RenderColorGradeLift", "Vector3", tint, out, &adjusted) &&
+                                           out[0].asReal() == 0.5 && out[2].asReal() == -0.5);
+
+        // What has no range is as it was.
+        ensure("a switch", ALLookFormat::sanitizeLookValue("RenderGlow", "Boolean", true, out, &adjusted) && !adjusted);
+        ensure("a setting with no row", ALLookFormat::sanitizeLookValue("NotALookSetting", "F32", 1.0e30, out, &adjusted) &&
+                                             out.asReal() == 1.0e30 && !adjusted);
+        ensure("every range has its ends in order", ALLookFormat::settingRange("RenderExposure") &&
+                                                        ALLookFormat::settingRange("RenderExposure")->lo < ALLookFormat::settingRange("RenderExposure")->hi);
+        ensure("a switch has none", ALLookFormat::settingRange("RenderGlow") == nullptr);
+    }
 } // namespace tut

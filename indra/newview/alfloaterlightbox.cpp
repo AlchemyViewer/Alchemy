@@ -2472,6 +2472,14 @@ void ALFloaterLightBox::finishSharedLookImport(const ALLookNotecard::ImportedLoo
             args["NAME"] = imported.wantedName;
             LLNotificationsUtil::add("LightBoxLookNotImported", args);
             return;
+        case Failure::NothingUsable:
+            // Not a disk's fault, as NotSaved would read: a newer viewer's
+            // settings, or none that passed.
+            args["NAME"]    = imported.wantedName;
+            args["UNKNOWN"] = imported.counts.unknown;
+            args["REFUSED"] = imported.counts.rejected;
+            LLNotificationsUtil::add("LightBoxLookNothingUsable", args);
+            return;
         case Failure::None:
             break;
     }
@@ -2511,20 +2519,35 @@ void ALFloaterLightBox::finishSharedLookImport(const ALLookNotecard::ImportedLoo
     {
         say(LLTrans::getString("LightBoxLookImportUndoNote"));
     }
-    if (!imported.alreadyHad && imported.lookName != imported.wantedName)
+    typedef ALLookNotecard::ImportedLook::Renamed Renamed;
+    if (!imported.alreadyHad)
     {
-        say(LLTrans::getString("LightBoxLookImportRenamedNote", words));
+        switch (imported.renamed)
+        {
+            case Renamed::Taken:
+                say(LLTrans::getString("LightBoxLookImportRenamedNote", words));
+                break;
+            case Renamed::Reserved:
+                say(LLTrans::getString("LightBoxLookImportReservedNote", words));
+                break;
+            case Renamed::Shortened:
+                say(LLTrans::getString("LightBoxLookImportShortenedNote", words));
+                break;
+            case Renamed::No:
+                break;
+        }
     }
-    if (imported.counts.unknown > 0)
-    {
-        words["[COUNT]"] = std::to_string(imported.counts.unknown);
-        say(LLTrans::getString("LightBoxLookImportUnknownNote", words));
-    }
-    if (imported.counts.rejected > 0)
-    {
-        words["[COUNT]"] = std::to_string(imported.counts.rejected);
-        say(LLTrans::getString("LightBoxLookImportIgnoredNote", words));
-    }
+    // A count, said in the singular where it is one.
+    const auto counted = [&say, &words](S32 count, const std::string& note) {
+        if (count > 0)
+        {
+            words["[COUNT]"] = std::to_string(count);
+            say(LLTrans::getString(count == 1 ? note + "One" : note, words));
+        }
+    };
+    counted(imported.counts.unknown, "LightBoxLookImportUnknownNote");
+    counted(imported.counts.rejected, "LightBoxLookImportIgnoredNote");
+    counted(imported.counts.adjusted, "LightBoxLookImportAdjustedNote");
     args["NAME"] = imported.lookName;
     args["NOTE"] = note;
     // Said as it went: applied and new here, applied and already here, added

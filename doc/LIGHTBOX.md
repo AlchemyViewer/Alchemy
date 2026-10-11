@@ -1382,11 +1382,21 @@ the heap, but LLSD frees what it built recursively. The toast only counts the
 refused keys. The first shared Look lost its tonemapper and its glow noise to
 a judgment written for the *declared* types rather than the stored ones,
 which is why `allookformat_test` now carries those two values verbatim.
-`LLControlVariable` has no range to check against, so nothing is clamped
-here; a setting that controls *work* rather than appearance
-(`RenderGlowIterations` is the number of full-screen passes) is clamped by
-the renderer where it is read, which protects Debug Settings and hand-edited
-files as well. `RenderLensFlareGhostCount` and `RenderCrossFilterPoints`
+**Every number is then held to its row's range** (`ALLookFormat::settingRange`):
+`LLControlVariable` has no range of its own, so the table in
+`allookformat.cpp` carries each row's — a slider's `min_val`/`max_val`, a
+colour wheel's `min_value`/`max_value`, a swatch's 0 to 1 per channel, a
+dropdown's item values — and a value outside it is clamped (moved to the
+nearest choice, for a dropdown) and counted as adjusted, which the import's
+toast says. A Look from outside therefore renders nothing the Lightbox could
+not show, and touching a row never snaps it back.
+`scripts/content_tools/check_look_ranges.py` holds the table to the rows, to
+the whitelist (every number on it has a range) and to the bundled Looks
+(every value inside); run it after moving a row's range or adding a setting.
+A setting that controls *work* rather than appearance
+(`RenderGlowIterations` is the number of full-screen passes) is also clamped
+by the renderer where it is read, which protects Debug Settings and
+hand-edited settings files as well. `RenderLensFlareGhostCount` and `RenderCrossFilterPoints`
 already were. So, since the security sweep, are the values whose *math* an
 absurd number breaks: the exposure range, compensation and speeds (the
 exposure map is a half float whose red channel is the scale 2^-EV, so the
@@ -1394,10 +1404,12 @@ range is held to ±15 EV — 2^16 is already past the largest half float — and
 `exposureF.glsl` starts over from the target where the history it reads is an
 infinity or a NaN, since mixing from one never comes back; the EV itself is
 not clamped after the mix, so a narrowed range is reached at the adaptation's
-pace rather than in a jump), and the tonemap whites and AgX contrast (inf /
-inf is a NaN frame; `tonemap_white_limit` is the one bound). Every other whitelisted number was traced to a plain uniform
-or bounded math; `allookformat_test` test 19 feeds the reader mutated Looks
-and the deepest nesting a notecard can hold.
+pace rather than in a jump), the tonemap whites and AgX contrast (inf /
+inf is a NaN frame; `tonemap_white_limit` is the one bound) and the tonemap
+mix. These are the renderer's own bounds, for what Debug Settings or a
+settings file can hold; a Look is held to the narrower ranges of the rows
+above. `allookformat_test` test 19 feeds the reader mutated Looks and the
+deepest nesting a notecard can hold.
 
 A Look whose settings have since changed is shown as `Name *` in the combo, via
 the `look_name_modified` string — **on the name, not beside it**. A detached

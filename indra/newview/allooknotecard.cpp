@@ -65,10 +65,24 @@ namespace
     // so a Look called "GOLDEN~1" would be written over "Golden Hour".
     // Empty where none could be found, which takes a thousand Looks of one
     // name, or where the Looks folder's path leaves no room for a name.
-    std::string chooseImportedLookName(const std::string& wanted, const LLSD& settings, bool& already_had)
+    std::string chooseImportedLookName(const std::string& wanted, const LLSD& settings, bool& already_had,
+                                       ALLookNotecard::ImportedLook::Renamed& renamed)
     {
+        typedef ALLookNotecard::ImportedLook::Renamed Renamed;
         LLPresetsManager& presets = LLPresetsManager::instance();
         already_had               = false;
+        renamed                   = Renamed::No;
+        // Why a name was passed over, for saying why the Look is not under
+        // the one it asked for.
+        bool passed_taken    = false;
+        bool passed_reserved = false;
+        const auto chosen    = [&](const std::string& name) {
+            if (name != wanted)
+            {
+                renamed = passed_taken ? Renamed::Taken : passed_reserved ? Renamed::Reserved : Renamed::Shortened;
+            }
+            return name;
+        };
 
         // The Looks there are, read from the folder once: by their keys, to
         // the spelling on disk.
@@ -90,6 +104,7 @@ namespace
             }
             if (LLPresetsManager::isReservedPresetName(candidate))
             {
+                passed_reserved = true;
                 continue;
             }
             const auto taken = held.find(ALLookFormat::lookNameKey(candidate));
@@ -98,18 +113,24 @@ namespace
                 // Nor is Neutral made from outside where the folder has
                 // lost it: the Lightbox falls back to it, and puts back the
                 // bundled one where there is none.
-                if (LLPresetsManager::isProtectedLookName(candidate) ||
-                    LLFile::isfile(LLPresetsManager::getPresetFilePath(PRESETS_LOOKS, candidate)))
+                if (LLPresetsManager::isProtectedLookName(candidate))
                 {
+                    passed_reserved = true;
                     continue;
                 }
-                return candidate;
+                if (LLFile::isfile(LLPresetsManager::getPresetFilePath(PRESETS_LOOKS, candidate)))
+                {
+                    passed_taken = true;
+                    continue;
+                }
+                return chosen(candidate);
             }
             if (presets.lookHoldsSameSettings(taken->second, settings))
             {
                 already_had = true;
                 return taken->second;
             }
+            passed_taken = true;
         }
         return std::string();
     }
@@ -204,7 +225,7 @@ void ALLookNotecard::importLookFromNotecardText(const std::string& text, const s
         wanted = LLTrans::getString("LightBoxLookImportFallbackName");
     }
     imported.wantedName = wanted;
-    imported.lookName   = chooseImportedLookName(wanted, look.settings, imported.alreadyHad);
+    imported.lookName   = chooseImportedLookName(wanted, look.settings, imported.alreadyHad, imported.renamed);
     if (imported.lookName.empty())
     {
         imported.failure = ImportedLook::Failure::NotSaved;
@@ -212,11 +233,21 @@ void ALLookNotecard::importLookFromNotecardText(const std::string& text, const s
         return;
     }
 
-    if (!imported.alreadyHad && !LLPresetsManager::instance().saveSharedLook(imported.lookName, look.settings, imported.counts))
+    if (!imported.alreadyHad)
     {
-        imported.failure = ImportedLook::Failure::NotSaved;
-        done(imported);
-        return;
+        switch (LLPresetsManager::instance().saveSharedLook(imported.lookName, look.settings, imported.counts))
+        {
+            case LLPresetsManager::SharedLookSave::Saved:
+                break;
+            case LLPresetsManager::SharedLookSave::NothingUsable:
+                imported.failure = ImportedLook::Failure::NothingUsable;
+                done(imported);
+                return;
+            case LLPresetsManager::SharedLookSave::NotWritten:
+                imported.failure = ImportedLook::Failure::NotSaved;
+                done(imported);
+                return;
+        }
     }
 
     // A LUT the Look names that is not here is shown without, silently, by

@@ -9886,6 +9886,14 @@ The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; could not be saved to y
     <tag>fail</tag>
   </notification>
 
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookNothingUsable"
+    type="alertmodal">
+The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; holds nothing this viewer can use: [UNKNOWN] of its settings are not known here, and [REFUSED] were not valid. It may have been made with a newer viewer.
+    <tag>fail</tag>
+  </notification>
+
   <!-- The four ways an import ends. [NOTE] is empty or holds further
        sentences, each with its own leading space, so none goes here. -->
   <notification
@@ -9925,7 +9933,7 @@ You already have this Look, as &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos;; 
     name="LightBoxLookLUTMissing"
     log_to_chat="false"
     type="notifytip">
-This Look uses the color LUT file &apos;&lt;nolink&gt;[LUT]&lt;/nolink&gt;&apos;, which is not in your colorlut folder, so it is shown without it. Ask whoever gave you the Look for the file, then use Open Folder next to Color LUT on the Look tab.
+This Look uses the color LUT file &apos;&lt;nolink&gt;[LUT]&lt;/nolink&gt;&apos;, which is not in your colorlut folder. Until it is, the Look is shown without it. Ask whoever gave you the Look for the file, then use Open Folder next to Color LUT on the Look tab.
   </notification>
 
   <notification

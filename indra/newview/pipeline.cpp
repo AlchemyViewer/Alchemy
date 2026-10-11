@@ -8555,7 +8555,10 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             // Tonemap type and parameters
             static LLCachedControl<S32> tonemap_type_setting(gSavedSettings, "AlchemyRenderTonemapType", 0U);
             shader->uniform1i(LLShaderMgr::TONEMAP_TYPE, tonemap_type_setting);
-            shader->uniform1f(LLShaderMgr::TONEMAP_MIX, psky->getTonemapMix(should_auto_adjust()));
+            // A mix, so 0..1: tonemapUtilF.glsl's mix() extrapolates past
+            // either end, and a sky or a settings file can carry anything.
+            const F32 tonemap_mix = psky->getTonemapMix(should_auto_adjust());
+            shader->uniform1f(LLShaderMgr::TONEMAP_MIX, std::isfinite(tonemap_mix) ? llclamp(tonemap_mix, 0.f, 1.f) : 1.f);
 
             constexpr F32 max_screen_brightness = 1.f;
             // The most any tonemapper's white may be, from a settings file or

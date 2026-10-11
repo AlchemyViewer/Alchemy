@@ -130,10 +130,32 @@ namespace ALLookFormat
     // renderer decodes or nothing at all; three finite numbers for a
     // Vector3 or a Color3, or four with the last ignored; and, for an LLSD
     // setting, a tone curve as ALToneCurveSet reads one. Anything else is
-    // refused, and so is any type not named here. The one place a value
-    // from outside is judged: a range, once the settings carry one, belongs
-    // here.
-    bool sanitizeLookValue(const std::string& control_name, const std::string& control_type, const LLSD& value, LLSD& sanitized);
+    // refused, and so is any type not named here. A number is then held to
+    // its setting's range (settingRange): clamped into it, or for a setting
+    // whose row is a dropdown moved to the nearest value the dropdown has,
+    // with @a adjusted, where given, told it was moved. The one place a
+    // value from outside is judged.
+    bool sanitizeLookValue(const std::string& control_name, const std::string& control_type, const LLSD& value, LLSD& sanitized,
+                           bool* adjusted = nullptr);
+
+    // What a setting a Look carries may hold: what its row in the Lightbox
+    // offers -- a slider's ends, a colour wheel's or a swatch's per channel,
+    // or the values of a dropdown -- so that a Look from outside renders
+    // nothing the Lightbox could not show, and that touching the row does
+    // not snap back. Each channel of a Vector3 or Color3 is held to the same
+    // ends. scripts/content_tools/check_look_ranges.py holds this to the
+    // rows themselves, to the list of settings a Look carries and to the
+    // bundled Looks.
+    struct SettingRange
+    {
+        F64              lo = 0.0;
+        F64              hi = 0.0;
+        // Where not empty, the only values a whole-number setting may take.
+        std::vector<S32> choices;
+    };
+    // The range a setting is held to, or null for one that has none: a
+    // switch, the LUT's name, the tone curves.
+    const SettingRange* settingRange(const std::string& control_name);
 
     // The file extensions a colour LUT may have: what the Lightbox's picker
     // lists, and what a shared Look may name. The renderer decodes a .cube

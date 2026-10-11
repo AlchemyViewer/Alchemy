@@ -58,15 +58,30 @@ namespace ALLookNotecard
             // Read, but it does not hold a Look.
             NotALook,
             // A Look, but it could not be written into the Looks folder.
-            NotSaved
+            NotSaved,
+            // A Look, but with nothing in it this viewer can use: every
+            // setting unknown here or refused. `counts` says how many.
+            NothingUsable
         };
         Failure     failure = Failure::None;
         std::string reason;
 
         // The name the Look was saved under, and the name the notecard
-        // asked for where that was taken by a different Look.
+        // asked for.
         std::string lookName;
         std::string wantedName;
+        // Why those differ, where they do: a different Look (or a file)
+        // already had the name; the name is Neutral's, or the default
+        // preset's, which no Look from outside may take; or the name was
+        // cut to fit the path a Look's file is written at.
+        enum class Renamed : U8
+        {
+            No,
+            Taken,
+            Reserved,
+            Shortened
+        };
+        Renamed renamed = Renamed::No;
         // An identical Look already stood under that name: nothing was
         // written, and that one is the Look to apply.
         bool alreadyHad = false;

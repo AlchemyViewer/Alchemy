@@ -117,22 +117,25 @@ public:
     /// What a Look's map says about one setting: nothing; a value that is
     /// refused (ALLookFormat::sanitizeLookValue, by the setting's own type,
     /// or no such setting, or an entry without a Value); or a value as it
-    /// is to be written, in `clean`. `ctrl`, where asked for, is the
-    /// setting itself, null where there is none.
+    /// is to be written, in `clean` -- held to the setting's range, and
+    /// `adjusted`, where asked for, told whether that moved it. `ctrl`, where
+    /// asked for, is the setting itself, null where there is none.
     enum class LookEntry
     {
         Absent,
         Refused,
         Taken
     };
-    LookEntry judgeLookEntry(const LLSD& settings, const std::string& ctrl_name, LLSD& clean, LLControlVariable** ctrl = nullptr);
+    LookEntry judgeLookEntry(const LLSD& settings, const std::string& ctrl_name, LLSD& clean, LLControlVariable** ctrl = nullptr,
+                             bool* adjusted = nullptr);
 
-    /// What was taken from a Look as it was applied or saved: written,
-    /// present but malformed and so skipped, and not a Look's setting at
-    /// all and so ignored.
+    /// What was taken from a Look as it was applied or saved: written (and
+    /// of those, how many were moved into their setting's range), present
+    /// but malformed, and not a Look's setting at all and so ignored.
     struct LookSettingCounts
     {
         S32 accepted = 0;
+        S32 adjusted = 0;
         S32 rejected = 0;
         S32 unknown  = 0;
     };
@@ -149,11 +152,21 @@ public:
     /// setting's own default in place of each that does not, so that the
     /// file is the full snapshot a saved Look is.
     /// Nothing is applied, and the active Look is not changed; the list
-    /// signal fires. False where the name is reserved, nothing passed, or
-    /// the file could not be written.
-    bool saveSharedLook(const std::string& name, const LLSD& shared_settings, LookSettingCounts& counts);
+    /// signal fires where it is saved.
+    enum class SharedLookSave
+    {
+        Saved,
+        // Nothing in it this viewer can use: every setting unknown here
+        // (a newer viewer's) or refused. `counts` says how many of each.
+        NothingUsable,
+        // The name is one no Look may have, or the file could not be written.
+        NotWritten
+    };
+    SharedLookSave saveSharedLook(const std::string& name, const LLSD& shared_settings, LookSettingCounts& counts);
     /// Whether the Look saved under `name` holds exactly the values a Look
-    /// from outside does, setting for setting, as each would be written.
+    /// from outside does, setting for setting, as each would be written --
+    /// and, on a side that is a full snapshot (applyLookSettings), a setting
+    /// it lacks as the default applying it would put there.
     bool lookHoldsSameSettings(const std::string& name, const LLSD& shared_settings);
     // The single source of truth for what a Look carries. Public because the
     // Lightbox's undo stack watches exactly this list: a setting worth saving

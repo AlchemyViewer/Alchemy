@@ -33,8 +33,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <locale>
+#include <map>
 #include <sstream>
 
 namespace
@@ -153,7 +155,203 @@ namespace
         text = NOTE + xml.str();
         return true;
     }
+
+    // Each setting's row in the Lightbox (panel_lightbox_look.xml,
+    // panel_lightbox_lens.xml): a slider's min_val and max_val, a colour
+    // wheel's min_value and max_value, a swatch's 0 to 1 per channel, a
+    // dropdown's item values. check_look_ranges.py reads this table and the
+    // rows, and fails where they part.
+    const std::map<std::string, ALLookFormat::SettingRange>& settingRanges()
+    {
+        using R = ALLookFormat::SettingRange;
+        static const std::map<std::string, R> ranges = {
+            // Look: tone mapping and exposure
+            { "RenderExposure", R{ 0.5, 4.0, {} } },
+            { "AlchemyRenderTonemapType", R{ 0.0, 6.0, { 0, 1, 2, 3, 4, 5, 6 } } },
+            { "RenderTonemapMix", R{ 0.0, 1.0, {} } },
+            { "RenderTonemapACESWhite", R{ 1.0, 16.0, {} } },
+            { "RenderTonemapReinhardWhite", R{ 1.0, 16.0, {} } },
+            { "RenderTonemapFilmicWhite", R{ 1.0, 16.0, {} } },
+            { "RenderTonemapAgxContrast", R{ 0.5, 2.5, {} } },
+            { "RenderTonemapAgxWhite", R{ 1.0, 32.0, {} } },
+            { "AlchemyExposureCompensation", R{ -4.0, 4.0, {} } },
+            { "AlchemyExposureMinEV", R{ -8.0, 0.0, {} } },
+            { "AlchemyExposureMaxEV", R{ 0.0, 8.0, {} } },
+            { "AlchemyExposureLowPercent", R{ 0.0, 50.0, {} } },
+            { "AlchemyExposureHighPercent", R{ 50.0, 100.0, {} } },
+            { "AlchemyExposureSpeedUp", R{ 0.1, 10.0, {} } },
+            { "AlchemyExposureSpeedDown", R{ 0.1, 10.0, {} } },
+            { "AlchemyExposureMeteringMode", R{ 0.0, 2.0, { 0, 1, 2 } } },
+            { "AlchemyExposureSkyWeight", R{ 0.0, 1.0, {} } },
+            // Look: colour grade
+            { "RenderColorGradeLUTStrength", R{ 0.0, 1.0, {} } },
+            { "RenderColorGradeBrightness", R{ -0.5, 0.5, {} } },
+            { "RenderColorGradeContrast", R{ 0.0, 2.0, {} } },
+            { "RenderColorGradeSaturation", R{ 0.0, 2.0, {} } },
+            { "RenderColorGradeVibrance", R{ -1.0, 1.0, {} } },
+            { "RenderColorGradeHighlights", R{ -1.0, 1.0, {} } },
+            { "RenderColorGradeShadows", R{ -1.0, 1.0, {} } },
+            { "RenderColorGradeHueShift", R{ -180.0, 180.0, {} } },
+            { "RenderColorGradeBlackPoint", R{ 0.0, 0.5, {} } },
+            { "RenderColorGradeWhitePoint", R{ 0.5, 1.0, {} } },
+            { "RenderColorGradeWhiteBalanceCCT", R{ -5000.0, 5000.0, {} } },
+            { "RenderColorGradeWhiteBalanceDuv", R{ -1.0, 1.0, {} } },
+            { "RenderColorGradeLift", R{ -0.5, 0.5, {} } },
+            { "RenderColorGradeGamma", R{ 0.5, 1.5, {} } },
+            { "RenderColorGradeGain", R{ 0.5, 1.5, {} } },
+            { "RenderColorGradeCurveAmount", R{ 0.0, 1.0, {} } },
+            { "RenderSplitToneAmount", R{ 0.0, 1.0, {} } },
+            { "RenderSplitToneBalance", R{ -1.0, 1.0, {} } },
+            { "RenderSplitToneShadowTint", R{ 0.0, 1.0, {} } },
+            { "RenderSplitToneHighlightTint", R{ 0.0, 1.0, {} } },
+            { "RenderSplitToneMidtoneTint", R{ 0.0, 1.0, {} } },
+            { "RenderSplitToneMidtoneAmount", R{ 0.0, 1.0, {} } },
+            { "RenderSplitToneShadowWidth", R{ 0.02, 0.5, {} } },
+            { "RenderSplitToneHighlightWidth", R{ 0.02, 0.5, {} } },
+            // Lens: bloom and glow
+            { "RenderBloomStrength", R{ 0.0, 2.0, {} } },
+            { "RenderBloomThreshold", R{ 0.0, 8.0, {} } },
+            { "RenderBloomKnee", R{ 0.0, 1.0, {} } },
+            { "RenderBloomScatter", R{ 0.5, 2.5, {} } },
+            { "RenderBloomAlphaGlowBoost", R{ 0.0, 8.0, {} } },
+            { "RenderBloomHalationStrength", R{ 0.0, 1.0, {} } },
+            { "RenderBloomHalationTint", R{ 0.0, 1.0, {} } },
+            { "RenderGlowStrength", R{ 0.0, 1.0, {} } },
+            { "RenderGlowWidth", R{ 0.0, 4.0, {} } },
+            { "RenderGlowIterations", R{ 1.0, 8.0, {} } },
+            { "RenderGlowLumWeights", R{ 0.0, 1.0, {} } },
+            { "RenderGlowMaxExtractAlpha", R{ 0.0, 1.0, {} } },
+            { "RenderGlowMinLuminance", R{ 0.0, 10000.0, {} } },
+            { "RenderGlowWarmthAmount", R{ 0.0, 1.0, {} } },
+            { "RenderGlowWarmthWeights", R{ 0.0, 2.0, {} } },
+            // Lens: flare
+            { "RenderLensFlareStrength", R{ 0.0, 1.0, {} } },
+            { "RenderLensFlareStreakLength", R{ 0.01, 2.0, {} } },
+            { "RenderLensFlareStreakFalloff", R{ 0.1, 10.0, {} } },
+            { "RenderLensFlareStreakThickness", R{ 0.0, 1.0, {} } },
+            { "RenderLensFlareStreakIntensity", R{ 0.0, 5.0, {} } },
+            { "RenderLensFlareStreakTint", R{ 0.0, 1.0, {} } },
+            { "RenderLensFlareChromaticSpread", R{ 0.0, 1.0, {} } },
+            { "RenderLensFlareGlow", R{ 0.0, 5.0, {} } },
+            { "RenderLensFlareGlowRadius", R{ 0.01, 0.5, {} } },
+            { "RenderLensFlareGlowFalloff", R{ 1.0, 30.0, {} } },
+            { "RenderLensFlareGhost", R{ 0.0, 5.0, {} } },
+            { "RenderLensFlareGhostCount", R{ 0.0, 8.0, {} } },
+            { "RenderLensFlareGhostSpacing", R{ 0.1, 1.0, {} } },
+            { "RenderLensFlareHalo", R{ 0.0, 5.0, {} } },
+            { "RenderLensFlareHaloRadius", R{ 0.01, 1.0, {} } },
+            { "RenderLensFlareHaloWidth", R{ 0.01, 0.5, {} } },
+            { "RenderLensFlareStarburst", R{ 0.0, 5.0, {} } },
+            { "RenderLensFlareStarburstSpikes", R{ 1.0, 32.0, {} } },
+            { "RenderLensFlareStarburstSharpness", R{ 1.0, 256.0, {} } },
+            { "RenderLensFlareStarburstLength", R{ 0.0, 1.0, {} } },
+            { "RenderLensFlareOcclusionScale", R{ 0.25, 2.0, {} } },
+            { "RenderLensFlareFadeTime", R{ 0.1, 1.0, {} } },
+            // Lens: chromatic aberration and distortion
+            { "RenderChromaticAberrationStrength", R{ 0.0, 1.0, {} } },
+            { "RenderChromaticAberrationFalloff", R{ 0.5, 4.0, {} } },
+            { "RenderChromaticAberrationAngle", R{ 0.0, 360.0, {} } },
+            { "RenderChromaticAberrationAnisotropy", R{ -1.0, 1.0, {} } },
+            { "RenderChromaticAberrationOffsetRX", R{ -1.0, 1.0, {} } },
+            { "RenderChromaticAberrationOffsetRY", R{ -1.0, 1.0, {} } },
+            { "RenderChromaticAberrationOffsetBX", R{ -1.0, 1.0, {} } },
+            { "RenderChromaticAberrationOffsetBY", R{ -1.0, 1.0, {} } },
+            { "RenderLensDistortionAmount", R{ 0.0, 1.0, {} } },
+            { "RenderLensDistortionK1", R{ -0.5, 0.5, {} } },
+            { "RenderLensDistortionK2", R{ -0.25, 0.25, {} } },
+            { "RenderLensDistortionSqueeze", R{ 0.5, 2.5, {} } },
+            { "RenderLensDistortionFit", R{ 0.0, 2.0, { 0, 1, 2 } } },
+            { "RenderLensDistortionCenter", R{ -0.5, 0.5, {} } },
+            { "RenderLensDistortionTangential", R{ -0.05, 0.05, {} } },
+            // Lens: bokeh
+            { "RenderBokehHighlightGain", R{ 0.0, 4.0, {} } },
+            { "RenderBokehHighlightThreshold", R{ 0.0, 8.0, {} } },
+            { "RenderBokehApertureBlades", R{ 0.0, 11.0, { 0, 3, 5, 6, 7, 8, 9, 11 } } },
+            { "RenderBokehApertureRotation", R{ 0.0, 360.0, {} } },
+            { "RenderBokehApertureCurvature", R{ 0.0, 1.0, {} } },
+            { "RenderBokehAnamorphicSqueeze", R{ 0.25, 4.0, {} } },
+            { "RenderBokehCatEyeAmount", R{ 0.0, 1.5, {} } },
+            { "RenderBokehFringeAmount", R{ 0.0, 1.0, {} } },
+            { "RenderBokehFringeNearTint", R{ 0.0, 1.0, {} } },
+            { "RenderBokehFringeFarTint", R{ 0.0, 1.0, {} } },
+            { "RenderBokehSphericalAberration", R{ -1.0, 1.0, {} } },
+            { "RenderBokehFieldStretch", R{ -1.0, 1.0, {} } },
+            { "RenderBokehFieldFalloff", R{ 1.0, 4.0, {} } },
+            { "RenderBokehComaAsymmetry", R{ 0.0, 1.0, {} } },
+            // Lens: cross filter and dirt
+            { "RenderCrossFilterStrength", R{ 0.0, 32.0, {} } },
+            { "RenderCrossFilterPoints", R{ 2.0, 12.0, { 2, 3, 4, 6, 8, 12 } } },
+            { "RenderCrossFilterAngle", R{ 0.0, 360.0, {} } },
+            { "RenderCrossFilterLength", R{ 0.25, 2.0, {} } },
+            { "RenderCrossFilterFalloff", R{ 0.1, 3.0, {} } },
+            { "RenderCrossFilterChromatic", R{ 0.0, 1.0, {} } },
+            { "RenderLensDirtStrength", R{ 0.0, 2.0, {} } },
+            { "RenderLensDirtBloomResponse", R{ 0.0, 2.0, {} } },
+            { "RenderLensDirtFlareResponse", R{ 0.0, 2.0, {} } },
+            { "RenderLensDirtGrime", R{ 0.0, 2.0, {} } },
+            { "RenderLensDirtMoteScale", R{ 0.5, 2.0, {} } },
+            { "RenderLensDirtSmudge", R{ 0.0, 2.0, {} } },
+            { "RenderLensDirtScratches", R{ 0.0, 32.0, {} } },
+            { "RenderLensDirtSeed", R{ 0.0, 999.0, {} } },
+            { "RenderLensDirtToe", R{ 0.6, 4.0, {} } },
+            { "RenderLensDirtGain", R{ 0.5, 2.5, {} } },
+            // Lens: vignette, grain and sharpening
+            { "RenderVignetteAmount", R{ 0.0, 1.0, {} } },
+            { "RenderVignetteCenter", R{ -0.5, 0.5, {} } },
+            { "RenderVignetteColor", R{ 0.0, 1.0, {} } },
+            { "RenderVignetteFeather", R{ 0.2, 4.0, {} } },
+            { "RenderVignetteMidColor", R{ 0.0, 1.0, {} } },
+            { "RenderVignetteMidPoint", R{ 0.0, 1.0, {} } },
+            { "RenderVignetteRadius", R{ 0.25, 1.5, {} } },
+            { "RenderVignetteShape", R{ 0.0, 1.0, {} } },
+            { "RenderVignetteSoft", R{ 0.0, 1.0, {} } },
+            { "RenderFilmGrainAmount", R{ 0.0, 1.0, {} } },
+            { "RenderFilmGrainRange", R{ 0.0, 1.0, {} } },
+            { "RenderFilmGrainSize", R{ 1.0, 8.0, {} } },
+            { "RenderFilmGrainStyle", R{ 0.0, 3.0, { 0, 1, 2, 3 } } },
+            { "RenderFilmGrainTint", R{ 0.0, 1.0, {} } },
+            { "RenderCASSharpness", R{ 0.0, 1.0, {} } },
+        };
+        return ranges;
+    }
+
+    // A number held to a range: clamped, and `moved` set where it was.
+    F64 heldTo(F64 value, const ALLookFormat::SettingRange& range, bool& moved)
+    {
+        const F64 held = llclamp(value, range.lo, range.hi);
+        moved          = moved || held != value;
+        return held;
+    }
+
+    // A whole number held to a range: to the nearest of its choices where it
+    // has them (the lower of two as near), clamped where it does not.
+    S32 wholeHeldTo(S32 value, const ALLookFormat::SettingRange& range, bool& moved)
+    {
+        if (range.choices.empty())
+        {
+            const S32 held = static_cast<S32>(llclamp(static_cast<F64>(value), range.lo, range.hi));
+            moved          = moved || held != value;
+            return held;
+        }
+        S32 nearest = range.choices.front();
+        for (const S32 choice : range.choices)
+        {
+            if (std::llabs(static_cast<S64>(choice) - value) < std::llabs(static_cast<S64>(nearest) - value))
+            {
+                nearest = choice;
+            }
+        }
+        moved = moved || nearest != value;
+        return nearest;
+    }
 } // namespace
+
+const ALLookFormat::SettingRange* ALLookFormat::settingRange(const std::string& control_name)
+{
+    const auto& ranges = settingRanges();
+    const auto  found  = ranges.find(control_name);
+    return found == ranges.end() ? nullptr : &found->second;
+}
 
 LLSD ALLookFormat::settingsWithoutDescriptions(const LLSD& look_file_params)
 {
@@ -246,8 +444,25 @@ bool ALLookFormat::looksLikeLookNotecard(std::string_view text)
     return text.substr(0, DETECT_WINDOW).find(marker) != std::string_view::npos;
 }
 
-bool ALLookFormat::sanitizeLookValue(const std::string& control_name, const std::string& control_type, const LLSD& value, LLSD& sanitized)
+bool ALLookFormat::sanitizeLookValue(const std::string& control_name, const std::string& control_type, const LLSD& value, LLSD& sanitized,
+                                     bool* adjusted)
 {
+    // Moved into the setting's range, where it has one and the value was
+    // outside it.
+    bool                moved = false;
+    const SettingRange* range = settingRange(control_name);
+    if (adjusted)
+    {
+        *adjusted = false;
+    }
+    const auto          said  = [&moved, adjusted]() {
+        if (adjusted)
+        {
+            *adjusted = moved;
+        }
+        return true;
+    };
+
     if (control_type == "F32")
     {
         F64 real = 0.0;
@@ -255,15 +470,23 @@ bool ALLookFormat::sanitizeLookValue(const std::string& control_name, const std:
         {
             return false;
         }
-        sanitized = LLSD::Real(real);
-        return true;
+        sanitized = LLSD::Real(range ? heldTo(real, *range, moved) : real);
+        return said();
     }
     if (control_type == "S32" || control_type == "U32")
     {
         // A U32 setting keeps its value as a signed Integer in LLSD
         // (convert_to_llsd<U32> in llcontrol.cpp), so it is taken in that
         // form too.
-        return wholeNumber(value, sanitized);
+        if (!wholeNumber(value, sanitized))
+        {
+            return false;
+        }
+        if (range)
+        {
+            sanitized = LLSD::Integer(wholeHeldTo(sanitized.asInteger(), *range, moved));
+        }
+        return said();
     }
     if (control_type == "Boolean")
     {
@@ -355,10 +578,10 @@ bool ALLookFormat::sanitizeLookValue(const std::string& control_name, const std:
             {
                 return false;
             }
-            triple.append(LLSD::Real(component));
+            triple.append(LLSD::Real(range ? heldTo(component, *range, moved) : component));
         }
         sanitized = triple;
-        return true;
+        return said();
     }
     if (control_type == "LLSD")
     {

@@ -1262,8 +1262,14 @@ floats were single precision; SLua's numbers are doubles, which do neither.</str
 	<string name="LightBoxLookImportFallbackName">Shared Look</string>
 	<string name="LightBoxLookImportUndoNote">Ctrl+Z in the Lightbox takes it back.</string>
 	<string name="LightBoxLookImportRenamedNote">You already had a different Look called '&lt;nolink&gt;[WANTED]&lt;/nolink&gt;', so this one is called '&lt;nolink&gt;[NAME]&lt;/nolink&gt;'.</string>
+	<string name="LightBoxLookImportReservedNote">The name '&lt;nolink&gt;[WANTED]&lt;/nolink&gt;' is kept for the Look that comes with the viewer, so this one is called '&lt;nolink&gt;[NAME]&lt;/nolink&gt;'.</string>
+	<string name="LightBoxLookImportShortenedNote">The name '&lt;nolink&gt;[WANTED]&lt;/nolink&gt;' is too long for a file in your Looks folder, so this Look is called '&lt;nolink&gt;[NAME]&lt;/nolink&gt;'.</string>
 	<string name="LightBoxLookImportUnknownNote">[COUNT] settings this viewer does not have were left out.</string>
-	<string name="LightBoxLookImportIgnoredNote">[COUNT] settings were not valid and were ignored.</string>
+	<string name="LightBoxLookImportUnknownNoteOne">1 setting this viewer does not have was left out.</string>
+	<string name="LightBoxLookImportIgnoredNote">[COUNT] settings were not valid, and are set to their defaults.</string>
+	<string name="LightBoxLookImportIgnoredNoteOne">1 setting was not valid, and is set to its default.</string>
+	<string name="LightBoxLookImportAdjustedNote">[COUNT] settings were outside what the Lightbox offers, and were brought within it.</string>
+	<string name="LightBoxLookImportAdjustedNoteOne">1 setting was outside what the Lightbox offers, and was brought within it.</string>
 
 	<!-- ToolTips for notecards -->
 	<string name="TooltipNotecardNotAllowedTypeDrop">
