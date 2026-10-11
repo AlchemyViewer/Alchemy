@@ -3250,7 +3250,7 @@ void LLPipeline::doOcclusion(LLCamera& camera)
 
     if (sReflectionProbesEnabled && sUseOcclusion > 1 && !LLPipeline::sShadowRender && !gCubeSnapshot)
     {
-        gGL.setColorMask(false, false);
+        LLGLSColorMask color_mask(false, false);
         LLGLDepthTest depth(GL_TRUE, GL_FALSE);
         LLGLDisable cull(GL_CULL_FACE);
 
@@ -3265,8 +3265,6 @@ void LLPipeline::doOcclusion(LLCamera& camera)
         mReflectionMapManager.doOcclusion();
         mHeroProbeManager.doOcclusion();
         gOcclusionCubeProgram.unbind();
-
-        gGL.setColorMask(true, true);
     }
 
     if (LLPipeline::sUseOcclusion > 1 &&
@@ -3274,7 +3272,7 @@ void LLPipeline::doOcclusion(LLCamera& camera)
     {
         LLVertexBuffer::unbind();
 
-        gGL.setColorMask(false, false);
+        LLGLSColorMask color_mask(false, false);
 
         LLGLDisable blend(GL_BLEND);
         gGL.getTextureSlot(0)->unbind();
@@ -3310,8 +3308,6 @@ void LLPipeline::doOcclusion(LLCamera& camera)
                 vo_part->processOccluders(&camera);
             }
         }
-
-        gGL.setColorMask(true, true);
     }
 }
 
