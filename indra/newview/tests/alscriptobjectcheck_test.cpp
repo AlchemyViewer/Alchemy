@@ -40,40 +40,15 @@
 #include <set>
 #include <sstream>
 
-// The lints as a scripter chose them are the viewer's settings: here, every
-// warning named "off" dropped.
-void ALScriptLints::apply(ALScriptProblems& problems)
-{
-    problems.erase(std::remove_if(problems.begin(), problems.end(), [](const ALScriptProblem& p) { return p.code == "off"; }), problems.end());
-}
-ALLuauConfig ALScriptLints::luauBase()
-{
-    return ALLuauConfig();
-}
-std::string alScriptKeyedWords(const std::string&, const std::vector<std::string>&, const std::string& english)
-{
-    return english;
-}
-bool ALScriptPreprocessor::fileOf(const std::string& path, std::string& file)
-{
-    if (path.rfind("disk:", 0) != 0)
-    {
-        return false;
-    }
-    file = path.substr(5);
-    return !file.empty();
-}
-std::string ALScriptPreprocessor::pathOf(const ALScriptRef& ref)
-{
-    return "object:" + ref.object.asString() + ":" + ref.item.asString();
-}
-std::string ALScriptModules::identity(const std::string& path)
-{
-    return path;
-}
-
 namespace
 {
+    // The lints as a scripter chose them are the viewer's settings: here,
+    // every warning named "off" dropped.
+    void applyLints(ALScriptProblems& problems)
+    {
+        problems.erase(std::remove_if(problems.begin(), problems.end(), [](const ALScriptProblem& p) { return p.code == "off"; }), problems.end());
+    }
+
     typedef ALScriptObjectCheck Check;
     typedef Check::Window       Window;
 
@@ -173,6 +148,7 @@ namespace tut
 {
     struct alscriptobjectcheck_data
     {
+        al_studio_test::ChosenLints  lints{ applyLints };
         al_studio_test::FakeServices services;
         FakeWindow                   window;
         Check                        check{ services, window, window };

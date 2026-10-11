@@ -31,15 +31,9 @@
 #include "llkeyboard.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
-
-class LLAvatarName;
-const std::string gFindBarTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gFindBarTestAnonName;
-}
 
 namespace tut
 {
@@ -129,7 +123,7 @@ namespace tut
         ensure("another letter is not the bar's", !bar->handleKeyHere('Q', toggle));
         ensure("nor the letter with another mask", !bar->handleKeyHere('C', MASK_SHIFT));
         // The viewer gives the keys their names; here, as they are.
-        LLKeyboard::setStringTranslatorFunc([](std::string_view name) { return std::string(name); });
+        ll_test::KeyNamesScope key_names([](std::string_view name) { return std::string(name); });
         const std::string tip = bar->getChild<LLUICtrl>("match_case")->getToolTip();
         ensure("the tip says the key: " + tip, tip.find(LLKeyboard::stringFromAccelerator(toggle, 'C')) != std::string::npos);
         bar->die();
@@ -163,7 +157,7 @@ namespace tut
         bar->setCount(-1, 0, std::string());
         field->handleKey(KEY_RETURN, replace_all, false);
         ensure_equals("with nothing found, nothing", every, 1);
-        LLKeyboard::setStringTranslatorFunc([](std::string_view name) { return std::string(name); });
+        ll_test::KeyNamesScope key_names([](std::string_view name) { return std::string(name); });
         const std::string tip = bar->getChild<LLUICtrl>("replace_all")->getToolTip();
         ensure("the tip says the key: " + tip, tip.find(LLKeyboard::stringFromAccelerator(replace_all, KEY_RETURN)) != std::string::npos);
         bar->setCount(0, 3, std::string(), false, 1);

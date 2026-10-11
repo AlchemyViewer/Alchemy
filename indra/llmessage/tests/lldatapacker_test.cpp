@@ -37,10 +37,12 @@
 #include "v3math.h"
 #include "v4math.h"
 #include "llsdserialize.h"
+#include "../test/namedtempfile.h"
 
-#define TEST_FILE_NAME  "datapacker_test.txt"
 
 namespace tut
+{
+namespace
 {
     struct datapacker_test
     {
@@ -48,6 +50,7 @@ namespace tut
     typedef test_group<datapacker_test> datapacker_test_t;
     typedef datapacker_test_t::object datapacker_test_object_t;
     tut::datapacker_test_t tut_datapacker_test("datapacker_test");
+}
 
     //*********LLDataPackerBinaryBuffer
     template<> template<>
@@ -348,7 +351,10 @@ namespace tut
     {
         F32 f_val = 44.44f, f_unpkval;
 
-        LLFILE* fp = LLFile::fopen(TEST_FILE_NAME, LLFILE_MODE("w+"));
+        // A file of the test's own, where no other run writes, removed as
+        // the test ends.
+        NamedTempFile file("datapacker_test", "", ".txt");
+        LLFILE* fp = LLFile::fopen(file.getPath().string(), LLFILE_MODE("w+"));
         if(!fp)
         {
             LL_ERRS() << "File couldnt be open" << LL_ENDL;
@@ -403,7 +409,10 @@ namespace tut
         LLVector4 unpkllvec4;
         LLUUID unpkuuid;
 
-        LLFILE* fp = LLFile::fopen(TEST_FILE_NAME, LLFILE_MODE("w+"));
+        // A file of the test's own, where no other run writes, removed as
+        // the test ends.
+        NamedTempFile file("datapacker_test", "", ".txt");
+        LLFILE* fp = LLFile::fopen(file.getPath().string(), LLFILE_MODE("w+"));
         if(!fp)
         {
             LL_ERRS() << "File couldnt be open" << LL_ENDL;

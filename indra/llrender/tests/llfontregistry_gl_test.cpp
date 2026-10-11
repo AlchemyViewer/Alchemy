@@ -52,7 +52,9 @@ namespace tut
     // A fixture that owns a local LLFontRegistry with
     // create_gl_textures=true over the GL context llheadlessgl_fixture.h
     // stands up. The pure-CPU suite in llfontregistry_test.cpp keeps its
-    // own create_gl_textures=false fixture and pays for no GL.
+    // own create_gl_textures=false fixture and pays for no GL. Both keep
+    // their names and namespace, outside the anonymous one:
+    // llfontregistry.h friends them by name.
 
     namespace
     {
@@ -151,7 +153,10 @@ namespace tut
 
     typedef test_group<llfontregistry_gl_data> llfontregistry_gl_test;
     typedef llfontregistry_gl_test::object     llfontregistry_gl_object;
+namespace
+{
     tut::llfontregistry_gl_test llfontregistry_gl_testcase("LLFontRegistry-GL");
+}
 
     // createFont with mCreateGLTextures=true must produce a head whose
     // bitmap cache, after rasterizing the ASCII range, has at least one

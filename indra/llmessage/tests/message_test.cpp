@@ -29,8 +29,8 @@
 #include "linden_common.h"
 #include "lltut.h"
 #include "llhttpconstants.h"
-#include "llapr.h"
 #include "llmessageconfig.h"
+#include "llmessagesystem_fixture.h"
 #include "llsdserialize.h"
 #include "message.h"
 #include "message_prehash.h"
@@ -52,36 +52,17 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct LLMessageSystemTestData
     {
+        // currently test disconnected message system
+        ll_test::MessageSystemScope mMessageSystem;
         std::string mTestConfigDir;
         std::string mSep;
 
         LLMessageSystemTestData()
         {
-            static bool init = false;
-            if(!init)
-            {
-                ll_init_apr();
-                //init_prehash_data();
-                init = true;
-            }
-            const F32 circuit_heartbeat_interval=5;
-            const F32 circuit_timeout=100;
-
-
-            // currently test disconnected message system
-            start_messaging_system("notafile", 13035,
-                                   1,
-                                   0,
-                                   0,
-                                   false,
-                                   "notasharedsecret",
-                                   NULL,
-                                   false,
-                                   circuit_heartbeat_interval,
-                                   circuit_timeout
-                                   );
             // generate temp dir
             std::ostringstream ostr;
 #if LL_WINDOWS
@@ -100,21 +81,23 @@ namespace tut
             LLMessageConfig::initClass("simulator", ostr.str());
         }
 
+        // A destructor cannot fail a test, so the clean-up only says what
+        // it could not remove.
         ~LLMessageSystemTestData()
         {
-            // not end_messaging_system()
-            delete static_cast<LLMessageSystem*>(gMessageSystem);
-            gMessageSystem = NULL;
-
             // rm contents of temp dir
             std::ostringstream ostr;
             ostr << mTestConfigDir << mSep << "message.xml";
-            int rmfile = LLFile::remove(ostr.str());
-            ensure_equals("rmfile value", rmfile, 0);
+            if (LLFile::remove(ostr.str()) != 0)
+            {
+                LL_WARNS() << "Could not remove " << ostr.str() << LL_ENDL;
+            }
 
             // rm temp dir
-            int rmdir = LLFile::remove(mTestConfigDir);
-            ensure_equals("rmdir value", rmdir, 0);
+            if (LLFile::remove(mTestConfigDir) != 0)
+            {
+                LL_WARNS() << "Could not remove " << mTestConfigDir << LL_ENDL;
+            }
         }
 
         void writeConfigFile(const LLSD& config)
@@ -132,6 +115,7 @@ namespace tut
     typedef test_group<LLMessageSystemTestData> LLMessageSystemTestGroup;
     typedef LLMessageSystemTestGroup::object        LLMessageSystemTestObject;
     LLMessageSystemTestGroup messageTestGroup("LLMessageSystem");
+}
 
     template<> template<>
     void LLMessageSystemTestObject::test<1>()

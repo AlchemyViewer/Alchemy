@@ -194,6 +194,16 @@ namespace tut
             return ALPreprocessor::run(ended(source, ending), o);
         }
 
+        // The grid's builtins, which the optimizer and const folding read. A
+        // test that needs them asks for them itself: Tailslide keeps them for
+        // the process once loaded, so whichever asks first loads them.
+        static void ensureGridBuiltins()
+        {
+            ALLSLService service;
+            std::string  error;
+            ensure("builtins: " + error, service.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error));
+        }
+
         // The same but the notes of a require nothing reads, which a script
         // made to try something else may leave about (test 50 tries them).
         static std::string faults(const ALPreprocessor::Result& r)
@@ -660,11 +670,7 @@ namespace tut
     void alpreprocessor_object::test<13>()
     {
         set_test_name("the optimizer runs over the expanded text, and its notes come back to the source");
-        {
-            ALLSLService service;
-            std::string  error;
-            ensure("builtins: " + error, service.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error));
-        }
+        ensureGridBuiltins();
         add("consts.lsl", "#define CHANNEL 7\ninteger unused = 1;\n");
         ALPreprocessor::Options o = options();
         o.optimize                = true;
@@ -1192,11 +1198,7 @@ namespace tut
     void alpreprocessor_object::test<28>()
     {
         set_test_name("the optimizer's run, weighed, says what it saved in code: the whole, and each note what its lines came to less");
-        {
-            ALLSLService service;
-            std::string  error;
-            ensure("builtins: " + error, service.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error));
-        }
+        ensureGridBuiltins();
         const std::string source = "integer unused(integer n)\n"
                                    "{\n"
                                    "    return n * 3;\n"
@@ -1249,11 +1251,7 @@ namespace tut
     void alpreprocessor_object::test<29>()
     {
         set_test_name("a script that does not compile is not the preprocessor's error: the optimizer stands aside with a note where the first error is");
-        {
-            ALLSLService service;
-            std::string  error;
-            ensure("builtins: " + error, service.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error));
-        }
+        ensureGridBuiltins();
         // Nexii's library, whose ObjectLinksetSittingAvatars has a parameter
         // without its type, included as a save would include it.
         llifstream        in(std::string(AL_ALSCRIPT_TEST_DIR) + "/preprocessor/include/linkset.lsl", std::ios::binary);
@@ -1514,6 +1512,7 @@ namespace tut
     void alpreprocessor_object::test<39>()
     {
         set_test_name("a function marked inline in any of the ways a mark is written, at the top of the script, and the marks taken off with the extensions off");
+        ensureGridBuiltins();
         ALPreprocessor::Options o = options();
         o.extensions              = true;
         ALPreprocessor::Result r  = ALPreprocessor::run("integer f(integer a) inline { return a; }\n"
@@ -1554,6 +1553,7 @@ namespace tut
     void alpreprocessor_object::test<40>()
     {
         set_test_name("const before a type is taken off, and each name it declares said where it is, a function's as a function");
+        ensureGridBuiltins();
         const auto at = [](const ALPreprocessor::Result& r, size_t i, const std::string& name, S32 line, S32 column, bool function) {
             return i < r.consts.size() && r.consts[i].name == name && r.consts[i].line == line && r.consts[i].column == column &&
                    r.consts[i].function == function;
@@ -1838,7 +1838,7 @@ namespace tut
     // How often each module ran, as a module says it through `counted`,
     // a builtin of the VM, as SLua's are: a module's own globals are its
     // own, and what it sets is not the script's.
-    std::map<std::string, int> gRuns;
+    static std::map<std::string, int> gRuns;
 
     template<> template<>
     void alpreprocessor_object::test<48>()

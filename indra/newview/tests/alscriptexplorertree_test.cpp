@@ -39,15 +39,6 @@
 #include <string>
 #include <vector>
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gExplorerTreeTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gExplorerTreeTestAnonName;
-}
-
 // Two functors the folder view declares and the viewer's inventory code
 // defines; linking the folder view pulls them, and nothing here runs them.
 void LLOpenFilteredFolders::doFolder(LLFolderViewFolder* folder) {}

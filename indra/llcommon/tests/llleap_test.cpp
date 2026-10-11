@@ -45,7 +45,7 @@ const size_t BUFFERED_LENGTH = 1023*1024; // try wrangling just under a megabyte
 // capture std::weak_ptrs to LLLeap instances so we can tell when they expire
 typedef std::vector<std::weak_ptr<LLLeap>> LLLeapVector;
 
-void waitfor(const LLLeapVector& instances, int timeout=60)
+static void waitfor(const LLLeapVector& instances, int timeout=60)
 {
     int i;
     for (i = 0; i < timeout; ++i)
@@ -81,7 +81,7 @@ void waitfor(const LLLeapVector& instances, int timeout=60)
                 i < timeout);
 }
 
-void waitfor(LLLeap* instance, int timeout=60)
+static void waitfor(LLLeap* instance, int timeout=60)
 {
     LLLeapVector instances;
     instances.push_back(instance->getWeak());
@@ -307,67 +307,70 @@ namespace tut
         ensure("bad launch returned non-NULL", ! LLLeap::create("bad exe", BADPYTHON, false));
     }
 
-    // Generic self-contained listener: derive from this and override its
-    // call() method, then tell somebody to post on the pump named getName().
-    // Control will reach your call() override.
-    struct ListenerBase
+    namespace
     {
-        // Pass the pump name you want; will tweak for uniqueness.
-        ListenerBase(const std::string& name):
-            mPump(name, true)
+        // Generic self-contained listener: derive from this and override its
+        // call() method, then tell somebody to post on the pump named getName().
+        // Control will reach your call() override.
+        struct ListenerBase
         {
-            mPump.listen(name, boost::bind(&ListenerBase::call, this, _1));
-        }
+            // Pass the pump name you want; will tweak for uniqueness.
+            ListenerBase(const std::string& name):
+                mPump(name, true)
+            {
+                mPump.listen(name, boost::bind(&ListenerBase::call, this, _1));
+            }
 
-        virtual ~ListenerBase() {}  // pacify MSVC
+            virtual ~ListenerBase() {}  // pacify MSVC
 
-        virtual bool call(const LLSD& request)
+            virtual bool call(const LLSD& request)
+            {
+                return false;
+            }
+
+            LLEventPump& getPump() { return mPump; }
+            const LLEventPump& getPump() const { return mPump; }
+
+            std::string getName() const { return mPump.getName(); }
+            void post(const LLSD& data) { mPump.post(data); }
+
+            LLEventStream mPump;
+        };
+
+        // Mimic a dummy little LLEventAPI that merely sends a reply back to its
+        // requester on the "reply" pump.
+        struct AckAPI: public ListenerBase
         {
-            return false;
-        }
+            AckAPI(): ListenerBase("AckAPI") {}
 
-        LLEventPump& getPump() { return mPump; }
-        const LLEventPump& getPump() const { return mPump; }
+            virtual bool call(const LLSD& request)
+            {
+                LLEventPumps::instance().obtain(request["reply"]).post("ack");
+                return false;
+            }
+        };
 
-        std::string getName() const { return mPump.getName(); }
-        void post(const LLSD& data) { mPump.post(data); }
-
-        LLEventStream mPump;
-    };
-
-    // Mimic a dummy little LLEventAPI that merely sends a reply back to its
-    // requester on the "reply" pump.
-    struct AckAPI: public ListenerBase
-    {
-        AckAPI(): ListenerBase("AckAPI") {}
-
-        virtual bool call(const LLSD& request)
+        // Give LLLeap script a way to post success/failure.
+        struct Result: public ListenerBase
         {
-            LLEventPumps::instance().obtain(request["reply"]).post("ack");
-            return false;
-        }
-    };
+            Result(): ListenerBase("Result") {}
 
-    // Give LLLeap script a way to post success/failure.
-    struct Result: public ListenerBase
-    {
-        Result(): ListenerBase("Result") {}
+            virtual bool call(const LLSD& request)
+            {
+                mData = request;
+                return false;
+            }
 
-        virtual bool call(const LLSD& request)
-        {
-            mData = request;
-            return false;
-        }
+            void ensure() const
+            {
+                tut::ensure(std::string("never posted to ") + getName(), mData.isDefined());
+                // Post an empty string for success, non-empty string is failure message.
+                tut::ensure(mData, mData.asString().empty());
+            }
 
-        void ensure() const
-        {
-            tut::ensure(std::string("never posted to ") + getName(), mData.isDefined());
-            // Post an empty string for success, non-empty string is failure message.
-            tut::ensure(mData, mData.asString().empty());
-        }
-
-        LLSD mData;
-    };
+            LLSD mData;
+        };
+    } // anonymous namespace
 
     template<> template<>
     void object::test<8>()
@@ -390,17 +393,20 @@ namespace tut
         result.ensure();
     }
 
-    struct ReqIDAPI: public ListenerBase
+    namespace
     {
-        ReqIDAPI(): ListenerBase("ReqIDAPI") {}
-
-        virtual bool call(const LLSD& request)
+        struct ReqIDAPI: public ListenerBase
         {
-            // free function from llevents.h
-            sendReply(LLSD(), request);
-            return false;
-        }
-    };
+            ReqIDAPI(): ListenerBase("ReqIDAPI") {}
+
+            virtual bool call(const LLSD& request)
+            {
+                // free function from llevents.h
+                sendReply(LLSD(), request);
+                return false;
+            }
+        };
+    } // anonymous namespace
 
     template<> template<>
     void object::test<9>()
@@ -452,8 +458,8 @@ namespace tut
 
     // This is the body of test<10>, extracted so we can run it over a number
     // of large-message sizes.
-    void test_large_message(const std::string& PYTHON, const std::string& reader_module,
-                            const std::string& test_name, size_t size)
+    static void test_large_message(const std::string& PYTHON, const std::string& reader_module,
+                                   const std::string& test_name, size_t size)
     {
         ReqIDAPI api;
         Result result;
@@ -517,73 +523,76 @@ namespace tut
         result.ensure();
     }
 
-    struct TestLargeMessage
+    namespace
     {
-        TestLargeMessage(const std::string& PYTHON_, const std::string& reader_module_,
-                         const std::string& test_name_):
-            PYTHON(PYTHON_),
-            reader_module(reader_module_),
-            test_name(test_name_)
-        {}
-
-        bool operator()(size_t left, size_t right) const
+        struct TestLargeMessage
         {
-            // We don't know whether upper_bound is going to pass the "sought
-            // value" as the left or the right operand. We pass 0 as the
-            // "sought value" so we can distinguish it. Of course that means
-            // the sequence we're searching must not itself contain 0!
-            size_t size;
-            bool success;
-            if (left)
+            TestLargeMessage(const std::string& PYTHON_, const std::string& reader_module_,
+                             const std::string& test_name_):
+                PYTHON(PYTHON_),
+                reader_module(reader_module_),
+                test_name(test_name_)
+            {}
+
+            bool operator()(size_t left, size_t right) const
             {
-                size = left;
-                // Consider our return value carefully. Normal binary_search
-                // (or, in our case, upper_bound) expects a container sorted
-                // in ascending order, and defaults to the std::less
-                // comparator. Our container is in fact in ascending order, so
-                // return consistently with std::less. Here we were called as
-                // compare(item, sought). If std::less were called that way,
-                // 'true' would mean to move right (to higher numbers) within
-                // the sequence: the item being considered is less than the
-                // sought value. For us, that means that test_large_message()
-                // success should return 'true'.
-                success = true;
-            }
-            else
-            {
-                size = right;
-                // Here we were called as compare(sought, item). If std::less
-                // were called that way, 'true' would mean to move left (to
-                // lower numbers) within the sequence: the sought value is
-                // less than the item being considered. For us, that means
-                // test_large_message() FAILURE should return 'true', hence
-                // test_large_message() success should return 'false'.
-                success = false;
+                // We don't know whether upper_bound is going to pass the "sought
+                // value" as the left or the right operand. We pass 0 as the
+                // "sought value" so we can distinguish it. Of course that means
+                // the sequence we're searching must not itself contain 0!
+                size_t size;
+                bool success;
+                if (left)
+                {
+                    size = left;
+                    // Consider our return value carefully. Normal binary_search
+                    // (or, in our case, upper_bound) expects a container sorted
+                    // in ascending order, and defaults to the std::less
+                    // comparator. Our container is in fact in ascending order, so
+                    // return consistently with std::less. Here we were called as
+                    // compare(item, sought). If std::less were called that way,
+                    // 'true' would mean to move right (to higher numbers) within
+                    // the sequence: the item being considered is less than the
+                    // sought value. For us, that means that test_large_message()
+                    // success should return 'true'.
+                    success = true;
+                }
+                else
+                {
+                    size = right;
+                    // Here we were called as compare(sought, item). If std::less
+                    // were called that way, 'true' would mean to move left (to
+                    // lower numbers) within the sequence: the sought value is
+                    // less than the item being considered. For us, that means
+                    // test_large_message() FAILURE should return 'true', hence
+                    // test_large_message() success should return 'false'.
+                    success = false;
+                }
+
+                try
+                {
+                    test_large_message(PYTHON, reader_module, test_name, size);
+                    std::cout << "test_large_message(" << size << ") succeeded" << std::endl;
+                    return success;
+                }
+                catch (const failure& e)
+                {
+                    std::cout << "test_large_message(" << size << ") failed: " << e.what() << std::endl;
+                    return ! success;
+                }
             }
 
-            try
-            {
-                test_large_message(PYTHON, reader_module, test_name, size);
-                std::cout << "test_large_message(" << size << ") succeeded" << std::endl;
-                return success;
-            }
-            catch (const failure& e)
-            {
-                std::cout << "test_large_message(" << size << ") failed: " << e.what() << std::endl;
-                return ! success;
-            }
-        }
-
-        const std::string PYTHON, reader_module, test_name;
-    };
+            const std::string PYTHON, reader_module, test_name;
+        };
+    } // anonymous namespace
 
     // The point of this function is to try to find a size at which
     // test_large_message() can succeed. We still want the overall test to
     // fail; otherwise we won't get the coder's attention -- but if
     // test_large_message() fails, try to find a plausible size at which it
     // DOES work.
-    void test_or_split(const std::string& PYTHON, const std::string& reader_module,
-                       const std::string& test_name, size_t size)
+    static void test_or_split(const std::string& PYTHON, const std::string& reader_module,
+                              const std::string& test_name, size_t size)
     {
         try
         {

@@ -41,6 +41,8 @@
 
 #include "../test/lltut.h"
 
+#include <optional>
+
 namespace
 {
     typedef ALScriptStudioDoc        Doc;
@@ -103,6 +105,39 @@ namespace
     }
     const std::string SCRIPT = "default\n{\n    state_entry()\n    {\n    }\n    touch_start(integer n)\n    {\n    }\n}\n\nf()\n{\n}\n"
                                "g(){}h(){}\nstate other\n{\n    timer()\n    {\n    }\n}\n";
+
+    // A colour of the table set while this lives, and put back as it was
+    // after -- a person's own again, or none -- for the UI tests after it.
+    class HeldColor
+    {
+    public:
+        HeldColor(const std::string& name, const LLColor4& color) : mName(name)
+        {
+            const auto& own = LLUIColorTable::instance().getUserColors();
+            if (const auto found = own.find(name); found != own.end())
+            {
+                mWas = found->second.get();
+            }
+            LLUIColorTable::instance().setColor(name, color);
+        }
+        ~HeldColor()
+        {
+            if (mWas)
+            {
+                LLUIColorTable::instance().setColor(mName, *mWas);
+            }
+            else
+            {
+                LLUIColorTable::instance().resetToDefault(mName);
+            }
+        }
+        HeldColor(const HeldColor&)            = delete;
+        HeldColor& operator=(const HeldColor&) = delete;
+
+    private:
+        std::string             mName;
+        std::optional<LLColor4> mWas;
+    };
 }
 
 namespace tut
@@ -110,14 +145,11 @@ namespace tut
     struct alscriptcrumbsbar_data
     {
         al_studio_test::StudioWindowOf<FakeCrumbsWindow> window;
-
         // The marks' colours told apart, as the skin's are: with none, every
         // mark is one red.
-        alscriptcrumbsbar_data()
-        {
-            LLUIColorTable::instance().setColor("CodeMarkWarning", LLColor4::yellow);
-            LLUIColorTable::instance().setColor("CodeMarkError", LLColor4::red);
-        }
+        HeldColor warningMark{ "CodeMarkWarning", LLColor4::yellow };
+        HeldColor errorMark{ "CodeMarkError", LLColor4::red };
+
         ~alscriptcrumbsbar_data() { gFocusMgr.setKeyboardFocus(nullptr); }
         ALScriptCrumbsBar* bar()
         {

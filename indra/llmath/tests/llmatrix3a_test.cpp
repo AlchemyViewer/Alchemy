@@ -148,12 +148,15 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct llmatrix3a_data
     {
     };
     typedef test_group<llmatrix3a_data> llmatrix3a_test;
     typedef llmatrix3a_test::object llmatrix3a_object;
     tut::llmatrix3a_test llmatrix3a_testcase("LLMatrix3a");
+}
 
     // Plain data of three registers; the identity; set and get by row and
     // by column.

@@ -56,6 +56,7 @@
 #include "llxmlnode.h"
 
 #include "../../llui/tests/alheadlessui_fixture.h"
+#include "alscriptstudio_stubs.h"
 
 #include <filesystem>
 #include <functional>
@@ -63,16 +64,6 @@
 #include <optional>
 #include <string>
 #include <vector>
-
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it. One test binary
-// includes this once.
-class LLAvatarName;
-const std::string gStudioTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gStudioTestAnonName;
-}
 
 namespace al_studio_test
 {

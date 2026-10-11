@@ -42,17 +42,15 @@
 
 namespace tut
 {
+namespace
+{
     struct llrender2dutils_data
     {
         // One context for the binary: standing it up is the expensive part,
         // and LLImageGL's class state does not survive a re-init.
         static ll_test::HeadlessGL& gl()
         {
-            static ll_test::HeadlessGL instance(/*needs_vbos=*/true,
-                                                /*needs_imagegl=*/true,
-                                                /*needs_llrender=*/true,
-                                                /*needs_render=*/true);
-            return instance;
+            return ll_test::sharedHeadlessGL();
         }
 
         llrender2dutils_data()
@@ -133,6 +131,7 @@ namespace tut
     typedef test_group<llrender2dutils_data> llrender2dutils_test;
     typedef llrender2dutils_test::object     llrender2dutils_object;
     tut::llrender2dutils_test llrender2dutils_testcase("llrender2dutils_gl");
+}
 
     // A rotated image turns about its own centre and keeps its size. An
     // odd-sized image at a quarter turn covers the same pixels it does

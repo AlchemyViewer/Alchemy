@@ -40,11 +40,12 @@
 #include "v3math.h"
 #include "v4math.h"
 #include "llsdutil.h"
-//#include "llsdutil.cpp"
-#include "llsdutil_math.cpp"
+#include "llsdutil_math.h"
 #include "lltemplatemessagebuilder.h"
 
 namespace tut
+{
+namespace
 {
     static LLTemplateMessageBuilder::message_template_name_map_t templateNameMap;
 
@@ -115,6 +116,7 @@ namespace tut
     typedef test_group<LLSDMessageBuilderTestData>  LLSDMessageBuilderTestGroup;
     typedef LLSDMessageBuilderTestGroup::object     LLSDMessageBuilderTestObject;
     LLSDMessageBuilderTestGroup llsdMessageBuilderTestGroup("LLSDMessageBuilder");
+}
 
     template<> template<>
     void LLSDMessageBuilderTestObject::test<1>()

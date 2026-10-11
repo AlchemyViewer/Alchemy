@@ -33,12 +33,15 @@
 
 namespace tut
 {
+namespace
+{
     struct avatarnamecache_data
     {
     };
     typedef test_group<avatarnamecache_data> avatarnamecache_test;
     typedef avatarnamecache_test::object avatarnamecache_object;
     tut::avatarnamecache_test avatarnamecache_testcase("LLAvatarNameCache");
+}
 
     template<> template<>
     void avatarnamecache_object::test<1>()

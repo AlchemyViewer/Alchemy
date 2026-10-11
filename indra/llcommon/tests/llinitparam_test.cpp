@@ -42,6 +42,9 @@
 // ParamValue<> is specialised for TestPoint below.
 //
 
+namespace
+{
+
 // A named-value lookup, the mechanism behind "left"/"center" in XUI.
 struct TestNames : public LLInitParam::TypeValuesHelper<S32, TestNames>
 {
@@ -126,6 +129,21 @@ struct ChoiceOfThings : public LLInitParam::ChoiceBlock<ChoiceOfThings>
     {}
 };
 
+// The same, built only by test 9. A choice block starts with its first
+// alternative chosen only when it is the first of its type, the one whose
+// construction builds the type's descriptor: with a type of its own, test 9
+// sees that whatever ran before it.
+struct FirstChoiceOfThings : public LLInitParam::ChoiceBlock<FirstChoiceOfThings>
+{
+    Alternative<S32>            number;
+    Alternative<std::string>    text;
+
+    FirstChoiceOfThings()
+    :   number("number", 0),
+        text("text", "")
+    {}
+};
+
 struct IgnoredBlock : public LLInitParam::Block<IgnoredBlock>
 {
     Optional<S32>   kept;
@@ -150,6 +168,8 @@ struct TestPoint
     S32 mX;
     S32 mY;
 };
+
+} // anonymous namespace
 
 namespace LLInitParam
 {
@@ -188,6 +208,9 @@ namespace LLInitParam
     };
 }
 
+namespace
+{
+
 struct PointBlock : public LLInitParam::Block<PointBlock>
 {
     Optional<TestPoint> point;
@@ -209,6 +232,8 @@ struct PointChoice : public LLInitParam::ChoiceBlock<PointChoice>
         point("point")
     {}
 };
+
+} // anonymous namespace
 
 namespace tut
 {
@@ -356,7 +381,7 @@ namespace tut
     {
         set_test_name("choosing one alternative unprovides the other");
 
-        ChoiceOfThings choice;
+        FirstChoiceOfThings choice;
         ensure("first declared alternative is chosen initially", choice.number.isChosen());
 
         choice.text = std::string("hello");

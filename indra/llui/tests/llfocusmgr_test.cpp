@@ -29,26 +29,20 @@
 
 #include "../test/lltut.h"
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gFocusMgrTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gFocusMgrTestAnonName;
-}
-
 namespace tut
 {
-    struct TestView : public LLView
+    namespace
     {
-        TestView(const LLView::Params& p) : LLView(p) {}
-    };
+        struct TestView : public LLView
+        {
+            TestView(const LLView::Params& p) : LLView(p) {}
+        };
 
-    // A focusable that is not a view. The viewer has one: media focus.
-    struct TestFocusable : public LLFocusableElement
-    {
-    };
+        // A focusable that is not a view. The viewer has one: media focus.
+        struct TestFocusable : public LLFocusableElement
+        {
+        };
+    }
 
     struct llfocusmgr_data
     {

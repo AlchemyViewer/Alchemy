@@ -108,23 +108,26 @@ namespace tut
         }
 
         // The main loop's queue, which the watcher hands its looks back
-        // through, as the viewer's is.
-        static LL::WorkQueue::ptr_t mainLoop()
-        {
-            static LL::WorkQueue queue("mainloop", 1024);
-            return LL::WorkQueue::getInstance("mainloop");
-        }
+        // through, as the viewer's is. Made when a test first pumps, and
+        // gone with its fixture: one left alive would stand in for the
+        // viewer's main loop for every test after it in the process. The
+        // watched files go first, and with the last of them the watcher's
+        // worker is joined, so nothing posts here once it is gone.
+        std::unique_ptr<LL::WorkQueue> main_loop;
 
         // The timers ticked and the main loop run, as the viewer's frames
         // do, until `until` holds or a few seconds go by.
-        static bool pumped(const std::function<bool()>& until)
+        bool pumped(const std::function<bool()>& until)
         {
-            const LL::WorkQueue::ptr_t main = mainLoop();
-            LLTimer                    timer;
+            if (!main_loop)
+            {
+                main_loop = std::make_unique<LL::WorkQueue>("mainloop", 1024);
+            }
+            LLTimer timer;
             while (timer.getElapsedTimeF32() < 5.f)
             {
                 LLEventTimer::updateClass();
-                main->runPending();
+                main_loop->runPending();
                 if (until())
                 {
                     return true;

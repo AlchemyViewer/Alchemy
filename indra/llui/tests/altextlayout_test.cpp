@@ -37,15 +37,6 @@
 #include <string>
 #include <vector>
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gLayoutTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gLayoutTestAnonName;
-}
-
 namespace tut
 {
     struct altextlayout_data
@@ -573,6 +564,9 @@ namespace tut
             text += "value" + std::to_string(i % 97) + " = f(x, [y, z]) + ";
         }
         ready(text.c_str());
+        // Counted from empty: the cache is the process's, and one an earlier
+        // test had filled would trade a piece for a piece and not grow.
+        ALFontShaping::clearCache();
         const size_t              before = ALFontShaping::cacheSize();
         const ALTextLayout::Line& line   = layout.line(0);
         ensure("shaped in pieces", ALFontShaping::cacheSize() > before + 10);

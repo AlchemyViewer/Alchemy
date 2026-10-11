@@ -47,15 +47,6 @@
 #include <string>
 #include <vector>
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it.
-class LLAvatarName;
-const std::string gEmbeddedTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gEmbeddedTestAnonName;
-}
-
 namespace
 {
     // The viewer's side, answered as a test says, and what was asked of it

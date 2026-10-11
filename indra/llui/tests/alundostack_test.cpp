@@ -35,12 +35,15 @@
 
 namespace tut
 {
-    // A step here is the names a change touched.
-    struct Step
+    namespace
     {
-        std::vector<std::string> mNames;
-        std::string mLabel;
-    };
+        // A step here is the names a change touched.
+        struct Step
+        {
+            std::vector<std::string> mNames;
+            std::string mLabel;
+        };
+    }
 
     struct alundostack_data
     {

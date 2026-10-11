@@ -32,6 +32,7 @@
 #include "alwatchedfile.h"
 #include "fsyspath.h"
 #include "llfile.h"
+#include "newview_test_fakes.h"
 #include "workqueue.h"
 
 #include "../test/lltut.h"
@@ -242,13 +243,8 @@ namespace tut
         }
 
         // The main loop's queue, as the viewer's is, which a look at the
-        // tabs waits for: kept for the rest of the run, since what was posted
-        // to it for a test gone finds nobody.
-        static LL::WorkQueue& mainLoop()
-        {
-            static LL::WorkQueue queue("mainloop", 1024);
-            return queue;
-        }
+        // tabs waits for: the process's, kept for the rest of the run.
+        static LL::WorkQueue& mainLoop() { return newview_test::mainLoop(); }
         // Whatever was waiting for the main loop, done.
         static void settle() { mainLoop().runPending(); }
 

@@ -38,14 +38,17 @@
 
 namespace LLUnits
 {
-    // using powers of 2 to allow strict floating point equality
-    LL_DECLARE_BASE_UNIT(Ounces, "oz");
-    LL_DECLARE_DERIVED_UNIT(TallCup, "", Ounces, / 12);
-    LL_DECLARE_DERIVED_UNIT(GrandeCup, "", Ounces, / 16);
-    LL_DECLARE_DERIVED_UNIT(VentiCup, "", Ounces, / 20);
+    namespace
+    {
+        // using powers of 2 to allow strict floating point equality
+        LL_DECLARE_BASE_UNIT(Ounces, "oz");
+        LL_DECLARE_DERIVED_UNIT(TallCup, "", Ounces, / 12);
+        LL_DECLARE_DERIVED_UNIT(GrandeCup, "", Ounces, / 16);
+        LL_DECLARE_DERIVED_UNIT(VentiCup, "", Ounces, / 20);
 
-    LL_DECLARE_BASE_UNIT(Grams, "g");
-    LL_DECLARE_DERIVED_UNIT(Milligrams, "mg", Grams, * 1000);
+        LL_DECLARE_BASE_UNIT(Grams, "g");
+        LL_DECLARE_DERIVED_UNIT(Milligrams, "mg", Grams, * 1000);
+    } // anonymous namespace
 }
 
 LL_DECLARE_UNIT_TYPEDEFS(LLUnits, Ounces);
@@ -59,14 +62,44 @@ LL_DECLARE_UNIT_TYPEDEFS(LLUnits, Milligrams);
 namespace tut
 {
     using namespace LLTrace;
+
+    namespace
+    {
+        // A ThreadRecorder makes itself this thread's recorder, with its own
+        // timer stack and current accumulators, and leaves all of them null
+        // when it goes. This takes the main thread's as they were before the
+        // test's recorder, and puts them back after it.
+        struct ThreadRecorderRestore
+        {
+            ThreadRecorder*        mRecorder{ get_thread_recorder() };
+            BlockTimerStackRecord* mTimerStack{ LLThreadLocalSingletonPointer<BlockTimerStackRecord>::getInstance() };
+            CountAccumulator*      mCounts{ LLThreadLocalSingletonPointer<CountAccumulator>::getInstance() };
+            SampleAccumulator*     mSamples{ LLThreadLocalSingletonPointer<SampleAccumulator>::getInstance() };
+            EventAccumulator*      mEvents{ LLThreadLocalSingletonPointer<EventAccumulator>::getInstance() };
+            TimeBlockAccumulator*  mTimers{ LLThreadLocalSingletonPointer<TimeBlockAccumulator>::getInstance() };
+
+            ~ThreadRecorderRestore()
+            {
+                set_thread_recorder(mRecorder);
+                LLThreadLocalSingletonPointer<BlockTimerStackRecord>::setInstance(mTimerStack);
+                LLThreadLocalSingletonPointer<CountAccumulator>::setInstance(mCounts);
+                LLThreadLocalSingletonPointer<SampleAccumulator>::setInstance(mSamples);
+                LLThreadLocalSingletonPointer<EventAccumulator>::setInstance(mEvents);
+                LLThreadLocalSingletonPointer<TimeBlockAccumulator>::setInstance(mTimers);
+            }
+        };
+    } // anonymous namespace
+
     struct trace
     {
-        ThreadRecorder mRecorder;
+        // before mRecorder, so it is put back after mRecorder is gone
+        ThreadRecorderRestore mRestore;
+        ThreadRecorder        mRecorder;
     };
 
     typedef test_group<trace> trace_t;
     typedef trace_t::object trace_object_t;
-    tut::trace_t tut_singleton("LLTrace");
+    tut::trace_t tut_lltrace("LLTrace");
 
     static CountStatHandle<S32> sCupsOfCoffeeConsumed("coffeeconsumed", "Delicious cup of dark roast.");
     static SampleStatHandle<F32Milligrams> sCaffeineLevelStat("caffeinelevel", "Coffee buzz quotient");
@@ -75,7 +108,7 @@ namespace tut
     static F32 sCaffeineLevel(0.f);
     const F32Milligrams sCaffeinePerOz(18.f);
 
-    void drink_coffee(S32 num_cups, S32Ounces cup_size)
+    static void drink_coffee(S32 num_cups, S32Ounces cup_size)
     {
         add(sCupsOfCoffeeConsumed, num_cups);
         for (S32 i = 0; i < num_cups; i++)

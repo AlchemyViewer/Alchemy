@@ -38,6 +38,8 @@
 
 namespace tut
 {
+namespace
+{
     struct control_group
     {
         std::unique_ptr<LLControlGroup> mCG;
@@ -92,6 +94,7 @@ namespace tut
     typedef test_group<control_group> control_group_test;
     typedef control_group_test::object control_group_t;
     control_group_test tut_control_group("control_group");
+}
 
     //load settings from files - LLSD
     template<> template<>

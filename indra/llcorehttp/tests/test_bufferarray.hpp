@@ -37,6 +37,8 @@ using namespace LLCore;
 
 namespace tut
 {
+namespace
+{
 
 struct BufferArrayTestData
 {
@@ -47,6 +49,7 @@ struct BufferArrayTestData
 typedef test_group<BufferArrayTestData> BufferArrayTestGroupType;
 typedef BufferArrayTestGroupType::object BufferArrayTestObjectType;
 BufferArrayTestGroupType BufferArrayTestGroup("BufferArray Tests");
+}
 
 template <> template <>
 void BufferArrayTestObjectType::test<1>()

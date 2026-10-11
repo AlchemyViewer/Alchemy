@@ -58,7 +58,9 @@ target_precompile_headers(llprimitive REUSE_FROM llprecompiled)
 # add unit tests
 if(AL_BUILD_TESTS)
   foreach(test llmediaentry llgltfmaterial llmaterialid llmaterial)
-    al_add_test(${test} UNIT PROJECT llprimitive)
+    al_add_test(${test} PROJECT llprimitive LIBRARIES llprimitive)
   endforeach()
+  # This one stubs LLMaterialID and LLPrimTextureList, which the library
+  # defines, so it compiles the one file it tests instead of linking it.
   al_add_test(llprimitive UNIT PROJECT llprimitive LIBRARIES llmessage)
 endif()

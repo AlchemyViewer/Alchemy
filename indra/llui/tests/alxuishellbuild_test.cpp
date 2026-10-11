@@ -34,30 +34,24 @@
 
 #include <cstring>
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gShellTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gShellTestAnonName;
-}
-
 namespace tut
 {
-    // A registered panel class that counts its constructions, standing in
-    // for the viewer classes whose constructors have side effects.
-    static int gProbeClassBuilt = 0;
-
-    struct ProbeClassPanel : public LLPanel
+    namespace
     {
-        ProbeClassPanel() { ++gProbeClassBuilt; }
-    };
+        // A registered panel class that counts its constructions, standing in
+        // for the viewer classes whose constructors have side effects.
+        int gProbeClassBuilt = 0;
 
-    struct TestPanel : public LLPanel
-    {
-        TestPanel(const LLPanel::Params& p) : LLPanel(p) {}
-    };
+        struct ProbeClassPanel : public LLPanel
+        {
+            ProbeClassPanel() { ++gProbeClassBuilt; }
+        };
+
+        struct TestPanel : public LLPanel
+        {
+            TestPanel(const LLPanel::Params& p) : LLPanel(p) {}
+        };
+    }
 
     struct alxuishellbuild_data
     {

@@ -31,7 +31,6 @@
 #include "../llremoteparcelrequest.h"
 
 #include "../llagent.h"
-#include "llurlentry.h"
 
 namespace {
     const LLUUID TEST_PARCEL_ID("11111111-1111-1111-1111-111111111111");
@@ -52,12 +51,10 @@ LLAgent::~LLAgent() { }
 void LLAgent::sendReliableMessage(void) { }
 LLUUID gAgentSessionID;
 LLUUID gAgentID;
-LLUIColor::LLUIColor(void) { }
-LLControlGroup::LLControlGroup(std::string const & name) : LLInstanceTracker<LLControlGroup, std::string>(name) { }
-LLControlGroup::~LLControlGroup(void) { }
-void LLUrlEntryParcel::processParcelInfo(const LLUrlEntryParcel::LLParcelData& parcel_data) { }
 
 namespace tut
+{
+namespace
 {
     struct TestObserver : public LLRemoteParcelInfoObserver {
         TestObserver() : mProcessed(false) { }
@@ -73,6 +70,7 @@ namespace tut
 
         bool mProcessed;
     };
+} // anonymous namespace
 
     struct RemoteParcelRequestData
     {

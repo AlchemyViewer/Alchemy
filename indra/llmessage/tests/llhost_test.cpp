@@ -34,12 +34,15 @@
 
 namespace tut
 {
+namespace
+{
     struct host_data
     {
     };
     typedef test_group<host_data> host_test;
     typedef host_test::object host_object;
     tut::host_test host_testcase("LLHost");
+}
 
 
     template<> template<>

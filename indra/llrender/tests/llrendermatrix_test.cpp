@@ -39,6 +39,8 @@
 
 namespace tut
 {
+namespace
+{
     struct llrendermatrix_data
     {
         // Every case starts from identity stacks and the forward depth
@@ -115,6 +117,7 @@ namespace tut
                              -0.8f, 0.6f, 0.f, 0.f,
                              0.f, 0.f, 1.f, 0.f,
                              5.f, -7.f, 9.f, 1.f };
+}
 
     // The stack ops apply the new transform ahead of what the stack held,
     // which on the scalar matrix is the product written the other way

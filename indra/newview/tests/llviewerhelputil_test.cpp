@@ -60,7 +60,7 @@ std::string LLControlGroup::getString(std::string_view name)
         return gHelpURL;
     return "";
 }
-LLControlGroup gSavedSettings("test");
+LLControlGroup gSavedSettings("llviewerhelputil");
 
 static void substitute_string(std::string &input, const std::string &search, const std::string &replace)
 {

@@ -32,6 +32,8 @@
 
 namespace tut
 {
+namespace
+{
     struct HTTPNodeTestData
     {
         LLHTTPNode mRoot;
@@ -144,6 +146,7 @@ namespace tut
     typedef test_group<HTTPNodeTestData>    HTTPNodeTestGroup;
     typedef HTTPNodeTestGroup::object       HTTPNodeTestObject;
     HTTPNodeTestGroup httpNodeTestGroup("http node");
+}
 
     template<> template<>
     void HTTPNodeTestObject::test<1>()
@@ -243,6 +246,8 @@ namespace tut
         ensure_equals("root of aleph", alephNode->rootNode(), &mRoot);
     }
 
+namespace
+{
     class IntegerNode : public LLHTTPNode
     {
     public:
@@ -284,6 +289,7 @@ namespace tut
             response->result(n*n);
         }
     };
+}
 
     template<> template<>
     void HTTPNodeTestObject::test<5>()
@@ -312,6 +318,8 @@ namespace tut
         ensure_equals("square result", response->mResult.asInteger(), 9);
     }
 
+namespace
+{
     class AlphaNode : public LLHTTPNode
     {
     public:
@@ -332,6 +340,7 @@ namespace tut
             return true;
         }
     };
+}
 
     template<> template<>
     void HTTPNodeTestObject::test<6>()

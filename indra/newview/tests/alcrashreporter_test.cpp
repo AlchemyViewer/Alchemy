@@ -27,6 +27,7 @@
 #include "../alcrashreporter.h"
 
 #include "llsd.h"
+#include "lluuid.h"
 #include "v3math.h"
 
 #include "../test/lltut.h"
@@ -112,8 +113,9 @@ namespace tut
     void object::test<7>()
     {
         set_test_name("consent is a sentinel file: recorded, seen, withdrawn");
+        // A name of this run's own: another run of the tests may be at it.
         const std::string sentinel =
-            (std::filesystem::temp_directory_path() / "alcrashreporter_test_consent").string();
+            (std::filesystem::temp_directory_path() / ("alcrashreporter_test_consent_" + LLUUID::generateNewID().asString())).string();
 
         ALCrashReporter::recordConsent(sentinel, false);
         ensure("absent to begin with", !ALCrashReporter::consentRecorded(sentinel));
@@ -167,8 +169,9 @@ namespace tut
     void object::test<10>()
     {
         set_test_name("a freeze's report is recorded for the next run, which takes it once");
+        // Names of this run's own, here and below: another run of the tests may be at it.
         const std::string record =
-            (std::filesystem::temp_directory_path() / "alcrashreporter_test_last_report").string();
+            (std::filesystem::temp_directory_path() / ("alcrashreporter_test_last_report_" + LLUUID::generateNewID().asString())).string();
         ALCrashReporter::takeRecordedReport(record);
         ensure("nothing to begin with", !ALCrashReporter::takeRecordedReport(record));
 
@@ -197,7 +200,7 @@ namespace tut
                       "00000000000000000000000000000001");
 
         const std::string record =
-            (std::filesystem::temp_directory_path() / "alcrashreporter_test_nil_report").string();
+            (std::filesystem::temp_directory_path() / ("alcrashreporter_test_nil_report_" + LLUUID::generateNewID().asString())).string();
         ALCrashReporter::recordReport(record, { "freeze", "00000000000000000000000000000000" });
         ensure("a nil report is not taken", !ALCrashReporter::takeRecordedReport(record));
     }
@@ -228,8 +231,8 @@ namespace tut
     void object::test<13>()
     {
         set_test_name("a record is written whole over the last, and nothing is left beside it");
-        const std::filesystem::path dir = std::filesystem::temp_directory_path() / "alcrashreporter_test_records";
-        std::filesystem::remove_all(dir);
+        const std::filesystem::path dir =
+            std::filesystem::temp_directory_path() / ("alcrashreporter_test_records_" + LLUUID::generateNewID().asString());
         std::filesystem::create_directories(dir);
         const auto entries = [&dir]()
         {

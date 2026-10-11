@@ -35,6 +35,7 @@
 #include "llmortician.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
@@ -42,20 +43,38 @@
 
 #include <string>
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gDockTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gDockTestAnonName;
-}
-
 namespace tut
 {
     struct aldockpanel_data
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
+        // Focus and capture as the test found them, whatever it leaves
+        // them on.
+        ll_test::FocusScope  focus;
+
+        // A pane still out is put back, its window closed as test 4 shows
+        // that does, and each test's dead views reaped as it ends, as the
+        // next frame would: test 12 empties the graveyard itself, and then
+        // finds only its own views there.
+        ~aldockpanel_data()
+        {
+            std::vector<LLHandle<LLFloater>> out;
+            for (LLView* child : *gFloaterView->getChildList())
+            {
+                if (ALPanelFloater* window = child->as<ALPanelFloater>(); window && !window->isDead())
+                {
+                    out.push_back(window->getHandle());
+                }
+            }
+            for (const LLHandle<LLFloater>& handle : out)
+            {
+                if (LLFloater* window = handle.get())
+                {
+                    window->closeFloater();
+                }
+            }
+            LLMortician::updateClass();
+        }
 
         // A window with a stack of two panes across it, the way a tool is
         // laid out: a side pane of a fixed width and a middle that takes

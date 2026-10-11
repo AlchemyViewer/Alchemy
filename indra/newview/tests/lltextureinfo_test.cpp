@@ -50,8 +50,6 @@
 // * Do not make any assumption as to how those classes or methods work (i.e. don't copy/paste code)
 // * A simulator for a class can be implemented here. Please comment and document thoroughly.
 
-LLControlGroup gSavedSettings("Global");
-
 void send_texture_stats_to_sim(const LLSD& texture_stats) {}
 
 LLAgent gAgent;

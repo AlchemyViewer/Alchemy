@@ -54,6 +54,8 @@ public:
 
 namespace tut
 {
+namespace
+{
     struct HttpOperationTestData
     {
         // the test objects inherit from this so the member functions and variables
@@ -63,6 +65,7 @@ namespace tut
     typedef test_group<HttpOperationTestData> HttpOperationTestGroupType;
     typedef HttpOperationTestGroupType::object HttpOperationTestObjectType;
     HttpOperationTestGroupType HttpOperationTestGroup("HttpOperation Tests");
+}
 
     template <> template <>
     void HttpOperationTestObjectType::test<1>()

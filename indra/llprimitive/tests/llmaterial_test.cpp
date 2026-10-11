@@ -25,10 +25,13 @@
 
 namespace tut
 {
+namespace
+{
     struct llmaterial_data { };
     typedef test_group<llmaterial_data> llmaterial_t;
     typedef llmaterial_t::object llmaterial_object_t;
     tut::llmaterial_t tut_llmaterial("llmaterial");
+}
 
     // Two distinct UUIDs used as before/after values for ID setters.
     static const LLUUID kIdA("11111111-2222-3333-4444-555555555555");

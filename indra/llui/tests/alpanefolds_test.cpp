@@ -38,15 +38,6 @@
 
 #include <string>
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gPaneFoldsTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gPaneFoldsTestAnonName;
-}
-
 namespace tut
 {
     struct alpanefolds_data

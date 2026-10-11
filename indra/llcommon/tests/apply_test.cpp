@@ -15,7 +15,6 @@
 #include "apply.h"
 // STL headers
 // std headers
-#include <iomanip>
 // external library headers
 // other Linden headers
 #include "llsd.h"
@@ -24,19 +23,8 @@
 #include <string>
 #include <vector>
 
-// for ensure_equals
-std::ostream& operator<<(std::ostream& out, const std::vector<std::string>& stringvec)
-{
-    const char* delim = "[";
-    for (const auto& str : stringvec)
-    {
-        out << delim << std::quoted(str);
-        delim = ", ";
-    }
-    return out << ']';
-}
-
-// the above must be declared BEFORE ensure_equals(std::vector<std::string>)
+// for ensure_equals(std::vector<std::string>): must come BEFORE lltut.h
+#include "StringVec.h"
 #include "../test/lltut.h"
 
 /*****************************************************************************
@@ -71,12 +59,12 @@ namespace tut
 
         // ensure that apply() actually reaches the target method --
         // lack of ensure_equals() failure could be due to no-op apply()
-        bool called{ false };
+        static bool called{ false };
         // capture calls from collect()
-        std::vector<std::string> collected;
+        static std::vector<std::string> collected;
 
         /*------------------------- test functions -------------------------*/
-        void various(LLSD::Boolean b, LLSD::Integer i, LLSD::Real f, const LLSD::String& s,
+        static void various(LLSD::Boolean b, LLSD::Integer i, LLSD::Real f, const LLSD::String& s,
                      const LLSD::UUID& uu, const LLSD::Date& dt,
                      const LLSD::URI& uri, const LLSD::Binary& bin)
         {
@@ -91,7 +79,7 @@ namespace tut
             ensure_equals("bin mismatch", bin, statics::bin);
         }
 
-        void strings(std::string s0, std::string s1, std::string s2, std::string s3, std::string s4)
+        static void strings(std::string s0, std::string s1, std::string s2, std::string s3, std::string s4)
         {
             called = true;
             ensure_equals("s0 mismatch", s0, statics::quick[0]);
@@ -101,7 +89,7 @@ namespace tut
             ensure_equals("s4 mismatch", s4, statics::quick[4]);
         }
 
-        void ints(int i0, int i1, int i2, int i3, int i4)
+        static void ints(int i0, int i1, int i2, int i3, int i4)
         {
             called = true;
             ensure_equals("i0 mismatch", i0, statics::fibs[0]);
@@ -111,32 +99,32 @@ namespace tut
             ensure_equals("i4 mismatch", i4, statics::fibs[4]);
         }
 
-        void sdfunc(const LLSD& sd)
+        static void sdfunc(const LLSD& sd)
         {
             called = true;
             ensure_equals("sd mismatch", sd.asInteger(), statics::i);
         }
 
-        void intfunc(int i)
+        static void intfunc(int i)
         {
             called = true;
             ensure_equals("i mismatch", i, statics::i);
         }
 
-        void voidfunc()
+        static void voidfunc()
         {
             called = true;
         }
 
         // recursion tail
-        void collect()
+        static void collect()
         {
             called = true;
         }
 
         // collect(arbitrary)
         template <typename... ARGS>
-        void collect(const std::string& first, ARGS&&... rest)
+        static void collect(const std::string& first, ARGS&&... rest)
         {
             statics::collected.push_back(first);
             collect(std::forward<ARGS>(rest)...);

@@ -36,6 +36,8 @@
 
 namespace tut
 {
+namespace
+{
     struct LLMessageConfigTestData {
         std::string mTestConfigDir;
 
@@ -56,14 +58,20 @@ namespace tut
             LLMessageConfig::initClass("simulator", mTestConfigDir);
         }
 
+        // A destructor cannot fail a test, so the clean-up only says what
+        // it could not remove.
         ~LLMessageConfigTestData()
         {
             // rm contents of temp dir
-            int rmfile = LLFile::remove((mTestConfigDir + "/message.xml"));
-            ensure_equals("rmfile value", rmfile, 0);
+            if (LLFile::remove((mTestConfigDir + "/message.xml")) != 0)
+            {
+                LL_WARNS() << "Could not remove " << mTestConfigDir << "/message.xml" << LL_ENDL;
+            }
             // rm temp dir
-            int rmdir = LLFile::remove(mTestConfigDir);
-            ensure_equals("rmdir value", rmdir, 0);
+            if (LLFile::remove(mTestConfigDir) != 0)
+            {
+                LL_WARNS() << "Could not remove " << mTestConfigDir << LL_ENDL;
+            }
         }
 
         void writeConfigFile(const LLSD& config)
@@ -80,6 +88,7 @@ namespace tut
     typedef test_group<LLMessageConfigTestData> LLMessageConfigTestGroup;
     typedef LLMessageConfigTestGroup::object LLMessageConfigTestObject;
     LLMessageConfigTestGroup llMessageConfigTestGroup("LLMessageConfig");
+}
 
     template<> template<>
     void LLMessageConfigTestObject::test<1>()

@@ -32,13 +32,6 @@
 
 #include "../test/lltut.h"
 
-class LLAvatarName;
-const std::string gSelectionTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gSelectionTestAnonName;
-}
-
 namespace tut
 {
     struct alxuiselection_data

@@ -32,10 +32,13 @@
 
 namespace LLUnits
 {
-    // using powers of 2 to allow strict floating point equality
-    LL_DECLARE_BASE_UNIT(Quatloos, "Quat");
-    LL_DECLARE_DERIVED_UNIT(Latinum, "Lat", Quatloos, / 4);
-    LL_DECLARE_DERIVED_UNIT(Solari, "Sol", Latinum, * 16);
+    namespace
+    {
+        // using powers of 2 to allow strict floating point equality
+        LL_DECLARE_BASE_UNIT(Quatloos, "Quat");
+        LL_DECLARE_DERIVED_UNIT(Latinum, "Lat", Quatloos, / 4);
+        LL_DECLARE_DERIVED_UNIT(Solari, "Sol", Latinum, * 16);
+    } // anonymous namespace
 }
 
 LL_DECLARE_UNIT_TYPEDEFS(LLUnits, Quatloos);
@@ -44,9 +47,12 @@ LL_DECLARE_UNIT_TYPEDEFS(LLUnits, Solari);
 
 namespace LLUnits
 {
-    LL_DECLARE_BASE_UNIT(Celcius, "c");
-    LL_DECLARE_DERIVED_UNIT(Fahrenheit, "f", Celcius, * 9 / 5 + 32);
-    LL_DECLARE_DERIVED_UNIT(Kelvin, "k", Celcius, + 273.15f);
+    namespace
+    {
+        LL_DECLARE_BASE_UNIT(Celcius, "c");
+        LL_DECLARE_DERIVED_UNIT(Fahrenheit, "f", Celcius, * 9 / 5 + 32);
+        LL_DECLARE_DERIVED_UNIT(Kelvin, "k", Celcius, + 273.15f);
+    } // anonymous namespace
 }
 
 LL_DECLARE_UNIT_TYPEDEFS(LLUnits, Celcius);
@@ -63,7 +69,7 @@ namespace tut
 
     typedef test_group<units> units_t;
     typedef units_t::object units_object_t;
-    tut::units_t tut_singleton("LLUnit");
+    tut::units_t tut_llunits("LLUnit");
 
     // storage type conversions
     template<> template<>
@@ -198,12 +204,7 @@ namespace tut
 
     }
 
-    bool accept_explicit_quatloos(S32Quatloos q)
-    {
-        return true;
-    }
-
-    bool accept_implicit_quatloos(S32Quatloos q)
+    static bool accept_explicit_quatloos(S32Quatloos q)
     {
         return true;
     }
@@ -362,7 +363,7 @@ namespace tut
         ensure("kilotriangles -> triangles conversion", tris.value() == 1000);
     }
 
-    bool value_near(F32 value, F32 target, F32 threshold)
+    static bool value_near(F32 value, F32 target, F32 threshold)
     {
         return fabsf(value - target) < threshold;
     }

@@ -77,6 +77,8 @@ namespace
 
 namespace tut
 {
+namespace
+{
     struct joints
     {
         LLJoint mA;
@@ -93,16 +95,20 @@ namespace tut
             mC.setJointNum(2);
         }
     };
+}
 
     //-------------------------------------------------------------------------
     // LLJointState
     //-------------------------------------------------------------------------
+namespace
+{
     struct lljointstate_data : public joints
     {
     };
     typedef test_group<lljointstate_data> lljointstate_test;
     typedef lljointstate_test::object lljointstate_object;
     tut::lljointstate_test lljointstate_testcase("LLJointState");
+}
 
     template<> template<>
     void lljointstate_object::test<1>()
@@ -171,6 +177,8 @@ namespace tut
     //-------------------------------------------------------------------------
     // LLPose
     //-------------------------------------------------------------------------
+namespace
+{
     struct llpose_data : public joints
     {
         LLPose mPose;
@@ -178,6 +186,7 @@ namespace tut
     typedef test_group<llpose_data> llpose_test;
     typedef llpose_test::object llpose_object;
     tut::llpose_test llpose_testcase("LLPose");
+}
 
     template<> template<>
     void llpose_object::test<1>()
@@ -316,6 +325,8 @@ namespace tut
     //-------------------------------------------------------------------------
     // LLJointStateBlender
     //-------------------------------------------------------------------------
+namespace
+{
     struct lljointstateblender_data : public joints
     {
         LLJointStateBlender mBlender;
@@ -323,6 +334,7 @@ namespace tut
     typedef test_group<lljointstateblender_data> lljointstateblender_test;
     typedef lljointstateblender_test::object lljointstateblender_object;
     tut::lljointstateblender_test lljointstateblender_testcase("LLJointStateBlender");
+}
 
     template<> template<>
     void lljointstateblender_object::test<1>()
@@ -590,6 +602,8 @@ namespace tut
     //-------------------------------------------------------------------------
     // LLPoseBlender
     //-------------------------------------------------------------------------
+namespace
+{
     struct llposeblender_data : public joints
     {
         LLPoseBlender mBlender;
@@ -605,6 +619,7 @@ namespace tut
     typedef test_group<llposeblender_data> llposeblender_test;
     typedef llposeblender_test::object llposeblender_object;
     tut::llposeblender_test llposeblender_testcase("LLPoseBlender");
+}
 
     template<> template<>
     void llposeblender_object::test<1>()

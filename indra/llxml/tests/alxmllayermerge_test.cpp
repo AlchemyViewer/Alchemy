@@ -28,6 +28,7 @@
 
 #include "lldir.h"
 #include "llfile.h"
+#include "lluuid.h"
 
 #include "../test/lltut.h"
 
@@ -35,6 +36,8 @@
 #include <sstream>
 
 namespace tut
+{
+namespace
 {
     // Every event, as one line: the kind, the layer, and the element or
     // attribute it was about, so a run can be compared with what the
@@ -213,10 +216,10 @@ namespace tut
 
         std::string mDir;
 
+        // A folder of its own each time, so two runs at once never share one.
         alxmllayermerge_data()
         {
-            mDir = gDirUtilp->add(gDirUtilp->getTempDir(), "alxmllayermerge_test");
-            gDirUtilp->deleteDirAndContents(mDir);
+            mDir = gDirUtilp->add(gDirUtilp->getTempDir(), "alxmllayermerge_test_" + LLUUID::generateNewID().asString());
             LLFile::mkdir(mDir);
         }
 
@@ -237,6 +240,7 @@ namespace tut
     typedef test_group<alxmllayermerge_data> alxmllayermerge_test;
     typedef alxmllayermerge_test::object     alxmllayermerge_object;
     tut::alxmllayermerge_test alxmllayermerge_testgroup("alxmllayermerge");
+}
 
     // One event per decision: repeated names in order, text overwritten
     // where the overlay has text and kept where it has none, a value=

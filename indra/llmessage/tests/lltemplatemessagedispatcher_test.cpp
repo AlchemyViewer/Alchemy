@@ -38,33 +38,14 @@
 
 LLPounceable<LLMessageSystem*, LLPounceableStatic> gMessageSystem;
 
-// sensor test doubles
-bool gClearRecvWasCalled = false;
-void LLMessageSystem::clearReceiveState(void)
+// What the test doubles below record, and the test's own helpers.
+namespace
 {
-    gClearRecvWasCalled = true;
-}
-
+bool gClearRecvWasCalled = false;
 char gUdpDispatchedData[MAX_BUFFER_SIZE];
 bool gUdpDispatchWasCalled = false;
-bool LLTemplateMessageReader::readMessage(const U8* data,class LLHost const &)
-{
-    gUdpDispatchWasCalled = true;
-    strcpy(gUdpDispatchedData, reinterpret_cast<const char*>(data));
-    return  true;
-}
-
 bool gValidateMessage = false;
-bool LLTemplateMessageReader::validateMessage(const U8*, S32 buffer_size, LLHost const &sender, bool trusted, bool faked)
-{
-    return gValidateMessage;
-}
-
 LLHost host;
-const LLHost& LLMessageSystem::getSender() const
-{
-    return host;
-}
 
 const char* gBinaryTemplateData = "BINARYTEMPLATEDATA";
 void fillVector(std::vector<U8>& vector_data, const char* data)
@@ -72,8 +53,34 @@ void fillVector(std::vector<U8>& vector_data, const char* data)
     vector_data.resize(strlen(data) + 1);
     strcpy(reinterpret_cast<char*>(&vector_data[0]), data);
 }
+}
+
+// sensor test doubles
+void LLMessageSystem::clearReceiveState(void)
+{
+    gClearRecvWasCalled = true;
+}
+
+bool LLTemplateMessageReader::readMessage(const U8* data,class LLHost const &)
+{
+    gUdpDispatchWasCalled = true;
+    strcpy(gUdpDispatchedData, reinterpret_cast<const char*>(data));
+    return  true;
+}
+
+bool LLTemplateMessageReader::validateMessage(const U8*, S32 buffer_size, LLHost const &sender, bool trusted, bool faked)
+{
+    return gValidateMessage;
+}
+
+const LLHost& LLMessageSystem::getSender() const
+{
+    return host;
+}
 
 namespace tut
+{
+namespace
 {
         static LLTemplateMessageReader::message_template_number_map_t numberMap;
 
@@ -95,6 +102,7 @@ namespace tut
 
     typedef test_group<LLTemplateMessageDispatcherData> factory;
     typedef factory::object object;
+}
 }
 
 namespace

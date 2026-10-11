@@ -45,50 +45,24 @@
 #include <algorithm>
 #include <set>
 
-// The lints as a scripter chose them, and the skin's words for a key, are
-// the viewer's settings.
+// The lints as a scripter chose them are the viewer's settings: here,
+// counted, and every warning dropped while they drop warnings.
 namespace
 {
     S32  gLintsApplied = 0;
     // Whether the lints as chosen drop every warning.
     bool gWarningsOff  = false;
-}
-void ALScriptLints::apply(ALScriptProblems& problems)
-{
-    ++gLintsApplied;
-    if (gWarningsOff)
+
+    void applyLints(ALScriptProblems& problems)
     {
-        problems.erase(std::remove_if(problems.begin(), problems.end(),
-                                      [](const ALScriptProblem& p) { return p.severity == ALScriptProblem::Severity::Warning; }),
-                       problems.end());
+        ++gLintsApplied;
+        if (gWarningsOff)
+        {
+            problems.erase(std::remove_if(problems.begin(), problems.end(),
+                                          [](const ALScriptProblem& p) { return p.severity == ALScriptProblem::Severity::Warning; }),
+                           problems.end());
+        }
     }
-}
-ALLuauConfig ALScriptLints::luauBase()
-{
-    return ALLuauConfig();
-}
-std::string alScriptKeyedWords(const std::string&, const std::vector<std::string>&, const std::string& english)
-{
-    return english;
-}
-// What the preprocessor and the modules index call a script and a file,
-// as they spell them; both are the viewer's.
-bool ALScriptPreprocessor::fileOf(const std::string& path, std::string& file)
-{
-    if (path.rfind("disk:", 0) != 0)
-    {
-        return false;
-    }
-    file = path.substr(5);
-    return !file.empty();
-}
-std::string ALScriptPreprocessor::pathOf(const ALScriptRef& ref)
-{
-    return "object:" + ref.object.asString() + ":" + ref.item.asString();
-}
-std::string ALScriptModules::identity(const std::string& path)
-{
-    return path;
 }
 
 namespace
@@ -237,10 +211,7 @@ namespace
         return out;
     }
     const std::string SCRIPT = "integer count;\ndefault\n{\n    state_entry() { count = 1; }\n}\n";
-}
 
-namespace tut
-{
     // A notecard's items need a world to be made with; this one answers
     // nothing.
     class NoWorld final : public ALNotecardEmbedded::World
@@ -258,9 +229,13 @@ namespace tut
         bool        pastDragStart(S32, S32) override { return false; }
         void        dragOut(const LLInventoryItem&, const ALScriptRef&) override {}
     };
+}
 
+namespace tut
+{
     struct alscriptstudiochecking_data
     {
+        al_studio_test::ChosenLints lints{ applyLints };
         // The viewer the units ask, attached first and let go of last.
         al_studio_test::StudioViewer viewer;
         al_studio_test::StudioWindow                    window;

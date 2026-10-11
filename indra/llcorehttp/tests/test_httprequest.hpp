@@ -67,6 +67,8 @@ void usleep(unsigned long usec);
 
 namespace tut
 {
+namespace
+{
 
 typedef std::vector<std::pair<ALRegex, ALRegex> > regex_container_t;
 
@@ -184,6 +186,7 @@ public:
 typedef test_group<HttpRequestTestData> HttpRequestTestGroupType;
 typedef HttpRequestTestGroupType::object HttpRequestTestObjectType;
 HttpRequestTestGroupType HttpRequestTestGroup("HttpRequest Tests");
+}
 
 template <> template <>
 void HttpRequestTestObjectType::test<1>()

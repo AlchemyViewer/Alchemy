@@ -37,21 +37,16 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
 #include <functional>
 #include <initializer_list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
-
-class LLAvatarName;
-const std::string gDiffTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gDiffTestAnonName;
-}
 
 namespace tut
 {
@@ -70,6 +65,9 @@ namespace tut
                     each->die();
                 }
             }
+            // Reaped now, as the next frame would: a test that empties the
+            // graveyard itself then finds only its own views there.
+            LLMortician::updateClass();
         }
 
         ALDiffView& make(const char* left, const char* right, bool inline_view = false)
@@ -876,7 +874,8 @@ namespace tut
         hp.rect                  = LLRect(0, 1080, 1920, 0);
         hp.mouse_opaque          = false;
         LLMenuHolderGL* holder   = LLUICtrlFactory::create<LLMenuHolderGL>(hp);
-        LLMenuGL::sMenuContainer = holder;
+        std::optional<ll_test::MenuContainerScope> menus;
+        menus.emplace(holder);
         press(d, "ignore");
         LLContextMenu* menu = holder->findChild<LLContextMenu>("menu_diff_ignore");
         ensure("shown", menu != nullptr);
@@ -893,7 +892,7 @@ namespace tut
         d.setIgnore("blank_lines", true);
         ensure_equals("a comment reworded, a blank line gone and blanks at an end: no change", d.changeCount(), 0);
         ensure("lit", ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
-        LLMenuGL::sMenuContainer = nullptr;
+        menus.reset();
         LLMortician::updateClass();
         delete holder;
     }
@@ -1466,7 +1465,7 @@ namespace tut
             ++typed;
             return nullptr;
         });
-        LLKeyboard::setStringTranslatorFunc([](std::string_view name) { return std::string(name); });
+        ll_test::KeyNamesScope key_names([](std::string_view name) { return std::string(name); });
         const auto tip = [&d](const char* name) { return d.bar()->getChild<LLView>(name)->getToolTip(); };
         const auto said = [](KEY key) { return LLKeyboard::stringFromAccelerator(MASK_ALT, key); };
         ensure("each key said on its button's tip",

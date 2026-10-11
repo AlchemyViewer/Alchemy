@@ -26,6 +26,8 @@
 
 namespace tut
 {
+namespace
+{
     struct impairment_data
     {
         ALNetImpairment mImpairment;
@@ -74,6 +76,7 @@ namespace tut
     typedef test_group<impairment_data> impairment_group_t;
     typedef impairment_group_t::object impairment_object_t;
     tut::impairment_group_t impairment_group("ALNetImpairment");
+}
 
     template<> template<>
     void impairment_object_t::test<1>()
@@ -234,9 +237,12 @@ namespace tut
 // link and report success.
 namespace tut
 {
+namespace
+{
     struct impairment_data {};
     typedef test_group<impairment_data> impairment_group_t;
     tut::impairment_group_t impairment_group("ALNetImpairment");
+}
 
     template<> template<>
     void impairment_group_t::object::test<1>()

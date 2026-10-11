@@ -49,12 +49,15 @@
 
 namespace tut
 {
+namespace
+{
     struct m3math_test
     {
     };
     typedef test_group<m3math_test> m3math_test_t;
     typedef m3math_test_t::object m3math_test_object_t;
     tut::m3math_test_t tut_m3math_test("m3math_h");
+}
 
     //test case for setIdentity() fn.
     template<> template<>

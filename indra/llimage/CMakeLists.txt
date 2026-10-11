@@ -57,5 +57,7 @@ target_precompile_headers(llimage REUSE_FROM llprecompiled)
 
 # Add tests
 if(AL_BUILD_TESTS)
+  # It stubs the image classes the library defines, so it compiles the one
+  # file it tests instead of linking the library.
   al_add_test(llimageworker UNIT PROJECT llimage)
 endif()

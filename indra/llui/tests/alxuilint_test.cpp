@@ -35,6 +35,7 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "altesttempdir.h"
 
 #include "alxmldocument.h"
 
@@ -45,13 +46,6 @@
 
 #include <algorithm>
 #include <cstring>
-
-class LLAvatarName;
-const std::string gLintTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gLintTestAnonName;
-}
 
 namespace tut
 {
@@ -374,8 +368,9 @@ namespace tut
     template<> template<>
     void alxuilint_object::test<6>()
     {
-        const std::string skins = gDirUtilp->add(gDirUtilp->getTempDir(), "alxuilint_catalog_test");
-        gDirUtilp->deleteDirAndContents(skins);
+        // A tree of the test's own, removed as it ends.
+        const ll_test::TempDir temp("alxuilint_catalog_test");
+        const std::string      skins = temp.string();
         auto write = [&](const std::string& relative, const std::string& text)
         {
             std::string dir = skins;
@@ -419,8 +414,6 @@ namespace tut
         }
         ensure_equals("one template written under another tag", mismatches, 1);
         ensure_equals("and one layer that did not parse", parse_errors, 1);
-
-        gDirUtilp->deleteDirAndContents(skins);
     }
 
     // A layout panel has one dimension the stack reads -- the one along the
@@ -762,8 +755,9 @@ namespace tut
         {
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        const std::string skins = gDirUtilp->add(gDirUtilp->getTempDir(), "alxuilint_file_test");
-        gDirUtilp->deleteDirAndContents(skins);
+        // A tree of the test's own, removed as it ends.
+        const ll_test::TempDir temp("alxuilint_file_test");
+        const std::string      skins = temp.string();
         std::string dir = skins;
         for (const char* step : { "default", "xui", "en" })
         {
@@ -797,7 +791,6 @@ namespace tut
             ensure_equals("and one it has not: " + run.describe(), run.count(ALXUILint::Rule::FileMissing), 1);
             ensure_equals("named", run.first(ALXUILint::Rule::FileMissing)->what, std::string("filename"));
         }
-        gDirUtilp->deleteDirAndContents(skins);
     }
 
     // Every finding names its sentence and the names in it, and says it

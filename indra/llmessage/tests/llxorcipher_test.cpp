@@ -32,12 +32,15 @@
 
 namespace tut
 {
+namespace
+{
     struct cipher
     {
     };
     typedef test_group<cipher> cipher_t;
     typedef cipher_t::object cipher_object_t;
     tut::cipher_t tut_cipher("cipher");
+}
 
     //encrypt->decrypt
     template<> template<>

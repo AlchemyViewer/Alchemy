@@ -30,6 +30,7 @@
 #include "lltut.h"
 #include "linden_common.h"
 #include "llfile.h"
+#include "lluuid.h"
 
 namespace tut
 {
@@ -45,21 +46,32 @@ namespace tut
         return path.append(element);
     }
 
-    static std::filesystem::path get_testdir(const std::filesystem::path& tempdir)
+    // Each named for its test alone, by `unique`: two runs at once, or a
+    // test that failed before it cleaned up, cannot meet another's files.
+    static std::filesystem::path get_testdir(const std::filesystem::path& tempdir, const std::string& unique)
     {
-        return append_filename(tempdir, std::u8string(u8"test_dir"));
+        return append_filename(tempdir, std::u8string(u8"test_dir_") + std::u8string(unique.begin(), unique.end()));
     }
 
-    static std::filesystem::path get_testdir_unicode(const std::filesystem::path& tempdir)
+    static std::filesystem::path get_testdir_unicode(const std::filesystem::path& tempdir, const std::string& unique)
     {
         // Example Unicode directory name: "test_ユニコード_dir"
-        return append_filename(tempdir, std::u8string(u8"test_\xE3\x83\xA6\xE3\x83\x8B\xE3\x82\xB3\xE3\x83\xBC\xE3\x83\x89_dir"));
+        return append_filename(tempdir, std::u8string(u8"test_\xE3\x83\xA6\xE3\x83\x8B\xE3\x82\xB3\xE3\x83\xBC\xE3\x83\x89_dir_") +
+                                            std::u8string(unique.begin(), unique.end()));
     }
 
     struct llfile_test
     {
+        std::string           unique = LLUUID::generateNewID().asString();
         std::filesystem::path tempdir = LLFile::tmpdir();
-        std::filesystem::path testdir = get_testdir(tempdir);
+        std::filesystem::path testdir = get_testdir(tempdir, unique);
+
+        // whatever a test leaves in its folders goes with it
+        ~llfile_test()
+        {
+            clear_entire_dir(testdir);
+            clear_entire_dir(get_testdir_unicode(tempdir, unique));
+        }
     };
     typedef test_group<llfile_test> llfile_test_t;
     typedef llfile_test_t::object   llfile_test_object_t;
@@ -159,6 +171,7 @@ namespace tut
         const size_t numints = 1024;
 
         // Testing the LLFile class implementation
+        LLFile::mkdir(testdir);
         std::filesystem::path testfile = testdir;
         testfile.append("llfile_test.bin");
 
@@ -228,6 +241,11 @@ namespace tut
         std::filesystem::path testfile = testdir;
         testfile.append("llfile_test.bin");
 
+        // a file already there, for noreplace to refuse
+        LLFile::mkdir(testdir);
+        const char* testdata = "testdata";
+        LLFile::write(testfile, testdata, 0, strlen(testdata));
+
         std::error_code ec;
         LLFile file(testfile, LLFile::out | LLFile::noreplace, ec);
         ensure("LLFile constructor should not have opened the already existing file", !file);
@@ -255,7 +273,7 @@ namespace tut
     void llfile_test_object_t::test<5>()
     {
         // Test file and directory operations with Unicode paths and filenames
-        std::filesystem::path testdir_unicode = get_testdir_unicode(tempdir);
+        std::filesystem::path testdir_unicode = get_testdir_unicode(tempdir, unique);
 
         // Unicode filename: "ファイル_テスト.bin" (means "file_test.bin" in Japanese)
         std::string unicode_filename = "\xE3\x83\x95\xE3\x82\xA1\xE3\x82\xA4\xE3\x83\xAB_\xE3\x83\x86\xE3\x82\xB9\xE3\x83\x88.bin";

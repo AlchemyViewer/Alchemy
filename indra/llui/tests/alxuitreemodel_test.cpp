@@ -34,6 +34,7 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include "../test/lltut.h"
 
@@ -41,13 +42,6 @@
 #include <memory>
 
 #include <boost/unordered_map.hpp>
-
-class LLAvatarName;
-const std::string gTreeModelTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gTreeModelTestAnonName;
-}
 
 // Two functors the folder view declares and the viewer's inventory code
 // defines; linking the folder view pulls them, and nothing here runs them.
@@ -182,7 +176,7 @@ namespace tut
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
 
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root);
@@ -218,7 +212,6 @@ namespace tut
 
         delete floater;
         fv.reset();
-        gFloaterView = nullptr;
     }
 
     // The filter matches by name and by tag and hides code-built rows on
@@ -232,7 +225,7 @@ namespace tut
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
 
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root);
@@ -297,7 +290,6 @@ namespace tut
 
         delete floater2;
         fv.reset();
-        gFloaterView = nullptr;
     }
 
     // An item told to contain itself is refused. Taken as its own child it
@@ -313,7 +305,7 @@ namespace tut
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
 
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root);
@@ -340,7 +332,6 @@ namespace tut
 
         delete floater;
         fv.reset();
-        gFloaterView = nullptr;
     }
 
     // A drag over a row lands before it, into it or after it by where on the
@@ -356,7 +347,7 @@ namespace tut
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
 
         // A combo box builds a line editor and a button of its own, so its
         // row is a folder holding rows no element describes.
@@ -511,7 +502,6 @@ namespace tut
         delete host;
         delete floater;
         fv.reset();
-        gFloaterView = nullptr;
     }
 
     template<> template<>
@@ -523,7 +513,7 @@ namespace tut
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::unique_ptr<LLFloaterView> fv(floaterView());
-        gFloaterView = fv.get();
+        ll_test::FloaterViewScope floater_view(fv.get());
         LLXMLNodePtr root;
         LLFloater*   floater = build(fv.get(), root);
         ALXUISourceMap map;
@@ -555,6 +545,5 @@ namespace tut
         filter.resetTime(0);
         ensure("a pass out of time stops", !top->filter(filter));
         ensure("before the top is reached", top->getLastFilterGeneration() < filter.getCurrentGeneration());
-        gFloaterView = nullptr;
     }
 }

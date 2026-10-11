@@ -34,38 +34,6 @@
 
 #include <iostream>
 
-//----------------------------------------------------------------------------
-// Implementation of enough of LLControlGroup to support the tests:
-
-static U32 test_preferred_maturity = SIM_ACCESS_PG;
-
-LLControlGroup::LLControlGroup(const std::string& name)
-:   LLInstanceTracker<LLControlGroup, std::string>(name)
-{
-}
-
-LLControlGroup::~LLControlGroup()
-{
-}
-
-// Implementation of just the LLControlGroup methods we requre
-LLControlVariable* LLControlGroup::declareU32(const std::string& name, U32 initial_val, const std::string& comment, LLControlVariable::ePersist persist)
-{
-    test_preferred_maturity = initial_val;
-    return NULL;
-}
-
-void LLControlGroup::setU32(std::string_view name, U32 val)
-{
-    test_preferred_maturity = val;
-}
-
-U32 LLControlGroup::getU32(std::string_view name)
-{
-    return test_preferred_maturity;
-}
-//----------------------------------------------------------------------------
-
 namespace tut
 {
     struct agentaccess
@@ -79,7 +47,7 @@ namespace tut
     template<> template<>
     void agentaccess_object_t::test<1>()
     {
-        LLControlGroup cgr("test");
+        LLControlGroup cgr("llagentaccess");
         cgr.declareU32("PreferredMaturity", SIM_ACCESS_PG, "declared_for_test", LLControlVariable::PERSIST_NO);
         LLAgentAccess aa(cgr);
 
@@ -108,7 +76,7 @@ namespace tut
     template<> template<>
     void agentaccess_object_t::test<2>()
     {
-        LLControlGroup cgr("test");
+        LLControlGroup cgr("llagentaccess");
         cgr.declareU32("PreferredMaturity", SIM_ACCESS_PG, "declared_for_test", LLControlVariable::PERSIST_NO);
         LLAgentAccess aa(cgr);
 
@@ -156,7 +124,7 @@ namespace tut
     template<> template<>
     void agentaccess_object_t::test<3>()
     {
-        LLControlGroup cgr("test");
+        LLControlGroup cgr("llagentaccess");
         cgr.declareU32("PreferredMaturity", SIM_ACCESS_PG, "declared_for_test", LLControlVariable::PERSIST_NO);
         LLAgentAccess aa(cgr);
 
@@ -194,7 +162,7 @@ namespace tut
     template<> template<>
     void agentaccess_object_t::test<4>()
     {
-        LLControlGroup cgr("test");
+        LLControlGroup cgr("llagentaccess");
         cgr.declareU32("PreferredMaturity", SIM_ACCESS_PG, "declared_for_test", LLControlVariable::PERSIST_NO);
         LLAgentAccess aa(cgr);
 
@@ -271,7 +239,7 @@ namespace tut
     template<> template<>
     void agentaccess_object_t::test<5>()
     {
-        LLControlGroup cgr("test");
+        LLControlGroup cgr("llagentaccess");
         cgr.declareU32("PreferredMaturity", SIM_ACCESS_PG, "declared_for_test", LLControlVariable::PERSIST_NO);
         LLAgentAccess aa(cgr);
 

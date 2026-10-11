@@ -32,13 +32,6 @@
 
 #include <pugixml.hpp>
 
-class LLAvatarName;
-const std::string gTranslateTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gTranslateTestAnonName;
-}
-
 namespace tut
 {
     struct alxuitranslate_data

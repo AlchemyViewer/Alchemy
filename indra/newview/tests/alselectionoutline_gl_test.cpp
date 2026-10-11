@@ -161,33 +161,22 @@ namespace tut
         {
             return al_ortho(0.f, (F32)W, 0.f, (F32)H, 0.f, 10.f);
         }
-    }
 
     struct alselectionoutline_data
     {
-        static ll_test::HeadlessGL& gl()
-        {
-            static ll_test::HeadlessGL instance(true, true, true, false);
-            return instance;
-        }
-
+        // Each test starts forward, as the window does, whatever ran before:
+        // the ones that set no convention of their own draw under it.
         alselectionoutline_data()
         : mShaders(std::string(AL_TEST_SHADER_DIR) + "/class")
         {
-            gl();
+            setConvention(false);
         }
 
+        // The convention, matrices, viewport and shader the tests set go back
+        // with mGL.
         ~alselectionoutline_data()
         {
             tearDown();
-            setConvention(false);
-            gGL.matrixMode(LLRender::MM_PROJECTION);
-            gGL.loadIdentity();
-            gGL.matrixMode(LLRender::MM_TEXTURE0);
-            gGL.loadIdentity();
-            gGL.matrixMode(LLRender::MM_MODELVIEW);
-            gGL.loadIdentity();
-            glViewport(0, 0, ll_test::HeadlessGL::WIDTH, ll_test::HeadlessGL::HEIGHT);
         }
 
         // Unloading a program deletes the shared objects attached to it, so a new convention compiles them again.
@@ -885,6 +874,7 @@ namespace tut
             return rect;
         }
 
+        ll_test::SharedGLScope mGL;
         ll_test::TestShaderMgr mShaders;
         LLGLSLShader mIdProgram;
         LLGLSLShader mJumpProgram;
@@ -926,6 +916,7 @@ namespace tut
     typedef test_group<alselectionoutline_data> alselectionoutline_t;
     typedef alselectionoutline_t::object alselectionoutline_object_t;
     tut::alselectionoutline_t alselectionoutline_testcase("ALSelectionOutline");
+    }
 
     // Two objects side by side: each is outlined around its outer contour in its own colour, a solid line two
     // pixels wide at a UI scale of 1. The edge between them is drawn once, thin and faint, on the side of the one
@@ -2376,8 +2367,12 @@ namespace tut
         const LLUUID b("c0ffee00-0000-4000-8000-00000000000b");
         std::vector<LLUUID> alive = { a, b };
         auto is_alive = [&alive](const LLUUID& id) { return std::find(alive.begin(), alive.end(), id) != alive.end(); };
-        // A fresh singleton for this case, given up at its end.
-        ALHoverGlow::deleteSingleton();
+        // A fresh singleton for this case, given up at its end however it ends.
+        struct FreshGlow
+        {
+            FreshGlow() { ALHoverGlow::deleteSingleton(); }
+            ~FreshGlow() { ALHoverGlow::deleteSingleton(); }
+        } fresh_glow;
         ALHoverGlow& glow = ALHoverGlow::instance();
         auto fade = [&glow](const LLUUID& id)
         {
@@ -2453,7 +2448,6 @@ namespace tut
         glow.hover(b, 100);
         ensure("named a frame ago, it is still named", glow.hovered(101) == b);
         ensure("unnamed for longer, the name lapses", glow.hovered(102).isNull());
-        ALHoverGlow::deleteSingleton();
 
         const F64 kept = Outline::TARGET_KEEP_SECONDS;
         ensure("a target drawn with this frame is kept", !Outline::stale(5, 100.0, 5, 100.0 + kept * 2.0));

@@ -35,6 +35,9 @@ namespace tut
 {
     struct altextfind_data
     {
+        // The worker a long text is looked through on, closed and waited
+        // for as each test ends: nothing of a test's own left running.
+        ~altextfind_data() { ALTextFind::closeWorker(); }
     };
     typedef test_group<altextfind_data> altextfind_group;
     typedef altextfind_group::object    altextfind_object;

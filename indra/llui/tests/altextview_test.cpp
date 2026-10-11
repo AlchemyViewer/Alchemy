@@ -39,6 +39,7 @@
 #include "llpreeditor.h"
 
 #include "alheadlessui_fixture.h"
+#include "altextviewprobe.h"
 
 #include "../test/lltut.h"
 
@@ -48,43 +49,6 @@
 #include <optional>
 #include <set>
 #include <string>
-
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gViewTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gViewTestAnonName;
-}
-
-namespace ll_test
-{
-    // What a test reaches inside the view for: how long Next Misspelling
-    // may check lines for, and its going on as the next frame would.
-    struct TextViewProbe
-    {
-        static void misspellingBudget(ALTextView& view, F32 seconds) { view.mMisspellingBudget = seconds; }
-        static bool seeking(const ALTextView& view) { return view.mMisspellingSought.has_value(); }
-        static void trimLayout(ALTextView& view) { view.trimLayout(); }
-        // Every selection, the main one among them, in the order they begin.
-        static std::vector<ALTextRange> selections(const ALTextView& view) { return view.selectionsInOrder(); }
-        static S32  heldMost() { return ALTextView::LAYOUT_HELD_MOST; }
-        // The rows and the gaps in sight, as the view walks them to draw.
-        static void visibleRows(ALTextView& view, const LLRect& text, const std::function<void(S32, S32, S32)>& visit) { view.forEachVisibleRow(text, visit); }
-        static void visibleGaps(ALTextView& view, const LLRect& text, const std::function<void(S32, S32, S32)>& visit) { view.forEachVisibleGap(text, visit); }
-        // What a frame does before it draws, of what a test reaches:
-        // Next Misspelling gone on with, and the primary selection offered.
-        static void nextFrame(ALTextView& view)
-        {
-            if (view.mMisspellingSought)
-            {
-                view.seekMisspelling();
-            }
-            view.publishPrimary();
-        }
-    };
-}
 
 namespace tut
 {
@@ -752,7 +716,17 @@ namespace tut
         }
         const std::string agent  = "secondlife:///app/agent/11111111-1111-1111-1111-111111111111/about";
         const std::string object = "secondlife:///app/objectim/22222222-2222-2222-2222-222222222222?name=Thing";
-        // Nothing installed: nothing changes.
+        // Nothing installed: nothing changes. And nothing left installed when
+        // the test ends, a failed check included, for the next to find.
+        struct Uninstalled
+        {
+            ~Uninstalled()
+            {
+                LLUrlAction::setIsFriendCallback(nullptr);
+                LLUrlAction::setIsObjectBlockedCallback(nullptr);
+                LLUrlAction::setIsObjectReachableCallback(nullptr);
+            }
+        } uninstalled;
         LLUrlAction::setIsFriendCallback(nullptr);
         LLUrlAction::setIsObjectBlockedCallback(nullptr);
         LLUrlAction::setIsObjectReachableCallback(nullptr);
@@ -773,9 +747,6 @@ namespace tut
         menu->getChild<LLView>("zoom_in")->setEnabled(true);
         LLUrlAction::adjustMenu(menu, object, true, true, false);
         ensure("the zoom item left alone when not asked", menu->getChild<LLView>("zoom_in")->getEnabled());
-        LLUrlAction::setIsFriendCallback(nullptr);
-        LLUrlAction::setIsObjectBlockedCallback(nullptr);
-        LLUrlAction::setIsObjectReachableCallback(nullptr);
         menu->die();
     }
     template<> template<>
@@ -1544,6 +1515,12 @@ namespace tut
     void altextview_object::test<50>()
     {
         set_test_name("find: no more matches than a list is any use as, said with a plus; a long text looked through once the query settles, not at each key");
+        // The worker the long text is looked through on, closed and waited
+        // for when the test ends: nothing of its own left running.
+        struct WorkerClosed
+        {
+            ~WorkerClosed() { ALTextFind::closeWorker(); }
+        } worker_closed;
         std::string many;
         for (size_t i = 0; i < ALTextFind::LIMIT + 5; ++i)
         {
@@ -3076,6 +3053,12 @@ namespace tut
     void altextview_object::test<98>()
     {
         set_test_name("Next over matches that are empty -- ^ at each line's start -- goes on from the current one at the caret, round the end; one the caret was put on is found first");
+        // A pattern across lines is looked for on the worker; closed and
+        // waited for when the test ends.
+        struct WorkerClosed
+        {
+            ~WorkerClosed() { ALTextFind::closeWorker(); }
+        } worker_closed;
 #if LL_DARWIN
         constexpr MASK toggle = MASK_CONTROL | MASK_ALT;
 #else
