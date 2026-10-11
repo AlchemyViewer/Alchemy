@@ -20,7 +20,10 @@ Parity holds for a file when:
     name TUT printed is the one the mapping folded into the case's;
   - each case's assertions, counted in the converted file, number its
     TUT test's ensure, fail and skip calls, as the mapping counted them in
-    the TUT file.
+    the TUT file, where a && chain the converter split counts one a term
+    (catch2_expected). After a file has been edited by hand past what the
+    converter wrote, --recounted lists the counts instead of holding them
+    to the mapping; names and results must still agree.
 
 A test the mapping says TUT never ran (past its group's limit) or this host
 does not compile is listed, not counted against parity. So is what the
@@ -183,11 +186,14 @@ def recount(path, cases):
         text = f.read().decode("utf-8", "surrogateescape")
     masked = mask(text)
     counts = {}
-    for m in re.finditer(r'TEST_CASE_METHOD\s*\(', masked):
+    for m in re.finditer(r'\bTEST_CASE(_METHOD)?\s*\(', masked):
         open_paren = m.end() - 1
         close = matching(masked, open_paren)
         header = text[open_paren + 1:close]
-        literal = re.search(r',\s*((?:"(?:[^"\\]|\\.)*"\s*)+),', header)
+        # The name is the first argument of a TEST_CASE, the second of a
+        # TEST_CASE_METHOD.
+        literal = re.search(r',\s*((?:"(?:[^"\\]|\\.)*"\s*)+),' if m.group(1) else
+                            r'^\s*((?:"(?:[^"\\]|\\.)*"\s*)+),', header)
         if not literal:
             continue
         name = "".join(unescape(p) for p in re.findall(r'"((?:[^"\\]|\\.)*)"', literal.group(1)))
@@ -328,11 +334,18 @@ def check(args):
             else:
                 problems.append(f"{path}: {name!r}: TUT {t['said']!r}, Catch2 {cases[name]}")
             static = counted.get(name)
-            if e["tut_assertions"] == e["catch2_assertions"] == static:
+            # One TUT call is one Catch2 assertion, but for a && chain split
+            # into one assertion a term, which the mapping counted.
+            expected = e.get("catch2_expected", e["tut_assertions"])
+            if expected == e["catch2_assertions"] == static:
                 counts_ok += 1
+            elif args.recounted and static is not None:
+                counts_ok += 1
+                print(f"{path}: listed: {name!r}: {expected} assertions converted, {static} in the file now")
             else:
                 problems.append(f"{path}: {name!r}: {e['tut_assertions']} TUT assertion calls, "
-                                f"{e['catch2_assertions']} Catch2 assertions mapped, {static} in the file")
+                                f"{expected} Catch2 assertions they became, {e['catch2_assertions']} mapped, "
+                                f"{static} in the file")
         for key, t in sorted(tut_results.items()):
             problems.append(f"{path}: TUT ran [{key[0]}, {key[1]}], which the mapping does not have")
         for name in sorted(set(cases) - seen_cases):
@@ -365,6 +378,9 @@ def main():
     chk = sub.add_parser("check", help="run the converted files' Catch2 entries and compare")
     chk.add_argument("--tut", required=True, help="what record kept")
     chk.add_argument("--mapping", required=True, help="tut2catch.py's mapping")
+    chk.add_argument("--recounted", action="store_true",
+                     help="the files were edited by hand since conversion: list each case's assertion count "
+                          "rather than hold it to the mapping's (names and results still must match)")
     chk.add_argument("files", nargs="*", help="only these converted files (default: all the mapping has)")
     args = parser.parse_args()
     return record(args) if args.step == "record" else check(args)

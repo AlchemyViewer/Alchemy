@@ -7,22 +7,38 @@ decided by the types clang resolved, not by its text:
   structure    every test<N> of a group becomes
                  TEST_CASE_METHOD(<data>, "<group>: <name>", "[<group tag>]")
                with the group's data struct as the fixture, built fresh for
-               each case as TUT built it for each test. The name is the
-               test's set_test_name literal, or #N when it has none; " #N"
-               is added to a name another case of the file has (ignoring
-               case). Tests declared out of TUT's numeric order are moved
-               later in the file, never earlier, so that declaration order,
-               Catch2's, is TUT's. The group's typedefs, its test_group
-               object and a class derived from test_group only to name it
-               go.
-  assertions   ensure(c) -> REQUIRE(c); ensure(msg, c) ->
-               UNSCOPED_INFO(msg) then REQUIRE(c), braced where the call was
-               a lone statement of an if, else or loop; ensure_not ->
-               REQUIRE_FALSE; ensure_equals -> REQUIRE(a == b), except
-               where both values are LLSD (REQUIRE_THAT with
+               each case as TUT built it for each test; or a plain
+               TEST_CASE("<group>: <name>", "[<group tag>]") where the struct
+               holds nothing and nothing else names it, and the struct goes.
+               The name is, first, one --names gives; then the test's
+               set_test_name literal; then the first sentence of the
+               comment written above the test, where that is prose; else
+               #N. " #N" is added to a name another case of the file has
+               (ignoring case). Tests declared out of TUT's numeric order
+               are moved later in the file, never earlier, so that
+               declaration order, Catch2's, is TUT's. The group's typedefs,
+               its test_group object and a class derived from test_group
+               only to name it go. namespace tut, once nothing names tut::
+               and no type production code befriends as tut:: is in it,
+               becomes an anonymous namespace, taking in one directly inside
+               it.
+  assertions   CHECK, which lets a case go on and so reports every failure
+               of a run; REQUIRE where going on could only crash or bury the
+               first failure: a condition that guards what follows (a
+               pointer, a size, an emptiness, a presence), in a loop or a
+               lambda, and in a helper outside a test's body. In a
+               destructor, where a throw would end the process, CHECK
+               always. With that macro (X below):
+               ensure(c) -> X(c); ensure(a && b && ...) -> X(a); X(b); ...
+               one assertion a term, so that each prints its operands;
+               ensure(msg, c) -> UNSCOPED_INFO(msg) then X(c), or, where c
+               split, { INFO(msg); X(a); X(b); } so the message goes with
+               each; braced where the call was a lone statement of an if,
+               else or loop; ensure_not -> X_FALSE; ensure_equals -> X(a ==
+               b), except where both values are LLSD (X_THAT with
                ll_test::LLSDEquals, the deep compare TUT's overload made)
                or LLURI (their asString()s, as TUT compared them);
-               ensure_not_equals -> REQUIRE(a != b); ensure_distance and
+               ensure_not_equals -> X(a != b); ensure_distance and
                ensure_approximately_equals_range -> WithinAbs;
                ensure_approximately_equals -> ll_test::WithinBits, at the
                precision of the overload TUT chose; ensure_contains,
@@ -30,12 +46,14 @@ decided by the types clang resolved, not by its text:
                matchers; ensure_memory_matches -> ll_test::MemoryMatches;
                fail -> FAIL; skip -> SKIP; throw tut::failure(m) -> FAIL(m);
                get_test_name() -> ll_test::currentTestName(); a catch of
-               tut::failure that rethrows -> ll_test::Failure. In a
-               destructor, where a throw would end the process, the CHECK
-               forms. Operands are parenthesised where a macro or an
-               operator would split or rebind them; a condition Catch2
-               cannot decompose (&&, ||, ?:) is parenthesised whole rather
-               than split, so each TUT call stays one assertion.
+               tut::failure that rethrows -> ll_test::Failure. A condition
+               is written so that Catch2 decomposes it and prints its
+               operands: parentheses the test wrote around the whole go; a
+               literal compared on the left moves right; x == true is X(x)
+               and x == false X_FALSE(x); strcmp(a, b) == 0 compares
+               std::string_views. Operands are parenthesised where a macro
+               or an operator would split or rebind them; a condition
+               Catch2 cannot decompose (||, ?:) is parenthesised whole.
   includes     lltut.h and tut.hpp give way to the Catch2 headers the file
                now uses, and altestmatchers.h, altestname.h or
                altestfailure.h where it uses them.
@@ -108,6 +126,15 @@ STATEMENT_PARENTS = {"CompoundStmt", "CaseStmt", "DefaultStmt", "LabelStmt", "At
 BODY_PARENTS = {"IfStmt", "ForStmt", "WhileStmt", "DoStmt", "CXXForRangeStmt"}
 FUNCTION_KINDS = {"FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl",
                   "CXXConversionDecl", "LambdaExpr"}
+LOOP_KINDS = {"ForStmt", "WhileStmt", "DoStmt", "CXXForRangeStmt"}
+# What a condition asks of an object when what follows relies on the answer:
+# that it holds something, or how much.
+GUARD_MEMBERS = {"size", "empty", "length", "count", "isDefined", "isUndefined", "has", "isMap", "isArray",
+                 "notNull", "isNull"}
+LITERAL_KINDS = {"IntegerLiteral", "FloatingLiteral", "CXXBoolLiteralExpr", "CharacterLiteral", "StringLiteral",
+                 "CXXNullPtrLiteralExpr", "GNUNullExpr", "FixedPointLiteral"}
+# A comment that names nothing: a separator, or a note to whoever reads on.
+NOT_A_NAME = re.compile(r"^(?:[-=*/#~_ ]*|(?:TODO|FIXME|XXX|HACK|NB|NOTE|BUG)\b.*)$", re.I)
 
 
 class ConvertError(Exception):
@@ -660,6 +687,134 @@ def decomposable(node):
     return True
 
 
+def unparenthesised(node):
+    """node, without the parentheses a test wrote around a whole Catch2 can
+    decompose, and without the implicit nodes around that."""
+    node = skip_implicit(node)
+    while node.get("kind") == "ParenExpr":
+        inner = [c for c in node.get("inner", []) if "kind" in c]
+        if not inner or not decomposable(inner[0]):
+            break
+        node = skip_implicit(inner[0])
+    return node
+
+
+def and_terms(node):
+    """The terms of a && chain, each as the test wrote it, or [node]."""
+    node = skip_implicit(node)
+    while node.get("kind") == "ParenExpr":
+        inner = [c for c in node.get("inner", []) if "kind" in c]
+        if not inner:
+            break
+        inside = skip_implicit(inner[0])
+        if inside.get("kind") != "BinaryOperator" or inside.get("opcode") != "&&":
+            break
+        node = inside
+    if node.get("kind") == "BinaryOperator" and node.get("opcode") == "&&":
+        inner = [c for c in node.get("inner", []) if "kind" in c]
+        if len(inner) == 2:
+            return and_terms(inner[0]) + and_terms(inner[1])
+    return [node]
+
+
+def operands(node):
+    """A comparison's two operands, implicit nodes and all, or None."""
+    node = skip_implicit(node)
+    inner = [c for c in node.get("inner", []) if "kind" in c]
+    if node.get("kind") == "BinaryOperator" and len(inner) == 2:
+        return inner
+    return None
+
+
+def is_literal(node):
+    node = skip_implicit(node)
+    if node.get("kind") == "UnaryOperator" and node.get("opcode") in ("-", "+"):
+        inner = [c for c in node.get("inner", []) if "kind" in c]
+        return bool(inner) and is_literal(inner[0])
+    if node.get("kind") == "DeclRefExpr" and node.get("referencedDecl", {}).get("kind") == "EnumConstantDecl":
+        return True
+    return node.get("kind") in LITERAL_KINDS
+
+
+def strcmp_args(node):
+    """The two arguments of a strcmp() call, or None."""
+    node = skip_implicit(node)
+    if node.get("kind") != "CallExpr":
+        return None
+    inner = [c for c in node.get("inner", []) if "kind" in c]
+    if len(inner) != 3:
+        return None
+    callee = inner[0]
+    while callee.get("kind") in ("ImplicitCastExpr", "ParenExpr") and callee.get("inner"):
+        callee = callee["inner"][0]
+    if callee.get("kind") != "DeclRefExpr" or callee.get("referencedDecl", {}).get("name") not in \
+            ("strcmp", "__builtin_strcmp"):
+        return None
+    return inner[1:]
+
+
+def value_args(name, args):
+    """The arguments a TUT call asserts about, without its message."""
+    if name in ("ensure", "ensure_not"):
+        return args[-1:]
+    if name in ("ensure_equals", "ensure_not_equals"):
+        return args[-2:]
+    if name in ("ensure_distance", "ensure_approximately_equals", "ensure_approximately_equals_range"):
+        return args[-3:]
+    if name in ("ensure_contains", "ensure_does_not_contain", "ensure_starts_with", "ensure_ends_with"):
+        return args[1:]
+    if name == "ensure_memory_matches":
+        return args[-4:]
+    return []
+
+
+def name_from_comment(text):
+    """A case's name from the comment above its test: the first sentence of
+    the comment's first paragraph, or None where the comment is not prose."""
+    lines = []
+    for raw in text.splitlines():
+        s = raw.strip()
+        s = re.sub(r"^(?://+!?|/\*+!?|\*+(?!/))\s?", "", s)
+        s = re.sub(r"\*+/\s*$", "", s).strip()
+        s = re.sub(r"^@(?:brief|test|note)\s+", "", s)
+        lines.append(s)
+    paragraph = []
+    for s in lines:
+        if not s:
+            if paragraph:
+                break
+            continue
+        paragraph.append(s)
+    text = re.sub(r"\s+", " ", " ".join(paragraph)).strip()
+    if not text or NOT_A_NAME.match(text):
+        return None
+    # Commented-out code, or a test's number, names nothing.
+    if re.search(r";\s*$|[{}]|==|->|::\w+\(|^\w+\s*\(.*\)\s*;?$|\btest\s*<\s*\d+\s*>|^#", text):
+        return None
+    if len(re.findall(r"[A-Za-z]{2,}", text)) < 2:
+        return None
+    # The first sentence: a full stop before a space or the end, not the one
+    # in "e.g." or after an initial.
+    sentence = text
+    for m in re.finditer(r"[.!?](?=\s|$)", text):
+        if re.search(r"(?:\be\.g|\bi\.e|\betc|\bvs|\bcf|\b[A-Za-z])$", text[:m.start()]):
+            continue
+        sentence = text[:m.start() + (1 if text[m.start()] in "!?" else 0)]
+        break
+    sentence = sentence.rstrip(" .:;,").strip()
+    if len(sentence) > 100:
+        cut = sentence[:100]
+        for sep in ("; ", ": ", " -- ", ", "):
+            i = cut.rfind(sep)
+            if i >= 40:
+                sentence = cut[:i]
+                break
+        else:
+            sentence = cut.rsplit(" ", 1)[0]
+        sentence = sentence.rstrip(" .:;,")
+    return sentence or None
+
+
 def is_null_message(node):
     node = skip_implicit(node)
     if node.get("kind") in ("GNUNullExpr", "CXXNullPtrLiteralExpr"):
@@ -771,6 +926,11 @@ class Converter:
         self.derived_groups = {}  # class derived from test_group -> (data, limit, name)
         self.removed_spans = []
         self.slot_at = {}         # chunk start -> the plan that puts tests there
+        self.emitted = {}         # offset of a converted call -> the Catch2 assertions it became
+        self.records = {}         # qualified name of a class -> its CXXRecordDecl
+        self.name_overrides = {}  # (group, n) -> a case's name, from --names
+        self.friend_names = set() # tut:: types production code befriends
+        self.tut_namespaces = []  # NamespaceDecl nodes named tut, with their parents
         source.find_conditionals(active_lines)
 
     # ---- helpers -------------------------------------------------------
@@ -807,7 +967,12 @@ class Converter:
         elif kind == "VarDecl":
             self.on_var(node, parents)
         elif kind == "CXXRecordDecl":
+            if node.get("completeDefinition") and node.get("name"):
+                spaces = [p.get("name") or "(anonymous namespace)" for p in parents if p.get("kind") == "NamespaceDecl"]
+                self.records.setdefault("::".join(spaces + [node["name"]]), node)
             self.on_record(node, parents)
+        elif kind == "NamespaceDecl" and node.get("name") == "tut":
+            self.tut_namespaces.append((node, parents))
         elif kind in ("CallExpr", "CXXMemberCallExpr"):
             self.on_call(node, parents)
         elif kind == "CXXThrowExpr":
@@ -1122,6 +1287,139 @@ class Converter:
                 return parent.get("kind") == "CXXDestructorDecl"
         return False
 
+    def strength(self, record, nodes):
+        """CHECK, which lets the case go on past a failure and so reports every
+        failure of a run, or REQUIRE, which ends it, where going on could
+        only crash or bury the first failure under its consequences:
+          - in a destructor, CHECK, since a throw would end the process;
+          - outside a test's own body (a helper, which any caller may call
+            in a loop) and in a loop or lambda of one, REQUIRE, so that the
+            first element that fails is the one reported;
+          - where the condition guards what follows (a pointer not null, a
+            size, an emptiness, a presence), REQUIRE;
+          - otherwise CHECK."""
+        if self.in_destructor(record):
+            return "CHECK"
+        test = self.test_containing(record["range"][0])
+        body = test_body(test) if test else None
+        if body is None:
+            return "REQUIRE"
+        for parent in reversed(record["parents"]):
+            if parent is body:
+                break
+            if parent.get("kind") in LOOP_KINDS or parent.get("kind") == "LambdaExpr":
+                return "REQUIRE"
+        if any(self.guards(n) for n in nodes if n):
+            return "REQUIRE"
+        return "CHECK"
+
+    @staticmethod
+    def guards(node):
+        """Whether a condition or value tells what the code after it relies
+        on: a pointer, compared with null or tested as a bool, or a member
+        that says how much an object holds or whether it holds anything.
+        Default arguments are not looked in: a NULL a callee defaults to is
+        nothing the test compared."""
+        if value_type(unparenthesised(node)).endswith("*"):
+            return True
+        stack = [node]
+        while stack:
+            sub = stack.pop()
+            kind = sub.get("kind")
+            if kind == "CXXDefaultArgExpr":
+                continue
+            if kind == "ImplicitCastExpr" and sub.get("castKind") == "PointerToBoolean":
+                return True
+            if kind == "BinaryOperator" and sub.get("opcode") in ("==", "!="):
+                if any(skip_implicit(c).get("kind") in ("CXXNullPtrLiteralExpr", "GNUNullExpr") or
+                       (c.get("kind") == "ImplicitCastExpr" and c.get("castKind") == "NullToPointer")
+                       for c in sub.get("inner", []) if "kind" in c):
+                    return True
+            if kind == "MemberExpr" and sub.get("name") in GUARD_MEMBERS:
+                # isNull() and notNull() guard only on what points: on a
+                # vector or a UUID they are values like any other.
+                if sub.get("name") not in ("isNull", "notNull"):
+                    return True
+                base = [c for c in sub.get("inner", []) if "kind" in c]
+                if base and re.search(r"Pointer|ptr\b|Handle|\*", value_type(skip_implicit(base[0]))):
+                    return True
+            stack.extend(c for c in sub.get("inner", []) if isinstance(c, dict) and "kind" in c)
+        return False
+
+    def plain_span(self, node):
+        """[start, end) of a node written in this file's text, or None."""
+        rng = self.node_range(node)
+        if rng is None or rng[2] not in ("file", "macro-arg") or rng[3] not in ("file", "macro-arg"):
+            return None
+        return rng[0], rng[1]
+
+    def assertion(self, node, span, negate):
+        """(suffix, text) of the one assertion a condition is: "" or "_FALSE"
+        after CHECK or REQUIRE, and what goes between its parentheses.
+        Parentheses the test wrote around a whole Catch2 decomposes go, so
+        that a failure prints its operands; a literal compared on the left
+        moves right; a bool compared with true or false is asserted as
+        itself; and strcmp() is compared as std::string_view, which prints."""
+        suffix = "_FALSE" if negate else ""
+        whole = self.render(*span)
+        node = unparenthesised(node)
+        nspan = self.plain_span(node)
+        if nspan is None:
+            return suffix, whole if decomposable(node) else "(" + whole + ")"
+        pair = operands(node)
+        op = node.get("opcode") if pair else None
+        if op in ("==", "!="):
+            left, right = (skip_implicit(p) for p in pair)
+            spans = [self.plain_span(p) for p in pair]
+            if None not in spans:
+                for lit, other, other_span in ((left, right, spans[1]), (right, left, spans[0])):
+                    if lit.get("kind") == "CXXBoolLiteralExpr" and value_type(other) == "bool":
+                        truth = (lit.get("value") is True) == (op == "==")
+                        other_node = unparenthesised(other)
+                        inner = self.render(*(self.plain_span(other_node) or other_span))
+                        if not decomposable(other_node) and not wrapped(inner):
+                            inner = "(" + inner + ")"
+                        return ("" if truth != negate else "_FALSE"), inner
+                for zero, call in ((left, right), (right, left)):
+                    args = strcmp_args(call)
+                    if args and zero.get("kind") == "IntegerLiteral" and zero.get("value") == "0":
+                        text = self.string_views(args, op)
+                        if text:
+                            return suffix, text
+                if is_literal(left) and not is_literal(right):
+                    return suffix, f"{self.render(*spans[1])} {op} {self.render(*spans[0])}"
+        if node.get("kind") == "UnaryOperator" and node.get("opcode") == "!":
+            inner = [c for c in node.get("inner", []) if "kind" in c]
+            args = strcmp_args(inner[0]) if inner else None
+            text = self.string_views(args, "==") if args else None
+            if text:
+                return suffix, text
+            # !x is x, asserted false, so that x prints.
+            operand = unparenthesised(inner[0]) if inner else None
+            ospan = self.plain_span(operand) if operand else None
+            if ospan:
+                text = self.render(*ospan)
+                return ("" if negate else "_FALSE"), text if decomposable(operand) else "(" + text + ")"
+        args = strcmp_args(node)
+        text = self.string_views(args, "!=") if args else None
+        if text:
+            return suffix, text
+        text = self.render(*nspan)
+        return suffix, text if decomposable(node) else "(" + text + ")"
+
+    def string_views(self, args, op):
+        spans = [self.plain_span(a) for a in args]
+        if None in spans:
+            return None
+        texts = []
+        for arg, span in zip(args, spans):
+            text = self.render(*span)
+            texts.append(text if skip_implicit(arg).get("kind") == "StringLiteral" else f"std::string_view({text})")
+        if not texts[0].startswith("std::string_view("):
+            texts.reverse()
+        self.headers.add("<string_view>")
+        return f"{texts[0]} {op} {texts[1]}"
+
     def arg_ranges(self, record):
         """[start, end) of each argument."""
         start, end = record["range"][0], record["range"][1]
@@ -1213,29 +1511,38 @@ class Converter:
         if kind == "bits-?":
             self.check(start, "cannot tell which ensure_approximately_equals overload was called")
             return
-        build = self.builder(name, kind, record, ranges, "CHECK" if check_form else "REQUIRE")
+        build = self.builder(name, kind, record, ranges, self.strength(record, value_args(name, args)))
         if build is not None:
             self.headers.update(headers_for(name, kind))
+            if any(strcmp_args(sub) for a in args for sub in iter_nodes(a)):
+                self.headers.add("<string_view>")
         if build is None:
             self.check(start, f"{name}() with {len(args)} arguments is not a form this converter knows")
             return
+        block = getattr(build, "block", False)
         stmt_end = end
-        if context == "body":
+        if context == "body" or block:
             after = self.src.skip_space(end)
             if self.src.masked[after:after + 1] != b";":
-                self.check(start, f"{name}() as a lone statement is not followed by its semicolon")
+                self.check(start, f"{name}() as a statement is not followed by its semicolon")
                 return
             stmt_end = after + 1
 
-        def render(conv, plan, build=build, context=context, start=start):
+        def render(conv, plan, build=build, context=context, start=start, block=block):
             statements = build()
+            flat = [s for st in statements for s in (st[1] if isinstance(st, tuple) else [st])]
+            conv.emitted[start] = sum(1 for s in flat if CATCH_ASSERTION.match(s.encode()))
             if context == "body":
-                if len(statements) > 1:
-                    return "{ " + "; ".join(statements) + "; }"
-                return statements[0] + ";"
+                if len(flat) > 1:
+                    return "{ " + "; ".join(flat) + "; }"
+                return flat[0] + ";"
+            indent = conv.src.indent_at(start).decode()
+            if block:
+                unit = "\t" if indent.startswith("\t") else "    "
+                return "{\n" + "".join(f"{indent}{unit}{s};\n" for s in flat) + indent + "}"
             if conv.src.starts_line(start):
-                return (";\n" + conv.src.indent_at(start).decode()).join(statements)
-            return "; ".join(statements)
+                return (";\n" + indent).join(flat)
+            return "; ".join(flat)
         self.plans.append(Plan(start, stmt_end, render))
 
     def builder(self, name, kind, record, ranges, req):
@@ -1258,10 +1565,26 @@ class Converter:
         if name in ("ensure", "ensure_not"):
             if n not in (1, 2):
                 return None
-            macro = req + ("_FALSE" if name == "ensure_not" else "")
+            condition = args[n - 1]
+            # A && chain is as many assertions, each printing its operands,
+            # each as strong as its own term needs.
+            terms = and_terms(condition) if name == "ensure" else [condition]
+            if len(terms) > 1 and any(self.plain_span(t) is None for t in terms):
+                terms = [condition]
 
             def build():
-                return (message(0) if n == 2 else []) + [f"{macro}({self.condition(ranges[n - 1], args[n - 1])})"]
+                out = []
+                for term in terms:
+                    span = ranges[n - 1] if len(terms) == 1 else self.plain_span(term)
+                    suffix, text = self.assertion(term, span, name == "ensure_not")
+                    strength = req if len(terms) == 1 else self.strength(record, [term])
+                    out.append(f"{strength}{suffix}({text})")
+                msg = message(0) if n == 2 else []
+                if msg and len(out) > 1:
+                    # The message is about all of them: INFO, scoped to them.
+                    return [("block", ["INFO" + msg[0][len("UNSCOPED_INFO"):]] + out)]
+                return msg + out
+            build.block = n == 2 and not is_null_message(args[0]) and len(terms) > 1
             return build
         if name in ("fail", "skip", "throw"):
             if n != 1:
@@ -1661,6 +1984,14 @@ class Converter:
                             test.name_literal_inner = "".join(pieces)
                             self.remove_statement(offset, call_end + 1)
                 test.tut_name = text_name if text_name is not None else ("" if not test.names else None)
+                # A name given in --names wins; then set_test_name's; then the
+                # first sentence of the comment written above the test.
+                given = self.name_overrides.get((group.name, test.n))
+                if given is None and text_name is None:
+                    given = self.comment_name(test)
+                if given is not None:
+                    text_name = given
+                    test.name_literal_inner = c_escape(given)
                 base = f"{group.name}: {text_name}" if text_name is not None else f"{group.name}: #{test.n}"
                 # Tests in different branches of an #if are never compiled
                 # together, so their names cannot clash.
@@ -1675,6 +2006,23 @@ class Converter:
                 else:
                     test.catch2_literal = '"' + c_escape(name) + '"'
 
+    def comment_name(self, test):
+        """A name from the comment lines right above a test, or None."""
+        if test.start is None:
+            return None
+        start = self.src.line_start(test.start)
+        top = start
+        while top > 0:
+            prev = self.src.line_start(top - 1)
+            if self.src.masked[prev:top].strip() == b"" and self.src.data[prev:top].strip():
+                top = prev
+                continue
+            break
+        text = self.text(top, start)
+        if not text.strip():
+            text = "\n".join(self.comments_in(test.start, test.header_end))
+        return name_from_comment(text)
+
     def remove_statement(self, start, end):
         after = self.src.skip_space(end)
         if self.src.masked[after:after + 1] == b";":
@@ -1682,15 +2030,49 @@ class Converter:
         self.removals.append((start, end, "statement"))
 
     # ---- the plans ----------------------------------------------------
+    def plan_fixtures(self):
+        """A group whose data struct holds nothing, and which nothing else in
+        the file names, is plain TEST_CASEs: the struct goes."""
+        for data, group in self.groups.items():
+            group.fixtureless = False
+            tests = [t for t in group.tests if not t.macro and t.catch2_name]
+            if not tests or any(t.inactive for t in group.tests):
+                continue
+            node = self.records.get(tests[0].data) or self.records.get(data)
+            if node is None:
+                short = data.replace("(anonymous namespace)::", "").rpartition("::")[2]
+                found = [n for k, n in self.records.items() if k.rpartition("::")[2] == short]
+                node = found[0] if len(found) == 1 else None
+            if node is None or node.get("bases") or node.get("name") in self.friend_names:
+                continue
+            if [c for c in node.get("inner", []) if "kind" in c and not c.get("isImplicit")]:
+                continue
+            rng = self.node_range(node)
+            if rng is None or rng[2] != "file":
+                continue
+            spans = [(rng[0], rng[1])] + [(s, e) for s, e, _ in self.removals] + \
+                [(t.start, t.header_end) for t in group.tests if t.start is not None and t.header_end]
+            named = [m.start() for m in re.finditer(rb"\b" + re.escape(node["name"].encode()) + rb"\b",
+                                                    self.src.masked)]
+            if any(not any(s <= at < e for s, e in spans) for at in named):
+                continue
+            group.fixtureless = True
+            self.remove_decl(node)
+
     def plan_structure(self):
         for test in self.tests:
             if test.macro or test.group is None or test.catch2_name is None:
                 continue
-            if "," in test.fixture:
-                self.check(test.start, f"the fixture {test.fixture} has a comma, which TEST_CASE_METHOD would split")
-                continue
             tag = group_tag(test.group.name)
-            header = f'TEST_CASE_METHOD({test.fixture}, {test.catch2_literal}, "[{tag}]")'
+            if getattr(test.group, "fixtureless", False):
+                test.header_text = f"TEST_CASE({test.catch2_literal},"
+                header = f'TEST_CASE({test.catch2_literal}, "[{tag}]")'
+            else:
+                if "," in test.fixture:
+                    self.check(test.start, f"the fixture {test.fixture} has a comma, which TEST_CASE_METHOD would split")
+                    continue
+                test.header_text = f"TEST_CASE_METHOD({test.fixture}, {test.catch2_literal},"
+                header = f'TEST_CASE_METHOD({test.fixture}, {test.catch2_literal}, "[{tag}]")'
             # A comment inside template<> template<> void X::test<N>() stays,
             # on a line of its own above the case.
             indent = self.src.indent_at(test.start).decode()
@@ -1714,6 +2096,62 @@ class Converter:
         self.removed_spans = self.tidy_removals(self.removed_spans)
         for start, end in self.removed_spans:
             self.plans.append(Plan(start, end, lambda conv, plan: ""))
+
+    def can_unwrap(self, converted):
+        """Whether namespace tut is only TUT's left: nothing names tut::, no
+        type production code befriends as tut:: is here, and no call is left
+        unconverted that would look for TUT in it."""
+        if self.checks or not self.tut_namespaces:
+            return False
+        masked = mask_source(converted.encode("utf-8", "surrogateescape"))
+        if re.search(rb"\btut\s*::|\busing\s+namespace\s+tut\b", masked):
+            return False
+        return not any(re.search(rb"\b" + re.escape(n.encode()) + rb"\b", masked) for n in self.friend_names)
+
+    def plan_unwrap(self):
+        """namespace tut becomes an anonymous namespace, and an anonymous
+        namespace written directly inside it, on lines of its own, merges
+        into it."""
+        taken = [(p.start, p.end) for p in self.plans if p.start != p.end]
+
+        def free(s, e):
+            return not any(a < e and s < b for a, b in taken)
+        size = len(self.src.data)
+        for node, parents in self.tut_namespaces:
+            rng = self.node_range(node)
+            if rng is None or rng[2] != "file" or any(p.get("kind") == "NamespaceDecl" for p in parents):
+                continue
+            m = re.compile(rb"namespace\s+tut\b").match(self.src.masked, rng[0])
+            if not m or not free(m.start(), m.end()):
+                continue
+            self.plans.append(Plan(m.start(), m.end(), lambda conv, plan: "namespace"))
+            # A comment on its closing brace that says whose it was says so no
+            # longer.
+            note = re.compile(rb"//[ \t]*(?:end[ \t]+(?:of[ \t]+)?)?(?:namespace[ \t]+)?tut\b[^\n]*").search(
+                self.src.data, rng[1], self.src.line_end(rng[1] - 1))
+            if note and free(note.start(), note.end()):
+                self.plans.append(Plan(note.start(), note.end(), lambda conv, plan: "// anonymous namespace"))
+            for child in node.get("inner", []):
+                if child.get("kind") != "NamespaceDecl" or child.get("name"):
+                    continue
+                crng = self.node_range(child)
+                if crng is None or crng[2] != "file":
+                    continue
+                opener = self.src.masked.find(b"{", crng[0])
+                close = crng[1]
+                if opener < 0 or not re.fullmatch(rb"namespace\s*", self.src.masked[crng[0]:opener]):
+                    continue
+                os_, oe = self.src.line_start(crng[0]), self.src.line_end(opener)
+                cs, ce = self.src.line_start(close - 1), self.src.line_end(close - 1)
+                if self.src.masked[os_:crng[0]].strip() or self.src.masked[opener + 1:oe].strip() or \
+                        self.src.masked[cs:close - 1].strip() or self.src.masked[close:ce].strip():
+                    continue
+                oe, ce = min(oe + 1, size), min(ce + 1, size)
+                if not (free(os_, oe) and free(cs, ce)):
+                    continue
+                self.plans.append(Plan(os_, oe, lambda conv, plan: ""))
+                self.plans.append(Plan(cs, ce, lambda conv, plan: ""))
+                taken += [(os_, oe), (cs, ce)]
 
     def comment_above(self, start):
         """Where the comment lines right above a removed declaration begin,
@@ -1930,15 +2368,19 @@ class Converter:
         """Per test: the TUT assertion calls in its body before, and the Catch2
         assertions in it after."""
         tut = {}
+        expected = {}
         for test in self.tests:
             if test.body_start is None or test.body_end is None:
                 continue
-            tut[id(test)] = sum(1 for o in self.counted if test.body_start <= o < test.body_end)
+            calls = [o for o in self.counted if test.body_start <= o < test.body_end]
+            tut[id(test)] = len(calls)
+            # A split && chain is more than one assertion for one TUT call.
+            expected[id(test)] = sum(self.emitted.get(o, 1) for o in calls)
         data = converted.encode("utf-8", "surrogateescape")
         catch = {id(t): n for t, n in count_catch_assertions(data, [
-            (t, f"TEST_CASE_METHOD({t.fixture}, {t.catch2_literal},") for t in self.tests
-            if t.catch2_name and not t.macro])}
-        return tut, catch
+            (t, getattr(t, "header_text", f"TEST_CASE_METHOD({t.fixture}, {t.catch2_literal},"))
+            for t in self.tests if t.catch2_name and not t.macro])}
+        return tut, catch, expected
 
 
 def count_catch_assertions(data, cases):
@@ -2137,7 +2579,40 @@ def group_tag(name):
 # --------------------------------------------------------------------------
 # One file
 # --------------------------------------------------------------------------
-def convert_file(path, build_dir, config, dry_run, output_dir=None):
+_FRIENDS = None
+
+
+def tut_friends():
+    """The tut:: types production code names as friends: they keep their
+    namespace, so a file holding one keeps namespace tut."""
+    global _FRIENDS
+    if _FRIENDS is None:
+        _FRIENDS = set()
+        for top, dirs, files in os.walk(os.path.join(ROOT, "indra")):
+            dirs[:] = [d for d in dirs if d not in ("tests", "test", "externals")]
+            for f in files:
+                if f.endswith((".h", ".hpp", ".inl")):
+                    with open(os.path.join(top, f), "rb") as fh:
+                        for m in re.finditer(rb"friend\s+(?:struct|class)\s+tut\s*::\s*(\w+)", fh.read()):
+                            _FRIENDS.add(m.group(1).decode())
+    return _FRIENDS
+
+
+def load_names(path):
+    """--names: {"<file from the root>": {"<group>": {"<n>": "<name>"}}}."""
+    if not path:
+        return {}
+    with open(path) as f:
+        data = json.load(f)
+    out = {}
+    for file, groups in data.items():
+        for group, tests in groups.items():
+            for n, name in tests.items():
+                out[(os.path.normpath(file), group, int(n))] = name
+    return out
+
+
+def convert_file(path, build_dir, config, dry_run, output_dir=None, names=None):
     db = CompileDatabase(build_dir, config)
     source = Source(path)
     if not TUT_INCLUDE.search(source.data) and b"test_group" not in source.data:
@@ -2150,6 +2625,9 @@ def convert_file(path, build_dir, config, dry_run, output_dir=None):
                       if n.get("kind") == "CXXMethodDecl" and n.get("name") == "test"
                       and "test_object" in n.get("mangledName", "")})
     conv = Converter(source, items, tut_ids, active_lines, demangle(mangled))
+    rel = os.path.normpath(os.path.relpath(path, ROOT))
+    conv.name_overrides = {(g, n): name for (f, g, n), name in (names or {}).items() if f == rel}
+    conv.friend_names = tut_friends()
     sys.setrecursionlimit(max(sys.getrecursionlimit(), 20000))
     conv.analyse()
     conv.resolve_calls()
@@ -2157,12 +2635,16 @@ def convert_file(path, build_dir, config, dry_run, output_dir=None):
     conv.resolve_tests()
     conv.remove_uncompiled_groups()
     conv.name_tests()
+    conv.plan_fixtures()
     conv.plan_structure()
     conv.plan_order()
     conv.plan_includes()
     conv.plan_checks()
     converted = conv.finish()
-    tut_counts, catch_counts = conv.counts(converted)
+    if conv.can_unwrap(converted):
+        conv.plan_unwrap()
+        converted = conv.finish()
+    tut_counts, catch_counts, expected_counts = conv.counts(converted)
     if output_dir:
         out = os.path.join(output_dir, os.path.relpath(path, ROOT))
         os.makedirs(os.path.dirname(out), exist_ok=True)
@@ -2181,6 +2663,7 @@ def convert_file(path, build_dir, config, dry_run, output_dir=None):
             "tut_name": test.tut_name,
             "catch2_name": test.catch2_name,
             "tut_assertions": tut_counts.get(id(test)),
+            "catch2_expected": expected_counts.get(id(test)),
             "catch2_assertions": catch_counts.get(id(test)),
             "not_compiled_here": test.inactive,
             "past_group_limit": bool(test.group and test.n and test.n > test.group.limit),
@@ -2192,12 +2675,12 @@ def convert_file(path, build_dir, config, dry_run, output_dir=None):
 
 
 def convert_one(args):
-    path, build_dir, config, dry_run, output_dir = args
+    path, build_dir, config, dry_run, output_dir, names = args
     result = {}
 
     def work():
         try:
-            result["value"] = convert_file(path, build_dir, config, dry_run, output_dir)
+            result["value"] = convert_file(path, build_dir, config, dry_run, output_dir, names)
         except ConvertError as e:
             result["value"] = {"file": os.path.relpath(path, ROOT), "error": str(e), "tests": [], "checks": [],
                                "notes": []}
@@ -2222,10 +2705,13 @@ def main():
                         "repository's root, instead of over the original")
     parser.add_argument("--jobs", type=int, default=1, help="files to convert at once")
     parser.add_argument("--quiet", action="store_true", help="print only the marks and the totals")
+    parser.add_argument("--names", help='cases\' names, as JSON: {"<file from the root>": {"<group>": '
+                        '{"<n>": "<name>"}}}; each wins over the test\'s own')
     args = parser.parse_args()
 
     files = [os.path.abspath(f) for f in args.files]
-    work = [(f, os.path.abspath(args.build_dir), args.config, args.dry_run, args.output_dir) for f in files]
+    names = load_names(args.names)
+    work = [(f, os.path.abspath(args.build_dir), args.config, args.dry_run, args.output_dir, names) for f in files]
     if args.jobs > 1:
         with concurrent.futures.ProcessPoolExecutor(max_workers=args.jobs) as pool:
             results = list(pool.map(convert_one, work))
