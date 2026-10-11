@@ -140,10 +140,13 @@ namespace
 
     // The line's tokens spaced afresh, after its indentation: one space
     // around a binary operator, none around a unary one or inside
-    // brackets, one after a comma and none before; a trailing comment,
-    // and anything the rules do not name, spaced as written.
-    std::string spaced(const Line& line, bool lua)
+    // brackets, one after a comma and none before; inside Luau's braces
+    // as Options::braceSpaces asks, whatever stands next to them; a
+    // trailing comment, and anything the rules do not name, spaced as
+    // written.
+    std::string spaced(const Line& line, const ALScriptFormatter::Options& options)
     {
+        const bool   lua       = options.lua;
         std::string  out;
         const Token* prev      = nullptr;
         // The last token before prev that is neither blank nor a comment:
@@ -205,7 +208,13 @@ namespace
             else if (t.kind == Kind::Punct)
             {
                 const std::string& p = t.text;
-                if (p == "," || p == ";")
+                if (lua && a.kind == Kind::Punct && a.text == "{" && p != "}")
+                {
+                    // A table's first part, or a table type's, whatever
+                    // begins it: { { 1 } }, { [k] = v }, { -1 }.
+                    say(options.braceSpaces);
+                }
+                else if (p == "," || p == ";")
                 {
                     say(false);
                 }
@@ -219,7 +228,7 @@ namespace
                     {
                         say(isKeyword(lua, a) && !(lua && a.text == "function"));
                     }
-                    else if (a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == ")" || a.text == "]" || a.text == "." || a.text == ":"))
+                    else if (a.kind == Kind::Punct && (a.text == "(" || a.text == "[" || a.text == ")" || a.text == "]" || a.text == "."))
                     {
                         say(false);
                     }
@@ -249,7 +258,7 @@ namespace
                 }
                 else if (p == "}")
                 {
-                    say(!(a.kind == Kind::Punct && a.text == "{"));
+                    say(!(a.kind == Kind::Punct && a.text == "{") && (!lua || options.braceSpaces));
                 }
                 else if (p == "." || p == "++" || p == "--")
                 {
@@ -317,7 +326,7 @@ namespace
                 }
                 else if (p == "{")
                 {
-                    say(true);
+                    say(!lua || options.braceSpaces);
                 }
                 else if (p == "," || p == ";")
                 {
@@ -793,7 +802,7 @@ namespace
     {
         Line line;
         line.tokens = tokens;
-        return indentText(options, indent) + spaced(line, options.lua);
+        return indentText(options, indent) + spaced(line, options);
     }
 
     // The tokens as pieces no wider than the width where a bracket's commas
@@ -975,7 +984,7 @@ namespace
                 text = indentText(options, line.indent);
                 if (options.spacing)
                 {
-                    text += spaced(line, options.lua);
+                    text += spaced(line, options);
                 }
                 else
                 {
