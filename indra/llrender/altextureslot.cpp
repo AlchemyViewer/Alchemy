@@ -390,12 +390,6 @@ bool ALTextureSlot::bind(LLCubeMap* cubeMap, ALSampler key)
             mCurrTexture = cubeMap->mImages[0]->getTexName();
             glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
             cubeMap->mImages[0]->updateBindStats();
-            // Named by the caller, not read off face 0. A cube map is as much a shared
-            // resource as any other texture -- the environment map is sampled by every
-            // shiny surface in the scene -- so which sampler a pass wants is the pass's
-            // business.
-            bindSampler(gGL.getSampler(key));
-            return true;
         }
         else
         {
@@ -403,6 +397,13 @@ bool ALTextureSlot::bind(LLCubeMap* cubeMap, ALSampler key)
             return false;
         }
     }
+
+    // Named by the caller, not read off face 0. A cube map is as much a shared
+    // resource as any other texture -- the environment map is sampled by every
+    // shiny surface in the scene -- so which sampler a pass wants is the pass's
+    // business. Outside the redundancy check, as in bindImpl: the same cube can be
+    // bound again after a pass that left a different sampler on this slot.
+    bindSampler(gGL.getSampler(key));
     return true;
 }
 
