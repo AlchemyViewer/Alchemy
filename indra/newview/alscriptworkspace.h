@@ -120,7 +120,8 @@ public:
     // reaches the callback as a save's does, its ref naming the item. A
     // notecard whose text then could not go up is taken away again, so
     // that nothing empty is left behind. The inventory never answers a
-    // create that failed, and such a one is never heard of again.
+    // create that failed, and such a one is never heard of again -- but
+    // after half a minute with no answer, a note says there is none yet.
     bool createNotecardWithText(const std::string& name, const std::string& description, const LLUUID& folder, const std::string& text,
                                 U32 next_owner_perm, ALScriptCompileCallback callback, std::string& error);
 

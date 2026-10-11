@@ -1858,6 +1858,17 @@ Your snippets could not be saved to the notecard &quot;[NAME]&quot;: [REASON].
     <tag>fail</tag>
   </notification>
 
+  <!-- A notecard made with text (ALScriptWorkspace::createNotecardWithText):
+       snippets exported, or a Lightbox Look shared. [NAME] can be a Look's,
+       and so a stranger's, so it stands in <nolink> and stays out of chat. -->
+  <notification
+   icon="notifytip.tga"
+   name="NotecardCreateNoAnswerYet"
+   log_to_chat="false"
+   type="notifytip">
+The notecard &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; has not appeared in your inventory yet. The server may still be making it: if it arrives, it will be filled in and you will be told as usual.
+  </notification>
+
   <notification
    icon="notifytip.tga"
    name="ScriptStudioSnippetsSaved"

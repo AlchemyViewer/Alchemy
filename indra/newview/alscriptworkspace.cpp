@@ -55,6 +55,7 @@
 #include "llinventorymodel.h"
 #include "llinventoryobserver.h"
 #include "llnotecard.h"
+#include "llnotificationsutil.h"
 #include "llselectmgr.h"
 #include "lltooldraganddrop.h"
 #include "llsdutil.h"
@@ -1105,9 +1106,22 @@ bool ALScriptWorkspace::createNotecardWithText(const std::string& name, const st
     // The item first, empty, and its text once it is here. A create that
     // fails is never answered (LLInventoryCallbackManager::fire drops a
     // null id), so nothing waits on it: a timer would race a late answer
-    // and could say both that it failed and that it was made.
+    // and could say both that it failed and that it was made. What a timer
+    // can say without that risk is that there is no answer yet -- not that
+    // there will be none -- and a late answer is then heard as any other.
+    //
+    // Follow-up: find a way to learn that a create failed that does not
+    // change create_inventory_item for every caller. Leads: the reply's
+    // SimApproved, which the viewer ignores, and whether the simulators send
+    // a reply at all when they refuse (LLInventoryCallbackManager::fire
+    // would drop one with a null id); a failure callback on the reliable
+    // send, for a request the simulator never acknowledged; and AIS3, whose
+    // create has an HTTP failure but which does not make notecards yet
+    // (USE_AIS_FOR_NC in llviewerinventory.cpp).
+    const std::shared_ptr<bool> answered = std::make_shared<bool>(false);
     LLPointer<LLBoostFuncInventoryCallback> made = new LLBoostFuncInventoryCallback(create_notecard_cb);
-    made->addOnFireFunc([text, callback](const LLUUID& item_id) {
+    made->addOnFireFunc([answered, text, callback](const LLUUID& item_id) {
+        *answered = true;
         const ALScriptRef ref(LLUUID::null, item_id);
         std::string       why;
         const bool        sent = ALScriptWorkspace::getInstance()->saveNotecard(
@@ -1144,6 +1158,23 @@ bool ALScriptWorkspace::createNotecardWithText(const std::string& name, const st
     }
     create_inventory_item(gAgent.getID(), gAgent.getSessionID(), folder, LLTransactionID::tnull, name, desc, LLAssetType::AT_NOTECARD,
                           LLInventoryType::IT_NOTECARD, NO_INV_SUBTYPE, next_owner_perm, made);
+
+    // A create is answered in a second or two. Long past that, say there is
+    // no answer yet, once, so that a press of Share or Export is not met by
+    // nothing at all -- and say no more than that: the notecard may still
+    // come, and is then filled in and told of as usual.
+    constexpr F32 NOTECARD_CREATE_SLOW_SECONDS = 30.f;
+    doAfterInterval(
+        [answered, name]() {
+            if (*answered || LLApp::isExiting() || gDisconnected)
+            {
+                return;
+            }
+            LLSD args;
+            args["NAME"] = name;
+            LLNotificationsUtil::add("NotecardCreateNoAnswerYet", args);
+        },
+        NOTECARD_CREATE_SLOW_SECONDS);
     return true;
 }
 
