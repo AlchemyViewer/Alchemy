@@ -39,6 +39,7 @@
 #include "hbxxh.h"
 #include "alprojection.h"
 #include "llcamera.h"
+#include "llthread.h"
 
 #include <algorithm>
 
@@ -352,12 +353,23 @@ LLRender::~LLRender()
 
 bool LLRender::init(bool needs_vertex_buffer)
 {
+    // LLGLState's map describes the main context. A worker thread's shared context keeps its
+    // own caps, and the map is not the worker's to write.
+    const bool main_context = on_main_thread();
+
 #if GL_ARB_debug_output && !LL_DARWIN
     if (gGLManager.mHasDebugOutput && gDebugGL)
     { //setup debug output callback
         //glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW_ARB, 0, NULL, GL_TRUE);
         glDebugMessageCallback((GLDEBUGPROC) gl_debug_callback, NULL);
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    }
+    if (main_context && gGLManager.mHasDebugOutput)
+    {
+        // Both caps are set raw: above, by a debug context's default, or by whoever made the
+        // context before this ran. They are read back rather than assumed.
+        LLGLState::seedState(GL_DEBUG_OUTPUT, glIsEnabled(GL_DEBUG_OUTPUT));
+        LLGLState::seedState(GL_DEBUG_OUTPUT_SYNCHRONOUS, glIsEnabled(GL_DEBUG_OUTPUT_SYNCHRONOUS));
     }
 #endif
 
@@ -422,6 +434,10 @@ bool LLRender::init(bool needs_vertex_buffer)
 
     // necessary for reflection maps
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+    if (main_context)
+    {
+        LLGLState::seedState(GL_TEXTURE_CUBE_MAP_SEAMLESS, GL_TRUE);
+    }
 
 #if LL_WINDOWS
     if (glGenVertexArrays == nullptr)
