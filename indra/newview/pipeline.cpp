@@ -4991,8 +4991,14 @@ void LLPipeline::renderPhysicsDisplay()
     gGL.flush();
     gDebugProgram.bind();
 
+    // The passes below set their own masks; this hands the caller's back.
+    LLGLSColorMask color_mask(true, false);
+
+    // Toward the camera: pass 0 lays the shapes' own depth down unoffset, and an outline
+    // pushed behind it fails the depth test everywhere the fill covers. setPolygonOffset
+    // flips the sign under reverse-Z itself.
     LLGLEnable polygon_offset_line(GL_POLYGON_OFFSET_LINE);
-    gGL.setPolygonOffset(3.f, 3.f);
+    gGL.setPolygonOffset(-3.f, -3.f);
     gGL.setLineWidth(3.f);
     LLGLEnable blend(GL_BLEND);
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
