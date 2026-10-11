@@ -585,6 +585,9 @@ namespace
         // Where each of the LSL's lines starts, from the first.
         const std::vector<size_t>& lineStarts();
         std::vector<size_t>        mLineStarts;
+        // Whether a line of the LSL lies blank between two others, counted
+        // from one, neither of them itself.
+        bool blankBetween(S32 after, S32 before);
         Expr lvalue(LSLLValueExpression* e);
         Expr call(LSLFunctionExpression* e);
         // The call as written, and the name SLua calls it by where it is
@@ -668,6 +671,12 @@ namespace
         void statement(LSLASTNode* s, bool last);
         void statementBody(LSLASTNode* s, bool last);
         void block(LSLASTNode* s);
+        // A blank line over a statement or a global, where the LSL had one
+        // or more between it and the one written before it, which grouped
+        // them: one, and not where nothing has been written since `opened`
+        // -- a block's start -- nor where a comment over it keeps the
+        // blank line over itself (Comment::apart).
+        void keepApart(LSLASTNode* before, LSLASTNode* node, size_t opened);
         // An if written from `at` in the text, `lines` lines down, its
         // stretches from `spans`, put on one line where it is one statement
         // and nothing said over it: if c then s end. Not called where a
@@ -907,6 +916,9 @@ namespace
         // What each part of the script may change, for LSL's order.
         ALLSLEffects                                     mEffects;
         std::string                                      mText;
+        // Where the block being written began in mText: no blank line kept
+        // over what is written first in it.
+        size_t                                           mBlockStart = std::string::npos;
         // The LSL's stretches beside the SLua's made of them, the SLua's
         // counted in mText until the head goes over it, and its last lines
         // worked out once all is written (endSpans); the LSL lines of the
@@ -1694,7 +1706,7 @@ namespace
             putTrailing(mText.size() - 1, indent() + c.text + "\n");
             return;
         }
-        if (c.apart && !mText.empty() && !blank_over)
+        if (c.apart && !mText.empty() && !blank_over && mText.size() != mBlockStart)
         {
             mText += "\n";
         }
@@ -2018,6 +2030,21 @@ namespace
             }
         }
         return mLineStarts;
+    }
+
+    bool Writer::blankBetween(S32 after, S32 before)
+    {
+        const std::vector<size_t>& starts = lineStarts();
+        for (S32 line = std::max(after + 1, 1); line < before && static_cast<size_t>(line) <= starts.size(); ++line)
+        {
+            const size_t from = starts[static_cast<size_t>(line) - 1];
+            const size_t to   = std::min(mSource.find('\n', from), mSource.size());
+            if (mSource.substr(from, to - from).find_first_not_of(" \t\r") == std::string_view::npos)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     std::vector<std::pair<std::string, unsigned long long>> Writer::numbersNear(LSLConstant* c)
@@ -4491,17 +4518,47 @@ namespace
         if (s->getNodeSubType() == NODE_COMPOUND_STATEMENT)
         {
             // What was after its brace that no line opening it took.
+            mBlockStart = mText.size();
             commentsOpening(s);
+            const size_t opened = mText.size();
+            LSLASTNode*  before = nullptr;
             for (LSLASTNode* child = s->getChild(0); child; child = child->getNext())
             {
+                keepApart(before, child, opened);
                 statement(child, !child->getNext());
+                before = isNull(child) || !child->getLoc() ? before : child;
             }
             lineUp();
             commentsAtEnd(s);
             return;
         }
+        mBlockStart = mText.size();
         statement(s, true);
         lineUp();
+    }
+
+    void Writer::keepApart(LSLASTNode* before, LSLASTNode* node, size_t opened)
+    {
+        if (!before || isNull(node) || !node->getLoc() || mText.size() == opened ||
+            (mText.size() >= 2 && mText.compare(mText.size() - 2, 2, "\n\n") == 0))
+        {
+            return;
+        }
+        const Pos begins = { node->getLoc()->first_line, node->getLoc()->first_column };
+        if (const auto found = mCommentsBefore.find(node); found != mCommentsBefore.end())
+        {
+            for (size_t k : found->second)
+            {
+                if (mComments[k].at < begins)
+                {
+                    return;
+                }
+            }
+        }
+        if (blankBetween(before->getLoc()->last_line, begins.line))
+        {
+            mText += "\n";
+        }
     }
 
     void Writer::statement(LSLASTNode* s, bool last)
@@ -7117,7 +7174,9 @@ namespace
 
     void Writer::globals()
     {
-        bool any = false;
+        bool         any    = false;
+        const size_t opened = mText.size();
+        LSLASTNode*  before = nullptr;
         for (LSLASTNode* g = mScript->getGlobals()->getChild(0); g; g = g->getNext())
         {
             if (g->getNodeType() != NODE_GLOBAL_VARIABLE)
@@ -7127,6 +7186,10 @@ namespace
             auto*          global = static_cast<LSLGlobalVariable*>(g);
             LSLIdentifier* id     = global->getIdentifier();
             LSLExpression* init   = global->getInitializer();
+            // Apart from the one before it as the LSL had them, or a
+            // function the LSL had between them, which is written later.
+            keepApart(before, global, opened);
+            before = global;
             commentsBefore(global);
             const size_t from = mText.size();
             if (boolean(id->getSymbol()))

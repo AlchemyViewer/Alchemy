@@ -2974,4 +2974,43 @@ namespace tut
         ensure("llcompat's, LSL's count: " + close.text, close.converted && has(close, "llcompat.SubStringIndex(item, P) == 0"));
         checksClean(close);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<87>()
+    {
+        set_test_name("a blank line between two statements or globals is kept, one for a run of them; none at a block's start or end, "
+                      "nor a second where a comment over the statement keeps its own");
+        const ALLSLToSLua::Result r = convert("integer a = 1;\n"
+                                              "integer b = 2;\n"
+                                              "\n"
+                                              "\n"
+                                              "integer c = 3;\n"
+                                              "integer preCheck(key avatar) {\n"
+                                              "\n"
+                                              "    // only allow my owner to request contents\n"
+                                              "    if (avatar != llGetOwner()) return FALSE;\n"
+                                              "\n"
+                                              "    return TRUE;\n"
+                                              "}\n"
+                                              "default {\n"
+                                              "    touch_start(integer n) {\n"
+                                              "        if (preCheck(llDetectedKey(0))) {\n"
+                                              "            llOwnerSay((string)a);\n"
+                                              "\n"
+                                              "            llOwnerSay((string)b);\n"
+                                              "\n"
+                                              "        }\n"
+                                              "\n"
+                                              "        // said apart\n"
+                                              "        llOwnerSay((string)c);\n"
+                                              "    }\n"
+                                              "}\n");
+        ensure("the globals: " + r.text, has(r, "local a = 1\nlocal b = 2\n\nlocal c = 3\n"));
+        ensure("Tapple's: " + r.text, has(r, "    -- only allow my owner to request contents\n    if avatar ~= ll.GetOwner() then return false end\n\n    return true\nend"));
+        ensure("none at a block's start: " + r.text, has(r, "(avatar)\n    -- only allow"));
+        ensure("in a block, none at its end: " + r.text, has(r, "        print(tostring(a))\n\n        print(tostring(b))\n    end\n"));
+        ensure("one over a comment kept apart: " + r.text, has(r, "    end\n\n    -- said apart\n    print(tostring(c))\n"));
+        ensure("never two: " + r.text, !has(r, "\n\n\n"));
+        checksClean(r);
+    }
 }
