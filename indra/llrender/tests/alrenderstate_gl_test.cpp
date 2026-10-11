@@ -1,7 +1,8 @@
 /**
  * @file alrenderstate_gl_test.cpp
- * @brief LLRender's cached clear colour and scissor box on the hidden window: what a clear fills
- *        with and cuts to, what GL holds after refreshState, and what LLGLSScissor hands back.
+ * @brief LLRender's cached clear colour, scissor box and patch size on the hidden window: what a
+ *        clear fills with and cuts to, what GL holds after refreshState, and what LLGLSScissor
+ *        hands back.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -131,6 +132,40 @@ namespace tut
         S32 box[4];
         glScissorBox(box);
         ensure("refreshState restores the scissor box", box[0] == 1 && box[1] == 1 && box[2] == 2 && box[3] == 2);
+        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+    }
+
+    // And the patch size, on a context with tessellation to have one.
+    template<> template<>
+    void alrenderstate_object_t::test<4>()
+    {
+        if (!glPatchParameteri)
+        {
+            skip("this context has no tessellation");
+        }
+
+        // Handed back however the test ends: the shared context outlives it, and its scope does not keep this.
+        struct PatchSizeRestore
+        {
+            GLint mFound = 0;
+            PatchSizeRestore() { glGetIntegerv(GL_PATCH_VERTICES, &mFound); }
+            ~PatchSizeRestore()
+            {
+                gGL.setPatchVertices((U32)mFound);
+                glPatchParameteri(GL_PATCH_VERTICES, mFound);
+            }
+        } restore;
+
+        gGL.setPatchVertices(4);
+        glPatchParameteri(GL_PATCH_VERTICES, 3);
+        gGL.setPatchVertices(4);
+        GLint patch = 0;
+        glGetIntegerv(GL_PATCH_VERTICES, &patch);
+        ensure_equals("an agreeing cache issues nothing", (S32)patch, 3);
+
+        gGL.refreshState();
+        glGetIntegerv(GL_PATCH_VERTICES, &patch);
+        ensure_equals("refreshState restores the patch size", (S32)patch, 4);
         ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
     }
 

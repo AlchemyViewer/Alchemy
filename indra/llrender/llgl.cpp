@@ -2420,6 +2420,18 @@ void LLGLManager::initExtensions()
         glGetnUniformuiv         = (PFNGLGETNUNIFORMUIVPROC)LL_GET_PROC_ADDRESS("glGetnUniformuiv");
     }
 
+    // Texture barrier. Core in 4.5, and GL_ARB_texture_barrier names it without a suffix on a
+    // lower context, so it is resolved here for the GL_VERSION_4_5 ladder's early-out as above.
+    // GL_NV_texture_barrier, which ARB's took over unchanged, names it glTextureBarrierNV.
+    if (mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_texture_barrier"))
+    {
+        glTextureBarrier = (PFNGLTEXTUREBARRIERPROC)LL_GET_PROC_ADDRESS("glTextureBarrier");
+    }
+    if (!glTextureBarrier && mGLExtensions.contains("GL_NV_texture_barrier"))
+    {
+        glTextureBarrier = (PFNGLTEXTUREBARRIERPROC)LL_GET_PROC_ADDRESS("glTextureBarrierNV");
+    }
+
     // GL_EXT_memory_object
     if (mHasEXTMemoryObject)
     {
@@ -3292,6 +3304,11 @@ GLboolean LLGLDepthTest::sWriteEnabled = GL_TRUE; // OpenGL default
 //static
 void LLGLState::initClass()
 {
+    // Runs per context, from initGL: the map and the depth state describe this context, and
+    // GL starts every context at its defaults.
+    sStateMap.clear();
+    LLGLDepthTest::initClass();
+
     sStateMap[GL_DITHER] = GL_TRUE;
     // sStateMap[GL_TEXTURE_2D] = GL_TRUE;
 
@@ -3675,6 +3692,15 @@ GLenum LLGLDepthTest::remap(GLenum func)
         // depth remap and must NOT flip.
         default:          return func;
     }
+}
+
+//static
+void LLGLDepthTest::initClass()
+{
+    sDepthEnabled = GL_FALSE;
+    sDepthFunc = GL_LESS;
+    sWriteEnabled = GL_TRUE;
+    glDepthFunc(remap(sDepthFunc));
 }
 
 void LLGLDepthTest::rebase()

@@ -1706,6 +1706,7 @@ void renderOctree(LLSpatialGroup* group)
 
         {
             LLGLDepthTest gl_depth(false, false);
+            gGL.flush();
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
             gGL.diffuseColor4f(1,0,0,group->mBuilt);
@@ -1749,6 +1750,12 @@ void renderOctree(LLSpatialGroup* group)
                     gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
                     if (!LLRenderPass::uploadMatrixPalette(face->mAvatar, face->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
                     {
+                        // Both pushes above are popped at the end of the iteration this skips.
+                        gGL.popMatrix();
+                        if (!group->getSpatialPartition()->isBridge())
+                        {
+                            gGL.popMatrix();
+                        }
                         continue;
                     }
                 }
@@ -1922,6 +1929,10 @@ void renderUpdateType(LLDrawable* drawablep)
 
 void renderBoundingBox(LLDrawable* drawable, bool set_color = true)
 {
+    // The colour is a uniform, so the last drawable's outlines go out under their own colour
+    // before it changes.
+    gGL.flush();
+
     if (set_color)
     {
         if (drawable->isSpatialBridge())
@@ -2949,6 +2960,8 @@ public:
                 gGL.vertex3fv(tri->mV[2]->getF32ptr());
             }
             gGL.end();
+            // Drawn under this pass's depth func and colour, which the next pass changes.
+            gGL.flush();
 
             if (i == 1)
             {

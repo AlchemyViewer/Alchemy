@@ -7,6 +7,8 @@ renderer is running: the two Bloom (HDR) sections, and the two Cross Filter
 sections that are seeded from the same bloom, while RenderHDREnabled is on, the
 two Glow (Legacy) sections while it is off
 (ALFloaterLightBox::refreshBloomSections, live as the setting changes). The
+Cross Filter sections also need a texture barrier, and stay hidden on a driver
+without one, where the renderer leaves the filter off. The
 rows also grey out on the same setting (enabled_control on Bloom and Cross
 Filter, disabled_control on Glow), which is all a build of this panel without the
 floater gets. (RenderBloomHDR is currently unwired renderer-side, so the fork

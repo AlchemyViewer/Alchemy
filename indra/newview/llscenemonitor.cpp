@@ -42,6 +42,8 @@
 #include "llviewerparcelmgr.h"
 #include "llviewerpartsim.h"
 
+#include <optional>
+
 LLSceneMonitorView* gSceneMonitorView = NULL;
 
 //
@@ -409,9 +411,10 @@ void LLSceneMonitor::calcDiffAggregate()
     }
 
     LLGLDepthTest depth(true, false, GL_ALWAYS);
+    std::optional<LLGLSColorMask> no_color;
     if(!mDebugViewerVisible)
     {
-        glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+        no_color.emplace(false, false);
     }
 
     LLGLSLShader* cur_shader = NULL;
@@ -429,6 +432,9 @@ void LLSceneMonitor::calcDiffAggregate()
 
     if(mDiffState == EXECUTE_DIFF)
     {
+        // The quad is still batched in gGL; the query only counts what reaches the GPU before
+        // it ends.
+        gGL.flush();
         glEndQuery(GL_SAMPLES_PASSED);
         mDiffState = WAIT_ON_RESULT;
     }
@@ -438,11 +444,6 @@ void LLSceneMonitor::calcDiffAggregate()
     if(cur_shader != NULL)
     {
         cur_shader->bind();
-    }
-
-    if(!mDebugViewerVisible)
-    {
-        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     }
 #endif
 }

@@ -2377,26 +2377,28 @@ void ALFloaterLightBox::refreshBloomSections()
     // is on the HDR side with the bloom it is seeded from: it streaks what
     // the bloom pyramid's top holds, and without the pyramid it draws nothing.
     // So is the auto exposure, which renderFinalize meters only under HDR.
+    // The cross filter also needs a texture barrier (generateBloomHDR), which a
+    // driver with neither GL 4.5 nor a texture barrier extension does not have.
     const bool hdr = gGLManager.mGLVersion > 4.05f && gSavedSettings.getBOOL("RenderHDREnabled");
-    static const std::pair<const char*, bool> bloom_sections[] = {
-        { "sec_autoexp", true },
-        { "sec_autoexp_adv", true },
-        { "sec_bloom", true },
-        { "sec_bloom_adv", true },
-        { "sec_crossfilter", true },
-        { "sec_crossfilter_adv", true },
-        { "sec_glow", false },
-        { "sec_glow_adv", false },
+    const bool cross_filter = hdr && glTextureBarrier;
+    const std::pair<const char*, bool> bloom_sections[] = {
+        { "sec_autoexp", hdr },
+        { "sec_autoexp_adv", hdr },
+        { "sec_bloom", hdr },
+        { "sec_bloom_adv", hdr },
+        { "sec_crossfilter", cross_filter },
+        { "sec_crossfilter_adv", cross_filter },
+        { "sec_glow", !hdr },
+        { "sec_glow_adv", !hdr },
     };
     std::set<LLAccordionCtrl*> changed;
-    for (const auto& [name, for_hdr] : bloom_sections)
+    for (const auto& [name, shown] : bloom_sections)
     {
         const ALLightboxDirectory::Section* section = mDirectory.section(name);
         if (!section || !section->mTab)
         {
             continue;
         }
-        const bool shown = (for_hdr == hdr);
         if (section->mTab->getVisible() == shown)
         {
             continue;

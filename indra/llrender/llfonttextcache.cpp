@@ -76,13 +76,16 @@ namespace
 bool ALFontCacheKey::environmentMoved(const LLFontGL* fontp)
 {
     const U64 font_cache_gen = fontp ? fontp->getCacheGeneration() : 0;
+    // The capture keeps the sampler's GL name, which a sampler rebuild deletes.
+    const U32 sampler_gen = gGL.getSamplerGeneration();
     if (mFont == fontp
         && mScaleX == LLFontGL::sScaleX
         && mScaleY == LLFontGL::sScaleY
         && mVertDPI == LLFontGL::sVertDPI
         && mHorizDPI == LLFontGL::sHorizDPI
         && mResGeneration == LLFontGL::sResolutionGeneration
-        && mFontCacheGen == font_cache_gen)
+        && mFontCacheGen == font_cache_gen
+        && mSamplerGen == sampler_gen)
     {
         return false;
     }
@@ -94,6 +97,7 @@ bool ALFontCacheKey::environmentMoved(const LLFontGL* fontp)
     mHorizDPI      = LLFontGL::sHorizDPI;
     mResGeneration = LLFontGL::sResolutionGeneration;
     mFontCacheGen  = font_cache_gen;
+    mSamplerGen    = sampler_gen;
     return true;
 }
 

@@ -39,6 +39,7 @@
 #include "hbxxh.h"
 #include "alprojection.h"
 #include "llcamera.h"
+#include "llthread.h"
 
 #include <algorithm>
 
@@ -352,12 +353,23 @@ LLRender::~LLRender()
 
 bool LLRender::init(bool needs_vertex_buffer)
 {
+    // LLGLState's map describes the main context. A worker thread's shared context keeps its
+    // own caps, and the map is not the worker's to write.
+    const bool main_context = on_main_thread();
+
 #if GL_ARB_debug_output && !LL_DARWIN
     if (gGLManager.mHasDebugOutput && gDebugGL)
     { //setup debug output callback
         //glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW_ARB, 0, NULL, GL_TRUE);
         glDebugMessageCallback((GLDEBUGPROC) gl_debug_callback, NULL);
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    }
+    if (main_context && gGLManager.mHasDebugOutput)
+    {
+        // Both caps are set raw: above, by a debug context's default, or by whoever made the
+        // context before this ran. They are read back rather than assumed.
+        LLGLState::seedState(GL_DEBUG_OUTPUT, glIsEnabled(GL_DEBUG_OUTPUT));
+        LLGLState::seedState(GL_DEBUG_OUTPUT_SYNCHRONOUS, glIsEnabled(GL_DEBUG_OUTPUT_SYNCHRONOUS));
     }
 #endif
 
@@ -422,6 +434,10 @@ bool LLRender::init(bool needs_vertex_buffer)
 
     // necessary for reflection maps
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+    if (main_context)
+    {
+        LLGLState::seedState(GL_TEXTURE_CUBE_MAP_SEAMLESS, GL_TRUE);
+    }
 
 #if LL_WINDOWS
     if (glGenVertexArrays == nullptr)
@@ -526,7 +542,7 @@ void LLRender::refreshState(void)
     mDirty = true;
 
     // Called when GL state may have been changed behind our back, so re-assert the shared
-    // blocks' bindings along with the texture units and colour mask.
+    // blocks' bindings along with the texture units and the state the setters cache.
     mLightsUBOBound   = false;
     mMatricesUBOBound = false;
 
@@ -539,10 +555,29 @@ void LLRender::refreshState(void)
 
     mTextureSlots[active_unit].activate();
 
-    setColorMask(mCurrColorMask[0], mCurrColorMask[1], mCurrColorMask[2], mCurrColorMask[3]);
+    // The cached state below is issued straight to GL: each setter would see its cache
+    // agreeing with the value asked for and skip the call.
+    glColorMask(mCurrColorMask[0] ? GL_TRUE : GL_FALSE,
+                mCurrColorMask[1] ? GL_TRUE : GL_FALSE,
+                mCurrColorMask[2] ? GL_TRUE : GL_FALSE,
+                mCurrColorMask[3] ? GL_TRUE : GL_FALSE);
 
-    // Unconditional re-issue: setPolygonOffset would see the cache already agreeing with the
-    // requested value and skip the GL call, leaving the fresh context at its 0,0 default.
+    // Blend factors still unknown since init have nothing to put back.
+    if (mCurrBlendColorSFactor != BF_UNDEF && mCurrBlendColorDFactor != BF_UNDEF &&
+        mCurrBlendAlphaSFactor != BF_UNDEF && mCurrBlendAlphaDFactor != BF_UNDEF)
+    {
+        glBlendFuncSeparate(sGLBlendFactor[mCurrBlendColorSFactor], sGLBlendFactor[mCurrBlendColorDFactor],
+                            sGLBlendFactor[mCurrBlendAlphaSFactor], sGLBlendFactor[mCurrBlendAlphaDFactor]);
+    }
+
+    glLineWidth(mLineWidth);
+
+    // Loaded only on a context with tessellation, the one that has a patch size.
+    if (glPatchParameteri)
+    {
+        glPatchParameteri(GL_PATCH_VERTICES, mPatchVertices);
+    }
+
     rebasePolygonOffset();
 
     // The same for the clear colour and a scissor box that was ever set.
@@ -1004,13 +1039,13 @@ void LLRender::setColorMask(bool writeColor, bool writeAlpha)
 
 void LLRender::setColorMask(bool writeColorR, bool writeColorG, bool writeColorB, bool writeAlpha)
 {
-    flush();
-
     if (mCurrColorMask[0] != writeColorR ||
         mCurrColorMask[1] != writeColorG ||
         mCurrColorMask[2] != writeColorB ||
         mCurrColorMask[3] != writeAlpha)
     {
+        flush();
+
         mCurrColorMask[0] = writeColorR;
         mCurrColorMask[1] = writeColorG;
         mCurrColorMask[2] = writeColorB;
@@ -1670,11 +1705,10 @@ void LLRender::diffuseColor4ub(U8 r, U8 g, U8 b, U8 a)
 
 void LLRender::setLineWidth(F32 width)
 {
-    gGL.flush();
-
     width = llclamp(width, gGLManager.mAliasedLineRange[0], gGLManager.mAliasedLineRange[1]);
     if(mLineWidth != width)
     {
+        flush();
         mLineWidth = width;
         glLineWidth(width);
     }

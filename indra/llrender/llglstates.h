@@ -40,7 +40,16 @@ public:
 
     ~LLGLDepthTest();
 
+    // A copy would restore the depth state a second time.
+    LLGLDepthTest(const LLGLDepthTest&) = delete;
+    LLGLDepthTest& operator=(const LLGLDepthTest&) = delete;
+
     void checkState();
+
+    // Take the tracked state back to a fresh context's: test off, writes on, GL_LESS, with the
+    // func issued through remap so GL agrees under whichever convention is latched. Run per
+    // context by LLGLState::initClass.
+    static void initClass();
 
     // Reverse-Z depth-func translation. The tracked state (sDepthFunc) and every call
     // site stay in the forward/semantic convention; the physical glDepthFunc is fed the

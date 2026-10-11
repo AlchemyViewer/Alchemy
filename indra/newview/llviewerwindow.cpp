@@ -3030,10 +3030,7 @@ void LLViewerWindow::draw()
 
     //S32 screen_x, screen_y;
 
-    if (!LLPipeline::RenderUIBuffer)
-    {
-        LLView::sDirtyRect = getWindowRectScaled();
-    }
+    LLView::sDirtyRect = getWindowRectScaled();
 
     // HACK for timecode debugging
     if (gSavedSettings.getBOOL("DisplayTimecode"))
