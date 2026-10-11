@@ -3296,7 +3296,10 @@ bool LLImageGL::scaleDown(S32 desired_discard)
     else
     { // use a PBO to downscale the texture
         U64 size = getBytes(desired_discard);
-        llassert(size <= 2048 * 2048 * 4); // we shouldn't be using this method to downscale huge textures, but it'll work
+        // At most a level below the largest texture the viewer keeps (a larger one is set
+        // missing on load), at four bytes a texel. The scratch buffer grows to whatever it is
+        // asked for; this bounds how far.
+        llassert(size <= (U64)(MAX_IMAGE_SIZE / 2) * (MAX_IMAGE_SIZE / 2) * 4);
         gGL.getTextureSlot(0)->bind(this, false, true);
 
         if (sScratchPBO == 0)
