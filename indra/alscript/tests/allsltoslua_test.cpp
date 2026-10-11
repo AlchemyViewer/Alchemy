@@ -324,7 +324,14 @@ namespace tut
         ensure("calling the state's handler: " + r.text, has(r, "states[currentState].timer") && has(r, "event ~= \"timer\""));
         ensure("state_exit a handler of its state: " + r.text, has(r, "state_exit = function()"));
         ensure("what is let go of noted: " + r.text, noted(r, "SluaStates"));
+        // Tapple's: a name with no state, which only an edit could write,
+        // said so at the call, before the state it is in is left.
+        const size_t looked = r.text.find("    local entering = states[name]\n    if not entering then\n        error(\"unknown state: \" .. name, 2)\n    end\n");
+        ensure("a state not there said: " + r.text, looked != std::string::npos && looked < r.text.find("local leaving"));
         checksClean(r);
+        ALLSLToSLua::Options typed;
+        typed.types = true;
+        checksClean(ALLSLToSLua::convert("default { touch_start(integer n) { state two; } }\nstate two { state_entry() { state default; } }\n", typed));
     }
 
     template<> template<>
