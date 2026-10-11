@@ -597,6 +597,13 @@ void LLSpinCtrl::setUnset(bool unset)
         if (!unset)
         {
             mEditor->setLabel(LLStringUtil::null);
+            // An unset box is empty but for what is typed into it, and what
+            // is typed is the number being chosen: the one in force goes in
+            // only where nothing was, or a commit reads it back instead.
+            if (!mEditor->getText().empty())
+            {
+                return;
+            }
         }
         updateEditor();
     }
