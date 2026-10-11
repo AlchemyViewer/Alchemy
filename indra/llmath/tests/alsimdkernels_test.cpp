@@ -35,7 +35,7 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "llthread.h"
 #include "../llmath.h"
 #include "../llsimdmath.h"
@@ -57,8 +57,6 @@
 using namespace alsimd;
 using namespace alsimd::kernels;
 
-namespace tut
-{
 namespace
 {
     std::string precise(double v)
@@ -82,9 +80,9 @@ namespace
 
     void ensure_same_bits(const std::string& what, const LLVector4a& got, const LLVector4a& expected)
     {
-        ensure(what + ": " + precise(got[0]) + " " + precise(got[1]) + " " + precise(got[2]) + " " + precise(got[3]) +
-                   " vs " + precise(expected[0]) + " " + precise(expected[1]) + " " + precise(expected[2]) + " " + precise(expected[3]),
-               same_bits(got, expected));
+        UNSCOPED_INFO(what + ": " + precise(got[0]) + " " + precise(got[1]) + " " + precise(got[2]) + " " + precise(got[3]) +
+                   " vs " + precise(expected[0]) + " " + precise(expected[1]) + " " + precise(expected[2]) + " " + precise(expected[3]));
+        REQUIRE(same_bits(got, expected));
     }
 
     // The error relative to the size of the terms that made the value,
@@ -93,7 +91,8 @@ namespace
     {
         const double scale = llmax(1.0, llmax(std::fabs(expected), magnitude));
         const double err = std::fabs((double)got - expected) / scale;
-        ensure(what + ": " + precise(got) + " is off " + precise(err) + " from " + precise(expected), err <= relative);
+        UNSCOPED_INFO(what + ": " + precise(got) + " is off " + precise(err) + " from " + precise(expected));
+        REQUIRE(err <= relative);
     }
 
     // The counts that leave every tail a width can have.
@@ -170,26 +169,14 @@ namespace
 
         State mSaved;
     };
-}
-} // namespace tut
+} // anonymous namespace
 
-namespace tut
-{
 namespace
 {
-    struct alsimdkernels_data
-    {
-    };
-    typedef test_group<alsimdkernels_data> alsimdkernels_test;
-    typedef alsimdkernels_test::object alsimdkernels_object;
-    tut::alsimdkernels_test alsimdkernels_testcase("alsimdkernels");
-}
-
     // Points, with w from the rows and with w set, against
     // affineTransform, bit for bit, at every count and width; nothing
     // written past the count.
-    template<> template<>
-    void alsimdkernels_object::test<1>()
+    TEST_CASE("alsimdkernels: transform_points against affineTransform at every count and width", "[alsimdkernels]")
     {
         const LLMatrix4a m = some_matrix();
         for (size_t n : COUNTS)
@@ -239,8 +226,7 @@ namespace
     }
 
     // Directions, with w from the rows and with w kept, against rotate.
-    template<> template<>
-    void alsimdkernels_object::test<2>()
+    TEST_CASE("alsimdkernels: transform_directions against rotate at every count and width", "[alsimdkernels]")
     {
         const LLMatrix4a m = some_matrix();
         for (size_t n : COUNTS)
@@ -277,8 +263,7 @@ namespace
     // Texture coordinates: two per vector, against the scalar arithmetic
     // in double within the two roundings the fused form takes, and every
     // width bit for bit against the first.
-    template<> template<>
-    void alsimdkernels_object::test<3>()
+    TEST_CASE("alsimdkernels: texture coordinates against double and every width against the first", "[alsimdkernels]")
     {
         const F32 cos_ang = 0.8f, sin_ang = 0.6f;
         const LLVector4a trans(-0.5f);
@@ -321,8 +306,7 @@ namespace
 
     // Index offsets: bit for bit, wrapping, unaligned on both sides, every
     // count.
-    template<> template<>
-    void alsimdkernels_object::test<4>()
+    TEST_CASE("alsimdkernels: offset_indices_u16 wraps and writes only its unaligned range", "[alsimdkernels]")
     {
         std::mt19937 rng(4);
         std::uniform_int_distribution<int> any(0, 65535);
@@ -343,7 +327,8 @@ namespace
                     offset_indices_u16_impl<W>(src.data() + 1, dst.data() + 1, n, offset);
                     for (size_t i = 0; i < n + 3; ++i)
                     {
-                        ensure_equals(std::string("offset_indices_u16 ") + width + " n " + std::to_string(n) + " offset " + std::to_string(offset) + " at " + std::to_string(i), dst[i], expected[i]);
+                        UNSCOPED_INFO(std::string("offset_indices_u16 ") + width + " n " + std::to_string(n) + " offset " + std::to_string(offset) + " at " + std::to_string(i));
+                        REQUIRE(dst[i] == expected[i]);
                     }
                 });
             }
@@ -354,8 +339,7 @@ namespace
     // reference within the two roundings a tier without FMA takes, w from
     // bias, the last vertex read without its neighbour, every width bit
     // for bit.
-    template<> template<>
-    void alsimdkernels_object::test<5>()
+    TEST_CASE("alsimdkernels: dequantize_u16x3 against double with w from bias", "[alsimdkernels]")
     {
         std::mt19937 rng(5);
         std::uniform_int_distribution<int> any(0, 65535);
@@ -389,7 +373,8 @@ namespace
                     const double expected = term + bias[lane];
                     ensure_close("dequantize_u16x3 n " + std::to_string(n) + " at " + std::to_string(i) + " lane " + std::to_string(lane), narrow[i][lane], expected, 5e-7, std::fabs(term) + std::fabs(bias[lane]));
                 }
-                ensure_equals("dequantize_u16x3 w is bias", narrow[i][3], bias[3]);
+                UNSCOPED_INFO("dequantize_u16x3 w is bias");
+                REQUIRE(narrow[i][3] == bias[3]);
             }
             ensure_same_bits("dequantize_u16x3 writes within n", narrow[n], SENTINEL);
 
@@ -407,8 +392,7 @@ namespace
 
     // Two 16-bit values per vertex, two vertices per vector, the odd tail's
     // upper pair at bias.
-    template<> template<>
-    void alsimdkernels_object::test<6>()
+    TEST_CASE("alsimdkernels: dequantize_u16x2 packs two vertices a vector and an odd tail at bias", "[alsimdkernels]")
     {
         std::mt19937 rng(6);
         std::uniform_int_distribution<int> any(0, 65535);
@@ -441,8 +425,10 @@ namespace
             }
             if (n & 1)
             {
-                ensure_equals("odd tail upper u is bias", dst[vectors - 1][2], bias[2]);
-                ensure_equals("odd tail upper v is bias", dst[vectors - 1][3], bias[3]);
+                UNSCOPED_INFO("odd tail upper u is bias");
+                REQUIRE(dst[vectors - 1][2] == bias[2]);
+                UNSCOPED_INFO("odd tail upper v is bias");
+                REQUIRE(dst[vectors - 1][3] == bias[3]);
             }
             ensure_same_bits("dequantize_u16x2 writes within its vectors", dst[vectors], SENTINEL);
         }
@@ -450,8 +436,7 @@ namespace
 
     // The skinning blend against a double reference, and the skinned points
     // against the blend and two transforms done one at a time.
-    template<> template<>
-    void alsimdkernels_object::test<7>()
+    TEST_CASE("alsimdkernels: skin_blend against double and skin_points against two transforms", "[alsimdkernels]")
     {
         constexpr U32 JOINTS = 6;
         LLMatrix4a palette[JOINTS];
@@ -544,8 +529,7 @@ namespace
 
     // Extents against the scalar minimum and maximum, bit for bit, every
     // count and width; an empty range leaves them alone.
-    template<> template<>
-    void alsimdkernels_object::test<8>()
+    TEST_CASE("alsimdkernels: extents against the scalar minimum and maximum bit for bit", "[alsimdkernels]")
     {
         for (size_t n : COUNTS)
         {
@@ -584,8 +568,7 @@ namespace
     // fast estimate's twelve bits, since one ulp of input can cross a step
     // of its table. With and without a mask and clothing weights, a
     // degenerate binormal delta included.
-    template<> template<>
-    void alsimdkernels_object::test<9>()
+    TEST_CASE("alsimdkernels: morph_apply against the loop it replaces", "[alsimdkernels]")
     {
         constexpr size_t MORPH = 37;
         constexpr size_t MESH = 50;
@@ -718,8 +701,7 @@ namespace
     // is a denormal float; under the flush-to-zero mode the render thread
     // runs in it has to come through every width and the public entry
     // untouched.
-    template<> template<>
-    void alsimdkernels_object::test<10>()
+    TEST_CASE("alsimdkernels: a denormal texture index in w survives flush-to-zero", "[alsimdkernels]")
     {
         FPModeRestorer restore_fp_mode;
         set_thread_fp_mode();
@@ -736,8 +718,8 @@ namespace
                     transform_impl<W, true, W_LANE::SET>(m, src.data(), dst.data(), n, w);
                     for (size_t i = 0; i < n; ++i)
                     {
-                        ensure_equals(std::string("index in w ") + width + " index " + std::to_string(index) + " n " + std::to_string(n) + " at " + std::to_string(i),
-                                      std::bit_cast<S32>(dst[i][3]), index);
+                        UNSCOPED_INFO(std::string("index in w ") + width + " index " + std::to_string(index) + " n " + std::to_string(n) + " at " + std::to_string(i));
+                        REQUIRE(std::bit_cast<S32>(dst[i][3]) == index);
                     }
                 });
 
@@ -745,8 +727,8 @@ namespace
                 alsimd::transform_points(m, src.data(), dst.data(), n, w);
                 for (size_t i = 0; i < n; ++i)
                 {
-                    ensure_equals("index in w through the library index " + std::to_string(index) + " n " + std::to_string(n) + " at " + std::to_string(i),
-                                  std::bit_cast<S32>(dst[i][3]), index);
+                    UNSCOPED_INFO("index in w through the library index " + std::to_string(index) + " n " + std::to_string(n) + " at " + std::to_string(i));
+                    REQUIRE(std::bit_cast<S32>(dst[i][3]) == index);
                 }
             }
         }

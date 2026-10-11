@@ -24,7 +24,8 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include "../llmath.h"
 #include "../llsimdmath.h"
 #include "../llvector4a.h"
@@ -75,7 +76,8 @@ namespace
         actual.store(got);
         for (S32 i = 0; i < 4; ++i)
         {
-            tut::ensure_approximately_equals_range((msg + " component").c_str(), got.mQ[i], expected.mQ[i], TOLERANCE);
+            UNSCOPED_INFO((msg + " component").c_str());
+            REQUIRE_THAT(got.mQ[i], Catch::Matchers::WithinAbs(expected.mQ[i], TOLERANCE));
         }
     }
 
@@ -86,25 +88,19 @@ namespace
         actual.store(got);
         const F32 d = got.mQ[0] * expected.mQ[0] + got.mQ[1] * expected.mQ[1]
                     + got.mQ[2] * expected.mQ[2] + got.mQ[3] * expected.mQ[3];
-        tut::ensure_approximately_equals_range(msg.c_str(), fabsf(d), 1.f, TOLERANCE);
+        UNSCOPED_INFO(msg.c_str());
+        REQUIRE_THAT(fabsf(d), Catch::Matchers::WithinAbs(1.f, TOLERANCE));
     }
 }
 
-namespace tut
-{
 namespace
 {
     struct llquaternion2_data
     {
         std::vector<LLQuaternion> mRotations = rotations();
     };
-    typedef test_group<llquaternion2_data> llquaternion2_test;
-    typedef llquaternion2_test::object llquaternion2_object;
-    tut::llquaternion2_test llquaternion2_testcase("LLQuaternion2");
-}
 
-    template<> template<>
-    void llquaternion2_object::test<1>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: LLQuaternion round trip and the identity", "[LLQuaternion2]")
     {
         // Round trip through the scalar type, and the identity.
         for (const LLQuaternion& q : mRotations)
@@ -117,8 +113,7 @@ namespace
         ensure_quat_equals("identity", LLQuaternion2::identity(), ident);
     }
 
-    template<> template<>
-    void llquaternion2_object::test<2>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: setMul matches LLQuaternion operator* for every pair", "[LLQuaternion2]")
     {
         // setMul against LLQuaternion's operator*, for every ordered pair.
         for (const LLQuaternion& a : mRotations)
@@ -132,8 +127,7 @@ namespace
         }
     }
 
-    template<> template<>
-    void llquaternion2_object::test<3>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: rotating by a product rotates by a and then by b", "[LLQuaternion2]")
     {
         // The product is what rotating by a and then by b does, which is the
         // property the joint hierarchy relies on.
@@ -153,14 +147,14 @@ namespace
                 const LLVector3 expected = (v * a) * b;
                 for (S32 i = 0; i < 3; ++i)
                 {
-                    ensure_approximately_equals_range("rotate by the product", out[i], expected.mV[i], 1e-4f);
+                    UNSCOPED_INFO("rotate by the product");
+                    REQUIRE_THAT(out[i], Catch::Matchers::WithinAbs(expected.mV[i], 1e-4f));
                 }
             }
         }
     }
 
-    template<> template<>
-    void llquaternion2_object::test<4>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: rotate matches LLVector3 operator* and carries w through", "[LLQuaternion2]")
     {
         // rotate() against LLVector3's operator*, and the w it was handed
         // comes back untouched.
@@ -188,15 +182,16 @@ namespace
                 const F32 scale = llmax(1.f, expected.magVec());
                 for (S32 i = 0; i < 3; ++i)
                 {
-                    ensure_approximately_equals_range("v * q", out[i], expected.mV[i], 1e-5f * scale);
+                    UNSCOPED_INFO("v * q");
+                    REQUIRE_THAT(out[i], Catch::Matchers::WithinAbs(expected.mV[i], 1e-5f * scale));
                 }
-                ensure_approximately_equals_range("w is carried through", out[3], 7.f, TOLERANCE);
+                UNSCOPED_INFO("w is carried through");
+                REQUIRE_THAT(out[3], Catch::Matchers::WithinAbs(7.f, TOLERANCE));
             }
         }
     }
 
-    template<> template<>
-    void llquaternion2_object::test<5>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: dot matches the scalar dot including its sign", "[LLQuaternion2]")
     {
         // dot() against the scalar dot, sign included: the sign is what says
         // which way round the shorter interpolation goes.
@@ -205,13 +200,13 @@ namespace
             for (const LLQuaternion& b : mRotations)
             {
                 const LLSimdScalar d = LLQuaternion2(a).dot(LLQuaternion2(b));
-                ensure_approximately_equals_range("dot", d.getF32(), dot(a, b), TOLERANCE);
+                UNSCOPED_INFO("dot");
+                REQUIRE_THAT(d.getF32(), Catch::Matchers::WithinAbs(dot(a, b), TOLERANCE));
             }
         }
     }
 
-    template<> template<>
-    void llquaternion2_object::test<6>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: setLerp ends at its inputs and stays a rotation between", "[LLQuaternion2]")
     {
         // The ends of the interpolation are the ends, and everything in
         // between comes out normalized.
@@ -231,14 +226,14 @@ namespace
                 {
                     LLQuaternion2 mid;
                     mid.setLerp(LLQuaternion2(a), LLQuaternion2(b), u);
-                    ensure("interpolated rotation is a rotation", mid.isOkRotation());
+                    UNSCOPED_INFO("interpolated rotation is a rotation");
+                    REQUIRE(mid.isOkRotation());
                 }
             }
         }
     }
 
-    template<> template<>
-    void llquaternion2_object::test<7>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: setLerp takes the shorter way round", "[LLQuaternion2]")
     {
         // The interpolation takes the shorter way round. Half way between two
         // rotations a quarter turn apart is an eighth of a turn from each,
@@ -259,16 +254,34 @@ namespace
         from_negated.store(got_negated);
         const F32 agreement = got_b.mQ[0] * got_negated.mQ[0] + got_b.mQ[1] * got_negated.mQ[1]
                             + got_b.mQ[2] * got_negated.mQ[2] + got_b.mQ[3] * got_negated.mQ[3];
-        ensure_approximately_equals_range("the negated end interpolates the same way",
-                                          fabsf(agreement), 1.f, TOLERANCE);
+        UNSCOPED_INFO("the negated end interpolates the same way");
+        CHECK_THAT(fabsf(agreement), Catch::Matchers::WithinAbs(1.f, TOLERANCE));
 
         // and it really is the eighth turn, not the seven eighths one
         const LLQuaternion eighth(F_PI * 0.25f, axis);
         ensure_same_rotation("half way is an eighth of a turn", from_b, eighth);
     }
 
-    template<> template<>
-    void llquaternion2_object::test<9>()
+
+
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: a quaternion times its conjugate is the identity", "[LLQuaternion2]")
+    {
+        // Conjugate undoes the rotation, and the product with it is identity.
+        for (const LLQuaternion& q : mRotations)
+        {
+            LLQuaternion2 simd(q);
+            LLQuaternion2 conj;
+            conj.setConjugate(simd);
+
+            LLQuaternion2 product;
+            product.setMul(simd, conj);
+
+            LLQuaternion ident;
+            ensure_same_rotation("q times its conjugate is identity", product, ident);
+        }
+    }
+
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: rotate scales by an off-unit quaternion as LLQuaternion does", "[LLQuaternion2]")
     {
         // A quaternion that has drifted off unit length scales what it
         // rotates, and callers get the same answer from either type. The
@@ -292,13 +305,13 @@ namespace
             const F32 scale = llmax(1.f, expected.magVec());
             for (S32 i = 0; i < 3; ++i)
             {
-                ensure_approximately_equals_range("off-unit v * q", out[i], expected.mV[i], 1e-5f * scale);
+                UNSCOPED_INFO("off-unit v * q");
+                REQUIRE_THAT(out[i], Catch::Matchers::WithinAbs(expected.mV[i], 1e-5f * scale));
             }
         }
     }
 
-    template<> template<>
-    void llquaternion2_object::test<10>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: setInverse undoes a rotation whatever its length", "[LLQuaternion2]")
     {
         // The inverse undoes the rotation whatever length it carries, where
         // the conjugate only does for one of unit length. A rotation that has
@@ -327,32 +340,15 @@ namespace
             product.store(got);
             for (S32 i = 0; i < 3; ++i)
             {
-                ensure_approximately_equals_range("q times its inverse has no axis", got.mQ[i], 0.f, 1e-5f);
+                UNSCOPED_INFO("q times its inverse has no axis");
+                REQUIRE_THAT(got.mQ[i], Catch::Matchers::WithinAbs(0.f, 1e-5f));
             }
-            ensure_approximately_equals_range("q times its inverse is the identity", got.mQ[3], 1.f, 1e-5f);
+            UNSCOPED_INFO("q times its inverse is the identity");
+            REQUIRE_THAT(got.mQ[3], Catch::Matchers::WithinAbs(1.f, 1e-5f));
         }
     }
 
-    template<> template<>
-    void llquaternion2_object::test<8>()
-    {
-        // Conjugate undoes the rotation, and the product with it is identity.
-        for (const LLQuaternion& q : mRotations)
-        {
-            LLQuaternion2 simd(q);
-            LLQuaternion2 conj;
-            conj.setConjugate(simd);
-
-            LLQuaternion2 product;
-            product.setMul(simd, conj);
-
-            LLQuaternion ident;
-            ensure_same_rotation("q times its conjugate is identity", product, ident);
-        }
-    }
-
-    template<> template<>
-    void llquaternion2_object::test<11>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: setSlerp follows the free slerp along the arc", "[LLQuaternion2]")
     {
         // Against the free slerp, which is the second implementation this is
         // compared with rather than the same one written twice.
@@ -365,7 +361,8 @@ namespace
 
             LLQuaternion expected = slerp(u, a, b);
             // q and -q are the same rotation.
-            tut::ensure_approximately_equals_range(what, fabsf(dot(got, expected)), 1.f, 1e-4f);
+            UNSCOPED_INFO(what);
+            REQUIRE_THAT(fabsf(dot(got, expected)), Catch::Matchers::WithinAbs(1.f, 1e-4f));
         };
 
         // A half turn apart, which is where a lerp is furthest out and where
@@ -394,8 +391,7 @@ namespace
         }
     }
 
-    template<> template<>
-    void llquaternion2_object::test<12>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: setSlerp ends at its inputs and handles equal or opposite pairs", "[LLQuaternion2]")
     {
         // The ends are the ends, whatever the pair.
         const LLQuaternion a(0.3f, LLVector3::x_axis);
@@ -405,13 +401,15 @@ namespace
         at_start.setSlerp(LLQuaternion2(a), LLQuaternion2(b), 0.f);
         LLQuaternion start;
         at_start.store(start);
-        ensure_approximately_equals_range("nought is the first", fabsf(dot(start, a)), 1.f, 1e-5f);
+        UNSCOPED_INFO("nought is the first");
+        CHECK_THAT(fabsf(dot(start, a)), Catch::Matchers::WithinAbs(1.f, 1e-5f));
 
         LLQuaternion2 at_end;
         at_end.setSlerp(LLQuaternion2(a), LLQuaternion2(b), 1.f);
         LLQuaternion end;
         at_end.store(end);
-        ensure_approximately_equals_range("one is the second", fabsf(dot(end, b)), 1.f, 1e-5f);
+        UNSCOPED_INFO("one is the second");
+        CHECK_THAT(fabsf(dot(end, b)), Catch::Matchers::WithinAbs(1.f, 1e-5f));
 
         // Two rotations that are the same rotation stay put rather than
         // dividing by the sine of nothing.
@@ -419,8 +417,10 @@ namespace
         same.setSlerp(LLQuaternion2(a), LLQuaternion2(a), 0.5f);
         LLQuaternion held;
         same.store(held);
-        ensure_approximately_equals_range("the same pair holds", fabsf(dot(held, a)), 1.f, 1e-5f);
-        ensure("and stays a rotation", same.isOkRotation());
+        UNSCOPED_INFO("the same pair holds");
+        CHECK_THAT(fabsf(dot(held, a)), Catch::Matchers::WithinAbs(1.f, 1e-5f));
+        UNSCOPED_INFO("and stays a rotation");
+        CHECK(same.isOkRotation());
 
         // Handed the far side of the same rotation, it comes back the short
         // way rather than through the rotations neither end asked for.
@@ -433,12 +433,11 @@ namespace
         shortest.setSlerp(LLQuaternion2(a), LLQuaternion2(negated), 0.5f);
         LLQuaternion midway;
         shortest.store(midway);
-        ensure_approximately_equals_range("a rotation and its negation are one place",
-                                          fabsf(dot(midway, a)), 1.f, 1e-4f);
+        UNSCOPED_INFO("a rotation and its negation are one place");
+        CHECK_THAT(fabsf(dot(midway, a)), Catch::Matchers::WithinAbs(1.f, 1e-4f));
     }
 
-    template<> template<>
-    void llquaternion2_object::test<13>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: setSlerp of random pairs is a rotation matching slerp", "[LLQuaternion2]")
     {
         // Every result is a rotation, over a spread of pairs and positions.
         std::mt19937 rng(20260906u);
@@ -461,18 +460,18 @@ namespace
 
             LLQuaternion2 blended;
             blended.setSlerp(LLQuaternion2(a), LLQuaternion2(b), u);
-            ensure("a blend of two rotations is a rotation", blended.isOkRotation());
+            UNSCOPED_INFO("a blend of two rotations is a rotation");
+            REQUIRE(blended.isOkRotation());
 
             LLQuaternion got;
             blended.store(got);
             LLQuaternion expected = slerp(u, a, b);
-            ensure_approximately_equals_range("and it is the one slerp gives",
-                                              fabsf(dot(got, expected)), 1.f, 1e-3f);
+            UNSCOPED_INFO("and it is the one slerp gives");
+            REQUIRE_THAT(fabsf(dot(got, expected)), Catch::Matchers::WithinAbs(1.f, 1e-3f));
         }
     }
 
-    template<> template<>
-    void llquaternion2_object::test<14>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: quantize8 and quantize16 keep a rotation within a step", "[LLQuaternion2]")
     {
         // Quantizing to eight or sixteen bits keeps a rotation a rotation,
         // within the step the bits allow.
@@ -480,30 +479,34 @@ namespace
         {
             LLQuaternion2 q8(q);
             q8.quantize8();
-            ensure("quantize8 is a rotation", q8.isOkRotation());
+            UNSCOPED_INFO("quantize8 is a rotation");
+            REQUIRE(q8.isOkRotation());
             LLQuaternion got8;
             q8.store(got8);
-            ensure_approximately_equals_range("quantize8 is the rotation it was given, to eight bits", fabsf(dot(got8, q)), 1.f, 1e-4f);
+            UNSCOPED_INFO("quantize8 is the rotation it was given, to eight bits");
+            REQUIRE_THAT(fabsf(dot(got8, q)), Catch::Matchers::WithinAbs(1.f, 1e-4f));
             for (S32 i = 0; i < 4; ++i)
             {
-                ensure("quantize8 component within a step", fabsf(got8.mQ[i] - q.mQ[i]) <= 2.f / 255.f);
+                UNSCOPED_INFO("quantize8 component within a step");
+                REQUIRE(fabsf(got8.mQ[i] - q.mQ[i]) <= 2.f / 255.f);
             }
 
             LLQuaternion2 q16(q);
             q16.quantize16();
-            ensure("quantize16 is a rotation", q16.isOkRotation());
+            UNSCOPED_INFO("quantize16 is a rotation");
+            REQUIRE(q16.isOkRotation());
             ensure_same_rotation("quantize16 is the rotation it was given", q16, q);
             LLQuaternion got16;
             q16.store(got16);
             for (S32 i = 0; i < 4; ++i)
             {
-                ensure("quantize16 component within a step", fabsf(got16.mQ[i] - q.mQ[i]) <= 2.f / 65535.f);
+                UNSCOPED_INFO("quantize16 component within a step");
+                REQUIRE(fabsf(got16.mQ[i] - q.mQ[i]) <= 2.f / 65535.f);
             }
         }
     }
 
-    template<> template<>
-    void llquaternion2_object::test<15>()
+    TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: setConjugate flips the vector part alone", "[LLQuaternion2]")
     {
         // The conjugate flips the vector part alone, and the identity is
         // its own conjugate.
@@ -512,13 +515,18 @@ namespace
         conj.setConjugate(LLQuaternion2(q));
         LLQuaternion got;
         conj.store(got);
-        ensure_equals("conjugate x", got.mQ[VX], -q.mQ[VX]);
-        ensure_equals("conjugate y", got.mQ[VY], -q.mQ[VY]);
-        ensure_equals("conjugate z", got.mQ[VZ], -q.mQ[VZ]);
-        ensure_equals("conjugate w", got.mQ[VW], q.mQ[VW]);
+        UNSCOPED_INFO("conjugate x");
+        CHECK(got.mQ[VX] == -q.mQ[VX]);
+        UNSCOPED_INFO("conjugate y");
+        CHECK(got.mQ[VY] == -q.mQ[VY]);
+        UNSCOPED_INFO("conjugate z");
+        CHECK(got.mQ[VZ] == -q.mQ[VZ]);
+        UNSCOPED_INFO("conjugate w");
+        CHECK(got.mQ[VW] == q.mQ[VW]);
 
         LLQuaternion2 ident;
         ident.setConjugate(LLQuaternion2::identity());
-        ensure("the identity is its own conjugate", ident.equals(LLQuaternion2::identity()));
+        UNSCOPED_INFO("the identity is its own conjugate");
+        CHECK(ident.equals(LLQuaternion2::identity()));
     }
 }

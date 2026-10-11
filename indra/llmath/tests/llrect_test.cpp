@@ -27,31 +27,17 @@
  */
 
 #include "linden_common.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 #include "../llrect.h"
 
-namespace tut
-{
 namespace
 {
-    struct LLRectData
-    {
-    };
-
-    typedef test_group<LLRectData> factory;
-    typedef factory::object object;
-}
 }
 
 namespace
 {
-    tut::factory llrect_test_factory("LLRect");
-}
-
-namespace tut
-{
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE("LLRect: default constructor gives an all-zero rect", "[LLRect]")
     {
         //
         // test the LLRect default constructor
@@ -62,19 +48,27 @@ namespace tut
 
         // default constructor
         LLRect rect1;
-        ensure_equals("Empty rect", rect1.getValue(), zero);
-        ensure_equals("Empty rect left", rect1.mLeft, 0);
-        ensure_equals("Empty rect top", rect1.mTop, 0);
-        ensure_equals("Empty rect right", rect1.mRight, 0);
-        ensure_equals("Empty rect bottom", rect1.mBottom, 0);
-        ensure_equals("Empty rect width", rect1.getWidth(), 0);
-        ensure_equals("Empty rect height", rect1.getHeight(), 0);
-        ensure_equals("Empty rect centerx", rect1.getCenterX(), 0);
-        ensure_equals("Empty rect centery", rect1.getCenterY(), 0);
+        UNSCOPED_INFO("Empty rect");
+        CHECK_THAT(rect1.getValue(), ll_test::LLSDEquals(zero));
+        UNSCOPED_INFO("Empty rect left");
+        CHECK(rect1.mLeft == 0);
+        UNSCOPED_INFO("Empty rect top");
+        CHECK(rect1.mTop == 0);
+        UNSCOPED_INFO("Empty rect right");
+        CHECK(rect1.mRight == 0);
+        UNSCOPED_INFO("Empty rect bottom");
+        CHECK(rect1.mBottom == 0);
+        UNSCOPED_INFO("Empty rect width");
+        CHECK(rect1.getWidth() == 0);
+        UNSCOPED_INFO("Empty rect height");
+        CHECK(rect1.getHeight() == 0);
+        UNSCOPED_INFO("Empty rect centerx");
+        CHECK(rect1.getCenterX() == 0);
+        UNSCOPED_INFO("Empty rect centery");
+        CHECK(rect1.getCenterY() == 0);
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE("LLRect: LLRectf default constructor gives an all-zero rect", "[LLRect]")
     {
         //
         // test the LLRectf default constructor
@@ -84,55 +78,77 @@ namespace tut
         zerof.append(0.0f); zerof.append(0.0f); zerof.append(0.0f); zerof.append(0.0f);
 
         LLRectf rect2;
-        ensure_equals("Empty rectf", rect2.getValue(), zerof);
-        ensure_equals("Empty rectf left", rect2.mLeft, 0.0f);
-        ensure_equals("Empty rectf top", rect2.mTop, 0.0f);
-        ensure_equals("Empty rectf right", rect2.mRight, 0.0f);
-        ensure_equals("Empty rectf bottom", rect2.mBottom, 0.0f);
-        ensure_equals("Empty rectf width", rect2.getWidth(), 0.0f);
-        ensure_equals("Empty rectf height", rect2.getHeight(), 0.0f);
-        ensure_equals("Empty rectf centerx", rect2.getCenterX(), 0.0f);
-        ensure_equals("Empty rectf centery", rect2.getCenterY(), 0.0f);
+        UNSCOPED_INFO("Empty rectf");
+        CHECK_THAT(rect2.getValue(), ll_test::LLSDEquals(zerof));
+        UNSCOPED_INFO("Empty rectf left");
+        CHECK(rect2.mLeft == 0.0f);
+        UNSCOPED_INFO("Empty rectf top");
+        CHECK(rect2.mTop == 0.0f);
+        UNSCOPED_INFO("Empty rectf right");
+        CHECK(rect2.mRight == 0.0f);
+        UNSCOPED_INFO("Empty rectf bottom");
+        CHECK(rect2.mBottom == 0.0f);
+        UNSCOPED_INFO("Empty rectf width");
+        CHECK(rect2.getWidth() == 0.0f);
+        UNSCOPED_INFO("Empty rectf height");
+        CHECK(rect2.getHeight() == 0.0f);
+        UNSCOPED_INFO("Empty rectf centerx");
+        CHECK(rect2.getCenterX() == 0.0f);
+        UNSCOPED_INFO("Empty rectf centery");
+        CHECK(rect2.getCenterY() == 0.0f);
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE("LLRect: constructor from another LLRect copies its edges", "[LLRect]")
     {
         //
         // test the LLRect constructor from another LLRect
         //
 
         LLRect rect3(LLRect(1, 6, 7, 2));
-        ensure_equals("Default rect left", rect3.mLeft, 1);
-        ensure_equals("Default rect top", rect3.mTop, 6);
-        ensure_equals("Default rect right", rect3.mRight, 7);
-        ensure_equals("Default rect bottom", rect3.mBottom, 2);
-        ensure_equals("Default rect width", rect3.getWidth(), 6);
-        ensure_equals("Default rect height", rect3.getHeight(), 4);
-        ensure_equals("Default rect centerx", rect3.getCenterX(), 4);
-        ensure_equals("Default rect centery", rect3.getCenterY(), 4);
+        UNSCOPED_INFO("Default rect left");
+        CHECK(rect3.mLeft == 1);
+        UNSCOPED_INFO("Default rect top");
+        CHECK(rect3.mTop == 6);
+        UNSCOPED_INFO("Default rect right");
+        CHECK(rect3.mRight == 7);
+        UNSCOPED_INFO("Default rect bottom");
+        CHECK(rect3.mBottom == 2);
+        UNSCOPED_INFO("Default rect width");
+        CHECK(rect3.getWidth() == 6);
+        UNSCOPED_INFO("Default rect height");
+        CHECK(rect3.getHeight() == 4);
+        UNSCOPED_INFO("Default rect centerx");
+        CHECK(rect3.getCenterX() == 4);
+        UNSCOPED_INFO("Default rect centery");
+        CHECK(rect3.getCenterY() == 4);
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE("LLRect: LLRectf four-float constructor sets edges and size", "[LLRect]")
     {
         //
         // test the LLRectf four-float constructor
         //
 
         LLRectf rect4(1.0f, 5.0f, 6.0f, 2.0f);
-        ensure_equals("Default rectf left", rect4.mLeft, 1.0f);
-        ensure_equals("Default rectf top", rect4.mTop, 5.0f);
-        ensure_equals("Default rectf right", rect4.mRight, 6.0f);
-        ensure_equals("Default rectf bottom", rect4.mBottom, 2.0f);
-        ensure_equals("Default rectf width", rect4.getWidth(), 5.0f);
-        ensure_equals("Default rectf height", rect4.getHeight(), 3.0f);
-        ensure_equals("Default rectf centerx", rect4.getCenterX(), 3.5f);
-        ensure_equals("Default rectf centery", rect4.getCenterY(), 3.5f);
+        UNSCOPED_INFO("Default rectf left");
+        CHECK(rect4.mLeft == 1.0f);
+        UNSCOPED_INFO("Default rectf top");
+        CHECK(rect4.mTop == 5.0f);
+        UNSCOPED_INFO("Default rectf right");
+        CHECK(rect4.mRight == 6.0f);
+        UNSCOPED_INFO("Default rectf bottom");
+        CHECK(rect4.mBottom == 2.0f);
+        UNSCOPED_INFO("Default rectf width");
+        CHECK(rect4.getWidth() == 5.0f);
+        UNSCOPED_INFO("Default rectf height");
+        CHECK(rect4.getHeight() == 3.0f);
+        UNSCOPED_INFO("Default rectf centerx");
+        CHECK(rect4.getCenterX() == 3.5f);
+        UNSCOPED_INFO("Default rectf centery");
+        CHECK(rect4.getCenterY() == 3.5f);
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE("LLRect: LLRectf LLSD constructor sets edges and size", "[LLRect]")
     {
         //
         // test the LLRectf LLSD constructor
@@ -141,18 +157,25 @@ namespace tut
         LLSD array;
         array.append(-1.0f); array.append(0.0f); array.append(0.0f); array.append(-1.0f);
         LLRectf rect5(array);
-        ensure_equals("LLSD rectf left", rect5.mLeft, -1.0f);
-        ensure_equals("LLSD rectf top", rect5.mTop, 0.0f);
-        ensure_equals("LLSD rectf right", rect5.mRight, 0.0f);
-        ensure_equals("LLSD rectf bottom", rect5.mBottom, -1.0f);
-        ensure_equals("LLSD rectf width", rect5.getWidth(), 1.0f);
-        ensure_equals("LLSD rectf height", rect5.getHeight(), 1.0f);
-        ensure_equals("LLSD rectf centerx", rect5.getCenterX(), -0.5f);
-        ensure_equals("LLSD rectf centery", rect5.getCenterY(), -0.5f);
+        UNSCOPED_INFO("LLSD rectf left");
+        CHECK(rect5.mLeft == -1.0f);
+        UNSCOPED_INFO("LLSD rectf top");
+        CHECK(rect5.mTop == 0.0f);
+        UNSCOPED_INFO("LLSD rectf right");
+        CHECK(rect5.mRight == 0.0f);
+        UNSCOPED_INFO("LLSD rectf bottom");
+        CHECK(rect5.mBottom == -1.0f);
+        UNSCOPED_INFO("LLSD rectf width");
+        CHECK(rect5.getWidth() == 1.0f);
+        UNSCOPED_INFO("LLSD rectf height");
+        CHECK(rect5.getHeight() == 1.0f);
+        UNSCOPED_INFO("LLSD rectf centerx");
+        CHECK(rect5.getCenterX() == -0.5f);
+        UNSCOPED_INFO("LLSD rectf centery");
+        CHECK(rect5.getCenterY() == -0.5f);
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE("LLRect: edges set directly give the matching size and center", "[LLRect]")
     {
         //
         // test directly setting the member variables for dimensions
@@ -164,18 +187,25 @@ namespace tut
         rectf.mTop = 1.0f;
         rectf.mRight = 1.0f;
         rectf.mBottom = -1.0f;
-        ensure_equals("Member-set rectf left", rectf.mLeft, -1.0f);
-        ensure_equals("Member-set rectf top", rectf.mTop, 1.0f);
-        ensure_equals("Member-set rectf right", rectf.mRight, 1.0f);
-        ensure_equals("Member-set rectf bottom", rectf.mBottom, -1.0f);
-        ensure_equals("Member-set rectf width", rectf.getWidth(), 2.0f);
-        ensure_equals("Member-set rectf height", rectf.getHeight(), 2.0f);
-        ensure_equals("Member-set rectf centerx", rectf.getCenterX(), 0.0f);
-        ensure_equals("Member-set rectf centery", rectf.getCenterY(), 0.0f);
+        UNSCOPED_INFO("Member-set rectf left");
+        CHECK(rectf.mLeft == -1.0f);
+        UNSCOPED_INFO("Member-set rectf top");
+        CHECK(rectf.mTop == 1.0f);
+        UNSCOPED_INFO("Member-set rectf right");
+        CHECK(rectf.mRight == 1.0f);
+        UNSCOPED_INFO("Member-set rectf bottom");
+        CHECK(rectf.mBottom == -1.0f);
+        UNSCOPED_INFO("Member-set rectf width");
+        CHECK(rectf.getWidth() == 2.0f);
+        UNSCOPED_INFO("Member-set rectf height");
+        CHECK(rectf.getHeight() == 2.0f);
+        UNSCOPED_INFO("Member-set rectf centerx");
+        CHECK(rectf.getCenterX() == 0.0f);
+        UNSCOPED_INFO("Member-set rectf centery");
+        CHECK(rectf.getCenterY() == 0.0f);
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE("LLRect: setValue() reads edges from LLSD", "[LLRect]")
     {
         //
         // test the setValue() method
@@ -186,18 +216,25 @@ namespace tut
         LLSD array;
         array.append(-1.0f); array.append(0.0f); array.append(0.0f); array.append(-1.0f);
         rectf.setValue(array);
-        ensure_equals("setValue() rectf left", rectf.mLeft, -1.0f);
-        ensure_equals("setValue() rectf top", rectf.mTop, 0.0f);
-        ensure_equals("setValue() rectf right", rectf.mRight, 0.0f);
-        ensure_equals("setValue() rectf bottom", rectf.mBottom, -1.0f);
-        ensure_equals("setValue() rectf width", rectf.getWidth(), 1.0f);
-        ensure_equals("setValue() rectf height", rectf.getHeight(), 1.0f);
-        ensure_equals("setValue() rectf centerx", rectf.getCenterX(), -0.5f);
-        ensure_equals("setValue() rectf centery", rectf.getCenterY(), -0.5f);
+        UNSCOPED_INFO("setValue() rectf left");
+        CHECK(rectf.mLeft == -1.0f);
+        UNSCOPED_INFO("setValue() rectf top");
+        CHECK(rectf.mTop == 0.0f);
+        UNSCOPED_INFO("setValue() rectf right");
+        CHECK(rectf.mRight == 0.0f);
+        UNSCOPED_INFO("setValue() rectf bottom");
+        CHECK(rectf.mBottom == -1.0f);
+        UNSCOPED_INFO("setValue() rectf width");
+        CHECK(rectf.getWidth() == 1.0f);
+        UNSCOPED_INFO("setValue() rectf height");
+        CHECK(rectf.getHeight() == 1.0f);
+        UNSCOPED_INFO("setValue() rectf centerx");
+        CHECK(rectf.getCenterX() == -0.5f);
+        UNSCOPED_INFO("setValue() rectf centery");
+        CHECK(rectf.getCenterY() == -0.5f);
     }
 
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE("LLRect: set() sets edges and size", "[LLRect]")
     {
         //
         // test the set() method
@@ -206,18 +243,25 @@ namespace tut
         LLRect rect;
 
         rect.set(10, 90, 70, 10);
-        ensure_equals("set() rectf left", rect.mLeft, 10);
-        ensure_equals("set() rectf top", rect.mTop, 90);
-        ensure_equals("set() rectf right", rect.mRight, 70);
-        ensure_equals("set() rectf bottom", rect.mBottom, 10);
-        ensure_equals("set() rectf width", rect.getWidth(), 60);
-        ensure_equals("set() rectf height", rect.getHeight(), 80);
-        ensure_equals("set() rectf centerx", rect.getCenterX(), 40);
-        ensure_equals("set() rectf centery", rect.getCenterY(), 50);
+        UNSCOPED_INFO("set() rectf left");
+        CHECK(rect.mLeft == 10);
+        UNSCOPED_INFO("set() rectf top");
+        CHECK(rect.mTop == 90);
+        UNSCOPED_INFO("set() rectf right");
+        CHECK(rect.mRight == 70);
+        UNSCOPED_INFO("set() rectf bottom");
+        CHECK(rect.mBottom == 10);
+        UNSCOPED_INFO("set() rectf width");
+        CHECK(rect.getWidth() == 60);
+        UNSCOPED_INFO("set() rectf height");
+        CHECK(rect.getHeight() == 80);
+        UNSCOPED_INFO("set() rectf centerx");
+        CHECK(rect.getCenterX() == 40);
+        UNSCOPED_INFO("set() rectf centery");
+        CHECK(rect.getCenterY() == 50);
     }
 
-    template<> template<>
-    void object::test<9>()
+    TEST_CASE("LLRect: setOriginAndSize() grows up and right from the origin", "[LLRect]")
     {
         //
         // test the setOriginAndSize() method
@@ -226,18 +270,25 @@ namespace tut
         LLRectf rectf;
 
         rectf.setOriginAndSize(0.0f, 0.0f, 2.0f, 1.0f);
-        ensure_equals("setOriginAndSize() rectf left", rectf.mLeft, 0.0f);
-        ensure_equals("setOriginAndSize() rectf top", rectf.mTop, 1.0f);
-        ensure_equals("setOriginAndSize() rectf right", rectf.mRight, 2.0f);
-        ensure_equals("setOriginAndSize() rectf bottom", rectf.mBottom, 0.0f);
-        ensure_equals("setOriginAndSize() rectf width", rectf.getWidth(), 2.0f);
-        ensure_equals("setOriginAndSize() rectf height", rectf.getHeight(), 1.0f);
-        ensure_equals("setOriginAndSize() rectf centerx", rectf.getCenterX(), 1.0f);
-        ensure_equals("setOriginAndSize() rectf centery", rectf.getCenterY(), 0.5f);
+        UNSCOPED_INFO("setOriginAndSize() rectf left");
+        CHECK(rectf.mLeft == 0.0f);
+        UNSCOPED_INFO("setOriginAndSize() rectf top");
+        CHECK(rectf.mTop == 1.0f);
+        UNSCOPED_INFO("setOriginAndSize() rectf right");
+        CHECK(rectf.mRight == 2.0f);
+        UNSCOPED_INFO("setOriginAndSize() rectf bottom");
+        CHECK(rectf.mBottom == 0.0f);
+        UNSCOPED_INFO("setOriginAndSize() rectf width");
+        CHECK(rectf.getWidth() == 2.0f);
+        UNSCOPED_INFO("setOriginAndSize() rectf height");
+        CHECK(rectf.getHeight() == 1.0f);
+        UNSCOPED_INFO("setOriginAndSize() rectf centerx");
+        CHECK(rectf.getCenterX() == 1.0f);
+        UNSCOPED_INFO("setOriginAndSize() rectf centery");
+        CHECK(rectf.getCenterY() == 0.5f);
     }
 
-    template<> template<>
-    void object::test<10>()
+    TEST_CASE("LLRect: setLeftTopAndSize() grows down and right from the top-left", "[LLRect]")
     {
         //
         // test the setLeftTopAndSize() method
@@ -246,18 +297,25 @@ namespace tut
         LLRectf rectf;
 
         rectf.setLeftTopAndSize(0.0f, 0.0f, 2.0f, 1.0f);
-        ensure_equals("setLeftTopAndSize() rectf left", rectf.mLeft, 0.0f);
-        ensure_equals("setLeftTopAndSize() rectf top", rectf.mTop, 0.0f);
-        ensure_equals("setLeftTopAndSize() rectf right", rectf.mRight, 2.0f);
-        ensure_equals("setLeftTopAndSize() rectf bottom", rectf.mBottom, -1.0f);
-        ensure_equals("setLeftTopAndSize() rectf width", rectf.getWidth(), 2.0f);
-        ensure_equals("setLeftTopAndSize() rectf height", rectf.getHeight(), 1.0f);
-        ensure_equals("setLeftTopAndSize() rectf centerx", rectf.getCenterX(), 1.0f);
-        ensure_equals("setLeftTopAndSize() rectf centery", rectf.getCenterY(), -0.5f);
+        UNSCOPED_INFO("setLeftTopAndSize() rectf left");
+        CHECK(rectf.mLeft == 0.0f);
+        UNSCOPED_INFO("setLeftTopAndSize() rectf top");
+        CHECK(rectf.mTop == 0.0f);
+        UNSCOPED_INFO("setLeftTopAndSize() rectf right");
+        CHECK(rectf.mRight == 2.0f);
+        UNSCOPED_INFO("setLeftTopAndSize() rectf bottom");
+        CHECK(rectf.mBottom == -1.0f);
+        UNSCOPED_INFO("setLeftTopAndSize() rectf width");
+        CHECK(rectf.getWidth() == 2.0f);
+        UNSCOPED_INFO("setLeftTopAndSize() rectf height");
+        CHECK(rectf.getHeight() == 1.0f);
+        UNSCOPED_INFO("setLeftTopAndSize() rectf centerx");
+        CHECK(rectf.getCenterX() == 1.0f);
+        UNSCOPED_INFO("setLeftTopAndSize() rectf centery");
+        CHECK(rectf.getCenterY() == -0.5f);
     }
 
-    template<> template<>
-    void object::test<11>()
+    TEST_CASE("LLRect: setCenterAndSize() spreads the size about the center", "[LLRect]")
     {
         //
         // test the setCenterAndSize() method
@@ -266,18 +324,25 @@ namespace tut
         LLRectf rectf;
 
         rectf.setCenterAndSize(0.0f, 0.0f, 2.0f, 1.0f);
-        ensure_equals("setCenterAndSize() rectf left", rectf.mLeft, -1.0f);
-        ensure_equals("setCenterAndSize() rectf top", rectf.mTop, 0.5f);
-        ensure_equals("setCenterAndSize() rectf right", rectf.mRight, 1.0f);
-        ensure_equals("setCenterAndSize() rectf bottom", rectf.mBottom, -0.5f);
-        ensure_equals("setCenterAndSize() rectf width", rectf.getWidth(), 2.0f);
-        ensure_equals("setCenterAndSize() rectf height", rectf.getHeight(), 1.0f);
-        ensure_equals("setCenterAndSize() rectf centerx", rectf.getCenterX(), 0.0f);
-        ensure_equals("setCenterAndSize() rectf centery", rectf.getCenterY(), 0.0f);
+        UNSCOPED_INFO("setCenterAndSize() rectf left");
+        CHECK(rectf.mLeft == -1.0f);
+        UNSCOPED_INFO("setCenterAndSize() rectf top");
+        CHECK(rectf.mTop == 0.5f);
+        UNSCOPED_INFO("setCenterAndSize() rectf right");
+        CHECK(rectf.mRight == 1.0f);
+        UNSCOPED_INFO("setCenterAndSize() rectf bottom");
+        CHECK(rectf.mBottom == -0.5f);
+        UNSCOPED_INFO("setCenterAndSize() rectf width");
+        CHECK(rectf.getWidth() == 2.0f);
+        UNSCOPED_INFO("setCenterAndSize() rectf height");
+        CHECK(rectf.getHeight() == 1.0f);
+        UNSCOPED_INFO("setCenterAndSize() rectf centerx");
+        CHECK(rectf.getCenterX() == 0.0f);
+        UNSCOPED_INFO("setCenterAndSize() rectf centery");
+        CHECK(rectf.getCenterY() == 0.0f);
     }
 
-    template<> template<>
-    void object::test<12>()
+    TEST_CASE("LLRect: isValid() fails for an inverted rect until makeValid()", "[LLRect]")
     {
         //
         // test the validity checking method
@@ -286,20 +351,23 @@ namespace tut
         LLRectf rectf;
 
         rectf.set(-1.0f, 1.0f, 1.0f, -1.0f);
-        ensure("BBox is valid", rectf.isValid());
+        UNSCOPED_INFO("BBox is valid");
+        CHECK(rectf.isValid());
 
         rectf.mLeft = 2.0f;
-        ensure("BBox is not valid", ! rectf.isValid());
+        UNSCOPED_INFO("BBox is not valid");
+        CHECK_FALSE(rectf.isValid());
 
         rectf.makeValid();
-        ensure("BBox forced valid", rectf.isValid());
+        UNSCOPED_INFO("BBox forced valid");
+        CHECK(rectf.isValid());
 
         rectf.set(-1.0f, -1.0f, -1.0f, -1.0f);
-        ensure("BBox(0,0,0,0) is valid", rectf.isValid());
+        UNSCOPED_INFO("BBox(0,0,0,0) is valid");
+        CHECK(rectf.isValid());
     }
 
-    template<> template<>
-    void object::test<13>()
+    TEST_CASE("LLRect: isEmpty() and notEmpty() on full and zero-size rects", "[LLRect]")
     {
         //
         // test the null checking methods
@@ -308,19 +376,22 @@ namespace tut
         LLRectf rectf;
 
         rectf.set(-1.0f, 1.0f, 1.0f, -1.0f);
-        ensure("BBox is not Null", ! rectf.isEmpty());
-        ensure("BBox notNull", rectf.notEmpty());
+        UNSCOPED_INFO("BBox is not Null");
+        CHECK_FALSE(rectf.isEmpty());
+        UNSCOPED_INFO("BBox notNull");
+        CHECK(rectf.notEmpty());
 
         rectf.mLeft = 2.0f;
         rectf.makeValid();
-        ensure("BBox is now Null", rectf.isEmpty());
+        UNSCOPED_INFO("BBox is now Null");
+        CHECK(rectf.isEmpty());
 
         rectf.set(-1.0f, -1.0f, -1.0f, -1.0f);
-        ensure("BBox(0,0,0,0) is Null", rectf.isEmpty());
+        UNSCOPED_INFO("BBox(0,0,0,0) is Null");
+        CHECK(rectf.isEmpty());
     }
 
-    template<> template<>
-    void object::test<14>()
+    TEST_CASE("LLRect: equality and inequality operators", "[LLRect]")
     {
         //
         // test the (in)equality operators
@@ -331,15 +402,18 @@ namespace tut
         rect1.set(-1.0f, 1.0f, 1.0f, -1.0f);
         rect2.set(-1.0f, 0.9f, 1.0f, -1.0f);
 
-        ensure("rect1 == rect2 (false)", ! (rect1 == rect2));
-        ensure("rect1 != rect2 (true)", rect1 != rect2);
+        UNSCOPED_INFO("rect1 == rect2 (false)");
+        CHECK_FALSE(rect1 == rect2);
+        UNSCOPED_INFO("rect1 != rect2 (true)");
+        CHECK(rect1 != rect2);
 
-        ensure("rect1 == rect1 (true)", rect1 == rect1);
-        ensure("rect1 != rect1 (false)", ! (rect1 != rect1));
+        UNSCOPED_INFO("rect1 == rect1 (true)");
+        CHECK(rect1 == rect1);
+        UNSCOPED_INFO("rect1 != rect1 (false)");
+        CHECK_FALSE(rect1 != rect1);
     }
 
-    template<> template<>
-    void object::test<15>()
+    TEST_CASE("LLRect: copy constructor gives an equal rect", "[LLRect]")
     {
         //
         // test the copy constructor
@@ -347,12 +421,13 @@ namespace tut
 
         LLRectf rect1, rect2(rect1);
 
-        ensure("rect1 == rect2 (true)", rect1 == rect2);
-        ensure("rect1 != rect2 (false)", ! (rect1 != rect2));
+        UNSCOPED_INFO("rect1 == rect2 (true)");
+        CHECK(rect1 == rect2);
+        UNSCOPED_INFO("rect1 != rect2 (false)");
+        CHECK_FALSE(rect1 != rect2);
     }
 
-    template<> template<>
-    void object::test<16>()
+    TEST_CASE("LLRect: translate() moves all four edges", "[LLRect]")
     {
         //
         // test the translate() method
@@ -363,28 +438,32 @@ namespace tut
 
         rect1.translate(0.0f, 0.0f);
 
-        ensure("translate(0, 0)", rect1 == rect2);
+        UNSCOPED_INFO("translate(0, 0)");
+        CHECK(rect1 == rect2);
 
         rect1.translate(100.0f, 100.0f);
         rect1.translate(-100.0f, -100.0f);
 
-        ensure("translate(100, 100) + translate(-100, -100)", rect1 == rect2);
+        UNSCOPED_INFO("translate(100, 100) + translate(-100, -100)");
+        CHECK(rect1 == rect2);
 
         rect1.translate(10.0f, 0.0f);
         rect2.set(9.0f, 1.0f, 11.0f, -1.0f);
-        ensure("translate(10, 0)", rect1 == rect2);
+        UNSCOPED_INFO("translate(10, 0)");
+        CHECK(rect1 == rect2);
 
         rect1.translate(0.0f, 10.0f);
         rect2.set(9.0f, 11.0f, 11.0f, 9.0f);
-        ensure("translate(0, 10)", rect1 == rect2);
+        UNSCOPED_INFO("translate(0, 10)");
+        CHECK(rect1 == rect2);
 
         rect1.translate(-10.0f, -10.0f);
         rect2.set(-1.0f, 1.0f, 1.0f, -1.0f);
-        ensure("translate(-10, -10)", rect1 == rect2);
+        UNSCOPED_INFO("translate(-10, -10)");
+        CHECK(rect1 == rect2);
     }
 
-    template<> template<>
-    void object::test<17>()
+    TEST_CASE("LLRect: stretch() moves the edges outward", "[LLRect]")
     {
         //
         // test the stretch() method
@@ -394,23 +473,26 @@ namespace tut
         LLRectf rect2(rect1);
 
         rect1.stretch(0.0f);
-        ensure("stretch(0)", rect1 == rect2);
+        UNSCOPED_INFO("stretch(0)");
+        CHECK(rect1 == rect2);
 
         rect1.stretch(0.0f, 0.0f);
-        ensure("stretch(0, 0)", rect1 == rect2);
+        UNSCOPED_INFO("stretch(0, 0)");
+        CHECK(rect1 == rect2);
 
         rect1.stretch(10.0f);
         rect1.stretch(-10.0f);
-        ensure("stretch(10) + stretch(-10)", rect1 == rect2);
+        UNSCOPED_INFO("stretch(10) + stretch(-10)");
+        CHECK(rect1 == rect2);
 
         rect1.stretch(2.0f, 1.0f);
         rect2.set(-3.0f, 2.0f, 3.0f, -2.0f);
-        ensure("stretch(2, 1)", rect1 == rect2);
+        UNSCOPED_INFO("stretch(2, 1)");
+        CHECK(rect1 == rect2);
     }
 
 
-    template<> template<>
-    void object::test<18>()
+    TEST_CASE("LLRect: unionWith() covers both rects", "[LLRect]")
     {
         //
         // test the unionWith() method
@@ -422,23 +504,25 @@ namespace tut
         rect2.set(-1.0f, 1.0f, 1.0f, -1.0f);
         rect3 = rect1;
         rect3.unionWith(rect2);
-        ensure_equals("union with self", rect3, rect1);
+        UNSCOPED_INFO("union with self");
+        CHECK(rect3 == rect1);
 
         rect1.set(-1.0f, 1.0f, 1.0f, -1.0f);
         rect2.set(-2.0f, 2.0f, 0.0f, 0.0f);
         rect3 = rect1;
         rect3.unionWith(rect2);
-        ensure_equals("union - overlap", rect3, LLRectf(-2.0f, 2.0f, 1.0f, -1.0f));
+        UNSCOPED_INFO("union - overlap");
+        CHECK(rect3 == LLRectf(-2.0f, 2.0f, 1.0f, -1.0f));
 
         rect1.set(-1.0f, 1.0f, 1.0f, -1.0f);
         rect2.set(5.0f, 10.0f, 10.0f, 5.0f);
         rect3 = rect1;
         rect3.unionWith(rect2);
-        ensure_equals("union - no overlap", rect3, LLRectf(-1.0f, 10.0f, 10.0f, -1.0f));
+        UNSCOPED_INFO("union - no overlap");
+        CHECK(rect3 == LLRectf(-1.0f, 10.0f, 10.0f, -1.0f));
     }
 
-    template<> template<>
-    void object::test<19>()
+    TEST_CASE("LLRect: intersectWith() keeps only the overlap", "[LLRect]")
     {
         //
         // test the intersectWith() methods
@@ -450,23 +534,25 @@ namespace tut
         rect2.set(-1.0f, 1.0f, 1.0f, -1.0f);
         rect3 = rect1;
         rect3.intersectWith(rect2);
-        ensure_equals("intersect with self", rect3, rect1);
+        UNSCOPED_INFO("intersect with self");
+        CHECK(rect3 == rect1);
 
         rect1.set(-1.0f, 1.0f, 1.0f, -1.0f);
         rect2.set(-2.0f, 2.0f, 0.0f, 0.0f);
         rect3 = rect1;
         rect3.intersectWith(rect2);
-        ensure_equals("intersect - overlap", rect3, LLRectf(-1.0f, 1.0f, 0.0f, 0.0f));
+        UNSCOPED_INFO("intersect - overlap");
+        CHECK(rect3 == LLRectf(-1.0f, 1.0f, 0.0f, 0.0f));
 
         rect1.set(-1.0f, 1.0f, 1.0f, -1.0f);
         rect2.set(5.0f, 10.0f, 10.0f, 5.0f);
         rect3 = rect1;
         rect3.intersectWith(rect2);
-        ensure("intersect - no overlap", rect3.isEmpty());
+        UNSCOPED_INFO("intersect - no overlap");
+        CHECK(rect3.isEmpty());
     }
 
-    template<> template<>
-    void object::test<20>()
+    TEST_CASE("LLRect: pointInRect() includes the left and bottom edges only", "[LLRect]")
     {
         //
         // test the pointInRect() method
@@ -474,17 +560,23 @@ namespace tut
 
         LLRectf rect(1.0f, 3.0f, 3.0f, 1.0f);
 
-        ensure("(0,0) not in rect", rect.pointInRect(0.0f, 0.0f) == false);
-        ensure("(2,2) in rect", rect.pointInRect(2.0f, 2.0f) == true);
-        ensure("(1,1) in rect", rect.pointInRect(1.0f, 1.0f) == true);
-        ensure("(3,3) not in rect", rect.pointInRect(3.0f, 3.0f) == false);
-        ensure("(2.999,2.999) in rect", rect.pointInRect(2.999f, 2.999f) == true);
-        ensure("(2.999,3.0) not in rect", rect.pointInRect(2.999f, 3.0f) == false);
-        ensure("(3.0,2.999) not in rect", rect.pointInRect(3.0f, 2.999f) == false);
+        UNSCOPED_INFO("(0,0) not in rect");
+        CHECK_FALSE(rect.pointInRect(0.0f, 0.0f));
+        UNSCOPED_INFO("(2,2) in rect");
+        CHECK(rect.pointInRect(2.0f, 2.0f));
+        UNSCOPED_INFO("(1,1) in rect");
+        CHECK(rect.pointInRect(1.0f, 1.0f));
+        UNSCOPED_INFO("(3,3) not in rect");
+        CHECK_FALSE(rect.pointInRect(3.0f, 3.0f));
+        UNSCOPED_INFO("(2.999,2.999) in rect");
+        CHECK(rect.pointInRect(2.999f, 2.999f));
+        UNSCOPED_INFO("(2.999,3.0) not in rect");
+        CHECK_FALSE(rect.pointInRect(2.999f, 3.0f));
+        UNSCOPED_INFO("(3.0,2.999) not in rect");
+        CHECK_FALSE(rect.pointInRect(3.0f, 2.999f));
     }
 
-    template<> template<>
-    void object::test<21>()
+    TEST_CASE("LLRect: localPointInRect() measures from the bottom-left corner", "[LLRect]")
     {
         //
         // test the localPointInRect() method
@@ -492,17 +584,23 @@ namespace tut
 
         LLRectf rect(1.0f, 3.0f, 3.0f, 1.0f);
 
-        ensure("(0,0) in local rect", rect.localPointInRect(0.0f, 0.0f) == true);
-        ensure("(-0.0001,-0.0001) not in local rect", rect.localPointInRect(-0.0001f, -0.001f) == false);
-        ensure("(1,1) in local rect", rect.localPointInRect(1.0f, 1.0f) == true);
-        ensure("(2,2) not in local rect", rect.localPointInRect(2.0f, 2.0f) == false);
-        ensure("(1.999,1.999) in local rect", rect.localPointInRect(1.999f, 1.999f) == true);
-        ensure("(1.999,2.0) not in local rect", rect.localPointInRect(1.999f, 2.0f) == false);
-        ensure("(2.0,1.999) not in local rect", rect.localPointInRect(2.0f, 1.999f) == false);
+        UNSCOPED_INFO("(0,0) in local rect");
+        CHECK(rect.localPointInRect(0.0f, 0.0f));
+        UNSCOPED_INFO("(-0.0001,-0.0001) not in local rect");
+        CHECK_FALSE(rect.localPointInRect(-0.0001f, -0.001f));
+        UNSCOPED_INFO("(1,1) in local rect");
+        CHECK(rect.localPointInRect(1.0f, 1.0f));
+        UNSCOPED_INFO("(2,2) not in local rect");
+        CHECK_FALSE(rect.localPointInRect(2.0f, 2.0f));
+        UNSCOPED_INFO("(1.999,1.999) in local rect");
+        CHECK(rect.localPointInRect(1.999f, 1.999f));
+        UNSCOPED_INFO("(1.999,2.0) not in local rect");
+        CHECK_FALSE(rect.localPointInRect(1.999f, 2.0f));
+        UNSCOPED_INFO("(2.0,1.999) not in local rect");
+        CHECK_FALSE(rect.localPointInRect(2.0f, 1.999f));
     }
 
-    template<> template<>
-    void object::test<22>()
+    TEST_CASE("LLRect: clampPointToRect() clamps to the edges", "[LLRect]")
     {
         //
         // test the clampPointToRect() method
@@ -513,17 +611,23 @@ namespace tut
 
         x = 2.0f; y = 2.0f;
         rect.clampPointToRect(x, y);
-        ensure_equals("clamp x-coord within rect", x, 2.0f);
-        ensure_equals("clamp y-coord within rect", y, 2.0f);
+        UNSCOPED_INFO("clamp x-coord within rect");
+        CHECK(x == 2.0f);
+        UNSCOPED_INFO("clamp y-coord within rect");
+        CHECK(y == 2.0f);
 
         x = -100.0f; y = 100.0f;
         rect.clampPointToRect(x, y);
-        ensure_equals("clamp x-coord outside rect", x, 1.0f);
-        ensure_equals("clamp y-coord outside rect", y, 3.0f);
+        UNSCOPED_INFO("clamp x-coord outside rect");
+        CHECK(x == 1.0f);
+        UNSCOPED_INFO("clamp y-coord outside rect");
+        CHECK(y == 3.0f);
 
         x = 3.0f; y = 1.0f;
         rect.clampPointToRect(x, y);
-        ensure_equals("clamp x-coord edge rect", x, 3.0f);
-        ensure_equals("clamp y-coord edge rect", y, 1.0f);
+        UNSCOPED_INFO("clamp x-coord edge rect");
+        CHECK(x == 3.0f);
+        UNSCOPED_INFO("clamp y-coord edge rect");
+        CHECK(y == 1.0f);
     }
 }

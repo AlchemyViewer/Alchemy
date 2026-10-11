@@ -24,7 +24,9 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include "altestmatchers.h"
 #include "../llmath.h"
 #include "../llsimdmath.h"
 #include "../llvector4a.h"
@@ -69,17 +71,8 @@ namespace
     };
 }
 
-namespace tut
-{
 namespace
 {
-    struct llmatrix4a_data
-    {
-    };
-    typedef test_group<llmatrix4a_data> llmatrix4a_test;
-    typedef llmatrix4a_test::object llmatrix4a_object;
-    tut::llmatrix4a_test llmatrix4a_testcase("LLMatrix4a");
-
     // A four by four in double, the rows of a row-vector matrix: the
     // reference the single-precision class is held to, with every product,
     // inverse and transform written out longhand.
@@ -250,7 +243,8 @@ namespace
                 const F32 scale = llmax(1.f, fabsf(a), fabsf(e));
                 std::ostringstream msg;
                 msg << what << " at [" << i << "][" << j << "]: " << a << " vs " << e;
-                ensure_approximately_equals_range(msg.str().c_str(), a, e, tolerance * scale);
+                UNSCOPED_INFO(msg.str().c_str());
+                REQUIRE_THAT(a, Catch::Matchers::WithinAbs(e, tolerance * scale));
             }
         }
     }
@@ -268,7 +262,8 @@ namespace
             const F32 scale = llmax(1.f, fabsf(actual[i]), fabsf(e));
             std::ostringstream msg;
             msg << what << " at lane " << i << ": " << actual[i] << " vs " << e;
-            ensure_approximately_equals_range(msg.str().c_str(), actual[i], e, tolerance * scale);
+            UNSCOPED_INFO(msg.str().c_str());
+            REQUIRE_THAT(actual[i], Catch::Matchers::WithinAbs(e, tolerance * scale));
         }
     }
 
@@ -295,7 +290,8 @@ namespace
                 }
                 std::ostringstream msg;
                 msg << what << " at [" << row << "][" << col << "]";
-                ensure_approximately_equals_range(msg.str().c_str(), product.mMatrix[row][col], row == col ? 1.f : 0.f, tolerance * (1.f + terms));
+                UNSCOPED_INFO(msg.str().c_str());
+                REQUIRE_THAT(product.mMatrix[row][col], Catch::Matchers::WithinAbs(row == col ? 1.f : 0.f, tolerance * (1.f + terms)));
             }
         }
     }
@@ -309,10 +305,8 @@ namespace
     {
         return LLVector4a(v.mV[0], v.mV[1], v.mV[2], 0.f);
     }
-}
 
-    template<> template<>
-    void llmatrix4a_object::test<1>()
+    TEST_CASE("LLMatrix4a: initAll agrees with LLMatrix4::initAll", "[LLMatrix4a]")
     {
         // initAll must agree with LLMatrix4::initAll, since the joint
         // transform path swapped one for the other. Not bit for bit: /fp:fast
@@ -340,21 +334,21 @@ namespace
                             std::ostringstream msg;
                             msg << "initAll mismatch at [" << row << "][" << col
                                 << "] for case " << cases;
-                            ensure_approximately_equals(msg.str().c_str(),
-                                                        actual4.mMatrix[row][col],
-                                                        expected.mMatrix[row][col],
-                                                        20);
+                            UNSCOPED_INFO(msg.str().c_str());
+                            REQUIRE_THAT(actual4.mMatrix[row][col],
+                                                        ll_test::WithinBits(expected.mMatrix[row][col],
+                                                        20));
                         }
                     }
                     ++cases;
                 }
             }
         }
-        ensure("every combination was covered", cases == 6 * 5 * 3);
+        UNSCOPED_INFO("every combination was covered");
+        CHECK(cases == 6 * 5 * 3);
     }
 
-    template<> template<>
-    void llmatrix4a_object::test<2>()
+    TEST_CASE("LLMatrix4a: initAll clears the fourth column of the upper rows", "[LLMatrix4a]")
     {
         // The fourth column of the upper rows must be zero, which is what the
         // scalar version leaves in place rather than writing. Start from a
@@ -369,30 +363,63 @@ namespace
         m.initAll(LLVector3(1.f, 1.f, 1.f), LLQuaternion(), LLVector3(1.f, 2.f, 3.f));
 
         const LLMatrix4 out = m.toMatrix4();
-        ensure_equals("row 0 pad cleared", out.mMatrix[0][3], 0.f);
-        ensure_equals("row 1 pad cleared", out.mMatrix[1][3], 0.f);
-        ensure_equals("row 2 pad cleared", out.mMatrix[2][3], 0.f);
-        ensure_equals("row 3 w is one", out.mMatrix[3][3], 1.f);
+        UNSCOPED_INFO("row 0 pad cleared");
+        CHECK(out.mMatrix[0][3] == 0.f);
+        UNSCOPED_INFO("row 1 pad cleared");
+        CHECK(out.mMatrix[1][3] == 0.f);
+        UNSCOPED_INFO("row 2 pad cleared");
+        CHECK(out.mMatrix[2][3] == 0.f);
+        UNSCOPED_INFO("row 3 w is one");
+        CHECK(out.mMatrix[3][3] == 1.f);
     }
 
-    template<> template<>
-    void llmatrix4a_object::test<3>()
+    TEST_CASE("LLMatrix4a: an identity rotation with unit scale is a translation matrix", "[LLMatrix4a]")
     {
         // An identity rotation with unit scale is the translation matrix.
         LLMatrix4a m;
         m.initAll(LLVector3(1.f, 1.f, 1.f), LLQuaternion(), LLVector3(4.f, 5.f, 6.f));
 
         const LLMatrix4 out = m.toMatrix4();
-        ensure_equals("m00", out.mMatrix[0][0], 1.f);
-        ensure_equals("m11", out.mMatrix[1][1], 1.f);
-        ensure_equals("m22", out.mMatrix[2][2], 1.f);
-        ensure_equals("tx", out.mMatrix[3][0], 4.f);
-        ensure_equals("ty", out.mMatrix[3][1], 5.f);
-        ensure_equals("tz", out.mMatrix[3][2], 6.f);
+        UNSCOPED_INFO("m00");
+        CHECK(out.mMatrix[0][0] == 1.f);
+        UNSCOPED_INFO("m11");
+        CHECK(out.mMatrix[1][1] == 1.f);
+        UNSCOPED_INFO("m22");
+        CHECK(out.mMatrix[2][2] == 1.f);
+        UNSCOPED_INFO("tx");
+        CHECK(out.mMatrix[3][0] == 4.f);
+        UNSCOPED_INFO("ty");
+        CHECK(out.mMatrix[3][1] == 5.f);
+        UNSCOPED_INFO("tz");
+        CHECK(out.mMatrix[3][2] == 6.f);
     }
 
-    template<> template<>
-    void llmatrix4a_object::test<5>()
+
+
+
+
+
+
+    TEST_CASE("LLMatrix4a: each basis row's length is its axis' scale", "[LLMatrix4a]")
+    {
+        // Scale lands on the corresponding basis row, not the diagonal, so a
+        // rotated matrix keeps each row's length equal to that axis' scale.
+        const LLVector3 scale(2.f, 3.f, 4.f);
+        LLMatrix4a m;
+        m.initAll(scale, LLQuaternion(0.7f, LLVector3(0.f, 0.f, 1.f)), LLVector3());
+
+        const LLMatrix4 out = m.toMatrix4();
+        for (S32 row = 0; row < 3; ++row)
+        {
+            const F32 len = LLVector3(out.mMatrix[row]).length();
+            std::ostringstream msg;
+            msg << "row " << row << " length matches its scale";
+            UNSCOPED_INFO(msg.str().c_str());
+            REQUIRE_THAT(len, Catch::Matchers::WithinAbs(scale.mV[row], 1e-4f));
+        }
+    }
+
+    TEST_CASE("LLMatrix4a: set(LLMatrix4) is the inverse of toMatrix4", "[LLMatrix4a]")
     {
         // set(LLMatrix4) is the inverse of toMatrix4().
         LLMatrix4 src;
@@ -407,13 +434,13 @@ namespace
         {
             for (S32 col = 0; col < 4; ++col)
             {
-                ensure_equals("round trip", back.mMatrix[row][col], src.mMatrix[row][col]);
+                UNSCOPED_INFO("round trip");
+                REQUIRE(back.mMatrix[row][col] == src.mMatrix[row][col]);
             }
         }
     }
 
-    template<> template<>
-    void llmatrix4a_object::test<6>()
+    TEST_CASE("LLMatrix4a: set(LLMatrix3) fills the basis and leaves an identity fourth row", "[LLMatrix4a]")
     {
         // set(LLMatrix3) fills the basis and leaves an identity fourth row.
         LLMatrix3 src;
@@ -424,15 +451,19 @@ namespace
         LLMatrix4a m;
         m.set(src);
         const LLMatrix4 out = m.toMatrix4();
-        ensure_equals("m00", out.mMatrix[0][0], 1.f);
-        ensure_equals("m12", out.mMatrix[1][2], 6.f);
-        ensure_equals("m22", out.mMatrix[2][2], 9.f);
-        ensure_equals("row 3 is the origin", out.mMatrix[3][0], 0.f);
-        ensure_equals("row 3 w is one", out.mMatrix[3][3], 1.f);
+        UNSCOPED_INFO("m00");
+        CHECK(out.mMatrix[0][0] == 1.f);
+        UNSCOPED_INFO("m12");
+        CHECK(out.mMatrix[1][2] == 6.f);
+        UNSCOPED_INFO("m22");
+        CHECK(out.mMatrix[2][2] == 9.f);
+        UNSCOPED_INFO("row 3 is the origin");
+        CHECK(out.mMatrix[3][0] == 0.f);
+        UNSCOPED_INFO("row 3 w is one");
+        CHECK(out.mMatrix[3][3] == 1.f);
     }
 
-    template<> template<>
-    void llmatrix4a_object::test<7>()
+    TEST_CASE("LLMatrix4a: setMul by the identity and with aliasing matches setMulNoAlias", "[LLMatrix4a]")
     {
         LLMatrix4a a;
         a.initAll(LLVector3(2.f, 1.f, 3.f),
@@ -442,9 +473,11 @@ namespace
         // Multiplying by the identity in either position is a no-op.
         LLMatrix4a r;
         r.setMul(a, LLMatrix4a::identity());
-        ensure("a * identity == a", r == a);
+        UNSCOPED_INFO("a * identity == a");
+        CHECK(r == a);
         r.setMul(LLMatrix4a::identity(), a);
-        ensure("identity * a == a", r == a);
+        UNSCOPED_INFO("identity * a == a");
+        CHECK(r == a);
 
         LLMatrix4a b;
         b.initAll(LLVector3(1.f, 1.f, 1.f),
@@ -455,21 +488,23 @@ namespace
         LLMatrix4a safe, fast;
         safe.setMul(a, b);
         fast.setMulNoAlias(a, b);
-        ensure("setMulNoAlias matches setMul", safe == fast);
+        UNSCOPED_INFO("setMulNoAlias matches setMul");
+        CHECK(safe == fast);
 
         // setMul tolerates its result aliasing either input, which is why it
         // exists alongside setMulNoAlias.
         LLMatrix4a lhs = a;
         lhs.setMul(lhs, b);
-        ensure("result may alias the left operand", lhs == safe);
+        UNSCOPED_INFO("result may alias the left operand");
+        CHECK(lhs == safe);
 
         LLMatrix4a rhs = b;
         rhs.setMul(a, rhs);
-        ensure("result may alias the right operand", rhs == safe);
+        UNSCOPED_INFO("result may alias the right operand");
+        CHECK(rhs == safe);
     }
 
-    template<> template<>
-    void llmatrix4a_object::test<8>()
+    TEST_CASE("LLMatrix4a: affineTransform applies the translation and rotate does not", "[LLMatrix4a]")
     {
         // affineTransform applies the translation, rotate() does not.
         LLMatrix4a m;
@@ -480,19 +515,24 @@ namespace
 
         LLVector4a moved;
         m.affineTransform(point, moved);
-        ensure_equals("affineTransform adds x", moved[0], 11.f);
-        ensure_equals("affineTransform adds y", moved[1], 22.f);
-        ensure_equals("affineTransform adds z", moved[2], 33.f);
+        UNSCOPED_INFO("affineTransform adds x");
+        CHECK(moved[0] == 11.f);
+        UNSCOPED_INFO("affineTransform adds y");
+        CHECK(moved[1] == 22.f);
+        UNSCOPED_INFO("affineTransform adds z");
+        CHECK(moved[2] == 33.f);
 
         LLVector4a turned;
         m.rotate(point, turned);
-        ensure_equals("rotate leaves x", turned[0], 1.f);
-        ensure_equals("rotate leaves y", turned[1], 2.f);
-        ensure_equals("rotate leaves z", turned[2], 3.f);
+        UNSCOPED_INFO("rotate leaves x");
+        CHECK(turned[0] == 1.f);
+        UNSCOPED_INFO("rotate leaves y");
+        CHECK(turned[1] == 2.f);
+        UNSCOPED_INFO("rotate leaves z");
+        CHECK(turned[2] == 3.f);
     }
 
-    template<> template<>
-    void llmatrix4a_object::test<9>()
+    TEST_CASE("LLMatrix4a: setTranslation and setRow change only what they name", "[LLMatrix4a]")
     {
         LLMatrix4a m;
         m.initAll(LLVector3(2.f, 2.f, 2.f),
@@ -502,21 +542,26 @@ namespace
         const LLVector4a basis = m.getRow<0>();
         m.setTranslation(LLVector3(5.f, 6.f, 7.f));
 
-        ensure("setTranslation leaves the basis alone", m.getRow<0>() == basis);
+        UNSCOPED_INFO("setTranslation leaves the basis alone");
+        CHECK(m.getRow<0>() == basis);
         const LLMatrix4 out = m.toMatrix4();
-        ensure_equals("tx", out.mMatrix[3][0], 5.f);
-        ensure_equals("ty", out.mMatrix[3][1], 6.f);
-        ensure_equals("tz", out.mMatrix[3][2], 7.f);
-        ensure_equals("stays affine", out.mMatrix[3][3], 1.f);
+        UNSCOPED_INFO("tx");
+        CHECK(out.mMatrix[3][0] == 5.f);
+        UNSCOPED_INFO("ty");
+        CHECK(out.mMatrix[3][1] == 6.f);
+        UNSCOPED_INFO("tz");
+        CHECK(out.mMatrix[3][2] == 7.f);
+        UNSCOPED_INFO("stays affine");
+        CHECK(out.mMatrix[3][3] == 1.f);
 
         LLVector4a replacement;
         replacement.set(1.f, 2.f, 3.f, 4.f);
         m.setRow<2>(replacement);
-        ensure("setRow round trips", m.getRow<2>() == replacement);
+        UNSCOPED_INFO("setRow round trips");
+        CHECK(m.getRow<2>() == replacement);
     }
 
-    template<> template<>
-    void llmatrix4a_object::test<10>()
+    TEST_CASE("LLMatrix4a: matMulBoundBox spans the same box as the eight corners", "[LLMatrix4a]")
     {
         // matMulBoundBox used to transform all eight corners and take their
         // min and max. It now grows the transformed centre by the half
@@ -576,34 +621,14 @@ namespace
                 // corner walk and the centre form round differently, and the
                 // 1000x scale row amplifies whichever rounds first.
                 const F32 magnitude = llmax(1.f, fabsf(expected[side][axis]));
-                ensure_approximately_equals_range(msg.str().c_str(),
-                                                  out[side][axis], expected[side][axis],
-                                                  magnitude * 1e-4f);
+                UNSCOPED_INFO(msg.str().c_str());
+                REQUIRE_THAT(out[side][axis], Catch::Matchers::WithinAbs(expected[side][axis],
+                                                  magnitude * 1e-4f));
             }
         }
     }
 
-    template<> template<>
-    void llmatrix4a_object::test<4>()
-    {
-        // Scale lands on the corresponding basis row, not the diagonal, so a
-        // rotated matrix keeps each row's length equal to that axis' scale.
-        const LLVector3 scale(2.f, 3.f, 4.f);
-        LLMatrix4a m;
-        m.initAll(scale, LLQuaternion(0.7f, LLVector3(0.f, 0.f, 1.f)), LLVector3());
-
-        const LLMatrix4 out = m.toMatrix4();
-        for (S32 row = 0; row < 3; ++row)
-        {
-            const F32 len = LLVector3(out.mMatrix[row]).length();
-            std::ostringstream msg;
-            msg << "row " << row << " length matches its scale";
-            ensure_approximately_equals_range(msg.str().c_str(), len, scale.mV[row], 1e-4f);
-        }
-    }
-
-    template<> template<>
-    void llmatrix4a_object::test<11>()
+    TEST_CASE("LLMatrix4a: add and scale and setLerp element by element against LLMatrix4", "[LLMatrix4a]")
     {
         // The whole-matrix arithmetic, element by element against the
         // scalar matrix: add, scale, lerp at its ends and in between.
@@ -637,29 +662,36 @@ namespace
                 const F32 bv = b4.mMatrix[row][col];
                 std::ostringstream msg;
                 msg << " at [" << row << "][" << col << "]";
-                ensure_equals("add" + msg.str(), sum4.mMatrix[row][col], av + bv);
-                ensure_equals("setMul(F32)" + msg.str(), scaled4.mMatrix[row][col], av * -1.5f);
-                ensure_equals("setLerp at 0" + msg.str(), zero4.mMatrix[row][col], av);
-                ensure_approximately_equals_range(("setLerp at 1" + msg.str()).c_str(), one4.mMatrix[row][col], bv, 1e-6f * llmax(1.f, fabsf(bv)));
+                UNSCOPED_INFO("add" + msg.str());
+                REQUIRE(sum4.mMatrix[row][col] == av + bv);
+                UNSCOPED_INFO("setMul(F32)" + msg.str());
+                REQUIRE(scaled4.mMatrix[row][col] == av * -1.5f);
+                UNSCOPED_INFO("setLerp at 0" + msg.str());
+                REQUIRE(zero4.mMatrix[row][col] == av);
+                UNSCOPED_INFO(("setLerp at 1" + msg.str()).c_str());
+                REQUIRE_THAT(one4.mMatrix[row][col], Catch::Matchers::WithinAbs(bv, 1e-6f * llmax(1.f, fabsf(bv))));
                 const F32 expected = (F32)((double)av + ((double)bv - av) * 0.25);
-                ensure_approximately_equals_range(("setLerp at a quarter" + msg.str()).c_str(), quarter4.mMatrix[row][col], expected, 1e-6f * llmax(1.f, fabsf(expected)));
+                UNSCOPED_INFO(("setLerp at a quarter" + msg.str()).c_str());
+                REQUIRE_THAT(quarter4.mMatrix[row][col], Catch::Matchers::WithinAbs(expected, 1e-6f * llmax(1.f, fabsf(expected))));
             }
         }
 
         // the identity, both ways
-        ensure("identity equals itself", LLMatrix4a::identity() == LLMatrix4a::identity());
+        UNSCOPED_INFO("identity equals itself");
+        CHECK(LLMatrix4a::identity() == LLMatrix4a::identity());
         LLMatrix4a fresh;
         fresh.setIdentity();
-        ensure("setIdentity is the identity", fresh == LLMatrix4a::identity());
-        ensure("a translation is not the identity", a != LLMatrix4a::identity());
+        UNSCOPED_INFO("setIdentity is the identity");
+        CHECK(fresh == LLMatrix4a::identity());
+        UNSCOPED_INFO("a translation is not the identity");
+        CHECK(a != LLMatrix4a::identity());
     }
 
     // THE CONVENTIONS: the matrix takes a row vector on the left, so
     // affineTransform is the scalar matrix's v * M, a product applies its
     // first factor first, and a builder set before a matrix acts on the
     // point before the matrix does.
-    template<> template<>
-    void llmatrix4a_object::test<12>()
+    TEST_CASE("LLMatrix4a: row vectors on the left and a product applies its first factor first", "[LLMatrix4a]")
     {
         const F32 tolerance = 1e-5f;
         const LLVector3 p3(0.7f, -2.5f, 11.f);
@@ -695,7 +727,8 @@ namespace
                 }
             }
         }
-        ensure("every combination was covered", cases == 6 * 5 * 3);
+        UNSCOPED_INFO("every combination was covered");
+        CHECK(cases == 6 * 5 * 3);
 
         // setMul(a, b) applies a first, then b
         LLMatrix4a a, b;
@@ -745,8 +778,7 @@ namespace
     // transform4, transpose, determinant, the inverses and the normal
     // matrix, on affine and projective matrices, against the double
     // reference.
-    template<> template<>
-    void llmatrix4a_object::test<13>()
+    TEST_CASE("LLMatrix4a: transform4/transpose/determinant/inverses/normal matrix vs double", "[LLMatrix4a]")
     {
         const F32 tolerance = 1e-5f;
 
@@ -787,14 +819,17 @@ namespace
             {
                 for (S32 j = 0; j < 4; ++j)
                 {
-                    ensure_equals("setTranspose swaps the indices", t.mMatrix[i][j], m.mMatrix[j][i]);
+                    UNSCOPED_INFO("setTranspose swaps the indices");
+                    REQUIRE(t.mMatrix[i][j] == m.mMatrix[j][i]);
                 }
             }
             LLMatrix4a tt = m;
             tt.transpose();
-            ensure("transpose in place", same_bytes(tt, t));
+            UNSCOPED_INFO("transpose in place");
+            REQUIRE(same_bytes(tt, t));
             tt.transpose();
-            ensure("transposed twice is itself", tt == m);
+            UNSCOPED_INFO("transposed twice is itself");
+            REQUIRE(tt == m);
 
             // the determinant, to within the size of the terms that cancel in
             // it, and the general inverse
@@ -803,14 +838,18 @@ namespace
             {
                 terms *= fabsf(m.mMatrix[row][0]) + fabsf(m.mMatrix[row][1]) + fabsf(m.mMatrix[row][2]) + fabsf(m.mMatrix[row][3]);
             }
-            ensure_approximately_equals_range("determinant", m.determinant(), F32(r.determinant()), 1e-6f * (1.f + terms));
+            UNSCOPED_INFO("determinant");
+            REQUIRE_THAT(m.determinant(), Catch::Matchers::WithinAbs(F32(r.determinant()), 1e-6f * (1.f + terms)));
 
             LLMatrix4a inv;
-            ensure("setInverse succeeds", inv.setInverse(m));
+            UNSCOPED_INFO("setInverse succeeds");
+            REQUIRE(inv.setInverse(m));
             ensure_matrix_close("setInverse matches the reference inverse", inv, r.inverse(), tolerance);
             LLMatrix4a in_place = m;
-            ensure("invert succeeds", in_place.invert());
-            ensure("invert in place", in_place == inv);
+            UNSCOPED_INFO("invert succeeds");
+            REQUIRE(in_place.invert());
+            UNSCOPED_INFO("invert in place");
+            REQUIRE(in_place == inv);
             ensure_product_is_identity("M * inverse(M)", m, inv, 1e-6f);
             ensure_product_is_identity("inverse(M) * M", inv, m, 1e-6f);
         }
@@ -824,7 +863,8 @@ namespace
         LLMatrix4a far_away;
         far_away.initAll(LLVector3(1.f, 1.f, 1.f), ROTATIONS[5], LLVector3(-256.f, 4096.f, 0.125f));
         LLMatrix4a far_inv;
-        ensure("setInverse of the far matrix succeeds", far_inv.setInverse(far_away));
+        UNSCOPED_INFO("setInverse of the far matrix succeeds");
+        CHECK(far_inv.setInverse(far_away));
         ensure_product_is_identity("far M * inverse(M)", far_away, far_inv, 1e-6f);
         ensure_product_is_identity("far inverse(M) * M", far_inv, far_away, 1e-6f);
 
@@ -836,11 +876,13 @@ namespace
             const Ref inverse = r.inverse();
 
             LLMatrix4a inv;
-            ensure("setAffineInverse succeeds", inv.setAffineInverse(m));
+            UNSCOPED_INFO("setAffineInverse succeeds");
+            REQUIRE(inv.setAffineInverse(m));
             ensure_matrix_close("setAffineInverse is the inverse of an affine matrix", inv, inverse, tolerance);
 
             LLMatrix4a n;
-            ensure("setNormalMatrix succeeds", n.setNormalMatrix(m));
+            UNSCOPED_INFO("setNormalMatrix succeeds");
+            REQUIRE(n.setNormalMatrix(m));
             const Ref inverse_transpose = inverse.transposed();
             for (S32 row = 0; row < 3; ++row)
             {
@@ -849,11 +891,14 @@ namespace
                     std::ostringstream msg;
                     msg << "normal matrix at [" << row << "][" << col << "]";
                     const F32 e = F32(inverse_transpose.m[row][col]);
-                    ensure_approximately_equals_range(msg.str().c_str(), n.mMatrix[row][col], e, tolerance * llmax(1.f, fabsf(e)));
+                    UNSCOPED_INFO(msg.str().c_str());
+                    REQUIRE_THAT(n.mMatrix[row][col], Catch::Matchers::WithinAbs(e, tolerance * llmax(1.f, fabsf(e))));
                 }
-                ensure_equals("normal matrix row pad", n.mMatrix[row][3], 0.f);
+                UNSCOPED_INFO("normal matrix row pad");
+                REQUIRE(n.mMatrix[row][3] == 0.f);
             }
-            ensure("normal matrix has no translation", n.mMatrix[3] == LLVector4a(0.f, 0.f, 0.f, 1.f));
+            UNSCOPED_INFO("normal matrix has no translation");
+            REQUIRE(n.mMatrix[3] == LLVector4a(0.f, 0.f, 0.f, 1.f));
 
             // a normal stays perpendicular to a transformed surface
             LLVector4a tangent(1.f, 2.f, -0.5f, 0.f), normal;
@@ -861,7 +906,8 @@ namespace
             LLVector4a tangent_out, normal_out;
             m.rotate(tangent, tangent_out);
             n.rotate(normal, normal_out);
-            ensure_approximately_equals_range("perpendicular after transform", tangent_out.dot3(normal_out).getF32(), 0.f, 1e-4f * tangent_out.getLength3().getF32() * normal_out.getLength3().getF32());
+            UNSCOPED_INFO("perpendicular after transform");
+            REQUIRE_THAT(tangent_out.dot3(normal_out).getF32(), Catch::Matchers::WithinAbs(0.f, 1e-4f * tangent_out.getLength3().getF32() * normal_out.getLength3().getF32()));
         }
 
         // singular: refused, untouched
@@ -869,17 +915,22 @@ namespace
         singular.initAll(SCALES[4], ROTATIONS[1], POSITIONS[1]);
         LLMatrix4a untouched;
         untouched.setIdentity();
-        ensure("setInverse of a singular matrix is refused", !untouched.setInverse(singular));
-        ensure("and leaves the target alone", untouched == LLMatrix4a::identity());
-        ensure("setAffineInverse of a singular matrix is refused", !untouched.setAffineInverse(singular));
-        ensure("setNormalMatrix of a singular matrix is refused", !untouched.setNormalMatrix(singular));
-        ensure("still untouched", untouched == LLMatrix4a::identity());
-        ensure_equals("singular determinant", singular.determinant(), 0.f);
+        UNSCOPED_INFO("setInverse of a singular matrix is refused");
+        CHECK_FALSE(untouched.setInverse(singular));
+        UNSCOPED_INFO("and leaves the target alone");
+        CHECK(untouched == LLMatrix4a::identity());
+        UNSCOPED_INFO("setAffineInverse of a singular matrix is refused");
+        CHECK_FALSE(untouched.setAffineInverse(singular));
+        UNSCOPED_INFO("setNormalMatrix of a singular matrix is refused");
+        CHECK_FALSE(untouched.setNormalMatrix(singular));
+        UNSCOPED_INFO("still untouched");
+        CHECK(untouched == LLMatrix4a::identity());
+        UNSCOPED_INFO("singular determinant");
+        CHECK(singular.determinant() == 0.f);
     }
 
     // The builders against the formulas, written out in double.
-    template<> template<>
-    void llmatrix4a_object::test<14>()
+    TEST_CASE("LLMatrix4a: builders against the formulas written out in double", "[LLMatrix4a]")
     {
         const F32 tolerance = 2e-6f;
 
@@ -887,15 +938,19 @@ namespace
             LLMatrix4a expected;
             expected.setIdentity();
             expected.mMatrix[3].set(4.f, -5.f, 6.f, 1.f);
-            ensure("translation", same_bytes(LLMatrix4a::translation(4.f, -5.f, 6.f), expected));
-            ensure("translation from a vector ignores w", same_bytes(LLMatrix4a::translation(LLVector4a(4.f, -5.f, 6.f, 9.f)), expected));
+            UNSCOPED_INFO("translation");
+            CHECK(same_bytes(LLMatrix4a::translation(4.f, -5.f, 6.f), expected));
+            UNSCOPED_INFO("translation from a vector ignores w");
+            CHECK(same_bytes(LLMatrix4a::translation(LLVector4a(4.f, -5.f, 6.f, 9.f)), expected));
 
             expected.setIdentity();
             expected.mMatrix[0].set(2.f, 0.f, 0.f, 0.f);
             expected.mMatrix[1].set(0.f, 3.f, 0.f, 0.f);
             expected.mMatrix[2].set(0.f, 0.f, 0.5f, 0.f);
-            ensure("scaling", same_bytes(LLMatrix4a::scaling(2.f, 3.f, 0.5f), expected));
-            ensure("scaling from a vector", same_bytes(LLMatrix4a::scaling(LLVector4a(2.f, 3.f, 0.5f, 9.f)), expected));
+            UNSCOPED_INFO("scaling");
+            CHECK(same_bytes(LLMatrix4a::scaling(2.f, 3.f, 0.5f), expected));
+            UNSCOPED_INFO("scaling from a vector");
+            CHECK(same_bytes(LLMatrix4a::scaling(LLVector4a(2.f, 3.f, 0.5f, 9.f)), expected));
         }
 
         // a rotation about an axis: Rodrigues in double, and the tree's own
@@ -962,7 +1017,8 @@ namespace
             r.m[3][0] = (1280.0 - 2.0 * (300.0 - 10.0)) / 5.0;
             r.m[3][1] = (720.0 - 2.0 * (400.0 - 20.0)) / 7.0;
             ensure_matrix_close("pick", LLMatrix4a::pick(300.f, 400.f, 5.f, 7.f, viewport), r, tolerance);
-            ensure("pick of nothing is the identity", LLMatrix4a::pick(300.f, 400.f, 0.f, 7.f, viewport) == LLMatrix4a::identity());
+            UNSCOPED_INFO("pick of nothing is the identity");
+            CHECK(LLMatrix4a::pick(300.f, 400.f, 0.f, 7.f, viewport) == LLMatrix4a::identity());
         }
 
         // the view: the camera's basis as columns, the eye's position in it
@@ -1012,8 +1068,7 @@ namespace
 
     // Quaternions from axes and matrices, the rotation from a quaternion,
     // and a scene node's TRS taken apart and put back.
-    template<> template<>
-    void llmatrix4a_object::test<15>()
+    TEST_CASE("LLMatrix4a: quaternions from axes and matrices and TRS taken apart and put back", "[LLMatrix4a]")
     {
         const F32 tolerance = 2e-6f;
 
@@ -1024,11 +1079,13 @@ namespace
             LLQuaternion2 q;
             q.setAxisAngle(as_direction(axis3), angle);
             const LLQuaternion2 expected(LLQuaternion(angle, axis3));
-            ensure("setAxisAngle is LLQuaternion(angle, axis)", q.equals(expected, 1e-6f));
+            UNSCOPED_INFO("setAxisAngle is LLQuaternion(angle, axis)");
+            REQUIRE(q.equals(expected, 1e-6f));
         }
         LLQuaternion2 none;
         none.setAxisAngle(LLVector4a(0.f, 0.f, 0.f, 0.f), 1.f);
-        ensure("no axis is the identity", none.equals(LLQuaternion2::identity(), 1e-7f));
+        UNSCOPED_INFO("no axis is the identity");
+        CHECK(none.equals(LLQuaternion2::identity(), 1e-7f));
 
         // setFromMatrix reads back what setRotation wrote, and agrees with the
         // scalar matrix's reading, up to the sign every rotation's two
@@ -1044,12 +1101,14 @@ namespace
             LLVector4a negated;
             negated.setNeg(back.getVector4a());
             const LLQuaternion2 flipped(negated);
-            ensure("setFromMatrix inverts setRotation", back.equals(LLQuaternion2(q), 1e-5f) || flipped.equals(LLQuaternion2(q), 1e-5f));
+            UNSCOPED_INFO("setFromMatrix inverts setRotation");
+            REQUIRE((back.equals(LLQuaternion2(q), 1e-5f) || flipped.equals(LLQuaternion2(q), 1e-5f)));
 
             LLMatrix3 m3;
             m3.setRows(LLVector3(m.mMatrix[0].getF32ptr()), LLVector3(m.mMatrix[1].getF32ptr()), LLVector3(m.mMatrix[2].getF32ptr()));
             const LLQuaternion2 scalar(m3.quaternion());
-            ensure("and reads as LLMatrix3::quaternion does", back.equals(scalar, 1e-5f));
+            UNSCOPED_INFO("and reads as LLMatrix3::quaternion does");
+            REQUIRE(back.equals(scalar, 1e-5f));
         }
 
         // TRS both ways
@@ -1071,21 +1130,25 @@ namespace
 
                     LLVector4a scale_out, translation_out;
                     LLQuaternion2 rotation_out;
-                    ensure("decompose succeeds", m.decompose(scale_out, rotation_out, translation_out));
+                    UNSCOPED_INFO("decompose succeeds");
+                    REQUIRE(m.decompose(scale_out, rotation_out, translation_out));
                     LLMatrix4a rebuilt;
                     rebuilt.setTRS(translation_out, rotation_out, scale_out);
                     ensure_matrix_close("decompose then setTRS is the matrix", rebuilt, m, 1e-4f);
-                    ensure("translation comes back", translation_out.equals3(tr, 1e-5f * llmax(1.f, fabsf(tr[1]))));
+                    UNSCOPED_INFO("translation comes back");
+                    REQUIRE(translation_out.equals3(tr, 1e-5f * llmax(1.f, fabsf(tr[1]))));
 
                     // a right-handed scale comes back as itself; a left-handed
                     // one as its negation, the rotation absorbing the flip
                     const bool right_handed = sc[0] * sc[1] * sc[2] > 0.f;
                     if (right_handed && sc[0] > 0.f && sc[1] > 0.f && sc[2] > 0.f)
                     {
-                        ensure("scale comes back", scale_out.equals3(sc, 1e-4f * llmax(1.f, fabsf(sc[1]))));
+                        UNSCOPED_INFO("scale comes back");
+                        REQUIRE(scale_out.equals3(sc, 1e-4f * llmax(1.f, fabsf(sc[1]))));
                         LLVector4a negated;
                         negated.setNeg(rotation_out.getVector4a());
-                        ensure("rotation comes back, up to sign", rotation_out.equals(rotation, 1e-4f) || LLQuaternion2(negated).equals(rotation, 1e-4f));
+                        UNSCOPED_INFO("rotation comes back, up to sign");
+                        REQUIRE((rotation_out.equals(rotation, 1e-4f) || LLQuaternion2(negated).equals(rotation, 1e-4f)));
                     }
                 }
             }
@@ -1094,18 +1157,19 @@ namespace
         // a projective or singular matrix is refused
         LLVector4a s, t;
         LLQuaternion2 r;
-        ensure("a projection does not decompose", !LLMatrix4a::perspective(1.f, 1.f, 1.f, 10.f).decompose(s, r, t));
+        UNSCOPED_INFO("a projection does not decompose");
+        CHECK_FALSE(LLMatrix4a::perspective(1.f, 1.f, 1.f, 10.f).decompose(s, r, t));
         LLMatrix4a flat;
         flat.setTRS(translations[1], LLQuaternion2(ROTATIONS[2]), LLVector4a(1.f, 0.f, 1.f, 0.f));
-        ensure("a flattened matrix does not decompose", !flat.decompose(s, r, t));
+        UNSCOPED_INFO("a flattened matrix does not decompose");
+        CHECK_FALSE(flat.decompose(s, r, t));
     }
 
     // Through a projection to the window and back, both depth conventions,
     // against the formulas in double. The way back carries the window's
     // resolution scaled by the depth, so it is held to the scene's size
     // rather than the point's.
-    template<> template<>
-    void llmatrix4a_object::test<16>()
+    TEST_CASE("LLMatrix4a: project and unproject in both depth conventions against double", "[LLMatrix4a]")
     {
         const F32 tolerance = 1e-4f;
         const F32 back_tolerance = 5e-4f;
@@ -1145,7 +1209,8 @@ namespace
                 // the same through an inverse taken once
                 LLMatrix4a inverse;
                 inverse.setMul(modelview, projection);
-                ensure("the camera inverts", inverse.invert());
+                UNSCOPED_INFO("the camera inverts");
+                REQUIRE(inverse.invert());
                 ensure_vector_close("unproject through the inverse", alprojection::unproject(win, inverse, viewport), back, 1e-6f);
                 ensure_vector_close("unproject_zo through the inverse", alprojection::unproject_zo(win_zo, inverse, viewport), back_zo, 1e-6f);
             }
