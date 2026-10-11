@@ -135,7 +135,7 @@ protected:
         uint64_t color_flags; // RGBA color (8 bits each) + solid_color flag (1 bit)
         uint64_t dimensions;  // width and height (32 bits each)
         uint64_t scale;       // UI scale (32 bits each for X and Y)
-        uint64_t tex_name;    // OpenGL texture name (32 bits) + padding
+        uint64_t tex_name;    // OpenGL texture name (low 32 bits) + sampler generation (high 32 bits)
 
         constexpr bool operator==(const PackedKey& other) const
         {
@@ -164,7 +164,8 @@ protected:
         static constexpr PackedKey create(S32 width, S32 height,
                                          const LLColor4& color, bool solid_color,
                                          const LLVector3& scale,
-                                         LLGLuint texture_name)
+                                         LLGLuint texture_name,
+                                         U32 sampler_generation)
         {
             auto float_to_u8 = [](F32 f) -> uint8_t {
                 return static_cast<uint8_t>(llclamp(f * 255.0f, 0.0f, 255.0f));
@@ -191,8 +192,11 @@ protected:
             uint64_t scl = (static_cast<uint64_t>(float_to_bits(scale.mV[VX])) << 32) |
                 static_cast<uint64_t>(float_to_bits(scale.mV[VY]));
 
-            // Store full 32-bit texture name in lower 32 bits (upper 32 bits unused/zero)
-            uint64_t tex = static_cast<uint64_t>(texture_name);
+            // A recording keeps the sampler's GL name, and rebuilding the samplers (an
+            // anisotropy change, a depth convention flip) deletes every name, so a recording
+            // made under an older generation would bind a dead or reused one.
+            uint64_t tex = (static_cast<uint64_t>(sampler_generation) << 32) |
+                static_cast<uint64_t>(texture_name);
 
             return PackedKey{ col, dim, scl, tex };
         }
