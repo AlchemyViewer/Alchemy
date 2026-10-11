@@ -3147,4 +3147,37 @@ namespace tut
         ensure("a one-line if, as before: " + r.text, has(r, "    if n == 5 then print(\"h\") end -- after h\n"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<96>()
+    {
+        set_test_name("a float cut to an integer is math.modf's first value: bare where only its first is read anyway -- an operand, all "
+                      "of a value assigned -- and kept to it by brackets where its values would spread");
+        const ALLSLToSLua::Result r = convert("integer menuChannel;\n"
+                                              "vector gV;\n"
+                                              "integer cut(float f) { return (integer)f; }\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    float f = llFrand(10);\n"
+                                              "    menuChannel = (integer)llFrand(1000) - 10000;\n"
+                                              "    integer x = (integer)f;\n"
+                                              "    x = (integer)f;\n"
+                                              "    x += (integer)f;\n"
+                                              "    x = -(integer)f;\n"
+                                              "    if ((integer)f == 3) llOwnerSay((string)((integer)f));\n"
+                                              "    llOwnerSay(llList2CSV([(integer)f]));\n"
+                                              "    gV.z = (integer)f;\n"
+                                              "    llOwnerSay((string)(cut(f) + x + menuChannel) + (string)gV);\n"
+                                              "} }\n");
+        ensure("Tapple's: " + r.text, has(r, "menuChannel = math.modf(ll.Frand(1000)) - 10000\n"));
+        ensure("a local: " + r.text, has(r, "local x = math.modf(f)\n"));
+        ensure("assigned: " + r.text, has(r, "    x = math.modf(f)\n"));
+        ensure("added: " + r.text, has(r, "    x += math.modf(f)\n"));
+        ensure("its negative: " + r.text, has(r, "    x = -math.modf(f)\n"));
+        ensure("compared: " + r.text, has(r, "if math.modf(f) == 3 then"));
+        ensure("an argument: " + r.text, has(r, "print(tostring((math.modf(f))))"));
+        ensure("a list's item: " + r.text, has(r, "{ (math.modf(f)) }"));
+        ensure("returned: " + r.text, has(r, "return (math.modf(f))"));
+        ensure("a vector's part, an argument: " + r.text, has(r, "gV = vector(gV.x, gV.y, (math.modf(f)))"));
+        checksClean(r);
+    }
 }

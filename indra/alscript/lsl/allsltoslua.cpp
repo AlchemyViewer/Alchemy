@@ -184,14 +184,25 @@ namespace
     // An expression as written: its text, how tightly it binds, and whether
     // it is a Luau boolean where LSL has 1 or 0. Where it is a find's
     // place counted as LSL's, `(x or 0) - 1`: x, SLua's place, counted
-    // from 1 or nil.
+    // from 1 or nil. Where it is a call that answers more than one value,
+    // kept to its first by brackets, `(math.modf(x))`: the call bare.
     struct Expr
     {
         std::string text;
         int         prec    = PRIMARY;
         bool        boolean = false;
         std::string place;
+        std::string bare;
     };
+
+    // As one value, where only its first is read anyway -- an operator's
+    // operand, the one value assigned -- a call without the brackets that
+    // keep it to one. Where its values would spread -- a call's last
+    // argument, a table's last item, a return -- the brackets stay.
+    Expr oneValue(const Expr& e)
+    {
+        return e.bare.empty() ? e : Expr{ e.bare, PRIMARY, e.boolean };
+    }
 
     // Pairs of words, looked for by views of them without a copy.
     struct PairLess
@@ -3728,8 +3739,8 @@ namespace
         const LSLIType    lt  = slType(lhs);
         const LSLIType    rt  = slType(rhs);
         const auto        infix = [&](const char* word, int prec, bool boolean = false, bool right_assoc = false) -> Expr {
-            const Expr a = value(lhs);
-            const Expr b = value(rhs);
+            const Expr a = oneValue(value(lhs));
+            const Expr b = oneValue(value(rhs));
             if (prec == COMPARE && boolean)
             {
                 if (std::optional<Expr> compared = placeCompared(word, a, b, lhs, rhs))
@@ -3981,7 +3992,7 @@ namespace
             {
                 // Bracketed where it begins with a minus of its own, which
                 // after this one would be a comment.
-                const Expr v = value(child);
+                const Expr v = oneValue(value(child));
                 return { "-" + (!v.text.empty() && v.text.front() == '-' ? "(" + v.text + ")" : bracketed(v, UNARY)), UNARY };
             }
             case OP_BOOLEAN_NOT:
@@ -4050,8 +4061,9 @@ namespace
             case LST_INTEGER:
                 if (from == LST_FLOATINGPOINT)
                 {
-                    // Toward zero, as LSL cuts a float.
-                    return { "(math.modf(" + v.text + "))" };
+                    // Toward zero, as LSL cuts a float: math.modf's first
+                    // value, its whole part.
+                    return { "(math.modf(" + v.text + "))", PRIMARY, false, {}, "math.modf(" + v.text + ")" };
                 }
                 if (from == LST_STRING)
                 {
@@ -4303,11 +4315,12 @@ namespace
         LSLASTNode*    member  = target->getMember();
         // What the new value is, from the old one where the operator makes
         // it so.
-        const auto made = [&](const std::string& old, LSLIType t) -> std::string {
+        // `whole` where it is all of the value assigned, not a part of one.
+        const auto made = [&](const std::string& old, LSLIType t, bool whole = false) -> std::string {
             const Expr v = rhs ? value(rhs) : Expr{ "1" };
             switch (op)
             {
-                case OP_ASSIGN: return rhs ? coerced(rhs, t).text : v.text;
+                case OP_ASSIGN: return rhs ? (whole ? oneValue(coerced(rhs, t)) : coerced(rhs, t)).text : v.text;
                 case OP_ADD_ASSIGN:
                 case OP_PRE_INCR:
                 case OP_POST_INCR:
@@ -4437,7 +4450,9 @@ namespace
                 line(name + " ..= " + joinedPiece(rhs).text);
                 return;
             }
-            const Expr v = rhs ? value(rhs) : Expr{ "1" };
+            // One value, but where it is math.fmod's last argument.
+            const Expr whole = rhs ? value(rhs) : Expr{ "1" };
+            const Expr v     = oneValue(whole);
             switch (op)
             {
                 case OP_ADD_ASSIGN:
@@ -4463,7 +4478,7 @@ namespace
                 case OP_MOD_ASSIGN:
                     if (type == LST_INTEGER)
                     {
-                        line(name + " = math.fmod(" + name + ", " + v.text + ")");
+                        line(name + " = math.fmod(" + name + ", " + whole.text + ")");
                         return;
                     }
                     break;
@@ -4475,7 +4490,7 @@ namespace
             line(name + " = " + truthOf(rhs));
             return;
         }
-        line(name + " = " + made(name, type));
+        line(name + " = " + made(name, type, true));
     }
 
     void Writer::effect(LSLExpression* e)
@@ -4912,7 +4927,7 @@ namespace
                 }
                 else
                 {
-                    line("local " + name + typed(type) + " = " + (isNull(init) ? defaultOf(type) : coerced(init, type).text));
+                    line("local " + name + typed(type) + " = " + (isNull(init) ? defaultOf(type) : oneValue(coerced(init, type)).text));
                 }
                 writeSteps(steps.after);
                 return;
@@ -7277,7 +7292,7 @@ namespace
             else
             {
                 const LSLIType type = varType(id->getSymbol(), id->getIType());
-                line("local " + nameOf(id) + typed(type) + " = " + (isNull(init) ? defaultOf(type) : coerced(init, type).text));
+                line("local " + nameOf(id) + typed(type) + " = " + (isNull(init) ? defaultOf(type) : oneValue(coerced(init, type)).text));
             }
             commentsAfter(global, from);
             lined(global, from);
