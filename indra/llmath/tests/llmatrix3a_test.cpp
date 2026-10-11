@@ -41,20 +41,12 @@
 
 #include <bit>
 #include <cmath>
-#include <cstdio>
 #include <limits>
 #include <string>
 #include <vector>
 
 namespace
 {
-    std::string precise(double v)
-    {
-        char buffer[32];
-        std::snprintf(buffer, sizeof(buffer), "%.9g", v);
-        return buffer;
-    }
-
     // The 3x3 as doubles, m[row][col]
     struct Rows
     {
@@ -74,16 +66,16 @@ namespace
         return r;
     }
 
-    void ensure_rows(const std::string& what, const LLMatrix3a& got, const Rows& expected, double tolerance)
+    void require_rows_near(const std::string& what, const LLMatrix3a& got, const Rows& expected, double tolerance)
     {
+        INFO(what);
         for (int row = 0; row < 3; ++row)
         {
             for (int col = 0; col < 3; ++col)
             {
                 const double g = got.getRow(row)[col];
                 const double e = expected.m[row][col];
-                UNSCOPED_INFO(what + " row " + std::to_string(row) + " column " + std::to_string(col) + ": " +
-                           precise(g) + " vs " + precise(e));
+                CAPTURE(row, col, g, e);
                 REQUIRE(std::fabs(g - e) <= tolerance * llmax(1.0, std::fabs(e)));
             }
         }
@@ -149,13 +141,9 @@ namespace
     // by column.
     TEST_CASE("LLMatrix3a: plain data of three registers; the identity; rows and columns", "[LLMatrix3a]")
     {
-        UNSCOPED_INFO("sizeof LLMatrix3a");
         CHECK(sizeof(LLMatrix3a) == (size_t)48);
-        UNSCOPED_INFO("alignof LLMatrix3a");
         CHECK(alignof(LLMatrix3a) == (size_t)16);
-        UNSCOPED_INFO("sizeof LLRotation");
         CHECK(sizeof(LLRotation) == (size_t)48);
-        UNSCOPED_INFO("trivially copyable");
         CHECK(std::is_trivially_copyable<LLRotation>::value);
 
         const LLMatrix3a& identity = LLMatrix3a::getIdentity();
@@ -163,26 +151,20 @@ namespace
         {
             for (int col = 0; col < 3; ++col)
             {
-                UNSCOPED_INFO("identity");
+                CAPTURE(row, col);
                 REQUIRE(identity.getRow(row)[col] == (row == col ? 1.f : 0.f));
             }
         }
 
         const LLMatrix3a m = odd_matrix();
-        UNSCOPED_INFO("getRow 1 y");
         CHECK(m.getRow(1)[1] == 5.5f);
-        UNSCOPED_INFO("getRow 2 w");
         CHECK(m.getRow(2)[3] == 300.f);
-        {
-            INFO("getRow<N> is getRow(N)");
-            CHECK(same_bits(m.getRow<0>(), m.getRow(0)));
-            CHECK(same_bits(m.getRow<1>(), m.getRow(1)));
-            CHECK(same_bits(m.getRow<2>(), m.getRow(2)));
-        }
+        CHECK(same_bits(m.getRow<0>(), m.getRow(0)));
+        CHECK(same_bits(m.getRow<1>(), m.getRow(1)));
+        CHECK(same_bits(m.getRow<2>(), m.getRow(2)));
 
         LLMatrix3a by_rows;
         by_rows.setRows(m.getRow<0>(), m.getRow<1>(), m.getRow<2>());
-        UNSCOPED_INFO("setRows");
         CHECK(same_bits(by_rows, m));
 
         LLMatrix3a by_columns;
@@ -191,13 +173,12 @@ namespace
         {
             for (int col = 0; col < 3; ++col)
             {
-                UNSCOPED_INFO("setColumns is the transpose of setRows");
+                CAPTURE(row, col);
                 REQUIRE(by_columns.getRow(row)[col] == m.getRow(col)[row]);
             }
         }
     }
 
-    // loadu takes the scalar matrix row by row.
     TEST_CASE("LLMatrix3a: loadu takes the scalar matrix row by row", "[LLMatrix3a]")
     {
         const F32 values[9] = {1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f};
@@ -206,12 +187,12 @@ namespace
         m.loadu(m3);
         for (int i = 0; i < 3; ++i)
         {
+            CAPTURE(i);
             for (int j = 0; j < 3; ++j)
             {
-                UNSCOPED_INFO("loadu");
+                CAPTURE(j);
                 REQUIRE(m.getRow(i)[j] == m3.mMatrix[i][j]);
             }
-            UNSCOPED_INFO("loadu w is zero");
             REQUIRE(m.getRow(i)[3] == 0.f);
         }
     }
@@ -227,26 +208,21 @@ namespace
         {
             for (int col = 0; col < 3; ++col)
             {
-                UNSCOPED_INFO("setTranspose");
+                CAPTURE(row, col);
                 REQUIRE(t.getRow(row)[col] == m.getRow(col)[row]);
             }
         }
-        UNSCOPED_INFO("transpose row 0 w");
         CHECK(t.getRow(0)[3] == m.getRow(2)[1]);
-        UNSCOPED_INFO("transpose row 1 w");
         CHECK(t.getRow(1)[3] == m.getRow(2)[0]);
-        UNSCOPED_INFO("transpose row 2 w");
         CHECK(t.getRow(2)[3] == m.getRow(2)[0]);
 
         LLMatrix3a back;
         back.setTranspose(t);
-        UNSCOPED_INFO("transpose twice");
         CHECK(same_bits3(back, m));
 
         // in place
         LLMatrix3a self = m;
         self.setTranspose(self);
-        UNSCOPED_INFO("setTranspose in place");
         CHECK(same_bits(self, t));
     }
 
@@ -262,7 +238,7 @@ namespace
         for (int col = 0; col < 3; ++col)
         {
             const double expected = v[0] * r.m[0][col] + v[1] * r.m[1][col] + v[2] * r.m[2][col];
-            UNSCOPED_INFO("rotate lane " + std::to_string(col) + ": " + precise(rotated[col]) + " vs " + precise(expected));
+            CAPTURE(col, rotated[col], expected);
             REQUIRE(std::fabs(rotated[col] - expected) <= 1e-6 * llmax(1.0, std::fabs(expected)));
         }
 
@@ -270,13 +246,11 @@ namespace
         rot.setRows(m.getRow<0>(), m.getRow<1>(), m.getRow<2>());
         LLVector4a set_rotated;
         set_rotated.setRotated(rot, v);
-        UNSCOPED_INFO("setRotated is rotate");
         CHECK(same_bits(set_rotated, rotated));
 
         // in place
         LLVector4a self = v;
         m.rotate(self, self);
-        UNSCOPED_INFO("rotate in place");
         CHECK(same_bits(self, rotated));
 
         for (const LLQuaternion& q : ROTATIONS)
@@ -288,7 +262,6 @@ namespace
             const LLVector3 expected = v3 * m3;
             LLVector4a got;
             a.rotate(v, got);
-            UNSCOPED_INFO("rotate is v * LLMatrix3");
             REQUIRE(got.equals3(LLVector4a(expected.mV[0], expected.mV[1], expected.mV[2]), 1e-5f));
         }
     }
@@ -316,7 +289,7 @@ namespace
 
         LLMatrix3a product;
         product.setMul(a, b);
-        ensure_rows("setMul", product, expected, 1e-6);
+        require_rows_near("setMul", product, expected, 1e-6);
 
         // the scalar type agrees on the order
         LLMatrix3 a3, b3;
@@ -337,19 +310,15 @@ namespace
         LLMatrix3a left, right;
         left.setMul(LLMatrix3a::getIdentity(), a);
         right.setMul(a, LLMatrix3a::getIdentity());
-        UNSCOPED_INFO("identity on the left");
         CHECK(same_bits(left, a));
-        UNSCOPED_INFO("identity on the right");
         CHECK(same_bits3(right, a));
 
         // aliasing either operand
         LLMatrix3a alias = a;
         alias.setMul(alias, b);
-        UNSCOPED_INFO("setMul aliasing a");
         CHECK(same_bits(alias, product));
         alias = b;
         alias.setMul(a, alias);
-        UNSCOPED_INFO("setMul aliasing b");
         CHECK(same_bits(alias, product));
 
         const LLVector4a v(1.f, -2.f, 0.5f, 0.f);
@@ -372,18 +341,17 @@ namespace
             r.m[0][2] * (r.m[1][0] * r.m[2][1] - r.m[1][1] * r.m[2][0]);
 
         const F32 det = m.getDeterminant().getF32();
-        UNSCOPED_INFO("getDeterminant: " + precise(det) + " vs " + precise(expected));
+        CAPTURE(det, expected);
         CHECK(std::fabs(det - expected) <= 1e-5 * std::fabs(expected));
 
         LLVector4a all;
         m.getDeterminant(all);
         for (int i = 0; i < 4; ++i)
         {
-            UNSCOPED_INFO("getDeterminant(LLVector4a) lane " + std::to_string(i));
+            CAPTURE(i);
             REQUIRE(all[i] == det);
         }
 
-        UNSCOPED_INFO("identity determinant");
         CHECK(LLMatrix3a::getIdentity().getDeterminant().getF32() == 1.f);
     }
 
@@ -394,32 +362,25 @@ namespace
         {
             LLRotation r;
             r.loadu(q.getMatrix3());
-            UNSCOPED_INFO("a rotation isOkRotation");
             REQUIRE(r.isOkRotation());
-            UNSCOPED_INFO("a rotation is finite");
             REQUIRE(r.isFinite());
         }
 
         LLRotation scaled;
         scaled.setRows(LLVector4a(2.f, 0.f, 0.f), LLVector4a(0.f, 2.f, 0.f), LLVector4a(0.f, 0.f, 2.f));
-        UNSCOPED_INFO("a scale is not a rotation");
         CHECK_FALSE(scaled.isOkRotation());
 
         LLRotation sheared;
         sheared.setRows(LLVector4a(1.f, 0.f, 0.f), LLVector4a(0.5f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
-        UNSCOPED_INFO("a shear is not a rotation");
         CHECK_FALSE(sheared.isOkRotation());
 
         LLRotation reflected;
         reflected.setRows(LLVector4a(-1.f, 0.f, 0.f), LLVector4a(0.f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
-        UNSCOPED_INFO("a reflection is not a rotation");
         CHECK_FALSE(reflected.isOkRotation());
 
         LLRotation nan;
         nan.setRows(LLVector4a(std::numeric_limits<F32>::quiet_NaN(), 0.f, 0.f), LLVector4a(0.f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
-        UNSCOPED_INFO("a NaN is not finite");
         CHECK_FALSE(nan.isFinite());
-        UNSCOPED_INFO("a NaN is not a rotation");
         CHECK_FALSE(nan.isOkRotation());
 
         LLRotation inf_in_w;
@@ -437,6 +398,7 @@ namespace
 
         for (int count : {0, 1, 2, 3, 7, 16})
         {
+            CAPTURE(count);
             std::vector<LLVector4a> src(count + 1), dst(count + 1);
             for (int i = 0; i < count; ++i)
             {
@@ -450,7 +412,7 @@ namespace
             {
                 LLVector4a one;
                 r.rotate(src[i], one);
-                UNSCOPED_INFO("batchTransform count " + std::to_string(count) + " element " + std::to_string(i));
+                CAPTURE(i);
                 REQUIRE(same_bits(dst[i], one));
             }
             UNSCOPED_INFO("batchTransform stays within count");
@@ -458,7 +420,6 @@ namespace
         }
     }
 
-    // setLerp and the tolerance compare.
     TEST_CASE("LLMatrix3a: setLerp and the tolerance compare", "[LLMatrix3a]")
     {
         const LLMatrix3a a = odd_matrix();
@@ -470,9 +431,7 @@ namespace
         at_zero.setLerp(a, b, 0.f);
         at_one.setLerp(a, b, 1.f);
         at_quarter.setLerp(a, b, 0.25f);
-        UNSCOPED_INFO("setLerp at 0");
         CHECK(same_bits(at_zero, a));
-        UNSCOPED_INFO("setLerp at 1");
         CHECK(at_one.isApproximatelyEqual(b, 1e-6f));
 
         const Rows ra = rows_of(a);
@@ -485,7 +444,7 @@ namespace
                 expected.m[row][col] = ra.m[row][col] + (rb.m[row][col] - ra.m[row][col]) * 0.25;
             }
         }
-        ensure_rows("setLerp at a quarter", at_quarter, expected, 1e-6);
+        require_rows_near("setLerp at a quarter", at_quarter, expected, 1e-6);
 
         LLMatrix3a nearby = a;
         LLVector4a nudged = nearby.getRow<1>();
@@ -493,7 +452,6 @@ namespace
         nearby.setRows(nearby.getRow<0>(), nudged, nearby.getRow<2>());
         UNSCOPED_INFO("isApproximatelyEqual within tolerance, w ignored");
         CHECK(nearby.isApproximatelyEqual(a));
-        UNSCOPED_INFO("isApproximatelyEqual outside tolerance");
         CHECK_FALSE(nearby.isApproximatelyEqual(a, 1e-7f));
     }
 }

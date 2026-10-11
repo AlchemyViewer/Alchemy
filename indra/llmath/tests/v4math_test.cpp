@@ -40,57 +40,39 @@ namespace
     TEST_CASE("v4math_h: constructors set every component and default w to 1", "[v4math_h]")
     {
         LLVector4 vec4;
-        {
-            INFO("1:LLVector4:Fail to initialize ");
-            CHECK(vec4.mV[VX] == 0);
-            CHECK(vec4.mV[VY] == 0);
-            CHECK(vec4.mV[VZ] == 0);
-            CHECK(vec4.mV[VW] == 1.0f);
-        }
+        CHECK(vec4.mV[VX] == 0);
+        CHECK(vec4.mV[VY] == 0);
+        CHECK(vec4.mV[VZ] == 0);
+        CHECK(vec4.mV[VW] == 1.0f);
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         LLVector4 vec4a(x,y,z);
-        {
-            INFO("2:LLVector4:Fail to initialize ");
-            CHECK(x == vec4a.mV[VX]);
-            CHECK(y == vec4a.mV[VY]);
-            CHECK(z == vec4a.mV[VZ]);
-            CHECK(vec4a.mV[VW] == 1.0f);
-        }
+        CHECK(x == vec4a.mV[VX]);
+        CHECK(y == vec4a.mV[VY]);
+        CHECK(z == vec4a.mV[VZ]);
+        CHECK(vec4a.mV[VW] == 1.0f);
         LLVector4 vec4b(x,y,z,w);
-        {
-            INFO("3:LLVector4:Fail to initialize ");
-            CHECK(x == vec4b.mV[VX]);
-            CHECK(y == vec4b.mV[VY]);
-            CHECK(z == vec4b.mV[VZ]);
-            CHECK(w == vec4b.mV[VW]);
-        }
+        CHECK(x == vec4b.mV[VX]);
+        CHECK(y == vec4b.mV[VY]);
+        CHECK(z == vec4b.mV[VZ]);
+        CHECK(w == vec4b.mV[VW]);
         const F32 vec[4] = {.112f ,23.2f, -4.2f, -.0001f};
         LLVector4 vec4c(vec);
-        {
-            INFO("4:LLVector4:Fail to initialize ");
-            CHECK(vec[0] == vec4c.mV[VX]);
-            CHECK(vec[1] == vec4c.mV[VY]);
-            CHECK(vec[2] == vec4c.mV[VZ]);
-            CHECK(vec[3] == vec4c.mV[VW]);
-        }
+        CHECK(vec[0] == vec4c.mV[VX]);
+        CHECK(vec[1] == vec4c.mV[VY]);
+        CHECK(vec[2] == vec4c.mV[VZ]);
+        CHECK(vec[3] == vec4c.mV[VW]);
         LLVector3 vec3(-2.23f,1.01f,42.3f);
         LLVector4 vec4d(vec3);
-        {
-            INFO("5:LLVector4:Fail to initialize ");
-            CHECK(vec3.mV[VX] == vec4d.mV[VX]);
-            CHECK(vec3.mV[VY] == vec4d.mV[VY]);
-            CHECK(vec3.mV[VZ] == vec4d.mV[VZ]);
-            CHECK(vec4d.mV[VW] == 1.f);
-        }
+        CHECK(vec3.mV[VX] == vec4d.mV[VX]);
+        CHECK(vec3.mV[VY] == vec4d.mV[VY]);
+        CHECK(vec3.mV[VZ] == vec4d.mV[VZ]);
+        CHECK(vec4d.mV[VW] == 1.f);
         F32 w1 = -.234f;
         LLVector4 vec4e(vec3,w1);
-        {
-            INFO("6:LLVector4:Fail to initialize ");
-            CHECK(vec3.mV[VX] == vec4e.mV[VX]);
-            CHECK(vec3.mV[VY] == vec4e.mV[VY]);
-            CHECK(vec3.mV[VZ] == vec4e.mV[VZ]);
-            CHECK(w1 == vec4e.mV[VW]);
-        }
+        CHECK(vec3.mV[VX] == vec4e.mV[VX]);
+        CHECK(vec3.mV[VY] == vec4e.mV[VY]);
+        CHECK(vec3.mV[VZ] == vec4e.mV[VZ]);
+        CHECK(w1 == vec4e.mV[VW]);
     }
 
     TEST_CASE("v4math_h: setVec sets components and clearVec/zeroVec reset them", "[v4math_h]")
@@ -98,76 +80,53 @@ namespace
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         LLVector4 vec4;
         vec4.setVec(x,y,z);
-        {
-            INFO("1:setVec:Fail to initialize ");
-            CHECK(x == vec4.mV[VX]);
-            CHECK(y == vec4.mV[VY]);
-            CHECK(z == vec4.mV[VZ]);
-            CHECK(vec4.mV[VW] == 1.0f);
-        }
+        CHECK(x == vec4.mV[VX]);
+        CHECK(y == vec4.mV[VY]);
+        CHECK(z == vec4.mV[VZ]);
+        CHECK(vec4.mV[VW] == 1.0f);
         vec4.clearVec();
-        {
-            INFO("2:clearVec:Fail ");
-            CHECK(vec4.mV[VX] == 0);
-            CHECK(vec4.mV[VY] == 0);
-            CHECK(vec4.mV[VZ] == 0);
-            CHECK(vec4.mV[VW] == 1.0f);
-        }
+        CHECK(vec4.mV[VX] == 0);
+        CHECK(vec4.mV[VY] == 0);
+        CHECK(vec4.mV[VZ] == 0);
+        CHECK(vec4.mV[VW] == 1.0f);
         vec4.setVec(x,y,z,w);
-        {
-            INFO("3:setVec:Fail to initialize ");
-            CHECK(x == vec4.mV[VX]);
-            CHECK(y == vec4.mV[VY]);
-            CHECK(z == vec4.mV[VZ]);
-            CHECK(w == vec4.mV[VW]);
-        }
+        CHECK(x == vec4.mV[VX]);
+        CHECK(y == vec4.mV[VY]);
+        CHECK(z == vec4.mV[VZ]);
+        CHECK(w == vec4.mV[VW]);
         vec4.zeroVec();
-        {
-            INFO("4:zeroVec:Fail ");
-            CHECK(vec4.mV[VX] == 0);
-            CHECK(vec4.mV[VY] == 0);
-            CHECK(vec4.mV[VZ] == 0);
-            CHECK(vec4.mV[VW] == 0);
-        }
+        CHECK(vec4.mV[VX] == 0);
+        CHECK(vec4.mV[VY] == 0);
+        CHECK(vec4.mV[VZ] == 0);
+        CHECK(vec4.mV[VW] == 0);
         LLVector3 vec3(-2.23f,1.01f,42.3f);
         vec4.clearVec();
         vec4.setVec(vec3);
-        {
-            INFO("5:setVec:Fail to initialize ");
-            CHECK(vec3.mV[VX] == vec4.mV[VX]);
-            CHECK(vec3.mV[VY] == vec4.mV[VY]);
-            CHECK(vec3.mV[VZ] == vec4.mV[VZ]);
-            CHECK(vec4.mV[VW] == 1.f);
-        }
+        CHECK(vec3.mV[VX] == vec4.mV[VX]);
+        CHECK(vec3.mV[VY] == vec4.mV[VY]);
+        CHECK(vec3.mV[VZ] == vec4.mV[VZ]);
+        CHECK(vec4.mV[VW] == 1.f);
         F32 w1 = -.234f;
         vec4.zeroVec();
         vec4.setVec(vec3,w1);
-        {
-            INFO("6:setVec:Fail to initialize ");
-            CHECK(vec3.mV[VX] == vec4.mV[VX]);
-            CHECK(vec3.mV[VY] == vec4.mV[VY]);
-            CHECK(vec3.mV[VZ] == vec4.mV[VZ]);
-            CHECK(w1 == vec4.mV[VW]);
-        }
+        CHECK(vec3.mV[VX] == vec4.mV[VX]);
+        CHECK(vec3.mV[VY] == vec4.mV[VY]);
+        CHECK(vec3.mV[VZ] == vec4.mV[VZ]);
+        CHECK(w1 == vec4.mV[VW]);
         const F32 vec[4] = {.112f ,23.2f, -4.2f, -.0001f};
         LLVector4 vec4a;
         vec4a.setVec(vec);
-        {
-            INFO("7:setVec:Fail to initialize ");
-            CHECK(vec[0] == vec4a.mV[VX]);
-            CHECK(vec[1] == vec4a.mV[VY]);
-            CHECK(vec[2] == vec4a.mV[VZ]);
-            CHECK(vec[3] == vec4a.mV[VW]);
-        }
+        CHECK(vec[0] == vec4a.mV[VX]);
+        CHECK(vec[1] == vec4a.mV[VY]);
+        CHECK(vec[2] == vec4a.mV[VZ]);
+        CHECK(vec[3] == vec4a.mV[VW]);
     }
 
     TEST_CASE("v4math_h: magVec and magVecSquared", "[v4math_h]")
     {
         F32 x = 10.f, y = -2.3f, z = -.023f;
         LLVector4 vec4(x,y,z);
-        UNSCOPED_INFO("magVec:Fail ");
         CHECK(is_approx_equal(vec4.magVec(), (F32) sqrt(x*x + y*y + z*z)));
-        UNSCOPED_INFO("magVecSquared:Fail ");
         CHECK(is_approx_equal(vec4.magVecSquared(), (x*x + y*y + z*z)));
     }
 
@@ -177,22 +136,16 @@ namespace
         LLVector4 vec4(x,y,z);
         F32 mag = vec4.normVec();
         mag = 1.f/ mag;
-        {
-            INFO("1:normVec: Fail ");
-            CHECK(is_approx_equal(mag*x,vec4.mV[VX]));
-            CHECK(is_approx_equal(mag*y, vec4.mV[VY]));
-            CHECK(is_approx_equal(mag*z, vec4.mV[VZ]));
-        }
+        CHECK(is_approx_equal(mag*x,vec4.mV[VX]));
+        CHECK(is_approx_equal(mag*y, vec4.mV[VY]));
+        CHECK(is_approx_equal(mag*z, vec4.mV[VZ]));
         x = 0.000000001f, y = 0.000000001f, z = 0.000000001f;
         vec4.clearVec();
         vec4.setVec(x,y,z);
         mag = vec4.normVec();
-        {
-            INFO("2:normVec: Fail ");
-            CHECK(is_approx_equal(mag*x,vec4.mV[VX]));
-            CHECK(is_approx_equal(mag*y, vec4.mV[VY]));
-            CHECK(is_approx_equal(mag*z, vec4.mV[VZ]));
-        }
+        CHECK(is_approx_equal(mag*x,vec4.mV[VX]));
+        CHECK(is_approx_equal(mag*y, vec4.mV[VY]));
+        CHECK(is_approx_equal(mag*z, vec4.mV[VZ]));
     }
 
     TEST_CASE("v4math_h: abs drops signs; isExactlyClear and isExactlyZero", "[v4math_h]")
@@ -200,18 +153,13 @@ namespace
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         LLVector4 vec4(x,y,z,w);
         vec4.abs();
-        {
-            INFO("abs:Fail ");
-            CHECK(x == vec4.mV[VX]);
-            CHECK(-y == vec4.mV[VY]);
-            CHECK(-z == vec4.mV[VZ]);
-            CHECK(-w == vec4.mV[VW]);
-        }
+        CHECK(x == vec4.mV[VX]);
+        CHECK(-y == vec4.mV[VY]);
+        CHECK(-z == vec4.mV[VZ]);
+        CHECK(-w == vec4.mV[VW]);
         vec4.clearVec();
-        UNSCOPED_INFO("isExactlyClear:Fail ");
         CHECK(vec4.isExactlyClear());
         vec4.zeroVec();
-        UNSCOPED_INFO("isExactlyZero:Fail ");
         CHECK(vec4.isExactlyZero());
     }
 
@@ -220,40 +168,29 @@ namespace
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         LLVector4 vec4(x,y,z,w),vec4a;
         vec4a = vec4.scaleVec(vec4);
-        {
-            INFO("scaleVec:Fail ");
-            CHECK(is_approx_equal(x*x, vec4a.mV[VX]));
-            CHECK(is_approx_equal(y*y, vec4a.mV[VY]));
-            CHECK(is_approx_equal(z*z, vec4a.mV[VZ]));
-            CHECK(is_approx_equal(w*w, vec4a.mV[VW]));
-        }
+        CHECK(is_approx_equal(x*x, vec4a.mV[VX]));
+        CHECK(is_approx_equal(y*y, vec4a.mV[VY]));
+        CHECK(is_approx_equal(z*z, vec4a.mV[VZ]));
+        CHECK(is_approx_equal(w*w, vec4a.mV[VW]));
     }
 
     TEST_CASE("v4math_h: subscript operator reads components and gives references", "[v4math_h]")
     {
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         LLVector4 vec4(x,y,z,w);
-        UNSCOPED_INFO("1:operator [] failed ");
         CHECK(x ==  vec4[0]);
-        UNSCOPED_INFO("2:operator [] failed ");
         CHECK(y ==  vec4[1]);
-        UNSCOPED_INFO("3:operator [] failed ");
         CHECK(z ==  vec4[2]);
-        UNSCOPED_INFO("4:operator [] failed ");
         CHECK(w ==  vec4[3]);
         x = 23.f, y = -.2361f, z = 3.25;
         vec4.setVec(x,y,z);
         F32 &ref1 = vec4[0];
-        UNSCOPED_INFO("5:operator [] failed ");
         CHECK(ref1 ==  vec4[0]);
         F32 &ref2 = vec4[1];
-        UNSCOPED_INFO("6:operator [] failed ");
         CHECK(ref2 ==  vec4[1]);
         F32 &ref3 = vec4[2];
-        UNSCOPED_INFO("7:operator [] failed ");
         CHECK(ref3 ==  vec4[2]);
         F32 &ref4 = vec4[3];
-        UNSCOPED_INFO("8:operator [] failed ");
         CHECK(ref4 ==  vec4[3]);
     }
 
@@ -271,7 +208,6 @@ namespace
         vec4.rotVec(mat);
         vec4a.setVec(x,y,z,w);
         vec4a.rotVec(mat);
-        UNSCOPED_INFO("1:rotVec: Fail ");
         CHECK(vec4a == vec4);
         F32 a = 2.32f, b = -23.2f, c = -34.1112f, d = 1.010112f;
         LLQuaternion q(a,b,c,d);
@@ -279,7 +215,6 @@ namespace
         vec4b.rotVec(q);
         vec4c.setVec(a, b, c, d);
         vec4c.rotVec(q);
-        UNSCOPED_INFO("2:rotVec: Fail ");
         CHECK(vec4b == vec4c);
     }
 
@@ -291,7 +226,6 @@ namespace
         stream1 << vec4;
         vec4a.setVec(x,y,z,w);
         stream2 << vec4a;
-        UNSCOPED_INFO("operator << failed");
         CHECK(stream1.str() == stream2.str());
     }
 
@@ -301,26 +235,19 @@ namespace
         F32 x2 = 1.2f, y2 = 2.5f, z2 = 1.f, w2 = 1.3f;
         LLVector4 vec4(x1,y1,z1,w1),vec4a(x2,y2,z2,w2),vec4b;
         vec4b = vec4a + vec4;
-        {
-            INFO("1:operator+:Fail to initialize ");
-            CHECK(is_approx_equal(x1+x2,vec4b.mV[VX]));
-            CHECK(is_approx_equal(y1+y2,vec4b.mV[VY]));
-            CHECK(is_approx_equal(z1+z2,vec4b.mV[VZ]));
-        }
+        CHECK(is_approx_equal(x1+x2,vec4b.mV[VX]));
+        CHECK(is_approx_equal(y1+y2,vec4b.mV[VY]));
+        CHECK(is_approx_equal(z1+z2,vec4b.mV[VZ]));
         x1 = -2.45f, y1 = 2.1f, z1 = 3.0f;
         vec4.clearVec();
         vec4a.clearVec();
         vec4.setVec(x1,y1,z1);
         vec4a +=vec4;
-        UNSCOPED_INFO("2:operator+=: Fail to initialize");
         CHECK(vec4a == vec4);
         vec4a += vec4;
-        {
-            INFO("3:operator+=:Fail to initialize ");
-            CHECK(is_approx_equal(2*x1,vec4a.mV[VX]));
-            CHECK(is_approx_equal(2*y1,vec4a.mV[VY]));
-            CHECK(is_approx_equal(2*z1,vec4a.mV[VZ]));
-        }
+        CHECK(is_approx_equal(2*x1,vec4a.mV[VX]));
+        CHECK(is_approx_equal(2*y1,vec4a.mV[VY]));
+        CHECK(is_approx_equal(2*z1,vec4a.mV[VZ]));
     }
     TEST_CASE("v4math_h: operator- and operator-=", "[v4math_h]")
     {
@@ -328,26 +255,19 @@ namespace
         F32 x2 = 1.2f, y2 = 2.5f, z2 = 1.f, w2 = 1.3f;
         LLVector4 vec4(x1,y1,z1,w1),vec4a(x2,y2,z2,w2),vec4b;
         vec4b = vec4a - vec4;
-        {
-            INFO("1:operator-:Fail to initialize ");
-            CHECK(is_approx_equal(x2-x1,vec4b.mV[VX]));
-            CHECK(is_approx_equal(y2-y1,vec4b.mV[VY]));
-            CHECK(is_approx_equal(z2-z1,vec4b.mV[VZ]));
-        }
+        CHECK(is_approx_equal(x2-x1,vec4b.mV[VX]));
+        CHECK(is_approx_equal(y2-y1,vec4b.mV[VY]));
+        CHECK(is_approx_equal(z2-z1,vec4b.mV[VZ]));
         x1 = -2.45f, y1 = 2.1f, z1 = 3.0f;
         vec4.clearVec();
         vec4a.clearVec();
         vec4.setVec(x1,y1,z1);
         vec4a -=vec4;
-        UNSCOPED_INFO("2:operator-=: Fail to initialize");
         CHECK(vec4a == -vec4);
         vec4a -=vec4;
-        {
-            INFO("3:operator-=:Fail to initialize ");
-            CHECK(is_approx_equal(-2*x1,vec4a.mV[VX]));
-            CHECK(is_approx_equal(-2*y1,vec4a.mV[VY]));
-            CHECK(is_approx_equal(-2*z1,vec4a.mV[VZ]));
-        }
+        CHECK(is_approx_equal(-2*x1,vec4a.mV[VX]));
+        CHECK(is_approx_equal(-2*y1,vec4a.mV[VY]));
+        CHECK(is_approx_equal(-2*z1,vec4a.mV[VZ]));
     }
 
     TEST_CASE("v4math_h: dot product and scalar multiplication", "[v4math_h]")
@@ -356,32 +276,22 @@ namespace
         F32 x2 = 1.2f, y2 = 2.5f, z2 = 1.f;
         LLVector4 vec4(x1,y1,z1),vec4a(x2,y2,z2);
         F32 res = vec4 * vec4a;
-        UNSCOPED_INFO("1:operator* failed ");
         CHECK(is_approx_equal(res, x1*x2 + y1*y2 + z1*z2));
         vec4a.clearVec();
         F32 mulVal = 4.2f;
         vec4a = vec4 * mulVal;
-        {
-            INFO("2:operator* failed ");
-            CHECK(is_approx_equal(x1*mulVal,vec4a.mV[VX]));
-            CHECK(is_approx_equal(y1*mulVal, vec4a.mV[VY]));
-            CHECK(is_approx_equal(z1*mulVal, vec4a.mV[VZ]));
-        }
+        CHECK(is_approx_equal(x1*mulVal,vec4a.mV[VX]));
+        CHECK(is_approx_equal(y1*mulVal, vec4a.mV[VY]));
+        CHECK(is_approx_equal(z1*mulVal, vec4a.mV[VZ]));
         vec4a.clearVec();
         vec4a = mulVal *  vec4 ;
-        {
-            INFO("3:operator* failed ");
-            CHECK(is_approx_equal(x1*mulVal, vec4a.mV[VX]));
-            CHECK(is_approx_equal(y1*mulVal, vec4a.mV[VY]));
-            CHECK(is_approx_equal(z1*mulVal, vec4a.mV[VZ]));
-        }
+        CHECK(is_approx_equal(x1*mulVal, vec4a.mV[VX]));
+        CHECK(is_approx_equal(y1*mulVal, vec4a.mV[VY]));
+        CHECK(is_approx_equal(z1*mulVal, vec4a.mV[VZ]));
         vec4 *= mulVal;
-        {
-            INFO("4:operator*= failed ");
-            CHECK(is_approx_equal(x1*mulVal, vec4.mV[VX]));
-            CHECK(is_approx_equal(y1*mulVal, vec4.mV[VY]));
-            CHECK(is_approx_equal(z1*mulVal, vec4.mV[VZ]));
-        }
+        CHECK(is_approx_equal(x1*mulVal, vec4.mV[VX]));
+        CHECK(is_approx_equal(y1*mulVal, vec4.mV[VY]));
+        CHECK(is_approx_equal(z1*mulVal, vec4.mV[VZ]));
     }
 
     TEST_CASE("v4math_h: cross product operator% and operator%=", "[v4math_h]")
@@ -390,14 +300,10 @@ namespace
         F32 x2 = 1.2f, y2 = 2.5f, z2 = 1.f;
         LLVector4 vec4(x1,y1,z1),vec4a(x2,y2,z2),vec4b;
         vec4b = vec4 % vec4a;
-        {
-            INFO("1:operator% failed ");
-            CHECK(is_approx_equal(y1*z2 - y2*z1, vec4b.mV[VX]));
-            CHECK(is_approx_equal(z1*x2 -z2*x1, vec4b.mV[VY]));
-            CHECK(is_approx_equal(x1*y2-x2*y1, vec4b.mV[VZ]));
-        }
+        CHECK(is_approx_equal(y1*z2 - y2*z1, vec4b.mV[VX]));
+        CHECK(is_approx_equal(z1*x2 -z2*x1, vec4b.mV[VY]));
+        CHECK(is_approx_equal(x1*y2-x2*y1, vec4b.mV[VZ]));
         vec4 %= vec4a;
-        UNSCOPED_INFO("operator%= failed ");
         CHECK(vec4 == vec4b);
     }
 
@@ -407,40 +313,29 @@ namespace
         F32 t = 1.f / div;
         LLVector4 vec4(x,y,z), vec4a;
         vec4a = vec4/div;
-        {
-            INFO("1:operator/ failed ");
-            CHECK(is_approx_equal(x*t, vec4a.mV[VX]));
-            CHECK(is_approx_equal(y*t, vec4a.mV[VY]));
-            CHECK(is_approx_equal(z*t, vec4a.mV[VZ]));
-        }
+        CHECK(is_approx_equal(x*t, vec4a.mV[VX]));
+        CHECK(is_approx_equal(y*t, vec4a.mV[VY]));
+        CHECK(is_approx_equal(z*t, vec4a.mV[VZ]));
         x = 1.23f, y = 4.f, z = -2.32f;
         vec4.clearVec();
         vec4a.clearVec();
         vec4.setVec(x,y,z);
         vec4a = vec4/div;
-        {
-            INFO("2:operator/ failed ");
-            CHECK(is_approx_equal(x*t, vec4a.mV[VX]));
-            CHECK(is_approx_equal(y*t, vec4a.mV[VY]));
-            CHECK(is_approx_equal(z*t, vec4a.mV[VZ]));
-        }
+        CHECK(is_approx_equal(x*t, vec4a.mV[VX]));
+        CHECK(is_approx_equal(y*t, vec4a.mV[VY]));
+        CHECK(is_approx_equal(z*t, vec4a.mV[VZ]));
         vec4 /= div;
-        {
-            INFO("3:operator/ failed ");
-            CHECK(is_approx_equal(x*t, vec4.mV[VX]));
-            CHECK(is_approx_equal(y*t, vec4.mV[VY]));
-            CHECK(is_approx_equal(z*t, vec4.mV[VZ]));
-        }
+        CHECK(is_approx_equal(x*t, vec4.mV[VX]));
+        CHECK(is_approx_equal(y*t, vec4.mV[VY]));
+        CHECK(is_approx_equal(z*t, vec4.mV[VZ]));
     }
 
     TEST_CASE("v4math_h: operator== and operator!=", "[v4math_h]")
     {
         F32 x = 1.f, y = 2.f, z = -1.1f;
         LLVector4 vec4(x,y,z), vec4a;
-        UNSCOPED_INFO("operator!= failed ");
         CHECK(vec4 != vec4a);
         vec4a = vec4;
-        UNSCOPED_INFO("operator== failed ");
         CHECK(vec4 ==vec4a);
     }
 
@@ -449,7 +344,6 @@ namespace
         F32 x = 1.f, y = 2.f, z = -1.1f;
         LLVector4 vec4(x,y,z), vec4a;
         vec4a = - vec4;
-        UNSCOPED_INFO("operator- failed ");
         CHECK(vec4 == - vec4a);
     }
 
@@ -457,12 +351,10 @@ namespace
     {
         F32 x = 1.f, y = 2.f, z = -1.1f,epsilon = .23425f;
         LLVector4 vec4(x,y,z), vec4a(x,y,z);
-        UNSCOPED_INFO("1:are_parallel: Fail ");
         CHECK(are_parallel(vec4a,vec4,epsilon));
         x = 21.f, y = 12.f, z = -123.1f;
         vec4a.clearVec();
         vec4a.setVec(x,y,z);
-        UNSCOPED_INFO("2:are_parallel: Fail ");
         CHECK_FALSE(are_parallel(vec4a,vec4,epsilon));
     }
 
@@ -475,7 +367,6 @@ namespace
         vec4.normVec();
         vec4a.normVec();
         angle2 = acos(vec4 * vec4a);
-        UNSCOPED_INFO("1:angle_between: Fail ");
         CHECK_THAT(angle1, ll_test::WithinBits(angle2, 8));
         F32 x1 = 21.f, y1 = 2.23f, z1 = -1.1f;
         LLVector4 vec4b(x,y,z), vec4c(x1,y1,z1);
@@ -483,7 +374,6 @@ namespace
         vec4b.normVec();
         vec4c.normVec();
         angle2 = acos(vec4b * vec4c);
-        UNSCOPED_INFO("2:angle_between: Fail ");
         CHECK_THAT(angle1, ll_test::WithinBits(angle2, 8));
     }
 
@@ -494,11 +384,9 @@ namespace
         LLVector4 vec4(x1,y1,z1),vec4a(x2,y2,z2);
         val1 = dist_vec(vec4,vec4a);
         val2 = (F32) sqrt((x1 - x2)*(x1 - x2) + (y1 - y2)* (y1 - y2) + (z1 - z2)* (z1 -z2));
-        UNSCOPED_INFO("dist_vec: Fail ");
         CHECK(val2 == val1);
         val1 = dist_vec_squared(vec4,vec4a);
         val2 =((x1 - x2)*(x1 - x2) + (y1 - y2)* (y1 - y2) + (z1 - z2)* (z1 -z2));
-        UNSCOPED_INFO("dist_vec_squared: Fail ");
         CHECK(val2 == val1);
     }
 
@@ -513,7 +401,6 @@ namespace
         val4 = w1 + (w2 - w1)* val;
         LLVector4 vec4b = lerp(vec4,vec4a,val);
         LLVector4 check(val1, val2, val3, val4);
-        UNSCOPED_INFO("lerp failed");
         CHECK(check == vec4b);
     }
 
@@ -522,14 +409,10 @@ namespace
         F32 x = 1.f, y = 2.f, z = -1.1f;
         LLVector4 vec4(x,y,z);
         LLVector3 vec3 = vec4to3(vec4);
-        {
-            INFO("vec4to3 failed");
-            CHECK(x == vec3.mV[VX]);
-            CHECK(y == vec3.mV[VY]);
-            CHECK(z == vec3.mV[VZ]);
-        }
+        CHECK(x == vec3.mV[VX]);
+        CHECK(y == vec3.mV[VY]);
+        CHECK(z == vec3.mV[VZ]);
         LLVector4 vec4a = vec3to4(vec3);
-        UNSCOPED_INFO("vec3to4 failed");
         CHECK(vec4a == vec4);
     }
 
@@ -540,7 +423,6 @@ namespace
         LLSD llsd = vec4.getValue();
         LLVector3 vec3(llsd);
         LLVector4 vec4a = vec3to4(vec3);
-        UNSCOPED_INFO("getValue failed");
         CHECK(vec4a == vec4);
     }
 }

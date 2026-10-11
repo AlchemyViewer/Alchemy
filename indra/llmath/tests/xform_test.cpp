@@ -40,17 +40,14 @@ namespace
         LLVector3 emptyVec(0.f,0.f,0.f);
         LLVector3 initialScaleVec(1.f,1.f,1.f);
 
-        {
-            INFO("LLXform empty constructor failed: ");
-            REQUIRE_FALSE(xform_obj.getParent());
-            CHECK_FALSE(xform_obj.isChanged());
-            CHECK(xform_obj.getPosition() == emptyVec);
-            CHECK((xform_obj.getRotation()).isIdentity());
-            CHECK(xform_obj.getScale() == initialScaleVec);
-            CHECK(xform_obj.getPositionW() == emptyVec);
-            CHECK((xform_obj.getWorldRotation()).isIdentity());
-            CHECK_FALSE(xform_obj.getScaleChildOffset());
-        }
+        CHECK_FALSE(xform_obj.getParent());
+        CHECK_FALSE(xform_obj.isChanged());
+        CHECK(xform_obj.getPosition() == emptyVec);
+        CHECK((xform_obj.getRotation()).isIdentity());
+        CHECK(xform_obj.getScale() == initialScaleVec);
+        CHECK(xform_obj.getPositionW() == emptyVec);
+        CHECK((xform_obj.getWorldRotation()).isIdentity());
+        CHECK_FALSE(xform_obj.getScaleChildOffset());
     }
 
     // test cases for
@@ -72,11 +69,9 @@ namespace
         LLVector3 vec(x, y, z);
         xform_obj.setScale(x, y, z);
         xform_obj.setPosition(x, y, posz);
-        UNSCOPED_INFO("setScale failed: ");
         CHECK(xform_obj.getScale() == vec);
 
         vec.setVec(x, y, posz);
-        UNSCOPED_INFO("getPosition failed: ");
         CHECK(xform_obj.getPosition() == vec);
 
         x = x * 2.f;
@@ -86,36 +81,29 @@ namespace
         xform_obj.setPositionX(x);
         xform_obj.setPositionY(y);
         xform_obj.setPositionZ(z);
-        UNSCOPED_INFO("setPositionX/Y/Z failed: ");
         CHECK(xform_obj.getPosition() == vec);
 
         xform_obj.setScaleChildOffset(true);
-        UNSCOPED_INFO("setScaleChildOffset failed: ");
         CHECK(xform_obj.getScaleChildOffset());
 
         vec.setVec(x, y, z);
 
         xform_obj.addPosition(vec);
         vec += vec;
-        UNSCOPED_INFO("addPosition failed: ");
         CHECK(xform_obj.getPosition() == vec);
 
         xform_obj.setScale(vec);
-        UNSCOPED_INFO("setScale vector failed: ");
         CHECK(xform_obj.getScale() == vec);
 
         LLQuaternion quat(x, y, z, w);
         xform_obj.setRotation(quat);
-        UNSCOPED_INFO("setRotation quat failed: ");
         CHECK(xform_obj.getRotation() == quat);
 
         xform_obj.setRotation(x, y, z, w);
-        UNSCOPED_INFO("getRotation 2 failed: ");
         CHECK(xform_obj.getRotation() == quat);
 
         xform_obj.setRotation(x, y, z);
         quat.setQuat(x,y,z);
-        UNSCOPED_INFO("setRotation xyz failed: ");
         CHECK(xform_obj.getRotation() == quat);
 
         // LLXform::setRotation(const F32 x, const F32 y, const F32 z)
@@ -133,52 +121,38 @@ namespace
         LLXform grandpar;
         xform_obj.setParent(&par);
         par.setParent(&grandpar);
-        UNSCOPED_INFO("setParent/getParent failed: ");
         CHECK(&par == xform_obj.getParent());
-        UNSCOPED_INFO("getRoot failed: ");
         CHECK(&grandpar == xform_obj.getRoot());
-        {
-            INFO("isRoot failed: ");
-            CHECK(grandpar.isRoot());
-            CHECK_FALSE(par.isRoot());
-            CHECK_FALSE(xform_obj.isRoot());
-        }
-        {
-            INFO("isRootEdit failed: ");
-            CHECK(grandpar.isRootEdit());
-            CHECK_FALSE(par.isRootEdit());
-            CHECK_FALSE(xform_obj.isRootEdit());
-        }
+        CHECK(grandpar.isRoot());
+        CHECK_FALSE(par.isRoot());
+        CHECK_FALSE(xform_obj.isRoot());
+        CHECK(grandpar.isRootEdit());
+        CHECK_FALSE(par.isRootEdit());
+        CHECK_FALSE(xform_obj.isRootEdit());
     }
 
     TEST_CASE("LLXForm: setters raise their changed flags and clearChanged clears them", "[LLXForm]")
     {
         LLXform xform_obj;
         xform_obj.setChanged(LLXform::TRANSLATED | LLXform::ROTATED | LLXform::SCALED);
-        UNSCOPED_INFO("setChanged/isChanged failed: ");
         CHECK(xform_obj.isChanged());
 
         xform_obj.clearChanged(LLXform::TRANSLATED | LLXform::ROTATED | LLXform::SCALED);
-        UNSCOPED_INFO("clearChanged failed: ");
         CHECK_FALSE(xform_obj.isChanged());
 
         LLVector3 llvect3(12.4f, -5.6f, 0.34f);
         xform_obj.setScale(llvect3);
-        UNSCOPED_INFO("setScale did not set SCALED flag: ");
         CHECK(xform_obj.isChanged(LLXform::SCALED));
         xform_obj.setPosition(1.2f, 2.3f, 3.4f);
-        UNSCOPED_INFO("setScale did not set TRANSLATED flag: ");
         CHECK(xform_obj.isChanged(LLXform::TRANSLATED));
-        UNSCOPED_INFO("TRANSLATED reset SCALED flag: ");
+        UNSCOPED_INFO("setPosition must not clear SCALED");
         CHECK(xform_obj.isChanged(LLXform::TRANSLATED | LLXform::SCALED));
         xform_obj.clearChanged(LLXform::SCALED);
-        UNSCOPED_INFO("reset SCALED failed: ");
         CHECK_FALSE(xform_obj.isChanged(LLXform::SCALED));
         xform_obj.setRotation(1, 2, 3, 4);
-        UNSCOPED_INFO("ROTATION flag not set ");
+        UNSCOPED_INFO("setRotation must set ROTATED");
         CHECK(xform_obj.isChanged(LLXform::TRANSLATED | LLXform::ROTATED));
         xform_obj.setScale(llvect3);
-        UNSCOPED_INFO("ROTATION flag not set ");
         CHECK(xform_obj.isChanged(LLXform::MOVED));
     }
 
@@ -189,37 +163,21 @@ namespace
         formMatrix_obj.init();
         LLMatrix4 mat4_obj;
 
-        UNSCOPED_INFO("1. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[0][0] == 1.f);
-        UNSCOPED_INFO("2. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[0][1] == 0.f);
-        UNSCOPED_INFO("3. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[0][2] == 0.f);
-        UNSCOPED_INFO("4. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[0][3] == 0.f);
-        UNSCOPED_INFO("5. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[1][0] == 0.f);
-        UNSCOPED_INFO("6. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[1][1] == 1.f);
-        UNSCOPED_INFO("7. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[1][2] == 0.f);
-        UNSCOPED_INFO("8. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[1][3] == 0.f);
-        UNSCOPED_INFO("9. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[2][0] == 0.f);
-        UNSCOPED_INFO("10. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[2][1] == 0.f);
-        UNSCOPED_INFO("11. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[2][2] == 1.f);
-        UNSCOPED_INFO("12. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[2][3] == 0.f);
-        UNSCOPED_INFO("13. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[3][0] == 0.f);
-        UNSCOPED_INFO("14. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[3][1] == 0.f);
-        UNSCOPED_INFO("15. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[3][2] == 0.f);
-        UNSCOPED_INFO("16. The value is not NULL");
         CHECK(formMatrix_obj.getWorldMatrix().mMatrix[3][3] == 1.f);
     }
 
@@ -231,17 +189,11 @@ namespace
         LLVector3 llmin_vec3;
         LLVector3 llmax_vec3;
         formMatrix_obj.getMinMax(llmin_vec3, llmax_vec3);
-        UNSCOPED_INFO("1. The value is not NULL");
         CHECK(llmin_vec3.mV[0] == 0.f);
-        UNSCOPED_INFO("2. The value is not NULL");
         CHECK(llmin_vec3.mV[1] == 0.f);
-        UNSCOPED_INFO("3. The value is not NULL");
         CHECK(llmin_vec3.mV[2] == 0.f);
-        UNSCOPED_INFO("4. The value is not NULL");
         CHECK(llmin_vec3.mV[0] == 0.f);
-        UNSCOPED_INFO("5. The value is not NULL");
         CHECK(llmin_vec3.mV[1] == 0.f);
-        UNSCOPED_INFO("6. The value is not NULL");
         CHECK(llmin_vec3.mV[2] == 0.f);
     }
 
@@ -276,14 +228,10 @@ namespace
 
         LLQuaternion worldRot = quat * quatparent;
 
-        UNSCOPED_INFO("getWorldPosition failed: ");
         CHECK(formMatrix_obj.getWorldPosition() == worldPos);
-        UNSCOPED_INFO("getWorldRotation failed: ");
         CHECK(formMatrix_obj.getWorldRotation() == worldRot);
 
-        UNSCOPED_INFO("getWorldPosition for parent failed: ");
         CHECK(parent.getWorldPosition() == llvecpospar);
-        UNSCOPED_INFO("getWorldRotation for parent failed: ");
         CHECK(parent.getWorldRotation() == quatparent);
     }
 }

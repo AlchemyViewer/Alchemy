@@ -41,7 +41,6 @@ namespace
         const U32 rhs = 0xFFFFFF;
         const U32 width = 24;
         U32 result = LLModularMath::subtract<width>(lhs, rhs);
-        UNSCOPED_INFO("diff(0x000001, 0xFFFFFF, 24)");
         CHECK(result == 2);
     }
 
@@ -52,7 +51,6 @@ namespace
         const U32 rhs = 0x000001;
         const U32 width = 24;
         U32 result = LLModularMath::subtract<width>(lhs, rhs);
-        UNSCOPED_INFO("diff(0x000002, 0x000001, 24)");
         CHECK(result == 1);
     }
 
@@ -63,7 +61,6 @@ namespace
         const U32 rhs = 0xABCDEF;
         const U32 width = 24;
         U32 result = LLModularMath::subtract<width>(lhs, rhs);
-        UNSCOPED_INFO("diff(0xABCDEF, 0xABCDEF, 24)");
         CHECK(result == 0);
     }
 }

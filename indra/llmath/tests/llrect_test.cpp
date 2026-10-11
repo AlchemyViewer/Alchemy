@@ -48,23 +48,14 @@ namespace
 
         // default constructor
         LLRect rect1;
-        UNSCOPED_INFO("Empty rect");
         CHECK_THAT(rect1.getValue(), ll_test::LLSDEquals(zero));
-        UNSCOPED_INFO("Empty rect left");
         CHECK(rect1.mLeft == 0);
-        UNSCOPED_INFO("Empty rect top");
         CHECK(rect1.mTop == 0);
-        UNSCOPED_INFO("Empty rect right");
         CHECK(rect1.mRight == 0);
-        UNSCOPED_INFO("Empty rect bottom");
         CHECK(rect1.mBottom == 0);
-        UNSCOPED_INFO("Empty rect width");
         CHECK(rect1.getWidth() == 0);
-        UNSCOPED_INFO("Empty rect height");
         CHECK(rect1.getHeight() == 0);
-        UNSCOPED_INFO("Empty rect centerx");
         CHECK(rect1.getCenterX() == 0);
-        UNSCOPED_INFO("Empty rect centery");
         CHECK(rect1.getCenterY() == 0);
     }
 
@@ -78,23 +69,14 @@ namespace
         zerof.append(0.0f); zerof.append(0.0f); zerof.append(0.0f); zerof.append(0.0f);
 
         LLRectf rect2;
-        UNSCOPED_INFO("Empty rectf");
         CHECK_THAT(rect2.getValue(), ll_test::LLSDEquals(zerof));
-        UNSCOPED_INFO("Empty rectf left");
         CHECK(rect2.mLeft == 0.0f);
-        UNSCOPED_INFO("Empty rectf top");
         CHECK(rect2.mTop == 0.0f);
-        UNSCOPED_INFO("Empty rectf right");
         CHECK(rect2.mRight == 0.0f);
-        UNSCOPED_INFO("Empty rectf bottom");
         CHECK(rect2.mBottom == 0.0f);
-        UNSCOPED_INFO("Empty rectf width");
         CHECK(rect2.getWidth() == 0.0f);
-        UNSCOPED_INFO("Empty rectf height");
         CHECK(rect2.getHeight() == 0.0f);
-        UNSCOPED_INFO("Empty rectf centerx");
         CHECK(rect2.getCenterX() == 0.0f);
-        UNSCOPED_INFO("Empty rectf centery");
         CHECK(rect2.getCenterY() == 0.0f);
     }
 
@@ -105,21 +87,13 @@ namespace
         //
 
         LLRect rect3(LLRect(1, 6, 7, 2));
-        UNSCOPED_INFO("Default rect left");
         CHECK(rect3.mLeft == 1);
-        UNSCOPED_INFO("Default rect top");
         CHECK(rect3.mTop == 6);
-        UNSCOPED_INFO("Default rect right");
         CHECK(rect3.mRight == 7);
-        UNSCOPED_INFO("Default rect bottom");
         CHECK(rect3.mBottom == 2);
-        UNSCOPED_INFO("Default rect width");
         CHECK(rect3.getWidth() == 6);
-        UNSCOPED_INFO("Default rect height");
         CHECK(rect3.getHeight() == 4);
-        UNSCOPED_INFO("Default rect centerx");
         CHECK(rect3.getCenterX() == 4);
-        UNSCOPED_INFO("Default rect centery");
         CHECK(rect3.getCenterY() == 4);
     }
 
@@ -130,21 +104,13 @@ namespace
         //
 
         LLRectf rect4(1.0f, 5.0f, 6.0f, 2.0f);
-        UNSCOPED_INFO("Default rectf left");
         CHECK(rect4.mLeft == 1.0f);
-        UNSCOPED_INFO("Default rectf top");
         CHECK(rect4.mTop == 5.0f);
-        UNSCOPED_INFO("Default rectf right");
         CHECK(rect4.mRight == 6.0f);
-        UNSCOPED_INFO("Default rectf bottom");
         CHECK(rect4.mBottom == 2.0f);
-        UNSCOPED_INFO("Default rectf width");
         CHECK(rect4.getWidth() == 5.0f);
-        UNSCOPED_INFO("Default rectf height");
         CHECK(rect4.getHeight() == 3.0f);
-        UNSCOPED_INFO("Default rectf centerx");
         CHECK(rect4.getCenterX() == 3.5f);
-        UNSCOPED_INFO("Default rectf centery");
         CHECK(rect4.getCenterY() == 3.5f);
     }
 
@@ -157,21 +123,13 @@ namespace
         LLSD array;
         array.append(-1.0f); array.append(0.0f); array.append(0.0f); array.append(-1.0f);
         LLRectf rect5(array);
-        UNSCOPED_INFO("LLSD rectf left");
         CHECK(rect5.mLeft == -1.0f);
-        UNSCOPED_INFO("LLSD rectf top");
         CHECK(rect5.mTop == 0.0f);
-        UNSCOPED_INFO("LLSD rectf right");
         CHECK(rect5.mRight == 0.0f);
-        UNSCOPED_INFO("LLSD rectf bottom");
         CHECK(rect5.mBottom == -1.0f);
-        UNSCOPED_INFO("LLSD rectf width");
         CHECK(rect5.getWidth() == 1.0f);
-        UNSCOPED_INFO("LLSD rectf height");
         CHECK(rect5.getHeight() == 1.0f);
-        UNSCOPED_INFO("LLSD rectf centerx");
         CHECK(rect5.getCenterX() == -0.5f);
-        UNSCOPED_INFO("LLSD rectf centery");
         CHECK(rect5.getCenterY() == -0.5f);
     }
 
@@ -187,21 +145,13 @@ namespace
         rectf.mTop = 1.0f;
         rectf.mRight = 1.0f;
         rectf.mBottom = -1.0f;
-        UNSCOPED_INFO("Member-set rectf left");
         CHECK(rectf.mLeft == -1.0f);
-        UNSCOPED_INFO("Member-set rectf top");
         CHECK(rectf.mTop == 1.0f);
-        UNSCOPED_INFO("Member-set rectf right");
         CHECK(rectf.mRight == 1.0f);
-        UNSCOPED_INFO("Member-set rectf bottom");
         CHECK(rectf.mBottom == -1.0f);
-        UNSCOPED_INFO("Member-set rectf width");
         CHECK(rectf.getWidth() == 2.0f);
-        UNSCOPED_INFO("Member-set rectf height");
         CHECK(rectf.getHeight() == 2.0f);
-        UNSCOPED_INFO("Member-set rectf centerx");
         CHECK(rectf.getCenterX() == 0.0f);
-        UNSCOPED_INFO("Member-set rectf centery");
         CHECK(rectf.getCenterY() == 0.0f);
     }
 
@@ -216,21 +166,13 @@ namespace
         LLSD array;
         array.append(-1.0f); array.append(0.0f); array.append(0.0f); array.append(-1.0f);
         rectf.setValue(array);
-        UNSCOPED_INFO("setValue() rectf left");
         CHECK(rectf.mLeft == -1.0f);
-        UNSCOPED_INFO("setValue() rectf top");
         CHECK(rectf.mTop == 0.0f);
-        UNSCOPED_INFO("setValue() rectf right");
         CHECK(rectf.mRight == 0.0f);
-        UNSCOPED_INFO("setValue() rectf bottom");
         CHECK(rectf.mBottom == -1.0f);
-        UNSCOPED_INFO("setValue() rectf width");
         CHECK(rectf.getWidth() == 1.0f);
-        UNSCOPED_INFO("setValue() rectf height");
         CHECK(rectf.getHeight() == 1.0f);
-        UNSCOPED_INFO("setValue() rectf centerx");
         CHECK(rectf.getCenterX() == -0.5f);
-        UNSCOPED_INFO("setValue() rectf centery");
         CHECK(rectf.getCenterY() == -0.5f);
     }
 
@@ -243,21 +185,13 @@ namespace
         LLRect rect;
 
         rect.set(10, 90, 70, 10);
-        UNSCOPED_INFO("set() rectf left");
         CHECK(rect.mLeft == 10);
-        UNSCOPED_INFO("set() rectf top");
         CHECK(rect.mTop == 90);
-        UNSCOPED_INFO("set() rectf right");
         CHECK(rect.mRight == 70);
-        UNSCOPED_INFO("set() rectf bottom");
         CHECK(rect.mBottom == 10);
-        UNSCOPED_INFO("set() rectf width");
         CHECK(rect.getWidth() == 60);
-        UNSCOPED_INFO("set() rectf height");
         CHECK(rect.getHeight() == 80);
-        UNSCOPED_INFO("set() rectf centerx");
         CHECK(rect.getCenterX() == 40);
-        UNSCOPED_INFO("set() rectf centery");
         CHECK(rect.getCenterY() == 50);
     }
 
@@ -270,21 +204,13 @@ namespace
         LLRectf rectf;
 
         rectf.setOriginAndSize(0.0f, 0.0f, 2.0f, 1.0f);
-        UNSCOPED_INFO("setOriginAndSize() rectf left");
         CHECK(rectf.mLeft == 0.0f);
-        UNSCOPED_INFO("setOriginAndSize() rectf top");
         CHECK(rectf.mTop == 1.0f);
-        UNSCOPED_INFO("setOriginAndSize() rectf right");
         CHECK(rectf.mRight == 2.0f);
-        UNSCOPED_INFO("setOriginAndSize() rectf bottom");
         CHECK(rectf.mBottom == 0.0f);
-        UNSCOPED_INFO("setOriginAndSize() rectf width");
         CHECK(rectf.getWidth() == 2.0f);
-        UNSCOPED_INFO("setOriginAndSize() rectf height");
         CHECK(rectf.getHeight() == 1.0f);
-        UNSCOPED_INFO("setOriginAndSize() rectf centerx");
         CHECK(rectf.getCenterX() == 1.0f);
-        UNSCOPED_INFO("setOriginAndSize() rectf centery");
         CHECK(rectf.getCenterY() == 0.5f);
     }
 
@@ -297,21 +223,13 @@ namespace
         LLRectf rectf;
 
         rectf.setLeftTopAndSize(0.0f, 0.0f, 2.0f, 1.0f);
-        UNSCOPED_INFO("setLeftTopAndSize() rectf left");
         CHECK(rectf.mLeft == 0.0f);
-        UNSCOPED_INFO("setLeftTopAndSize() rectf top");
         CHECK(rectf.mTop == 0.0f);
-        UNSCOPED_INFO("setLeftTopAndSize() rectf right");
         CHECK(rectf.mRight == 2.0f);
-        UNSCOPED_INFO("setLeftTopAndSize() rectf bottom");
         CHECK(rectf.mBottom == -1.0f);
-        UNSCOPED_INFO("setLeftTopAndSize() rectf width");
         CHECK(rectf.getWidth() == 2.0f);
-        UNSCOPED_INFO("setLeftTopAndSize() rectf height");
         CHECK(rectf.getHeight() == 1.0f);
-        UNSCOPED_INFO("setLeftTopAndSize() rectf centerx");
         CHECK(rectf.getCenterX() == 1.0f);
-        UNSCOPED_INFO("setLeftTopAndSize() rectf centery");
         CHECK(rectf.getCenterY() == -0.5f);
     }
 
@@ -324,21 +242,13 @@ namespace
         LLRectf rectf;
 
         rectf.setCenterAndSize(0.0f, 0.0f, 2.0f, 1.0f);
-        UNSCOPED_INFO("setCenterAndSize() rectf left");
         CHECK(rectf.mLeft == -1.0f);
-        UNSCOPED_INFO("setCenterAndSize() rectf top");
         CHECK(rectf.mTop == 0.5f);
-        UNSCOPED_INFO("setCenterAndSize() rectf right");
         CHECK(rectf.mRight == 1.0f);
-        UNSCOPED_INFO("setCenterAndSize() rectf bottom");
         CHECK(rectf.mBottom == -0.5f);
-        UNSCOPED_INFO("setCenterAndSize() rectf width");
         CHECK(rectf.getWidth() == 2.0f);
-        UNSCOPED_INFO("setCenterAndSize() rectf height");
         CHECK(rectf.getHeight() == 1.0f);
-        UNSCOPED_INFO("setCenterAndSize() rectf centerx");
         CHECK(rectf.getCenterX() == 0.0f);
-        UNSCOPED_INFO("setCenterAndSize() rectf centery");
         CHECK(rectf.getCenterY() == 0.0f);
     }
 
@@ -351,19 +261,17 @@ namespace
         LLRectf rectf;
 
         rectf.set(-1.0f, 1.0f, 1.0f, -1.0f);
-        UNSCOPED_INFO("BBox is valid");
         CHECK(rectf.isValid());
 
         rectf.mLeft = 2.0f;
-        UNSCOPED_INFO("BBox is not valid");
         CHECK_FALSE(rectf.isValid());
 
         rectf.makeValid();
-        UNSCOPED_INFO("BBox forced valid");
+        UNSCOPED_INFO("after makeValid()");
         CHECK(rectf.isValid());
 
         rectf.set(-1.0f, -1.0f, -1.0f, -1.0f);
-        UNSCOPED_INFO("BBox(0,0,0,0) is valid");
+        UNSCOPED_INFO("zero-size rect");
         CHECK(rectf.isValid());
     }
 
@@ -376,18 +284,16 @@ namespace
         LLRectf rectf;
 
         rectf.set(-1.0f, 1.0f, 1.0f, -1.0f);
-        UNSCOPED_INFO("BBox is not Null");
         CHECK_FALSE(rectf.isEmpty());
-        UNSCOPED_INFO("BBox notNull");
         CHECK(rectf.notEmpty());
 
         rectf.mLeft = 2.0f;
         rectf.makeValid();
-        UNSCOPED_INFO("BBox is now Null");
+        UNSCOPED_INFO("inverted rect after makeValid()");
         CHECK(rectf.isEmpty());
 
         rectf.set(-1.0f, -1.0f, -1.0f, -1.0f);
-        UNSCOPED_INFO("BBox(0,0,0,0) is Null");
+        UNSCOPED_INFO("zero-size rect");
         CHECK(rectf.isEmpty());
     }
 
@@ -402,14 +308,10 @@ namespace
         rect1.set(-1.0f, 1.0f, 1.0f, -1.0f);
         rect2.set(-1.0f, 0.9f, 1.0f, -1.0f);
 
-        UNSCOPED_INFO("rect1 == rect2 (false)");
         CHECK_FALSE(rect1 == rect2);
-        UNSCOPED_INFO("rect1 != rect2 (true)");
         CHECK(rect1 != rect2);
 
-        UNSCOPED_INFO("rect1 == rect1 (true)");
         CHECK(rect1 == rect1);
-        UNSCOPED_INFO("rect1 != rect1 (false)");
         CHECK_FALSE(rect1 != rect1);
     }
 
@@ -421,9 +323,7 @@ namespace
 
         LLRectf rect1, rect2(rect1);
 
-        UNSCOPED_INFO("rect1 == rect2 (true)");
         CHECK(rect1 == rect2);
-        UNSCOPED_INFO("rect1 != rect2 (false)");
         CHECK_FALSE(rect1 != rect2);
     }
 
@@ -511,14 +411,14 @@ namespace
         rect2.set(-2.0f, 2.0f, 0.0f, 0.0f);
         rect3 = rect1;
         rect3.unionWith(rect2);
-        UNSCOPED_INFO("union - overlap");
+        UNSCOPED_INFO("overlapping rects");
         CHECK(rect3 == LLRectf(-2.0f, 2.0f, 1.0f, -1.0f));
 
         rect1.set(-1.0f, 1.0f, 1.0f, -1.0f);
         rect2.set(5.0f, 10.0f, 10.0f, 5.0f);
         rect3 = rect1;
         rect3.unionWith(rect2);
-        UNSCOPED_INFO("union - no overlap");
+        UNSCOPED_INFO("disjoint rects");
         CHECK(rect3 == LLRectf(-1.0f, 10.0f, 10.0f, -1.0f));
     }
 
@@ -541,14 +441,14 @@ namespace
         rect2.set(-2.0f, 2.0f, 0.0f, 0.0f);
         rect3 = rect1;
         rect3.intersectWith(rect2);
-        UNSCOPED_INFO("intersect - overlap");
+        UNSCOPED_INFO("overlapping rects");
         CHECK(rect3 == LLRectf(-1.0f, 1.0f, 0.0f, 0.0f));
 
         rect1.set(-1.0f, 1.0f, 1.0f, -1.0f);
         rect2.set(5.0f, 10.0f, 10.0f, 5.0f);
         rect3 = rect1;
         rect3.intersectWith(rect2);
-        UNSCOPED_INFO("intersect - no overlap");
+        UNSCOPED_INFO("disjoint rects");
         CHECK(rect3.isEmpty());
     }
 
@@ -560,19 +460,12 @@ namespace
 
         LLRectf rect(1.0f, 3.0f, 3.0f, 1.0f);
 
-        UNSCOPED_INFO("(0,0) not in rect");
         CHECK_FALSE(rect.pointInRect(0.0f, 0.0f));
-        UNSCOPED_INFO("(2,2) in rect");
         CHECK(rect.pointInRect(2.0f, 2.0f));
-        UNSCOPED_INFO("(1,1) in rect");
         CHECK(rect.pointInRect(1.0f, 1.0f));
-        UNSCOPED_INFO("(3,3) not in rect");
         CHECK_FALSE(rect.pointInRect(3.0f, 3.0f));
-        UNSCOPED_INFO("(2.999,2.999) in rect");
         CHECK(rect.pointInRect(2.999f, 2.999f));
-        UNSCOPED_INFO("(2.999,3.0) not in rect");
         CHECK_FALSE(rect.pointInRect(2.999f, 3.0f));
-        UNSCOPED_INFO("(3.0,2.999) not in rect");
         CHECK_FALSE(rect.pointInRect(3.0f, 2.999f));
     }
 
@@ -584,19 +477,12 @@ namespace
 
         LLRectf rect(1.0f, 3.0f, 3.0f, 1.0f);
 
-        UNSCOPED_INFO("(0,0) in local rect");
         CHECK(rect.localPointInRect(0.0f, 0.0f));
-        UNSCOPED_INFO("(-0.0001,-0.0001) not in local rect");
         CHECK_FALSE(rect.localPointInRect(-0.0001f, -0.001f));
-        UNSCOPED_INFO("(1,1) in local rect");
         CHECK(rect.localPointInRect(1.0f, 1.0f));
-        UNSCOPED_INFO("(2,2) not in local rect");
         CHECK_FALSE(rect.localPointInRect(2.0f, 2.0f));
-        UNSCOPED_INFO("(1.999,1.999) in local rect");
         CHECK(rect.localPointInRect(1.999f, 1.999f));
-        UNSCOPED_INFO("(1.999,2.0) not in local rect");
         CHECK_FALSE(rect.localPointInRect(1.999f, 2.0f));
-        UNSCOPED_INFO("(2.0,1.999) not in local rect");
         CHECK_FALSE(rect.localPointInRect(2.0f, 1.999f));
     }
 
@@ -611,23 +497,23 @@ namespace
 
         x = 2.0f; y = 2.0f;
         rect.clampPointToRect(x, y);
-        UNSCOPED_INFO("clamp x-coord within rect");
+        UNSCOPED_INFO("point inside rect");
         CHECK(x == 2.0f);
-        UNSCOPED_INFO("clamp y-coord within rect");
+        UNSCOPED_INFO("point inside rect");
         CHECK(y == 2.0f);
 
         x = -100.0f; y = 100.0f;
         rect.clampPointToRect(x, y);
-        UNSCOPED_INFO("clamp x-coord outside rect");
+        UNSCOPED_INFO("point outside rect");
         CHECK(x == 1.0f);
-        UNSCOPED_INFO("clamp y-coord outside rect");
+        UNSCOPED_INFO("point outside rect");
         CHECK(y == 3.0f);
 
         x = 3.0f; y = 1.0f;
         rect.clampPointToRect(x, y);
-        UNSCOPED_INFO("clamp x-coord edge rect");
+        UNSCOPED_INFO("point on the bottom-right corner");
         CHECK(x == 3.0f);
-        UNSCOPED_INFO("clamp y-coord edge rect");
+        UNSCOPED_INFO("point on the bottom-right corner");
         CHECK(y == 1.0f);
     }
 }

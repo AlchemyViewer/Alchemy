@@ -37,60 +37,42 @@ namespace
     TEST_CASE("v3color_h: constructors take nothing or components or an array or a hex string", "[v3color_h]")
     {
         LLColor3 llcolor3;
-        {
-            INFO("1:LLColor3:Fail to default-initialize ");
-            CHECK(llcolor3.mV[0] == 0.0f);
-            CHECK(llcolor3.mV[1] == 0.0f);
-            CHECK(llcolor3.mV[2] == 0.0f);
-        }
+        CHECK(llcolor3.mV[0] == 0.0f);
+        CHECK(llcolor3.mV[1] == 0.0f);
+        CHECK(llcolor3.mV[2] == 0.0f);
         F32 r = 2.0f, g = 3.2f, b = 1.f;
         F32 v1,v2,v3;
         LLColor3 llcolor3a(r,g,b);
-        {
-            INFO("2:LLColor3:Fail to initialize ");
-            CHECK(llcolor3a.mV[0] == 2.0f);
-            CHECK(llcolor3a.mV[1] == 3.2f);
-            CHECK(llcolor3a.mV[2] == 1.f);
-        }
+        CHECK(llcolor3a.mV[0] == 2.0f);
+        CHECK(llcolor3a.mV[1] == 3.2f);
+        CHECK(llcolor3a.mV[2] == 1.f);
 
         const F32 vec[3] = {2.0f, 3.2f,1.f};
         LLColor3 llcolor3b(vec);
-        {
-            INFO("3:LLColor3:Fail to initialize ");
-            CHECK(llcolor3b.mV[0] == 2.0f);
-            CHECK(llcolor3b.mV[1] == 3.2f);
-            CHECK(llcolor3b.mV[2] == 1.f);
-        }
+        CHECK(llcolor3b.mV[0] == 2.0f);
+        CHECK(llcolor3b.mV[1] == 3.2f);
+        CHECK(llcolor3b.mV[2] == 1.f);
         const char* str = "561122";
         LLColor3 llcolor3c(str);
         v1 = (F32)86.0f/255.0f; // 0x56 = 86
         v2 = (F32)17.0f/255.0f; // 0x11 = 17
         v3 = (F32)34.0f/255.f;  // 0x22 = 34
-        {
-            INFO("4:LLColor3:Fail to initialize ");
-            CHECK(is_approx_equal(v1, llcolor3c.mV[0]));
-            CHECK(is_approx_equal(v2, llcolor3c.mV[1]));
-            CHECK(is_approx_equal(v3, llcolor3c.mV[2]));
-        }
+        CHECK(is_approx_equal(v1, llcolor3c.mV[0]));
+        CHECK(is_approx_equal(v2, llcolor3c.mV[1]));
+        CHECK(is_approx_equal(v3, llcolor3c.mV[2]));
     }
 
     TEST_CASE("v3color_h: setToBlack and setToWhite", "[v3color_h]")
     {
         LLColor3 llcolor3;
         llcolor3.setToBlack();
-        {
-            INFO("setToBlack:Fail to set black ");
-            CHECK(llcolor3.mV[0] == 0.f);
-            CHECK(llcolor3.mV[1] == 0.f);
-            CHECK(llcolor3.mV[2] == 0.f);
-        }
+        CHECK(llcolor3.mV[0] == 0.f);
+        CHECK(llcolor3.mV[1] == 0.f);
+        CHECK(llcolor3.mV[2] == 0.f);
         llcolor3.setToWhite();
-        {
-            INFO("setToWhite:Fail to set white  ");
-            CHECK(llcolor3.mV[0] == 1.f);
-            CHECK(llcolor3.mV[1] == 1.f);
-            CHECK(llcolor3.mV[2] == 1.f);
-        }
+        CHECK(llcolor3.mV[0] == 1.f);
+        CHECK(llcolor3.mV[1] == 1.f);
+        CHECK(llcolor3.mV[2] == 1.f);
     }
 
     TEST_CASE("v3color_h: setVec from components or another color or an array", "[v3color_h]")
@@ -98,33 +80,24 @@ namespace
         F32 r = 2.3436212f, g = 1231.f, b = 4.7849321232f;
         LLColor3 llcolor3, llcolor3a;
         llcolor3.setVec(r,g,b);
-        {
-            INFO("1:setVec(r,g,b) Fail ");
-            CHECK(r == llcolor3.mV[0]);
-            CHECK(g == llcolor3.mV[1]);
-            CHECK(b == llcolor3.mV[2]);
-        }
+        CHECK(r == llcolor3.mV[0]);
+        CHECK(g == llcolor3.mV[1]);
+        CHECK(b == llcolor3.mV[2]);
         llcolor3a.setVec(llcolor3);
-        UNSCOPED_INFO("2:setVec(LLColor3) Fail ");
         CHECK(llcolor3 == llcolor3a);
         F32 vec[3] = {1.2324f, 2.45634f, .234563f};
         llcolor3.setToBlack();
         llcolor3.setVec(vec);
-        {
-            INFO("3:setVec(F32*) Fail ");
-            CHECK(vec[0] == llcolor3.mV[0]);
-            CHECK(vec[1] == llcolor3.mV[1]);
-            CHECK(vec[2] == llcolor3.mV[2]);
-        }
+        CHECK(vec[0] == llcolor3.mV[0]);
+        CHECK(vec[1] == llcolor3.mV[1]);
+        CHECK(vec[2] == llcolor3.mV[2]);
     }
 
     TEST_CASE("v3color_h: magVecSquared and magVec", "[v3color_h]")
     {
         F32 r = 2.3436212f, g = 1231.f, b = 4.7849321232f;
         LLColor3 llcolor3(r,g,b);
-        UNSCOPED_INFO("magVecSquared:Fail ");
         CHECK(is_approx_equal(llcolor3.magVecSquared(), (r*r + g*g + b*b)));
-        UNSCOPED_INFO("magVec:Fail ");
         CHECK(is_approx_equal(llcolor3.magVec(), (F32) sqrt(r*r + g*g + b*b)));
     }
 
@@ -139,23 +112,17 @@ namespace
         val1 = r * oomag;
         val2 = g * oomag;
         val3 = b * oomag;
-        {
-            INFO("1:normVec failed ");
-            CHECK(is_approx_equal(val1, llcolor3.mV[0]));
-            CHECK(is_approx_equal(val2, llcolor3.mV[1]));
-            CHECK(is_approx_equal(val3, llcolor3.mV[2]));
-            CHECK(is_approx_equal(vecMag, mag));
-        }
+        CHECK(is_approx_equal(val1, llcolor3.mV[0]));
+        CHECK(is_approx_equal(val2, llcolor3.mV[1]));
+        CHECK(is_approx_equal(val3, llcolor3.mV[2]));
+        CHECK(is_approx_equal(vecMag, mag));
         r = .000000000f, g = 0.f, b = 0.0f;
         llcolor3.setVec(r,g,b);
         vecMag = llcolor3.normVec();
-        {
-            INFO("2:normVec failed should be 0. ");
-            CHECK(llcolor3.mV[0] == 0.);
-            CHECK(llcolor3.mV[1] == 0.);
-            CHECK(llcolor3.mV[2] == 0.);
-            CHECK(vecMag == 0.);
-        }
+        CHECK(llcolor3.mV[0] == 0.);
+        CHECK(llcolor3.mV[1] == 0.);
+        CHECK(llcolor3.mV[2] == 0.);
+        CHECK(vecMag == 0.);
     }
 
     TEST_CASE("v3color_h: operator<< prints equal colors the same", "[v3color_h]")
@@ -166,7 +133,6 @@ namespace
         stream1 << llcolor3;
         llcolor3a.setVec(r,g,b);
         stream2 << llcolor3a;
-        UNSCOPED_INFO("operator << failed ");
         CHECK(stream1.str() == stream2.str());
     }
 
@@ -175,7 +141,6 @@ namespace
         F32 r = 2.3436212f, g = -1231.f, b = .7849321232f;
         LLColor3 llcolor3(r,g,b),llcolor3a;
         llcolor3a = llcolor3;
-        UNSCOPED_INFO("operator == failed ");
         CHECK(llcolor3a == llcolor3);
     }
 
@@ -184,22 +149,16 @@ namespace
         F32 r1 =1.f, g1 = 2.f,b1 = 1.2f, r2 = -2.3f, g2 = 1.11f, b2 = 1234.234f;
         LLColor3 llcolor3(r1,g1,b1),llcolor3a(r2,g2,b2),llcolor3b;
         llcolor3b = llcolor3 + llcolor3a ;
-        {
-            INFO("1:operator+ failed");
-            CHECK(is_approx_equal(r1+r2 ,llcolor3b.mV[0]));
-            CHECK(is_approx_equal(g1+g2,llcolor3b.mV[1]));
-            CHECK(is_approx_equal(b1+b2,llcolor3b.mV[2]));
-        }
+        CHECK(is_approx_equal(r1+r2 ,llcolor3b.mV[0]));
+        CHECK(is_approx_equal(g1+g2,llcolor3b.mV[1]));
+        CHECK(is_approx_equal(b1+b2,llcolor3b.mV[2]));
         r1 = -.235f, g1 = -24.32f, b1 = 2.13f,  r2 = -2.3f, g2 = 1.f, b2 = 34.21f;
         llcolor3.setVec(r1,g1,b1);
         llcolor3a.setVec(r2,g2,b2);
         llcolor3b = llcolor3 + llcolor3a;
-        {
-            INFO("2:operator+ failed");
-            CHECK(is_approx_equal(r1+r2 ,llcolor3b.mV[0]));
-            CHECK(is_approx_equal(g1+g2,llcolor3b.mV[1]));
-            CHECK(is_approx_equal(b1+b2,llcolor3b.mV[2]));
-        }
+        CHECK(is_approx_equal(r1+r2 ,llcolor3b.mV[0]));
+        CHECK(is_approx_equal(g1+g2,llcolor3b.mV[1]));
+        CHECK(is_approx_equal(b1+b2,llcolor3b.mV[2]));
     }
 
     TEST_CASE("v3color_h: operator- subtracts component-wise", "[v3color_h]")
@@ -207,22 +166,16 @@ namespace
         F32 r1 =1.f, g1 = 2.f,b1 = 1.2f, r2 = -2.3f, g2 = 1.11f, b2 = 1234.234f;
         LLColor3 llcolor3(r1,g1,b1),llcolor3a(r2,g2,b2),llcolor3b;
         llcolor3b = llcolor3 - llcolor3a ;
-        {
-            INFO("1:operator- failed");
-            CHECK(is_approx_equal(r1-r2 ,llcolor3b.mV[0]));
-            CHECK(is_approx_equal(g1-g2,llcolor3b.mV[1]));
-            CHECK(is_approx_equal(b1-b2,llcolor3b.mV[2]));
-        }
+        CHECK(is_approx_equal(r1-r2 ,llcolor3b.mV[0]));
+        CHECK(is_approx_equal(g1-g2,llcolor3b.mV[1]));
+        CHECK(is_approx_equal(b1-b2,llcolor3b.mV[2]));
         r1 = -.235f, g1 = -24.32f, b1 = 2.13f,  r2 = -2.3f, g2 = 1.f, b2 = 34.21f;
         llcolor3.setVec(r1,g1,b1);
         llcolor3a.setVec(r2,g2,b2);
         llcolor3b = llcolor3 - llcolor3a;
-        {
-            INFO("2:operator- failed");
-            CHECK(is_approx_equal(r1-r2 ,llcolor3b.mV[0]));
-            CHECK(is_approx_equal(g1-g2,llcolor3b.mV[1]));
-            CHECK(is_approx_equal(b1-b2,llcolor3b.mV[2]));
-        }
+        CHECK(is_approx_equal(r1-r2 ,llcolor3b.mV[0]));
+        CHECK(is_approx_equal(g1-g2,llcolor3b.mV[1]));
+        CHECK(is_approx_equal(b1-b2,llcolor3b.mV[2]));
     }
 
     TEST_CASE("v3color_h: operator* by a color and by a scalar on either side", "[v3color_h]")
@@ -230,29 +183,20 @@ namespace
         F32 r1 =1.f, g1 = 2.f,b1 = 1.2f, r2 = -2.3f, g2 = 1.11f, b2 = 1234.234f;
         LLColor3 llcolor3(r1,g1,b1),llcolor3a(r2,g2,b2),llcolor3b;
         llcolor3b = llcolor3 * llcolor3a;
-        {
-            INFO("1:operator* failed");
-            CHECK(is_approx_equal(r1*r2 ,llcolor3b.mV[0]));
-            CHECK(is_approx_equal(g1*g2,llcolor3b.mV[1]));
-            CHECK(is_approx_equal(b1*b2,llcolor3b.mV[2]));
-        }
+        CHECK(is_approx_equal(r1*r2 ,llcolor3b.mV[0]));
+        CHECK(is_approx_equal(g1*g2,llcolor3b.mV[1]));
+        CHECK(is_approx_equal(b1*b2,llcolor3b.mV[2]));
         llcolor3a.setToBlack();
         F32 mulVal = 4.332f;
         llcolor3a = llcolor3 * mulVal;
-        {
-            INFO("2:operator* failed");
-            CHECK(is_approx_equal(r1*mulVal ,llcolor3a.mV[0]));
-            CHECK(is_approx_equal(g1*mulVal,llcolor3a.mV[1]));
-            CHECK(is_approx_equal(b1*mulVal,llcolor3a.mV[2]));
-        }
+        CHECK(is_approx_equal(r1*mulVal ,llcolor3a.mV[0]));
+        CHECK(is_approx_equal(g1*mulVal,llcolor3a.mV[1]));
+        CHECK(is_approx_equal(b1*mulVal,llcolor3a.mV[2]));
         llcolor3a.setToBlack();
         llcolor3a = mulVal * llcolor3;
-        {
-            INFO("3:operator* failed");
-            CHECK(is_approx_equal(r1*mulVal ,llcolor3a.mV[0]));
-            CHECK(is_approx_equal(g1*mulVal,llcolor3a.mV[1]));
-            CHECK(is_approx_equal(b1*mulVal,llcolor3a.mV[2]));
-        }
+        CHECK(is_approx_equal(r1*mulVal ,llcolor3a.mV[0]));
+        CHECK(is_approx_equal(g1*mulVal,llcolor3a.mV[1]));
+        CHECK(is_approx_equal(b1*mulVal,llcolor3a.mV[2]));
     }
 
     TEST_CASE("v3color_h: unary minus negates", "[v3color_h]")
@@ -260,7 +204,6 @@ namespace
         F32 r = 2.3436212f, g = 1231.f, b = 4.7849321232f;
         LLColor3 llcolor3(r,g,b),llcolor3a;
         llcolor3a = -llcolor3;
-        UNSCOPED_INFO("operator- failed ");
         CHECK(-llcolor3a == llcolor3);
     }
 
@@ -268,12 +211,10 @@ namespace
     {
         F32 r = 2.3436212f, g = 1231.f, b = 4.7849321232f;
         LLColor3 llcolor3(r,g,b),llcolor3a(r,g,b);
-        UNSCOPED_INFO("1:operator== failed");
         CHECK(llcolor3a == llcolor3);
         r = 13.3436212f, g = -11.f, b = .7849321232f;
         llcolor3.setVec(r,g,b);
         llcolor3a.setVec(r,g,b);
-        UNSCOPED_INFO("2:operator== failed");
         CHECK(llcolor3a == llcolor3);
     }
 
@@ -281,11 +222,9 @@ namespace
     {
         F32 r1 =1.f, g1 = 2.f,b1 = 1.2f, r2 = -2.3f, g2 = 1.11f, b2 = 1234.234f;
         LLColor3 llcolor3(r1,g1,b1),llcolor3a(r2,g2,b2);
-        UNSCOPED_INFO("1:operator!= failed");
         CHECK(llcolor3 != llcolor3a);
         llcolor3.setToBlack();
         llcolor3a.setVec(llcolor3);
-        UNSCOPED_INFO("2:operator!= failed");
         CHECK_FALSE(llcolor3a != llcolor3);
     }
 
@@ -294,21 +233,15 @@ namespace
         F32 r1 =1.f, g1 = 2.f,b1 = 1.2f, r2 = -2.3f, g2 = 1.11f, b2 = 1234.234f;
         LLColor3 llcolor3(r1,g1,b1),llcolor3a(r2,g2,b2);
         llcolor3a += llcolor3;
-        {
-            INFO("1:operator+= failed");
-            CHECK(is_approx_equal(r1+r2 ,llcolor3a.mV[0]));
-            CHECK(is_approx_equal(g1+g2,llcolor3a.mV[1]));
-            CHECK(is_approx_equal(b1+b2,llcolor3a.mV[2]));
-        }
+        CHECK(is_approx_equal(r1+r2 ,llcolor3a.mV[0]));
+        CHECK(is_approx_equal(g1+g2,llcolor3a.mV[1]));
+        CHECK(is_approx_equal(b1+b2,llcolor3a.mV[2]));
         llcolor3.setVec(r1,g1,b1);
         llcolor3a.setVec(r2,g2,b2);
         llcolor3a += llcolor3;
-        {
-            INFO("2:operator+= failed");
-            CHECK(is_approx_equal(r1+r2 ,llcolor3a.mV[0]));
-            CHECK(is_approx_equal(g1+g2,llcolor3a.mV[1]));
-            CHECK(is_approx_equal(b1+b2,llcolor3a.mV[2]));
-        }
+        CHECK(is_approx_equal(r1+r2 ,llcolor3a.mV[0]));
+        CHECK(is_approx_equal(g1+g2,llcolor3a.mV[1]));
+        CHECK(is_approx_equal(b1+b2,llcolor3a.mV[2]));
     }
 
     TEST_CASE("v3color_h: operator-= subtracts component-wise", "[v3color_h]")
@@ -316,20 +249,14 @@ namespace
         F32 r1 =1.f, g1 = 2.f,b1 = 1.2f, r2 = -2.3f, g2 = 1.11f, b2 = 1234.234f;
         LLColor3 llcolor3(r1,g1,b1),llcolor3a(r2,g2,b2);
         llcolor3a -= llcolor3;
-        UNSCOPED_INFO("1:operator-= failed");
         CHECK(is_approx_equal(r2-r1, llcolor3a.mV[0]));
-        UNSCOPED_INFO("2:operator-= failed");
         CHECK(is_approx_equal(g2-g1, llcolor3a.mV[1]));
-        UNSCOPED_INFO("3:operator-= failed");
         CHECK(is_approx_equal(b2-b1, llcolor3a.mV[2]));
         llcolor3.setVec(r1,g1,b1);
         llcolor3a.setVec(r2,g2,b2);
         llcolor3a -= llcolor3;
-        UNSCOPED_INFO("4:operator-= failed");
         CHECK(is_approx_equal(r2-r1, llcolor3a.mV[0]));
-        UNSCOPED_INFO("5:operator-= failed");
         CHECK(is_approx_equal(g2-g1, llcolor3a.mV[1]));
-        UNSCOPED_INFO("6:operator-= failed");
         CHECK(is_approx_equal(b2-b1, llcolor3a.mV[2]));
     }
 
@@ -338,20 +265,14 @@ namespace
         F32 r1 =1.f, g1 = 2.f,b1 = 1.2f, r2 = -2.3f, g2 = 1.11f, b2 = 1234.234f;
         LLColor3 llcolor3(r1,g1,b1),llcolor3a(r2,g2,b2);
         llcolor3a *= llcolor3;
-        {
-            INFO("1:operator*= failed");
-            CHECK(is_approx_equal(r1*r2 ,llcolor3a.mV[0]));
-            CHECK(is_approx_equal(g1*g2,llcolor3a.mV[1]));
-            CHECK(is_approx_equal(b1*b2,llcolor3a.mV[2]));
-        }
+        CHECK(is_approx_equal(r1*r2 ,llcolor3a.mV[0]));
+        CHECK(is_approx_equal(g1*g2,llcolor3a.mV[1]));
+        CHECK(is_approx_equal(b1*b2,llcolor3a.mV[2]));
         F32 mulVal = 4.332f;
         llcolor3 *=mulVal;
-        {
-            INFO("2:operator*= failed");
-            CHECK(is_approx_equal(r1*mulVal ,llcolor3.mV[0]));
-            CHECK(is_approx_equal(g1*mulVal,llcolor3.mV[1]));
-            CHECK(is_approx_equal(b1*mulVal,llcolor3.mV[2]));
-        }
+        CHECK(is_approx_equal(r1*mulVal ,llcolor3.mV[0]));
+        CHECK(is_approx_equal(g1*mulVal,llcolor3.mV[1]));
+        CHECK(is_approx_equal(b1*mulVal,llcolor3.mV[2]));
     }
 
     TEST_CASE("v3color_h: clamp limits components to the 0 to 1 range", "[v3color_h]")
@@ -359,21 +280,15 @@ namespace
         F32 r = 2.3436212f, g = -1231.f, b = .7849321232f;
         LLColor3 llcolor3(r,g,b);
         llcolor3.clamp();
-        {
-            INFO("1:clamp:Fail to clamp ");
-            CHECK(llcolor3.mV[0] == 1.0f);
-            CHECK(llcolor3.mV[1] == 0.f);
-            CHECK(b == llcolor3.mV[2]);
-        }
+        CHECK(llcolor3.mV[0] == 1.0f);
+        CHECK(llcolor3.mV[1] == 0.f);
+        CHECK(b == llcolor3.mV[2]);
         r = -2.3436212f, g = -1231.f, b = 67.7849321232f;
         llcolor3.setVec(r,g,b);
         llcolor3.clamp();
-        {
-            INFO("2:clamp:Fail to clamp ");
-            CHECK(llcolor3.mV[0] == 0.f);
-            CHECK(llcolor3.mV[1] == 0.f);
-            CHECK(llcolor3.mV[2] == 1.f);
-        }
+        CHECK(llcolor3.mV[0] == 0.f);
+        CHECK(llcolor3.mV[1] == 0.f);
+        CHECK(llcolor3.mV[2] == 1.f);
     }
 
     TEST_CASE("v3color_h: lerp interpolates every component", "[v3color_h]")
@@ -385,12 +300,9 @@ namespace
         val2 = g1 + (g2 - g1)* val;
         val3 = b1 + (b2 - b1)* val;
         LLColor3 llcolor3b = lerp(llcolor3,llcolor3a,val);
-        {
-            INFO("lerp failed ");
-            CHECK(val1 ==llcolor3b.mV[0]);
-            CHECK(val2 ==llcolor3b.mV[1]);
-            CHECK(val3 ==llcolor3b.mV[2]);
-        }
+        CHECK(val1 ==llcolor3b.mV[0]);
+        CHECK(val2 ==llcolor3b.mV[1]);
+        CHECK(val3 ==llcolor3b.mV[2]);
     }
 
     TEST_CASE("v3color_h: distVec and distVec_squared", "[v3color_h]")
@@ -398,11 +310,9 @@ namespace
         F32 r1 =1.f, g1 = 2.f,b1 = 1.2f, r2 = -2.3f, g2 = 1.11f, b2 = 1234.234f;
         LLColor3 llcolor3(r1,g1,b1),llcolor3a(r2,g2,b2);
         F32 val = distVec(llcolor3,llcolor3a);
-        UNSCOPED_INFO("distVec failed ");
         CHECK(is_approx_equal((F32) sqrt((r1-r2)*(r1-r2) + (g1-g2)*(g1-g2) + (b1-b2)*(b1-b2)) ,val));
 
         F32 val1 = distVec_squared(llcolor3,llcolor3a);
-        UNSCOPED_INFO("distVec_squared failed ");
         CHECK(is_approx_equal(((r1-r2)*(r1-r2) + (g1-g2)*(g1-g2) + (b1-b2)*(b1-b2)) ,val1));
     }
 
@@ -414,11 +324,9 @@ namespace
         LLSD sd = llcolor31.getValue();
         LLColor3 llcolor32;
         llcolor32.setValue(sd);
-        UNSCOPED_INFO("LLColor3::setValue/getValue failed");
         CHECK(llcolor31 == llcolor32);
 
         LLColor3 llcolor33(sd);
-        UNSCOPED_INFO("LLColor3(LLSD) failed");
         CHECK(llcolor31 == llcolor33);
     }
 }

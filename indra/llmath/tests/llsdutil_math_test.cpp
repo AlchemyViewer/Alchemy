@@ -63,7 +63,6 @@ namespace
                     // This test is supposed to succeed. Comparing to the
                     // empty string ensures that if the test fails, it will
                     // display the string received so we can tell what failed.
-                    UNSCOPED_INFO("match");
                     REQUIRE(match == "");
                 }
                 else
@@ -72,7 +71,7 @@ namespace
                     // the string 'match' will be empty, which doesn't tell us
                     // much about which case went awry. So construct a more
                     // detailed description string.
-                    UNSCOPED_INFO(proto_key + " shouldn't match " + pi->first);
+                    INFO(proto_key << " shouldn't match " << pi->first);
                     REQUIRE_FALSE(match.empty());
                 }
             }
@@ -85,18 +84,15 @@ namespace
         LLVector3 vec1(-1.0, 2.0, -3.0);
         sd = ll_sd_from_vector3(vec1);
         LLVector3 vec2 = ll_vector3_from_sd(sd);
-        UNSCOPED_INFO("vector3 -> sd -> vector3: 1");
         CHECK(vec1 == vec2);
 
         LLVector3 vec3(sd);
-        UNSCOPED_INFO("vector3 -> sd -> vector3: 2");
         CHECK(vec1 == vec3);
 
         sd.clear();
         vec1.setVec(0., 0., 0.);
         sd = ll_sd_from_vector3(vec1);
         vec2 = ll_vector3_from_sd(sd);
-        UNSCOPED_INFO("vector3 -> sd -> vector3: 3");
         CHECK(vec1 == vec2);
         sd.clear();
     }
@@ -107,11 +103,9 @@ namespace
         LLVector3d vec1((F64)(U64L(0xFEDCBA9876543210) << 2), -1., 0);
         sd = ll_sd_from_vector3d(vec1);
         LLVector3d vec2 = ll_vector3d_from_sd(sd);
-        UNSCOPED_INFO("vector3d -> sd -> vector3d: 1");
         CHECK(vec1 == vec2);
 
         LLVector3d vec3(sd);
-        UNSCOPED_INFO("vector3d -> sd -> vector3d : 2");
         CHECK(vec1 == vec3);
     }
 
@@ -121,11 +115,9 @@ namespace
         LLVector2 vec((F32) -3., (F32) 4.2);
         sd = ll_sd_from_vector2(vec);
         LLVector2 vec1 = ll_vector2_from_sd(sd);
-        UNSCOPED_INFO("vector2 -> sd -> vector2");
         CHECK(vec == vec1);
 
         LLSD sd2 = ll_sd_from_vector2(vec1);
-        UNSCOPED_INFO("sd -> vector2 -> sd: 2");
         CHECK_THAT(sd, ll_test::LLSDEquals(sd2));
     }
 
@@ -135,11 +127,9 @@ namespace
         LLQuaternion quat((F32) 1., (F32) -0.98, (F32) 2.3, (F32) 0xffff);
         sd = ll_sd_from_quaternion(quat);
         LLQuaternion quat1 = ll_quaternion_from_sd(sd);
-        UNSCOPED_INFO("LLQuaternion -> sd -> LLQuaternion");
         CHECK(quat == quat1);
 
         LLSD sd2 = ll_sd_from_quaternion(quat1);
-        UNSCOPED_INFO("sd -> LLQuaternion -> sd ");
         CHECK_THAT(sd, ll_test::LLSDEquals(sd2));
     }
 
@@ -149,11 +139,9 @@ namespace
         LLColor4 c(1.0f, 2.2f, 4.0f, 7.f);
         sd = ll_sd_from_color4(c);
         LLColor4 c1 =ll_color4_from_sd(sd);
-        UNSCOPED_INFO("LLColor4 -> sd -> LLColor4");
         CHECK(c == c1);
 
         LLSD sd1 = ll_sd_from_color4(c1);
-        UNSCOPED_INFO("sd -> LLColor4 -> sd");
         CHECK_THAT(sd, ll_test::LLSDEquals(sd1));
     }
 }

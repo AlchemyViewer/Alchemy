@@ -70,25 +70,26 @@ namespace
         return out;
     }
 
-    void ensure_quat_equals(const std::string& msg, const LLQuaternion2& actual, const LLQuaternion& expected)
+    void require_quat_near(const std::string& msg, const LLQuaternion2& actual, const LLQuaternion& expected)
     {
+        INFO(msg);
         LLQuaternion got;
         actual.store(got);
         for (S32 i = 0; i < 4; ++i)
         {
-            UNSCOPED_INFO((msg + " component").c_str());
+            CAPTURE(i);
             REQUIRE_THAT(got.mQ[i], Catch::Matchers::WithinAbs(expected.mQ[i], TOLERANCE));
         }
     }
 
     // A rotation and its negation are the same rotation.
-    void ensure_same_rotation(const std::string& msg, const LLQuaternion2& actual, const LLQuaternion& expected)
+    void require_same_rotation(const std::string& msg, const LLQuaternion2& actual, const LLQuaternion& expected)
     {
         LLQuaternion got;
         actual.store(got);
         const F32 d = got.mQ[0] * expected.mQ[0] + got.mQ[1] * expected.mQ[1]
                     + got.mQ[2] * expected.mQ[2] + got.mQ[3] * expected.mQ[3];
-        UNSCOPED_INFO(msg.c_str());
+        INFO(msg);
         REQUIRE_THAT(fabsf(d), Catch::Matchers::WithinAbs(1.f, TOLERANCE));
     }
 }
@@ -106,11 +107,11 @@ namespace
         for (const LLQuaternion& q : mRotations)
         {
             LLQuaternion2 simd(q);
-            ensure_quat_equals("round trip", simd, q);
+            require_quat_near("round trip", simd, q);
         }
 
         LLQuaternion ident;
-        ensure_quat_equals("identity", LLQuaternion2::identity(), ident);
+        require_quat_near("identity", LLQuaternion2::identity(), ident);
     }
 
     TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: setMul matches LLQuaternion operator* for every pair", "[LLQuaternion2]")
@@ -122,7 +123,7 @@ namespace
             {
                 LLQuaternion2 result;
                 result.setMul(LLQuaternion2(a), LLQuaternion2(b));
-                ensure_quat_equals("a * b", result, a * b);
+                require_quat_near("a * b", result, a * b);
             }
         }
     }
@@ -147,7 +148,7 @@ namespace
                 const LLVector3 expected = (v * a) * b;
                 for (S32 i = 0; i < 3; ++i)
                 {
-                    UNSCOPED_INFO("rotate by the product");
+                    CAPTURE(i);
                     REQUIRE_THAT(out[i], Catch::Matchers::WithinAbs(expected.mV[i], 1e-4f));
                 }
             }
@@ -182,7 +183,7 @@ namespace
                 const F32 scale = llmax(1.f, expected.magVec());
                 for (S32 i = 0; i < 3; ++i)
                 {
-                    UNSCOPED_INFO("v * q");
+                    CAPTURE(i);
                     REQUIRE_THAT(out[i], Catch::Matchers::WithinAbs(expected.mV[i], 1e-5f * scale));
                 }
                 UNSCOPED_INFO("w is carried through");
@@ -200,7 +201,6 @@ namespace
             for (const LLQuaternion& b : mRotations)
             {
                 const LLSimdScalar d = LLQuaternion2(a).dot(LLQuaternion2(b));
-                UNSCOPED_INFO("dot");
                 REQUIRE_THAT(d.getF32(), Catch::Matchers::WithinAbs(dot(a, b), TOLERANCE));
             }
         }
@@ -216,17 +216,17 @@ namespace
             {
                 LLQuaternion2 at_start;
                 at_start.setLerp(LLQuaternion2(a), LLQuaternion2(b), 0.f);
-                ensure_same_rotation("u = 0 is a", at_start, a);
+                require_same_rotation("u = 0 is a", at_start, a);
 
                 LLQuaternion2 at_end;
                 at_end.setLerp(LLQuaternion2(a), LLQuaternion2(b), 1.f);
-                ensure_same_rotation("u = 1 is b", at_end, b);
+                require_same_rotation("u = 1 is b", at_end, b);
 
                 for (F32 u = 0.125f; u < 1.f; u += 0.125f)
                 {
                     LLQuaternion2 mid;
                     mid.setLerp(LLQuaternion2(a), LLQuaternion2(b), u);
-                    UNSCOPED_INFO("interpolated rotation is a rotation");
+                    CAPTURE(u);
                     REQUIRE(mid.isOkRotation());
                 }
             }
@@ -259,10 +259,8 @@ namespace
 
         // and it really is the eighth turn, not the seven eighths one
         const LLQuaternion eighth(F_PI * 0.25f, axis);
-        ensure_same_rotation("half way is an eighth of a turn", from_b, eighth);
+        require_same_rotation("half way is an eighth of a turn", from_b, eighth);
     }
-
-
 
     TEST_CASE_METHOD(llquaternion2_data, "LLQuaternion2: a quaternion times its conjugate is the identity", "[LLQuaternion2]")
     {
@@ -277,7 +275,7 @@ namespace
             product.setMul(simd, conj);
 
             LLQuaternion ident;
-            ensure_same_rotation("q times its conjugate is identity", product, ident);
+            require_same_rotation("q times its conjugate is identity", product, ident);
         }
     }
 
@@ -305,7 +303,7 @@ namespace
             const F32 scale = llmax(1.f, expected.magVec());
             for (S32 i = 0; i < 3; ++i)
             {
-                UNSCOPED_INFO("off-unit v * q");
+                CAPTURE(i);
                 REQUIRE_THAT(out[i], Catch::Matchers::WithinAbs(expected.mV[i], 1e-5f * scale));
             }
         }
@@ -340,6 +338,7 @@ namespace
             product.store(got);
             for (S32 i = 0; i < 3; ++i)
             {
+                CAPTURE(i);
                 UNSCOPED_INFO("q times its inverse has no axis");
                 REQUIRE_THAT(got.mQ[i], Catch::Matchers::WithinAbs(0.f, 1e-5f));
             }
@@ -352,8 +351,10 @@ namespace
     {
         // Against the free slerp, which is the second implementation this is
         // compared with rather than the same one written twice.
-        auto check = [](const char* what, const LLQuaternion& a, const LLQuaternion& b, F32 u)
+        auto require_follows_slerp = [](const char* what, const LLQuaternion& a, const LLQuaternion& b, F32 u)
         {
+            INFO(what);
+            CAPTURE(u);
             LLQuaternion2 blended;
             blended.setSlerp(LLQuaternion2(a), LLQuaternion2(b), u);
             LLQuaternion got;
@@ -361,7 +362,6 @@ namespace
 
             LLQuaternion expected = slerp(u, a, b);
             // q and -q are the same rotation.
-            UNSCOPED_INFO(what);
             REQUIRE_THAT(fabsf(dot(got, expected)), Catch::Matchers::WithinAbs(1.f, 1e-4f));
         };
 
@@ -371,14 +371,14 @@ namespace
         const LLQuaternion half_turn(F_PI * 0.99f, LLVector3::z_axis);
         for (F32 u = 0.f; u <= 1.f; u += 0.125f)
         {
-            check("a half turn follows the arc", at_zero, half_turn, u);
+            require_follows_slerp("a half turn follows the arc", at_zero, half_turn, u);
         }
 
         // A quarter turn, comfortably inside the range a lerp used to take.
         const LLQuaternion quarter(F_PI_BY_TWO, LLVector3::y_axis);
         for (F32 u = 0.f; u <= 1.f; u += 0.125f)
         {
-            check("a quarter turn follows the arc", at_zero, quarter, u);
+            require_follows_slerp("a quarter turn follows the arc", at_zero, quarter, u);
         }
 
         // About an axis that is not a basis vector.
@@ -387,7 +387,7 @@ namespace
         const LLQuaternion oblique(2.f, axis);
         for (F32 u = 0.f; u <= 1.f; u += 0.125f)
         {
-            check("an oblique axis follows the arc", at_zero, oblique, u);
+            require_follows_slerp("an oblique axis follows the arc", at_zero, oblique, u);
         }
     }
 
@@ -445,6 +445,7 @@ namespace
 
         for (S32 trial = 0; trial < 200; ++trial)
         {
+            CAPTURE(trial);
             LLVector3 axis_a(spread(rng), spread(rng), spread(rng));
             LLVector3 axis_b(spread(rng), spread(rng), spread(rng));
             if (axis_a.magVecSquared() < 1e-6f || axis_b.magVecSquared() < 1e-6f)
@@ -460,13 +461,11 @@ namespace
 
             LLQuaternion2 blended;
             blended.setSlerp(LLQuaternion2(a), LLQuaternion2(b), u);
-            UNSCOPED_INFO("a blend of two rotations is a rotation");
             REQUIRE(blended.isOkRotation());
 
             LLQuaternion got;
             blended.store(got);
             LLQuaternion expected = slerp(u, a, b);
-            UNSCOPED_INFO("and it is the one slerp gives");
             REQUIRE_THAT(fabsf(dot(got, expected)), Catch::Matchers::WithinAbs(1.f, 1e-3f));
         }
     }
@@ -479,28 +478,26 @@ namespace
         {
             LLQuaternion2 q8(q);
             q8.quantize8();
-            UNSCOPED_INFO("quantize8 is a rotation");
             REQUIRE(q8.isOkRotation());
             LLQuaternion got8;
             q8.store(got8);
-            UNSCOPED_INFO("quantize8 is the rotation it was given, to eight bits");
+            UNSCOPED_INFO("quantize8 keeps the rotation it was given");
             REQUIRE_THAT(fabsf(dot(got8, q)), Catch::Matchers::WithinAbs(1.f, 1e-4f));
             for (S32 i = 0; i < 4; ++i)
             {
-                UNSCOPED_INFO("quantize8 component within a step");
+                CAPTURE(i);
                 REQUIRE(fabsf(got8.mQ[i] - q.mQ[i]) <= 2.f / 255.f);
             }
 
             LLQuaternion2 q16(q);
             q16.quantize16();
-            UNSCOPED_INFO("quantize16 is a rotation");
             REQUIRE(q16.isOkRotation());
-            ensure_same_rotation("quantize16 is the rotation it was given", q16, q);
+            require_same_rotation("quantize16 is the rotation it was given", q16, q);
             LLQuaternion got16;
             q16.store(got16);
             for (S32 i = 0; i < 4; ++i)
             {
-                UNSCOPED_INFO("quantize16 component within a step");
+                CAPTURE(i);
                 REQUIRE(fabsf(got16.mQ[i] - q.mQ[i]) <= 2.f / 65535.f);
             }
         }
@@ -515,13 +512,9 @@ namespace
         conj.setConjugate(LLQuaternion2(q));
         LLQuaternion got;
         conj.store(got);
-        UNSCOPED_INFO("conjugate x");
         CHECK(got.mQ[VX] == -q.mQ[VX]);
-        UNSCOPED_INFO("conjugate y");
         CHECK(got.mQ[VY] == -q.mQ[VY]);
-        UNSCOPED_INFO("conjugate z");
         CHECK(got.mQ[VZ] == -q.mQ[VZ]);
-        UNSCOPED_INFO("conjugate w");
         CHECK(got.mQ[VW] == q.mQ[VW]);
 
         LLQuaternion2 ident;

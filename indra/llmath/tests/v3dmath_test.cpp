@@ -42,31 +42,24 @@ namespace
     TEST_CASE("v3dmath_h: constructors set every component", "[v3dmath_h]")
     {
         LLVector3d vec3D;
-        {
-            INFO("1:LLVector3d:Fail to initialize ");
-            CHECK(vec3D.mdV[VX] == 0);
-            CHECK(vec3D.mdV[VY] == 0);
-            CHECK(vec3D.mdV[VZ] == 0);
-        }
+        CHECK(vec3D.mdV[VX] == 0);
+        CHECK(vec3D.mdV[VY] == 0);
+        CHECK(vec3D.mdV[VZ] == 0);
+
         F64 x = 2.32f, y = 1.212f, z = -.12f;
         LLVector3d vec3Da(x,y,z);
-        {
-            INFO("2:LLVector3d:Fail to initialize ");
-            CHECK(vec3Da.mdV[VX] == 2.32f);
-            CHECK(vec3Da.mdV[VY] == 1.212f);
-            CHECK(vec3Da.mdV[VZ] == -.12f);
-        }
+        CHECK(vec3Da.mdV[VX] == 2.32f);
+        CHECK(vec3Da.mdV[VY] == 1.212f);
+        CHECK(vec3Da.mdV[VZ] == -.12f);
+
         const F64 vec[3] = {1.2f ,3.2f, -4.2f};
         LLVector3d vec3Db(vec);
-        {
-            INFO("3:LLVector3d:Fail to initialize ");
-            CHECK(vec3Db.mdV[VX] == 1.2f);
-            CHECK(vec3Db.mdV[VY] == 3.2f);
-            CHECK(vec3Db.mdV[VZ] == -4.2f);
-        }
+        CHECK(vec3Db.mdV[VX] == 1.2f);
+        CHECK(vec3Db.mdV[VY] == 3.2f);
+        CHECK(vec3Db.mdV[VZ] == -4.2f);
+
         LLVector3 vec3((F32)x,(F32)y,(F32)z);
         LLVector3d vec3Dc(vec3);
-        UNSCOPED_INFO("4:LLVector3d Fail to initialize");
         CHECK(vec3Da == vec3Dc);
     }
 
@@ -77,7 +70,6 @@ namespace
         LLVector3d vec3d(llsd);
         LLSD sd = vec3d.getValue();
         LLVector3d vec3da(sd);
-        UNSCOPED_INFO("1:getValue:Fail ");
         CHECK(vec3d == vec3da);
     }
 
@@ -89,7 +81,6 @@ namespace
         vec3d.setValue(llsd);
         LLSD sd = vec3d.getValue();
         LLVector3d vec3da(sd);
-        UNSCOPED_INFO("1:setValue:Fail to initialize ");
         CHECK(vec3d == vec3da);
     }
 
@@ -102,12 +93,9 @@ namespace
         llsd[2] = a[2];
         LLVector3d vec3D;
         vec3D = (LLVector3d)llsd;
-        {
-            INFO("1:operator=:Fail to initialize ");
-            CHECK(llsd[0].asReal()== vec3D.mdV[VX]);
-            CHECK(llsd[1].asReal() == vec3D.mdV[VY]);
-            CHECK(llsd[2].asReal() == vec3D.mdV[VZ]);
-        }
+        CHECK(llsd[0].asReal()== vec3D.mdV[VX]);
+        CHECK(llsd[1].asReal() == vec3D.mdV[VY]);
+        CHECK(llsd[2].asReal() == vec3D.mdV[VZ]);
     }
 
     TEST_CASE("v3dmath_h: clearVec/zeroVec and the setVec overloads", "[v3dmath_h]")
@@ -115,47 +103,36 @@ namespace
         F64 x = 2.32f, y = 1.212f, z = -.12f;
         LLVector3d vec3D(x,y,z);
         vec3D.clearVec();
-        {
-            INFO("1:clearVec:Fail to initialize ");
-            CHECK(vec3D.mdV[VX] == 0);
-            CHECK(vec3D.mdV[VY] == 0);
-            CHECK(vec3D.mdV[VZ] == 0);
-        }
+        CHECK(vec3D.mdV[VX] == 0);
+        CHECK(vec3D.mdV[VY] == 0);
+        CHECK(vec3D.mdV[VZ] == 0);
+
         vec3D.setVec(x,y,z);
-        {
-            INFO("2:setVec:Fail to initialize ");
-            CHECK(x == vec3D.mdV[VX]);
-            CHECK(y == vec3D.mdV[VY]);
-            CHECK(z == vec3D.mdV[VZ]);
-        }
+        CHECK(x == vec3D.mdV[VX]);
+        CHECK(y == vec3D.mdV[VY]);
+        CHECK(z == vec3D.mdV[VZ]);
+
         vec3D.zeroVec();
-        {
-            INFO("3:zeroVec:Fail to initialize ");
-            CHECK(vec3D.mdV[VX] == 0);
-            CHECK(vec3D.mdV[VY] == 0);
-            CHECK(vec3D.mdV[VZ] == 0);
-        }
+        CHECK(vec3D.mdV[VX] == 0);
+        CHECK(vec3D.mdV[VY] == 0);
+        CHECK(vec3D.mdV[VZ] == 0);
+
         vec3D.clearVec();
         LLVector3 vec3((F32)x,(F32)y,(F32)z);
         vec3D.setVec(vec3);
-        {
-            INFO("4:setVec:Fail to initialize ");
-            CHECK(x == vec3D.mdV[VX]);
-            CHECK(y == vec3D.mdV[VY]);
-            CHECK(z == vec3D.mdV[VZ]);
-        }
+        CHECK(x == vec3D.mdV[VX]);
+        CHECK(y == vec3D.mdV[VY]);
+        CHECK(z == vec3D.mdV[VZ]);
+
         vec3D.clearVec();
         const F64 vec[3] = {x,y,z};
         vec3D.setVec(vec);
-        {
-            INFO("5:setVec:Fail to initialize ");
-            CHECK(x == vec3D.mdV[VX]);
-            CHECK(y == vec3D.mdV[VY]);
-            CHECK(z == vec3D.mdV[VZ]);
-        }
+        CHECK(x == vec3D.mdV[VX]);
+        CHECK(y == vec3D.mdV[VY]);
+        CHECK(z == vec3D.mdV[VZ]);
+
         LLVector3d vec3Da;
         vec3Da.setVec(vec3D);
-        UNSCOPED_INFO("6:setVec: Fail to initialize");
         CHECK(vec3D == vec3Da);
     }
 
@@ -164,24 +141,18 @@ namespace
         F64 x = -2.32, y = 1.212, z = -.12;
         LLVector3d vec3D(x,y,z);
         vec3D.abs();
-        {
-            INFO("1:abs:Fail  ");
-            CHECK(-x == vec3D.mdV[VX]);
-            CHECK(y == vec3D.mdV[VY]);
-            CHECK(-z == vec3D.mdV[VZ]);
-        }
-        UNSCOPED_INFO("2:isNull():Fail ");
+        CHECK(-x == vec3D.mdV[VX]);
+        CHECK(y == vec3D.mdV[VY]);
+        CHECK(-z == vec3D.mdV[VZ]);
+
         CHECK_FALSE(vec3D.isNull());
         vec3D.clearVec();
         x =.00000001, y = .000001001, z = .000001001;
         vec3D.setVec(x,y,z);
-        UNSCOPED_INFO("3:isNull():Fail ");
         CHECK(vec3D.isNull());
-        UNSCOPED_INFO("4:isExactlyZero():Fail ");
         CHECK_FALSE(vec3D.isExactlyZero());
         x =.0000000, y = .00000000, z = .00000000;
         vec3D.setVec(x,y,z);
-        UNSCOPED_INFO("5:isExactlyZero():Fail ");
         CHECK(vec3D.isExactlyZero());
     }
 
@@ -190,23 +161,17 @@ namespace
         F64 x = -2.32, y = 1.212, z = -.12;
         LLVector3d vec3D(x,y,z);
 
-        UNSCOPED_INFO("1:operator [] failed");
         CHECK(x ==  vec3D[0]);
-        UNSCOPED_INFO("2:operator [] failed");
         CHECK(y ==  vec3D[1]);
-        UNSCOPED_INFO("3:operator [] failed");
         CHECK(z ==  vec3D[2]);
         vec3D.clearVec();
         x = 23.23, y = -.2361, z = 3.25;
         vec3D.setVec(x,y,z);
         F64 &ref1 = vec3D[0];
-        UNSCOPED_INFO("4:operator [] failed");
         CHECK(ref1 ==  vec3D[0]);
         F64 &ref2 = vec3D[1];
-        UNSCOPED_INFO("5:operator [] failed");
         CHECK(ref2 ==  vec3D[1]);
         F64 &ref3 = vec3D[2];
-        UNSCOPED_INFO("6:operator [] failed");
         CHECK(ref3 ==  vec3D[2]);
     }
 
@@ -216,12 +181,9 @@ namespace
         LLVector4 vec4(x,y,z);
         LLVector3d vec3D;
         vec3D = vec4;
-        {
-            INFO("1:operator=:Fail to initialize ");
-            CHECK(vec4.mV[VX] == vec3D.mdV[VX]);
-            CHECK(vec4.mV[VY] == vec3D.mdV[VY]);
-            CHECK(vec4.mV[VZ] == vec3D.mdV[VZ]);
-        }
+        CHECK(vec4.mV[VX] == vec3D.mdV[VX]);
+        CHECK(vec4.mV[VY] == vec3D.mdV[VY]);
+        CHECK(vec4.mV[VZ] == vec3D.mdV[VZ]);
     }
 
     TEST_CASE("v3dmath_h: operator+ and operator+=", "[v3dmath_h]")
@@ -230,26 +192,20 @@ namespace
         F64 x2 = 1.2, y2 = 2.5, z2 = 1.;
         LLVector3d vec3D(x1,y1,z1),vec3Da(x2,y2,z2),vec3Db;
         vec3Db = vec3Da+ vec3D;
-        {
-            INFO("1:operator+:Fail to initialize ");
-            CHECK(x1+x2 == vec3Db.mdV[VX]);
-            CHECK(y1+y2 == vec3Db.mdV[VY]);
-            CHECK(z1+z2 == vec3Db.mdV[VZ]);
-        }
+        CHECK(x1+x2 == vec3Db.mdV[VX]);
+        CHECK(y1+y2 == vec3Db.mdV[VY]);
+        CHECK(z1+z2 == vec3Db.mdV[VZ]);
+
         x1 = -2.45, y1 = 2.1, z1 = 3.0;
         vec3D.clearVec();
         vec3Da.clearVec();
         vec3D.setVec(x1,y1,z1);
         vec3Da += vec3D;
-        UNSCOPED_INFO("2:operator+=: Fail to initialize");
         CHECK(vec3Da == vec3D);
         vec3Da += vec3D;
-        {
-            INFO("3:operator+=:Fail to initialize ");
-            CHECK(2*x1 == vec3Da.mdV[VX]);
-            CHECK(2*y1 == vec3Da.mdV[VY]);
-            CHECK(2*z1 == vec3Da.mdV[VZ]);
-        }
+        CHECK(2*x1 == vec3Da.mdV[VX]);
+        CHECK(2*y1 == vec3Da.mdV[VY]);
+        CHECK(2*z1 == vec3Da.mdV[VZ]);
     }
 
     TEST_CASE("v3dmath_h: operator- and operator-=", "[v3dmath_h]")
@@ -258,83 +214,47 @@ namespace
         F64 x2 = 1.2, y2 = 2.5, z2 = 1.;
         LLVector3d vec3D(x1,y1,z1),vec3Da(x2,y2,z2),vec3Db;
         vec3Db = vec3Da - vec3D;
-        {
-            INFO("1:operator-:Fail to initialize ");
-            CHECK(x2-x1 == vec3Db.mdV[VX]);
-            CHECK(y2-y1 == vec3Db.mdV[VY]);
-            CHECK(z2-z1 == vec3Db.mdV[VZ]);
-        }
+        CHECK(x2-x1 == vec3Db.mdV[VX]);
+        CHECK(y2-y1 == vec3Db.mdV[VY]);
+        CHECK(z2-z1 == vec3Db.mdV[VZ]);
+
         x1 = -2.45, y1 = 2.1, z1 = 3.0;
         vec3D.clearVec();
         vec3Da.clearVec();
         vec3D.setVec(x1,y1,z1);
         vec3Da -=vec3D;
-        {
-            INFO("2:operator-=:Fail to initialize ");
-            CHECK(vec3Da.mdV[VX] == 2.45);
-            CHECK(vec3Da.mdV[VY] == -2.1);
-            CHECK(vec3Da.mdV[VZ] == -3.0);
-        }
+        CHECK(vec3Da.mdV[VX] == 2.45);
+        CHECK(vec3Da.mdV[VY] == -2.1);
+        CHECK(vec3Da.mdV[VZ] == -3.0);
+
         vec3Da -= vec3D;
-        {
-            INFO("3:operator-=:Fail to initialize ");
-            CHECK(-2*x1 == vec3Da.mdV[VX]);
-            CHECK(-2*y1 == vec3Da.mdV[VY]);
-            CHECK(-2*z1 == vec3Da.mdV[VZ]);
-        }
+        CHECK(-2*x1 == vec3Da.mdV[VX]);
+        CHECK(-2*y1 == vec3Da.mdV[VY]);
+        CHECK(-2*z1 == vec3Da.mdV[VZ]);
     }
+
     TEST_CASE("v3dmath_h: operator* dot and scalar products and operator*=", "[v3dmath_h]")
     {
         F64 x1 = 1., y1 = 2., z1 = -1.1;
         F64 x2 = 1.2, y2 = 2.5, z2 = 1.;
         LLVector3d vec3D(x1,y1,z1),vec3Da(x2,y2,z2);
         F64 res = vec3D * vec3Da;
-        UNSCOPED_INFO("1:operator* failed");
-        CHECK_THAT(res,
-            ll_test::WithinBits((x1*x2 + y1*y2 + z1*z2),
-            8));
+        CHECK_THAT(res, ll_test::WithinBits(x1*x2 + y1*y2 + z1*z2, 8));
         vec3Da.clearVec();
         F64 mulVal = 4.2;
         vec3Da = vec3D * mulVal;
-        UNSCOPED_INFO("2a:operator* failed");
-        CHECK_THAT(vec3Da.mdV[VX],
-            ll_test::WithinBits(x1*mulVal,
-            8));
-        UNSCOPED_INFO("2b:operator* failed");
-        CHECK_THAT(vec3Da.mdV[VY],
-            ll_test::WithinBits(y1*mulVal,
-            8));
-        UNSCOPED_INFO("2c:operator* failed");
-        CHECK_THAT(vec3Da.mdV[VZ],
-            ll_test::WithinBits(z1*mulVal,
-            8));
+        CHECK_THAT(vec3Da.mdV[VX], ll_test::WithinBits(x1*mulVal, 8));
+        CHECK_THAT(vec3Da.mdV[VY], ll_test::WithinBits(y1*mulVal, 8));
+        CHECK_THAT(vec3Da.mdV[VZ], ll_test::WithinBits(z1*mulVal, 8));
         vec3Da.clearVec();
         vec3Da = mulVal * vec3D;
-        UNSCOPED_INFO("3a:operator* failed");
-        CHECK_THAT(vec3Da.mdV[VX],
-            ll_test::WithinBits(x1*mulVal,
-            8));
-        UNSCOPED_INFO("3b:operator* failed");
-        CHECK_THAT(vec3Da.mdV[VY],
-            ll_test::WithinBits(y1*mulVal,
-            8));
-        UNSCOPED_INFO("3c:operator* failed");
-        CHECK_THAT(vec3Da.mdV[VZ],
-            ll_test::WithinBits(z1*mulVal,
-            8));
+        CHECK_THAT(vec3Da.mdV[VX], ll_test::WithinBits(x1*mulVal, 8));
+        CHECK_THAT(vec3Da.mdV[VY], ll_test::WithinBits(y1*mulVal, 8));
+        CHECK_THAT(vec3Da.mdV[VZ], ll_test::WithinBits(z1*mulVal, 8));
         vec3D *= mulVal;
-        UNSCOPED_INFO("4a:operator*= failed");
-        CHECK_THAT(vec3D.mdV[VX],
-            ll_test::WithinBits(x1*mulVal,
-            8));
-        UNSCOPED_INFO("4b:operator*= failed");
-        CHECK_THAT(vec3D.mdV[VY],
-            ll_test::WithinBits(y1*mulVal,
-            8));
-        UNSCOPED_INFO("4c:operator*= failed");
-        CHECK_THAT(vec3D.mdV[VZ],
-            ll_test::WithinBits(z1*mulVal,
-            8));
+        CHECK_THAT(vec3D.mdV[VX], ll_test::WithinBits(x1*mulVal, 8));
+        CHECK_THAT(vec3D.mdV[VY], ll_test::WithinBits(y1*mulVal, 8));
+        CHECK_THAT(vec3D.mdV[VZ], ll_test::WithinBits(z1*mulVal, 8));
     }
 
     TEST_CASE("v3dmath_h: operator% and operator%= cross products", "[v3dmath_h]")
@@ -347,19 +267,14 @@ namespace
         val1 = y1*z2 - y2*z1;
         val2 = z1*x2 -z2*x1;
         val3 = x1*y2-x2*y1;
-        {
-            INFO("1:operator% failed");
-            CHECK(val1 == vec3Db.mdV[VX]);
-            CHECK(val2 == vec3Db.mdV[VY]);
-            CHECK(val3 == vec3Db.mdV[VZ]);
-        }
+        CHECK(val1 == vec3Db.mdV[VX]);
+        CHECK(val2 == vec3Db.mdV[VY]);
+        CHECK(val3 == vec3Db.mdV[VZ]);
+
         vec3D %= vec3Da;
-        {
-            INFO("2:operator%= failed");
-            CHECK(is_approx_equal(vec3D.mdV[VX],vec3Db.mdV[VX]));
-            CHECK(is_approx_equal(vec3D.mdV[VY],vec3Db.mdV[VY]));
-            CHECK(is_approx_equal(vec3D.mdV[VZ],vec3Db.mdV[VZ]));
-        }
+        CHECK(is_approx_equal(vec3D.mdV[VX],vec3Db.mdV[VX]));
+        CHECK(is_approx_equal(vec3D.mdV[VY],vec3Db.mdV[VY]));
+        CHECK(is_approx_equal(vec3D.mdV[VZ],vec3Db.mdV[VZ]));
     }
 
     TEST_CASE("v3dmath_h: operator/ and operator/= divide by a scalar", "[v3dmath_h]")
@@ -368,67 +283,36 @@ namespace
         F64 t = 1.f / div;
         LLVector3d vec3D(x1,y1,z1), vec3Da;
         vec3Da = vec3D/div;
-        UNSCOPED_INFO("1a:operator/ failed");
-        CHECK_THAT(vec3Da.mdV[VX],
-            ll_test::WithinBits(x1*t,
-            8));
-        UNSCOPED_INFO("1b:operator/ failed");
-        CHECK_THAT(vec3Da.mdV[VY],
-            ll_test::WithinBits(y1*t,
-            8));
-        UNSCOPED_INFO("1c:operator/ failed");
-        CHECK_THAT(vec3Da.mdV[VZ],
-            ll_test::WithinBits(z1*t,
-            8));
+        CHECK_THAT(vec3Da.mdV[VX], ll_test::WithinBits(x1*t, 8));
+        CHECK_THAT(vec3Da.mdV[VY], ll_test::WithinBits(y1*t, 8));
+        CHECK_THAT(vec3Da.mdV[VZ], ll_test::WithinBits(z1*t, 8));
         x1 = 1.23, y1 = 4., z1 = -2.32;
         vec3D.clearVec();
         vec3Da.clearVec();
         vec3D.setVec(x1,y1,z1);
         vec3Da = vec3D/div;
-        UNSCOPED_INFO("2a:operator/ failed");
-        CHECK_THAT(vec3Da.mdV[VX],
-            ll_test::WithinBits(x1*t,
-            8));
-        UNSCOPED_INFO("2b:operator/ failed");
-        CHECK_THAT(vec3Da.mdV[VY],
-            ll_test::WithinBits(y1*t,
-            8));
-        UNSCOPED_INFO("2c:operator/ failed");
-        CHECK_THAT(vec3Da.mdV[VZ],
-            ll_test::WithinBits(z1*t,
-            8));
+        CHECK_THAT(vec3Da.mdV[VX], ll_test::WithinBits(x1*t, 8));
+        CHECK_THAT(vec3Da.mdV[VY], ll_test::WithinBits(y1*t, 8));
+        CHECK_THAT(vec3Da.mdV[VZ], ll_test::WithinBits(z1*t, 8));
         vec3D /= div;
-        UNSCOPED_INFO("3a:operator/= failed");
-        CHECK_THAT(vec3D.mdV[VX],
-            ll_test::WithinBits(x1*t,
-            8));
-        UNSCOPED_INFO("3b:operator/= failed");
-        CHECK_THAT(vec3D.mdV[VY],
-            ll_test::WithinBits(y1*t,
-            8));
-        UNSCOPED_INFO("3c:operator/= failed");
-        CHECK_THAT(vec3D.mdV[VZ],
-            ll_test::WithinBits(z1*t,
-            8));
+        CHECK_THAT(vec3D.mdV[VX], ll_test::WithinBits(x1*t, 8));
+        CHECK_THAT(vec3D.mdV[VY], ll_test::WithinBits(y1*t, 8));
+        CHECK_THAT(vec3D.mdV[VZ], ll_test::WithinBits(z1*t, 8));
     }
 
     TEST_CASE("v3dmath_h: operator== and operator!=", "[v3dmath_h]")
     {
         F64 x1 = 1., y1 = 2., z1 = -1.1;
         LLVector3d vec3D(x1,y1,z1), vec3Da;
-        UNSCOPED_INFO("1:operator!= failed");
         CHECK(vec3D !=vec3Da);
         vec3Da = vec3D;
-        UNSCOPED_INFO("2:operator== failed");
         CHECK(vec3D ==vec3Da);
         vec3D.clearVec();
         vec3Da.clearVec();
         x1 = .211, y1 = 21.111, z1 = 23.22;
         vec3D.setVec(x1,y1,z1);
         vec3Da.setVec(x1,y1,z1);
-        UNSCOPED_INFO("3:operator== failed");
         CHECK(vec3D ==vec3Da);
-        UNSCOPED_INFO("4:operator!= failed");
         CHECK_FALSE(vec3D !=vec3Da);
     }
 
@@ -440,7 +324,6 @@ namespace
         stream1 << vec3D;
         vec3Da.setVec(x1,y1,z1);
         stream2 << vec3Da;
-        UNSCOPED_INFO("1:operator << failed");
         CHECK(stream1.str() == stream2.str());
     }
 
@@ -450,7 +333,6 @@ namespace
         std::string buf("1.23 2. 4");
         LLVector3d vec3D, vec3Da(x1,y1,z1);
         LLVector3d::parseVector3d(buf, &vec3D);
-        UNSCOPED_INFO("1:parseVector3d: failed ");
         CHECK(vec3D == vec3Da);
     }
 
@@ -459,7 +341,6 @@ namespace
         F64 x1 = 1., y1 = 2., z1 = -1.1;
         LLVector3d vec3D(x1,y1,z1), vec3Da;
         vec3Da = -vec3D;
-        UNSCOPED_INFO("1:operator- failed");
         CHECK(vec3D == - vec3Da);
     }
 
@@ -468,17 +349,12 @@ namespace
         F64 x = 1., y = 2., z = -1.1;
         LLVector3d vec3D(x,y,z);
         F64 res = (x*x + y*y + z*z) - vec3D.magVecSquared();
-        {
-            INFO("1:magVecSquared:Fail ");
-            CHECK(-F_APPROXIMATELY_ZERO <= res);
-            CHECK(res <=F_APPROXIMATELY_ZERO);
-        }
+        CHECK(-F_APPROXIMATELY_ZERO <= res);
+        CHECK(res <=F_APPROXIMATELY_ZERO);
+
         res = (F32) sqrt(x*x + y*y + z*z) - vec3D.magVec();
-        {
-            INFO("2:magVec: Fail ");
-            CHECK(-F_APPROXIMATELY_ZERO <= res);
-            CHECK(res <=F_APPROXIMATELY_ZERO);
-        }
+        CHECK(-F_APPROXIMATELY_ZERO <= res);
+        CHECK(res <=F_APPROXIMATELY_ZERO);
     }
 
     TEST_CASE("v3dmath_h: normVec normalises long and tiny vectors", "[v3dmath_h]")
@@ -487,34 +363,16 @@ namespace
         LLVector3d vec3D(x,y,z);
         F64 mag = vec3D.normVec();
         mag = 1.f/ mag;
-        UNSCOPED_INFO("1a:normVec: Fail ");
-        CHECK_THAT(vec3D.mdV[VX],
-            ll_test::WithinBits(x * mag,
-            8));
-        UNSCOPED_INFO("1b:normVec: Fail ");
-        CHECK_THAT(vec3D.mdV[VY],
-            ll_test::WithinBits(y * mag,
-            8));
-        UNSCOPED_INFO("1c:normVec: Fail ");
-        CHECK_THAT(vec3D.mdV[VZ],
-            ll_test::WithinBits(z * mag,
-            8));
+        CHECK_THAT(vec3D.mdV[VX], ll_test::WithinBits(x * mag, 8));
+        CHECK_THAT(vec3D.mdV[VY], ll_test::WithinBits(y * mag, 8));
+        CHECK_THAT(vec3D.mdV[VZ], ll_test::WithinBits(z * mag, 8));
         x = 0.000000001, y = 0.000000001, z = 0.000000001;
         vec3D.clearVec();
         vec3D.setVec(x,y,z);
         mag = vec3D.normVec();
-        UNSCOPED_INFO("2a:normVec: Fail ");
-        CHECK_THAT(vec3D.mdV[VX],
-            ll_test::WithinBits(x * mag,
-            8));
-        UNSCOPED_INFO("2b:normVec: Fail ");
-        CHECK_THAT(vec3D.mdV[VY],
-            ll_test::WithinBits(y * mag,
-            8));
-        UNSCOPED_INFO("2c:normVec: Fail ");
-        CHECK_THAT(vec3D.mdV[VZ],
-            ll_test::WithinBits(z * mag,
-            8));
+        CHECK_THAT(vec3D.mdV[VX], ll_test::WithinBits(x * mag, 8));
+        CHECK_THAT(vec3D.mdV[VY], ll_test::WithinBits(y * mag, 8));
+        CHECK_THAT(vec3D.mdV[VZ], ll_test::WithinBits(z * mag, 8));
     }
 
     TEST_CASE("v3dmath_h: parseVector3d reads large values exactly", "[v3dmath_h]")
@@ -525,7 +383,6 @@ namespace
         std::string buf("1111.232222 2222222222.22 422222222222");
         LLVector3d vec3Da, vec3Db(x1,y1,z1);
         LLVector3d::parseVector3d(buf, &vec3Da);
-        UNSCOPED_INFO("1:parseVector3 failed");
         CHECK(vec3Da == vec3Db);
     }
 
@@ -539,12 +396,9 @@ namespace
         val3 = z1 + (z2 - z1)* val;
         LLVector3d vec3Da(x1,y1,z1),vec3Db(x2,y2,z2);
         LLVector3d vec3d = lerp(vec3Da,vec3Db,val);
-        {
-            INFO("1:lerp failed");
-            CHECK(val1 ==vec3d.mdV[VX]);
-            CHECK(val2 ==vec3d.mdV[VY]);
-            CHECK(val3 ==vec3d.mdV[VZ]);
-        }
+        CHECK(val1 ==vec3d.mdV[VX]);
+        CHECK(val2 ==vec3d.mdV[VY]);
+        CHECK(val3 ==vec3d.mdV[VZ]);
     }
 
     TEST_CASE("v3dmath_h: clamp reports a component out of range", "[v3dmath_h]")
@@ -552,11 +406,9 @@ namespace
         F64 x = 2.32, y = 1.212, z = -.12;
         F64 min = 0.0001, max = 3.0;
         LLVector3d vec3d(x,y,z);
-        UNSCOPED_INFO("1:clamp:Fail ");
         CHECK(vec3d.clamp(min, max));
         x = 0.000001f, z = 5.3f;
         vec3d.setVec(x,y,z);
-        UNSCOPED_INFO("2:clamp:Fail ");
         CHECK(vec3d.clamp(min, max));
     }
 
@@ -565,12 +417,10 @@ namespace
         F64 x = 10., y = 20., z = -15.;
         F64 epsilon = .23425;
         LLVector3d vec3Da(x,y,z), vec3Db(x,y,z);
-        UNSCOPED_INFO("1:are_parallel: Fail ");
         CHECK(are_parallel(vec3Da,vec3Db,epsilon));
         F64 x1 = -12., y1 = -20., z1 = -100.;
         vec3Db.clearVec();
         vec3Db.setVec(x1,y1,z1);
-        UNSCOPED_INFO("2:are_parallel: Fail ");
         CHECK_FALSE(are_parallel(vec3Da,vec3Db,epsilon));
     }
 
@@ -580,7 +430,6 @@ namespace
         F64 angle1, angle2;
         LLVector3d vec3Da(x,y,z), vec3Db(x,y,z);
         angle1 = angle_between(vec3Da, vec3Db);
-        UNSCOPED_INFO("1:angle_between: Fail ");
         CHECK(angle1 == 0);
         F64 x1 = -1., y1 = -20., z1 = -1.;
         vec3Da.clearVec();
@@ -590,7 +439,6 @@ namespace
         vec3Da.normVec();
         F64 angle = vec3Db*vec3Da;
         angle = acos(angle);
-        UNSCOPED_INFO("2:angle_between: Fail ");
         CHECK(angle == angle2);
     }
 }

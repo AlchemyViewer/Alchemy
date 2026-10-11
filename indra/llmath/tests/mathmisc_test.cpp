@@ -46,11 +46,9 @@ namespace
     {
         S32 val = 89543;
         val = llabs(val);
-        UNSCOPED_INFO("integer absolute value 1");
         CHECK(val == 89543);
         val = -500;
         val = llabs(val);
-        UNSCOPED_INFO("integer absolute value 2");
         CHECK(val == 500);
     }
 
@@ -58,11 +56,9 @@ namespace
     {
         F32 val = -2583.4f;
         val = llabs(val);
-        UNSCOPED_INFO("float absolute value 1");
         CHECK(val == 2583.4f);
         val = 430903.f;
         val = llabs(val);
-        UNSCOPED_INFO("float absolute value 2");
         CHECK(val == 430903.f);
     }
 
@@ -70,11 +66,9 @@ namespace
     {
         F64 val = 387439393.987329839;
         val = llabs(val);
-        UNSCOPED_INFO("double absolute value 1");
         CHECK(val == 387439393.987329839);
         val = -8937843.9394878;
         val = llabs(val);
-        UNSCOPED_INFO("double absolute value 2");
         CHECK(val == 8937843.9394878);
     }
 
@@ -82,11 +76,9 @@ namespace
     {
         F32 val = 430903.9f;
         S32 val1 = lltrunc(val);
-        UNSCOPED_INFO("float truncate value 1");
         CHECK(val1 == 430903);
         val = -2303.9f;
         val1 = lltrunc(val);
-        UNSCOPED_INFO("float truncate value 2");
         CHECK(val1 == -2303);
     }
 
@@ -94,11 +86,9 @@ namespace
     {
         F64 val = 387439393.987329839 ;
         S32 val1 = lltrunc(val);
-        UNSCOPED_INFO("float truncate value 1");
         CHECK(val1 == 387439393);
         val = -387439393.987329839;
         val1 = lltrunc(val);
-        UNSCOPED_INFO("float truncate value 2");
         CHECK(val1 == -387439393);
     }
 
@@ -106,11 +96,9 @@ namespace
     {
         F32 val = 430903.2f;
         S32 val1 = llfloor(val);
-        UNSCOPED_INFO("float llfloor value 1");
         CHECK(val1 == 430903);
         val = -430903.9f;
         val1 = llfloor(val);
-        UNSCOPED_INFO("float llfloor value 2");
         CHECK(val1 == -430904);
     }
 
@@ -118,11 +106,9 @@ namespace
     {
         F32 val = 430903.2f;
         S32 val1 = llceil(val);
-        UNSCOPED_INFO("float llceil value 1");
         CHECK(val1 == 430904);
         val = -430903.9f;
         val1 = llceil(val);
-        UNSCOPED_INFO("float llceil value 2");
         CHECK(val1 == -430903);
     }
 
@@ -130,11 +116,9 @@ namespace
     {
         F32 val = 430903.2f;
         S32 val1 = ll_round(val);
-        UNSCOPED_INFO("float ll_round value 1");
         CHECK(val1 == 430903);
         val = -430903.9f;
         val1 = ll_round(val);
-        UNSCOPED_INFO("float ll_round value 2");
         CHECK(val1 == -430904);
     }
 
@@ -142,11 +126,9 @@ namespace
     {
         F32 val = 430905.2654f, nearest = 100.f;
         val = ll_round(val, nearest);
-        UNSCOPED_INFO("float ll_round value 1");
         CHECK(val == 430900);
         val = -430905.2654f, nearest = 10.f;
         val = ll_round(val, nearest);
-        UNSCOPED_INFO("float ll_round value 1");
         CHECK(val == -430910);
     }
 
@@ -154,11 +136,9 @@ namespace
     {
         F64 val = 430905.2654, nearest = 100.0;
         val = ll_round(val, nearest);
-        UNSCOPED_INFO("double ll_round value 1");
         CHECK(val == 430900);
         val = -430905.2654, nearest = 10.0;
         val = ll_round(val, nearest);
-        UNSCOPED_INFO("double ll_round value 1");
         CHECK(val == -430910.00000);
     }
 
@@ -167,18 +147,12 @@ namespace
         const F32   F_PI        = 3.1415926535897932384626433832795f;
         F32 angle = 3506.f;
         angle =  llsimple_angle(angle);
-        {
-            INFO("llsimple_angle  value 1");
-            CHECK(angle <=F_PI);
-            CHECK(angle >= -F_PI);
-        }
+        CHECK(angle <=F_PI);
+        CHECK(angle >= -F_PI);
         angle = -431.f;
         angle =  llsimple_angle(angle);
-        {
-            INFO("llsimple_angle  value 1");
-            CHECK(angle <=F_PI);
-            CHECK(angle >= -F_PI);
-        }
+        CHECK(angle <=F_PI);
+        CHECK(angle >= -F_PI);
     }
 }
 
@@ -191,13 +165,10 @@ namespace
 
     TEST_CASE_METHOD(uuid_data, "mathmisc LLUUID: isNull by default and after setNull but not after generate", "[mathmisc_LLUUID]")
     {
-        UNSCOPED_INFO("uuid null");
         CHECK(id.isNull());
         id.generate();
-        UNSCOPED_INFO("generate not null");
         CHECK(id.notNull());
         id.setNull();
-        UNSCOPED_INFO("set null");
         CHECK(id.isNull());
     }
 
@@ -205,13 +176,10 @@ namespace
     {
         id.generate();
         LLUUID a(id);
-        UNSCOPED_INFO("copy equal");
         CHECK(id == a);
         a.generate();
-        UNSCOPED_INFO("generate not equal");
         CHECK(id != a);
         a = id;
-        UNSCOPED_INFO("assignment equal");
         CHECK(id == a);
     }
 
@@ -222,10 +190,8 @@ namespace
         LLUUID mask;
         mask.generate();
         copy ^= mask;
-        UNSCOPED_INFO("mask not equal");
         CHECK(id != copy);
         copy ^= mask;
-        UNSCOPED_INFO("mask back");
         CHECK(id == copy);
     }
 
@@ -234,7 +200,6 @@ namespace
         id.generate();
         std::string id_str = id.asString();
         LLUUID copy(id_str.c_str());
-        UNSCOPED_INFO("string serialization");
         CHECK(id == copy);
     }
 
@@ -254,7 +219,6 @@ namespace
             c2.update(*rh);
             ++rh;
         }
-        UNSCOPED_INFO("crc update 1");
         CHECK(c1.getCRC() == c2.getCRC());
     }
 
@@ -280,7 +244,6 @@ namespace
         }
         c2.update((U8*)TEST_BUFFER2, sizeof(TEST_BUFFER2) - 1);
 
-        UNSCOPED_INFO("crc update 2");
         CHECK(c1.getCRC() == c2.getCRC());
     }
 }
@@ -293,7 +256,7 @@ namespace
 
     struct line_data
     {
-        // Tests 1 and 3 seed the main thread's generator.
+        // The intersects and two-planes cases seed the main thread's generator.
         ~line_data() { ll_test::reseedRandomFromEntropy(); }
     };
 
@@ -612,9 +575,7 @@ namespace
         volatile float zero = 0.0f;
         float nan = zero / zero;
         float inf = 1.0f / zero;
-        UNSCOPED_INFO("isnan sees a NaN");
         CHECK(std::isnan(nan));
-        UNSCOPED_INFO("isinf sees an infinity");
         CHECK(std::isinf(inf));
     }
 }

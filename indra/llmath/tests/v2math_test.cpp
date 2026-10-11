@@ -37,41 +37,26 @@ namespace
     TEST_CASE("v2math_h: constructors and clearVec/zeroVec", "[v2math_h]")
     {
         LLVector2 vec2;
-        {
-            INFO("LLVector2:Fail to initialize ");
-            CHECK(vec2.mV[VX] == 0.f);
-            CHECK(vec2.mV[VY] == 0.f);
-        }
+        CHECK(vec2.mV[VX] == 0.f);
+        CHECK(vec2.mV[VY] == 0.f);
 
         F32 x =2.0f, y = 3.2f ;
         LLVector2 vec3(x,y);
-        {
-            INFO("LLVector2(F32 x, F32 y):Fail to initialize ");
-            CHECK(x == vec3.mV[VX]);
-            CHECK(y == vec3.mV[VY]);
-        }
+        CHECK(x == vec3.mV[VX]);
+        CHECK(y == vec3.mV[VY]);
 
         const F32 vec[2] = {3.2f, 4.5f};
         LLVector2 vec4(vec);
-        {
-            INFO("LLVector2(const F32 *vec):Fail to initialize ");
-            CHECK(vec[0] == vec4.mV[VX]);
-            CHECK(vec[1] == vec4.mV[VY]);
-        }
+        CHECK(vec[0] == vec4.mV[VX]);
+        CHECK(vec[1] == vec4.mV[VY]);
 
         vec4.clearVec();
-        {
-            INFO("clearVec():Fail to clean the values ");
-            CHECK(vec4.mV[VX] == 0.f);
-            CHECK(vec4.mV[VY] == 0.f);
-        }
+        CHECK(vec4.mV[VX] == 0.f);
+        CHECK(vec4.mV[VY] == 0.f);
 
         vec3.zeroVec();
-        {
-            INFO("zeroVec():Fail to fill the zero ");
-            CHECK(vec3.mV[VX] == 0.f);
-            CHECK(vec3.mV[VY] == 0.f);
-        }
+        CHECK(vec3.mV[VX] == 0.f);
+        CHECK(vec3.mV[VY] == 0.f);
     }
 
     TEST_CASE("v2math_h: the setVec overloads", "[v2math_h]")
@@ -79,33 +64,24 @@ namespace
         F32 x = 123.356f, y = 2387.453f;
         LLVector2 vec2,vec3;
         vec2.setVec(x, y);
-        {
-            INFO("1:setVec: Fail  ");
-            CHECK(x == vec2.mV[VX]);
-            CHECK(y == vec2.mV[VY]);
-        }
+        CHECK(x == vec2.mV[VX]);
+        CHECK(y == vec2.mV[VY]);
 
         vec3.setVec(vec2);
-        UNSCOPED_INFO("2:setVec: Fail   ");
         CHECK(vec2 == vec3);
 
         vec3.zeroVec();
         const F32 vec[2] = {3.24653f, 457653.4f};
         vec3.setVec(vec);
-        {
-            INFO("3:setVec: Fail  ");
-            CHECK(vec[0] == vec3.mV[VX]);
-            CHECK(vec[1] == vec3.mV[VY]);
-        }
+        CHECK(vec[0] == vec3.mV[VX]);
+        CHECK(vec[1] == vec3.mV[VY]);
     }
 
     TEST_CASE("v2math_h: magVecSquared and magVec", "[v2math_h]")
     {
         F32 x = 2.2345f, y = 3.5678f ;
         LLVector2 vec2(x,y);
-        UNSCOPED_INFO("magVecSquared:Fail ");
         CHECK(is_approx_equal(vec2.magVecSquared(), (x*x + y*y)));
-        UNSCOPED_INFO("magVec:Fail ");
         CHECK(is_approx_equal(vec2.magVec(), (F32) sqrt(x*x + y*y)));
     }
 
@@ -113,19 +89,14 @@ namespace
     {
         F32 x =-2.0f, y = -3.0f ;
         LLVector2 vec2(x,y);
-        UNSCOPED_INFO("abs():Fail");
-        CHECK(vec2.abs() == true);
-        UNSCOPED_INFO("abs() x");
+        CHECK(vec2.abs());
         CHECK(is_approx_equal(vec2.mV[VX], 2.f));
-        UNSCOPED_INFO("abs() y");
         CHECK(is_approx_equal(vec2.mV[VY], 3.f));
 
-        UNSCOPED_INFO("isNull():Fail ");
         CHECK_FALSE(vec2.isNull());   //Returns true if vector has a _very_small_ length
 
         x =.00000001f, y = .000001001f;
         vec2.setVec(x, y);
-        UNSCOPED_INFO("isNull(): Fail ");
         CHECK(vec2.isNull());
     }
 
@@ -134,22 +105,16 @@ namespace
         F32 x =1.f, y = 2.f;
         LLVector2 vec2(x, y), vec3;
         vec3 = vec3.scaleVec(vec2);
-        {
-            INFO("scaleVec: Fail ");
-            CHECK(vec3.mV[VX] == 0.);
-            CHECK(vec3.mV[VY] == 0.);
-        }
-        UNSCOPED_INFO("isExactlyZero(): Fail");
+        CHECK(vec3.mV[VX] == 0.);
+        CHECK(vec3.mV[VY] == 0.);
+
         CHECK(vec3.isExactlyZero());
 
         vec3.setVec(2.f, 1.f);
         vec3 = vec3.scaleVec(vec2);
-        {
-            INFO("scaleVec: Fail ");
-            CHECK(vec3.mV[VX] == 2.f);
-            CHECK(vec3.mV[VY] == 2.f);
-        }
-        UNSCOPED_INFO("isExactlyZero():Fail");
+        CHECK(vec3.mV[VX] == 2.f);
+        CHECK(vec3.mV[VY] == 2.f);
+
         CHECK_FALSE(vec3.isExactlyZero());
     }
 
@@ -161,11 +126,8 @@ namespace
         vec4 = vec2 + vec3 ;
         val1 = x1+x2;
         val2 = y1+y2;
-        {
-            INFO("1:operator+ failed");
-            CHECK(val1 == vec4.mV[VX]);
-            CHECK(val2 == vec4.mV[VY]);
-        }
+        CHECK(val1 == vec4.mV[VX]);
+        CHECK(val2 == vec4.mV[VY]);
 
         vec2.clearVec();
         vec3.clearVec();
@@ -175,11 +137,8 @@ namespace
         vec4 = vec2 + vec3;
         val1 = x1+x2;
         val2 = y1+y2;
-        {
-            INFO("2:operator+ failed");
-            CHECK(val1 == vec4.mV[VX]);
-            CHECK(val2 == vec4.mV[VY]);
-        }
+        CHECK(val1 == vec4.mV[VX]);
+        CHECK(val2 == vec4.mV[VY]);
     }
 
     TEST_CASE("v2math_h: operator- subtracts componentwise", "[v2math_h]")
@@ -190,11 +149,8 @@ namespace
         vec4 = vec2 - vec3 ;
         val1 = x1-x2;
         val2 = y1-y2;
-        {
-            INFO("1:operator- failed");
-            CHECK(val1 == vec4.mV[VX]);
-            CHECK(val2 == vec4.mV[VY]);
-        }
+        CHECK(val1 == vec4.mV[VX]);
+        CHECK(val2 == vec4.mV[VY]);
 
         vec2.clearVec();
         vec3.clearVec();
@@ -205,11 +161,8 @@ namespace
         vec4 = vec2 - vec3;
         val1 = x1-x2;
         val2 = y1-y2;
-        {
-            INFO("2:operator- failed");
-            CHECK(val1 == vec4.mV[VX]);
-            CHECK(val2 == vec4.mV[VY]);
-        }
+        CHECK(val1 == vec4.mV[VX]);
+        CHECK(val2 == vec4.mV[VY]);
     }
 
     TEST_CASE("v2math_h: operator* as dot product and scalar product", "[v2math_h]")
@@ -219,7 +172,6 @@ namespace
         LLVector2 vec2(x1, y1), vec3(x2, y2);
         val1 = vec2 * vec3;
         val2 = x1*x2 + y1*y2;
-        UNSCOPED_INFO("1:operator* failed");
         CHECK(val1 == val2);
 
         vec3.clearVec();
@@ -227,19 +179,13 @@ namespace
         vec3 = vec2 * mulVal;
         val1 = x1*mulVal;
         val2 = y1*mulVal;
-        {
-            INFO("2:operator* failed");
-            CHECK(val1 == vec3.mV[VX]);
-            CHECK(val2 == vec3.mV[VY]);
-        }
+        CHECK(val1 == vec3.mV[VX]);
+        CHECK(val2 == vec3.mV[VY]);
 
         vec3.clearVec();
         vec3 = mulVal * vec2;
-        {
-            INFO("3:operator* failed");
-            CHECK(val1 == vec3.mV[VX]);
-            CHECK(val2 == vec3.mV[VY]);
-        }
+        CHECK(val1 == vec3.mV[VX]);
+        CHECK(val2 == vec3.mV[VY]);
     }
 
     TEST_CASE("v2math_h: operator/ divides by a scalar", "[v2math_h]")
@@ -250,11 +196,8 @@ namespace
         vec3 = vec2 / div;
         val1 = x1 / div;
         val2 = y1 / div;
-        {
-            INFO("1:operator/ failed");
-            CHECK(is_approx_equal(val1, vec3.mV[VX]));
-            CHECK(is_approx_equal(val2, vec3.mV[VY]));
-        }
+        CHECK(is_approx_equal(val1, vec3.mV[VX]));
+        CHECK(is_approx_equal(val2, vec3.mV[VY]));
 
         vec3.clearVec();
         x1 = -.235f, y1 = -24.32f, div = -2.2f;
@@ -262,11 +205,8 @@ namespace
         vec3 = vec2 / div;
         val1 = x1 / div;
         val2 = y1 / div;
-        {
-            INFO("2:operator/ failed");
-            CHECK(is_approx_equal(val1, vec3.mV[VX]));
-            CHECK(is_approx_equal(val2, vec3.mV[VY]));
-        }
+        CHECK(is_approx_equal(val1, vec3.mV[VX]));
+        CHECK(is_approx_equal(val2, vec3.mV[VY]));
     }
 
     TEST_CASE("v2math_h: operator% is the cross product", "[v2math_h]")
@@ -277,11 +217,8 @@ namespace
         vec4 = vec2 % vec3;
         val1 = x1*y2 - x2*y1;
         val2 = y1*x2 - y2*x1;
-        {
-            INFO("1:operator% failed");
-            CHECK(val1 == vec4.mV[VX]);
-            CHECK(val2 == vec4.mV[VY]);
-        }
+        CHECK(val1 == vec4.mV[VX]);
+        CHECK(val2 == vec4.mV[VY]);
 
         vec2.clearVec();
         vec3.clearVec();
@@ -292,17 +229,14 @@ namespace
         vec4 = vec2 % vec3;
         val1 = x1*y2 - x2*y1;
         val2 = y1*x2 - y2*x1;
-        {
-            INFO("2:operator% failed");
-            CHECK(val1 == vec4.mV[VX]);
-            CHECK(val2 == vec4.mV[VY]);
-        }
+        CHECK(val1 == vec4.mV[VX]);
+        CHECK(val2 == vec4.mV[VY]);
     }
+
     TEST_CASE("v2math_h: operator== for equal vectors", "[v2math_h]")
     {
         F32 x1 =1.f, y1 = 2.f;
         LLVector2 vec2(x1, y1), vec3(x1, y1);
-        UNSCOPED_INFO("1:operator== failed");
         CHECK(vec2 == vec3);
 
         vec2.clearVec();
@@ -310,7 +244,6 @@ namespace
         x1 = -.235f, y1 = -24.32f;
         vec2.setVec(x1, y1);
         vec3.setVec(vec2);
-        UNSCOPED_INFO("2:operator== failed");
         CHECK(vec2 == vec3);
     }
 
@@ -318,16 +251,15 @@ namespace
     {
         F32 x1 = 1.f, y1 = 2.f,x2 = 2.332f, y2 = -1.23f;
         LLVector2 vec2(x1, y1), vec3(x2, y2);
-        UNSCOPED_INFO("1:operator!= failed");
         CHECK(vec2 != vec3);
 
         vec2.clearVec();
         vec3.clearVec();
         vec2.setVec(x1, y1);
         vec3.setVec(vec2);
-        UNSCOPED_INFO("2:operator!= failed");
         CHECK_FALSE(vec2 != vec3);
     }
+
     TEST_CASE("v2math_h: operator+= and operator-=", "[v2math_h]")
     {
         F32 x1 = 1.f, y1 = 2.f,x2 = 2.332f, y2 = -1.23f;
@@ -336,21 +268,15 @@ namespace
         vec2 +=vec3;
         val1 = x1+x2;
         val2 = y1+y2;
-        {
-            INFO("1:operator+= failed");
-            CHECK(val1 == vec2.mV[VX]);
-            CHECK(val2 == vec2.mV[VY]);
-        }
+        CHECK(val1 == vec2.mV[VX]);
+        CHECK(val2 == vec2.mV[VY]);
 
         vec2.setVec(x1, y1);
         vec2 -=vec3;
         val1 = x1-x2;
         val2 = y1-y2;
-        {
-            INFO("2:operator-= failed");
-            CHECK(val1 == vec2.mV[VX]);
-            CHECK(val2 == vec2.mV[VY]);
-        }
+        CHECK(val1 == vec2.mV[VX]);
+        CHECK(val2 == vec2.mV[VY]);
 
         vec2.clearVec();
         vec3.clearVec();
@@ -360,21 +286,15 @@ namespace
         vec2 +=vec3;
         val1 = x1+x2;
         val2 = y1+y2;
-        {
-            INFO("3:operator+= failed");
-            CHECK(val1 == vec2.mV[VX]);
-            CHECK(val2 == vec2.mV[VY]);
-        }
+        CHECK(val1 == vec2.mV[VX]);
+        CHECK(val2 == vec2.mV[VY]);
 
         vec2.setVec(x1, y1);
         vec2 -=vec3;
         val1 = x1-x2;
         val2 = y1-y2;
-        {
-            INFO("4:operator-= failed");
-            CHECK(is_approx_equal(val1, vec2.mV[VX]));
-            CHECK(is_approx_equal(val2, vec2.mV[VY]));
-        }
+        CHECK(is_approx_equal(val1, vec2.mV[VX]));
+        CHECK(is_approx_equal(val2, vec2.mV[VY]));
     }
 
     TEST_CASE("v2math_h: operator/= divides by a scalar", "[v2math_h]")
@@ -385,11 +305,8 @@ namespace
         vec2 /=mulVal;
         val1 = x1 / mulVal;
         val2 = y1 / mulVal;
-        {
-            INFO("1:operator/= failed");
-            CHECK(is_approx_equal(val1, vec2.mV[VX]));
-            CHECK(is_approx_equal(val2, vec2.mV[VY]));
-        }
+        CHECK(is_approx_equal(val1, vec2.mV[VX]));
+        CHECK(is_approx_equal(val2, vec2.mV[VY]));
 
         vec2.clearVec();
         x1 = .213f, y1 = -2.34f, mulVal = -.23f;
@@ -397,11 +314,8 @@ namespace
         vec2 /=mulVal;
         val1 = x1 / mulVal;
         val2 = y1 / mulVal;
-        {
-            INFO("2:operator/= failed");
-            CHECK(is_approx_equal(val1, vec2.mV[VX]));
-            CHECK(is_approx_equal(val2, vec2.mV[VY]));
-        }
+        CHECK(is_approx_equal(val1, vec2.mV[VX]));
+        CHECK(is_approx_equal(val2, vec2.mV[VY]));
     }
 
     TEST_CASE("v2math_h: operator*= multiplies by a scalar", "[v2math_h]")
@@ -412,11 +326,8 @@ namespace
         vec2 *=mulVal;
         val1 = x1*mulVal;
         val2 = y1*mulVal;
-        {
-            INFO("1:operator*= failed");
-            CHECK(val1 == vec2.mV[VX]);
-            CHECK(val2 == vec2.mV[VY]);
-        }
+        CHECK(val1 == vec2.mV[VX]);
+        CHECK(val2 == vec2.mV[VY]);
 
         vec2.clearVec();
         x1 = .213f, y1 = -2.34f, mulVal = -.23f;
@@ -424,11 +335,8 @@ namespace
         vec2 *=mulVal;
         val1 = x1*mulVal;
         val2 = y1*mulVal;
-        {
-            INFO("2:operator*= failed");
-            CHECK(val1 == vec2.mV[VX]);
-            CHECK(val2 == vec2.mV[VY]);
-        }
+        CHECK(val1 == vec2.mV[VX]);
+        CHECK(val2 == vec2.mV[VY]);
     }
 
     TEST_CASE("v2math_h: operator%= matches the cross product", "[v2math_h]")
@@ -439,11 +347,8 @@ namespace
         vec2 %= vec3;
         val1 = x1*y2 - x2*y1;
         val2 = y1*x2 - y2*x1;
-        {
-            INFO("1:operator%= failed");
-            CHECK(val1 == vec2.mV[VX]);
-            CHECK(val2 == vec2.mV[VY]);
-        }
+        CHECK(val1 == vec2.mV[VX]);
+        CHECK(val2 == vec2.mV[VY]);
     }
 
     TEST_CASE("v2math_h: unary operator- negates", "[v2math_h]")
@@ -451,7 +356,6 @@ namespace
         F32 x1 =1.f, y1 = 2.f;
         LLVector2 vec2(x1, y1),vec3;
         vec3 = -vec2;
-        UNSCOPED_INFO("1:operator- failed");
         CHECK(-vec3 == vec2);
     }
 
@@ -463,7 +367,6 @@ namespace
         stream1 << vec2;
         vec3.setVec(x1, y1);
         stream2 << vec3;
-        UNSCOPED_INFO("1:operator << failed");
         CHECK(stream1.str() == stream2.str());
     }
 
@@ -471,13 +374,11 @@ namespace
     {
         F32 x1 =1.0f, y1 = 2.0f, x2 = -.32f, y2 = .2234f;
         LLVector2 vec2(x1, y1),vec3(x2, y2);
-        UNSCOPED_INFO("1:operator < failed");
         CHECK(vec3 < vec2);
 
         x1 = 1.0f, y1 = 2.0f, x2 = 1.0f, y2 = 3.2234f;
         vec2.setVec(x1, y1);
         vec3.setVec(x2, y2);
-        UNSCOPED_INFO("2:operator < failed");
         CHECK_FALSE(vec3 < vec2);
     }
 
@@ -485,19 +386,15 @@ namespace
     {
         F32 x1 =1.0f, y1 = 2.0f;
         LLVector2 vec2(x1, y1);
-        UNSCOPED_INFO("1:operator [] failed");
         CHECK(x1 ==  vec2[0]);
-        UNSCOPED_INFO("2:operator [] failed");
         CHECK(y1 ==  vec2[1]);
 
         vec2.clearVec();
         x1 = 23.0f, y1 = -.2361f;
         vec2.setVec(x1, y1);
         F32 ref1 = vec2[0];
-        UNSCOPED_INFO("3:operator [] failed");
         CHECK(ref1 ==  x1);
         F32 ref2 = vec2[1];
-        UNSCOPED_INFO("4:operator [] failed");
         CHECK(ref2 ==  y1);
     }
 
@@ -508,16 +405,13 @@ namespace
         LLVector2 vec2(x1, y1),vec3(x2, y2);
         val1 = dist_vec_squared2D(vec2, vec3);
         val2 = (x1 - x2)*(x1 - x2) + (y1 - y2)* (y1 - y2);
-        UNSCOPED_INFO("dist_vec_squared2D values are not equal");
         CHECK(val2 == val1);
 
         val1 = dist_vec_squared(vec2, vec3);
-        UNSCOPED_INFO("dist_vec_squared values are not equal");
         CHECK(val2 == val1);
 
         val1 =  dist_vec(vec2, vec3);
         val2 = (F32) sqrt((x1 - x2)*(x1 - x2) + (y1 - y2)* (y1 - y2));
-        UNSCOPED_INFO("dist_vec values are not equal");
         CHECK(val2 == val1);
     }
 
@@ -529,11 +423,8 @@ namespace
         LLVector2 vec4 = lerp(vec2, vec3, fVal);
         val1 = x1 + (x2 - x1) * fVal;
         val2 = y1 + (y2 - y1) * fVal;
-        {
-            INFO("lerp values are not equal");
-            CHECK(val1 == vec4.mV[VX]);
-            CHECK(val2 == vec4.mV[VY]);
-        }
+        CHECK(val1 == vec4.mV[VX]);
+        CHECK(val2 == vec4.mV[VY]);
     }
 
     TEST_CASE("v2math_h: normVec normalises and zeroes a tiny vector", "[v2math_h]")
@@ -549,22 +440,16 @@ namespace
         val1 = x1 * oomag;
         val2 = y1 * oomag;
 
-        {
-            INFO("normVec failed");
-            CHECK(is_approx_equal(val1, vec2.mV[VX]));
-            CHECK(is_approx_equal(val2, vec2.mV[VY]));
-            CHECK(is_approx_equal(vecMag, mag));
-        }
+        CHECK(is_approx_equal(val1, vec2.mV[VX]));
+        CHECK(is_approx_equal(val2, vec2.mV[VY]));
+        CHECK(is_approx_equal(vecMag, mag));
 
         x1 =.00000001f, y1 = 0.f;
 
         vec2.setVec(x1, y1);
         vecMag = vec2.normVec();
-        {
-            INFO("normVec failed should be 0.");
-            CHECK(vec2.mV[VX] == 0.);
-            CHECK(vec2.mV[VY] == 0.);
-            CHECK(vecMag == 0.);
-        }
+        CHECK(vec2.mV[VX] == 0.);
+        CHECK(vec2.mV[VY] == 0.);
+        CHECK(vecMag == 0.);
     }
 }

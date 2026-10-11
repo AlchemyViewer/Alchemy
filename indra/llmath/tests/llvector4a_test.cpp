@@ -80,58 +80,59 @@ namespace
         return (U32)(d < 0 ? -d : d);
     }
 
-    void ensure_bits(const std::string& what, const LLVector4a& got, U32 x, U32 y, U32 z, U32 w)
+    void require_bits(const std::string& what, const LLVector4a& got, U32 x, U32 y, U32 z, U32 w)
     {
+        INFO(what);
         const U32 expected[4] = {x, y, z, w};
-        for (int i = 0; i < 4; ++i)
+        for (int lane = 0; lane < 4; ++lane)
         {
-            UNSCOPED_INFO(what + " lane " + std::to_string(i));
-            REQUIRE(bits_of(got[i]) == expected[i]);
+            CAPTURE(lane);
+            REQUIRE(bits_of(got[lane]) == expected[lane]);
         }
     }
 
-    void ensure_exact(const std::string& what, const LLVector4a& got, F32 x, F32 y, F32 z, F32 w)
+    void require_exact(const std::string& what, const LLVector4a& got, F32 x, F32 y, F32 z, F32 w)
     {
-        ensure_bits(what, got, bits_of(x), bits_of(y), bits_of(z), bits_of(w));
+        require_bits(what, got, bits_of(x), bits_of(y), bits_of(z), bits_of(w));
     }
 
-    void ensure_ulps(const std::string& what, F32 got, F32 expected, U32 ulps)
+    void require_ulps(const std::string& what, F32 got, F32 expected, U32 ulps)
     {
         const U32 d = ulps_between(got, expected);
-        UNSCOPED_INFO(what + ": " + precise(got) + " is " + std::to_string(d) + " ulps from " + precise(expected));
+        INFO(what << ": " << precise(got) << " is " << d << " ulps from " << precise(expected));
         REQUIRE(d <= ulps);
     }
 
-    void ensure_ulps(const std::string& what, const LLVector4a& got, const F32* expected, U32 ulps, int lanes = 4)
+    void require_ulps(const std::string& what, const LLVector4a& got, const F32* expected, U32 ulps, int lanes = 4)
     {
-        for (int i = 0; i < lanes; ++i)
+        for (int lane = 0; lane < lanes; ++lane)
         {
-            ensure_ulps(what + " lane " + std::to_string(i), got[i], expected[i], ulps);
+            CAPTURE(lane);
+            require_ulps(what, got[lane], expected[lane], ulps);
         }
     }
 
-    void ensure_relative(const std::string& what, F32 got, double expected, double relative)
+    void require_relative(const std::string& what, F32 got, double expected, double relative)
     {
         const double err = std::fabs((double)got - expected) / std::fabs(expected);
-        UNSCOPED_INFO(what + ": " + precise(got) + " is off " + precise(err) + " relative from " + precise(expected));
+        INFO(what << ": " << precise(got) << " is off " << precise(err) << " relative from " << precise(expected));
         REQUIRE(err <= relative);
     }
 
-    void ensure_relative(const std::string& what, const LLVector4a& got, const double* expected, double relative, int lanes = 4)
+    void require_relative(const std::string& what, const LLVector4a& got, const double* expected, double relative, int lanes = 4)
     {
-        for (int i = 0; i < lanes; ++i)
+        for (int lane = 0; lane < lanes; ++lane)
         {
-            ensure_relative(what + " lane " + std::to_string(i), got[i], expected[i], relative);
+            CAPTURE(lane);
+            require_relative(what, got[lane], expected[lane], relative);
         }
     }
 
-    void ensure_same_lanes(const std::string& what, const LLVector4a& v)
+    void require_same_lanes(const std::string& what, const LLVector4a& v)
     {
-        UNSCOPED_INFO(what + " lane 1");
+        INFO(what);
         REQUIRE(bits_of(v[1]) == bits_of(v[0]));
-        UNSCOPED_INFO(what + " lane 2");
         REQUIRE(bits_of(v[2]) == bits_of(v[0]));
-        UNSCOPED_INFO(what + " lane 3");
         REQUIRE(bits_of(v[3]) == bits_of(v[0]));
     }
 
@@ -185,21 +186,15 @@ namespace
     // Plain data of one register, and the two constants.
     TEST_CASE_METHOD(llvector4a_data, "LLVector4a: plain data of one register and the two constants", "[LLVector4a]")
     {
-        UNSCOPED_INFO("sizeof LLVector4a");
         CHECK(sizeof(LLVector4a) == (size_t)16);
-        UNSCOPED_INFO("alignof LLVector4a");
         CHECK(alignof(LLVector4a) == (size_t)16);
-        UNSCOPED_INFO("sizeof LLSimdScalar");
         CHECK(sizeof(LLSimdScalar) == (size_t)16);
-        UNSCOPED_INFO("sizeof LLVector4Logical");
         CHECK(sizeof(LLVector4Logical) == (size_t)16);
-        UNSCOPED_INFO("trivially copyable");
         CHECK(std::is_trivially_copyable<LLVector4a>::value);
-        UNSCOPED_INFO("standard layout");
         CHECK(std::is_standard_layout<LLVector4a>::value);
 
-        ensure_exact("zero", LLVector4a::getZero(), 0.f, 0.f, 0.f, 0.f);
-        ensure_exact("epsilon", LLVector4a::getEpsilon(), F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZERO);
+        require_exact("zero", LLVector4a::getZero(), 0.f, 0.f, 0.f, 0.f);
+        require_exact("epsilon", LLVector4a::getEpsilon(), F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZERO);
     }
 
     // Loads, stores, set, splat and the lane accessors move bits.
@@ -209,71 +204,62 @@ namespace
 
         LLVector4a v;
         v.load4a(src);
-        ensure_bits("load4a", v, pa[0], pa[1], pa[2], pa[3]);
+        require_bits("load4a", v, pa[0], pa[1], pa[2], pa[3]);
 
         v.loadua(src + 1);
-        ensure_bits("loadua", v, pa[1], pa[2], pa[3], bits_of(99.f));
+        require_bits("loadua", v, pa[1], pa[2], pa[3], bits_of(99.f));
 
         v.load3(src + 1);
-        ensure_bits("load3", v, pa[1], pa[2], pa[3], 0u);
+        require_bits("load3", v, pa[1], pa[2], pa[3], 0u);
 
         alignas(16) F32 dst[4] = {1.f, 1.f, 1.f, 1.f};
         a().store4a(dst);
-        UNSCOPED_INFO("store4a x");
         CHECK(bits_of(dst[0]) == pa[0]);
-        UNSCOPED_INFO("store4a y");
         CHECK(bits_of(dst[1]) == pa[1]);
-        UNSCOPED_INFO("store4a z");
         CHECK(bits_of(dst[2]) == pa[2]);
-        UNSCOPED_INFO("store4a w");
         CHECK(bits_of(dst[3]) == pa[3]);
 
         alignas(16) F32 copied[4];
         LLVector4a::copy4a(copied, src);
-        UNSCOPED_INFO("copy4a");
         CHECK(bits_of(copied[2]) == pa[2]);
 
         v.set(1.f, 2.f, 3.f);
-        ensure_exact("set defaults w to zero", v, 1.f, 2.f, 3.f, 0.f);
+        require_exact("set defaults w to zero", v, 1.f, 2.f, 3.f, 0.f);
 
         v.clear();
-        ensure_exact("clear", v, 0.f, 0.f, 0.f, 0.f);
+        require_exact("clear", v, 0.f, 0.f, 0.f, 0.f);
 
         v.splat(float_of(pa[2]));
-        ensure_bits("splat(F32)", v, pa[2], pa[2], pa[2], pa[2]);
+        require_bits("splat(F32)", v, pa[2], pa[2], pa[2], pa[2]);
 
         v.splat<3>(a());
-        ensure_bits("splat<3>", v, pa[3], pa[3], pa[3], pa[3]);
+        require_bits("splat<3>", v, pa[3], pa[3], pa[3], pa[3]);
 
         v.splat(a(), 1);
-        ensure_bits("splat(v, 1)", v, pa[1], pa[1], pa[1], pa[1]);
+        require_bits("splat(v, 1)", v, pa[1], pa[1], pa[1], pa[1]);
 
         const LLVector4a splatted(a().getScalarAt<2>());
-        ensure_bits("LLVector4a(LLSimdScalar)", splatted, pa[2], pa[2], pa[2], pa[2]);
+        require_bits("LLVector4a(LLSimdScalar)", splatted, pa[2], pa[2], pa[2], pa[2]);
 
         v.splat(a().getScalarAt(3));
-        ensure_bits("splat(LLSimdScalar) from getScalarAt(3)", v, pa[3], pa[3], pa[3], pa[3]);
+        require_bits("splat(LLSimdScalar) from getScalarAt(3)", v, pa[3], pa[3], pa[3], pa[3]);
 
         const LLVector4a one(1.f);
-        ensure_exact("explicit LLVector4a(F32)", one, 1.f, 1.f, 1.f, 1.f);
+        require_exact("explicit LLVector4a(F32)", one, 1.f, 1.f, 1.f, 1.f);
 
         const LLVector4a from_a = a();
-        UNSCOPED_INFO("operator[] 2");
         CHECK(bits_of(from_a[2]) == pa[2]);
-        UNSCOPED_INFO("getScalarAt<1>");
         CHECK(bits_of(from_a.getScalarAt<1>().getF32()) == pa[1]);
-        UNSCOPED_INFO("getScalarAt(0)");
         CHECK(bits_of(from_a.getScalarAt(0).getF32()) == pa[0]);
 
         LLVector4a written = a();
         written.getF32ptr()[1] = 7.f;
-        ensure_bits("getF32ptr writes through", written, pa[0], bits_of(7.f), pa[2], pa[3]);
-        UNSCOPED_INFO("getF32ptr reads");
+        require_bits("getF32ptr writes through", written, pa[0], bits_of(7.f), pa[2], pa[3]);
         CHECK(bits_of(written.getF32ptr()[3]) == pa[3]);
 
         LLVector4a copy;
         copy = (LLQuad)a();
-        ensure_bits("operator=(LLQuad)", copy, pa[0], pa[1], pa[2], pa[3]);
+        require_bits("operator=(LLQuad)", copy, pa[0], pa[1], pa[2], pa[3]);
     }
 
     // The mask type: compares, gathered bits, any/all, invert, the elements.
@@ -286,56 +272,37 @@ namespace
         const LLVector4a y(2.f, 2.f, 2.f, nan_lane);
         const LLVector4a y_again(2.f, 2.f, 2.f, nan_lane);
 
-        UNSCOPED_INFO("greaterThan");
         CHECK(x.greaterThan(y).getGatheredBits() == (U32)(LLVector4Logical::MASK_Z));
-        UNSCOPED_INFO("lessThan");
         CHECK(x.lessThan(y).getGatheredBits() == (U32)(LLVector4Logical::MASK_X));
-        UNSCOPED_INFO("greaterEqual");
         CHECK(x.greaterEqual(y).getGatheredBits() == (U32)(LLVector4Logical::MASK_Y | LLVector4Logical::MASK_Z));
-        UNSCOPED_INFO("lessEqual");
         CHECK(x.lessEqual(y).getGatheredBits() == (U32)(LLVector4Logical::MASK_X | LLVector4Logical::MASK_Y));
-        UNSCOPED_INFO("equal");
         CHECK(x.equal(y).getGatheredBits() == (U32)(LLVector4Logical::MASK_Y));
         UNSCOPED_INFO("NaN compares equal to nothing");
         CHECK(y.equal(y_again).getGatheredBits() == (U32)(LLVector4Logical::MASK_XYZ));
 
         LLVector4Logical m = x.greaterEqual(y);
-        UNSCOPED_INFO("areAnySet");
         CHECK(m.areAnySet());
-        UNSCOPED_INFO("areAnySet(MASK_XYZ)");
         CHECK(m.areAnySet(LLVector4Logical::MASK_XYZ));
-        UNSCOPED_INFO("areAnySet(MASK_X) false");
         CHECK_FALSE(m.areAnySet(LLVector4Logical::MASK_X));
-        UNSCOPED_INFO("areAnySet(MASK_W) false");
         CHECK_FALSE(m.areAnySet(LLVector4Logical::MASK_W));
-        UNSCOPED_INFO("areAllSet false");
         CHECK_FALSE(m.areAllSet());
-        UNSCOPED_INFO("areAllSet(MASK_XYZ) false");
         CHECK_FALSE(m.areAllSet(LLVector4Logical::MASK_XYZ));
-        UNSCOPED_INFO("areAllSet(Y|Z)");
         CHECK(m.areAllSet(LLVector4Logical::MASK_Y | LLVector4Logical::MASK_Z));
 
         m.invert();
-        UNSCOPED_INFO("invert");
         CHECK(m.getGatheredBits() == (U32)(LLVector4Logical::MASK_X | LLVector4Logical::MASK_W));
 
         LLVector4Logical built;
         built.clear();
-        UNSCOPED_INFO("clear");
         CHECK(built.getGatheredBits() == 0u);
-        UNSCOPED_INFO("clear areAnySet");
         CHECK_FALSE(built.areAnySet());
         built.setElement<0>();
         built.setElement<2>();
-        UNSCOPED_INFO("setElement");
         CHECK(built.getGatheredBits() == (U32)(LLVector4Logical::MASK_X | LLVector4Logical::MASK_Z));
         built.setElement<1>();
-        UNSCOPED_INFO("areAllSet(MASK_XYZ)");
         CHECK(built.areAllSet(LLVector4Logical::MASK_XYZ));
-        UNSCOPED_INFO("areAllSet still false");
         CHECK_FALSE(built.areAllSet());
         built.setElement<3>();
-        UNSCOPED_INFO("areAllSet");
         CHECK(built.areAllSet());
 
         // select takes whole lanes, bits and all
@@ -345,7 +312,7 @@ namespace
         pick.setElement<3>();
         LLVector4a chosen;
         chosen.setSelectWithMask(pick, a(), b());
-        ensure_bits("setSelectWithMask", chosen, pb[0], pa[1], pb[2], pa[3]);
+        require_bits("setSelectWithMask", chosen, pb[0], pa[1], pb[2], pa[3]);
     }
 
     // Lane arithmetic is one rounding per lane, so it matches scalar float
@@ -360,49 +327,49 @@ namespace
 
         r.setAdd(p, q);
         for (int i = 0; i < 4; ++i) { volatile F32 e = na[i] + nb[i]; expected[i] = e; }
-        ensure_exact("setAdd", r, expected[0], expected[1], expected[2], expected[3]);
+        require_exact("setAdd", r, expected[0], expected[1], expected[2], expected[3]);
         r = p; r.add(q);
-        ensure_exact("add", r, expected[0], expected[1], expected[2], expected[3]);
-        ensure_exact("operator+", p + q, expected[0], expected[1], expected[2], expected[3]);
+        require_exact("add", r, expected[0], expected[1], expected[2], expected[3]);
+        require_exact("operator+", p + q, expected[0], expected[1], expected[2], expected[3]);
         r = p; r += q;
-        ensure_exact("operator+=", r, expected[0], expected[1], expected[2], expected[3]);
+        require_exact("operator+=", r, expected[0], expected[1], expected[2], expected[3]);
 
         r.setSub(p, q);
         for (int i = 0; i < 4; ++i) { volatile F32 e = na[i] - nb[i]; expected[i] = e; }
-        ensure_exact("setSub", r, expected[0], expected[1], expected[2], expected[3]);
+        require_exact("setSub", r, expected[0], expected[1], expected[2], expected[3]);
         r = p; r.sub(q);
-        ensure_exact("sub", r, expected[0], expected[1], expected[2], expected[3]);
-        ensure_exact("operator-", p - q, expected[0], expected[1], expected[2], expected[3]);
+        require_exact("sub", r, expected[0], expected[1], expected[2], expected[3]);
+        require_exact("operator-", p - q, expected[0], expected[1], expected[2], expected[3]);
         r = p; r -= q;
-        ensure_exact("operator-=", r, expected[0], expected[1], expected[2], expected[3]);
+        require_exact("operator-=", r, expected[0], expected[1], expected[2], expected[3]);
 
         r.setMul(p, q);
         for (int i = 0; i < 4; ++i) { volatile F32 e = na[i] * nb[i]; expected[i] = e; }
-        ensure_exact("setMul", r, expected[0], expected[1], expected[2], expected[3]);
+        require_exact("setMul", r, expected[0], expected[1], expected[2], expected[3]);
         r = p; r.mul(q);
-        ensure_exact("mul", r, expected[0], expected[1], expected[2], expected[3]);
+        require_exact("mul", r, expected[0], expected[1], expected[2], expected[3]);
 
         r = p; r.mul(-3.f);
         for (int i = 0; i < 4; ++i) { volatile F32 e = na[i] * -3.f; expected[i] = e; }
-        ensure_exact("mul(F32)", r, expected[0], expected[1], expected[2], expected[3]);
+        require_exact("mul(F32)", r, expected[0], expected[1], expected[2], expected[3]);
 
         r.setDiv(p, q);
         for (int i = 0; i < 4; ++i) { volatile F32 e = na[i] / nb[i]; expected[i] = e; }
-        ensure_ulps("setDiv", r, expected, 1);
+        require_ulps("setDiv", r, expected, 1);
         r = p; r.div(q);
-        ensure_ulps("div", r, expected, 1);
+        require_ulps("div", r, expected, 1);
 
         // The negative zero as its bits, in and out: /fp:fast lets the
         // compiler take -0.f for 0.f, and MSVC for arm64 does.
         const LLVector4a signs(alsimd::or_(alsimd::set(-1.5f, 0.f, 0.f, -INF),
                                            alsimd::and_(alsimd::set1_bits(0x80000000u), alsimd::mask_lane<2>())));
         r.setAbs(signs);
-        ensure_bits("setAbs", r, bits_of(1.5f), 0u, 0u, bits_of(INF));
+        require_bits("setAbs", r, bits_of(1.5f), 0u, 0u, bits_of(INF));
         r.setNeg(signs);
-        ensure_bits("setNeg", r, bits_of(1.5f), 0x80000000u, 0u, bits_of(INF));
+        require_bits("setNeg", r, bits_of(1.5f), 0x80000000u, 0u, bits_of(INF));
         r = signs;
         r.negate();
-        ensure_bits("negate", r, bits_of(1.5f), 0x80000000u, 0u, bits_of(INF));
+        require_bits("negate", r, bits_of(1.5f), 0x80000000u, 0u, bits_of(INF));
 
         // a NaN payload survives the sign ops unchanged
         r.setAbs(a());
@@ -416,7 +383,6 @@ namespace
         // sets its own threads to
         const LLVector4a tiny(DENORMAL, DENORMAL, 0.f, 0.f);
         r.setAdd(tiny, tiny);
-        UNSCOPED_INFO("denormal add");
         CHECK(bits_of(r[0]) == bits_of(DENORMAL) * 2);
     }
 
@@ -429,27 +395,27 @@ namespace
 
         LLVector4a r;
         r.setAllDot3(p, q);
-        ensure_same_lanes("setAllDot3", r);
-        ensure_relative("setAllDot3", r[0], dot3_exact(na, nb), 4e-7);
-        ensure_ulps("setAllDot3 vs scalar", r[0], dot3_ref(na, nb), 2);
+        require_same_lanes("setAllDot3", r);
+        require_relative("setAllDot3", r[0], dot3_exact(na, nb), 4e-7);
+        require_ulps("setAllDot3 vs scalar", r[0], dot3_ref(na, nb), 2);
 
         r.setAllDot4(p, q);
-        ensure_same_lanes("setAllDot4", r);
-        ensure_relative("setAllDot4", r[0], dot4_exact(na, nb), 4e-7);
+        require_same_lanes("setAllDot4", r);
+        require_relative("setAllDot4", r[0], dot4_exact(na, nb), 4e-7);
 
-        ensure_relative("dot3", p.dot3(q).getF32(), dot3_exact(na, nb), 4e-7);
-        ensure_relative("dot4", p.dot4(q).getF32(), dot4_exact(na, nb), 4e-7);
+        require_relative("dot3", p.dot3(q).getF32(), dot3_exact(na, nb), 4e-7);
+        require_relative("dot4", p.dot4(q).getF32(), dot4_exact(na, nb), 4e-7);
 
         // w does not reach the three-lane forms
         const LLVector4a p_w(na[0], na[1], na[2], 1e30f);
-        ensure_relative("dot3 ignores w", p_w.dot3(q).getF32(), dot3_exact(na, nb), 4e-7);
+        require_relative("dot3 ignores w", p_w.dot3(q).getF32(), dot3_exact(na, nb), 4e-7);
 
         // a length, both ways
         const LLVector4a v(3.f, 4.f, 12.f, 100.f);
-        ensure_ulps("getLength3", v.getLength3().getF32(), 13.f, 1);
+        require_ulps("getLength3", v.getLength3().getF32(), 13.f, 1);
         r.setAllLength3(v);
-        ensure_same_lanes("setAllLength3", r);
-        ensure_ulps("setAllLength3", r[0], 13.f, 1);
+        require_same_lanes("setAllLength3", r);
+        require_ulps("setAllLength3", r[0], 13.f, 1);
     }
 
     // The cross product against double, within the rounding the fused form
@@ -468,10 +434,9 @@ namespace
 
         LLVector4a r;
         r.setCross3(p, q);
-        ensure_relative("setCross3", r, expected, 4e-7, 3);
-        UNSCOPED_INFO("setCross3 w is zero");
+        require_relative("setCross3", r, expected, 4e-7, 3);
         CHECK(r[3] == 0.f);
-        ensure_relative("cross3", p.cross3(q), expected, 4e-7, 3);
+        require_relative("cross3", p.cross3(q), expected, 4e-7, 3);
 
         // perpendicular to both, and antisymmetric
         UNSCOPED_INFO("cross is perpendicular to a");
@@ -486,7 +451,7 @@ namespace
 
         // the basis
         r.setCross3(LLVector4a(1.f, 0.f, 0.f), LLVector4a(0.f, 1.f, 0.f));
-        ensure_exact("x cross y is z", r, 0.f, 0.f, 1.f, 0.f);
+        require_exact("x cross y is z", r, 0.f, 0.f, 1.f, 0.f);
     }
 
     // The normalize family: the full-precision forms within an ulp or two of
@@ -502,42 +467,37 @@ namespace
 
         LLVector4a v(raw[0], raw[1], raw[2], raw[3]);
         v.normalize3();
-        ensure_relative("normalize3", v, n3, 4e-7, 3);
-        UNSCOPED_INFO("normalize3 result isNormalized3");
+        require_relative("normalize3", v, n3, 4e-7, 3);
         CHECK(v.isNormalized3());
-        UNSCOPED_INFO("normalize3 result isNormalized3 tight");
         CHECK(v.isNormalized3(1e-6f));
 
         v.set(raw[0], raw[1], raw[2], raw[3]);
         v.normalize4();
-        ensure_relative("normalize4", v, n4, 4e-7);
-        UNSCOPED_INFO("normalize4 result isNormalized4");
+        require_relative("normalize4", v, n4, 4e-7);
         CHECK(v.isNormalized4(1e-6f));
 
         v.set(raw[0], raw[1], raw[2], raw[3]);
         const F32 length = v.normalize3withLength().getF32();
-        ensure_relative("normalize3withLength direction", v, n3, 4e-7, 3);
-        ensure_ulps("normalize3withLength length", length, 13.f, 1);
+        require_relative("normalize3withLength direction", v, n3, 4e-7, 3);
+        require_ulps("normalize3withLength length", length, 13.f, 1);
 
         v.set(raw[0], raw[1], raw[2], raw[3]);
         v.normalize3fast();
-        ensure_relative("normalize3fast", v, n3, 1.0 / 2048.0, 3);
+        require_relative("normalize3fast", v, n3, 1.0 / 2048.0, 3);
 
         // large and small lengths, where an estimate's range matters
         const double third = 1.0 / std::sqrt(3.0);
         const double unit3[3] = {third, third, third};
         v.set(1e18f, 1e18f, 1e18f);
         v.normalize3();
-        ensure_relative("normalize3 of a large vector", v, unit3, 4e-7, 3);
+        require_relative("normalize3 of a large vector", v, unit3, 4e-7, 3);
         v.set(1e-18f, 1e-18f, 1e-18f);
         v.normalize3();
-        ensure_relative("normalize3 of a small vector", v, unit3, 4e-7, 3);
+        require_relative("normalize3 of a small vector", v, unit3, 4e-7, 3);
 
         // isNormalized measures length, not squared length
         const LLVector4a off(1.0005f, 0.f, 0.f, 0.f);
-        UNSCOPED_INFO("isNormalized3 at the default tolerance");
         CHECK(off.isNormalized3());
-        UNSCOPED_INFO("isNormalized3 at a tight tolerance");
         CHECK_FALSE(off.isNormalized3(1e-4f));
         const LLVector4a off4(0.f, 0.f, 0.f, 1.0005f);
         UNSCOPED_INFO("isNormalized4 sees w");
@@ -548,16 +508,16 @@ namespace
         // the checked form
         LLVector4a checked(3.f, -4.f, 12.f, 0.f);
         checked.normalize3fast_checked();
-        ensure_relative("normalize3fast_checked", checked, n3, 1.0 / 2048.0, 3);
+        require_relative("normalize3fast_checked", checked, n3, 1.0 / 2048.0, 3);
 
         checked.set(NAN_QUIET, 1.f, 1.f);
         checked.normalize3fast_checked();
-        ensure_exact("normalize3fast_checked of a NaN is the default", checked, 0.f, 1.f, 0.f, 1.f);
+        require_exact("normalize3fast_checked of a NaN is the default", checked, 0.f, 1.f, 0.f, 1.f);
 
         checked.set(0.f, 0.f, 0.f);
         LLVector4a fallback(0.f, 0.f, 1.f, 0.f);
         checked.normalize3fast_checked(&fallback);
-        ensure_exact("normalize3fast_checked of zero is the fallback", checked, 0.f, 0.f, 1.f, 0.f);
+        require_exact("normalize3fast_checked of zero is the fallback", checked, 0.f, 0.f, 1.f, 0.f);
     }
 
     // min, max, clamp and lerp: the first two on numbers alone, clamp with
@@ -569,54 +529,46 @@ namespace
 
         LLVector4a r;
         r.setMin(p, q);
-        ensure_exact("setMin", r, -0.75f, -2.25f, 1.0625f, -8.f);
+        require_exact("setMin", r, -0.75f, -2.25f, 1.0625f, -8.f);
         r.setMax(p, q);
-        ensure_exact("setMax", r, 1.5f, 4.f, 3.125f, 0.5f);
+        require_exact("setMax", r, 1.5f, 4.f, 3.125f, 0.5f);
 
         LLVector4a lo(-1.f, -1.f, -1.f, -1.f), hi(1.f, 1.f, 1.f, 1.f);
         update_min_max(lo, hi, p);
-        ensure_exact("update_min_max min", lo, -1.f, -2.25f, -1.f, -1.f);
-        ensure_exact("update_min_max max", hi, 1.5f, 1.f, 3.125f, 1.f);
+        require_exact("update_min_max min", lo, -1.f, -2.25f, -1.f, -1.f);
+        require_exact("update_min_max max", hi, 1.5f, 1.f, 3.125f, 1.f);
 
         const LLVector4a low(0.f, -1.f, -1.f, 0.f);
         const LLVector4a high(1.f, 1.f, 2.f, 0.f);
         r.set(-0.5f, 0.5f, 3.f, NAN_QUIET);
         r.clamp(low, high);
-        ensure_exact("clamp x y z", LLVector4a(r[0], r[1], r[2], 0.f), 0.f, 0.5f, 2.f, 0.f);
+        require_exact("clamp x y z", LLVector4a(r[0], r[1], r[2], 0.f), 0.f, 0.5f, 2.f, 0.f);
         UNSCOPED_INFO("clamp leaves a NaN lane NaN");
         CHECK(std::isnan(r[3]));
         r.set(0.f, 1.f, -1.f, 0.f);
         r.clamp(low, high);
-        ensure_exact("clamp at the bounds", r, 0.f, 1.f, -1.f, 0.f);
+        require_exact("clamp at the bounds", r, 0.f, 1.f, -1.f, 0.f);
 
         r.setLerp(p, q, 0.f);
-        ensure_exact("setLerp at 0 is lhs", r, na[0], na[1], na[2], na[3]);
+        require_exact("setLerp at 0 is lhs", r, na[0], na[1], na[2], na[3]);
         r.setLerp(p, q, 1.f);
-        ensure_ulps("setLerp at 1 is rhs", r, nb, 1);
+        require_ulps("setLerp at 1 is rhs", r, nb, 1);
         r.setLerp(p, q, 0.25f);
         F32 expected[4];
         for (int i = 0; i < 4; ++i) { expected[i] = (F32)((double)na[i] + ((double)nb[i] - na[i]) * 0.25); }
-        ensure_ulps("setLerp at a quarter", r, expected, 2);
+        require_ulps("setLerp at a quarter", r, expected, 2);
     }
 
     // Finite means every exponent short of all ones, in the lanes asked.
     TEST_CASE_METHOD(llvector4a_data, "LLVector4a: isFinite3 and isFinite4 reject infinity and NaN in their lanes", "[LLVector4a]")
     {
-        UNSCOPED_INFO("numbers are finite");
         CHECK(n_a().isFinite4());
-        UNSCOPED_INFO("a denormal is finite");
         CHECK(LLVector4a(DENORMAL, 0.f, 0.f, 0.f).isFinite4());
-        UNSCOPED_INFO("the largest float is finite");
         CHECK(LLVector4a(std::numeric_limits<F32>::max(), 0.f, 0.f, 0.f).isFinite4());
-        UNSCOPED_INFO("an infinity in x");
         CHECK_FALSE(LLVector4a(INF, 0.f, 0.f, 0.f).isFinite3());
-        UNSCOPED_INFO("a negative infinity in z");
         CHECK_FALSE(LLVector4a(0.f, 0.f, -INF, 0.f).isFinite3());
-        UNSCOPED_INFO("a NaN in y");
         CHECK_FALSE(LLVector4a(0.f, NAN_QUIET, 0.f, 0.f).isFinite3());
-        UNSCOPED_INFO("a NaN in w passes isFinite3");
         CHECK(LLVector4a(0.f, 0.f, 0.f, NAN_QUIET).isFinite3());
-        UNSCOPED_INFO("a NaN in w fails isFinite4");
         CHECK_FALSE(LLVector4a(0.f, 0.f, 0.f, NAN_QUIET).isFinite4());
         UNSCOPED_INFO("a NaN payload fails");
         CHECK_FALSE(a().isFinite3());
@@ -628,11 +580,8 @@ namespace
         const LLVector4a p = n_a();
         LLVector4a nearby = p;
         nearby.add(LLVector4a(1e-7f, -1e-7f, 1e-7f, 1e-7f));
-        UNSCOPED_INFO("equals4 within the default tolerance");
         CHECK(p.equals4(nearby));
-        UNSCOPED_INFO("operator== within the default tolerance");
         CHECK(p == nearby);
-        UNSCOPED_INFO("equals4 outside a tight tolerance");
         CHECK_FALSE(p.equals4(nearby, 1e-8f));
 
         LLVector4a w_off = p;
@@ -641,15 +590,12 @@ namespace
         CHECK(p.equals3(w_off));
         UNSCOPED_INFO("equals4 sees w");
         CHECK_FALSE(p.equals4(w_off));
-        UNSCOPED_INFO("operator!=");
         CHECK(p != w_off);
 
         // Held against another value rather than itself: /fp:fast lets the
         // compiler fold x - x to 0, so a vector equals itself whatever it holds.
         const LLVector4a nan(NAN_QUIET, 0.f, 0.f, 0.f);
-        UNSCOPED_INFO("a NaN equals nothing");
         CHECK_FALSE(nan.equals4(LLVector4a::getZero()));
-        UNSCOPED_INFO("and nothing equals a NaN");
         CHECK_FALSE(LLVector4a::getZero().equals4(nan));
     }
 
@@ -680,24 +626,16 @@ namespace
             for (int i = 0; i < 3; ++i)
             {
                 const F32 clamped = llclamp(in[i], low[i], high[i]);
-                const std::string lane = " lane " + std::to_string(i) + " of " + precise(in[i]);
-                UNSCOPED_INFO("quantize8 within half a step" + lane);
+                INFO("lane " << i << " of " << precise(in[i]));
                 REQUIRE(std::fabs(v8[i] - clamped) <= delta[i] / 255.f * 0.5f + 1e-6f);
-                UNSCOPED_INFO("quantize16 within half a step" + lane);
                 REQUIRE(std::fabs(v16[i] - clamped) <= delta[i] / 65535.f * 0.5f + 1e-6f);
                 // the way back multiplies by the step and by the range, so a
                 // bound can come back an ulp past itself
                 const F32 slack = 1e-6f * llmax(1.f, std::fabs(high[i]));
-                {
-                    INFO("quantize8 within the range" + lane);
-                    REQUIRE(v8[i] >= low[i] - slack);
-                    REQUIRE(v8[i] <= high[i] + slack);
-                }
-                {
-                    INFO("quantize16 within the range" + lane);
-                    REQUIRE(v16[i] >= low[i] - slack);
-                    REQUIRE(v16[i] <= high[i] + slack);
-                }
+                REQUIRE(v8[i] >= low[i] - slack);
+                REQUIRE(v8[i] <= high[i] + slack);
+                REQUIRE(v16[i] >= low[i] - slack);
+                REQUIRE(v16[i] <= high[i] + slack);
             }
             UNSCOPED_INFO("quantize8 flat channel is low");
             REQUIRE(v8[3] == 5.f);
@@ -717,11 +655,8 @@ namespace
         // a value within a step of zero becomes zero
         LLVector4a tiny(0.001f, -0.001f, 0.01f, 5.f);
         tiny.quantize8(low, high);
-        UNSCOPED_INFO("quantize8 snaps x to zero");
         CHECK(bits_of(tiny[0]) == 0u);
-        UNSCOPED_INFO("quantize8 snaps y to zero");
         CHECK(bits_of(tiny[1]) == 0u);
-        UNSCOPED_INFO("quantize8 snaps z to zero");
         CHECK(bits_of(tiny[2]) == 0u);
     }
 
@@ -765,20 +700,14 @@ namespace
 
                 LLVector4a by_matrix;
                 by_matrix.setRotated(rot, v);
-                UNSCOPED_INFO("setRotated(LLRotation) x");
                 REQUIRE(std::fabs(by_matrix[0] - expected.mV[0]) <= tolerance);
-                UNSCOPED_INFO("setRotated(LLRotation) y");
                 REQUIRE(std::fabs(by_matrix[1] - expected.mV[1]) <= tolerance);
-                UNSCOPED_INFO("setRotated(LLRotation) z");
                 REQUIRE(std::fabs(by_matrix[2] - expected.mV[2]) <= tolerance);
 
                 LLVector4a by_quat;
                 by_quat.setRotated(q2, v);
-                UNSCOPED_INFO("setRotated(LLQuaternion2) x");
                 REQUIRE(std::fabs(by_quat[0] - expected_q.mV[0]) <= tolerance);
-                UNSCOPED_INFO("setRotated(LLQuaternion2) y");
                 REQUIRE(std::fabs(by_quat[1] - expected_q.mV[1]) <= tolerance);
-                UNSCOPED_INFO("setRotated(LLQuaternion2) z");
                 REQUIRE(std::fabs(by_quat[2] - expected_q.mV[2]) <= tolerance);
 
                 LLVector4a back;
@@ -799,53 +728,36 @@ namespace
     {
         const LLSimdScalar three(3.f);
         const LLSimdScalar minus_two(-2.f);
-        UNSCOPED_INFO("getF32");
         CHECK(three.getF32() == 3.f);
-        UNSCOPED_INFO("operator+");
         CHECK((three + minus_two).getF32() == 1.f);
-        UNSCOPED_INFO("operator-");
         CHECK((three - minus_two).getF32() == 5.f);
-        UNSCOPED_INFO("operator*");
         CHECK((three * minus_two).getF32() == -6.f);
-        UNSCOPED_INFO("operator/");
         CHECK((three / minus_two).getF32() == -1.5f);
-        UNSCOPED_INFO("unary minus");
         CHECK((-three).getF32() == -3.f);
-        UNSCOPED_INFO("getAbs");
         CHECK(minus_two.getAbs().getF32() == 2.f);
-        UNSCOPED_INFO("getZero");
         CHECK(LLSimdScalar::getZero().getF32() == 0.f);
 
         LLSimdScalar s = three;
-        s += minus_two; UNSCOPED_INFO("+="); CHECK(s.getF32() == 1.f);
-        s -= minus_two; UNSCOPED_INFO("-="); CHECK(s.getF32() == 3.f);
-        s *= minus_two; UNSCOPED_INFO("*="); CHECK(s.getF32() == -6.f);
-        s /= three;     UNSCOPED_INFO("/="); CHECK(s.getF32() == -2.f);
-        s = 7.f;        UNSCOPED_INFO("="); CHECK(s.getF32() == 7.f);
+        s += minus_two; CHECK(s.getF32() == 1.f);
+        s -= minus_two; CHECK(s.getF32() == 3.f);
+        s *= minus_two; CHECK(s.getF32() == -6.f);
+        s /= three;     CHECK(s.getF32() == -2.f);
+        s = 7.f;        CHECK(s.getF32() == 7.f);
 
         LLSimdScalar mm;
-        mm.setMax(three, minus_two); UNSCOPED_INFO("setMax"); CHECK(mm.getF32() == 3.f);
-        mm.setMin(three, minus_two); UNSCOPED_INFO("setMin"); CHECK(mm.getF32() == -2.f);
+        mm.setMax(three, minus_two); CHECK(mm.getF32() == 3.f);
+        mm.setMin(three, minus_two); CHECK(mm.getF32() == -2.f);
 
-        UNSCOPED_INFO("<");
         CHECK(minus_two < three);
-        UNSCOPED_INFO("<=");
         CHECK(three <= three);
-        UNSCOPED_INFO(">");
         CHECK(three > minus_two);
-        UNSCOPED_INFO(">=");
         CHECK(minus_two >= minus_two);
-        UNSCOPED_INFO("==");
         CHECK(three == LLSimdScalar(3.f));
-        UNSCOPED_INFO("!=");
         CHECK(three != minus_two);
-        UNSCOPED_INFO("isApproximatelyEqual");
         CHECK(three.isApproximatelyEqual(LLSimdScalar(3.f + 1e-6f)));
-        UNSCOPED_INFO("isApproximatelyEqual outside");
         CHECK_FALSE(three.isApproximatelyEqual(minus_two));
 
         // a dot product comes back in the lane that is read
-        UNSCOPED_INFO("a dot as scalar");
         CHECK(n_a().dot3(LLVector4a(1.f, 0.f, 0.f)).getF32() == na[0]);
     }
 }

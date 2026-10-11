@@ -40,46 +40,33 @@ namespace
     TEST_CASE("v4coloru_h: constructors set components and default alpha to 255", "[v4coloru_h]")
     {
         LLColor4U llcolor4u;
-        {
-            INFO("1:LLColor4u:Fail to initialize ");
-            CHECK(llcolor4u.mV[VRED] == 0);
-            CHECK(llcolor4u.mV[VGREEN] == 0);
-            CHECK(llcolor4u.mV[VBLUE] == 0);
-            CHECK(llcolor4u.mV[VALPHA] == 255);
-        }
+        CHECK(llcolor4u.mV[VRED] == 0);
+        CHECK(llcolor4u.mV[VGREEN] == 0);
+        CHECK(llcolor4u.mV[VBLUE] == 0);
+        CHECK(llcolor4u.mV[VALPHA] == 255);
 
         U8 r = 0x12, g = 0xFF, b = 0xAF, a = 0x23;
         LLColor4U llcolor4u1(r,g,b);
-        {
-            INFO("2:LLColor4u:Fail to initialize ");
-            CHECK(r == llcolor4u1.mV[VRED]);
-            CHECK(g == llcolor4u1.mV[VGREEN]);
-            CHECK(b == llcolor4u1.mV[VBLUE]);
-            CHECK(llcolor4u1.mV[VALPHA] == 255);
-        }
+        CHECK(r == llcolor4u1.mV[VRED]);
+        CHECK(g == llcolor4u1.mV[VGREEN]);
+        CHECK(b == llcolor4u1.mV[VBLUE]);
+        CHECK(llcolor4u1.mV[VALPHA] == 255);
 
         LLColor4U llcolor4u2(r,g,b,a);
-        {
-            INFO("3:LLColor4u:Fail to initialize ");
-            CHECK(r == llcolor4u2.mV[VRED]);
-            CHECK(g == llcolor4u2.mV[VGREEN]);
-            CHECK(b == llcolor4u2.mV[VBLUE]);
-            CHECK(a == llcolor4u2.mV[VALPHA]);
-        }
+        CHECK(r == llcolor4u2.mV[VRED]);
+        CHECK(g == llcolor4u2.mV[VGREEN]);
+        CHECK(b == llcolor4u2.mV[VBLUE]);
+        CHECK(a == llcolor4u2.mV[VALPHA]);
 
         const U8 vec[4] = {0x12,0xFF,0xAF,0x23};
         LLColor4U llcolor4u3(vec);
-        {
-            INFO("4:LLColor4u:Fail to initialize ");
-            CHECK(vec[0] == llcolor4u3.mV[VRED]);
-            CHECK(vec[1] == llcolor4u3.mV[VGREEN]);
-            CHECK(vec[2] == llcolor4u3.mV[VBLUE]);
-            CHECK(vec[3] == llcolor4u3.mV[VALPHA]);
-        }
+        CHECK(vec[0] == llcolor4u3.mV[VRED]);
+        CHECK(vec[1] == llcolor4u3.mV[VGREEN]);
+        CHECK(vec[2] == llcolor4u3.mV[VBLUE]);
+        CHECK(vec[3] == llcolor4u3.mV[VALPHA]);
 
         LLSD sd = llcolor4u3.getValue();
         LLColor4U llcolor4u4(sd);
-        UNSCOPED_INFO("5:LLColor4u (LLSD) Failed ");
         CHECK(llcolor4u4 == llcolor4u3);
     }
 
@@ -89,7 +76,6 @@ namespace
         LLSD sd = llcolor4ua.getValue();
         LLColor4U llcolor4u;
         llcolor4u.setValue(sd);
-        UNSCOPED_INFO("setValue(LLSD)/getValue Failed ");
         CHECK(llcolor4u == llcolor4ua);
     }
 
@@ -98,22 +84,16 @@ namespace
         U8 r = 0x12, g = 0xFF, b = 0xAF, a = 0x23;
         LLColor4U llcolor4u(r,g,b,a);
         llcolor4u.setToBlack();
-        {
-            INFO("setToBlack:Fail to set black ");
-            CHECK(llcolor4u.mV[VRED] == 0);
-            CHECK(llcolor4u.mV[VGREEN] == 0);
-            CHECK(llcolor4u.mV[VBLUE] == 0);
-            CHECK(llcolor4u.mV[VALPHA] == 255);
-        }
+        CHECK(llcolor4u.mV[VRED] == 0);
+        CHECK(llcolor4u.mV[VGREEN] == 0);
+        CHECK(llcolor4u.mV[VBLUE] == 0);
+        CHECK(llcolor4u.mV[VALPHA] == 255);
 
         llcolor4u.setToWhite();
-        {
-            INFO("setToWhite:Fail to white ");
-            CHECK(llcolor4u.mV[VRED] == 255);
-            CHECK(llcolor4u.mV[VGREEN] == 255);
-            CHECK(llcolor4u.mV[VBLUE] == 255);
-            CHECK(llcolor4u.mV[VALPHA] == 255);
-        }
+        CHECK(llcolor4u.mV[VRED] == 255);
+        CHECK(llcolor4u.mV[VGREEN] == 255);
+        CHECK(llcolor4u.mV[VBLUE] == 255);
+        CHECK(llcolor4u.mV[VALPHA] == 255);
     }
 
     TEST_CASE("v4coloru_h: cast from LLSD reads back what getValue wrote", "[v4coloru_h]")
@@ -122,7 +102,6 @@ namespace
         LLColor4U llcolor4ua(r,g,b,a);
         LLSD sd = llcolor4ua.getValue();
         LLColor4U llcolor4u = (LLColor4U)sd;
-        UNSCOPED_INFO("Operator=(LLSD) Failed ");
         CHECK(llcolor4u == llcolor4ua);
     }
 
@@ -131,39 +110,29 @@ namespace
         U8 r = 0x12, g = 0xFF, b = 0xAF, a = 0x23;
         LLColor4U llcolor4u;
         llcolor4u.setVec(r,g,b,a);
-        {
-            INFO("1:setVec:Fail to set the values ");
-            CHECK(r == llcolor4u.mV[VRED]);
-            CHECK(g == llcolor4u.mV[VGREEN]);
-            CHECK(b == llcolor4u.mV[VBLUE]);
-            CHECK(a == llcolor4u.mV[VALPHA]);
-        }
+        CHECK(r == llcolor4u.mV[VRED]);
+        CHECK(g == llcolor4u.mV[VGREEN]);
+        CHECK(b == llcolor4u.mV[VBLUE]);
+        CHECK(a == llcolor4u.mV[VALPHA]);
 
         llcolor4u.setToBlack();
         llcolor4u.setVec(r,g,b);
-        {
-            INFO("2:setVec:Fail to set the values ");
-            CHECK(r == llcolor4u.mV[VRED]);
-            CHECK(g == llcolor4u.mV[VGREEN]);
-            CHECK(b == llcolor4u.mV[VBLUE]);
-            CHECK(llcolor4u.mV[VALPHA] == 255);
-        }
+        CHECK(r == llcolor4u.mV[VRED]);
+        CHECK(g == llcolor4u.mV[VGREEN]);
+        CHECK(b == llcolor4u.mV[VBLUE]);
+        CHECK(llcolor4u.mV[VALPHA] == 255);
 
         LLColor4U llcolor4u1;
         llcolor4u1.setVec(llcolor4u);
-        UNSCOPED_INFO("3:setVec:Fail to set the values ");
         CHECK(llcolor4u1 == llcolor4u);
 
         const U8 vec[4] = {0x12,0xFF,0xAF,0x23};
         LLColor4U llcolor4u2;
         llcolor4u2.setVec(vec);
-        {
-            INFO("4:setVec:Fail to set the values ");
-            CHECK(vec[0] == llcolor4u2.mV[VRED]);
-            CHECK(vec[1] == llcolor4u2.mV[VGREEN]);
-            CHECK(vec[2] == llcolor4u2.mV[VBLUE]);
-            CHECK(vec[3] == llcolor4u2.mV[VALPHA]);
-        }
+        CHECK(vec[0] == llcolor4u2.mV[VRED]);
+        CHECK(vec[1] == llcolor4u2.mV[VGREEN]);
+        CHECK(vec[2] == llcolor4u2.mV[VBLUE]);
+        CHECK(vec[3] == llcolor4u2.mV[VALPHA]);
     }
 
     TEST_CASE("v4coloru_h: setAlpha sets the alpha", "[v4coloru_h]")
@@ -171,7 +140,6 @@ namespace
         U8 alpha = 0x12;
         LLColor4U llcolor4u;
         llcolor4u.setAlpha(alpha);
-        UNSCOPED_INFO("setAlpha:Fail to set alpha value ");
         CHECK(alpha == llcolor4u.mV[VALPHA]);
     }
 
@@ -179,9 +147,7 @@ namespace
     {
         U8 r = 0x12, g = 0xFF, b = 0xAF;
         LLColor4U llcolor4u(r,g,b);
-        UNSCOPED_INFO("magVecSquared:Fail ");
         CHECK(is_approx_equal(llcolor4u.magVecSquared(), (F32)(r*r + g*g + b*b)));
-        UNSCOPED_INFO("magVec:Fail ");
         CHECK(is_approx_equal(llcolor4u.magVec(), (F32) sqrt((F32) (r*r + g*g + b*b))));
     }
 
@@ -193,7 +159,6 @@ namespace
         stream1 << llcolor4u1;
         llcolor4u2.setVec(r,g,b);
         stream2 << llcolor4u2;
-        UNSCOPED_INFO("operator << failed ");
         CHECK(stream1.str() == stream2.str());
     }
 
@@ -203,26 +168,14 @@ namespace
         U8 r2 = 0x1C, g2 = 0x9A, b2 = 0x1B;
         LLColor4U llcolor4u1(r1,g1,b1), llcolor4u2(r2,g2,b2),llcolor4u3;
         llcolor4u3 = llcolor4u1 + llcolor4u2;
-        UNSCOPED_INFO("1a.operator+:Fail to Add the values ");
-        CHECK(llcolor4u3.mV[VRED] ==
-            (U8)(r1+r2));
-        UNSCOPED_INFO("1b.operator+:Fail to Add the values ");
-        CHECK(llcolor4u3.mV[VGREEN] ==
-            (U8)(g1+g2));
-        UNSCOPED_INFO("1c.operator+:Fail to Add the values ");
-        CHECK(llcolor4u3.mV[VBLUE] ==
-            (U8)(b1+b2));
+        CHECK(llcolor4u3.mV[VRED] == (U8)(r1+r2));
+        CHECK(llcolor4u3.mV[VGREEN] == (U8)(g1+g2));
+        CHECK(llcolor4u3.mV[VBLUE] == (U8)(b1+b2));
 
         llcolor4u2 += llcolor4u1;
-        UNSCOPED_INFO("2a.operator+=:Fail to Add the values ");
-        CHECK(llcolor4u2.mV[VRED] ==
-            (U8)(r1+r2));
-        UNSCOPED_INFO("2b.operator+=:Fail to Add the values ");
-        CHECK(llcolor4u2.mV[VGREEN] ==
-            (U8)(g1+g2));
-        UNSCOPED_INFO("2c.operator+=:Fail to Add the values ");
-        CHECK(llcolor4u2.mV[VBLUE] ==
-            (U8)(b1+b2));
+        CHECK(llcolor4u2.mV[VRED] == (U8)(r1+r2));
+        CHECK(llcolor4u2.mV[VGREEN] == (U8)(g1+g2));
+        CHECK(llcolor4u2.mV[VBLUE] == (U8)(b1+b2));
     }
 
     TEST_CASE("v4coloru_h: operator- and operator-= wrap modulo 256", "[v4coloru_h]")
@@ -231,26 +184,14 @@ namespace
         U8 r2 = 0x1C, g2 = 0x9A, b2 = 0x1B;
         LLColor4U llcolor4u1(r1,g1,b1), llcolor4u2(r2,g2,b2),llcolor4u3;
         llcolor4u3 = llcolor4u1 - llcolor4u2;
-        UNSCOPED_INFO("1a. operator-:Fail to Add the values ");
-        CHECK(llcolor4u3.mV[VRED] ==
-            (U8)(r1-r2));
-        UNSCOPED_INFO("1b. operator-:Fail to Add the values ");
-        CHECK(llcolor4u3.mV[VGREEN] ==
-            (U8)(g1-g2));
-        UNSCOPED_INFO("1c. operator-:Fail to Add the values ");
-        CHECK(llcolor4u3.mV[VBLUE] ==
-            (U8)(b1-b2));
+        CHECK(llcolor4u3.mV[VRED] == (U8)(r1-r2));
+        CHECK(llcolor4u3.mV[VGREEN] == (U8)(g1-g2));
+        CHECK(llcolor4u3.mV[VBLUE] == (U8)(b1-b2));
 
         llcolor4u1 -= llcolor4u2;
-        UNSCOPED_INFO("2a. operator-=:Fail to Add the values ");
-        CHECK(llcolor4u1.mV[VRED] ==
-            (U8)(r1-r2));
-        UNSCOPED_INFO("2b. operator-=:Fail to Add the values ");
-        CHECK(llcolor4u1.mV[VGREEN] ==
-            (U8)(g1-g2));
-        UNSCOPED_INFO("2c. operator-=:Fail to Add the values ");
-        CHECK(llcolor4u1.mV[VBLUE] ==
-            (U8)(b1-b2));
+        CHECK(llcolor4u1.mV[VRED] == (U8)(r1-r2));
+        CHECK(llcolor4u1.mV[VGREEN] == (U8)(g1-g2));
+        CHECK(llcolor4u1.mV[VBLUE] == (U8)(b1-b2));
     }
 
     TEST_CASE("v4coloru_h: operator* by a color and operator*= by a scalar wrap modulo 256", "[v4coloru_h]")
@@ -259,27 +200,15 @@ namespace
         U8 r2 = 0x1C, g2 = 0x9A, b2 = 0x1B;
         LLColor4U llcolor4u1(r1,g1,b1), llcolor4u2(r2,g2,b2),llcolor4u3;
         llcolor4u3 = llcolor4u1 * llcolor4u2;
-        UNSCOPED_INFO("1a. operator*:Fail to multiply the values");
-        CHECK(llcolor4u3.mV[VRED] ==
-            (U8)(r1*r2));
-        UNSCOPED_INFO("1b. operator*:Fail to multiply the values");
-        CHECK(llcolor4u3.mV[VGREEN] ==
-            (U8)(g1*g2));
-        UNSCOPED_INFO("1c. operator*:Fail to multiply the values");
-        CHECK(llcolor4u3.mV[VBLUE] ==
-            (U8)(b1*b2));
+        CHECK(llcolor4u3.mV[VRED] == (U8)(r1*r2));
+        CHECK(llcolor4u3.mV[VGREEN] == (U8)(g1*g2));
+        CHECK(llcolor4u3.mV[VBLUE] == (U8)(b1*b2));
 
         U8 mulVal = 123;
         llcolor4u1 *= mulVal;
-        UNSCOPED_INFO("2a. operator*=:Fail to multiply the values");
-        CHECK(llcolor4u1.mV[VRED] ==
-            (U8)(r1*mulVal));
-        UNSCOPED_INFO("2b. operator*=:Fail to multiply the values");
-        CHECK(llcolor4u1.mV[VGREEN] ==
-            (U8)(g1*mulVal));
-        UNSCOPED_INFO("2c. operator*=:Fail to multiply the values");
-        CHECK(llcolor4u1.mV[VBLUE] ==
-            (U8)(b1*mulVal));
+        CHECK(llcolor4u1.mV[VRED] == (U8)(r1*mulVal));
+        CHECK(llcolor4u1.mV[VGREEN] == (U8)(g1*mulVal));
+        CHECK(llcolor4u1.mV[VBLUE] == (U8)(b1*mulVal));
     }
 
     TEST_CASE("v4coloru_h: operator== and operator!=", "[v4coloru_h]")
@@ -287,10 +216,8 @@ namespace
         U8 r = 0x12, g = 0xFF, b = 0xAF;
         LLColor4U llcolor4u(r,g,b),llcolor4u1;
         llcolor4u1 = llcolor4u;
-        UNSCOPED_INFO("operator== failed to ensure the equality ");
         CHECK(llcolor4u1 == llcolor4u);
         llcolor4u1.setToBlack();
-        UNSCOPED_INFO("operator!= failed to ensure the equality ");
         CHECK(llcolor4u1 != llcolor4u);
     }
 
@@ -300,7 +227,6 @@ namespace
         LLColor4U llcolor4u(r,g,b,a);
         U8 modVal = 45;
         llcolor4u %= modVal;
-        UNSCOPED_INFO("operator%=:Fail ");
         CHECK(llcolor4u.mV[VALPHA] == (U8)(a * modVal));
     }
 
@@ -310,20 +236,15 @@ namespace
         LLColor4U llcolor4u1(r,g,b,a);
         std::string color("12, 23, 132, 50");
         LLColor4U::parseColor4U(color, &llcolor4u1);
-        {
-            INFO("parseColor4U() failed to parse the color value ");
-            CHECK(llcolor4u1.mV[VRED] == 12);
-            CHECK(llcolor4u1.mV[VGREEN] == 23);
-            CHECK(llcolor4u1.mV[VBLUE] == 132);
-            CHECK(llcolor4u1.mV[VALPHA] == 50);
-        }
+        CHECK(llcolor4u1.mV[VRED] == 12);
+        CHECK(llcolor4u1.mV[VGREEN] == 23);
+        CHECK(llcolor4u1.mV[VBLUE] == 132);
+        CHECK(llcolor4u1.mV[VALPHA] == 50);
 
         color = "12, 23, 132";
-        UNSCOPED_INFO("2:parseColor4U() failed to parse the color value ");
         CHECK_FALSE(LLColor4U::parseColor4U(color, &llcolor4u1));
 
         color = "12";
-        UNSCOPED_INFO("2:parseColor4U() failed to parse the color value ");
         CHECK_FALSE(LLColor4U::parseColor4U(color, &llcolor4u1));
     }
 
@@ -337,13 +258,10 @@ namespace
         // Previously the test used (U8)ll_round(...) directly, which wraps
         // modulo 256 for products > 255 (e.g. 123 * 3 = 369 -> 113), locking
         // in the wrap bug. multAll now clamps, so green saturates at 255.
-        {
-            INFO("multAll:Fail to multiply ");
-            CHECK((U8)llclampb(ll_round(r * fVal)) == llcolor4u1.mV[VRED]);
-            CHECK((U8)llclampb(ll_round(g * fVal)) == llcolor4u1.mV[VGREEN]);
-            CHECK((U8)llclampb(ll_round(b * fVal)) == llcolor4u1.mV[VBLUE]);
-            CHECK((U8)llclampb(ll_round(a * fVal)) == llcolor4u1.mV[VALPHA]);
-        }
+        CHECK((U8)llclampb(ll_round(r * fVal)) == llcolor4u1.mV[VRED]);
+        CHECK((U8)llclampb(ll_round(g * fVal)) == llcolor4u1.mV[VGREEN]);
+        CHECK((U8)llclampb(ll_round(b * fVal)) == llcolor4u1.mV[VBLUE]);
+        CHECK((U8)llclampb(ll_round(a * fVal)) == llcolor4u1.mV[VALPHA]);
     }
 
     TEST_CASE("v4coloru_h: addClampMax adds and clamps each channel at 255", "[v4coloru_h]")
@@ -352,25 +270,19 @@ namespace
         U8 r2 = 23, g2 = 230, b2 = 124, a2 = 255;
         LLColor4U llcolor4u(r1,g1,b1,a1),llcolor4u1(r2,g2,b2,a2);
         llcolor4u1 = llcolor4u1.addClampMax(llcolor4u);
-        {
-            INFO("1:addClampMax():Fail to add the value ");
-            CHECK(r1+r2 == llcolor4u1.mV[VRED]);
-            CHECK(llcolor4u1.mV[VGREEN] == 255);
-            CHECK(b1+b2 == llcolor4u1.mV[VBLUE]);
-            CHECK(llcolor4u1.mV[VALPHA] == 255);
-        }
+        CHECK(r1+r2 == llcolor4u1.mV[VRED]);
+        CHECK(llcolor4u1.mV[VGREEN] == 255);
+        CHECK(b1+b2 == llcolor4u1.mV[VBLUE]);
+        CHECK(llcolor4u1.mV[VALPHA] == 255);
 
         r1 = 132, g1 = 3, b1 = 3, a1 = 2;
         r2 = 123, g2 = 230, b2 = 154, a2 = 25;
         LLColor4U llcolor4u2(r1,g1,b1,a1),llcolor4u3(r2,g2,b2,a2);
         llcolor4u3 = llcolor4u3.addClampMax(llcolor4u2);
-        {
-            INFO("2:addClampMax():Fail to add the value ");
-            CHECK(llcolor4u3.mV[VRED] == 255);
-            CHECK(g1+g2 == llcolor4u3.mV[VGREEN]);
-            CHECK(b1+b2 == llcolor4u3.mV[VBLUE]);
-            CHECK(a1+a2 == llcolor4u3.mV[VALPHA]);
-        }
+        CHECK(llcolor4u3.mV[VRED] == 255);
+        CHECK(g1+g2 == llcolor4u3.mV[VGREEN]);
+        CHECK(b1+b2 == llcolor4u3.mV[VBLUE]);
+        CHECK(a1+a2 == llcolor4u3.mV[VALPHA]);
     }
 
     TEST_CASE("v4coloru_h: setVecScaleClamp scales the brightest channel to 255 and clamps at 0", "[v4coloru_h]")
@@ -383,12 +295,9 @@ namespace
         F32 color_scale_factor = MAX_COLOR/r;
         S32 r2 = ll_round(r * color_scale_factor);
         S32 g2 = ll_round(g * color_scale_factor);
-        {
-            INFO("setVecScaleClamp():Fail to add the value ");
-            CHECK(r2 == llcolor4u.mV[VRED]);
-            CHECK(g2 == llcolor4u.mV[VGREEN]);
-            CHECK(llcolor4u.mV[VBLUE] == 0);
-            CHECK(llcolor4u.mV[VALPHA] == 255);
-        }
+        CHECK(r2 == llcolor4u.mV[VRED]);
+        CHECK(g2 == llcolor4u.mV[VGREEN]);
+        CHECK(llcolor4u.mV[VBLUE] == 0);
+        CHECK(llcolor4u.mV[VALPHA] == 255);
     }
 }

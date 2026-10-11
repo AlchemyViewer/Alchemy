@@ -44,9 +44,7 @@ namespace
 
         LLBBoxLocal bbox1;
 
-        UNSCOPED_INFO("Default bbox min");
         CHECK(bbox1.getMin() == LLVector3(0.0f, 0.0f, 0.0f));
-        UNSCOPED_INFO("Default bbox max");
         CHECK(bbox1.getMax() == LLVector3(0.0f, 0.0f, 0.0f));
     }
 
@@ -58,9 +56,7 @@ namespace
 
         LLBBoxLocal bbox2(LLVector3(-1.0f, -2.0f, 0.0f), LLVector3(1.0f, 2.0f, 3.0f));
 
-        UNSCOPED_INFO("Custom bbox min");
         CHECK(bbox2.getMin() == LLVector3(-1.0f, -2.0f, 0.0f));
-        UNSCOPED_INFO("Custom bbox max");
         CHECK(bbox2.getMax() == LLVector3(1.0f, 2.0f, 3.0f));
     }
 
@@ -76,7 +72,6 @@ namespace
         LLBBoxLocal bbox2;
         bbox2.setMin(LLVector3(1.0f, 2.0f, 3.0f));
 
-        UNSCOPED_INFO("Custom bbox min (2)");
         CHECK(bbox2.getMin() == LLVector3(1.0f, 2.0f, 3.0f));
     }
 
@@ -92,7 +87,6 @@ namespace
         LLBBoxLocal bbox2;
         bbox2.setMax(LLVector3(10.0f, 20.0f, 30.0f));
 
-        UNSCOPED_INFO("Custom bbox max (2)");
         CHECK(bbox2.getMax() == LLVector3(10.0f, 20.0f, 30.0f));
     }
 
@@ -102,17 +96,15 @@ namespace
         // test the getCenter() method
         //
 
-        UNSCOPED_INFO("Default bbox center");
         CHECK(LLBBoxLocal().getCenter() == LLVector3(0.0f, 0.0f, 0.0f));
 
         LLBBoxLocal bbox1(LLVector3(-1.0f, -1.0f, -1.0f), LLVector3(0.0f, 0.0f, 0.0f));
 
-        UNSCOPED_INFO("Custom bbox center");
         CHECK(bbox1.getCenter() == LLVector3(-0.5f, -0.5f, -0.5f));
 
         LLBBoxLocal bbox2(LLVector3(0.0f, 0.0f, 0.0f), LLVector3(-1.0f, -1.0f, -1.0f));
 
-        UNSCOPED_INFO("Invalid bbox center");
+        UNSCOPED_INFO("min above max");
         CHECK(bbox2.getCenter() == LLVector3(-0.5f, -0.5f, -0.5f));
     }
 
@@ -124,12 +116,10 @@ namespace
 
         LLBBoxLocal bbox2(LLVector3(0.0f, 0.0f, 0.0f), LLVector3(-1.0f, -1.0f, -1.0f));
 
-        UNSCOPED_INFO("Default bbox extent");
         CHECK(LLBBoxLocal().getExtent() == LLVector3(0.0f, 0.0f, 0.0f));
 
         LLBBoxLocal bbox3(LLVector3(-1.0f, -1.0f, -1.0f), LLVector3(1.0f, 2.0f, 0.0f));
 
-        UNSCOPED_INFO("Custom bbox extent");
         CHECK(bbox3.getExtent() == LLVector3(2.0f, 3.0f, 1.0f));
     }
 
@@ -147,31 +137,22 @@ namespace
         bbox1.addPoint(LLVector3(-1.0f, -2.0f, -3.0f));
         bbox1.addPoint(LLVector3(3.0f, 4.0f, 5.0f));
 
-        UNSCOPED_INFO("Custom BBox center (1)");
         CHECK(bbox1.getCenter() == LLVector3(1.0f, 1.0f, 1.0f));
-        UNSCOPED_INFO("Custom BBox min (1)");
         CHECK(bbox1.getMin() == LLVector3(-1.0f, -2.0f, -3.0f));
-        UNSCOPED_INFO("Custom BBox max (1)");
         CHECK(bbox1.getMax() == LLVector3(3.0f, 4.0f, 5.0f));
 
         bbox1.addPoint(LLVector3(0.0f, 0.0f, 0.0f));
         bbox1.addPoint(LLVector3(1.0f, 2.0f, 3.0f));
         bbox1.addPoint(LLVector3(2.0f, 2.0f, 2.0f));
 
-        UNSCOPED_INFO("Custom BBox center (2)");
         CHECK(bbox1.getCenter() == LLVector3(1.0f, 1.0f, 1.0f));
-        UNSCOPED_INFO("Custom BBox min (2)");
         CHECK(bbox1.getMin() == LLVector3(-1.0f, -2.0f, -3.0f));
-        UNSCOPED_INFO("Custom BBox max (2)");
         CHECK(bbox1.getMax() == LLVector3(3.0f, 4.0f, 5.0f));
 
         bbox1.addPoint(LLVector3(5.0f, 5.0f, 5.0f));
 
-        UNSCOPED_INFO("Custom BBox center (3)");
         CHECK(bbox1.getCenter() == LLVector3(2.0f, 1.5f, 1.0f));
-        UNSCOPED_INFO("Custom BBox min (3)");
         CHECK(bbox1.getMin() == LLVector3(-1.0f, -2.0f, -3.0f));
-        UNSCOPED_INFO("Custom BBox max (3)");
         CHECK(bbox1.getMax() == LLVector3(5.0f, 5.0f, 5.0f));
     }
 
@@ -188,20 +169,14 @@ namespace
         LLBBoxLocal bbox2(LLVector3(1.0f, 1.0f, 1.0f), LLVector3(2.0f, 2.0f, 2.0f));
         bbox2.addBBox(LLBBoxLocal(LLVector3(1.5f, 1.5f, 1.5f), LLVector3(3.0f, 3.0f, 3.0f)));
 
-        UNSCOPED_INFO("Custom BBox center (4)");
         CHECK(bbox2.getCenter() == LLVector3(2.0f, 2.0f, 2.0f));
-        UNSCOPED_INFO("Custom BBox min (4)");
         CHECK(bbox2.getMin() == LLVector3(1.0f, 1.0f, 1.0f));
-        UNSCOPED_INFO("Custom BBox max (4)");
         CHECK(bbox2.getMax() == LLVector3(3.0f, 3.0f, 3.0f));
 
         bbox2.addBBox(LLBBoxLocal(LLVector3(-1.0f, -1.0f, -1.0f), LLVector3(0.0f, 0.0f, 0.0f)));
 
-        UNSCOPED_INFO("Custom BBox center (5)");
         CHECK(bbox2.getCenter() == LLVector3(1.0f, 1.0f, 1.0f));
-        UNSCOPED_INFO("Custom BBox min (5)");
         CHECK(bbox2.getMin() == LLVector3(-1.0f, -1.0f, -1.0f));
-        UNSCOPED_INFO("Custom BBox max (5)");
         CHECK(bbox2.getMax() == LLVector3(3.0f, 3.0f, 3.0f));
     }
 
@@ -214,35 +189,25 @@ namespace
         LLBBoxLocal bbox1;
         bbox1.expand(0.0f);
 
-        UNSCOPED_INFO("Zero-expanded Default BBox center");
         CHECK(bbox1.getCenter() == LLVector3(0.0f, 0.0f, 0.0f));
 
         LLBBoxLocal bbox2(LLVector3(1.0f, 2.0f, 3.0f), LLVector3(3.0f, 4.0f, 5.0f));
         bbox2.expand(0.0f);
 
-        UNSCOPED_INFO("Zero-expanded BBox center");
         CHECK(bbox2.getCenter() == LLVector3(2.0f, 3.0f, 4.0f));
-        UNSCOPED_INFO("Zero-expanded BBox min");
         CHECK(bbox2.getMin() == LLVector3(1.0f, 2.0f, 3.0f));
-        UNSCOPED_INFO("Zero-expanded BBox max");
         CHECK(bbox2.getMax() == LLVector3(3.0f, 4.0f, 5.0f));
 
         bbox2.expand(0.5f);
 
-        UNSCOPED_INFO("Positive-expanded BBox center");
         CHECK(bbox2.getCenter() == LLVector3(2.0f, 3.0f, 4.0f));
-        UNSCOPED_INFO("Positive-expanded BBox min");
         CHECK(bbox2.getMin() == LLVector3(0.5f, 1.5f, 2.5f));
-        UNSCOPED_INFO("Positive-expanded BBox max");
         CHECK(bbox2.getMax() == LLVector3(3.5f, 4.5f, 5.5f));
 
         bbox2.expand(-1.0f);
 
-        UNSCOPED_INFO("Negative-expanded BBox center");
         CHECK(bbox2.getCenter() == LLVector3(2.0f, 3.0f, 4.0f));
-        UNSCOPED_INFO("Negative-expanded BBox min");
         CHECK(bbox2.getMin() == LLVector3(1.5f, 2.5f, 3.5f));
-        UNSCOPED_INFO("Negative-expanded BBox max");
         CHECK(bbox2.getMax() == LLVector3(2.5f, 3.5f, 4.5f));
     }
 }

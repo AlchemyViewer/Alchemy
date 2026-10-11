@@ -43,13 +43,10 @@ namespace
     TEST_CASE("LLQuaternion: default constructor gives the identity quaternion", "[LLQuaternion]")
     {
         LLQuaternion llquat;
-        {
-            INFO("LLQuaternion::LLQuaternion() failed");
-            CHECK(llquat.mQ[0] == 0.f);
-            CHECK(llquat.mQ[1] == 0.f);
-            CHECK(llquat.mQ[2] == 0.f);
-            CHECK(llquat.mQ[3] == 1.f);
-        }
+        CHECK(llquat.mQ[0] == 0.f);
+        CHECK(llquat.mQ[1] == 0.f);
+        CHECK(llquat.mQ[2] == 0.f);
+        CHECK(llquat.mQ[3] == 1.f);
     }
 
     //test case for explicit LLQuaternion(const LLMatrix4 &mat) fn.
@@ -62,25 +59,22 @@ namespace
         LLVector4 vector4(3.0f, 8.0f, 1.0f, 5.0f);
 
         llmat.initRows(vector1, vector2, vector3, vector4);
-        {
-            INFO("explicit LLQuaternion(const LLMatrix4 &mat) failed");
-            CHECK(llmat.mMatrix[0][0] == 2.0f);
-            CHECK(llmat.mMatrix[0][1] == 1.0f);
-            CHECK(llmat.mMatrix[0][2] == 3.0f);
-            CHECK(llmat.mMatrix[0][3] == 6.0f);
-            CHECK(llmat.mMatrix[1][0] == 5.0f);
-            CHECK(llmat.mMatrix[1][1] == 6.0f);
-            CHECK(llmat.mMatrix[1][2] == 0.0f);
-            CHECK(llmat.mMatrix[1][3] == 1.0f);
-            CHECK(llmat.mMatrix[2][0] == 2.0f);
-            CHECK(llmat.mMatrix[2][1] == 1.0f);
-            CHECK(llmat.mMatrix[2][2] == 2.0f);
-            CHECK(llmat.mMatrix[2][3] == 9.0f);
-            CHECK(llmat.mMatrix[3][0] == 3.0f);
-            CHECK(llmat.mMatrix[3][1] == 8.0f);
-            CHECK(llmat.mMatrix[3][2] == 1.0f);
-            CHECK(llmat.mMatrix[3][3] == 5.0f);
-        }
+        CHECK(llmat.mMatrix[0][0] == 2.0f);
+        CHECK(llmat.mMatrix[0][1] == 1.0f);
+        CHECK(llmat.mMatrix[0][2] == 3.0f);
+        CHECK(llmat.mMatrix[0][3] == 6.0f);
+        CHECK(llmat.mMatrix[1][0] == 5.0f);
+        CHECK(llmat.mMatrix[1][1] == 6.0f);
+        CHECK(llmat.mMatrix[1][2] == 0.0f);
+        CHECK(llmat.mMatrix[1][3] == 1.0f);
+        CHECK(llmat.mMatrix[2][0] == 2.0f);
+        CHECK(llmat.mMatrix[2][1] == 1.0f);
+        CHECK(llmat.mMatrix[2][2] == 2.0f);
+        CHECK(llmat.mMatrix[2][3] == 9.0f);
+        CHECK(llmat.mMatrix[3][0] == 3.0f);
+        CHECK(llmat.mMatrix[3][1] == 8.0f);
+        CHECK(llmat.mMatrix[3][2] == 1.0f);
+        CHECK(llmat.mMatrix[3][3] == 5.0f);
     }
 
     TEST_CASE("LLQuaternion: LLMatrix3 setRows keeps each float exactly", "[LLQuaternion]")
@@ -92,18 +86,15 @@ namespace
         LLVector3 vect3(566.003034f, 12.98705f, 234.764423f);
         llmat.setRows(vect1, vect2, vect3);
 
-        {
-            INFO("LLMatrix3::setRows fn failed.");
-            CHECK(llmat.mMatrix[0][0] == 3.4028234660000000f);
-            CHECK(llmat.mMatrix[0][1] == 234.56f);
-            CHECK(llmat.mMatrix[0][2] == 4234.442234f);
-            CHECK(llmat.mMatrix[1][0] == 741.434f);
-            CHECK(llmat.mMatrix[1][1] == 23.00034f);
-            CHECK(llmat.mMatrix[1][2] == 6567.223423f);
-            CHECK(llmat.mMatrix[2][0] == 566.003034f);
-            CHECK(llmat.mMatrix[2][1] == 12.98705f);
-            CHECK(llmat.mMatrix[2][2] == 234.764423f);
-        }
+        CHECK(llmat.mMatrix[0][0] == 3.4028234660000000f);
+        CHECK(llmat.mMatrix[0][1] == 234.56f);
+        CHECK(llmat.mMatrix[0][2] == 4234.442234f);
+        CHECK(llmat.mMatrix[1][0] == 741.434f);
+        CHECK(llmat.mMatrix[1][1] == 23.00034f);
+        CHECK(llmat.mMatrix[1][2] == 6567.223423f);
+        CHECK(llmat.mMatrix[2][0] == 566.003034f);
+        CHECK(llmat.mMatrix[2][1] == 12.98705f);
+        CHECK(llmat.mMatrix[2][2] == 234.764423f);
     }
 
     //test case for LLQuaternion(F32 x, F32 y, F32 z, F32 w), setQuatInit() and normQuat() fns.
@@ -118,13 +109,10 @@ namespace
         res_quat.setQuatInit(x_val, y_val, z_val, w_val);
         res_quat.normQuat();
 
-        {
-            INFO("LLQuaternion::normQuat() fn failed");
-            CHECK(is_approx_equal(0.42426407f, res_quat.mQ[0]));
-            CHECK(is_approx_equal(0.28284273f, res_quat.mQ[1]));
-            CHECK(is_approx_equal(0.84852815f, res_quat.mQ[2]));
-            CHECK(is_approx_equal(0.14142136f, res_quat.mQ[3]));
-        }
+        CHECK(is_approx_equal(0.42426407f, res_quat.mQ[0]));
+        CHECK(is_approx_equal(0.28284273f, res_quat.mQ[1]));
+        CHECK(is_approx_equal(0.84852815f, res_quat.mQ[2]));
+        CHECK(is_approx_equal(0.14142136f, res_quat.mQ[3]));
 
         x_val = 0.0f;
         y_val = 0.0f;
@@ -134,22 +122,16 @@ namespace
         res_quat.setQuatInit(x_val, y_val, z_val, w_val);
         res_quat.normQuat();
 
-        {
-            INFO("LLQuaternion::normQuat() fn. failed.");
-            CHECK(is_approx_equal(0.0f, res_quat.mQ[0]));
-            CHECK(is_approx_equal(0.0f, res_quat.mQ[1]));
-            CHECK(is_approx_equal(0.0f, res_quat.mQ[2]));
-            CHECK(is_approx_equal(1.0f, res_quat.mQ[3]));
-        }
+        CHECK(is_approx_equal(0.0f, res_quat.mQ[0]));
+        CHECK(is_approx_equal(0.0f, res_quat.mQ[1]));
+        CHECK(is_approx_equal(0.0f, res_quat.mQ[2]));
+        CHECK(is_approx_equal(1.0f, res_quat.mQ[3]));
 
 
-        {
-            INFO("LLQuaternion::normQuat() fn. failed.");
-            CHECK(is_approx_equal(0.0f, res_quat.mQ[0]));
-            CHECK(is_approx_equal(0.0f, res_quat.mQ[1]));
-            CHECK(is_approx_equal(0.0f, res_quat.mQ[2]));
-            CHECK(is_approx_equal(1.0f, res_quat.mQ[3]));
-        }
+        CHECK(is_approx_equal(0.0f, res_quat.mQ[0]));
+        CHECK(is_approx_equal(0.0f, res_quat.mQ[1]));
+        CHECK(is_approx_equal(0.0f, res_quat.mQ[2]));
+        CHECK(is_approx_equal(1.0f, res_quat.mQ[3]));
     }
 
     //test case for conjQuat() and transQuat() fns.
@@ -167,12 +149,9 @@ namespace
         result.conjQuat();
         result1.transQuat();
 
-        {
-            INFO("LLQuaternion::conjQuat and LLQuaternion::transQuat failed ");
-            CHECK(is_approx_equal(result1.mQ[0], result.mQ[0]));
-            CHECK(is_approx_equal(result1.mQ[1], result.mQ[1]));
-            CHECK(is_approx_equal(result1.mQ[2], result.mQ[2]));
-        }
+        CHECK(is_approx_equal(result1.mQ[0], result.mQ[0]));
+        CHECK(is_approx_equal(result1.mQ[1], result.mQ[1]));
+        CHECK(is_approx_equal(result1.mQ[2], result.mQ[2]));
 
     }
 
@@ -180,11 +159,9 @@ namespace
     TEST_CASE("LLQuaternion: dot sums the products of the four components", "[LLQuaternion]")
     {
         LLQuaternion quat1(3.0f, 2.0f, 6.0f, 0.0f), quat2(1.0f, 1.0f, 1.0f, 1.0f);
-        UNSCOPED_INFO("1. The two values are different");
         CHECK(ll_round(12.000000f, 2) == ll_round(dot(quat1, quat2), 2));
 
         LLQuaternion quat0(3.0f, 9.334f, 34.5f, 23.0f), quat(34.5f, 23.23f, 2.0f, 45.5f);
-        UNSCOPED_INFO("2. The two values are different");
         CHECK(ll_round(1435.828807f, 2) == ll_round(dot(quat0, quat), 2));
     }
 
@@ -195,26 +172,20 @@ namespace
         LLQuaternion quat(3.0f, 2.0f, 6.0f, 0.0f);
         LLQuaternion quat1;
         quat1 = quat.constrain(radian);
-        {
-            INFO("1. LLQuaternion::constrain(F32 radians) failed");
-            CHECK(is_approx_equal_fraction(-0.423442f, quat1.mQ[0], 8));
-            CHECK(is_approx_equal_fraction(-0.282295f, quat1.mQ[1], 8));
-            CHECK(is_approx_equal_fraction(-0.846884f, quat1.mQ[2], 8));
-            CHECK(is_approx_equal_fraction(0.154251f, quat1.mQ[3], 8));
-        }
+        CHECK(is_approx_equal_fraction(-0.423442f, quat1.mQ[0], 8));
+        CHECK(is_approx_equal_fraction(-0.282295f, quat1.mQ[1], 8));
+        CHECK(is_approx_equal_fraction(-0.846884f, quat1.mQ[2], 8));
+        CHECK(is_approx_equal_fraction(0.154251f, quat1.mQ[3], 8));
 
 
         radian = 30.0f;
         LLQuaternion quat0(37.50f, 12.0f, 86.023f, 40.32f);
         quat1 = quat0.constrain(radian);
 
-        {
-            INFO("2. LLQuaternion::constrain(F32 radians) failed");
-            CHECK(is_approx_equal_fraction(37.500000f, quat1.mQ[0], 8));
-            CHECK(is_approx_equal_fraction(12.0000f, quat1.mQ[1], 8));
-            CHECK(is_approx_equal_fraction(86.0230f, quat1.mQ[2], 8));
-            CHECK(is_approx_equal_fraction(40.320000f, quat1.mQ[3], 8));
-        }
+        CHECK(is_approx_equal_fraction(37.500000f, quat1.mQ[0], 8));
+        CHECK(is_approx_equal_fraction(12.0000f, quat1.mQ[1], 8));
+        CHECK(is_approx_equal_fraction(86.0230f, quat1.mQ[2], 8));
+        CHECK(is_approx_equal_fraction(40.320000f, quat1.mQ[3], 8));
     }
 
     TEST_CASE("LLQuaternion: lerp and slerp and nlerp overloads interpolate", "[LLQuaternion]")
@@ -232,53 +203,38 @@ namespace
         // Previous "expected" values were derived from a typo that read
         // q.mQ[VZ] for W instead of q.mQ[VW].
         res_lerp = lerp(value1, quat1);
-        {
-            INFO("1. LLQuaternion lerp(F32 t, const LLQuaternion &q) failed");
-            CHECK(is_approx_equal_fraction(0.218195f, res_lerp.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(0.436390f, res_lerp.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(0.872779f, res_lerp.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(0.014546f, res_lerp.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(0.218195f, res_lerp.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(0.436390f, res_lerp.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(0.872779f, res_lerp.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(0.014546f, res_lerp.mQ[3], 16));
 
         //test case for lerp(F32 t, const LLQuaternion &p, const LLQuaternion &q) fn.
         res_lerp = lerp(value1, quat1, quat2);
-        {
-            INFO("2. LLQuaternion lerp(F32 t, const LLQuaternion &p, const LLQuaternion &q) failed");
-            CHECK(is_approx_equal_fraction(0.314306f, res_lerp.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(0.116156f, res_lerp.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(0.283559f, res_lerp.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(0.898506f, res_lerp.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(0.314306f, res_lerp.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(0.116156f, res_lerp.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(0.283559f, res_lerp.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(0.898506f, res_lerp.mQ[3], 16));
 
         //test case for slerp( F32 u, const LLQuaternion &a, const LLQuaternion &b ) fn.
         res_slerp = slerp(value1, quat1, quat2);
-        {
-            INFO("3. LLQuaternion slerp( F32 u, const LLQuaternion &a, const LLQuaternion &b) failed");
-            CHECK(is_approx_equal_fraction(46.000f, res_slerp.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(17.00f, res_slerp.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(41.5f, res_slerp.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(131.5f, res_slerp.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(46.000f, res_slerp.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(17.00f, res_slerp.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(41.5f, res_slerp.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(131.5f, res_slerp.mQ[3], 16));
 
         //test case for nlerp(F32 t, const LLQuaternion &a, const LLQuaternion &b) fn.
         res_nlerp = nlerp(value1, quat1, quat2);
-        {
-            INFO("4. LLQuaternion nlerp(F32 t, const LLQuaternion &a, const LLQuaternion &b) failed");
-            CHECK(is_approx_equal_fraction(0.314306f, res_nlerp.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(0.116157f, res_nlerp.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(0.283559f, res_nlerp.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(0.898506f, res_nlerp.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(0.314306f, res_nlerp.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(0.116157f, res_nlerp.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(0.283559f, res_nlerp.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(0.898506f, res_nlerp.mQ[3], 16));
 
         //test case for nlerp(F32 t, const LLQuaternion &q) fn.
         res_slerp = slerp(value1, quat1);
-        {
-            INFO("5. LLQuaternion slerp(F32 t, const LLQuaternion &q) failed");
-            CHECK(is_approx_equal_fraction(1.0f, res_slerp.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(2.0f, res_slerp.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(4.0000f, res_slerp.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(1.000f, res_slerp.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(1.0f, res_slerp.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(2.0f, res_slerp.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(4.0000f, res_slerp.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(1.000f, res_slerp.mQ[3], 16));
 
         LLQuaternion quat3(2.0f, 1.0f, 5.5f, 10.5f);
         LLQuaternion res_nlerp1;
@@ -289,13 +245,10 @@ namespace
         //   pre-normalize r = (200, 100, 550, 951)  (W = 1 + 100*(10.5 - 1) = 951)
         //   |r| = sqrt(1256901) ~= 1121.116
         //   r/|r| ~= (0.178394, 0.089197, 0.490583, 0.848262)
-        {
-            INFO("6. LLQuaternion nlerp(F32 t, const LLQuaternion &q)  failed");
-            CHECK(is_approx_equal_fraction(0.178394f, res_nlerp1.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(0.089197f, res_nlerp1.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(0.490583f, res_nlerp1.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(0.848262f, res_nlerp1.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(0.178394f, res_nlerp1.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(0.089197f, res_nlerp1.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(0.490583f, res_nlerp1.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(0.848262f, res_nlerp1.mQ[3], 16));
 
         //test case for lerp(F32 t, const LLQuaternion &q) fn.
         // value1 = 100, quat2 = (4, 3, 6.5, 9.7):
@@ -303,13 +256,10 @@ namespace
         //   |r| = sqrt(1431141) ~= 1196.303
         //   r/|r| ~= (0.334363, 0.250773, 0.543341, 0.728076)
         res_lerp = lerp(value1, quat2);
-        {
-            INFO("7. LLQuaternion lerp(F32 t, const LLQuaternion &q) failed");
-            CHECK(is_approx_equal_fraction(0.334363f, res_lerp.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(0.250773f, res_lerp.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(0.543341f, res_lerp.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(0.728076f, res_lerp.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(0.334363f, res_lerp.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(0.250773f, res_lerp.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(0.543341f, res_lerp.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(0.728076f, res_lerp.mQ[3], 16));
 
     }
 
@@ -319,13 +269,10 @@ namespace
         LLQuaternion quat1(1.0f, 2.5f, 3.5f, 5.5f);
         LLQuaternion quat2(4.0f, 3.0f, 5.0f, 1.0f);
         LLQuaternion result = quat1 *  quat2;
-        {
-            INFO("1. LLQuaternion Operator* failed");
-            CHECK(result.mQ[0] == 21.0f);
-            CHECK(result.mQ[1] == 10.0f);
-            CHECK(result.mQ[2] == 38.0f);
-            CHECK(result.mQ[3] == -23.5f);
-        }
+        CHECK(result.mQ[0] == 21.0f);
+        CHECK(result.mQ[1] == 10.0f);
+        CHECK(result.mQ[2] == 38.0f);
+        CHECK(result.mQ[3] == -23.5f);
 
         LLQuaternion quat3(2341.340f, 2352.345f, 233.25f, 7645.5f);
         LLQuaternion quat4(674.067f, 893.0897f, 578.0f, 231.0f);
@@ -333,51 +280,36 @@ namespace
         // Products in the millions: the build contracts and reassociates
         // the arithmetic, so the last bit or two of each is the
         // machine's, not the one the constants were written on.
-        {
-            INFO("2. LLQuaternion Operator* failed");
-            CHECK(is_approx_equal_fraction(4543086.5f, result.mQ[0], 2));
-            CHECK(is_approx_equal_fraction(8567578.0f, result.mQ[1], 2));
-            CHECK(is_approx_equal_fraction(3967591.25f, result.mQ[2], 2));
-            CHECK(is_approx_equal_fraction(-2047783.25f, result.mQ[3], 2));
-        }
+        CHECK(is_approx_equal_fraction(4543086.5f, result.mQ[0], 2));
+        CHECK(is_approx_equal_fraction(8567578.0f, result.mQ[1], 2));
+        CHECK(is_approx_equal_fraction(3967591.25f, result.mQ[2], 2));
+        CHECK(is_approx_equal_fraction(-2047783.25f, result.mQ[3], 2));
 
         //inline LLQuaternion operator+(const LLQuaternion &a, const LLQuaternion &b)fn.
         result = quat1 + quat2;
-        {
-            INFO("3. LLQuaternion operator+ failed");
-            CHECK(result.mQ[0] == 5.0f);
-            CHECK(result.mQ[1] == 5.5f);
-            CHECK(result.mQ[2] == 8.5f);
-            CHECK(result.mQ[3] == 6.5f);
-        }
+        CHECK(result.mQ[0] == 5.0f);
+        CHECK(result.mQ[1] == 5.5f);
+        CHECK(result.mQ[2] == 8.5f);
+        CHECK(result.mQ[3] == 6.5f);
 
         result = quat3 + quat4;
-        {
-            INFO("4. LLQuaternion operator+ failed");
-            CHECK(is_approx_equal(3015.407227f, result.mQ[0]));
-            CHECK(is_approx_equal(3245.434570f, result.mQ[1]));
-            CHECK(result.mQ[2] == 811.25f);
-            CHECK(result.mQ[3] == 7876.5f);
-        }
+        CHECK(is_approx_equal(3015.407227f, result.mQ[0]));
+        CHECK(is_approx_equal(3245.434570f, result.mQ[1]));
+        CHECK(result.mQ[2] == 811.25f);
+        CHECK(result.mQ[3] == 7876.5f);
 
         //inline LLQuaternion operator-(const LLQuaternion &a, const LLQuaternion &b) fn
         result = quat1 - quat2;
-        {
-            INFO("5. LLQuaternion operator-(const LLQuaternion &a, const LLQuaternion &b) failed");
-            CHECK(result.mQ[0] == -3.0f);
-            CHECK(result.mQ[1] == -0.5f);
-            CHECK(result.mQ[2] == -1.5f);
-            CHECK(result.mQ[3] == 4.5f);
-        }
+        CHECK(result.mQ[0] == -3.0f);
+        CHECK(result.mQ[1] == -0.5f);
+        CHECK(result.mQ[2] == -1.5f);
+        CHECK(result.mQ[3] == 4.5f);
 
         result = quat3 - quat4;
-        {
-            INFO("6. LLQuaternion operator-(const LLQuaternion &a, const LLQuaternion &b) failed");
-            CHECK(is_approx_equal(1667.273071f, result.mQ[0]));
-            CHECK(is_approx_equal(1459.255249f, result.mQ[1]));
-            CHECK(result.mQ[2] == -344.75f);
-            CHECK(result.mQ[3] == 7414.50f);
-        }
+        CHECK(is_approx_equal(1667.273071f, result.mQ[0]));
+        CHECK(is_approx_equal(1459.255249f, result.mQ[1]));
+        CHECK(result.mQ[2] == -344.75f);
+        CHECK(result.mQ[3] == 7414.50f);
     }
 
     //test case for LLVector4 operator*(const LLVector4 &a, const LLQuaternion &rot) fn.
@@ -386,25 +318,19 @@ namespace
         LLVector4 vect(12.0f, 5.0f, 60.0f, 75.1f);
         LLQuaternion quat(2323.034f, 23.5f, 673.23f, 57667.5f);
         LLVector4 result = vect * quat;
-        {
-            INFO("1. LLVector4 operator*(const LLVector4 &a, const LLQuaternion &rot) failed");
-            CHECK(is_approx_equal(39928406016.0f, result.mV[0]));
-            CHECK(1457802240.0f >= result.mV[1]);
-            CHECK(1457800960.0f <= result.mV[1]);
-            CHECK(is_approx_equal(200580612096.0f, result.mV[2]));
-            CHECK(result.mV[3] == 75.099998f);
-        }
+        CHECK(is_approx_equal(39928406016.0f, result.mV[0]));
+        CHECK(1457802240.0f >= result.mV[1]);
+        CHECK(1457800960.0f <= result.mV[1]);
+        CHECK(is_approx_equal(200580612096.0f, result.mV[2]));
+        CHECK(result.mV[3] == 75.099998f);
 
         LLVector4 vect1(22.0f, 45.0f, 40.0f, 78.1f);
         LLQuaternion quat1(2.034f, 45.5f, 37.23f, 7.5f);
         result = vect1 * quat1;
-        {
-            INFO("2. LLVector4 operator*(const LLVector4 &a, const LLQuaternion &rot) failed");
-            CHECK(is_approx_equal(-58153.5390f, result.mV[0]));
-            CHECK(is_approx_equal(183787.8125f, result.mV[1]));
-            CHECK(is_approx_equal(116864.164063f, result.mV[2]));
-            CHECK(is_approx_equal(78.099998f, result.mV[3]));
-        }
+        CHECK(is_approx_equal(-58153.5390f, result.mV[0]));
+        CHECK(is_approx_equal(183787.8125f, result.mV[1]));
+        CHECK(is_approx_equal(116864.164063f, result.mV[2]));
+        CHECK(is_approx_equal(78.099998f, result.mV[3]));
     }
 
     //test case for LLVector3 operator*(const LLVector3 &a, const LLQuaternion &rot) fn.
@@ -413,22 +339,16 @@ namespace
         LLVector3 vect(12.0f, 5.0f, 60.0f);
         LLQuaternion quat(23.5f, 6.5f, 3.23f, 56.5f);
         LLVector3 result = vect * quat;
-        {
-            INFO("1. LLVector3 operator*(const LLVector3 &a, const LLQuaternion &rot) failed");
-            CHECK(is_approx_equal(97182.953125f,result.mV[0]));
-            CHECK(is_approx_equal(-135405.640625f, result.mV[1]));
-            CHECK(is_approx_equal(162986.140f, result.mV[2]));
-        }
+        CHECK(is_approx_equal(97182.953125f,result.mV[0]));
+        CHECK(is_approx_equal(-135405.640625f, result.mV[1]));
+        CHECK(is_approx_equal(162986.140f, result.mV[2]));
 
         LLVector3 vect1(5.0f, 40.0f, 78.1f);
         LLQuaternion quat1(2.034f, 45.5f, 37.23f, 7.5f);
         result = vect1 * quat1;
-        {
-            INFO("2. LLVector3 operator*(const LLVector3 &a, const LLQuaternion &rot) failed");
-            CHECK(is_approx_equal(33217.703f, result.mV[0]));
-            CHECK(is_approx_equal(295383.8125f, result.mV[1]));
-            CHECK(is_approx_equal(84718.140f, result.mV[2]));
-        }
+        CHECK(is_approx_equal(33217.703f, result.mV[0]));
+        CHECK(is_approx_equal(295383.8125f, result.mV[1]));
+        CHECK(is_approx_equal(84718.140f, result.mV[2]));
     }
 
     //test case for LLVector3d operator*(const LLVector3d &a, const LLQuaternion &rot) fn.
@@ -437,32 +357,23 @@ namespace
         LLVector3d vect(-2.0f, 5.0f, -6.0f);
         LLQuaternion quat(-3.5f, 4.5f, 3.5f, 6.5f);
         LLVector3d result = vect * quat;
-        {
-            INFO("1. LLVector3d operator*(const LLVector3d &a, const LLQuaternion &rot) failed ");
-            CHECK(result.mdV[0] == -633.0f);
-            CHECK(result.mdV[1] == -300.0f);
-            CHECK(result.mdV[2] == -36.0f);
-        }
+        CHECK(result.mdV[0] == -633.0f);
+        CHECK(result.mdV[1] == -300.0f);
+        CHECK(result.mdV[2] == -36.0f);
 
         LLVector3d vect1(5.0f, -4.5f, 8.21f);
         LLQuaternion quat1(2.0f, 4.5f, -7.2f, 9.5f);
         result = vect1 * quat1;
-        {
-            INFO("2. LLVector3d operator*(const LLVector3d &a, const LLQuaternion &rot) failed");
-            CHECK(is_approx_equal_fraction(-120.29f, (F32) result.mdV[0], 8));
-            CHECK(is_approx_equal_fraction(-1683.958f, (F32) result.mdV[1], 8));
-            CHECK(is_approx_equal_fraction(516.56f, (F32) result.mdV[2], 8));
-        }
+        CHECK(is_approx_equal_fraction(-120.29f, (F32) result.mdV[0], 8));
+        CHECK(is_approx_equal_fraction(-1683.958f, (F32) result.mdV[1], 8));
+        CHECK(is_approx_equal_fraction(516.56f, (F32) result.mdV[2], 8));
 
         LLVector3d vect2(2.0f, 3.5f, 1.1f);
         LLQuaternion quat2(1.0f, 4.0f, 2.0f, 5.0f);
         result = vect2 * quat2;
-        {
-            INFO("3. LLVector3d operator*(const LLVector3d &a, const LLQuaternion &rot) failed");
-            CHECK(is_approx_equal_fraction(18.400001f, (F32) result.mdV[0], 8));
-            CHECK(is_approx_equal_fraction(188.6f, (F32) result.mdV[1], 8));
-            CHECK(is_approx_equal_fraction(32.20f, (F32) result.mdV[2], 8));
-        }
+        CHECK(is_approx_equal_fraction(18.400001f, (F32) result.mdV[0], 8));
+        CHECK(is_approx_equal_fraction(188.6f, (F32) result.mdV[1], 8));
+        CHECK(is_approx_equal_fraction(32.20f, (F32) result.mdV[2], 8));
     }
 
     //test case for inline LLQuaternion operator-(const LLQuaternion &a) fn.
@@ -470,23 +381,17 @@ namespace
     {
         LLQuaternion quat(23.5f, 34.5f, 16723.4f, 324.7f);
         LLQuaternion result = -quat;
-        {
-            INFO("1. LLQuaternion operator-(const LLQuaternion &a) failed");
-            CHECK(result.mQ[0] == -23.5f);
-            CHECK(result.mQ[1] == -34.5f);
-            CHECK(result.mQ[2] == -16723.4f);
-            CHECK(result.mQ[3] == -324.7f);
-        }
+        CHECK(result.mQ[0] == -23.5f);
+        CHECK(result.mQ[1] == -34.5f);
+        CHECK(result.mQ[2] == -16723.4f);
+        CHECK(result.mQ[3] == -324.7f);
 
         LLQuaternion quat1(-3.5f, -34.5f, -16.4f, -154.7f);
         result = -quat1;
-        {
-            INFO("2. LLQuaternion operator-(const LLQuaternion &a) failed.");
-            CHECK(result.mQ[0] == 3.5f);
-            CHECK(result.mQ[1] == 34.5f);
-            CHECK(result.mQ[2] == 16.4f);
-            CHECK(result.mQ[3] == 154.7f);
-        }
+        CHECK(result.mQ[0] == 3.5f);
+        CHECK(result.mQ[1] == 34.5f);
+        CHECK(result.mQ[2] == 16.4f);
+        CHECK(result.mQ[3] == 154.7f);
     }
 
     //test case for inline LLQuaternion operator*(F32 a, const LLQuaternion &q) and
@@ -498,13 +403,10 @@ namespace
         LLQuaternion result = a * quat_value;
         LLQuaternion result1 = quat_value * a;
 
-        {
-            INFO("1. LLQuaternion operator* failed");
-            CHECK(result.mQ[0] == result1.mQ[0]);
-            CHECK(result.mQ[1] == result1.mQ[1]);
-            CHECK(result.mQ[2] == result1.mQ[2]);
-            CHECK(result.mQ[3] == result1.mQ[3]);
-        }
+        CHECK(result.mQ[0] == result1.mQ[0]);
+        CHECK(result.mQ[1] == result1.mQ[1]);
+        CHECK(result.mQ[2] == result1.mQ[2]);
+        CHECK(result.mQ[3] == result1.mQ[3]);
 
 
         LLQuaternion quat_val(9454.0f, 43568.3450f, 456343247.0343f, 2346.03434f);
@@ -512,13 +414,10 @@ namespace
         result = a * quat_val;
         result1 = quat_val * a;
 
-        {
-            INFO("2. LLQuaternion operator* failed");
-            CHECK(result.mQ[0] == result1.mQ[0]);
-            CHECK(result.mQ[1] == result1.mQ[1]);
-            CHECK(result.mQ[2] == result1.mQ[2]);
-            CHECK(result.mQ[3] == result1.mQ[3]);
-        }
+        CHECK(result.mQ[0] == result1.mQ[0]);
+        CHECK(result.mQ[1] == result1.mQ[1]);
+        CHECK(result.mQ[2] == result1.mQ[2]);
+        CHECK(result.mQ[3] == result1.mQ[3]);
     }
 
     TEST_CASE("LLQuaternion: operator~ conjugates and operator== matches equal quaternions", "[LLQuaternion]")
@@ -526,18 +425,14 @@ namespace
         // test cases for inline LLQuaternion operator~(const LLQuaternion &a)
         LLQuaternion quat_val(2323.634f, -43535.4f, 3455.88f, -32232.45f);
         LLQuaternion result = ~quat_val;
-        {
-            INFO("1. LLQuaternion operator~(const LLQuaternion &a) failed ");
-            CHECK(result.mQ[0] == -2323.634f);
-            CHECK(result.mQ[1] == 43535.4f);
-            CHECK(result.mQ[2] == -3455.88f);
-            CHECK(result.mQ[3] == -32232.45f);
-        }
+        CHECK(result.mQ[0] == -2323.634f);
+        CHECK(result.mQ[1] == 43535.4f);
+        CHECK(result.mQ[2] == -3455.88f);
+        CHECK(result.mQ[3] == -32232.45f);
 
         //test case for inline bool LLQuaternion::operator==(const LLQuaternion &b) const
         LLQuaternion quat_val1(2323.634f, -43535.4f, 3455.88f, -32232.45f);
         LLQuaternion quat_val2(2323.634f, -43535.4f, 3455.88f, -32232.45f);
-        UNSCOPED_INFO("2. LLQuaternion::operator==(const LLQuaternion &b) failed");
         CHECK(quat_val1 == quat_val2);
     }
 
@@ -546,7 +441,6 @@ namespace
         //test case for inline bool LLQuaternion::operator!=(const LLQuaternion &b) const
         LLQuaternion quat_val1(2323.634f, -43535.4f, 3455.88f, -32232.45f);
         LLQuaternion quat_val2(0, -43535.4f, 3455.88f, -32232.45f);
-        UNSCOPED_INFO("LLQuaternion::operator!=(const LLQuaternion &b) failed");
         CHECK(quat_val1 != quat_val2);
     }
 
@@ -558,58 +452,40 @@ namespace
         F32 z = 3.0f;
 
         LLQuaternion result = mayaQ(x, y, z, LLQuaternion::XYZ);
-        {
-            INFO("1. LLQuaternion mayaQ(F32 xRot, F32 yRot, F32 zRot, LLQuaternion::Order order) failed for XYZ");
-            CHECK(is_approx_equal_fraction(0.0172174f, result.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(0.009179f, result.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(0.026020f, result.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(0.999471f, result.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(0.0172174f, result.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(0.009179f, result.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(0.026020f, result.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(0.999471f, result.mQ[3], 16));
 
         LLQuaternion result1 = mayaQ(x, y, z, LLQuaternion::YZX);
-        {
-            INFO("2. LLQuaternion mayaQ(F32 xRot, F32 yRot, F32 zRot, LLQuaternion::Order order) failed for XYZ");
-            CHECK(is_approx_equal_fraction(0.017217f, result1.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(0.008265f, result1.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(0.026324f, result1.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(0.999471f, result1.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(0.017217f, result1.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(0.008265f, result1.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(0.026324f, result1.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(0.999471f, result1.mQ[3], 16));
 
         LLQuaternion result2 = mayaQ(x, y, z, LLQuaternion::ZXY);
-        {
-            INFO("3. LLQuaternion mayaQ(F32 xRot, F32 yRot, F32 zRot, LLQuaternion::Order order) failed for ZXY");
-            CHECK(is_approx_equal_fraction(0.017674f, result2.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(0.008265f, result2.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(0.026020f, result2.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(0.999471f, result2.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(0.017674f, result2.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(0.008265f, result2.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(0.026020f, result2.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(0.999471f, result2.mQ[3], 16));
 
         LLQuaternion result3 = mayaQ(x, y, z, LLQuaternion::XZY);
-        {
-            INFO("4. TLLQuaternion mayaQ(F32 xRot, F32 yRot, F32 zRot, LLQuaternion::Order order) failed for XZY");
-            CHECK(is_approx_equal_fraction(0.017674f, result3.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(0.009179f, result3.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(0.026020f, result3.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(0.999463f, result3.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(0.017674f, result3.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(0.009179f, result3.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(0.026020f, result3.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(0.999463f, result3.mQ[3], 16));
 
         LLQuaternion result4 = mayaQ(x, y, z, LLQuaternion::YXZ);
-        {
-            INFO("5. LLQuaternion mayaQ(F32 xRot, F32 yRot, F32 zRot, LLQuaternion::Order order) failed for YXZ");
-            CHECK(is_approx_equal_fraction(0.017217f, result4.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(0.009179f, result4.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(0.026324f, result4.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(0.999463f, result4.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(0.017217f, result4.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(0.009179f, result4.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(0.026324f, result4.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(0.999463f, result4.mQ[3], 16));
 
         LLQuaternion result5 = mayaQ(x, y, z, LLQuaternion::ZYX);
-        {
-            INFO("6. LLQuaternion mayaQ(F32 xRot, F32 yRot, F32 zRot, LLQuaternion::Order order) failed for ZYX");
-            CHECK(is_approx_equal_fraction(0.017674f, result5.mQ[0], 16));
-            CHECK(is_approx_equal_fraction(0.008265f, result5.mQ[1], 16));
-            CHECK(is_approx_equal_fraction(0.026324f, result5.mQ[2], 16));
-            CHECK(is_approx_equal_fraction(0.999463f, result5.mQ[3], 16));
-        }
+        CHECK(is_approx_equal_fraction(0.017674f, result5.mQ[0], 16));
+        CHECK(is_approx_equal_fraction(0.008265f, result5.mQ[1], 16));
+        CHECK(is_approx_equal_fraction(0.026324f, result5.mQ[2], 16));
+        CHECK(is_approx_equal_fraction(0.999463f, result5.mQ[3], 16));
     }
 
     TEST_CASE("LLQuaternion: operator<< prints the components in braces", "[LLQuaternion]")
@@ -618,18 +494,15 @@ namespace
         LLQuaternion a(1.0f, 1.0f, 1.0f, 1.0f);
         std::ostringstream result_value;
         result_value << a;
-        UNSCOPED_INFO("1. Operator << failed");
         CHECK(result_value.str() == "{ 1, 1, 1, 1 }");
 
         LLQuaternion b(-31.034f, 231.2340f, 3451.344320f, -341.0f);
         std::ostringstream result_value1;
         result_value1 << b;
-        UNSCOPED_INFO("2. Operator << failed");
         CHECK(result_value1.str() == "{ -31.034, 231.234, 3451.34, -341 }");
 
         LLQuaternion c(1.0f, 2.2f, 3.3f, 4.4f);
         result_value << c;
-        UNSCOPED_INFO("3. Operator << failed");
         CHECK(result_value.str() == "{ 1, 1, 1, 1 }{ 1, 2.2, 3.3, 4.4 }");
 
     }
@@ -638,33 +511,25 @@ namespace
     {
         //test case for const char *OrderToString( const LLQuaternion::Order order ) fn
         const char* result = OrderToString(LLQuaternion::XYZ);
-        UNSCOPED_INFO("1. OrderToString failed for XYZ");
         CHECK(std::string_view(result) == "XYZ");
 
         result = OrderToString(LLQuaternion::YZX);
-        UNSCOPED_INFO("2. OrderToString failed for YZX");
         CHECK(std::string_view(result) == "YZX");
 
         result = OrderToString(LLQuaternion::ZXY);
-        {
-            INFO("3. OrderToString failed for ZXY");
-            CHECK(std::string_view(result) == "ZXY");
-            CHECK(std::string_view(result) != "XYZ");
-            CHECK(std::string_view(result) != "YXZ");
-            CHECK(std::string_view(result) != "ZYX");
-            CHECK(std::string_view(result) != "XYZ");
-        }
+        CHECK(std::string_view(result) == "ZXY");
+        CHECK(std::string_view(result) != "XYZ");
+        CHECK(std::string_view(result) != "YXZ");
+        CHECK(std::string_view(result) != "ZYX");
+        CHECK(std::string_view(result) != "XYZ");
 
         result = OrderToString(LLQuaternion::XZY);
-        UNSCOPED_INFO("4. OrderToString failed for XZY");
         CHECK(std::string_view(result) == "XZY");
 
         result = OrderToString(LLQuaternion::ZYX);
-        UNSCOPED_INFO("5. OrderToString failed for ZYX");
         CHECK(std::string_view(result) == "ZYX");
 
         result = OrderToString(LLQuaternion::YXZ);
-        UNSCOPED_INFO("6.OrderToString failed for YXZ");
         CHECK(std::string_view(result) == "YXZ");
     }
 
@@ -672,27 +537,21 @@ namespace
     {
         //test case for LLQuaternion::Order StringToOrder( const char *str ) fn
         int result = StringToOrder("XYZ");
-        UNSCOPED_INFO("1. LLQuaternion::Order StringToOrder(const char *str ) failed for XYZ");
         CHECK(result == 0);
 
         result = StringToOrder("YZX");
-        UNSCOPED_INFO("2. LLQuaternion::Order StringToOrder(const char *str) failed for YZX");
         CHECK(result == 1);
 
         result = StringToOrder("ZXY");
-        UNSCOPED_INFO("3. LLQuaternion::Order StringToOrder(const char *str) failed for ZXY");
         CHECK(result == 2);
 
         result = StringToOrder("XZY");
-        UNSCOPED_INFO("4. LLQuaternion::Order StringToOrder(const char *str) failed for XZY");
         CHECK(result == 3);
 
         result = StringToOrder("YXZ");
-        UNSCOPED_INFO("5. LLQuaternion::Order StringToOrder(const char *str) failed for YXZ");
         CHECK(result == 4);
 
         result = StringToOrder("ZYX");
-        UNSCOPED_INFO("6. LLQuaternion::Order StringToOrder(const char *str) failed for  ZYX");
         CHECK(result == 5);
 
     }
@@ -704,13 +563,10 @@ namespace
         LLVector3 vect(12.0f, 4.0f, 1.0f);
         LLQuaternion llquat(angle_value, vect);
         llquat.getAngleAxis(&angle_value, vect);
-        {
-            INFO("LLQuaternion::getAngleAxis(F32* angle, LLVector3 &vec) failed");
-            CHECK(is_approx_equal_fraction(2.035406f, angle_value, 16));
-            CHECK(is_approx_equal_fraction(0.315244f, vect.mV[1], 16));
-            CHECK(is_approx_equal_fraction(0.078811f, vect.mV[2], 16));
-            CHECK(is_approx_equal_fraction(0.945733f, vect.mV[0], 16));
-        }
+        CHECK(is_approx_equal_fraction(2.035406f, angle_value, 16));
+        CHECK(is_approx_equal_fraction(0.315244f, vect.mV[1], 16));
+        CHECK(is_approx_equal_fraction(0.078811f, vect.mV[2], 16));
+        CHECK(is_approx_equal_fraction(0.945733f, vect.mV[0], 16));
     }
 
     TEST_CASE("LLQuaternion: getEulerAngles leaves an identity quaternion unchanged", "[LLQuaternion]")
@@ -722,16 +578,12 @@ namespace
 
         LLQuaternion llquat;
         llquat.getEulerAngles(&roll, &pitch, &yaw);
-        {
-            INFO("LLQuaternion::getEulerAngles(F32 *roll, F32 *pitch, F32 *yaw) failed");
-            CHECK(is_approx_equal(0.000f, llquat.mQ[0]));
-            CHECK(is_approx_equal(0.000f, llquat.mQ[1]));
-            CHECK(is_approx_equal(0.000f, llquat.mQ[2]));
-            CHECK(is_approx_equal(1.000f, llquat.mQ[3]));
-        }
+        CHECK(is_approx_equal(0.000f, llquat.mQ[0]));
+        CHECK(is_approx_equal(0.000f, llquat.mQ[1]));
+        CHECK(is_approx_equal(0.000f, llquat.mQ[2]));
+        CHECK(is_approx_equal(1.000f, llquat.mQ[3]));
     }
 
-    // The product and the dot evaluate at compile time.
     TEST_CASE("LLQuaternion: product and dot evaluate at compile time", "[LLQuaternion]")
     {
         constexpr LLQuaternion half_turn(0.f, 0.f, 1.f, 0.f);

@@ -151,24 +151,20 @@ namespace
         int outside = 0, crossing = 0, inside = 0;
         for (const Box& b : some_boxes(2, FAR_X))
         {
+            CAPTURE(b.center);
             const S32 expected = by_loop(b);
             const S32 got = mCamera.AABBInFrustum(b.center, b.radius);
-            UNSCOPED_INFO("AABBInFrustum at " + std::to_string(b.center[0]) + " " + std::to_string(b.center[1]) + " " + std::to_string(b.center[2]));
             REQUIRE(got == expected);
             outside += expected == 0;
             crossing += expected == 1;
             inside += expected == 2;
 
             const S32 expected_no_far = by_loop(b, true);
-            UNSCOPED_INFO("AABBInFrustumNoFarClip at " + std::to_string(b.center[0]));
             REQUIRE(mCamera.AABBInFrustumNoFarClip(b.center, b.radius) == expected_no_far);
         }
-        {
-            INFO("the boxes fell on every side: " + std::to_string(outside) + " " + std::to_string(crossing) + " " + std::to_string(inside));
-            CHECK(outside > 100);
-            CHECK(crossing > 100);
-            CHECK(inside > 100);
-        }
+        CHECK(outside > 100);
+        CHECK(crossing > 100);
+        CHECK(inside > 100);
 
         // the obvious three
         UNSCOPED_INFO("a box in the middle is inside");
@@ -191,25 +187,22 @@ namespace
         const Box above = {LLVector4a(50.f, 0.f, 20.f, 0.f), LLVector4a(1.f, 1.f, 1.f, 0.f)};
         UNSCOPED_INFO("above the clip plane is outside");
         CHECK(mCamera.AABBInFrustum(above.center, above.radius) == 0);
-        UNSCOPED_INFO("and the loop agrees");
         CHECK(by_loop(above) == 0);
         for (const Box& b : some_boxes(3, FAR_X))
         {
-            UNSCOPED_INFO("with the clip plane");
+            CAPTURE(b.center);
             REQUIRE(mCamera.AABBInFrustum(b.center, b.radius) == by_loop(b));
         }
 
         mCamera.disableUserClipPlane();
         UNSCOPED_INFO("above the disabled clip plane is inside");
         CHECK(mCamera.AABBInFrustum(above.center, above.radius) == 2);
-        UNSCOPED_INFO("and the loop agrees");
         CHECK(by_loop(above) == 2);
 
         mCamera.ignoreAgentFrustumPlane(LLCamera::AGENT_PLANE_FAR);
         const Box beyond = {LLVector4a(FAR_X + 50.f, 0.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f, 0.f)};
         UNSCOPED_INFO("beyond an ignored far plane is inside");
         CHECK(mCamera.AABBInFrustum(beyond.center, beyond.radius) == 2);
-        UNSCOPED_INFO("and the loop agrees");
         CHECK(by_loop(beyond) == 2);
     }
 
@@ -222,7 +215,7 @@ namespace
         {
             Box in_agent = b;
             in_agent.center.set(b.center[0] + shift.mV[0], b.center[1] + shift.mV[1], b.center[2] + shift.mV[2], 0.f);
-            UNSCOPED_INFO("AABBInRegionFrustumNoFarClip at " + std::to_string(b.center[0]));
+            CAPTURE(b.center);
             REQUIRE(mCamera.AABBInRegionFrustumNoFarClip(b.center, b.radius) == by_loop(in_agent, true));
         }
         UNSCOPED_INFO("a region box past the region far clip is outside");
@@ -241,17 +234,14 @@ namespace
         // the near plane moved back to x = -50, still facing back
         LLPlane moved(LLVector3(-50.f, 0.f, 0.f), LLVector3(-1.f, 0.f, 0.f));
         mCamera.setAgentPlane(LLCamera::AGENT_PLANE_NEAR, moved);
-        UNSCOPED_INFO("the plane reads back");
         CHECK(mCamera.getAgentPlane(LLCamera::AGENT_PLANE_NEAR).equal(moved));
         UNSCOPED_INFO("behind the old near plane is now inside");
         CHECK(mCamera.AABBInFrustum(behind.center, behind.radius) == 2);
-        UNSCOPED_INFO("and the loop agrees");
         CHECK(by_loop(behind) == 2);
         for (const Box& b : some_boxes(5, FAR_X))
         {
-            UNSCOPED_INFO("with the near plane moved");
+            CAPTURE(b.center);
             REQUIRE(mCamera.AABBInFrustum(b.center, b.radius) == by_loop(b));
-            UNSCOPED_INFO("with the near plane moved, far ignored");
             REQUIRE(mCamera.AABBInFrustumNoFarClip(b.center, b.radius) == by_loop(b, true));
         }
 
@@ -261,11 +251,9 @@ namespace
         const Box straddling = {LLVector4a(50.f, 0.f, 0.f, 0.f), LLVector4a(2.f, 1.f, 1.f, 0.f)};
         UNSCOPED_INFO("a box across the flipped plane is partly in");
         CHECK(mCamera.AABBInFrustum(straddling.center, straddling.radius) == 1);
-        UNSCOPED_INFO("and the loop agrees");
         CHECK(by_loop(straddling) == 1);
         UNSCOPED_INFO("beyond the flipped plane is outside");
         CHECK(mCamera.AABBInFrustum(LLVector4a(70.f, 0.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f, 0.f)) == 0);
-        UNSCOPED_INFO("and the loop agrees");
         CHECK(by_loop({LLVector4a(70.f, 0.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f, 0.f)}) == 0);
     }
 }
