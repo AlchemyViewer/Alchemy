@@ -18,6 +18,11 @@ Parity holds for a file when:
   - each pair agrees: ok is a pass, a TUT skip is a Catch2 skip, and every
     TUT failure (fail, exception, abnormal end) is a Catch2 failure; and the
     name TUT printed is the one the mapping folded into the case's;
+  - no two cases share a name (Catch2 takes two that differ in their tags),
+    none is tagged [!mayfail] or [!shouldfail], under which Catch2 passes a
+    case whatever it does, and the run's exit code fits its cases: 0 when
+    some passed and none failed, 125 when all skipped, neither when any
+    failed;
   - each case's assertions, counted in the converted file, number its
     TUT test's ensure, fail and skip calls, as the mapping counted them in
     the TUT file, where a && chain the converter split counts one a term
@@ -50,6 +55,11 @@ import xml.etree.ElementTree as ElementTree
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DEFAULT_BUILD = "build-Darwin-ninja-os"
 DEFAULT_CONFIG = "RelWithDebInfo"
+# What every test entry exits with when it skips: the harness turns Catch2's
+# "all skipped" into it, and CTest reads it as skipped.
+SKIP_CODE = 125
+# Tags under which Catch2 passes a case whatever it does.
+FORGIVING_TAGS = ("[!mayfail]", "[!shouldfail]")
 RESULT_LINE = re.compile(
     r"^\[(?P<group>.+?), (?P<n>\d+)(?:: (?P<name>.*?))?\] "
     r"(?P<result>ok|fail|exception|test destructor throw|abnormal termination|skipped known failure|unknown)\b")
@@ -157,27 +167,40 @@ def record(args):
 # check
 # --------------------------------------------------------------------------
 def catch2_results(test, timeout):
-    """{case name: pass | skip | fail} from running a Catch2 entry as XML."""
+    """The cases a Catch2 entry ran, as XML, in the order it ran them: each
+    {name, tags, result: ok | skip | fail}. A list, not a dict by name: Catch2
+    takes two cases of one name that differ in their tags."""
     with tempfile.TemporaryDirectory() as tmp:
         report = os.path.join(tmp, "report.xml")
         code, text = run(test, ["-r", f"xml::out={report}"], timeout)
-        cases = {}
+        cases = []
         try:
             root = ElementTree.parse(report).getroot()
         except (ElementTree.ParseError, FileNotFoundError):
             return code, None, text
         for case in root.iter("TestCase"):
             result = case.find("OverallResult")
-            if result is None:
-                cases[case.get("name")] = "fail"
-                continue
-            if result.get("success") != "true":
-                cases[case.get("name")] = "fail"
+            if result is None or result.get("success") != "true":
+                outcome = "fail"
             elif int(result.get("skips", "0")) > 0:
-                cases[case.get("name")] = "skip"
+                outcome = "skip"
             else:
-                cases[case.get("name")] = "ok"
+                outcome = "ok"
+            cases.append({"name": case.get("name"), "tags": case.get("tags", ""), "result": outcome})
         return code, cases, text
+
+
+def exit_fits(code, cases, output):
+    """Whether a run's exit code says what its cases do: 0 when some passed
+    and none failed (1 when the state guard found a change, which it says),
+    the skip code when every case skipped, and neither when any failed or
+    none ran -- a filter that matches nothing exits 2."""
+    results = {c["result"] for c in cases}
+    if "fail" in results or not results:
+        return code not in (0, SKIP_CODE, "timeout")
+    if results == {"skip"}:
+        return code == SKIP_CODE
+    return code == 0 or (code == 1 and "The state guard found" in output)
 
 
 def recount(path, cases):
@@ -302,6 +325,24 @@ def check(args):
             problems.append(f"{path}: {entry_names[0]} gave no XML (exit {code}):\n{output[-2000:]}")
             continue
         guard = [line for line in output.splitlines() if line.startswith("State guard:")]
+        # The first case of a name is the one matched; a second is an error
+        # of its own.
+        by_name = {}
+        for case in cases:
+            if case["name"] in by_name:
+                problems.append(f"{path}: Catch2 has more than one case named {case['name']!r}")
+            else:
+                by_name[case["name"]] = case
+            for tag in FORGIVING_TAGS:
+                if tag in case["tags"]:
+                    problems.append(f"{path}: {case['name']!r} is tagged {tag}, under which Catch2 passes it "
+                                    f"whatever it does")
+        if not exit_fits(code, cases, output):
+            counts = {}
+            for case in cases:
+                counts[case["result"]] = counts.get(case["result"], 0) + 1
+            problems.append(f"{path}: {entry_names[0]} exited {code}, which does not fit its cases ("
+                            + (", ".join(f"{v} {k}" for k, v in sorted(counts.items())) or "none") + ")")
         tut_results = {(r["group"], r["n"]): r for r in recorded["results"]}
         counted = recount(os.path.join(ROOT, path), [e["catch2_name"] for e in entries if e["catch2_name"]])
         matched = agree = counts_ok = 0
@@ -315,14 +356,14 @@ def check(args):
             if e.get("not_compiled_here") or (e.get("past_group_limit") and key not in tut_results):
                 listed.append(f"{e['group']} {e['n']}: " +
                               ("not compiled here" if e.get("not_compiled_here") else "past its group's limit"))
-                if name in cases:
+                if name in by_name:
                     seen_cases.add(name)
                 continue
             t = tut_results.pop(key, None)
             if t is None:
                 problems.append(f"{path}: {e['group']} test<{e['n']}> did not run under TUT")
                 continue
-            if not name or name not in cases:
+            if not name or name not in by_name:
                 problems.append(f"{path}: {e['group']} test<{e['n']}> has no Catch2 case"
                                 + (f" ({name!r})" if name else ""))
                 continue
@@ -331,10 +372,10 @@ def check(args):
             if e.get("tut_name") is not None and e["tut_name"] != t["name"]:
                 problems.append(f"{path}: {e['group']} test<{e['n']}>: TUT named it {t['name']!r}, "
                                 f"the mapping {e['tut_name']!r}")
-            if cases[name] == t["result"]:
+            if by_name[name]["result"] == t["result"]:
                 agree += 1
             else:
-                problems.append(f"{path}: {name!r}: TUT {t['said']!r}, Catch2 {cases[name]}")
+                problems.append(f"{path}: {name!r}: TUT {t['said']!r}, Catch2 {by_name[name]['result']}")
             static = counted.get(name)
             # One TUT call is one Catch2 assertion, but for a && chain split
             # into one assertion a term, which the mapping counted.
@@ -350,7 +391,7 @@ def check(args):
                                 f"{static} in the file")
         for key, t in sorted(tut_results.items()):
             problems.append(f"{path}: TUT ran [{key[0]}, {key[1]}], which the mapping does not have")
-        for name in sorted(set(cases) - seen_cases):
+        for name in sorted(set(by_name) - seen_cases):
             problems.append(f"{path}: Catch2 case {name!r} is no TUT test of the mapping")
         clean = not any(p.startswith(path + ":") for p in problems)
         rows.append((path, len(recorded["results"]), len(cases), matched, agree, counts_ok, len(listed), code,
