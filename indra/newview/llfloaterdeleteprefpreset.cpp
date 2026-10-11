@@ -34,7 +34,6 @@
 #include "llfloaterpreference.h"
 #include "llnotificationsutil.h"
 #include "llpresetsmanager.h"
-#include "lltrans.h"
 #include "llviewercontrol.h"
 #include "llfloaterreg.h"
 
@@ -79,62 +78,87 @@ void LLFloaterDeletePrefPreset::onOpen(const LLSD& key)
 
 void LLFloaterDeletePrefPreset::fillPresetCombo()
 {
-    LLComboBox* combo = getChild<LLComboBox>("preset_combo");
-    bool        action = false;
-    if (PRESETS_LOOKS == mSubdirectory)
-    {
-        // Every Look but Neutral, which is what the Lightbox falls back to
-        // when the Look in use is deleted, and so is not one to delete.
-        LLPresetsManager::preset_name_list_t names;
-        LLPresetsManager::getInstance()->loadPresetNamesFromDir(mSubdirectory, names, DEFAULT_HIDE);
-        combo->clearRows();
-        combo->setEnabled(true);
-        for (const std::string& name : names)
-        {
-            if (!LLPresetsManager::isProtectedLookName(name))
-            {
-                combo->add(name, name);
-                action = true;
-            }
-        }
-        if (!action)
-        {
-            combo->setLabel(LLTrans::getString("preset_combo_label"));
-            combo->setEnabled(false);
-        }
-    }
-    else
-    {
-        action = LLPresetsManager::getInstance()->setPresetNamesInComboBox(mSubdirectory, combo, DEFAULT_HIDE);
-    }
-
-    LLButton* delete_btn = getChild<LLButton>("delete");
-    delete_btn->setEnabled(action);
+    LLComboBox* combo  = getChild<LLComboBox>("preset_combo");
+    const bool  action = LLPresetsManager::getInstance()->setPresetNamesInComboBox(mSubdirectory, combo, DEFAULT_HIDE);
+    getChild<LLButton>("delete")->setEnabled(action);
 }
+
+namespace
+{
+    // The preset deleted, and for a Look that was in use, Neutral put on in
+    // its place: the settings would otherwise stay the deleted Look's, under
+    // a bar that names some other one.
+    void deletePresetNamed(const std::string& subdirectory, const std::string& name)
+    {
+        // Asked before the delete, which forgets it.
+        const bool look_in_use = PRESETS_LOOKS == subdirectory &&
+                                 (gSavedSettings.getString("PresetLooksActive") == name || gSavedSettings.getString("PresetLooksLastApplied") == name);
+        if (!LLPresetsManager::getInstance()->deletePreset(subdirectory, name))
+        {
+            LLSD args;
+            args["NAME"] = name;
+            LLNotificationsUtil::add("PresetNotDeleted", args);
+        }
+        else if (look_in_use)
+        {
+            ALFloaterLightBox::putOnNeutralForDeletedLook(name);
+        }
+    }
+} // namespace
 
 void LLFloaterDeletePrefPreset::onBtnDelete()
 {
     LLComboBox* combo = getChild<LLComboBox>("preset_combo");
     std::string name = combo->getSimple();
 
-    // Asked before the delete, which forgets it: whether the Look going is
-    // the one the settings came from.
-    const bool look_in_use = PRESETS_LOOKS == mSubdirectory &&
-                             (gSavedSettings.getString("PresetLooksActive") == name || gSavedSettings.getString("PresetLooksLastApplied") == name);
+    // The answers to what is asked below arrive whenever they do, and this
+    // floater may be gone by then.
+    const LLHandle<LLFloater> handle       = getHandle();
+    const std::string         subdirectory = mSubdirectory;
 
-    if (!LLPresetsManager::getInstance()->deletePreset(mSubdirectory, name))
+    if (PRESETS_LOOKS == mSubdirectory && LLPresetsManager::isProtectedLookName(name))
     {
+        // Neutral is what deleting the Look in use falls back to, so it is
+        // not deleted -- but one saved over before it was protected would
+        // otherwise be kept as it is for good. Delete offers it back as it
+        // came with the viewer.
+        LLNotificationsUtil::add("LightBoxLookRestoreNeutral", LLSD(), LLSD(), [handle](const LLSD& notification, const LLSD& response) {
+            if (LLNotificationsUtil::getSelectedOption(notification, response) != 0)
+            {
+                return;
+            }
+            ALFloaterLightBox::restoreNeutral();
+            if (LLFloater* self = handle.get())
+            {
+                self->closeFloater();
+            }
+        });
+        return;
+    }
+
+    if (PRESETS_LOOKS == mSubdirectory && gSavedSettings.getString("PresetLooksActive").empty() &&
+        gSavedSettings.getString("PresetLooksLastApplied") == name)
+    {
+        // The Look in use, with changes on top of it that nothing has saved:
+        // Neutral goes on in their place, so ask first.
         LLSD args;
         args["NAME"] = name;
-        LLNotificationsUtil::add("PresetNotDeleted", args);
-    }
-    else if (look_in_use)
-    {
-        // The settings would otherwise stay the deleted Look's, under a bar
-        // that names some other one.
-        ALFloaterLightBox::putOnNeutralForDeletedLook(name);
+        LLNotificationsUtil::add("LightBoxLookDeleteModified", args, LLSD(),
+                                 [handle, subdirectory, name](const LLSD& notification, const LLSD& response) {
+                                     if (LLNotificationsUtil::getSelectedOption(notification, response) != 0)
+                                     {
+                                         return;
+                                     }
+                                     deletePresetNamed(subdirectory, name);
+                                     if (LLFloater* self = handle.get())
+                                     {
+                                         self->closeFloater();
+                                     }
+                                 });
+        return;
     }
 
+    deletePresetNamed(mSubdirectory, name);
     closeFloater();
 }
 

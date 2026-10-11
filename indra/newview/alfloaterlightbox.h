@@ -96,8 +96,13 @@ public:
     /// One undo step where the Lightbox is open, so that Ctrl+Z brings back
     /// the settings the deleted Look had -- to be saved again, if deleting
     /// it was a mistake. Neutral is put back from the bundled copy first
-    /// where the Looks folder has lost it.
+    /// where the Looks folder has lost it. With the Lightbox closed there is
+    /// no undo step to take, and a note says what happened instead.
     static void putOnNeutralForDeletedLook(const std::string& deleted_name);
+    /// Neutral put back as it came with the viewer (LLPresetsManager::
+    /// restoreNeutralLook), and put on again where it is the Look in use --
+    /// one undo step, where the Lightbox is open.
+    static void restoreNeutral();
     /// A Look notecard dropped anywhere on the window is imported.
     bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept,
                            std::string& tooltip_msg) override;

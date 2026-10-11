@@ -1118,10 +1118,11 @@ bool LLPresetsManager::isProtectedLookName(const std::string& name)
 
 bool LLPresetsManager::ensureNeutralLook()
 {
-    if (LLFile::isfile(getPresetFilePath(PRESETS_LOOKS, LOOK_NEUTRAL)))
-    {
-        return true;
-    }
+    return LLFile::isfile(getPresetFilePath(PRESETS_LOOKS, LOOK_NEUTRAL)) || restoreNeutralLook();
+}
+
+bool LLPresetsManager::restoreNeutralLook()
+{
     const std::string bundled = gDirUtilp->add(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, PRESETS_LOOKS), LOOK_NEUTRAL + ".xml");
     if (!LLFile::copy(bundled, getPresetFilePath(PRESETS_LOOKS, LOOK_NEUTRAL)))
     {
@@ -1129,6 +1130,7 @@ bool LLPresetsManager::ensureNeutralLook()
         return false;
     }
     LL_INFOS("Presets") << "Put the bundled Look '" << LOOK_NEUTRAL << "' back" << LL_ENDL;
+    triggerChangeLooksSignal();
     return true;
 }
 

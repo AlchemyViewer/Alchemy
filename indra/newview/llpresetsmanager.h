@@ -113,6 +113,11 @@ public:
     /// none there -- one deleted before it was protected, or never seeded.
     /// False where there is none and it could not be copied.
     bool ensureNeutralLook();
+    /// The bundled Neutral copied over the one in the Looks folder: the way
+    /// back for a Neutral saved over before it was protected, which can
+    /// then be neither saved over nor deleted. What Delete does with
+    /// Neutral, once asked. False where it could not be copied.
+    bool restoreNeutralLook();
 
     /// What a Look's map says about one setting: nothing; a value that is
     /// refused (ALLookFormat::sanitizeLookValue, by the setting's own type,

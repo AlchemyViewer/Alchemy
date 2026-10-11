@@ -122,15 +122,30 @@ void LLFloaterSavePrefPreset::onBtnSave()
     // A Look is held to the rule a Look from outside is: a file is named
     // after it, so no name that begins with a dot (the list would never show
     // it), draws nothing, names a Windows device, or makes a path longer
-    // than Windows opens. What can be kept of a name is; a name with nothing
-    // to keep is refused, and the floater stays up for another.
+    // than Windows opens. A name with nothing to keep is refused; one that
+    // had to change is put back in the field to be looked at, since it would
+    // otherwise save a second Look beside the one meant -- and the floater
+    // stays up either way.
     if (PRESETS_LOOKS == mSubdirectory)
     {
-        const std::string held = ALLookFormat::numberedLookName(ALLookFormat::lookNameFromUntrustedText(name), 1,
-                                                                LLPresetsManager::escapedPresetNameLimit(PRESETS_LOOKS));
-        if (held.empty())
+        const std::string clean = ALLookFormat::lookNameFromUntrustedText(name);
+        if (clean.empty())
         {
             LLNotificationsUtil::add("LightBoxLookNameRefused");
+            return;
+        }
+        const std::string held = ALLookFormat::numberedLookName(clean, 1, LLPresetsManager::escapedPresetNameLimit(PRESETS_LOOKS));
+        if (held.empty())
+        {
+            LLNotificationsUtil::add("LightBoxLookNameTooLong");
+            return;
+        }
+        std::string typed = name;
+        LLStringUtil::trim(typed);
+        if (held != typed)
+        {
+            mPresetCombo->setTextEntry(held);
+            LLNotificationsUtil::add("LightBoxLookNameChanged");
             return;
         }
         // Neutral is what the Lightbox falls back to; saved over, it would

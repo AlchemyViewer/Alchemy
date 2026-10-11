@@ -54,6 +54,10 @@
 		Neutral, for deleted Look: [NAME]
 	</floater.string>
 	<floater.string
+	 name="history_look_neutral_restored">
+		Neutral, put back as it came
+	</floater.string>
+	<floater.string
 	 name="look_none">
 		No Look
 	</floater.string>

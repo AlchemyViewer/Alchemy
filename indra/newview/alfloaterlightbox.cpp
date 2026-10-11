@@ -60,7 +60,6 @@
 #include "llnotificationsutil.h"
 #include "llpanel.h"
 #include "llpresetsmanager.h"
-#include "llscrolllistitem.h"
 #include "llsdutil.h"
 #include "llsettingsvo.h"
 #include "llsliderctrl.h"
@@ -2336,7 +2335,42 @@ void ALFloaterLightBox::putOnNeutralForDeletedLook(const std::string& deleted_na
         lightbox->applyLookAsOneUndoStep(LOOK_NEUTRAL, lightbox->getString("history_look_deleted", label));
         return;
     }
-    presets.loadLooksPreset(LOOK_NEUTRAL);
+    // Nothing on screen says the grade changed, and there is no undo step.
+    if (presets.loadLooksPreset(LOOK_NEUTRAL))
+    {
+        LLSD args;
+        args["NAME"] = deleted_name;
+        LLNotificationsUtil::add("LightBoxLookDeletedNeutralOn", args);
+    }
+}
+
+// static
+void ALFloaterLightBox::restoreNeutral()
+{
+    LLPresetsManager& presets = LLPresetsManager::instance();
+    // Whether Neutral is what the settings came from, before the copy.
+    const bool in_use = LLPresetsManager::isProtectedLookName(gSavedSettings.getString("PresetLooksActive")) ||
+                        LLPresetsManager::isProtectedLookName(gSavedSettings.getString("PresetLooksLastApplied"));
+    if (!presets.restoreNeutralLook())
+    {
+        LLSD args;
+        args["NAME"] = LOOK_NEUTRAL;
+        LLNotificationsUtil::add("PresetNotSaved", args);
+        return;
+    }
+    if (in_use)
+    {
+        if (ALFloaterLightBox* lightbox = LLFloaterReg::findTypedInstance<ALFloaterLightBox>("lightbox"))
+        {
+            lightbox->closePopover(false);
+            lightbox->applyLookAsOneUndoStep(LOOK_NEUTRAL, lightbox->getString("history_look_neutral_restored"));
+        }
+        else
+        {
+            presets.loadLooksPreset(LOOK_NEUTRAL);
+        }
+    }
+    LLNotificationsUtil::add("LightBoxLookNeutralRestored");
 }
 
 void ALFloaterLightBox::onClickLookSaveAs()
@@ -2608,11 +2642,8 @@ void ALFloaterLightBox::refreshLooksBar()
     }
     if (mLookDelete)
     {
-        // Any Look but Neutral, which is not offered for deleting.
-        const std::vector<LLScrollListItem*> items = mLooksCombo->getAllData();
-        mLookDelete->setEnabled(std::any_of(items.begin(), items.end(), [](const LLScrollListItem* item) {
-            return item && !LLPresetsManager::isProtectedLookName(item->getValue().asString());
-        }));
+        // Any Look -- Neutral too, which Delete offers to put back as it came.
+        mLookDelete->setEnabled(mLooksCombo->getItemCount() > 0);
     }
     if (mLookRevert)
     {

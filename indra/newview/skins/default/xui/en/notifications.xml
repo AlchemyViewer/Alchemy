@@ -9788,10 +9788,63 @@ Can not overwrite default preset.
   </notification>
 
   <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookRestoreNeutral"
+    type="alertmodal">
+Neutral is what the Lightbox goes back to when the Look in use is deleted, so it can&apos;t be deleted. Put it back as it came with the viewer instead? Any changes saved over it are lost.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Put It Back"/>
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookNeutralRestored"
+    type="notifytip">
+Neutral is back as it came with the viewer.
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookDeleteModified"
+    type="alertmodal">
+The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; is in use, with changes you haven&apos;t saved. Deleting it puts Neutral on in their place. Delete it?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Delete"/>
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookDeletedNeutralOn"
+    log_to_chat="false"
+    type="notifytip">
+The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; was in use, so Neutral is on now.
+  </notification>
+
+  <notification
     icon="notifytip.tga"
     name="LightBoxLookNeutralProtected"
     type="notifytip">
 Neutral can&apos;t be saved over: it is what the Lightbox goes back to when the Look in use is deleted. Save your changes as a new Look instead.
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookNameTooLong"
+    type="notifytip">
+That name is too long for a file in your Looks folder, whose own path is already long. Choose a shorter name.
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookNameChanged"
+    type="notifytip">
+Some of that name can&apos;t be part of a Look&apos;s name, or it was too long, so it has been changed to the name now shown. Press Save to save under it.
   </notification>
 
   <notification

@@ -1430,15 +1430,22 @@ which would name a Look the settings are not.
 **Neutral is protected** (`LOOK_NEUTRAL`, `isProtectedLookName`). It is what the
 Lightbox falls back to when the Look in use — active or last applied — is
 deleted (`putOnNeutralForDeletedLook`, called by the delete floater), so that
-the settings do not stay the deleted Look's under a bar naming another. That
-apply is one undo step, and Ctrl+Z brings the deleted Look's settings back to be
-saved again. Neutral therefore may be neither saved over nor deleted: the bar's
-Save opens Save As with a note instead (`LightBoxLookNeutralProtected`), Save As
-refuses the name, the delete floater leaves it out, an import never makes a
-Look called Neutral, and `savePreset`/`deletePreset` refuse it as a backstop.
-Where the Looks folder has lost it all the same — deleted before it was
-protected — `ensureNeutralLook` copies the bundled one back before falling back
-to it, the one exception to "deleted stays deleted".
+the settings do not stay the deleted Look's under a bar naming another. With the
+Lightbox open that apply is one undo step, and Ctrl+Z brings the deleted Look's
+settings back to be saved again; with it closed there is no step to take, and
+a note says what happened (`LightBoxLookDeletedNeutralOn`). Deleting the Look in
+use while it carries unsaved changes asks first (`LightBoxLookDeleteModified`).
+Neutral therefore may be neither saved over nor deleted: the bar's Save opens
+Save As with a note instead (`LightBoxLookNeutralProtected`), Save As refuses
+the name, an import never makes a Look called Neutral, and
+`savePreset`/`deletePreset` refuse it as a backstop. Delete, with Neutral
+chosen, offers to put it back as it came with the viewer instead
+(`restoreNeutralLook`, `ALFloaterLightBox::restoreNeutral`) — the way back for
+a Neutral saved over before it was protected, which would otherwise be kept as
+it is for good — and puts it on again where it is in use. Where the Looks folder
+has lost it all the same — deleted before it was protected — `ensureNeutralLook`
+copies the bundled one back before falling back to it, the one exception to
+"deleted stays deleted".
 
 ### 9b. Looks as notecards
 
