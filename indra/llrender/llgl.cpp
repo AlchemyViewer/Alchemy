@@ -46,7 +46,10 @@
 
 #include "llglheaders.h"
 #include "llglslshader.h"
+#include "llimagegl.h"
 #include "llshadermgr.h"
+
+#include <fmt/format.h>
 
 
 #if LL_SDL_WINDOW
@@ -228,6 +231,44 @@ namespace
             || internal_format == GL_DEPTH_COMPONENT32F
             || internal_format == GL_DEPTH24_STENCIL8
             || internal_format == GL_DEPTH32F_STENCIL8;
+    }
+
+    // Whether the texture bound at `target` is read as its stencil, through an integer sampler: a stencil-only one
+    // always, and a depth-stencil one where GL 4.3's stencil texturing has set its mode so. Below 4.3 a depth-stencil
+    // texture is read as its depth.
+    bool reads_stencil(GLenum target, GLint internal_format)
+    {
+        if (internal_format == GL_STENCIL_INDEX8)
+        {
+            return true;
+        }
+        if ((internal_format != GL_DEPTH24_STENCIL8 && internal_format != GL_DEPTH32F_STENCIL8)
+            || gGLManager.mGLVersion < 4.29f)
+        {
+            return false;
+        }
+        GLint mode = GL_DEPTH_COMPONENT;
+        glGetTexParameteriv(target, GL_DEPTH_STENCIL_TEXTURE_MODE, &mode);
+        return mode == GL_STENCIL_INDEX;
+    }
+
+    // Whether a sampler, or the texture object where none is bound, reads texel by texel: the only way GL reads an
+    // integer texture, which a filtering one leaves incomplete.
+    bool reads_nearest(GLuint sampler, GLenum target)
+    {
+        GLint min_filter = 0;
+        GLint mag_filter = 0;
+        if (sampler != 0)
+        {
+            glGetSamplerParameteriv(sampler, GL_TEXTURE_MIN_FILTER, &min_filter);
+            glGetSamplerParameteriv(sampler, GL_TEXTURE_MAG_FILTER, &mag_filter);
+        }
+        else
+        {
+            glGetTexParameteriv(target, GL_TEXTURE_MIN_FILTER, &min_filter);
+            glGetTexParameteriv(target, GL_TEXTURE_MAG_FILTER, &mag_filter);
+        }
+        return mag_filter == GL_NEAREST && (min_filter == GL_NEAREST || min_filter == GL_NEAREST_MIPMAP_NEAREST);
     }
 
     const std::vector<ProgramSampler>& get_program_samplers(GLuint program)
@@ -538,6 +579,29 @@ bool validate_bound_samplers()
             failure = llformat("'%s' (unit %d) is a shadow sampler over non-depth texture %d "
                                "(format 0x%x)",
                                sampler.mName.c_str(), sampler.mUnit, texture, internal_format);
+            break;
+        }
+
+        // An integer texture reads only through an integer sampler, and an integer sampler reads only an integer
+        // texture or a texture read as its stencil, which a float one cannot read. Every other pairing is undefined.
+        const bool integer_texture = LLImageGL::isIntegerFormat(internal_format);
+        const bool stencil_texture = reads_stencil(sampler.mTarget, internal_format);
+        if (sampler.mIsInteger != (integer_texture || stencil_texture))
+        {
+            failure = fmt::format("'{}' (unit {}) is {} sampler over {} texture {} (format {:#x})", sampler.mName,
+                                  sampler.mUnit, sampler.mIsInteger ? "an integer" : "a float",
+                                  integer_texture   ? "an integer"
+                                  : stencil_texture ? "a stencil-mode"
+                                                    : "a non-integer",
+                                  texture, internal_format);
+            break;
+        }
+        // And GL reads integers texel by texel: under a filtering sampler the texture is incomplete, and reads 0.
+        if (sampler.mIsInteger && !reads_nearest((GLuint)bound_sampler, sampler.mTarget))
+        {
+            failure = fmt::format("'{}' (unit {}) is an integer sampler over texture {} filtered by sampler {}, "
+                                  "which leaves it incomplete",
+                                  sampler.mName, sampler.mUnit, texture, bound_sampler);
             break;
         }
     }

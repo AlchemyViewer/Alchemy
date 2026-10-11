@@ -411,7 +411,7 @@ public:
     // had chosen; it was deleted once that count reached zero, so it cannot come back by habit.
     S32 bindTexture(S32 uniform, LLTexture* texture, ALSampler key);
     // An unnamed key resolves to the target's per-attachment default (bilinear for
-    // attachment 0, point for data attachments) -- see LLRenderTarget::bindTexture.
+    // attachment 0, point for data attachments and integer ones) -- see LLRenderTarget::bindTexture.
     S32 bindTexture(S32 uniform, LLRenderTarget* texture, ALSampler key = ALSamplers::TargetDefault, U32 index = 0);
 
     // Colour and depth attachments are separate calls rather than one with a bool.

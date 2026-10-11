@@ -2,8 +2,8 @@
  * @file llglslshader_gl_test.cpp
  * @brief LLGLSLShader on the hidden window. Its uniform value cache: what a program holds, read back from GL, after
  *        each kind of set, across a relink, and where two setters write one location. The units every kind of
- *        sampler gets. And who owns a shader object: a program its own, deleted once it links, the manager the shared
- *        ones.
+ *        sampler gets, integer textures read through reserved samplers, and what the debug validator says of stencil
+ *        reads. And who owns a shader object: a program its own, deleted once it links, the manager the shared ones.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -127,18 +127,53 @@ namespace tut
             { "objects/nonindexedTextureV.glsl",
               "vec2 test_nonindexed_stub(vec2 t) { return t; }\n" },
 
-            // A triangle over the viewport.
+            // A triangle over the viewport, and a fragment that copies its texel of a texture out.
             { "test/fullscreenV.glsl",
               "void main()\n"
               "{\n"
               "    vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0;\n"
               "    gl_Position = vec4(p, 0.0, 1.0);\n"
               "}\n" },
+            { "test/sampleF.glsl",
+              "uniform sampler2D testSourceMap;\n"
+              "out vec4 frag_color;\n"
+              "void main()\n"
+              "{\n"
+              "    frag_color = texelFetch(testSourceMap, ivec2(gl_FragCoord.xy), 0);\n"
+              "}\n" },
             { "test/solidF.glsl",
               "out vec4 frag_color;\n"
               "void main()\n"
               "{\n"
               "    frag_color = vec4(1.0);\n"
+              "}\n" },
+
+            // An integer output of each kind, a function of the pixel: unsigned past 2^24, signed either side of 0.
+            { "test/uintWriteF.glsl",
+              "out uvec4 frag_uint;\n"
+              "void main()\n"
+              "{\n"
+              "    uvec2 p = uvec2(gl_FragCoord.xy);\n"
+              "    frag_uint = uvec4(0x01000001u + p.y * 1000u + p.x, 0u, 0u, 0u);\n"
+              "}\n" },
+            { "test/intWriteF.glsl",
+              "out ivec4 frag_int;\n"
+              "void main()\n"
+              "{\n"
+              "    ivec2 p = ivec2(gl_FragCoord.xy);\n"
+              "    frag_int = ivec4(-1 - p.x, p.y * 300 - 1000, 0, 0);\n"
+              "}\n" },
+            // Both read back at the pixel's own texel through texture(), which the bound sampler governs.
+            { "test/intSampleF.glsl",
+              "uniform usampler2D testUintMap;\n"
+              "uniform isampler2D testIntMap;\n"
+              "layout(location = 0) out uvec4 frag_uint;\n"
+              "layout(location = 1) out ivec4 frag_int;\n"
+              "void main()\n"
+              "{\n"
+              "    vec2 uv = gl_FragCoord.xy / vec2(textureSize(testUintMap, 0));\n"
+              "    frag_uint = texture(testUintMap, uv);\n"
+              "    frag_int = texture(testIntMap, uv);\n"
               "}\n" },
 
             // A sampler of each kind under a reserved name: an array of two, an array texture, an unsigned one and an
@@ -653,6 +688,102 @@ namespace tut
         ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
     }
 
+    // Integer targets read through bindTexture with no sampler named: an R32UI and an RG16I target, each written by a
+    // program's integer output, come back texel for texel through a usampler2D and an isampler2D. A filtering sampler
+    // leaves an integer texture incomplete, reading 0, so the default for an integer attachment is point, attachment 0
+    // included.
+    template<> template<>
+    void llglslshader_object_t::test<19>()
+    {
+        setUpShaders();
+        constexpr U32 W = 11;
+        constexpr U32 H = 6;
+        ensure("R32UI target allocates", mTargets[0].allocate(W, H, GL_R32UI));
+        ensure("RG16I target allocates", mTargets[1].allocate(W, H, GL_RG16I));
+        ensure("output target allocates", mTargets[2].allocate(W, H, GL_RGBA32UI));
+        ensure("its signed attachment", mTargets[2].addColorAttachment(GL_RGBA32I));
+        ensure("unsigned writer builds",
+               buildProgram(mDraw, "uint write (test)",
+                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/uintWriteF.glsl", GL_FRAGMENT_SHADER } }));
+        ensure("signed writer builds",
+               buildProgram(mDraw2, "int write (test)",
+                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intWriteF.glsl", GL_FRAGMENT_SHADER } }));
+        ensure("reader builds",
+               buildProgram(mDraw3, "integer sample (test)",
+                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intSampleF.glsl", GL_FRAGMENT_SHADER } }));
+        ensure("the unsigned sampler has a unit", mDraw3.getTextureChannel(TEST_UINT_MAP) >= 0);
+        ensure("the signed sampler has a unit", mDraw3.getTextureChannel(TEST_INT_MAP) >= 0);
+
+        LLGLDisable blend(GL_BLEND);
+        for (U32 source = 0; source < 2; ++source)
+        {
+            mTargets[source].bindTarget();
+            (source ? mDraw2 : mDraw).bind();
+            gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
+            mTargets[source].flush();
+        }
+
+        mTargets[2].bindTarget();
+        mDraw3.bind();
+        ensure("unsigned source bound", mDraw3.bindTexture(TEST_UINT_MAP, &mTargets[0]) >= 0);
+        ensure("signed source bound", mDraw3.bindTexture(TEST_INT_MAP, &mTargets[1]) >= 0);
+
+        // Read off GL, since a driver may read an integer texture under a filtering sampler texel by texel anyway.
+        for (const S32 uniform : { (S32)TEST_UINT_MAP, (S32)TEST_INT_MAP })
+        {
+            glActiveTexture(GL_TEXTURE0 + mDraw3.getTextureChannel(uniform));
+            GLint sampler = 0;
+            glGetIntegerv(GL_SAMPLER_BINDING, &sampler);
+            GLint min_filter = 0;
+            GLint mag_filter = 0;
+            glGetSamplerParameteriv((GLuint)sampler, GL_TEXTURE_MIN_FILTER, &min_filter);
+            glGetSamplerParameteriv((GLuint)sampler, GL_TEXTURE_MAG_FILTER, &mag_filter);
+            const std::string which = uniform == TEST_UINT_MAP ? "the unsigned source's" : "the signed source's";
+            ensure_equals(which + " sampler magnifies by the nearest texel", (U32)mag_filter, (U32)GL_NEAREST);
+            ensure_equals(which + " sampler minifies by the nearest texel", (U32)min_filter,
+                          (U32)GL_NEAREST_MIPMAP_NEAREST);
+        }
+        glActiveTexture(GL_TEXTURE0 + gGL.getCurrentTexUnitIndex());
+        // And the debug validator, which checks every sampler a draw reads, finds nothing to say -- where a filtering
+        // sampler named over an integer texture is what it is there to catch.
+        gDebugGL = true;
+        const bool samplers_valid = validate_bound_samplers();
+        mDraw3.bindTexture(TEST_UINT_MAP, &mTargets[0], ALSamplers::BilinearClamp);
+        const bool filtered_valid = validate_bound_samplers();
+        gDebugGL = false;
+        ensure("the debug validator passes the binds", samplers_valid);
+        ensure("and refuses a filtering sampler over an integer texture", !filtered_valid);
+        mDraw3.bindTexture(TEST_UINT_MAP, &mTargets[0]);
+
+        gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
+        std::vector<U32> uints((size_t)W * H * 4, 0x55u);
+        std::vector<S32> ints((size_t)W * H * 4, 0x55);
+        glReadPixels(0, 0, W, H, GL_RGBA_INTEGER, GL_UNSIGNED_INT, uints.data());
+        glReadBuffer(GL_COLOR_ATTACHMENT1);
+        glReadPixels(0, 0, W, H, GL_RGBA_INTEGER, GL_INT, ints.data());
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+        mTargets[2].flush();
+        mDraw3.unbindTexture(TEST_UINT_MAP);
+        mDraw3.unbindTexture(TEST_INT_MAP);
+
+        for (U32 y = 0; y < H; ++y)
+        {
+            for (U32 x = 0; x < W; ++x)
+            {
+                const std::string at = " at " + std::to_string(x) + "," + std::to_string(y);
+                const size_t i = ((size_t)y * W + x) * 4;
+                const U32 uint_expected[4] = { 0x01000001u + y * 1000u + x, 0u, 0u, 1u };
+                const S32 int_expected[4] = { -1 - (S32)x, (S32)y * 300 - 1000, 0, 1 };
+                for (U32 c = 0; c < 4; ++c)
+                {
+                    ensure_equals("unsigned component " + std::to_string(c) + at, uints[i + c], uint_expected[c]);
+                    ensure_equals("signed component " + std::to_string(c) + at, ints[i + c], int_expected[c]);
+                }
+            }
+        }
+        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+    }
+
     // A shared object is the shader manager's, not the programs' that attach it. Two programs built through
     // createShader attach the same one, as every program with a feature attaches its object, and call into it. Once
     // linked a program holds no object, and its own are deleted: the count of live objects is what it was before the
@@ -744,6 +875,59 @@ namespace tut
         ensure("and one programs linked with", glIsShader(shared) == GL_FALSE);
         ensure_equals("none counted live", LLShaderMgr::sLiveObjects, live + 1 - (U32)held);
         ensureDraws("C still draws", mDraw3);
+        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+    }
+
+    // A depth-stencil texture reads as its depth until GL 4.3's stencil texturing turns it to its stencil: the debug
+    // validator refuses an unsigned sampler over it as depth and passes it as stencil, and the reverse for a float
+    // sampler.
+    template<> template<>
+    void llglslshader_object_t::test<25>()
+    {
+        setUpShaders();
+        if (gGLManager.mGLVersion < 4.29f)
+        {
+            skip("the context has no stencil texturing");
+        }
+        ensure("unsigned reader builds",
+               buildProgram(mDraw, "stencil read (test)",
+                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intSampleF.glsl", GL_FRAGMENT_SHADER } }));
+        ensure("float reader builds",
+               buildProgram(mDraw2, "depth read (test)",
+                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/sampleF.glsl", GL_FRAGMENT_SHADER } }));
+
+        GLuint texture = 0;
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH24_STENCIL8, 4, 4);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        // `program`'s sampler `uniform` over the texture, its mode `mode`, through a point sampler: what the validator
+        // says, and nothing left bound.
+        auto validates = [&](LLGLSLShader& program, S32 uniform, GLenum mode)
+        {
+            program.bind();
+            const S32 unit = program.getTextureChannel(uniform);
+            ALTextureSlot* slot = gGL.getTextureSlot((U32)unit);
+            slot->bindManual(ALTextureSlot::TT_TEXTURE, texture, gGL.getSampler(ALSamplers::PointClamp));
+            glActiveTexture(GL_TEXTURE0 + unit);
+            glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, (GLint)mode);
+            glActiveTexture(GL_TEXTURE0 + gGL.getCurrentTexUnitIndex());
+            gDebugGL = true;
+            const bool valid = validate_bound_samplers();
+            gDebugGL = false;
+            slot->unbind();
+            slot->bindSampler(0);
+            return valid;
+        };
+
+        ensure("an unsigned sampler over the depth refused",
+               !validates(mDraw, TEST_UINT_MAP, GL_DEPTH_COMPONENT));
+        ensure("over the stencil passed", validates(mDraw, TEST_UINT_MAP, GL_STENCIL_INDEX));
+        ensure("a float sampler over the stencil refused", !validates(mDraw2, TEST_SOURCE_MAP, GL_STENCIL_INDEX));
+        ensure("over the depth passed", validates(mDraw2, TEST_SOURCE_MAP, GL_DEPTH_COMPONENT));
+
+        glDeleteTextures(1, &texture);
         ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
     }
 

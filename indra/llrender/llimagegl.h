@@ -102,8 +102,8 @@ public:
     //
     // dataFormatBits/Bytes report the *tight host-side* layout — i.e. the
     // packed CPU buffer size for glTexImage2D/glTexSubImage2D uploads
-    // (matching the pixel format). Use these for source-pointer
-    // arithmetic and host-side accounting (getBytes/getMipBytes).
+    // (matching the pixel format, at a byte a component for an unsized
+    // one). Use these for source-pointer arithmetic.
     //
     // dataFormatVRAMBits/Bytes report the *driver-side* allocation for
     // VRAM accounting. They differ from the host values for formats that
@@ -115,6 +115,16 @@ public:
     static S32 dataFormatVRAMBits(S32 dataformat);
     static S64 dataFormatVRAMBytes(S32 dataformat, S32 width, S32 height);
     static S32 dataFormatComponents(S32 dataformat);
+
+    // The sized integer colour formats: R32UI, RG16I, RGB10_A2UI and the rest. A shader reads their texels as
+    // integers, through an isampler or a usampler, and GL neither filters them nor builds their mips: a filtering
+    // sampler leaves such a texture incomplete, reading 0, and glGenerateMipmap refuses it.
+    static bool isIntegerFormat(S32 internal_format);
+    // Of those, the ones whose texels are signed, read through an isampler.
+    static bool isSignedIntegerFormat(S32 internal_format);
+    // The pixel format an integer internal format's host data is laid out in: GL_RED_INTEGER for R32UI,
+    // GL_RGBA_INTEGER for RGBA16I. 0 for any other format.
+    static U32 integerPixelFormat(S32 internal_format);
 
     bool updateBindStats() const ;
     F32 getTimePassedSinceLastBound();
@@ -357,6 +367,11 @@ private:
 
     void freePickMask();
     bool isCompressed() const;
+
+    // Bytes of one level at this size, as getBytes and getMipBytes count it: an integer level by its pixel format AND
+    // type -- an R32UI texel is four bytes, which GL_RED_INTEGER alone cannot say -- and any other by dataFormatBytes
+    // of its pixel format, a byte a component. Rounded up to four, as dataFormatBytes rounds.
+    S64 levelBytes(S32 width, S32 height) const;
 
     // The alpha facts an upload derives, routed through mPendingAlpha when stagesAlpha().
     // setPickMask takes ownership of mask, which may be null for "no pick mask".

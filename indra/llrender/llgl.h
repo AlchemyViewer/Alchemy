@@ -223,9 +223,12 @@ void flush_glerror(); // Flush GL errors when we know we're handling them correc
 
 void log_glerror();
 // Validate every sampler the currently bound program declares against the state actually
-// bound to its texture unit: something bound at all, and no depth/compare mismatch in either
+// bound to its texture unit: something bound at all, no depth/compare mismatch in either
 // direction (non-shadow sampler over a compare-enabled depth texture, or a shadow sampler
-// without comparisons). Returns true when the state is sound.
+// without comparisons), and no integer one -- an integer sampler over a texture that is
+// neither integer nor read as its stencil, a float sampler over one that is, or an integer
+// texture under a filtering sampler, which leaves it incomplete. Returns true when the
+// state is sound.
 //
 // gDebugGL only -- returns true immediately otherwise. Intended for llassert() at draw
 // sites, the way LLVertexBuffer::validateRange is used, so it fails at the draw responsible

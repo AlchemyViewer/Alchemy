@@ -142,7 +142,7 @@ Shader management has two layers:
 
 **Shader objects** have one owner each. A program owns the objects it compiles from its own files and deletes them once it links, detaching every object then, since a linked program needs none. The shared objects every program attaches by name are `LLShaderMgr`'s, deleted by `clearShaderObjects`, so unloading or rebuilding one program leaves the rest whole. `LLShaderMgr::sLiveObjects` counts what is compiled and not yet deleted.
 
-**Samplers**: every sampler type GL has gets a texture unit, float, int and unsigned, arrays and buffers included, in reserved-uniform order.
+**Samplers**: every sampler type GL has gets a texture unit, float, int and unsigned, arrays and buffers included, in reserved-uniform order. `LLImageGL` and `LLRenderTarget` allocate, clear and sample the sized integer formats: point sampled, no mips.
 
 GLSL shaders live in `indra/newview/app_settings/shaders/` organized by quality class and category:
 - **`class1/`** — Base shaders (all hardware)
