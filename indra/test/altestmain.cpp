@@ -39,9 +39,11 @@
 #include "lltracethreadrecorder.h"
 
 #include <catch2/catch_session.hpp>
+#include <catch2/catch_tostring.hpp>
 
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 namespace
 {
@@ -117,6 +119,12 @@ int main(int argc, char* argv[])
     // Declared order, as TUT ran a group's tests, until no test leans on the
     // ones before it. --order on the command line still wins.
     session.configData().runOrder = Catch::TestRunOrder::Declared;
+
+    // Every digit a float or double holds, where Catch2 prints 5 and 10: two
+    // values a failure prints alike are then alike, which matters to tests
+    // that compare to the last bit.
+    Catch::StringMaker<float>::precision  = std::numeric_limits<float>::max_digits10;
+    Catch::StringMaker<double>::precision = std::numeric_limits<double>::max_digits10;
 
     if (const int result = session.applyCommandLine(argc, argv); result != 0)
     {
