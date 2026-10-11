@@ -38,6 +38,8 @@
 #include "hbxxh.h"
 #include "llsdserialize.h"
 
+#include <bit>
+
 #if LL_DARWIN
 #include "OpenGL/OpenGL.h"
 #endif
@@ -92,10 +94,13 @@ const std::string gShaderConstsVal[LLGLSLShader::NUM_SHADER_CONSTS] =
     , "0.99999" // SHADER_CONST_STAR_DEPTH       // SL-14113
 };
 
-
-bool shouldChange(const LLVector4& v1, const LLVector4& v2)
+namespace
 {
-    return v1 != v2;
+    // The bits a component is uploaded as, which is what the uniform value cache compares: an int or a uint as
+    // itself, a float by its bits, never by value.
+    inline U32 uniform_bits(GLint v)   { return std::bit_cast<U32>(v); }
+    inline U32 uniform_bits(GLuint v)  { return v; }
+    inline U32 uniform_bits(GLfloat v) { return std::bit_cast<U32>(v); }
 }
 
 #if !LL_RELEASE_FOR_DOWNLOAD
@@ -662,7 +667,9 @@ void LLGLSLShader::unloadInternal()
     mAttribute.clear();
     mTexture.clear();
     mUniform.clear();
-    mMinimumAlpha = MINIMUM_ALPHA_UNSET; // program state is going away with the program
+    // program state is going away with the program
+    mUniformCache.clear();
+    mMinimumAlpha = MINIMUM_ALPHA_UNSET;
 
     if (mProgramObject)
     {
@@ -1168,8 +1175,10 @@ bool LLGLSLShader::mapUniforms()
     mUniform.clear();
     mUniformMap.clear();
     mTexture.clear();
-    mValue.clear();
-    mMinimumAlpha = MINIMUM_ALPHA_UNSET; // fresh mapping: GPU-side value is the default again
+    // Fresh mapping: GPU-side values are the defaults again. The cache stays empty while the samplers below are
+    // given their units, and is sized once every location is known.
+    mUniformCache.clear();
+    mMinimumAlpha = MINIMUM_ALPHA_UNSET;
     //initialize arrays
     mUniform.resize(LLShaderMgr::instance()->mReservedUniforms.size(), -1);
     mTexture.resize(LLShaderMgr::instance()->mReservedUniforms.size(), -1);
@@ -1258,6 +1267,24 @@ bool LLGLSLShader::mapUniforms()
     // acts as a canary for adding textures and breaking machines limited to 32.
     llassert(max_index == 0 || mActiveTextureChannels <= 32);
 
+    // Every location a setter can reach is an active uniform's, each one in mUniformMap by name, the reserved ones
+    // included; the cache covers all of them up to its cap.
+    size_t locations = 0;
+    for (const auto& named : mUniformMap)
+    {
+        if (named.second >= 0)
+        {
+            locations = llmax(locations, (size_t)named.second + 1);
+        }
+    }
+    if (locations > UniformCache::MAX_LOCATIONS)
+    {
+        LL_WARNS_ONCE("Shader") << mName << " has a uniform at location " << locations - 1
+                                << "; uniforms past " << UniformCache::MAX_LOCATIONS
+                                << " upload on every set" << LL_ENDL;
+    }
+    mUniformCache.reset(locations);
+
     // Set up block binding, in a way supported by Apple (rather than binding = 1 in .glsl).
     // See slide 35 and more of https://docs.huihoo.com/apple/wwdc/2011/session_420__advances_in_opengl_for_mac_os_x_lion.pdf
     for (U32 i = 0; i < NUM_UNIFORM_BLOCKS; ++i)
@@ -1306,6 +1333,11 @@ bool LLGLSLShader::link(bool suppress_errors)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
     bool success = LLShaderMgr::instance()->linkProgramObject(mProgramObject, suppress_errors, mName);
+
+    // A link resets every uniform to its initializer and may move its location; nothing cached for the old link
+    // holds. Sets upload uncached until mapUniforms sizes the cache for this one.
+    mUniformCache.clear();
+    mMinimumAlpha = MINIMUM_ALPHA_UNSET;
 
     if (!success && !suppress_errors)
     {
@@ -1618,14 +1650,10 @@ void LLGLSLShader::uniform1i(U32 index, GLint x)
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location >= 0 && mUniformCache.changed(location, UniformCache::Kind::Int, uniform_bits(x)))
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            if (iter == mValue.end() || iter->second.mV[0] != x)
-            {
-                glUniform1i(mUniform[index], x);
-                mValue[mUniform[index]] = LLVector4((F32)x, 0.f, 0.f, 0.f);
-            }
+            glUniform1i(location, x);
         }
     }
 }
@@ -1644,18 +1672,16 @@ void LLGLSLShader::uniform1f(U32 index, GLfloat x)
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location >= 0 && mUniformCache.changed(location, UniformCache::Kind::Float, uniform_bits(x)))
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            if (iter == mValue.end() || iter->second.mV[0] != x)
-            {
-                glUniform1f(mUniform[index], x);
-                mValue[mUniform[index]] = LLVector4(x, 0.f, 0.f, 0.f);
-            }
+            glUniform1f(location, x);
         }
     }
 }
 
+// Uploads without comparing, and records what it uploaded: a cached setter writing the same location afterwards
+// compares against what GL holds.
 void LLGLSLShader::fastUniform1f(U32 index, GLfloat x)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
@@ -1663,7 +1689,9 @@ void LLGLSLShader::fastUniform1f(U32 index, GLfloat x)
     llassert(mProgramObject);
     llassert(index < mUniform.size());
     llassert(mUniform[index] >= 0);
-    glUniform1f(mUniform[index], x);
+    const GLint location = mUniform[index];
+    glUniform1f(location, x);
+    mUniformCache.uploaded(location, UniformCache::Kind::Float, uniform_bits(x));
 }
 
 void LLGLSLShader::uniform1ui(U32 index, GLuint x)
@@ -1679,14 +1707,10 @@ void LLGLSLShader::uniform1ui(U32 index, GLuint x)
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location >= 0 && mUniformCache.changed(location, UniformCache::Kind::UInt, uniform_bits(x)))
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            if (iter == mValue.end() || iter->second.mV[0] != (F32)x)
-            {
-                glUniform1ui(mUniform[index], x);
-                mValue[mUniform[index]] = LLVector4((F32)x, 0.f, 0.f, 0.f);
-            }
+            glUniform1ui(location, x);
         }
     }
 }
@@ -1705,15 +1729,10 @@ void LLGLSLShader::uniform2f(U32 index, GLfloat x, GLfloat y)
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location >= 0 && mUniformCache.changed(location, UniformCache::Kind::Vec2, uniform_bits(x), uniform_bits(y)))
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            LLVector4 vec(x, y, 0.f, 0.f);
-            if (iter == mValue.end() || shouldChange(iter->second, vec))
-            {
-                glUniform2f(mUniform[index], x, y);
-                mValue[mUniform[index]] = vec;
-            }
+            glUniform2f(location, x, y);
         }
     }
 }
@@ -1732,15 +1751,11 @@ void LLGLSLShader::uniform3f(U32 index, GLfloat x, GLfloat y, GLfloat z)
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location >= 0
+            && mUniformCache.changed(location, UniformCache::Kind::Vec3, uniform_bits(x), uniform_bits(y), uniform_bits(z)))
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            LLVector4 vec(x, y, z, 0.f);
-            if (iter == mValue.end() || shouldChange(iter->second, vec))
-            {
-                glUniform3f(mUniform[index], x, y, z);
-                mValue[mUniform[index]] = vec;
-            }
+            glUniform3f(location, x, y, z);
         }
     }
 }
@@ -1759,15 +1774,12 @@ void LLGLSLShader::uniform4f(U32 index, GLfloat x, GLfloat y, GLfloat z, GLfloat
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location >= 0
+            && mUniformCache.changed(location, UniformCache::Kind::Vec4,
+                                     uniform_bits(x), uniform_bits(y), uniform_bits(z), uniform_bits(w)))
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            LLVector4 vec(x, y, z, w);
-            if (iter == mValue.end() || shouldChange(iter->second, vec))
-            {
-                glUniform4f(mUniform[index], x, y, z, w);
-                mValue[mUniform[index]] = vec;
-            }
+            glUniform4f(location, x, y, z, w);
         }
     }
 }
@@ -1786,15 +1798,19 @@ void LLGLSLShader::uniform1iv(U32 index, U32 count, const GLint* v)
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location < 0)
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            LLVector4 vec((F32)v[0], 0.f, 0.f, 0.f);
-            if (iter == mValue.end() || shouldChange(iter->second, vec) || count != 1)
-            {
-                glUniform1iv(mUniform[index], count, v);
-                mValue[mUniform[index]] = vec;
-            }
+            return;
+        }
+        if (count != 1)
+        {
+            mUniformCache.forget(location);
+            glUniform1iv(location, count, v);
+        }
+        else if (mUniformCache.changed(location, UniformCache::Kind::Int, uniform_bits(v[0])))
+        {
+            glUniform1iv(location, 1, v);
         }
     }
 }
@@ -1813,15 +1829,20 @@ void LLGLSLShader::uniform4iv(U32 index, U32 count, const GLint* v)
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location < 0)
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            LLVector4 vec((F32)v[0], (F32)v[1], (F32)v[2], (F32)v[3]);
-            if (iter == mValue.end() || shouldChange(iter->second, vec) || count != 1)
-            {
-                glUniform1iv(mUniform[index], count, v);
-                mValue[mUniform[index]] = vec;
-            }
+            return;
+        }
+        if (count != 1)
+        {
+            mUniformCache.forget(location);
+            glUniform4iv(location, count, v);
+        }
+        else if (mUniformCache.changed(location, UniformCache::Kind::IVec4,
+                                       uniform_bits(v[0]), uniform_bits(v[1]), uniform_bits(v[2]), uniform_bits(v[3])))
+        {
+            glUniform4iv(location, 1, v);
         }
     }
 }
@@ -1841,15 +1862,19 @@ void LLGLSLShader::uniform1fv(U32 index, U32 count, const GLfloat* v)
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location < 0)
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            LLVector4 vec(v[0], 0.f, 0.f, 0.f);
-            if (iter == mValue.end() || shouldChange(iter->second, vec) || count != 1)
-            {
-                glUniform1fv(mUniform[index], count, v);
-                mValue[mUniform[index]] = vec;
-            }
+            return;
+        }
+        if (count != 1)
+        {
+            mUniformCache.forget(location);
+            glUniform1fv(location, count, v);
+        }
+        else if (mUniformCache.changed(location, UniformCache::Kind::Float, uniform_bits(v[0])))
+        {
+            glUniform1fv(location, 1, v);
         }
     }
 }
@@ -1868,15 +1893,19 @@ void LLGLSLShader::uniform2fv(U32 index, U32 count, const GLfloat* v)
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location < 0)
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            LLVector4 vec(v[0], v[1], 0.f, 0.f);
-            if (iter == mValue.end() || shouldChange(iter->second, vec) || count != 1)
-            {
-                glUniform2fv(mUniform[index], count, v);
-                mValue[mUniform[index]] = vec;
-            }
+            return;
+        }
+        if (count != 1)
+        {
+            mUniformCache.forget(location);
+            glUniform2fv(location, count, v);
+        }
+        else if (mUniformCache.changed(location, UniformCache::Kind::Vec2, uniform_bits(v[0]), uniform_bits(v[1])))
+        {
+            glUniform2fv(location, 1, v);
         }
     }
 }
@@ -1895,15 +1924,20 @@ void LLGLSLShader::uniform3fv(U32 index, U32 count, const GLfloat* v)
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location < 0)
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            LLVector4 vec(v[0], v[1], v[2], 0.f);
-            if (iter == mValue.end() || shouldChange(iter->second, vec) || count != 1)
-            {
-                glUniform3fv(mUniform[index], count, v);
-                mValue[mUniform[index]] = vec;
-            }
+            return;
+        }
+        if (count != 1)
+        {
+            mUniformCache.forget(location);
+            glUniform3fv(location, count, v);
+        }
+        else if (mUniformCache.changed(location, UniformCache::Kind::Vec3,
+                                       uniform_bits(v[0]), uniform_bits(v[1]), uniform_bits(v[2])))
+        {
+            glUniform3fv(location, 1, v);
         }
     }
 }
@@ -1922,20 +1956,27 @@ void LLGLSLShader::uniform4fv(U32 index, U32 count, const GLfloat* v)
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location < 0)
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            LLVector4 vec(v[0], v[1], v[2], v[3]);
-            if (iter == mValue.end() || shouldChange(iter->second, vec) || count != 1)
-            {
-                LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
-                glUniform4fv(mUniform[index], count, v);
-                mValue[mUniform[index]] = vec;
-            }
+            return;
+        }
+        if (count != 1)
+        {
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+            mUniformCache.forget(location);
+            glUniform4fv(location, count, v);
+        }
+        else if (mUniformCache.changed(location, UniformCache::Kind::Vec4,
+                                       uniform_bits(v[0]), uniform_bits(v[1]), uniform_bits(v[2]), uniform_bits(v[3])))
+        {
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+            glUniform4fv(location, 1, v);
         }
     }
 }
 
+// Uploads without comparing, and records what it uploaded; see fastUniform1f.
 void LLGLSLShader::fastUniform4fv(U32 index, U32 count, const GLfloat* v)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
@@ -1943,7 +1984,17 @@ void LLGLSLShader::fastUniform4fv(U32 index, U32 count, const GLfloat* v)
     llassert(mProgramObject);
     llassert(index < mUniform.size());
     llassert(mUniform[index] >= 0);
-    glUniform4fv(mUniform[index], count, v);
+    const GLint location = mUniform[index];
+    glUniform4fv(location, count, v);
+    if (count == 1)
+    {
+        mUniformCache.uploaded(location, UniformCache::Kind::Vec4,
+                               uniform_bits(v[0]), uniform_bits(v[1]), uniform_bits(v[2]), uniform_bits(v[3]));
+    }
+    else
+    {
+        mUniformCache.forget(location);
+    }
 }
 
 void LLGLSLShader::uniform4uiv(U32 index, U32 count, const GLuint* v)
@@ -1960,16 +2011,22 @@ void LLGLSLShader::uniform4uiv(U32 index, U32 count, const GLuint* v)
             return;
         }
 
-        if (mUniform[index] >= 0)
+        const GLint location = mUniform[index];
+        if (location < 0)
         {
-            const auto& iter = mValue.find(mUniform[index]);
-            LLVector4 vec((F32)v[0], (F32)v[1], (F32)v[2], (F32)v[3]);
-            if (iter == mValue.end() || shouldChange(iter->second, vec) || count != 1)
-            {
-                LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
-                glUniform4uiv(mUniform[index], count, v);
-                mValue[mUniform[index]] = vec;
-            }
+            return;
+        }
+        if (count != 1)
+        {
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+            mUniformCache.forget(location);
+            glUniform4uiv(location, count, v);
+        }
+        else if (mUniformCache.changed(location, UniformCache::Kind::UVec4,
+                                       uniform_bits(v[0]), uniform_bits(v[1]), uniform_bits(v[2]), uniform_bits(v[3])))
+        {
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+            glUniform4uiv(location, 1, v);
         }
     }
 }
@@ -2138,15 +2195,11 @@ void LLGLSLShader::uniform1i(const LLStaticHashedString& uniform, GLint v)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
     GLint location = getUniformLocation(uniform);
 
-    if (location >= 0)
+    // The slot a location has is shared with the reserved-index setters, so a name and an index for one uniform
+    // never disagree about what it holds.
+    if (location >= 0 && mUniformCache.changed(location, UniformCache::Kind::Int, uniform_bits(v)))
     {
-        const auto& iter = mValue.find(location);
-        LLVector4 vec((F32)v, 0.f, 0.f, 0.f);
-        if (iter == mValue.end() || shouldChange(iter->second, vec))
-        {
-            glUniform1i(location, v);
-            mValue[location] = vec;
-        }
+        glUniform1i(location, v);
     }
 }
 void LLGLSLShader::vertexAttrib4f(U32 index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)

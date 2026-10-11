@@ -31,7 +31,6 @@
 #include "llrender.h"
 #include "llsd.h"
 #include "llstaticstringtable.h"
-#include <boost/unordered_map.hpp>
 
 class LLShaderFeatures
 {
@@ -455,16 +454,15 @@ public:
     U32 mAttributeMask;  //mask of which reserved attributes are set (lines up with LLVertexBuffer::getTypeMask())
     std::vector<GLint> mUniform;   //lookup table of uniform enum to uniform location
     LLStaticStringTable<GLint> mUniformMap; //lookup map of uniform name to uniform location
-    typedef boost::unordered_map<GLint, LLVector4>  uniform_value_map_t;
-    uniform_value_map_t mValue; //lookup map of uniform location to last known value
     std::vector<GLint> mTexture;
     // Last value routed to MINIMUM_ALPHA on this program, so setMinimumAlpha can skip the
     // batch flush and the whole uniform path when unchanged (the alpha pool re-applies it
     // per batch; GLTF material binds re-push it per material). EVERY writer of that
     // uniform must go through setMinimumAlpha to keep this authoritative -- do not write
     // it via uniform1f/fastUniform1f directly. -1 is a live value (GLTF "no masking"),
-    // so the unset sentinel sits far outside the usable range; reset alongside mValue
-    // (mapUniforms/unloadInternal), since both shadow GPU-side program state.
+    // so the unset sentinel sits far outside the usable range; reset alongside the
+    // uniform value cache (link/mapUniforms/unloadInternal), since both shadow GPU-side
+    // program state.
     static constexpr F32 MINIMUM_ALPHA_UNSET = -1e30f;
     F32 mMinimumAlpha = MINIMUM_ALPHA_UNSET;
 
@@ -596,6 +594,113 @@ public:
 
 private:
     void unloadInternal();
+
+    // What this program holds at each uniform location, as the setters last uploaded it, so a set of the value a
+    // location already holds skips its glUniform* call. Every setter but the matrices' comes through here, on the
+    // path of every draw.
+    //
+    // A slot holds the bit patterns of the components uploaded and the kind of upload that wrote them: the GL
+    // component type and count. A set matches only when both agree exactly, so ints and uints are compared as
+    // themselves and floats by their bits -- +0 against -0, or two NaN payloads, cost an upload and never skip one.
+    // A location written through one kind and then set through another uploads: what GL holds there was converted
+    // from the first kind's bytes.
+    //
+    // Indexed by location. Implementations number a program's uniforms from 0 at link, an array taking a location
+    // an element, so a flat array sized past the largest location a setter can reach -- every active uniform's,
+    // found by name in mapUniforms -- costs one slot a location and no hashing, and the reserved-index setters and
+    // the named one share the slot each location has. A location at or past MAX_LOCATIONS uploads every time.
+    //
+    // Arrays (count != 1) upload every time and forget their location's slot, which holds element 0 as a single
+    // set wrote it. Matrices neither consult nor touch the cache: GL takes only the matrix setters at a matrix's
+    // location, so no kind a slot describes can be held there.
+    //
+    // Empty until mapUniforms sizes it, and emptied by every link and unload: a link resets each uniform to its
+    // initializer, and a value cached for an older link would skip a set the new one needs.
+    class UniformCache
+    {
+    public:
+        // The uploads a slot can describe: one value of each type a setter writes.
+        enum class Kind : U32
+        {
+            Empty,  // holds nothing, so matches no set
+            Int,    // glUniform1i, glUniform1iv with count 1
+            IVec4,  // glUniform4iv with count 1
+            UInt,   // glUniform1ui
+            UVec4,  // glUniform4uiv with count 1
+            Float,  // glUniform1f, glUniform1fv with count 1
+            Vec2,   // glUniform2f, glUniform2fv with count 1
+            Vec3,   // glUniform3f, glUniform3fv with count 1
+            Vec4,   // glUniform4f, glUniform4fv with count 1
+        };
+
+        // GL 4.3's minimum GL_MAX_UNIFORM_LOCATIONS. A program's own locations stay well below it; a driver that
+        // numbered them sparsely would cost uploads past it, not memory.
+        static constexpr size_t MAX_LOCATIONS = 1024;
+
+        // Cache locations 0 to `locations` - 1, every slot empty.
+        void reset(size_t locations)
+        {
+            mSlots.assign(llmin(locations, MAX_LOCATIONS), Slot());
+            mCount = (U32)mSlots.size();
+        }
+
+        // Cache nothing: every set uploads.
+        void clear()
+        {
+            mSlots.clear();
+            mCount = 0;
+        }
+
+        // Whether a set must reach GL: its location is not cached, or its slot holds another kind or other bits.
+        // Records the set as uploaded, so the caller uploads whenever this says so. Components past the kind's
+        // count are zero on both sides.
+        bool changed(GLint location, Kind kind, U32 x, U32 y = 0, U32 z = 0, U32 w = 0)
+        {
+            if ((U32)location >= mCount)
+            {
+                return true;
+            }
+            Slot& slot = mSlots[(U32)location];
+            // One branch on the whole comparison rather than one a word.
+            const U32 diff = ((U32)slot.mKind ^ (U32)kind)
+                           | (slot.mBits[0] ^ x) | (slot.mBits[1] ^ y) | (slot.mBits[2] ^ z) | (slot.mBits[3] ^ w);
+            if (diff == 0)
+            {
+                return false;
+            }
+            slot = Slot{ kind, { x, y, z, w } };
+            return true;
+        }
+
+        // Record a set its caller uploaded regardless.
+        void uploaded(GLint location, Kind kind, U32 x, U32 y = 0, U32 z = 0, U32 w = 0)
+        {
+            if ((U32)location < mCount)
+            {
+                mSlots[(U32)location] = Slot{ kind, { x, y, z, w } };
+            }
+        }
+
+        // Forget what a location holds, after an upload no slot describes.
+        void forget(GLint location)
+        {
+            if ((U32)location < mCount)
+            {
+                mSlots[(U32)location].mKind = Kind::Empty;
+            }
+        }
+
+    private:
+        struct Slot
+        {
+            Kind mKind = Kind::Empty;
+            U32  mBits[4] = {}; // the uploaded components' bit patterns, zero past the kind's count
+        };
+
+        std::vector<Slot> mSlots;
+        U32 mCount = 0; // mSlots.size(), kept beside it so the bounds check is one compare
+    };
+    UniformCache mUniformCache;
 
     // ---- compile-time variant construction (see EVariant / createShader) ----
     // build one axis's corner set into the matching member; see the definition

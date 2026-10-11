@@ -128,43 +128,29 @@ void LLDrawPoolWater::beginPostDeferredPass(S32 pass)
 void LLDrawPoolWater::renderPostDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
-    LLGLDisable blend(GL_BLEND);
-
-    // Leave the alpha alone, as WindLight's deferred water did: it is the glow channel, and the
-    // water's zero there wiped the glow of whatever lies beneath the surface.
-    gGL.setColorMask(true, false);
-
-    LLColor3 light_diffuse(0, 0, 0);
 
     LLEnvironment& environment = LLEnvironment::instance();
     LLSettingsWater::ptr_t pwater = environment.getCurrentWater();
     LLSettingsSky::ptr_t   psky   = environment.getCurrentSky();
     LLVector3              light_dir       = environment.getLightDirection();
     bool                   sun_up          = environment.getIsSunUp();
-    bool                   moon_up         = environment.getIsMoonUp();
     bool                   has_normal_mips = gSavedSettings.getBOOL("RenderWaterMipNormal");
     bool                   underwater      = LLViewerCamera::getInstance()->cameraUnderWater();
     LLColor4               fog_color       = LLColor4(pwater->getWaterFogColor(), 0.f);
     LLColor3               fog_color_linear = linearColor3(fog_color);
 
-    if (sun_up)
+    // The alpha is the glow channel. The surface adds its sun glint's glow to it, as WindLight's water did, over the
+    // glow of whatever lies beneath, which it would otherwise wipe; seen from below it leaves the alpha alone. Only
+    // the class 3 shader writes a glow: class 1's is a placeholder that writes 1. Captures take no glow.
+    const bool glint_glow = !underwater && mShaderLevel > 2 && !gCubeSnapshot;
+    LLGLState blend(GL_BLEND, glint_glow ? GL_TRUE : GL_FALSE);
+    if (glint_glow)
     {
-        light_diffuse += psky->getSunlightColor();
+        gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_ZERO, LLRender::BF_ONE, LLRender::BF_ONE);
     }
-    // moonlight is several orders of magnitude less bright than sunlight,
-    // so only use this color when the moon alone is showing
-    else if (moon_up)
-    {
-        light_diffuse += psky->getMoonlightColor();
-    }
+    gGL.setColorMask(true, glint_glow);
 
-    // Apply magic numbers translating light direction into intensities
     light_dir.normalize();
-    F32 ground_proj_sq = light_dir.mV[0] * light_dir.mV[0] + light_dir.mV[1] * light_dir.mV[1];
-    if (0.f < light_diffuse.normalize())  // Normalizing a color? Puzzling...
-    {
-        light_diffuse *= (1.5f + (6.f * ground_proj_sq));
-    }
 
     // Named at the bind rather than written onto the normal maps.
     //
@@ -175,7 +161,6 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     const ALSampler water_normal_sampler =
         has_normal_mips ? ALSamplers::AnisoWrap : ALSamplers::PointWrap;
 
-    LLColor4      specular(sun_up ? psky->getSunlightColor() : psky->getMoonlightColor());
     LLGLSLShader *shader     = nullptr;
 
     // Each wave layer's scroll, the wave direction times the time times the layer's rate, taken
@@ -249,7 +234,6 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     shader->uniform1f(LLShaderMgr::WATER_WATERHEIGHT, camera_height - water_height);
     shader->uniform3fv(LLShaderMgr::WATER_EYEVEC, 1, LLViewerCamera::getInstance()->getOrigin().mV);
 
-    shader->uniform3fv(LLShaderMgr::WATER_SPECULAR, 1, light_diffuse.mV);
 
     shader->uniform2fv(LLShaderMgr::WATER_BIG_WAVE_SCROLL, 1, big_wave_scroll.mV);
     shader->uniform4fv(LLShaderMgr::WATER_LITTLE_WAVE_SCROLL, 1, little_wave_scroll.mV);
@@ -257,6 +241,8 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     shader->uniform3fv(LLShaderMgr::WATER_LIGHT_DIR, 1, light_dir.mV);
 
     shader->uniform3fv(LLShaderMgr::WATER_NORM_SCALE, 1, pwater->getNormalScale().mV);
+    static LLCachedControl<F32> glint_roughness(gSavedSettings, "AlchemyRenderWaterGlintRoughness", 0.35f);
+    shader->uniform1f(LLShaderMgr::WATER_GLINT_ROUGHNESS, llclamp((F32)glint_roughness, 0.05f, 1.f));
     shader->uniform1f(LLShaderMgr::WATER_FRESNEL_SCALE, pwater->getFresnelScale());
     shader->uniform1f(LLShaderMgr::WATER_FRESNEL_OFFSET, pwater->getFresnelOffset());
     shader->uniform1f(LLShaderMgr::WATER_BLUR_MULTIPLIER, fmaxf(0, pwater->getBlurMultiplier()) * 2);
@@ -319,6 +305,10 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     // clean up
     gPipeline.unbindDeferredShader(*shader);
 
+    if (glint_glow)
+    {
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    }
     gGL.setColorMask(true, false);
 }
 

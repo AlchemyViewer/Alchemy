@@ -2218,6 +2218,17 @@
             <key>Value</key>
             <real>64</real>
         </map>
+        <key>AlchemyRenderWaterGlintRoughness</key>
+        <map>
+            <key>Comment</key>
+            <string>Roughness of the sun's reflection on water, which sets how far each wave face's glint spreads: low gives small, hard sparkles, high soft ones that run together into a broad path. 0.35 matches WindLight's water. 0.05 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.35</real>
+        </map>
         <key>AlchemyRenderTonemapType</key>
         <map>
             <key>Comment</key>
