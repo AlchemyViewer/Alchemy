@@ -88,7 +88,7 @@ public:
     /// escaped as a file name.
     static std::string getPresetFilePath(const std::string& subdirectory, const std::string& name);
     /// How long a preset's name may be once escaped as a file name, for it
-    /// to be written (through "<name>.xml.tmp") in that subdirectory: on
+    /// to be written (as "<name>.xml") in that subdirectory: on
     /// Windows, what MAX_PATH leaves after the folder's path; elsewhere, what
     /// a file name holds. 0 where the folder's path leaves nothing.
     static size_t escapedPresetNameLimit(const std::string& subdirectory);

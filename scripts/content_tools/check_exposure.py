@@ -24,6 +24,8 @@ What is checked, because each is easy to get subtly wrong and hard to see on scr
       history read as an infinity or a NaN starts over from the target, a finite history
       outside a narrowed range eases in rather than jumping, and an absurd sky weight meters as
       the largest one the upload allows.
+  (g) The sources: the constants and clamps above are read out of pipeline.cpp, and the
+      statements they mirror out of exposureF.glsl, so that a change there fails here.
 
 If the shaders' binning, trim, target or adaptation change, change them here in the same commit.
 
@@ -31,7 +33,9 @@ Standard library only. Exit status 0 on RESULT: OK, 1 on RESULT: MISMATCH.
 """
 
 import math
+import pathlib
 import random
+import re
 import sys
 
 # ---------------------------------------------------------------------------------------
@@ -276,12 +280,52 @@ def check_bounds(ck):
     for broken in (float("inf"), float("-inf"), float("nan")):
         _, ev, target = exposure(bins, params, params2, prev=broken, dt=1.0 / 60)
         ck.expect("a history of %s starts over from the target" % broken, ev == target, "EV %.4f, target %.4f" % (ev, target))
-    _, ev, target = exposure(bins, params, params2, prev=-20.0, dt=1.0 / 60)
-    ck.expect("a finite history past the range eases toward it", -20.0 < ev < target, "EV %.4f from -20 toward %.4f" % (ev, target))
+    # A history the meter can really hold -- inside +-15 -- outside a range since narrowed to it: one
+    # frame later the EV has moved toward the range but is still outside it. Clamped after the mix
+    # instead, it would jump to the range's end at once.
+    _, ev, target = exposure(bins, params, params2, prev=-12.0, dt=1.0 / 60)
+    ck.expect("a history outside a narrowed range eases into it", -12.0 < ev < params[1],
+              "EV %.4f from -12, range from %.1f" % (ev, params[1]))
     grid = uniform_grid(KEY, sky_share=0.5, sky=KEY * 4.0)
     _, ev_huge, _ = meter(grid, dict(DEFAULTS, sky_weight=1e38))
     _, ev_max, _ = meter(grid, dict(DEFAULTS, sky_weight=SKY_WEIGHT_MAX))
     ck.expect("an absurd sky weight meters as the largest one", ev_huge == ev_max and math.isfinite(ev_huge), "EV %.4f vs %.4f" % (ev_huge, ev_max))
+
+
+def check_sources(ck):
+    """The numbers and statements this copies, as the sources write them: a clamp moved there and
+    not here would otherwise leave every check above passing against the old one."""
+    print("(g) the sources say what this copies")
+    root = pathlib.Path(__file__).resolve().parents[2]
+    pipeline = (root / "indra" / "newview" / "pipeline.cpp").read_text(encoding="utf-8")
+    shader = (root / "indra" / "newview" / "app_settings" / "shaders" / "class1" / "deferred" / "exposureF.glsl").read_text(encoding="utf-8")
+    number = r"(-?[\d.]+)f?"
+    expected = [
+        ("the meter's width", r"constexpr U32 EXPOSURE_METER_WIDTH = (\d+);", [METER_WIDTH]),
+        ("the meter's height", r"constexpr U32 EXPOSURE_METER_HEIGHT = (\d+);", [METER_HEIGHT]),
+        ("the bins", r"constexpr U32 EXPOSURE_HISTOGRAM_BINS = (\d+);", [BINS]),
+        ("the histogram's lowest EV", r"constexpr F32 EXPOSURE_HISTOGRAM_MIN_EV = " + number + ";", [HISTOGRAM_MIN_EV]),
+        ("the histogram's highest EV", r"constexpr F32 EXPOSURE_HISTOGRAM_MAX_EV = " + number + ";", [HISTOGRAM_MAX_EV]),
+        ("the key", r"constexpr F32 EXPOSURE_KEY = " + number + ";", [KEY]),
+        ("the sky weight's cap", r"constexpr F32 EXPOSURE_SKY_WEIGHT_MAX = " + number + ";", [SKY_WEIGHT_MAX]),
+        ("the EV range", r"llclamp\(finite_or\(min_ev\(\), [^)]*\), " + number + ", " + number + r"\)", [-15.0, 15.0]),
+        ("the compensation", r"llclamp\(finite_or\(compensation\(\), [^)]*\), " + number + ", " + number + r"\)", [-16.0, 16.0]),
+        ("the rate up", r"llclamp\(finite_or\(speed_up\(\), [^)]*\), " + number + ", " + number + r"\)", [0.0, 100.0]),
+        ("the rate down", r"llclamp\(finite_or\(speed_down\(\), [^)]*\), " + number + ", " + number + r"\)", [0.0, 100.0]),
+        ("the low trim", r"llclamp\(finite_or\(low_percent\(\), [^)]*\) \* 0\.01f, " + number + ", " + number + r"\)", [0.0, 0.99]),
+    ]
+    for what, pattern, values in expected:
+        found = re.search(pattern, pipeline)
+        got = [float(v) for v in found.groups()] if found else None
+        ck.expect("pipeline.cpp: %s" % what, got == [float(v) for v in values], "found %s, mirrored %s" % (got, values))
+    statements = [
+        ("the target is held to the range", "target = clamp(target, dynamic_exposure_params.y, dynamic_exposure_params.z);"),
+        ("a history that is no number starts over", "if (isnan(prev) || isinf(prev))"),
+        ("the EV eases, unclamped", "ev = mix(prev, target, 1.0 - exp(-rate * dt));"),
+        ("the scale is 2^-EV", "frag_color = vec4(exp2(-ev), ev, target, 1.0);"),
+    ]
+    for what, statement in statements:
+        ck.expect("exposureF.glsl: %s" % what, statement in shader)
 
 
 def main():
@@ -292,6 +336,7 @@ def main():
     check_adaptation(ck)
     check_black(ck)
     check_bounds(ck)
+    check_sources(ck)
     print("RESULT: %s" % ("OK" if ck.failures == 0 else "MISMATCH"))
     return 0 if ck.failures == 0 else 1
 

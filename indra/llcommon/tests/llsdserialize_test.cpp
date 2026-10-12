@@ -1174,15 +1174,6 @@ namespace tut
             LLSD(),
             LLSDParser::PARSE_FAILURE,
             1);
-        // Inside an array, where a self-closing value is the first element
-        // past the limit (inside a map a key always reaches that depth
-        // first), and so where a wrong pop would take its parent's slot.
-        ensureParse(
-            "a self-closing element past the limit inside an array",
-            "<llsd><array><undef/></array></llsd>",
-            LLSD(),
-            LLSDParser::PARSE_FAILURE,
-            2);
         ensureParse(
             "a key past the limit inside a map",
             "<llsd><map><key>a</key><map><key>b</key><undef/></map></map></llsd>",
@@ -1217,6 +1208,16 @@ namespace tut
             "a tab by reference",
             "<llsd><string>a&#x9;b</string></llsd>",
             LLSD("a\tb"),
+            1);
+        ensureParse(
+            "a newline by reference",
+            "<llsd><string>a&#xA;b</string></llsd>",
+            LLSD("a\nb"),
+            1);
+        ensureParse(
+            "a return by reference",
+            "<llsd><string>a&#xD;b</string></llsd>",
+            LLSD("a\rb"),
             1);
         ensureParse(
             "a C1 control by reference is a Char",

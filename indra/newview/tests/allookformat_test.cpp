@@ -1188,4 +1188,69 @@ namespace tut
                                                         ALLookFormat::settingRange("RenderExposure")->lo < ALLookFormat::settingRange("RenderExposure")->hi);
         ensure("a switch has none", ALLookFormat::settingRange("RenderGlow") == nullptr);
     }
+
+    // The notecard's limit, to the byte, for each of the two forms the text
+    // is written in: indented where that fits, run together where only that
+    // does, and refused past it.
+    template<> template<> void object::test<21>()
+    {
+        set_test_name("the notecard limit to the byte");
+        const auto padded = [](size_t length) {
+            LLSD settings             = LLSD::emptyMap();
+            settings["RenderPadding"] = look_format::entry("String", std::string(length, 'x'));
+            return look_format::lookNamed("Edge", settings);
+        };
+        const size_t limit = ALLookFormat::NOTECARD_BYTE_LIMIT;
+
+        // Measured with one byte of padding, not none: an empty string is
+        // written as a shorter, self-closing element, and from there on the
+        // text grows a byte a byte.
+        std::string text;
+        ensure("a small one composes", ALLookFormat::composeNotecardText(padded(1), text));
+        const size_t indented_base = text.size() - 1;
+        ensure("indented, exactly at the limit", ALLookFormat::composeNotecardText(padded(limit - indented_base), text));
+        ensure_equals("and as long as the limit", text.size(), limit);
+        ensure("written indented", text.find('\n', text.find("<llsd")) < text.find("</llsd>"));
+
+        // One more byte, and it is written run together instead.
+        ensure("one past, run together", ALLookFormat::composeNotecardText(padded(limit - indented_base + 1), text));
+        ensure("shorter than the limit", text.size() < limit);
+        ensure("on one line", text.find('\n', text.find("<llsd")) > text.find("</llsd>"));
+        const size_t run_base = text.size() - (limit - indented_base + 1);
+        ensure("run together, exactly at the limit", ALLookFormat::composeNotecardText(padded(limit - run_base), text));
+        ensure_equals("and as long as the limit", text.size(), limit);
+        ensure("run together, one past, refused", !ALLookFormat::composeNotecardText(padded(limit - run_base + 1), text));
+        ensure_equals("and the size said", text.size(), limit + 1);
+    }
+
+    // Every kind of character a name loses, one by one: the non-characters,
+    // the word joiner's kin, the annotation marks and the tags.
+    template<> template<> void object::test<22>()
+    {
+        set_test_name("what a name loses");
+        const std::pair<const char*, const char*> lost[] = {
+            { "U+FFFE", "Soft\xEF\xBF\xBE" },
+            { "U+FFFF", "Soft\xEF\xBF\xBF" },
+            { "U+FDD0", "Soft\xEF\xB7\x90" },
+            { "U+FDEF", "Soft\xEF\xB7\xAF" },
+            { "U+2060", "Soft\xE2\x81\xA0" },
+            { "U+206F", "Soft\xE2\x81\xAF" },
+            { "U+FFF9", "Soft\xEF\xBF\xB9" },
+            { "U+FFFB", "Soft\xEF\xBF\xBB" },
+            { "U+E0041", "Soft\xF3\xA0\x81\x81" },
+            { "U+E007F", "Soft\xF3\xA0\x81\xBF" },
+        };
+        for (const auto& [what, name] : lost)
+        {
+            ensure_equals(std::string(what) + " goes", ALLookFormat::lookNameFromUntrustedText(std::string(name) + "Film"), std::string("SoftFilm"));
+        }
+
+        // A whole number at each end of an S32, and one past each.
+        LLSD out;
+        ensure("the largest taken", ALLookFormat::sanitizeLookValue("NotALookSetting", "S32", 2147483647.0, out) && out.asInteger() == 2147483647);
+        ensure("one more refused", !ALLookFormat::sanitizeLookValue("NotALookSetting", "S32", 2147483648.0, out));
+        ensure("the smallest taken", ALLookFormat::sanitizeLookValue("NotALookSetting", "S32", -2147483648.0, out) &&
+                                         out.asInteger() == std::numeric_limits<S32>::min());
+        ensure("one less refused", !ALLookFormat::sanitizeLookValue("NotALookSetting", "S32", -2147483649.0, out));
+    }
 } // namespace tut

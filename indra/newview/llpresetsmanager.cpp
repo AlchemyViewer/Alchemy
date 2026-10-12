@@ -998,20 +998,21 @@ std::string LLPresetsManager::getPresetFilePath(const std::string& subdirectory,
 // static
 size_t LLPresetsManager::escapedPresetNameLimit(const std::string& subdirectory)
 {
-    // writePresetFile writes "<name>.xml.tmp" and renames it.
-    constexpr size_t TEMP_SUFFIX = sizeof(".xml.tmp") - 1;
+    // The file is "<name>.xml"; writePresetFile writes it through a temp file
+    // whose path is never longer.
+    constexpr size_t EXTENSION = sizeof(".xml") - 1;
 #if LL_WINDOWS
     // Windows opens nothing whose whole path is longer than MAX_PATH less
     // its terminator, and the viewer does not ask for long paths. The
     // folder's path is measured in UTF-8 bytes, which are never fewer than
     // the UTF-16 units Windows counts.
     constexpr size_t PATH_LIMIT = 259;
-    const size_t     used       = getPresetsDir(subdirectory).size() + gDirUtilp->getDirDelimiter().size() + TEMP_SUFFIX;
+    const size_t     used       = getPresetsDir(subdirectory).size() + gDirUtilp->getDirDelimiter().size() + EXTENSION;
     return used < PATH_LIMIT ? PATH_LIMIT - used : 0;
 #else
     // Elsewhere it is the file name alone that is limited.
     constexpr size_t NAME_LIMIT = 255;
-    return NAME_LIMIT - TEMP_SUFFIX;
+    return NAME_LIMIT - EXTENSION;
 #endif
 }
 
@@ -1043,8 +1044,12 @@ bool LLPresetsManager::writePresetFile(const std::string& subdirectory, const st
     // Written beside the file and moved over it once it is whole, so that a
     // disk that fills halfway, or a viewer that dies, leaves the preset
     // that was there rather than a short one. The list is read from
-    // "*.xml", which the half-written file is not.
-    const std::string temp_path = full_path + ".tmp";
+    // "*.xml", which the half-written file is not. One name in each folder
+    // for it, whatever the preset: its path is never longer than the
+    // preset's own -- a name of the preset's plus ".tmp" would stop a
+    // preset that fits Windows' path limit from saving -- and one a viewer
+    // died writing is written over by the next save, not left beside it.
+    const std::string temp_path = getPresetsDir(subdirectory) + gDirUtilp->getDirDelimiter() + "preset.tmp";
     {
         llofstream preset_file(temp_path.c_str());
         if (!preset_file.is_open())
@@ -1077,8 +1082,8 @@ bool LLPresetsManager::writePresetFile(const std::string& subdirectory, const st
 // cut short; a map or an array is only described: streaming one recurses
 // once per level of nesting, and a stranger's notecard can nest a value
 // fifteen hundred deep in twenty kilobytes, which is the main thread's
-// whole stack on Windows. The parser now refuses such a text, and this
-// does not rely on it.
+// whole stack on Windows. The parser refuses text nested that deep
+// (ALLookFormat::XML_DEPTH_LIMIT), but this does not rely on it.
 static std::string refusedEntryText(const LLSD& entry)
 {
     const LLSD& value = entry.isMap() && entry.has("Value") ? entry["Value"] : entry;
@@ -1239,9 +1244,9 @@ LLPresetsManager::LookSettingCounts LLPresetsManager::applyLookSettings(const LL
             case LookEntry::Absent:
                 break;
             case LookEntry::Refused:
-                // Skipped, as a malformed key always was, and counted so
-                // that the user can be told -- by name here, so that a Look
-                // that loses a setting can be looked into.
+                // Skipped, and counted so that the user can be told -- by
+                // name here, so that a Look that loses a setting can be
+                // looked into.
                 LL_WARNS("Presets") << "Look setting '" << ctrl_name << "' refused and skipped: " << refusedEntryText(params[ctrl_name]) << LL_ENDL;
                 ++counts.rejected;
                 break;
