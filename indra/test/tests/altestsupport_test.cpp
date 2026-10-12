@@ -120,6 +120,9 @@ TEST_CASE("LLSDEquals compares all the way down and says where two differ", "[al
     // LLDate's own == holds a NaN date equal to any.
     const LLSD nan_date = LLDate(std::numeric_limits<F64>::quiet_NaN());
     CHECK_FALSE(ll_test::LLSDEquals(LLDate(0.0)).match(nan_date));
+    // Nor a NaN number, which MSVC's /fp:fast compare would hold equal.
+    const LLSD nan_real = std::numeric_limits<F64>::quiet_NaN();
+    CHECK_FALSE(ll_test::LLSDEquals(0.0).match(nan_real));
     CHECK_THAT(LLSD(LLDate(1.0)), ll_test::LLSDEquals(LLDate(1.0)));
 }
 
