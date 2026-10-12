@@ -207,13 +207,13 @@ TEST_CASE("BufferArray Tests: BufferArray multiple writes - sequential reads", "
     UNSCOPED_INFO("nothing written past what was read");
     CHECK(buffer[4] == 'X');
 
-    // Read some more without repositioning
+    // Read on from where the last read stopped
     memset(buffer, 'X', sizeof(buffer));
     len = ba->read(12, buffer, sizeof(buffer));
     CHECK((str1_len - 2) == len);
     CHECK(strncmp(buffer, str1+2, str1_len-2) == 0);
     UNSCOPED_INFO("nothing written past what was read");
-    CHECK(buffer[str1_len-1] == 'X');
+    CHECK(buffer[str1_len-2] == 'X');
 
     // release the implicit reference, causing the object to be released
     ba->release();
@@ -244,7 +244,7 @@ TEST_CASE("BufferArray Tests: BufferArray overwrite spanning blocks and appendin
     len = ba->write(8, str2, str2_len);
     CHECK(str2_len == len);
 
-    // Leave position and read verifying content
+    // A zero-length read at the end of the data reads nothing
     memset(buffer, 'X', sizeof(buffer));
     len = ba->read(8 + str2_len, buffer, 0);
     CHECK(len == 0);

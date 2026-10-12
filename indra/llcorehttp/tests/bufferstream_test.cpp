@@ -46,7 +46,7 @@ typedef BufferArrayStreamBuf::traits_type tst_traits_t;
 
 TEST_CASE("BufferStream Tests: BufferArrayStreamBuf over a NULL BufferArray fails every call", "[BufferStream_Tests]")
 {
-    // create a new ref counted object with an implicit reference
+    // a stream buffer over no BufferArray
     BufferArrayStreamBuf * bsb = new BufferArrayStreamBuf(NULL);
 
     // Not much will work with a NULL
@@ -58,7 +58,7 @@ TEST_CASE("BufferStream Tests: BufferArrayStreamBuf over a NULL BufferArray fail
     CHECK(bsb->xsputn("blah", 4) == 0);
     CHECK(bsb->seekoff(0, std::ios_base::beg, std::ios_base::in) == std::streampos(-1));
 
-    // release the implicit reference, causing the object to be released
+    // the stream buffer is not ref counted
     delete bsb;
     bsb = NULL;
 }
@@ -66,7 +66,7 @@ TEST_CASE("BufferStream Tests: BufferArrayStreamBuf over a NULL BufferArray fail
 
 TEST_CASE("BufferStream Tests: BufferArrayStream over a NULL BufferArray starts out good", "[BufferStream_Tests]")
 {
-    // create a new ref counted object with an implicit reference
+    // a stream over no BufferArray
     BufferArrayStream * bas = new BufferArrayStream(NULL);
 
     // Not much will work with a NULL here
@@ -74,37 +74,39 @@ TEST_CASE("BufferStream Tests: BufferArrayStream over a NULL BufferArray starts 
     CHECK_FALSE(bas->fail());
     CHECK(bas->good());
 
-    // release the implicit reference, causing the object to be released
+    // the stream is not ref counted
     delete bas;
     bas = NULL;
 }
 
 
-TEST_CASE("BufferStream Tests: BufferArrayStreamBuf construction with empty BufferArray", "[BufferStream_Tests]")
+TEST_CASE("BufferStream Tests: BufferArrayStreamBuf takes a reference on an empty BufferArray", "[BufferStream_Tests]")
 {
     // create a new ref counted BufferArray with implicit reference
     BufferArray * ba = new BufferArray;
     BufferArrayStreamBuf * bsb = new BufferArrayStreamBuf(ba);
+    CHECK(ba->getRefCount() == 2);
 
     // I can release my ref on the BA
     ba->release();
     ba = NULL;
 
-    // release the implicit reference, causing the object to be released
+    // the stream buffer is not ref counted; deleting it drops the BufferArray's last reference
     delete bsb;
     bsb = NULL;
 }
 
 
-TEST_CASE("BufferStream Tests: BufferArrayStream construction with empty BufferArray", "[BufferStream_Tests]")
+TEST_CASE("BufferStream Tests: BufferArrayStream holds a reference on an empty BufferArray while it lives", "[BufferStream_Tests]")
 {
     // create a new ref counted BufferArray with implicit reference
     BufferArray * ba = new BufferArray;
 
     {
-        // create a new ref counted object with an implicit reference
         BufferArrayStream bas(ba);
+        CHECK(ba->getRefCount() == 2);
     }
+    CHECK(ba->getRefCount() == 1);
 
     // release the implicit reference, causing the object to be released
     ba->release();
@@ -151,9 +153,12 @@ TEST_CASE("BufferStream Tests: BufferArrayStreamBuf reads and appends and seeks 
     UNSCOPED_INFO("showmanyc() picks up seekoff");
     CHECK(bsb->showmanyc() == (c_len + 5 - 4));
     CHECK(bsb->seekoff(0, std::ios_base::end, std::ios_base::in) == std::streampos(c_len + 4));
+    // The seek to the end leaves the read position on the last character, the '!',
+    // so pbackfail() refuses the '!' and puts back the 'a' before it
     CHECK(tst_traits_t::eof() == bsb->pbackfail('!'));
+    CHECK(bsb->pbackfail('a') == 'a');
 
-    // release the implicit reference, causing the object to be released
+    // the stream buffer is not ref counted; deleting it drops the BufferArray's last reference
     delete bsb;
     bsb = NULL;
 }

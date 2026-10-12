@@ -133,18 +133,18 @@ TEST_CASE_METHOD(HttpStatusTestData, "HttpStatus Tests: toString says something 
     CHECK_FALSE(msg.empty());
 }
 
-TEST_CASE_METHOD(HttpStatusTestData, "HttpStatus Tests: statuses of different types compare unequal", "[HttpStatus_Tests]")
+TEST_CASE_METHOD(HttpStatusTestData, "HttpStatus Tests: distinct statuses compare unequal when both succeed or both fail", "[HttpStatus_Tests]")
 {
     // Make certain equality/inequality tests do not pass
     // through the bool conversion.  Distinct successful
-    // and error statuses should compare unequal.
+    // statuses, and distinct error statuses, should compare unequal.
 
     HttpStatus status1(HttpStatus::LLCORE, HE_SUCCESS);
     HttpStatus status2(HttpStatus::EXT_CURL_EASY, HE_SUCCESS);
     CHECK(status1 != status2);
 
     status1 = HttpStatus(HttpStatus::LLCORE, HE_REPLY_ERROR);
-    status1 = HttpStatus(HttpStatus::LLCORE, HE_SHUTTING_DOWN);
+    status2 = HttpStatus(HttpStatus::LLCORE, HE_SHUTTING_DOWN);
 
     CHECK(status1 != status2);
 }

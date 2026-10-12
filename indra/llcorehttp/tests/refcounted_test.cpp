@@ -33,6 +33,17 @@ using namespace LLCoreInt;
 
 namespace
 {
+    // A RefCounted the test may own: its destructor is public, so it can live on the stack
+    // after noRef() has taken it out of reference counting
+    struct OwnedRefCounted : public RefCounted
+    {
+        OwnedRefCounted()
+            : RefCounted(false)
+        {}
+
+        ~OwnedRefCounted() override = default;
+    };
+
     TEST_CASE("RefCounted Tests: construction with an implicit count holds one reference", "[RefCounted_Tests]")
     {
         // create a new ref counted object with an implicit reference
@@ -45,7 +56,7 @@ namespace
 
     TEST_CASE("RefCounted Tests: construction without an implicit count holds none", "[RefCounted_Tests]")
     {
-        // create a new ref counted object with an implicit reference
+        // create a new ref counted object without an implicit reference
         RefCounted * rc = new RefCounted(false);
         CHECK(rc->getRefCount() == 0);
 
@@ -53,7 +64,7 @@ namespace
         rc->addRef();
         CHECK(rc->getRefCount() == 1);
 
-        // release the implicit reference, causing the object to be released
+        // release the added reference, causing the object to be released
         rc->release();
     }
 
@@ -87,12 +98,13 @@ namespace
 
     TEST_CASE("RefCounted Tests: noRef marks the object not ref counted", "[RefCounted_Tests]")
     {
-        RefCounted * rc = new RefCounted(false);
+        // owned by the test, since an object out of reference counting cannot be released
+        OwnedRefCounted rc;
 
         // set the noRef
-        rc->noRef();
+        rc.noRef();
 
-        // with only one reference, isLastRef should be true
-        CHECK(rc->getRefCount() == RefCounted::NOT_REF_COUNTED);
+        // the count now says the object is not ref counted
+        CHECK(rc.getRefCount() == RefCounted::NOT_REF_COUNTED);
     }
 }

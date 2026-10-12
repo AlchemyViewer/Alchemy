@@ -38,7 +38,10 @@
 
 #include <curl/curl.h>
 #include "alregex.h"
+#include <chrono>
+#include <map>
 #include <sstream>
+#include <vector>
 
 #include "llcleanup.h"
 #include "llproxy.h"
@@ -820,7 +823,7 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to the peer is a
 }
 
 
-TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: requestGetByteRange with a zero range is answered 200", "[HttpRequest_Tests]")
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET with a byte range sends its Range header and takes a 200 for the whole body", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
@@ -835,6 +838,7 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: requestGetByteRange wi
     mHandlerCalls = 0;
 
     HttpRequest * req = NULL;
+    HttpOptions::ptr_t opts;
 
     try
     {
@@ -848,13 +852,22 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: requestGetByteRange wi
         // create a new ref counted object with an implicit reference
         req = new HttpRequest();
 
-        // Issue a GET that *can* connect
+        opts = HttpOptions::ptr_t(new HttpOptions());
+        opts->setWantHeaders(true);
+
+        // Issue a GET for 25 bytes from offset 100.  The peer reflects the
+        // Range header it was sent and, ignoring it, answers 200 with the
+        // whole body, which has no Content-Range for llcorehttp to check.
         mStatus = HttpStatus(200);
+        handler.mHeadersRequired.push_back(
+            regex_container_t::value_type(
+                ALRegex("X-Reflect-range", ALRegex::ICASE),
+                ALRegex("bytes=100-124", ALRegex::ICASE)));
         HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
-                                                     url_base,
-                                                     0,
-                                                     0,
-                                                     HttpOptions::ptr_t(),
+                                                     url_base + "reflect/",
+                                                     100,
+                                                     25,
+                                                     opts,
                                                      HttpHeaders::ptr_t(),
                                                      handlerp);
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
@@ -873,6 +886,7 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: requestGetByteRange wi
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
+        handler.mHeadersRequired.clear();
         handle = req->requestStopThread(handlerp);
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
@@ -897,6 +911,9 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: requestGetByteRange wi
         }
         CHECK(HttpService::isStopped());
 
+        // release options
+        opts.reset();
+
         // release the request object
         delete req;
         req = NULL;
@@ -909,6 +926,7 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: requestGetByteRange wi
     catch (...)
     {
         stop_thread(req);
+        opts.reset();
         delete req;
         HttpRequest::destroyService();
         throw;
@@ -945,7 +963,7 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT with a body to t
         // create a new ref counted object with an implicit reference
         req = new HttpRequest();
 
-        // Issue a GET that *can* connect
+        // Issue a PUT that *can* connect
         static const char * body_text("Now is the time for all good men...");
         body->append(body_text, strlen(body_text));
         mStatus = HttpStatus(200);
@@ -1050,7 +1068,7 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST with a body to 
         // create a new ref counted object with an implicit reference
         req = new HttpRequest();
 
-        // Issue a GET that *can* connect
+        // Issue a POST that *can* connect
         static const char * body_text("Now is the time for all good men...");
         body->append(body_text, strlen(body_text));
         mStatus = HttpStatus(200);
@@ -1883,7 +1901,7 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST sends default h
                 ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                ALRegex("X-Reflect-transfer_encoding", ALRegex::ICASE),
+                ALRegex("X-Reflect-transfer-encoding", ALRegex::ICASE),
                 ALRegex(".*chunked.*", ALRegex::ICASE)));
         HttpHandle handle = req->requestPost(HttpRequest::DEFAULT_POLICY_ID,
                                              url_base + "reflect/",
@@ -2401,7 +2419,7 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a POS
         ba = new BufferArray;
         ba->append(msg, strlen(msg));
 
-        // Issue a default POST
+        // Issue a POST with modified headers
         mStatus = HttpStatus(200);
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
@@ -2613,7 +2631,7 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the last of several Co
         ba = new BufferArray;
         ba->append(msg, strlen(msg));
 
-        // Issue a default PUT
+        // Issue a PUT with several Content-Types
         mStatus = HttpStatus(200);
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
@@ -2936,19 +2954,49 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: BUG-2295 a 206 with a 
     }
 }
 
-TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 with good and bad Retry-After headers complete", "[HttpRequest_Tests]")
+// Records, by URL, when each response was delivered and the retries it reports
+class RetryRecordingHandler : public TestHandler2
+{
+public:
+    struct Delivery
+    {
+        std::chrono::steady_clock::time_point mAt;
+        unsigned int mRetries;
+        unsigned int m503Retries;
+    };
+
+    RetryRecordingHandler(HttpRequestTestData * state,
+                          const std::string & name)
+        : TestHandler2(state, name)
+        {}
+
+    void onCompleted(HttpHandle handle, HttpResponse * response) override
+        {
+            TestHandler2::onCompleted(handle, response);
+
+            Delivery delivery{ std::chrono::steady_clock::now(), 0, 0 };
+            response->getRetries(&delivery.mRetries, &delivery.m503Retries);
+            mDeliveries[response->getRequestURL()] = delivery;
+        }
+
+    std::map<std::string, Delivery> mDeliveries;
+};
+
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 are retried once and a good Retry-After holds the retry back", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
-    // This tests mainly that the code doesn't fall over if
-    // various well- and mis-formed Retry-After headers are
-    // sent along with the response.  Direct inspection of
-    // the parsing result isn't supported.
+    // Each of the peer's seven 503 answers, /503/0/ to /503/6/, carries
+    // a different Retry-After, well- or mis-formed, and the code must not
+    // fall over on any of them.  The parsing result can't be inspected,
+    // but its effect can: only /503/0/'s "2" is a delay llcorehttp takes,
+    // and it holds that retry back two seconds where the others retry
+    // after the default backoff of one.
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
     // Create before memory record as the string copy will bump numbers.
-    TestHandler2 handler(this, "handler");
+    RetryRecordingHandler handler(this, "handler");
     LLCore::HttpHandler::ptr_t handlerp(&handler, NoOpDeletor);
     std::string url_base(get_base_url() + "/503/"); // path to 503 generators
     mHandlerCalls = 0;
@@ -2972,13 +3020,16 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 with
         opts->setRetries(1);            // Retry once only
         opts->setUseRetryAfter(true);   // Try to parse the retry-after header
 
-        // Issue a GET that 503s with valid retry-after
+        // Issue a GET to each of the peer's 503 answers
         mStatus = HttpStatus(503);
-        int url_limit(6);
+        const int url_limit(7);
+        std::vector<std::string> urls;
+        const auto issued(std::chrono::steady_clock::now());
         for (int i(0); i < url_limit; ++i)
         {
             std::ostringstream url;
             url << url_base << i << "/";
+            urls.push_back(url.str());
             HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
                                                          url.str(),
                                                          0,
@@ -3003,6 +3054,21 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 with
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
         CHECK(mHandlerCalls == url_limit);
+
+        // Each GET was retried once, as a 503, whatever its Retry-After said,
+        // and the retry of the one with "Retry-After: 2" came no sooner than that
+        for (int i(0); i < url_limit; ++i)
+        {
+            CAPTURE(i);
+            const auto delivery(handler.mDeliveries.find(urls[i]));
+            REQUIRE(delivery != handler.mDeliveries.end());
+            CHECK(delivery->second.mRetries == 1u);
+            CHECK(delivery->second.m503Retries == 1u);
+            if (0 == i)
+            {
+                CHECK(delivery->second.mAt - issued >= std::chrono::milliseconds(1900));
+            }
+        }
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
