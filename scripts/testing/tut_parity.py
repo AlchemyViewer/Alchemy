@@ -9,7 +9,8 @@ Two steps, either side of scripts/testing/tut2catch.py:
              [group, N: name] ok | fail | exception: ... | skipped known failure | ...
            A test TUT never reported (a dummy test<N> slot) is not a test.
            With them it keeps the sha256 of the TUT source, the one
-           indra/**/tests/<stem>.cpp git tracks. A test built at other
+           indra/**/tests/<stem>.cpp git tracks, and it refuses an
+           executable built before that source last changed. A test built at other
            x86-64 tiers too (an entry ending _baseline, _v2, _v3, _v4) is
            kept a tier apart, under <stem>@<tier>.
   check    after converting and building: runs each converted file's CTest
@@ -26,7 +27,10 @@ Parity holds for a file when:
   - its inputs are the ones the run is of: the converted file is no newer
     than the executable its entry runs, and where the recorded results
     and the mapping both have the TUT source's sha256, the two agree (where
-    either has none, that is listed);
+    either has none, that is listed); and the file is the one the converter
+    wrote, by the mapping's catch2_sha256, unless --recounted says it was
+    edited by hand and the edits were reviewed -- an edit that weakens an
+    assertion keeps every count, so nothing else here would see it;
   - every TUT test it reported has exactly one Catch2 case, and every case
     of the file is one of its TUT tests;
   - each pair agrees: ok is a pass, a TUT skip is a Catch2 skip, and every
@@ -210,6 +214,21 @@ def record(args):
         if test is None:
             print(f"{name}: no such CTest entry", file=sys.stderr)
             return 2
+        stem, tier = tut_identity(name)
+        # What the results are of, so that check can tell they are of the
+        # source the mapping was made from.
+        source, digest = tut_source(stem)
+        if source is None:
+            print(f"{name}: not exactly one tracked indra/**/tests/{stem}.cpp, so no source hash kept",
+                  file=sys.stderr)
+        # An executable older than its source is not of it: its results
+        # would stand for tests the file no longer has.
+        command = test["command"]
+        if source is not None and command and os.path.isfile(command[0]) and \
+                os.path.getmtime(os.path.join(ROOT, source)) > os.path.getmtime(command[0]):
+            print(f"{name}: {source} changed since {command[0]} was built; build it again to record it",
+                  file=sys.stderr)
+            return 2
         code, text = run(test, ["-v"], args.timeout)
         results = []
         for line in text.splitlines():
@@ -220,13 +239,6 @@ def record(args):
             results.append({"group": m.group("group"), "n": int(m.group("n")), "name": m.group("name") or "",
                             "result": {"ok": "ok", "skipped known failure": "skip"}.get(result, "fail"),
                             "said": line[m.start("result"):].strip()})
-        stem, tier = tut_identity(name)
-        # What the results are of, so that check can tell they are of the
-        # source the mapping was made from.
-        source, digest = tut_source(stem)
-        if source is None:
-            print(f"{name}: not exactly one tracked indra/**/tests/{stem}.cpp, so no source hash kept",
-                  file=sys.stderr)
         # Each tier's run is kept apart: one the host cannot run exits 125
         # with no results, which must not stand for the others.
         out[f"{stem}@{tier}" if tier else stem] = {"ctest": name, "tier": tier, "exit": code, "tut_file": source,
@@ -704,6 +716,20 @@ def check(args):
         file_cases, outside = read_cases(os.path.join(ROOT, path))
         kept = compiled_lines(os.path.join(ROOT, path))
         record = (file_records or {}).get(path)
+        # A file edited past what the converter wrote is held to the
+        # converter's counts only once --recounted says it was looked at: an
+        # edit that kept every count, a weakened assertion, shows nowhere
+        # else.
+        if record is not None:
+            with open(os.path.join(ROOT, path), "rb") as f:
+                written = hashlib.sha256(f.read()).hexdigest() == record.get("catch2_sha256")
+            if not record.get("catch2_sha256"):
+                print(f"{path}: listed: no hash in the mapping of the file the converter wrote")
+            elif not written and args.recounted:
+                print(f"{path}: listed: edited since the converter wrote it")
+            elif not written:
+                file_problems.append(f"{path}: edited since the converter wrote it; review the edits, then "
+                                     f"check it with --recounted")
         # What no test's count holds: the assertions outside every test body
         # (helpers, fixtures), which the mapping totals for the file.
         if file_records is None:
