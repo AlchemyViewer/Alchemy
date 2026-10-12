@@ -36,7 +36,9 @@ decided by the types clang resolved, not by its text:
                pointer, null or not; an optional or a smart pointer, tested
                through its operator bool or compared with nullptr; a
                position compared with end() or npos; a size, an emptiness,
-               a presence: has(), has_value(), found() and the like); a
+               a presence: has(), has_value(), found() and the like,
+               answered with a bool or an integer, not a vector's float
+               length()); a
                condition that calls what makes it (a non-const member
                function returning bool, or a call returning bool that fills
                an argument passed by reference or address), where that
@@ -174,6 +176,9 @@ LOOP_KINDS = {"ForStmt", "WhileStmt", "DoStmt", "CXXForRangeStmt"}
 # that it holds something, or how much.
 GUARD_MEMBERS = {"size", "empty", "length", "count", "isDefined", "isUndefined", "has", "isMap", "isArray",
                  "notNull", "isNull", "has_value", "found"}
+# What a member answering how much or whether answers with.
+INTEGRAL = re.compile(r"(?:(?:unsigned|signed|short|long|int|char|bool|wchar_t|char8_t|char16_t|char32_t|"
+                      r"__int128)\s*)+")
 # A container's ends, which a position found in it is compared with: at one,
 # there is nothing to read.
 END_MEMBERS = {"end", "cend", "rend", "crend"}
@@ -1400,7 +1405,8 @@ class Converter:
         nullptr through an operator of its own; a position
         compared with its container's end() or with npos; or a member that
         says how much an object holds or whether it holds anything
-        (has_value() and found() among them). Default arguments are not
+        (has_value() and found() among them), answering with a bool or an
+        integer: a float length() is a magnitude, not a size. Default arguments are not
         looked in: a NULL a callee defaults to is nothing the test
         compared."""
         if value_type(unparenthesised(node)).endswith("*"):
@@ -1420,12 +1426,21 @@ class Converter:
                     return True
             if any(is_end(c) for c in compared(sub)):
                 return True
-            if kind == "MemberExpr" and sub.get("name") in GUARD_MEMBERS:
+            # A member, called or read, answering how much or whether: with
+            # a bool or an integer, as a size or a count does; a float
+            # length() is a magnitude.
+            member = None
+            if kind == "CXXMemberCallExpr":
+                member = next((c for c in sub.get("inner", []) if "kind" in c), {})
+            elif kind == "MemberExpr" and sub.get("type", {}).get("qualType") != "<bound member function type>":
+                member = sub
+            if member and member.get("kind") == "MemberExpr" and member.get("name") in GUARD_MEMBERS and \
+                    INTEGRAL.fullmatch(value_type(sub)):
                 # isNull() and notNull() guard only on what points: on a
                 # vector or a UUID they are values like any other.
-                if sub.get("name") not in ("isNull", "notNull"):
+                if member.get("name") not in ("isNull", "notNull"):
                     return True
-                base = [c for c in sub.get("inner", []) if "kind" in c]
+                base = [c for c in member.get("inner", []) if "kind" in c]
                 if base and re.search(r"Pointer|ptr\b|Handle|\*", value_type(skip_implicit(base[0]))):
                     return True
             stack.extend(c for c in sub.get("inner", []) if isinstance(c, dict) and "kind" in c)
