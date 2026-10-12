@@ -1596,6 +1596,9 @@ class Converter:
         for arg, span in zip(args, spans):
             text = self.render(*span)
             texts.append(text if skip_implicit(arg).get("kind") == "StringLiteral" else f"std::string_view({text})")
+        # Two literals compared as they are would be two arrays' addresses.
+        if not any(t.startswith("std::string_view(") for t in texts):
+            texts[0] = f"std::string_view({texts[0]})"
         if not texts[0].startswith("std::string_view("):
             texts.reverse()
         self.headers.add("<string_view>")
