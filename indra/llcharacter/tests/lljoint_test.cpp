@@ -42,9 +42,7 @@ namespace
     {
         LLJoint lljoint;
         LLJoint* jnt = lljoint.getParent();
-        UNSCOPED_INFO("getParent() failed ");
-        REQUIRE((NULL == jnt));
-        UNSCOPED_INFO("getRoot() failed ");
+        CHECK(jnt == NULL);
         CHECK(&lljoint == lljoint.getRoot());
     }
 
@@ -54,7 +52,6 @@ namespace
         LLJoint parent(str), child;
         child.setup(str, &parent);
         LLJoint* jnt = child.getParent();
-        UNSCOPED_INFO("setup() failed ");
         CHECK(&parent == jnt);
     }
 
@@ -64,7 +61,6 @@ namespace
         std::string str = "LLJoint";
         child.setup(str, &parent);
         LLJoint* jnt = parent.findJoint(str);
-        UNSCOPED_INFO("findJoint() failed ");
         CHECK(&child == jnt);
     }
 
@@ -74,7 +70,6 @@ namespace
         std::string str1 = "LLJoint", str2;
         parent.setName(str1);
         str2 = parent.getName();
-        UNSCOPED_INFO("setName() failed ");
         CHECK(str1 == str2);
     }
 
@@ -85,7 +80,6 @@ namespace
         // SL-315
         lljoint.setPosition(vec3);
         LLVector3 pos = lljoint.getPosition();
-        UNSCOPED_INFO("setPosition()/getPosition() failed ");
         CHECK(vec3 == pos);
     }
 
@@ -96,10 +90,8 @@ namespace
         // SL-315
         lljoint.setWorldPosition(vec3);
         LLVector3 pos = lljoint.getWorldPosition();
-        UNSCOPED_INFO("1:setWorldPosition()/getWorldPosition() failed ");
         CHECK(vec3 == pos);
         LLVector3 lastPos = lljoint.getLastWorldPosition();
-        UNSCOPED_INFO("2:getLastWorldPosition failed ");
         CHECK(vec3 == lastPos);
     }
 
@@ -109,7 +101,6 @@ namespace
         LLQuaternion q(2.3f,30.f,10.f,1.f);
         lljoint.setRotation(q);
         LLQuaternion rot = lljoint.getRotation();
-        UNSCOPED_INFO("setRotation()/getRotation() failed ");
         CHECK(q == rot);
     }
     TEST_CASE("LLJoint: setWorldRotation sets the world and last world rotations", "[LLJoint]")
@@ -118,10 +109,8 @@ namespace
         LLQuaternion q(2.3f,30.f,10.f,1.f);
         lljoint.setWorldRotation(q);
         LLQuaternion rot = lljoint.getWorldRotation();
-        UNSCOPED_INFO("1:setWorldRotation()/getWorldRotation() failed ");
         CHECK(q == rot);
         LLQuaternion lastRot = lljoint.getLastWorldRotation();
-        UNSCOPED_INFO("2:getLastWorldRotation failed ");
         CHECK(q == lastRot);
     }
 
@@ -131,7 +120,6 @@ namespace
         LLVector3 vec3(2.3f,30.f,10.f);
         lljoint.setScale(vec3);
         LLVector3 scale = lljoint.getScale();
-        UNSCOPED_INFO("setScale()/getScale failed ");
         CHECK(vec3 == scale);
     }
 
@@ -142,7 +130,6 @@ namespace
         mat.setIdentity();
         lljoint.setWorldMatrix(mat);//giving warning setWorldMatrix not correctly implemented;
         LLMatrix4 mat4 = lljoint.getWorldMatrix().toMatrix4();
-        UNSCOPED_INFO("setWorldMatrix()/getWorldMatrix failed ");
         CHECK(mat4 == mat);
     }
 
@@ -152,7 +139,6 @@ namespace
         LLJoint lljoint(joint_num);
         lljoint.setName("parent");
         S32 jointNum =  lljoint.getJointNum();
-        UNSCOPED_INFO("getJointNum failed ");
         CHECK(jointNum == joint_num);
     }
 
@@ -162,7 +148,6 @@ namespace
         LLVector3 vec3(2.3f,30.f,10.f);
         lljoint.setSkinOffset(vec3);
         LLVector3 offset = lljoint.getSkinOffset();
-        UNSCOPED_INFO("1:setSkinOffset()/getSkinOffset() failed ");
         CHECK(vec3 == offset);
     }
 
@@ -179,31 +164,23 @@ namespace
 
         LLJoint* jnt = NULL;
         jnt = lljoint2.getParent();
-        UNSCOPED_INFO("addChild() failed ");
         CHECK(&lljoint == jnt);
         LLJoint* jnt1 = lljoint.findJoint("child3");
-        UNSCOPED_INFO("findJoint() failed ");
         CHECK(&lljoint3 == jnt1);
         lljoint.removeChild(&lljoint3);
         LLJoint* jnt2 = lljoint.findJoint("child3");
-        UNSCOPED_INFO("removeChild() failed ");
-        REQUIRE((NULL == jnt2));
+        CHECK(jnt2 == NULL);
 
         lljointgp.addChild(&lljoint);
-        UNSCOPED_INFO("GetParent() failed ");
         CHECK(&lljoint== lljoint2.getParent());
-        UNSCOPED_INFO("getRoot() failed ");
         CHECK(&lljointgp == lljoint2.getRoot());
 
-        UNSCOPED_INFO("getRoot() failed ");
         CHECK(&lljoint1 == lljoint.findJoint("child1"));
 
         lljointgp.removeAllChildren();
         // parent removed from grandparent - so should not be able to locate child
-        UNSCOPED_INFO("removeAllChildren() failed ");
-        REQUIRE((NULL == lljointgp.findJoint("child1")));
+        CHECK(lljointgp.findJoint("child1") == NULL);
         // it should still exist in parent though
-        UNSCOPED_INFO("removeAllChildren() failed ");
         CHECK(&lljoint1 == lljoint.findJoint("child1"));
     }
 
@@ -220,10 +197,8 @@ namespace
         llparent1.addChild(&lladoptedchild);
 
         llparent2.addChild(&lladoptedchild);
-        UNSCOPED_INFO("1. addChild failed to remove prior parent");
         CHECK(lladoptedchild.getParent() == &llparent2);
-        UNSCOPED_INFO("2. addChild failed to remove prior parent");
-        REQUIRE(llparent1.findJoint("child2") == NULL);
+        CHECK(llparent1.findJoint("child2") == NULL);
     }
 
     TEST_CASE("LLJoint: updateWorldMatrixChildren recomputes only dirty updating joints", "[LLJoint]")
@@ -289,7 +264,6 @@ namespace
         CHECK(root.updateWorldMatrixChildren() == 2);
 
         root.setRotation(rot);
-        UNSCOPED_INFO("rewriting the same rotation dirties nothing");
         CHECK(root.updateWorldMatrixChildren() == 0);
 
         root.setRotation(LLQuaternion(0.9f, LLVector3::z_axis));
@@ -369,7 +343,6 @@ namespace
             const F32 u = (0.010f + 0.006f * (frame % 5)) / 0.4f;
             root.setWorldRotationIfMoved(slerp(u, root.getWorldRotation(), target));
         }
-        UNSCOPED_INFO("a root that has caught up with its target stops dirtying the tree");
         CHECK(root.updateWorldMatrixChildren() == 0);
 
         // What it stopped short by is the whole cost of the tolerance.
@@ -517,11 +490,8 @@ namespace
         }
 
         root.setScale(LLVector3(2.f, 2.f, 2.f));
-        {
-            INFO("the same scale again dirties nothing");
-            CHECK(root.mDirtyFlags == 0);
-            CHECK(a.mDirtyFlags == 0);
-        }
+        CHECK(root.mDirtyFlags == 0);
+        CHECK(a.mDirtyFlags == 0);
 
         root.setScale(LLVector3(3.f, 2.f, 2.f));
         UNSCOPED_INFO("a different scale dirties the joint");
@@ -560,7 +530,6 @@ namespace
             child.setWorldRotation(wanted);
 
             const LLQuaternion got = child.getWorldRotation();
-            UNSCOPED_INFO("the world rotation asked for is the one that comes back");
             REQUIRE_THAT(fabsf(dot(got, wanted)), ll_test::WithinBits(1.f, 16));
         }
     }
@@ -590,7 +559,6 @@ namespace
 
         child.setWorldRotation(wanted);
 
-        UNSCOPED_INFO("the two routes agree on the local rotation");
         CHECK_THAT(fabsf(dot(child.getRotation(), through_the_matrix)), ll_test::WithinBits(1.f, 16));
     }
 
@@ -652,7 +620,6 @@ namespace
         const LLQuaternion got = child.getWorldRotation();
         for (S32 i = 0; i < 4; ++i)
         {
-            UNSCOPED_INFO("the world rotation comes back as it was asked for");
             REQUIRE_THAT(got.mQ[i], ll_test::WithinBits(wanted.mQ[i], 14));
         }
     }

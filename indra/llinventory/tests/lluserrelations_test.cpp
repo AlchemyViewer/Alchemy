@@ -41,13 +41,8 @@ namespace
     TEST_CASE_METHOD(user_relationship, "relationships: a default relationship grants nothing and is offline", "[relationships]")
     {
         // Test the default construction
-        UNSCOPED_INFO("No granted rights to");
-        CHECK_FALSE(mRelationship.isRightGrantedTo(
-                LLRelationship::GRANT_ONLINE_STATUS));
-        UNSCOPED_INFO("No granted rights from");
-        CHECK_FALSE(mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_ONLINE_STATUS));
-        UNSCOPED_INFO("No online status");
+        CHECK_FALSE(mRelationship.isRightGrantedTo(LLRelationship::GRANT_ONLINE_STATUS));
+        CHECK_FALSE(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
         CHECK_FALSE(mRelationship.isOnline());
     }
 
@@ -57,18 +52,10 @@ namespace
         mRelationship.grantRights(
             LLRelationship::GRANT_ONLINE_STATUS,
             LLRelationship::GRANT_MODIFY_OBJECTS);
-        UNSCOPED_INFO("Granted rights to has online");
-        CHECK(mRelationship.isRightGrantedTo(
-                LLRelationship::GRANT_ONLINE_STATUS));
-        UNSCOPED_INFO("Granted rights from does not have online");
-        CHECK_FALSE(mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_ONLINE_STATUS));
-        UNSCOPED_INFO("Granted rights to does not have modify");
-        CHECK_FALSE(mRelationship.isRightGrantedTo(
-                LLRelationship::GRANT_MODIFY_OBJECTS));
-        UNSCOPED_INFO("Granted rights from has modify");
-        CHECK(mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_MODIFY_OBJECTS));
+        CHECK(mRelationship.isRightGrantedTo(LLRelationship::GRANT_ONLINE_STATUS));
+        CHECK_FALSE(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
+        CHECK_FALSE(mRelationship.isRightGrantedTo(LLRelationship::GRANT_MODIFY_OBJECTS));
+        CHECK(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_MODIFY_OBJECTS));
     }
 
     TEST_CASE_METHOD(user_relationship, "relationships: revokeRights removes only the rights it names", "[relationships]")
@@ -78,55 +65,43 @@ namespace
             LLRelationship::GRANT_ONLINE_STATUS
             | LLRelationship::GRANT_MAP_LOCATION,
             LLRelationship::GRANT_ONLINE_STATUS);
-        UNSCOPED_INFO("Granted rights to has online and map");
         CHECK(mRelationship.isRightGrantedTo(
                 LLRelationship::GRANT_ONLINE_STATUS
                 | LLRelationship::GRANT_MAP_LOCATION));
-        UNSCOPED_INFO("Granted rights from has online");
-        CHECK(mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_ONLINE_STATUS));
+        CHECK(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
 
         mRelationship.revokeRights(
             LLRelationship::GRANT_MAP_LOCATION,
             LLRelationship::GRANT_NONE);
-        UNSCOPED_INFO("Granted rights revoked map");
+        UNSCOPED_INFO("map revoked");
         CHECK_FALSE(mRelationship.isRightGrantedTo(
                 LLRelationship::GRANT_ONLINE_STATUS
                 | LLRelationship::GRANT_MAP_LOCATION));
-        UNSCOPED_INFO("Granted rights revoked still has online");
-        CHECK(mRelationship.isRightGrantedTo(
-                LLRelationship::GRANT_ONLINE_STATUS));
+        UNSCOPED_INFO("online kept after revoking map");
+        CHECK(mRelationship.isRightGrantedTo(LLRelationship::GRANT_ONLINE_STATUS));
 
         mRelationship.grantRights(
             LLRelationship::GRANT_NONE,
             LLRelationship::GRANT_MODIFY_OBJECTS);
-        UNSCOPED_INFO("Granted rights from still has online");
-        CHECK(mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_ONLINE_STATUS));
-        UNSCOPED_INFO("Granted rights from has full grant");
+        UNSCOPED_INFO("online kept after granting modify");
+        CHECK(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
         CHECK(mRelationship.isRightGrantedFrom(
                 LLRelationship::GRANT_ONLINE_STATUS
                 | LLRelationship::GRANT_MODIFY_OBJECTS));
         mRelationship.revokeRights(
             LLRelationship::GRANT_NONE,
             LLRelationship::GRANT_MODIFY_OBJECTS);
-        UNSCOPED_INFO("Granted rights from still has online");
-        CHECK(mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_ONLINE_STATUS));
-        UNSCOPED_INFO("Granted rights from no longer modify");
-        CHECK_FALSE(mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_MODIFY_OBJECTS));
+        UNSCOPED_INFO("online kept after revoking modify");
+        CHECK(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
+        CHECK_FALSE(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_MODIFY_OBJECTS));
     }
 
     TEST_CASE_METHOD(user_relationship, "relationships: online sets the online status", "[relationships]")
     {
-        UNSCOPED_INFO("No online status");
         CHECK_FALSE(mRelationship.isOnline());
         mRelationship.online(true);
-        UNSCOPED_INFO("Online status");
         CHECK(mRelationship.isOnline());
         mRelationship.online(false);
-        UNSCOPED_INFO("No online status");
         CHECK_FALSE(mRelationship.isOnline());
     }
 

@@ -81,6 +81,7 @@ namespace
             continuous += dt;
             const QuantumStep q = LLMotionController::computeQuantumStep(continuous, step, 0);
             const F32 target = q.count * step;
+            CAPTURE(frame);
             UNSCOPED_INFO("target is ahead of real time");
             REQUIRE(target > continuous);
             UNSCOPED_INFO("target is no more than one quantum ahead");
@@ -102,9 +103,8 @@ namespace
         {
             continuous += FRAME;
             const QuantumStep q = LLMotionController::computeQuantumStep(continuous, QUANTUM, last_count);
-            UNSCOPED_INFO("interp is at least zero");
+            CAPTURE(frame);
             REQUIRE(q.interp >= 0.f);
-            UNSCOPED_INFO("interp is below one");
             REQUIRE(q.interp < 1.f);
             if (q.advanced)
             {
@@ -158,6 +158,7 @@ namespace
         {
             const F32 u = LLMotionController::quantumInterpolant(interp, last_interp);
             pose = lerp(pose, target, u);
+            CAPTURE(interp);
             UNSCOPED_INFO("the pose sits on the linear track");
             REQUIRE_THAT(pose, ll_test::WithinBits(target * interp, 16));
             last_interp = interp;
@@ -186,7 +187,6 @@ namespace
         // would move a little every frame. It lands on sixteenths, never
         // finer than one and never coarser than a quarter, and anything under
         // a sixteenth is not worth quantizing at all.
-        UNSCOPED_INFO("a quarter stays a quarter");
         CHECK(LLMotionController::quantizeTimeStep(0.25f) == 0.25f);
         UNSCOPED_INFO("more than a quarter is capped");
         CHECK(LLMotionController::quantizeTimeStep(0.4f) == 0.25f);
@@ -196,9 +196,7 @@ namespace
         CHECK(LLMotionController::quantizeTimeStep(0.124f) == 0.0625f);
         UNSCOPED_INFO("a twentieth is too fine to bother with");
         CHECK(LLMotionController::quantizeTimeStep(0.05f) == 0.f);
-        UNSCOPED_INFO("nothing asked for is nothing");
         CHECK(LLMotionController::quantizeTimeStep(0.f) == 0.f);
-        UNSCOPED_INFO("a negative request is nothing");
         CHECK(LLMotionController::quantizeTimeStep(-1.f) == 0.f);
 
         // Every rung is exact in binary, so a clock stepping by one is exact.

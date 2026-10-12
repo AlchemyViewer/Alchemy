@@ -175,7 +175,7 @@ namespace
         LLVolumeParams params;
 
         // Make sure volume starts off null
-        REQUIRE(primitive.getVolume() == NULL);
+        CHECK(primitive.getVolume() == NULL);
 
         // Make sure we have no texture entries before setting the volume
         CHECK(primitive.getNumTEs() == 0);
@@ -184,7 +184,7 @@ namespace
         CHECK_FALSE(primitive.isChanged(LLXform::GEOMETRY));
 
         // Make sure setVolume returns true
-        REQUIRE(primitive.setVolume(params, 0, true));
+        CHECK(primitive.setVolume(params, 0, true));
         LLVolume* new_volume = primitive.getVolume();
 
         // make sure new volume was actually created
@@ -218,7 +218,7 @@ namespace
         LLVolumeParams params;
 
         // Make sure volume starts off null
-        REQUIRE(primitive.getVolume() == NULL);
+        CHECK(primitive.getVolume() == NULL);
 
         // Make sure we have no texture entries before setting the volume
         CHECK(primitive.getNumTEs() == 0);
@@ -227,7 +227,7 @@ namespace
         CHECK_FALSE(primitive.isChanged(LLXform::GEOMETRY));
 
         // Make sure setVolume returns true
-        REQUIRE(primitive.setVolume(params, 0, false));
+        CHECK(primitive.setVolume(params, 0, false));
 
         LLVolume* new_volume = primitive.getVolume();
 

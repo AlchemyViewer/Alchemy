@@ -33,7 +33,7 @@
 #include "../llcommon/lltimer.h"
 // for lltrace class
 #include "../llcommon/lltrace.h"
-// Tut header
+// Catch2 header
 #include <catch2/catch_test_macros.hpp>
 
 // -------------------------------------------------------------------------------------------
@@ -95,7 +95,7 @@ const std::string& LLImage::getLastThreadError() { static std::string msg; retur
 // -------------------------------------------------------------------------------------------
 
 // -------------------------------------------------------------------------------------------
-// TUT
+// Tests
 // -------------------------------------------------------------------------------------------
 
 namespace
@@ -164,13 +164,11 @@ namespace
     {
         // Test a *threaded* instance of the class
         mThread = new LLImageDecodeThread(true);
-        UNSCOPED_INFO("LLImageDecodeThread: threaded constructor failed");
         REQUIRE(mThread != NULL);
         // Insert something in the queue
         bool done = false;
         LLImageDecodeThread::handle_t decodeHandle = mThread->decodeImage(NULL, 0, false, new responder_test(&done));
         // Verifies we get back a valid handle
-        UNSCOPED_INFO("LLImageDecodeThread:  threaded decodeImage(), returned handle is null");
         CHECK(decodeHandle != 0);
         // Wait till the thread has time to handle the work order (though it doesn't do much per work order...)
         const U32 INCREMENT_TIME = 500;             // 500 milliseconds
@@ -182,7 +180,6 @@ namespace
             total_time += INCREMENT_TIME;
         }
         // Verifies that the responder has now been called
-        UNSCOPED_INFO("LLImageDecodeThread: threaded work unit not processed");
         CHECK(done);
     }
 }

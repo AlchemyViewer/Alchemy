@@ -75,7 +75,6 @@ namespace
     {
         std::vector<char> buffer(gesture.getMaxSerialSize() + 1, '\0');
         LLDataPackerAsciiBuffer dp(buffer.data(), (S32)buffer.size());
-        UNSCOPED_INFO("the gesture serializes");
         REQUIRE(gesture.serialize(dp));
         buffer.resize(dp.getCurrentSize());
         buffer.back() = '\0';
@@ -87,7 +86,6 @@ namespace
     {
         std::vector<char> buffer(step.getMaxSerialSize() + 1, '\0');
         LLDataPackerAsciiBuffer dp(buffer.data(), (S32)buffer.size());
-        UNSCOPED_INFO("the step serializes");
         REQUIRE(step.serialize(dp));
         buffer.resize(dp.getCurrentSize());
         buffer.back() = '\0';
@@ -133,26 +131,18 @@ namespace
 
         LLMultiGesture read;
         LLDataPackerAsciiBuffer dp(bytes.data(), (S32)bytes.size());
-        UNSCOPED_INFO("a gesture it wrote is accepted");
         REQUIRE(read.deserialize(dp));
 
-        UNSCOPED_INFO("key");
         CHECK(read.mKey == written->mKey);
-        UNSCOPED_INFO("mask");
         CHECK(read.mMask == written->mMask);
-        UNSCOPED_INFO("trigger");
         CHECK(read.mTrigger == written->mTrigger);
-        UNSCOPED_INFO("replace text");
         CHECK(read.mReplaceText == written->mReplaceText);
-        UNSCOPED_INFO("step count");
         REQUIRE(read.mSteps.size() == written->mSteps.size());
 
-        UNSCOPED_INFO("the animation step came back");
         CHECK(static_cast<LLGestureStepAnimation*>(read.mSteps[0])->mAnimName ==
-                      std::string("express_wave"));
-        UNSCOPED_INFO("the chat step came back");
+              std::string("express_wave"));
         CHECK(static_cast<LLGestureStepChat*>(read.mSteps[2])->mChatText ==
-                      std::string("hello"));
+              std::string("hello"));
     }
 
     TEST_CASE("LLMultiGesture: a gesture cut short anywhere is refused", "[LLMultiGesture]")
@@ -174,7 +164,6 @@ namespace
 
             LLMultiGesture read;
             LLDataPackerAsciiBuffer dp(truncated.data(), (S32)truncated.size());
-            UNSCOPED_INFO("a gesture cut short is refused");
             REQUIRE_FALSE(read.deserialize(dp));
         }
     }
@@ -199,10 +188,9 @@ namespace
 
         LLMultiGesture read;
         LLDataPackerAsciiBuffer dp(bytes.data(), (S32)bytes.size());
-        UNSCOPED_INFO("a step count with no steps behind it is refused");
-        REQUIRE_FALSE(read.deserialize(dp));
+        CHECK_FALSE(read.deserialize(dp));
         UNSCOPED_INFO("and nothing was built from it");
-        REQUIRE(read.mSteps.empty());
+        CHECK(read.mSteps.empty());
     }
 
     TEST_CASE("LLMultiGesture: a step count past one real step is refused", "[LLMultiGesture]")
@@ -228,10 +216,9 @@ namespace
 
         LLMultiGesture read;
         LLDataPackerAsciiBuffer dp(bytes.data(), (S32)bytes.size());
-        UNSCOPED_INFO("still refused");
-        REQUIRE_FALSE(read.deserialize(dp));
+        CHECK_FALSE(read.deserialize(dp));
         UNSCOPED_INFO("and stopped at the one step the body actually held");
-        REQUIRE(read.mSteps.size() <= 1u);
+        CHECK(read.mSteps.size() <= 1u);
     }
 
     TEST_CASE("LLMultiGesture: each step reads back and refuses a missing last field", "[LLMultiGesture]")
@@ -250,9 +237,7 @@ namespace
             LLGestureStepAnimation whole;
             UNSCOPED_INFO("the animation step reads back");
             CHECK(step_accepts(whole, bytes));
-            UNSCOPED_INFO("with its name");
             CHECK(whole.mAnimName == full.mAnimName);
-            UNSCOPED_INFO("and its flags");
             CHECK(whole.mFlags == full.mFlags);
 
             LLGestureStepAnimation cut;
@@ -269,7 +254,6 @@ namespace
             LLGestureStepSound whole;
             UNSCOPED_INFO("the sound step reads back");
             CHECK(step_accepts(whole, bytes));
-            UNSCOPED_INFO("with its name");
             CHECK(whole.mSoundName == full.mSoundName);
 
             LLGestureStepSound cut;
@@ -285,9 +269,7 @@ namespace
             LLGestureStepChat whole;
             UNSCOPED_INFO("the chat step reads back");
             CHECK(step_accepts(whole, bytes));
-            UNSCOPED_INFO("with its text");
             CHECK(whole.mChatText == full.mChatText);
-            UNSCOPED_INFO("and its flags");
             CHECK(whole.mFlags == full.mFlags);
 
             LLGestureStepChat cut;
@@ -303,7 +285,6 @@ namespace
             LLGestureStepWait whole;
             UNSCOPED_INFO("the wait step reads back");
             CHECK(step_accepts(whole, bytes));
-            UNSCOPED_INFO("with its flags");
             CHECK(whole.mFlags == full.mFlags);
 
             LLGestureStepWait cut;
@@ -368,8 +349,8 @@ namespace
         LLMultiGesture read;
         LLDataPackerAsciiBuffer dp(fewer.data(), (S32)fewer.size());
         UNSCOPED_INFO("a gesture that claims fewer steps than it holds is taken");
-        REQUIRE(read.deserialize(dp));
+        CHECK(read.deserialize(dp));
         UNSCOPED_INFO("with the number it claimed");
-        REQUIRE(read.mSteps.size() == 2u);
+        CHECK(read.mSteps.size() == 2u);
     }
 }

@@ -169,14 +169,14 @@ struct LLDir_Dummy: public LLDir
     }
 
     void clear_checked() { mChecked.clear(); }
-    void ensure_checked(const std::string& pathname) const
+    void require_checked(const std::string& pathname) const
     {
-        UNSCOPED_INFO((STRINGIZE(pathname << " was not checked but should have been")));
+        INFO(pathname << " was not checked but should have been");
         REQUIRE(mChecked.find(pathname) != mChecked.end());
     }
-    void ensure_not_checked(const std::string& pathname) const
+    void require_not_checked(const std::string& pathname) const
     {
-        UNSCOPED_INFO((STRINGIZE(pathname << " was checked but should not have been")));
+        INFO(pathname << " was checked but should not have been");
         REQUIRE(mChecked.find(pathname) == mChecked.end());
     }
 
@@ -273,24 +273,14 @@ namespace
 }
 #endif // LL_LINUX
 
-namespace tut
-{
 namespace
 {
-    struct LLDirTest
-        {
-        };
-}
-
-    TEST_CASE_METHOD(LLDirTest, "LLDir: getDirDelimiter is not empty", "[LLDir]")
-        // getDirDelimiter
+    TEST_CASE("LLDir: getDirDelimiter is not empty", "[LLDir]")
     {
-        UNSCOPED_INFO("getDirDelimiter");
-        REQUIRE_FALSE(gDirUtilp->getDirDelimiter().empty());
+        CHECK_FALSE(gDirUtilp->getDirDelimiter().empty());
     }
 
-    TEST_CASE_METHOD(LLDirTest, "LLDir: getBaseFileName with and without stripping the extension", "[LLDir]")
-        // getBaseFileName
+    TEST_CASE("LLDir: getBaseFileName with and without stripping the extension", "[LLDir]")
     {
         std::string delim = gDirUtilp->getDirDelimiter();
         std::string rawFile = "foo";
@@ -304,93 +294,38 @@ namespace
         std::string dottedPathExt = dottedPathNoExt + ".eXt";
 
         // foo[.bAr]
-
-        UNSCOPED_INFO("getBaseFileName/r-no-ext/no-strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(rawFile, false) ==
-                  "foo");
-
-        UNSCOPED_INFO("getBaseFileName/r-no-ext/strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(rawFile, true) ==
-                  "foo");
-
-        UNSCOPED_INFO("getBaseFileName/r-ext/no-strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(rawFileExt, false) ==
-                  "foo.bAr");
-
-        UNSCOPED_INFO("getBaseFileName/r-ext/strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(rawFileExt, true) ==
-                  "foo");
+        CHECK(gDirUtilp->getBaseFileName(rawFile, false) == "foo");
+        CHECK(gDirUtilp->getBaseFileName(rawFile, true) == "foo");
+        CHECK(gDirUtilp->getBaseFileName(rawFileExt, false) == "foo.bAr");
+        CHECK(gDirUtilp->getBaseFileName(rawFileExt, true) == "foo");
 
         // foo.
-
-        UNSCOPED_INFO("getBaseFileName/rn-no-ext/no-strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(rawFileNullExt, false) ==
-                  "foo.");
-
-        UNSCOPED_INFO("getBaseFileName/rn-no-ext/strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(rawFileNullExt, true) ==
-                  "foo");
+        CHECK(gDirUtilp->getBaseFileName(rawFileNullExt, false) == "foo.");
+        CHECK(gDirUtilp->getBaseFileName(rawFileNullExt, true) == "foo");
 
         // .bAr
         // interesting case - with no basename, this IS the basename, not the extension.
-
-        UNSCOPED_INFO("getBaseFileName/e-ext/no-strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(rawExt, false) ==
-                  ".bAr");
-
-        UNSCOPED_INFO("getBaseFileName/e-ext/strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(rawExt, true) ==
-                  ".bAr");
+        CHECK(gDirUtilp->getBaseFileName(rawExt, false) == ".bAr");
+        CHECK(gDirUtilp->getBaseFileName(rawExt, true) == ".bAr");
 
         // .
-
-        UNSCOPED_INFO("getBaseFileName/d/no-strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(rawDot, false) ==
-                  ".");
-
-        UNSCOPED_INFO("getBaseFileName/d/strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(rawDot, true) ==
-                  ".");
+        CHECK(gDirUtilp->getBaseFileName(rawDot, false) == ".");
+        CHECK(gDirUtilp->getBaseFileName(rawDot, true) == ".");
 
         // aa/bb/cc/dd/ee[.eXt]
-
-        UNSCOPED_INFO("getBaseFileName/no-ext/no-strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(pathNoExt, false) ==
-                  "ee");
-
-        UNSCOPED_INFO("getBaseFileName/no-ext/strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(pathNoExt, true) ==
-                  "ee");
-
-        UNSCOPED_INFO("getBaseFileName/ext/no-strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(pathExt, false) ==
-                  "ee.eXt");
-
-        UNSCOPED_INFO("getBaseFileName/ext/strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(pathExt, true) ==
-                  "ee");
+        CHECK(gDirUtilp->getBaseFileName(pathNoExt, false) == "ee");
+        CHECK(gDirUtilp->getBaseFileName(pathNoExt, true) == "ee");
+        CHECK(gDirUtilp->getBaseFileName(pathExt, false) == "ee.eXt");
+        CHECK(gDirUtilp->getBaseFileName(pathExt, true) == "ee");
 
         // aa/bb/cc.dd/ee[.eXt]
-
-        UNSCOPED_INFO("getBaseFileName/d-no-ext/no-strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(dottedPathNoExt, false) ==
-                  "ee");
-
-        UNSCOPED_INFO("getBaseFileName/d-no-ext/strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(dottedPathNoExt, true) ==
-                  "ee");
-
-        UNSCOPED_INFO("getBaseFileName/d-ext/no-strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(dottedPathExt, false) ==
-                  "ee.eXt");
-
-        UNSCOPED_INFO("getBaseFileName/d-ext/strip-exten");
-        CHECK(gDirUtilp->getBaseFileName(dottedPathExt, true) ==
-                  "ee");
+        CHECK(gDirUtilp->getBaseFileName(dottedPathNoExt, false) == "ee");
+        CHECK(gDirUtilp->getBaseFileName(dottedPathNoExt, true) == "ee");
+        CHECK(gDirUtilp->getBaseFileName(dottedPathExt, false) == "ee.eXt");
+        CHECK(gDirUtilp->getBaseFileName(dottedPathExt, true) == "ee");
     }
 
-    TEST_CASE_METHOD(LLDirTest, "LLDir: getDirName drops the last path component", "[LLDir]")
-        // getDirName
+    TEST_CASE("LLDir: getDirName drops the last path component", "[LLDir]")
     {
         std::string delim = gDirUtilp->getDirDelimiter();
         std::string rawFile = "foo";
@@ -401,38 +336,19 @@ namespace
         std::string dottedPathExt = dottedPathNoExt + ".eXt";
 
         // foo[.bAr]
-
-        UNSCOPED_INFO("getDirName/r-no-ext");
-        CHECK(gDirUtilp->getDirName(rawFile) ==
-                  "");
-
-        UNSCOPED_INFO("getDirName/r-ext");
-        CHECK(gDirUtilp->getDirName(rawFileExt) ==
-                  "");
+        CHECK(gDirUtilp->getDirName(rawFile) == "");
+        CHECK(gDirUtilp->getDirName(rawFileExt) == "");
 
         // aa/bb/cc/dd/ee[.eXt]
-
-        UNSCOPED_INFO("getDirName/no-ext");
-        CHECK(gDirUtilp->getDirName(pathNoExt) ==
-                  "aa" + delim + "bb" + delim + "cc" + delim + "dd");
-
-        UNSCOPED_INFO("getDirName/ext");
-        CHECK(gDirUtilp->getDirName(pathExt) ==
-                  "aa" + delim + "bb" + delim + "cc" + delim + "dd");
+        CHECK(gDirUtilp->getDirName(pathNoExt) == "aa" + delim + "bb" + delim + "cc" + delim + "dd");
+        CHECK(gDirUtilp->getDirName(pathExt) == "aa" + delim + "bb" + delim + "cc" + delim + "dd");
 
         // aa/bb/cc.dd/ee[.eXt]
-
-        UNSCOPED_INFO("getDirName/d-no-ext");
-        CHECK(gDirUtilp->getDirName(dottedPathNoExt) ==
-                  "aa" + delim + "bb" + delim + "cc.dd");
-
-        UNSCOPED_INFO("getDirName/d-ext");
-        CHECK(gDirUtilp->getDirName(dottedPathExt) ==
-                  "aa" + delim + "bb" + delim + "cc.dd");
+        CHECK(gDirUtilp->getDirName(dottedPathNoExt) == "aa" + delim + "bb" + delim + "cc.dd");
+        CHECK(gDirUtilp->getDirName(dottedPathExt) == "aa" + delim + "bb" + delim + "cc.dd");
     }
 
-    TEST_CASE_METHOD(LLDirTest, "LLDir: getExtension is the lower-cased extension of the basename", "[LLDir]")
-        // getExtension
+    TEST_CASE("LLDir: getExtension is the lower-cased extension of the basename", "[LLDir]")
     {
         std::string delim = gDirUtilp->getDirDelimiter();
         std::string rawFile = "foo";
@@ -446,67 +362,37 @@ namespace
         std::string dottedPathExt = dottedPathNoExt + ".eXt";
 
         // foo[.bAr]
-
-        UNSCOPED_INFO("getExtension/r-no-ext");
-        CHECK(gDirUtilp->getExtension(rawFile) ==
-                  "");
-
-        UNSCOPED_INFO("getExtension/r-ext");
-        CHECK(gDirUtilp->getExtension(rawFileExt) ==
-                  "bar");
+        CHECK(gDirUtilp->getExtension(rawFile) == "");
+        CHECK(gDirUtilp->getExtension(rawFileExt) == "bar");
 
         // foo.
-
-        UNSCOPED_INFO("getExtension/rn-no-ext");
-        CHECK(gDirUtilp->getExtension(rawFileNullExt) ==
-                  "");
+        CHECK(gDirUtilp->getExtension(rawFileNullExt) == "");
 
         // .bAr
         // interesting case - with no basename, this IS the basename, not the extension.
-
-        UNSCOPED_INFO("getExtension/e-ext");
-        CHECK(gDirUtilp->getExtension(rawExt) ==
-                  "");
+        CHECK(gDirUtilp->getExtension(rawExt) == "");
 
         // .
-
-        UNSCOPED_INFO("getExtension/d");
-        CHECK(gDirUtilp->getExtension(rawDot) ==
-                  "");
+        CHECK(gDirUtilp->getExtension(rawDot) == "");
 
         // aa/bb/cc/dd/ee[.eXt]
-
-        UNSCOPED_INFO("getExtension/no-ext");
-        CHECK(gDirUtilp->getExtension(pathNoExt) ==
-                  "");
-
-        UNSCOPED_INFO("getExtension/ext");
-        CHECK(gDirUtilp->getExtension(pathExt) ==
-                  "ext");
+        CHECK(gDirUtilp->getExtension(pathNoExt) == "");
+        CHECK(gDirUtilp->getExtension(pathExt) == "ext");
 
         // aa/bb/cc.dd/ee[.eXt]
-
-        UNSCOPED_INFO("getExtension/d-no-ext");
-        CHECK(gDirUtilp->getExtension(dottedPathNoExt) ==
-                  "");
-
-        UNSCOPED_INFO("getExtension/d-ext");
-        CHECK(gDirUtilp->getExtension(dottedPathExt) ==
-                  "ext");
+        CHECK(gDirUtilp->getExtension(dottedPathNoExt) == "");
+        CHECK(gDirUtilp->getExtension(dottedPathExt) == "ext");
     }
 
-namespace
-{
    std::string makeTestFile( const std::string& dir, const std::string& file )
    {
       std::string path = dir + file;
       LLFILE* handle = LLFile::fopen(path, LLFILE_MODE("w"));
-      UNSCOPED_INFO("failed to open test file '"+path+"'");
+      CAPTURE(path);
       REQUIRE(handle != NULL);
       // Harbison & Steele, 4th ed., p. 366: "If an error occurs, fputs
       // returns EOF; otherwise, it returns some other, nonnegative value."
-      UNSCOPED_INFO("failed to write to test file '"+path+"'");
-      REQUIRE(EOF != fputs("test file", handle));
+      REQUIRE(fputs("test file", handle) != EOF);
       fclose(handle);
       return path;
    }
@@ -528,8 +414,9 @@ namespace
 
    static const char* DirScanFilename[5] = { "file1.abc", "file2.abc", "file1.xyz", "file2.xyz", "file1.mno" };
 
-   void scanTest(const std::string& directory, const std::string& pattern, bool correctResult[5])
+   void require_scan_returns(const std::string& directory, const std::string& pattern, bool correctResult[5])
    {
+      CAPTURE(directory, pattern);
 
       // Scan directory and see if any file1.* files are found
       std::string scanResult;
@@ -549,33 +436,30 @@ namespace
          // check is now either 5 (not found) or the index of the matching name
          if (check < 5)
          {
-            UNSCOPED_INFO("found file '"+(std::string)DirScanFilename[check]+"' twice");
+            UNSCOPED_INFO("found file '" << DirScanFilename[check] << "' twice");
             REQUIRE_FALSE(filesFound[check]);
             filesFound[check] = true;
          }
          else // check is 5 - should not happen
          {
-            FAIL("found unknown file '"+scanResult+"'");
+            FAIL("found unknown file '" << scanResult << "'");
          }
       }
       for (int i=0; i<5; i++)
       {
+         CAPTURE(DirScanFilename[i]);
          if (correctResult[i])
          {
-            UNSCOPED_INFO("scan of '"+directory+"' using '"+pattern+"' did not return '"+DirScanFilename[i]+"'");
             REQUIRE(filesFound[i]);
          }
          else
          {
-            UNSCOPED_INFO("scan of '"+directory+"' using '"+pattern+"' incorrectly returned '"+DirScanFilename[i]+"'");
             REQUIRE_FALSE(filesFound[i]);
          }
       }
    }
-}
 
-   TEST_CASE_METHOD(LLDirTest, "LLDir: LLDirIterator::next matches glob patterns", "[LLDir]")
-      // LLDirIterator::next
+   TEST_CASE("LLDir: LLDirIterator::next matches glob patterns", "[LLDir]")
    {
       std::string delim = gDirUtilp->getDirDelimiter();
       std::string dirTemp = LLFile::tmpdir();
@@ -595,61 +479,61 @@ namespace
 
       // Scan dir1 and see if each of the 5 files is found exactly once
       bool expected1[5] = { true, true, true, true, true };
-      scanTest(dir1, "*", expected1);
+      require_scan_returns(dir1, "*", expected1);
 
       // Scan dir2 and see if only the 2 *.xyz files are found
       bool  expected2[5] = { false, false, true, true, false };
-      scanTest(dir1, "*.xyz", expected2);
+      require_scan_returns(dir1, "*.xyz", expected2);
 
       // Scan dir2 and see if only the 1 *.mno file is found
       bool  expected3[5] = { false, false, false, false, true };
-      scanTest(dir2, "*.mno", expected3);
+      require_scan_returns(dir2, "*.mno", expected3);
 
       // Scan dir1 and see if any *.foo files are found
       bool  expected4[5] = { false, false, false, false, false };
-      scanTest(dir1, "*.foo", expected4);
+      require_scan_returns(dir1, "*.foo", expected4);
 
       // Scan dir1 and see if any file1.* files are found
       bool  expected5[5] = { true, false, true, false, true };
-      scanTest(dir1, "file1.*", expected5);
+      require_scan_returns(dir1, "file1.*", expected5);
 
       // Scan dir1 and see if any file1.* files are found
       bool  expected6[5] = { true, true, false, false, false };
-      scanTest(dir1, "file?.abc", expected6);
+      require_scan_returns(dir1, "file?.abc", expected6);
 
       // Scan dir2 and see if any file?.x?z files are found
       bool  expected7[5] = { false, false, true, true, false };
-      scanTest(dir2, "file?.x?z", expected7);
+      require_scan_returns(dir2, "file?.x?z", expected7);
 
       // Scan dir2 and see if any file?.??c files are found
       bool  expected8[5] = { true, true, false, false, false };
-      scanTest(dir2, "file?.??c", expected8);
-      scanTest(dir2, "*.??c", expected8);
+      require_scan_returns(dir2, "file?.??c", expected8);
+      require_scan_returns(dir2, "*.??c", expected8);
 
       // Scan dir1 and see if any *.?n? files are found
       bool  expected9[5] = { false, false, false, false, true };
-      scanTest(dir1, "*.?n?", expected9);
+      require_scan_returns(dir1, "*.?n?", expected9);
 
       // Scan dir1 and see if any *.???? files are found
       bool  expected10[5] = { false, false, false, false, false };
-      scanTest(dir1, "*.????", expected10);
+      require_scan_returns(dir1, "*.????", expected10);
 
       // Scan dir1 and see if any ?????.* files are found
       bool  expected11[5] = { true, true, true, true, true };
-      scanTest(dir1, "?????.*", expected11);
+      require_scan_returns(dir1, "?????.*", expected11);
 
       // Scan dir1 and see if any ??l??.xyz files are found
       bool  expected12[5] = { false, false, true, true, false };
-      scanTest(dir1, "??l??.xyz", expected12);
+      require_scan_returns(dir1, "??l??.xyz", expected12);
 
       bool expected13[5] = { true, false, true, false, false };
-      scanTest(dir1, "file1.{abc,xyz}", expected13);
+      require_scan_returns(dir1, "file1.{abc,xyz}", expected13);
 
       bool expected14[5] = { true, true, false, false, false };
-      scanTest(dir1, "file[0-9].abc", expected14);
+      require_scan_returns(dir1, "file[0-9].abc", expected14);
 
       bool expected15[5] = { true, true, false, false, false };
-      scanTest(dir1, "file[!a-z].abc", expected15);
+      require_scan_returns(dir1, "file[!a-z].abc", expected15);
 
       // clean up all test files and directories
       for (int i=0; i<5; i++)
@@ -661,7 +545,7 @@ namespace
       LLFile::remove(dir2);
    }
 
-    TEST_CASE_METHOD(LLDirTest, "LLDir: findSkinnedFilenames searches skins and languages and caches probes", "[LLDir]")
+    TEST_CASE("LLDir: findSkinnedFilenames searches skins and languages and caches probes", "[LLDir]")
     {
         LLDir_Dummy lldir;
         /*------------------------ "default", "en" -------------------------*/
@@ -677,42 +561,42 @@ namespace
                       StringVec{ "install/skins/default/colors.xml", "user/skins/default/colors.xml" });
         // We should not have needed to check for skins/default/en. We should
         // just "know" that SKINBASE is not localized.
-        lldir.ensure_not_checked("install/skins/default/en");
+        lldir.require_not_checked("install/skins/default/en");
 
         CHECK(lldir.findSkinnedFilenames(LLDir::TEXTURES, "only_default.jpeg") ==
                       StringVec{ "install/skins/default/textures/only_default.jpeg" });
         // Nor should we have needed to check skins/default/textures/en
         // because textures is known not to be localized.
-        lldir.ensure_not_checked("install/skins/default/textures/en");
+        lldir.require_not_checked("install/skins/default/textures/en");
 
         StringVec expected(StringVec{ "install/skins/default/xui/en/strings.xml", "user/skins/default/xui/en/strings.xml" });
         CHECK(lldir.findSkinnedFilenames(LLDir::XUI, "strings.xml", LLDir::ALL_SKINS) ==
                       expected);
         // The first time, we had to probe to find out whether xui was localized.
-        lldir.ensure_checked("install/skins/default/xui/en");
+        lldir.require_checked("install/skins/default/xui/en");
         lldir.clear_checked();
         // Now make the same call again -- should return same result --
         CHECK(lldir.findSkinnedFilenames(LLDir::XUI, "strings.xml", LLDir::ALL_SKINS) ==
                       expected);
         // but this time it should remember that xui is localized.
-        lldir.ensure_not_checked("install/skins/default/xui/en");
+        lldir.require_not_checked("install/skins/default/xui/en");
 
         // localized subdir with "en-us" instead of "en"
         CHECK(lldir.findSkinnedFilenames("html", "welcome.html") == StringVec{ "install/skins/default/html/en-us/welcome.html" });
-        lldir.ensure_checked("install/skins/default/html/en");
-        lldir.ensure_checked("install/skins/default/html/en-us");
+        lldir.require_checked("install/skins/default/html/en");
+        lldir.require_checked("install/skins/default/html/en-us");
         lldir.clear_checked();
         CHECK(lldir.findSkinnedFilenames("html", "welcome.html") == StringVec{ "install/skins/default/html/en-us/welcome.html" });
-        lldir.ensure_not_checked("install/skins/default/html/en");
-        lldir.ensure_not_checked("install/skins/default/html/en-us");
+        lldir.require_not_checked("install/skins/default/html/en");
+        lldir.require_not_checked("install/skins/default/html/en-us");
 
         CHECK(lldir.findSkinnedFilenames("future", "somefile.txt") == StringVec{ "install/skins/default/future/somefile.txt" });
         // Test probing for an unrecognized unlocalized future subdir.
-        lldir.ensure_checked("install/skins/default/future/en");
+        lldir.require_checked("install/skins/default/future/en");
         lldir.clear_checked();
         CHECK(lldir.findSkinnedFilenames("future", "somefile.txt") == StringVec{ "install/skins/default/future/somefile.txt" });
         // Second time it should remember that future is unlocalized.
-        lldir.ensure_not_checked("install/skins/default/future/en");
+        lldir.require_not_checked("install/skins/default/future/en");
 
         // When language is set to "en", requesting an html file pulls up the
         // "en-us" version -- not because it magically matches those strings,
@@ -801,47 +685,33 @@ namespace
                                  "user/skins/steam/xui/en/strings.xml", "user/skins/steam/xui/fr/strings.xml" });
     }
 
-    TEST_CASE_METHOD(LLDirTest, "LLDir: add joins with a single slash and skips an empty part", "[LLDir]")
+    TEST_CASE("LLDir: add joins with a single slash and skips an empty part", "[LLDir]")
     {
         LLDir_Dummy lldir;
-        UNSCOPED_INFO("both empty");
         CHECK(lldir.add("", "") == "");
-        UNSCOPED_INFO("path empty");
         CHECK(lldir.add("", "b") == "b");
-        UNSCOPED_INFO("name empty");
         CHECK(lldir.add("a", "") == "a");
-        UNSCOPED_INFO("both simple");
         CHECK(lldir.add("a", "b") == "a/b");
-        UNSCOPED_INFO("name leading slash");
         CHECK(lldir.add("a", "/b") == "a/b");
-        UNSCOPED_INFO("path trailing slash");
         CHECK(lldir.add("a/", "b") == "a/b");
-        UNSCOPED_INFO("both bring slashes");
         CHECK(lldir.add("a/", "/b") == "a/b");
     }
 
-    TEST_CASE_METHOD(LLDirTest, "LLDir: relocateLegacyPath maps a moved legacy profile into its new dirs", "[LLDir]")
+    TEST_CASE("LLDir: relocateLegacyPath maps a moved legacy profile into its new dirs", "[LLDir]")
     {
         LLDir_Relocated lldir;
-        UNSCOPED_INFO("root");
         CHECK(lldir.relocateLegacyPath("old") == "user");
-        UNSCOPED_INFO("root slash");
         CHECK(lldir.relocateLegacyPath("old/") == "user");
-        UNSCOPED_INFO("account");
         CHECK(lldir.relocateLegacyPath("old/bob_resident") == "user/bob_resident");
-        UNSCOPED_INFO("settings");
         CHECK(lldir.relocateLegacyPath("old/user_settings/settings.xml") == "cfg/settings.xml");
-        UNSCOPED_INFO("logs");
         CHECK(lldir.relocateLegacyPath("old/logs") == "state");
-        UNSCOPED_INFO("cache");
         CHECK(lldir.relocateLegacyPath("old/cache/texturecache") == "cachedir/texturecache");
-        UNSCOPED_INFO("sibling");
+        UNSCOPED_INFO("a sibling sharing the root's prefix");
         CHECK(lldir.relocateLegacyPath("oldish/x") == "oldish/x");
-        UNSCOPED_INFO("elsewhere");
         CHECK(lldir.relocateLegacyPath("chat/logs") == "chat/logs");
 
         lldir.buildFilesystem("old/bob_resident");
-        UNSCOPED_INFO("still there");
+        UNSCOPED_INFO("a path still in the legacy root stays");
         CHECK(lldir.relocateLegacyPath("old/bob_resident") == "old/bob_resident");
 
         LLDir_Dummy unmoved;
@@ -850,17 +720,13 @@ namespace
     }
 
 #if LL_LINUX
-    TEST_CASE_METHOD(LLDirTest, "LLDir: LLDirXDG::layout uses only absolute XDG variables and legacyLayout the old dirs", "[LLDir]")
+    TEST_CASE("LLDir: LLDirXDG::layout uses only absolute XDG variables and legacyLayout the old dirs", "[LLDir]")
     {
         ScratchHome scratch;
         LLDirXDG::Layout dirs = LLDirXDG::layout("/h", "app");
-        UNSCOPED_INFO("data default");
         CHECK(dirs.data == "/h/.local/share/app");
-        UNSCOPED_INFO("config default");
         CHECK(dirs.config == "/h/.config/app");
-        UNSCOPED_INFO("cache default");
         CHECK(dirs.cache == "/h/.cache/app");
-        UNSCOPED_INFO("state default");
         CHECK(dirs.state == "/h/.local/state/app");
 
         ::setenv("XDG_DATA_HOME", "/d", 1);
@@ -868,70 +734,51 @@ namespace
         ::setenv("XDG_CACHE_HOME", "", 1);
         ::setenv("XDG_STATE_HOME", "/s", 1);
         dirs = LLDirXDG::layout("/h", "app");
-        UNSCOPED_INFO("data set");
         CHECK(dirs.data == "/d/app");
-        UNSCOPED_INFO("config relative ignored");
+        UNSCOPED_INFO("a relative XDG_CONFIG_HOME is ignored");
         CHECK(dirs.config == "/h/.config/app");
-        UNSCOPED_INFO("cache empty ignored");
+        UNSCOPED_INFO("an empty XDG_CACHE_HOME is ignored");
         CHECK(dirs.cache == "/h/.cache/app");
-        UNSCOPED_INFO("state set");
         CHECK(dirs.state == "/s/app");
 
         dirs = LLDirXDG::legacyLayout("/h/.app");
-        UNSCOPED_INFO("legacy data");
         CHECK(dirs.data == "/h/.app");
-        UNSCOPED_INFO("legacy config");
         CHECK(dirs.config == "/h/.app/user_settings");
-        UNSCOPED_INFO("legacy cache");
         CHECK(dirs.cache == "/h/.app/cache");
-        UNSCOPED_INFO("legacy state");
         CHECK(dirs.state == "/h/.app/logs");
     }
 
-    TEST_CASE_METHOD(LLDirTest, "LLDir: LLDirXDG::migrate moves a legacy profile into the XDG dirs", "[LLDir]")
+    TEST_CASE("LLDir: LLDirXDG::migrate moves a legacy profile into the XDG dirs", "[LLDir]")
     {
         ScratchHome scratch;
         std::vector<std::string> notes;
         const LLDirXDG::Layout dirs = LLDirXDG::layout(scratch.home, "app");
 
-        UNSCOPED_INFO("no legacy profile");
-        REQUIRE((LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::NONE));
-        UNSCOPED_INFO("nothing made for no profile");
-        REQUIRE(!scratch.exists(".local"));
+        CHECK(LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::NONE);
+        CHECK_FALSE(scratch.exists(".local"));
 
         scratch.writeLegacyProfile();
-        UNSCOPED_INFO("moved");
-        REQUIRE((LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::MOVED));
-        UNSCOPED_INFO("legacy root gone");
-        REQUIRE(!scratch.exists(".app"));
-        UNSCOPED_INFO("settings");
-        REQUIRE(scratch.exists(".config/app/settings.xml"));
-        UNSCOPED_INFO("logs");
-        REQUIRE(scratch.exists(".local/state/app/Alchemy.log"));
-        UNSCOPED_INFO("cache");
-        REQUIRE(scratch.exists(".cache/app/texturecache/t"));
-        UNSCOPED_INFO("account");
-        REQUIRE(scratch.exists(".local/share/app/bob_resident/settings_per_account.xml"));
-        UNSCOPED_INFO("skins");
-        REQUIRE(scratch.exists(".local/share/app/skins/default/colors.xml"));
-        UNSCOPED_INFO("no settings left in data");
-        REQUIRE(!scratch.exists(".local/share/app/user_settings"));
-        UNSCOPED_INFO("no logs left in data");
-        REQUIRE(!scratch.exists(".local/share/app/logs"));
-        UNSCOPED_INFO("no cache left in data");
-        REQUIRE(!scratch.exists(".local/share/app/cache"));
-        UNSCOPED_INFO("base dirs private");
-        REQUIRE((fs::status(scratch.path(".local/state")).permissions() & fs::perms::all) == fs::perms::owner_all);
+        CHECK(LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::MOVED);
+        CHECK_FALSE(scratch.exists(".app"));
+        CHECK(scratch.exists(".config/app/settings.xml"));
+        CHECK(scratch.exists(".local/state/app/Alchemy.log"));
+        CHECK(scratch.exists(".cache/app/texturecache/t"));
+        CHECK(scratch.exists(".local/share/app/bob_resident/settings_per_account.xml"));
+        CHECK(scratch.exists(".local/share/app/skins/default/colors.xml"));
+        CHECK_FALSE(scratch.exists(".local/share/app/user_settings"));
+        CHECK_FALSE(scratch.exists(".local/share/app/logs"));
+        CHECK_FALSE(scratch.exists(".local/share/app/cache"));
+        UNSCOPED_INFO("the base dirs it makes are private");
+        CHECK((fs::status(scratch.path(".local/state")).permissions() & fs::perms::all) == fs::perms::owner_all);
 
         // an older viewer run afterwards makes a new legacy root; it stays put
         scratch.write(".app/user_settings/settings.xml", "new");
-        UNSCOPED_INFO("second legacy root left");
-        REQUIRE((LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::NONE));
-        UNSCOPED_INFO("second legacy root intact");
-        REQUIRE(scratch.exists(".app/user_settings/settings.xml"));
+        UNSCOPED_INFO("a legacy root made after the move is left");
+        CHECK(LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::NONE);
+        CHECK(scratch.exists(".app/user_settings/settings.xml"));
     }
 
-    TEST_CASE_METHOD(LLDirTest, "LLDir: LLDirXDG::migrate leaves a profile it cannot move whole", "[LLDir]")
+    TEST_CASE("LLDir: LLDirXDG::migrate leaves a profile it cannot move whole", "[LLDir]")
     {
         std::vector<std::string> notes;
         {
@@ -939,16 +786,13 @@ namespace
             const LLDirXDG::Layout dirs = LLDirXDG::layout(scratch.home, "app");
             scratch.writeLegacyProfile();
             scratch.write(".config/app/other.xml");
-            UNSCOPED_INFO("config dir in the way");
-            REQUIRE((LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::FAILED));
-            UNSCOPED_INFO("put back");
-            REQUIRE(scratch.legacyProfileIntact());
-            UNSCOPED_INFO("no data dir");
-            REQUIRE(!scratch.exists(".local/share/app"));
-            UNSCOPED_INFO("no state dir");
-            REQUIRE(!scratch.exists(".local/state/app"));
-            UNSCOPED_INFO("config dir untouched");
-            REQUIRE(scratch.exists(".config/app/other.xml"));
+            UNSCOPED_INFO("a config dir in the way");
+            CHECK(LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::FAILED);
+            UNSCOPED_INFO("the profile is put back");
+            CHECK(scratch.legacyProfileIntact());
+            CHECK_FALSE(scratch.exists(".local/share/app"));
+            CHECK_FALSE(scratch.exists(".local/state/app"));
+            CHECK(scratch.exists(".config/app/other.xml"));
         }
         {
             ScratchHome scratch;
@@ -956,15 +800,13 @@ namespace
             scratch.writeLegacyProfile();
             scratch.write(".app/logs/Alchemy.exec_marker");
             const int fd = ::open(scratch.path(".app/logs/Alchemy.exec_marker").c_str(), O_RDWR);
-            UNSCOPED_INFO("marker locked");
+            UNSCOPED_INFO("the running viewer's marker is locked");
             REQUIRE((fd != -1 && ::flock(fd, LOCK_EX | LOCK_NB) == 0));
-            UNSCOPED_INFO("viewer running");
-            REQUIRE((LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::FAILED));
-            UNSCOPED_INFO("left while running");
-            REQUIRE(scratch.legacyProfileIntact());
+            CHECK(LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::FAILED);
+            CHECK(scratch.legacyProfileIntact());
             ::close(fd);
-            UNSCOPED_INFO("moved once it exits");
-            REQUIRE((LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::MOVED));
+            UNSCOPED_INFO("moved once the viewer exits");
+            CHECK(LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::MOVED);
         }
         {
             ScratchHome scratch;
@@ -972,16 +814,14 @@ namespace
             scratch.writeLegacyProfile();
             fs::rename(scratch.path(".app"), scratch.path("elsewhere"));
             fs::create_directory_symlink(scratch.path("elsewhere"), scratch.path(".app"));
-            UNSCOPED_INFO("symlink kept");
-            REQUIRE((LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::FAILED));
-            UNSCOPED_INFO("symlinked profile intact");
-            REQUIRE(scratch.legacyProfileIntact());
-            UNSCOPED_INFO("symlink still a symlink");
-            REQUIRE(fs::is_symlink(scratch.path(".app")));
+            UNSCOPED_INFO("a symlinked profile");
+            CHECK(LLDirXDG::migrate(scratch.path(".app"), dirs, notes) == LLDirXDG::Migration::FAILED);
+            CHECK(scratch.legacyProfileIntact());
+            CHECK(fs::is_symlink(scratch.path(".app")));
         }
     }
 
-    TEST_CASE_METHOD(LLDirTest, "LLDir: LLDirXDG::adoptCache renames an old cache only where none is in the way", "[LLDir]")
+    TEST_CASE("LLDir: LLDirXDG::adoptCache renames an old cache only where none is in the way", "[LLDir]")
     {
         ScratchHome scratch;
         std::vector<std::string> notes;
@@ -989,24 +829,18 @@ namespace
         const std::string cache = scratch.path(".cache/app");
 
         LLDirXDG::adoptCache(old_cache, cache, notes);
-        UNSCOPED_INFO("nothing to adopt");
-        REQUIRE(!scratch.exists(".cache"));
+        CHECK_FALSE(scratch.exists(".cache"));
 
         scratch.write(".cache/App/texturecache/t");
         LLDirXDG::adoptCache(old_cache, cache, notes);
-        UNSCOPED_INFO("adopted");
-        REQUIRE(scratch.exists(".cache/app/texturecache/t"));
-        UNSCOPED_INFO("old name gone");
-        REQUIRE(!scratch.exists(".cache/App"));
+        CHECK(scratch.exists(".cache/app/texturecache/t"));
+        CHECK_FALSE(scratch.exists(".cache/App"));
 
         scratch.write(".cache/App/texturecache/stale");
         LLDirXDG::adoptCache(old_cache, cache, notes);
-        UNSCOPED_INFO("current cache kept");
-        REQUIRE(scratch.exists(".cache/app/texturecache/t"));
-        UNSCOPED_INFO("old cache left beside it");
-        REQUIRE(scratch.exists(".cache/App/texturecache/stale"));
-        UNSCOPED_INFO("old cache not merged in");
-        REQUIRE(!scratch.exists(".cache/app/texturecache/stale"));
+        CHECK(scratch.exists(".cache/app/texturecache/t"));
+        CHECK(scratch.exists(".cache/App/texturecache/stale"));
+        CHECK_FALSE(scratch.exists(".cache/app/texturecache/stale"));
     }
 #endif // LL_LINUX
 }

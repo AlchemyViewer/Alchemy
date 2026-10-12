@@ -39,26 +39,21 @@ namespace
     {
         for (S32 i=0; i<LLParcel::C_COUNT; ++i)
         {
+            CAPTURE(i);
             const std::string& catstring =  LLParcel::getCategoryString(LLParcel::ECategory(i));
-            UNSCOPED_INFO("LLParcel::getCategoryString(i)");
             REQUIRE_FALSE(catstring.empty());
 
             const std::string& catuistring =  LLParcel::getCategoryUIString(LLParcel::ECategory(i));
-            UNSCOPED_INFO("LLParcel::getCategoryUIString(i)");
             REQUIRE_FALSE(catuistring.empty());
 
-            UNSCOPED_INFO("LLParcel::ECategory mapping of string back to enum");
             REQUIRE(LLParcel::getCategoryFromString(catstring) == i);
-            UNSCOPED_INFO("LLParcel::ECategory mapping of uistring back to enum");
             REQUIRE(LLParcel::getCategoryFromUIString(catuistring) == i);
         }
 
         // test the C_ANY case, which has to work for UI strings
         const std::string& catuistring =  LLParcel::getCategoryUIString(LLParcel::C_ANY);
-        UNSCOPED_INFO("LLParcel::getCategoryUIString(C_ANY)");
-        REQUIRE_FALSE(catuistring.empty());
+        CHECK_FALSE(catuistring.empty());
 
-        UNSCOPED_INFO("LLParcel::ECategory mapping of uistring back to enum");
         CHECK(LLParcel::getCategoryFromUIString(catuistring) == LLParcel::C_ANY);
     }
 }

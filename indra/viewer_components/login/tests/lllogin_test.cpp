@@ -50,20 +50,6 @@
 #include "llsd.h"
 #include "stringize.h"
 
-#if LL_WINDOWS
-#define skipwin(arg) skip(arg)
-#define skipmac(arg)
-#define skiplinux(arg)
-#elif LL_DARWIN
-#define skipwin(arg)
-#define skipmac(arg) skip(arg)
-#define skiplinux(arg)
-#elif LL_LINUX
-#define skipwin(arg)
-#define skipmac(arg)
-#define skiplinux(arg) skip(arg)
-#endif
-
 /*****************************************************************************
 *   Helper classes
 *****************************************************************************/
@@ -116,8 +102,8 @@ public:
             std::chrono::duration<double> elapsed = (now - start);
             if (elapsed.count() > seconds)
             {
-                FAIL(STRINGIZE("LoginListener::waitFor() took more than "
-                                    << seconds << " seconds waiting for " << desc));
+                FAIL("LoginListener::waitFor() took more than "
+                     << seconds << " seconds waiting for " << desc);
             }
             // haven't yet received the new call, nor have we timed out --
             // just wait
@@ -204,7 +190,7 @@ public:
 }
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
 namespace
 {
@@ -294,7 +280,6 @@ namespace
         login.connect("login.bar.com", credentials);
         llcoro::suspend();
 
-        UNSCOPED_INFO("Auth state");
         CHECK(listener.lastEvent()["change"].asString() == "authenticating");
 
         auto prev = listener.getCalls();
@@ -313,7 +298,6 @@ namespace
         // giving up
         listener.waitFor(prev, 11.0);
 
-        UNSCOPED_INFO("Failed to offline");
         CHECK(listener.lastEvent()["state"].asString() == "offline");
     }
 
@@ -340,7 +324,6 @@ namespace
         login.connect("login.bar.com", credentials);
         llcoro::suspend();
 
-        UNSCOPED_INFO("Auth state");
         CHECK(listener.lastEvent()["change"].asString() == "authenticating");
 
         auto prev = listener.getCalls();
@@ -358,7 +341,6 @@ namespace
         // giving up
         listener.waitFor(prev, 11.0);
 
-        UNSCOPED_INFO("Failed to offline");
         CHECK(listener.lastEvent()["state"].asString() == "offline");
     }
 }

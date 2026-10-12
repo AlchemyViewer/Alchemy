@@ -48,9 +48,9 @@
 namespace
 {
     // q and -q are the same rotation, so compare through the absolute dot product.
-    void ensure_quat_equals(const char* msg, const LLQuaternion& actual, const LLQuaternion& expected)
+    void require_same_rotation(const char* what, const LLQuaternion& actual, const LLQuaternion& expected)
     {
-        UNSCOPED_INFO(msg);
+        INFO(what);
         REQUIRE_THAT(fabsf(dot(actual, expected)), Catch::Matchers::WithinAbs(1.f, 1e-5f));
     }
 }
@@ -122,7 +122,6 @@ namespace
         {
             mParamInfos.push_back(std::make_unique<ALTestVisualParamInfo>(id, name, sex));
             ALTestVisualParam* param = new ALTestVisualParam();
-            UNSCOPED_INFO("the parameter takes its info");
             REQUIRE(param->setInfo(mParamInfos.back().get()));
             mCharacter.addVisualParam(param);
             return param;
@@ -133,12 +132,9 @@ namespace
         ALTestMotion* startFreshMotion(LLUUID& id, LLMotionConstructor create = ALTestMotion::create)
         {
             id = LLUUID::generateNewID();
-            UNSCOPED_INFO("registerMotion");
             REQUIRE(mCharacter.registerMotion(id, create));
-            UNSCOPED_INFO("startMotion");
             REQUIRE(mCharacter.startMotion(id));
             LLMotion* motion = mCharacter.findMotion(id);
-            UNSCOPED_INFO("started motion is findable");
             REQUIRE(motion != nullptr);
             return static_cast<ALTestMotion*>(motion);
         }
@@ -148,7 +144,6 @@ namespace
         void animateJoint(ALTestMotion* motion, const char* joint_name)
         {
             LLJoint* joint = mCharacter.getJoint(joint_name);
-            UNSCOPED_INFO("joint resolves");
             REQUIRE(joint != nullptr);
             motion->addJoint(joint, LLJointState::ROT);
         }
@@ -171,45 +166,30 @@ namespace
     TEST_CASE_METHOD(llcharacter_data, "LLCharacter: joints resolve by name and index with their numbers and parents", "[LLCharacter]")
     {
         LLJoint* pelvis = mCharacter.getJoint("mPelvis");
-        UNSCOPED_INFO("pelvis resolves");
         REQUIRE(pelvis != nullptr);
-        UNSCOPED_INFO("pelvis joint number");
         CHECK(pelvis->getJointNum() == 0);
-        UNSCOPED_INFO("pelvis hangs off the root");
         CHECK(pelvis->getParent() == mCharacter.getRootJoint());
 
         LLJoint* head = mCharacter.getJoint("mHead");
-        UNSCOPED_INFO("head resolves");
         REQUIRE(head != nullptr);
-        UNSCOPED_INFO("head joint number");
         CHECK(head->getJointNum() == 4);
-        UNSCOPED_INFO("head parent");
         CHECK(head->getParent()->getName() == std::string("mNeck"));
 
-        UNSCOPED_INFO("character joint by index");
         CHECK(mCharacter.getCharacterJoint(2) == mCharacter.getJoint("mChest"));
-        UNSCOPED_INFO("unknown joint is null");
-        REQUIRE(mCharacter.getJoint("mNope") == nullptr);
+        CHECK(mCharacter.getJoint("mNope") == nullptr);
     }
 
     TEST_CASE_METHOD(llcharacter_data, "LLCharacter: registerMotion refuses duplicates and createMotion builds one instance", "[LLCharacter]")
     {
         LLUUID id = LLUUID::generateNewID();
-        UNSCOPED_INFO("registerMotion accepts a new id");
         CHECK(mCharacter.registerMotion(id, ALTestMotion::create));
-        UNSCOPED_INFO("registerMotion refuses a duplicate");
         CHECK_FALSE(mCharacter.registerMotion(id, ALTestMotion::create));
 
         LLMotion* motion = mCharacter.createMotion(id);
-        UNSCOPED_INFO("createMotion builds an instance");
         REQUIRE(motion != nullptr);
-        UNSCOPED_INFO("findMotion returns the same instance");
         CHECK(mCharacter.findMotion(id) == motion);
-        UNSCOPED_INFO("createMotion again returns the same instance");
         CHECK(mCharacter.createMotion(id) == motion);
-        UNSCOPED_INFO("onInitialize ran once");
         CHECK(static_cast<ALTestMotion*>(motion)->mInitializeCount == 1);
-        UNSCOPED_INFO("created motion is not active");
         CHECK_FALSE(mCharacter.isMotionActive(id));
     }
 
@@ -217,9 +197,7 @@ namespace
     {
         LLUUID id;
         ALTestMotion* motion = startFreshMotion(id);
-        UNSCOPED_INFO("motion is active");
         CHECK(mCharacter.isMotionActive(id));
-        UNSCOPED_INFO("onActivate ran once");
         CHECK(motion->mActivateCount == 1);
         UNSCOPED_INFO("activation primes with one onUpdate");
         CHECK(motion->mUpdateCount == 1);
@@ -235,13 +213,10 @@ namespace
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
         UNSCOPED_INFO("normal update runs onUpdate");
         CHECK(motion->mUpdateCount == 2);
-        ensure_quat_equals("normal update blends the pose into the skeleton", pelvis->getRotation(), rot);
+        require_same_rotation("normal update blends the pose into the skeleton", pelvis->getRotation(), rot);
 
-        UNSCOPED_INFO("stopMotion");
         CHECK(mCharacter.stopMotion(id, true));
-        UNSCOPED_INFO("stopped motion is inactive");
         CHECK_FALSE(mCharacter.isMotionActive(id));
-        UNSCOPED_INFO("onDeactivate ran once");
         CHECK(motion->mDeactivateCount == 1);
 
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
@@ -257,7 +232,6 @@ namespace
         motion->mUpdateResult = false;
 
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
-        UNSCOPED_INFO("self-completing motion is marked stopped");
         CHECK(motion->isStopped());
     }
 
@@ -279,20 +253,12 @@ namespace
 
         const LLMotionController::motion_list_t& normals = activeMotions(LLMotion::NORMAL_BLEND);
         const LLMotionController::motion_list_t& additives = activeMotions(LLMotion::ADDITIVE_BLEND);
-        UNSCOPED_INFO("two normal motions");
         REQUIRE(normals.size() == 2u);
-        {
-            INFO("normal list is newest first");
-            CHECK(normals[0] == normal_second);
-            CHECK(normals[1] == normal_first);
-        }
-        UNSCOPED_INFO("two additive motions");
+        CHECK(normals[0] == normal_second);
+        CHECK(normals[1] == normal_first);
         REQUIRE(additives.size() == 2u);
-        {
-            INFO("additive list is newest first");
-            CHECK(additives[0] == additive_second);
-            CHECK(additives[1] == additive_first);
-        }
+        CHECK(additives[0] == additive_second);
+        CHECK(additives[1] == additive_first);
 
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
         UNSCOPED_INFO("newest additive motion is updated first");
@@ -302,14 +268,13 @@ namespace
         UNSCOPED_INFO("newest normal motion is updated first");
         CHECK(normal_second->mUpdateSerial < normal_first->mUpdateSerial);
 
-        UNSCOPED_INFO("stopMotion");
         CHECK(mCharacter.stopMotion(additive_first_id, true));
         UNSCOPED_INFO("stopping an additive motion shortens the additive list");
         REQUIRE(additives.size() == 1u);
         UNSCOPED_INFO("the other additive motion stays");
         CHECK(additives[0] == additive_second);
         UNSCOPED_INFO("and leaves the normal list alone");
-        REQUIRE(normals.size() == 2u);
+        CHECK(normals.size() == 2u);
     }
 
     TEST_CASE_METHOD(llcharacter_data, "LLCharacter: a motion leaving the list mid-update skips no other motion", "[LLCharacter]")
@@ -324,7 +289,6 @@ namespace
         animateJoint(oldest, "mPelvis");
         animateJoint(ending, "mTorso");
         animateJoint(newest, "mChest");
-        UNSCOPED_INFO("stopMotion");
         CHECK(mCharacter.stopMotion(ending_id, false));
 
         S32 frames = 0;
@@ -333,9 +297,7 @@ namespace
             runFrame();
             ++frames;
         }
-        UNSCOPED_INFO("the ending motion left the list");
         CHECK_FALSE(mCharacter.isMotionActive(ending_id));
-        UNSCOPED_INFO("the ending motion was deactivated once");
         CHECK(ending->mDeactivateCount == 1);
         UNSCOPED_INFO("the motion behind it was updated every frame");
         CHECK(oldest->mUpdateCount == 1 + frames);
@@ -343,7 +305,6 @@ namespace
         CHECK(newest->mUpdateCount == 1 + frames);
 
         const LLMotionController::motion_list_t& normals = activeMotions(LLMotion::NORMAL_BLEND);
-        UNSCOPED_INFO("two motions remain");
         REQUIRE(normals.size() == 2u);
         {
             INFO("remaining motions are still newest first");
@@ -370,7 +331,6 @@ namespace
         animateJoint(startFreshMotion(id, ALTestMotion::createAdditive), "mNeck");
         mCharacter.mPixelAreaQueries = 0;
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
-        UNSCOPED_INFO("pixel area is not asked once per motion");
         CHECK(mCharacter.mPixelAreaQueries == queries_with_one_motion);
     }
 
@@ -382,14 +342,10 @@ namespace
         startFreshMotion(additive_id, ALTestMotion::createAdditive);
 
         mCharacter.flushAllMotions();
-        UNSCOPED_INFO("normal motion restarted");
         CHECK(mCharacter.isMotionActive(normal_id));
-        UNSCOPED_INFO("additive motion restarted");
         CHECK(mCharacter.isMotionActive(additive_id));
-        UNSCOPED_INFO("one normal motion");
-        REQUIRE(activeMotions(LLMotion::NORMAL_BLEND).size() == 1u);
-        UNSCOPED_INFO("one additive motion");
-        REQUIRE(activeMotions(LLMotion::ADDITIVE_BLEND).size() == 1u);
+        CHECK(activeMotions(LLMotion::NORMAL_BLEND).size() == 1u);
+        CHECK(activeMotions(LLMotion::ADDITIVE_BLEND).size() == 1u);
     }
 
     TEST_CASE_METHOD(llcharacter_data, "LLCharacter: a hidden update drops every stopped motion in one pass", "[LLCharacter]")
@@ -400,20 +356,15 @@ namespace
         startFreshMotion(oldest_id);
         startFreshMotion(middle_id);
         startFreshMotion(newest_id);
-        UNSCOPED_INFO("stop middle");
         CHECK(mCharacter.stopMotion(middle_id, false));
-        UNSCOPED_INFO("stop oldest");
         CHECK(mCharacter.stopMotion(oldest_id, false));
 
         mCharacter.updateMotions(LLCharacter::HIDDEN_UPDATE);
-        UNSCOPED_INFO("the stopped middle motion left the list");
         CHECK_FALSE(mCharacter.isMotionActive(middle_id));
         UNSCOPED_INFO("the stopped motion behind it left the list too");
         CHECK_FALSE(mCharacter.isMotionActive(oldest_id));
-        UNSCOPED_INFO("the running motion stayed");
         CHECK(mCharacter.isMotionActive(newest_id));
-        UNSCOPED_INFO("one motion remains");
-        REQUIRE(activeMotions(LLMotion::NORMAL_BLEND).size() == 1u);
+        CHECK(activeMotions(LLMotion::NORMAL_BLEND).size() == 1u);
     }
 
     TEST_CASE_METHOD(llcharacter_data, "LLCharacter: setTimeStep snaps only a stopped motion's stop time", "[LLCharacter]")
@@ -427,13 +378,11 @@ namespace
         ALTestMotion* running = startFreshMotion(running_id);
         ALTestMotion* stopped = startFreshMotion(stopped_id);
         runFrame();
-        UNSCOPED_INFO("stopMotion");
         CHECK(mCharacter.stopMotion(stopped_id, false));
         stopped->mStopTimeCalls = 0;
         running->mStopTimeCalls = 0;
 
         mCharacter.getMotionController().setTimeStep(0.25f);
-        UNSCOPED_INFO("the running motion is still running");
         CHECK_FALSE(running->isStopped());
         UNSCOPED_INFO("its stop time was never set");
         CHECK(running->mStopTimeCalls == 0);
@@ -441,7 +390,6 @@ namespace
         CHECK(running->getStopTime() == 0.0);
         UNSCOPED_INFO("a motion that never ends keeps its open send-stop time");
         CHECK(running->sendStopTimestamp() == F32_MAX);
-        UNSCOPED_INFO("the stopped motion is still stopped");
         CHECK(stopped->isStopped());
         UNSCOPED_INFO("its stop time sits on the quantum");
         CHECK(fmod(stopped->getStopTime(), 0.25) == 0.0);
@@ -468,12 +416,10 @@ namespace
         newest->mEaseInDuration = 10.f;
 
         const LLUUID started_id = LLUUID::generateNewID();
-        UNSCOPED_INFO("registerMotion");
         CHECK(mCharacter.registerMotion(started_id, ALTestMotion::create));
         middle->mStartOnUpdate = started_id;
 
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
-        UNSCOPED_INFO("the started motion is playing");
         CHECK(mCharacter.isMotionActive(started_id));
         UNSCOPED_INFO("the motion ahead of the starter was updated once");
         CHECK(newest->mUpdateCount == 2);
@@ -486,7 +432,6 @@ namespace
         CHECK(started->mUpdateCount == 1);
 
         const LLMotionController::motion_list_t& normals = activeMotions(LLMotion::NORMAL_BLEND);
-        UNSCOPED_INFO("four motions listed");
         REQUIRE(normals.size() == 4u);
         {
             INFO("newest first, the started one ahead of them all");
@@ -502,19 +447,16 @@ namespace
         // The values motions hand one another are slots on the character: set
         // by whoever owns the value, empty when nobody does.
         F32 speed = 3.f;
-        UNSCOPED_INFO("an unset channel reads empty");
-        REQUIRE(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == nullptr);
+        CHECK(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == nullptr);
         mCharacter.setAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED, &speed);
-        UNSCOPED_INFO("a set channel reads back what was set");
         CHECK(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == &speed);
         {
             INFO("the other channels are untouched");
-            REQUIRE(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_POINT_AT_POINT) == nullptr);
-            REQUIRE(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT) == nullptr);
+            CHECK(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_POINT_AT_POINT) == nullptr);
+            CHECK(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT) == nullptr);
         }
         mCharacter.removeAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED);
-        UNSCOPED_INFO("a removed channel reads empty");
-        REQUIRE(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == nullptr);
+        CHECK(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == nullptr);
 
         // The hand pose is not a slot but a copy, so the request stands after
         // whatever it was read from has changed or gone, and it is dropped
@@ -535,12 +477,10 @@ namespace
         UNSCOPED_INFO("at the priority asked at");
         CHECK(mCharacter.getHandPoseRequestPriority() == 2);
         mCharacter.clearHandPoseRequest();
-        UNSCOPED_INFO("a cleared request is gone");
         CHECK_FALSE(mCharacter.hasHandPoseRequest());
 
         mCharacter.requestHandPose(1, 2);
         mCharacter.flushAllMotions();
-        UNSCOPED_INFO("a flush drops the hand pose");
         CHECK_FALSE(mCharacter.hasHandPoseRequest());
     }
 
@@ -569,11 +509,11 @@ namespace
         UNSCOPED_INFO("the last update does not raise the weight");
         CHECK(motion->getPose()->getWeight() <= easing_in);
         UNSCOPED_INFO("the motion is still around for its last update");
-        REQUIRE(activeMotions(LLMotion::NORMAL_BLEND).size() == 1u);
+        CHECK(activeMotions(LLMotion::NORMAL_BLEND).size() == 1u);
 
         runFrame();
         UNSCOPED_INFO("and is gone the frame after");
-        REQUIRE(activeMotions(LLMotion::NORMAL_BLEND).empty());
+        CHECK(activeMotions(LLMotion::NORMAL_BLEND).empty());
     }
 
     TEST_CASE_METHOD(llcharacter_data, "LLCharacter: a motion still easing in does not mask the one under it", "[LLCharacter]")
@@ -582,7 +522,6 @@ namespace
         // at full weight and no others. One still easing in has claimed
         // nothing, so what is under it is still blended and still shows.
         LLJoint* joint = mCharacter.getJoint("mPelvis");
-        UNSCOPED_INFO("the joint resolves");
         REQUIRE(joint != nullptr);
 
         const LLQuaternion under_rot(0.9f, LLVector3::x_axis);
@@ -630,7 +569,6 @@ namespace
         CHECK_FALSE(mCharacter.updateVisualParams());
         UNSCOPED_INFO("and applies nothing");
         CHECK(first->mApplied == 0);
-        UNSCOPED_INFO("to either of them");
         CHECK(second->mApplied == 0);
 
         first->setWeight(0.5f);
@@ -651,9 +589,7 @@ namespace
         second->setWeight(0.75f);
         UNSCOPED_INFO("a sweep with two to do says so");
         CHECK(mCharacter.updateVisualParams());
-        UNSCOPED_INFO("and applies the first");
         CHECK(first->mApplied == 2);
-        UNSCOPED_INFO("and the second");
         CHECK(second->mApplied == 1);
     }
 
@@ -672,7 +608,6 @@ namespace
         animating->setWeight(0.5f);
         UNSCOPED_INFO("an animating parameter is not swept");
         CHECK_FALSE(mCharacter.updateVisualParams());
-        UNSCOPED_INFO("and not applied");
         CHECK(animating->mApplied == settled);
 
         animating->setAnimating(false);
@@ -685,7 +620,6 @@ namespace
         female->setWeight(0.75f);
         UNSCOPED_INFO("a parameter for the other sex has nothing to apply");
         CHECK_FALSE(mCharacter.updateVisualParams());
-        UNSCOPED_INFO("and is not applied");
         CHECK(female->mApplied == female_settled);
     }
 
@@ -698,7 +632,6 @@ namespace
         addParam(10, "First");
         addParam(20, "Second");
 
-        UNSCOPED_INFO("every parameter is counted");
         CHECK(mCharacter.getVisualParamCount() == 3);
 
         std::vector<S32> ids;
@@ -708,37 +641,26 @@ namespace
         {
             ids.push_back(param->getID());
         }
-        UNSCOPED_INFO("all three are walked");
         REQUIRE(ids.size() == 3u);
         UNSCOPED_INFO("in id order, not the order they arrived");
         CHECK(ids[0] == 10);
-        UNSCOPED_INFO("second");
         CHECK(ids[1] == 20);
-        UNSCOPED_INFO("third");
         CHECK(ids[2] == 30);
 
         LLVisualParam* by_name = mCharacter.getVisualParam("Second");
-        UNSCOPED_INFO("a parameter is found by its name");
         REQUIRE(by_name != nullptr);
-        UNSCOPED_INFO("and it is the right one");
         CHECK(by_name->getID() == 20);
 
-        UNSCOPED_INFO("the name is matched without regard to case");
-        REQUIRE(mCharacter.getVisualParam("sEcOnD") == by_name);
-        UNSCOPED_INFO("in either direction");
-        REQUIRE(mCharacter.getVisualParam("SECOND") == by_name);
-        UNSCOPED_INFO("a name nobody has is not found");
-        REQUIRE(mCharacter.getVisualParam("NotAParameter") == nullptr);
+        CHECK(mCharacter.getVisualParam("sEcOnD") == by_name);
+        CHECK(mCharacter.getVisualParam("SECOND") == by_name);
+        CHECK(mCharacter.getVisualParam("NotAParameter") == nullptr);
 
         // And by id, which is the other way in.
-        UNSCOPED_INFO("a parameter is found by its id");
-        REQUIRE(mCharacter.getVisualParam(20) == by_name);
+        CHECK(mCharacter.getVisualParam(20) == by_name);
 
         UNSCOPED_INFO("setting a weight by name finds it");
         CHECK(mCharacter.setVisualParamWeight("SeCoNd", 0.25f));
-        UNSCOPED_INFO("and sets it");
         CHECK_THAT(mCharacter.getVisualParamWeight("second"), ll_test::WithinBits(0.25f, 16));
-        UNSCOPED_INFO("setting one nobody has does not");
         CHECK_FALSE(mCharacter.setVisualParamWeight("NotAParameter", 0.25f));
     }
 
@@ -751,19 +673,16 @@ namespace
 
         UNSCOPED_INFO("the second one took the first one's place");
         CHECK(mCharacter.getVisualParamCount() == 1);
-        UNSCOPED_INFO("and it is the one that is found");
-        REQUIRE(mCharacter.getVisualParam(7) == (LLVisualParam*)second);
+        CHECK(mCharacter.getVisualParam(7) == (LLVisualParam*)second);
 
         S32 walked = 0;
         for (LLVisualParam* param = mCharacter.getFirstVisualParam();
              param;
              param = mCharacter.getNextVisualParam())
         {
-            UNSCOPED_INFO("the list holds the one that is found");
             REQUIRE(param == (LLVisualParam*)second);
             walked++;
         }
-        UNSCOPED_INFO("once");
         CHECK(walked == 1);
 
         // The one it replaced is nobody's now, so the character will not free
@@ -783,7 +702,6 @@ namespace
 
         ALTestVisualParamInfo foreign_info(5, "Mine");
         ALTestVisualParam foreign;
-        UNSCOPED_INFO("the foreign parameter takes its info");
         REQUIRE(foreign.setInfo(&foreign_info));
 
         UNSCOPED_INFO("a foreign parameter with a known id is taken");
@@ -795,12 +713,10 @@ namespace
 
         // Handed this character's own, the lookup finds that same one, which
         // is what lets a caller who already has it write to it directly.
-        UNSCOPED_INFO("the id finds the one that was added");
-        REQUIRE(mCharacter.getVisualParam(5) == (LLVisualParam*)mine);
+        CHECK(mCharacter.getVisualParam(5) == (LLVisualParam*)mine);
 
         ALTestVisualParamInfo unknown_info(6, "Unknown");
         ALTestVisualParam unknown;
-        UNSCOPED_INFO("the unknown parameter takes its info");
         REQUIRE(unknown.setInfo(&unknown_info));
         UNSCOPED_INFO("a parameter with an id this character has not got is refused");
         CHECK_FALSE(mCharacter.setVisualParamWeight(&unknown, 0.5f));

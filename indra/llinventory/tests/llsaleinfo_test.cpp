@@ -45,19 +45,12 @@ namespace
         LLSD llsd_obj1 = ll_create_sd_from_sale_info(llsaleinfo);
         LLSaleInfo saleinfo1 = ll_sale_info_from_sd(llsd_obj1);
 
-        UNSCOPED_INFO("1. The getSaleType() fn failed");
         CHECK(llsaleinfo.getSaleType() == LLSaleInfo::FS_COPY);
-        UNSCOPED_INFO("2. LLSaleInfo::isForSale() fn failed");
         CHECK(llsaleinfo.isForSale());
-        UNSCOPED_INFO("3. The getSalePrice() fn failed");
         CHECK(sale_price == llsaleinfo.getSalePrice());
-        UNSCOPED_INFO("4. The getCRC32() fn failed");
         CHECK(llsaleinfo.getCRC32() == 235833404);
-        UNSCOPED_INFO("5. LLSaleInfo::lookup(const char* name) fn failed");
         CHECK(llsaleinfo.lookup(sale) == LLSaleInfo::FS_COPY);
-        UNSCOPED_INFO("6. ll_create_sd_from_sale_info() fn failed");
         CHECK(llsaleinfo.getSalePrice() == saleinfo1.getSalePrice());
-        UNSCOPED_INFO("7. ll_create_sd_from_sale_info() fn failed");
         CHECK(llsaleinfo.getSaleType() == saleinfo1.getSaleType());
 
         llsaleinfo.setSalePrice(10000000);
@@ -66,19 +59,12 @@ namespace
         llsd_obj1 = ll_create_sd_from_sale_info(llsaleinfo);
         saleinfo1 = ll_sale_info_from_sd(llsd_obj1);
 
-        UNSCOPED_INFO("8. The getSaleType() and setSaleType() fn failed");
         CHECK(llsaleinfo.getSaleType() == LLSaleInfo::FS_ORIGINAL);
-        UNSCOPED_INFO("9. LLSaleInfo::isForSale() fn failed");
         CHECK(llsaleinfo.isForSale());
-        UNSCOPED_INFO("10. The getSalePrice() fn failed");
         CHECK(llsaleinfo.getSalePrice() == 10000000);
-        UNSCOPED_INFO("11. The getCRC32() fn failed");
         CHECK(llsaleinfo.getCRC32() == 127911702);
-        UNSCOPED_INFO("12. LLSaleInfo::lookup(const char* name) fn failed");
         CHECK(llsaleinfo.lookup(sale) == LLSaleInfo::FS_CONTENTS);
-        UNSCOPED_INFO("13. ll_create_sd_from_sale_info() fn failed");
         CHECK(llsaleinfo.getSalePrice() == saleinfo1.getSalePrice());
-        UNSCOPED_INFO("14. ll_create_sd_from_sale_info() fn failed");
         CHECK(llsaleinfo.getSaleType() == saleinfo1.getSaleType());
 
         llsaleinfo.setSalePrice(55000550);
@@ -87,19 +73,12 @@ namespace
         llsd_obj1 = ll_create_sd_from_sale_info(llsaleinfo);
         saleinfo1 = ll_sale_info_from_sd(llsd_obj1);
 
-        UNSCOPED_INFO("15. The getSaleType() and setSaleType() fn failed");
         CHECK(llsaleinfo.getSaleType() == LLSaleInfo::FS_CONTENTS);
-        UNSCOPED_INFO("16. LLSaleInfo::isForSale() fn failed");
         CHECK(llsaleinfo.isForSale());
-        UNSCOPED_INFO("17. The getSalePrice() fn failed");
         CHECK(llsaleinfo.getSalePrice() == 55000550);
-        UNSCOPED_INFO("18. The getCRC32() fn failed");
         CHECK(llsaleinfo.getCRC32() == 408735656);
-        UNSCOPED_INFO("19. LLSaleInfo::lookup(const char* name) fn failed");
         CHECK(llsaleinfo.lookup(sale) == LLSaleInfo::FS_ORIGINAL);
-        UNSCOPED_INFO("20. ll_create_sd_from_sale_info() fn failed");
         CHECK(llsaleinfo.getSalePrice() == saleinfo1.getSalePrice());
-        UNSCOPED_INFO("21. ll_create_sd_from_sale_info() fn failed");
         CHECK(llsaleinfo.getSaleType() == saleinfo1.getSaleType());
 
         llsaleinfo.setSalePrice(-6432);
@@ -108,19 +87,12 @@ namespace
         llsd_obj1 = ll_create_sd_from_sale_info(llsaleinfo);
         saleinfo1 = ll_sale_info_from_sd(llsd_obj1);
 
-        UNSCOPED_INFO("22. The getSaleType() and setSaleType() fn failed");
         CHECK(llsaleinfo.getSaleType() == LLSaleInfo::FS_NOT);
-        UNSCOPED_INFO("23. LLSaleInfo::isForSale() fn failed");
         CHECK_FALSE(llsaleinfo.isForSale());
-        UNSCOPED_INFO("24. The getSalePrice() fn failed");
         CHECK(llsaleinfo.getSalePrice() == 0);
-        UNSCOPED_INFO("25. The getCRC32() fn failed");
         CHECK(llsaleinfo.getCRC32() == 0);
-        UNSCOPED_INFO("26. LLSaleInfo::lookup(const char* name) fn failed");
         CHECK(llsaleinfo.lookup(sale) == LLSaleInfo::FS_NOT);
-        UNSCOPED_INFO("27. ll_create_sd_from_sale_info() fn failed");
         CHECK(llsaleinfo.getSalePrice() == saleinfo1.getSalePrice());
-        UNSCOPED_INFO("28. ll_create_sd_from_sale_info() fn failed");
         CHECK(llsaleinfo.getSaleType() == saleinfo1.getSaleType());
     }
 
@@ -138,11 +110,8 @@ namespace
         bool has_perm_mask = false;
         llsaleinfo1.importLegacyStream(istream, has_perm_mask, perm_mask);
 
-        {
-            INFO("importStream() fn failed ");
-            CHECK(llsaleinfo.getSalePrice() == llsaleinfo1.getSalePrice());
-            CHECK(llsaleinfo.getSaleType() == llsaleinfo1.getSaleType());
-        }
+        CHECK(llsaleinfo.getSalePrice() == llsaleinfo1.getSalePrice());
+        CHECK(llsaleinfo.getSaleType() == llsaleinfo1.getSaleType());
     }
 
     TEST_CASE("llsaleinfo: asLLSD and fromLLSD round-trip", "[llsaleinfo]")
@@ -158,9 +127,7 @@ namespace
         LLSaleInfo saleinfo1;
         saleinfo1.fromLLSD( sd_result, has_perm_mask, perm_mask);
 
-        UNSCOPED_INFO("asLLSD and fromLLSD failed");
         CHECK(saleinfo.getSalePrice() == saleinfo1.getSalePrice());
-        UNSCOPED_INFO("asLLSD and fromLLSD failed");
         CHECK(saleinfo.getSaleType() == saleinfo1.getSaleType());
     }
 
@@ -170,12 +137,10 @@ namespace
         S32 sale_price = 233223;
         LLSaleInfo::EForSale ret_type = LLSaleInfo::lookup("orig");
 
-        UNSCOPED_INFO("lookup(const char* name) fn failed");
         CHECK(ret_type == LLSaleInfo::FS_ORIGINAL);
 
         LLSaleInfo saleinfo(LLSaleInfo::FS_COPY, sale_price);
         const char* result = LLSaleInfo::lookup(LLSaleInfo::FS_COPY);
-        UNSCOPED_INFO("char* lookup(EForSale type) fn failed");
         CHECK(std::string_view(result) == "copy");
     }
 
@@ -186,7 +151,6 @@ namespace
         LLSaleInfo saleinfo(LLSaleInfo::FS_COPY, sale_price);
         LLSaleInfo saleinfo1(LLSaleInfo::FS_COPY, sale_price);
         saleinfo1.accumulate(saleinfo);
-        UNSCOPED_INFO("LLSaleInfo::accumulate(const LLSaleInfo& sale_info) fn failed");
         CHECK(saleinfo1.getSalePrice() == 40);
 
     }
@@ -200,9 +164,7 @@ namespace
         LLSaleInfo saleinfoequal(LLSaleInfo::FS_ORIGINAL, sale_price);
         LLSaleInfo saleinfonotequal(LLSaleInfo::FS_ORIGINAL, sale_price*2);
 
-        UNSCOPED_INFO("operator == fn. failed");
         CHECK(saleinfo == saleinfoequal);
-        UNSCOPED_INFO("operator != fn. failed");
         CHECK(saleinfo != saleinfonotequal);
     }
 

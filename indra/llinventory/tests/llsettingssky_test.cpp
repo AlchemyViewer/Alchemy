@@ -56,9 +56,9 @@ namespace
         return (F32)layer[key].asReal();
     }
 
-    void ensure_close(const std::string& msg, F32 actual, F32 expected)
+    void require_close(const std::string& what, F32 actual, F32 expected)
     {
-        UNSCOPED_INFO(msg.c_str());
+        INFO(what);
         REQUIRE_THAT(actual, Catch::Matchers::WithinAbs(expected, fabsf(expected) * 1.0e-5f + 1.0e-9f));
     }
 
@@ -74,12 +74,12 @@ namespace
     TEST_CASE("llsettingssky: setMieAnisotropy changes the sky's g and the LLSD it saves", "[llsettingssky]")
     {
         LLSettingsSky::ptr_t sky = make_sky(default_settings());
-        ensure_close("default g", sky->getMieAnisotropy(), 0.8f);
+        require_close("default g", sky->getMieAnisotropy(), 0.8f);
 
         sky->setMieAnisotropy(0.6f);
-        ensure_close("g after the setter", sky->getMieAnisotropy(), 0.6f);
-        ensure_close("g in the saved LLSD",
-                     term(sky->getSettings()[LLSettingsSky::SETTING_MIE_CONFIG][0], LLSettingsSky::SETTING_MIE_ANISOTROPY_FACTOR), 0.6f);
+        require_close("g after the setter", sky->getMieAnisotropy(), 0.6f);
+        require_close("g in the saved LLSD",
+                      term(sky->getSettings()[LLSettingsSky::SETTING_MIE_CONFIG][0], LLSettingsSky::SETTING_MIE_ANISOTROPY_FACTOR), 0.6f);
     }
 
     // The default ozone profile is Bruneton's tent, 0 at 10 km, 1 at 25 km, 0 at 40 km, and it
@@ -87,18 +87,16 @@ namespace
     TEST_CASE("llsettingssky: the default ozone profile is Bruneton's tent and validates", "[llsettingssky]")
     {
         LLSettingsSky::ptr_t sky = make_sky(default_settings());
-        UNSCOPED_INFO("the default sky validates");
         CHECK(sky->validate());
 
         LLSD ozone = sky->getAbsorptionConfigs();
-        UNSCOPED_INFO("ozone layers");
         REQUIRE(ozone.size() == size_t(2));
 
-        ensure_close("lower width", term(ozone[0], LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH), 25000.0f);
-        ensure_close("lower linear", term(ozone[0], LLSettingsSky::SETTING_DENSITY_PROFILE_LINEAR_TERM), 1.0f / 15000.0f);
-        ensure_close("lower constant", term(ozone[0], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), -2.0f / 3.0f);
-        ensure_close("upper linear", term(ozone[1], LLSettingsSky::SETTING_DENSITY_PROFILE_LINEAR_TERM), -1.0f / 15000.0f);
-        ensure_close("upper constant", term(ozone[1], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 8.0f / 3.0f);
+        require_close("lower width", term(ozone[0], LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH), 25000.0f);
+        require_close("lower linear", term(ozone[0], LLSettingsSky::SETTING_DENSITY_PROFILE_LINEAR_TERM), 1.0f / 15000.0f);
+        require_close("lower constant", term(ozone[0], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), -2.0f / 3.0f);
+        require_close("upper linear", term(ozone[1], LLSettingsSky::SETTING_DENSITY_PROFILE_LINEAR_TERM), -1.0f / 15000.0f);
+        require_close("upper constant", term(ozone[1], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 8.0f / 3.0f);
     }
 
     // Blending mixes the profiles term by term, anisotropy included.
@@ -117,11 +115,11 @@ namespace
         sky->blend(end, 0.5);
 
         LLSD rayleigh = sky->getRayleighConfig();
-        ensure_close("Rayleigh exp term", term(rayleigh, LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_TERM), 1.5f);
-        ensure_close("Rayleigh exp scale", term(rayleigh, LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_SCALE_FACTOR),
-                     0.5f * (-1.0f / 8000.0f - 1.0f / 4000.0f));
-        ensure_close("Rayleigh constant", term(rayleigh, LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.25f);
-        ensure_close("Mie g", sky->getMieAnisotropy(), 0.7f);
+        require_close("Rayleigh exp term", term(rayleigh, LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_TERM), 1.5f);
+        require_close("Rayleigh exp scale", term(rayleigh, LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_SCALE_FACTOR),
+                      0.5f * (-1.0f / 8000.0f - 1.0f / 4000.0f));
+        require_close("Rayleigh constant", term(rayleigh, LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.25f);
+        require_close("Mie g", sky->getMieAnisotropy(), 0.7f);
     }
 
     // A one-layer profile blended with a two-layer one is padded by repeating its layer, taking
@@ -140,18 +138,17 @@ namespace
         LLSettingsSky::ptr_t start = make_sky(from);
         start->blend(end, 0.0);
         LLSD at_start = start->getAbsorptionConfigs();
-        UNSCOPED_INFO("layers at 0");
         REQUIRE(at_start.size() == size_t(2));
-        ensure_close("boundary at 0", term(at_start[0], LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH), 25000.0f);
-        ensure_close("below the boundary at 0", term(at_start[0], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.2f);
-        ensure_close("above the boundary at 0", term(at_start[1], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.2f);
+        require_close("boundary at 0", term(at_start[0], LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH), 25000.0f);
+        require_close("below the boundary at 0", term(at_start[0], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.2f);
+        require_close("above the boundary at 0", term(at_start[1], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.2f);
 
         LLSettingsSky::ptr_t half = make_sky(from);
         half->blend(end, 0.5);
         LLSD at_half = half->getAbsorptionConfigs();
-        ensure_close("boundary at 0.5", term(at_half[0], LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH), 25000.0f);
-        ensure_close("below the boundary at 0.5", term(at_half[0], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.3f);
-        ensure_close("above the boundary at 0.5", term(at_half[1], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.5f);
+        require_close("boundary at 0.5", term(at_half[0], LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH), 25000.0f);
+        require_close("below the boundary at 0.5", term(at_half[0], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.3f);
+        require_close("above the boundary at 0.5", term(at_half[1], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.5f);
     }
 
     // An unknown key inside a layer is stripped and the sky still validates; a sky that failed
@@ -162,10 +159,8 @@ namespace
         settings[LLSettingsSky::SETTING_RAYLEIGH_CONFIG][0]["not_a_density_term"] = 1.0;
 
         LLSettingsSky::ptr_t sky = make_sky(settings);
-        UNSCOPED_INFO("the sky validates");
         CHECK(sky->validate());
-        UNSCOPED_INFO("the unknown key is stripped");
-        REQUIRE_FALSE(sky->getRayleighConfig().has("not_a_density_term"));
+        CHECK_FALSE(sky->getRayleighConfig().has("not_a_density_term"));
     }
 
     // Skies saved by earlier Density tabs hold the absorption profile as [[layer], layer].
@@ -180,21 +175,16 @@ namespace
         sky->validate();
 
         LLSD stored = sky->getAbsorptionConfigs();
-        ensure_close("the layer after the nested array is clamped", term(stored[1], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 10.0f);
+        require_close("the layer after the nested array is clamped", term(stored[1], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 10.0f);
 
         LLSD flat = LLSettingsSky::flattenDensityProfile(stored);
-        UNSCOPED_INFO("flattened layers");
         REQUIRE(flat.size() == size_t(2));
-        {
-            INFO("flattened layers are maps");
-            REQUIRE(flat[0].isMap());
-            REQUIRE(flat[1].isMap());
-        }
+        CHECK(flat[0].isMap());
+        CHECK(flat[1].isMap());
 
         LLSD first = sky->getAbsorptionConfig();
-        UNSCOPED_INFO("the first layer is a map");
         REQUIRE(first.isMap());
-        ensure_close("the first layer's constant", term(first, LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.5f);
+        require_close("the first layer's constant", term(first, LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.5f);
     }
 
     // Setting a profile marks the sky dirty, so its derived state is recomputed.
@@ -202,23 +192,19 @@ namespace
     {
         LLSettingsSky::ptr_t sky = make_sky(default_settings());
         sky->update();
-        UNSCOPED_INFO("clean after update");
         CHECK_FALSE(sky->isDirty());
 
         sky->setRayleighConfigs(llsd::array(layer(0.0f, 1.0f, -1.0f / 4000.0f, 0.0f, 0.0f)));
-        UNSCOPED_INFO("dirty after setRayleighConfigs");
         CHECK(sky->isDirty());
     }
 
-    // A profile with no layers has no first layer.
     TEST_CASE("llsettingssky: a profile with no layers has no first layer", "[llsettingssky]")
     {
         LLSD settings = default_settings();
         settings[LLSettingsSky::SETTING_RAYLEIGH_CONFIG] = LLSD::emptyArray();
 
         LLSettingsSky::ptr_t sky = make_sky(settings);
-        UNSCOPED_INFO("no first Rayleigh layer");
-        REQUIRE(sky->getRayleighConfig().isUndefined());
+        CHECK(sky->getRayleighConfig().isUndefined());
     }
 
     // Cloud cover fades in from a sky without a cloud texture toward the next sky's cover, and out toward none,
@@ -238,9 +224,10 @@ namespace
         LLSettingsBase::ptr_t to_cloudy = make_sky(cloudy);
         for (F64 t : { 0.25, 0.5, 1.0 })
         {
+            CAPTURE(t);
             LLSettingsSky::ptr_t sky = make_sky(clear);
             sky->blend(to_cloudy, t);
-            ensure_close("fading in at " + std::to_string(t), sky->getCloudShadow(), 0.6f * (F32)t);
+            require_close("fading in", sky->getCloudShadow(), 0.6f * (F32)t);
             UNSCOPED_INFO("fading in takes the next sky's texture");
             REQUIRE(sky->getCloudNoiseTextureId() == cloud_texture);
         }
@@ -248,9 +235,10 @@ namespace
         LLSettingsBase::ptr_t to_clear = make_sky(clear);
         for (F64 t : { 0.25, 0.5, 1.0 })
         {
+            CAPTURE(t);
             LLSettingsSky::ptr_t sky = make_sky(cloudy);
             sky->blend(to_clear, t);
-            ensure_close("fading out at " + std::to_string(t), sky->getCloudShadow(), 0.6f * (1.f - (F32)t));
+            require_close("fading out", sky->getCloudShadow(), 0.6f * (1.f - (F32)t));
             UNSCOPED_INFO("fading out keeps its own texture");
             REQUIRE(sky->getCloudNoiseTextureId() == cloud_texture);
         }
@@ -260,7 +248,7 @@ namespace
         LLSettingsBase::ptr_t to_cloudier = make_sky(cloudier);
         LLSettingsSky::ptr_t sky = make_sky(cloudy);
         sky->blend(to_cloudier, 0.25);
-        ensure_close("between two textured skies", sky->getCloudShadow(), 0.7f);
+        require_close("between two textured skies", sky->getCloudShadow(), 0.7f);
     }
 
     // Flattening looks through nesting to any depth, as validation and the first-layer getters do, so the
@@ -273,15 +261,14 @@ namespace
         settings[LLSettingsSky::SETTING_MIE_CONFIG] = llsd::array(llsd::array(llsd::array(deep)), shallow);
 
         LLSD flat = LLSettingsSky::flattenDensityProfile(settings[LLSettingsSky::SETTING_MIE_CONFIG]);
-        UNSCOPED_INFO("both layers flattened");
         REQUIRE(flat.size() == size_t(2));
-        ensure_close("the deep layer first", term(flat[0], LLSettingsSky::SETTING_MIE_ANISOTROPY_FACTOR), 0.8f);
+        require_close("the deep layer first", term(flat[0], LLSettingsSky::SETTING_MIE_ANISOTROPY_FACTOR), 0.8f);
 
         LLSettingsSky::ptr_t sky = make_sky(settings);
-        ensure_close("g from the deep layer", sky->getMieAnisotropy(), 0.8f);
+        require_close("g from the deep layer", sky->getMieAnisotropy(), 0.8f);
         sky->setMieAnisotropy(0.6f);
-        ensure_close("g after the setter", sky->getMieAnisotropy(), 0.6f);
+        require_close("g after the setter", sky->getMieAnisotropy(), 0.6f);
         UNSCOPED_INFO("the setter keeps both layers");
-        REQUIRE(sky->getMieConfigs().size() == size_t(2));
+        CHECK(sky->getMieConfigs().size() == size_t(2));
     }
 }

@@ -96,7 +96,6 @@ namespace
         int results = mCG->loadFromFile(mTestConfigFile.c_str());
         UNSCOPED_INFO("number of settings");
         CHECK(results == 1);
-        UNSCOPED_INFO("value of setting");
         CHECK(mCG->getU32("TestSetting") == 12);
     }
 
@@ -105,7 +104,6 @@ namespace
     {
         int results = mCG->loadFromFile(mTestConfigFile.c_str());
         mCG->setU32("TestSetting", 13);
-        UNSCOPED_INFO("value of changed setting");
         CHECK(mCG->getU32("TestSetting") == 13);
         LLControlGroup test_cg("foo2");
         std::string temp_test_file = (mTestConfigDir + "setting_llsd_temp.xml");
@@ -114,7 +112,6 @@ namespace
         results = test_cg.loadFromFile(temp_test_file.c_str());
         UNSCOPED_INFO("number of changed settings loaded");
         CHECK(results == 1);
-        UNSCOPED_INFO("value of changed settings loaded");
         CHECK(test_cg.getU32("TestSetting") == 13);
     }
 
@@ -129,7 +126,6 @@ namespace
         LLControlVariable* control = mCG->getControl("TestSetting");
         LLSD new_value = 13;
         control->setValue(new_value, false);
-        UNSCOPED_INFO("value of changed setting");
         CHECK(mCG->getU32("TestSetting") == 13);
         LLControlGroup test_cg("foo3");
         std::string temp_test_file = (mTestConfigDir + "setting_llsd_persist_temp.xml");
@@ -146,10 +142,9 @@ namespace
     {
         int results = mCG->loadFromFile(mTestConfigFile.c_str());
         UNSCOPED_INFO("number of settings");
-        CHECK(results == 1);
+        REQUIRE(results == 1);
         mCG->getControl("TestSetting")->getSignal()->connect(boost::bind(&this->handleListenerTest));
         mCG->setU32("TestSetting", 13);
-        UNSCOPED_INFO("listener fired on changed setting");
         CHECK(mListenerFired);
     }
 

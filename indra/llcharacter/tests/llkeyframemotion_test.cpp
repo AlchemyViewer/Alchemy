@@ -248,9 +248,10 @@ namespace
     }
 
     template <typename T>
-    void ensure_same_value(const char* what, F32 time, const T& got, const T& want)
+    void require_same_value(const char* what, F32 time, const T& got, const T& want)
     {
-        UNSCOPED_INFO(std::string(what) + " at t=" + std::to_string(time));
+        INFO(what);
+        CAPTURE(time);
         REQUIRE(got == want);
     }
 
@@ -259,11 +260,13 @@ namespace
     // reference divides by a real one. They agree to about a part in ten
     // million, which is not the same bits. Everything else here is compared
     // exactly, this one to a tolerance well inside what a rotation can carry.
-    void ensure_same_value(const char* what, F32 time, const LLQuaternion& got, const LLQuaternion& want)
+    void require_same_value(const char* what, F32 time, const LLQuaternion& got, const LLQuaternion& want)
     {
+        INFO(what);
+        CAPTURE(time);
         for (S32 i = 0; i < 4; ++i)
         {
-            UNSCOPED_INFO((std::string(what) + " at t=" + std::to_string(time)).c_str());
+            CAPTURE(i);
             REQUIRE_THAT(got.mQ[i], Catch::Matchers::WithinAbs(want.mQ[i], 1e-6f));
         }
     }
@@ -271,21 +274,21 @@ namespace
     // Every way of sampling a curve without a cursor: far outside the keys,
     // random within them, and exactly on each one and a step either side.
     template <typename CurveT, typename T>
-    void ensure_stateless_parity(const char* what, Rng& rng, const CurveT& curve, const MapCurve<T>& reference)
+    void require_stateless_parity(const char* what, Rng& rng, const CurveT& curve, const MapCurve<T>& reference)
     {
         for (U32 i = 0; i < 2000; ++i)
         {
             const F32 time = rng.uniform(-0.5f, DURATION + 0.5f);
-            ensure_same_value(what, time, sample(curve, time), reference.getValue(time));
+            require_same_value(what, time, sample(curve, time), reference.getValue(time));
         }
         for (U32 k = 0; k < curve.getNumKeys(); ++k)
         {
             const F32 time = curve.getKeyTime(k);
             const F32 above = std::nextafter(time, DURATION * 2.f);
             const F32 below = std::nextafter(time, -DURATION);
-            ensure_same_value(what, time, sample(curve, time), reference.getValue(time));
-            ensure_same_value(what, above, sample(curve, above), reference.getValue(above));
-            ensure_same_value(what, below, sample(curve, below), reference.getValue(below));
+            require_same_value(what, time, sample(curve, time), reference.getValue(time));
+            require_same_value(what, above, sample(curve, above), reference.getValue(above));
+            require_same_value(what, below, sample(curve, below), reference.getValue(below));
         }
     }
 
@@ -294,8 +297,8 @@ namespace
     // looping motion does. Every sample must match the map, and the cursor
     // must be exactly where the map's search would have landed.
     template <typename CurveT, typename T>
-    U32 ensure_playback_parity(const char* what, Rng& rng, const CurveT& curve, const MapCurve<T>& reference,
-                               F32 min_step, F32 max_step, U32 samples)
+    U32 require_playback_parity(const char* what, Rng& rng, const CurveT& curve, const MapCurve<T>& reference,
+                                F32 min_step, F32 max_step, U32 samples)
     {
         U32 cursor = 0;
         U32 wraps = 0;
@@ -308,8 +311,9 @@ namespace
                 time -= DURATION;
                 ++wraps;
             }
-            ensure_same_value(what, time, sample(curve, time, cursor), reference.getValue(time));
-            UNSCOPED_INFO(std::string(what) + " cursor at t=" + std::to_string(time));
+            require_same_value(what, time, sample(curve, time, cursor), reference.getValue(time));
+            INFO(what << ": cursor");
+            CAPTURE(time);
             REQUIRE_THAT(cursor, ll_test::LLSDEquals(reference.lowerBound(time)));
         }
         return wraps;
@@ -534,11 +538,8 @@ namespace
         set_key(curve, 2.f, LLVector3(0.f, 2.f, 0.f));
         UNSCOPED_INFO("a repeated time does not add a key");
         CHECK(curve.getNumKeys() == 3u);
-        UNSCOPED_INFO("keys are sorted: first");
         CHECK(curve.getKeyTime(0) == 1.f);
-        UNSCOPED_INFO("keys are sorted: second");
         CHECK(curve.getKeyTime(1) == 2.f);
-        UNSCOPED_INFO("keys are sorted: third");
         CHECK(curve.getKeyTime(2) == 3.f);
         UNSCOPED_INFO("the last value at a time wins");
         CHECK(key_value(curve, 1) == LLVector3(0.f, 2.f, 0.f));
@@ -547,14 +548,12 @@ namespace
         RotationCurve rotations;
         MapCurve<LLQuaternion> reference;
         build(rng, rotations, reference, LLKeyframeMotion::IT_LINEAR);
-        UNSCOPED_INFO("random keys: count matches the map");
         REQUIRE(rotations.getNumKeys() == static_cast<U32>(reference.mKeys.size()));
         U32 k = 0;
         for (const auto& key : reference.mKeys)
         {
-            UNSCOPED_INFO("random keys: time matches the map");
+            CAPTURE(k);
             REQUIRE(rotations.getKeyTime(k) == key.first);
-            UNSCOPED_INFO("random keys: value matches the map");
             REQUIRE(key_value(rotations, k) == key.second);
             ++k;
         }
@@ -571,25 +570,25 @@ namespace
             PositionCurve curve;
             MapCurve<LLVector3> reference;
             build(rng, curve, reference, LLKeyframeMotion::IT_LINEAR);
-            ensure_stateless_parity("linear position", rng, curve, reference);
+            require_stateless_parity("linear position", rng, curve, reference);
         }
         {
             PositionCurve curve;
             MapCurve<LLVector3> reference;
             build(rng, curve, reference, LLKeyframeMotion::IT_STEP);
-            ensure_stateless_parity("stepped position", rng, curve, reference);
+            require_stateless_parity("stepped position", rng, curve, reference);
         }
         {
             RotationCurve curve;
             MapCurve<LLQuaternion> reference;
             build(rng, curve, reference, LLKeyframeMotion::IT_LINEAR);
-            ensure_stateless_parity("linear rotation", rng, curve, reference);
+            require_stateless_parity("linear rotation", rng, curve, reference);
         }
         {
             RotationCurve curve;
             MapCurve<LLQuaternion> reference;
             build(rng, curve, reference, LLKeyframeMotion::IT_STEP);
-            ensure_stateless_parity("stepped rotation", rng, curve, reference);
+            require_stateless_parity("stepped rotation", rng, curve, reference);
         }
     }
 
@@ -605,18 +604,16 @@ namespace
         MapCurve<LLQuaternion> reference;
         build(rng, curve, reference, LLKeyframeMotion::IT_LINEAR);
 
-        const U32 fine_wraps = ensure_playback_parity("fine playback", rng, curve, reference, 0.f, 0.03f, 1200);
-        UNSCOPED_INFO("fine playback wrapped");
+        const U32 fine_wraps = require_playback_parity("fine playback", rng, curve, reference, 0.f, 0.03f, 1200);
         CHECK(fine_wraps >= 3);
 
-        const U32 coarse_wraps = ensure_playback_parity("coarse playback", rng, curve, reference, 0.3f, 1.f, 200);
-        UNSCOPED_INFO("coarse playback wrapped");
+        const U32 coarse_wraps = require_playback_parity("coarse playback", rng, curve, reference, 0.3f, 1.f, 200);
         CHECK(coarse_wraps >= 20);
 
         PositionCurve stepped;
         MapCurve<LLVector3> stepped_reference;
         build(rng, stepped, stepped_reference, LLKeyframeMotion::IT_STEP);
-        ensure_playback_parity("stepped playback", rng, stepped, stepped_reference, 0.f, 0.05f, 800);
+        require_playback_parity("stepped playback", rng, stepped, stepped_reference, 0.f, 0.05f, 800);
     }
 
     TEST_CASE_METHOD(llkeyframemotion_data, "LLKeyframeMotion: a sample on a key returns that key whatever the cursor", "[LLKeyframeMotion]")
@@ -637,14 +634,15 @@ namespace
             const U32 hints[] = { 0u, k > 0 ? k - 1 : 0u, k, k + 1, count, count + 7 };
             for (U32 hint : hints)
             {
+                CAPTURE(k, hint);
                 U32 cursor = hint;
-                ensure_same_value("exact key under any cursor", time, sample(curve, time, cursor), reference.getValue(time));
+                require_same_value("exact key under any cursor", time, sample(curve, time, cursor), reference.getValue(time));
                 UNSCOPED_INFO("exact key leaves the cursor on the key");
                 REQUIRE(cursor == k);
 
                 cursor = hint;
                 const F32 above = std::nextafter(time, DURATION * 2.f);
-                ensure_same_value("just past a key under any cursor", above, sample(curve, above, cursor), reference.getValue(above));
+                require_same_value("just past a key under any cursor", above, sample(curve, above, cursor), reference.getValue(above));
                 UNSCOPED_INFO("just past a key leaves the cursor after it");
                 REQUIRE(cursor == k + 1);
             }
@@ -659,10 +657,8 @@ namespace
         // has to say what it answers with rather than handing back whatever
         // was in the memory.
         PositionCurve no_positions;
-        UNSCOPED_INFO("an empty position curve is the zero vector");
         CHECK(sample(no_positions, 1.f) == LLVector3());
         RotationCurve no_rotations;
-        UNSCOPED_INFO("an empty rotation curve is the identity");
         CHECK(sample(no_rotations, 1.f) == LLQuaternion());
 
         RotationCurve one;
@@ -696,34 +692,23 @@ namespace
         LLKeyframeMotion motion(LLUUID::generateNewID());
         std::vector<U8> buffer(4096);
         const AssetAnimation anim = two_joint_animation();
-        UNSCOPED_INFO("the animation is accepted");
         REQUIRE(load(motion, anim, buffer.data(), (S32)buffer.size()));
 
-        UNSCOPED_INFO("both joints came through");
         CHECK(motion.getNumJointMotions() == 2);
-        UNSCOPED_INFO("duration");
         CHECK_THAT(motion.getDuration(), ll_test::WithinBits(anim.mDuration, 16));
-        UNSCOPED_INFO("the animation loops");
         CHECK(motion.getLoop());
-        UNSCOPED_INFO("ease in");
         CHECK_THAT(motion.getEaseInDuration(), ll_test::WithinBits(anim.mEaseIn, 16));
-        UNSCOPED_INFO("ease out");
         CHECK_THAT(motion.getEaseOutDuration(), ll_test::WithinBits(anim.mEaseOut, 16));
-        UNSCOPED_INFO("base priority");
         CHECK((S32)motion.getPriority() == anim.mBasePriority);
 
         LLPose* pose = motion.getPose();
         UNSCOPED_INFO("a joint state per joint motion");
         CHECK(pose->getNumJointStates() == 2);
         LLJointState* pelvis_state = pose->findJointState(std::string("mPelvis"));
-        UNSCOPED_INFO("the pelvis is in the pose");
         REQUIRE(pelvis_state != nullptr);
-        UNSCOPED_INFO("the pelvis carries both channels");
         CHECK(pelvis_state->getUsage() == (U32)(LLJointState::ROT | LLJointState::POS));
         LLJointState* torso_state = pose->findJointState(std::string("mTorso"));
-        UNSCOPED_INFO("the torso is in the pose");
         REQUIRE(torso_state != nullptr);
-        UNSCOPED_INFO("the torso carries rotation only");
         CHECK(torso_state->getUsage() == (U32)LLJointState::ROT);
         UNSCOPED_INFO("the torso keeps its own priority");
         CHECK((S32)torso_state->getPriority() == anim.mJoints[1].mPriority);
@@ -733,12 +718,13 @@ namespace
         // rotations over a packed vector, so this is close rather than equal.
         for (const auto& key : anim.mJoints[0].mPositions)
         {
+            CAPTURE(key.first);
             LLJointState* sampled = sampleAt(motion, key.first, "mPelvis");
-            UNSCOPED_INFO("the pelvis is sampled");
             REQUIRE(sampled != nullptr);
             const LLVector3 got = sampled->getPosition();
             for (S32 i = 0; i < 3; ++i)
             {
+                CAPTURE(i);
                 UNSCOPED_INFO("position key survived the parse");
                 REQUIRE_THAT(got.mV[i], Catch::Matchers::WithinAbs(key.second.mV[i], 1e-3f));
             }
@@ -746,19 +732,18 @@ namespace
 
         for (const auto& key : anim.mJoints[0].mRotations)
         {
+            CAPTURE(key.first);
             LLJointState* sampled = sampleAt(motion, key.first, "mPelvis");
-            UNSCOPED_INFO("the pelvis is sampled");
             REQUIRE(sampled != nullptr);
             UNSCOPED_INFO("rotation key survived the parse");
             REQUIRE_THAT(fabsf(dot(sampled->getRotation(), key.second)), Catch::Matchers::WithinAbs(1.f, 1e-3f));
         }
 
         LLJointState* torso_sample = sampleAt(motion, anim.mJoints[1].mRotations[0].first, "mTorso");
-        UNSCOPED_INFO("the torso is sampled");
         REQUIRE(torso_sample != nullptr);
         UNSCOPED_INFO("the torso's one key survived the parse");
         CHECK_THAT(fabsf(dot(torso_sample->getRotation(), anim.mJoints[1].mRotations[0].second)),
-                                          Catch::Matchers::WithinAbs(1.f, 1e-3f));
+                   Catch::Matchers::WithinAbs(1.f, 1e-3f));
     }
 
     TEST_CASE_METHOD(llkeyframemotion_data, "LLKeyframeMotion: serialize then deserialize gives back the same joints and keys", "[LLKeyframeMotion]")
@@ -769,43 +754,32 @@ namespace
         // first reading was already quantized.
         LLKeyframeMotion first(LLUUID::generateNewID());
         std::vector<U8> buffer(4096);
-        UNSCOPED_INFO("the animation is accepted");
         REQUIRE(load(first, two_joint_animation(), buffer.data(), (S32)buffer.size()));
 
         std::vector<U8> written(first.getFileSize());
         LLDataPackerBinaryBuffer writer(written.data(), (S32)written.size());
-        UNSCOPED_INFO("it serializes");
         CHECK(first.serialize(writer));
 
         LLKeyframeMotion second(LLUUID::generateNewID());
         second.setCharacter(&mCharacter);
         LLDataPackerBinaryBuffer reader(written.data(), writer.getCurrentSize());
-        UNSCOPED_INFO("what was written reads back");
         CHECK(second.deserialize(reader, second.getID()));
 
-        UNSCOPED_INFO("same joint count");
         CHECK(second.getNumJointMotions() == first.getNumJointMotions());
-        UNSCOPED_INFO("same duration");
         CHECK_THAT(second.getDuration(), ll_test::WithinBits(first.getDuration(), 16));
-        UNSCOPED_INFO("same base priority");
         CHECK((S32)second.getPriority() == (S32)first.getPriority());
 
         LLPose* first_pose = first.getPose();
         LLPose* second_pose = second.getPose();
-        UNSCOPED_INFO("same joint state count");
         CHECK(second_pose->getNumJointStates() == first_pose->getNumJointStates());
         for (const char* name : { "mPelvis", "mTorso" })
         {
+            CAPTURE(name);
             LLJointState* a = first_pose->findJointState(std::string(name));
             LLJointState* b = second_pose->findJointState(std::string(name));
-            {
-                INFO("joint survived the round trip");
-                REQUIRE(a != nullptr);
-                REQUIRE(b != nullptr);
-            }
-            UNSCOPED_INFO("same usage");
+            REQUIRE(a != nullptr);
+            REQUIRE(b != nullptr);
             REQUIRE(b->getUsage() == a->getUsage());
-            UNSCOPED_INFO("same priority");
             REQUIRE((S32)b->getPriority() == (S32)a->getPriority());
         }
 
@@ -816,17 +790,14 @@ namespace
         {
             for (const char* name : { "mPelvis", "mTorso" })
             {
+                CAPTURE(time, name);
                 LLJointState* a = sampleAt(first, time, name);
                 LLJointState* b = sampleAt(second, time, name);
-                {
-                    INFO("joint sampled on both sides");
-                    REQUIRE(a != nullptr);
-                    REQUIRE(b != nullptr);
-                }
+                REQUIRE(a != nullptr);
+                REQUIRE(b != nullptr);
 
                 const LLQuaternion rot_a = a->getRotation();
                 const LLQuaternion rot_b = b->getRotation();
-                UNSCOPED_INFO("same rotation after the round trip");
                 REQUIRE_THAT(fabsf(dot(rot_a, rot_b)), Catch::Matchers::WithinAbs(1.f, 1e-4f));
 
                 if (a->getUsage() & LLJointState::POS)
@@ -835,7 +806,7 @@ namespace
                     const LLVector3 pos_b = b->getPosition();
                     for (S32 i = 0; i < 3; ++i)
                     {
-                        UNSCOPED_INFO("same position after the round trip");
+                        CAPTURE(i);
                         REQUIRE_THAT(pos_b.mV[i], Catch::Matchers::WithinAbs(pos_a.mV[i], 1e-4f));
                     }
                 }
@@ -854,6 +825,7 @@ namespace
 
         for (S32 chain_length = 0; chain_length < MAX_CHAIN_LENGTH; ++chain_length)
         {
+            CAPTURE(chain_length);
             LLKeyframeMotion motion(LLUUID::generateNewID());
             UNSCOPED_INFO("a chain the arrays can hold is accepted");
             REQUIRE(load(motion, constrained_animation(chain_length), buffer.data(), (S32)buffer.size()));
@@ -864,7 +836,7 @@ namespace
             // so the length is the only thing left to refuse it.
             LLKeyframeMotion motion(LLUUID::generateNewID());
             UNSCOPED_INFO("a chain as long as the arrays is refused");
-            REQUIRE_FALSE(load(motion, constrained_animation(MAX_CHAIN_LENGTH), buffer.data(), (S32)buffer.size()));
+            CHECK_FALSE(load(motion, constrained_animation(MAX_CHAIN_LENGTH), buffer.data(), (S32)buffer.size()));
         }
 
         {
@@ -872,7 +844,7 @@ namespace
             // joint count check has always refused
             LLKeyframeMotion motion(LLUUID::generateNewID());
             UNSCOPED_INFO("a chain longer than the skeleton is refused");
-            REQUIRE_FALSE(load(motion, constrained_animation(200), buffer.data(), (S32)buffer.size()));
+            CHECK_FALSE(load(motion, constrained_animation(200), buffer.data(), (S32)buffer.size()));
         }
     }
 
@@ -885,18 +857,14 @@ namespace
         // joint it had already written holding a pose nothing asked for.
         LLKeyframeMotion motion(LLUUID::generateNewID());
         std::vector<U8> buffer(4096);
-        UNSCOPED_INFO("the constrained animation loads");
         REQUIRE(load(motion, constrained_animation(1), buffer.data(), (S32)buffer.size()));
 
         // The chain runs up from the collision volume: its parent and then its
         // grandparent, which for the test character is mHead and mNeck.
         LLJoint* first_in_chain = mCharacter.getJoint("mHead");
         LLJoint* second_in_chain = mCharacter.getJoint("mNeck");
-        {
-            INFO("the chain joints resolve");
-            REQUIRE(first_in_chain != nullptr);
-            REQUIRE(second_in_chain != nullptr);
-        }
+        REQUIRE(first_in_chain != nullptr);
+        REQUIRE(second_in_chain != nullptr);
 
         const LLQuaternion marker(1.1f, LLVector3::x_axis);
         first_in_chain->setRotation(marker);
@@ -922,7 +890,6 @@ namespace
         LLKeyframeMotion motion(LLUUID::generateNewID());
         std::vector<U8> buffer(4096);
         const AssetAnimation anim = two_joint_animation();
-        UNSCOPED_INFO("the animation loads");
         REQUIRE(load(motion, anim, buffer.data(), (S32)buffer.size()));
 
         U8 nothing_claimed[LL_CHARACTER_MAX_ANIMATED_JOINTS] = {};
@@ -932,12 +899,8 @@ namespace
         LLPose* pose = motion.getPose();
         LLJointState* torso = pose->findJointState(std::string("mTorso"));
         LLJointState* pelvis = pose->findJointState(std::string("mPelvis"));
-        {
-            INFO("both joints are in the pose");
-            REQUIRE(torso != nullptr);
-            REQUIRE(pelvis != nullptr);
-        }
-        UNSCOPED_INFO("the torso only rotates");
+        REQUIRE(torso != nullptr);
+        REQUIRE(pelvis != nullptr);
         CHECK(torso->getUsage() == (U32)LLJointState::ROT);
 
         const LLQuaternion marker(2.4f, LLVector3(0.f, 0.f, 1.f));
@@ -973,13 +936,13 @@ namespace
         auto refuses = [&](const char* what, const AssetAnimation& anim)
         {
             LLKeyframeMotion motion(LLUUID::generateNewID());
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE_FALSE(load(motion, anim, buffer.data(), (S32)buffer.size()));
         };
         auto accepts = [&](const char* what, const AssetAnimation& anim)
         {
             LLKeyframeMotion motion(LLUUID::generateNewID());
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE(load(motion, anim, buffer.data(), (S32)buffer.size()));
         };
 
@@ -1060,12 +1023,13 @@ namespace
         auto refuses = [&](const char* what, const AssetAnimation& anim)
         {
             LLKeyframeMotion motion(LLUUID::generateNewID());
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE_FALSE(load(motion, anim, buffer.data(), (S32)buffer.size()));
         };
 
         for (const char* special : { "mRoot", "mScreen" })
         {
+            CAPTURE(special);
             AssetAnimation anim = two_joint_animation();
             anim.mJoints[0].mName = special;
             refuses("an animation naming a special joint is refused", anim);
@@ -1129,13 +1093,13 @@ namespace
         auto refuses = [&](const char* what, const AssetAnimation& anim)
         {
             LLKeyframeMotion motion(LLUUID::generateNewID());
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE_FALSE(load(motion, anim, buffer.data(), (S32)buffer.size()));
         };
         auto accepts = [&](const char* what, const AssetAnimation& anim)
         {
             LLKeyframeMotion motion(LLUUID::generateNewID());
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE(load(motion, anim, buffer.data(), (S32)buffer.size()));
         };
 
@@ -1187,6 +1151,7 @@ namespace
 
         for (S32 length = 0; length < whole; ++length)
         {
+            CAPTURE(length);
             LLKeyframeMotion motion(LLUUID::generateNewID());
             motion.setCharacter(&mCharacter);
             LLDataPackerBinaryBuffer reader(buffer.data(), length);
@@ -1214,6 +1179,7 @@ namespace
 
         for (S32 length = 0; length < whole; ++length)
         {
+            CAPTURE(length);
             LLKeyframeMotion motion(LLUUID::generateNewID());
             motion.setCharacter(&mCharacter);
             LLDataPackerBinaryBuffer reader(buffer.data(), length);
@@ -1236,31 +1202,25 @@ namespace
         std::vector<U8> buffer(8192);
         const AssetAnimation anim = two_joint_animation();
 
-        UNSCOPED_INFO("the cache starts empty");
         CHECK(LLKeyframeDataCache::size() == 0u);
 
         LLKeyframeMotion motion(LLUUID::generateNewID());
-        UNSCOPED_INFO("the animation is read");
         REQUIRE(load(motion, anim, buffer.data(), (S32)buffer.size()));
 
-        UNSCOPED_INFO("and kept");
+        UNSCOPED_INFO("the cache keeps what was read");
         CHECK(LLKeyframeDataCache::size() == 1u);
         LLKeyframeMotion::JointMotionList* held = LLKeyframeDataCache::getKeyframeData(motion.getID());
-        UNSCOPED_INFO("under the id it was read for");
         REQUIRE(held != nullptr);
-        UNSCOPED_INFO("with the joints it was read with");
         CHECK(held->getNumJointMotions() == 2u);
 
         // Counted rather than owned: the cache has one hold on it and the
         // motion reading it has the other.
-        UNSCOPED_INFO("two things are holding it");
         CHECK(held->getNumRefs() == 2);
 
         {
             LLKeyframeMotion second(motion.getID());
-            UNSCOPED_INFO("a second motion reading it makes three");
             CHECK(second.onInitialize(&mCharacter) == LLMotion::STATUS_SUCCESS);
-            UNSCOPED_INFO("holds");
+            UNSCOPED_INFO("a second motion reading it makes three holds");
             CHECK(held->getNumRefs() == 3);
         }
         UNSCOPED_INFO("and letting go puts it back");
@@ -1276,27 +1236,23 @@ namespace
         const AssetAnimation anim = two_joint_animation();
 
         LLKeyframeMotion motion(LLUUID::generateNewID());
-        UNSCOPED_INFO("the animation is read");
         REQUIRE(load(motion, anim, buffer.data(), (S32)buffer.size()));
         const F32 duration = motion.getDuration();
         UNSCOPED_INFO("it has a duration to lose");
         CHECK(duration > 0.f);
 
         LLKeyframeDataCache::clear();
-        UNSCOPED_INFO("the cache lets go of it");
         CHECK(LLKeyframeDataCache::size() == 0u);
-        UNSCOPED_INFO("and no longer hands it out");
-        REQUIRE(LLKeyframeDataCache::getKeyframeData(motion.getID()) == nullptr);
+        CHECK(LLKeyframeDataCache::getKeyframeData(motion.getID()) == nullptr);
 
         UNSCOPED_INFO("the motion still has it");
         CHECK_THAT(motion.getDuration(), ll_test::WithinBits(duration, 16));
-        UNSCOPED_INFO("whole");
         CHECK(motion.getNumJointMotions() == 2);
 
         // And it still plays, which reads the curves the cache used to own.
         LLJointState* state = sampleAt(motion, 0.5f, "mPelvis");
         UNSCOPED_INFO("a motion whose cache entry is gone still animates");
-        REQUIRE(state != nullptr);
+        CHECK(state != nullptr);
     }
 
     TEST_CASE_METHOD(llkeyframemotion_data, "LLKeyframeMotion: removeKeyframeData leaves a playing motion its animation", "[LLKeyframeMotion]")
@@ -1307,18 +1263,16 @@ namespace
         const AssetAnimation anim = two_joint_animation();
 
         LLKeyframeMotion motion(LLUUID::generateNewID());
-        UNSCOPED_INFO("the animation is read");
         REQUIRE(load(motion, anim, buffer.data(), (S32)buffer.size()));
 
         LLKeyframeDataCache::removeKeyframeData(motion.getID());
-        UNSCOPED_INFO("the cache lets go of it");
         CHECK(LLKeyframeDataCache::size() == 0u);
-        UNSCOPED_INFO("the motion does not");
+        UNSCOPED_INFO("the motion does not let go of it");
         CHECK(motion.getNumJointMotions() == 2);
 
         // Removing one nobody has is not an error.
         LLKeyframeDataCache::removeKeyframeData(LLUUID::generateNewID());
-        UNSCOPED_INFO("and the cache is no worse for it");
+        UNSCOPED_INFO("removing an id nobody has leaves the cache as it was");
         CHECK(LLKeyframeDataCache::size() == 0u);
     }
 
@@ -1331,16 +1285,13 @@ namespace
         const AssetAnimation anim = two_joint_animation();
 
         LLKeyframeMotion kept(LLUUID::generateNewID());
-        UNSCOPED_INFO("the first animation is read");
         REQUIRE(load(kept, anim, buffer.data(), (S32)buffer.size()));
 
         LLUUID dropped_id;
         {
             LLKeyframeMotion dropped(LLUUID::generateNewID());
             dropped_id = dropped.getID();
-            UNSCOPED_INFO("the second is read");
             REQUIRE(load(dropped, anim, buffer.data(), (S32)buffer.size()));
-            UNSCOPED_INFO("both are in the cache");
             CHECK(LLKeyframeDataCache::size() == 2u);
 
             LLKeyframeDataCache::purge();
@@ -1353,10 +1304,9 @@ namespace
         UNSCOPED_INFO("a purge drops what nobody is playing");
         CHECK(LLKeyframeDataCache::size() == 1u);
         UNSCOPED_INFO("the one that went is the one nobody had");
-        REQUIRE(LLKeyframeDataCache::getKeyframeData(dropped_id) == nullptr);
+        CHECK(LLKeyframeDataCache::getKeyframeData(dropped_id) == nullptr);
         UNSCOPED_INFO("and the one that stayed is the one somebody had");
-        REQUIRE(LLKeyframeDataCache::getKeyframeData(kept.getID()) != nullptr);
-        UNSCOPED_INFO("still whole");
+        CHECK(LLKeyframeDataCache::getKeyframeData(kept.getID()) != nullptr);
         CHECK(kept.getNumJointMotions() == 2);
     }
 
@@ -1373,10 +1323,8 @@ namespace
         LLKeyframeMotion second(id);
         {
             LLKeyframeMotion first(id);
-            UNSCOPED_INFO("the animation is read");
             REQUIRE(load(first, anim, buffer.data(), (S32)buffer.size()));
             first_list = LLKeyframeDataCache::getKeyframeData(id);
-            UNSCOPED_INFO("and kept");
             REQUIRE(first_list != nullptr);
 
             // The second finds it in the cache rather than reading it again,
@@ -1391,7 +1339,7 @@ namespace
         UNSCOPED_INFO("one motion going does not take the animation with it");
         CHECK(LLKeyframeDataCache::size() == 1u);
         UNSCOPED_INFO("and it is the same one");
-        REQUIRE(LLKeyframeDataCache::getKeyframeData(id) == first_list);
+        CHECK(LLKeyframeDataCache::getKeyframeData(id) == first_list);
     }
 
     TEST_CASE_METHOD(llkeyframemotion_data, "LLKeyframeMotion: a loop seam leads the tail after the last key back to the loop start", "[LLKeyframeMotion]")
@@ -1458,7 +1406,6 @@ namespace
         // An empty curve is asked nothing and says nothing.
         PositionCurve empty;
         empty.setLoopSeam(true, 0.f, 2.f);
-        UNSCOPED_INFO("an empty curve has no keys");
         CHECK(empty.getNumKeys() == 0u);
     }
 
@@ -1494,7 +1441,7 @@ namespace
         // q and -q are the same rotation, so compare through the dot product.
         UNSCOPED_INFO("the rotation tail ends on the loop's first pose");
         CHECK_THAT(fabsf(dot(at_end, LLQuaternion(0.f, LLVector3::z_axis))),
-                                          Catch::Matchers::WithinAbs(1.f, 1e-4f));
+                   Catch::Matchers::WithinAbs(1.f, 1e-4f));
     }
 
     TEST_CASE_METHOD(llkeyframemotion_data, "LLKeyframeMotion: a hand pose request outlives the animation and respects priority", "[LLKeyframeMotion]")
@@ -1509,7 +1456,6 @@ namespace
 
         {
             LLKeyframeMotion motion(LLUUID::generateNewID());
-            UNSCOPED_INFO("the animation is read");
             REQUIRE(load(motion, anim, buffer.data(), (S32)buffer.size()));
             UNSCOPED_INFO("nothing is asked for before it is sampled");
             CHECK_FALSE(mCharacter.hasHandPoseRequest());
@@ -1533,7 +1479,6 @@ namespace
         anim.mHandPose = LLHandMotion::HAND_POSE_POINT;
         anim.mJoints[0].mPriority = LLJoint::MEDIUM_PRIORITY;
         LLKeyframeMotion lower(LLUUID::generateNewID());
-        UNSCOPED_INFO("the lower priority animation is read");
         REQUIRE(load(lower, anim, buffer.data(), (S32)buffer.size()));
         sampleAt(lower, 0.f, "mPelvis");
         UNSCOPED_INFO("a lower priority motion leaves the request standing");
@@ -1543,7 +1488,6 @@ namespace
         anim.mHandPose = LLHandMotion::HAND_POSE_PEACE_R;
         anim.mJoints[0].mPriority = LLJoint::HIGH_PRIORITY;
         LLKeyframeMotion equal(LLUUID::generateNewID());
-        UNSCOPED_INFO("the equal priority animation is read");
         REQUIRE(load(equal, anim, buffer.data(), (S32)buffer.size()));
         sampleAt(equal, 0.f, "mPelvis");
         UNSCOPED_INFO("an equal priority motion asking later takes the request");
@@ -1558,7 +1502,6 @@ namespace
         // or by nothing, never by the 4.2 ms that passed.
         std::vector<U8> buffer(8192);
         LLKeyframeMotion motion(LLUUID::generateNewID());
-        UNSCOPED_INFO("the animation is read");
         REQUIRE(load(motion, two_joint_animation(), buffer.data(), (S32)buffer.size()));
         motion.setStopped(false);
 

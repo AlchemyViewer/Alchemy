@@ -42,27 +42,18 @@ namespace
         const std::string xml =
             "<thing id=\"abc\" name=\"hello world\" count=\"42\">body text</thing>";
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parseBuffer succeeds");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        UNSCOPED_INFO("node non-null");
         REQUIRE(node.notNull());
-        UNSCOPED_INFO("node name");
         CHECK(node->hasName("thing"));
-        UNSCOPED_INFO("id attribute");
         CHECK(node->getID() == std::string("abc"));
-        UNSCOPED_INFO("text value");
         CHECK(node->getValue() == std::string("body text"));
 
         std::string name;
-        UNSCOPED_INFO("name attr present");
         REQUIRE(node->getAttributeString("name", name));
-        UNSCOPED_INFO("name attr value");
         CHECK(name == std::string("hello world"));
 
         S32 count = 0;
-        UNSCOPED_INFO("count attr present");
         CHECK(node->getAttributeS32("count", count));
-        UNSCOPED_INFO("count attr value");
         CHECK(count == 42);
     }
 
@@ -72,9 +63,7 @@ namespace
     {
         const std::string xml = "<v>\"abc\\\"def\"</v>"; // raw: <v>"abc\"def"</v>
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parse");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        UNSCOPED_INFO("unescaped value");
         CHECK(node->getValue() == std::string("abc\"def"));
     }
 
@@ -88,11 +77,9 @@ namespace
         xml += "</big>";
         std::istringstream stream(xml);
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parseStream");
         REQUIRE(LLXMLNode::parseStream(stream, node, nullptr));
         UNSCOPED_INFO("accumulated length");
         REQUIRE(node->getValue().size() == N);
-        UNSCOPED_INFO("all content preserved");
         CHECK(node->getValue() == std::string(N, 'x'));
     }
 
@@ -102,20 +89,14 @@ namespace
         const std::string xml =
             "<root><pos type=\"float\">1.5 -2.25 3.0</pos></root>";
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parse");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
 
         LLXMLNodePtr pos;
-        UNSCOPED_INFO("getChild pos");
         REQUIRE(node->getChild("pos", pos));
         F32 v[3] = { 0.f, 0.f, 0.f };
-        UNSCOPED_INFO("3 floats parsed");
         CHECK((S32)pos->getFloatValue(3, v) == 3);
-        UNSCOPED_INFO("v0");
         CHECK(std::fabs(v[0] - 1.5f) < 1e-5f);
-        UNSCOPED_INFO("v1");
         CHECK(std::fabs(v[1] + 2.25f) < 1e-5f);
-        UNSCOPED_INFO("v2");
         CHECK(std::fabs(v[2] - 3.0f) < 1e-5f);
     }
 
@@ -125,27 +106,18 @@ namespace
         LLXMLNodePtr node = new LLXMLNode("flags", false);
         const bool vals[3] = { true, false, true };
         node->setBoolValue(3, vals);
-        UNSCOPED_INFO("bool serialization");
-        CHECK(node->getValue() ==
-                      std::string("true false true"));
+        CHECK(node->getValue() == std::string("true false true"));
 
         bool out[3] = { false, false, false };
-        UNSCOPED_INFO("read back count");
         CHECK((S32)node->getBoolValue(3, out) == 3);
-        UNSCOPED_INFO("b0");
         CHECK(out[0]);
-        UNSCOPED_INFO("b1");
         CHECK_FALSE(out[1]);
-        UNSCOPED_INFO("b2");
         CHECK(out[2]);
     }
 
-    // XML escaping of the five special characters.
     TEST_CASE("llxmlnode: escapeXML escapes the five special characters", "[llxmlnode]")
     {
-        UNSCOPED_INFO("escapeXML");
-        CHECK(LLXMLNode::escapeXML("a<b>&\"'c") ==
-                      std::string("a&lt;b&gt;&amp;&quot;&apos;c"));
+        CHECK(LLXMLNode::escapeXML("a<b>&\"'c") == std::string("a&lt;b&gt;&amp;&quot;&apos;c"));
     }
 
     // deepCopy uses the copy constructor; verify fields survive the copy.
@@ -153,23 +125,16 @@ namespace
     {
         const std::string xml = "<a id=\"i1\" k=\"v\">text</a>";
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parse");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
 
         LLXMLNodePtr copy = node->deepCopy();
-        UNSCOPED_INFO("copy non-null");
         REQUIRE(copy.notNull());
-        UNSCOPED_INFO("copy name");
         CHECK(copy->hasName("a"));
-        UNSCOPED_INFO("copy id");
         CHECK(copy->getID() == std::string("i1"));
-        UNSCOPED_INFO("copy value");
         CHECK(copy->getValue() == std::string("text"));
 
         std::string k;
-        UNSCOPED_INFO("copy attr present");
         REQUIRE(copy->getAttributeString("k", k));
-        UNSCOPED_INFO("copy attr value");
         CHECK(k == std::string("v"));
     }
 
@@ -179,17 +144,13 @@ namespace
     {
         const std::string xml = "<v>he said &quot;hello&quot; loudly</v>";
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parse");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        UNSCOPED_INFO("quotes preserved");
-        CHECK(node->getValue() ==
-                      std::string("he said \"hello\" loudly"));
+        CHECK(node->getValue() == std::string("he said \"hello\" loudly"));
 
         std::istringstream stream(xml);
         LLXMLNodePtr snode;
-        UNSCOPED_INFO("parseStream");
         REQUIRE(LLXMLNode::parseStream(stream, snode, nullptr));
-        UNSCOPED_INFO("stream agrees");
+        UNSCOPED_INFO("parseStream agrees with parseBuffer");
         CHECK(snode->getValue() == node->getValue());
     }
 
@@ -198,9 +159,7 @@ namespace
     {
         const std::string xml = "<v>&quot;hello&quot;</v>";
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parse");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        UNSCOPED_INFO("outer quotes stripped");
         CHECK(node->getValue() == std::string("hello"));
     }
 
@@ -209,9 +168,7 @@ namespace
     {
         const std::string xml = "<v><![CDATA[raw <x> &amp; y]]></v>";
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parse");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        UNSCOPED_INFO("cdata verbatim");
         CHECK(node->getValue() == std::string("raw <x> &amp; y"));
     }
 
@@ -221,38 +178,28 @@ namespace
     {
         const std::string xml = "<a>x<b/>   <c/>y</a>";
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parse");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
         UNSCOPED_INFO("interior whitespace kept");
         CHECK(node->getValue() == std::string("x   y"));
     }
 
-    // Line numbers are reported for elements and for their attributes.
     TEST_CASE("llxmlnode: line numbers are reported for elements and their attributes", "[llxmlnode]")
     {
         const std::string xml = "<a>\n  <b k=\"v\"/>\n  <c/>\n</a>";
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parse");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        UNSCOPED_INFO("root line");
         CHECK(node->getLineNumber() == 1);
 
         LLXMLNodePtr b;
-        UNSCOPED_INFO("getChild b");
         REQUIRE(node->getChild("b", b));
-        UNSCOPED_INFO("b line");
         CHECK(b->getLineNumber() == 2);
 
         LLXMLNodePtr attr;
-        UNSCOPED_INFO("attribute node");
         REQUIRE(b->getAttribute("k", attr));
-        UNSCOPED_INFO("attribute line");
         CHECK(attr->getLineNumber() == 2);
 
         LLXMLNodePtr c;
-        UNSCOPED_INFO("getChild c");
         REQUIRE(node->getChild("c", c));
-        UNSCOPED_INFO("c line");
         CHECK(c->getLineNumber() == 3);
     }
 
@@ -273,41 +220,35 @@ namespace
             "<other/>"
             "</root>";
         LLXMLNodePtr root;
-        UNSCOPED_INFO("parse");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), root, nullptr));
-        UNSCOPED_INFO("nine children");
         CHECK(root->getChildCount() == 9u);
 
         LLXMLNodePtr first;
-        UNSCOPED_INFO("getChild finds one");
         REQUIRE(root->getChild("s", first));
         std::string n;
-        UNSCOPED_INFO("it has n");
         REQUIRE(first->getAttributeString("n", n));
-        UNSCOPED_INFO("and is the first in the file");
+        UNSCOPED_INFO("getChild answers the first in the file");
         CHECK(n == std::string("0"));
 
         LLXMLNodeList all;
         root->getChildren("s", all);
         UNSCOPED_INFO("getChildren finds them all");
-        REQUIRE(all.size() == 8u);
+        CHECK(all.size() == 8u);
 
         // Delete in document order: each deletion is of the front of the
         // run, which is where a descent is least likely to land.
         for (int expected = 0; expected < 8; ++expected)
         {
+            CAPTURE(expected);
             LLXMLNodePtr child;
             UNSCOPED_INFO("still one to find");
             REQUIRE(root->getChild("s", child));
-            UNSCOPED_INFO("attribute");
             REQUIRE(child->getAttributeString("n", n));
             UNSCOPED_INFO("in document order");
             REQUIRE(n == std::to_string(expected));
-            UNSCOPED_INFO("deleted");
             REQUIRE(root->deleteChild(child));
             UNSCOPED_INFO("and orphaned");
             REQUIRE(child->mParent == nullptr);
-            UNSCOPED_INFO("count follows");
             REQUIRE(root->getChildCount() == (U32)(8 - expected));
 
             // The sibling list agrees with the map about what is left.
@@ -321,7 +262,6 @@ namespace
         }
 
         LLXMLNodePtr none;
-        UNSCOPED_INFO("no s is left");
         CHECK_FALSE(root->getChild("s", none));
         LLXMLNodePtr other;
         UNSCOPED_INFO("the other child remains");
@@ -338,7 +278,6 @@ namespace
             "<s n=\"4\"/><s n=\"5\"/><s n=\"6\"/><s n=\"7\"/>"
             "</root>";
         LLXMLNodePtr root;
-        UNSCOPED_INFO("parse");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), root, nullptr));
 
         std::vector<LLXMLNodePtr> children;
@@ -346,17 +285,16 @@ namespace
         {
             children.push_back(c);
         }
-        UNSCOPED_INFO("eight in the list");
         REQUIRE(children.size() == 8u);
 
         for (size_t index : { 7u, 3u, 0u, 5u, 1u, 6u, 2u, 4u })
         {
+            CAPTURE(index);
             UNSCOPED_INFO("deleted from wherever it sits");
             REQUIRE(root->deleteChild(children[index]));
         }
-        UNSCOPED_INFO("none left");
         CHECK(root->getChildCount() == 0u);
         UNSCOPED_INFO("and the list is empty");
-        REQUIRE(root->getFirstChild().isNull());
+        CHECK(root->getFirstChild().isNull());
     }
 }

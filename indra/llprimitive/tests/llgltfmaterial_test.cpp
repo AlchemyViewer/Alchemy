@@ -109,29 +109,25 @@ namespace
         return material;
     }
 
-    void ensure_gltf_material_serialize(const std::string& ensure_suffix, const LLGLTFMaterial& material_in)
+    void require_json_round_trip(const std::string& what, const LLGLTFMaterial& material_in)
     {
+        INFO(what);
         const std::string json_in = material_in.asJSON();
         LLGLTFMaterial material_out;
         std::string warn_msg;
         std::string error_msg;
         bool serialize_success = material_out.fromJSON(json_in, warn_msg, error_msg);
-        UNSCOPED_INFO("LLGLTFMaterial serialization has no warnings: " + ensure_suffix);
-        REQUIRE("" == warn_msg);
-        UNSCOPED_INFO("LLGLTFMaterial serialization has no errors: " + ensure_suffix);
-        REQUIRE("" == error_msg);
-        UNSCOPED_INFO("LLGLTFMaterial serializes successfully: " + ensure_suffix);
+        REQUIRE(warn_msg == "");
+        REQUIRE(error_msg == "");
         REQUIRE(serialize_success);
-        UNSCOPED_INFO("LLGLTFMaterial is preserved when deserialized: " + ensure_suffix);
         REQUIRE(material_in == material_out);
         const std::string json_out = material_out.asJSON();
-        UNSCOPED_INFO("LLGLTFMaterial is preserved when serialized: " + ensure_suffix);
         REQUIRE(json_in == json_out);
     }
 
-    void ensure_gltf_material_trimmed(const std::string& material_json, const std::string& must_not_contain)
+    void require_trimmed(const std::string& material_json, const std::string& must_not_contain)
     {
-        UNSCOPED_INFO("LLGLTFMaterial serialization trims property '" + must_not_contain + "'");
+        CAPTURE(must_not_contain);
         REQUIRE(material_json.find(must_not_contain) == std::string::npos);
     }
 
@@ -143,14 +139,12 @@ namespace
     // exercises the actual hash invariant directly.
     TEST_CASE("llgltfmaterial: there are four texture infos", "[llgltfmaterial]")
     {
-        UNSCOPED_INFO("LLGLTFMaterial texture info count");
         CHECK((U32)LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT == 4);
     }
 
     // Test that occlusion and metallicRoughness are the same (They are different for asset validation. See lluploadmaterial.cpp)
     TEST_CASE("llgltfmaterial: occlusion and metallicRoughness share a texture info", "[llgltfmaterial]")
     {
-        UNSCOPED_INFO("LLGLTFMaterial occlusion does not differ from metallic roughness");
         CHECK(LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS == LLGLTFMaterial::GLTF_TEXTURE_INFO_OCCLUSION);
     }
 
@@ -165,12 +159,12 @@ namespace
         {
             for (bool forOverride : forOverrides)
             {
+                CAPTURE(doubleSided, forOverride);
                 LLGLTFMaterial material;
                 material.setDoubleSided(doubleSided, forOverride);
                 const bool overrideBit = (doubleSided == false) && forOverride;
-                UNSCOPED_INFO("LLGLTFMaterial: double sided = " + std::to_string(doubleSided) + " override bit when forOverride = " + std::to_string(forOverride));
                 REQUIRE(material.mOverrideDoubleSided == overrideBit);
-                ensure_gltf_material_serialize("double sided = " + std::to_string(doubleSided), material);
+                require_json_round_trip("double sided = " + std::to_string(doubleSided), material);
             }
         }
 
@@ -178,12 +172,12 @@ namespace
         {
             for (bool forOverride : forOverrides)
             {
+                CAPTURE(alphaMode, forOverride);
                 LLGLTFMaterial material;
                 material.setAlphaMode(alphaMode, forOverride);
                 const bool overrideBit = (alphaMode == LLGLTFMaterial::ALPHA_MODE_OPAQUE) && forOverride;
-                UNSCOPED_INFO("LLGLTFMaterial: alpha mode = " + std::to_string(alphaMode) + " override bit when forOverride = " + std::to_string(forOverride));
                 REQUIRE(material.mOverrideAlphaMode == overrideBit);
-                ensure_gltf_material_serialize("alpha mode = " + std::to_string(alphaMode), material);
+                require_json_round_trip("alpha mode = " + std::to_string(alphaMode), material);
             }
         }
     }
@@ -198,7 +192,7 @@ namespace
         transform.mScale[VX] = 0.05f;
         transform.mScale[VY] = 100.f;
         transform.mRotation = 1.571f;
-        ensure_gltf_material_serialize("material with transform", material);
+        require_json_round_trip("material with transform", material);
     }
 
     // Test that a GLTF material avoids serializing a material unnecessarily
@@ -207,18 +201,18 @@ namespace
         {
             const LLGLTFMaterial material;
             const std::string material_json = material.asJSON();
-            ensure_gltf_material_trimmed(material_json, "pbrMetallicRoughness");
-            ensure_gltf_material_trimmed(material_json, "normalTexture");
-            ensure_gltf_material_trimmed(material_json, "emissiveTexture");
-            ensure_gltf_material_trimmed(material_json, "occlusionTexture");
+            require_trimmed(material_json, "pbrMetallicRoughness");
+            require_trimmed(material_json, "normalTexture");
+            require_trimmed(material_json, "emissiveTexture");
+            require_trimmed(material_json, "occlusionTexture");
         }
 
         {
             LLGLTFMaterial metallic_factor_material;
             metallic_factor_material.setMetallicFactor(0.5);
             const std::string metallic_factor_material_json = metallic_factor_material.asJSON();
-            ensure_gltf_material_trimmed(metallic_factor_material_json, "baseColorTexture");
-            ensure_gltf_material_trimmed(metallic_factor_material_json, "metallicRoughnessTexture");
+            require_trimmed(metallic_factor_material_json, "baseColorTexture");
+            require_trimmed(metallic_factor_material_json, "metallicRoughnessTexture");
         }
     }
 
@@ -227,35 +221,33 @@ namespace
     {
         {
             const LLGLTFMaterial full_material = create_test_material();
-            ensure_gltf_material_serialize("full material", full_material);
+            require_json_round_trip("full material", full_material);
         }
 
         {
             LLGLTFMaterial texture_ids_only_material;
             apply_test_material_texture_ids(texture_ids_only_material);
-            ensure_gltf_material_serialize("material with texture IDs only", texture_ids_only_material);
+            require_json_round_trip("material with texture IDs only", texture_ids_only_material);
         }
 
         {
             LLGLTFMaterial texture_transforms_only_material;
             apply_test_material_texture_ids(texture_transforms_only_material);
-            ensure_gltf_material_serialize("material with texture transforms only", texture_transforms_only_material);
+            require_json_round_trip("material with texture transforms only", texture_transforms_only_material);
         }
 
         {
             LLGLTFMaterial factors_only_material;
             apply_test_material_factors(factors_only_material);
-            ensure_gltf_material_serialize("material with scaling/tint factors only", factors_only_material);
+            require_json_round_trip("material with scaling/tint factors only", factors_only_material);
         }
     }
 
-    // Test that sDefault is a no-op override
     TEST_CASE("llgltfmaterial: sDefault is a no-op override", "[llgltfmaterial]")
     {
         const LLGLTFMaterial material_asset = create_test_material();
         LLGLTFMaterial render_material = material_asset;
         render_material.applyOverride(LLGLTFMaterial::sDefault);
-        UNSCOPED_INFO("LLGLTFMaterial: sDefault is a no-op override");
         CHECK(material_asset == render_material);
     }
 
@@ -266,7 +258,6 @@ namespace
         apply_test_material_texture_transforms(override_material);
         LLGLTFMaterial render_material;
         render_material.applyOverride(override_material);
-        UNSCOPED_INFO("LLGLTFMaterial: transform overrides");
         CHECK(render_material == override_material);
     }
 
@@ -282,7 +273,7 @@ namespace
 
             render_material.applyOverride(override_material);
 
-            UNSCOPED_INFO("LLGLTFMaterial: extra overrides with non-default values applied over default");
+            UNSCOPED_INFO("non-default overrides applied over defaults");
             CHECK(render_material == override_material);
         }
         {
@@ -299,7 +290,7 @@ namespace
             override_material.mOverrideDoubleSided = false;
             override_material.mOverrideAlphaMode = false;
 
-            UNSCOPED_INFO("LLGLTFMaterial: extra overrides with default values applied over non-default");
+            UNSCOPED_INFO("default overrides applied over non-defaults");
             CHECK(render_material == override_material);
         }
     }
@@ -331,7 +322,7 @@ namespace
             for (LLGLTFMaterial::TextureInfo j = LLGLTFMaterial::TextureInfo(0); j  < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; j = LLGLTFMaterial::TextureInfo(U32(j) + 1))
             {
                 const LLUUID& render_texture = render_material.mTextureId[j];
-                UNSCOPED_INFO("LLGLTFMaterial: Override texture ID " + override_texture.asString() + " replaces underlying texture ID " + asset_texture.asString());
+                CAPTURE(override_texture, asset_texture);
                 REQUIRE(render_texture == override_texture);
             }
         }
@@ -343,68 +334,67 @@ namespace
         const S32 non_default_alpha_modes[] = { LLGLTFMaterial::ALPHA_MODE_BLEND, LLGLTFMaterial::ALPHA_MODE_MASK };
         for (S32 non_default_alpha_mode : non_default_alpha_modes)
         {
+            CAPTURE(non_default_alpha_mode);
             LLGLTFMaterial material;
             // Set default alpha mode
             material.setAlphaMode(LLGLTFMaterial::ALPHA_MODE_OPAQUE, true);
-            UNSCOPED_INFO("LLGLTFMaterial: alpha mode override flag set");
-            REQUIRE(material.mOverrideAlphaMode == true);
+            REQUIRE(material.mOverrideAlphaMode);
             // Set non-default alpha mode
             material.setAlphaMode(non_default_alpha_mode, true);
-            UNSCOPED_INFO("LLGLTFMaterial: alpha mode override flag unset");
-            REQUIRE(material.mOverrideAlphaMode == false);
+            REQUIRE_FALSE(material.mOverrideAlphaMode);
         }
 
         {
             // Set default double sided
             LLGLTFMaterial material;
             material.setDoubleSided(false, true);
-            UNSCOPED_INFO("LLGLTFMaterial: double sided override flag set");
-            CHECK(material.mOverrideDoubleSided == true);
+            CHECK(material.mOverrideDoubleSided);
             // Set non-default double sided
             material.setDoubleSided(true, true);
-            UNSCOPED_INFO("LLGLTFMaterial: double sided override flag unset");
-            CHECK(material.mOverrideDoubleSided == false);
+            CHECK_FALSE(material.mOverrideDoubleSided);
         }
     }
 
+    // the field must lie inside the material and the new value must differ
     template<typename T>
-    void ensure_material_hash_pre(LLGLTFMaterial& material, T& material_field, const T new_value, const std::string& field_name)
+    void require_perturbable_field(LLGLTFMaterial& material, T& material_field, const T new_value)
     {
         {
-            INFO("LLGLTFMaterial: Hash: Test field " + field_name + " is part of the test material object");
+            INFO("the field is part of the test material object");
             REQUIRE(size_t(&material_field) >= size_t(&material));
             REQUIRE((size_t(&material_field) + sizeof(material_field)) <= (size_t(&material) + sizeof(material)));
         }
-        UNSCOPED_INFO("LLGLTFMaterial: Hash: " + field_name + " differs and will cause a perturbation worth hashing");
         REQUIRE(material_field != new_value);
     }
 
+    // perturbing the field to the new value does not change the hash
     template<typename T>
-    void ensure_material_hash_not_changed(LLGLTFMaterial& material, T& material_field, const T new_value, const std::string& field_name)
+    void require_hash_ignores(LLGLTFMaterial& material, T& material_field, const T new_value, const std::string& field_name)
     {
-        ensure_material_hash_pre(material, material_field, new_value, field_name);
+        CAPTURE(field_name);
+        require_perturbable_field(material, material_field, new_value);
 
         const LLGLTFMaterial old_material = material;
         material_field = new_value;
         // If this test fails, consult LLGLTFMaterial::getHash, and optionally consult http://www.catb.org/esr/structure-packing/ for guidance on optimal memory packing (effectiveness is platform-dependent)
-        UNSCOPED_INFO(("LLGLTFMaterial: Hash: Perturbing " + field_name + " to new value does NOT change the hash").c_str());
         REQUIRE(material.getHash() == old_material.getHash());
     }
 
+    // perturbing the field to the new value changes the hash
     template<typename T>
-    void ensure_material_hash_changed(LLGLTFMaterial& material, T& material_field, const T new_value, const std::string& field_name)
+    void require_hash_covers(LLGLTFMaterial& material, T& material_field, const T new_value, const std::string& field_name)
     {
-        ensure_material_hash_pre(material, material_field, new_value, field_name);
+        CAPTURE(field_name);
+        require_perturbable_field(material, material_field, new_value);
 
         const LLGLTFMaterial old_material = material;
         material_field = new_value;
         // If this test fails, consult LLGLTFMaterial::getHash, and optionally consult http://www.catb.org/esr/structure-packing/ for guidance on optimal memory packing (effectiveness is platform-dependent)
-        UNSCOPED_INFO(("LLGLTFMaterial: Hash: Perturbing " + field_name + " to new value changes the hash").c_str());
         REQUIRE(material.getHash() != old_material.getHash());
     }
 
-#define ENSURE_HASH_NOT_CHANGED(HASH_MAT, SOURCE_MAT, FIELD) ensure_material_hash_not_changed(HASH_MAT, HASH_MAT.FIELD, SOURCE_MAT.FIELD, #FIELD)
-#define ENSURE_HASH_CHANGED(HASH_MAT, SOURCE_MAT, FIELD) ensure_material_hash_changed(HASH_MAT, HASH_MAT.FIELD, SOURCE_MAT.FIELD, #FIELD)
+#define HASH_IGNORES(HASH_MAT, SOURCE_MAT, FIELD) require_hash_ignores(HASH_MAT, HASH_MAT.FIELD, SOURCE_MAT.FIELD, #FIELD)
+#define HASH_COVERS(HASH_MAT, SOURCE_MAT, FIELD) require_hash_covers(HASH_MAT, HASH_MAT.FIELD, SOURCE_MAT.FIELD, #FIELD)
 
     // Test LLGLTFMaterial::getHash. The hash is now built from a canonical
     // packing of the meaningful members, so the previous structure-layout
@@ -426,19 +416,19 @@ namespace
 
         LLGLTFMaterial hash_mat;
 
-        ENSURE_HASH_NOT_CHANGED(hash_mat, source_mat, mTrackingIdToLocalTexture);
-        ENSURE_HASH_CHANGED(hash_mat, source_mat, mLocalTexDataDigest);
+        HASH_IGNORES(hash_mat, source_mat, mTrackingIdToLocalTexture);
+        HASH_COVERS(hash_mat, source_mat, mLocalTexDataDigest);
 
-        ENSURE_HASH_CHANGED(hash_mat, source_mat, mTextureId);
-        ENSURE_HASH_CHANGED(hash_mat, source_mat, mTextureTransform);
-        ENSURE_HASH_CHANGED(hash_mat, source_mat, mBaseColor);
-        ENSURE_HASH_CHANGED(hash_mat, source_mat, mEmissiveColor);
-        ENSURE_HASH_CHANGED(hash_mat, source_mat, mMetallicFactor);
-        ENSURE_HASH_CHANGED(hash_mat, source_mat, mRoughnessFactor);
-        ENSURE_HASH_CHANGED(hash_mat, source_mat, mAlphaCutoff);
-        ENSURE_HASH_CHANGED(hash_mat, source_mat, mAlphaMode);
-        ENSURE_HASH_CHANGED(hash_mat, source_mat, mDoubleSided);
-        ENSURE_HASH_CHANGED(hash_mat, source_mat, mOverrideDoubleSided);
-        ENSURE_HASH_CHANGED(hash_mat, source_mat, mOverrideAlphaMode);
+        HASH_COVERS(hash_mat, source_mat, mTextureId);
+        HASH_COVERS(hash_mat, source_mat, mTextureTransform);
+        HASH_COVERS(hash_mat, source_mat, mBaseColor);
+        HASH_COVERS(hash_mat, source_mat, mEmissiveColor);
+        HASH_COVERS(hash_mat, source_mat, mMetallicFactor);
+        HASH_COVERS(hash_mat, source_mat, mRoughnessFactor);
+        HASH_COVERS(hash_mat, source_mat, mAlphaCutoff);
+        HASH_COVERS(hash_mat, source_mat, mAlphaMode);
+        HASH_COVERS(hash_mat, source_mat, mDoubleSided);
+        HASH_COVERS(hash_mat, source_mat, mOverrideDoubleSided);
+        HASH_COVERS(hash_mat, source_mat, mOverrideAlphaMode);
     }
 }

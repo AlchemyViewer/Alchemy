@@ -135,22 +135,18 @@ namespace
     TEST_CASE("LLInventory: LLInventoryType::lookup maps a name to its type", "[LLInventory]")
     {
         LLInventoryType::EType retType =  LLInventoryType::lookup(std::string("sound"));
-        UNSCOPED_INFO("1.LLInventoryType::lookup(char*) failed");
         CHECK(retType == LLInventoryType::IT_SOUND);
 
         retType = LLInventoryType::lookup(std::string("snapshot"));
-        UNSCOPED_INFO("2.LLInventoryType::lookup(char*) failed");
         CHECK(retType == LLInventoryType::IT_SNAPSHOT);
     }
 
     TEST_CASE("LLInventory: LLInventoryType::lookup maps a type to its name", "[LLInventory]")
     {
         static std::string retType =  LLInventoryType::lookup(LLInventoryType::IT_CALLINGCARD);
-        UNSCOPED_INFO("1.LLInventoryType::lookup(EType) failed");
         CHECK(retType == "callcard");
 
         retType = LLInventoryType::lookup(LLInventoryType::IT_LANDMARK);
-        UNSCOPED_INFO("2.LLInventoryType::lookup(EType) failed");
         CHECK(retType == "landmark");
 
     }
@@ -158,22 +154,18 @@ namespace
     TEST_CASE("LLInventory: lookupHumanReadable gives a type's display name", "[LLInventory]")
     {
         static std::string retType =  LLInventoryType::lookupHumanReadable(LLInventoryType::IT_CALLINGCARD);
-        UNSCOPED_INFO("1.LLInventoryType::lookupHumanReadable(EType) failed");
         CHECK(retType == "calling card");
 
         retType =  LLInventoryType::lookupHumanReadable(LLInventoryType::IT_LANDMARK);
-        UNSCOPED_INFO("2.LLInventoryType::lookupHumanReadable(EType) failed");
         CHECK(retType == "landmark");
     }
 
     TEST_CASE("LLInventory: defaultForAssetType gives an asset type's inventory type", "[LLInventory]")
     {
         static LLInventoryType::EType retType =  LLInventoryType::defaultForAssetType(LLAssetType::AT_TEXTURE);
-        UNSCOPED_INFO("1.LLInventoryType::defaultForAssetType(LLAssetType EType) failed");
         CHECK(retType == LLInventoryType::IT_TEXTURE);
 
         retType =  LLInventoryType::defaultForAssetType(LLAssetType::AT_LANDMARK);
-        UNSCOPED_INFO("2.LLInventoryType::defaultForAssetType(LLAssetType EType) failed");
         CHECK(retType == LLInventoryType::IT_LANDMARK);
     }
 
@@ -186,32 +178,19 @@ namespace
         //LL_INFOS() << "sd: " << *sd << LL_ENDL;
         LLPointer<LLInventoryItem> dst = new LLInventoryItem;
         bool successful_parse = dst->fromLLSD(sd);
-        UNSCOPED_INFO("0.LLInventoryItem::fromLLSD()");
-        CHECK(successful_parse == true);
-        UNSCOPED_INFO("1.item id::getUUID() failed");
+        CHECK(successful_parse);
         CHECK(dst->getUUID() == src->getUUID());
-        UNSCOPED_INFO("2.parent::getParentUUID() failed");
         CHECK(dst->getParentUUID() == src->getParentUUID());
-        UNSCOPED_INFO("3.name::getName() failed");
         CHECK(dst->getName() == src->getName());
-        UNSCOPED_INFO("4.type::getType() failed");
         CHECK(dst->getType() == src->getType());
 
-        UNSCOPED_INFO("5.permissions::getPermissions() failed");
         CHECK(dst->getPermissions() == src->getPermissions());
-        UNSCOPED_INFO("6.description::getDescription() failed");
         CHECK(dst->getDescription() == src->getDescription());
-        UNSCOPED_INFO("7.sale type::getSaleType() failed");
         CHECK(dst->getSaleInfo().getSaleType() == src->getSaleInfo().getSaleType());
-        UNSCOPED_INFO("8.sale price::getSalePrice() failed");
         CHECK(dst->getSaleInfo().getSalePrice() == src->getSaleInfo().getSalePrice());
-        UNSCOPED_INFO("9.asset id::getAssetUUID() failed");
         CHECK(dst->getAssetUUID() == src->getAssetUUID());
-        UNSCOPED_INFO("10.inventory type::getInventoryType() failed");
         CHECK(dst->getInventoryType() == src->getInventoryType());
-        UNSCOPED_INFO("11.flags::getFlags() failed");
         CHECK(dst->getFlags() == src->getFlags());
-        UNSCOPED_INFO("12.creation::getCreationDate() failed");
         CHECK(dst->getCreationDate() == src->getCreationDate());
 
         LLUUID new_item_id, new_parent_id;
@@ -264,30 +243,18 @@ namespace
         sd = ll_create_sd_from_inventory_item(src);
         //LL_INFOS() << "sd: " << *sd << LL_ENDL;
         successful_parse = dst->fromLLSD(sd);
-        UNSCOPED_INFO("13.item id::getUUID() failed");
         CHECK(dst->getUUID() == src->getUUID());
-        UNSCOPED_INFO("14.parent::getParentUUID() failed");
         CHECK(dst->getParentUUID() == src->getParentUUID());
-        UNSCOPED_INFO("15.name::getName() failed");
         CHECK(dst->getName() == src->getName());
-        UNSCOPED_INFO("16.type::getType() failed");
         CHECK(dst->getType() == src->getType());
 
-        UNSCOPED_INFO("17.permissions::getPermissions() failed");
         CHECK(dst->getPermissions() == src->getPermissions());
-        UNSCOPED_INFO("18.description::getDescription() failed");
         CHECK(dst->getDescription() == src->getDescription());
-        UNSCOPED_INFO("19.sale type::getSaleType() failed type");
         CHECK(dst->getSaleInfo().getSaleType() == src->getSaleInfo().getSaleType());
-        UNSCOPED_INFO("20.sale price::getSalePrice() failed price");
         CHECK(dst->getSaleInfo().getSalePrice() == src->getSaleInfo().getSalePrice());
-        UNSCOPED_INFO("21.asset id::getAssetUUID() failed id");
         CHECK(dst->getAssetUUID() == src->getAssetUUID());
-        UNSCOPED_INFO("22.inventory type::getInventoryType() failed type");
         CHECK(dst->getInventoryType() == src->getInventoryType());
-        UNSCOPED_INFO("23.flags::getFlags() failed");
         CHECK(dst->getFlags() == src->getFlags());
-        UNSCOPED_INFO("24.creation::getCreationDate() failed");
         CHECK(dst->getCreationDate() == src->getCreationDate());
 
     }
@@ -348,41 +315,27 @@ namespace
         LLSD sd = ll_create_sd_from_inventory_item(src);
         LLPointer<LLInventoryItem> dst = new LLInventoryItem;
         bool successful_parse = dst->fromLLSD(sd);
-        UNSCOPED_INFO("0.LLInventoryItem::fromLLSD()");
-        CHECK(successful_parse == true);
+        CHECK(successful_parse);
 
         LLPointer<LLInventoryItem> src1 = create_random_inventory_item();
         src1->copyItem(src);
 
-        UNSCOPED_INFO("1.item id::getUUID() failed");
         CHECK(dst->getUUID() == src1->getUUID());
-        UNSCOPED_INFO("2.parent::getParentUUID() failed");
         CHECK(dst->getParentUUID() == src1->getParentUUID());
-        UNSCOPED_INFO("3.name::getName() failed");
         CHECK(dst->getName() == src1->getName());
-        UNSCOPED_INFO("4.type::getType() failed");
         CHECK(dst->getType() == src1->getType());
 
-        UNSCOPED_INFO("5.permissions::getPermissions() failed");
         CHECK(dst->getPermissions() == src1->getPermissions());
-        UNSCOPED_INFO("6.description::getDescription() failed");
         CHECK(dst->getDescription() == src1->getDescription());
-        UNSCOPED_INFO("7.sale type::getSaleType() failed type");
         CHECK(dst->getSaleInfo().getSaleType() == src1->getSaleInfo().getSaleType());
-        UNSCOPED_INFO("8.sale price::getSalePrice() failed price");
         CHECK(dst->getSaleInfo().getSalePrice() == src1->getSaleInfo().getSalePrice());
-        UNSCOPED_INFO("9.asset id::getAssetUUID() failed id");
         CHECK(dst->getAssetUUID() == src1->getAssetUUID());
-        UNSCOPED_INFO("10.inventory type::getInventoryType() failed type");
         CHECK(dst->getInventoryType() == src1->getInventoryType());
-        UNSCOPED_INFO("11.flags::getFlags() failed");
         CHECK(dst->getFlags() == src1->getFlags());
-        UNSCOPED_INFO("12.creation::getCreationDate() failed");
         CHECK(dst->getCreationDate() == src1->getCreationDate());
 
         // quick test to make sure generateUUID() really works
         src1->generateUUID();
-        UNSCOPED_INFO("13.item id::generateUUID() failed");
         CHECK(src->getUUID() != src1->getUUID());
     }
 
@@ -425,29 +378,17 @@ namespace
 
         file.close();
 
-        UNSCOPED_INFO("1.item id::getUUID() failed");
         CHECK(src1->getUUID() == src2->getUUID());
-        UNSCOPED_INFO("2.parent::getParentUUID() failed");
         CHECK(src1->getParentUUID() == src2->getParentUUID());
-        UNSCOPED_INFO("3.permissions::getPermissions() failed");
         CHECK(src1->getPermissions() == src2->getPermissions());
-        UNSCOPED_INFO("4.sale price::getSalePrice() failed price");
         CHECK(src1->getSaleInfo().getSalePrice() == src2->getSaleInfo().getSalePrice());
-        UNSCOPED_INFO("5.asset id::getAssetUUID() failed id");
         CHECK(src1->getAssetUUID() == src2->getAssetUUID());
-        UNSCOPED_INFO("6.type::getType() failed");
         CHECK(src1->getType() == src2->getType());
-        UNSCOPED_INFO("7.inventory type::getInventoryType() failed type");
         CHECK(src1->getInventoryType() == src2->getInventoryType());
-        UNSCOPED_INFO("8.name::getName() failed");
         CHECK(src1->getName() == src2->getName());
-        UNSCOPED_INFO("9.description::getDescription() failed");
         CHECK(src1->getDescription() == src2->getDescription());
-        UNSCOPED_INFO("10.creation::getCreationDate() failed");
         CHECK(src1->getCreationDate() == src2->getCreationDate());
-        UNSCOPED_INFO("13.thumbnails::getThumbnailUUID() failed");
         CHECK(src1->getThumbnailUUID() == src2->getThumbnailUUID());
-        UNSCOPED_INFO("14.favorites::getIsFavorite() failed");
         CHECK(src1->getIsFavorite() == src2->getIsFavorite());
     }
 
@@ -462,30 +403,18 @@ namespace
         LLPointer<LLInventoryItem> src2 = new LLInventoryItem();
         src2->importLegacyStream(istream);
 
-        UNSCOPED_INFO("1.item id::getUUID() failed");
         CHECK(src1->getUUID() == src2->getUUID());
-        UNSCOPED_INFO("2.parent::getParentUUID() failed");
         CHECK(src1->getParentUUID() == src2->getParentUUID());
-        UNSCOPED_INFO("3.permissions::getPermissions() failed");
         CHECK(src1->getPermissions() == src2->getPermissions());
-        UNSCOPED_INFO("4.sale price::getSalePrice() failed price");
         CHECK(src1->getSaleInfo().getSalePrice() == src2->getSaleInfo().getSalePrice());
-        UNSCOPED_INFO("5.asset id::getAssetUUID() failed id");
         CHECK(src1->getAssetUUID() == src2->getAssetUUID());
-        UNSCOPED_INFO("6.type::getType() failed");
         CHECK(src1->getType() == src2->getType());
-        UNSCOPED_INFO("7.inventory type::getInventoryType() failed type");
         CHECK(src1->getInventoryType() == src2->getInventoryType());
-        UNSCOPED_INFO("8.name::getName() failed");
         CHECK(src1->getName() == src2->getName());
-        UNSCOPED_INFO("9.description::getDescription() failed");
         CHECK(src1->getDescription() == src2->getDescription());
-        UNSCOPED_INFO("10.creation::getCreationDate() failed");
         CHECK(src1->getCreationDate() == src2->getCreationDate());
-        UNSCOPED_INFO("11.thumbnails::getThumbnailUUID() failed");
         CHECK(src1->getThumbnailUUID() == src2->getThumbnailUUID());
-        UNSCOPED_INFO("12.favorites::getIsFavorite() failed");
-        CHECK(false == src2->getIsFavorite()); // not supposed to carry over
+        CHECK_FALSE(src2->getIsFavorite()); // not supposed to carry over
     }
 
     TEST_CASE("LLInventory: placeholder for the removed XML export and import", "[LLInventory]")
@@ -501,33 +430,19 @@ namespace
         LLPointer<LLInventoryItem> src2 = new LLInventoryItem();
         src2->fromLLSD(retSd);
 
-        UNSCOPED_INFO("1.item id::getUUID() failed");
         CHECK(src1->getUUID() == src2->getUUID());
-        UNSCOPED_INFO("2.parent::getParentUUID() failed");
         CHECK(src1->getParentUUID() == src2->getParentUUID());
-        UNSCOPED_INFO("3.permissions::getPermissions() failed");
         CHECK(src1->getPermissions() == src2->getPermissions());
-        UNSCOPED_INFO("4.asset id::getAssetUUID() failed id");
         CHECK(src1->getAssetUUID() == src2->getAssetUUID());
-        UNSCOPED_INFO("5.type::getType() failed");
         CHECK(src1->getType() == src2->getType());
-        UNSCOPED_INFO("6.inventory type::getInventoryType() failed type");
         CHECK(src1->getInventoryType() == src2->getInventoryType());
-        UNSCOPED_INFO("7.flags::getFlags() failed");
         CHECK(src1->getFlags() == src2->getFlags());
-        UNSCOPED_INFO("8.sale type::getSaleType() failed type");
         CHECK(src1->getSaleInfo().getSaleType() == src2->getSaleInfo().getSaleType());
-        UNSCOPED_INFO("9.sale price::getSalePrice() failed price");
         CHECK(src1->getSaleInfo().getSalePrice() == src2->getSaleInfo().getSalePrice());
-        UNSCOPED_INFO("10.name::getName() failed");
         CHECK(src1->getName() == src2->getName());
-        UNSCOPED_INFO("11.description::getDescription() failed");
         CHECK(src1->getDescription() == src2->getDescription());
-        UNSCOPED_INFO("12.creation::getCreationDate() failed");
         CHECK(src1->getCreationDate() == src2->getCreationDate());
-        UNSCOPED_INFO("13.thumbnails::getThumbnailUUID() failed");
         CHECK(src1->getThumbnailUUID() == src2->getThumbnailUUID());
-        UNSCOPED_INFO("14.favorites::getIsFavorite() failed");
         CHECK(src1->getIsFavorite() == src2->getIsFavorite());
     }
 
@@ -539,21 +454,15 @@ namespace
         LLSD sd = ll_create_sd_from_inventory_category(src);
         LLPointer<LLInventoryCategory> dst = ll_create_category_from_sd(sd);
 
-        UNSCOPED_INFO("1.item id::getUUID() failed");
         CHECK(dst->getUUID() == src->getUUID());
-        UNSCOPED_INFO("2.parent::getParentUUID() failed");
         CHECK(dst->getParentUUID() == src->getParentUUID());
-        UNSCOPED_INFO("3.name::getName() failed");
         CHECK(dst->getName() == src->getName());
-        UNSCOPED_INFO("4.type::getType() failed");
         CHECK(dst->getType() == src->getType());
-        UNSCOPED_INFO("5.preferred type::getPreferredType() failed");
         CHECK(dst->getPreferredType() == src->getPreferredType());
 
         src->setPreferredType( LLFolderType::FT_TEXTURE);
         sd = ll_create_sd_from_inventory_category(src);
         dst = ll_create_category_from_sd(sd);
-        UNSCOPED_INFO("6.preferred type::getPreferredType() failed");
         CHECK(dst->getPreferredType() == src->getPreferredType());
 
 
@@ -598,19 +507,12 @@ namespace
         LLPointer<LLInventoryCategory> src2 = new LLInventoryCategory();
         src2->importLLSDMap(s_item);
 
-        UNSCOPED_INFO("1.item id::getUUID() failed");
         CHECK(src1->getUUID() == src2->getUUID());
-        UNSCOPED_INFO("2.parent::getParentUUID() failed");
         CHECK(src1->getParentUUID() == src2->getParentUUID());
-        UNSCOPED_INFO("3.type::getType() failed");
         CHECK(src1->getType() == src2->getType());
-        UNSCOPED_INFO("4.preferred type::getPreferredType() failed");
         CHECK(src1->getPreferredType() == src2->getPreferredType());
-        UNSCOPED_INFO("5.name::getName() failed");
         CHECK(src1->getName() == src2->getName());
-        UNSCOPED_INFO("6.thumbnails::getThumbnailUUID() failed");
         CHECK(src1->getThumbnailUUID() == src2->getThumbnailUUID());
-        UNSCOPED_INFO("7.favorites::getIsFavorite() failed");
         CHECK(src1->getIsFavorite() == src2->getIsFavorite());
     }
 
@@ -625,19 +527,12 @@ namespace
         LLPointer<LLInventoryCategory> src2 = new LLInventoryCategory();
         src2->importLegacyStream(istream);
 
-        UNSCOPED_INFO("1.item id::getUUID() failed");
         CHECK(src1->getUUID() == src2->getUUID());
-        UNSCOPED_INFO("2.parent::getParentUUID() failed");
         CHECK(src1->getParentUUID() == src2->getParentUUID());
-        UNSCOPED_INFO("3.type::getType() failed");
         CHECK(src1->getType() == src2->getType());
-        UNSCOPED_INFO("4.preferred type::getPreferredType() failed");
         CHECK(src1->getPreferredType() == src2->getPreferredType());
-        UNSCOPED_INFO("5.name::getName() failed");
         CHECK(src1->getName() == src2->getName());
-        UNSCOPED_INFO("13.thumbnails::getThumbnailUUID() failed");
         CHECK(src1->getThumbnailUUID() == src2->getThumbnailUUID());
-        UNSCOPED_INFO("14.favorites::getIsFavorite() failed");
-        CHECK(false == src2->getIsFavorite()); // currently not supposed to carry over
+        CHECK_FALSE(src2->getIsFavorite()); // currently not supposed to carry over
     }
 }

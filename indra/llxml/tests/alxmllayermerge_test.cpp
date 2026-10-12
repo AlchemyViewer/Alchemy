@@ -253,7 +253,6 @@ namespace
         RecordingObserver rec;
         ALXmlLayerMerge::merge(base, overlay, 1, &rec);
 
-        UNSCOPED_INFO("title");
         CHECK(attr(base, "", "title") == std::string("Titel"));
         UNSCOPED_INFO("the base's width is untouched");
         CHECK(attr(base, "", "width") == std::string("100"));
@@ -261,7 +260,6 @@ namespace
         CHECK(attr(base, "p/b", "label") == std::string("Erste"));
         UNSCOPED_INFO("second of a repeated name");
         CHECK(attr(base, "p/b#1", "label") == std::string("Zweite"));
-        UNSCOPED_INFO("text");
         CHECK(attr(base, "p/t", "text()") == std::string("Text"));
         UNSCOPED_INFO("an item by value");
         CHECK(attr(base, "p/c/v2", "label") == std::string("Zwei"));
@@ -276,37 +274,26 @@ namespace
         UNSCOPED_INFO("while its attribute applies");
         CHECK(attr(base, "p/w", "font") == std::string("Serif"));
 
-        UNSCOPED_INFO("the extra attribute was reported dropped");
-        REQUIRE(rec.has("dropped 1 extra=x"));
-        UNSCOPED_INFO("one attribute dropped");
+        CHECK(rec.has("dropped 1 extra=x"));
         CHECK(rec.dropped == 1);
-        UNSCOPED_INFO("the value= was reported applied as text");
-        REQUIRE(rec.has("value-as-text 1 text[u]"));
-        UNSCOPED_INFO("once");
+        CHECK(rec.has("value-as-text 1 text[u]"));
         CHECK(rec.valueAsText == 1);
-        UNSCOPED_INFO("the kept text was reported");
-        REQUIRE(rec.has("kept 1 text[w]"));
-        UNSCOPED_INFO("one text kept");
+        CHECK(rec.has("kept 1 text[w]"));
         CHECK(rec.kept == 1);
-        UNSCOPED_INFO("the missing child was reported");
-        REQUIRE(rec.has("nosibling 1 text[missing]"));
-        UNSCOPED_INFO("the unnamed child was reported");
-        REQUIRE(rec.has("unnamed 1 text[]"));
-        UNSCOPED_INFO("two children unmatched");
+        CHECK(rec.has("nosibling 1 text[missing]"));
+        CHECK(rec.has("unnamed 1 text[]"));
         CHECK(rec.unmatched == 2);
         // p, b, b, t, u, w, c, and the item: eight matches.
-        UNSCOPED_INFO("matches");
         CHECK(rec.matched == 8);
         UNSCOPED_INFO("the second button matched the second base button");
-        REQUIRE(rec.has("match 1 button[b]"));
+        CHECK(rec.has("match 1 button[b]"));
         UNSCOPED_INFO("texts applied: t");
         CHECK(rec.text == 1);
         // title; label on b, b; font on w; value and label on the item.
         // Names are keys, and are not written.
-        UNSCOPED_INFO("attributes applied");
         CHECK(rec.applied == 6);
         UNSCOPED_INFO("the name is never written");
-        REQUIRE_FALSE(rec.has("attr 1 name=f"));
+        CHECK_FALSE(rec.has("attr 1 name=f"));
     }
 
     // With no observer the tree comes out the same: a rule that changes
@@ -322,10 +309,9 @@ namespace
         LLXMLNodePtr silent_overlay = parse(OVERLAY);
         ALXmlLayerMerge::merge(silent_base, silent_overlay);
 
-        UNSCOPED_INFO("the same tree with and without an observer");
         CHECK(serialize(silent_base) == serialize(observed_base));
         UNSCOPED_INFO("and the observer saw something");
-        REQUIRE_FALSE(rec.events.empty());
+        CHECK_FALSE(rec.events.empty());
     }
 
     // Loading: the base and each layer in turn; a layer whose root name
@@ -344,26 +330,20 @@ namespace
         {
             RecordingObserver rec;
             LLXMLNodePtr root;
-            UNSCOPED_INFO("loads");
             REQUIRE(ALXmlLayerMerge::load({ base, "", overlay, renamed, retagged }, root, &rec));
             UNSCOPED_INFO("layers parsed: base, overlay, renamed, retagged");
             CHECK(rec.parsed == 4);
-            UNSCOPED_INFO("three roots matched");
             CHECK(rec.roots == 3);
             UNSCOPED_INFO("the overlay at layer 2, after the empty path");
-            REQUIRE(rec.has("root 2 floater[f]"));
-            UNSCOPED_INFO("one root said to differ in name");
+            CHECK(rec.has("root 2 floater[f]"));
             CHECK(rec.renamed == 1);
-            UNSCOPED_INFO("at layer 3");
-            REQUIRE(rec.has("renamed 3 floater[g]"));
+            CHECK(rec.has("renamed 3 floater[g]"));
             UNSCOPED_INFO("the base keeps its name");
             CHECK(attr(root, "", "name") == std::string("f"));
             UNSCOPED_INFO("its child matched by name all the same");
             CHECK(attr(root, "p", "width") == std::string("7"));
-            UNSCOPED_INFO("one root said to differ in tag");
             CHECK(rec.retagged == 1);
-            UNSCOPED_INFO("at layer 4");
-            REQUIRE(rec.has("retagged 4 panel[f]"));
+            CHECK(rec.has("retagged 4 panel[f]"));
             UNSCOPED_INFO("and its title applied all the same");
             CHECK(attr(root, "", "title") == std::string("Retagged"));
         }
@@ -372,10 +352,8 @@ namespace
             LLXMLNodePtr root;
             UNSCOPED_INFO("a broken layer does not fail the load");
             REQUIRE(ALXmlLayerMerge::load({ base, broken, overlay }, root, &rec));
-            UNSCOPED_INFO("it is reported skipped");
             CHECK(rec.skipped == 1);
-            UNSCOPED_INFO("as layer 1");
-            REQUIRE(rec.has("skipped 1"));
+            CHECK(rec.has("skipped 1"));
             UNSCOPED_INFO("with a line past the first");
             CHECK(rec.skippedLine >= 2);
             UNSCOPED_INFO("the base is intact");
@@ -383,12 +361,12 @@ namespace
             UNSCOPED_INFO("and the layer after it still applies");
             CHECK(attr(root, "", "title") == std::string("Titel"));
             UNSCOPED_INFO("at its own index");
-            REQUIRE(rec.has("root 2 floater[f]"));
+            CHECK(rec.has("root 2 floater[f]"));
         }
         {
             LLXMLNodePtr root;
             UNSCOPED_INFO("a broken base fails the load");
-            REQUIRE_FALSE(ALXmlLayerMerge::load({ broken, overlay }, root));
+            CHECK_FALSE(ALXmlLayerMerge::load({ broken, overlay }, root));
             UNSCOPED_INFO("nothing loads from nothing");
             CHECK_FALSE(ALXmlLayerMerge::load({}, root));
         }
@@ -399,7 +377,6 @@ namespace
             RecordingObserver installed;
             ALXmlLayerMerge::setDefaultObserver(&installed);
             LLXMLNodePtr root;
-            UNSCOPED_INFO("loads");
             CHECK(ALXmlLayerMerge::load({ base, overlay }, root));
             UNSCOPED_INFO("the default observer heard it");
             CHECK(installed.roots == 1);
@@ -407,7 +384,6 @@ namespace
 
             RecordingObserver silent;
             LLXMLNodePtr again;
-            UNSCOPED_INFO("loads");
             CHECK(ALXmlLayerMerge::load({ base, overlay }, again));
             UNSCOPED_INFO("and hears nothing once it is gone");
             CHECK(silent.roots == 0);
@@ -424,7 +400,6 @@ namespace
         LLXMLNodePtr overlay = parse(
             "<panel name=\"p\"><button name=\"b\" label=\"A\"/><text name=\"x\">Y</text><button name=\"b\" label=\"B\"/></panel>");
         ALXmlLayerMerge::merge(base, overlay);
-        UNSCOPED_INFO("the first b");
         CHECK(attr(base, "b", "label") == std::string("A"));
         UNSCOPED_INFO("the second b, with a match between them");
         CHECK(attr(base, "b#1", "label") == std::string("B"));
@@ -462,19 +437,15 @@ namespace
             ALXmlLayerMerge::merge(base, overlay, 1, &rec);
             UNSCOPED_INFO("the one element of the name below is where it went");
             CHECK(attr(base, "stack/note", "text()") == std::string("Notiz"));
-            UNSCOPED_INFO("and it was reported as a rescue");
-            REQUIRE(rec.has("rescued 1 text[note]"));
+            CHECK(rec.has("rescued 1 text[note]"));
             UNSCOPED_INFO("two of the name below is a guess not made");
             CHECK(attr(base, "stack/deeper/twice", "label") == std::string("1"));
             UNSCOPED_INFO("either of them");
             CHECK(attr(base, "other/twice", "label") == std::string("2"));
-            UNSCOPED_INFO("and said so");
-            REQUIRE(rec.has("ambiguous 1 button[twice]"));
+            CHECK(rec.has("ambiguous 1 button[twice]"));
             UNSCOPED_INFO("a name the base has nowhere");
-            REQUIRE(rec.has("nosibling 1 button[gone]"));
-            UNSCOPED_INFO("one rescue");
+            CHECK(rec.has("nosibling 1 button[gone]"));
             CHECK(rec.rescued == 1);
-            UNSCOPED_INFO("two misses");
             CHECK(rec.unmatched == 2);
         }
 
@@ -488,12 +459,11 @@ namespace
             LLXMLNodePtr overlay = parse(xml.c_str());
             RecordingObserver rec;
             ALXmlLayerMerge::merge(base, overlay, 1, &rec);
-            UNSCOPED_INFO(std::string("the copy written where the base has it wins, stray ")
-                          + (stray_first ? "first" : "second"));
+            CAPTURE(stray_first);
+            UNSCOPED_INFO("the copy written where the base has it wins");
             REQUIRE(attr(base, "stack/note", "text()") == std::string("Richtig"));
             UNSCOPED_INFO("and the stray applies to nothing");
             REQUIRE(rec.has("nosibling 1 text[note]"));
-            UNSCOPED_INFO("with no rescue made");
             REQUIRE(rec.rescued == 0);
         }
     }
@@ -509,7 +479,6 @@ namespace
         {
             RecordingObserver rec;
             LLXMLNodePtr root;
-            UNSCOPED_INFO("loads");
             REQUIRE(ALXmlLayerMerge::loadSources({ { base, nullptr }, { overlay, &held } }, root, &rec));
             UNSCOPED_INFO("the title is the held text's, not the file's");
             CHECK(attr(root, "", "title") == std::string("Gehalten"));
@@ -522,14 +491,13 @@ namespace
             LLXMLNodePtr root;
             UNSCOPED_INFO("loads past a held text that does not parse");
             REQUIRE(ALXmlLayerMerge::loadSources({ { base, nullptr }, { overlay, &broken } }, root, &rec));
-            UNSCOPED_INFO("which is skipped");
             CHECK(rec.skipped == 1);
-            UNSCOPED_INFO("with the text's line, past the first: " + std::to_string(rec.skippedLine));
+            UNSCOPED_INFO("with the text's line, past the first");
             CHECK(rec.skippedLine >= 2);
             {
-                INFO("and a reason: " + rec.skippedReason);
-                REQUIRE_FALSE(rec.skippedReason.empty());
-                REQUIRE(rec.skippedReason.find("No error") == std::string::npos);
+                CAPTURE(rec.skippedReason);
+                CHECK_FALSE(rec.skippedReason.empty());
+                CHECK(rec.skippedReason.find("No error") == std::string::npos);
             }
             UNSCOPED_INFO("and the file under that name did not apply either");
             CHECK(attr(root, "", "title") == std::string("Title"));

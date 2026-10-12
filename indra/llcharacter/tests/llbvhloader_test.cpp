@@ -386,15 +386,13 @@ namespace
         // A translation table, then a BVH, then the animation that comes out.
         WrittenAnimation build(const std::string& table, const std::vector<std::string>& lines)
         {
+            CAPTURE(table);
             std::unique_ptr<LLBVHLoader> loader = makeLoader();
-            UNSCOPED_INFO("the table is read");
             REQUIRE(readTable(*loader, table) == E_ST_OK);
-            UNSCOPED_INFO("the BVH is read");
             REQUIRE(load(*loader, lines) == E_ST_OK);
 
             std::vector<U8> bytes = write(*loader);
             WrittenAnimation written;
-            UNSCOPED_INFO("the animation can be read back");
             REQUIRE(read_written(bytes, written));
             return written;
         }
@@ -416,7 +414,6 @@ namespace
     {
         // A well formed file, and what it says coming out the other side.
         std::unique_ptr<LLBVHLoader> loader = makeLoader();
-        UNSCOPED_INFO("a well formed BVH is read");
         CHECK(load(*loader, sample_lines()) == E_ST_OK);
 
         // Four frames, of which the first is a reference and the last is only
@@ -426,24 +423,18 @@ namespace
 
         std::vector<U8> bytes = write(*loader);
         WrittenAnimation written;
-        UNSCOPED_INFO("the animation it writes can be read back");
         REQUIRE(read_written(bytes, written));
 
-        UNSCOPED_INFO("both joints are written");
-        CHECK(written.mNumJoints == 2u);
+        REQUIRE(written.mNumJoints == 2u);
         UNSCOPED_INFO("under the names the table gave them");
         CHECK(written.mJointNames[0] == std::string("mPelvis"));
-        UNSCOPED_INFO("and the second the same");
         CHECK(written.mJointNames[1] == std::string("mTorso"));
         UNSCOPED_INFO("the root's positions are written");
         CHECK(written.mNumPosKeys[0] > 0);
         UNSCOPED_INFO("a three channel joint has no positions to write");
         CHECK(written.mNumPosKeys[1] == 0);
-        {
-            INFO("both joints have rotations");
-            CHECK(written.mNumRotKeys[0] > 0);
-            CHECK(written.mNumRotKeys[1] > 0);
-        }
+        CHECK(written.mNumRotKeys[0] > 0);
+        CHECK(written.mNumRotKeys[1] > 0);
         UNSCOPED_INFO("nothing asked for a constraint");
         CHECK(written.mNumConstraints == 0);
 
@@ -458,14 +449,12 @@ namespace
         // The bytes a BVH turns into are read by the same code that reads an
         // animation somebody sends you, so that is what they are given to.
         std::unique_ptr<LLBVHLoader> loader = makeLoader();
-        UNSCOPED_INFO("a well formed BVH is read");
         CHECK(load(*loader, sample_lines()) == E_ST_OK);
 
         std::vector<U8> bytes = write(*loader);
         LLKeyframeMotion motion(LLUUID::generateNewID());
         UNSCOPED_INFO("what the loader writes is what the reader takes");
         CHECK(loadAsMotion(motion, bytes));
-        UNSCOPED_INFO("with both joints");
         CHECK(motion.getNumJointMotions() == 2);
     }
 
@@ -477,7 +466,7 @@ namespace
             std::vector<std::string> lines = sample_lines();
             lines[index] = text;
             std::unique_ptr<LLBVHLoader> loader = makeLoader();
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE(load(*loader, lines) == expected);
         };
 
@@ -517,6 +506,7 @@ namespace
         // because that is where the iterator asserts.
         for (S32 length = LINE_END_SITE + 1; length <= LINE_END_SITE + 3; ++length)
         {
+            CAPTURE(length);
             std::vector<std::string> lines = sample_lines();
             lines.resize(length);
             std::unique_ptr<LLBVHLoader> loader = makeLoader();
@@ -535,7 +525,7 @@ namespace
             std::vector<std::string> lines = sample_lines();
             lines[LINE_JOINT_CHANNELS] = text;
             std::unique_ptr<LLBVHLoader> loader = makeLoader();
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE(load(*loader, lines) == expected);
         };
 
@@ -583,7 +573,7 @@ namespace
             std::vector<std::string> lines = sample_lines();
             lines[LINE_JOINT_CHANNELS] = text;
             std::unique_ptr<LLBVHLoader> loader = makeLoader();
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE(load(*loader, lines) == expected);
         };
 
@@ -621,7 +611,7 @@ namespace
             std::vector<std::string> lines = sample_lines();
             lines[index] = text;
             std::unique_ptr<LLBVHLoader> loader = makeLoader();
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE(load(*loader, lines) == expected);
         };
 
@@ -676,7 +666,7 @@ namespace
             std::vector<std::string> lines = sample_lines();
             lines[index] = text;
             std::unique_ptr<LLBVHLoader> loader = makeLoader();
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE(load(*loader, lines) == expected);
         };
 
@@ -723,16 +713,14 @@ namespace
         const size_t last_number = whole.rfind(' ') + 1;
         UNSCOPED_INFO("the file is worth cutting up");
         REQUIRE(whole.size() > 200);
-        {
-            INFO("the last number was found");
-            CHECK(last_number > 1);
-            REQUIRE(last_number < whole.size());
-        }
+        CHECK(last_number > 1);
+        REQUIRE(last_number < whole.size());
 
         std::unique_ptr<LLBVHLoader> loader = makeLoader();
 
         for (size_t length = 0; length <= last_number; ++length)
         {
+            CAPTURE(length);
             rearm(*loader);
             UNSCOPED_INFO("a BVH cut short is refused");
             REQUIRE(loadText(*loader, whole.substr(0, length)) != E_ST_OK);
@@ -740,6 +728,7 @@ namespace
 
         for (size_t length = last_number + 1; length <= whole.size(); ++length)
         {
+            CAPTURE(length);
             rearm(*loader);
             UNSCOPED_INFO("a BVH whose last number is merely shorter is whole");
             REQUIRE(loadText(*loader, whole.substr(0, length)) == E_ST_OK);
@@ -755,7 +744,7 @@ namespace
         auto table = [&](const char* what, const std::string& text, ELoadStatus expected)
         {
             std::unique_ptr<LLBVHLoader> loader = makeLoader();
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE(readTable(*loader, text) == expected);
         };
 
@@ -785,7 +774,6 @@ namespace
         // the table is read long before the loader knows.
         {
             std::unique_ptr<LLBVHLoader> loader = makeLoader();
-            UNSCOPED_INFO("the globals are read");
             CHECK(readTable(*loader,
                 header +
                 "[GLOBALS]\n"
@@ -795,12 +783,10 @@ namespace
                 "easeout = 0.2 easeInOut\n"
                 "hand = 3\n"
                 "emote = wave\n") == E_ST_OK);
-            UNSCOPED_INFO("and then the BVH");
             CHECK(load(*loader, sample_lines()) == E_ST_OK);
 
             std::vector<U8> bytes = write(*loader);
             WrittenAnimation written;
-            UNSCOPED_INFO("the animation can be read back");
             REQUIRE(read_written(bytes, written));
 
             UNSCOPED_INFO("the priority is the one the table gave");
@@ -811,15 +797,12 @@ namespace
             CHECK(written.mHandPose == 3u);
             UNSCOPED_INFO("so is the emote");
             CHECK(written.mEmoteName == std::string("wave"));
-            UNSCOPED_INFO("the animation loops");
             CHECK(written.mLoop == 1);
             UNSCOPED_INFO("the ease in is not scaled down under a loop");
             CHECK_THAT(written.mEaseIn, ll_test::WithinBits(0.1f, 16));
             UNSCOPED_INFO("nor the ease out");
             CHECK_THAT(written.mEaseOut, ll_test::WithinBits(0.2f, 16));
-            UNSCOPED_INFO("the loop starts a quarter of the way in");
             CHECK_THAT(written.mLoopInPoint, ll_test::WithinBits(0.25f * written.mDuration, 16));
-            UNSCOPED_INFO("and ends three quarters of the way in");
             CHECK_THAT(written.mLoopOutPoint, ll_test::WithinBits(0.75f * written.mDuration, 16));
             UNSCOPED_INFO("a loop point is somewhere, not nowhere");
             CHECK(written.mLoopOutPoint > 0.f);
@@ -828,15 +811,12 @@ namespace
         // Without a table saying otherwise the loop runs the whole animation.
         {
             std::unique_ptr<LLBVHLoader> loader = makeLoader();
-            UNSCOPED_INFO("a plain BVH is read");
             CHECK(load(*loader, sample_lines()) == E_ST_OK);
             std::vector<U8> bytes = write(*loader);
             WrittenAnimation written;
-            UNSCOPED_INFO("the animation can be read back");
             REQUIRE(read_written(bytes, written));
-            UNSCOPED_INFO("it does not loop");
             CHECK(written.mLoop == 0);
-            UNSCOPED_INFO("and the loop still ends at the end");
+            UNSCOPED_INFO("the loop still ends at the end");
             CHECK_THAT(written.mLoopOutPoint, ll_test::WithinBits(written.mDuration, 16));
         }
     }
@@ -855,27 +835,18 @@ namespace
             CHECK(readTable(*loader,
                 header + "constraint = 2 0.0 0.2 0.8 1.0 mFootRight 1 2 3 mGroundPlane 4 5 6\n") ==
                 E_ST_OK);
-            UNSCOPED_INFO("and then the BVH");
             CHECK(load(*loader, sample_lines()) == E_ST_OK);
 
             std::vector<U8> bytes = write(*loader);
             WrittenAnimation written;
-            UNSCOPED_INFO("the animation can be read back");
             REQUIRE(read_written(bytes, written));
 
-            UNSCOPED_INFO("the constraint is written");
             CHECK(written.mNumConstraints == 1);
-            UNSCOPED_INFO("with its chain length");
             CHECK((S32)written.mChainLength == 2);
-            UNSCOPED_INFO("as a point constraint");
             CHECK((S32)written.mConstraintType == (S32)CONSTRAINT_TYPE_POINT);
-            UNSCOPED_INFO("anchored where it said");
             CHECK(volume_name(written.mSourceVolume) == std::string("mFootRight"));
-            UNSCOPED_INFO("and aimed where it said");
             CHECK(volume_name(written.mTargetVolume) == std::string("mGroundPlane"));
-            UNSCOPED_INFO("the source offset is the one it gave");
             CHECK(written.mSourceOffset == LLVector3(1.f, 2.f, 3.f));
-            UNSCOPED_INFO("and the target offset");
             CHECK(written.mTargetOffset == LLVector3(4.f, 5.f, 6.f));
 
             // The line never said a direction, so nothing may be written as
@@ -887,13 +858,9 @@ namespace
             UNSCOPED_INFO("and the bytes past the target name");
             CHECK(trailing_zeroes(written.mTargetVolume) == 4);
 
-            UNSCOPED_INFO("the ease in starts where it said");
             CHECK_THAT(written.mEaseInStart, ll_test::WithinBits(0.f, 16));
-            UNSCOPED_INFO("and stops where it said");
             CHECK_THAT(written.mEaseInStop, ll_test::WithinBits(0.2f, 16));
-            UNSCOPED_INFO("the ease out starts where it said");
             CHECK_THAT(written.mEaseOutStart, ll_test::WithinBits(0.8f, 16));
-            UNSCOPED_INFO("and stops where it said");
             CHECK_THAT(written.mEaseOutStop, ll_test::WithinBits(1.f, 16));
         }
 
@@ -904,14 +871,11 @@ namespace
             CHECK(readTable(*loader,
                 header + "planar_constraint = 2 0.0 0.2 0.8 1.0 mFootRight 0 0 0 mGroundPlane 0 0 0 0 0 4\n") ==
                 E_ST_OK);
-            UNSCOPED_INFO("and then the BVH");
             CHECK(load(*loader, sample_lines()) == E_ST_OK);
 
             std::vector<U8> bytes = write(*loader);
             WrittenAnimation written;
-            UNSCOPED_INFO("the animation can be read back");
             REQUIRE(read_written(bytes, written));
-            UNSCOPED_INFO("as a plane constraint");
             CHECK((S32)written.mConstraintType == (S32)CONSTRAINT_TYPE_PLANE);
             UNSCOPED_INFO("the direction it gave is normalized");
             CHECK(written.mTargetDir == LLVector3(0.f, 0.f, 1.f));
@@ -927,12 +891,10 @@ namespace
             CHECK(readTable(*loader,
                 header + "constraint = 2 0.0 0.2 0.8 1.0 mAJointWithAVer 0 0 0 mGroundPlane 0 0 0\n") ==
                 E_ST_OK);
-            UNSCOPED_INFO("and then the BVH");
             CHECK(load(*loader, sample_lines()) == E_ST_OK);
 
             std::vector<U8> bytes = write(*loader);
             WrittenAnimation written;
-            UNSCOPED_INFO("the animation can be read back");
             REQUIRE(read_written(bytes, written));
             UNSCOPED_INFO("the name fills the field");
             CHECK(volume_name(written.mSourceVolume) == std::string("mAJointWithAVer"));
@@ -959,7 +921,7 @@ namespace
             // whole point of a table: it is read after the aliases now.
             WrittenAnimation written = build(header + "[abdomen]\noutname = mChest\n", sample_lines());
             UNSCOPED_INFO("both joints are still written");
-            CHECK(written.mNumJoints == 2u);
+            REQUIRE(written.mNumJoints == 2u);
             UNSCOPED_INFO("the root keeps the name the alias gave it");
             CHECK(written.mJointNames[0] == std::string("mPelvis"));
             UNSCOPED_INFO("and the table renames the other");
@@ -970,15 +932,12 @@ namespace
             // name and the frame whole, so one applied after a table takes the
             // table's outname away with it.
             std::unique_ptr<LLBVHLoader> loader = makeLoader();
-            UNSCOPED_INFO("the table is read");
             CHECK(readTable(*loader, header + "[abdomen]\noutname = mChest\n") == E_ST_OK);
             loader->makeTranslation("abdomen", "mTorso");
-            UNSCOPED_INFO("the BVH is read");
             CHECK(load(*loader, sample_lines()) == E_ST_OK);
 
             std::vector<U8> bytes = write(*loader);
             WrittenAnimation written;
-            UNSCOPED_INFO("the animation can be read back");
             REQUIRE(read_written(bytes, written));
             UNSCOPED_INFO("an alias read after a table undoes what it said");
             CHECK(written.mJointNames[1] == std::string("mTorso"));
@@ -986,7 +945,7 @@ namespace
         {
             WrittenAnimation written = build(header + "[abdomen]\nignore = true\n", sample_lines());
             UNSCOPED_INFO("an ignored joint is not written");
-            CHECK(written.mNumJoints == 1u);
+            REQUIRE(written.mNumJoints == 1u);
             UNSCOPED_INFO("and the one left is the other one");
             CHECK(written.mJointNames[0] == std::string("mPelvis"));
         }
@@ -1047,7 +1006,7 @@ namespace
         auto table = [&](const char* what, const std::string& text, ELoadStatus expected)
         {
             std::unique_ptr<LLBVHLoader> loader = makeLoader();
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE(readTable(*loader, text) == expected);
         };
 
@@ -1108,13 +1067,9 @@ namespace
         const std::string header = "Translations 1.0\n";
         const std::vector<std::string> lines = moving_lines();
         const WrittenAnimation plain = build(header, lines);
-        UNSCOPED_INFO("the animation to compare against has two joints");
-        CHECK(plain.mNumJoints == 2u);
-        {
-            INFO("and keys to compare");
-            REQUIRE_FALSE(plain.mRotKeys[1].empty());
-            REQUIRE_FALSE(plain.mPosKeys[0].empty());
-        }
+        REQUIRE(plain.mNumJoints == 2u);
+        REQUIRE_FALSE(plain.mRotKeys[1].empty());
+        REQUIRE_FALSE(plain.mPosKeys[0].empty());
 
         {
             // Every position key is moved by this, and five metres is as far
@@ -1192,8 +1147,7 @@ namespace
 
             const WrittenAnimation one_frame = build(header, single);
             UNSCOPED_INFO("a single frame animation is written");
-            CHECK(one_frame.mNumJoints == 2u);
-            UNSCOPED_INFO("with one rotation key");
+            REQUIRE(one_frame.mNumJoints == 2u);
             CHECK(one_frame.mNumRotKeys[1] == 1);
 
             WrittenAnimation merged = build(header + "[abdomen]\nmergeparent = hip\n", single);
@@ -1213,7 +1167,6 @@ namespace
         CHECK(file.good());
 
         std::unique_ptr<LLBVHLoader> loader = makeLoader();
-        UNSCOPED_INFO("the shipped translation table is read");
         CHECK(loader->loadTranslationTable(file) == E_ST_OK);
 
         // Nothing in it is a setting, so nothing in it may become one by
@@ -1224,6 +1177,7 @@ namespace
         while (std::getline(again, line))
         {
             number++;
+            CAPTURE(number, line);
             if (number == 1)
             {
                 UNSCOPED_INFO("the header is the first line of it");
@@ -1250,7 +1204,6 @@ namespace
         LLXMLNodePtr root;
         UNSCOPED_INFO("the shipped skeleton was read");
         REQUIRE(LLXMLNode::parseFile(AL_SHIPPED_AVATAR_SKELETON, root, nullptr));
-        UNSCOPED_INFO("and it has a root");
         REQUIRE(root.notNull());
 
         alias_map_t aliases;
@@ -1270,8 +1223,7 @@ namespace
         // A bone claiming a name another bone already has takes it, and only
         // says so in the log.
         UNSCOPED_INFO("no alias is claimed by two bones");
-        REQUIRE((claimed_twice.empty() ? std::string() : claimed_twice.front()) ==
-                      std::string());
+        CHECK((claimed_twice.empty() ? std::string() : claimed_twice.front()) == std::string());
 
         // The whole map through the whole reader, which is what the upload
         // does with it.
@@ -1287,13 +1239,10 @@ namespace
 
         std::vector<U8> bytes = write(*loader);
         WrittenAnimation written;
-        UNSCOPED_INFO("the animation can be read back");
         REQUIRE(read_written(bytes, written));
-        UNSCOPED_INFO("both joints are written");
-        CHECK(written.mNumJoints == 2u);
+        REQUIRE(written.mNumJoints == 2u);
         UNSCOPED_INFO("the root under the name the skeleton gives it");
         CHECK(written.mJointNames[0] == std::string("mPelvis"));
-        UNSCOPED_INFO("and the other one too");
         CHECK(written.mJointNames[1] == std::string("mTorso"));
     }
 #endif

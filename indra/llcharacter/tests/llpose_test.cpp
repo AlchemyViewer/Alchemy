@@ -48,20 +48,18 @@ namespace
 {
     const F32 TOLERANCE = 1e-5f;
 
-    void ensure_vec3_equals(const char* msg, const LLVector3& actual, const LLVector3& expected)
+    void require_vec3_near(const char* what, const LLVector3& actual, const LLVector3& expected)
     {
-        UNSCOPED_INFO(msg);
+        INFO(what);
         REQUIRE_THAT(actual.mV[VX], Catch::Matchers::WithinAbs(expected.mV[VX], TOLERANCE));
-        UNSCOPED_INFO(msg);
         REQUIRE_THAT(actual.mV[VY], Catch::Matchers::WithinAbs(expected.mV[VY], TOLERANCE));
-        UNSCOPED_INFO(msg);
         REQUIRE_THAT(actual.mV[VZ], Catch::Matchers::WithinAbs(expected.mV[VZ], TOLERANCE));
     }
 
     // q and -q are the same rotation, so compare through the absolute dot product.
-    void ensure_quat_equals(const char* msg, const LLQuaternion& actual, const LLQuaternion& expected)
+    void require_same_rotation(const char* what, const LLQuaternion& actual, const LLQuaternion& expected)
     {
-        UNSCOPED_INFO(msg);
+        INFO(what);
         REQUIRE_THAT(fabsf(dot(actual, expected)), Catch::Matchers::WithinAbs(1.f, TOLERANCE));
     }
 
@@ -113,13 +111,11 @@ namespace
         // through a state that carries the matching usage, but a state that
         // came back with something else in it would be a silent wrong pose.
         LLPointer<LLJointState> state = new LLJointState(&mA);
-        UNSCOPED_INFO("no usage");
         CHECK(state->getUsage() == 0u);
-        UNSCOPED_INFO("no weight");
         CHECK(state->getWeight() == 0.f);
-        ensure_vec3_equals("position starts at the origin", state->getPosition(), LLVector3::zero);
-        ensure_quat_equals("rotation starts at identity", state->getRotation(), LLQuaternion::DEFAULT);
-        ensure_vec3_equals("scale starts at zero", state->getScale(), LLVector3::zero);
+        require_vec3_near("position starts at the origin", state->getPosition(), LLVector3::zero);
+        require_same_rotation("rotation starts at identity", state->getRotation(), LLQuaternion::DEFAULT);
+        require_vec3_near("scale starts at zero", state->getScale(), LLVector3::zero);
     }
 
     TEST_CASE_METHOD(lljointstate_data, "LLJointState: values set as scalars read back through both views", "[LLJointState]")
@@ -136,17 +132,17 @@ namespace
         state->setRotation(ROT_A);
         state->setScale(scale);
 
-        ensure_vec3_equals("position read back", state->getPosition(), pos);
-        ensure_quat_equals("rotation read back", state->getRotation(), ROT_A);
-        ensure_vec3_equals("scale read back", state->getScale(), scale);
+        require_vec3_near("position read back", state->getPosition(), pos);
+        require_same_rotation("rotation read back", state->getRotation(), ROT_A);
+        require_vec3_near("scale read back", state->getScale(), scale);
 
-        ensure_vec3_equals("position through the vector view",
-                           LLVector3(state->getPositionV().getF32ptr()), pos);
-        ensure_vec3_equals("scale through the vector view",
-                           LLVector3(state->getScaleV().getF32ptr()), scale);
+        require_vec3_near("position through the vector view",
+                          LLVector3(state->getPositionV().getF32ptr()), pos);
+        require_vec3_near("scale through the vector view",
+                          LLVector3(state->getScaleV().getF32ptr()), scale);
         LLQuaternion from_vector;
         state->getRotationQ().store(from_vector);
-        ensure_quat_equals("rotation through the vector view", from_vector, ROT_A);
+        require_same_rotation("rotation through the vector view", from_vector, ROT_A);
     }
 
     TEST_CASE_METHOD(lljointstate_data, "LLJointState: values set through the vector view read back as scalars", "[LLJointState]")
@@ -164,9 +160,9 @@ namespace
         state->setRotation(LLQuaternion2(ROT_B));
         state->setScale(scale);
 
-        ensure_vec3_equals("position set as a vector", state->getPosition(), LLVector3(-4.f, 5.f, 6.f));
-        ensure_quat_equals("rotation set as a quaternion2", state->getRotation(), ROT_B);
-        ensure_vec3_equals("scale set as a vector", state->getScale(), LLVector3(0.5f, 0.25f, 0.125f));
+        require_vec3_near("position set as a vector", state->getPosition(), LLVector3(-4.f, 5.f, 6.f));
+        require_same_rotation("rotation set as a quaternion2", state->getRotation(), ROT_B);
+        require_vec3_near("scale set as a vector", state->getScale(), LLVector3(0.5f, 0.25f, 0.125f));
     }
 
     //-------------------------------------------------------------------------
@@ -188,11 +184,9 @@ namespace
     TEST_CASE_METHOD(lljointstateblender_data, "LLJointStateBlender: addJointState refuses a state with no joint", "[LLJointStateBlender]")
     {
         LLPointer<LLJointState> orphan = make_state(nullptr, LLJointState::ROT);
-        UNSCOPED_INFO("state without a joint is refused");
         CHECK_FALSE(mBlender.addJointState(orphan, LLJoint::MEDIUM_PRIORITY, false));
 
         LLPointer<LLJointState> sa = make_state(&mA, LLJointState::ROT);
-        UNSCOPED_INFO("state with a joint is accepted");
         CHECK(mBlender.addJointState(sa, LLJoint::MEDIUM_PRIORITY, false));
     }
 
@@ -206,9 +200,9 @@ namespace
 
         mBlender.blendJointStates();
 
-        ensure_vec3_equals("single state position", mA.getPosition(), LLVector3(1.f, 2.f, 3.f));
-        ensure_quat_equals("single state rotation", mA.getRotation(), ROT_A);
-        ensure_vec3_equals("single state scale", mA.getScale(), LLVector3(2.f, 2.f, 2.f));
+        require_vec3_near("single state position", mA.getPosition(), LLVector3(1.f, 2.f, 3.f));
+        require_same_rotation("single state rotation", mA.getRotation(), ROT_A);
+        require_vec3_near("single state scale", mA.getScale(), LLVector3(2.f, 2.f, 2.f));
     }
 
     TEST_CASE_METHOD(lljointstateblender_data, "LLJointStateBlender: a zero-weight state leaves the joint alone", "[LLJointStateBlender]")
@@ -220,8 +214,8 @@ namespace
 
         mBlender.blendJointStates();
 
-        ensure_vec3_equals("zero-weight state leaves position", mA.getPosition(), LLVector3::zero);
-        ensure_quat_equals("zero-weight state leaves rotation", mA.getRotation(), LLQuaternion::DEFAULT);
+        require_vec3_near("zero-weight state leaves position", mA.getPosition(), LLVector3::zero);
+        require_same_rotation("zero-weight state leaves rotation", mA.getRotation(), LLQuaternion::DEFAULT);
     }
 
     TEST_CASE_METHOD(lljointstateblender_data, "LLJointStateBlender: higher priority wins and equal priority keeps the first", "[LLJointStateBlender]")
@@ -235,20 +229,20 @@ namespace
         mBlender.addJointState(low, LLJoint::LOW_PRIORITY, false);
         mBlender.addJointState(high, LLJoint::HIGH_PRIORITY, false);
         mBlender.blendJointStates();
-        ensure_quat_equals("high after low", mA.getRotation(), ROT_B);
+        require_same_rotation("high after low", mA.getRotation(), ROT_B);
 
         mA.setRotation(LLQuaternion::DEFAULT);
         mBlender.addJointState(high, LLJoint::HIGH_PRIORITY, false);
         mBlender.addJointState(low, LLJoint::LOW_PRIORITY, false);
         mBlender.blendJointStates();
-        ensure_quat_equals("low after high", mA.getRotation(), ROT_B);
+        require_same_rotation("low after high", mA.getRotation(), ROT_B);
 
         // At equal priority the state added first stays in front.
         mA.setRotation(LLQuaternion::DEFAULT);
         mBlender.addJointState(low, LLJoint::MEDIUM_PRIORITY, false);
         mBlender.addJointState(high, LLJoint::MEDIUM_PRIORITY, false);
         mBlender.blendJointStates();
-        ensure_quat_equals("equal priority keeps the first", mA.getRotation(), ROT_A);
+        require_same_rotation("equal priority keeps the first", mA.getRotation(), ROT_A);
     }
 
     TEST_CASE_METHOD(lljointstateblender_data, "LLJointStateBlender: two half-weight positions meet in the middle", "[LLJointStateBlender]")
@@ -263,7 +257,7 @@ namespace
         mBlender.addJointState(second, LLJoint::MEDIUM_PRIORITY, false);
         mBlender.blendJointStates();
 
-        ensure_vec3_equals("half and half", mA.getPosition(), LLVector3(1.f, 2.f, 0.f));
+        require_vec3_near("half and half", mA.getPosition(), LLVector3(1.f, 2.f, 0.f));
     }
 
     TEST_CASE_METHOD(lljointstateblender_data, "LLJointStateBlender: an additive state adds position and scale and composes rotation", "[LLJointStateBlender]")
@@ -282,9 +276,9 @@ namespace
         mBlender.addJointState(add, LLJoint::ADDITIVE_PRIORITY, true);
         mBlender.blendJointStates();
 
-        ensure_vec3_equals("additive position sums", mA.getPosition(), LLVector3(1.f, 1.f, 0.f));
-        ensure_quat_equals("additive rotation composes", mA.getRotation(), ROT_B * ROT_A);
-        ensure_vec3_equals("additive scale sums", mA.getScale(), LLVector3(1.5f, 1.f, 1.f));
+        require_vec3_near("additive position sums", mA.getPosition(), LLVector3(1.f, 1.f, 0.f));
+        require_same_rotation("additive rotation composes", mA.getRotation(), ROT_B * ROT_A);
+        require_vec3_near("additive scale sums", mA.getScale(), LLVector3(1.5f, 1.f, 1.f));
     }
 
     TEST_CASE_METHOD(lljointstateblender_data, "LLJointStateBlender: blending or clearing empties the queued states", "[LLJointStateBlender]")
@@ -294,17 +288,17 @@ namespace
         sa->setRotation(ROT_A);
         mBlender.addJointState(sa, LLJoint::MEDIUM_PRIORITY, false);
         mBlender.blendJointStates();
-        ensure_quat_equals("first blend applies", mA.getRotation(), ROT_A);
+        require_same_rotation("first blend applies", mA.getRotation(), ROT_A);
 
         mA.setRotation(ROT_C);
         mBlender.blendJointStates();
-        ensure_quat_equals("empty blend leaves the joint alone", mA.getRotation(), ROT_C);
+        require_same_rotation("empty blend leaves the joint alone", mA.getRotation(), ROT_C);
 
         // clear() drops queued states without applying them.
         mBlender.addJointState(sa, LLJoint::MEDIUM_PRIORITY, false);
         mBlender.clear();
         mBlender.blendJointStates();
-        ensure_quat_equals("cleared blend leaves the joint alone", mA.getRotation(), ROT_C);
+        require_same_rotation("cleared blend leaves the joint alone", mA.getRotation(), ROT_C);
     }
 
     TEST_CASE_METHOD(lljointstateblender_data, "LLJointStateBlender: a full blender refuses lower priority and takes higher", "[LLJointStateBlender]")
@@ -313,21 +307,18 @@ namespace
         for (S32 i = 0; i < JSB_NUM_JOINT_STATES; ++i)
         {
             states.push_back(make_state(&mA, LLJointState::ROT));
-            UNSCOPED_INFO("slot accepted");
             REQUIRE(mBlender.addJointState(states.back(), LLJoint::MEDIUM_PRIORITY, false));
         }
 
         LLPointer<LLJointState> lower = make_state(&mA, LLJointState::ROT);
-        UNSCOPED_INFO("full blender refuses a lower priority");
         CHECK_FALSE(mBlender.addJointState(lower, LLJoint::LOW_PRIORITY, false));
 
         LLPointer<LLJointState> higher = make_state(&mA, LLJointState::ROT);
         higher->setRotation(ROT_B);
-        UNSCOPED_INFO("full blender takes a higher priority");
         CHECK(mBlender.addJointState(higher, LLJoint::HIGH_PRIORITY, false));
 
         mBlender.blendJointStates();
-        ensure_quat_equals("the higher priority lands in front", mA.getRotation(), ROT_B);
+        require_same_rotation("the higher priority lands in front", mA.getRotation(), ROT_B);
     }
 
     TEST_CASE_METHOD(lljointstateblender_data, "LLJointStateBlender: a rotation-only blend does not dirty the position", "[LLJointStateBlender]")
@@ -349,11 +340,9 @@ namespace
         mBlender.addJointState(rot_only, LLJoint::MEDIUM_PRIORITY, false);
         mBlender.blendJointStates();
 
-        ensure_vec3_equals("rotation-only blend leaves scale alone", mA.getScale(), scale);
-        ensure_quat_equals("rotation-only blend still applies rotation", mA.getRotation(), ROT_A);
-        UNSCOPED_INFO("rotation-only blend does not dirty position");
+        require_vec3_near("rotation-only blend leaves scale alone", mA.getScale(), scale);
+        require_same_rotation("rotation-only blend still applies rotation", mA.getRotation(), ROT_A);
         CHECK((mA.mDirtyFlags & LLJoint::POSITION_DIRTY) == 0);
-        UNSCOPED_INFO("rotation-only blend does dirty rotation");
         CHECK((mA.mDirtyFlags & LLJoint::ROTATION_DIRTY) != 0);
     }
 
@@ -367,7 +356,7 @@ namespace
         mBlender.addJointState(scale_only, LLJoint::MEDIUM_PRIORITY, false);
         mBlender.blendJointStates();
 
-        ensure_vec3_equals("scale-only blend applies scale", mA.getScale(), scale);
+        require_vec3_near("scale-only blend applies scale", mA.getScale(), scale);
     }
 
     TEST_CASE_METHOD(lljointstateblender_data, "LLJointStateBlender: a non-finite scale never reaches the joint", "[LLJointStateBlender]")
@@ -382,9 +371,8 @@ namespace
         mBlender.addJointState(bad_scale, LLJoint::MEDIUM_PRIORITY, false);
         mBlender.blendJointStates();
 
-        UNSCOPED_INFO("joint scale stays finite");
         CHECK(mA.getScale().isFinite());
-        ensure_vec3_equals("non-finite scale is reset", mA.getScale(), LLVector3(1.f, 1.f, 1.f));
+        require_vec3_near("non-finite scale is reset", mA.getScale(), LLVector3(1.f, 1.f, 1.f));
     }
 
     TEST_CASE_METHOD(lljointstateblender_data, "LLJointStateBlender: holding a pose stops dirtying the joint", "[LLJointStateBlender]")
@@ -398,7 +386,7 @@ namespace
 
         mBlender.addJointState(held, LLJoint::MEDIUM_PRIORITY, false);
         mBlender.blendJointStates();
-        ensure_quat_equals("first blend applies the pose", mA.getRotation(), ROT_A);
+        require_same_rotation("first blend applies the pose", mA.getRotation(), ROT_A);
 
         mA.updateWorldMatrix();
         UNSCOPED_INFO("joint is clean once the pose has been applied");
@@ -419,12 +407,10 @@ namespace
         {
             states.push_back(make_state(&mA, LLJointState::ROT));
             states.back()->setRotation(ROT_B);
-            UNSCOPED_INFO("a free slot takes the state");
             REQUIRE(mBlender.addJointState(states.back(), LLJoint::HIGH_PRIORITY, false));
         }
 
         LLPointer<LLJointState> equal = make_state(&mA, LLJointState::ROT);
-        UNSCOPED_INFO("a full blender refuses an equal priority");
         CHECK_FALSE(mBlender.addJointState(equal, LLJoint::HIGH_PRIORITY, false));
 
         LLPointer<LLJointState> higher = make_state(&mA, LLJointState::ROT);
@@ -433,7 +419,7 @@ namespace
         CHECK(mBlender.addJointState(higher, LLJoint::HIGHEST_PRIORITY, false));
 
         mBlender.blendJointStates();
-        ensure_quat_equals("the highest priority won", mA.getRotation(), ROT_A);
+        require_same_rotation("the highest priority won", mA.getRotation(), ROT_A);
 
         // Applying releases every slot, so the next frame starts empty rather
         // than inheriting six states that are already spoken for.
@@ -442,39 +428,27 @@ namespace
         UNSCOPED_INFO("the slots came back");
         CHECK(mBlender.addJointState(next, LLJoint::LOW_PRIORITY, false));
         mBlender.blendJointStates();
-        ensure_quat_equals("the next frame blends only its own state", mA.getRotation(), ROT_C);
+        require_same_rotation("the next frame blends only its own state", mA.getRotation(), ROT_C);
     }
 
     TEST_CASE_METHOD(llpose_data, "LLPose: an empty pose has no states and no weight", "[LLPose]")
     {
-        UNSCOPED_INFO("empty pose has no states");
         CHECK(mPose.getNumJointStates() == 0);
-        UNSCOPED_INFO("empty pose has nothing to iterate");
-        REQUIRE(mPose.getJointStates().empty());
-        UNSCOPED_INFO("empty pose finds nothing by joint");
-        REQUIRE(mPose.findJointState(&mA) == nullptr);
-        UNSCOPED_INFO("empty pose finds nothing by name");
-        REQUIRE(mPose.findJointState(std::string("a")) == nullptr);
-        UNSCOPED_INFO("empty pose weight");
+        CHECK(mPose.getJointStates().empty());
+        CHECK(mPose.findJointState(&mA) == nullptr);
+        CHECK(mPose.findJointState(std::string("a")) == nullptr);
         CHECK(mPose.getWeight() == 0.f);
     }
 
     TEST_CASE_METHOD(llpose_data, "LLPose: an added state is counted and found by joint and by name", "[LLPose]")
     {
         LLPointer<LLJointState> sa = make_state(&mA, LLJointState::ROT);
-        UNSCOPED_INFO("addJointState returns true");
         CHECK(mPose.addJointState(sa));
-        UNSCOPED_INFO("one state");
         CHECK(mPose.getNumJointStates() == 1);
-        UNSCOPED_INFO("find by joint");
         CHECK(mPose.findJointState(&mA) == sa.get());
-        UNSCOPED_INFO("find by name");
         CHECK(mPose.findJointState(std::string("a")) == sa.get());
-        UNSCOPED_INFO("other joint absent");
-        REQUIRE(mPose.findJointState(&mB) == nullptr);
-        UNSCOPED_INFO("one state to iterate");
+        CHECK(mPose.findJointState(&mB) == nullptr);
         REQUIRE(mPose.getJointStates().size() == (size_t)1);
-        UNSCOPED_INFO("the state to iterate is the one added");
         CHECK(mPose.getJointStates()[0].get() == sa.get());
     }
 
@@ -485,9 +459,7 @@ namespace
         LLPointer<LLJointState> second = make_state(&mA, LLJointState::POS);
         mPose.addJointState(first);
         mPose.addJointState(second);
-        UNSCOPED_INFO("same joint dedups");
         CHECK(mPose.getNumJointStates() == 1);
-        UNSCOPED_INFO("first state kept");
         CHECK(mPose.findJointState(&mA) == first.get());
     }
 
@@ -497,26 +469,19 @@ namespace
         LLPointer<LLJointState> sb = make_state(&mB, LLJointState::ROT);
         mPose.addJointState(sa);
         mPose.addJointState(sb);
-        UNSCOPED_INFO("two states");
         CHECK(mPose.getNumJointStates() == 2);
 
         mPose.removeJointState(sa);
-        UNSCOPED_INFO("one left after remove");
         CHECK(mPose.getNumJointStates() == 1);
-        UNSCOPED_INFO("removed state gone");
-        REQUIRE(mPose.findJointState(&mA) == nullptr);
-        UNSCOPED_INFO("other state stays");
+        CHECK(mPose.findJointState(&mA) == nullptr);
         CHECK(mPose.findJointState(&mB) == sb.get());
 
         mPose.addJointState(sa);
-        UNSCOPED_INFO("re-add after remove");
         CHECK(mPose.getNumJointStates() == 2);
 
         mPose.removeAllJointStates();
-        UNSCOPED_INFO("removeAll empties");
         CHECK(mPose.getNumJointStates() == 0);
-        UNSCOPED_INFO("nothing to iterate");
-        REQUIRE(mPose.getJointStates().empty());
+        CHECK(mPose.getJointStates().empty());
     }
 
     TEST_CASE_METHOD(llpose_data, "LLPose: iterating the states visits each once", "[LLPose]")
@@ -533,13 +498,9 @@ namespace
         {
             seen.push_back(state.get());
         }
-        UNSCOPED_INFO("iteration visits every state");
-        REQUIRE(seen.size() == (size_t)3);
-        UNSCOPED_INFO("iteration visits a");
+        CHECK(seen.size() == (size_t)3);
         CHECK(std::count(seen.begin(), seen.end(), sa.get()) == 1);
-        UNSCOPED_INFO("iteration visits b");
         CHECK(std::count(seen.begin(), seen.end(), sb.get()) == 1);
-        UNSCOPED_INFO("iteration visits c");
         CHECK(std::count(seen.begin(), seen.end(), sc.get()) == 1);
     }
 
@@ -551,11 +512,8 @@ namespace
         mPose.addJointState(sb);
 
         mPose.setWeight(0.5f);
-        UNSCOPED_INFO("pose weight stored");
         CHECK(mPose.getWeight() == 0.5f);
-        UNSCOPED_INFO("weight reaches a");
         CHECK(sa->getWeight() == 0.5f);
-        UNSCOPED_INFO("weight reaches b");
         CHECK(sb->getWeight() == 0.5f);
 
         // A state added after setWeight is brought up to the pose's weight.
@@ -568,11 +526,8 @@ namespace
         CHECK(sc->getWeight() == 0.5f);
 
         mPose.setWeight(1.f);
-        UNSCOPED_INFO("second setWeight reaches a");
         CHECK(sa->getWeight() == 1.f);
-        UNSCOPED_INFO("second setWeight reaches b");
         CHECK(sb->getWeight() == 1.f);
-        UNSCOPED_INFO("second setWeight reaches c");
         CHECK(sc->getWeight() == 1.f);
     }
 
@@ -590,20 +545,14 @@ namespace
         mPose.addJointState(other);
         UNSCOPED_INFO("two states on one joint are one entry");
         CHECK(mPose.getNumJointStates() == 2);
-        UNSCOPED_INFO("found by joint");
         CHECK(mPose.findJointState(&mA) == first.get());
-        UNSCOPED_INFO("found by name");
         CHECK(mPose.findJointState("a") == first.get());
-        UNSCOPED_INFO("the other joint is found by name too");
         CHECK(mPose.findJointState("b") == other.get());
-        UNSCOPED_INFO("an unknown name finds nothing");
-        REQUIRE(mPose.findJointState("nobody") == nullptr);
+        CHECK(mPose.findJointState("nobody") == nullptr);
 
         mPose.removeJointState(mPose.findJointState(&mA));
-        UNSCOPED_INFO("removed by the state found");
         CHECK(mPose.getNumJointStates() == 1);
-        UNSCOPED_INFO("the joint is gone");
-        REQUIRE(mPose.findJointState(&mA) == nullptr);
+        CHECK(mPose.findJointState(&mA) == nullptr);
         mPose.removeJointState(second);
         UNSCOPED_INFO("removing an absent state changes nothing");
         CHECK(mPose.getNumJointStates() == 1);
@@ -638,12 +587,11 @@ namespace
         sb->setPosition(LLVector3(3.f, 2.f, 1.f));
         arm(motion);
 
-        UNSCOPED_INFO("addMotion returns true");
         CHECK(addMotion(&motion));
         mBlender.blendAndApply();
 
-        ensure_quat_equals("motion rotation applied", mA.getRotation(), ROT_A);
-        ensure_vec3_equals("motion position applied", mB.getPosition(), LLVector3(3.f, 2.f, 1.f));
+        require_same_rotation("motion rotation applied", mA.getRotation(), ROT_A);
+        require_vec3_near("motion position applied", mB.getPosition(), LLVector3(3.f, 2.f, 1.f));
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: the higher priority motion wins in either order", "[LLPoseBlender]")
@@ -659,13 +607,13 @@ namespace
         addMotion(&low);
         addMotion(&high);
         mBlender.blendAndApply();
-        ensure_quat_equals("higher motion priority wins, low first", mA.getRotation(), ROT_B);
+        require_same_rotation("higher motion priority wins, low first", mA.getRotation(), ROT_B);
 
         mA.setRotation(LLQuaternion::DEFAULT);
         addMotion(&high);
         addMotion(&low);
         mBlender.blendAndApply();
-        ensure_quat_equals("higher motion priority wins, high first", mA.getRotation(), ROT_B);
+        require_same_rotation("higher motion priority wins, high first", mA.getRotation(), ROT_B);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: a joint state's own priority overrides its motion's", "[LLPoseBlender]")
@@ -682,7 +630,7 @@ namespace
         addMotion(&medium);
         addMotion(&low);
         mBlender.blendAndApply();
-        ensure_quat_equals("joint state priority beats motion priority", mA.getRotation(), ROT_A);
+        require_same_rotation("joint state priority beats motion priority", mA.getRotation(), ROT_A);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: an additive motion composes ahead of the base and is masked behind", "[LLPoseBlender]")
@@ -702,13 +650,13 @@ namespace
         addMotion(&additive);
         addMotion(&base);
         mBlender.blendAndApply();
-        ensure_quat_equals("additive ahead of the base composes onto it", mA.getRotation(), ROT_B * ROT_A);
+        require_same_rotation("additive ahead of the base composes onto it", mA.getRotation(), ROT_B * ROT_A);
 
         mA.setRotation(LLQuaternion::DEFAULT);
         addMotion(&base);
         addMotion(&additive);
         mBlender.blendAndApply();
-        ensure_quat_equals("additive behind a saturated base is masked", mA.getRotation(), ROT_A);
+        require_same_rotation("additive behind a saturated base is masked", mA.getRotation(), ROT_A);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: blendAndApply and clearBlenders empty the queued motions", "[LLPoseBlender]")
@@ -719,18 +667,18 @@ namespace
 
         addMotion(&motion);
         mBlender.blendAndApply();
-        ensure_quat_equals("first apply", mA.getRotation(), ROT_A);
+        require_same_rotation("first apply", mA.getRotation(), ROT_A);
 
         // The active list is consumed by blendAndApply().
         mA.setRotation(ROT_C);
         mBlender.blendAndApply();
-        ensure_quat_equals("second apply without addMotion is a no-op", mA.getRotation(), ROT_C);
+        require_same_rotation("second apply without addMotion is a no-op", mA.getRotation(), ROT_C);
 
         // clearBlenders() discards queued states.
         addMotion(&motion);
         mBlender.clearBlenders();
         mBlender.blendAndApply();
-        ensure_quat_equals("cleared queue is a no-op", mA.getRotation(), ROT_C);
+        require_same_rotation("cleared queue is a no-op", mA.getRotation(), ROT_C);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: a joint with no number is kept in the motion's pose", "[LLPoseBlender]")
@@ -744,7 +692,6 @@ namespace
 
         ALTestMotion motion;
         motion.addJoint(&unnumbered, LLJointState::ROT);
-        UNSCOPED_INFO("unnumbered joint stays in the pose");
         CHECK(motion.getPose()->getNumJointStates() == 1);
     }
 
@@ -768,8 +715,8 @@ namespace
 
         addMotion(&motion);
         mBlender.blendAndApply();
-        ensure_quat_equals("the unnumbered joint is not blended", unnumbered.getRotation(), before);
-        ensure_quat_equals("the numbered joint in the same motion is", mA.getRotation(), ROT_A);
+        require_same_rotation("the unnumbered joint is not blended", unnumbered.getRotation(), before);
+        require_same_rotation("the numbered joint in the same motion is", mA.getRotation(), ROT_A);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: the first and the last pool slots both blend", "[LLPoseBlender]")
@@ -788,8 +735,8 @@ namespace
 
         addMotion(&motion);
         mBlender.blendAndApply();
-        ensure_quat_equals("slot zero blends", mA.getRotation(), ROT_A);
-        ensure_quat_equals("the last slot blends", last.getRotation(), ROT_C);
+        require_same_rotation("slot zero blends", mA.getRotation(), ROT_A);
+        require_same_rotation("the last slot blends", last.getRotation(), ROT_C);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: blendAndCache holds the blend and interpolate moves toward it", "[LLPoseBlender]")
@@ -806,21 +753,21 @@ namespace
 
         addMotion(&motion);
         mBlender.blendAndCache(true);
-        ensure_quat_equals("caching leaves the joint's rotation alone", mA.getRotation(), LLQuaternion::DEFAULT);
-        ensure_vec3_equals("caching leaves the joint's position alone", mA.getPosition(), LLVector3::zero);
+        require_same_rotation("caching leaves the joint's rotation alone", mA.getRotation(), LLQuaternion::DEFAULT);
+        require_vec3_near("caching leaves the joint's position alone", mA.getPosition(), LLVector3::zero);
 
         mBlender.interpolate(0.5f);
-        ensure_vec3_equals("half way toward the cached position", mA.getPosition(), LLVector3(1.f, 2.f, 3.f));
+        require_vec3_near("half way toward the cached position", mA.getPosition(), LLVector3(1.f, 2.f, 3.f));
 
         mBlender.interpolate(1.f);
-        ensure_vec3_equals("at the cached position", mA.getPosition(), LLVector3(2.f, 4.f, 6.f));
-        ensure_quat_equals("at the cached rotation", mA.getRotation(), ROT_A);
+        require_vec3_near("at the cached position", mA.getPosition(), LLVector3(2.f, 4.f, 6.f));
+        require_same_rotation("at the cached rotation", mA.getRotation(), ROT_A);
 
         // and once the blenders are cleared, interpolating moves nothing
         mBlender.clearBlenders();
         mA.setPosition(LLVector3::zero);
         mBlender.interpolate(1.f);
-        ensure_vec3_equals("a cleared blender no longer drives the joint", mA.getPosition(), LLVector3::zero);
+        require_vec3_near("a cleared blender no longer drives the joint", mA.getPosition(), LLVector3::zero);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: interpolating a rotation-only cache does not dirty the position", "[LLPoseBlender]")
@@ -870,7 +817,7 @@ namespace
         addMotion(&playing);
 
         mBlender.blendAndApply();
-        ensure_quat_equals("the motion with a weight still reaches the joint", mA.getRotation(), ROT_A);
+        require_same_rotation("the motion with a weight still reaches the joint", mA.getRotation(), ROT_A);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: leaving out a saturated rotation gives the same pose", "[LLPoseBlender]")
@@ -905,8 +852,8 @@ namespace
         mBlender.blendAndApply();
         const LLQuaternion left_out = mA.getRotation();
 
-        ensure_quat_equals("blending it in gives the owner's rotation", blended_in, ROT_A);
-        ensure_quat_equals("and so does leaving it out", left_out, blended_in);
+        require_same_rotation("blending it in gives the owner's rotation", blended_in, ROT_A);
+        require_same_rotation("and so does leaving it out", left_out, blended_in);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: only rotation is left out under a saturated joint", "[LLPoseBlender]")
@@ -927,8 +874,8 @@ namespace
         mBlender.addMotion(&mover, saturated);
         mBlender.blendAndApply();
 
-        ensure_vec3_equals("the position still reaches the joint", mA.getPosition(), offset);
-        ensure_quat_equals("and so does the rotation that came with it", mA.getRotation(), ROT_B);
+        require_vec3_near("the position still reaches the joint", mA.getPosition(), offset);
+        require_same_rotation("and so does the rotation that came with it", mA.getRotation(), ROT_B);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: a half-faded owner does not mask what is underneath", "[LLPoseBlender]")
@@ -951,11 +898,8 @@ namespace
         mBlender.blendAndApply();
 
         const LLQuaternion got = mA.getRotation();
-        {
-            INFO("a half faded owner leaves the one underneath showing through");
-            CHECK(fabsf(dot(got, ROT_A)) < 0.999f);
-            CHECK(fabsf(dot(got, ROT_B)) < 0.999f);
-        }
+        CHECK(fabsf(dot(got, ROT_A)) < 0.999f);
+        CHECK(fabsf(dot(got, ROT_B)) < 0.999f);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: left-out rotations leave a slot for a motion that needs one", "[LLPoseBlender]")
@@ -986,8 +930,8 @@ namespace
         mBlender.addMotion(&mover, saturated);
 
         mBlender.blendAndApply();
-        ensure_vec3_equals("the slots were there for the motion that needed one",
-                           mA.getPosition(), offset);
+        require_vec3_near("the slots were there for the motion that needed one",
+                          mA.getPosition(), offset);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: interpolate leaves channels nothing blended where they are", "[LLPoseBlender]")
@@ -1012,8 +956,8 @@ namespace
         mA.setScale(rescaled);
 
         mBlender.interpolate(0.5f);
-        ensure_vec3_equals("a position nothing blended is left where it is", mA.getPosition(), moved);
-        ensure_vec3_equals("and so is a scale", mA.getScale(), rescaled);
+        require_vec3_near("a position nothing blended is left where it is", mA.getPosition(), moved);
+        require_vec3_near("and so is a scale", mA.getScale(), rescaled);
         UNSCOPED_INFO("the channel that was blended still moves");
         CHECK(mA.getRotation() != LLQuaternion::DEFAULT);
     }
@@ -1035,8 +979,8 @@ namespace
         mBlender.blendAndCache(true);
 
         mBlender.interpolate(0.25f);
-        ensure_quat_equals("a quarter of the way along the arc, not across it",
-                           mA.getRotation(), slerp(0.25f, LLQuaternion::DEFAULT, far_apart));
+        require_same_rotation("a quarter of the way along the arc, not across it",
+                              mA.getRotation(), slerp(0.25f, LLQuaternion::DEFAULT, far_apart));
     }
 
 

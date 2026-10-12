@@ -34,21 +34,20 @@ namespace
     // hash, and (2) writing the first value back restores the original hash
     // (i.e. the hash is a pure function of state with no path dependence).
     template <typename Setter, typename Value>
-    static void ensure_setter_round_trip(const std::string& name,
-                                         Setter setter,
-                                         const Value& before_value,
-                                         const Value& after_value)
+    static void require_setter_round_trip(const std::string& name,
+                                          Setter setter,
+                                          const Value& before_value,
+                                          const Value& after_value)
     {
+        CAPTURE(name);
         LLMaterial m;
         (m.*setter)(before_value);
         const LLUUID before = m.getHash();
 
         (m.*setter)(after_value);
-        UNSCOPED_INFO((name + ": new value changes hash").c_str());
         REQUIRE(m.getHash() != before);
 
         (m.*setter)(before_value);
-        UNSCOPED_INFO((name + ": restoring value restores hash").c_str());
         REQUIRE(m.getHash() == before);
     }
 
@@ -60,11 +59,8 @@ namespace
         const LLUUID a = m.getHash();
         const LLUUID b = m.getHash();
         const LLUUID c = m.getHash();
-        UNSCOPED_INFO("repeated reads");
         CHECK(a == b);
-        UNSCOPED_INFO("repeated reads");
         CHECK(b == c);
-        UNSCOPED_INFO("hash is not the null UUID");
         CHECK(a.notNull());
     }
 
@@ -76,53 +72,53 @@ namespace
     TEST_CASE("llmaterial: every setter changes the hash and setting back restores it", "[llmaterial]")
     {
         // ID setters.
-        ensure_setter_round_trip("setNormalID",
+        require_setter_round_trip("setNormalID",
             &LLMaterial::setNormalID,   LLUUID::null,   kIdA);
-        ensure_setter_round_trip("setSpecularID",
+        require_setter_round_trip("setSpecularID",
             &LLMaterial::setSpecularID, LLUUID::null,   kIdB);
 
         // F32 setters (individual axes).
-        ensure_setter_round_trip("setNormalOffsetX",
+        require_setter_round_trip("setNormalOffsetX",
             &LLMaterial::setNormalOffsetX,   0.0f, 1.5f);
-        ensure_setter_round_trip("setNormalOffsetY",
+        require_setter_round_trip("setNormalOffsetY",
             &LLMaterial::setNormalOffsetY,   0.0f, 2.5f);
-        ensure_setter_round_trip("setNormalRepeatX",
+        require_setter_round_trip("setNormalRepeatX",
             &LLMaterial::setNormalRepeatX,   1.0f, 3.5f);
-        ensure_setter_round_trip("setNormalRepeatY",
+        require_setter_round_trip("setNormalRepeatY",
             &LLMaterial::setNormalRepeatY,   1.0f, 4.5f);
-        ensure_setter_round_trip("setNormalRotation",
+        require_setter_round_trip("setNormalRotation",
             &LLMaterial::setNormalRotation,  0.0f, 1.57f);
-        ensure_setter_round_trip("setSpecularOffsetX",
+        require_setter_round_trip("setSpecularOffsetX",
             &LLMaterial::setSpecularOffsetX, 0.0f, 5.5f);
-        ensure_setter_round_trip("setSpecularOffsetY",
+        require_setter_round_trip("setSpecularOffsetY",
             &LLMaterial::setSpecularOffsetY, 0.0f, 6.5f);
-        ensure_setter_round_trip("setSpecularRepeatX",
+        require_setter_round_trip("setSpecularRepeatX",
             &LLMaterial::setSpecularRepeatX, 1.0f, 7.5f);
-        ensure_setter_round_trip("setSpecularRepeatY",
+        require_setter_round_trip("setSpecularRepeatY",
             &LLMaterial::setSpecularRepeatY, 1.0f, 8.5f);
-        ensure_setter_round_trip("setSpecularRotation",
+        require_setter_round_trip("setSpecularRotation",
             &LLMaterial::setSpecularRotation, 0.0f, 2.71f);
 
         // LLColor4U setter.
-        ensure_setter_round_trip<void(LLMaterial::*)(const LLColor4U&), LLColor4U>(
+        require_setter_round_trip<void(LLMaterial::*)(const LLColor4U&), LLColor4U>(
             "setSpecularLightColor",
             &LLMaterial::setSpecularLightColor,
             LLColor4U(0, 0, 0, 0),
             LLColor4U(11, 22, 33, 44));
 
         // U8 setters.
-        ensure_setter_round_trip<void(LLMaterial::*)(U8), U8>(
+        require_setter_round_trip<void(LLMaterial::*)(U8), U8>(
             "setSpecularLightExponent",
             &LLMaterial::setSpecularLightExponent, U8(0), U8(99));
-        ensure_setter_round_trip<void(LLMaterial::*)(U8), U8>(
+        require_setter_round_trip<void(LLMaterial::*)(U8), U8>(
             "setEnvironmentIntensity",
             &LLMaterial::setEnvironmentIntensity, U8(0), U8(123));
-        ensure_setter_round_trip<void(LLMaterial::*)(U8), U8>(
+        require_setter_round_trip<void(LLMaterial::*)(U8), U8>(
             "setDiffuseAlphaMode",
             &LLMaterial::setDiffuseAlphaMode,
             (U8)LLMaterial::DIFFUSE_ALPHA_MODE_BLEND,
             (U8)LLMaterial::DIFFUSE_ALPHA_MODE_MASK);
-        ensure_setter_round_trip<void(LLMaterial::*)(U8), U8>(
+        require_setter_round_trip<void(LLMaterial::*)(U8), U8>(
             "setAlphaMaskCutoff",
             &LLMaterial::setAlphaMaskCutoff, U8(0), U8(200));
     }
@@ -148,7 +144,6 @@ namespace
         paired.setSpecularOffset(4.5f, 5.5f);
         paired.setSpecularRepeat(6.5f, 7.5f);
 
-        UNSCOPED_INFO("paired vs. split writes agree");
         CHECK(split.getHash() == paired.getHash());
     }
 
@@ -161,42 +156,42 @@ namespace
         {
             LLMaterial x; x.setNormalOffsetX(1.0f);
             LLMaterial y; y.setNormalOffsetY(1.0f);
-            UNSCOPED_INFO("Normal offset X vs Y distinguishes");
+            UNSCOPED_INFO("normal offset X vs Y");
             CHECK(x.getHash() != y.getHash());
         }
         // mNormalRepeatX vs mNormalRepeatY
         {
             LLMaterial x; x.setNormalRepeatX(2.0f);
             LLMaterial y; y.setNormalRepeatY(2.0f);
-            UNSCOPED_INFO("Normal repeat X vs Y distinguishes");
+            UNSCOPED_INFO("normal repeat X vs Y");
             CHECK(x.getHash() != y.getHash());
         }
         // mSpecularOffsetX vs mSpecularOffsetY
         {
             LLMaterial x; x.setSpecularOffsetX(3.0f);
             LLMaterial y; y.setSpecularOffsetY(3.0f);
-            UNSCOPED_INFO("Specular offset X vs Y distinguishes");
+            UNSCOPED_INFO("specular offset X vs Y");
             CHECK(x.getHash() != y.getHash());
         }
         // mSpecularRepeatX vs mSpecularRepeatY
         {
             LLMaterial x; x.setSpecularRepeatX(4.0f);
             LLMaterial y; y.setSpecularRepeatY(4.0f);
-            UNSCOPED_INFO("Specular repeat X vs Y distinguishes");
+            UNSCOPED_INFO("specular repeat X vs Y");
             CHECK(x.getHash() != y.getHash());
         }
         // Same UUIDs swapped between mNormalID and mSpecularID.
         {
             LLMaterial ab; ab.setNormalID(kIdA); ab.setSpecularID(kIdB);
             LLMaterial ba; ba.setNormalID(kIdB); ba.setSpecularID(kIdA);
-            UNSCOPED_INFO("Normal/Specular ID swap distinguishes");
+            UNSCOPED_INFO("normal and specular IDs swapped");
             CHECK(ab.getHash() != ba.getHash());
         }
         // Normal vs specular rotation
         {
             LLMaterial n; n.setNormalRotation(1.0f);
             LLMaterial s; s.setSpecularRotation(1.0f);
-            UNSCOPED_INFO("Normal vs Specular rotation distinguishes");
+            UNSCOPED_INFO("normal vs specular rotation");
             CHECK(n.getHash() != s.getHash());
         }
         // Trailing U8 fields all share size/alignment — make sure the packer
@@ -206,11 +201,11 @@ namespace
             LLMaterial i; i.setEnvironmentIntensity(7);
             LLMaterial d; d.setDiffuseAlphaMode((U8)LLMaterial::DIFFUSE_ALPHA_MODE_MASK);
             LLMaterial c; c.setAlphaMaskCutoff(7);
-            UNSCOPED_INFO("exponent vs intensity distinguishes");
+            UNSCOPED_INFO("exponent vs intensity");
             CHECK(e.getHash() != i.getHash());
-            UNSCOPED_INFO("intensity vs alpha mode distinguishes");
+            UNSCOPED_INFO("intensity vs alpha mode");
             CHECK(i.getHash() != d.getHash());
-            UNSCOPED_INFO("alpha mode vs cutoff distinguishes");
+            UNSCOPED_INFO("alpha mode vs cutoff");
             CHECK(d.getHash() != c.getHash());
         }
     }
@@ -227,16 +222,14 @@ namespace
         LLMaterial back;
         back.setAlphaMaskCutoff(99); // make cache dirty + state altered
         back.fromLLSD(sd);
-        UNSCOPED_INFO("fromLLSD round-trip yields baseline hash");
         CHECK(back.getHash() == before);
 
         // Now perturb a field through LLSD and check the hash moves.
         LLMaterial perturbed;
         perturbed.fromLLSD(sd);
-        UNSCOPED_INFO("post-fromLLSD matches baseline");
         CHECK(perturbed.getHash() == before);
         perturbed.setEnvironmentIntensity(42);
-        UNSCOPED_INFO("post-fromLLSD setter still invalidates");
+        UNSCOPED_INFO("a setter after fromLLSD still invalidates");
         CHECK(perturbed.getHash() != before);
     }
 
@@ -250,21 +243,17 @@ namespace
 
         // Copy after the source's cache has been populated.
         LLMaterial copy_warm(src);
-        UNSCOPED_INFO("warm copy preserves hash");
         CHECK(copy_warm.getHash() == src_hash);
 
         // Copy from a source whose cache is dirty (never read).
         LLMaterial dirty_src;
         dirty_src.setEnvironmentIntensity(7);  // marks dirty without reading
         LLMaterial copy_cold(dirty_src);
-        UNSCOPED_INFO("cold copy still produces the right hash");
         CHECK(copy_cold.getHash() == dirty_src.getHash());
 
         // Mutating the copy must not bleed back into the source.
         copy_warm.setEnvironmentIntensity(99);
-        UNSCOPED_INFO("mutating copy invalidates copy's hash");
         CHECK(copy_warm.getHash() != src_hash);
-        UNSCOPED_INFO("source hash unchanged");
         CHECK(src.getHash() == src_hash);
     }
 
@@ -281,7 +270,6 @@ namespace
         m.setEnvironmentIntensity(0); // already the default
         m.setNormalRotation(0.0f);    // already the default
         const LLUUID h2 = m.getHash();
-        UNSCOPED_INFO("redundant setter writes preserve hash");
         CHECK(h1 == h2);
     }
 
@@ -299,16 +287,12 @@ namespace
         b.setSpecularLightColor(LLColor4U(10, 20, 30, 40));
         b.setEnvironmentIntensity(50);
 
-        UNSCOPED_INFO("operator== for equal state");
         CHECK(a == b);
-        UNSCOPED_INFO("hash equality follows operator==");
         CHECK(a.getHash() == b.getHash());
 
         // One-bit perturbation must break both equalities together.
         b.setEnvironmentIntensity(51);
-        UNSCOPED_INFO("operator!= after single-field change");
         CHECK(a != b);
-        UNSCOPED_INFO("hash inequality after single-field change");
         CHECK(a.getHash() != b.getHash());
     }
 }
