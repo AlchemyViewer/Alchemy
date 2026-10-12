@@ -114,13 +114,17 @@ namespace
         // test the getExtent() method
         //
 
-        LLBBoxLocal bbox2(LLVector3(0.0f, 0.0f, 0.0f), LLVector3(-1.0f, -1.0f, -1.0f));
-
         CHECK(LLBBoxLocal().getExtent() == LLVector3(0.0f, 0.0f, 0.0f));
 
         LLBBoxLocal bbox3(LLVector3(-1.0f, -1.0f, -1.0f), LLVector3(1.0f, 2.0f, 0.0f));
 
         CHECK(bbox3.getExtent() == LLVector3(2.0f, 3.0f, 1.0f));
+
+        // Max less min, so negative where min is above max.
+        LLBBoxLocal bbox2(LLVector3(0.0f, 0.0f, 0.0f), LLVector3(-1.0f, -1.0f, -1.0f));
+
+        UNSCOPED_INFO("min above max");
+        CHECK(bbox2.getExtent() == LLVector3(-1.0f, -1.0f, -1.0f));
     }
 
     TEST_CASE("LLBBoxLocal: addPoint grows the box only for points outside it", "[LLBBoxLocal]")
