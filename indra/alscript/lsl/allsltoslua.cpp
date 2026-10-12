@@ -794,11 +794,18 @@ namespace
 
         // --- LSL's order ----------------------------------------------------------------
 
-        // Whether a binary's sides run the other way round could do or give
-        // something else: one changes what the other reads, or both do
-        // something past the script. LSL ran the right side first, and Luau
-        // runs the left.
-        bool orderMatters(LSLExpression* lhs, LSLExpression* rhs) const;
+        // Why a binary's sides run the other way round could do or give
+        // something else, where they could: one changes what the other
+        // reads, or both reach past the script and one of them changes
+        // something there. LSL ran the right side first, and Luau runs the
+        // left. The note that says so, naming what does it, and its words.
+        struct Order
+        {
+            const char*              key = nullptr;
+            const char*              english = nullptr;
+            std::vector<std::string> args;
+        };
+        Order orderMatters(LSLExpression* lhs, LSLExpression* rhs) const;
         // l = (l = []) + l + ..., which spared LSO's memory by clearing l
         // after LSL, going right to left, had read it: the clearing taken
         // out of the tree, since Luau would clear it first, and what is left
@@ -3909,10 +3916,12 @@ namespace
         const bool assigns = op == OP_ASSIGN || op == OP_ADD_ASSIGN || op == OP_SUB_ASSIGN || op == OP_MUL_ASSIGN || op == OP_DIV_ASSIGN ||
                              op == OP_MOD_ASSIGN;
         const bool andOr = op == OP_BOOLEAN_AND || op == OP_BOOLEAN_OR;
-        if (!assigns && !(andOr && !ALLSLTraits::sideEffectFree(rhs)) && orderMatters(lhs, rhs))
+        if (!assigns && !(andOr && !ALLSLTraits::sideEffectFree(rhs)))
         {
-            note(e, "SluaRightFirst",
-                 "LSL ran the right side of this before the left, and Luau runs the left first: one side changes what the other reads.");
+            if (Order order = orderMatters(lhs, rhs); order.key)
+            {
+                note(e, order.key, order.english, std::move(order.args));
+            }
         }
         const auto bit = [&](const char* fn) -> Expr {
             // bit32 answers 0 to 4294967295, where LSL's integers were signed:
@@ -6093,36 +6102,117 @@ namespace
 
     // --- LSL's order -------------------------------------------------------------------
 
-    bool Writer::orderMatters(LSLExpression* lhs, LSLExpression* rhs) const
+    Writer::Order Writer::orderMatters(LSLExpression* lhs, LSLExpression* rhs) const
     {
         const ALLSLEffects::Writes left  = mEffects.of(lhs);
         const ALLSLEffects::Writes right = mEffects.of(rhs);
-        // Both past the script, where either may change something there.
-        if (left.impure && right.impure && !(ALLSLTraits::changesNothing(lhs) && ALLSLTraits::changesNothing(rhs)))
-        {
-            return true;
-        }
-        // What one side sets, the other reads, or a function of the
-        // script's that it calls may.
-        const auto sees = [](const ALLSLEffects::Writes& w, LSLExpression* other) {
-            if (w.variables.empty())
-            {
-                return false;
-            }
-            bool seen = false;
-            walk(other, [&](LSLASTNode* node) {
-                if (node->getNodeSubType() == NODE_LVALUE_EXPRESSION)
-                {
-                    seen = seen || w.writes(static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol());
-                }
-                else if (node->getNodeSubType() == NODE_FUNCTION_EXPRESSION && readOf(node))
-                {
-                    seen = true;
-                }
-            });
-            return seen;
+        // A call by its LSL name, as the note says it.
+        const auto callName = [](LSLASTNode* call) {
+            return std::string(static_cast<LSLFunctionExpression*>(call)->getIdentifier()->getName()) + "()";
         };
-        return sees(left, rhs) || sees(right, lhs);
+        // The first call on a side that reaches past the script, one that
+        // changes something there where `changing`.
+        const auto reaching = [&](LSLExpression* side, bool changing) -> LSLASTNode* {
+            LSLASTNode* found = nullptr;
+            walk(side, [&](LSLASTNode* node) {
+                LSLSymbol* callee = !found && node->getNodeSubType() == NODE_FUNCTION_EXPRESSION
+                                        ? static_cast<LSLFunctionExpression*>(node)->getIdentifier()->getSymbol()
+                                        : nullptr;
+                if (!callee)
+                {
+                    return;
+                }
+                if (callee->getSubType() == SYM_BUILTIN)
+                {
+                    const ALLSLTraits::Trait* t = ALLSLTraits::of(callee->getName());
+                    found = (!t || !t->pure) && (!changing || !t || !t->mustUse) ? node : nullptr;
+                    return;
+                }
+                const ALLSLEffects::Writes& theirs = mEffects.ofFunction(callee);
+                found = theirs.impure && (!changing || theirs.changes) ? node : nullptr;
+            });
+            return found;
+        };
+        // Both past the script, where either changes something there: the
+        // one that changes it, and the other's.
+        if (left.impure && right.impure && (left.changes || right.changes))
+        {
+            LSLASTNode* changer = left.changes ? reaching(lhs, true) : reaching(rhs, true);
+            LSLASTNode* other   = left.changes ? reaching(rhs, false) : reaching(lhs, false);
+            if (changer && other)
+            {
+                return { "SluaRightFirstWorld",
+                         "LSL ran the right side of this before the left, and Luau runs the left first: [1] may change what [2] does or "
+                         "finds outside the script.",
+                         { callName(changer), callName(other) } };
+            }
+            return { "SluaRightFirst", "LSL ran the right side of this before the left, and Luau runs the left first: one side changes "
+                                       "what the other reads." };
+        }
+        // What one side sets, the other reads or sets too: itself, or
+        // through a function of the script's it calls.
+        const auto meets = [&](const ALLSLEffects::Writes& w, LSLExpression* side, LSLExpression* other) -> std::optional<Order> {
+            const ALLSLEffects::Writes theirs = mEffects.of(other);
+            for (LSLSymbol* var : w.variables)
+            {
+                bool named = theirs.writes(var);
+                walk(other, [&](LSLASTNode* node) {
+                    if (named)
+                    {
+                        return;
+                    }
+                    if (node->getNodeSubType() == NODE_LVALUE_EXPRESSION)
+                    {
+                        named = static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol() == var;
+                    }
+                    else if (LSLSymbol* callee = readOf(node); callee && node->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+                    {
+                        named = mEffects.reads(callee, var);
+                    }
+                });
+                if (!named)
+                {
+                    continue;
+                }
+                // Set on its own side directly, or by a call there.
+                LSLASTNode* call = nullptr;
+                bool        set  = false;
+                walk(side, [&](LSLASTNode* node) {
+                    if (node->getNodeType() == NODE_EXPRESSION && operation_mutates(static_cast<LSLExpression*>(node)->getOperation()) &&
+                        node->getChild(0) && node->getChild(0)->getNodeSubType() == NODE_LVALUE_EXPRESSION &&
+                        static_cast<LSLLValueExpression*>(node->getChild(0))->getIdentifier()->getSymbol() == var)
+                    {
+                        set = true;
+                    }
+                    else if (LSLSymbol* callee = !call ? readOf(node) : nullptr;
+                             callee && node->getNodeSubType() == NODE_FUNCTION_EXPRESSION && mEffects.ofFunction(callee).writes(var))
+                    {
+                        call = node;
+                    }
+                });
+                if (set || !call)
+                {
+                    return Order{ "SluaRightFirstSet",
+                                  "LSL ran the right side of this before the left, and Luau runs the left first: [1] is set on one side and "
+                                  "read or set on the other.",
+                                  { var->getName() } };
+                }
+                return Order{ "SluaRightFirstCall",
+                              "LSL ran the right side of this before the left, and Luau runs the left first: [1] sets [2], which the other "
+                              "side reads or sets too.",
+                              { callName(call), var->getName() } };
+            }
+            return std::nullopt;
+        };
+        if (std::optional<Order> found = meets(left, lhs, rhs))
+        {
+            return *found;
+        }
+        if (std::optional<Order> found = meets(right, rhs, lhs))
+        {
+            return *found;
+        }
+        return {};
     }
 
     namespace

@@ -50,11 +50,15 @@ class ALLSLEffects
 public:
     // What running some code may change: the variables it assigns, and
     // whether it does anything past that -- calls a library function that
-    // is not pure, which may change the world or read what changes.
+    // is not pure, which may change the world or read what changes. And
+    // whether it may change the world: a library call made for more than
+    // its answer, a change of state, a print. What only reads the world
+    // reads the same before or after another that only reads it.
     struct Writes
     {
         boost::unordered_flat_set<Tailslide::LSLSymbol*> variables;
-        bool                                             impure = false;
+        bool                                             impure  = false;
+        bool                                             changes = false;
 
         bool writes(Tailslide::LSLSymbol* variable) const { return variables.contains(variable); }
         void add(const Writes& more);
@@ -68,6 +72,9 @@ public:
     // and through what it calls, and whether anything it does is impure.
     // One the script does not define is taken as impure.
     const Writes& ofFunction(Tailslide::LSLSymbol* function) const;
+    // Whether calling a function may read a global variable: itself or
+    // through what it calls. One the script does not define may read any.
+    bool reads(Tailslide::LSLSymbol* function, Tailslide::LSLSymbol* variable) const;
     // What running a node may change: its assignments and increments,
     // and what the calls in it may.
     Writes of(Tailslide::LSLASTNode* node) const;
@@ -87,4 +94,8 @@ public:
 private:
     boost::unordered_flat_map<Tailslide::LSLSymbol*, Writes> mFunctions;
     Writes                                                  mUnknown;
+    // The globals each function names, itself and through its callees;
+    // and those that call one the script does not define.
+    boost::unordered_flat_map<Tailslide::LSLSymbol*, boost::unordered_flat_set<Tailslide::LSLSymbol*>> mReads;
+    boost::unordered_flat_set<Tailslide::LSLSymbol*>                                                 mReadsAny;
 };

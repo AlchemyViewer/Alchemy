@@ -204,6 +204,18 @@ namespace tut
             }
             return false;
         }
+        // Any of the notes that LSL ran a binary's right side first.
+        static bool orderNoted(const ALLSLToSLua::Result& r)
+        {
+            for (const ALScriptProblem& p : r.notes)
+            {
+                if (p.key.rfind("SluaRightFirst", 0) == 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     };
 
     typedef test_group<allsltoslua_data, 100> allsltoslua_group;
@@ -570,7 +582,7 @@ namespace tut
         ensure("nothing cleared first: " + r.text, !has(r, "gItems = {} return") && !has(r, "gLog = \"\" return"));
         ensure("noted once for each variable: " + r.text, noted(r, "SluaMemoryHack") && count(r, "-- LSL: (gItems = []) + gItems") == 1 &&
                                                          count(r, "-- LSL: (gLog = \"\") + gLog") == 1);
-        ensure("not taken as an order that shows", !noted(r, "SluaRightFirst"));
+        ensure("not taken as an order that shows", !orderNoted(r));
         checksClean(r);
 
         const ALLSLToSLua::Result order = convert("integer gCount;\n"
@@ -581,7 +593,11 @@ namespace tut
                                                   "    integer k = gCount - bump();\n"
                                                   "    llOwnerSay((string)(j + k));\n"
                                                   "} }\n");
-        ensure("an assignment the other side reads", noted(order, "SluaRightFirst"));
+        ensure("an assignment the other side reads, named", noted(order, "SluaRightFirstSet", "i"));
+        ensure("a call that sets what the other side reads, named", noted(order, "SluaRightFirstCall", "bump()"));
+        ensure("said over its line, with what: " + order.text, has(order, "-- LSL: LSL ran the right side of this before the left, and Luau "
+                                                                         "runs the left first: bump() sets gCount, which the other side "
+                                                                         "reads or sets too."));
         ensure("said over its line: " + order.text, has(order, "-- LSL: LSL ran the right side of this before the left"));
         checksClean(order);
 
@@ -593,7 +609,7 @@ namespace tut
                                                   "    string s = \"n: \" + (string)bump();\n"
                                                   "    llOwnerSay(s + (string)(j + (integer)llGetTime()));\n"
                                                   "} }\n");
-        ensure("nothing either side changes the other reads: " + quiet.text, !noted(quiet, "SluaRightFirst"));
+        ensure("nothing either side changes the other reads: " + quiet.text, !orderNoted(quiet));
         checksClean(quiet);
     }
 
@@ -3180,7 +3196,6 @@ namespace tut
         ensure("a vector's part, an argument: " + r.text, has(r, "gV = vector(gV.x, gV.y, (math.modf(f)))"));
         checksClean(r);
     }
-
     template<> template<>
     void allsltoslua_object::test<97>()
     {
@@ -3272,6 +3287,35 @@ namespace tut
         ensure("together: " + r.text, has(r, "        print(\"r\")\n    end,\n    touch_start = function(detected)\n"));
         ensure("one blank line over a comment over it: " + r.text, has(r, "    end,\n\n    -- listening\n    listen = function("));
         ensure("none at the table's top: " + r.text, has(r, "states.collect = {\n    changed = function(change)\n"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<99>()
+    {
+        set_test_name("LSL's right side first noted only where the order could show, naming what: not two sides that only read the "
+                      "world, through a function of the script's too (Tapple's); a call that changes the world beside one that reads it; "
+                      "a call that sets what the other side's function reads; not one beside a function that does not read it");
+        const ALLSLToSLua::Result r = convert("key gSender;\n"
+                                              "string gCache;\n"
+                                              "string myInfo() { return (string)llGetKey(); }\n"
+                                              "string say() { llOwnerSay(\"x\"); return \"y\"; }\n"
+                                              "string cached() { return gCache; }\n"
+                                              "string fill() { gCache = \"z\"; return gCache; }\n"
+                                              "string other() { return \"o\"; }\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    llOwnerSay(\"activeRequestor: \" + llKey2Name(gSender) + \"; llGetKey: \" + llKey2Name(myInfo()));\n"
+                                              "    llOwnerSay(llKey2Name(gSender) + say());\n"
+                                              "    llOwnerSay(cached() + fill());\n"
+                                              "    llOwnerSay(other() + fill());\n"
+                                              "} }\n");
+        ensure("Tapple's, two sides that only read: " + r.text, !noted(r, "SluaRightFirst") && !noted(r, "SluaRightFirstWorld", "myInfo()"));
+        ensure("a call that changes the world, named with the other: " + r.text, noted(r, "SluaRightFirstWorld", "say()") &&
+               has(r, "-- LSL: LSL ran the right side of this before the left, and Luau runs the left first: say() may change what "
+                      "llKey2Name() does or finds outside the script.\n    print(ll.Key2Name(gSender) .. say())"));
+        ensure("a call that sets what the other's reads: " + r.text, noted(r, "SluaRightFirstCall", "fill()") &&
+               has(r, "fill() sets gCache, which the other side reads or sets too.\n    print(cached() .. fill())"));
+        ensure("noted twice, no more: " + r.text, count(r, "LSL ran the right side") == 2);
         checksClean(r);
     }
 }

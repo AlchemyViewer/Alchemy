@@ -217,4 +217,33 @@ namespace tut
         ensure("a call that reads before one that writes", !firstQ(q.calls("bump")[0]));
         ensure("a call that writes before a quiet one", !firstQ(q.calls("same")[1]));
     }
+    template<> template<>
+    void allsleffects_object::test<3>()
+    {
+        set_test_name("what a function changes past the script, apart from what it only reads there; and the globals it reads, "
+                      "through what it calls");
+        const Parsed p("integer g;\n"
+                       "integer h;\n"
+                       "key me() { return llGetKey(); }\n"
+                       "say() { llOwnerSay(\"x\"); }\n"
+                       "loud() { say(); }\n"
+                       "integer look() { return g; }\n"
+                       "integer near() { return look(); }\n"
+                       "integer bump() { return ++h; }\n"
+                       "default { state_entry() { me(); loud(); near(); bump(); } }\n");
+        ensure("parsed", p.script != nullptr);
+        const ALLSLEffects effects(p.script);
+        ensure("reading the world is past the script", effects.ofFunction(p.function("me")).impure);
+        ensure("and changes nothing there", !effects.ofFunction(p.function("me")).changes);
+        ensure("saying something changes it", effects.ofFunction(p.function("say")).changes);
+        ensure("through what it calls too", effects.ofFunction(p.function("loud")).changes);
+        ensure("a read of a global", effects.reads(p.function("look"), p.global("g")));
+        ensure("through what it calls", effects.reads(p.function("near"), p.global("g")));
+        ensure("not one it does not name", !effects.reads(p.function("near"), p.global("h")));
+        ensure("nor one only another function names", !effects.reads(p.function("me"), p.global("g")));
+        ensure("one it steps", effects.reads(p.function("bump"), p.global("h")));
+        ensure("a function the script does not define reads any", effects.reads(nullptr, p.global("g")));
+        LSLASTNode* body = p.script->getStates()->getChild(0);
+        ensure("a statement's, its calls'", effects.of(body).changes && effects.of(body).impure);
+    }
 }
