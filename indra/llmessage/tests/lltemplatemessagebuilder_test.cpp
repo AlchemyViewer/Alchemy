@@ -108,6 +108,7 @@ namespace
         messageTemplate.addBlock(defaultBlock());
         LLTemplateMessageBuilder* builder = defaultBuilder(messageTemplate);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
+        CHECK(reader->getNumberOfBlocks(_PREHASH_Test0) == 1);
         delete reader;
     }
 
@@ -271,13 +272,16 @@ namespace
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
         messageTemplate.addBlock(defaultBlock(MVT_LLQuaternion, 12));
-        LLQuaternion outValue, inValue = LLQuaternion(0.0f, LLVector3(0.3713907f, 0.5570861f, 0.7427813f));
+        // one radian about a unit axis: w > 0, so the packing keeps it
+        LLQuaternion outValue, inValue = LLQuaternion(1.f, LLVector3(0.3713907f, 0.5570861f, 0.7427813f));
 
         LLTemplateMessageBuilder* builder = defaultBuilder(messageTemplate);
         builder->addQuat(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getQuat(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        CHECK(inValue == outValue);
+        // the wire carries x, y and z, and the reader recovers w from them
+        CAPTURE(inValue, outValue);
+        CHECK(outValue.isEqualEps(inValue, 1e-5f));
         delete reader;
     }
 
@@ -359,12 +363,12 @@ namespace
         delete builder;
 
         // build template: Test1 before Test0
-        messageTemplate = defaultTemplate();
-        messageTemplate.addBlock(createBlock(const_cast<char*>(_PREHASH_Test1), MVT_U32, 4, MBT_SINGLE));
-        messageTemplate.addBlock(createBlock(const_cast<char*>(_PREHASH_Test0), MVT_U32, 4, MBT_SINGLE));
+        LLMessageTemplate reorderedTemplate = defaultTemplate();
+        reorderedTemplate.addBlock(createBlock(const_cast<char*>(_PREHASH_Test1), MVT_U32, 4, MBT_SINGLE));
+        reorderedTemplate.addBlock(createBlock(const_cast<char*>(_PREHASH_Test0), MVT_U32, 4, MBT_SINGLE));
 
         // build message: 1st declared block var == 0xaaaa, 2nd declared block var == 0xbbbb
-        builder = defaultBuilder(messageTemplate, const_cast<char*>(_PREHASH_Test1));
+        builder = defaultBuilder(reorderedTemplate, const_cast<char*>(_PREHASH_Test1));
         builder->addU32(_PREHASH_Test0, 0xaaaa);
         builder->nextBlock(_PREHASH_Test0);
         builder->addU32(_PREHASH_Test0, 0xbbbb);
@@ -429,12 +433,12 @@ namespace
         delete builder;
 
         // Build template: Test0 before Test1
-        messageTemplate = defaultTemplate();
-        messageTemplate.addBlock(createBlock(const_cast<char*>(_PREHASH_Test0), MVT_U32, 4, MBT_SINGLE));
-        messageTemplate.addBlock(createBlock(const_cast<char*>(_PREHASH_Test1), MVT_U32, 4, MBT_SINGLE));
+        LLMessageTemplate longerTemplate = defaultTemplate();
+        longerTemplate.addBlock(createBlock(const_cast<char*>(_PREHASH_Test0), MVT_U32, 4, MBT_SINGLE));
+        longerTemplate.addBlock(createBlock(const_cast<char*>(_PREHASH_Test1), MVT_U32, 4, MBT_SINGLE));
 
         // Build message
-        builder = defaultBuilder(messageTemplate, const_cast<char*>(_PREHASH_Test0));
+        builder = defaultBuilder(longerTemplate, const_cast<char*>(_PREHASH_Test0));
         builder->addU32(_PREHASH_Test0, 0xaaaa);
         builder->nextBlock(_PREHASH_Test1);
         builder->addU32(_PREHASH_Test0, 0xbbbb);
@@ -509,10 +513,13 @@ namespace
         builder = defaultBuilder(messageTemplate);
         builder->newMessage(_PREHASH_TestMessage);
         reader->copyToBuilder(*builder);
-        U8 buffer[MAX_BUFFER_SIZE];
-        builder->buildMessage(buffer, MAX_BUFFER_SIZE, 0);
+        delete reader;
 
-        delete builder;
+        // read the forwarded message
+        reader = setReader(messageTemplate, builder);
+        U32 outValue = 0;
+        reader->getU32(_PREHASH_Test0, _PREHASH_Test0, outValue);
+        CHECK(outValue == 42);
         delete reader;
     }
 
@@ -523,6 +530,7 @@ namespace
         LLTemplateMessageBuilder* builder = defaultBuilder(messageTemplate);
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 10);
+        CHECK(reader->getNumberOfBlocks(_PREHASH_Test0) == 1);
         delete reader;
     }
 
@@ -698,13 +706,16 @@ namespace
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
         messageTemplate.addBlock(defaultBlock(MVT_LLQuaternion, 12));
-        LLQuaternion outValue, inValue = LLQuaternion(0.0f, LLVector3(0.3713907f, 0.5570861f, 0.7427813f));
+        // one radian about a unit axis: w > 0, so the packing keeps it
+        LLQuaternion outValue, inValue = LLQuaternion(1.f, LLVector3(0.3713907f, 0.5570861f, 0.7427813f));
         LLTemplateMessageBuilder* builder = defaultBuilder(messageTemplate);
         builder->addQuat(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 12);
         reader->getQuat(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        CHECK(inValue == outValue);
+        // the wire carries x, y and z, and the reader recovers w from them
+        CAPTURE(inValue, outValue);
+        CHECK(outValue.isEqualEps(inValue, 1e-5f));
         delete reader;
     }
 
@@ -858,13 +869,12 @@ namespace
         reader->validateMessage(buffer, builtSize, LLHost());
         reader->readMessage(buffer, LLHost());
         reader->getU32(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        (void)outValue;
         char outBuffer[bufferSize];
-        memset(buffer, 0xcc, bufferSize);
+        memset(outBuffer, 0xcc, bufferSize);
         reader->getString(_PREHASH_Test1, _PREHASH_Test0, bufferSize,
                           outBuffer);
         CHECK(outValue == inValue);
-        CHECK(strlen(outBuffer) == 0);
+        CHECK(outBuffer[0] == '\0');
         delete reader;
     }
 
@@ -908,8 +918,8 @@ namespace
         LLTemplateMessageBuilder* builder = defaultBuilder(messageTemplate);
         std::string in(300, 'x');
         builder->addString(_PREHASH_Test0, in);
+        REQUIRE(in.size() == (size_t)300);
         CHECK(in[254] == 'x');
-        CHECK(in.size() == (size_t)300);
 
         // round-trip: stored copy is clamped to 255 bytes and NUL-terminated
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
@@ -946,7 +956,7 @@ namespace
         builder->nextBlock(_PREHASH_Test1);
         builder->addU32(_PREHASH_Test0, 0xdeadbeef);
 
-        LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
+        std::unique_ptr<LLTemplateMessageReader> reader(setReader(messageTemplate, builder));
 
         CHECK(reader->getNumberOfBlocks(_PREHASH_Test0) == NUM_BLOCKS);
         for (S32 i = 0; i < NUM_BLOCKS; ++i)
@@ -959,7 +969,6 @@ namespace
         U32 single = 0;
         reader->getU32(_PREHASH_Test1, _PREHASH_Test0, single);
         CHECK(single == (U32)0xdeadbeef);
-        delete reader;
     }
 
     TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: one reader decodes messages of differing repeat counts in turn", "[LLTemplateMessageBuilder]")
@@ -1035,7 +1044,7 @@ namespace
         nameMap[_PREHASH_TestMessage] = &messageTemplate;
         numberMap[1] = &messageTemplate;
 
-        LLTemplateMessageBuilder* builder = new LLTemplateMessageBuilder(nameMap);
+        auto builder = std::make_unique<LLTemplateMessageBuilder>(nameMap);
 
         const U32 cap = 1024;
         for (S32 pass = 0; pass < 4; ++pass)
@@ -1070,7 +1079,6 @@ namespace
             }
             builder->clearMessage();
         }
-        delete builder;
     }
 }
 

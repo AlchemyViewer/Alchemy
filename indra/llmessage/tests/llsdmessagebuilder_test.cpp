@@ -47,15 +47,15 @@ namespace
 {
     static LLTemplateMessageBuilder::message_template_name_map_t templateNameMap;
 
-    LLMsgData* messageData = NULL;
-    LLMsgBlkData* messageBlockData = NULL;
-
     struct LLSDMessageBuilderTestData {
+        // A legacy message holding one block, testBlock, for the
+        // copyFromMessageData cases to fill. The message owns the block.
+        LLMsgData messageData{"testMessage"};
+        LLMsgBlkData* messageBlockData = new LLMsgBlkData("testBlock", 0);
 
         LLSDMessageBuilderTestData()
         {
-            messageData = new LLMsgData("testMessage");
-            messageBlockData = new LLMsgBlkData("testBlock", 0);
+            messageData.addBlock(messageBlockData);
         }
 
         static LLSDMessageBuilder defaultBuilder()
@@ -96,10 +96,10 @@ namespace
             return result;
         }
 
-        static LLTemplateMessageBuilder* defaultTemplateBuilder(LLMessageTemplate& messageTemplate, char* name = const_cast<char*>(_PREHASH_Test0))
+        static std::unique_ptr<LLTemplateMessageBuilder> defaultTemplateBuilder(LLMessageTemplate& messageTemplate, char* name = const_cast<char*>(_PREHASH_Test0))
         {
             templateNameMap[_PREHASH_TestMessage] = &messageTemplate;
-            LLTemplateMessageBuilder* builder = new LLTemplateMessageBuilder(templateNameMap);
+            auto builder = std::make_unique<LLTemplateMessageBuilder>(templateNameMap);
             builder->newMessage(_PREHASH_TestMessage);
             builder->nextBlock(name);
             return builder;
@@ -113,10 +113,10 @@ namespace
 
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: a builder with a message and a block makes a reader", "[LLSDMessageBuilder]")
-        // construction and test of undefined
     {
       LLSDMessageBuilder builder = defaultBuilder();
       LLSDMessageReader reader = setReader(builder);
+      CHECK(reader.getNumberOfBlocks("block") == 1);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addBOOL round trips a bool through the reader", "[LLSDMessageBuilder]")
@@ -294,12 +294,9 @@ namespace
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData creates the blocks of a legacy message", "[LLSDMessageBuilder]")
     {
-      LLMsgBlkData* mbd = new LLMsgBlkData("testBlock", 0);
-      LLMsgData* md = new LLMsgData("testMessage");
-      md->addBlock(mbd);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*md);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(output["testBlock"].isDefined());
@@ -310,68 +307,57 @@ namespace
       char binData[] = "abcdefghijklmnop";
 
       addValue(messageBlockData, (char *)"testBinData", &binData, MVT_FIXED, sizeof(binData));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      REQUIRE(v.size() > 0);
-
-      CHECK_THAT(ll_test::Memory(&v[0], sizeof(binData)), ll_test::MemoryMatches(binData, sizeof(binData)));
+      CHECK_THAT(ll_test::Memory(v.data(), v.size()), ll_test::MemoryMatches(binData, sizeof(binData)));
     }
 
-    TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData of MVT_VARIABLE data_size 1 is commented out", "[LLSDMessageBuilder]")
+    TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_VARIABLE data_size 1 with no closing NUL as binary", "[LLSDMessageBuilder]")
     {
-     /* U8 binData[] = "abcdefghijklmnop";
+      // a data_size 1 field becomes a string only when it ends in a NUL;
+      // other bytes stay binary, a NUL inside them included
+      U8 binData[] = {'a', 'b', 0, 'c', 'd'};
 
-      addValue(messageBlockData, "testBinData", &binData, MVT_VARIABLE, sizeof(binData), 1);
-      messageData->addBlock(messageBlockData);
+      addValue(messageBlockData, (char *)"testBinData", &binData, MVT_VARIABLE, sizeof(binData), 1);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      ensure("Ensure MVT_S16Array data copied from legacy to llsd give a valid vector", v.size() > 0);
-
-      ensure_memory_matches("Ensure MVT_VARIABLE U8 binary data works in a message copied from legacy to llsd",
-          &v[0], sizeof(binData), binData, sizeof(binData));*/
+      CHECK_THAT(ll_test::Memory(v.data(), v.size()), ll_test::MemoryMatches(binData, sizeof(binData)));
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_VARIABLE data_size 2 U16s as binary", "[LLSDMessageBuilder]")
     {
       U16 binData[] = {1,2,3,4,5,6,7,8,9}; //9 shorts
 
-      addValue(messageBlockData, (char *)"testBinData", &binData, MVT_VARIABLE, sizeof(binData) >> 1, 2);
-      messageData->addBlock(messageBlockData);
+      addValue(messageBlockData, (char *)"testBinData", &binData, MVT_VARIABLE, sizeof(binData), 2);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      REQUIRE(v.size() > 0);
-
-      CHECK_THAT(ll_test::Memory(&v[0], sizeof(binData) >> 1), ll_test::MemoryMatches(binData, sizeof(binData) >> 1));
+      CHECK_THAT(ll_test::Memory(v.data(), v.size()), ll_test::MemoryMatches(binData, sizeof(binData)));
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_VARIABLE data_size 4 U32s as binary", "[LLSDMessageBuilder]")
     {
       U32 binData[] = {9,8,7,6,5,4,3,2,1};
 
-      addValue(messageBlockData, (char *)"testBinData", &binData, MVT_VARIABLE, sizeof(binData) >> 2, 4);
-      messageData->addBlock(messageBlockData);
+      addValue(messageBlockData, (char *)"testBinData", &binData, MVT_VARIABLE, sizeof(binData), 4);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      REQUIRE(v.size() > 0);
-
-      CHECK_THAT(ll_test::Memory(&v[0], sizeof(binData) >> 2), ll_test::MemoryMatches(binData, sizeof(binData) >> 2));
+      CHECK_THAT(ll_test::Memory(v.data(), v.size()), ll_test::MemoryMatches(binData, sizeof(binData)));
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_U8 as an integer", "[LLSDMessageBuilder]")
@@ -379,10 +365,9 @@ namespace
       U8 data = 0xa5;
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_U8, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == data);
@@ -393,10 +378,9 @@ namespace
       U16 data = 0xa55a;
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_U16, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == data);
@@ -407,24 +391,22 @@ namespace
       U32 data = 0xa55a7117;
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_U32, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(ll_U32_from_sd(output["testBlock"][0]["testBinData"]) == data);
     }
 
-    // MVT_U64 - crush into an s32: LLSD does not support 64 bit values
+    // MVT_U64 - LLSD has no 64 bit integer, so ll_sd_from_U64 carries it as 8 bytes of binary
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData keeps all 64 bits of MVT_U64 for ll_U64_from_sd", "[LLSDMessageBuilder]")
     {
       U64 data = U64L(0xa55a711711223344);
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_U64, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(ll_U64_from_sd(output["testBlock"][0]["testBinData"]) == data);
@@ -435,10 +417,9 @@ namespace
       S8 data = -31;
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_S8, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == data);
@@ -449,10 +430,9 @@ namespace
       S16 data = -31;
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_S16, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == data);
@@ -463,10 +443,9 @@ namespace
       S32 data = -3100;
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_S32, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == data);
@@ -478,10 +457,9 @@ namespace
       S64 data = -31003100;
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_S64, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == (S32)data);
@@ -492,10 +470,9 @@ namespace
       F32 data = 1234.1234f;
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_F32, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(output["testBlock"][0]["testBinData"].asReal() == data);
@@ -506,10 +483,9 @@ namespace
       F64 data = 1234.1234;
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_F64, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(output["testBlock"][0]["testBinData"].asReal() == data);
@@ -520,10 +496,9 @@ namespace
       LLVector3 data(1,2,3);
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_LLVector3, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(ll_vector3_from_sd(output["testBlock"][0]["testBinData"]) == data);
@@ -534,10 +509,9 @@ namespace
       LLVector3d data(1,2,3);
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_LLVector3d, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(ll_vector3d_from_sd(output["testBlock"][0]["testBinData"]) == data);
@@ -549,10 +523,9 @@ namespace
       LLSD v = ll_sd_from_vector4(data);
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_LLVector4, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK_THAT(output["testBlock"][0]["testBinData"], ll_test::LLSDEquals(v));
@@ -560,19 +533,21 @@ namespace
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData unpacks MVT_LLQuaternion from a packed vector", "[LLSDMessageBuilder]")
     {
-      LLQuaternion data(0.3713907f, 0.5570861f, 0.7427813f,0.0f);
+      // one radian about a unit axis: w > 0, so the packing keeps it
+      LLQuaternion data(1.f, LLVector3(0.3713907f, 0.5570861f, 0.7427813f));
 
       //we send a quaternion packed into a vec3 (w is infered) - so sizeof(vec) == 12 bytes not 16.
       LLVector3 vec = data.packToVector3();
 
       addValue(messageBlockData, (char *)"testBinData", &vec, MVT_LLQuaternion, sizeof(vec));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
-      CHECK(ll_quaternion_from_sd(output["testBlock"][0]["testBinData"]) == data);
+      LLQuaternion unpacked = ll_quaternion_from_sd(output["testBlock"][0]["testBinData"]);
+      CAPTURE(data, unpacked);
+      CHECK(unpacked.isEqualEps(data, 1e-5f));
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_LLUUID as a UUID", "[LLSDMessageBuilder]")
@@ -580,13 +555,10 @@ namespace
       LLUUID data("01234567-0123-0123-0123-234567abcdef");
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_LLUUID, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
-
-      std::string v = output["testBlock"][0]["testBinData"].asUUID().asString();
 
       CHECK(output["testBlock"][0]["testBinData"].asUUID() == data);
     }
@@ -596,14 +568,11 @@ namespace
       bool valueTrue = true;
       bool valueFalse = false;
 
-      LLMsgData* md = new LLMsgData("testMessage");
-      LLMsgBlkData* mbd = new LLMsgBlkData("testBlock", 0);
-      addValue(mbd, (char *)"testBoolFalse", &valueFalse, MVT_BOOL, sizeof(bool));
-      addValue(mbd, (char *)"testBoolTrue", &valueTrue, MVT_BOOL, sizeof(bool));
-      md->addBlock(mbd);
+      addValue(messageBlockData, (char *)"testBoolFalse", &valueFalse, MVT_BOOL, sizeof(bool));
+      addValue(messageBlockData, (char *)"testBoolTrue", &valueTrue, MVT_BOOL, sizeof(bool));
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*md);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(output["testBlock"][0]["testBoolTrue"].asBoolean());
@@ -616,10 +585,9 @@ namespace
       LLSD v = ll_sd_from_ipaddr(data);
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_IP_ADDR, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK_THAT(output["testBlock"][0]["testBinData"], ll_test::LLSDEquals(v));
@@ -630,10 +598,9 @@ namespace
       U16 data = 0xff88;
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_IP_PORT, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == data);
@@ -644,16 +611,13 @@ namespace
       U16 data[3] = {0,1,2};
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_U16Vec3, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      REQUIRE(v.size() > 0);
-
-      CHECK_THAT(ll_test::Memory((U16*)&v[0], 6), ll_test::MemoryMatches(data, 6));
+      CHECK_THAT(ll_test::Memory(v.data(), v.size()), ll_test::MemoryMatches(data, 6));
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_U16Quat as eight bytes", "[LLSDMessageBuilder]")
@@ -661,16 +625,13 @@ namespace
       U16 data[4] = {0,1,2,4};
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_U16Quat, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      REQUIRE(v.size() > 0);
-
-      CHECK_THAT(ll_test::Memory((U16*)&v[0], 8), ll_test::MemoryMatches(data, 8));
+      CHECK_THAT(ll_test::Memory(v.data(), v.size()), ll_test::MemoryMatches(data, 8));
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_S16Array as binary", "[LLSDMessageBuilder]")
@@ -678,16 +639,13 @@ namespace
       S16 data[19] = {0,-1,2,-4,5,-6,7,-8,9,-10,11,-12,13,-14,15,16,17,18};
 
       addValue(messageBlockData, (char *)"testBinData", &data, MVT_S16Array, sizeof(data));
-      messageData->addBlock(messageBlockData);
       LLSDMessageBuilder builder = defaultBuilder();
 
-      builder.copyFromMessageData(*messageData);
+      builder.copyFromMessageData(messageData);
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      REQUIRE(v.size() > 0);
-
-      CHECK_THAT(ll_test::Memory((U16*)&v[0], 19), ll_test::MemoryMatches(data, 19));
+      CHECK_THAT(ll_test::Memory(v.data(), v.size()), ll_test::MemoryMatches(data, sizeof(data)));
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies a U8 from an LLTemplateMessageBuilder", "[LLSDMessageBuilder]")
@@ -695,7 +653,7 @@ namespace
         LLMessageTemplate messageTemplate = defaultTemplate();
         messageTemplate.addBlock(defaultTemplateBlock(MVT_U8, 1));
         U8 inValue = 2;
-        LLTemplateMessageBuilder* template_builder = defaultTemplateBuilder(messageTemplate);
+        std::unique_ptr<LLTemplateMessageBuilder> template_builder = defaultTemplateBuilder(messageTemplate);
         template_builder->addU8(_PREHASH_Test0, inValue);
 
         LLSDMessageBuilder builder;
@@ -711,7 +669,7 @@ namespace
         LLMessageTemplate messageTemplate = defaultTemplate();
         messageTemplate.addBlock(defaultTemplateBlock(MVT_VARIABLE, 1));
         std::string inValue = "testing";
-        LLTemplateMessageBuilder* builder = defaultTemplateBuilder(messageTemplate);
+        std::unique_ptr<LLTemplateMessageBuilder> builder = defaultTemplateBuilder(messageTemplate);
         builder->addString(_PREHASH_Test0, inValue.c_str());
 
         LLSDMessageBuilder sd_builder;
@@ -727,10 +685,9 @@ namespace
         // and must yield an empty value instead of reading out of bounds
     {
         addValue(messageBlockData, (char*)"testBinData", nullptr, MVT_VARIABLE, 0, 1);
-        messageData->addBlock(messageBlockData);
         LLSDMessageBuilder builder = defaultBuilder();
 
-        builder.copyFromMessageData(*messageData);
+        builder.copyFromMessageData(messageData);
         LLSD output = builder.getMessage();
 
         CHECK(output["testBlock"][0]["testBinData"].isDefined());
@@ -748,7 +705,7 @@ namespace
         block->addVariable(const_cast<char*>(_PREHASH_Test1), MVT_U8, 1);
         messageTemplate.addBlock(block);
 
-        LLTemplateMessageBuilder* builder = defaultTemplateBuilder(messageTemplate);
+        std::unique_ptr<LLTemplateMessageBuilder> builder = defaultTemplateBuilder(messageTemplate);
         builder->addU8(_PREHASH_Test0, 7); // Test1 left as a placeholder
 
         LLSDMessageBuilder sd_builder;

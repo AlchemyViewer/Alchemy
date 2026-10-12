@@ -58,9 +58,6 @@ namespace
         CHECK(nValue.getTypeEnum() == NVT_NULL);
         CHECK(nValue.getClassEnum() == NVC_NULL);
         CHECK(nValue.getSendtoEnum() == NVS_NULL);
-
-        LLNameValue nValue1(" SecondLife ASSET RW SIM 232324343");
-
     }
 
     // LLNameValue(const char* data);
@@ -85,6 +82,13 @@ namespace
         CHECK(std::string_view(nValue1.getString()) == "232324343");
         CHECK_FALSE(nValue1.sendToData());
         CHECK_FALSE(nValue1.sendToViewer());
+
+        LLNameValue nValueSim(" SecondLife ASSET RW SIM 232324343");
+        CHECK(std::string_view(nValueSim.mName) == "SecondLife");
+        CHECK(nValueSim.getTypeEnum() == NVT_ASSET);
+        CHECK(nValueSim.getClassEnum() == NVC_READ_WRITE);
+        CHECK(nValueSim.getSendtoEnum() == NVS_SIM);
+        CHECK(std::string_view(nValueSim.getAsset()) == "232324343");
 
         LLNameValue nValue2("SecondLife", "23.5", "F32", "R", "DS");
         CHECK(nValue2.getTypeEnum() == NVT_F32);
@@ -394,7 +398,7 @@ namespace
         LLNameValue nValue4("SecondLife", "<1,2,3>", "VEC3", "R", "S");
         // this should not have updated as it is read only.
         LLVector3 vec(4,5,6);
-        nValue3.setVec3(vec);
+        nValue4.setVec3(vec);
         LLVector3 vec1(1,2,3);
         CHECK(*nValue4.getVec3() == vec1);
 

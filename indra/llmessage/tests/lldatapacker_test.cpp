@@ -29,6 +29,7 @@
 #include "linden_common.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <memory>
 #include <string_view>
 #include "altestmatchers.h"
 
@@ -65,7 +66,7 @@ namespace
         UNSCOPED_INFO("16 fraction bits");
         CHECK_THAT(f_val2, ll_test::WithinBits(f_unpkval2, 16));
         UNSCOPED_INFO("23 fraction bits");
-        CHECK_THAT(f_val3, ll_test::WithinBits(f_unpkval3, 31));
+        CHECK_THAT(f_val3, ll_test::WithinBits(f_unpkval3, 23));
     }
 
     TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer round-trips every packed type", "[datapacker_test]")
@@ -75,6 +76,7 @@ namespace
         char str[] = "SecondLife is virtual World\0";
         char strBinary[] = "SecondLife is virtual World";
         char strBinaryFixed[] = "Fixed Data";
+        S32 sizeBinary = sizeof(strBinary);
         S32 sizeBinaryFixed = sizeof(strBinaryFixed);
         U8 valU8 = 'C';
         U16 valU16 = 0xFFFF;
@@ -89,9 +91,11 @@ namespace
         LLUUID uuid;
 
         std::string unpkstr;
-        char unpkstrBinary[256];
-        char unpkstrBinaryFixed[256];
-        S32 unpksizeBinary;
+        // Zeroed, so a short or failed unpack reads as a short string
+        // rather than as whatever the stack held.
+        char unpkstrBinary[256] = {};
+        char unpkstrBinaryFixed[256] = {};
+        S32 unpksizeBinary = 0;
         U8 unpkvalU8;
         U16 unpkvalU16;
         U32 unpkvalU32;
@@ -106,7 +110,7 @@ namespace
 
         LLDataPackerBinaryBuffer lldp(packbuf,1024);
         lldp.packString(str , "linden_lab_str");
-        lldp.packBinaryData((U8*)strBinary, sizeof(strBinary), "linden_lab_bd");
+        lldp.packBinaryData((U8*)strBinary, sizeBinary, "linden_lab_bd");
         lldp.packBinaryDataFixed((U8*)strBinaryFixed, sizeBinaryFixed, "linden_lab_bdf");
         lldp.packU8(valU8,"linden_lab_u8");
         lldp.packU16(valU16,"linden_lab_u16");
@@ -140,6 +144,7 @@ namespace
         lldp1.unpackUUID(unpkuuid, "linden_lab_uuid");
 
         CHECK(std::string_view(str) == std::string_view(unpkstr.c_str()));
+        CHECK(unpksizeBinary == sizeBinary);
         CHECK(std::string_view(strBinary) == std::string_view(unpkstrBinary));
         CHECK(std::string_view(strBinaryFixed) == std::string_view(unpkstrBinaryFixed));
         CHECK(valU8 == unpkvalU8);
@@ -172,6 +177,7 @@ namespace
 
     TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer freeBuffer leaves a zero buffer size", "[datapacker_test]")
     {
+        // freeBuffer deletes it, so it comes from new[] and is the packer's.
         U8* packbuf = new U8[128];
         char str[] = "SecondLife is virtual World";
         LLDataPackerBinaryBuffer lldp(packbuf, 128);
@@ -183,13 +189,20 @@ namespace
 
     TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer assignBuffer takes the new size and rewinds", "[datapacker_test]")
     {
-        U8* buf = new U8[]("SecondLife is virtual World");
-        S32 size = sizeof(buf);
-        LLDataPackerBinaryBuffer lldp(buf, size);
-        U8* new_buf = new U8[]("Its Amazing");
-        size = sizeof(new_buf)-1;
-        lldp.assignBuffer(new_buf, size);
-        CHECK(lldp.getBufferSize() == size);
+        const char first[] = "SecondLife is virtual World";
+        const S32 first_size = sizeof(first);
+        const S32 second_size = sizeof("Its Amazing");
+
+        // assignBuffer deletes the buffer it replaces, so the first comes
+        // from new[] and is the packer's. Nothing deletes the second.
+        LLDataPackerBinaryBuffer lldp(new U8[first_size], first_size);
+        lldp.packString(first, "linden_lab");
+        // Moved on, so that the rewind below has something to undo.
+        CHECK(lldp.getCurrentSize() == first_size);
+
+        std::unique_ptr<U8[]> new_buf = std::make_unique<U8[]>(second_size);
+        lldp.assignBuffer(new_buf.get(), second_size);
+        CHECK(lldp.getBufferSize() == second_size);
         CHECK(lldp.getCurrentSize() == 0);
     }
 
@@ -199,7 +212,9 @@ namespace
         char str[] = "SecondLife is virtual World";
         LLDataPackerBinaryBuffer lldp(packbuf, 128);
         lldp.packString(str , "linden_lab");
-        U8 new_buffer[128];
+        // Zeroed, so that a copy that did not happen reads as an empty
+        // string rather than as whatever the stack held.
+        U8 new_buffer[128] = {};
         std::string unpkbuf;
         LLDataPackerBinaryBuffer lldp1(new_buffer,128);
         lldp1 = lldp;
@@ -229,6 +244,7 @@ namespace
         char str[] = "SecondLife is virtual World\0";
         char strBinary[] = "SecondLife is virtual World";
         char strBinaryFixed[] = "Fixed Data";
+        S32 sizeBinary = sizeof(strBinary);
         S32 sizeBinaryFixed = sizeof(strBinaryFixed);
         U8 valU8 = 'C';
         U16 valU16 = 0xFFFF;
@@ -243,9 +259,11 @@ namespace
         LLUUID uuid;
 
         std::string unpkstr;
-        char unpkstrBinary[256];
-        char unpkstrBinaryFixed[256];
-        S32 unpksizeBinary;
+        // Zeroed, so a short or failed unpack reads as a short string
+        // rather than as whatever the stack held.
+        char unpkstrBinary[256] = {};
+        char unpkstrBinaryFixed[256] = {};
+        S32 unpksizeBinary = 0;
         U8 unpkvalU8;
         U16 unpkvalU16;
         U32 unpkvalU32;
@@ -260,7 +278,7 @@ namespace
 
         LLDataPackerAsciiBuffer lldp(packbuf,1024);
         lldp.packString(str , "linden_lab_str");
-        lldp.packBinaryData((U8*)strBinary, sizeof(strBinary), "linden_lab_bd");
+        lldp.packBinaryData((U8*)strBinary, sizeBinary, "linden_lab_bd");
         lldp.packBinaryDataFixed((U8*)strBinaryFixed, sizeBinaryFixed, "linden_lab_bdf");
         lldp.packU8(valU8,"linden_lab_u8");
         lldp.packU16(valU16,"linden_lab_u16");
@@ -294,6 +312,7 @@ namespace
         lldp1.unpackUUID(unpkuuid, "linden_lab_uuid");
 
         CHECK(std::string_view(str) == std::string_view(unpkstr.c_str()));
+        CHECK(unpksizeBinary == sizeBinary);
         CHECK(std::string_view(strBinary) == std::string_view(unpkstrBinary));
         CHECK(std::string_view(strBinaryFixed) == std::string_view(unpkstrBinaryFixed));
         CHECK(valU8 == unpkvalU8);
@@ -311,6 +330,7 @@ namespace
 
     TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer freeBuffer leaves a zero buffer size", "[datapacker_test]")
     {
+        // freeBuffer deletes it, so it comes from new[] and is the packer's.
         char* packbuf = new char[128];
         char str[] = "SecondLife is virtual World";
         LLDataPackerAsciiBuffer lldp(packbuf, 128);
@@ -324,10 +344,16 @@ namespace
         char buf[] = "SecondLife is virtual World";
         S32 size = sizeof(buf);
         LLDataPackerAsciiBuffer lldp(buf, size);
+        lldp.packS32(42, "linden_lab");
+        // Moved on, so that the rewind below has something to undo: "42\n",
+        // and the terminator an ascii buffer counts in its size.
+        CHECK(lldp.getCurrentSize() == 4);
+
         char new_buf[] = "Its Amazing";
         size = sizeof(new_buf);
         lldp.assignBuffer(new_buf, size);
         CHECK(lldp.getBufferSize() == size);
+        // Nothing but the terminator.
         CHECK(lldp.getCurrentSize() == 1);
     }
 
@@ -365,6 +391,7 @@ namespace
         char str[] = "SecondLife is virtual World\0";
         char strBinary[] = "SecondLife is virtual World";
         char strBinaryFixed[] = "Fixed Data";
+        S32 sizeBinary = sizeof(strBinary);
         S32 sizeBinaryFixed = sizeof(strBinaryFixed);
         U8 valU8 = 'C';
         U16 valU16 = 0xFFFF;
@@ -379,9 +406,11 @@ namespace
         LLUUID uuid;
 
         std::string unpkstr;
-        char unpkstrBinary[256];
-        char unpkstrBinaryFixed[256];
-        S32 unpksizeBinary;
+        // Zeroed, so a short or failed unpack reads as a short string
+        // rather than as whatever the stack held.
+        char unpkstrBinary[256] = {};
+        char unpkstrBinaryFixed[256] = {};
+        S32 unpksizeBinary = 0;
         U8 unpkvalU8;
         U16 unpkvalU16;
         U32 unpkvalU32;
@@ -407,7 +436,7 @@ namespace
         LLDataPackerAsciiFile lldp(fp,2);
 
         lldp.packString(str , "linden_lab_str");
-        lldp.packBinaryData((U8*)strBinary, sizeof(strBinary), "linden_lab_bd");
+        lldp.packBinaryData((U8*)strBinary, sizeBinary, "linden_lab_bd");
         lldp.packBinaryDataFixed((U8*)strBinaryFixed, sizeBinaryFixed, "linden_lab_bdf");
         lldp.packU8(valU8,"linden_lab_u8");
         lldp.packU16(valU16,"linden_lab_u16");
@@ -444,6 +473,7 @@ namespace
         fclose(fp);
 
         CHECK(std::string_view(str) == std::string_view(unpkstr.c_str()));
+        CHECK(unpksizeBinary == sizeBinary);
         CHECK(std::string_view(strBinary) == std::string_view(unpkstrBinary));
         CHECK(std::string_view(strBinaryFixed) == std::string_view(unpkstrBinaryFixed));
         CHECK(valU8 == unpkvalU8);
@@ -480,6 +510,7 @@ namespace
         const char str[] = "SecondLife is virtual World";
         const char strBinary[] = "SecondLife is virtual World";
         const char strBinaryFixed[] = "Fixed Data";
+        S32 sizeBinary = sizeof(strBinary);
         S32 sizeBinaryFixed = sizeof(strBinaryFixed);
         U8 valU8 = 'C';
         U16 valU16 = 0xFFFF;
@@ -494,9 +525,11 @@ namespace
         LLUUID uuid;
 
         std::string unpkstr;
-        char unpkstrBinary[256];
-        char unpkstrBinaryFixed[256];
-        S32 unpksizeBinary;
+        // Zeroed, so a short or failed unpack reads as a short string
+        // rather than as whatever the stack held.
+        char unpkstrBinary[256] = {};
+        char unpkstrBinaryFixed[256] = {};
+        S32 unpksizeBinary = 0;
         U8 unpkvalU8;
         U16 unpkvalU16;
         U32 unpkvalU32;
@@ -513,7 +546,7 @@ namespace
         LLDataPackerAsciiFile lldp(ostr,2);
 
         lldp.packString(str , "linden_lab_str");
-        lldp.packBinaryData((U8*)strBinary, sizeof(strBinary), "linden_lab_bd");
+        lldp.packBinaryData((U8*)strBinary, sizeBinary, "linden_lab_bd");
         lldp.packBinaryDataFixed((U8*)strBinaryFixed, sizeBinaryFixed, "linden_lab_bdf");
         lldp.packU8(valU8,"linden_lab_u8");
         lldp.packU16(valU16,"linden_lab_u16");
@@ -547,6 +580,7 @@ namespace
         lldp1.unpackUUID(unpkuuid, "linden_lab_uuid");
 
         CHECK(std::string_view(str) == std::string_view(unpkstr.c_str()));
+        CHECK(unpksizeBinary == sizeBinary);
         CHECK(std::string_view(strBinary) == std::string_view(unpkstrBinary));
         CHECK(std::string_view(strBinaryFixed) == std::string_view(unpkstrBinaryFixed));
         CHECK(valU8 == unpkvalU8);
