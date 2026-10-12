@@ -711,9 +711,10 @@ namespace
         void statement(LSLASTNode* s, bool last);
         void statementBody(LSLASTNode* s, bool last);
         void block(LSLASTNode* s);
-        // A blank line over a statement or a global, where the LSL had one
-        // or more between it and the one written before it, which grouped
-        // them: one, and not where nothing has been written since `opened`
+        // A blank line over a statement, a global or a handler in a state's
+        // table, where the LSL had one or more between it and the one
+        // written before it, which grouped them: one, and not where nothing
+        // has been written since `opened`
         // -- a block's start -- nor where a comment over it keeps the
         // blank line over itself (Comment::apart).
         void keepApart(LSLASTNode* before, LSLASTNode* node, size_t opened);
@@ -7760,12 +7761,17 @@ namespace
             commentsBefore(state);
             line("states" + stateKey(name) + " = {");
             ++mDepth;
+            const size_t opened = mText.size();
+            LSLASTNode*  before = nullptr;
             for (LSLASTNode* h = state->getEventHandlers()->getChild(0); h; h = h->getNext())
             {
                 auto*             handler = static_cast<LSLEventHandler*>(h);
                 const std::string event   = handler->getIdentifier()->getName();
                 std::vector<std::string> lead;
                 const std::string        params = handlerParams(handler, lead);
+                // Apart from the one before it where the LSL had them so.
+                keepApart(before, handler, opened);
+                before = handler;
                 commentsBefore(handler);
                 if (event == "timer" && !mTimers)
                 {

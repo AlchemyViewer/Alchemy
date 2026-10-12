@@ -3247,4 +3247,31 @@ namespace tut
                has(own, "(function() local was2 = was; was += 1 return was2 end)() + was"));
         checksClean(own);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<98>()
+    {
+        set_test_name("a state's handlers in its table kept apart by a blank line where the LSL had them so, and together where not");
+        const ALLSLToSLua::Result r = convert("default { state_entry() { state collect; } }\n"
+                                              "state collect {\n"
+                                              "    changed(integer change) {\n"
+                                              "        if (change & CHANGED_INVENTORY) {\n"
+                                              "            llOwnerSay(\"c\");\n"
+                                              "        }\n"
+                                              "    }\n"
+                                              "\n"
+                                              "    on_rez(integer param) {\n"
+                                              "        llOwnerSay(\"r\");\n"
+                                              "    }\n"
+                                              "    touch_start(integer n) { llOwnerSay(\"t\"); }\n"
+                                              "\n"
+                                              "    // listening\n"
+                                              "    listen(integer c, string name, key id, string msg) { llOwnerSay(msg); }\n"
+                                              "}\n");
+        ensure("Tapple's, apart: " + r.text, has(r, "        end\n    end,\n\n    on_rez = function(param)\n"));
+        ensure("together: " + r.text, has(r, "        print(\"r\")\n    end,\n    touch_start = function(detected)\n"));
+        ensure("one blank line over a comment over it: " + r.text, has(r, "    end,\n\n    -- listening\n    listen = function("));
+        ensure("none at the table's top: " + r.text, has(r, "states.collect = {\n    changed = function(change)\n"));
+        checksClean(r);
+    }
 }
