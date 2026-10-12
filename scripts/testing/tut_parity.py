@@ -12,7 +12,8 @@ Two steps, either side of scripts/testing/tut2catch.py:
            indra/**/tests/<stem>.cpp git tracks, and it refuses an
            executable built before that source last changed: the entry's
            own target, wherever it is in the command (llcorehttp's runs
-           under a Python peer). A test built at other
+           under a Python peer), as check finds a Catch2 entry's binary. A
+           test built at other
            x86-64 tiers too (an entry ending _baseline, _v2, _v3, _v4) is
            kept a tier apart, under <stem>@<tier>.
   check    after converting and building: runs each converted file's CTest
@@ -37,7 +38,9 @@ Parity holds for a file when:
     of the file is one of its TUT tests;
   - each pair agrees: ok is a pass, a TUT skip is a Catch2 skip, and every
     TUT failure (fail, exception, abnormal end) is a Catch2 failure; and the
-    name TUT printed is the one the mapping folded into the case's;
+    name TUT printed is the one the mapping folded into the case's, but
+    where a test skipped or failed before its set_test_name ran, and so
+    printed none, which is listed;
   - the cases run in the order TUT ran their tests, groups by name and
     each group's tests by number, since a test may lean on what the ones
     before it left;
@@ -186,16 +189,19 @@ def tut_identity(name):
     return (m.group(1)[:-len(tier) - 1] if tier else m.group(1)) + "_test", tier
 
 
-def tut_executable(name, command):
-    """The test executable in a TUT entry's command: the file named for the
-    entry's target, INTEGRATION_TEST_<test> for INTEGRATION_TEST_RUNNER_<test>
-    and the entry's own name otherwise, wherever a launcher put it; else the
-    command's first word."""
-    target = name.replace("INTEGRATION_TEST_RUNNER_", "INTEGRATION_TEST_", 1)
+def executable_in(command, target):
+    """The file in an entry's command named for its target, wherever a
+    launcher put it; else the command's first word."""
     for word in command:
         if os.path.splitext(os.path.basename(word))[0] == target and os.path.isfile(word):
             return word
     return command[0] if command else None
+
+
+def tut_executable(name, command):
+    """The test executable in a TUT entry's command: INTEGRATION_TEST_<test>
+    for INTEGRATION_TEST_RUNNER_<test>, and the entry's own name otherwise."""
+    return executable_in(command, name.replace("INTEGRATION_TEST_RUNNER_", "INTEGRATION_TEST_", 1))
 
 
 def tut_source(stem):
@@ -545,10 +551,10 @@ def check_run(args, label, path, entry_name, test, recorded, entries, file_cases
     first_problem = len(problems)
     # A converted file changed since its binary was built is not what the
     # binary runs: its cases, lines and counts would not be the run's.
-    command = test["command"]
-    if command and os.path.isfile(command[0]) and \
-            os.path.getmtime(os.path.join(ROOT, path)) > os.path.getmtime(command[0]):
-        problems.append(f"{label}: changed since {command[0]} was built; build it again to check it")
+    executable = executable_in(test["command"], entry_name.split("/", 1)[0])
+    if executable and os.path.isfile(executable) and \
+            os.path.getmtime(os.path.join(ROOT, path)) > os.path.getmtime(executable):
+        problems.append(f"{label}: changed since {executable} was built; build it again to check it")
         return None
     code, cases, output = catch2_results(test, args.timeout)
     # Where the host cannot run a tier, either side exits with the skip code
@@ -662,8 +668,13 @@ def check_run(args, label, path, entry_name, test, recorded, entries, file_cases
         paired[name] = key
         matched += 1
         if e.get("tut_name") is not None and e["tut_name"] != t["name"]:
-            problems.append(f"{label}: {e['group']} test<{e['n']}>: TUT named it {t['name']!r}, "
-                            f"the mapping {e['tut_name']!r}")
+            # TUT prints a test's name once its set_test_name has run: one
+            # that skipped or failed before that printed none.
+            if not t["name"] and t["result"] != "ok":
+                listed.append(f"{e['group']} {e['n']}: ended before its set_test_name, so TUT printed no name")
+            else:
+                problems.append(f"{label}: {e['group']} test<{e['n']}>: TUT named it {t['name']!r}, "
+                                f"the mapping {e['tut_name']!r}")
         if by_name[name]["result"] == t["result"]:
             agree += 1
         else:
