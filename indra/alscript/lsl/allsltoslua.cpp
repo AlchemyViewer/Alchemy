@@ -2648,6 +2648,13 @@ namespace
         {
             return coerced(given, LST_KEY).text;
         }
+        if (!mOptions.keyTextAny)
+        {
+            noteOnce(given, "SluaKeyAsTextBare",
+                     "SLua's ll takes a key as text, as LSL's functions did, so text is given as it is, though the type checker asks for a "
+                     "uuid: `:: any` quiets it, uuid() stops the script on text that is no UUID, and touuid() gives nil for it.");
+            return value(given).text;
+        }
         noteOnce(given, "SluaKeyAsText",
                  "SLua's ll takes a key as text, as LSL's functions did, so text is given as it is; `:: any` tells the type checker, which "
                  "asks for a uuid. uuid() would stop the script on text that is no UUID.");

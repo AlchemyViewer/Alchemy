@@ -3318,4 +3318,54 @@ namespace tut
         ensure("noted twice, no more: " + r.text, count(r, "LSL ran the right side") == 2);
         checksClean(r);
     }
+    template<> template<>
+    void allsltoslua_object::test<100>()
+    {
+        set_test_name("text given where ll takes a key, with keyTextAny off, as it is with no :: any (Tapple's), the note giving the "
+                      "ways to see to it; what the type checker then marks, where it knows the text for text");
+        const std::string lsl = "key inventorySender;\n"
+                                "string myInfo() { return (string)llGetKey(); }\n"
+                                "default { touch_start(integer n) {\n"
+                                "    llOwnerSay(\"activeRequestor: \" + llKey2Name(inventorySender) + \"; llGetKey: \" + llKey2Name(myInfo()));\n"
+                                "    llOwnerSay(llKey2Name(\"a2e76fcd-9360-4f6d-a924-938f923df11d\"));\n"
+                                "} }\n";
+        ALLSLToSLua::Options o;
+        o.keyTextAny                = false;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        ensure("converted", r.converted);
+        ensure("as it is: " + r.text, has(r, "ll.Key2Name(myInfo()))") && !has(r, "myInfo() :: any"));
+        ensure("a UUID written out, still a uuid: " + r.text, has(r, "ll.Key2Name(uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\"))"));
+        ensure("the note with the ways: " + r.text, noted(r, "SluaKeyAsTextBare") && !noted(r, "SluaKeyAsText") &&
+                                                       has(r, "`:: any` quiets it, uuid() stops the script on text that is no UUID"));
+        // What the checker marks as an error, each by its line.
+        const auto marked = [&](const std::string& slua) {
+            std::string said;
+            for (const ALScriptProblem& p : service.check(slua))
+            {
+                said += p.severity == ALScriptProblem::Severity::Error ? llformat("[%d] %s\n", p.line + 1, p.message.c_str()) : std::string();
+            }
+            return said;
+        };
+        // The line the text for a key is on, as marked says it.
+        const auto lineOf = [](const std::string& slua) {
+            const size_t at = slua.find("ll.Key2Name(myInfo())");
+            ensure("written: " + slua, at != std::string::npos);
+            return llformat("[%d] ", static_cast<S32>(std::count(slua.begin(), slua.begin() + at, '\n')) + 1);
+        };
+        // Nonstrict, as the grid has it, takes an untyped function's answer
+        // for anything; typed, as Tapple converts, or strict, it is text.
+        // The old solver's: the new one's nonstrict marks only what must
+        // fail, and its strict cannot yet take LLEvents:on's handlers.
+        if (!newSolver)
+        {
+            o.types                         = true;
+            const ALLSLToSLua::Result typed = ALLSLToSLua::convert(lsl, o);
+            const std::string         said  = marked(typed.text);
+            ensure("typed, the text for a key marked, alone:\n" + said + "---\n" + typed.text,
+                   said.rfind(lineOf(typed.text), 0) == 0 && std::count(said.begin(), said.end(), '\n') == 1);
+            const std::string strict = "--!strict\n" + r.text;
+            const std::string loud   = marked(strict);
+            ensure("strict, the same:\n" + loud + "---\n" + strict, loud.rfind(lineOf(strict), 0) == 0 && std::count(loud.begin(), loud.end(), '\n') == 1);
+        }
+    }
 }

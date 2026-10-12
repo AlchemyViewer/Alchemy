@@ -750,6 +750,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptConvertKeyTextAny</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua writes text given where SLua's ll takes a key as x :: any, which the type checker takes; off, as it is, which the type checker marks for the scripter to see to. The script runs the same either way.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptConvertComments</key>
         <map>
             <key>Comment</key>

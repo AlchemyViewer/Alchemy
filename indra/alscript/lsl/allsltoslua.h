@@ -84,6 +84,12 @@ public:
         // Luau types on locals, parameters and what functions return, from
         // LSL's types.
         bool types = false;
+        // Text given where SLua's ll takes a key, as LSL's functions took
+        // it, written `x :: any`, which the type checker, asking for a
+        // uuid, takes; or as it is, which it marks where it knows the text
+        // for text -- strict, or types written -- for the scripter to see
+        // to. The VM takes the text either way.
+        bool keyTextAny = true;
         // Each place noted as a "-- LSL:" comment over its line, as well as
         // in the notes.
         bool comments = true;

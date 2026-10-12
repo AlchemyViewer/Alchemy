@@ -8192,6 +8192,7 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     options.idioms        = gSavedSettings.getBOOL("ALScriptConvertIdioms");
     options.handlers      = gSavedSettings.getBOOL("ALScriptConvertHandlerFields") ? ALLSLToSLua::Options::Handlers::Field : ALLSLToSLua::Options::Handlers::On;
     options.types         = gSavedSettings.getBOOL("ALScriptConvertTypes");
+    options.keyTextAny    = gSavedSettings.getBOOL("ALScriptConvertKeyTextAny");
     options.comments      = gSavedSettings.getBOOL("ALScriptConvertComments");
     options.keepComments  = gSavedSettings.getBOOL("ALScriptConvertKeepComments");
     // Its tables' braces as the formatter writes them.

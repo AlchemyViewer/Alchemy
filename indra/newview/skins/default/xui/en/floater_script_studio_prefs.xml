@@ -1750,6 +1750,17 @@ end</floater.string>
              top_pad="4"
              width="700" />
             <check_box
+             control_name="ALScriptConvertKeyTextAny"
+             follows="left|top"
+             height="20"
+             label="Text given for a key written :: any, for the type checker"
+             layout="topleft"
+             left="12"
+             name="convert_key_text_any"
+             tool_tip="ll.Key2Name(name :: any): SLua's ll takes a key as text, as LSL's functions did, and the type checker asks for a uuid. Off: the text as it is, which the type checker marks for you to see to; uuid(x) stops the script on text that is no UUID, and touuid(x) gives nil for it."
+             top_pad="4"
+             width="700" />
+            <check_box
              control_name="ALScriptConvertComments"
              follows="left|top"
              height="20"
