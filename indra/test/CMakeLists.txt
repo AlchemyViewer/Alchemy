@@ -116,6 +116,16 @@ al_expect_from_test_support(
   EXIT 1
   OUTPUT "a test case that leaves the environment changed. left the environment changed.*AL_TEST_SUPPORT_LEAK=1"
 )
+# A check a library's own listener adds as the run starts names its culprit
+# too. That listener is in every run of this binary, so the entries that
+# expect a clean exit show it blames no case that left its state alone,
+# whichever listener runs first.
+al_expect_from_test_support(
+  guard_checks_a_library
+  ARGS "[.library-leak]"
+  EXIT 1
+  OUTPUT "a test case that leaves a library's state changed. left the library's state changed"
+)
 al_expect_from_test_support(
   replay_on_failure
   ARGS "[.replay-fail]"

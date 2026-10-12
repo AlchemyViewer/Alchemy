@@ -47,6 +47,10 @@ namespace ll_test
         using Describe = std::function<std::string()>;
         using Restore = std::function<void()>;
 
+        // Takes the check's first description as it is added. A library's
+        // own checks are added by a listener of its own when the run starts,
+        // before or after the guard's snapshot there: either way, no case is
+        // compared with nothing.
         static void add(std::string name, Describe describe, Restore restore = {});
 
         // What every LL process has: the working directory, the environment,
