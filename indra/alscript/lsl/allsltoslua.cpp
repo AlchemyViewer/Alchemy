@@ -245,6 +245,17 @@ namespace
         return RESERVED.contains(name);
     }
 
+    // An LSL name as a Luau one: one Luau or SLua holds for its own with a
+    // mark after it.
+    std::string luauName(std::string name)
+    {
+        while (reservedName(name))
+        {
+            name += "_";
+        }
+        return name;
+    }
+
     // SLua's events that hand their handler the detected table in place of
     // LSL's count.
     bool detectedEvent(std::string_view name)
@@ -432,6 +443,15 @@ namespace
         std::string nameOf(LSLIdentifier* id);
         std::string nameOf(const char* lsl);
         std::string stateKey(const std::string& state) const;
+        // A fresh name, before anything is written, for each of the
+        // script's own whose Luau name would mean another than LSL's did: a
+        // global whose mark gave it another's name (print as print_ beside
+        // a print_), and a local -- a parameter, a declaration -- in whose
+        // reach the script names a function or a variable that has its
+        // Luau name. LSL kept its functions apart from its variables, so
+        // f2() beside a parameter f2 called the function, where Luau's
+        // parameter hides it.
+        void nameApart();
 
         // --- the text ---------------------------------------------------------------
 
@@ -1018,6 +1038,8 @@ namespace
         boost::unordered_flat_map<LSLSymbol*, std::string>    mEach;
         std::vector<std::string>                              mItemNames;
         std::string                                           mUnread;
+        // What a step inside an expression was, made once.
+        std::string                                           mWas;
         boost::unordered_flat_map<LSLSymbol*, U8>             mListTypes;
         boost::unordered_flat_set<LSLSymbol*>                 mLoopOnly;
         boost::unordered_flat_set<LSLSymbol*>                 mBooleans;
@@ -1130,17 +1152,113 @@ namespace
 
     std::string Writer::nameOf(const char* lsl)
     {
-        // A name Luau or SLua holds for its own, with a mark after it.
-        std::string name = lsl ? lsl : "";
-        while (reservedName(name))
-        {
-            name += "_";
-        }
+        std::string name = luauName(lsl ? lsl : "");
         if (lsl)
         {
             sameAs(lsl, name);
         }
         return name;
+    }
+
+    void Writer::nameApart()
+    {
+        takeNames();
+        const auto luau = [this](LSLSymbol* symbol) {
+            const auto found = mNames.find(symbol);
+            return found != mNames.end() ? found->second : luauName(symbol->getName());
+        };
+        const auto rename = [this](LSLSymbol* symbol) {
+            const std::string fresh = freshName(std::string(symbol->getName()) + "_");
+            mNames[symbol]          = fresh;
+            sameAs(symbol->getName(), fresh);
+            return fresh;
+        };
+        // The globals, each its own name: the script's as it wrote it, and a
+        // marked one where that is no other's.
+        boost::unordered_flat_set<std::string> globals;
+        std::vector<LSLSymbol*>                marks;
+        for (LSLASTNode* g = mScript->getGlobals()->getChild(0); g; g = g->getNext())
+        {
+            if (LSLSymbol* symbol = g->getSymbol(); symbol && luau(symbol) == symbol->getName())
+            {
+                globals.insert(symbol->getName());
+            }
+            else if (symbol)
+            {
+                marks.push_back(symbol);
+            }
+        }
+        for (LSLSymbol* symbol : marks)
+        {
+            if (!globals.insert(luau(symbol)).second)
+            {
+                globals.insert(rename(symbol));
+            }
+        }
+        // Each local against what its reach names but what is declared in
+        // it, which hides it there in Luau as in LSL: the outer first, whose
+        // names those inside them are held to.
+        const auto apart = [&](LSLIdentifier* id, const std::vector<LSLASTNode*>& reach) {
+            LSLSymbol* local = id ? id->getSymbol() : nullptr;
+            if (!local)
+            {
+                return;
+            }
+            const std::string                     name = luau(local);
+            boost::unordered_flat_set<LSLSymbol*> inside;
+            bool                                  hides = false;
+            for (LSLASTNode* root : reach)
+            {
+                walk(root, [&](LSLASTNode* node) {
+                    if (node->getNodeSubType() == NODE_DECLARATION)
+                    {
+                        inside.insert(node->getSymbol());
+                    }
+                });
+            }
+            for (LSLASTNode* root : reach)
+            {
+                walk(root, [&](LSLASTNode* node) {
+                    LSLSymbol* named = node->getNodeType() == NODE_IDENTIFIER ? static_cast<LSLIdentifier*>(node)->getSymbol() : nullptr;
+                    hides = hides || (named && named != local && !inside.contains(named) && named->getSubType() != SYM_BUILTIN &&
+                                      (named->getSymbolType() == SYM_VARIABLE || named->getSymbolType() == SYM_FUNCTION) && luau(named) == name);
+                });
+            }
+            if (hides)
+            {
+                rename(local);
+            }
+        };
+        walk(mScript, [&](LSLASTNode* node) {
+            // A parameter's reach is its body; a declaration's, what follows
+            // it in its block.
+            LSLASTNode* params = nullptr;
+            LSLASTNode* body   = nullptr;
+            if (node->getNodeType() == NODE_GLOBAL_FUNCTION)
+            {
+                params = static_cast<LSLGlobalFunction*>(node)->getArguments();
+                body   = static_cast<LSLGlobalFunction*>(node)->getStatements();
+            }
+            else if (node->getNodeType() == NODE_EVENT_HANDLER)
+            {
+                params = static_cast<LSLEventHandler*>(node)->getArguments();
+                body   = static_cast<LSLEventHandler*>(node)->getStatements();
+            }
+            else if (node->getNodeSubType() == NODE_DECLARATION)
+            {
+                std::vector<LSLASTNode*> after;
+                for (LSLASTNode* next = node->getNext(); next; next = next->getNext())
+                {
+                    after.push_back(next);
+                }
+                apart(static_cast<LSLDeclaration*>(node)->getIdentifier(), after);
+                return;
+            }
+            for (LSLASTNode* p = isNull(params) ? nullptr : params->getChild(0); p; p = p->getNext())
+            {
+                apart(static_cast<LSLIdentifier*>(p), { body });
+            }
+        });
     }
 
     void Writer::sameAs(std::string_view lsl, std::string_view slua)
@@ -4153,9 +4271,13 @@ namespace
             target = static_cast<LSLLValueExpression*>(static_cast<LSLBinaryExpression*>(e)->getLHS());
         }
         const std::string name = lvalue(target).text;
+        if (post && mWas.empty())
+        {
+            mWas = freshName("was");
+        }
         if (post)
         {
-            mText += "local was = " + name + "; ";
+            mText += "local " + mWas + " = " + name + "; ";
         }
         effect(e);
         std::string made = mText;
@@ -4167,7 +4289,7 @@ namespace
         mText   = saved;
         mDepth  = depth;
         mInline = inline_;
-        return { "(function() " + made + " return " + (post ? "was" : name) + " end)()" };
+        return { "(function() " + made + " return " + (post ? mWas : name) + " end)()" };
     }
 
     Expr Writer::expr(LSLExpression* e)
@@ -7776,6 +7898,7 @@ end
         mTimeBase   = resets && mOptions.sluaCalls;
         mCompatTime = resets && !mOptions.sluaCalls;
         forgetMemoryHacks();
+        nameApart();
         findTextKeys();
         findListTypes();
         findBooleans();

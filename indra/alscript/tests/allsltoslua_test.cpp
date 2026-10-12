@@ -3180,4 +3180,71 @@ namespace tut
         ensure("a vector's part, an argument: " + r.text, has(r, "gV = vector(gV.x, gV.y, (math.modf(f)))"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<97>()
+    {
+        set_test_name("a local whose Luau name would hide what its reach names, which LSL kept apart, is named apart: Tapple's parameter "
+                      "f2 beside the function f2, a local beside a function the mark gave its name, a parameter named as its own "
+                      "function; a global the mark gave another's name; nothing where nothing is hidden");
+        const ALLSLToSLua::Result r = convert("f1(string f2) {\n"
+                                              "    llOwnerSay(f2);\n"
+                                              "    f2();\n"
+                                              "}\n"
+                                              "\n"
+                                              "f2() {\n"
+                                              "    llOwnerSay(\"world\");\n"
+                                              "}\n"
+                                              "\n"
+                                              "default { state_entry() {\n"
+                                              "    f1(\"hello\");\n"
+                                              "} }\n");
+        ensure("Tapple's, the parameter named apart: " + r.text, has(r, "local function f1(f2_)\n    print(f2_)\n    f2()\nend\n"));
+        ensure("the function as it was: " + r.text, has(r, "local f2\n") && has(r, "function f2()\n"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result detected = convert("integer detected() {\n"
+                                                     "    return 5;\n"
+                                                     "}\n"
+                                                     "\n"
+                                                     "default\n"
+                                                     "{\n"
+                                                     "    touch_start(integer total_number)\n"
+                                                     "    {\n"
+                                                     "        string detected = \"fritz\";\n"
+                                                     "\n"
+                                                     "        llOwnerSay(llDetectedName(0));\n"
+                                                     "        llOwnerSay(detected);\n"
+                                                     "        llOwnerSay((string)(detected() * detected()));\n"
+                                                     "    }\n"
+                                                     "}\n");
+        ensure("Tapple's detected, the function marked: " + detected.text, has(detected, "local function detected_()"));
+        ensure("the local apart from it: " + detected.text, has(detected, "local detected_2 = \"fritz\"") && has(detected, "print(detected_2)"));
+        ensure("the function called: " + detected.text, has(detected, "print(tostring(detected_() * detected_()))"));
+        checksClean(detected);
+
+        const ALLSLToSLua::Result own = convert("integer fact(integer fact) {\n"
+                                                "    if (fact <= 1) return 1;\n"
+                                                "    return fact * fact(fact - 1);\n"
+                                                "}\n"
+                                                "string table = \"t\";\n"
+                                                "string table_ = \"u\";\n"
+                                                "f3(string f2) { llOwnerSay(f2); }\n"
+                                                "f2() { llOwnerSay(\"f2\"); }\n"
+                                                "f4() { f2(); string f2 = \"x\"; llOwnerSay(f2); }\n"
+                                                "default { touch_start(integer n) {\n"
+                                                "    integer was = 1;\n"
+                                                "    integer k = was++ + was;\n"
+                                                "    llOwnerSay(table + table_ + (string)(fact(n) + k));\n"
+                                                "    f3(\"a\"); f4();\n"
+                                                "} }\n");
+        ensure("a parameter named as its function: " + own.text, has(own, "local function fact(fact_)") && has(own, "return fact_ * fact(fact_ - 1)"));
+        ensure("a global the mark gave another's name: " + own.text,
+               has(own, "local table_2 = \"t\"\n") && has(own, "local table_ = \"u\"\n") && has(own, "print(`{table_2}{table_}{fact(n) + k}`)"));
+        ensure("nothing hidden, nothing renamed: " + own.text, has(own, "local function f3(f2)\n    print(f2)\n"));
+        ensure("a call before the local, not in its reach: " + own.text, has(own, "    f2()\n    local f2 = \"x\"\n    print(f2)\n"));
+        ensure("what a step was, under a name the script does not have: " + own.text,
+               has(own, "(function() local was2 = was; was += 1 return was2 end)() + was"));
+        checksClean(own);
+    }
 }
