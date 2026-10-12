@@ -54,8 +54,9 @@ namespace ll_test
     // Makes std::terminate, before it aborts, name the test case that was
     // running and what the exception in flight said. Catch2's own report of
     // the abort that follows names the case outside Windows, but not what was
-    // thrown; on Windows, where it handles no SIGABRT, nothing else would say
-    // either.
+    // thrown. On Windows, where Catch2 handles no SIGABRT and the CRT keeps a
+    // terminate handler a thread, an abort from any thread names the case and
+    // replays LOGFAIL's log, where an LL_ERRS wrote what went wrong.
     void installTerminateHandler();
 }
 

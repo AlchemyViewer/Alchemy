@@ -144,7 +144,7 @@ al_expect_from_test_support(
   terminate_names_the_case
   ARGS "[.thread-errs]"
   EXIT nonzero
-  OUTPUT "std::terminate in test case .a test case whose thread hits an LL_ERRS.: LL_ERRS: .*an error off the main thread"
+  OUTPUT "in test case .a test case whose thread hits an LL_ERRS..*an error off the main thread"
 )
 al_expect_from_test_support(
   teardown_failure_fails

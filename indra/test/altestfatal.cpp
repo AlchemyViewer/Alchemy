@@ -25,10 +25,12 @@
 #include "linden_common.h"
 
 #include "altestfatal.h"
+#include "altestlogreplay.h"
 #include "altestname.h"
 
 #include "llerrorcontrol.h"
 
+#include <csignal>
 #include <cstdlib>
 #include <exception>
 #include <iostream>
@@ -55,6 +57,10 @@ namespace ll_test
 
     void installTerminateHandler()
     {
+#if LL_WINDOWS
+        // No abort dialog for CTest to wait out, from any thread.
+        _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif
         std::set_terminate(
             []
             {
@@ -75,11 +81,22 @@ namespace ll_test
                     }
                 }
                 std::cerr << std::endl;
-#if LL_WINDOWS
-                // No abort dialog for CTest to wait out.
-                _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
-#endif
                 std::abort();
             });
+#if LL_WINDOWS
+        // The CRT keeps a terminate handler a thread, so the one above serves
+        // the main thread only, and a thread of a test's own ends in the
+        // default one's abort(). The CRT's SIGABRT handler is the process's,
+        // and Catch2, which handles structured exceptions on Windows, leaves
+        // it alone: there the case is named, and LOGFAIL's log replayed, as
+        // Catch2 does for a crash. What was thrown is no longer in reach, but
+        // an LL_ERRS logged it.
+        std::signal(SIGABRT,
+                    [](int)
+                    {
+                        std::cerr << "abort in test case \"" << currentTestName() << "\"" << std::endl;
+                        LogReplay::replay(std::cerr, currentTestName(), true);
+                    });
+#endif
     }
 }
