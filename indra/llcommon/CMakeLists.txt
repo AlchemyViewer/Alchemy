@@ -337,6 +337,7 @@ if(AL_BUILD_TESTS)
     llrand
     llsd
     llsdjson
+    llsdserialize
     llsdutil
     llsingleton
     llstreamtools
@@ -357,10 +358,10 @@ if(AL_BUILD_TESTS)
   endforeach()
 
   # These drive a Python peer: LEAP's protocol is to an external script,
-  # llprocess spawns one, and llsdserialize round-trips through the llsd
-  # package as an independent implementation. A peer that imports a script a
-  # test wrote to the temp folder would leave its bytecode there.
-  foreach(test llleap llprocess llsdserialize)
+  # llprocess spawns one, and llsdserialize_python round-trips through the
+  # llsd package as an independent implementation. A peer that imports a
+  # script a test wrote to the temp folder would leave its bytecode there.
+  foreach(test llleap llprocess llsdserialize_python)
     al_add_test(
       ${test}
       PROJECT llcommon
