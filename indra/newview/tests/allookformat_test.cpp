@@ -555,6 +555,8 @@ namespace tut
         ensure_equals("climbing out", ALLookFormat::lutFileNameOnly("../../x.cube"), "x.cube");
         ensure_equals("a Windows path", ALLookFormat::lutFileNameOnly("C:\\a\\b.png"), "b.png");
         ensure_equals("dot dot", ALLookFormat::lutFileNameOnly(".."), "");
+        ensure_equals("no stream of a file", ALLookFormat::lutFileNameOnly("grade.cube:hidden.cube"), "");
+        ensure_equals("nor a device a colon ends", ALLookFormat::lutFileNameOnly("COM1:.png"), "");
         ensure_equals("dot", ALLookFormat::lutFileNameOnly("."), "");
         ensure_equals("nothing", ALLookFormat::lutFileNameOnly(""), "");
         ensure_equals("a folder", ALLookFormat::lutFileNameOnly("luts/"), "");
@@ -699,6 +701,21 @@ namespace tut
         ensure_equals("a mark counts for nothing in a key", ALLookFormat::lookNameKey("Neutral\xE2\x80\x8E"), ALLookFormat::lookNameKey("neutral"));
         ensure_equals("nor does a joiner", ALLookFormat::lookNameKey("Soft\xE2\x80\x8D" "Film"), "softfilm");
         ensure_equals("letters outside ASCII are left as they are", ALLookFormat::lookNameKey("\xC3\x89t\xC3\xA9"), "\xC3\x89t\xC3\xA9");
+        // Every kind of space, and whatever draws as nothing, as the list
+        // reads them.
+        ensure_equals("a no-break space alone is nothing", ALLookFormat::lookNameFromUntrustedText("\xC2\xA0"), "");
+        ensure_equals("nor an ideographic one", ALLookFormat::lookNameFromUntrustedText("\xE3\x80\x80"), "");
+        ensure_equals("nor one between marks", ALLookFormat::lookNameFromUntrustedText("\xE2\x80\x8E\xE3\x80\x80\xE2\x80\x8E"), "");
+        ensure_equals("nor a blank braille cell", ALLookFormat::lookNameFromUntrustedText("\xE2\xA0\x80"), "");
+        ensure_equals("a no-break space at an end goes", ALLookFormat::lookNameFromUntrustedText("\xC2\xA0Soft Film\xC2\xA0"), "Soft Film");
+        ensure_equals("one inside stays in the name", ALLookFormat::lookNameFromUntrustedText("Soft\xC2\xA0" "Film"), "Soft\xC2\xA0" "Film");
+        ensure_equals("but reads as a space in the key", ALLookFormat::lookNameKey("Soft\xC2\xA0" "Film"), "soft film");
+        ensure_equals("a run of spaces is one", ALLookFormat::lookNameKey("Soft \xE3\x80\x80  Film"), "soft film");
+        ensure_equals("a space at an end is none", ALLookFormat::lookNameKey("Neutral\xC2\xA0"), "neutral");
+        ensure_equals("a variation selector counts for nothing", ALLookFormat::lookNameKey("Neutral\xEF\xB8\x8E"), "neutral");
+        ensure_equals("nor a Mongolian free variation selector", ALLookFormat::lookNameKey("Neutral\xE1\xA0\x8B"), "neutral");
+        ensure_equals("an emoji keeps its selector in the name", ALLookFormat::lookNameFromUntrustedText("Love \xE2\x9D\xA4\xEF\xB8\x8F"),
+                      "Love \xE2\x9D\xA4\xEF\xB8\x8F");
 
         const std::string notecard = ALLookFormat::notecardNameForLook(std::string(70, 'L'));
         ensure("the notecard's name fits an item", notecard.size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
@@ -766,6 +783,15 @@ namespace tut
         ensure("numbered and cut to fit escaped", LLURI::escape(fitted_second).size() <= 30);
         ensure("and still ends with its number", fitted_second.size() >= 4 && fitted_second.compare(fitted_second.size() - 4, 4, " (2)") == 0);
         ensure_equals("an ASCII name fits as it is", ALLookFormat::numberedLookName("Sunset", 1, 6), "Sunset");
+        // A cut that takes a name's one letter leaves marks that draw
+        // nothing: no name at all.
+        std::string marks;
+        for (S32 i = 0; i < 31; ++i)
+        {
+            marks += "\xD8\x9C";
+        }
+        ensure_equals("thirty-one marks and a letter take a key", ALLookFormat::lookNameKey(marks + "a"), "a");
+        ensure_equals("cut to the marks, nothing is left", ALLookFormat::numberedLookName(marks + "a", 1, 180), "");
         ensure_equals("no room for any of it is nothing", ALLookFormat::numberedLookName("Sunset", 2, 8), "");
     }
 

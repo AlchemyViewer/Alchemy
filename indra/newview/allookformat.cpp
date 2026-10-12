@@ -629,8 +629,11 @@ std::string ALLookFormat::lutFileNameOnly(const std::string& lut_setting)
         return std::string();
     }
     // The renderer opens the LUT at every start: a Look naming a device
-    // could hang the viewer on a serial port. No LUT is called that.
-    if (isWindowsDeviceName(name))
+    // could hang the viewer on a serial port. No LUT is called that -- and
+    // none has a ':' in it, which in a bare Windows file name can only
+    // mean an alternate data stream, and which ends a device's name as
+    // well as a dot does ("COM1:.png").
+    if (isWindowsDeviceName(name) || name.find(':') != std::string::npos)
     {
         return std::string();
     }
@@ -726,23 +729,85 @@ namespace
         return true;
     }
 
-    // The characters a name may keep that draw nothing of their own
-    // (drawsInName says why they are kept).
-    bool invisibleInName(llwchar cp)
+    // Unicode's Default_Ignorable_Code_Point (DerivedCoreProperties.txt):
+    // what a renderer draws as nothing where it has no use for it. Some of
+    // these a name keeps (drawsInName) -- a joiner, a bidi mark, the
+    // variation selector an emoji needs -- but none of them tells two names
+    // apart to a reader. Written out rather than asked of ICU, which this
+    // file does without so that its tests need nothing of the viewer's; the
+    // property has not moved in years.
+    bool defaultIgnorable(llwchar cp)
     {
-        return cp == 0x200C || cp == 0x200D || cp == 0x061C || cp == 0x200E || cp == 0x200F;
+        return cp == 0x00AD || cp == 0x034F || cp == 0x061C || cp == 0x115F || cp == 0x1160 || cp == 0x17B4 || cp == 0x17B5 ||
+               (cp >= 0x180B && cp <= 0x180F) || (cp >= 0x200B && cp <= 0x200F) || (cp >= 0x202A && cp <= 0x202E) ||
+               (cp >= 0x2060 && cp <= 0x206F) || cp == 0x3164 || (cp >= 0xFE00 && cp <= 0xFE0F) || cp == 0xFEFF || cp == 0xFFA0 ||
+               (cp >= 0xFFF0 && cp <= 0xFFF8) || (cp >= 0x1BCA0 && cp <= 0x1BCA3) || (cp >= 0x1D173 && cp <= 0x1D17A) ||
+               (cp >= 0xE0000 && cp <= 0xE0FFF);
+    }
+
+    // Unicode's White_Space (PropList.txt), and the blank braille cell,
+    // U+2800, which is no space to Unicode but draws as one.
+    bool readsAsSpace(llwchar cp)
+    {
+        return (cp >= 0x09 && cp <= 0x0D) || cp == 0x20 || cp == 0x85 || cp == 0xA0 || cp == 0x1680 || (cp >= 0x2000 && cp <= 0x200A) ||
+               cp == 0x2028 || cp == 0x2029 || cp == 0x202F || cp == 0x205F || cp == 0x3000 || cp == 0x2800;
+    }
+
+    // A name with whatever reads as a space taken off both ends.
+    std::string trimmedOfSpaces(const std::string& name)
+    {
+        size_t begin = 0;
+        while (begin < name.size())
+        {
+            const LLCodepointAt at = utf8str_decode_at(name, begin);
+            if (!readsAsSpace(at.cp))
+            {
+                break;
+            }
+            begin = at.next;
+        }
+        size_t end = begin;
+        for (size_t i = begin; i < name.size();)
+        {
+            const LLCodepointAt at = utf8str_decode_at(name, i);
+            if (!readsAsSpace(at.cp))
+            {
+                end = at.next;
+            }
+            i = at.next;
+        }
+        return name.substr(begin, end - begin);
+    }
+
+    // Whether a name draws anything once what reads as a space, or as
+    // nothing, and the dots are set aside.
+    bool drawsSomething(const std::string& name)
+    {
+        return ALLookFormat::lookNameKey(name).find_first_not_of(". ") != std::string::npos;
     }
 } // namespace
 
 std::string ALLookFormat::lookNameKey(const std::string& name)
 {
+    // What reads as a space is one, runs of them one, and none at either
+    // end; what draws nothing is nothing.
     std::string key;
     key.reserve(name.size());
+    bool spaced = false;
     for (size_t i = 0; i < name.size();)
     {
         const LLCodepointAt at = utf8str_decode_at(name, i);
-        if (!invisibleInName(at.cp))
+        if (readsAsSpace(at.cp))
         {
+            spaced = !key.empty();
+        }
+        else if (!defaultIgnorable(at.cp))
+        {
+            if (spaced)
+            {
+                key.push_back(' ');
+                spaced = false;
+            }
             if (at.cp >= 'A' && at.cp <= 'Z')
             {
                 key.push_back(static_cast<char>(at.cp - 'A' + 'a'));
@@ -794,17 +859,21 @@ std::string ALLookFormat::cleanMetadataText(const std::string& raw, size_t byte_
 
 std::string ALLookFormat::lookNameFromUntrustedText(const std::string& raw)
 {
-    std::string name = cleanMetadataText(raw, LOOK_NAME_BYTE_LIMIT);
-    // No dot first: a Look is a file named after it, and the Looks are
-    // listed from "*.xml", which leaves out a file whose name begins with
-    // one -- such a Look would be saved, applied, and then never seen again
-    // to be chosen or deleted.
-    name.erase(0, name.find_first_not_of(". "));
+    // No space of any kind at either end -- cleanMetadataText trims only
+    // ASCII ones -- and no dot first: a Look is a file named after it, and
+    // the Looks are listed from "*.xml", which leaves out a file whose name
+    // begins with one -- such a Look would be saved, applied, and then
+    // never seen again to be chosen or deleted.
+    std::string name = trimmedOfSpaces(cleanMetadataText(raw, LOOK_NAME_BYTE_LIMIT));
+    while (!name.empty() && name.front() == '.')
+    {
+        name = trimmedOfSpaces(name.substr(1));
+    }
     // Nothing worth calling a name: dots, spaces and characters that draw
     // nothing, or a name that Windows would open as a device once it is a
     // file -- a Look is saved as its name and ".xml", and LLURI::escape
     // leaves letters as they are.
-    if (lookNameKey(name).find_first_not_of(". ") == std::string::npos || isWindowsDeviceName(name))
+    if (!drawsSomething(name) || isWindowsDeviceName(name))
     {
         return std::string();
     }
@@ -843,10 +912,11 @@ std::string ALLookFormat::numberedLookName(const std::string& wanted, S32 n, siz
     // fits: escaped, a byte outside ASCII is three.
     while (!base.empty() && LLURI::escape(base + suffix).size() > escaped_limit)
     {
-        base = utf8str_truncate(base, static_cast<S32>(base.size()) - 1);
-        LLStringUtil::trimTail(base);
+        base = trimmedOfSpaces(utf8str_truncate(base, static_cast<S32>(base.size()) - 1));
     }
-    if (base.empty())
+    // And something left that draws: the cut can take a name's one letter
+    // and leave the marks around it.
+    if (!drawsSomething(base))
     {
         return std::string();
     }

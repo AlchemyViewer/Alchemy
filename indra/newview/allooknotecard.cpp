@@ -29,6 +29,7 @@
 #include "allookformat.h"
 #include "alscriptworkspace.h"
 
+#include "lldbstrings.h"
 #include "llagentui.h"
 #include "llapp.h"
 #include "lldir.h"
@@ -49,6 +50,8 @@
 // held to the same number.
 static_assert(ALLookFormat::NOTECARD_BYTE_LIMIT == static_cast<size_t>(LLNotecard::MAX_SIZE),
               "ALLookFormat::NOTECARD_BYTE_LIMIT must equal LLNotecard::MAX_SIZE");
+static_assert(ALLookFormat::LOOK_NAME_BYTE_LIMIT == static_cast<size_t>(DB_INV_ITEM_NAME_STR_LEN),
+              "ALLookFormat::LOOK_NAME_BYTE_LIMIT must equal DB_INV_ITEM_NAME_STR_LEN");
 
 namespace
 {

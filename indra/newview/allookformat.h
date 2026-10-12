@@ -59,6 +59,8 @@ namespace ALLookFormat
     // The longest an inventory item's name may be (DB_INV_ITEM_NAME_STR_LEN),
     // and so the longest a Look's name is let be: a Look file is named after
     // its Look, and LLURI::escape can triple a UTF-8 name on the way.
+    // allooknotecard.cpp asserts against the inventory's own, so the two
+    // cannot drift apart.
     inline constexpr size_t LOOK_NAME_BYTE_LIMIT = 63;
     // A LUT is named by its file name, and no file system takes a longer one.
     inline constexpr size_t LUT_NAME_BYTE_LIMIT = 255;
@@ -104,8 +106,9 @@ namespace ALLookFormat
     bool composeNotecardText(const SharedLook& look, std::string& text);
 
     // The Look a notecard's text holds. Whatever stands before the first
-    // '<' is skipped -- a byte-order mark, a blank line, a line typed above
-    // the header -- and the text must then be an LLSD map holding the
+    // "<llsd" is skipped -- a byte-order mark, a blank line, a line typed
+    // above it, the note composeNotecardText writes -- and the text must
+    // then be an LLSD map holding the
     // reserved key, itself a map with an integer Format. The names in it
     // come back cleaned (cleanMetadataText); the settings come back as they
     // are, for the manager to judge one by one.
@@ -189,10 +192,12 @@ namespace ALLookFormat
     std::string lookNameFromUntrustedText(const std::string& raw);
     // What two names are compared by, to tell whether they name the same
     // Look: ASCII letters in lower case, as the file systems of Windows and
-    // macOS match file names, and without the characters a name may keep
-    // that draw nothing of their own (the zero-width joiner and non-joiner,
-    // and the bidi marks) -- so that "Neutral" and "Neutral" with a mark
-    // after it, which read the same in the list, are taken for one name.
+    // macOS match file names; every kind of space one plain space, runs of
+    // them one, and none at either end; and without what Unicode calls
+    // default-ignorable -- the joiners, the bidi marks, the variation
+    // selectors, which a name may keep but which draw nothing of their own.
+    // So "Neutral", "Neutral" with a mark or a no-break space after it, and
+    // "neutral" are taken for one name, as they read in the list.
     std::string lookNameKey(const std::string& name);
     // What a Look's notecard is called: NOTECARD_NAME_PREFIX and the name,
     // within what an item's name holds.

@@ -1144,12 +1144,13 @@ bool LLPresetsManager::presetExists(const std::string& subdirectory, const std::
     // filesystem does not care about case: saving "sunset" over
     // "Sunset.xml" replaces it. Matching exactly here would let that pair
     // slip past. On Linux this says yes for a name that would actually
-    // coexist, which errs the survivable way round.
-    std::string wanted(name);
-    LLStringUtil::toLower(wanted);
-    if (std::any_of(names.begin(), names.end(), [&wanted](std::string existing) {
-            LLStringUtil::toLower(existing);
-            return existing == wanted;
+    // coexist, which errs the survivable way round. And by the key Look
+    // names are told apart by (ALLookFormat::lookNameKey), which folds case
+    // the same way: a name that differs only by a space of another kind, or
+    // by a mark that draws nothing, reads as the same one in the list.
+    const std::string wanted = ALLookFormat::lookNameKey(name);
+    if (std::any_of(names.begin(), names.end(), [&wanted](const std::string& existing) {
+            return ALLookFormat::lookNameKey(existing) == wanted;
         }))
     {
         return true;
