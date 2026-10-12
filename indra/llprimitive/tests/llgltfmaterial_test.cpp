@@ -443,4 +443,86 @@ namespace
         ENSURE_HASH_CHANGED(hash_mat, source_mat, mOverrideDoubleSided);
         ENSURE_HASH_CHANGED(hash_mat, source_mat, mOverrideAlphaMode);
     }
+
+namespace
+{
+    // Notes the tracking ids updateTextureTracking() finds, where
+    // LLFetchedGLTFMaterial associates each with its local bitmap
+    struct tracking_material : public LLGLTFMaterial
+    {
+        void updateTextureTracking() override
+        {
+            mTrackedIds.clear();
+            for (const auto& [tracking_id, local_texture] : mTrackingIdToLocalTexture)
+            {
+                mTrackedIds.insert(tracking_id);
+            }
+        }
+
+        std::set<LLUUID> mTrackedIds;
+    };
+}
+
+    // Test that a local texture on an override is tracked on the render
+    // material the override is applied to
+    template<> template<>
+    void llgltfmaterial_object_t::test<13>()
+    {
+        {
+            const LLUUID base_tracking_id = LLUUID::generateNewID();
+            const LLUUID base_local_texture = LLUUID::generateNewID();
+            const LLUUID override_tracking_id = LLUUID::generateNewID();
+            const LLUUID override_local_texture = LLUUID::generateNewID();
+
+            LLGLTFMaterial override_material;
+            override_material.setBaseColorId(override_local_texture, true);
+            override_material.addLocalTextureTracking(override_tracking_id, override_local_texture);
+
+            tracking_material render_material;
+            apply_test_material_texture_ids(render_material);
+            render_material.setNormalId(base_local_texture);
+            render_material.addLocalTextureTracking(base_tracking_id, base_local_texture);
+
+            render_material.applyOverride(override_material);
+
+            ensure_equals("LLGLTFMaterial: override's local texture applied", render_material.mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR], override_local_texture);
+            const auto override_tracked = render_material.mTrackingIdToLocalTexture.find(override_tracking_id);
+            ensure("LLGLTFMaterial: render material tracks the override's local texture", override_tracked != render_material.mTrackingIdToLocalTexture.end());
+            ensure_equals("LLGLTFMaterial: render material tracks the override's local texture by its world id", override_tracked->second, override_local_texture);
+            const auto base_tracked = render_material.mTrackingIdToLocalTexture.find(base_tracking_id);
+            ensure("LLGLTFMaterial: render material still tracks its own local texture", base_tracked != render_material.mTrackingIdToLocalTexture.end());
+            ensure_equals("LLGLTFMaterial: render material still tracks its own local texture by its world id", base_tracked->second, base_local_texture);
+            ensure_equals("LLGLTFMaterial: render material tracks only the two local textures", render_material.mTrackingIdToLocalTexture.size(), size_t(2));
+
+            ensure("LLGLTFMaterial: updateTextureTracking finds the override's tracking id", render_material.mTrackedIds.count(override_tracking_id) == 1);
+            ensure("LLGLTFMaterial: updateTextureTracking finds the material's own tracking id", render_material.mTrackedIds.count(base_tracking_id) == 1);
+
+            LLGLTFMaterial expected_material;
+            expected_material.addLocalTextureTracking(base_tracking_id, base_local_texture);
+            expected_material.addLocalTextureTracking(override_tracking_id, override_local_texture);
+            ensure_equals("LLGLTFMaterial: local texture digest covers the override's local texture", render_material.mLocalTexDataDigest, expected_material.mLocalTexDataDigest);
+        }
+
+        {
+            // Both track the same local texture: the override's entry wins,
+            // as its texture ids do
+            const LLUUID tracking_id = LLUUID::generateNewID();
+            const LLUUID base_local_texture = LLUUID::generateNewID();
+            const LLUUID override_local_texture = LLUUID::generateNewID();
+
+            LLGLTFMaterial override_material;
+            override_material.setBaseColorId(override_local_texture, true);
+            override_material.addLocalTextureTracking(tracking_id, override_local_texture);
+
+            LLGLTFMaterial render_material;
+            render_material.setBaseColorId(base_local_texture);
+            render_material.addLocalTextureTracking(tracking_id, base_local_texture);
+
+            render_material.applyOverride(override_material);
+
+            const auto tracked = render_material.mTrackingIdToLocalTexture.find(tracking_id);
+            ensure("LLGLTFMaterial: render material tracks a local texture both track", tracked != render_material.mTrackingIdToLocalTexture.end());
+            ensure_equals("LLGLTFMaterial: override's world id replaces the material's for a local texture both track", tracked->second, override_local_texture);
+        }
+    }
 }
