@@ -57,7 +57,10 @@ Parity holds for a file when:
     passing assertions (-s), and each CHECK, REQUIRE and _THAT site must
     report from at least one line it spans. A FAIL or SKIP that ran would
     have failed or skipped the case, and a case that failed or skipped may
-    have stopped early, so neither is held to it.
+    have stopped early, so neither is held to it; nor is one the build
+    leaves out, which the file's compile command in the build's
+    compile_commands.json, run as clang++ -E, says. Where there is no such
+    command, one under an #if that never ran is listed.
 
 A test the mapping says TUT never ran (past its group's limit) or this host
 does not compile is listed, not counted against parity, as is an assertion
@@ -312,17 +315,23 @@ def converter():
 def read_cases(path):
     """The converted file's test cases and assertion sites, read from the file
     as tut2catch.py reads it: comments and literals masked, #if 0 branches
-    left out. A site is (first line, last line, macro), the lines its call
-    spans; returns ([{name, lines, sites}], the sites outside every case)."""
+    left out. A site is (first line, last line, macro, the #if blocks that
+    hold it), the lines its call spans; a case is {name, lines, sites, the
+    #if blocks that hold it}. Returns (the cases, the sites outside every
+    case)."""
     tc = converter()
     with open(path, "rb") as f:
         data = f.read()
     masked = tc.mask_source(data)
     dead = tc.dead_regions(masked)
+    conditional = conditional_regions(masked)
     newlines = [m.start() for m in re.finditer(rb"\n", masked)]
 
     def live(at):
         return not any(start <= at < end for start, end in dead)
+
+    def held(at):
+        return frozenset(i for i, (start, end) in enumerate(conditional) if start <= at < end)
 
     def line(at):
         return bisect.bisect_left(newlines, at) + 1
@@ -332,7 +341,7 @@ def read_cases(path):
         if live(m.start()):
             close = matching(masked, m.end() - 1)
             macro = m.group(0).rstrip(b"( \t\r\n").decode()
-            sites.append((m.start(), (line(m.start()), line(close), macro)))
+            sites.append((m.start(), (line(m.start()), line(close), macro, held(m.start()))))
     cases = []
     inside = set()
     for m in re.finditer(rb"\bTEST_CASE(_METHOD)?\s*\(", masked):
@@ -352,8 +361,73 @@ def read_cases(path):
         end = matching(masked, brace)
         body = [(at, site) for at, site in sites if brace < at < end]
         inside.update(at for at, _ in body)
-        cases.append({"name": name, "lines": (line(m.start()), line(brace)), "sites": [site for _, site in body]})
+        cases.append({"name": name, "lines": (line(m.start()), line(brace)), "sites": [site for _, site in body],
+                      "held": held(m.start())})
     return cases, [site for at, site in sites if at not in inside]
+
+
+def conditional_regions(masked):
+    """[start, end) of each #if block, but an include guard's: code a build
+    may leave out."""
+    regions = []
+    stack = []
+    for m in re.finditer(rb"^[ \t]*#[ \t]*(if|ifdef|ifndef|endif)\b([^\n]*)", masked, re.M):
+        if m.group(1) != b"endif":
+            name = m.group(2).strip()
+            guard = m.group(1) == b"ifndef" and re.match(rb"\s*#[ \t]*define[ \t]+" + re.escape(name) + rb"\b",
+                                                          masked[m.end():]) is not None
+            stack.append((m.end(), guard))
+        elif stack:
+            start, guard = stack.pop()
+            if not guard:
+                regions.append((start, m.start()))
+    return regions
+
+
+class CompiledLines:
+    """The lines of a file this build compiles: its compile command, from
+    compile_commands.json as tut2catch.py reads it, run as clang++ -E. None
+    for a file with no command to be had, or one that fails."""
+
+    def __init__(self, build_dir, config):
+        self.build_dir = build_dir
+        self.config = config
+        self.database = None
+        self.loaded = False
+
+    def __call__(self, path):
+        tc = converter()
+        # As the build names it, through any link on the way.
+        path = os.path.realpath(path)
+        if not self.loaded:
+            self.loaded = True
+            try:
+                self.database = tc.CompileDatabase(self.build_dir, self.config)
+            except tc.ConvertError:
+                pass
+        if self.database is None:
+            return None
+        try:
+            directory, args, compiled = self.database.command(path)
+            proc = subprocess.run(args + ["-E", compiled], cwd=directory, capture_output=True)
+        except (tc.ConvertError, OSError):
+            return None
+        if proc.returncode != 0:
+            return None
+        kept = set()
+        line = 0
+        in_main = False
+        for raw in proc.stdout.split(b"\n"):
+            m = re.match(rb'^# (\d+) "((?:[^"\\]|\\.)*)"', raw)
+            if m:
+                line = int(m.group(1))
+                named = os.path.join(directory, m.group(2).decode("utf-8", "replace"))
+                in_main = os.path.basename(named) == os.path.basename(path) and os.path.realpath(named) == path
+                continue
+            if in_main and raw.strip():
+                kept.add(line)
+            line += 1
+        return kept
 
 
 def matching(masked, at):
@@ -433,10 +507,12 @@ def tree_tier(build_dir):
     return m.group(1) if m else None
 
 
-def check_run(args, label, path, entry_name, test, recorded, entries, file_cases, outside, record, problems):
+def check_run(args, label, path, entry_name, test, recorded, entries, file_cases, outside, kept, record, problems):
     """One Catch2 entry's run of a converted file against TUT's run of its
     original: appends what does not hold to problems, prints what is listed,
-    and returns the table's row, or None where there is no run to show."""
+    and returns the table's row, or None where there is no run to show. kept
+    is the file's lines this build compiles, or None where that is not
+    known."""
     first_problem = len(problems)
     # A converted file changed since its binary was built is not what the
     # binary runs: its cases, lines and counts would not be the run's.
@@ -488,7 +564,15 @@ def check_run(args, label, path, entry_name, test, recorded, entries, file_cases
         counted[name] = len(body["sites"]) if body else None
     # An assertion counted is not one that ran: a case passes as well when a
     # loop around its CHECK never turns. Each site in a passing case's body
-    # must have reported at least once.
+    # this build compiles must have reported at least once. Where that is
+    # not known, one under an #if the case is not under (a case that ran was
+    # compiled) is listed.
+    def compiled(first, last, conditional):
+        return any(n in kept for n in range(first, last + 1)) if kept is not None else \
+            (None if conditional else True)
+
+    # Listed for the run, apart from the tests listed.
+    notes = []
     ran_anywhere = set()
     for case in cases:
         ran = ran_here(case, path)
@@ -496,13 +580,19 @@ def check_run(args, label, path, entry_name, test, recorded, entries, file_cases
         if case["result"] != "ok":
             continue
         body = body_of(case, file_cases)
-        for first, last, macro in body["sites"] if body else []:
-            if macro not in REPORTING_ONLY and not any(first <= n <= last for n in ran):
+        for first, last, macro, blocks in body["sites"] if body else []:
+            if macro in REPORTING_ONLY or any(first <= n <= last for n in ran):
+                continue
+            here = compiled(first, last, bool(blocks - body["held"]))
+            if here:
                 problems.append(f"{label}: {case['name']!r} passed without running the {macro} on line {first}")
-    # Listed for the run, apart from the tests listed.
-    notes = [f"the {macro} on line {first}, outside every case, never ran"
-             for first, last, macro in outside
-             if macro not in REPORTING_ONLY and not any(first <= n <= last for n in ran_anywhere)]
+            elif here is None:
+                notes.append(f"{case['name']!r}: the {macro} on line {first} never ran, and is under an #if no "
+                             f"compile command here says this build compiles")
+    notes += [f"the {macro} on line {first}, outside every case, never ran"
+              for first, last, macro, blocks in outside
+              if macro not in REPORTING_ONLY and not any(first <= n <= last for n in ran_anywhere)
+              and compiled(first, last, bool(blocks)) is not False]
     # The TUT results must be of the source the mapping was made from.
     hashes = {"the recorded results": recorded.get("tut_sha256"), "the mapping": (record or {}).get("tut_sha256")}
     if all(hashes.values()):
@@ -593,6 +683,7 @@ def check(args):
         records[tut_identity(recorded["ctest"]) if recorded.get("ctest") else (key, None)] = recorded
     own_tier = tree_tier(args.build_dir)
     tests = ctest_tests(args.build_dir, args.config)
+    compiled_lines = CompiledLines(args.build_dir, args.config)
     by_file = {}
     for entry in mapping:
         by_file.setdefault(entry["file"], []).append(entry)
@@ -605,6 +696,7 @@ def check(args):
         stem = os.path.splitext(os.path.basename(path))[0]
         file_problems = []
         file_cases, outside = read_cases(os.path.join(ROOT, path))
+        kept = compiled_lines(os.path.join(ROOT, path))
         record = (file_records or {}).get(path)
         # What no test's count holds: the assertions outside every test body
         # (helpers, fixtures), which the mapping totals for the file.
@@ -647,7 +739,7 @@ def check(args):
                 continue
             used.add(key)
             row = check_run(args, label, path, runs[tier][0], tests[runs[tier][0]], records[key], entries,
-                            file_cases, outside, record, problems)
+                            file_cases, outside, kept, record, problems)
             if row:
                 file_rows.append(row)
         # TUT's runs no Catch2 entry was checked against: its run at the
