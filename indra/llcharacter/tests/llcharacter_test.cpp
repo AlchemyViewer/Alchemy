@@ -173,7 +173,9 @@ namespace
         LLJoint* head = mCharacter.getJoint("mHead");
         REQUIRE(head != nullptr);
         CHECK(head->getJointNum() == 4);
-        CHECK(head->getParent()->getName() == std::string("mNeck"));
+        LLJoint* neck = head->getParent();
+        REQUIRE(neck != nullptr);
+        CHECK(neck->getName() == std::string("mNeck"));
 
         CHECK(mCharacter.getCharacterJoint(2) == mCharacter.getJoint("mChest"));
         CHECK(mCharacter.getJoint("mNope") == nullptr);
@@ -428,6 +430,7 @@ namespace
         UNSCOPED_INFO("the motion behind the starter was updated once");
         CHECK(oldest->mUpdateCount == 2);
         ALTestMotion* started = static_cast<ALTestMotion*>(mCharacter.findMotion(started_id));
+        REQUIRE(started != nullptr);
         UNSCOPED_INFO("the new motion had only its activation update");
         CHECK(started->mUpdateCount == 1);
 

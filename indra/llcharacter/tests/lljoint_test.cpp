@@ -172,7 +172,7 @@ namespace
         CHECK(jnt2 == NULL);
 
         lljointgp.addChild(&lljoint);
-        CHECK(&lljoint== lljoint2.getParent());
+        CHECK(&lljointgp == lljoint.getParent());
         CHECK(&lljointgp == lljoint2.getRoot());
 
         CHECK(&lljoint1 == lljoint.findJoint("child1"));

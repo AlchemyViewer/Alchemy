@@ -636,7 +636,7 @@ namespace
                LINE_FRAME_TIME, "Frame Time: 0.0", E_ST_NO_FRAME_TIME);
         mutate("a negative frame time is refused",
                LINE_FRAME_TIME, "Frame Time: -0.033333", E_ST_NO_FRAME_TIME);
-        mutate("a frame time that is not a number is refused",
+        mutate("a frame time of NaN is refused",
                LINE_FRAME_TIME, "Frame Time: nan", E_ST_NO_FRAME_TIME);
         mutate("an infinite frame time is refused",
                LINE_FRAME_TIME, "Frame Time: inf", E_ST_NO_FRAME_TIME);
@@ -791,8 +791,12 @@ namespace
 
             UNSCOPED_INFO("the priority is the one the table gave");
             CHECK(written.mBasePriority == 4);
-            UNSCOPED_INFO("and every joint is given it");
-            CHECK(written.mJointPriorities[0] == 4);
+            {
+                INFO("and every joint is given it");
+                REQUIRE(written.mNumJoints == 2u);
+                CHECK(written.mJointPriorities[0] == 4);
+                CHECK(written.mJointPriorities[1] == 4);
+            }
             UNSCOPED_INFO("the hand pose is the one the table gave");
             CHECK(written.mHandPose == 3u);
             UNSCOPED_INFO("so is the emote");
@@ -939,6 +943,7 @@ namespace
             std::vector<U8> bytes = write(*loader);
             WrittenAnimation written;
             REQUIRE(read_written(bytes, written));
+            REQUIRE(written.mNumJoints == 2u);
             UNSCOPED_INFO("an alias read after a table undoes what it said");
             CHECK(written.mJointNames[1] == std::string("mTorso"));
         }
@@ -957,6 +962,7 @@ namespace
         {
             WrittenAnimation written = build(
                 header + "[GLOBALS]\npriority = 3\n[abdomen]\npriority = 2\n", sample_lines());
+            REQUIRE(written.mNumJoints == 2u);
             UNSCOPED_INFO("the base priority is the global one");
             CHECK(written.mBasePriority == 3);
             UNSCOPED_INFO("a joint with no section of its own takes it");
@@ -967,6 +973,7 @@ namespace
         {
             WrittenAnimation written = build(
                 header + "[GLOBALS]\npriority = 3\n[abdomen]\npriority = -2\n", sample_lines());
+            REQUIRE(written.mNumJoints == 2u);
             UNSCOPED_INFO("a modifier may take it down again");
             CHECK(written.mJointPriorities[1] == 1);
         }
@@ -976,6 +983,7 @@ namespace
             WrittenAnimation written = build(
                 header + "[GLOBALS]\npriority = 2147483647\n[abdomen]\npriority = 2147483647\n",
                 sample_lines());
+            REQUIRE(written.mNumJoints == 2u);
             UNSCOPED_INFO("the global priority is written as it was given");
             CHECK(written.mBasePriority == 2147483647);
             UNSCOPED_INFO("but a joint priority is brought into range");
@@ -985,6 +993,7 @@ namespace
             WrittenAnimation written = build(
                 header + "[GLOBALS]\npriority = -2147483648\n[abdomen]\npriority = -2147483648\n",
                 sample_lines());
+            REQUIRE(written.mNumJoints == 2u);
             UNSCOPED_INFO("from the other end too");
             CHECK(written.mJointPriorities[1] == (S32)LLJoint::USE_MOTION_PRIORITY);
         }
@@ -1075,6 +1084,8 @@ namespace
             // Every position key is moved by this, and five metres is as far
             // as a position key goes, so a hundred puts them all at the end.
             WrittenAnimation written = build(header + "[hip]\nrelativepos = 100 0 0\n", lines);
+            REQUIRE(written.mNumJoints == 2u);
+            REQUIRE_FALSE(written.mPosKeys[0].empty());
             UNSCOPED_INFO("a relative position moves the position keys");
             CHECK(written.mPosKeys[0] != plain.mPosKeys[0]);
             UNSCOPED_INFO("as far as they go");
@@ -1086,6 +1097,7 @@ namespace
         }
         {
             WrittenAnimation written = build(header + "[abdomen]\nrelativerot = firstkey\n", lines);
+            REQUIRE(written.mNumJoints == 2u);
             UNSCOPED_INFO("a rotation taken from the first key moves the rotation keys");
             CHECK(written.mRotKeys[1] != plain.mRotKeys[1]);
             UNSCOPED_INFO("and leaves the other joint alone");
@@ -1094,6 +1106,7 @@ namespace
         {
             WrittenAnimation written = build(
                 header + "[abdomen]\nframe = 1 0 0, 0 1 0, 0 0 1\n", lines);
+            REQUIRE(written.mNumJoints == 2u);
             UNSCOPED_INFO("a frame matrix moves the rotation keys");
             CHECK(written.mRotKeys[1] != plain.mRotKeys[1]);
             UNSCOPED_INFO("and leaves the other joint alone");
@@ -1102,6 +1115,7 @@ namespace
         {
             WrittenAnimation written = build(
                 header + "[abdomen]\noffset = 0 1 0, 0 0 1, 1 0 0\n", lines);
+            REQUIRE(written.mNumJoints == 2u);
             UNSCOPED_INFO("an offset matrix moves the rotation keys");
             CHECK(written.mRotKeys[1] != plain.mRotKeys[1]);
         }
@@ -1115,9 +1129,11 @@ namespace
         const std::string header = "Translations 1.0\n";
         const std::vector<std::string> lines = moving_lines();
         const WrittenAnimation plain = build(header, lines);
+        REQUIRE(plain.mNumJoints == 2u);
 
         {
             WrittenAnimation written = build(header + "[abdomen]\nmergeparent = hip\n", lines);
+            REQUIRE(written.mNumJoints == 2u);
             UNSCOPED_INFO("a merged parent moves the rotation keys");
             CHECK(written.mRotKeys[1] != plain.mRotKeys[1]);
             UNSCOPED_INFO("and leaves the parent alone");
@@ -1125,6 +1141,7 @@ namespace
         }
         {
             WrittenAnimation written = build(header + "[hip]\nmergechild = abdomen\n", lines);
+            REQUIRE(written.mNumJoints == 2u);
             UNSCOPED_INFO("a merged child moves the rotation keys");
             CHECK(written.mRotKeys[0] != plain.mRotKeys[0]);
         }
@@ -1132,6 +1149,7 @@ namespace
             // A name that is nobody is nobody, rather than an error: the table
             // is written once and the files come and go.
             WrittenAnimation written = build(header + "[abdomen]\nmergeparent = elbow\n", lines);
+            REQUIRE(written.mNumJoints == 2u);
             UNSCOPED_INFO("a merge with a joint the file does not have changes nothing");
             CHECK(written.mRotKeys[1] == plain.mRotKeys[1]);
         }
@@ -1151,6 +1169,7 @@ namespace
             CHECK(one_frame.mNumRotKeys[1] == 1);
 
             WrittenAnimation merged = build(header + "[abdomen]\nmergeparent = hip\n", single);
+            REQUIRE(merged.mNumJoints == 2u);
             UNSCOPED_INFO("a merge with no frame behind it is no merge");
             CHECK(merged.mRotKeys[1] == one_frame.mRotKeys[1]);
         }

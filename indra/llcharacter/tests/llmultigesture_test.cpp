@@ -55,10 +55,12 @@ namespace
         LLGestureStepSound* sound = new LLGestureStepSound();
         sound->mSoundName = "chime";
         sound->mSoundAssetID.generate();
+        sound->mFlags = 1;
         gesture->mSteps.push_back(sound);
 
         LLGestureStepChat* chat = new LLGestureStepChat();
         chat->mChatText = "hello";
+        chat->mFlags = 1;
         gesture->mSteps.push_back(chat);
 
         LLGestureStepWait* wait = new LLGestureStepWait();
@@ -138,11 +140,33 @@ namespace
         CHECK(read.mTrigger == written->mTrigger);
         CHECK(read.mReplaceText == written->mReplaceText);
         REQUIRE(read.mSteps.size() == written->mSteps.size());
+        for (size_t i = 0; i < written->mSteps.size(); ++i)
+        {
+            CAPTURE(i);
+            REQUIRE(read.mSteps[i]->getType() == written->mSteps[i]->getType());
+        }
 
-        CHECK(static_cast<LLGestureStepAnimation*>(read.mSteps[0])->mAnimName ==
-              std::string("express_wave"));
-        CHECK(static_cast<LLGestureStepChat*>(read.mSteps[2])->mChatText ==
-              std::string("hello"));
+        const auto& written_anim = *static_cast<LLGestureStepAnimation*>(written->mSteps[0]);
+        const auto& read_anim = *static_cast<LLGestureStepAnimation*>(read.mSteps[0]);
+        CHECK(read_anim.mAnimName == written_anim.mAnimName);
+        CHECK(read_anim.mAnimAssetID == written_anim.mAnimAssetID);
+        CHECK(read_anim.mFlags == written_anim.mFlags);
+
+        const auto& written_sound = *static_cast<LLGestureStepSound*>(written->mSteps[1]);
+        const auto& read_sound = *static_cast<LLGestureStepSound*>(read.mSteps[1]);
+        CHECK(read_sound.mSoundName == written_sound.mSoundName);
+        CHECK(read_sound.mSoundAssetID == written_sound.mSoundAssetID);
+        CHECK(read_sound.mFlags == written_sound.mFlags);
+
+        const auto& written_chat = *static_cast<LLGestureStepChat*>(written->mSteps[2]);
+        const auto& read_chat = *static_cast<LLGestureStepChat*>(read.mSteps[2]);
+        CHECK(read_chat.mChatText == written_chat.mChatText);
+        CHECK(read_chat.mFlags == written_chat.mFlags);
+
+        const auto& written_wait = *static_cast<LLGestureStepWait*>(written->mSteps[3]);
+        const auto& read_wait = *static_cast<LLGestureStepWait*>(read.mSteps[3]);
+        CHECK(read_wait.mWaitSeconds == written_wait.mWaitSeconds);
+        CHECK(read_wait.mFlags == written_wait.mFlags);
     }
 
     TEST_CASE("LLMultiGesture: a gesture cut short anywhere is refused", "[LLMultiGesture]")
@@ -238,6 +262,7 @@ namespace
             UNSCOPED_INFO("the animation step reads back");
             CHECK(step_accepts(whole, bytes));
             CHECK(whole.mAnimName == full.mAnimName);
+            CHECK(whole.mAnimAssetID == full.mAnimAssetID);
             CHECK(whole.mFlags == full.mFlags);
 
             LLGestureStepAnimation cut;
@@ -255,6 +280,8 @@ namespace
             UNSCOPED_INFO("the sound step reads back");
             CHECK(step_accepts(whole, bytes));
             CHECK(whole.mSoundName == full.mSoundName);
+            CHECK(whole.mSoundAssetID == full.mSoundAssetID);
+            CHECK(whole.mFlags == full.mFlags);
 
             LLGestureStepSound cut;
             UNSCOPED_INFO("a sound step missing its flags is refused");
@@ -285,6 +312,7 @@ namespace
             LLGestureStepWait whole;
             UNSCOPED_INFO("the wait step reads back");
             CHECK(step_accepts(whole, bytes));
+            CHECK(whole.mWaitSeconds == full.mWaitSeconds);
             CHECK(whole.mFlags == full.mFlags);
 
             LLGestureStepWait cut;

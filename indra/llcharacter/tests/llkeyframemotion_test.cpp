@@ -314,7 +314,7 @@ namespace
             require_same_value(what, time, sample(curve, time, cursor), reference.getValue(time));
             INFO(what << ": cursor");
             CAPTURE(time);
-            REQUIRE_THAT(cursor, ll_test::LLSDEquals(reference.lowerBound(time)));
+            REQUIRE(cursor == reference.lowerBound(time));
         }
         return wraps;
     }

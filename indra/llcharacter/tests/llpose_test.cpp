@@ -681,10 +681,12 @@ namespace
         require_same_rotation("cleared queue is a no-op", mA.getRotation(), ROT_C);
     }
 
-    TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: a joint with no number is kept in the motion's pose", "[LLPoseBlender]")
+    TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: a joint with no number is in the motion's pose but not its signature", "[LLPoseBlender]")
     {
-        // A joint that never received a joint number is kept in the pose but
-        // left out of the motion's joint signature.
+        // A joint that never received a joint number is still kept in the
+        // pose: LLMotion::addJointState inserts the state before it checks the
+        // number's range. It is left out of the motion's joint signature,
+        // which has no slot for it.
         LLJoint unnumbered;
         unnumbered.setup("unnumbered");
         UNSCOPED_INFO("default joint number");
@@ -693,6 +695,8 @@ namespace
         ALTestMotion motion;
         motion.addJoint(&unnumbered, LLJointState::ROT);
         CHECK(motion.getPose()->getNumJointStates() == 1);
+        const U8* signature = &motion.mJointSignature[0][0];
+        CHECK(std::count_if(signature, signature + sizeof(motion.mJointSignature), [](U8 b) { return b != 0; }) == 0);
     }
 
     TEST_CASE_METHOD(llposeblender_data, "LLPoseBlender: a joint with no number is skipped and the rest still blend", "[LLPoseBlender]")
