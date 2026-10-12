@@ -28,10 +28,20 @@ decided by the types clang resolved, not by its text:
   assertions   CHECK, which lets a case go on and so reports every failure
                of a run; REQUIRE where going on could only crash or bury the
                first failure: a condition that guards what follows (a
-               pointer, a size, an emptiness, a presence), in a loop or a
-               lambda, and in a helper outside a test's body. In a
-               destructor, where a throw would end the process, CHECK
-               always. With that macro (X below):
+               pointer, null or not; an optional or a smart pointer, tested
+               through its operator bool or compared with nullptr; a
+               position compared with end() or npos; a size, an emptiness,
+               a presence: has(), has_value(), found() and the like); a
+               condition that calls what makes it (a non-const member
+               function returning bool, ensure(m.setInverse(n)), or a call
+               returning bool that fills an argument passed by reference or
+               address), where the test reads that object or argument
+               after it; a term of a split && chain that a later term of it
+               reads a variable of (TUT's ensure stopped the test at the
+               first term that failed); in a loop or a lambda; and in a
+               helper outside a test's body. A plain compare of values
+               stays CHECK. In a destructor, where a throw would end the
+               process, CHECK always. With that macro (X below):
                ensure(c) -> X(c); ensure(a && b && ...) -> X(a); X(b); ...
                one assertion a term, so that each prints its operands;
                ensure(msg, c) -> UNSCOPED_INFO(msg) then X(c), or, where c
@@ -139,7 +149,13 @@ LOOP_KINDS = {"ForStmt", "WhileStmt", "DoStmt", "CXXForRangeStmt"}
 # What a condition asks of an object when what follows relies on the answer:
 # that it holds something, or how much.
 GUARD_MEMBERS = {"size", "empty", "length", "count", "isDefined", "isUndefined", "has", "isMap", "isArray",
-                 "notNull", "isNull"}
+                 "notNull", "isNull", "has_value", "found"}
+# A container's ends, which a position found in it is compared with: at one,
+# there is nothing to read.
+END_MEMBERS = {"end", "cend", "rend", "crend"}
+# The arithmetic types: a constant of one is no state a later term relies on.
+ARITHMETIC = re.compile(r"(?:(?:unsigned|signed|short|long|int|char|float|double|bool|wchar_t|char8_t|char16_t|"
+                        r"char32_t|size_t|F32|F64|S8|U8|S16|U16|S32|U32|S64|U64)\s*)+")
 LITERAL_KINDS = {"IntegerLiteral", "FloatingLiteral", "CXXBoolLiteralExpr", "CharacterLiteral", "StringLiteral",
                  "CXXNullPtrLiteralExpr", "GNUNullExpr", "FixedPointLiteral"}
 # A comment that names nothing: a separator, or a note to whoever reads on.
@@ -937,6 +953,7 @@ class Converter:
         self.name_overrides = {}  # (group, n) -> a case's name, from --names
         self.friend_names = set() # tut:: types production code befriends
         self.tut_namespaces = []  # NamespaceDecl nodes named tut, with their parents
+        self.body_reads = {}      # id of a test's body -> (offset, declaration) of what it reads
         source.find_conditionals(active_lines)
 
     # ---- helpers -------------------------------------------------------
@@ -1313,9 +1330,9 @@ class Converter:
           - outside a test's own body (a helper, which any caller may call
             in a loop) and in a loop or lambda of one, REQUIRE, so that the
             first element that fails is the one reported;
-          - where the condition guards what follows (a pointer not null, a
-            size, an emptiness, a presence), REQUIRE;
-          - otherwise CHECK."""
+          - where the condition guards what follows (see guards()), or
+            calls what makes it (see prepares()), REQUIRE;
+          - otherwise CHECK, a plain compare of values among it."""
         if self.in_destructor(record):
             return "CHECK"
         test = self.test_containing(record["range"][0])
@@ -1327,17 +1344,22 @@ class Converter:
                 break
             if parent.get("kind") in LOOP_KINDS or parent.get("kind") == "LambdaExpr":
                 return "REQUIRE"
-        if any(self.guards(n) for n in nodes if n):
+        if any(self.guards(n) or self.prepares(n, record) for n in nodes if n):
             return "REQUIRE"
         return "CHECK"
 
     @staticmethod
     def guards(node):
         """Whether a condition or value tells what the code after it relies
-        on: a pointer, compared with null or tested as a bool, or a member
-        that says how much an object holds or whether it holds anything.
-        Default arguments are not looked in: a NULL a callee defaults to is
-        nothing the test compared."""
+        on: a pointer, compared with null or tested as a bool; an object
+        tested through its operator bool (an optional, a smart pointer, a
+        stream; not an atomic, whose bool is its value) or compared with
+        nullptr through an operator of its own; a position
+        compared with its container's end() or with npos; or a member that
+        says how much an object holds or whether it holds anything
+        (has_value() and found() among them). Default arguments are not
+        looked in: a NULL a callee defaults to is nothing the test
+        compared."""
         if value_type(unparenthesised(node)).endswith("*"):
             return True
         stack = [node]
@@ -1348,11 +1370,13 @@ class Converter:
                 continue
             if kind == "ImplicitCastExpr" and sub.get("castKind") == "PointerToBoolean":
                 return True
-            if kind == "BinaryOperator" and sub.get("opcode") in ("==", "!="):
-                if any(skip_implicit(c).get("kind") in ("CXXNullPtrLiteralExpr", "GNUNullExpr") or
-                       (c.get("kind") == "ImplicitCastExpr" and c.get("castKind") == "NullToPointer")
-                       for c in sub.get("inner", []) if "kind" in c):
+            if kind == "MemberExpr" and sub.get("name") == "operator bool":
+                # An atomic's bool is its value, not whether it holds one.
+                base = [c for c in sub.get("inner", []) if "kind" in c]
+                if not (base and re.search(r"atomic", base[0].get("type", {}).get("qualType", ""), re.I)):
                     return True
+            if any(is_end(c) for c in compared(sub)):
+                return True
             if kind == "MemberExpr" and sub.get("name") in GUARD_MEMBERS:
                 # isNull() and notNull() guard only on what points: on a
                 # vector or a UUID they are values like any other.
@@ -1363,6 +1387,57 @@ class Converter:
                     return True
             stack.extend(c for c in sub.get("inner", []) if isinstance(c, dict) and "kind" in c)
         return False
+
+    def prepares(self, node, record):
+        """Whether a condition calls what makes the state the test reads
+        after it: a call returning bool, to a non-const member function of
+        an object, or with an argument it may fill (one passed by non-const
+        reference, or by address), where the test's body reads that object
+        or argument again after the assertion. A false answer is that what
+        it goes on to read was never made, as with
+        ensure(inverse.setInverse(m)) before inverse is used."""
+        test = self.test_containing(record["range"][0])
+        body = test_body(test) if test else None
+        if body is None:
+            return False
+        made = set()
+        stack = [node]
+        while stack:
+            sub = stack.pop()
+            kind = sub.get("kind")
+            if kind in ("CXXDefaultArgExpr", "LambdaExpr"):
+                continue
+            inner = [c for c in sub.get("inner", []) if isinstance(c, dict) and "kind" in c]
+            if kind in ("CallExpr", "CXXMemberCallExpr") and inner and value_type(sub) == "bool":
+                callee = inner[0]
+                if kind == "CXXMemberCallExpr" and callee.get("kind") == "MemberExpr" and \
+                        callee.get("name") != "operator bool":
+                    base = [c for c in callee.get("inner", []) if "kind" in c]
+                    if base and not const_object(base[0], callee.get("isArrow")):
+                        made |= variables(base[0])
+                for arg in inner[1:]:
+                    if fills(arg):
+                        made |= variables(arg)
+            stack.extend(inner)
+        if not made:
+            return False
+        after = record["range"][1]
+        return any(at >= after and decl in made for at, decl in self.reads(body))
+
+    def reads(self, body):
+        """(offset, declaration) of every variable and field a test's body
+        names, once per body."""
+        cache = self.body_reads
+        if id(body) not in cache:
+            found = []
+            for sub in iter_nodes(body):
+                decl = variable_of(sub)
+                if decl:
+                    at = self.loc(sub.get("range", {}).get("begin")).in_text()
+                    if at is not None:
+                        found.append((at, decl))
+            cache[id(body)] = found
+        return cache[id(body)]
 
     def plain_span(self, node):
         """[start, end) of a node written in this file's text, or None."""
@@ -1661,12 +1736,25 @@ class Converter:
             if len(terms) > 1 and any(self.call_span(t, record) is None for t in terms):
                 terms = [condition]
 
+            # TUT's ensure stopped the test at the first term that failed:
+            # one a later term reads the same variable as ends the case.
+            chained = [False] * len(terms)
+            if len(terms) > 1 and not self.in_destructor(record):
+                later = set()
+                for i in range(len(terms) - 1, -1, -1):
+                    reads = variables(terms[i], constants=False)
+                    chained[i] = bool(reads & later)
+                    later |= reads
+
             def build():
                 out = []
-                for term in terms:
+                for i, term in enumerate(terms):
                     span = ranges[n - 1] if len(terms) == 1 else self.call_span(term, record)
                     suffix, text = self.assertion(term, span, name == "ensure_not", record)
-                    strength = req if len(terms) == 1 else self.strength(record, [term])
+                    if len(terms) == 1:
+                        strength = req
+                    else:
+                        strength = "REQUIRE" if chained[i] else self.strength(record, [term])
                     out.append(f"{strength}{suffix}({text})")
                 msg = message(0) if n == 2 else []
                 if msg and len(out) > 1:
@@ -2517,6 +2605,100 @@ def dead_regions(masked):
             else:
                 stack[-1] = [m.end(), kw == "elif" and re.fullmatch(r"\(?\s*(0|false)\s*\)?", rest) is not None]
     return regions
+
+
+def compared(node):
+    """The two operands of an == or != comparison, built in or overloaded,
+    or ()."""
+    kind = node.get("kind")
+    inner = [c for c in node.get("inner", []) if isinstance(c, dict) and "kind" in c]
+    if kind == "BinaryOperator" and node.get("opcode") in ("==", "!=") and len(inner) == 2:
+        return inner
+    if kind == "CXXOperatorCallExpr" and len(inner) == 3:
+        name = skip_implicit(inner[0]).get("referencedDecl", {}).get("name")
+        if name in ("operator==", "operator!="):
+            return inner[1:]
+    return ()
+
+
+def is_end(node):
+    """Whether a compared operand is where nothing is: null, a container's
+    end() and the like, or npos."""
+    if node.get("kind") == "ImplicitCastExpr" and node.get("castKind") == "NullToPointer":
+        return True
+    node = skip_implicit(node)
+    kind = node.get("kind")
+    if kind in ("CXXNullPtrLiteralExpr", "GNUNullExpr"):
+        return True
+    if kind == "DeclRefExpr" and node.get("referencedDecl", {}).get("name") == "npos":
+        return True
+    if kind == "CXXMemberCallExpr":
+        callee = next((c for c in node.get("inner", []) if "kind" in c), {})
+        return callee.get("kind") == "MemberExpr" and callee.get("name") in END_MEMBERS
+    return False
+
+
+def variable_of(node):
+    """The declaration a node names, where it is a variable or a field."""
+    kind = node.get("kind")
+    if kind == "DeclRefExpr":
+        ref = node.get("referencedDecl", {})
+        if ref.get("kind") in ("VarDecl", "ParmVarDecl", "BindingDecl"):
+            return ref.get("id")
+    elif kind == "MemberExpr" and node.get("type", {}).get("qualType") != "<bound member function type>":
+        return node.get("referencedMemberDecl")
+    return None
+
+
+def variables(node, constants=True):
+    """The variables and fields a node reads, by declaration, without those
+    of default arguments; without, too, unless constants, a constant of
+    arithmetic type, which is no state."""
+    found = set()
+    stack = [node]
+    while stack:
+        sub = stack.pop()
+        if sub.get("kind") == "CXXDefaultArgExpr":
+            continue
+        decl = variable_of(sub)
+        if decl:
+            t = sub.get("referencedDecl", {}).get("type", {}) if sub.get("kind") == "DeclRefExpr" \
+                else sub.get("type", {})
+            text = t.get("desugaredQualType") or t.get("qualType") or ""
+            if constants or not re.fullmatch(r"const\s+" + ARITHMETIC.pattern, text.strip()):
+                found.add(decl)
+        stack.extend(c for c in sub.get("inner", []) if isinstance(c, dict) and "kind" in c)
+    return found
+
+
+def const_object(base, arrow):
+    """Whether the object a member function is called on is const there, as
+    clang typed it: a const member function called on an object that is not
+    const has it converted to const, so a call on an object that stays
+    non-const is to a non-const member function."""
+    text = base.get("type", {}).get("qualType", "")
+    if arrow and "*" in text:
+        text = text[:text.rfind("*")]
+    while re.search(r"<[^<>]*>", text):
+        text = re.sub(r"<[^<>]*>", "", text)
+    return re.search(r"\bconst\b", text) is not None
+
+
+def fills(arg):
+    """Whether a call may fill an argument: an lvalue passed as it is, bound
+    to a non-const reference, or the address of one, to a pointer to
+    non-const. One bound to a const reference, or to a const pointer, is
+    converted to const first."""
+    kind = arg.get("kind")
+    text = arg.get("type", {}).get("qualType", "")
+    if kind == "UnaryOperator" and arg.get("opcode") == "&":
+        return not const_object(arg, True)
+    if kind in ("ImplicitCastExpr", "CXXConstructExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") or \
+            arg.get("valueCategory") != "lvalue":
+        return False
+    while re.search(r"<[^<>]*>", text):
+        text = re.sub(r"<[^<>]*>", "", text)
+    return re.search(r"\bconst\b", text) is None
 
 
 def names_only(record):
