@@ -231,10 +231,11 @@ namespace
         CHECK_THAT(quarter.mV[VZ], WithinAbs(0.f, 1e-6));
         CHECK(quarter.mV[VW] == 3.f);
 
+        // A vector off the turn's axis, which the turn moves.
         const LLQuaternion q(1.3f, LLVector3(2.32f, -23.2f, -34.1112f));
-        LLVector4 vec4b(2.32f, -23.2f, -34.1112f, 1.010112f);
+        LLVector4 vec4b(1.f, 2.f, 3.f, 1.010112f);
         vec4b.rotVec(q);
-        const LLVector3 turned = LLVector3(2.32f, -23.2f, -34.1112f) * q;
+        const LLVector3 turned = LLVector3(1.f, 2.f, 3.f) * q;
         CHECK(vec4b.mV[VX] == turned.mV[VX]);
         CHECK(vec4b.mV[VY] == turned.mV[VY]);
         CHECK(vec4b.mV[VZ] == turned.mV[VZ]);
