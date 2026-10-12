@@ -242,4 +242,25 @@ namespace
                       LLMessageConfig::getMaxQueuedEvents(),
                       100);
     }
+
+    template<> template<>
+    void LLMessageConfigTestObject::test<10>()
+        // initClass with another directory reads that directory's file
+    {
+        const std::string other_dir = mTestConfigDir + "-other";
+        LLFile::mkdir(other_dir);
+        LLSD config;
+        config["serverDefaults"]["simulator"] = "llsd";
+        {
+            llofstream file((other_dir + "/message.xml").c_str());
+            LLSDSerialize::toPrettyXML(config, file);
+        }
+
+        // The fixture named its own directory, whose file holds nothing.
+        LLMessageConfig::initClass("simulator", other_dir);
+        const LLMessageConfig::Flavor flavor = LLMessageConfig::getServerDefaultFlavor();
+        LLFile::remove(other_dir + "/message.xml");
+        LLFile::remove(other_dir);
+        ensure_equals("the config of the directory named last", flavor, LLMessageConfig::LLSD_FLAVOR);
+    }
 }
