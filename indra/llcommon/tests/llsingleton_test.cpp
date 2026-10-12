@@ -137,65 +137,78 @@ namespace tut
         ensure(LLSingletonTest::instanceExists());
     }
 
-#define TESTS(CLS, OTHER, N0, N1, N2, N3)                               \
-    template<> template<>                                               \
-    void singleton_object_t::test<N0>()                                 \
-    {                                                                   \
-        set_test_name("just " #CLS);                                    \
-        CLS::sDepFlag = CLS::DEP_NONE;                                  \
-        OTHER::sDepFlag = OTHER::DEP_NONE;                              \
-        sLog.clear();                                                   \
-                                                                        \
-        (void)CLS::instance();                                          \
-        ensure_equals(sLog, #CLS "i" #CLS);                             \
-        LLSingletonBase::deleteAll();                                   \
-        ensure_equals(sLog, #CLS "i" #CLS "x" #CLS "~" #CLS);           \
-    }                                                                   \
-                                                                        \
-    template<> template<>                                               \
-    void singleton_object_t::test<N1>()                                 \
-    {                                                                   \
-        set_test_name(#CLS " ctor depends " #OTHER);                    \
-        CLS::sDepFlag = CLS::DEP_CTOR;                                  \
-        OTHER::sDepFlag = OTHER::DEP_NONE;                              \
-        sLog.clear();                                                   \
-                                                                        \
-        (void)CLS::instance();                                          \
-        ensure_equals(sLog, #CLS #OTHER "i" #OTHER "i" #CLS);           \
-        LLSingletonBase::deleteAll();                                   \
-        ensure_equals(sLog, #CLS #OTHER "i" #OTHER "i" #CLS "x" #CLS "~" #CLS "x" #OTHER "~" #OTHER); \
-    }                                                                   \
-                                                                        \
-    template<> template<>                                               \
-    void singleton_object_t::test<N2>()                                 \
-    {                                                                   \
-        set_test_name(#CLS " init depends " #OTHER);                    \
-        CLS::sDepFlag = CLS::DEP_INIT;                                  \
-        OTHER::sDepFlag = OTHER::DEP_NONE;                              \
-        sLog.clear();                                                   \
-                                                                        \
-        (void)CLS::instance();                                          \
-        ensure_equals(sLog, #CLS "i" #CLS #OTHER "i" #OTHER);           \
-        LLSingletonBase::deleteAll();                                   \
-        ensure_equals(sLog, #CLS "i" #CLS #OTHER "i" #OTHER "x" #CLS "~" #CLS "x" #OTHER "~" #OTHER); \
-    }                                                                   \
-                                                                        \
-    template<> template<>                                               \
-    void singleton_object_t::test<N3>()                                 \
-    {                                                                   \
-        set_test_name(#CLS " circular init");                           \
-        CLS::sDepFlag = CLS::DEP_INIT;                                  \
-        OTHER::sDepFlag = OTHER::DEP_CTOR;                              \
-        sLog.clear();                                                   \
-                                                                        \
-        (void)CLS::instance();                                          \
-        ensure_equals(sLog, #CLS "i" #CLS #OTHER "i" #OTHER);           \
-        LLSingletonBase::deleteAll();                                   \
-        ensure_equals(sLog, #CLS "i" #CLS #OTHER "i" #OTHER "x" #CLS "~" #CLS "x" #OTHER "~" #OTHER); \
+    // Makes CLS, CLS and OTHER depending on each other as the flags say, and
+    // checks the order they were made in, then deletes every singleton and
+    // checks the order they were cleaned up and destroyed in.
+    template <class CLS, class OTHER>
+    static void check_order(typename CLS::dep_flag cls_dep, typename OTHER::dep_flag other_dep,
+                            const std::string& made, const std::string& deleted)
+    {
+        CLS::sDepFlag = cls_dep;
+        OTHER::sDepFlag = other_dep;
+        sLog.clear();
+
+        (void)CLS::instance();
+        ensure_equals(sLog, made);
+        LLSingletonBase::deleteAll();
+        ensure_equals(sLog, made + deleted);
     }
 
-    TESTS(A, B, 4, 5, 6, 7)
-    TESTS(B, A, 8, 9, 10, 11)
+    template<> template<>
+    void singleton_object_t::test<4>()
+    {
+        set_test_name("just A");
+        check_order<A, B>(A::DEP_NONE, B::DEP_NONE, "AiA", "xA~A");
+    }
+
+    template<> template<>
+    void singleton_object_t::test<5>()
+    {
+        set_test_name("A ctor depends B");
+        check_order<A, B>(A::DEP_CTOR, B::DEP_NONE, "ABiBiA", "xA~AxB~B");
+    }
+
+    template<> template<>
+    void singleton_object_t::test<6>()
+    {
+        set_test_name("A init depends B");
+        check_order<A, B>(A::DEP_INIT, B::DEP_NONE, "AiABiB", "xA~AxB~B");
+    }
+
+    template<> template<>
+    void singleton_object_t::test<7>()
+    {
+        set_test_name("A circular init");
+        check_order<A, B>(A::DEP_INIT, B::DEP_CTOR, "AiABiB", "xA~AxB~B");
+    }
+
+    template<> template<>
+    void singleton_object_t::test<8>()
+    {
+        set_test_name("just B");
+        check_order<B, A>(B::DEP_NONE, A::DEP_NONE, "BiB", "xB~B");
+    }
+
+    template<> template<>
+    void singleton_object_t::test<9>()
+    {
+        set_test_name("B ctor depends A");
+        check_order<B, A>(B::DEP_CTOR, A::DEP_NONE, "BAiAiB", "xB~BxA~A");
+    }
+
+    template<> template<>
+    void singleton_object_t::test<10>()
+    {
+        set_test_name("B init depends A");
+        check_order<B, A>(B::DEP_INIT, A::DEP_NONE, "BiBAiA", "xB~BxA~A");
+    }
+
+    template<> template<>
+    void singleton_object_t::test<11>()
+    {
+        set_test_name("B circular init");
+        check_order<B, A>(B::DEP_INIT, A::DEP_CTOR, "BiBAiA", "xB~BxA~A");
+    }
 
 #define PARAMSINGLETON(cls)                                             \
     class cls: public LLParamSingleton<cls>                             \
