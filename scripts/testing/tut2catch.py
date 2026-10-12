@@ -92,9 +92,13 @@ What it cannot decide it leaves unconverted, marked // TM-CHECK: <why> (or
 /* TM-CHECK: */ inside a macro), and it exits 1 listing every mark; 2 if a
 file could not be read at all, or the converter itself failed on one (its
 traceback is that file's error, and the other files go on). It never
-drops a test or an assertion: --mapping writes one entry per test, with the
-TUT-side assertion calls in its body and the Catch2 assertions now in it,
-which scripts/testing/tut_parity.py checks.
+drops a test or an assertion: --mapping writes, as {"tests": [...],
+"files": [...]}, one entry per test, with the TUT-side assertion calls in
+its body and the Catch2 assertions now in it, and one per file, with the
+sha256 of the TUT source it read and the TUT assertion calls outside every
+test's body, in code not under #if 0 (tut_outside_calls), with the Catch2
+assertions they became (catch2_outside_expected), all of which
+scripts/testing/tut_parity.py checks.
 
 Needs the build tree's compile_commands.json (CMake writes it; the presets
 turn it on) and the compiler it names, which must be clang: the AST comes
@@ -112,6 +116,7 @@ takes from seconds to a minute, so --jobs helps.
 import argparse
 import bisect
 import concurrent.futures
+import hashlib
 import json
 import os
 import re
@@ -2623,14 +2628,21 @@ class Converter:
         return self.render(0, len(self.src.data))
 
     def counts(self, converted):
-        """Per test: the TUT assertion calls in its body before, and the Catch2
-        assertions in it after."""
+        """Per test: the TUT assertion calls in its body before, the Catch2
+        assertions in it after, and the Catch2 assertions those calls became;
+        and for the file, the TUT assertion calls outside every test's body
+        (a helper's, a fixture's, a lambda's at namespace scope) and the
+        Catch2 assertions those became. Calls are counted as in the bodies:
+        in a branch this host compiles or not, never under #if 0 or in a
+        comment, so a recount of the converted file finds as many."""
         tut = {}
         expected = {}
+        inside = set()
         for test in self.tests:
             if test.body_start is None or test.body_end is None:
                 continue
             calls = [o for o in self.counted if test.body_start <= o < test.body_end]
+            inside.update(calls)
             tut[id(test)] = len(calls)
             # A split && chain is more than one assertion for one TUT call.
             expected[id(test)] = sum(self.emitted.get(o, 1) for o in calls)
@@ -2638,7 +2650,8 @@ class Converter:
         catch = {id(t): n for t, n in count_catch_assertions(data, [
             (t, getattr(t, "header_text", f"TEST_CASE_METHOD({t.fixture}, {t.catch2_literal},"))
             for t in self.tests if t.catch2_name and not t.macro])}
-        return tut, catch, expected
+        outside = [o for o in self.counted if o not in inside]
+        return tut, catch, expected, len(outside), sum(self.emitted.get(o, 1) for o in outside)
 
 
 def count_catch_assertions(data, cases):
@@ -3030,7 +3043,7 @@ def convert_file(path, build_dir, config, dry_run, output_dir=None, names=None):
     if conv.can_unwrap(converted):
         conv.plan_unwrap()
         converted = conv.finish()
-    tut_counts, catch_counts, expected_counts = conv.counts(converted)
+    tut_counts, catch_counts, expected_counts, tut_outside, catch_outside = conv.counts(converted)
     if output_dir:
         out = os.path.join(output_dir, os.path.relpath(path, ROOT))
         os.makedirs(os.path.dirname(out), exist_ok=True)
@@ -3056,7 +3069,10 @@ def convert_file(path, build_dir, config, dry_run, output_dir=None, names=None):
         })
     checks = [{"file": os.path.relpath(path, ROOT), "line": source.line_of(o), "why": w}
               for o, w in sorted(conv.checks)]
-    return {"file": os.path.relpath(path, ROOT), "tests": tests, "checks": checks, "notes": conv.notes,
+    totals = {"file": os.path.relpath(path, ROOT), "tut_sha256": hashlib.sha256(source.data).hexdigest(),
+              "tut_outside_calls": tut_outside, "catch2_outside_expected": catch_outside}
+    return {"file": os.path.relpath(path, ROOT), "tests": tests, "totals": totals, "checks": checks,
+            "notes": conv.notes,
             "groups": sorted(g.name for g in conv.groups.values())}
 
 
@@ -3110,6 +3126,7 @@ def main():
         results = [convert_one(w) for w in work]
 
     mapping = []
+    totals = []
     total_checks = 0
     errors = 0
     for r in results:
@@ -3122,6 +3139,7 @@ def main():
                 print(f"{r['file']}: {r['skipped']}")
             continue
         mapping.extend(r["tests"])
+        totals.append(r["totals"])
         total_checks += len(r["checks"])
         if not args.quiet:
             converted = sum(1 for t in r["tests"] if t["catch2_name"])
@@ -3133,7 +3151,7 @@ def main():
             print(f"{c['file']}:{c['line']}: TM-CHECK: {c['why']}")
     if args.mapping:
         with open(args.mapping, "w") as f:
-            json.dump(mapping, f, indent=1)
+            json.dump({"tests": mapping, "files": totals}, f, indent=1)
     print(f"{len(results)} file(s), {len(mapping)} test(s), {total_checks} TM-CHECK(s), {errors} error(s)")
     return 2 if errors else (1 if total_checks else 0)
 
