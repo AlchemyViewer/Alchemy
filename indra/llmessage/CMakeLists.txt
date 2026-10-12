@@ -182,6 +182,12 @@ if(AL_BUILD_TESTS)
     )
   endforeach()
 
+  # The state guard's checks on what llmessage keeps for the process, for
+  # every test binary that links it.
+  add_library(llmessage_test_checks OBJECT tests/llmessage_test_checks.cpp)
+  target_link_libraries(llmessage_test_checks PRIVATE al::flags al_test_support llmessage)
+  set_target_properties(llmessage_test_checks PROPERTIES FOLDER "Tests/llmessage")
+
   # io_test's pipes, which are not tests of their own.
   add_library(llmessage_test_pipes OBJECT tests/llpipeutil.cpp)
   target_link_libraries(llmessage_test_pipes PRIVATE al::flags llmessage)
@@ -210,6 +216,6 @@ if(AL_BUILD_TESTS)
       tests/llzerocode_test.cpp
       tests/message_test.cpp
     LIBRARIES llfilesystem llmath llcorehttp llmessage llcommon
-    SUPPORT llmessage_test_pipes
+    SUPPORT llmessage_test_checks llmessage_test_pipes
   )
 endif()

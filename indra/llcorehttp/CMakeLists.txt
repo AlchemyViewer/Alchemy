@@ -76,6 +76,12 @@ target_precompile_headers(llcorehttp REUSE_FROM llprecompiled)
 
 # tests
 if(AL_BUILD_TESTS)
+  # The state guard's checks on what llcorehttp keeps for the process, for
+  # every test binary that links it.
+  add_library(llcorehttp_test_checks OBJECT tests/llcorehttp_test_checks.cpp)
+  target_link_libraries(llcorehttp_test_checks PRIVATE al::flags al_test_support llcorehttp llmessage)
+  set_target_properties(llcorehttp_test_checks PROPERTIES FOLDER "Tests/llcorehttp")
+
   # The suites run under a Python peer that serves the requests they make.
   # An http_proxy in the environment would put a proxy between the two, so
   # the run clears it.
@@ -94,6 +100,7 @@ if(AL_BUILD_TESTS)
       tests/refcounted_test.cpp
       tests/websocketmgr_test.cpp
     LIBRARIES llcorehttp llmessage llcommon
+    SUPPORT llcorehttp_test_checks
     PYTHON
     LAUNCHER ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_llcorehttp_peer.py"
     ENVIRONMENT "http_proxy="
