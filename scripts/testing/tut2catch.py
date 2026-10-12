@@ -55,8 +55,12 @@ decided by the types clang resolved, not by its text:
                b), except where both values are LLSD (X_THAT with
                ll_test::LLSDEquals, the deep compare TUT's overload made)
                or LLURI (their asString()s, as TUT compared them);
-               ensure_not_equals -> X(a != b); ensure_distance and
-               ensure_approximately_equals_range -> WithinAbs;
+               ensure_not_equals -> X(a != b); ensure_distance ->
+               ll_test::WithinDistance<T>, which, as TUT's did, fails a
+               value on the border and works in T, the type TUT's
+               template took; ensure_approximately_equals_range ->
+               WithinAbs, the actual narrowed to F32 as TUT's parameter
+               narrowed it (a NaN, which TUT's let pass, fails it);
                ensure_approximately_equals -> ll_test::WithinBits, at the
                precision of the overload TUT chose; ensure_contains,
                _does_not_contain, _starts_with, _ends_with -> the string
@@ -706,9 +710,9 @@ def precedence(node):
 
 def headers_for(name, kind):
     """What a converted call needs included, beyond the test macros."""
-    if kind == "equals-llsd" or name in ("ensure_approximately_equals", "ensure_memory_matches"):
+    if kind == "equals-llsd" or name in ("ensure_approximately_equals", "ensure_memory_matches", "ensure_distance"):
         return {'"altestmatchers.h"'}
-    if name in ("ensure_distance", "ensure_approximately_equals_range"):
+    if name == "ensure_approximately_equals_range":
         return {"<catch2/matchers/catch_matchers_floating_point.hpp>"}
     if name in ("ensure_contains", "ensure_does_not_contain", "ensure_starts_with", "ensure_ends_with"):
         return {"<catch2/matchers/catch_matchers_string.hpp>"}
@@ -1284,7 +1288,23 @@ class Converter:
             return "equals"
         if name == "ensure_approximately_equals":
             return "bits-" + (self.parameter_float(record) or "?")
+        if name == "ensure_distance":
+            return "distance-" + (self.distance_type(record) or "?")
         return name
+
+    def distance_type(self, record):
+        """The type TUT's ensure_distance<T> worked in, as clang resolved it:
+        that of its last parameter, const T&."""
+        callee = record["callee"] or {}
+        qual = callee.get("referencedDecl", {}).get("type", {}).get("qualType", "")
+        m = re.match(r"^void \((.*)\)$", qual)
+        if not m:
+            return None
+        last = split_template_args(m.group(1))[-1]
+        t = re.sub(r"\s*&$", "", last.strip())
+        t = re.sub(r"^const\s+|\s+const$", "", t).replace("(anonymous namespace)::", "").strip()
+        # A comma would split the macro's arguments.
+        return t if t and "," not in t else None
 
     def parameter_float(self, record):
         callee = record["callee"] or {}
@@ -1679,6 +1699,9 @@ class Converter:
         if kind == "bits-?":
             self.check(start, "cannot tell which ensure_approximately_equals overload was called")
             return
+        if kind == "distance-?":
+            self.check(start, "cannot tell, or cannot write in a macro's argument, the type ensure_distance worked in")
+            return
         build = self.builder(name, kind, record, ranges, self.strength(record, value_args(name, args)))
         if build is not None:
             self.headers.update(headers_for(name, kind))
@@ -1803,7 +1826,15 @@ class Converter:
                 actual = self.operand(ranges, a, args[a], 1, guard=True)
                 expected = self.operand(ranges, a + 1, args[a + 1], 1)
                 margin = self.operand(ranges, a + 2, args[a + 2], 1)
-                return msg + [f"{req}_THAT({actual},{self.separator(ranges, a)}Catch::Matchers::WithinAbs("
+                if name == "ensure_distance":
+                    # TUT's: strictly inside, worked in its own type.
+                    matcher = f"ll_test::WithinDistance<{kind.split('-', 1)[1]}>("
+                else:
+                    # TUT's parameters were F32: the actual was narrowed.
+                    if value_type(skip_implicit_casts(args[a])) not in ("float", "F32"):
+                        actual = f"F32({actual})"
+                    matcher = "Catch::Matchers::WithinAbs("
+                return msg + [f"{req}_THAT({actual},{self.separator(ranges, a)}{matcher}"
                               f"{expected},{self.separator(ranges, a + 1)}{margin}))"]
             return build
         if name == "ensure_approximately_equals":
@@ -1862,7 +1893,7 @@ class Converter:
             self.check(offset, f"{name}() in a macro whose uses differ, or are not statements in a block")
             return
         kind = kinds.pop()
-        if kind in ("dependent", "bits-?") or name in TUT_MEMBERS or name == "ensure_errno":
+        if kind in ("dependent", "bits-?", "distance-?") or name in TUT_MEMBERS or name == "ensure_errno":
             self.check(offset, f"{name}() in a macro, as {kind}")
             return
         parts = self.text_call(offset)
@@ -2888,12 +2919,17 @@ def text_statements(name, texts, macro, kind=None):
                    "ensure_starts_with": "Catch::Matchers::StartsWith",
                    "ensure_ends_with": "Catch::Matchers::EndsWith"}[name]
         return message(texts[0]) + [f"REQUIRE_THAT({operand(texts[1])}, {matcher}({texts[2]}))"]
-    if name in ("ensure_distance", "ensure_approximately_equals_range"):
+    if name == "ensure_distance" and kind.startswith("distance-"):
         if n not in (3, 4):
             return None
         msg = message(texts[0]) if n == 4 else []
         a, e, d = texts[-3:]
-        return msg + [f"REQUIRE_THAT({operand(a)}, Catch::Matchers::WithinAbs({e}, {d}))"]
+        return msg + [f"REQUIRE_THAT({operand(a)}, ll_test::WithinDistance<{kind[9:]}>({e}, {d}))"]
+    if name == "ensure_approximately_equals_range":
+        if n != 4:
+            return None
+        a, e, d = texts[-3:]
+        return message(texts[0]) + [f"REQUIRE_THAT(F32({a}), Catch::Matchers::WithinAbs({e}, {d}))"]
     if name == "ensure_approximately_equals" and kind in ("bits-F32", "bits-F64"):
         if n not in (3, 4):
             return None
