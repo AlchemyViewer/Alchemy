@@ -12,7 +12,8 @@ endif()
 # al_add_test_binary(<name> PROJECT <project> SOURCES <test file>... [UNIT <file>...]
 #                    [LIBRARIES <target>...] [SUPPORT <object library>...]
 #                    [INCLUDES <dir>...] [DEFINES <define>...] [ENVIRONMENT <VAR=value>...]
-#                    [GL] [PYTHON] [ISA_TIER <tier>] [RESOURCE_LOCK <name>...] [COMBINED])
+#                    [GL] [PYTHON] [ISA_TIER <tier>] [RESOURCE_LOCK <name>...] [LAUNCHER <command>...]
+#                    [COMBINED])
 #
 # Builds the test files into one Catch2 executable, <name>, with the harness
 # (al_test_support: the main, the listeners and the matchers) and SUPPORT's
@@ -56,14 +57,17 @@ endif()
 # ISA_TIER binary is built at that x86-64 tier, named <name>_<tier>, labelled
 # isa, and skips on a host below it -- or below the tree's own tier, since it
 # links the tree's libraries, built at that one. RESOURCE_LOCK names what the binary's
-# entries hold that no two may hold at once, such as a fixed port.
+# entries hold that no two may hold at once, such as a fixed port. LAUNCHER is
+# a command each entry runs the binary through, its path and arguments after
+# the command's own: llcorehttp's tests run under the Python peer that serves
+# their requests. A per-case entry, and its discovery, go through it too.
 function(al_add_test_binary name)
   cmake_parse_arguments(
     PARSE_ARGV 1
     arg
     "GL;PYTHON;COMBINED"
     "PROJECT;ISA_TIER"
-    "SOURCES;UNIT;LIBRARIES;SUPPORT;INCLUDES;DEFINES;ENVIRONMENT;RESOURCE_LOCK"
+    "SOURCES;UNIT;LIBRARIES;SUPPORT;INCLUDES;DEFINES;ENVIRONMENT;RESOURCE_LOCK;LAUNCHER"
   )
   if(NOT arg_PROJECT)
     message(FATAL_ERROR "al_add_test_binary(${name}): PROJECT is required")
@@ -119,6 +123,9 @@ function(al_add_test_binary name)
   add_executable(${target} ${arg_SOURCES} ${arg_UNIT})
   target_link_libraries(${target} PRIVATE al::flags al_test_support ${arg_SUPPORT} ${arg_LIBRARIES})
   target_include_directories(${target} PRIVATE ${arg_INCLUDES} ${INDRA_SOURCE_DIR}/test)
+  # For the helpers in test/ that TUT tests still share, so each fails a
+  # test the way its framework does.
+  target_compile_definitions(${target} PRIVATE AL_TEST_CATCH2=1)
   if(arg_UNIT)
     target_include_directories(
       ${target}
@@ -190,6 +197,11 @@ function(al_add_test_binary name)
       DISABLED
       ${disabled}
     )
+    # Catch.cmake runs the discovery and each case through the target's
+    # emulator, which CMake's own add_test leaves alone in a native build.
+    if(arg_LAUNCHER)
+      set_target_properties(${target} PROPERTIES CROSSCOMPILING_EMULATOR "${arg_LAUNCHER}")
+    endif()
     # The main makes Catch2's "all skipped" CTest's 125, so a skip is not
     # left to the discovery's own code for it.
     catch_discover_tests(
@@ -235,7 +247,7 @@ function(al_add_test_binary name)
     foreach(stem IN LISTS stems)
       add_test(
         NAME ${target}/${stem}
-        COMMAND $<TARGET_FILE:${target}> --filenames-as-tags "[#${stem}]~[.]" ${arguments}
+        COMMAND ${arg_LAUNCHER} $<TARGET_FILE:${target}> --filenames-as-tags "[#${stem}]~[.]" ${arguments}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
       )
       set_tests_properties(
@@ -287,7 +299,7 @@ function(al_add_test_binary name)
       endif()
       add_test(
         NAME ${target}/combined
-        COMMAND $<TARGET_FILE:${target}> ${arguments}
+        COMMAND ${arg_LAUNCHER} $<TARGET_FILE:${target}> ${arguments}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
       )
       set_tests_properties(

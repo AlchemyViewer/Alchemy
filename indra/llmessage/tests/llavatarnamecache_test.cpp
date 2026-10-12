@@ -29,77 +29,78 @@
 
 #include "../llavatarnamecache.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
-{
 namespace
 {
-    struct avatarnamecache_data
-    {
-    };
-    typedef test_group<avatarnamecache_data> avatarnamecache_test;
-    typedef avatarnamecache_test::object avatarnamecache_object;
-    tut::avatarnamecache_test avatarnamecache_testcase("LLAvatarNameCache");
-}
-
-    template<> template<>
-    void avatarnamecache_object::test<1>()
+    TEST_CASE("LLAvatarNameCache: max_age_from_cache_control parses a well-formed max-age", "[LLAvatarNameCache]")
     {
         bool valid = false;
         S32 max_age = 0;
 
         valid = max_age_from_cache_control("max-age=3600", &max_age);
-        ensure("typical input valid", valid);
-        ensure_equals("typical input parsed", max_age, 3600);
+        UNSCOPED_INFO("typical input valid");
+        CHECK(valid);
+        CHECK(max_age == 3600);
 
         valid = max_age_from_cache_control(
             " max-age=600 , no-cache,private=\"stuff\" ", &max_age);
-        ensure("complex input valid", valid);
-        ensure_equals("complex input parsed", max_age, 600);
+        UNSCOPED_INFO("complex input valid");
+        CHECK(valid);
+        CHECK(max_age == 600);
 
         valid = max_age_from_cache_control(
             "no-cache, max-age = 123 ", &max_age);
-        ensure("complex input 2 valid", valid);
-        ensure_equals("complex input 2 parsed", max_age, 123);
+        UNSCOPED_INFO("complex input 2 valid");
+        CHECK(valid);
+        CHECK(max_age == 123);
     }
 
-    template<> template<>
-    void avatarnamecache_object::test<2>()
+    TEST_CASE("LLAvatarNameCache: max_age_from_cache_control rejects malformed input but accepts zero", "[LLAvatarNameCache]")
     {
         bool valid = false;
         S32 max_age = -1;
 
         valid = max_age_from_cache_control("", &max_age);
-        ensure("empty input returns invalid", !valid);
-        ensure_equals("empty input doesn't change val", max_age, -1);
+        UNSCOPED_INFO("empty input returns invalid");
+        CHECK_FALSE(valid);
+        UNSCOPED_INFO("empty input doesn't change val");
+        CHECK(max_age == -1);
 
         valid = max_age_from_cache_control("no-cache", &max_age);
-        ensure("no max-age field returns invalid", !valid);
+        UNSCOPED_INFO("no max-age field returns invalid");
+        CHECK_FALSE(valid);
 
         valid = max_age_from_cache_control("max", &max_age);
-        ensure("just 'max' returns invalid", !valid);
+        UNSCOPED_INFO("just 'max' returns invalid");
+        CHECK_FALSE(valid);
 
         valid = max_age_from_cache_control("max-age", &max_age);
-        ensure("partial max-age is invalid", !valid);
+        UNSCOPED_INFO("partial max-age is invalid");
+        CHECK_FALSE(valid);
 
         valid = max_age_from_cache_control("max-age=", &max_age);
-        ensure("longer partial max-age is invalid", !valid);
+        UNSCOPED_INFO("longer partial max-age is invalid");
+        CHECK_FALSE(valid);
 
         valid = max_age_from_cache_control("max-age=FOO", &max_age);
-        ensure("invalid integer max-age is invalid", !valid);
+        UNSCOPED_INFO("invalid integer max-age is invalid");
+        CHECK_FALSE(valid);
 
         valid = max_age_from_cache_control("max-age 234", &max_age);
-        ensure("space separated max-age is invalid", !valid);
+        UNSCOPED_INFO("space separated max-age is invalid");
+        CHECK_FALSE(valid);
 
         valid = max_age_from_cache_control("max-age=0", &max_age);
-        ensure("zero max-age is valid", valid);
+        UNSCOPED_INFO("zero max-age is valid");
+        CHECK(valid);
 
         // *TODO: Handle "0000" as zero
         //valid = max_age_from_cache_control("max-age=0000", &max_age);
         //ensure("multi-zero max-age is valid", valid);
 
         valid = max_age_from_cache_control("max-age=-123", &max_age);
-        ensure("less than zero max-age is invalid", !valid);
+        UNSCOPED_INFO("less than zero max-age is invalid");
+        CHECK_FALSE(valid);
     }
 }

@@ -28,7 +28,10 @@
 
 #include "linden_common.h"
 
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <memory>
+#include <string_view>
+#include "altestmatchers.h"
 
 #include "lldatapacker.h"
 #include "v4color.h"
@@ -40,21 +43,10 @@
 #include "../test/namedtempfile.h"
 
 
-namespace tut
-{
 namespace
 {
-    struct datapacker_test
-    {
-    };
-    typedef test_group<datapacker_test> datapacker_test_t;
-    typedef datapacker_test_t::object datapacker_test_object_t;
-    tut::datapacker_test_t tut_datapacker_test("datapacker_test");
-}
-
     //*********LLDataPackerBinaryBuffer
-    template<> template<>
-    void datapacker_test_object_t::test<1>()
+    TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer packFixed round-trips at three widths", "[datapacker_test]")
     {
         U8 packbuf[128];
         F32 f_val1 = 44.44f, f_unpkval1;
@@ -69,19 +61,22 @@ namespace
         lldp1.unpackFixed(f_unpkval1, "linden_lab", false, 8, 8);
         lldp1.unpackFixed(f_unpkval2, "linden_lab", false, 14, 16);
         lldp1.unpackFixed(f_unpkval3, "linden_lab", false, 8, 23);
-        ensure_approximately_equals("LLDataPackerBinaryBuffer::packFixed 8 failed", f_val1, f_unpkval1, 8);
-        ensure_approximately_equals("LLDataPackerBinaryBuffer::packFixed 16 failed", f_val2, f_unpkval2, 16);
-        ensure_approximately_equals("LLDataPackerBinaryBuffer::packFixed 23 failed", f_val3, f_unpkval3, 31);
+        UNSCOPED_INFO("8 fraction bits");
+        CHECK_THAT(f_val1, ll_test::WithinBits(f_unpkval1, 8));
+        UNSCOPED_INFO("16 fraction bits");
+        CHECK_THAT(f_val2, ll_test::WithinBits(f_unpkval2, 16));
+        UNSCOPED_INFO("23 fraction bits");
+        CHECK_THAT(f_val3, ll_test::WithinBits(f_unpkval3, 23));
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<2>()
+    TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer round-trips every packed type", "[datapacker_test]")
     {
         U8 packbuf[1024];
 
         char str[] = "SecondLife is virtual World\0";
         char strBinary[] = "SecondLife is virtual World";
         char strBinaryFixed[] = "Fixed Data";
+        S32 sizeBinary = sizeof(strBinary);
         S32 sizeBinaryFixed = sizeof(strBinaryFixed);
         U8 valU8 = 'C';
         U16 valU16 = 0xFFFF;
@@ -96,9 +91,11 @@ namespace
         LLUUID uuid;
 
         std::string unpkstr;
-        char unpkstrBinary[256];
-        char unpkstrBinaryFixed[256];
-        S32 unpksizeBinary;
+        // Zeroed, so a short or failed unpack reads as a short string
+        // rather than as whatever the stack held.
+        char unpkstrBinary[256] = {};
+        char unpkstrBinaryFixed[256] = {};
+        S32 unpksizeBinary = 0;
         U8 unpkvalU8;
         U16 unpkvalU16;
         U32 unpkvalU32;
@@ -113,7 +110,7 @@ namespace
 
         LLDataPackerBinaryBuffer lldp(packbuf,1024);
         lldp.packString(str , "linden_lab_str");
-        lldp.packBinaryData((U8*)strBinary, sizeof(strBinary), "linden_lab_bd");
+        lldp.packBinaryData((U8*)strBinary, sizeBinary, "linden_lab_bd");
         lldp.packBinaryDataFixed((U8*)strBinaryFixed, sizeBinaryFixed, "linden_lab_bdf");
         lldp.packU8(valU8,"linden_lab_u8");
         lldp.packU16(valU16,"linden_lab_u16");
@@ -146,24 +143,24 @@ namespace
         lldp1.unpackVector4(unpkllvec4, "linden_lab_vec4");
         lldp1.unpackUUID(unpkuuid, "linden_lab_uuid");
 
-        ensure("LLDataPackerBinaryBuffer::packString failed", strcmp(str, unpkstr.c_str())  == 0);
-        ensure("LLDataPackerBinaryBuffer::packBinaryData failed", strcmp(strBinary, unpkstrBinary)  == 0);
-        ensure("LLDataPackerBinaryBuffer::packBinaryDataFixed failed", strcmp(strBinaryFixed, unpkstrBinaryFixed) == 0);
-        ensure_equals("LLDataPackerBinaryBuffer::packU8 failed", valU8, unpkvalU8);
-        ensure_equals("LLDataPackerBinaryBuffer::packU16 failed", valU16, unpkvalU16);
-        ensure_equals("LLDataPackerBinaryBuffer::packU32 failed", valU32, unpkvalU32);
-        ensure_equals("LLDataPackerBinaryBuffer::packS32 failed", valS32, unpkvalS32);
-        ensure("LLDataPackerBinaryBuffer::packF32 failed", is_approx_equal(valF32, unpkvalF32));
-        ensure_equals("LLDataPackerBinaryBuffer::packColor4 failed", llcol4, unpkllcol4);
-        ensure_equals("LLDataPackerBinaryBuffer::packColor4U failed", llcol4u, unpkllcol4u);
-        ensure_equals("LLDataPackerBinaryBuffer::packVector2 failed", llvec2, unpkllvec2);
-        ensure_equals("LLDataPackerBinaryBuffer::packVector3 failed", llvec3, unpkllvec3);
-        ensure_equals("LLDataPackerBinaryBuffer::packVector4 failed", llvec4, unpkllvec4);
-        ensure_equals("LLDataPackerBinaryBuffer::packUUID failed", uuid, unpkuuid);
+        CHECK(std::string_view(str) == std::string_view(unpkstr.c_str()));
+        CHECK(unpksizeBinary == sizeBinary);
+        CHECK(std::string_view(strBinary) == std::string_view(unpkstrBinary));
+        CHECK(std::string_view(strBinaryFixed) == std::string_view(unpkstrBinaryFixed));
+        CHECK(valU8 == unpkvalU8);
+        CHECK(valU16 == unpkvalU16);
+        CHECK(valU32 == unpkvalU32);
+        CHECK(valS32 == unpkvalS32);
+        CHECK(is_approx_equal(valF32, unpkvalF32));
+        CHECK(llcol4 == unpkllcol4);
+        CHECK(llcol4u == unpkllcol4u);
+        CHECK(llvec2 == unpkllvec2);
+        CHECK(llvec3 == unpkllvec3);
+        CHECK(llvec4 == unpkllvec4);
+        CHECK(uuid == unpkuuid);
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<3>()
+    TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer sizes after packString and reset", "[datapacker_test]")
     {
         U8 packbuf[128];
         char str[] = "SecondLife is virtual World";
@@ -171,57 +168,64 @@ namespace
         LLDataPackerBinaryBuffer lldp(packbuf, 128);
         lldp.packString(str , "linden_lab");
 
-        ensure("LLDataPackerBinaryBuffer: current size is wrong", strSize == lldp.getCurrentSize());
-        ensure("LLDataPackerBinaryBuffer: buffer size is wrong", 128 == lldp.getBufferSize());
+        CHECK(strSize == lldp.getCurrentSize());
+        CHECK(lldp.getBufferSize() == 128);
 
         lldp.reset();
-        ensure("LLDataPackerBinaryBuffer::reset failed",0 == lldp.getCurrentSize());
+        CHECK(lldp.getCurrentSize() == 0);
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<4>()
+    TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer freeBuffer leaves a zero buffer size", "[datapacker_test]")
     {
+        // freeBuffer deletes it, so it comes from new[] and is the packer's.
         U8* packbuf = new U8[128];
         char str[] = "SecondLife is virtual World";
         LLDataPackerBinaryBuffer lldp(packbuf, 128);
         lldp.packString(str , "linden_lab");
         lldp.freeBuffer();
-        ensure("LLDataPackerBinaryBuffer.freeBuffer failed" , 0 == lldp.getBufferSize());
+        CHECK(lldp.getBufferSize() == 0);
 
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<5>()
+    TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer assignBuffer takes the new size and rewinds", "[datapacker_test]")
     {
-        U8* buf = new U8[]("SecondLife is virtual World");
-        S32 size = sizeof(buf);
-        LLDataPackerBinaryBuffer lldp(buf, size);
-        U8* new_buf = new U8[]("Its Amazing");
-        size = sizeof(new_buf)-1;
-        lldp.assignBuffer(new_buf, size);
-        ensure("LLDataPackerBinaryBuffer::assignBuffer failed" , ((lldp.getBufferSize() == size) && (0 == lldp.getCurrentSize()))) ;
+        const char first[] = "SecondLife is virtual World";
+        const S32 first_size = sizeof(first);
+        const S32 second_size = sizeof("Its Amazing");
+
+        // assignBuffer deletes the buffer it replaces, so the first comes
+        // from new[] and is the packer's. Nothing deletes the second.
+        LLDataPackerBinaryBuffer lldp(new U8[first_size], first_size);
+        lldp.packString(first, "linden_lab");
+        // Moved on, so that the rewind below has something to undo.
+        CHECK(lldp.getCurrentSize() == first_size);
+
+        std::unique_ptr<U8[]> new_buf = std::make_unique<U8[]>(second_size);
+        lldp.assignBuffer(new_buf.get(), second_size);
+        CHECK(lldp.getBufferSize() == second_size);
+        CHECK(lldp.getCurrentSize() == 0);
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<6>()
+    TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer operator= copies the packed buffer", "[datapacker_test]")
     {
         U8 packbuf[128];
         char str[] = "SecondLife is virtual World";
         LLDataPackerBinaryBuffer lldp(packbuf, 128);
         lldp.packString(str , "linden_lab");
-        U8 new_buffer[128];
+        // Zeroed, so that a copy that did not happen reads as an empty
+        // string rather than as whatever the stack held.
+        U8 new_buffer[128] = {};
         std::string unpkbuf;
         LLDataPackerBinaryBuffer lldp1(new_buffer,128);
         lldp1 = lldp;
         lldp1.unpackString(unpkbuf, "linden_lab");
-        ensure("1. LLDataPackerBinaryBuffer::operator= failed" , lldp1.getBufferSize() == lldp.getBufferSize());
-        ensure_equals("2.LLDataPackerBinaryBuffer::operator= failed", str,unpkbuf);
+        CHECK(lldp1.getBufferSize() == lldp.getBufferSize());
+        CHECK(str == unpkbuf);
     }
 
     //*********LLDataPackerAsciiBuffer
 
-    template<> template<>
-    void datapacker_test_object_t::test<7>()
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer packFixed round-trips", "[datapacker_test]")
     {
         char packbuf[128];
         F32 f_val = 44.44f, f_unpkval;
@@ -230,17 +234,17 @@ namespace
 
         LLDataPackerAsciiBuffer lldp1(packbuf, lldp.getCurrentSize());
         lldp1.unpackFixed(f_unpkval, "linden_lab", false, 8, 8);
-        ensure_approximately_equals("LLDataPackerAsciiBuffer::packFixed failed", f_val, f_unpkval, 8);
+        CHECK_THAT(f_val, ll_test::WithinBits(f_unpkval, 8));
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<8>()
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer round-trips every packed type", "[datapacker_test]")
     {
         char packbuf[1024];
 
         char str[] = "SecondLife is virtual World\0";
         char strBinary[] = "SecondLife is virtual World";
         char strBinaryFixed[] = "Fixed Data";
+        S32 sizeBinary = sizeof(strBinary);
         S32 sizeBinaryFixed = sizeof(strBinaryFixed);
         U8 valU8 = 'C';
         U16 valU16 = 0xFFFF;
@@ -255,9 +259,11 @@ namespace
         LLUUID uuid;
 
         std::string unpkstr;
-        char unpkstrBinary[256];
-        char unpkstrBinaryFixed[256];
-        S32 unpksizeBinary;
+        // Zeroed, so a short or failed unpack reads as a short string
+        // rather than as whatever the stack held.
+        char unpkstrBinary[256] = {};
+        char unpkstrBinaryFixed[256] = {};
+        S32 unpksizeBinary = 0;
         U8 unpkvalU8;
         U16 unpkvalU16;
         U32 unpkvalU32;
@@ -272,7 +278,7 @@ namespace
 
         LLDataPackerAsciiBuffer lldp(packbuf,1024);
         lldp.packString(str , "linden_lab_str");
-        lldp.packBinaryData((U8*)strBinary, sizeof(strBinary), "linden_lab_bd");
+        lldp.packBinaryData((U8*)strBinary, sizeBinary, "linden_lab_bd");
         lldp.packBinaryDataFixed((U8*)strBinaryFixed, sizeBinaryFixed, "linden_lab_bdf");
         lldp.packU8(valU8,"linden_lab_u8");
         lldp.packU16(valU16,"linden_lab_u16");
@@ -305,49 +311,55 @@ namespace
         lldp1.unpackVector4(unpkllvec4, "linden_lab_vec4");
         lldp1.unpackUUID(unpkuuid, "linden_lab_uuid");
 
-        ensure("LLDataPackerAsciiBuffer::packString failed", strcmp(str, unpkstr.c_str())  == 0);
-        ensure("LLDataPackerAsciiBuffer::packBinaryData failed", strcmp(strBinary, unpkstrBinary)  == 0);
-        ensure("LLDataPackerAsciiBuffer::packBinaryDataFixed failed", strcmp(strBinaryFixed, unpkstrBinaryFixed) == 0);
-        ensure_equals("LLDataPackerAsciiBuffer::packU8 failed", valU8, unpkvalU8);
-        ensure_equals("LLDataPackerAsciiBuffer::packU16 failed", valU16, unpkvalU16);
-        ensure_equals("LLDataPackerAsciiBuffer::packU32 failed", valU32, unpkvalU32);
-        ensure_equals("LLDataPackerAsciiBuffer::packS32 failed", valS32, unpkvalS32);
-        ensure("LLDataPackerAsciiBuffer::packF32 failed", is_approx_equal(valF32, unpkvalF32));
-        ensure_equals("LLDataPackerAsciiBuffer::packColor4 failed", llcol4, unpkllcol4);
-        ensure_equals("LLDataPackerAsciiBuffer::packColor4U failed", llcol4u, unpkllcol4u);
-        ensure_equals("LLDataPackerAsciiBuffer::packVector2 failed", llvec2, unpkllvec2);
-        ensure_equals("LLDataPackerAsciiBuffer::packVector3 failed", llvec3, unpkllvec3);
-        ensure_equals("LLDataPackerAsciiBuffer::packVector4 failed", llvec4, unpkllvec4);
-        ensure_equals("LLDataPackerAsciiBuffer::packUUID failed", uuid, unpkuuid);
+        CHECK(std::string_view(str) == std::string_view(unpkstr.c_str()));
+        CHECK(unpksizeBinary == sizeBinary);
+        CHECK(std::string_view(strBinary) == std::string_view(unpkstrBinary));
+        CHECK(std::string_view(strBinaryFixed) == std::string_view(unpkstrBinaryFixed));
+        CHECK(valU8 == unpkvalU8);
+        CHECK(valU16 == unpkvalU16);
+        CHECK(valU32 == unpkvalU32);
+        CHECK(valS32 == unpkvalS32);
+        CHECK(is_approx_equal(valF32, unpkvalF32));
+        CHECK(llcol4 == unpkllcol4);
+        CHECK(llcol4u == unpkllcol4u);
+        CHECK(llvec2 == unpkllvec2);
+        CHECK(llvec3 == unpkllvec3);
+        CHECK(llvec4 == unpkllvec4);
+        CHECK(uuid == unpkuuid);
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<9>()
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer freeBuffer leaves a zero buffer size", "[datapacker_test]")
     {
+        // freeBuffer deletes it, so it comes from new[] and is the packer's.
         char* packbuf = new char[128];
         char str[] = "SecondLife is virtual World";
         LLDataPackerAsciiBuffer lldp(packbuf, 128);
         lldp.packString(str , "linden_lab");
         lldp.freeBuffer();
-        ensure("LLDataPackerAsciiBuffer::freeBuffer failed" , 0 == lldp.getBufferSize());
+        CHECK(lldp.getBufferSize() == 0);
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<10>()
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer assignBuffer takes the new size and rewinds", "[datapacker_test]")
     {
         char buf[] = "SecondLife is virtual World";
         S32 size = sizeof(buf);
         LLDataPackerAsciiBuffer lldp(buf, size);
+        lldp.packS32(42, "linden_lab");
+        // Moved on, so that the rewind below has something to undo: "42\n",
+        // and the terminator an ascii buffer counts in its size.
+        CHECK(lldp.getCurrentSize() == 4);
+
         char new_buf[] = "Its Amazing";
         size = sizeof(new_buf);
         lldp.assignBuffer(new_buf, size);
-        ensure("LLDataPackerAsciiBuffer::assignBuffer failed" , ((lldp.getBufferSize() == size) && (1 == lldp.getCurrentSize()))) ;
+        CHECK(lldp.getBufferSize() == size);
+        // Nothing but the terminator.
+        CHECK(lldp.getCurrentSize() == 1);
     }
 
     //*********LLDataPackerAsciiFile
 
-    template<> template<>
-    void datapacker_test_object_t::test<11>()
+    TEST_CASE("datapacker_test: LLDataPackerAsciiFile packFixed round-trips through a file", "[datapacker_test]")
     {
         F32 f_val = 44.44f, f_unpkval;
 
@@ -371,15 +383,15 @@ namespace
         lldp1.unpackFixed(f_unpkval, "linden_lab", false, 8, 8);
         fclose(fp);
 
-        ensure_approximately_equals("LLDataPackerAsciiFile::packFixed failed", f_val, f_unpkval, 8);
+        CHECK_THAT(f_val, ll_test::WithinBits(f_unpkval, 8));
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<12>()
+    TEST_CASE("datapacker_test: LLDataPackerAsciiFile round-trips every packed type through a file", "[datapacker_test]")
     {
         char str[] = "SecondLife is virtual World\0";
         char strBinary[] = "SecondLife is virtual World";
         char strBinaryFixed[] = "Fixed Data";
+        S32 sizeBinary = sizeof(strBinary);
         S32 sizeBinaryFixed = sizeof(strBinaryFixed);
         U8 valU8 = 'C';
         U16 valU16 = 0xFFFF;
@@ -394,9 +406,11 @@ namespace
         LLUUID uuid;
 
         std::string unpkstr;
-        char unpkstrBinary[256];
-        char unpkstrBinaryFixed[256];
-        S32 unpksizeBinary;
+        // Zeroed, so a short or failed unpack reads as a short string
+        // rather than as whatever the stack held.
+        char unpkstrBinary[256] = {};
+        char unpkstrBinaryFixed[256] = {};
+        S32 unpksizeBinary = 0;
         U8 unpkvalU8;
         U16 unpkvalU16;
         U32 unpkvalU32;
@@ -422,7 +436,7 @@ namespace
         LLDataPackerAsciiFile lldp(fp,2);
 
         lldp.packString(str , "linden_lab_str");
-        lldp.packBinaryData((U8*)strBinary, sizeof(strBinary), "linden_lab_bd");
+        lldp.packBinaryData((U8*)strBinary, sizeBinary, "linden_lab_bd");
         lldp.packBinaryDataFixed((U8*)strBinaryFixed, sizeBinaryFixed, "linden_lab_bdf");
         lldp.packU8(valU8,"linden_lab_u8");
         lldp.packU16(valU16,"linden_lab_u16");
@@ -458,24 +472,24 @@ namespace
 
         fclose(fp);
 
-        ensure("LLDataPackerAsciiFile::packString failed", strcmp(str, unpkstr.c_str())  == 0);
-        ensure("LLDataPackerAsciiFile::packBinaryData failed", strcmp(strBinary, unpkstrBinary)  == 0);
-        ensure("LLDataPackerAsciiFile::packBinaryDataFixed failed", strcmp(strBinaryFixed, unpkstrBinaryFixed) == 0);
-        ensure_equals("LLDataPackerAsciiFile::packU8 failed", valU8, unpkvalU8);
-        ensure_equals("LLDataPackerAsciiFile::packU16 failed", valU16, unpkvalU16);
-        ensure_equals("LLDataPackerAsciiFile::packU32 failed", valU32, unpkvalU32);
-        ensure_equals("LLDataPackerAsciiFile::packS32 failed", valS32, unpkvalS32);
-        ensure("LLDataPackerAsciiFile::packF32 failed", is_approx_equal(valF32, unpkvalF32));
-        ensure_equals("LLDataPackerAsciiFile::packColor4 failed", llcol4, unpkllcol4);
-        ensure_equals("LLDataPackerAsciiFile::packColor4U failed", llcol4u, unpkllcol4u);
-        ensure_equals("LLDataPackerAsciiFile::packVector2 failed", llvec2, unpkllvec2);
-        ensure_equals("LLDataPackerAsciiFile::packVector3 failed", llvec3, unpkllvec3);
-        ensure_equals("LLDataPackerAsciiFile::packVector4 failed", llvec4, unpkllvec4);
-        ensure_equals("LLDataPackerAsciiFile::packUUID failed", uuid, unpkuuid);
+        CHECK(std::string_view(str) == std::string_view(unpkstr.c_str()));
+        CHECK(unpksizeBinary == sizeBinary);
+        CHECK(std::string_view(strBinary) == std::string_view(unpkstrBinary));
+        CHECK(std::string_view(strBinaryFixed) == std::string_view(unpkstrBinaryFixed));
+        CHECK(valU8 == unpkvalU8);
+        CHECK(valU16 == unpkvalU16);
+        CHECK(valU32 == unpkvalU32);
+        CHECK(valS32 == unpkvalS32);
+        CHECK(is_approx_equal(valF32, unpkvalF32));
+        CHECK(llcol4 == unpkllcol4);
+        CHECK(llcol4u == unpkllcol4u);
+        CHECK(llvec2 == unpkllvec2);
+        CHECK(llvec3 == unpkllvec3);
+        CHECK(llvec4 == unpkllvec4);
+        CHECK(uuid == unpkuuid);
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<13>()
+    TEST_CASE("datapacker_test: LLDataPackerAsciiFile packFixed round-trips through string streams", "[datapacker_test]")
     {
         F32 f_val = 44.44f, f_unpkval;
 
@@ -488,15 +502,15 @@ namespace
 
         lldp1.unpackFixed(f_unpkval, "linden_lab", false, 8, 8);
 
-        ensure_approximately_equals("LLDataPackerAsciiFile::packFixed (iostring) failed", f_unpkval, f_val, 8);
+        CHECK_THAT(f_unpkval, ll_test::WithinBits(f_val, 8));
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<14>()
+    TEST_CASE("datapacker_test: LLDataPackerAsciiFile round-trips every type through string streams", "[datapacker_test]")
     {
         const char str[] = "SecondLife is virtual World";
         const char strBinary[] = "SecondLife is virtual World";
         const char strBinaryFixed[] = "Fixed Data";
+        S32 sizeBinary = sizeof(strBinary);
         S32 sizeBinaryFixed = sizeof(strBinaryFixed);
         U8 valU8 = 'C';
         U16 valU16 = 0xFFFF;
@@ -511,9 +525,11 @@ namespace
         LLUUID uuid;
 
         std::string unpkstr;
-        char unpkstrBinary[256];
-        char unpkstrBinaryFixed[256];
-        S32 unpksizeBinary;
+        // Zeroed, so a short or failed unpack reads as a short string
+        // rather than as whatever the stack held.
+        char unpkstrBinary[256] = {};
+        char unpkstrBinaryFixed[256] = {};
+        S32 unpksizeBinary = 0;
         U8 unpkvalU8;
         U16 unpkvalU16;
         U32 unpkvalU32;
@@ -530,7 +546,7 @@ namespace
         LLDataPackerAsciiFile lldp(ostr,2);
 
         lldp.packString(str , "linden_lab_str");
-        lldp.packBinaryData((U8*)strBinary, sizeof(strBinary), "linden_lab_bd");
+        lldp.packBinaryData((U8*)strBinary, sizeBinary, "linden_lab_bd");
         lldp.packBinaryDataFixed((U8*)strBinaryFixed, sizeBinaryFixed, "linden_lab_bdf");
         lldp.packU8(valU8,"linden_lab_u8");
         lldp.packU16(valU16,"linden_lab_u16");
@@ -563,24 +579,24 @@ namespace
         lldp1.unpackVector4(unpkllvec4, "linden_lab_vec4");
         lldp1.unpackUUID(unpkuuid, "linden_lab_uuid");
 
-        ensure("LLDataPackerAsciiFile::packString (iostring) failed", strcmp(str, unpkstr.c_str())  == 0);
-        ensure("LLDataPackerAsciiFile::packBinaryData (iostring) failed", strcmp(strBinary, unpkstrBinary)  == 0);
-        ensure("LLDataPackerAsciiFile::packBinaryDataFixed (iostring) failed", strcmp(strBinaryFixed, unpkstrBinaryFixed) == 0);
-        ensure_equals("LLDataPackerAsciiFile::packU8 (iostring) failed", valU8, unpkvalU8);
-        ensure_equals("LLDataPackerAsciiFile::packU16 (iostring) failed", valU16, unpkvalU16);
-        ensure_equals("LLDataPackerAsciiFile::packU32 (iostring) failed", valU32, unpkvalU32);
-        ensure_equals("LLDataPackerAsciiFile::packS32 (iostring) failed", valS32, unpkvalS32);
-        ensure("LLDataPackerAsciiFile::packF32 (iostring) failed", is_approx_equal(valF32, unpkvalF32));
-        ensure_equals("LLDataPackerAsciiFile::packColor4 (iostring) failed", llcol4, unpkllcol4);
-        ensure_equals("LLDataPackerAsciiFile::packColor4U (iostring) failed", llcol4u, unpkllcol4u);
-        ensure_equals("LLDataPackerAsciiFile::packVector2 (iostring) failed", llvec2, unpkllvec2);
-        ensure_equals("LLDataPackerAsciiFile::packVector3 (iostring) failed", llvec3, unpkllvec3);
-        ensure_equals("LLDataPackerAsciiFile::packVector4 (iostring) failed", llvec4, unpkllvec4);
-        ensure_equals("LLDataPackerAsciiFile::packUUID (iostring) failed", uuid, unpkuuid);
+        CHECK(std::string_view(str) == std::string_view(unpkstr.c_str()));
+        CHECK(unpksizeBinary == sizeBinary);
+        CHECK(std::string_view(strBinary) == std::string_view(unpkstrBinary));
+        CHECK(std::string_view(strBinaryFixed) == std::string_view(unpkstrBinaryFixed));
+        CHECK(valU8 == unpkvalU8);
+        CHECK(valU16 == unpkvalU16);
+        CHECK(valU32 == unpkvalU32);
+        CHECK(valS32 == unpkvalS32);
+        CHECK(is_approx_equal(valF32, unpkvalF32));
+        CHECK(llcol4 == unpkllcol4);
+        CHECK(llcol4u == unpkllcol4u);
+        CHECK(llvec2 == unpkllvec2);
+        CHECK(llvec3 == unpkllvec3);
+        CHECK(llvec4 == unpkllvec4);
+        CHECK(uuid == unpkuuid);
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<15>()
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer refuses every read past the end", "[datapacker_test]")
     {
         // An ascii buffer that has run out says so. Every unpack in that class
         // comes through one place, and each one moves the cursor on by what it
@@ -588,30 +604,33 @@ namespace
         // told yes while the cursor walked off the buffer.
         char buffer[128];
         LLDataPackerAsciiBuffer writer(buffer, sizeof(buffer));
-        ensure("packS32", writer.packS32(42, "first"));
-        ensure("packString", writer.packString("second", "second"));
+        CHECK(writer.packS32(42, "first"));
+        CHECK(writer.packString("second", "second"));
 
         const S32 written = writer.getCurrentSize();
 
         LLDataPackerAsciiBuffer reader(buffer, written);
         S32 first = 0;
         std::string second;
-        ensure("the first field reads back", reader.unpackS32(first, "first"));
-        ensure_equals("and is what was written", first, 42);
-        ensure("the second field reads back", reader.unpackString(second, "second"));
-        ensure_equals("and is what was written", second, std::string("second"));
+        CHECK(reader.unpackS32(first, "first"));
+        CHECK(first == 42);
+        REQUIRE(reader.unpackString(second, "second"));
+        CHECK(second == std::string("second"));
 
         S32 past_the_end = 7;
-        ensure("a read past the end is refused", !reader.unpackS32(past_the_end, "third"));
-        ensure_equals("and leaves what it was handed alone", past_the_end, 7);
+        UNSCOPED_INFO("a read past the end is refused");
+        CHECK_FALSE(reader.unpackS32(past_the_end, "third"));
+        UNSCOPED_INFO("and leaves its argument alone");
+        CHECK(past_the_end == 7);
 
         std::string also_past = "untouched";
-        ensure("and stays refused", !reader.unpackString(also_past, "fourth"));
-        ensure_equals("however many times it is asked", also_past, std::string("untouched"));
+        UNSCOPED_INFO("a second read past the end is refused too");
+        CHECK_FALSE(reader.unpackString(also_past, "fourth"));
+        UNSCOPED_INFO("and leaves its argument alone too");
+        CHECK(also_past == std::string("untouched"));
     }
 
-    template<> template<>
-    void datapacker_test_object_t::test<16>()
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer refuses the first read of an empty buffer", "[datapacker_test]")
     {
         // An empty buffer is refused from the first read rather than from the
         // second.
@@ -619,7 +638,60 @@ namespace
         LLDataPackerAsciiBuffer reader(buffer, 0);
 
         S32 value = 11;
-        ensure("nothing to read", !reader.unpackS32(value, "anything"));
-        ensure_equals("and nothing was written", value, 11);
+        CHECK_FALSE(reader.unpackS32(value, "anything"));
+        UNSCOPED_INFO("the refused read leaves its argument alone");
+        CHECK(value == 11);
+    }
+
+    // A line of binary data that claims more bytes than it holds gives what
+    // it holds and fails, rather than reading on past the end of the line.
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer unpackBinaryData reads no further than its line", "[datapacker_test]")
+    {
+        char text[] = "0000000100 01 02 \n";
+        LLDataPackerAsciiBuffer reader(text, sizeof(text));
+        U8 value[128] = {};
+        S32 size = -1;
+        CHECK_FALSE(reader.unpackBinaryData(value, sizeof(value), size, "data"));
+        CHECK(size == 2);
+        CHECK(value[0] == 1);
+        CHECK(value[1] == 2);
+        CHECK(value[2] == 0);
+    }
+
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer unpackBinaryDataFixed reads no further than its line", "[datapacker_test]")
+    {
+        char text[] = "01 02 \n";
+        LLDataPackerAsciiBuffer reader(text, sizeof(text));
+        U8 value[4] = {};
+        CHECK_FALSE(reader.unpackBinaryDataFixed(value, sizeof(value), "data"));
+        CHECK(value[0] == 1);
+        CHECK(value[1] == 2);
+        CHECK(value[2] == 0);
+    }
+
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer unpackBinaryData refuses a line with no size", "[datapacker_test]")
+    {
+        char text[] = "lots 01 02 \n";
+        LLDataPackerAsciiBuffer reader(text, sizeof(text));
+        U8 value[4] = {};
+        S32 size = -1;
+        CHECK_FALSE(reader.unpackBinaryData(value, sizeof(value), size, "data"));
+        CHECK(size == 0);
+    }
+
+    TEST_CASE("datapacker_test: LLDataPackerAsciiFile unpackBinaryData and unpackBinaryDataFixed read no further than their lines", "[datapacker_test]")
+    {
+        std::istringstream istr("data\t0000000100 01 02 \nfixed\t01 02 \n");
+        LLDataPackerAsciiFile reader(istr, 2);
+        U8 value[128] = {};
+        S32 size = -1;
+        CHECK_FALSE(reader.unpackBinaryData(value, sizeof(value), size, "data"));
+        CHECK(size == 2);
+        CHECK(value[2] == 0);
+
+        U8 fixed[4] = {};
+        CHECK_FALSE(reader.unpackBinaryDataFixed(fixed, sizeof(fixed), "fixed"));
+        CHECK(fixed[1] == 2);
+        CHECK(fixed[2] == 0);
     }
 }

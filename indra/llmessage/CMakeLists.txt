@@ -173,38 +173,49 @@ if(AL_BUILD_TESTS)
   # These three stand in for parts of llmessage and llcorehttp with stubs of
   # their own, so they build their one file and do not link llmessage.
   foreach(test llcoproceduremanager lltrustedmessageservice lltemplatemessagedispatcher)
-    al_add_test(${test} UNIT PROJECT llmessage LIBRARIES llmath llcorehttp)
+    al_add_test_binary(
+      ${test}_test
+      PROJECT llmessage
+      SOURCES tests/${test}_test.cpp
+      UNIT ${test}.cpp
+      LIBRARIES llmath llcorehttp llcommon
+    )
   endforeach()
 
-  set(
-    test_libs
-    llfilesystem
-    llmath
-    llcorehttp
-    llmessage
-    llcommon
+  # The state guard's checks on what llmessage keeps for the process, for
+  # every test binary that links it.
+  add_library(llmessage_test_checks OBJECT tests/llmessage_test_checks.cpp)
+  target_link_libraries(llmessage_test_checks PRIVATE al::flags al_test_support llmessage)
+  set_target_properties(llmessage_test_checks PROPERTIES FOLDER "Tests/llmessage")
+
+  # io_test's pipes, which are not tests of their own.
+  add_library(llmessage_test_pipes OBJECT tests/llpipeutil.cpp)
+  target_link_libraries(llmessage_test_pipes PRIVATE al::flags llmessage)
+  set_target_properties(llmessage_test_pipes PROPERTIES FOLDER "Tests/llmessage")
+
+  al_add_test_binary(
+    llmessage_tests
+    PROJECT llmessage
+    SOURCES
+      tests/alnetimpairment_test.cpp
+      tests/io_test.cpp
+      tests/llavatarnamecache_test.cpp
+      tests/llbuffer_test.cpp
+      tests/lldatapacker_test.cpp
+      tests/llhost_test.cpp
+      tests/llhttpnode_test.cpp
+      tests/llmessageconfig_test.cpp
+      tests/llmessagetemplateparser_test.cpp
+      tests/llnamevalue_test.cpp
+      tests/llpartdata_test.cpp
+      tests/llsdmessagebuilder_test.cpp
+      tests/llsdmessagereader_test.cpp
+      tests/lltemplatemessagebuilder_test.cpp
+      tests/llxfer_file_test.cpp
+      tests/llxorcipher_test.cpp
+      tests/llzerocode_test.cpp
+      tests/message_test.cpp
+    LIBRARIES llfilesystem llmath llcorehttp llmessage llcommon
+    SUPPORT llmessage_test_checks llmessage_test_pipes
   )
-  al_add_test(io PROJECT llmessage SOURCES tests/llpipeutil.cpp LIBRARIES ${test_libs})
-  foreach(
-    test
-    alnetimpairment
-    llavatarnamecache
-    llbuffer
-    lldatapacker
-    llhost
-    llhttpnode
-    llsdmessagebuilder
-    llsdmessagereader
-    llmessageconfig
-    llmessagetemplateparser
-    llnamevalue
-    llpartdata
-    lltemplatemessagebuilder
-    llxfer_file
-    llxorcipher
-    llzerocode
-    message
-  )
-    al_add_test(${test} PROJECT llmessage LIBRARIES ${test_libs})
-  endforeach()
 endif()

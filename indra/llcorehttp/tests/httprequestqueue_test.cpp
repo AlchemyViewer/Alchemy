@@ -1,5 +1,5 @@
 /**
- * @file test_httprequestqueue.hpp
+ * @file httprequestqueue_test.cpp
  * @brief unit tests for the LLCore::HttpRequestQueue class
  *
  * $LicenseInfo:firstyear=2012&license=viewerlgpl$
@@ -23,8 +23,9 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
-#ifndef TEST_LLCORE_HTTP_REQUESTQUEUE_H_
-#define TEST_LLCORE_HTTP_REQUESTQUEUE_H_
+#include "linden_common.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 #include "_httprequestqueue.h"
 
@@ -33,45 +34,26 @@
 #include "_httpoperation.h"
 
 
+using namespace LLCore;
 using namespace LLCoreInt;
 
 
 
-namespace tut
-{
 namespace
 {
-
-struct HttpRequestqueueTestData
+TEST_CASE("HttpRequestqueue Tests: init makes a queue holding one reference", "[HttpRequestqueue_Tests]")
 {
-    // the test objects inherit from this so the member functions and variables
-    // can be referenced directly inside of the test functions.
-};
-
-typedef test_group<HttpRequestqueueTestData> HttpRequestqueueTestGroupType;
-typedef HttpRequestqueueTestGroupType::object HttpRequestqueueTestObjectType;
-HttpRequestqueueTestGroupType HttpRequestqueueTestGroup("HttpRequestqueue Tests");
-}
-
-template <> template <>
-void HttpRequestqueueTestObjectType::test<1>()
-{
-    set_test_name("HttpRequestQueue construction");
-
     // create a new ref counted object with an implicit reference
     HttpRequestQueue::init();
 
-    ensure("One ref on construction of HttpRequestQueue", HttpRequestQueue::instanceOf()->getRefCount() == 1);
+    CHECK(HttpRequestQueue::instanceOf()->getRefCount() == 1);
 
     // release the implicit reference, causing the object to be released
     HttpRequestQueue::term();
 }
 
-template <> template <>
-void HttpRequestqueueTestObjectType::test<2>()
+TEST_CASE("HttpRequestqueue Tests: term drops only the reference init made", "[HttpRequestqueue_Tests]")
 {
-    set_test_name("HttpRequestQueue refcount works");
-
     // create a new ref counted object with an implicit reference
     HttpRequestQueue::init();
 
@@ -81,17 +63,14 @@ void HttpRequestqueueTestObjectType::test<2>()
     // release the singleton, hold on to the object
     HttpRequestQueue::term();
 
-    ensure("One ref after term() called", rq->getRefCount() == 1);
+    CHECK(rq->getRefCount() == 1);
 
     // Drop ref
     rq->release();
 }
 
-template <> template <>
-void HttpRequestqueueTestObjectType::test<3>()
+TEST_CASE("HttpRequestqueue Tests: fetchOp returns an added op once", "[HttpRequestqueue_Tests]")
 {
-    set_test_name("HttpRequestQueue addOp/fetchOp work");
-
     // create a new ref counted object with an implicit reference
     HttpRequestQueue::init();
 
@@ -102,21 +81,18 @@ void HttpRequestqueueTestObjectType::test<3>()
     rq->addOp(op);      // transfer my refcount
 
     op = rq->fetchOp(true);     // Potentially hangs the test on failure
-    ensure("One goes in, one comes out", static_cast<bool>(op));
+    CHECK(static_cast<bool>(op));
     op.reset();
 
     op = rq->fetchOp(false);
-    ensure("Better not be two of them", !op);
+    CHECK_FALSE(op);
 
     // release the singleton, hold on to the object
     HttpRequestQueue::term();
 }
 
-template <> template <>
-void HttpRequestqueueTestObjectType::test<4>()
+TEST_CASE("HttpRequestqueue Tests: fetchAll returns every added op", "[HttpRequestqueue_Tests]")
 {
-    set_test_name("HttpRequestQueue addOp/fetchAll work");
-
     // create a new ref counted object with an implicit reference
     HttpRequestQueue::init();
 
@@ -134,10 +110,10 @@ void HttpRequestqueueTestObjectType::test<4>()
     {
         HttpRequestQueue::OpContainer ops;
         rq->fetchAll(true, ops);        // Potentially hangs the test on failure
-        ensure("Three go in, three come out", 3 == ops.size());
+        CHECK(ops.size() == 3);
 
         op = rq->fetchOp(false);
-        ensure("Better not be any more of them", !op);
+        CHECK_FALSE(op);
         op.reset();
 
         // release the singleton, hold on to the object
@@ -154,7 +130,4 @@ void HttpRequestqueueTestObjectType::test<4>()
     }
 }
 
-}  // end namespace tut
-
-
-#endif  // TEST_LLCORE_HTTP_REQUESTQUEUE_H_
+}  // anonymous namespace

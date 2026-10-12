@@ -26,62 +26,52 @@
  * $/LicenseInfo$
  */
 
-#include <tut/tut.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 
 #include "linden_common.h"
-#include "lltut.h"
 #include "llbuffer.h"
 #include "llerror.h"
 
 
-namespace tut
-{
 namespace
 {
-    struct buffer
-    {
-    };
-
-    typedef test_group<buffer> buffer_t;
-    typedef buffer_t::object buffer_object_t;
-    tut::buffer_t tut_buffer("buffer");
-}
-
-    template<> template<>
-    void buffer_object_t::test<1>()
+    TEST_CASE("buffer: LLChannelDescriptors in() is the base channel and out() the next", "[buffer]")
     {
         LLChannelDescriptors channelDescriptors;
-        ensure("in() and out() functions Failed", (0 == channelDescriptors.in() && 1 == channelDescriptors.out()));
+        CHECK(channelDescriptors.in() == 0);
+        CHECK(channelDescriptors.out() == 1);
 
         S32 val = 50;
         LLChannelDescriptors channelDescriptors1(val);
-        ensure("LLChannelDescriptors in() and out() functions Failed", (50 == channelDescriptors1.in() && 51 == channelDescriptors1.out()));
+        CHECK(channelDescriptors1.in() == 50);
+        CHECK(channelDescriptors1.out() == 51);
     }
 
-    template<> template<>
-    void buffer_object_t::test<2>()
+    TEST_CASE("buffer: a default LLSegment is empty and setChannel sets its channel", "[buffer]")
     {
         LLSegment segment;
-        ensure("LLSegment get functions failed", (0 == segment.getChannel() && NULL == segment.data() && 0 == segment.size()));
+        CHECK((segment.getChannel() == 0 && segment.data() == NULL));
+        CHECK(segment.size() == 0);
         segment.setChannel(50);
-        ensure_equals("LLSegment setChannel() function failed", segment.getChannel(), 50);
-        ensure("LLSegment isOnChannel() function failed", (true == segment.isOnChannel(50)));
+        CHECK(segment.getChannel() == 50);
+        CHECK(segment.isOnChannel(50));
     }
 
-    template<> template<>
-    void buffer_object_t::test<3>()
+    TEST_CASE("buffer: an LLSegment over data keeps its channel and data", "[buffer]")
     {
         S32 channel = 30;
         const char str[] = "SecondLife";
         S32 len = sizeof(str);
         LLSegment segment(channel, (U8*)str, len);
-        ensure("LLSegment get functions failed", (30 == segment.getChannel() && len == segment.size() && (U8*)str == segment.data()));
-        ensure_memory_matches("LLSegment::data() failed",  segment.data(), segment.size(), (U8*)str, len);
-        ensure("LLSegment isOnChannel() function failed", (true == segment.isOnChannel(channel)));
+        CHECK(segment.getChannel() == 30);
+        REQUIRE(segment.size() == len);
+        CHECK(segment.data() == (U8*)str);
+        CHECK_THAT(ll_test::Memory(segment.data(), segment.size()), ll_test::MemoryMatches((U8*)str, len));
+        CHECK(segment.isOnChannel(channel));
     }
 
-    template<> template<>
-    void buffer_object_t::test<4>()
+    TEST_CASE("buffer: LLHeapBuffer createSegment succeeds until the buffer is full", "[buffer]")
     {
         S32 channel = 50;
         S32 bigSize = 16384*2;
@@ -94,40 +84,43 @@ namespace
         S32 requestSize;
 
         requestSize = 16384-1;
-        ensure("1. LLHeapBuffer createSegment failed", (true == buf.createSegment(channel, requestSize, segment)) && segment.size() == requestSize);
-        // second request for remainign 1 byte
+        CHECK(buf.createSegment(channel, requestSize, segment));
+        CHECK(segment.size() == requestSize);
+        // second request for the remaining 1 byte
 
         requestSize = 1;
-        ensure("2. LLHeapBuffer createSegment failed", (true == buf.createSegment(channel, requestSize, segment)) && segment.size() == requestSize);
+        CHECK(buf.createSegment(channel, requestSize, segment));
+        CHECK(segment.size() == requestSize);
 
         // it should fail now.
         requestSize = 1;
-        ensure("3. LLHeapBuffer createSegment failed", (false == buf.createSegment(channel, requestSize, segment)));
+        CHECK_FALSE(buf.createSegment(channel, requestSize, segment));
 
         LLHeapBuffer buf1(bigSize);
 
-        // requst for more than default size but less than total sizeit should fail now.
+        // a request for more than the default size but less than this buffer's size succeeds.
         requestSize = 16384 + 1;
-        ensure("4. LLHeapBuffer createSegment failed", (true == buf1.createSegment(channel, requestSize, segment)) && segment.size() == requestSize);
+        CHECK(buf1.createSegment(channel, requestSize, segment));
+        CHECK(segment.size() == requestSize);
 
         LLHeapBuffer buf2((U8*) str, smallSize);
         requestSize = smallSize;
-        ensure("5. LLHeapBuffer createSegment failed", (true == buf2.createSegment(channel, requestSize, segment)) && segment.size() == requestSize && memcmp(segment.data(), (U8*) str, requestSize) == 0);
+        CHECK(buf2.createSegment(channel, requestSize, segment));
+        REQUIRE(segment.size() == requestSize);
+        CHECK(memcmp(segment.data(), (U8*) str, requestSize) == 0);
+        // it is full now, so it refuses any request, even one it would otherwise cut down to fit.
         requestSize = smallSize+1;
-        ensure("6. LLHeapBuffer createSegment failed", (false == buf2.createSegment(channel, requestSize, segment)));
+        CHECK_FALSE(buf2.createSegment(channel, requestSize, segment));
     }
 
-    //makeChannelConsumer()
-    template<> template<>
-    void buffer_object_t::test<5>()
+    TEST_CASE("buffer: makeChannelConsumer reads the out channel of its producer", "[buffer]")
     {
         LLChannelDescriptors inchannelDescriptors(20);
         LLChannelDescriptors outchannelDescriptors = LLBufferArray::makeChannelConsumer(inchannelDescriptors);
-        ensure("LLBufferArray::makeChannelConsumer() function Failed", (21 == outchannelDescriptors.in()));
+        CHECK(outchannelDescriptors.in() == 21);
     }
 
-    template<> template<>
-    void buffer_object_t::test<6>()
+    TEST_CASE("buffer: countAfter counts the bytes appended to a channel", "[buffer]")
     {
         LLBufferArray bufferArray;
         const char array[] = "SecondLife";
@@ -135,12 +128,10 @@ namespace
         LLChannelDescriptors channelDescriptors = bufferArray.nextChannel();
         bufferArray.append(channelDescriptors.in(), (U8*)array, len);
         S32 count = bufferArray.countAfter(channelDescriptors.in(), NULL);
-        ensure_equals("Appended size is:", count, len);
+        CHECK(count == len);
     }
 
-    //append() and prepend()
-    template<> template<>
-    void buffer_object_t::test<7>()
+    TEST_CASE("buffer: readAfter reads prepended data before appended data", "[buffer]")
     {
         LLBufferArray bufferArray;
         const char array[] = "SecondLife";
@@ -157,15 +148,13 @@ namespace
         char buf[100];
         S32 len2 = 20;
         bufferArray.readAfter(channelDescriptors.in(), NULL, (U8*)buf, len2);
-        ensure_equals("readAfter length failed", len2, 20);
+        CHECK(len2 == 20);
 
         buf[len2] = '\0';
-        ensure_equals("readAfter/prepend/append failed", buf, str);
+        CHECK(buf == str);
     }
 
-    //append()
-    template<> template<>
-    void buffer_object_t::test<8>()
+    TEST_CASE("buffer: readAfter reads two appends in order", "[buffer]")
     {
         LLBufferArray bufferArray;
         const char array[] = "SecondLife";
@@ -182,14 +171,13 @@ namespace
         char buf[100];
         S32 len2 = 20;
         bufferArray.readAfter(channelDescriptors.in(), NULL, (U8*)buf, len2);
-        ensure_equals("readAfter length failed", len2, 20);
+        CHECK(len2 == 20);
 
         buf[len2] = '\0';
-        ensure_equals("readAfter/append/append failed", buf, str);
+        CHECK(buf == str);
     }
 
-    template<> template<>
-    void buffer_object_t::test<9>()
+    TEST_CASE("buffer: takeContents moves the data of another array", "[buffer]")
     {
         LLBufferArray bufferArray;
         const char array[] = "SecondLife";
@@ -198,17 +186,17 @@ namespace
         LLChannelDescriptors channelDescriptors = bufferArray.nextChannel();
         bufferArray.append(channelDescriptors.in(), (U8*)array, len);
         LLBufferArray bufferArray1;
-        ensure("Contents are not copied and the source buffer is not empty", (1 == bufferArray1.takeContents(bufferArray)));
+        REQUIRE(bufferArray1.takeContents(bufferArray) == 1);
 
         char buf[100];
         S32 len2 = len;
         bufferArray1.readAfter(channelDescriptors.in(), NULL, (U8*)buf, len2);
-        ensure_equals("takeContents failed to copy", buf, str);
+        // the terminator is the last byte read, so a short read leaves buf unterminated
+        REQUIRE(len2 == len);
+        CHECK(buf == str);
     }
 
-    //seek()
-    template<> template<>
-    void buffer_object_t::test<10>()
+    TEST_CASE("buffer: seek moves back from where a read ended", "[buffer]")
     {
         const char array[] = "SecondLife is a Virtual World";
         S32 len = static_cast<S32>(strlen(array));
@@ -225,11 +213,10 @@ namespace
         last = bufferArray.readAfter(0, last, (U8*)buf, len1);
         buf[len1] = '\0';
         std::string str(buf);
-        ensure_equals("Seek does'nt worked", str, std::string("a Virtual World"));
+        CHECK(str == std::string("a Virtual World"));
     }
 
-    template<> template<>
-    void buffer_object_t::test<11>()
+    TEST_CASE("buffer: splitAfter starts a new segment after the address", "[buffer]")
     {
         const char array[] = "SecondLife is a Virtual World";
         S32 len = static_cast<S32>(strlen(array));
@@ -241,34 +228,49 @@ namespace
         U8* last = bufferArray.readAfter(0, 0, (U8*)buf, len1);
         bufferArray.splitAfter(last);
         LLBufferArray::segment_iterator_t iterator = bufferArray.beginSegment();
+        REQUIRE(iterator != bufferArray.endSegment());
         ++iterator;
+        REQUIRE(iterator != bufferArray.endSegment());
         std::string str(((char*)(*iterator).data()), (*iterator).size());
-        ensure_equals("Strings are not equal;splitAfter() operation failed", str, std::string(" is a Virtual World"));
+        CHECK(str == std::string(" is a Virtual World"));
     }
 
-    //makeSegment()->eraseSegment()
-    template<> template<>
-    void buffer_object_t::test<12>()
+    TEST_CASE("buffer: splitAfter the last byte of a segment adds no empty segment", "[buffer]")
+    {
+        const char array[] = "SecondLife";
+        S32 len = static_cast<S32>(strlen(array));
+        LLBufferArray bufferArray;
+        bufferArray.append(0, (U8*)array, len);
+
+        char buf[255];
+        S32 len1 = len;
+        U8* last = bufferArray.readAfter(0, 0, (U8*)buf, len1);
+        REQUIRE(len1 == len);
+        LLBufferArray::segment_iterator_t iterator = bufferArray.splitAfter(last);
+        REQUIRE(iterator != bufferArray.endSegment());
+        CHECK((*iterator).size() == len);
+        CHECK(++iterator == bufferArray.endSegment());
+    }
+
+    TEST_CASE("buffer: eraseSegment removes the segment makeSegment made", "[buffer]")
     {
         LLBufferArray bufferArray;
         LLChannelDescriptors channelDescriptors;
         LLBufferArray::segment_iterator_t it;
         S32 length = 1000;
         it = bufferArray.makeSegment(channelDescriptors.out(), length);
-        ensure("makeSegment() function failed", (it != bufferArray.endSegment()));
-        ensure("eraseSegment() function failed", bufferArray.eraseSegment(it));
-        ensure("eraseSegment() begin/end should now be same", bufferArray.beginSegment() == bufferArray.endSegment());
+        REQUIRE(it != bufferArray.endSegment());
+        CHECK(bufferArray.eraseSegment(it));
+        CHECK(bufferArray.beginSegment() == bufferArray.endSegment());
     }
 
-    // constructSegmentAfter()
-    template<> template<>
-    void buffer_object_t::test<13>()
+    TEST_CASE("buffer: constructSegmentAfter on an empty array returns endSegment", "[buffer]")
     {
         LLBufferArray bufferArray;
         LLBufferArray::segment_iterator_t it;
         LLSegment segment;
         LLBufferArray::segment_iterator_t end = bufferArray.endSegment();
         it = bufferArray.constructSegmentAfter(NULL, segment);
-        ensure("constructSegmentAfter() function failed", (it == end));
+        CHECK(it == end);
     }
 }

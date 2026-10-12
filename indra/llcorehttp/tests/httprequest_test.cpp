@@ -1,5 +1,5 @@
 /**
- * @file test_httprequest.hpp
+ * @file httprequest_test.cpp
  * @brief unit tests for the LLCore::HttpRequest class
  *
  * $LicenseInfo:firstyear=2012&license=viewerlgpl$
@@ -23,8 +23,9 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
-#ifndef TEST_LLCORE_HTTP_REQUEST_H_
-#define TEST_LLCORE_HTTP_REQUEST_H_
+#include "linden_common.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 #include "httprequest.h"
 #include "bufferarray.h"
@@ -37,11 +38,18 @@
 
 #include <curl/curl.h>
 #include "alregex.h"
+#include <chrono>
+#include <map>
 #include <sstream>
+#include <vector>
 
-#include "llcorehttp_test.h"
+#include "llcleanup.h"
+#include "llproxy.h"
+
+#include <iostream>
 
 
+using namespace LLCore;
 using namespace LLCoreInt;
 
 // spin/sleep waiting times for client/server exchange tests
@@ -56,17 +64,82 @@ static const int LOOP_COUNT_LONG(3000);         // 30-second dwell time
 
 namespace
 {
-
 #if defined(WIN32)
 
 void usleep(unsigned long usec);
 
 #endif
 
+// Initialization and cleanup for libcurl: curl's global state and the
+// LLProxy singleton, for the length of a test.
+void init_curl()
+{
+    curl_global_init(CURL_GLOBAL_ALL);
+
+    LLProxy::getInstance();
 }
 
-namespace tut
+
+void term_curl()
 {
+    SUBSYSTEM_CLEANUP(LLProxy);
+}
+
+
+class ScopedCurlInit
+{
+public:
+    ScopedCurlInit()
+        {
+            init_curl();
+        }
+
+    ~ScopedCurlInit()
+        {
+            term_curl();
+        }
+};
+
+
+// The peer's address, which test_llcorehttp_peer.py, the program this test
+// runs under, puts in LL_TEST_PORT.
+std::string get_base_url()
+{
+    const char * env(getenv("LL_TEST_PORT"));
+
+    if (! env)
+    {
+        std::cerr << "LL_TEST_PORT environment variable missing." << std::endl;
+        std::cerr << "Test expects to run in test_llcorehttp_peer.py script." << std::endl;
+        INFO("LL_TEST_PORT set in environment");
+        REQUIRE(env != NULL);
+    }
+
+    int port(atoi(env));
+    std::ostringstream out;
+    out << "http://localhost:" << port << "/";
+    return out.str();
+}
+
+
+void stop_thread(LLCore::HttpRequest * req)
+{
+    if (req)
+    {
+        req->requestStopThread(LLCore::HttpHandler::ptr_t());
+
+        int count = 0;
+        int limit = 10;
+        while (count++ < limit && ! HttpService::isStopped())
+        {
+            req->update(1000);
+            usleep(100000);
+        }
+    }
+}
+
+}
+
 namespace
 {
 
@@ -94,16 +167,14 @@ public:
         {
             if (LLCORE_HTTP_HANDLE_INVALID != mExpectHandle)
             {
-                ensure("Expected handle received in handler", mExpectHandle == handle);
+                REQUIRE(mExpectHandle == handle);
             }
-            ensure("Handler got a response", NULL != response);
+            REQUIRE(response != NULL);
             if (response && mState)
             {
                 const HttpStatus actual_status(response->getStatus());
-                std::ostringstream test;
-                test << "Expected HttpStatus received in response.  Wanted:  "
-                     << mState->mStatus.toHex() << " Received:  " << actual_status.toHex();
-                ensure(test.str().c_str(), actual_status == mState->mStatus);
+                INFO("wanted status " << mState->mStatus.toHex() << ", received " << actual_status.toHex());
+                REQUIRE(actual_status == mState->mStatus);
             }
             if (mState)
             {
@@ -111,9 +182,9 @@ public:
             }
             if (! mHeadersRequired.empty() || ! mHeadersDisallowed.empty())
             {
-                ensure("Response required with header check", response != NULL);
+                REQUIRE(response != NULL);
                 HttpHeaders::ptr_t header(response->getHeaders());  // Will not hold onto this
-                ensure("Some quantity of headers returned", header != NULL);
+                REQUIRE(header != NULL);
 
                 if (! mHeadersRequired.empty())
                 {
@@ -134,11 +205,8 @@ public:
                                 break;
                             }
                         }
-                        std::ostringstream str;
-                        str << "Required header #" << i << " "
-                            << mHeadersRequired[i].first << "=" << mHeadersRequired[i].second
-                            << " not found in response";
-                        ensure(str.str(), found);
+                        INFO("required header " << mHeadersRequired[i].first << "=" << mHeadersRequired[i].second);
+                        REQUIRE(found);
                     }
                 }
 
@@ -153,11 +221,8 @@ public:
                             if (mHeadersDisallowed[i].first.match((*iter).first) &&
                                 mHeadersDisallowed[i].second.match((*iter).second))
                             {
-                                std::ostringstream str;
-                                str << "Disallowed header #" << i << " "
-                                    << mHeadersDisallowed[i].first << "=" << mHeadersDisallowed[i].second
-                                    << " found in response";
-                                ensure(str.str(), false);
+                                FAIL("disallowed header " << mHeadersDisallowed[i].first << "="
+                                     << mHeadersDisallowed[i].second << " found in response");
                             }
                         }
                     }
@@ -166,10 +231,9 @@ public:
 
             if (! mCheckContentType.empty())
             {
-                ensure("Response required with content type check", response != NULL);
+                REQUIRE(response != NULL);
                 std::string con_type(response->getContentType());
-                ensure("Content-Type as expected (" + mCheckContentType + ")",
-                       mCheckContentType == con_type);
+                REQUIRE(mCheckContentType == con_type);
             }
 
             // std::cout << "TestHandler2::onCompleted() invoked" << std::endl;
@@ -183,17 +247,10 @@ public:
     regex_container_t mHeadersDisallowed;
 };
 
-typedef test_group<HttpRequestTestData> HttpRequestTestGroupType;
-typedef HttpRequestTestGroupType::object HttpRequestTestObjectType;
-HttpRequestTestGroupType HttpRequestTestGroup("HttpRequest Tests");
-}
 
-template <> template <>
-void HttpRequestTestObjectType::test<1>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: an HttpRequest is constructed and deleted with the service up", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
-
-    set_test_name("HttpRequest construction");
 
     HttpRequest * req = NULL;
 
@@ -219,12 +276,9 @@ void HttpRequestTestObjectType::test<1>()
     }
 }
 
-template <> template <>
-void HttpRequestTestObjectType::test<2>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a NoOp queued with no thread running leaves two queue references", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
-
-    set_test_name("HttpRequest and Null Op queued");
 
     HttpRequest * req = NULL;
 
@@ -238,14 +292,14 @@ void HttpRequestTestObjectType::test<2>()
 
         // Issue a NoOp
         HttpHandle handle = req->requestNoOp(LLCore::HttpHandler::ptr_t());
-        ensure("Request issued", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // release the request object
         delete req;
         req = NULL;
 
         // Request queue should have two references:  global singleton & service object
-        ensure("Two references to request queue", 2 == HttpRequestQueue::instanceOf()->getRefCount());
+        CHECK(HttpRequestQueue::instanceOf()->getRefCount() == 2);
 
         // Okay, tear it down
         HttpRequest::destroyService();
@@ -259,17 +313,11 @@ void HttpRequestTestObjectType::test<2>()
     }
 }
 
-namespace
-{
     void NoOpDeletor(LLCore::HttpHandler *) { }
-}
 
-template <> template <>
-void HttpRequestTestObjectType::test<3>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a NoOp is answered and a stop request stops the worker thread", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
-
-    set_test_name("HttpRequest NoOp + Stop execution");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -294,7 +342,7 @@ void HttpRequestTestObjectType::test<3>()
 
         // Issue a NoOp
         HttpHandle handle = req->requestNoOp(handlerp);
-        ensure("Valid handle returned for first request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -304,12 +352,13 @@ void HttpRequestTestObjectType::test<3>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -319,8 +368,9 @@ void HttpRequestTestObjectType::test<3>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -329,7 +379,7 @@ void HttpRequestTestObjectType::test<3>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release the request object
         delete req;
@@ -338,7 +388,7 @@ void HttpRequestTestObjectType::test<3>()
         // Shut down service
         HttpRequest::destroyService();
 
-        ensure("Two handler calls on the way out", 2 == mHandlerCalls);
+        CHECK(mHandlerCalls == 2);
     }
     catch (...)
     {
@@ -349,12 +399,9 @@ void HttpRequestTestObjectType::test<3>()
     }
 }
 
-template <> template <>
-void HttpRequestTestObjectType::test<4>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: two HttpRequest instances are served by one worker thread", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
-
-    set_test_name("2 HttpRequest instances, one thread");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -384,11 +431,11 @@ void HttpRequestTestObjectType::test<4>()
 
         // Issue some NoOps
         HttpHandle handle = req1->requestNoOp(handler1p);
-        ensure("Valid handle returned for first request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         handler1.mExpectHandle = handle;
 
         handle = req2->requestNoOp(handler2p);
-        ensure("Valid handle returned for first request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         handler2.mExpectHandle = handle;
 
         // Run the notification pump.
@@ -400,12 +447,13 @@ void HttpRequestTestObjectType::test<4>()
             req2->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 2);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // Okay, request a shutdown of the servicing thread
         handle = req2->requestStopThread(handler2p);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         handler2.mExpectHandle = handle;
 
         // Run the notification pump again
@@ -417,8 +465,9 @@ void HttpRequestTestObjectType::test<4>()
             req2->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 3);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 3);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -427,7 +476,7 @@ void HttpRequestTestObjectType::test<4>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release the request object
         delete req1;
@@ -438,7 +487,7 @@ void HttpRequestTestObjectType::test<4>()
         // Shut down service
         HttpRequest::destroyService();
 
-        ensure("Two handler calls on the way out", 3 == mHandlerCalls);
+        CHECK(mHandlerCalls == 3);
     }
     catch (...)
     {
@@ -450,16 +499,13 @@ void HttpRequestTestObjectType::test<4>()
     }
 }
 
-template <> template <>
-void HttpRequestTestObjectType::test<5>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a NoOp is answered behind a soft spin before hard termination", "[HttpRequest_Tests]")
 {
 #ifndef LL_WINDOWS
-    skip("Skip due to issues with testing pthread cancellation");
+    SKIP("Skip due to issues with testing pthread cancellation");
 #endif
 
     ScopedCurlInit ready;
-
-    set_test_name("HttpRequest Spin (soft) + NoOp + hard termination");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -484,11 +530,11 @@ void HttpRequestTestObjectType::test<5>()
 
         // Issue a Spin
         HttpHandle handle = req->requestSpin(1);
-        ensure("Valid handle returned for spin request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Issue a NoOp
         handle = req->requestNoOp(handlerp);
-        ensure("Valid handle returned for no-op request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -498,7 +544,7 @@ void HttpRequestTestObjectType::test<5>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("NoOp notification received", mHandlerCalls == 1);
+        CHECK(mHandlerCalls == 1);
 
         // release the request object
         delete req;
@@ -517,15 +563,12 @@ void HttpRequestTestObjectType::test<5>()
 }
 
 
-template <> template <>
-void HttpRequestTestObjectType::test<6>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a hard spin keeps a NoOp unanswered until hard termination", "[HttpRequest_Tests]")
 {
 #ifndef LL_WINDOWS
-    skip("Skip due to issues with testing pthread cancellation");
+    SKIP("Skip due to issues with testing pthread cancellation");
 #endif
     ScopedCurlInit ready;
-
-    set_test_name("HttpRequest Spin + NoOp + hard termination");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -551,11 +594,11 @@ void HttpRequestTestObjectType::test<6>()
 
         // Issue a Spin
         HttpHandle handle = req->requestSpin(0);        // Hard spin
-        ensure("Valid handle returned for spin request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Issue a NoOp
         handle = req->requestNoOp(handlerp);
-        ensure("Valid handle returned for no-op request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -565,7 +608,7 @@ void HttpRequestTestObjectType::test<6>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("No notifications received", mHandlerCalls == 0);
+        CHECK(mHandlerCalls == 0);
 
         // release the request object
         delete req;
@@ -584,12 +627,9 @@ void HttpRequestTestObjectType::test<6>()
 }
 
 
-template <> template <>
-void HttpRequestTestObjectType::test<7>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a dead port fails with CURLE_COULDNT_CONNECT", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
-
-    set_test_name("HttpRequest GET to dead port + Stop execution");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -626,7 +666,7 @@ void HttpRequestTestObjectType::test<7>()
                                                      opts,
                                                      HttpHeaders::ptr_t(),
                                                      handlerp);
-        ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -636,13 +676,14 @@ void HttpRequestTestObjectType::test<7>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -652,8 +693,9 @@ void HttpRequestTestObjectType::test<7>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -662,7 +704,7 @@ void HttpRequestTestObjectType::test<7>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release options
         opts.reset();
@@ -674,7 +716,7 @@ void HttpRequestTestObjectType::test<7>()
         // Shut down service
         HttpRequest::destroyService();
 
-        ensure("Two handler calls on the way out", 2 == mHandlerCalls);
+        CHECK(mHandlerCalls == 2);
     }
     catch (...)
     {
@@ -687,15 +729,12 @@ void HttpRequestTestObjectType::test<7>()
 }
 
 
-template <> template <>
-void HttpRequestTestObjectType::test<8>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to the peer is answered 200", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
     std::string url_base(get_base_url());
     // std::cerr << "Base:  "  << url_base << std::endl;
-
-    set_test_name("HttpRequest GET to real service");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -725,7 +764,7 @@ void HttpRequestTestObjectType::test<8>()
                                             HttpOptions::ptr_t(),
                                             HttpHeaders::ptr_t(),
                                             handlerp);
-        ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -735,13 +774,14 @@ void HttpRequestTestObjectType::test<8>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -751,8 +791,9 @@ void HttpRequestTestObjectType::test<8>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -761,7 +802,7 @@ void HttpRequestTestObjectType::test<8>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release the request object
         delete req;
@@ -770,7 +811,7 @@ void HttpRequestTestObjectType::test<8>()
         // Shut down service
         HttpRequest::destroyService();
 
-        ensure("Two handler calls on the way out", 2 == mHandlerCalls);
+        CHECK(mHandlerCalls == 2);
     }
     catch (...)
     {
@@ -782,15 +823,12 @@ void HttpRequestTestObjectType::test<8>()
 }
 
 
-template <> template <>
-void HttpRequestTestObjectType::test<9>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET with a byte range sends its Range header and takes a 200 for the whole body", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
     std::string url_base(get_base_url());
     // std::cerr << "Base:  "  << url_base << std::endl;
-
-    set_test_name("HttpRequest GET with Range: header to real service");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -800,6 +838,7 @@ void HttpRequestTestObjectType::test<9>()
     mHandlerCalls = 0;
 
     HttpRequest * req = NULL;
+    HttpOptions::ptr_t opts;
 
     try
     {
@@ -813,16 +852,25 @@ void HttpRequestTestObjectType::test<9>()
         // create a new ref counted object with an implicit reference
         req = new HttpRequest();
 
-        // Issue a GET that *can* connect
+        opts = HttpOptions::ptr_t(new HttpOptions());
+        opts->setWantHeaders(true);
+
+        // Issue a GET for 25 bytes from offset 100.  The peer reflects the
+        // Range header it was sent and, ignoring it, answers 200 with the
+        // whole body, which has no Content-Range for llcorehttp to check.
         mStatus = HttpStatus(200);
+        handler.mHeadersRequired.push_back(
+            regex_container_t::value_type(
+                ALRegex("X-Reflect-range", ALRegex::ICASE),
+                ALRegex("bytes=100-124", ALRegex::ICASE)));
         HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
-                                                     url_base,
-                                                     0,
-                                                     0,
-                                                     HttpOptions::ptr_t(),
+                                                     url_base + "reflect/",
+                                                     100,
+                                                     25,
+                                                     opts,
                                                      HttpHeaders::ptr_t(),
                                                      handlerp);
-        ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -832,13 +880,15 @@ void HttpRequestTestObjectType::test<9>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
+        handler.mHeadersRequired.clear();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -848,8 +898,9 @@ void HttpRequestTestObjectType::test<9>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -858,7 +909,10 @@ void HttpRequestTestObjectType::test<9>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
+
+        // release options
+        opts.reset();
 
         // release the request object
         delete req;
@@ -867,11 +921,12 @@ void HttpRequestTestObjectType::test<9>()
         // Shut down service
         HttpRequest::destroyService();
 
-        ensure("Two handler calls on the way out", 2 == mHandlerCalls);
+        CHECK(mHandlerCalls == 2);
     }
     catch (...)
     {
         stop_thread(req);
+        opts.reset();
         delete req;
         HttpRequest::destroyService();
         throw;
@@ -879,15 +934,12 @@ void HttpRequestTestObjectType::test<9>()
 }
 
 
-template <> template <>
-void HttpRequestTestObjectType::test<10>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT with a body to the peer is answered 200", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
     std::string url_base(get_base_url());
     // std::cerr << "Base:  "  << url_base << std::endl;
-
-    set_test_name("HttpRequest PUT to real service");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -911,7 +963,7 @@ void HttpRequestTestObjectType::test<10>()
         // create a new ref counted object with an implicit reference
         req = new HttpRequest();
 
-        // Issue a GET that *can* connect
+        // Issue a PUT that *can* connect
         static const char * body_text("Now is the time for all good men...");
         body->append(body_text, strlen(body_text));
         mStatus = HttpStatus(200);
@@ -921,7 +973,7 @@ void HttpRequestTestObjectType::test<10>()
                                             HttpOptions::ptr_t(),
                                             HttpHeaders::ptr_t(),
                                             handlerp);
-        ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -931,13 +983,14 @@ void HttpRequestTestObjectType::test<10>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -947,8 +1000,9 @@ void HttpRequestTestObjectType::test<10>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -957,7 +1011,7 @@ void HttpRequestTestObjectType::test<10>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // Lose the request body
         body->release();
@@ -970,7 +1024,7 @@ void HttpRequestTestObjectType::test<10>()
         // Shut down service
         HttpRequest::destroyService();
 
-        ensure("Two handler calls on the way out", 2 == mHandlerCalls);
+        CHECK(mHandlerCalls == 2);
     }
     catch (...)
     {
@@ -985,15 +1039,12 @@ void HttpRequestTestObjectType::test<10>()
     }
 }
 
-template <> template <>
-void HttpRequestTestObjectType::test<11>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST with a body to the peer is answered 200", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
     std::string url_base(get_base_url());
     // std::cerr << "Base:  "  << url_base << std::endl;
-
-    set_test_name("HttpRequest POST to real service");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -1017,7 +1068,7 @@ void HttpRequestTestObjectType::test<11>()
         // create a new ref counted object with an implicit reference
         req = new HttpRequest();
 
-        // Issue a GET that *can* connect
+        // Issue a POST that *can* connect
         static const char * body_text("Now is the time for all good men...");
         body->append(body_text, strlen(body_text));
         mStatus = HttpStatus(200);
@@ -1027,7 +1078,7 @@ void HttpRequestTestObjectType::test<11>()
                                              HttpOptions::ptr_t(),
                                              HttpHeaders::ptr_t(),
                                              handlerp);
-        ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -1037,13 +1088,14 @@ void HttpRequestTestObjectType::test<11>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -1053,8 +1105,9 @@ void HttpRequestTestObjectType::test<11>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -1063,7 +1116,7 @@ void HttpRequestTestObjectType::test<11>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // Lose the request body
         body->release();
@@ -1076,7 +1129,7 @@ void HttpRequestTestObjectType::test<11>()
         // Shut down service
         HttpRequest::destroyService();
 
-        ensure("Two handler calls on the way out", 2 == mHandlerCalls);
+        CHECK(mHandlerCalls == 2);
     }
     catch (...)
     {
@@ -1091,15 +1144,12 @@ void HttpRequestTestObjectType::test<11>()
     }
 }
 
-template <> template <>
-void HttpRequestTestObjectType::test<12>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET with tracing on is answered 200", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
     std::string url_base(get_base_url());
     // std::cerr << "Base:  "  << url_base << std::endl;
-
-    set_test_name("HttpRequest GET with some tracing");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -1134,7 +1184,7 @@ void HttpRequestTestObjectType::test<12>()
                                                      HttpOptions::ptr_t(),
                                                      HttpHeaders::ptr_t(),
                                                      handlerp);
-        ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -1144,13 +1194,14 @@ void HttpRequestTestObjectType::test<12>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -1160,8 +1211,9 @@ void HttpRequestTestObjectType::test<12>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -1170,7 +1222,7 @@ void HttpRequestTestObjectType::test<12>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release the request object
         delete req;
@@ -1179,7 +1231,7 @@ void HttpRequestTestObjectType::test<12>()
         // Shut down service
         HttpRequest::destroyService();
 
-        ensure("Two handler calls on the way out", 2 == mHandlerCalls);
+        CHECK(mHandlerCalls == 2);
     }
     catch (...)
     {
@@ -1191,8 +1243,7 @@ void HttpRequestTestObjectType::test<12>()
 }
 
 
-template <> template <>
-void HttpRequestTestObjectType::test<13>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET that wants headers gets the peer's X-LL-Special header", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
@@ -1202,8 +1253,6 @@ void HttpRequestTestObjectType::test<13>()
 
     std::string url_base(get_base_url());
     // std::cerr << "Base:  "  << url_base << std::endl;
-
-    set_test_name("HttpRequest GET with returned headers");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -1246,7 +1295,7 @@ void HttpRequestTestObjectType::test<13>()
                                                      opts,
                                                      HttpHeaders::ptr_t(),
                                                      handlerp);
-        ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // release options
         opts.reset();
@@ -1259,14 +1308,15 @@ void HttpRequestTestObjectType::test<13>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handler.mHeadersRequired.clear();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -1276,8 +1326,9 @@ void HttpRequestTestObjectType::test<13>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -1286,7 +1337,7 @@ void HttpRequestTestObjectType::test<13>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release the request object
         delete req;
@@ -1295,7 +1346,7 @@ void HttpRequestTestObjectType::test<13>()
         // Shut down service
         HttpRequest::destroyService();
 
-        ensure("Two handler calls on the way out", 2 == mHandlerCalls);
+        CHECK(mHandlerCalls == 2);
     }
     catch (...)
     {
@@ -1308,12 +1359,9 @@ void HttpRequestTestObjectType::test<13>()
 }
 
 
-template <> template <>
-void HttpRequestTestObjectType::test<14>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a peer that sleeps times out after two seconds", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
-
-    set_test_name("HttpRequest GET timeout");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -1351,7 +1399,7 @@ void HttpRequestTestObjectType::test<14>()
                                                      opts,
                                                      HttpHeaders::ptr_t(),
                                                      handlerp);
-        ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -1361,13 +1409,14 @@ void HttpRequestTestObjectType::test<14>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -1377,8 +1426,9 @@ void HttpRequestTestObjectType::test<14>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -1387,7 +1437,7 @@ void HttpRequestTestObjectType::test<14>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release options
         opts.reset();
@@ -1399,7 +1449,7 @@ void HttpRequestTestObjectType::test<14>()
         // Shut down service
         HttpRequest::destroyService();
 
-        ensure("Two handler calls on the way out", 2 == mHandlerCalls);
+        CHECK(mHandlerCalls == 2);
     }
     catch (...)
     {
@@ -1412,15 +1462,12 @@ void HttpRequestTestObjectType::test<14>()
 }
 
 // Test retrieval of Content-Type/Content-Encoding headers
-template <> template <>
-void HttpRequestTestObjectType::test<15>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET reports the response's Content-Type", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
     std::string url_base(get_base_url());
     // std::cerr << "Base:  "  << url_base << std::endl;
-
-    set_test_name("HttpRequest GET with Content-Type");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -1456,7 +1503,7 @@ void HttpRequestTestObjectType::test<15>()
                                             HttpOptions::ptr_t(),
                                             HttpHeaders::ptr_t(),
                                             handlerp);
-        ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -1466,14 +1513,15 @@ void HttpRequestTestObjectType::test<15>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handler.mCheckContentType.clear();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -1483,8 +1531,9 @@ void HttpRequestTestObjectType::test<15>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -1493,7 +1542,7 @@ void HttpRequestTestObjectType::test<15>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release the request object
         delete req;
@@ -1502,7 +1551,7 @@ void HttpRequestTestObjectType::test<15>()
         // Shut down service
         HttpRequest::destroyService();
 
-        ensure("Two handler calls on the way out", 2 == mHandlerCalls);
+        CHECK(mHandlerCalls == 2);
     }
     catch (...)
     {
@@ -1515,8 +1564,7 @@ void HttpRequestTestObjectType::test<15>()
 
 
 // Test header generation on GET requests
-template <> template <>
-void HttpRequestTestObjectType::test<16>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET sends default headers and a texture fetch adds Range and Accept", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
@@ -1525,8 +1573,6 @@ void HttpRequestTestObjectType::test<16>()
     warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
-
-    set_test_name("Header generation for HttpRequest GET");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -1610,7 +1656,7 @@ void HttpRequestTestObjectType::test<16>()
                                             options,
                                             HttpHeaders::ptr_t(),
                                             handlerp);
-        ensure("Valid handle returned for get request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -1620,8 +1666,9 @@ void HttpRequestTestObjectType::test<16>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // Do a texture-style fetch
         headers = HttpHeaders::ptr_t(new HttpHeaders);
@@ -1686,7 +1733,7 @@ void HttpRequestTestObjectType::test<16>()
                                           options,
                                           headers,
                                           handlerp);
-        ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         count = 0;
@@ -1696,8 +1743,9 @@ void HttpRequestTestObjectType::test<16>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 2);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
 
         // Okay, request a shutdown of the servicing thread
@@ -1705,7 +1753,7 @@ void HttpRequestTestObjectType::test<16>()
         handler.mHeadersRequired.clear();
         handler.mHeadersDisallowed.clear();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -1715,8 +1763,9 @@ void HttpRequestTestObjectType::test<16>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 3);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 3);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -1725,7 +1774,7 @@ void HttpRequestTestObjectType::test<16>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release options & headers
         options.reset();
@@ -1752,8 +1801,7 @@ void HttpRequestTestObjectType::test<16>()
 
 
 // Test header generation on POST requests
-template <> template <>
-void HttpRequestTestObjectType::test<17>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST sends default headers and a form-urlencoded Content-Type", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
@@ -1762,8 +1810,6 @@ void HttpRequestTestObjectType::test<17>()
     warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
-
-    set_test_name("Header generation for HttpRequest POST");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -1855,7 +1901,7 @@ void HttpRequestTestObjectType::test<17>()
                 ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                ALRegex("X-Reflect-transfer_encoding", ALRegex::ICASE),
+                ALRegex("X-Reflect-transfer-encoding", ALRegex::ICASE),
                 ALRegex(".*chunked.*", ALRegex::ICASE)));
         HttpHandle handle = req->requestPost(HttpRequest::DEFAULT_POLICY_ID,
                                              url_base + "reflect/",
@@ -1863,7 +1909,7 @@ void HttpRequestTestObjectType::test<17>()
                                              options,
                                              HttpHeaders::ptr_t(),
                                              handlerp);
-        ensure("Valid handle returned for get request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         ba->release();
         ba = NULL;
 
@@ -1875,8 +1921,9 @@ void HttpRequestTestObjectType::test<17>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
 
         // Okay, request a shutdown of the servicing thread
@@ -1884,7 +1931,7 @@ void HttpRequestTestObjectType::test<17>()
         handler.mHeadersRequired.clear();
         handler.mHeadersDisallowed.clear();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -1894,8 +1941,9 @@ void HttpRequestTestObjectType::test<17>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -1904,7 +1952,7 @@ void HttpRequestTestObjectType::test<17>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release options & headers
         options.reset();
@@ -1936,8 +1984,7 @@ void HttpRequestTestObjectType::test<17>()
 
 
 // Test header generation on PUT requests
-template <> template <>
-void HttpRequestTestObjectType::test<18>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT sends default headers with a length and no Content-Type", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
@@ -1946,8 +1993,6 @@ void HttpRequestTestObjectType::test<18>()
     warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
-
-    set_test_name("Header generation for HttpRequest PUT");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -2048,7 +2093,7 @@ void HttpRequestTestObjectType::test<18>()
                                             options,
                                             HttpHeaders::ptr_t(),
                                             handlerp);
-        ensure("Valid handle returned for get request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         ba->release();
         ba = NULL;
 
@@ -2060,8 +2105,9 @@ void HttpRequestTestObjectType::test<18>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
 
         // Okay, request a shutdown of the servicing thread
@@ -2069,7 +2115,7 @@ void HttpRequestTestObjectType::test<18>()
         handler.mHeadersRequired.clear();
         handler.mHeadersDisallowed.clear();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -2079,8 +2125,9 @@ void HttpRequestTestObjectType::test<18>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -2089,7 +2136,7 @@ void HttpRequestTestObjectType::test<18>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release options & headers
         options.reset();
@@ -2121,8 +2168,7 @@ void HttpRequestTestObjectType::test<18>()
 
 
 // Test header generation on GET requests with overrides
-template <> template <>
-void HttpRequestTestObjectType::test<19>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a GET replace its defaults", "[HttpRequest_Tests]")
 {
     // It appears that HttpRequest is fully capable of sending duplicate header values in violation of
     // this test's expectations. Something needs to budge: is sending duplicate header values desired?
@@ -2133,7 +2179,7 @@ void HttpRequestTestObjectType::test<19>()
     // X-Reflect-content-type: text/html
     // X-Reflect-content-type: application/llsd+xml
     //
-    skip("FIXME: Bad assertions or broken functionality.");
+    SKIP("FIXME: Bad assertions or broken functionality.");
 
     ScopedCurlInit ready;
 
@@ -2142,8 +2188,6 @@ void HttpRequestTestObjectType::test<19>()
     warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
-
-    set_test_name("Header generation for HttpRequest GET with header overrides");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -2246,7 +2290,7 @@ void HttpRequestTestObjectType::test<19>()
                                             options,
                                             headers,
                                             handlerp);
-        ensure("Valid handle returned for get request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
         int count(0);
@@ -2256,15 +2300,16 @@ void HttpRequestTestObjectType::test<19>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handler.mHeadersRequired.clear();
         handler.mHeadersDisallowed.clear();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -2274,8 +2319,9 @@ void HttpRequestTestObjectType::test<19>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -2284,7 +2330,7 @@ void HttpRequestTestObjectType::test<19>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release options & headers
         options.reset();
@@ -2311,8 +2357,7 @@ void HttpRequestTestObjectType::test<19>()
 
 
 // Test header generation on POST requests with overrides
-template <> template <>
-void HttpRequestTestObjectType::test<20>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a POST replace its defaults", "[HttpRequest_Tests]")
 {
     // It appears that HttpRequest is fully capable of sending duplicate header values in violation of
     // this test's expectations. Something needs to budge: is sending duplicate header values desired?
@@ -2323,7 +2368,7 @@ void HttpRequestTestObjectType::test<20>()
     // X-Reflect-content-type: text/html
     // X-Reflect-content-type: application/llsd+xml
     //
-    skip("FIXME: Bad assertions or broken functionality.");
+    SKIP("FIXME: Bad assertions or broken functionality.");
 
     ScopedCurlInit ready;
 
@@ -2332,8 +2377,6 @@ void HttpRequestTestObjectType::test<20>()
     warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
-
-    set_test_name("Header generation for HttpRequest POST with header overrides");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -2376,7 +2419,7 @@ void HttpRequestTestObjectType::test<20>()
         ba = new BufferArray;
         ba->append(msg, strlen(msg));
 
-        // Issue a default POST
+        // Issue a POST with modified headers
         mStatus = HttpStatus(200);
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
@@ -2454,7 +2497,7 @@ void HttpRequestTestObjectType::test<20>()
                                              options,
                                              headers,
                                              handlerp);
-        ensure("Valid handle returned for get request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         ba->release();
         ba = NULL;
 
@@ -2466,8 +2509,9 @@ void HttpRequestTestObjectType::test<20>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
 
         // Okay, request a shutdown of the servicing thread
@@ -2475,7 +2519,7 @@ void HttpRequestTestObjectType::test<20>()
         handler.mHeadersRequired.clear();
         handler.mHeadersDisallowed.clear();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -2485,8 +2529,9 @@ void HttpRequestTestObjectType::test<20>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -2495,7 +2540,7 @@ void HttpRequestTestObjectType::test<20>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release options & headers
         options.reset();
@@ -2526,8 +2571,7 @@ void HttpRequestTestObjectType::test<20>()
 
 
 // Test header generation on PUT requests with overrides
-template <> template <>
-void HttpRequestTestObjectType::test<21>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the last of several Content-Types given to a PUT is the one sent", "[HttpRequest_Tests]")
 {
     // It appears that HttpRequest is fully capable of sending duplicate header values in violation of
     // this test's expectations. Something needs to budge: is sending duplicate header values desired?
@@ -2538,7 +2582,7 @@ void HttpRequestTestObjectType::test<21>()
     // X-Reflect-content-type: text/html
     // X-Reflect-content-type: application/llsd+xml
     //
-    skip("FIXME: Bad assertions or broken functionality.");
+    SKIP("FIXME: Bad assertions or broken functionality.");
 
     ScopedCurlInit ready;
 
@@ -2547,8 +2591,6 @@ void HttpRequestTestObjectType::test<21>()
     warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
-
-    set_test_name("Header generation for HttpRequest PUT with header overrides");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -2589,7 +2631,7 @@ void HttpRequestTestObjectType::test<21>()
         ba = new BufferArray;
         ba->append(msg, strlen(msg));
 
-        // Issue a default PUT
+        // Issue a PUT with several Content-Types
         mStatus = HttpStatus(200);
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
@@ -2662,7 +2704,7 @@ void HttpRequestTestObjectType::test<21>()
                                             options,
                                             headers,
                                             handlerp);
-        ensure("Valid handle returned for get request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         ba->release();
         ba = NULL;
 
@@ -2674,8 +2716,9 @@ void HttpRequestTestObjectType::test<21>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == 1);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
 
         // Okay, request a shutdown of the servicing thread
@@ -2683,7 +2726,7 @@ void HttpRequestTestObjectType::test<21>()
         handler.mHeadersRequired.clear();
         handler.mHeadersDisallowed.clear();
         handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -2693,8 +2736,9 @@ void HttpRequestTestObjectType::test<21>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 2);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -2703,7 +2747,7 @@ void HttpRequestTestObjectType::test<21>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release options & headers
         options.reset();
@@ -2733,15 +2777,12 @@ void HttpRequestTestObjectType::test<21>()
 }
 
 // BUG-2295 Tests - Content-Range header received but no body
-template <> template <>
-void HttpRequestTestObjectType::test<22>()
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: BUG-2295 a 206 with a missing or short body gets the right status", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
     std::string url_base(get_base_url());
     // std::cerr << "Base:  "  << url_base << std::endl;
-
-    set_test_name("BUG-2295");
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
@@ -2786,7 +2827,7 @@ void HttpRequestTestObjectType::test<22>()
                                                          options,
                                                          HttpHeaders::ptr_t(),
                                                          handlerp);
-            ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+            REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         }
 
         // Run the notification pump.
@@ -2797,8 +2838,9 @@ void HttpRequestTestObjectType::test<22>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time - ms1", count < limit);
-        ensure("One handler invocation for each request - ms1", mHandlerCalls == test_count);
+        UNSCOPED_INFO("Request executed in reasonable time - ms1");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == test_count);
 
         // ======================================
         // Issue bug2295 GETs that will get a libcurl 18 (PARTIAL_FILE)
@@ -2817,7 +2859,7 @@ void HttpRequestTestObjectType::test<22>()
                                                          options,
                                                          HttpHeaders::ptr_t(),
                                                          handlerp);
-            ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+            REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         }
 
         // Run the notification pump.
@@ -2828,8 +2870,9 @@ void HttpRequestTestObjectType::test<22>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time - ms2", count < limit);
-        ensure("One handler invocation for each request - ms2", mHandlerCalls == test2_count);
+        UNSCOPED_INFO("Request executed in reasonable time - ms2");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == test2_count);
 
         // ======================================
         // Issue bug2295 GETs that will get an llcorehttp HE_INV_CONTENT_RANGE_HDR status
@@ -2848,7 +2891,7 @@ void HttpRequestTestObjectType::test<22>()
                                                          options,
                                                          HttpHeaders::ptr_t(),
                                                          handlerp);
-            ensure("Valid handle returned for ranged request", handle != LLCORE_HTTP_HANDLE_INVALID);
+            REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         }
 
         // Run the notification pump.
@@ -2859,8 +2902,9 @@ void HttpRequestTestObjectType::test<22>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time - ms3", count < limit);
-        ensure("One handler invocation for each request - ms3", mHandlerCalls == test3_count);
+        UNSCOPED_INFO("Request executed in reasonable time - ms3");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == test3_count);
 
         // ======================================
         // Okay, request a shutdown of the servicing thread
@@ -2868,7 +2912,7 @@ void HttpRequestTestObjectType::test<22>()
         mStatus = HttpStatus();
         mHandlerCalls = 0;
         HttpHandle handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -2878,8 +2922,9 @@ void HttpRequestTestObjectType::test<22>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Shutdown request executed in reasonable time", count < limit);
-        ensure("Shutdown handler invocation", mHandlerCalls == 1);
+        UNSCOPED_INFO("Shutdown request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -2888,7 +2933,7 @@ void HttpRequestTestObjectType::test<22>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release options
         options.reset();
@@ -2909,22 +2954,49 @@ void HttpRequestTestObjectType::test<22>()
     }
 }
 
-template <> template <>
-void HttpRequestTestObjectType::test<23>()
+// Records, by URL, when each response was delivered and the retries it reports
+class RetryRecordingHandler : public TestHandler2
+{
+public:
+    struct Delivery
+    {
+        std::chrono::steady_clock::time_point mAt;
+        unsigned int mRetries;
+        unsigned int m503Retries;
+    };
+
+    RetryRecordingHandler(HttpRequestTestData * state,
+                          const std::string & name)
+        : TestHandler2(state, name)
+        {}
+
+    void onCompleted(HttpHandle handle, HttpResponse * response) override
+        {
+            TestHandler2::onCompleted(handle, response);
+
+            Delivery delivery{ std::chrono::steady_clock::now(), 0, 0 };
+            response->getRetries(&delivery.mRetries, &delivery.m503Retries);
+            mDeliveries[response->getRequestURL()] = delivery;
+        }
+
+    std::map<std::string, Delivery> mDeliveries;
+};
+
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 are retried once and a good Retry-After holds the retry back", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
-    set_test_name("HttpRequest GET 503s with 'Retry-After'");
-
-    // This tests mainly that the code doesn't fall over if
-    // various well- and mis-formed Retry-After headers are
-    // sent along with the response.  Direct inspection of
-    // the parsing result isn't supported.
+    // Each of the peer's seven 503 answers, /503/0/ to /503/6/, carries
+    // a different Retry-After, well- or mis-formed, and the code must not
+    // fall over on any of them.  The parsing result can't be inspected,
+    // but its effect can: only /503/0/'s "2" is a delay llcorehttp takes,
+    // and it holds that retry back two seconds where the others retry
+    // after the default backoff of one.
 
     // Handler can be stack-allocated *if* there are no dangling
     // references to it after completion of this method.
     // Create before memory record as the string copy will bump numbers.
-    TestHandler2 handler(this, "handler");
+    RetryRecordingHandler handler(this, "handler");
     LLCore::HttpHandler::ptr_t handlerp(&handler, NoOpDeletor);
     std::string url_base(get_base_url() + "/503/"); // path to 503 generators
     mHandlerCalls = 0;
@@ -2948,13 +3020,16 @@ void HttpRequestTestObjectType::test<23>()
         opts->setRetries(1);            // Retry once only
         opts->setUseRetryAfter(true);   // Try to parse the retry-after header
 
-        // Issue a GET that 503s with valid retry-after
+        // Issue a GET to each of the peer's 503 answers
         mStatus = HttpStatus(503);
-        int url_limit(6);
+        const int url_limit(7);
+        std::vector<std::string> urls;
+        const auto issued(std::chrono::steady_clock::now());
         for (int i(0); i < url_limit; ++i)
         {
             std::ostringstream url;
             url << url_base << i << "/";
+            urls.push_back(url.str());
             HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
                                                          url.str(),
                                                          0,
@@ -2963,9 +3038,8 @@ void HttpRequestTestObjectType::test<23>()
                                                          HttpHeaders::ptr_t(),
                                                          handlerp);
 
-            std::ostringstream testtag;
-            testtag << "Valid handle returned for 503 request #" << i;
-            ensure(testtag.str(), handle != LLCORE_HTTP_HANDLE_INVALID);
+            CAPTURE(i);
+            REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         }
 
 
@@ -2977,14 +3051,30 @@ void HttpRequestTestObjectType::test<23>()
             req->update(0);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Request executed in reasonable time", count < limit);
-        ensure("One handler invocation for request", mHandlerCalls == url_limit);
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == url_limit);
+
+        // Each GET was retried once, as a 503, whatever its Retry-After said,
+        // and the retry of the one with "Retry-After: 2" came no sooner than that
+        for (int i(0); i < url_limit; ++i)
+        {
+            CAPTURE(i);
+            const auto delivery(handler.mDeliveries.find(urls[i]));
+            REQUIRE(delivery != handler.mDeliveries.end());
+            CHECK(delivery->second.mRetries == 1u);
+            CHECK(delivery->second.m503Retries == 1u);
+            if (0 == i)
+            {
+                CHECK(delivery->second.mAt - issued >= std::chrono::milliseconds(1900));
+            }
+        }
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         mHandlerCalls = 0;
         HttpHandle handle = req->requestStopThread(handlerp);
-        ensure("Valid handle returned for second request", handle != LLCORE_HTTP_HANDLE_INVALID);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
         count = 0;
@@ -2994,8 +3084,9 @@ void HttpRequestTestObjectType::test<23>()
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Second request executed in reasonable time", count < limit);
-        ensure("Second handler invocation", mHandlerCalls == 1);
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 1);
 
         // See that we actually shutdown the thread
         count = 0;
@@ -3004,7 +3095,7 @@ void HttpRequestTestObjectType::test<23>()
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        ensure("Thread actually stopped running", HttpService::isStopped());
+        CHECK(HttpService::isStopped());
 
         // release options
         opts.reset();
@@ -3027,7 +3118,7 @@ void HttpRequestTestObjectType::test<23>()
 }
 
 
-}  // end namespace tut
+}  // anonymous namespace
 
 namespace
 {
@@ -3042,5 +3133,3 @@ void usleep(unsigned long usec)
 #endif
 
 }
-
-#endif  // TEST_LLCORE_HTTP_REQUEST_H_

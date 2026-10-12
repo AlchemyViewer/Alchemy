@@ -27,24 +27,13 @@
  */
 
 #include "linden_common.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 #include "llxorcipher.h"
 
-namespace tut
-{
 namespace
 {
-    struct cipher
-    {
-    };
-    typedef test_group<cipher> cipher_t;
-    typedef cipher_t::object cipher_object_t;
-    tut::cipher_t tut_cipher("cipher");
-}
-
-    //encrypt->decrypt
-    template<> template<>
-    void cipher_object_t::test<1>()
+    TEST_CASE("cipher: encrypt then decrypt with the same pad round-trips the data", "[cipher]")
     {
         const U32 len = 3;
         const U8 pad[] = "abc";
@@ -56,18 +45,16 @@ namespace
         LLXORCipher xorCipher1(pad, len);
 
         U32 length = xorCipher.requiredEncryptionSpace(50);
-        ensure("requiredEncryptionSpace() function failed", (length == 50));
+        CHECK(length == 50);
 
         U32 lenEncrypted = xorCipher.encrypt((U8 *) str, str_len, encrypted, str_len);
-        ensure("Encryption failed", (lenEncrypted == str_len));
+        CHECK(lenEncrypted == str_len);
         U32 lenDecrypted = xorCipher1.decrypt(encrypted, str_len, decrypted, str_len);
-        ensure("Decryption failed", (lenDecrypted == str_len));
-        ensure_memory_matches("LLXORCipher Encrypt/Decrypt failed", str, str_len, decrypted, lenDecrypted);
+        CHECK(lenDecrypted == str_len);
+        CHECK_THAT(ll_test::Memory(str, str_len), ll_test::MemoryMatches(decrypted, lenDecrypted));
     }
 
-    // operator=
-    template<> template<>
-    void cipher_object_t::test<2>()
+    TEST_CASE("cipher: operator= copies the pad so the copy decrypts", "[cipher]")
     {
         const U8 pad[] = "ABCDEFGHIJKLMNOPQ"; // pad len longer than data to be ciphered
         const U32 pad_len = sizeof(pad);
@@ -86,12 +73,10 @@ namespace
         // encrypted using xorCipher
         xorCipher1 = xorCipher;
         U32 lenDecrypted = xorCipher1.decrypt(encrypted, str_len, decrypted, str_len);
-        ensure_memory_matches("LLXORCipher operator= failed", str, str_len, decrypted, lenDecrypted);
+        CHECK_THAT(ll_test::Memory(str, str_len), ll_test::MemoryMatches(decrypted, lenDecrypted));
     }
 
-    //in place encrypt->decrypt
-    template<> template<>
-    void cipher_object_t::test<3>()
+    TEST_CASE("cipher: in-place encrypt changes the data and decrypt restores it", "[cipher]")
     {
         U32 padNum = 0x12349087;
         const U8* pad = (U8*) &padNum;
@@ -104,9 +89,9 @@ namespace
         LLXORCipher xorCipher1(pad, pad_len);
         xorCipher.encrypt((U8 *) str, str_len);
         // it should not be the same as original data!
-        ensure("LLXORCipher: In Place encrypt failed", memcmp(str, str1, str_len) != 0);
+        CHECK(memcmp(str, str1, str_len) != 0);
         xorCipher1.decrypt((U8 *) str, str_len);
-        // it should not be the same as original data!
-        ensure_memory_matches("LLXORCipher: In Place decrypt failed", str, str_len, str1, str_len);
+        // it should be the original data again
+        CHECK_THAT(ll_test::Memory(str, str_len), ll_test::MemoryMatches(str1, str_len));
     }
 }

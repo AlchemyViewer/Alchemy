@@ -1,5 +1,5 @@
 /**
- * @file test_httpheaders.hpp
+ * @file httpheaders_test.cpp
  * @brief unit tests for the LLCore::HttpHeaders class
  *
  * $LicenseInfo:firstyear=2012&license=viewerlgpl$
@@ -23,51 +23,33 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
-#ifndef TEST_LLCORE_HTTP_HEADERS_H_
-#define TEST_LLCORE_HTTP_HEADERS_H_
+#include "linden_common.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 #include "httpheaders.h"
 
 #include <iostream>
 
 
+using namespace LLCore;
 using namespace LLCoreInt;
 
 
-namespace tut
-{
 namespace
 {
-
-struct HttpHeadersTestData
+TEST_CASE("HttpHeaders Tests: a new HttpHeaders is empty", "[HttpHeaders_Tests]")
 {
-    // the test objects inherit from this so the member functions and variables
-    // can be referenced directly inside of the test functions.
-};
-
-typedef test_group<HttpHeadersTestData> HttpHeadersTestGroupType;
-typedef HttpHeadersTestGroupType::object HttpHeadersTestObjectType;
-HttpHeadersTestGroupType HttpHeadersTestGroup("HttpHeaders Tests");
-}
-
-template <> template <>
-void HttpHeadersTestObjectType::test<1>()
-{
-    set_test_name("HttpHeaders construction");
-
     // create a new ref counted object with an implicit reference
     HttpHeaders::ptr_t headers = HttpHeaders::ptr_t(new HttpHeaders());
-    ensure("Nothing in headers", 0 == headers->size());
+    CHECK(headers->size() == 0);
 
     // release the implicit reference, causing the object to be released
     headers.reset();
 }
 
-template <> template <>
-void HttpHeadersTestObjectType::test<2>()
+TEST_CASE("HttpHeaders Tests: append keeps names and values in order", "[HttpHeaders_Tests]")
 {
-    set_test_name("HttpHeaders construction");
-
     // create a new ref counted object with an implicit reference
     HttpHeaders::ptr_t headers = HttpHeaders::ptr_t(new HttpHeaders());
 
@@ -80,24 +62,21 @@ void HttpHeadersTestObjectType::test<2>()
         std::string str2v("application/json");
         headers->append(str2n, str2v);
 
-        ensure("Headers retained", 2 == headers->size());
+        REQUIRE(headers->size() == 2);
         HttpHeaders::container_t & c(headers->getContainerTESTONLY());
 
-        ensure("First name is first name", c[0].first == str1n);
-        ensure("First value is first value", c[0].second == str1v);
-        ensure("Second name is second name", c[1].first == str2n);
-        ensure("Second value is second value", c[1].second == str2v);
+        CHECK(c[0].first == str1n);
+        CHECK(c[0].second == str1v);
+        CHECK(c[1].first == str2n);
+        CHECK(c[1].second == str2v);
     }
 
     // release the implicit reference, causing the object to be released
     headers.reset();
 }
 
-template <> template <>
-void HttpHeadersTestObjectType::test<3>()
+TEST_CASE("HttpHeaders Tests: find matches whole names case-sensitively", "[HttpHeaders_Tests]")
 {
-    set_test_name("HttpHeaders basic find");
-
     // create a new ref counted object with an implicit reference
     HttpHeaders::ptr_t headers = HttpHeaders::ptr_t(new HttpHeaders());
 
@@ -113,35 +92,35 @@ void HttpHeadersTestObjectType::test<3>()
         std::string str3v("trois gymnopedie");
         headers->append(str3n, str3v);
 
-        ensure("Headers retained", 3 == headers->size());
+        CHECK(headers->size() == 3);
 
         const std::string * result(NULL);
 
         // Find a header
         result = headers->find("TRES");
-        ensure("Found the last item", result != NULL);
-        ensure("Last item is a nice", result != NULL && str3v == *result);
+        REQUIRE(result != NULL);
+        CHECK((result != NULL && str3v == *result));
 
         // appends above are raw and find is case sensitive
         result = headers->find("TReS");
-        ensure("Last item not found due to case", result == NULL);
+        UNSCOPED_INFO("the case differs");
+        CHECK(result == NULL);
 
         result = headers->find("TRE");
-        ensure("Last item not found due to prefixing (1)", result == NULL);
+        UNSCOPED_INFO("a prefix of the name");
+        CHECK(result == NULL);
 
         result = headers->find("TRESS");
-        ensure("Last item not found due to prefixing (2)", result == NULL);
+        UNSCOPED_INFO("the name and more");
+        CHECK(result == NULL);
     }
 
     // release the implicit reference, causing the object to be released
     headers.reset();
 }
 
-template <> template <>
-void HttpHeadersTestObjectType::test<4>()
+TEST_CASE("HttpHeaders Tests: appendNormal splits and cleans raw header lines", "[HttpHeaders_Tests]")
 {
-    set_test_name("HttpHeaders normalized header entry");
-
     // create a new ref counted object with an implicit reference
     HttpHeaders::ptr_t headers = HttpHeaders::ptr_t(new HttpHeaders());
 
@@ -150,80 +129,82 @@ void HttpHeadersTestObjectType::test<4>()
         static char line1v[] = "image/yourfacehere";
         headers->appendNormal(line1, sizeof(line1) - 1);
 
-        ensure("First append worked in some fashion", 1 == headers->size());
+        CHECK(headers->size() == 1);
 
         const std::string * result(NULL);
 
         // Find a header
         result = headers->find("accept");
-        ensure("Found 'accept'", result != NULL);
-        ensure("accept value has face", result != NULL && *result == line1v);
+        REQUIRE(result != NULL);
+        CHECK((result != NULL && *result == line1v));
 
         // Left-clean on value
         static char line2[] = " next : \t\tlinejunk \t";
         headers->appendNormal(line2, sizeof(line2) - 1);
-        ensure("Second append worked", 2 == headers->size());
+        CHECK(headers->size() == 2);
         result = headers->find("next");
-        ensure("Found 'next'", result != NULL);
-        ensure("next value is left-clean", result != NULL &&
-               *result == "linejunk \t");
+        REQUIRE(result != NULL);
+        UNSCOPED_INFO("the value is trimmed on the left only");
+        CHECK((result != NULL &&
+               *result == "linejunk \t"));
 
         // First value unmolested
         result = headers->find("accept");
-        ensure("Found 'accept' again", result != NULL);
-        ensure("accept value has face", result != NULL && *result == line1v);
+        REQUIRE(result != NULL);
+        CHECK((result != NULL && *result == line1v));
 
         // Colons in value are okay
         static char line3[] = "FancY-PANTs::plop:-neuf-=vleem=";
         static char line3v[] = ":plop:-neuf-=vleem=";
         headers->appendNormal(line3, sizeof(line3) - 1);
-        ensure("Third append worked", 3 == headers->size());
+        CHECK(headers->size() == 3);
         result = headers->find("fancy-pants");
-        ensure("Found 'fancy-pants'", result != NULL);
-        ensure("fancy-pants value has colons", result != NULL && *result == line3v);
+        REQUIRE(result != NULL);
+        UNSCOPED_INFO("colons in the value are kept");
+        CHECK((result != NULL && *result == line3v));
 
         // Zero-length value
         static char line4[] = "all-talk-no-walk:";
         headers->appendNormal(line4, sizeof(line4) - 1);
-        ensure("Fourth append worked", 4 == headers->size());
+        CHECK(headers->size() == 4);
         result = headers->find("all-talk-no-walk");
-        ensure("Found 'all-talk'", result != NULL);
-        ensure("al-talk value is zero-length", result != NULL && result->size() == 0);
+        REQUIRE(result != NULL);
+        CHECK((result != NULL && result->size() == 0));
 
         // Zero-length name
         static char line5[] = ":all-talk-no-walk";
         static char line5v[] = "all-talk-no-walk";
         headers->appendNormal(line5, sizeof(line5) - 1);
-        ensure("Fifth append worked", 5 == headers->size());
+        CHECK(headers->size() == 5);
         result = headers->find("");
-        ensure("Found no-name", result != NULL);
-        ensure("no-name value is something", result != NULL && *result == line5v);
+        REQUIRE(result != NULL);
+        CHECK((result != NULL && *result == line5v));
 
         // Lone colon is still something
         headers->clear();
         static char line6[] = "  :";
         headers->appendNormal(line6, sizeof(line6) - 1);
-        ensure("Sixth append worked", 1 == headers->size());
+        CHECK(headers->size() == 1);
         result = headers->find("");
-        ensure("Found 2nd no-name", result != NULL);
-        ensure("2nd no-name value is nothing", result != NULL && result->size() == 0);
+        REQUIRE(result != NULL);
+        CHECK((result != NULL && result->size() == 0));
 
         // Line without colons is taken as-is and unstripped in name
         static char line7[] = " \toskdgioasdghaosdghoowg28342908tg8902hg0hwedfhqew890v7qh0wdebv78q0wdevbhq>?M>BNM<ZV>?NZ? \t";
         headers->appendNormal(line7, sizeof(line7) - 1);
-        ensure("Seventh append worked", 2 == headers->size());
+        CHECK(headers->size() == 2);
         result = headers->find(line7);
-        ensure("Found whatsit line", result != NULL);
-        ensure("Whatsit line has no value", result != NULL && result->size() == 0);
+        REQUIRE(result != NULL);
+        CHECK((result != NULL && result->size() == 0));
 
         // Normaling interface heeds the byte count, doesn't look for NUL-terminator
         static char line8[] = "binary:ignorestuffontheendofthis";
         headers->appendNormal(line8, 13);
-        ensure("Eighth append worked", 3 == headers->size());
+        CHECK(headers->size() == 3);
         result = headers->find("binary");
-        ensure("Found 'binary'", result != NULL);
-        ensure("binary value was limited to 'ignore'", result != NULL &&
-               *result == "ignore");
+        REQUIRE(result != NULL);
+        CHECK((result != NULL &&
+               *result == "ignore"));
 
     }
 
@@ -232,20 +213,17 @@ void HttpHeadersTestObjectType::test<4>()
 }
 
 // Verify forward iterator finds everything as expected
-template <> template <>
-void HttpHeadersTestObjectType::test<5>()
+TEST_CASE("HttpHeaders Tests: iterators visit every entry in order", "[HttpHeaders_Tests]")
 {
-    set_test_name("HttpHeaders iterator tests");
-
     // create a new ref counted object with an implicit reference
     HttpHeaders::ptr_t headers = HttpHeaders::ptr_t(new HttpHeaders());
 
     HttpHeaders::iterator end(headers->end()), begin(headers->begin());
-    ensure("Empty container has equal begin/end const iterators", end == begin);
+    CHECK(end == begin);
     HttpHeaders::const_iterator cend(headers->end()), cbegin(headers->begin());
-    ensure("Empty container has equal rbegin/rend const iterators", cend == cbegin);
+    CHECK(cend == cbegin);
 
-    ensure("Empty container has equal begin/end iterators", headers->end() == headers->begin());
+    CHECK(headers->end() == headers->begin());
 
     {
         static char line1[] = " AcCePT : image/yourfacehere";
@@ -272,7 +250,7 @@ void HttpHeadersTestObjectType::test<5>()
         static char line6v[] = "";
         headers->appendNormal(line6, sizeof(line6) - 1);
 
-        ensure("All entries accounted for", 6 == headers->size());
+        REQUIRE(headers->size() == 6);
 
         static char * values[] = {
             line1v,
@@ -289,9 +267,8 @@ void HttpHeadersTestObjectType::test<5>()
              cend != it;
              ++it, ++i)
         {
-            std::ostringstream str;
-            str << "Const Iterator value # " << i << " was " << values[i];
-            ensure(str.str(), (*it).second == values[i]);
+            CAPTURE(i);
+            REQUIRE((*it).second == values[i]);
         }
 
         // Rewind, do non-consts
@@ -301,9 +278,8 @@ void HttpHeadersTestObjectType::test<5>()
              end != it;
              ++it, ++i)
         {
-            std::ostringstream str;
-            str << "Const Iterator value # " << i << " was " << values[i];
-            ensure(str.str(), (*it).second == values[i]);
+            CAPTURE(i);
+            REQUIRE((*it).second == values[i]);
         }
     }
 
@@ -312,18 +288,15 @@ void HttpHeadersTestObjectType::test<5>()
 }
 
 // Reverse iterators find everything as expected
-template <> template <>
-void HttpHeadersTestObjectType::test<6>()
+TEST_CASE("HttpHeaders Tests: reverse iterators visit every entry in reverse order", "[HttpHeaders_Tests]")
 {
-    set_test_name("HttpHeaders reverse iterator tests");
-
     // create a new ref counted object with an implicit reference
     HttpHeaders::ptr_t headers = HttpHeaders::ptr_t(new HttpHeaders());
 
     HttpHeaders::reverse_iterator rend(headers->rend()), rbegin(headers->rbegin());
-    ensure("Empty container has equal rbegin/rend const iterators", rend == rbegin);
+    CHECK(rend == rbegin);
     HttpHeaders::const_reverse_iterator crend(headers->rend()), crbegin(headers->rbegin());
-    ensure("Empty container has equal rbegin/rend const iterators", crend == crbegin);
+    CHECK(crend == crbegin);
 
     {
         static char line1[] = " AcCePT : image/yourfacehere";
@@ -350,7 +323,7 @@ void HttpHeadersTestObjectType::test<6>()
         static char line6v[] = "";
         headers->appendNormal(line6, sizeof(line6) - 1);
 
-        ensure("All entries accounted for", 6 == headers->size());
+        REQUIRE(headers->size() == 6);
 
         static char * values[] = {
             line6v,
@@ -367,9 +340,8 @@ void HttpHeadersTestObjectType::test<6>()
              cend != it;
              ++it, ++i)
         {
-            std::ostringstream str;
-            str << "Const Iterator value # " << i << " was " << values[i];
-            ensure(str.str(), (*it).second == values[i]);
+            CAPTURE(i);
+            REQUIRE((*it).second == values[i]);
         }
 
         // Rewind, do non-consts
@@ -379,9 +351,8 @@ void HttpHeadersTestObjectType::test<6>()
              end != it;
              ++it, ++i)
         {
-            std::ostringstream str;
-            str << "Iterator value # " << i << " was " << values[i];
-            ensure(str.str(), (*it).second == values[i]);
+            CAPTURE(i);
+            REQUIRE((*it).second == values[i]);
         }
     }
 
@@ -389,7 +360,4 @@ void HttpHeadersTestObjectType::test<6>()
     headers.reset();
 }
 
-}  // end namespace tut
-
-
-#endif  // TEST_LLCORE_HTTP_HEADERS_H_
+}  // anonymous namespace
