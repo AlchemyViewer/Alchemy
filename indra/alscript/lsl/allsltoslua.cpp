@@ -2472,7 +2472,14 @@ namespace
             case LST_INTEGER:
             case LST_FLOATINGPOINT: return { bracketed(out, COMPARE + 1) + " ~= 0", COMPARE, true };
             case LST_STRING: return { bracketed(out, COMPARE + 1) + " ~= \"\"", COMPARE, true };
-            case LST_KEY: return { bracketed(out, PRIMARY) + ".istruthy", PRIMARY, true };
+            case LST_KEY:
+                // A key SLua holds as text -- link_message's id, one given
+                // text -- a uuid made of it first, none where it is no UUID.
+                if (slType(e) == LST_STRING)
+                {
+                    return { "(touuid(" + out.text + ") or NULL_KEY).istruthy", PRIMARY, true };
+                }
+                return { bracketed(out, PRIMARY) + ".istruthy", PRIMARY, true };
             case LST_VECTOR: return { bracketed(out, COMPARE + 1) + " ~= ZERO_VECTOR", COMPARE, true };
             case LST_QUATERNION: return { bracketed(out, COMPARE + 1) + " ~= ZERO_ROTATION", COMPARE, true };
             case LST_LIST: return { "#" + bracketed(out, UNARY) + " > 0", COMPARE, true };
@@ -7480,7 +7487,7 @@ namespace
             if (e && e->getNodeSubType() == NODE_CONSTANT_EXPRESSION && e->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
             {
                 const std::string_view value = static_cast<LSLStringConstant*>(e->getChild(0))->getValue();
-                return !value.empty() && !ALLSLTraits::isUuid(value);
+                return !ALLSLTraits::isUuid(value);
             }
             if (e && e->getNodeSubType() == NODE_LVALUE_EXPRESSION && isNull(static_cast<LSLLValueExpression*>(e)->getMember()))
             {

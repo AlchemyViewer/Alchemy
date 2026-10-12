@@ -2205,8 +2205,9 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<76>()
     {
-        set_test_name("a key of no text said to be NULL_KEY, and one with capitals said to be written small, cast or given; other text as "
-                      "it was said; the two XorBase64Strings said to be what ll.XorBase64 is not, LSL's kept");
+        set_test_name("a key cast from no text said to be NULL_KEY, and one with capitals said to be written small, cast or given; a key "
+                      "given no text kept text; other text as it was said; the two XorBase64Strings said to be what ll.XorBase64 is not, "
+                      "LSL's kept");
         const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
                                               "    key a = (key)\"\"; key c = (key)\"A2E76FCD-9360-4F6D-A924-938F923DF11D\";\n"
                                               "    if ((key)\"\" == NULL_KEY) llOwnerSay(\"same\");\n"
@@ -2233,14 +2234,16 @@ namespace tut
         }
         checksClean(r);
 
-        // Given rather than cast: the same said, and a UUID written small
+        // Given rather than cast: no text kept as text, as other text that is
+        // no UUID is; capitals the same said, and a UUID written small
         // nothing at all.
         const ALLSLToSLua::Result given = convert("default { touch_start(integer n) {\n"
                                                   "    key b = \"\"; key c = \"A2E76FCD-9360-4F6D-A924-938F923DF11D\";\n"
                                                   "    key l = \"a2e76fcd-9360-4f6d-a924-938f923df11d\";\n"
                                                   "    llOwnerSay((string)llGetOwnerKey(b) + (string)llGetOwnerKey(c) + (string)llGetOwnerKey(l));\n"
                                                   "} }\n");
-        ensure("given no text: " + given.text, noted(given, "SluaKeyEmpty") && noted(given, "SluaKeyCase"));
+        ensure("given no text, text: " + given.text, has(given, "local b = \"\"") && has(given, "ll.GetOwnerKey(b :: any)") &&
+                                                        !noted(given, "SluaKeyEmpty") && noted(given, "SluaKeyCase"));
         ensure("nothing else said of them: " + given.text, !noted(given, "SluaKeyText") && !noted(given, "SluaUuidText"));
         checksClean(given);
     }
@@ -3371,22 +3374,45 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<101>()
     {
-        set_test_name("a key compared with no text or a UUID written out is compared as a uuid, the text made one as the key was "
-                      "(Tapple's): NULL_KEY's text is not \"\"; other text, and NULL_KEY, which LSL had as text, still as text");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    key k = \"\";\n"
-                                              "    llOwnerSay((string)(k == \"\"));\n"
-                                              "    if (\"\" != k) llOwnerSay(\"some\");\n"
-                                              "    if (k == \"a2e76fcd-9360-4f6d-a924-938f923df11d\") llOwnerSay(\"that one\");\n"
-                                              "    if (k == \"none\") llOwnerSay(\"text\");\n"
-                                              "    if (NULL_KEY != \"\") llOwnerSay(\"NULL_KEY has text\");\n"
-                                              "} }\n");
-        ensure("Tapple's: " + r.text, has(r, "local k = uuid(\"\")") && has(r, "print(tostring(if k == uuid(\"\") then 1 else 0))"));
-        ensure("either way round: " + r.text, has(r, "if uuid(\"\") ~= k then"));
-        ensure("a UUID written out: " + r.text, has(r, "if k == uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\") then"));
-        ensure("other text, as text: " + r.text, has(r, "if tostring(k) == \"none\" then"));
+        set_test_name("a key given no text holds text, as LSL's did (Tapple's): compared with \"\", sent over a link message, made text "
+                      "and asked its truth as LSL had it; a key that is a uuid compared with no text or a UUID written out as a uuid, "
+                      "other text and NULL_KEY as text");
+        const ALLSLToSLua::Result r = convert("key gUser = \"\";\n"
+                                              "default {\n"
+                                              "    state_entry() {\n"
+                                              "        key k = \"\";\n"
+                                              "        llOwnerSay((string)(k == \"\"));\n"
+                                              "    }\n"
+                                              "    touch_start(integer n) {\n"
+                                              "        if (gUser) llOwnerSay(\"busy\");\n"
+                                              "        gUser = llDetectedKey(0);\n"
+                                              "        llMessageLinked(LINK_SET, 0, \"\", gUser);\n"
+                                              "        gUser = \"\";\n"
+                                              "        llMessageLinked(LINK_SET, 0, \"\", gUser);\n"
+                                              "        llOwnerSay(\"user: \" + (string)gUser);\n"
+                                              "    }\n"
+                                              "    link_message(integer s, integer num, string m, key id) {\n"
+                                              "        if (id == \"\") llOwnerSay(\"nobody\");\n"
+                                              "        if (id) llOwnerSay(\"someone\");\n"
+                                              "        key d;\n"
+                                              "        if (d == \"\") llOwnerSay(\"no key yet\");\n"
+                                              "        if (\"\" != d) llOwnerSay(\"some\");\n"
+                                              "        if (d == \"a2e76fcd-9360-4f6d-a924-938f923df11d\") llOwnerSay(\"that one\");\n"
+                                              "        if (d == \"none\") llOwnerSay(\"text\");\n"
+                                              "        if (NULL_KEY != \"\") llOwnerSay(\"NULL_KEY has text\");\n"
+                                              "    }\n"
+                                              "}\n");
+        ensure("Tapple's, text: " + r.text, has(r, "local k = \"\"") && has(r, "print(tostring(if k == \"\" then 1 else 0))"));
+        ensure("a global given no text, text: " + r.text, has(r, "local gUser = \"\"") && has(r, "gUser = tostring(detected[1]:getKey())"));
+        ensure("sent as text, no text and all: " + r.text, count(r, "ll.MessageLinked(LINK_SET, 0, \"\", gUser)") == 2);
+        ensure("made text as it is: " + r.text, has(r, "print(\"user: \" .. gUser)"));
+        ensure("its truth as LSL's key's: " + r.text, has(r, "if (touuid(gUser) or NULL_KEY).istruthy then"));
+        ensure("the id, text: " + r.text, has(r, "if id == \"\" then") && has(r, "if (touuid(id) or NULL_KEY).istruthy then"));
+        ensure("a uuid against no text, a uuid: " + r.text, has(r, "local d = NULL_KEY") && has(r, "if d == uuid(\"\") then") &&
+                                                           has(r, "if uuid(\"\") ~= d then"));
+        ensure("a UUID written out: " + r.text, has(r, "if d == uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\") then"));
+        ensure("other text, as text: " + r.text, has(r, "if tostring(d) == \"none\" then"));
         ensure("NULL_KEY, as LSL's text: " + r.text, has(r, "if tostring(NULL_KEY) ~= \"\" then"));
-        ensure("said once: " + r.text, noted(r, "SluaKeyEmpty") && count(r, "-- LSL: SLua's uuid of no text is NULL_KEY") == 1);
         checksClean(r);
     }
 }
