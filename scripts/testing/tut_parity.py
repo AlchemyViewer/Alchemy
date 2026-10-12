@@ -9,11 +9,18 @@ Two steps, either side of scripts/testing/tut2catch.py:
              [group, N: name] ok | fail | exception: ... | skipped known failure | ...
            A test TUT never reported (a dummy test<N> slot) is not a test.
            With them it keeps the sha256 of the TUT source, the one
-           indra/**/tests/<stem>.cpp git tracks.
+           indra/**/tests/<stem>.cpp git tracks. A test built at other
+           x86-64 tiers too (an entry ending _baseline, _v2, _v3, _v4) is
+           kept a tier apart, under <stem>@<tier>.
   check    after converting and building: runs each converted file's CTest
            entry, <binary>/<file stem>, as XML, and matches the cases to the
            TUT results through tut2catch.py's mapping. tut2catch.py must be
            beside this script: the converted file is read as it reads one.
+           A file built at other tiers too has an entry
+           <binary>_<tier>/<file stem> at each, held to TUT's run at that
+           tier; the tree's own binary is held to TUT's untiered run (or,
+           where there is none, its run at the tree's tier, AL_ISA_TIER). A
+           tier the host does not run skips on both sides, which is listed.
 
 Parity holds for a file when:
   - its inputs are the ones the run is of: the converted file is no newer
@@ -54,11 +61,12 @@ Parity holds for a file when:
 
 A test the mapping says TUT never ran (past its group's limit) or this host
 does not compile is listed, not counted against parity, as is an assertion
-outside every case (a helper's) that no case ran. So is what the
-Catch2 harness's state guard says a case left changed: TUT never looked, so
-it is a finding about the test, not a difference the conversion made; the
+outside every case (a helper's) that no case ran. So is what the Catch2
+harness's state guard says a case left changed: TUT never looked, so it is
+a finding about the test, not a difference the conversion made; the
 table's exit column shows the run's exit code. It prints a table, one row a
-file, and exits 1 on any mismatch, listing each.
+file (and one a tier it is built at besides), and exits 1 on any mismatch,
+listing each.
 
     python3 -I scripts/testing/tut_parity.py record --out /tmp/tut.json \\
         INTEGRATION_TEST_RUNNER_v3math PROJECT_llmath_TEST_v3color
@@ -84,6 +92,8 @@ DEFAULT_CONFIG = "RelWithDebInfo"
 # What every test entry exits with when it skips: the harness turns Catch2's
 # "all skipped" into it, and CTest reads it as skipped.
 SKIP_CODE = 125
+# The x86-64 tiers a test is built for beside the tree's own, lowest first.
+TIERS = ("baseline", "v2", "v3", "v4")
 # Tags under which Catch2 passes a case whatever it does.
 FORGIVING_TAGS = ("[!mayfail]", "[!shouldfail]")
 RESULT_LINE = re.compile(
@@ -149,12 +159,21 @@ def run(test, extra, timeout):
         return "timeout", (e.stdout or b"").decode("utf-8", "replace")
 
 
-def stem_of_tut(name):
-    """The test file a TUT CTest entry runs, by stem."""
+def isa_tier(name):
+    """The x86-64 tier a TUT entry's or a Catch2 binary's name ends in
+    (_baseline, _v2, _v3, _v4), it being built for that tier; None for one
+    built at the tree's own."""
+    m = re.search(r"_(" + "|".join(TIERS) + r")$", name)
+    return m.group(1) if m else None
+
+
+def tut_identity(name):
+    """The test file a TUT CTest entry runs, by stem, and its ISA tier."""
     m = re.search(r"TEST_RUNNER_(\w+)$", name) or re.search(r"_TEST_(\w+)$", name)
     if not m:
-        return name
-    return re.sub(r"_(?:baseline|v2|v3|v4)$", "", m.group(1)) + "_test"
+        return name, None
+    tier = isa_tier(m.group(1))
+    return (m.group(1)[:-len(tier) - 1] if tier else m.group(1)) + "_test", tier
 
 
 def tut_source(stem):
@@ -197,18 +216,21 @@ def record(args):
             results.append({"group": m.group("group"), "n": int(m.group("n")), "name": m.group("name") or "",
                             "result": {"ok": "ok", "skipped known failure": "skip"}.get(result, "fail"),
                             "said": line[m.start("result"):].strip()})
-        stem = stem_of_tut(name)
+        stem, tier = tut_identity(name)
         # What the results are of, so that check can tell they are of the
         # source the mapping was made from.
         source, digest = tut_source(stem)
         if source is None:
             print(f"{name}: not exactly one tracked indra/**/tests/{stem}.cpp, so no source hash kept",
                   file=sys.stderr)
-        out[stem] = {"ctest": name, "exit": code, "tut_file": source, "tut_sha256": digest, "results": results}
+        # Each tier's run is kept apart: one the host cannot run exits 125
+        # with no results, which must not stand for the others.
+        out[f"{stem}@{tier}" if tier else stem] = {"ctest": name, "tier": tier, "exit": code, "tut_file": source,
+                                                   "tut_sha256": digest, "results": results}
         counts = {}
         for r in results:
             counts[r["result"]] = counts.get(r["result"], 0) + 1
-        print(f"{name}: exit {code}, " + ", ".join(f"{v} {k}" for k, v in sorted(counts.items())))
+        print(f"{name}: exit {code}, " + (", ".join(f"{v} {k}" for k, v in sorted(counts.items())) or "no results"))
     if args.out:
         with open(args.out, "w") as f:
             json.dump(out, f, indent=1)
@@ -401,10 +423,172 @@ def read_mapping(path):
     return mapping["tests"], {record["file"]: record for record in mapping.get("files", [])}
 
 
+def tree_tier(build_dir):
+    """The ISA tier the build tree is built for: AL_ISA_TIER in its cache."""
+    try:
+        with open(os.path.join(build_dir, "CMakeCache.txt"), errors="replace") as f:
+            m = re.search(r"^AL_ISA_TIER:\w+=(\S+)$", f.read(), re.M)
+    except OSError:
+        return None
+    return m.group(1) if m else None
+
+
+def check_run(args, label, path, entry_name, test, recorded, entries, file_cases, outside, record, problems):
+    """One Catch2 entry's run of a converted file against TUT's run of its
+    original: appends what does not hold to problems, prints what is listed,
+    and returns the table's row, or None where there is no run to show."""
+    first_problem = len(problems)
+    # A converted file changed since its binary was built is not what the
+    # binary runs: its cases, lines and counts would not be the run's.
+    command = test["command"]
+    if command and os.path.isfile(command[0]) and \
+            os.path.getmtime(os.path.join(ROOT, path)) > os.path.getmtime(command[0]):
+        problems.append(f"{label}: changed since {command[0]} was built; build it again to check it")
+        return None
+    code, cases, output = catch2_results(test, args.timeout)
+    # Where the host cannot run a tier, either side exits with the skip code
+    # before running anything: TUT with no results, Catch2 with no XML.
+    tut_skipped = recorded["exit"] == SKIP_CODE and not recorded["results"]
+    catch2_skipped = code == SKIP_CODE and cases is None
+    if tut_skipped and catch2_skipped:
+        print(f"{label}: listed: TUT and Catch2 both skipped it (exit {SKIP_CODE}): the host does not run its tier")
+        return label, 0, 0, 0, 0, 0, 0, code, "skipped"
+    if tut_skipped or catch2_skipped:
+        problems.append(f"{label}: TUT {'skipped' if tut_skipped else 'ran'} it (exit {recorded['exit']}), "
+                        f"{entry_name} {'skipped' if catch2_skipped else 'ran'} it (exit {code})")
+        return None
+    if cases is None:
+        problems.append(f"{label}: {entry_name} gave no XML (exit {code}):\n{output[-2000:]}")
+        return None
+    guard = [line for line in output.splitlines() if line.startswith("State guard:")]
+    # The first case of a name is the one matched; a second is an error of
+    # its own.
+    by_name = {}
+    for case in cases:
+        if case["name"] in by_name:
+            problems.append(f"{label}: Catch2 has more than one case named {case['name']!r}")
+        else:
+            by_name[case["name"]] = case
+        for tag in FORGIVING_TAGS:
+            if tag in case["tags"]:
+                problems.append(f"{label}: {case['name']!r} is tagged {tag}, under which Catch2 passes it "
+                                f"whatever it does")
+    if not exit_fits(code, cases, output):
+        counts = {}
+        for case in cases:
+            counts[case["result"]] = counts.get(case["result"], 0) + 1
+        problems.append(f"{label}: {entry_name} exited {code}, which does not fit its cases ("
+                        + (", ".join(f"{v} {k}" for k, v in sorted(counts.items())) or "none") + ")")
+    tut_results = {(r["group"], r["n"]): r for r in recorded["results"]}
+    counted = {}
+    for c in file_cases:
+        counted.setdefault(c["name"], len(c["sites"]))
+    # An assertion counted is not one that ran: a case passes as well when a
+    # loop around its CHECK never turns. Each site in a passing case's body
+    # must have reported at least once.
+    ran_anywhere = set()
+    for case in cases:
+        ran = ran_here(case, path)
+        ran_anywhere |= ran
+        if case["result"] != "ok":
+            continue
+        body = body_of(case, file_cases)
+        for first, last, macro in body["sites"] if body else []:
+            if macro not in REPORTING_ONLY and not any(first <= n <= last for n in ran):
+                problems.append(f"{label}: {case['name']!r} passed without running the {macro} on line {first}")
+    # Listed for the run, apart from the tests listed.
+    notes = [f"the {macro} on line {first}, outside every case, never ran"
+             for first, last, macro in outside
+             if macro not in REPORTING_ONLY and not any(first <= n <= last for n in ran_anywhere)]
+    # The TUT results must be of the source the mapping was made from.
+    hashes = {"the recorded results": recorded.get("tut_sha256"), "the mapping": (record or {}).get("tut_sha256")}
+    if all(hashes.values()):
+        if len(set(hashes.values())) > 1:
+            problems.append(f"{label}: TUT's results were recorded from another {os.path.basename(path)} than the "
+                            f"one converted (sha256 {hashes['the recorded results'][:12]}, the mapping's "
+                            f"{hashes['the mapping'][:12]})")
+    else:
+        notes.append(f"no TUT source hash in {' or '.join(k for k, v in hashes.items() if not v)}, "
+                     f"so the two are not known to be of one source")
+    matched = agree = counts_ok = 0
+    listed = []
+    seen_cases = set()
+    paired = {}
+    for e in entries:
+        key = (e["group"], e["n"])
+        name = e["catch2_name"]
+        # Before taking TUT's result: a test<N> defined in both branches of
+        # an #if is two entries, and the result is the active twin's.
+        if e.get("not_compiled_here") or (e.get("past_group_limit") and key not in tut_results):
+            listed.append(f"{e['group']} {e['n']}: " +
+                          ("not compiled here" if e.get("not_compiled_here") else "past its group's limit"))
+            if name in by_name:
+                seen_cases.add(name)
+            continue
+        t = tut_results.pop(key, None)
+        if t is None:
+            problems.append(f"{label}: {e['group']} test<{e['n']}> did not run under TUT")
+            continue
+        if not name or name not in by_name:
+            problems.append(f"{label}: {e['group']} test<{e['n']}> has no Catch2 case"
+                            + (f" ({name!r})" if name else ""))
+            continue
+        seen_cases.add(name)
+        paired[name] = key
+        matched += 1
+        if e.get("tut_name") is not None and e["tut_name"] != t["name"]:
+            problems.append(f"{label}: {e['group']} test<{e['n']}>: TUT named it {t['name']!r}, "
+                            f"the mapping {e['tut_name']!r}")
+        if by_name[name]["result"] == t["result"]:
+            agree += 1
+        else:
+            problems.append(f"{label}: {name!r}: TUT {t['said']!r}, Catch2 {by_name[name]['result']}")
+        static = counted.get(name)
+        # One TUT call is one Catch2 assertion, but for a && chain split into
+        # one assertion a term, which the mapping counted.
+        expected = e.get("catch2_expected", e["tut_assertions"])
+        if expected == e["catch2_assertions"] == static:
+            counts_ok += 1
+        elif args.recounted and static == 0 and e["tut_assertions"] > 0:
+            problems.append(f"{label}: {name!r}: {e['tut_assertions']} TUT assertion calls, none in the file")
+        elif args.recounted and static is not None:
+            counts_ok += 1
+            print(f"{label}: listed: {name!r}: {expected} assertions converted, {static} in the file now")
+        else:
+            problems.append(f"{label}: {name!r}: {e['tut_assertions']} TUT assertion calls, "
+                            f"{expected} Catch2 assertions they became, {e['catch2_assertions']} mapped, "
+                            f"{static} in the file")
+    for key, t in sorted(tut_results.items()):
+        problems.append(f"{label}: TUT ran [{key[0]}, {key[1]}], which the mapping does not have")
+    for name in sorted(set(by_name) - seen_cases):
+        problems.append(f"{label}: Catch2 case {name!r} is no TUT test of the mapping")
+    # TUT ran a file's groups by name and each group's tests by number, and a
+    # test may lean on what the ones before it left.
+    keys = set(paired.values())
+    tut_order = [(r["group"], r["n"]) for r in recorded["results"] if (r["group"], r["n"]) in keys]
+    catch2_order = [(paired[c["name"]], c["name"]) for c in cases if c["name"] in paired and by_name[c["name"]] is c]
+    for at, (tut_key, (key, name)) in enumerate(zip(tut_order, catch2_order)):
+        if tut_key != key:
+            problems.append(f"{label}: Catch2 runs {name!r}, [{key[0]}, {key[1]}], as test {at + 1} of "
+                            f"{len(tut_order)}, where TUT ran [{tut_key[0]}, {tut_key[1]}]: not TUT's order")
+            break
+    for line in listed + notes + guard:
+        print(f"{label}: listed: {line}")
+    return (label, len(recorded["results"]), len(cases), matched, agree, counts_ok, len(listed), code,
+            "ok" if len(problems) == first_problem else "MISMATCH")
+
+
 def check(args):
     mapping, file_records = read_mapping(args.mapping)
     with open(args.tut) as f:
         tut = json.load(f)
+    # By stem and tier, the tier read from each record's CTest name: results
+    # recorded before they were kept by tier, the last tier's under the stem,
+    # still say which tier they are of.
+    records = {}
+    for key, recorded in tut.items():
+        records[tut_identity(recorded["ctest"]) if recorded.get("ctest") else (key, None)] = recorded
+    own_tier = tree_tier(args.build_dir)
     tests = ctest_tests(args.build_dir, args.config)
     by_file = {}
     for entry in mapping:
@@ -416,160 +600,65 @@ def check(args):
     for path in files:
         entries = by_file.get(path, [])
         stem = os.path.splitext(os.path.basename(path))[0]
-        recorded = tut.get(stem)
-        if recorded is None:
-            problems.append(f"{path}: no TUT results recorded for {stem}")
-            continue
-        entry_names = [n for n, t in tests.items() if n.endswith("/" + stem)]
-        if len(entry_names) != 1:
-            problems.append(f"{path}: {len(entry_names)} Catch2 CTest entries end in /{stem}")
-            continue
-        # A converted file changed since its binary was built is not what
-        # the binary runs: its cases, lines and counts would not be the run's.
-        command = tests[entry_names[0]]["command"]
-        if command and os.path.isfile(command[0]) and \
-                os.path.getmtime(os.path.join(ROOT, path)) > os.path.getmtime(command[0]):
-            problems.append(f"{path}: changed since {command[0]} was built; build it again to check it")
-            continue
-        code, cases, output = catch2_results(tests[entry_names[0]], args.timeout)
-        if cases is None:
-            problems.append(f"{path}: {entry_names[0]} gave no XML (exit {code}):\n{output[-2000:]}")
-            continue
-        guard = [line for line in output.splitlines() if line.startswith("State guard:")]
-        # The first case of a name is the one matched; a second is an error
-        # of its own.
-        by_name = {}
-        for case in cases:
-            if case["name"] in by_name:
-                problems.append(f"{path}: Catch2 has more than one case named {case['name']!r}")
-            else:
-                by_name[case["name"]] = case
-            for tag in FORGIVING_TAGS:
-                if tag in case["tags"]:
-                    problems.append(f"{path}: {case['name']!r} is tagged {tag}, under which Catch2 passes it "
-                                    f"whatever it does")
-        if not exit_fits(code, cases, output):
-            counts = {}
-            for case in cases:
-                counts[case["result"]] = counts.get(case["result"], 0) + 1
-            problems.append(f"{path}: {entry_names[0]} exited {code}, which does not fit its cases ("
-                            + (", ".join(f"{v} {k}" for k, v in sorted(counts.items())) or "none") + ")")
-        tut_results = {(r["group"], r["n"]): r for r in recorded["results"]}
+        file_problems = []
         file_cases, outside = read_cases(os.path.join(ROOT, path))
-        counted = {}
-        for c in file_cases:
-            counted.setdefault(c["name"], len(c["sites"]))
-        # An assertion counted is not one that ran: a case passes as well
-        # when a loop around its CHECK never turns. Each site in a passing
-        # case's body must have reported at least once.
-        ran_anywhere = set()
-        for case in cases:
-            ran = ran_here(case, path)
-            ran_anywhere |= ran
-            if case["result"] != "ok":
-                continue
-            body = body_of(case, file_cases)
-            for first, last, macro in body["sites"] if body else []:
-                if macro not in REPORTING_ONLY and not any(first <= n <= last for n in ran):
-                    problems.append(f"{path}: {case['name']!r} passed without running the {macro} on line {first}")
-        # Listed for the file, apart from the tests listed.
-        notes = [f"the {macro} on line {first}, outside every case, never ran"
-                 for first, last, macro in outside
-                 if macro not in REPORTING_ONLY and not any(first <= n <= last for n in ran_anywhere)]
-        matched = agree = counts_ok = 0
-        listed = []
         record = (file_records or {}).get(path)
-        # The TUT results must be of the source the mapping was made from.
-        hashes = {"the recorded results": recorded.get("tut_sha256"), "the mapping": (record or {}).get("tut_sha256")}
-        if all(hashes.values()):
-            if len(set(hashes.values())) > 1:
-                problems.append(f"{path}: TUT's results were recorded from another {stem}.cpp than the one "
-                                f"converted (sha256 {hashes['the recorded results'][:12]}, the mapping's "
-                                f"{hashes['the mapping'][:12]})")
-        else:
-            notes.append(f"no TUT source hash in {' or '.join(k for k, v in hashes.items() if not v)}, "
-                         f"so the two are not known to be of one source")
         # What no test's count holds: the assertions outside every test body
         # (helpers, fixtures), which the mapping totals for the file.
         if file_records is None:
-            notes.append("no file totals in the mapping")
+            print(f"{path}: listed: no file totals in the mapping")
         elif record is None:
-            problems.append(f"{path}: the mapping has no record of the file")
+            file_problems.append(f"{path}: the mapping has no record of the file")
         elif len(outside) != record["catch2_outside_expected"]:
             if args.recounted and (outside or not record["tut_outside_calls"]):
-                notes.append(f"{record['catch2_outside_expected']} assertions outside every case converted, "
-                             f"{len(outside)} in the file now")
+                print(f"{path}: listed: {record['catch2_outside_expected']} assertions outside every case "
+                      f"converted, {len(outside)} in the file now")
             else:
-                problems.append(f"{path}: {record['tut_outside_calls']} TUT assertion calls outside every test, "
-                                f"{record['catch2_outside_expected']} Catch2 assertions they became, "
-                                f"{len(outside)} outside every case in the file")
-        seen_cases = set()
-        paired = {}
-        for e in entries:
-            key = (e["group"], e["n"])
-            name = e["catch2_name"]
-            # Before taking TUT's result: a test<N> defined in both branches
-            # of an #if is two entries, and the result is the active twin's.
-            if e.get("not_compiled_here") or (e.get("past_group_limit") and key not in tut_results):
-                listed.append(f"{e['group']} {e['n']}: " +
-                              ("not compiled here" if e.get("not_compiled_here") else "past its group's limit"))
-                if name in by_name:
-                    seen_cases.add(name)
+                file_problems.append(f"{path}: {record['tut_outside_calls']} TUT assertion calls outside every "
+                                     f"test, {record['catch2_outside_expected']} Catch2 assertions they became, "
+                                     f"{len(outside)} outside every case in the file")
+        # The file's Catch2 entries, <binary>/<stem>, by the tier the binary
+        # is built for: one at the tree's own, checked against TUT's
+        # untiered entry (or, where there is none, its entry at the tree's
+        # tier), and at most one, <binary>_<tier>, at each other tier,
+        # checked against TUT's entry at that tier.
+        runs = {}
+        for name in tests:
+            if name.endswith("/" + stem):
+                runs.setdefault(isa_tier(name[:-len(stem) - 1]), []).append(name)
+        if len(runs.get(None, [])) != 1:
+            file_problems.append(f"{path}: {len(runs.get(None, []))} Catch2 CTest entries end in /{stem}")
+        used = set()
+        file_rows = []
+        for tier in sorted(runs, key=lambda t: TIERS.index(t) + 1 if t else 0):
+            label = f"{path} ({tier})" if tier else path
+            if len(runs[tier]) != 1:
+                if tier:
+                    file_problems.append(f"{label}: {len(runs[tier])} Catch2 CTest entries end in _{tier}/{stem}")
                 continue
-            t = tut_results.pop(key, None)
-            if t is None:
-                problems.append(f"{path}: {e['group']} test<{e['n']}> did not run under TUT")
+            key = (stem, tier)
+            if tier is None and key not in records and (stem, own_tier) in records:
+                key = (stem, own_tier)
+            if key not in records:
+                file_problems.append(f"{label}: no TUT results recorded for {stem}" + (f" at {tier}" if tier else ""))
                 continue
-            if not name or name not in by_name:
-                problems.append(f"{path}: {e['group']} test<{e['n']}> has no Catch2 case"
-                                + (f" ({name!r})" if name else ""))
-                continue
-            seen_cases.add(name)
-            paired[name] = key
-            matched += 1
-            if e.get("tut_name") is not None and e["tut_name"] != t["name"]:
-                problems.append(f"{path}: {e['group']} test<{e['n']}>: TUT named it {t['name']!r}, "
-                                f"the mapping {e['tut_name']!r}")
-            if by_name[name]["result"] == t["result"]:
-                agree += 1
+            used.add(key)
+            row = check_run(args, label, path, runs[tier][0], tests[runs[tier][0]], records[key], entries,
+                            file_cases, outside, record, problems)
+            if row:
+                file_rows.append(row)
+        # TUT's runs no Catch2 entry was checked against: its run at the
+        # tree's own tier is the untiered one again, where that was checked.
+        for key in sorted((k for k in records if k[0] == stem and k not in used), key=lambda k: k[1] or ""):
+            if key[1] and key[1] == own_tier and (stem, None) in used:
+                print(f"{path}: listed: TUT's run at {own_tier}, the tree's own tier: {runs[None][0]} runs that "
+                      f"tier, and was checked against TUT's untiered run")
             else:
-                problems.append(f"{path}: {name!r}: TUT {t['said']!r}, Catch2 {by_name[name]['result']}")
-            static = counted.get(name)
-            # One TUT call is one Catch2 assertion, but for a && chain split
-            # into one assertion a term, which the mapping counted.
-            expected = e.get("catch2_expected", e["tut_assertions"])
-            if expected == e["catch2_assertions"] == static:
-                counts_ok += 1
-            elif args.recounted and static == 0 and e["tut_assertions"] > 0:
-                problems.append(f"{path}: {name!r}: {e['tut_assertions']} TUT assertion calls, "
-                                f"none in the file")
-            elif args.recounted and static is not None:
-                counts_ok += 1
-                print(f"{path}: listed: {name!r}: {expected} assertions converted, {static} in the file now")
-            else:
-                problems.append(f"{path}: {name!r}: {e['tut_assertions']} TUT assertion calls, "
-                                f"{expected} Catch2 assertions they became, {e['catch2_assertions']} mapped, "
-                                f"{static} in the file")
-        for key, t in sorted(tut_results.items()):
-            problems.append(f"{path}: TUT ran [{key[0]}, {key[1]}], which the mapping does not have")
-        for name in sorted(set(by_name) - seen_cases):
-            problems.append(f"{path}: Catch2 case {name!r} is no TUT test of the mapping")
-        # TUT ran a file's groups by name and each group's tests by number,
-        # and a test may lean on what the ones before it left.
-        keys = set(paired.values())
-        tut_order = [(r["group"], r["n"]) for r in recorded["results"] if (r["group"], r["n"]) in keys]
-        catch2_order = [(paired[c["name"]], c["name"]) for c in cases
-                        if c["name"] in paired and by_name[c["name"]] is c]
-        for at, (tut_key, (key, name)) in enumerate(zip(tut_order, catch2_order)):
-            if tut_key != key:
-                problems.append(f"{path}: Catch2 runs {name!r}, [{key[0]}, {key[1]}], as test {at + 1} of "
-                                f"{len(tut_order)}, where TUT ran [{tut_key[0]}, {tut_key[1]}]: not TUT's order")
-                break
-        clean = not any(p.startswith(path + ":") for p in problems)
-        rows.append((path, len(recorded["results"]), len(cases), matched, agree, counts_ok, len(listed), code,
-                     "ok" if clean else "MISMATCH"))
-        for line in listed + notes + guard:
-            print(f"{path}: listed: {line}")
+                file_problems.append(f"{path}: TUT ran {stem} " + (f"at {key[1]}" if key[1] else "untiered")
+                                     + f" ({records[key]['ctest']}), and no Catch2 entry does")
+        problems.extend(file_problems)
+        for row in file_rows:
+            rows.append(row[:-1] + ("MISMATCH",) if file_problems else row)
 
     header = ("file", "TUT", "Catch2", "matched", "agree", "counts", "listed", "exit", "parity")
     widths = [max(len(str(r[i])) for r in rows + [header]) for i in range(len(header))]
@@ -577,7 +666,7 @@ def check(args):
         print("  ".join(str(v).ljust(w) if i == 0 else str(v).rjust(w) for i, (v, w) in enumerate(zip(r, widths))))
     for p in problems:
         print(f"mismatch: {p}")
-    return 1 if problems or any(r[-1] != "ok" for r in rows) else 0
+    return 1 if problems else 0
 
 
 def main():
