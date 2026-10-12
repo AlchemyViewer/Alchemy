@@ -76,7 +76,6 @@ al_add_test_binary(
   PROJECT test
   SOURCES tests/altestsupport_test.cpp
   LIBRARIES llcommon
-  COMBINED
 )
 
 function(al_expect_from_test_support name)
