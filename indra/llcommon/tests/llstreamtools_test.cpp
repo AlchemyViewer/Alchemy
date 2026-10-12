@@ -26,25 +26,17 @@
  * $/LicenseInfo$
  */
 
-#include <tut/tut.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 
 #include "linden_common.h"
 #include "llstreamtools.h"
-#include "lltut.h"
 
 
-namespace tut
+namespace
 {
-    struct streamtools_data
-    {
-    };
-    typedef test_group<streamtools_data> streamtools_test;
-    typedef streamtools_test::object streamtools_object;
-    tut::streamtools_test streamtools_testcase("streamtools");
-
     //test cases for skip_whitespace()
-    template<> template<>
-    void streamtools_object::test<1>()
+    TEST_CASE("streamtools: skip_whitespace skips spaces and tabs but not line ends", "[streamtools]")
     {
         char arr[255];
         std::string str;
@@ -53,40 +45,44 @@ namespace tut
         std::istringstream is;
 
         is.str(str = "");
-        ensure("skip_whitespace: empty string", (false == skip_whitespace(is)));
+        UNSCOPED_INFO("skip_whitespace: empty string");
+        CHECK_FALSE(skip_whitespace(is));
 
         is.clear();
         is.str(str = " SecondLife is a 3D World");
         skip_whitespace(is);
         is.get(arr, 255, '\0');
         expected_result = "SecondLife is a 3D World";
-        ensure_equals("skip_whitespace: space", arr, expected_result);
+        UNSCOPED_INFO("skip_whitespace: space");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(str = "\t          \tSecondLife is a 3D World");
         skip_whitespace(is);
         is.get(arr, 255, '\0');
         expected_result = "SecondLife is a 3D World";
-        ensure_equals("skip_whitespace: space and tabs", arr, expected_result);
+        UNSCOPED_INFO("skip_whitespace: space and tabs");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(str = "\t          \tSecondLife is a 3D World       ");
         skip_whitespace(is);
         is.get(arr, 255, '\0');
         expected_result = "SecondLife is a 3D World       ";
-        ensure_equals("skip_whitespace: space at end", arr, expected_result);
+        UNSCOPED_INFO("skip_whitespace: space at end");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(str = "\t \r\nSecondLife is a 3D World");
         skip_whitespace(is);
         is.get(arr, 255, '\0');
         expected_result = "\r\nSecondLife is a 3D World";
-        ensure_equals("skip_whitespace: space at end", arr, expected_result);
+        UNSCOPED_INFO("skip_whitespace: space at end");
+        CHECK(arr == expected_result);
     }
 
     //testcases for skip_emptyspaces()
-    template<> template<>
-    void streamtools_object::test<2>()
+    TEST_CASE("streamtools: skip_emptyspace skips whitespace and line ends", "[streamtools]")
     {
         char arr[255];
         std::string str;
@@ -100,31 +96,34 @@ namespace tut
         skip_emptyspace(is);
         is.get(arr, 255, '\0');
         expected_result = "SecondLife is a 3D World.\n";
-        ensure_equals("skip_emptyspace: space and tabs", arr, expected_result);
+        UNSCOPED_INFO("skip_emptyspace: space and tabs");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(str = "  \t\r\n    \r    SecondLife is a 3D World.\n");
         skip_emptyspace(is);
         is.get(arr, 255, '\0');
         expected_result = "SecondLife is a 3D World.\n";
-        ensure_equals("skip_emptyspace: space, tabs, carriage return, newline", arr, expected_result);
+        UNSCOPED_INFO("skip_emptyspace: space, tabs, carriage return, newline");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(str = "");
         ret = skip_emptyspace(is);
         is.get(arr, 255, '\0');
-        ensure("skip_emptyspace: empty string", ret == false);
+        UNSCOPED_INFO("skip_emptyspace: empty string");
+        CHECK_FALSE(ret);
 
         is.clear();
         is.str(str = "  \r\n  \t ");
         ret = skip_emptyspace(is);
         is.get(arr, 255, '\0');
-        ensure("skip_emptyspace: space newline empty", ret == false);
+        UNSCOPED_INFO("skip_emptyspace: space newline empty");
+        CHECK_FALSE(ret);
     }
 
     //testcases for skip_comments_and_emptyspace()
-    template<> template<>
-    void streamtools_object::test<3>()
+    TEST_CASE("streamtools: skip_comments_and_emptyspace skips comment lines and empty space", "[streamtools]")
     {
         char arr[255];
         std::string str;
@@ -138,19 +137,23 @@ namespace tut
         skip_comments_and_emptyspace(is);
         is.get(arr, 255, '\0');
         expected_result = "SecondLife is a 3D World.\n";
-        ensure_equals("skip_comments_and_emptyspace: space, tabs, carriage return, newline", arr, expected_result);
+        UNSCOPED_INFO("skip_comments_and_emptyspace: space, tabs, carriage return, newline");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(str = "#    \r\n    SecondLife is a 3D World.");
         skip_comments_and_emptyspace(is);
         is.get(arr, 255, '\0');
         expected_result = "SecondLife is a 3D World.";
-        ensure_equals("skip_comments_and_emptyspace: skip comment - 1", arr, expected_result);
+        UNSCOPED_INFO("skip_comments_and_emptyspace: skip comment - 1");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(str = "#    \r\n  #  SecondLife is a 3D World. ##");
-        ensure("should not be good()", ! skip_comments_and_emptyspace(is));
-        ensure("should be at eof()", is.eof());
+        UNSCOPED_INFO("should not be good()");
+        CHECK_FALSE(skip_comments_and_emptyspace(is));
+        UNSCOPED_INFO("should be at eof()");
+        CHECK(is.eof());
         // don't get(): given bad state, we can't rely on results
 
         is.clear();
@@ -158,22 +161,24 @@ namespace tut
         skip_comments_and_emptyspace(is);
         is.get(arr, 255, '\0');
         expected_result = "SecondLife is a 3D World. ##";
-        ensure_equals("skip_comments_and_emptyspace: skip comment - 3", arr, expected_result);
+        UNSCOPED_INFO("skip_comments_and_emptyspace: skip comment - 3");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(str = "");
         ret = skip_comments_and_emptyspace(is);
-        ensure("skip_comments_and_emptyspace: empty string", ! ret);
+        UNSCOPED_INFO("skip_comments_and_emptyspace: empty string");
+        CHECK_FALSE(ret);
 
         is.clear();
         is.str(str = "  \r\n  \t # SecondLife is a 3D World");
         ret = skip_comments_and_emptyspace(is);
-        ensure("skip_comments_and_emptyspace: space newline comment empty", ! ret);
+        UNSCOPED_INFO("skip_comments_and_emptyspace: space newline comment empty");
+        CHECK_FALSE(ret);
     }
 
     //testcases for skip_line()
-    template<> template<>
-    void streamtools_object::test<4>()
+    TEST_CASE("streamtools: skip_line skips past the next newline", "[streamtools]")
     {
         char arr[255];
         std::string str;
@@ -187,32 +192,35 @@ namespace tut
         skip_line(is);
         is.get(arr, 255, '\0');
         expected_result = "\n It provides an opportunity to the site \nuser to perform real life activities in virtual world.";
-        ensure_equals("skip_line: 1 newline", arr, expected_result);
+        UNSCOPED_INFO("skip_line: 1 newline");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(expected_result);
         skip_line(is);
         is.get(arr, 255, '\0');
         expected_result = " It provides an opportunity to the site \nuser to perform real life activities in virtual world.";
-        ensure_equals("skip_line: 2 newline", arr, expected_result);
+        UNSCOPED_INFO("skip_line: 2 newline");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(expected_result);
         skip_line(is);
         is.get(arr, 255, '\0');
         expected_result = "user to perform real life activities in virtual world.";
-        ensure_equals("skip_line: 3 newline", arr, expected_result);
+        UNSCOPED_INFO("skip_line: 3 newline");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(str = "");
         ret = skip_line(is);
-        ensure("skip_line: empty string", ret == false);
+        UNSCOPED_INFO("skip_line: empty string");
+        CHECK_FALSE(ret);
     }
 
 
     // testcases for skip_to_next_word()
-    template<> template<>
-    void streamtools_object::test<5>()
+    TEST_CASE("streamtools: skip_to_next_word skips the word and the delimiters after it", "[streamtools]")
     {
         char arr[255];
         std::string str;
@@ -226,7 +234,8 @@ namespace tut
         skip_to_next_word(is); // get past SecondLife
         is.get(arr, 255, '\0');
         expected_result = "is a 3D_World.\n\n It-provides an opportunity to the site \nuser to perform real life activities in virtual world.";
-        ensure_equals("skip_to_next_word: 1", arr, expected_result);
+        UNSCOPED_INFO("skip_to_next_word: 1");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(expected_result);
@@ -235,30 +244,33 @@ namespace tut
         skip_to_next_word(is); // get past 3D_World.\n\n
         is.get(arr, 255, '\0');
         expected_result = "It-provides an opportunity to the site \nuser to perform real life activities in virtual world.";
-        ensure_equals("skip_to_next_word: get past .\n\n 2", arr, expected_result);
+        UNSCOPED_INFO("skip_to_next_word: get past .\n\n 2");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(expected_result);
         skip_to_next_word(is); // get past It-
         expected_result = "provides an opportunity to the site \nuser to perform real life activities in virtual world.";
         is.get(arr, 255, '\0');
-        ensure_equals("skip_to_next_word: get past -", arr, expected_result);
+        UNSCOPED_INFO("skip_to_next_word: get past -");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(str = "");
         ret = skip_to_next_word(is);
-        ensure("skip_line: empty string", ret == false);
+        UNSCOPED_INFO("skip_line: empty string");
+        CHECK_FALSE(ret);
 
         is.clear();
         is.str(str = "                   \r\n\r\n");
         ret = skip_to_next_word(is);
-        ensure("skip_line: space new lines", ret == false);
+        UNSCOPED_INFO("skip_line: space new lines");
+        CHECK_FALSE(ret);
     }
 
 
     //testcases for skip_to_end_of_next_keyword()
-    template<> template<>
-    void streamtools_object::test<6>()
+    TEST_CASE("streamtools: skip_to_end_of_next_keyword finds a keyword that starts a line", "[streamtools]")
     {
         char arr[255];
         std::string str;
@@ -272,55 +284,62 @@ namespace tut
         ret = skip_to_end_of_next_keyword("FIRSTKEY", is);
         is.get(arr, 255, '\0');
         expected_result = " followed by second delimiter\nSECONDKEY\t SecondValue followed by third delimiter   \nSECONDKEY\nFOURTHKEY FOURTHVALUEis a 3DWorld.";
-        ensure_equals("skip_to_end_of_next_keyword: 1", arr, expected_result);
+        UNSCOPED_INFO("skip_to_end_of_next_keyword: 1");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(expected_result);
         ret = skip_to_end_of_next_keyword("SECONDKEY", is);
         is.get(arr, 255, '\0');
         expected_result = "\t SecondValue followed by third delimiter   \nSECONDKEY\nFOURTHKEY FOURTHVALUEis a 3DWorld.";
-        ensure_equals("skip_to_end_of_next_keyword: 2", arr, expected_result);
+        UNSCOPED_INFO("skip_to_end_of_next_keyword: 2");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(expected_result);
         ret = skip_to_end_of_next_keyword("SECONDKEY", is);
         is.get(arr, 255, '\0');
         expected_result = "\nFOURTHKEY FOURTHVALUEis a 3DWorld.";
-        ensure_equals("skip_to_end_of_next_keyword: 3", arr, expected_result);
+        UNSCOPED_INFO("skip_to_end_of_next_keyword: 3");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(expected_result);
         ret = skip_to_end_of_next_keyword("FOURTHKEY", is);
         is.get(arr, 255, '\0');
         expected_result = " FOURTHVALUEis a 3DWorld.";
-        ensure_equals("skip_to_end_of_next_keyword: 4", arr, expected_result);
+        UNSCOPED_INFO("skip_to_end_of_next_keyword: 4");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(str = "{should be skipped as newline/space/tab does not follow but this one should be picked\n { Does it?\n");
         ret = skip_to_end_of_next_keyword("{", is);
         is.get(arr, 255, '\0');
         expected_result = " Does it?\n";
-        ensure_equals("skip_to_end_of_next_keyword: multiple delim matches on same line", arr, expected_result);
+        UNSCOPED_INFO("skip_to_end_of_next_keyword: multiple delim matches on same line");
+        CHECK(arr == expected_result);
 
         is.clear();
         is.str(str = "Delim { could not be found at start");
         ret = skip_to_end_of_next_keyword("{", is);
-        ensure("skip_to_end_of_next_keyword: delim should not be present", ret == false);
+        UNSCOPED_INFO("skip_to_end_of_next_keyword: delim should not be present");
+        CHECK_FALSE(ret);
 
         is.clear();
         is.str(str = "Empty Delim");
         ret = skip_to_end_of_next_keyword("", is);
-        ensure("skip_to_end_of_next_keyword: empty delim should not be valid", ret == false);
+        UNSCOPED_INFO("skip_to_end_of_next_keyword: empty delim should not be valid");
+        CHECK_FALSE(ret);
 
         is.clear();
         is.str(str = "");
         ret = skip_to_end_of_next_keyword("}", is);
-        ensure("skip_to_end_of_next_keyword: empty string", ret == false);
+        UNSCOPED_INFO("skip_to_end_of_next_keyword: empty string");
+        CHECK_FALSE(ret);
     }
 
     //testcases for get_word(std::string& output_string, std::istream& input_stream)
-    template<> template<>
-    void streamtools_object::test<7>()
+    TEST_CASE("streamtools: get_word reads words split by whitespace", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -333,17 +352,20 @@ namespace tut
         actual_result = "";
         ret = get_word(actual_result, is);
         expected_result = "First";
-        ensure_equals("get_word: 1", actual_result, expected_result);
+        UNSCOPED_INFO("get_word: 1");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         ret = get_word(actual_result, is);
         expected_result = "Second";
-        ensure_equals("get_word: 2", actual_result, expected_result);
+        UNSCOPED_INFO("get_word: 2");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         ret = get_word(actual_result, is);
         expected_result = "Third";
-        ensure_equals("get_word: 3", actual_result, expected_result);
+        UNSCOPED_INFO("get_word: 3");
+        CHECK(actual_result == expected_result);
 
         // the current implementation of get_word seems inconsistent with
         // skip_to_next_word. skip_to_next_word treats any character other
@@ -354,29 +376,32 @@ namespace tut
         actual_result = "";
         ret = get_word(actual_result, is); // will copy Fourth-ShouldThisBePartOfFourth
         expected_result = "Fourth-ShouldThisBePartOfFourth"; // as per current impl.
-        ensure_equals("get_word: 4", actual_result, expected_result);
+        UNSCOPED_INFO("get_word: 4");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         ret = get_word(actual_result, is); // will copy Fifth
         expected_result = "Fifth"; // as per current impl.
-        ensure_equals("get_word: 5", actual_result, expected_result);
+        UNSCOPED_INFO("get_word: 5");
+        CHECK(actual_result == expected_result);
 
         is.clear();
         is.str(str = "  \t \r  \n ");
         actual_result = "";
         ret = get_word(actual_result, is);
-        ensure("get_word: empty all spaces, newline tabs", ret == false);
+        UNSCOPED_INFO("get_word: empty all spaces, newline tabs");
+        CHECK_FALSE(ret);
 
         is.clear();
         is.str(str = "");
         actual_result = "";
         ret = get_word(actual_result, is);
-        ensure("get_word: empty string", ret == false);
+        UNSCOPED_INFO("get_word: empty string");
+        CHECK_FALSE(ret);
     }
 
     // testcase for get_word and skip_to_next_word compatibility
-    template<> template<>
-    void streamtools_object::test<8>()
+    TEST_CASE("streamtools: get_word and skip_to_next_word reach the same fifth word", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -415,12 +440,12 @@ namespace tut
         // will copy ShouldThisBePartOfFourth, the fifth word,
         // while using get_word above five times result in getting "Fifth"
         get_word(expected_result, is);
-        ensure_equals("get_word: skip_to_next_word compatibility", actual_result, expected_result);
+        UNSCOPED_INFO("get_word: skip_to_next_word compatibility");
+        CHECK(actual_result == expected_result);
     }
 
     //testcases for get_word(std::string& output_string, std::istream& input_stream, int n)
-    template<> template<>
-    void streamtools_object::test<9>()
+    TEST_CASE("streamtools: get_word with a limit stops after n characters", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -433,44 +458,50 @@ namespace tut
         actual_result = "";
         ret = get_word(actual_result, is, 255);
         expected_result = "First";
-        ensure_equals("get_word: 1", actual_result, expected_result);
+        UNSCOPED_INFO("get_word: 1");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         ret = get_word(actual_result, is, 4);
         expected_result = "Seco"; // should be cut short
-        ensure_equals("get_word: 2", actual_result, expected_result);
+        UNSCOPED_INFO("get_word: 2");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         ret = get_word(actual_result, is, 255);
         expected_result = "nd"; // get remainder of Second
-        ensure_equals("get_word: 3", actual_result, expected_result);
+        UNSCOPED_INFO("get_word: 3");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         ret = get_word(actual_result, is, 0); // 0 size string
         expected_result = ""; // get remainder of Second
-        ensure_equals("get_word: 0 sized output", actual_result, expected_result);
+        UNSCOPED_INFO("get_word: 0 sized output");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         ret = get_word(actual_result, is, 255);
         expected_result = "Third";
-        ensure_equals("get_word: 4", actual_result, expected_result);
+        UNSCOPED_INFO("get_word: 4");
+        CHECK(actual_result == expected_result);
 
         is.clear();
         is.str(str = "  \t \r  \n ");
         actual_result = "";
         ret = get_word(actual_result, is, 255);
-        ensure("get_word: empty all spaces, newline tabs", ret == false);
+        UNSCOPED_INFO("get_word: empty all spaces, newline tabs");
+        CHECK_FALSE(ret);
 
         is.clear();
         is.str(str = "");
         actual_result = "";
         ret = get_word(actual_result, is, 255);
-        ensure("get_word: empty string", ret == false);
+        UNSCOPED_INFO("get_word: empty string");
+        CHECK_FALSE(ret);
     }
 
     //test cases for get_line(std::string& output_string, std::istream& input_stream)
-    template<> template<>
-    void streamtools_object::test<10>()
+    TEST_CASE("streamtools: get_line reads up to and including each newline", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -482,39 +513,44 @@ namespace tut
         actual_result = "";
         get_line(actual_result, is);
         expected_result = "First Second \t \r\n";
-        ensure_equals("get_line: 1", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: 1");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         get_line(actual_result, is);
         expected_result = " Third  Fourth-ShouldThisBePartOfFourth  IsThisFifth\n";
-        ensure_equals("get_line: 2", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: 2");
+        CHECK(actual_result == expected_result);
 
         is.clear();
         is.str(str = "\nFirst Line.\n\nSecond Line.\n");
         actual_result = "";
         get_line(actual_result, is);
         expected_result = "\n";
-        ensure_equals("get_line: First char as newline", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: First char as newline");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         get_line(actual_result, is);
         expected_result = "First Line.\n";
-        ensure_equals("get_line: 3", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: 3");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         get_line(actual_result, is);
         expected_result = "\n";
-        ensure_equals("get_line: 4", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: 4");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         get_line(actual_result, is);
         expected_result = "Second Line.\n";
-        ensure_equals("get_line: 5", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: 5");
+        CHECK(actual_result == expected_result);
     }
 
     //test cases for get_line(std::string& output_string, std::istream& input_stream)
-    template<> template<>
-    void streamtools_object::test<11>()
+    TEST_CASE("streamtools: get_line reads a line with no newline and returns good()", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -527,13 +563,14 @@ namespace tut
         actual_result = "";
         ret = get_line(actual_result, is);
         expected_result = "One Line only with no newline";
-        ensure_equals("get_line: No newline", actual_result, expected_result);
-        ensure_equals("return value is good state of stream", ret, is.good());
+        UNSCOPED_INFO("get_line: No newline");
+        CHECK(actual_result == expected_result);
+        UNSCOPED_INFO("return value is good state of stream");
+        CHECK(ret == is.good());
     }
 
     //test cases for get_line(std::string& output_string, std::istream& input_stream)
-    template<> template<>
-    void streamtools_object::test<12>()
+    TEST_CASE("streamtools: get_line keeps a lone carriage return", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -546,12 +583,12 @@ namespace tut
         actual_result = "";
         get_line(actual_result, is);
         expected_result = "Should not skip lone \r.\r\n";
-        ensure_equals("get_line: carriage return skipped even though not followed by newline", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: carriage return skipped even though not followed by newline");
+        CHECK(actual_result == expected_result);
     }
 
     //test cases for get_line(std::string& output_string, std::istream& input_stream)
-    template<> template<>
-    void streamtools_object::test<13>()
+    TEST_CASE("streamtools: get_line reads a line that is just a newline", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -563,13 +600,13 @@ namespace tut
         actual_result = "";
         get_line(actual_result, is);
         expected_result = "\n";
-        ensure_equals("get_line: Just newline", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: Just newline");
+        CHECK(actual_result == expected_result);
     }
 
 
     //testcases for get_line(std::string& output_string, std::istream& input_stream, int n)
-    template<> template<>
-    void streamtools_object::test<14>()
+    TEST_CASE("streamtools: get_line with a limit cuts the line and adds a newline", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -581,36 +618,40 @@ namespace tut
         actual_result = "";
         get_line(actual_result, is, 255);
         expected_result = "First Line.\n";
-        ensure_equals("get_line: Basic Operation", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: Basic Operation");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         get_line(actual_result, is, sizeof("Second")-1);
         expected_result = "Second\n";
-        ensure_equals("get_line: Insufficient length 1", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: Insufficient length 1");
+        CHECK(actual_result == expected_result);
 
         actual_result = "";
         get_line(actual_result, is, 255);
         expected_result = " Line.\n";
-        ensure_equals("get_line: Remainder after earlier insufficient length", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: Remainder after earlier insufficient length");
+        CHECK(actual_result == expected_result);
 
         is.clear();
         is.str(str = "One Line only with no newline with limited length");
         actual_result = "";
         get_line(actual_result, is, sizeof("One Line only with no newline with limited length")-1);
         expected_result = "One Line only with no newline with limited length\n";
-        ensure_equals("get_line: No newline with limited length", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: No newline with limited length");
+        CHECK(actual_result == expected_result);
 
         is.clear();
         is.str(str = "One Line only with no newline");
         actual_result = "";
         get_line(actual_result, is, 255);
         expected_result = "One Line only with no newline";
-        ensure_equals("get_line: No newline", actual_result, expected_result);
+        UNSCOPED_INFO("get_line: No newline");
+        CHECK(actual_result == expected_result);
     }
 
     //testcases for get_line(std::string& output_string, std::istream& input_stream, int n)
-    template<> template<>
-    void streamtools_object::test<15>()
+    TEST_CASE("streamtools: get_line with a limit reads a line with no newline and returns good()", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -623,13 +664,14 @@ namespace tut
         actual_result = "";
         ret = get_line(actual_result, is, 255);
         expected_result = "One Line only with no newline";
-        ensure_equals("get_line: No newline", actual_result, expected_result);
-        ensure_equals("return value is good state of stream", ret, is.good());
+        UNSCOPED_INFO("get_line: No newline");
+        CHECK(actual_result == expected_result);
+        UNSCOPED_INFO("return value is good state of stream");
+        CHECK(ret == is.good());
     }
 
     //testcases for remove_last_char()
-    template<> template<>
-    void streamtools_object::test<16>()
+    TEST_CASE("streamtools: remove_last_char removes only a matching last character", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -639,25 +681,29 @@ namespace tut
 
         ret = remove_last_char('d',str);
         expected_result = "SecondLife is a 3D Worl";
-        ensure_equals("remove_last_char: should remove last char", str, expected_result);
+        UNSCOPED_INFO("remove_last_char: should remove last char");
+        CHECK(str == expected_result);
 
         str = "SecondLife is a 3D World";
         ret = remove_last_char('W',str);
         expected_result = "SecondLife is a 3D World";
-        ensure_equals("remove_last_char: should not remove as it is not last char", str, expected_result);
-        ensure("remove_last_char: should return false", ret == false);
+        UNSCOPED_INFO("remove_last_char: should not remove as it is not last char");
+        CHECK(str == expected_result);
+        UNSCOPED_INFO("remove_last_char: should return false");
+        CHECK_FALSE(ret);
 
         str = "SecondLife is a 3D World\n";
         ret = remove_last_char('\n',str);
         expected_result = "SecondLife is a 3D World";
-        ensure_equals("remove_last_char: should remove last newline", str, expected_result);
-        ensure("remove_last_char: should remove newline and return true", ret == true);
+        UNSCOPED_INFO("remove_last_char: should remove last newline");
+        CHECK(str == expected_result);
+        UNSCOPED_INFO("remove_last_char: should remove newline and return true");
+        CHECK(ret);
     }
 
 
     //testcases for unescaped_string()
-    template<> template<>
-    void streamtools_object::test<17>()
+    TEST_CASE("streamtools: unescape_string unescapes newlines and backslashes only", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -665,37 +711,42 @@ namespace tut
         str = "SecondLife is a 3D world \\n";
         unescape_string(str);
         expected_result = "SecondLife is a 3D world \n";
-        ensure_equals("unescape_string: newline", str, expected_result);
+        UNSCOPED_INFO("unescape_string: newline");
+        CHECK(str == expected_result);
 
         str = "SecondLife is a 3D world \\\\t \\n";
         unescape_string(str);
         expected_result = "SecondLife is a 3D world \\t \n";
-        ensure_equals("unescape_string: backslash and newline", str, expected_result);
+        UNSCOPED_INFO("unescape_string: backslash and newline");
+        CHECK(str == expected_result);
 
         str = "SecondLife is a 3D world \\ ";
         unescape_string(str);
         expected_result = "SecondLife is a 3D world \\ ";
-        ensure_equals("unescape_string: insufficient to unescape", str, expected_result);
+        UNSCOPED_INFO("unescape_string: insufficient to unescape");
+        CHECK(str == expected_result);
 
         str = "SecondLife is a 3D world \\n \\n \\n \\\\\\n";
         unescape_string(str);
         expected_result = "SecondLife is a 3D world \n \n \n \\\n";
-        ensure_equals("unescape_string: multipel newline and backslash", str, expected_result);
+        UNSCOPED_INFO("unescape_string: multipel newline and backslash");
+        CHECK(str == expected_result);
 
         str = "SecondLife is a 3D world \\t";
         unescape_string(str);
         expected_result = "SecondLife is a 3D world \\t";
-        ensure_equals("unescape_string: leaves tab as is", str, expected_result);
+        UNSCOPED_INFO("unescape_string: leaves tab as is");
+        CHECK(str == expected_result);
 
         str = "\\n";
         unescape_string(str);
         expected_result = "\n";
-        ensure_equals("unescape_string: only a newline", str, expected_result);
+        UNSCOPED_INFO("unescape_string: only a newline");
+        CHECK(str == expected_result);
     }
 
     //testcases for escape_string()
-    template<> template<>
-    void streamtools_object::test<18>()
+    TEST_CASE("streamtools: escape_string escapes newlines and backslashes and round-trips", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -703,46 +754,52 @@ namespace tut
         str = "SecondLife is a 3D world \n";
         escape_string(str);
         expected_result = "SecondLife is a 3D world \\n";
-        ensure_equals("escape_string: newline", str, expected_result);
+        UNSCOPED_INFO("escape_string: newline");
+        CHECK(str == expected_result);
 
         str = "SecondLife is a 3D world \\t \n";
         escape_string(str);
         expected_result = "SecondLife is a 3D world \\\\t \\n";
-        ensure_equals("escape_string: backslash and newline", str, expected_result);
+        UNSCOPED_INFO("escape_string: backslash and newline");
+        CHECK(str == expected_result);
 
         str = "SecondLife is a 3D world \n \n \n \\\n";
         escape_string(str);
         expected_result = "SecondLife is a 3D world \\n \\n \\n \\\\\\n";
-        ensure_equals("escape_string: multipel newline and backslash", str, expected_result);
+        UNSCOPED_INFO("escape_string: multipel newline and backslash");
+        CHECK(str == expected_result);
 
         str = "SecondLife is a 3D world \t";
         escape_string(str);
         expected_result = "SecondLife is a 3D world \t";
-        ensure_equals("unescape_string: leaves tab as is", str, expected_result);
+        UNSCOPED_INFO("unescape_string: leaves tab as is");
+        CHECK(str == expected_result);
 
         str = "\n";
         escape_string(str);
         expected_result = "\\n";
-        ensure_equals("unescape_string: only a newline", str, expected_result);
+        UNSCOPED_INFO("unescape_string: only a newline");
+        CHECK(str == expected_result);
 
         // serialization/deserialization escape->unescape
         str = "SecondLife is a 3D world \n \n \n \\\n";
         escape_string(str);
         unescape_string(str);
         expected_result = "SecondLife is a 3D world \n \n \n \\\n";
-        ensure_equals("escape_string: should preserve with escape/unescape", str, expected_result);
+        UNSCOPED_INFO("escape_string: should preserve with escape/unescape");
+        CHECK(str == expected_result);
 
         // serialization/deserialization  unescape->escape
         str = "SecondLife is a 3D world \\n \\n \\n \\\\";
         unescape_string(str);
         escape_string(str);
         expected_result = "SecondLife is a 3D world \\n \\n \\n \\\\";
-        ensure_equals("escape_string: should preserve with unescape/escape", str, expected_result);
+        UNSCOPED_INFO("escape_string: should preserve with unescape/escape");
+        CHECK(str == expected_result);
     }
 
     // testcases for replace_newlines_with_whitespace()
-    template<> template<>
-    void streamtools_object::test<19>()
+    TEST_CASE("streamtools: replace_newlines_with_whitespace replaces only newlines", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -750,27 +807,30 @@ namespace tut
         str = "SecondLife is a 3D \n\nworld\n";
         replace_newlines_with_whitespace(str);
         expected_result = "SecondLife is a 3D   world ";
-        ensure_equals("replace_newlines_with_whitespace: replace all newline", str, expected_result);
+        UNSCOPED_INFO("replace_newlines_with_whitespace: replace all newline");
+        CHECK(str == expected_result);
 
         str = "\nSecondLife is a 3D world\n";
         replace_newlines_with_whitespace(str);
         expected_result = " SecondLife is a 3D world ";
-        ensure_equals("replace_newlines_with_whitespace: begin and newline", str, expected_result);
+        UNSCOPED_INFO("replace_newlines_with_whitespace: begin and newline");
+        CHECK(str == expected_result);
 
         str = "SecondLife is a 3D world\r\t";
         replace_newlines_with_whitespace(str);
         expected_result = "SecondLife is a 3D world\r\t";
-        ensure_equals("replace_newlines_with_whitespace: should only replace newline", str, expected_result);
+        UNSCOPED_INFO("replace_newlines_with_whitespace: should only replace newline");
+        CHECK(str == expected_result);
 
         str = "";
         replace_newlines_with_whitespace(str);
         expected_result = "";
-        ensure_equals("replace_newlines_with_whitespace: empty string", str, expected_result);
+        UNSCOPED_INFO("replace_newlines_with_whitespace: empty string");
+        CHECK(str == expected_result);
     }
 
     //testcases for remove_double_quotes()
-    template<> template<>
-    void streamtools_object::test<20>()
+    TEST_CASE("streamtools: remove_double_quotes removes paired and lone double quotes", "[streamtools]")
     {
         std::string str;
         std::string expected_result;
@@ -778,42 +838,53 @@ namespace tut
         str = "SecondLife is a \"\"3D world";
         remove_double_quotes(str);
         expected_result = "SecondLife is a 3D world";
-        ensure_equals("remove_double_quotes: replace empty doube quotes", str, expected_result);
+        UNSCOPED_INFO("remove_double_quotes: replace empty doube quotes");
+        CHECK(str == expected_result);
 
         str = "SecondLife is a \"3D world";
         remove_double_quotes(str);
         expected_result = "SecondLife is a 3D world";
-        ensure_equals("remove_double_quotes: keep as is it matching quote not found", str, expected_result);
+        UNSCOPED_INFO("remove_double_quotes: keep as is it matching quote not found");
+        CHECK(str == expected_result);
     }
 
     // testcases for get_brace_count()
-    template<> template<>
-    void streamtools_object::test<21>()
+    TEST_CASE("streamtools: get_brace_count has no checks yet", "[streamtools]")
     {
     }
 
     //testcases for get_keyword_and_value()
-    template<> template<>
-    void streamtools_object::test<22>()
+    TEST_CASE("streamtools: get_keyword_and_value splits off the first word as the keyword", "[streamtools]")
     {
         std::string s = "SecondLife is a 3D World";
         std::string keyword;
         std::string value;
         get_keyword_and_value(keyword, value, s);
-        ensure("get_keyword_and_value: Unable to get Keyword and Value", ((keyword == "SecondLife") && (value == "is a 3D World")));
+        {
+            INFO("get_keyword_and_value: Unable to get Keyword and Value");
+            CHECK(keyword == "SecondLife");
+            CHECK(value == "is a 3D World");
+        }
 
         s = "SecondLife";
         get_keyword_and_value(keyword, value, s);
-        ensure("get_keyword_and_value: value should be empty", ((keyword == "SecondLife") && (value == "")));
+        {
+            INFO("get_keyword_and_value: value should be empty");
+            CHECK(keyword == "SecondLife");
+            CHECK(value == "");
+        }
 
         s = "SecondLife \t  is cool!     \n";
         get_keyword_and_value(keyword, value, s);
-        ensure("get_keyword_and_value: remove space before value but not after", ((keyword == "SecondLife") && (value == "is cool!     ")));
+        {
+            INFO("get_keyword_and_value: remove space before value but not after");
+            CHECK(keyword == "SecondLife");
+            CHECK(value == "is cool!     ");
+        }
     }
 
     //testcases for get_keyword_and_value()
-    template<> template<>
-    void streamtools_object::test<23>()
+    TEST_CASE("streamtools: get_keyword_and_value gives no value after a keyword and newline", "[streamtools]")
     {
         std::string s;
         std::string keyword = "SOME PRIOR KEYWORD";
@@ -821,12 +892,15 @@ namespace tut
 
         s = "SecondLife\n";
         get_keyword_and_value(keyword, value, s);
-        ensure("get_keyword_and_value: terminated with newline. value should be empty", ((keyword == "SecondLife") && (value == "")));
+        {
+            INFO("get_keyword_and_value: terminated with newline. value should be empty");
+            CHECK(keyword == "SecondLife");
+            CHECK(value == "");
+        }
     }
 
     //testcases for get_keyword_and_value()
-    template<> template<>
-    void streamtools_object::test<24>()
+    TEST_CASE("streamtools: get_keyword_and_value of an empty string clears both", "[streamtools]")
     {
         std::string s;
         std::string keyword = "SOME PRIOR KEYWORD";
@@ -834,19 +908,23 @@ namespace tut
 
         s = "";
         get_keyword_and_value(keyword, value, s);
-        ensure("get_keyword_and_value: empty string. keyword value should empty", ((keyword == "") && (value == "")));
+        {
+            INFO("get_keyword_and_value: empty string. keyword value should empty");
+            CHECK(keyword == "");
+            CHECK(value == "");
+        }
     }
 
     //testcase for fullread()
-    template<> template<>
-    void streamtools_object::test<25>()
+    TEST_CASE("streamtools: fullread reads across newlines up to the requested count", "[streamtools]")
     {
         std::string str = "First Line.\nSecond Line\n";
         std::istringstream is(str);
         char buf[255] = {0};
 
         fullread(is, buf, 255);
-        ensure_memory_matches("fullread: read with newlines", (void*) buf, static_cast<U32>(str.size())-1, (void*) str.c_str(), static_cast<U32>(str.size())-1);
+        UNSCOPED_INFO("fullread: read with newlines");
+        REQUIRE_THAT(ll_test::Memory((void*) buf, static_cast<U32>(str.size())-1), ll_test::MemoryMatches((void*) str.c_str(), static_cast<U32>(str.size())-1));
 
         is.clear();
         is.str(str = "First Line.\nSecond Line\n");
@@ -855,14 +933,14 @@ namespace tut
         char expected_string[] = "First Line.\nSecond";
         int len = sizeof(expected_string)-1;
         fullread(is, buf, len);
-        ensure_memory_matches("fullread: read with newlines", (void*) buf, len, (void*) &expected_string, len);
+        UNSCOPED_INFO("fullread: read with newlines");
+        REQUIRE_THAT(ll_test::Memory((void*) buf, len), ll_test::MemoryMatches((void*) &expected_string, len));
     }
 
 
 //   testcases for operator >>
 
-    template<> template<>
-    void streamtools_object::test<26>()
+    TEST_CASE("streamtools: operator>> consumes a matching C string and fails on a mismatch", "[streamtools]")
     {
         char arr[255];
         std::string str;
@@ -872,12 +950,14 @@ namespace tut
         stream >> toCheck.c_str();
         stream.get(arr, 255, '\0');
         expected_result = " is a 3D World";
-        ensure_equals("istream << operator", arr, expected_result);
+        UNSCOPED_INFO("istream << operator");
+        CHECK(arr == expected_result);
 
         stream.clear();
         stream.str(str = "SecondLife is a 3D World");
         toCheck = "is";
         stream >> toCheck.c_str();
-        ensure("istream << operator should have failed", stream.good() == false);
+        UNSCOPED_INFO("istream << operator should have failed");
+        CHECK_FALSE(stream.good());
     }
 }

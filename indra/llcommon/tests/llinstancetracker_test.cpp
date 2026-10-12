@@ -38,7 +38,7 @@
 #include <stdexcept>
 // std headers
 // other Linden headers
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace
 {
@@ -79,62 +79,58 @@ struct Unkeyed: public LLInstanceTracker<Unkeyed>
 *****************************************************************************/
 namespace tut
 {
-    struct llinstancetracker_data
+    TEST_CASE("llinstancetracker: Keyed instances are found by key and forgotten when destroyed", "[llinstancetracker]")
     {
-    };
-    typedef test_group<llinstancetracker_data> llinstancetracker_group;
-    typedef llinstancetracker_group::object object;
-    llinstancetracker_group llinstancetrackergrp("llinstancetracker");
-
-    template<> template<>
-    void object::test<1>()
-    {
-        ensure_equals(Keyed::instanceCount(), 0);
+        CHECK(Keyed::instanceCount() == 0);
         {
             Keyed one("one");
-            ensure_equals(Keyed::instanceCount(), 1);
+            CHECK(Keyed::instanceCount() == 1);
             auto found = Keyed::getInstance("one");
-            ensure("couldn't find stack Keyed", bool(found));
-            ensure_equals("found wrong Keyed instance", found.get(), &one);
+            UNSCOPED_INFO("couldn't find stack Keyed");
+            REQUIRE(bool(found));
+            UNSCOPED_INFO("found wrong Keyed instance");
+            REQUIRE(found.get() == &one);
             {
                 std::unique_ptr<Keyed> two(new Keyed("two"));
-                ensure_equals(Keyed::instanceCount(), 2);
+                CHECK(Keyed::instanceCount() == 2);
                 auto found = Keyed::getInstance("two");
-                ensure("couldn't find heap Keyed", bool(found));
-                ensure_equals("found wrong Keyed instance", found.get(), two.get());
+                UNSCOPED_INFO("couldn't find heap Keyed");
+                REQUIRE(bool(found));
+                UNSCOPED_INFO("found wrong Keyed instance");
+                REQUIRE(found.get() == two.get());
             }
-            ensure_equals(Keyed::instanceCount(), 1);
+            CHECK(Keyed::instanceCount() == 1);
         }
         auto found = Keyed::getInstance("one");
-        ensure("Keyed key lives too long", ! found);
-        ensure_equals(Keyed::instanceCount(), 0);
+        UNSCOPED_INFO("Keyed key lives too long");
+        REQUIRE_FALSE(found);
+        CHECK(Keyed::instanceCount() == 0);
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE("llinstancetracker: Unkeyed instances are counted and their weak pointers expire", "[llinstancetracker]")
     {
-        ensure_equals(Unkeyed::instanceCount(), 0);
+        CHECK(Unkeyed::instanceCount() == 0);
         std::weak_ptr<Unkeyed> dangling;
         {
             Unkeyed one;
-            ensure_equals(Unkeyed::instanceCount(), 1);
+            CHECK(Unkeyed::instanceCount() == 1);
             std::weak_ptr<Unkeyed> found = one.getWeak();
-            ensure(! found.expired());
+            CHECK_FALSE(found.expired());
             {
                 std::unique_ptr<Unkeyed> two(new Unkeyed);
-                ensure_equals(Unkeyed::instanceCount(), 2);
+                CHECK(Unkeyed::instanceCount() == 2);
             }
-            ensure_equals(Unkeyed::instanceCount(), 1);
+            CHECK(Unkeyed::instanceCount() == 1);
             // store a weak pointer to a temp Unkeyed instance
             dangling = found;
         } // make that instance vanish
         // check the now-invalid pointer to the destroyed instance
-        ensure("weak_ptr<Unkeyed> failed to track destruction", dangling.expired());
-        ensure_equals(Unkeyed::instanceCount(), 0);
+        UNSCOPED_INFO("weak_ptr<Unkeyed> failed to track destruction");
+        CHECK(dangling.expired());
+        CHECK(Unkeyed::instanceCount() == 0);
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE("llinstancetracker: key_snapshot and instance_snapshot list each Keyed once", "[llinstancetracker]")
     {
         Keyed one("one"), two("two"), three("three");
         // We don't want to rely on the underlying container delivering keys
@@ -146,12 +142,13 @@ namespace tut
         StringVector keys(snap.begin(), snap.end());
         std::sort(keys.begin(), keys.end());
         StringVector::const_iterator ki(keys.begin());
-        ensure_equals(*ki++, "one");
-        ensure_equals(*ki++, "three");
-        ensure_equals(*ki++, "two");
+        CHECK(*ki++ == "one");
+        CHECK(*ki++ == "three");
+        CHECK(*ki++ == "two");
         // Use ensure() here because ensure_equals would want to display
         // mismatched values, and frankly that wouldn't help much.
-        ensure("didn't reach end", ki == keys.end());
+        UNSCOPED_INFO("didn't reach end");
+        REQUIRE(ki == keys.end());
 
         // Use a somewhat different approach to order independence with
         // instance_snapshot(): explicitly capture the instances we know in a
@@ -163,13 +160,14 @@ namespace tut
         instances.insert(&three);
         for (auto& ref : Keyed::instance_snapshot())
         {
-            ensure_equals("spurious instance", instances.erase(&ref), 1);
+            UNSCOPED_INFO("spurious instance");
+            REQUIRE(instances.erase(&ref) == 1);
         }
-        ensure_equals("unreported instance", instances.size(), 0);
+        UNSCOPED_INFO("unreported instance");
+        REQUIRE(instances.size() == 0);
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE("llinstancetracker: instance_snapshot lists each Unkeyed once", "[llinstancetracker]")
     {
         Unkeyed one, two, three;
         typedef std::set<Unkeyed*> KeySet;
@@ -181,17 +179,17 @@ namespace tut
 
         for (auto& ref : Unkeyed::instance_snapshot())
         {
-            ensure_equals("spurious instance", instances.erase(&ref), 1);
+            UNSCOPED_INFO("spurious instance");
+            REQUIRE(instances.erase(&ref) == 1);
         }
 
-        ensure_equals("unreported instance", instances.size(), 0);
+        UNSCOPED_INFO("unreported instance");
+        REQUIRE(instances.size() == 0);
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE("llinstancetracker: delete Keyed with outstanding instance_snapshot", "[llinstancetracker]")
     {
         std::string desc("delete Keyed with outstanding instance_snapshot");
-        set_test_name(desc);
         Keyed* keyed = new Keyed(desc);
         // capture a snapshot but do not yet traverse it
         auto snapshot = Keyed::instance_snapshot();
@@ -200,14 +198,12 @@ namespace tut
         // traversing the snapshot should reflect the deletion
         // avoid ensure_equals() because it requires the ability to stream the
         // two values to std::ostream
-        ensure(snapshot.begin() == snapshot.end());
+        REQUIRE(snapshot.begin() == snapshot.end());
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE("llinstancetracker: delete Keyed with outstanding key_snapshot", "[llinstancetracker]")
     {
         std::string desc("delete Keyed with outstanding key_snapshot");
-        set_test_name(desc);
         Keyed* keyed = new Keyed(desc);
         // capture a snapshot but do not yet traverse it
         auto snapshot = Keyed::key_snapshot();
@@ -216,13 +212,11 @@ namespace tut
         // traversing the snapshot should reflect the deletion
         // avoid ensure_equals() because it requires the ability to stream the
         // two values to std::ostream
-        ensure(snapshot.begin() == snapshot.end());
+        REQUIRE(snapshot.begin() == snapshot.end());
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE("llinstancetracker: delete Unkeyed with outstanding instance_snapshot", "[llinstancetracker]")
     {
-        set_test_name("delete Unkeyed with outstanding instance_snapshot");
         std::string what;
         Unkeyed* unkeyed = new Unkeyed;
         // capture a snapshot but do not yet traverse it
@@ -232,13 +226,11 @@ namespace tut
         // traversing the snapshot should reflect the deletion
         // avoid ensure_equals() because it requires the ability to stream the
         // two values to std::ostream
-        ensure(snapshot.begin() == snapshot.end());
+        REQUIRE(snapshot.begin() == snapshot.end());
     }
 
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE("llinstancetracker: a throwing subclass constructor leaves no instance behind", "[llinstancetracker]")
     {
-        set_test_name("exception in subclass ctor");
         typedef std::set<Unkeyed*> InstanceSet;
         InstanceSet existing;
         // We can't use the iterator-range InstanceSet constructor because
@@ -271,7 +263,8 @@ namespace tut
         // its constructor exception.
         for (auto& ref : Unkeyed::instance_snapshot())
         {
-            ensure("failed to remove instance", existing.find(&ref) != existing.end());
+            UNSCOPED_INFO("failed to remove instance");
+            REQUIRE(existing.find(&ref) != existing.end());
         }
     }
 } // namespace tut

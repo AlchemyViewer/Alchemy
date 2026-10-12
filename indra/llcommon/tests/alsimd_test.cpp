@@ -34,7 +34,7 @@
 #include "linden_common.h"
 
 #include "../alsimd.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <bit>
 #include <cmath>
@@ -46,8 +46,6 @@
 
 using namespace alsimd;
 
-namespace tut
-{
 namespace
 {
     struct Lanes
@@ -112,7 +110,8 @@ namespace
         const U32 expected[4] = {x, y, z, w};
         for (int i = 0; i < 4; ++i)
         {
-            ensure_equals(what + " lane " + std::to_string(i), bits_of(l.v[i]), expected[i]);
+            UNSCOPED_INFO(what + " lane " + std::to_string(i));
+            REQUIRE(bits_of(l.v[i]) == expected[i]);
         }
     }
 
@@ -150,9 +149,9 @@ namespace
         for (int i = 0; i < 4; ++i)
         {
             const double err = std::fabs((double)l.v[i] - expected[i]) / std::fabs(expected[i]);
-            ensure(what + " lane " + std::to_string(i) + ": " + precise(l.v[i]) + " is off " +
-                       precise(err) + " relative from " + precise(expected[i]),
-                   err <= relative);
+            UNSCOPED_INFO(what + " lane " + std::to_string(i) + ": " + precise(l.v[i]) + " is off " +
+                       precise(err) + " relative from " + precise(expected[i]));
+            REQUIRE(err <= relative);
         }
     }
 
@@ -163,10 +162,9 @@ namespace
     const F32 NAN_QUIET = std::numeric_limits<F32>::quiet_NaN();
     const F32 DENORMAL = std::numeric_limits<F32>::denorm_min();
     const F32 DENORMAL_BIG = float_of(0x007fffffu);
-}
-} // namespace tut
+} // anonymous namespace
 
-namespace tut
+namespace
 {
     struct alsimd_data
     {
@@ -179,23 +177,22 @@ namespace tut
         f32x4 a() const { return set(float_of(pa[0]), float_of(pa[1]), float_of(pa[2]), float_of(pa[3])); }
         f32x4 b() const { return set(float_of(pb[0]), float_of(pb[1]), float_of(pb[2]), float_of(pb[3])); }
     };
-    typedef test_group<alsimd_data> alsimd_test;
-    typedef alsimd_test::object alsimd_object;
-    tut::alsimd_test alsimd_testcase("alsimd");
 
     // The register is sixteen bytes at sixteen, on every target.
-    template<> template<>
-    void alsimd_object::test<1>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: the register is sixteen bytes at sixteen on every target", "[alsimd]")
     {
-        ensure_equals("sizeof f32x4", sizeof(f32x4), (size_t)16);
-        ensure_equals("alignof f32x4", alignof(f32x4), (size_t)16);
-        ensure_equals("sizeof mask4", sizeof(mask4), (size_t)16);
-        ensure_equals("sizeof i32x4", sizeof(i32x4), (size_t)16);
+        UNSCOPED_INFO("sizeof f32x4");
+        CHECK(sizeof(f32x4) == (size_t)16);
+        UNSCOPED_INFO("alignof f32x4");
+        CHECK(alignof(f32x4) == (size_t)16);
+        UNSCOPED_INFO("sizeof mask4");
+        CHECK(sizeof(mask4) == (size_t)16);
+        UNSCOPED_INFO("sizeof i32x4");
+        CHECK(sizeof(i32x4) == (size_t)16);
     }
 
     // Loads and stores move bits.
-    template<> template<>
-    void alsimd_object::test<2>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: loads and stores move bits", "[alsimd]")
     {
         alignas(16) F32 src[5] = {float_of(pa[0]), float_of(pa[1]), float_of(pa[2]), float_of(pa[3]), 99.f};
         ensure_lanes_bits("load", load(src), pa[0], pa[1], pa[2], pa[3]);
@@ -205,9 +202,11 @@ namespace tut
 
         alignas(16) F32 dst[8] = {};
         store(dst, a());
-        ensure_equals("store", std::memcmp(dst, src, 16), 0);
+        UNSCOPED_INFO("store");
+        CHECK(std::memcmp(dst, src, 16) == 0);
         storeu(dst + 1, a());
-        ensure_equals("storeu", std::memcmp(dst + 1, src, 16), 0);
+        UNSCOPED_INFO("storeu");
+        CHECK(std::memcmp(dst + 1, src, 16) == 0);
 
         ensure_lanes_bits("set", a(), pa[0], pa[1], pa[2], pa[3]);
         ensure_lanes("set1", set1(-2.5f), -2.5f, -2.5f, -2.5f, -2.5f);
@@ -215,13 +214,16 @@ namespace tut
     }
 
     // Lanes and permutations are bit moves.
-    template<> template<>
-    void alsimd_object::test<3>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: lanes and permutations are bit moves", "[alsimd]")
     {
-        ensure_equals("lane<0>", bits_of(lane<0>(a())), pa[0]);
-        ensure_equals("lane<1>", bits_of(lane<1>(a())), pa[1]);
-        ensure_equals("lane<2>", bits_of(lane<2>(a())), pa[2]);
-        ensure_equals("lane<3>", bits_of(lane<3>(a())), pa[3]);
+        UNSCOPED_INFO("lane<0>");
+        CHECK(bits_of(lane<0>(a())) == pa[0]);
+        UNSCOPED_INFO("lane<1>");
+        CHECK(bits_of(lane<1>(a())) == pa[1]);
+        UNSCOPED_INFO("lane<2>");
+        CHECK(bits_of(lane<2>(a())) == pa[2]);
+        UNSCOPED_INFO("lane<3>");
+        CHECK(bits_of(lane<3>(a())) == pa[3]);
 
         ensure_lanes_bits("splat<0>", splat<0>(a()), pa[0], pa[0], pa[0], pa[0]);
         ensure_lanes_bits("splat<1>", splat<1>(a()), pa[1], pa[1], pa[1], pa[1]);
@@ -249,8 +251,7 @@ namespace tut
     }
 
     // Arithmetic is one rounding per lane.
-    template<> template<>
-    void alsimd_object::test<4>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: arithmetic is one rounding per lane", "[alsimd]")
     {
         const F32 xs[4] = {1.5f, -3.25f, 1e-3f, 65535.f};
         const F32 ys[4] = {2.75f, 0.125f, 3.f, -7.f};
@@ -266,10 +267,14 @@ namespace tut
             const Lanes d = lanes_of(sub(x, y));
             const Lanes p = lanes_of(mul(x, y));
             const Lanes q = lanes_of(div(x, y));
-            ensure_equals("add", bits_of(s.v[i]), bits_of(sum));
-            ensure_equals("sub", bits_of(d.v[i]), bits_of(diff));
-            ensure_equals("mul", bits_of(p.v[i]), bits_of(prod));
-            ensure("div within an ulp", ulps_between(q.v[i], quot) <= 1);
+            UNSCOPED_INFO("add");
+            REQUIRE(bits_of(s.v[i]) == bits_of(sum));
+            UNSCOPED_INFO("sub");
+            REQUIRE(bits_of(d.v[i]) == bits_of(diff));
+            UNSCOPED_INFO("mul");
+            REQUIRE(bits_of(p.v[i]) == bits_of(prod));
+            UNSCOPED_INFO("div within an ulp");
+            REQUIRE(ulps_between(q.v[i], quot) <= 1);
         }
 
         // A negative zero as its bits, in and out: /fp:fast lets the compiler
@@ -279,8 +284,10 @@ namespace tut
                           bits_of(-1.f), bits_of(2.f), 0x80000000u, 0u);
         ensure_lanes_bits("abs", abs(or_(set(1.f, -2.f, 0.f, -INF), and_(sign, mask_lane<2>()))),
                           bits_of(1.f), bits_of(2.f), 0u, bits_of(INF));
-        ensure_equals("neg keeps a NaN payload", bits_of(lane<2>(neg(a()))), pa[2] ^ 0x80000000u);
-        ensure_equals("abs keeps a NaN payload", bits_of(lane<2>(abs(neg(a())))), pa[2]);
+        UNSCOPED_INFO("neg keeps a NaN payload");
+        CHECK(bits_of(lane<2>(neg(a()))) == (pa[2] ^ 0x80000000u));
+        UNSCOPED_INFO("abs keeps a NaN payload");
+        CHECK(bits_of(lane<2>(abs(neg(a())))) == pa[2]);
 
         // Denormals pass through: the ops do not rely on flush-to-zero.
         ensure_lanes("denormal mul", mul(set(DENORMAL, DENORMAL_BIG, 0.f, 0.f), set1(1.f)), DENORMAL, DENORMAL_BIG, 0.f, 0.f);
@@ -289,8 +296,7 @@ namespace tut
 
     // Fused multiply-add: exact against fma where the machine fuses, exact
     // against two roundings where it does not.
-    template<> template<>
-    void alsimd_object::test<5>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: fused multiply-add matches fma or two roundings as the machine does", "[alsimd]")
     {
         const F32 as[4] = {1.5f, -3.25f, 1e-3f, 65535.f};
         const F32 bs[4] = {2.75f, 0.125f, 3.f, -7.f};
@@ -321,17 +327,20 @@ namespace tut
                 e_fnmadd = cs[i] - p;
                 e_lane = pl + cs[i];
             }
-            ensure_equals("fmadd", bits_of(r_fmadd.v[i]), bits_of(e_fmadd));
-            ensure_equals("fmsub", bits_of(r_fmsub.v[i]), bits_of(e_fmsub));
-            ensure_equals("fnmadd", bits_of(r_fnmadd.v[i]), bits_of(e_fnmadd));
-            ensure_equals("fmadd_lane", bits_of(r_lane.v[i]), bits_of(e_lane));
+            UNSCOPED_INFO("fmadd");
+            REQUIRE(bits_of(r_fmadd.v[i]) == bits_of(e_fmadd));
+            UNSCOPED_INFO("fmsub");
+            REQUIRE(bits_of(r_fmsub.v[i]) == bits_of(e_fmsub));
+            UNSCOPED_INFO("fnmadd");
+            REQUIRE(bits_of(r_fnmadd.v[i]) == bits_of(e_fnmadd));
+            UNSCOPED_INFO("fmadd_lane");
+            REQUIRE(bits_of(r_lane.v[i]) == bits_of(e_lane));
         }
     }
 
     // min, max and sqrt on ordinary values. A NaN or a zero of either sign
     // in min and max is the backend's to decide and is not tested.
-    template<> template<>
-    void alsimd_object::test<6>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: min and max and sqrt on ordinary values", "[alsimd]")
     {
         const f32x4 x = set(1.f, -2.f, 3.5f, -INF);
         const f32x4 y = set(0.5f, -1.f, 3.5f, 4.f);
@@ -343,14 +352,14 @@ namespace tut
         const Lanes l = lanes_of(s);
         for (int i = 0; i < 4; ++i)
         {
-            ensure_equals("sqrt", bits_of(l.v[i]), bits_of(std::sqrt(sq[i])));
+            UNSCOPED_INFO("sqrt");
+            REQUIRE(bits_of(l.v[i]) == bits_of(std::sqrt(sq[i])));
         }
     }
 
     // The estimates, within what each promises, across the magnitudes a
     // length or a quantization range takes.
-    template<> template<>
-    void alsimd_object::test<7>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: the estimates are within what each promises", "[alsimd]")
     {
         const F32 xs[4] = {1.f, 0.0001f, 12345.678f, 3e20f};
         double e_rsqrt[4], e_rcp[4];
@@ -385,8 +394,7 @@ namespace tut
     // halves, the negatives and the integers already there. A result of zero
     // keeps the sign of its input from SSE4 up and on NEON; the SSE2 forms
     // below that go through an integer and lose it.
-    template<> template<>
-    void alsimd_object::test<8>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: round to nearest even and floor and ceil including the halves", "[alsimd]")
     {
         const F32 xs[8] = {2.5f, 3.5f, -2.5f, -3.5f, 0.25f, -1.75f, 1234567.f, -7.f};
         for (int base = 0; base < 8; base += 4)
@@ -400,11 +408,16 @@ namespace tut
             for (int i = 0; i < 4; ++i)
             {
                 const F32 v = xs[base + i];
-                ensure_equals("round " + std::to_string(v), bits_of(r.v[i]), bits_of(std::nearbyint(v)));
-                ensure_equals("floor " + std::to_string(v), bits_of(f.v[i]), bits_of(std::floor(v)));
-                ensure_equals("ceil " + std::to_string(v), bits_of(c.v[i]), bits_of(std::ceil(v)));
-                ensure_equals("cvt_round " + std::to_string(v), int_lane(cr, i), (S32)std::nearbyint(v));
-                ensure_equals("cvt_trunc " + std::to_string(v), int_lane(ct, i), (S32)v);
+                UNSCOPED_INFO("round " + std::to_string(v));
+                REQUIRE(bits_of(r.v[i]) == bits_of(std::nearbyint(v)));
+                UNSCOPED_INFO("floor " + std::to_string(v));
+                REQUIRE(bits_of(f.v[i]) == bits_of(std::floor(v)));
+                UNSCOPED_INFO("ceil " + std::to_string(v));
+                REQUIRE(bits_of(c.v[i]) == bits_of(std::ceil(v)));
+                UNSCOPED_INFO("cvt_round " + std::to_string(v));
+                REQUIRE(int_lane(cr, i) == (S32)std::nearbyint(v));
+                UNSCOPED_INFO("cvt_trunc " + std::to_string(v));
+                REQUIRE(int_lane(ct, i) == (S32)v);
             }
         }
         const f32x4 near_zero = set(-0.f, -0.25f, 0.f, -0.5f);
@@ -422,12 +435,12 @@ namespace tut
 
         ensure_lanes("to_float", to_float(ints(0, -1, 16777216, -12345678)), 0.f, -1.f, 16777216.f, -12345678.f);
         const Lanes back = lanes_of(cvt_trunc(set(0.f, -1.f, 16777216.f, -12345678.f)));
-        ensure_equals("cvt_trunc round trip", int_lane(back, 3), -12345678);
+        UNSCOPED_INFO("cvt_trunc round trip");
+        CHECK(int_lane(back, 3) == -12345678);
     }
 
     // Bit operations move bits.
-    template<> template<>
-    void alsimd_object::test<9>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: bit operations move bits", "[alsimd]")
     {
         ensure_lanes_bits("and", and_(a(), b()), pa[0] & pb[0], pa[1] & pb[1], pa[2] & pb[2], pa[3] & pb[3]);
         ensure_lanes_bits("andnot", andnot(a(), b()), ~pa[0] & pb[0], ~pa[1] & pb[1], ~pa[2] & pb[2], ~pa[3] & pb[3]);
@@ -439,8 +452,7 @@ namespace tut
 
     // Masks: the constants, the comparisons with a NaN in play, and what
     // reads them.
-    template<> template<>
-    void alsimd_object::test<10>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: mask constants and comparisons with a NaN and what reads them", "[alsimd]")
     {
         ensure_lanes_bits("mask_none", mask_none(), MASK_OFF, MASK_OFF, MASK_OFF, MASK_OFF);
         ensure_lanes_bits("mask_all", mask_all(), MASK_ON, MASK_ON, MASK_ON, MASK_ON);
@@ -469,28 +481,41 @@ namespace tut
         ensure_lanes_bits("select inverted", select(mask_not(m), a(), b()), pb[0], pa[1], pa[2], pa[3]);
         ensure_lanes_bits("select xyz", select(mask_xyz(), a(), b()), pa[0], pa[1], pa[2], pb[3]);
 
-        ensure_equals("bits none", bits(mask_none()), 0u);
-        ensure_equals("bits all", bits(mask_all()), 0xFu);
-        ensure_equals("bits lane 2", bits(mask_lane<2>()), 4u);
-        ensure_equals("bits xyz", bits(mask_xyz()), 7u);
-        ensure_equals("bits cmpge", bits(cmpge(x, y)), 0xAu);
+        UNSCOPED_INFO("bits none");
+        CHECK(bits(mask_none()) == 0u);
+        UNSCOPED_INFO("bits all");
+        CHECK(bits(mask_all()) == 0xFu);
+        UNSCOPED_INFO("bits lane 2");
+        CHECK(bits(mask_lane<2>()) == 4u);
+        UNSCOPED_INFO("bits xyz");
+        CHECK(bits(mask_xyz()) == 7u);
+        UNSCOPED_INFO("bits cmpge");
+        CHECK(bits(cmpge(x, y)) == 0xAu);
 
-        ensure("any none", !any(mask_none()));
-        ensure("any lane 3", any(mask_lane<3>()));
-        ensure("all all", all(mask_all()));
-        ensure("all xyz is not all", !all(mask_xyz()));
-        ensure("any3 lane 3 is not any3", !any3(mask_lane<3>()));
-        ensure("any3 lane 1", any3(mask_lane<1>()));
-        ensure("all3 xyz", all3(mask_xyz()));
-        ensure("all3 with lane 1 clear", !all3(mask_not(mask_lane<1>())));
-        ensure("all3 with only lane 3 clear", all3(mask_not(mask_lane<3>())));
+        UNSCOPED_INFO("any none");
+        CHECK_FALSE(any(mask_none()));
+        UNSCOPED_INFO("any lane 3");
+        CHECK(any(mask_lane<3>()));
+        UNSCOPED_INFO("all all");
+        CHECK(all(mask_all()));
+        UNSCOPED_INFO("all xyz is not all");
+        CHECK_FALSE(all(mask_xyz()));
+        UNSCOPED_INFO("any3 lane 3 is not any3");
+        CHECK_FALSE(any3(mask_lane<3>()));
+        UNSCOPED_INFO("any3 lane 1");
+        CHECK(any3(mask_lane<1>()));
+        UNSCOPED_INFO("all3 xyz");
+        CHECK(all3(mask_xyz()));
+        UNSCOPED_INFO("all3 with lane 1 clear");
+        CHECK_FALSE(all3(mask_not(mask_lane<1>())));
+        UNSCOPED_INFO("all3 with only lane 3 clear");
+        CHECK(all3(mask_not(mask_lane<3>())));
     }
 
     // Dot products sum rounded products in one order on every backend, so
     // they are exact against that order; the cross product rounds one
     // product and fuses the other where the machine fuses.
-    template<> template<>
-    void alsimd_object::test<11>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: dot products sum in one order and cross3 fuses where the machine does", "[alsimd]")
     {
         const F32 as[4] = {1.5f, -3.25f, 0.001f, 4.f};
         const F32 bs[4] = {2.75f, 0.125f, 3.f, -7.f};
@@ -529,9 +554,11 @@ namespace tut
         const Lanes c = lanes_of(cross3(a, b));
         for (int i = 0; i < 3; ++i)
         {
-            ensure_equals("cross3 lane " + std::to_string(i), bits_of(c.v[i]), bits_of(expected[i]));
+            UNSCOPED_INFO("cross3 lane " + std::to_string(i));
+            REQUIRE(bits_of(c.v[i]) == bits_of(expected[i]));
         }
-        ensure_equals("cross3 w", c.v[3], 0.f);
+        UNSCOPED_INFO("cross3 w");
+        CHECK(c.v[3] == 0.f);
 
         // The cross product of two axes is the third.
         ensure_lanes("x cross y", cross3(set(1.f, 0.f, 0.f, 0.f), set(0.f, 1.f, 0.f, 0.f)), 0.f, 0.f, 1.f, 0.f);
@@ -539,39 +566,48 @@ namespace tut
     }
 
     // The feature macros describe the build they came from.
-    template<> template<>
-    void alsimd_object::test<12>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: the feature macros describe the build they came from", "[alsimd]")
     {
-        ensure("one architecture", AL_SIMD_X86 + AL_SIMD_NEON == 1);
-        ensure("a width", AL_SIMD_WIDTH == 4 || AL_SIMD_WIDTH == 8 || AL_SIMD_WIDTH == 16);
+        UNSCOPED_INFO("one architecture");
+        CHECK(AL_SIMD_X86 + AL_SIMD_NEON == 1);
+        UNSCOPED_INFO("a width");
+        CHECK((AL_SIMD_WIDTH == 4 || AL_SIMD_WIDTH == 8 || AL_SIMD_WIDTH == 16));
         if constexpr (AL_SIMD_AVX512)
         {
-            ensure("AVX-512 implies AVX2", AL_SIMD_AVX2 == 1);
-            ensure("AVX-512 is sixteen wide", AL_SIMD_WIDTH == 16);
+            UNSCOPED_INFO("AVX-512 implies AVX2");
+            CHECK(AL_SIMD_AVX2 == 1);
+            UNSCOPED_INFO("AVX-512 is sixteen wide");
+            CHECK(AL_SIMD_WIDTH == 16);
         }
         if constexpr (AL_SIMD_AVX2)
         {
-            ensure("AVX2 implies AVX", AL_SIMD_AVX == 1);
-            ensure("AVX2 implies FMA", AL_SIMD_FMA == 1);
+            UNSCOPED_INFO("AVX2 implies AVX");
+            CHECK(AL_SIMD_AVX == 1);
+            UNSCOPED_INFO("AVX2 implies FMA");
+            CHECK(AL_SIMD_FMA == 1);
         }
         if constexpr (AL_SIMD_AVX)
         {
-            ensure("AVX implies SSE4", AL_SIMD_SSE4 == 1);
-            ensure("AVX is at least eight wide", AL_SIMD_WIDTH >= 8);
+            UNSCOPED_INFO("AVX implies SSE4");
+            CHECK(AL_SIMD_SSE4 == 1);
+            UNSCOPED_INFO("AVX is at least eight wide");
+            CHECK(AL_SIMD_WIDTH >= 8);
         }
         if constexpr (AL_SIMD_NEON)
         {
-            ensure("NEON has FMA", AL_SIMD_FMA == 1);
-            ensure("NEON is four wide", AL_SIMD_WIDTH == 4);
+            UNSCOPED_INFO("NEON has FMA");
+            CHECK(AL_SIMD_FMA == 1);
+            UNSCOPED_INFO("NEON is four wide");
+            CHECK(AL_SIMD_WIDTH == 4);
         }
-        ensure("the level is not above the flags", AL_ISA_LEVEL <= 2 || (AL_ISA_LEVEL == 3 && AL_SIMD_AVX2) || (AL_ISA_LEVEL == 4 && AL_SIMD_AVX512));
+        UNSCOPED_INFO("the level is not above the flags");
+        CHECK((AL_ISA_LEVEL <= 2 || (AL_ISA_LEVEL == 3 && AL_SIMD_AVX2) || (AL_ISA_LEVEL == 4 && AL_SIMD_AVX512)));
     }
 
     // The aligned copy moves every byte and no other, at every size the
     // three loops can be entered with, both ends at every sixteen-byte
     // offset within a line, and at the sizes the slabs come in.
-    template<> template<>
-    void alsimd_object::test<13>()
+    TEST_CASE_METHOD(alsimd_data, "alsimd: copy_aligned16 moves every byte and no other at every entry size", "[alsimd]")
     {
         constexpr size_t LARGEST = 4 * 1024 * 1024;
         constexpr size_t GUARD = 64;
@@ -608,9 +644,12 @@ namespace tut
                     std::memset(dst - 16, 0xEE, size + 32);
                     copy_aligned16(reinterpret_cast<char*>(dst), reinterpret_cast<const char*>(src), size);
                     const std::string what = "copy of " + std::to_string(size) + " at " + std::to_string(src_off) + "/" + std::to_string(dst_off);
-                    ensure(what + " moved every byte", std::memcmp(dst, src, size) == 0);
-                    ensure(what + " left the byte before", dst[-1] == 0xEE);
-                    ensure(what + " left the byte after", dst[size] == 0xEE);
+                    UNSCOPED_INFO(what + " moved every byte");
+                    REQUIRE(std::memcmp(dst, src, size) == 0);
+                    UNSCOPED_INFO(what + " left the byte before");
+                    REQUIRE(dst[-1] == 0xEE);
+                    UNSCOPED_INFO(what + " left the byte after");
+                    REQUIRE(dst[size] == 0xEE);
                 }
             }
         }

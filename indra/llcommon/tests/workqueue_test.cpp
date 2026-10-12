@@ -19,7 +19,8 @@
 #include <deque>
 // external library headers
 // other Linden headers
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestfailure.h"
 #include "../test/catch_and_store_what_in.h"
 #include "llcond.h"
 #include "llcoros.h"
@@ -34,44 +35,40 @@ using namespace std::literals::string_literals; // s suffix
 /*****************************************************************************
 *   TUT
 *****************************************************************************/
-namespace tut
+namespace
 {
     struct workqueue_data
     {
         WorkSchedule queue{"queue"};
     };
-    typedef test_group<workqueue_data> workqueue_group;
-    typedef workqueue_group::object object;
-    workqueue_group workqueuegrp("workqueue");
 
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(workqueue_data, "workqueue: a schedule is findable by name and an unnamed one gets a default", "[workqueue]")
     {
-        set_test_name("name");
-        ensure_equals("didn't capture name", queue.getKey(), "queue");
-        ensure("not findable", WorkSchedule::getInstance("queue") == queue.getWeak().lock());
+        UNSCOPED_INFO("didn't capture name");
+        CHECK(queue.getKey() == "queue");
+        UNSCOPED_INFO("not findable");
+        CHECK(WorkSchedule::getInstance("queue") == queue.getWeak().lock());
         WorkSchedule q2;
-        ensure("has no name", LLStringUtil::startsWith(q2.getKey(), "WorkQueue"));
+        UNSCOPED_INFO("has no name");
+        CHECK(LLStringUtil::startsWith(q2.getKey(), "WorkQueue"));
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(workqueue_data, "workqueue: posted work runs only when the queue is serviced", "[workqueue]")
     {
-        set_test_name("post");
         bool wasRun{ false };
         // We only get away with binding a simple bool because we're running
         // the work on the same thread.
         queue.post([&wasRun](){ wasRun = true; });
         queue.close();
-        ensure("ran too soon", ! wasRun);
+        UNSCOPED_INFO("ran too soon");
+        CHECK_FALSE(wasRun);
         queue.runUntilClose();
-        ensure("didn't run", wasRun);
+        UNSCOPED_INFO("didn't run");
+        CHECK(wasRun);
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE_METHOD(workqueue_data, "workqueue: postEvery repeats at its interval until the work returns false", "[workqueue]")
     {
-        set_test_name("postEvery");
         // record of runs
         using Shared = std::deque<WorkSchedule::TimePoint>;
         // This is an example of how to share data between the originator of
@@ -114,7 +111,8 @@ namespace tut
         }
         // Take a copy of the captured deque.
         Shared result = data.get();
-        ensure_equals("called wrong number of times", result.size(), 3);
+        UNSCOPED_INFO("called wrong number of times");
+        REQUIRE(result.size() == 3);
         // postEvery() assumes you want the first call to happen right away.
         // Pretend our start time was (interval) earlier than that, to make
         // our too early/too late tests uniform for all entries.
@@ -125,10 +123,12 @@ namespace tut
             start += interval;
             try
             {
-                ensure(STRINGIZE("call " << i << " too soon"), diff >= interval);
-                ensure(STRINGIZE("call " << i << " too late"), diff < interval*1.5);
+                UNSCOPED_INFO((STRINGIZE("call " << i << " too soon")));
+                REQUIRE((diff >= interval));
+                UNSCOPED_INFO((STRINGIZE("call " << i << " too late")));
+                REQUIRE((diff < interval*1.5));
             }
-            catch (const tut::failure&)
+            catch (const ll_test::Failure&)
             {
                 auto interval_ms = interval / 1ms;
                 auto diff_ms = diff / 1ms;
@@ -139,10 +139,8 @@ namespace tut
         }
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE_METHOD(workqueue_data, "workqueue: postTo hands int and string results to the caller's callback", "[workqueue]")
     {
-        set_test_name("postTo");
         WorkSchedule main("main");
         auto qptr = WorkSchedule::getInstance("queue");
         int result = 0;
@@ -158,7 +156,8 @@ namespace tut
         qptr->runOne();
         // this should run the callback
         main.runOne();
-        ensure_equals("failed to run int callback", result, 17);
+        UNSCOPED_INFO("failed to run int callback");
+        CHECK(result == 17);
 
         std::string alpha;
         // postTo() handles arbitrary return types
@@ -168,13 +167,12 @@ namespace tut
             [&alpha](const std::string& s){ alpha = s; });
         qptr->runPending();
         main.runPending();
-        ensure_equals("failed to run string callback", alpha, "abc");
+        UNSCOPED_INFO("failed to run string callback");
+        CHECK(alpha == "abc");
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE_METHOD(workqueue_data, "workqueue: postTo with void work still runs the callback", "[workqueue]")
     {
-        set_test_name("postTo with void return");
         WorkSchedule main("main");
         auto qptr = WorkSchedule::getInstance("queue");
         std::string observe;
@@ -188,23 +186,24 @@ namespace tut
             [&observe](){ observe.append(";main"); });
         qptr->runOne();
         main.runOne();
-        ensure_equals("failed to run both lambdas", observe, "queue;main");
+        UNSCOPED_INFO("failed to run both lambdas");
+        CHECK(observe == "queue;main");
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE_METHOD(workqueue_data, "workqueue: waitForResult throws on the main coroutine but works on others", "[workqueue]")
     {
-        set_test_name("waitForResult");
         std::string stored;
         // Try to call waitForResult() on this thread's main coroutine. It
         // should throw because the main coroutine must service the queue.
         auto what{ catch_what<WorkSchedule::Error>(
                 [this, &stored](){ stored = queue.waitForResult(
                         [](){ return "should throw"; }); }) };
-        ensure("lambda should not have run", stored.empty());
-        ensure_not("waitForResult() should have thrown", what.empty());
-        ensure(STRINGIZE("should mention waitForResult: " << what),
-               what.find("waitForResult") != std::string::npos);
+        UNSCOPED_INFO("lambda should not have run");
+        REQUIRE(stored.empty());
+        UNSCOPED_INFO("waitForResult() should have thrown");
+        REQUIRE_FALSE(what.empty());
+        UNSCOPED_INFO((STRINGIZE("should mention waitForResult: " << what)));
+        REQUIRE(what.find("waitForResult") != std::string::npos);
 
         // Call waitForResult() on a coroutine, with a string result.
         LLCoros::instance().launch(
@@ -218,7 +217,8 @@ namespace tut
         // 'queue'. Service it.
         queue.runOne();
         llcoro::suspend();
-        ensure_equals("bad waitForResult return", stored, "string result");
+        UNSCOPED_INFO("bad waitForResult return");
+        CHECK(stored == "string result");
 
         // Call waitForResult() on a coroutine, with a void callable.
         stored.clear();
@@ -233,7 +233,9 @@ namespace tut
         llcoro::suspend();
         queue.runOne();
         llcoro::suspend();
-        ensure_equals("didn't run coroutine", stored, "ran");
-        ensure("void waitForResult() didn't return", done);
+        UNSCOPED_INFO("didn't run coroutine");
+        CHECK(stored == "ran");
+        UNSCOPED_INFO("void waitForResult() didn't return");
+        CHECK(done);
     }
-} // namespace tut
+} // anonymous namespace

@@ -46,7 +46,9 @@
 #include "llstring.h"
 
 #include "hexdump.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestfailure.h"
+#include "altestmatchers.h"
 #include "../test/namedtempfile.h"
 #include "stringize.h"
 #include "StringVec.h"
@@ -68,7 +70,8 @@ namespace tut
                               ARGS&&... args)
     {
         auto PYTHON(LLStringUtil::getenv("PYTHON"));
-        ensure("Set $PYTHON to the Python interpreter", !PYTHON.empty());
+        UNSCOPED_INFO("Set $PYTHON to the Python interpreter");
+        REQUIRE_FALSE(PYTHON.empty());
 
         NamedTempFile scriptfile("py", script);
 
@@ -82,11 +85,13 @@ namespace tut
         {
             char buffer[256];
             strerror_s(buffer, errno); // C++ can infer the buffer size!  :-O
-            ensure(STRINGIZE("Couldn't run Python " << desc << "script: " << buffer), false);
+            UNSCOPED_INFO((STRINGIZE("Couldn't run Python " << desc << "script: " << buffer)));
+            REQUIRE(false);
         }
         else
         {
-            ensure_equals(STRINGIZE(desc << " script terminated with rc " << rc), rc, expect);
+            UNSCOPED_INFO(STRINGIZE(desc << " script terminated with rc " << rc));
+            REQUIRE(rc == expect);
         }
 
 #else  // LL_DARWIN, LL_LINUX
@@ -98,34 +103,35 @@ namespace tut
             params.args.add(arg);
         }
         LLProcessPtr py(LLProcess::create(params));
-        ensure(STRINGIZE("Couldn't launch " << desc << " script"), bool(py));
+        UNSCOPED_INFO((STRINGIZE("Couldn't launch " << desc << " script")));
+        REQUIRE(bool(py));
         // Implementing timeout would mean messing with alarm() and
         // catching SIGALRM... later maybe...
         int status(0);
         if (waitpid(py->getProcessID(), &status, 0) == -1)
         {
             int waitpid_errno(errno);
-            ensure_equals(STRINGIZE("Couldn't retrieve rc from " << desc << " script: "
-                                    "waitpid() errno " << waitpid_errno),
-                          waitpid_errno, ECHILD);
+            UNSCOPED_INFO((STRINGIZE("Couldn't retrieve rc from " << desc << " script: "
+                                    "waitpid() errno " << waitpid_errno)));
+            REQUIRE(waitpid_errno == ECHILD);
         }
         else
         {
             if (WIFEXITED(status))
             {
                 int rc(WEXITSTATUS(status));
-                ensure_equals(STRINGIZE(desc << " script terminated with rc " << rc),
-                              rc, expect);
+                UNSCOPED_INFO((STRINGIZE(desc << " script terminated with rc " << rc)));
+                REQUIRE(rc == expect);
             }
             else if (WIFSIGNALED(status))
             {
-                ensure(STRINGIZE(desc << " script terminated by signal " << WTERMSIG(status)),
-                       false);
+                UNSCOPED_INFO((STRINGIZE(desc << " script terminated by signal " << WTERMSIG(status))));
+                REQUIRE(false);
             }
             else
             {
-                ensure(STRINGIZE(desc << " script produced impossible status " << status),
-                       false);
+                UNSCOPED_INFO((STRINGIZE(desc << " script produced impossible status " << status)));
+                REQUIRE(false);
             }
         }
 #endif
@@ -145,24 +151,16 @@ namespace tut
         ~TestPythonCompatible() {}
     };
 
-    typedef tut::test_group<TestPythonCompatible> TestPythonCompatibleGroup;
-    typedef TestPythonCompatibleGroup::object TestPythonCompatibleObject;
-    TestPythonCompatibleGroup pycompat("LLSD serialize Python compatibility");
-
-    template<> template<>
-    void TestPythonCompatibleObject::test<1>()
+    TEST_CASE_METHOD(TestPythonCompatible, "LLSD serialize Python compatibility: python_expect() sees a nonzero exit code", "[LLSD_serialize_Python_compatibility]")
     {
-        set_test_name("verify python()");
         python_expect("hello",
                       "import sys\n"
                       "sys.exit(17)\n",
                       17);                 // expect nonzero rc
     }
 
-    template<> template<>
-    void TestPythonCompatibleObject::test<2>()
+    TEST_CASE_METHOD(TestPythonCompatible, "LLSD serialize Python compatibility: python() runs a script in a NamedTempFile", "[LLSD_serialize_Python_compatibility]")
     {
-        set_test_name("verify NamedTempFile");
         python("platform",
                "import sys\n"
                "print('Running on', sys.platform)\n");
@@ -272,7 +270,7 @@ namespace tut
                    "debug = open(r'" << debug.getPath().string() << "', 'w')\n"
                    "verify(parse_each(open(r'" << file.getPath().string() << "', 'rb')))\n";});
         }
-        catch (const failure&)
+        catch (const ll_test::Failure&)
         {
             LL_DEBUGS() << "Script debug output:" << LL_ENDL;
             debug.peep_log();
@@ -280,44 +278,34 @@ namespace tut
         }
     }
 
-    template<> template<>
-    void TestPythonCompatibleObject::test<3>()
+    TEST_CASE_METHOD(TestPythonCompatible, "LLSD serialize Python compatibility: to Python using LLSDSerialize::serialize(LLSD_XML)", "[LLSD_serialize_Python_compatibility]")
     {
-        set_test_name("to Python using LLSDSerialize::serialize(LLSD_XML)");
         toPythonUsing("LLSD_XML",
                       [](const LLSD& sd, std::ostream& out)
         { LLSDSerialize::serialize(sd, out, LLSDSerialize::LLSD_XML); });
     }
 
-    template<> template<>
-    void TestPythonCompatibleObject::test<4>()
+    TEST_CASE_METHOD(TestPythonCompatible, "LLSD serialize Python compatibility: to Python using LLSDSerialize::serialize(LLSD_NOTATION)", "[LLSD_serialize_Python_compatibility]")
     {
-        set_test_name("to Python using LLSDSerialize::serialize(LLSD_NOTATION)");
         toPythonUsing("LLSD_NOTATION",
                       [](const LLSD& sd, std::ostream& out)
         { LLSDSerialize::serialize(sd, out, LLSDSerialize::LLSD_NOTATION); });
     }
 
-    template<> template<>
-    void TestPythonCompatibleObject::test<5>()
+    TEST_CASE_METHOD(TestPythonCompatible, "LLSD serialize Python compatibility: to Python using LLSDSerialize::serialize(LLSD_BINARY)", "[LLSD_serialize_Python_compatibility]")
     {
-        set_test_name("to Python using LLSDSerialize::serialize(LLSD_BINARY)");
         toPythonUsing("LLSD_BINARY",
                       [](const LLSD& sd, std::ostream& out)
         { LLSDSerialize::serialize(sd, out, LLSDSerialize::LLSD_BINARY); });
     }
 
-    template<> template<>
-    void TestPythonCompatibleObject::test<6>()
+    TEST_CASE_METHOD(TestPythonCompatible, "LLSD serialize Python compatibility: to Python using LLSDSerialize::toXML()", "[LLSD_serialize_Python_compatibility]")
     {
-        set_test_name("to Python using LLSDSerialize::toXML()");
         toPythonUsing("toXML()", LLSDSerialize::toXML);
     }
 
-    template<> template<>
-    void TestPythonCompatibleObject::test<7>()
+    TEST_CASE_METHOD(TestPythonCompatible, "LLSD serialize Python compatibility: to Python using LLSDSerialize::toNotation()", "[LLSD_serialize_Python_compatibility]")
     {
-        set_test_name("to Python using LLSDSerialize::toNotation()");
         toPythonUsing("toNotation()", LLSDSerialize::toNotation);
     }
 
@@ -388,62 +376,52 @@ namespace tut
         LLSD item;
         try
         {
-            ensure("Failed to read LLSD::Integer from Python",
-                   itemFromStream(inf, item, parse));
-            ensure_equals(item.asInteger(), 17);
-            ensure("Failed to read LLSD::Real from Python",
-                   itemFromStream(inf, item, parse));
-            ensure_approximately_equals("Bad LLSD::Real value from Python",
-                                        item.asReal(), 3.14, 7); // 7 bits ~= 0.01
-            ensure("Failed to read LLSD::String from Python",
-                   itemFromStream(inf, item, parse));
-            ensure_equals(item.asString(),
+            UNSCOPED_INFO("Failed to read LLSD::Integer from Python");
+            REQUIRE(itemFromStream(inf, item, parse));
+            REQUIRE(item.asInteger() == 17);
+            UNSCOPED_INFO("Failed to read LLSD::Real from Python");
+            REQUIRE(itemFromStream(inf, item, parse));
+            UNSCOPED_INFO("Bad LLSD::Real value from Python");
+            REQUIRE_THAT(item.asReal(), ll_test::WithinBits(3.14, 7)); // 7 bits ~= 0.01
+            UNSCOPED_INFO("Failed to read LLSD::String from Python");
+            REQUIRE(itemFromStream(inf, item, parse));
+            REQUIRE(item.asString() ==
                           "This string\n"
                           "has several\n"
                           "lines.");
         }
-        catch (const tut::failure& err)
+        catch (const ll_test::Failure&)
         {
-            std::cout << "for " << err.what() << ", item = " << item << std::endl;
+            std::cout << "for item = " << item << std::endl;
             throw;
         }
     }
 
-    template<> template<>
-    void TestPythonCompatibleObject::test<8>()
+    TEST_CASE_METHOD(TestPythonCompatible, "LLSD serialize Python compatibility: from Python XML using LLSDSerialize::deserialize()", "[LLSD_serialize_Python_compatibility]")
     {
-        set_test_name("from Python XML using LLSDSerialize::deserialize()");
         fromPythonUsing("format_xml");
     }
 
-    template<> template<>
-    void TestPythonCompatibleObject::test<9>()
+    TEST_CASE_METHOD(TestPythonCompatible, "LLSD serialize Python compatibility: from Python notation using LLSDSerialize::deserialize()", "[LLSD_serialize_Python_compatibility]")
     {
-        set_test_name("from Python notation using LLSDSerialize::deserialize()");
         fromPythonUsing("format_notation");
     }
 
-    template<> template<>
-    void TestPythonCompatibleObject::test<10>()
+    TEST_CASE_METHOD(TestPythonCompatible, "LLSD serialize Python compatibility: from Python binary using LLSDSerialize::deserialize()", "[LLSD_serialize_Python_compatibility]")
     {
-        set_test_name("from Python binary using LLSDSerialize::deserialize()");
         fromPythonUsing("format_binary");
     }
 
-    template<> template<>
-    void TestPythonCompatibleObject::test<11>()
+    TEST_CASE_METHOD(TestPythonCompatible, "LLSD serialize Python compatibility: from Python XML using fromXML()", "[LLSD_serialize_Python_compatibility]")
     {
-        set_test_name("from Python XML using fromXML()");
         // fromXML()'s optional 3rd param isn't max_bytes, it's emit_errors
         fromPythonUsing("format_xml",
                         [](std::istream& istr, LLSD& data, llssize)
                         { return LLSDSerialize::fromXML(data, istr) > 0; });
     }
 
-    template<> template<>
-    void TestPythonCompatibleObject::test<12>()
+    TEST_CASE_METHOD(TestPythonCompatible, "LLSD serialize Python compatibility: from Python notation using fromNotation()", "[LLSD_serialize_Python_compatibility]")
     {
-        set_test_name("from Python notation using fromNotation()");
         fromPythonUsing("format_notation",
                         [](std::istream& istr, LLSD& data, llssize max_bytes)
                         { return LLSDSerialize::fromNotation(data, istr, max_bytes) > 0; });

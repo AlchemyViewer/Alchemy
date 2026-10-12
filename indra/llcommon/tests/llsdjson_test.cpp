@@ -25,7 +25,7 @@
  */
 
 #include "linden_common.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "llsdjson.h"
 #include "llsdutil.h"
@@ -36,7 +36,7 @@
 #include <cmath>
 #include <limits>
 
-namespace tut
+namespace
 {
     struct llsdjson_data
     {
@@ -46,168 +46,213 @@ namespace tut
             LLSD result;
             std::string errmsg;
             bool ok = LlsdFromJsonString(json, result, &errmsg);
-            ensure("parse failed for " + json + ": " + errmsg, ok);
+            UNSCOPED_INFO("parse failed for " + json + ": " + errmsg);
+            REQUIRE(ok);
             return result;
         }
     };
-    typedef test_group<llsdjson_data> llsdjson_test;
-    typedef llsdjson_test::object llsdjson_object;
-    tut::llsdjson_test tllsdjson("LlsdJson");
 
     // scalar parsing: types and values
-    template<> template<>
-    void llsdjson_object::test<1>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: scalars parse to the right type and value", "[LlsdJson]")
     {
         LLSD val = parse("null");
-        ensure_equals("null type", val.type(), LLSD::TypeUndefined);
+        UNSCOPED_INFO("null type");
+        CHECK(val.type() == LLSD::TypeUndefined);
 
         val = parse("true");
-        ensure_equals("bool type", val.type(), LLSD::TypeBoolean);
-        ensure("bool value", val.asBoolean());
+        UNSCOPED_INFO("bool type");
+        CHECK(val.type() == LLSD::TypeBoolean);
+        UNSCOPED_INFO("bool value");
+        CHECK(val.asBoolean());
 
         val = parse("false");
-        ensure("false value", !val.asBoolean());
+        UNSCOPED_INFO("false value");
+        CHECK_FALSE(val.asBoolean());
 
         val = parse("42");
-        ensure_equals("int type", val.type(), LLSD::TypeInteger);
-        ensure_equals("int value", val.asInteger(), 42);
+        UNSCOPED_INFO("int type");
+        CHECK(val.type() == LLSD::TypeInteger);
+        UNSCOPED_INFO("int value");
+        CHECK(val.asInteger() == 42);
 
         val = parse("-7");
-        ensure_equals("negative int", val.asInteger(), -7);
+        UNSCOPED_INFO("negative int");
+        CHECK(val.asInteger() == -7);
 
         val = parse("3.25");
-        ensure_equals("real type", val.type(), LLSD::TypeReal);
-        ensure_equals("real value", val.asReal(), 3.25);
+        UNSCOPED_INFO("real type");
+        CHECK(val.type() == LLSD::TypeReal);
+        UNSCOPED_INFO("real value");
+        CHECK(val.asReal() == 3.25);
 
         val = parse("\"hello world\"");
-        ensure_equals("string type", val.type(), LLSD::TypeString);
-        ensure_equals("string value", val.asString(), "hello world");
+        UNSCOPED_INFO("string type");
+        CHECK(val.type() == LLSD::TypeString);
+        UNSCOPED_INFO("string value");
+        CHECK(val.asString() == "hello world");
     }
 
     // integer vs real distinction is preserved by the parse
-    template<> template<>
-    void llsdjson_object::test<2>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: integer vs real distinction is preserved by the parse", "[LlsdJson]")
     {
-        ensure_equals("1 is integer", parse("1").type(), LLSD::TypeInteger);
-        ensure_equals("1.0 is real", parse("1.0").type(), LLSD::TypeReal);
-        ensure_equals("1e0 is real", parse("1e0").type(), LLSD::TypeReal);
-        ensure_equals("0 is integer", parse("0").type(), LLSD::TypeInteger);
+        UNSCOPED_INFO("1 is integer");
+        CHECK(parse("1").type() == LLSD::TypeInteger);
+        UNSCOPED_INFO("1.0 is real");
+        CHECK(parse("1.0").type() == LLSD::TypeReal);
+        UNSCOPED_INFO("1e0 is real");
+        CHECK(parse("1e0").type() == LLSD::TypeReal);
+        UNSCOPED_INFO("0 is integer");
+        CHECK(parse("0").type() == LLSD::TypeInteger);
     }
 
     // arrays: order, nesting, empties
-    template<> template<>
-    void llsdjson_object::test<3>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: arrays parse in order with nesting and empty arrays", "[LlsdJson]")
     {
         LLSD val = parse("[1, \"two\", 3.0, null, [true]]");
-        ensure_equals("array type", val.type(), LLSD::TypeArray);
-        ensure_equals("array size", val.size(), 5);
-        ensure_equals("elt 0", val[0].asInteger(), 1);
-        ensure_equals("elt 1", val[1].asString(), "two");
-        ensure_equals("elt 2", val[2].asReal(), 3.0);
-        ensure_equals("elt 3 undefined", val[3].type(), LLSD::TypeUndefined);
-        ensure_equals("nested array", val[4][0].asBoolean(), true);
+        UNSCOPED_INFO("array type");
+        CHECK(val.type() == LLSD::TypeArray);
+        UNSCOPED_INFO("array size");
+        REQUIRE(val.size() == 5);
+        UNSCOPED_INFO("elt 0");
+        CHECK(val[0].asInteger() == 1);
+        UNSCOPED_INFO("elt 1");
+        CHECK(val[1].asString() == "two");
+        UNSCOPED_INFO("elt 2");
+        CHECK(val[2].asReal() == 3.0);
+        UNSCOPED_INFO("elt 3 undefined");
+        CHECK(val[3].type() == LLSD::TypeUndefined);
+        UNSCOPED_INFO("nested array");
+        CHECK(val[4][0].asBoolean() == true);
 
         val = parse("[]");
-        ensure_equals("empty array type", val.type(), LLSD::TypeArray);
-        ensure_equals("empty array size", val.size(), 0);
+        UNSCOPED_INFO("empty array type");
+        CHECK(val.type() == LLSD::TypeArray);
+        UNSCOPED_INFO("empty array size");
+        REQUIRE(val.size() == 0);
     }
 
     // objects: keys, nesting, empties
-    template<> template<>
-    void llsdjson_object::test<4>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: objects parse by key with nesting and empty objects", "[LlsdJson]")
     {
         LLSD val = parse("{\"a\": 1, \"b\": {\"c\": [2, 3]}}");
-        ensure_equals("map type", val.type(), LLSD::TypeMap);
-        ensure_equals("map size", val.size(), 2);
-        ensure_equals("member a", val["a"].asInteger(), 1);
-        ensure_equals("nested member", val["b"]["c"][1].asInteger(), 3);
+        UNSCOPED_INFO("map type");
+        CHECK(val.type() == LLSD::TypeMap);
+        UNSCOPED_INFO("map size");
+        REQUIRE(val.size() == 2);
+        UNSCOPED_INFO("member a");
+        CHECK(val["a"].asInteger() == 1);
+        UNSCOPED_INFO("nested member");
+        CHECK(val["b"]["c"][1].asInteger() == 3);
 
         val = parse("{}");
-        ensure_equals("empty map type", val.type(), LLSD::TypeMap);
-        ensure_equals("empty map size", val.size(), 0);
+        UNSCOPED_INFO("empty map type");
+        CHECK(val.type() == LLSD::TypeMap);
+        UNSCOPED_INFO("empty map size");
+        REQUIRE(val.size() == 0);
     }
 
     // serialization golden strings
-    template<> template<>
-    void llsdjson_object::test<5>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: serialization writes the golden strings", "[LlsdJson]")
     {
-        ensure_equals("undefined", LlsdToJson(LLSD()), "null");
-        ensure_equals("true", LlsdToJson(LLSD(true)), "true");
-        ensure_equals("false", LlsdToJson(LLSD(false)), "false");
-        ensure_equals("integer", LlsdToJson(LLSD(17)), "17");
-        ensure_equals("negative", LlsdToJson(LLSD(-17)), "-17");
-        ensure_equals("real", LlsdToJson(LLSD(2.5)), "2.5");
-        ensure_equals("string", LlsdToJson(LLSD("simple")), "\"simple\"");
-        ensure_equals("empty string", LlsdToJson(LLSD("")), "\"\"");
-        ensure_equals("empty map", LlsdToJson(LLSD::emptyMap()), "{}");
-        ensure_equals("empty array", LlsdToJson(LLSD::emptyArray()), "[]");
+        UNSCOPED_INFO("undefined");
+        CHECK(LlsdToJson(LLSD()) == "null");
+        UNSCOPED_INFO("true");
+        CHECK(LlsdToJson(LLSD(true)) == "true");
+        UNSCOPED_INFO("false");
+        CHECK(LlsdToJson(LLSD(false)) == "false");
+        UNSCOPED_INFO("integer");
+        CHECK(LlsdToJson(LLSD(17)) == "17");
+        UNSCOPED_INFO("negative");
+        CHECK(LlsdToJson(LLSD(-17)) == "-17");
+        UNSCOPED_INFO("real");
+        CHECK(LlsdToJson(LLSD(2.5)) == "2.5");
+        UNSCOPED_INFO("string");
+        CHECK(LlsdToJson(LLSD("simple")) == "\"simple\"");
+        UNSCOPED_INFO("empty string");
+        CHECK(LlsdToJson(LLSD("")) == "\"\"");
+        UNSCOPED_INFO("empty map");
+        CHECK(LlsdToJson(LLSD::emptyMap()) == "{}");
+        UNSCOPED_INFO("empty array");
+        CHECK(LlsdToJson(LLSD::emptyArray()) == "[]");
 
         LLSD map;
         map["b"] = 2;
         map["a"] = 1;
         // LLSD maps iterate in sorted key order
-        ensure_equals("map", LlsdToJson(map), "{\"a\":1,\"b\":2}");
+        UNSCOPED_INFO("map");
+        CHECK(LlsdToJson(map) == "{\"a\":1,\"b\":2}");
 
         LLSD array;
         array.append(1);
         array.append("x");
-        ensure_equals("array", LlsdToJson(array), "[1,\"x\"]");
+        UNSCOPED_INFO("array");
+        CHECK(LlsdToJson(array) == "[1,\"x\"]");
     }
 
     // string escaping in serialization
-    template<> template<>
-    void llsdjson_object::test<6>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: string escaping in serialization", "[LlsdJson]")
     {
-        ensure_equals("quote", LlsdToJson(LLSD("a\"b")), "\"a\\\"b\"");
-        ensure_equals("backslash", LlsdToJson(LLSD("a\\b")), "\"a\\\\b\"");
-        ensure_equals("newline", LlsdToJson(LLSD("a\nb")), "\"a\\nb\"");
-        ensure_equals("tab", LlsdToJson(LLSD("a\tb")), "\"a\\tb\"");
+        UNSCOPED_INFO("quote");
+        CHECK(LlsdToJson(LLSD("a\"b")) == "\"a\\\"b\"");
+        UNSCOPED_INFO("backslash");
+        CHECK(LlsdToJson(LLSD("a\\b")) == "\"a\\\\b\"");
+        UNSCOPED_INFO("newline");
+        CHECK(LlsdToJson(LLSD("a\nb")) == "\"a\\nb\"");
+        UNSCOPED_INFO("tab");
+        CHECK(LlsdToJson(LLSD("a\tb")) == "\"a\\tb\"");
 
         // control character must be escaped one way or another; round-trip it
         LLSD ctrl;
-        ensure("control char parses",
-               LlsdFromJsonString(LlsdToJson(LLSD(std::string("a\x01z"))), ctrl));
-        ensure_equals("control char round-trip", ctrl.asString(), std::string("a\x01z"));
+        UNSCOPED_INFO("control char parses");
+        REQUIRE(LlsdFromJsonString(LlsdToJson(LLSD(std::string("a\x01z"))), ctrl));
+        UNSCOPED_INFO("control char round-trip");
+        CHECK(ctrl.asString() == std::string("a\x01z"));
 
         // UTF-8 passes through unescaped or escaped, but must round-trip
         std::string utf8("\xE3\x81\x93\xE3\x82\x93 caf\xC3\xA9");
         LLSD uni;
-        ensure("utf8 parses", LlsdFromJsonString(LlsdToJson(LLSD(utf8)), uni));
-        ensure_equals("utf8 round-trip", uni.asString(), utf8);
+        UNSCOPED_INFO("utf8 parses");
+        REQUIRE(LlsdFromJsonString(LlsdToJson(LLSD(utf8)), uni));
+        UNSCOPED_INFO("utf8 round-trip");
+        CHECK(uni.asString() == utf8);
     }
 
     // special scalar types serialize as strings
-    template<> template<>
-    void llsdjson_object::test<7>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: special scalar types serialize as strings", "[LlsdJson]")
     {
         LLUUID id("c96f9b8e-f5ad-4b72-b6f7-a2b30d1444d2");
-        ensure_equals("uuid", LlsdToJson(LLSD(id)),
+        UNSCOPED_INFO("uuid");
+        CHECK(LlsdToJson(LLSD(id)) ==
                       "\"c96f9b8e-f5ad-4b72-b6f7-a2b30d1444d2\"");
 
         LLDate date("2026-06-11T12:34:56Z");
-        ensure_equals("date", LlsdToJson(LLSD(date)), "\"2026-06-11T12:34:56Z\"");
+        UNSCOPED_INFO("date");
+        CHECK(LlsdToJson(LLSD(date)) == "\"2026-06-11T12:34:56Z\"");
 
         LLURI uri("http://example.com/path");
-        ensure_equals("uri", LlsdToJson(LLSD(uri)), "\"http://example.com/path\"");
+        UNSCOPED_INFO("uri");
+        CHECK(LlsdToJson(LLSD(uri)) == "\"http://example.com/path\"");
     }
 
     // non-finite reals degrade to null (JSON has no NaN/Infinity)
-    template<> template<>
-    void llsdjson_object::test<8>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: non-finite reals degrade to null (JSON has no NaN/Infinity)", "[LlsdJson]")
     {
-        ensure_equals("nan", LlsdToJson(LLSD(std::numeric_limits<F64>::quiet_NaN())), "null");
-        ensure_equals("inf", LlsdToJson(LLSD(std::numeric_limits<F64>::infinity())), "null");
-        ensure_equals("-inf", LlsdToJson(LLSD(-std::numeric_limits<F64>::infinity())), "null");
+        UNSCOPED_INFO("nan");
+        CHECK(LlsdToJson(LLSD(std::numeric_limits<F64>::quiet_NaN())) == "null");
+        UNSCOPED_INFO("inf");
+        CHECK(LlsdToJson(LLSD(std::numeric_limits<F64>::infinity())) == "null");
+        UNSCOPED_INFO("-inf");
+        CHECK(LlsdToJson(LLSD(-std::numeric_limits<F64>::infinity())) == "null");
 
         // and stay valid inside containers
         LLSD map;
         map["bad"] = std::numeric_limits<F64>::quiet_NaN();
-        ensure_equals("nan in map", LlsdToJson(map), "{\"bad\":null}");
+        UNSCOPED_INFO("nan in map");
+        CHECK(LlsdToJson(map) == "{\"bad\":null}");
     }
 
     // structured round trip preserves everything
-    template<> template<>
-    void llsdjson_object::test<9>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: structured round trip preserves everything", "[LlsdJson]")
     {
         LLSD src;
         src["int"] = 123;
@@ -221,26 +266,28 @@ namespace tut
 
         LLSD dst;
         std::string json = LlsdToJson(src);
-        ensure("round-trip parses: " + json, LlsdFromJsonString(json, dst));
-        ensure("round-trip equality: " + json, llsd_equals(src, dst));
+        UNSCOPED_INFO("round-trip parses: " + json);
+        REQUIRE(LlsdFromJsonString(json, dst));
+        UNSCOPED_INFO("round-trip equality: " + json);
+        CHECK(llsd_equals(src, dst));
     }
 
     // full-precision reals survive the round trip
-    template<> template<>
-    void llsdjson_object::test<10>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: full-precision reals survive the round trip", "[LlsdJson]")
     {
         F64 vals[] = { 0.1, 1.0/3.0, 2.718281828459045, 1e-300, 1.7976931348623157e308 };
         for (F64 v : vals)
         {
             LLSD parsed;
-            ensure("real parses", LlsdFromJsonString(LlsdToJson(LLSD(v)), parsed));
-            ensure_equals("real precision", parsed.asReal(), v);
+            UNSCOPED_INFO("real parses");
+            REQUIRE(LlsdFromJsonString(LlsdToJson(LLSD(v)), parsed));
+            UNSCOPED_INFO("real precision");
+            REQUIRE(parsed.asReal() == v);
         }
     }
 
     // parse failures report errors and clear the output
-    template<> template<>
-    void llsdjson_object::test<11>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: parse failures report errors and clear the output", "[LlsdJson]")
     {
         const char* bad[] =
         {
@@ -262,42 +309,49 @@ namespace tut
             LLSD out = LLSD::emptyMap();
             std::string errmsg;
             bool ok = LlsdFromJsonString(json, out, &errmsg);
-            ensure(std::string("rejects: ") + json, !ok);
-            ensure(std::string("errmsg set for: ") + json, !errmsg.empty());
-            ensure_equals(std::string("output cleared for: ") + json,
-                          out.type(), LLSD::TypeUndefined);
+            UNSCOPED_INFO(std::string("rejects: ") + json);
+            REQUIRE_FALSE(ok);
+            UNSCOPED_INFO(std::string("errmsg set for: ") + json);
+            REQUIRE_FALSE(errmsg.empty());
+            UNSCOPED_INFO(std::string("output cleared for: ") + json);
+            REQUIRE(out.type() == LLSD::TypeUndefined);
         }
 
         // errmsg pointer is optional
         LLSD out;
-        ensure("no errmsg crash", !LlsdFromJsonString("{", out));
+        UNSCOPED_INFO("no errmsg crash");
+        CHECK_FALSE(LlsdFromJsonString("{", out));
     }
 
     // unicode object keys
-    template<> template<>
-    void llsdjson_object::test<12>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: unicode object keys round-trip", "[LlsdJson]")
     {
         LLSD src;
         src["caf\xC3\xA9"] = 1;
         LLSD dst;
-        ensure("unicode key parses", LlsdFromJsonString(LlsdToJson(src), dst));
-        ensure_equals("unicode key value", dst["caf\xC3\xA9"].asInteger(), 1);
+        UNSCOPED_INFO("unicode key parses");
+        REQUIRE(LlsdFromJsonString(LlsdToJson(src), dst));
+        UNSCOPED_INFO("unicode key value");
+        CHECK(dst["caf\xC3\xA9"].asInteger() == 1);
     }
 
     // padded_string overload parses in place
-    template<> template<>
-    void llsdjson_object::test<13>()
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: padded_string overload parses in place", "[LlsdJson]")
     {
         LLSD out;
-        ensure("padded parse",
-               LlsdFromJsonString(simdjson::padded_string(std::string("{\"a\": [1, 2.5, \"three\"]}")), out));
-        ensure_equals("padded int", out["a"][0].asInteger(), 1);
-        ensure_equals("padded real", out["a"][1].asReal(), 2.5);
-        ensure_equals("padded string", out["a"][2].asString(), "three");
+        UNSCOPED_INFO("padded parse");
+        REQUIRE(LlsdFromJsonString(simdjson::padded_string(std::string("{\"a\": [1, 2.5, \"three\"]}")), out));
+        UNSCOPED_INFO("padded int");
+        CHECK(out["a"][0].asInteger() == 1);
+        UNSCOPED_INFO("padded real");
+        CHECK(out["a"][1].asReal() == 2.5);
+        UNSCOPED_INFO("padded string");
+        CHECK(out["a"][2].asString() == "three");
 
         std::string errmsg;
-        ensure("padded parse fails",
-               !LlsdFromJsonString(simdjson::padded_string(std::string("{")), out, &errmsg));
-        ensure("padded errmsg set", !errmsg.empty());
+        UNSCOPED_INFO("padded parse fails");
+        REQUIRE_FALSE(LlsdFromJsonString(simdjson::padded_string(std::string("{")), out, &errmsg));
+        UNSCOPED_INFO("padded errmsg set");
+        REQUIRE_FALSE(errmsg.empty());
     }
 }

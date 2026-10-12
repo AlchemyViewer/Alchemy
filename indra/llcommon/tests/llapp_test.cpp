@@ -25,14 +25,15 @@
  * $/LicenseInfo$
  */
 
-#include <tut/tut.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include "linden_common.h"
 #include "llapp.h"
-#include "lltut.h"
+
+#include "alteststateguard.h"
 
 
-namespace tut
+namespace
 {
     struct application
     {
@@ -51,15 +52,16 @@ namespace tut
         ~application()
         {
             delete mApp;
+            // An LLApp ends LLCommon with it, the APR pool and LLTrace's
+            // master recorder, and this binary is alone so that one can:
+            // the next case starts from what this one leaves.
+            ll_test::StateGuard::accept("the LLApp");
+            ll_test::StateGuard::accept("the LLTrace master recorder");
+            ll_test::StateGuard::accept("the APR pool");
         }
     };
 
-    typedef test_group<application> application_t;
-    typedef application_t::object application_object_t;
-    tut::application_t tut_application("application");
-
-    template<> template<>
-    void application_object_t::test<1>()
+    TEST_CASE_METHOD(application, "application: getOption returns the default option data", "[application]")
     {
         LLSD defaults;
         defaults["template"] = "../../../scripts/messages/message_template.msg";
@@ -68,20 +70,22 @@ namespace tut
         mApp->setOptionData(LLApp::PRIORITY_DEFAULT, defaults);
 
         LLSD datadir_sd = mApp->getOption("datadir");
-        ensure_equals("data type", datadir_sd.type(), LLSD::TypeString);
-        ensure_equals(
-            "data value", datadir_sd.asString(), std::string("data"));
+        UNSCOPED_INFO("data type");
+        CHECK(datadir_sd.type() == LLSD::TypeString);
+        UNSCOPED_INFO("data value");
+        CHECK(datadir_sd.asString() == std::string("data"));
     }
 
-    template<> template<>
-    void application_object_t::test<2>()
+    TEST_CASE_METHOD(application, "application: a runtime override beats the general configuration", "[application]")
     {
         LLSD options;
         options["boolean-test"] = true;
         mApp->setOptionData(LLApp::PRIORITY_GENERAL_CONFIGURATION, options);
-        ensure("bool set", mApp->getOption("boolean-test").asBoolean());
+        UNSCOPED_INFO("bool set");
+        CHECK(mApp->getOption("boolean-test").asBoolean());
         options["boolean-test"] = false;
         mApp->setOptionData(LLApp::PRIORITY_RUNTIME_OVERRIDE, options);
-        ensure("bool unset", !mApp->getOption("boolean-test").asBoolean());
+        UNSCOPED_INFO("bool unset");
+        CHECK_FALSE(mApp->getOption("boolean-test").asBoolean());
     }
 }

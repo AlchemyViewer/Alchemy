@@ -28,7 +28,8 @@
 #include "linden_common.h"
 
 #include "llsingleton.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include "wrapllerrs.h"
 #include "llsd.h"
 
@@ -93,7 +94,7 @@ DEFINE_MEMBERS(B, A)
 
 } // anonymous namespace
 
-namespace tut
+namespace
 {
     struct singleton
     {
@@ -104,37 +105,30 @@ namespace tut
         };
     };
 
-    typedef test_group<singleton> singleton_t;
-    typedef singleton_t::object singleton_object_t;
-    tut::singleton_t tut_llsingleton("LLSingleton");
-
-    template<> template<>
-    void singleton_object_t::test<1>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: an empty case that checks nothing", "[LLSingleton]")
     {
 
     }
-    template<> template<>
-    void singleton_object_t::test<2>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: getInstance() makes an instance", "[LLSingleton]")
     {
         LLSingletonTest* singleton_test = LLSingletonTest::getInstance();
-        ensure(singleton_test);
+        REQUIRE(singleton_test);
     }
 
-    template<> template<>
-    void singleton_object_t::test<3>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: deleteSingleton() removes the instance and getInstance() remakes it", "[LLSingleton]")
     {
         //Construct the instance
         LLSingletonTest::getInstance();
-        ensure(LLSingletonTest::instanceExists());
+        CHECK(LLSingletonTest::instanceExists());
 
         //Delete the instance
         LLSingletonTest::deleteSingleton();
-        ensure(!LLSingletonTest::instanceExists());
+        CHECK_FALSE(LLSingletonTest::instanceExists());
 
         //Construct it again.
         LLSingletonTest* singleton_test = LLSingletonTest::getInstance();
-        ensure(singleton_test);
-        ensure(LLSingletonTest::instanceExists());
+        REQUIRE(singleton_test);
+        CHECK(LLSingletonTest::instanceExists());
     }
 
     // Makes CLS, CLS and OTHER depending on each other as the flags say, and
@@ -149,64 +143,48 @@ namespace tut
         sLog.clear();
 
         (void)CLS::instance();
-        ensure_equals(sLog, made);
+        REQUIRE(sLog == made);
         LLSingletonBase::deleteAll();
-        ensure_equals(sLog, made + deleted);
+        REQUIRE(sLog == made + deleted);
     }
 
-    template<> template<>
-    void singleton_object_t::test<4>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: A alone is made and deleted in order", "[LLSingleton]")
     {
-        set_test_name("just A");
         check_order<A, B>(A::DEP_NONE, B::DEP_NONE, "AiA", "xA~A");
     }
 
-    template<> template<>
-    void singleton_object_t::test<5>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: A needing B in its constructor is deleted before B", "[LLSingleton]")
     {
-        set_test_name("A ctor depends B");
         check_order<A, B>(A::DEP_CTOR, B::DEP_NONE, "ABiBiA", "xA~AxB~B");
     }
 
-    template<> template<>
-    void singleton_object_t::test<6>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: A needing B in initSingleton is deleted before B", "[LLSingleton]")
     {
-        set_test_name("A init depends B");
         check_order<A, B>(A::DEP_INIT, B::DEP_NONE, "AiABiB", "xA~AxB~B");
     }
 
-    template<> template<>
-    void singleton_object_t::test<7>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: A needing B in initSingleton and B needing A is deleted before B", "[LLSingleton]")
     {
-        set_test_name("A circular init");
         check_order<A, B>(A::DEP_INIT, B::DEP_CTOR, "AiABiB", "xA~AxB~B");
     }
 
-    template<> template<>
-    void singleton_object_t::test<8>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: B alone is made and deleted in order", "[LLSingleton]")
     {
-        set_test_name("just B");
         check_order<B, A>(B::DEP_NONE, A::DEP_NONE, "BiB", "xB~B");
     }
 
-    template<> template<>
-    void singleton_object_t::test<9>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: B needing A in its constructor is deleted before A", "[LLSingleton]")
     {
-        set_test_name("B ctor depends A");
         check_order<B, A>(B::DEP_CTOR, A::DEP_NONE, "BAiAiB", "xB~BxA~A");
     }
 
-    template<> template<>
-    void singleton_object_t::test<10>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: B needing A in initSingleton is deleted before A", "[LLSingleton]")
     {
-        set_test_name("B init depends A");
         check_order<B, A>(B::DEP_INIT, A::DEP_NONE, "BiBAiA", "xB~BxA~A");
     }
 
-    template<> template<>
-    void singleton_object_t::test<11>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: B needing A in initSingleton and A needing B is deleted before A", "[LLSingleton]")
     {
-        set_test_name("B circular init");
         check_order<B, A>(B::DEP_INIT, A::DEP_CTOR, "BiBAiA", "xB~BxA~A");
     }
 
@@ -227,78 +205,78 @@ namespace tut
     // validly initialize each using two different constructors. If we tried
     // to test that with a single LLParamSingleton class within the same test
     // program, we'd get 'trying to use deleted LLParamSingleton' errors.
-    namespace
-    {
         PARAMSINGLETON(PSing1);
         PARAMSINGLETON(PSing2);
-    } // anonymous namespace
 
-    template<> template<>
-    void singleton_object_t::test<12>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: LLParamSingleton must be initialized once and not used after deletion", "[LLSingleton]")
     {
-        set_test_name("LLParamSingleton");
-
         WrapLLErrs catcherr;
         // query methods
-        ensure("false positive on instanceExists()", ! PSing1::instanceExists());
-        ensure("false positive on wasDeleted()", ! PSing1::wasDeleted());
+        UNSCOPED_INFO("false positive on instanceExists()");
+        CHECK_FALSE(PSing1::instanceExists());
+        UNSCOPED_INFO("false positive on wasDeleted()");
+        CHECK_FALSE(PSing1::wasDeleted());
         // try to reference before initializing
         std::string threw = catcherr.catch_llerrs([](){
                 (void)PSing1::instance();
             });
-        ensure_contains("too-early instance() didn't throw", threw, "Uninitialized");
+        UNSCOPED_INFO("too-early instance() didn't throw");
+        CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("Uninitialized"));
         // getInstance() behaves the same as instance()
         threw = catcherr.catch_llerrs([](){
                 (void)PSing1::getInstance();
             });
-        ensure_contains("too-early getInstance() didn't throw", threw, "Uninitialized");
+        UNSCOPED_INFO("too-early getInstance() didn't throw");
+        CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("Uninitialized"));
         // initialize using LLSD::String constructor
         PSing1::initParamSingleton("string");
-        ensure_equals(PSing1::instance().desc(), "string");
-        ensure("false negative on instanceExists()", PSing1::instanceExists());
+        CHECK(PSing1::instance().desc() == "string");
+        UNSCOPED_INFO("false negative on instanceExists()");
+        CHECK(PSing1::instanceExists());
         // try to initialize again
         threw = catcherr.catch_llerrs([](){
                 PSing1::initParamSingleton("again");
             });
-        ensure_contains("second ctor(string) didn't throw", threw, "twice");
+        UNSCOPED_INFO("second ctor(string) didn't throw");
+        CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("twice"));
         // try to initialize using the other constructor -- should be
         // well-formed, but illegal at runtime
         threw = catcherr.catch_llerrs([](){
                 PSing1::initParamSingleton(17);
             });
-        ensure_contains("other ctor(int) didn't throw", threw, "twice");
+        UNSCOPED_INFO("other ctor(int) didn't throw");
+        CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("twice"));
         PSing1::deleteSingleton();
-        ensure("false negative on wasDeleted()", PSing1::wasDeleted());
+        UNSCOPED_INFO("false negative on wasDeleted()");
+        CHECK(PSing1::wasDeleted());
         threw = catcherr.catch_llerrs([](){
                 (void)PSing1::instance();
             });
-        ensure_contains("accessed deleted LLParamSingleton", threw, "deleted");
+        UNSCOPED_INFO("accessed deleted LLParamSingleton");
+        CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("deleted"));
     }
 
-    template<> template<>
-    void singleton_object_t::test<13>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: LLParamSingleton by its alternate constructor initializes only once", "[LLSingleton]")
     {
-        set_test_name("LLParamSingleton alternate ctor");
-
         WrapLLErrs catcherr;
         // We don't have to restate all the tests for PSing1. Only test validly
         // using the other constructor.
         PSing2::initParamSingleton(17);
-        ensure_equals(PSing2::instance().desc(), "17");
+        CHECK(PSing2::instance().desc() == "17");
         // can't do it twice
         std::string threw = catcherr.catch_llerrs([](){
                 PSing2::initParamSingleton(34);
             });
-        ensure_contains("second ctor(int) didn't throw", threw, "twice");
+        UNSCOPED_INFO("second ctor(int) didn't throw");
+        CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("twice"));
         // can't use the other constructor either
         threw = catcherr.catch_llerrs([](){
                 PSing2::initParamSingleton("string");
             });
-        ensure_contains("other ctor(string) didn't throw", threw, "twice");
+        UNSCOPED_INFO("other ctor(string) didn't throw");
+        CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("twice"));
     }
 
-    namespace
-    {
         class CircularPCtor: public LLParamSingleton<CircularPCtor>
         {
             LLSINGLETON(CircularPCtor)
@@ -307,21 +285,17 @@ namespace tut
                 (void)instance();
             }
         };
-    } // anonymous namespace
 
-    template<> template<>
-    void singleton_object_t::test<14>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: a circular LLParamSingleton constructor errs", "[LLSingleton]")
     {
-        set_test_name("Circular LLParamSingleton constructor");
         WrapLLErrs catcherr;
         std::string threw = catcherr.catch_llerrs([](){
                 CircularPCtor::initParamSingleton();
             });
-        ensure_contains("constructor circularity didn't throw", threw, "constructor");
+        UNSCOPED_INFO("constructor circularity didn't throw");
+        CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("constructor"));
     }
 
-    namespace
-    {
         class CircularPInit: public LLParamSingleton<CircularPInit>
         {
             LLSINGLETON_EMPTY_CTOR(CircularPInit);
@@ -336,16 +310,14 @@ namespace tut
                 }
             }
         };
-    } // anonymous namespace
 
-    template<> template<>
-    void singleton_object_t::test<15>()
+    TEST_CASE_METHOD(singleton, "LLSingleton: a circular LLParamSingleton initSingleton() is allowed", "[LLSingleton]")
     {
-        set_test_name("Circular LLParamSingleton initSingleton()");
         WrapLLErrs catcherr;
         std::string threw = catcherr.catch_llerrs([](){
                 CircularPInit::initParamSingleton();
             });
-        ensure("initSingleton() circularity threw", threw.empty());
+        UNSCOPED_INFO("initSingleton() circularity threw");
+        REQUIRE(threw.empty());
     }
 }

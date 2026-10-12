@@ -17,7 +17,8 @@
 // std headers
 // external library headers
 // other Linden headers
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include "llevents.h"
 #include "llsdutil.h"
 
@@ -69,7 +70,7 @@ public:
 /*****************************************************************************
 *   TUT
 *****************************************************************************/
-namespace tut
+namespace
 {
     struct lazyeventapi_data
     {
@@ -84,36 +85,29 @@ namespace tut
             LLEventPumps::deleteSingleton();
         }
     };
-    typedef test_group<lazyeventapi_data> lazyeventapi_group;
-    typedef lazyeventapi_group::object object;
-    lazyeventapi_group lazyeventapigrp("lazyeventapi");
 
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(lazyeventapi_data, "lazyeventapi: a LazyEventAPI creates its listener when its pump is used", "[lazyeventapi]")
     {
-        set_test_name("LazyEventAPI");
         // this is where the magic (should) happen
         // 'register' still a keyword until C++17
         MyRegistrar regster;
         LLEventPumps::instance().obtain("Test").post(llsd::map("op", "set", "data", "hey"));
-        ensure_equals("failed to set data", data.asString(), "hey");
+        UNSCOPED_INFO("failed to set data");
+        CHECK(data.asString() == "hey");
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(lazyeventapi_data, "lazyeventapi: without a LazyEventAPI no listener answers its pump", "[lazyeventapi]")
     {
-        set_test_name("No LazyEventAPI");
         // Because the MyRegistrar declaration in test<1>() is local, because
         // it has been destroyed, we fully expect NOT to reach a MyListener
         // instance with this post.
         LLEventPumps::instance().obtain("Test").post(llsd::map("op", "set", "data", "moot"));
-        ensure("accidentally set data", ! data.isDefined());
+        UNSCOPED_INFO("accidentally set data");
+        REQUIRE_FALSE(data.isDefined());
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE_METHOD(lazyeventapi_data, "lazyeventapi: instance_snapshot finds a LazyEventAPI and its metadata", "[lazyeventapi]")
     {
-        set_test_name("LazyEventAPI metadata");
         MyRegistrar regster;
         // Of course we have 'regster' in hand; we don't need to search for
         // it. But this next test verifies that we can find (all) LazyEventAPI
@@ -124,19 +118,28 @@ namespace tut
         for (const auto& registrar : LL::LazyEventAPIBase::instance_snapshot())
             if ((found = dynamic_cast<const MyRegistrar*>(&registrar)))
                 break;
-        ensure("Failed to find MyRegistrar via LLInstanceTracker", found);
+        UNSCOPED_INFO("Failed to find MyRegistrar via LLInstanceTracker");
+        REQUIRE(found);
 
-        ensure_equals("wrong API name", found->getName(), "Test");
-        ensure_contains("wrong API desc", found->getDesc(), "test LLEventAPI");
-        ensure_equals("wrong API field", found->getDispatchKey(), "op");
+        UNSCOPED_INFO("wrong API name");
+        CHECK(found->getName() == "Test");
+        UNSCOPED_INFO("wrong API desc");
+        CHECK_THAT(found->getDesc(), Catch::Matchers::ContainsSubstring("test LLEventAPI"));
+        UNSCOPED_INFO("wrong API field");
+        CHECK(found->getDispatchKey() == "op");
         // Normally we'd just iterate over *found. But for test purposes,
         // actually capture the range of NameDesc pairs in a vector.
         std::vector<LL::LazyEventAPIBase::NameDesc> ops{ found->begin(), found->end() };
-        ensure_equals("failed to find operations", ops.size(), 1);
-        ensure_equals("wrong operation name", ops[0].first, "set");
-        ensure_contains("wrong operation desc", ops[0].second, "set operation");
+        UNSCOPED_INFO("failed to find operations");
+        REQUIRE(ops.size() == 1);
+        UNSCOPED_INFO("wrong operation name");
+        CHECK(ops[0].first == "set");
+        UNSCOPED_INFO("wrong operation desc");
+        CHECK_THAT(ops[0].second, Catch::Matchers::ContainsSubstring("set operation"));
         LLSD metadata{ found->getMetadata(ops[0].first) };
-        ensure_equals("bad metadata name", metadata["name"].asString(), ops[0].first);
-        ensure_equals("bad metadata desc", metadata["desc"].asString(), ops[0].second);
+        UNSCOPED_INFO("bad metadata name");
+        CHECK(metadata["name"].asString() == ops[0].first);
+        UNSCOPED_INFO("bad metadata desc");
+        CHECK(metadata["desc"].asString() == ops[0].second);
     }
-} // namespace tut
+} // anonymous namespace

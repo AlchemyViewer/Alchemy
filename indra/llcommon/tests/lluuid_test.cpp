@@ -30,15 +30,10 @@
 
 #include "../lluuid.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
-    struct lluuid_data { };
-    typedef test_group<lluuid_data> lluuid_t;
-    typedef lluuid_t::object lluuid_object_t;
-    tut::lluuid_t tut_lluuid("LLUUID");
-
     static const std::string kSampleStr = "01020304-0506-0708-090a-0b0c0d0e0f10";
 
     // Compile-time verification that LLUUID is constexpr-constructible.
@@ -96,8 +91,6 @@ namespace tut
         return z ^ (z >> 31);
     }
 
-    namespace
-    {
         // Occupancy of a 256-bucket table indexed from one end of the hash or the
         // other: containers take the index from the low bits (MSVC's
         // std::unordered_map, any hand-rolled `h & (n-1)`) or from the high bits
@@ -125,7 +118,6 @@ namespace tut
                 }
             }
         };
-    } // anonymous namespace
 
     // Structured payloads: a counter walking each 8-byte window, every
     // one-bit value, a pair of small ints in the outermost lanes, and short
@@ -184,70 +176,80 @@ namespace tut
         "std::hash<LLUUID> must be declared avalanching");
 
     // Default construction is null.
-    template<> template<>
-    void lluuid_object_t::test<1>()
+    TEST_CASE("LLUUID: default construction is null and so are null and tnull", "[LLUUID]")
     {
         LLUUID id;
-        ensure("default-constructed isNull", id.isNull());
-        ensure("default-constructed !notNull", !id.notNull());
-        ensure("default-constructed == LLUUID::null", id == LLUUID::null);
+        UNSCOPED_INFO("default-constructed isNull");
+        CHECK(id.isNull());
+        UNSCOPED_INFO("default-constructed !notNull");
+        CHECK_FALSE(id.notNull());
+        UNSCOPED_INFO("default-constructed == LLUUID::null");
+        CHECK(id == LLUUID::null);
         // null / tnull are the all-zero UUID (verified at runtime since they are
         // exported out-of-line constants, no longer constexpr).
-        ensure("LLUUID::null isNull", LLUUID::null.isNull());
-        ensure("LLTransactionID::tnull isNull", LLTransactionID::tnull.isNull());
+        UNSCOPED_INFO("LLUUID::null isNull");
+        CHECK(LLUUID::null.isNull());
+        UNSCOPED_INFO("LLTransactionID::tnull isNull");
+        CHECK(LLTransactionID::tnull.isNull());
         for (int i = 0; i < UUID_BYTES; ++i)
         {
-            ensure_equals("default byte zero", (int)id.mData[i], 0);
+            UNSCOPED_INFO("default byte zero");
+            REQUIRE((int)id.mData[i] == 0);
         }
     }
 
     // setNull zeroes every byte.
-    template<> template<>
-    void lluuid_object_t::test<2>()
+    TEST_CASE("LLUUID: setNull zeroes every byte", "[LLUUID]")
     {
         LLUUID id;
         fill_sample(id);
-        ensure("filled UUID is not null", id.notNull());
+        UNSCOPED_INFO("filled UUID is not null");
+        CHECK(id.notNull());
         id.setNull();
-        ensure("setNull -> isNull", id.isNull());
+        UNSCOPED_INFO("setNull -> isNull");
+        CHECK(id.isNull());
         for (int i = 0; i < UUID_BYTES; ++i)
         {
-            ensure_equals("setNull byte zero", (int)id.mData[i], 0);
+            UNSCOPED_INFO("setNull byte zero");
+            REQUIRE((int)id.mData[i] == 0);
         }
     }
 
     // String parsing round-trip via set() / asString().
-    template<> template<>
-    void lluuid_object_t::test<3>()
+    TEST_CASE("LLUUID: set() parses a string that asString() gives back", "[LLUUID]")
     {
         LLUUID id;
-        ensure("set valid string", id.set(kSampleStr));
-        ensure_equals("asString round-trips", id.asString(), kSampleStr);
+        UNSCOPED_INFO("set valid string");
+        REQUIRE(id.set(kSampleStr));
+        UNSCOPED_INFO("asString round-trips");
+        CHECK(id.asString() == kSampleStr);
         for (int i = 0; i < UUID_BYTES; ++i)
         {
-            ensure_equals("byte parsed correctly", (int)id.mData[i], i + 1);
+            UNSCOPED_INFO("byte parsed correctly");
+            REQUIRE((int)id.mData[i] == i + 1);
         }
     }
 
     // set() with an empty string clears to null; invalid input also nulls.
-    template<> template<>
-    void lluuid_object_t::test<4>()
+    TEST_CASE("LLUUID: set() with an empty string clears to null; invalid input also nulls", "[LLUUID]")
     {
         LLUUID id;
         fill_sample(id);
 
-        ensure("empty string set returns true", id.set(std::string()));
-        ensure("empty string -> null", id.isNull());
+        UNSCOPED_INFO("empty string set returns true");
+        CHECK(id.set(std::string()));
+        UNSCOPED_INFO("empty string -> null");
+        CHECK(id.isNull());
 
         fill_sample(id);
-        ensure("bogus string set returns false",
-            !id.set(std::string("not-a-uuid"), false));
-        ensure("bogus string -> null", id.isNull());
+        UNSCOPED_INFO("bogus string set returns false");
+        CHECK_FALSE(id.set(std::string("not-a-uuid"), false));
+        UNSCOPED_INFO("bogus string -> null");
+        CHECK(id.isNull());
     }
 
     // Equality / inequality for matching and one-byte-different UUIDs.
-    template<> template<>
-    void lluuid_object_t::test<5>()
+    TEST_CASE("LLUUID: equality and inequality for matching and one-byte-different UUIDs", "[LLUUID]")
     {
         LLUUID a, b, c;
         fill_sample(a);
@@ -255,17 +257,20 @@ namespace tut
         fill_sample(c);
         c.mData[UUID_BYTES - 1] ^= 0x01;
 
-        ensure("a == b", a == b);
-        ensure("!(a != b)", !(a != b));
-        ensure("a != c", a != c);
-        ensure("!(a == c)", !(a == c));
+        UNSCOPED_INFO("a == b");
+        CHECK(a == b);
+        UNSCOPED_INFO("!(a != b)");
+        CHECK_FALSE(a != b);
+        UNSCOPED_INFO("a != c");
+        CHECK(a != c);
+        UNSCOPED_INFO("!(a == c)");
+        CHECK_FALSE(a == c);
     }
 
     // Byte-lexicographic sort order. IW's comment in lluuid.cpp warns against
     // optimizing operator< with word-wide reads precisely because the word
     // interpretation reverses bytes on LE. This test pins the byte-lex behavior.
-    template<> template<>
-    void lluuid_object_t::test<6>()
+    TEST_CASE("LLUUID: operator< orders bytes lexicographically", "[LLUUID]")
     {
         LLUUID low, high;
         low.setNull();
@@ -273,15 +278,18 @@ namespace tut
         low.mData[1]  = 0x01; // word value 0x100 on LE
         high.mData[0] = 0x01; // word value 0x001 on LE — but first byte wins
 
-        ensure("byte-lex: low < high",  low <  high);
-        ensure("byte-lex: high > low",  high >  low);
-        ensure("irreflexive: !(low < low)", !(low < low));
-        ensure("irreflexive: !(low > low)", !(low > low));
+        UNSCOPED_INFO("byte-lex: low < high");
+        CHECK(low <  high);
+        UNSCOPED_INFO("byte-lex: high > low");
+        CHECK(high >  low);
+        UNSCOPED_INFO("irreflexive: !(low < low)");
+        CHECK_FALSE(low < low);
+        UNSCOPED_INFO("irreflexive: !(low > low)");
+        CHECK_FALSE(low > low);
     }
 
     // operator^= is its own inverse (XOR twice cancels) and commutative.
-    template<> template<>
-    void lluuid_object_t::test<7>()
+    TEST_CASE("LLUUID: XOR by an id twice cancels and XOR with itself is null", "[LLUUID]")
     {
         LLUUID a, b, original;
         fill_sample(a);
@@ -291,114 +299,122 @@ namespace tut
         b.set("11223344-5566-7788-99aa-bbccddeeff00");
 
         LLUUID xored = a ^ b;
-        ensure("XOR changes value", xored != a);
+        UNSCOPED_INFO("XOR changes value");
+        CHECK(xored != a);
 
         LLUUID xored_twice = xored ^ b;
-        ensure_equals("double XOR cancels", xored_twice, original);
+        UNSCOPED_INFO("double XOR cancels");
+        CHECK(xored_twice == original);
 
         LLUUID xored_self = a ^ a;
-        ensure("self-XOR yields null", xored_self.isNull());
+        UNSCOPED_INFO("self-XOR yields null");
+        CHECK(xored_self.isNull());
     }
 
     // Bit-level regression for the digest/CRC functions. These values are
     // computed assuming the host is little-endian (effectively all targets);
     // they pin the pre-UB-fix numerical output so callers that persist or
     // compare these checksums are unaffected.
-    template<> template<>
-    void lluuid_object_t::test<8>()
+    TEST_CASE("LLUUID: getCRC32 and getCRC16 give their pinned values", "[LLUUID]")
     {
-        ensure_equals("null CRC32 == 0",      LLUUID::null.getCRC32(),    (U32)0);
-        ensure_equals("null CRC16 == 0",      LLUUID::null.getCRC16(),    (U16)0);
+        UNSCOPED_INFO("null CRC32 == 0");
+        CHECK(LLUUID::null.getCRC32() == (U32)0);
+        UNSCOPED_INFO("null CRC16 == 0");
+        CHECK(LLUUID::null.getCRC16() == (U16)0);
 
         LLUUID id;
         fill_sample(id);
         // mData = {0x01, 0x02, ..., 0x10}
         // LE U32s: 0x04030201, 0x08070605, 0x0c0b0a09, 0x100f0e0d — sum 0x2824201C
-        ensure_equals("sample CRC32", id.getCRC32(), (U32)0x2824201C);
+        UNSCOPED_INFO("sample CRC32");
+        CHECK(id.getCRC32() == (U32)0x2824201C);
         // LE U16s sum: high bytes (2+4+...+16)=72=0x48; low bytes (1+3+...+15)=64=0x40
-        ensure_equals("sample CRC16", id.getCRC16(), (U16)0x4840);
+        UNSCOPED_INFO("sample CRC16");
+        CHECK(id.getCRC16() == (U16)0x4840);
     }
 
     // Hash: the four spellings of it agree, and equal IDs hash equally.
-    template<> template<>
-    void lluuid_object_t::test<9>()
+    TEST_CASE("LLUUID: the hash spellings agree and equal ids hash equally", "[LLUUID]")
     {
         LLUUID a, b;
         fill_sample(a);
         fill_sample(b);
-        ensure_equals("equal IDs equal std::hash",
-            std::hash<LLUUID>{}(a), std::hash<LLUUID>{}(b));
-        ensure_equals("std::hash matches hash_value",
-            std::hash<LLUUID>{}(a), hash_value(b));
-        ensure_equals("boost::hash matches hash_value",
-            boost::hash<LLUUID>{}(a), hash_value(b));
+        UNSCOPED_INFO("equal IDs equal std::hash");
+        CHECK(std::hash<LLUUID>{}(a) == std::hash<LLUUID>{}(b));
+        UNSCOPED_INFO("std::hash matches hash_value");
+        CHECK(std::hash<LLUUID>{}(a) == hash_value(b));
+        UNSCOPED_INFO("boost::hash matches hash_value");
+        CHECK(boost::hash<LLUUID>{}(a) == hash_value(b));
 
         // A different UUID should (overwhelmingly likely) hash differently.
         LLUUID c;
         c.set("ffffffff-ffff-ffff-ffff-ffffffffffff");
-        ensure_not_equals("distinct IDs typically hash differently",
-            std::hash<LLUUID>{}(a), std::hash<LLUUID>{}(c));
+        UNSCOPED_INFO("distinct IDs typically hash differently");
+        CHECK(std::hash<LLUUID>{}(a) != std::hash<LLUUID>{}(c));
 
         // LLTransactionID and LLAssetID reach the same hash through the base.
         LLTransactionID tid;
         fill_sample(tid);
-        ensure_equals("LLTransactionID hashes as its LLUUID bytes",
-            boost::hash<LLTransactionID>{}(tid), hash_value(a));
+        UNSCOPED_INFO("LLTransactionID hashes as its LLUUID bytes");
+        CHECK(boost::hash<LLTransactionID>{}(tid) == hash_value(a));
         const LLAssetID aid = a;
-        ensure_equals("LLAssetID hashes as its LLUUID bytes",
-            std::hash<LLAssetID>{}(aid), hash_value(a));
+        UNSCOPED_INFO("LLAssetID hashes as its LLUUID bytes");
+        CHECK(std::hash<LLAssetID>{}(aid) == hash_value(a));
     }
 
     // generateNewID produces distinct, non-null UUIDs.
-    template<> template<>
-    void lluuid_object_t::test<10>()
+    TEST_CASE("LLUUID: generateNewID produces distinct non-null valid UUIDs", "[LLUUID]")
     {
         LLUUID a = LLUUID::generateNewID();
         LLUUID b = LLUUID::generateNewID();
-        ensure("generated id is not null", a.notNull());
-        ensure("generated id is not null (2)", b.notNull());
-        ensure("two generated ids differ", a != b);
+        UNSCOPED_INFO("generated id is not null");
+        CHECK(a.notNull());
+        UNSCOPED_INFO("generated id is not null (2)");
+        CHECK(b.notNull());
+        UNSCOPED_INFO("two generated ids differ");
+        CHECK(a != b);
         // validate() should accept the generated string form
-        ensure("generated id validates", LLUUID::validate(a.asString()));
+        UNSCOPED_INFO("generated id validates");
+        CHECK(LLUUID::validate(a.asString()));
     }
 
     // to_chars emits exactly UUID_STR_LENGTH-1 chars in canonical 8-4-4-4-12 form.
-    template<> template<>
-    void lluuid_object_t::test<11>()
+    TEST_CASE("LLUUID: to_chars emits UUID_STR_LENGTH-1 chars in canonical 8-4-4-4-12 form", "[LLUUID]")
     {
         LLUUID id;
         id.set(kSampleStr);
         char buf[UUID_STR_LENGTH] = {};
         id.to_chars(buf);
-        ensure_equals("to_chars matches set string",
-            std::string(buf), kSampleStr);
-        ensure_equals("to_chars length", strlen(buf), (size_t)(UUID_STR_LENGTH - 1));
+        UNSCOPED_INFO("to_chars matches set string");
+        CHECK(std::string(buf) == kSampleStr);
+        UNSCOPED_INFO("to_chars length");
+        CHECK(strlen(buf) == (size_t)(UUID_STR_LENGTH - 1));
     }
 
     // ostream insertion delegates to the canonical 36-char form.
-    template<> template<>
-    void lluuid_object_t::test<12>()
+    TEST_CASE("LLUUID: ostream insertion delegates to the canonical 36-char form", "[LLUUID]")
     {
         LLUUID id;
         id.set(kSampleStr);
         std::ostringstream os;
         os << id;
-        ensure_equals("operator<< matches asString", os.str(), id.asString());
+        UNSCOPED_INFO("operator<< matches asString");
+        CHECK(os.str() == id.asString());
     }
 
     // validate() accepts canonical forms and rejects garbage.
-    template<> template<>
-    void lluuid_object_t::test<13>()
+    TEST_CASE("LLUUID: validate() accepts canonical forms and rejects garbage", "[LLUUID]")
     {
-        ensure("validate canonical", LLUUID::validate(kSampleStr));
-        ensure("reject short string", !LLUUID::validate("abc"));
-        ensure("reject non-hex characters",
-            !LLUUID::validate("zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz"));
+        UNSCOPED_INFO("validate canonical");
+        CHECK(LLUUID::validate(kSampleStr));
+        UNSCOPED_INFO("reject short string");
+        CHECK_FALSE(LLUUID::validate("abc"));
+        UNSCOPED_INFO("reject non-hex characters");
+        CHECK_FALSE(LLUUID::validate("zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz"));
     }
 
     // std::set<LLUUID> via the default operator< yields byte-lex iteration.
-    template<> template<>
-    void lluuid_object_t::test<14>()
+    TEST_CASE("LLUUID: std::set<LLUUID> via the default operator< yields byte-lex iteration", "[LLUUID]")
     {
         LLUUID one, two;
         one.setNull();
@@ -411,11 +427,11 @@ namespace tut
         s.insert(one);
 
         auto it = s.begin();
-        ensure_equals("first sorted entry has lowest first byte",
-            (int)it->mData[0], 1);
+        UNSCOPED_INFO("first sorted entry has lowest first byte");
+        CHECK((int)it->mData[0] == 1);
         ++it;
-        ensure_equals("second sorted entry has next first byte",
-            (int)it->mData[0], 2);
+        UNSCOPED_INFO("second sorted entry has next first byte");
+        CHECK((int)it->mData[0] == 2);
     }
 
     // Both halves of the value must reach the hash independently.
@@ -423,8 +439,7 @@ namespace tut
     // This is the test that fails the moment someone replaces the hash with
     // `lo ^ hi` or any other fold of the two halves: a fold gives the same
     // answer for (lo, hi) and (lo^m, hi^m), and for (lo, hi) and (hi, lo).
-    template<> template<>
-    void lluuid_object_t::test<15>()
+    TEST_CASE("LLUUID: both halves of the value reach the hash independently", "[LLUUID]")
     {
         U64 state = 0x5eed01;
         int xor_equivalent = 0;
@@ -439,11 +454,11 @@ namespace tut
             if (h == hash_value(make_id(lo ^ m, hi ^ m))) ++xor_equivalent;
             if (h == hash_value(make_id(hi, lo)))         ++half_swapped;
         }
-        ensure_equals("ids with an equal XOR of halves must not share a hash "
-                      "(the hash is not a fold of the two halves)",
-            xor_equivalent, 0);
-        ensure_equals("swapping the two halves must change the hash",
-            half_swapped, 0);
+        UNSCOPED_INFO("ids with an equal XOR of halves must not share a hash "
+                      "(the hash is not a fold of the two halves)");
+        CHECK(xor_equivalent == 0);
+        UNSCOPED_INFO("swapping the two halves must change the hash");
+        CHECK(half_swapped == 0);
     }
 
     // Strict avalanche: flipping any one of the 128 input bits must flip each
@@ -451,8 +466,7 @@ namespace tut
     // per output bit, so the sampling error is well under a percent and the
     // [0.35, 0.65] band is generous for a good hash while far out of reach for
     // a fold (0.016) or a single constant multiply (0.18).
-    template<> template<>
-    void lluuid_object_t::test<16>()
+    TEST_CASE("LLUUID: flipping any input bit flips each output bit about half the time", "[LLUUID]")
     {
         const int kBases = 256;
         const int kOutputBits = (int)(sizeof(size_t) * 8);
@@ -482,16 +496,19 @@ namespace tut
             }
         }
 
-        ensure_equals("no single input bit flip may leave the hash unchanged",
-            fixed_points, 0);
+        UNSCOPED_INFO("no single input bit flip may leave the hash unchanged");
+        CHECK(fixed_points == 0);
         for (int o = 0; o < kOutputBits; ++o)
         {
             const double rate = (double)flips[o] / (double)trials;
-            ensure("every output bit must flip near half the time for a "
+            {
+                INFO("every output bit must flip near half the time for a "
                    "single-bit input change (output bit "
                    + std::to_string(o) + " flipped "
-                   + std::to_string(rate) + " of the time)",
-                rate >= 0.35 && rate <= 0.65);
+                   + std::to_string(rate) + " of the time)");
+                REQUIRE(rate >= 0.35);
+                REQUIRE(rate <= 0.65);
+            }
         }
     }
 
@@ -499,8 +516,7 @@ namespace tut
     // This is what a composed key looks like: a fixed prefix and a counter.
     // Both ends of the hash have to spread it, because containers index from
     // the low bits or the high bits depending on which one you reach for.
-    template<> template<>
-    void lluuid_object_t::test<17>()
+    TEST_CASE("LLUUID: a counter in one 32-bit lane spreads over both ends of the hash", "[LLUUID]")
     {
         for (int lane = 0; lane < 4; ++lane)
         {
@@ -518,26 +534,25 @@ namespace tut
             const int mean = (int)(ids.size() / BucketSpread::NUM_BUCKETS); // 16
             const std::string where = " (lane " + std::to_string(lane) + ")";
 
-            ensure("counter in one lane must not pile up in the low bits" + where,
-                spread.mLowMax <= 3 * mean);
-            ensure("counter in one lane must not pile up in the high bits" + where,
-                spread.mHighMax <= 3 * mean);
-            ensure_equals("counter in one lane must reach every low-bit bucket" + where,
-                spread.mLowEmpty, 0);
-            ensure_equals("counter in one lane must reach every high-bit bucket" + where,
-                spread.mHighEmpty, 0);
+            UNSCOPED_INFO("counter in one lane must not pile up in the low bits" + where);
+            REQUIRE(spread.mLowMax <= 3 * mean);
+            UNSCOPED_INFO("counter in one lane must not pile up in the high bits" + where);
+            REQUIRE(spread.mHighMax <= 3 * mean);
+            UNSCOPED_INFO("counter in one lane must reach every low-bit bucket" + where);
+            REQUIRE(spread.mLowEmpty == 0);
+            UNSCOPED_INFO("counter in one lane must reach every high-bit bucket" + where);
+            REQUIRE(spread.mHighEmpty == 0);
         }
     }
 
     // The mixed structured corpus: no full 64-bit collisions at all, and no
     // bucket carrying more than three times its share at either end.
-    template<> template<>
-    void lluuid_object_t::test<18>()
+    TEST_CASE("LLUUID: the structured corpus has no full collisions and no crowded buckets", "[LLUUID]")
     {
         std::vector<LLUUID> corpus;
         build_structured_corpus(corpus);
-        ensure("structured corpus is large enough to be meaningful",
-            corpus.size() > 8000);
+        UNSCOPED_INFO("structured corpus is large enough to be meaningful");
+        REQUIRE(corpus.size() > 8000);
 
         std::set<size_t> seen;
         int collisions = 0;
@@ -545,32 +560,31 @@ namespace tut
         {
             if (!seen.insert(hash_value(id)).second) ++collisions;
         }
-        ensure_equals("structured 16-byte payloads must not collide outright",
-            collisions, 0);
+        UNSCOPED_INFO("structured 16-byte payloads must not collide outright");
+        CHECK(collisions == 0);
 
         const BucketSpread spread(corpus);
         const int mean = (int)(corpus.size() / BucketSpread::NUM_BUCKETS);
-        ensure("structured payloads must not pile up in the low bits",
-            spread.mLowMax <= 3 * mean);
-        ensure("structured payloads must not pile up in the high bits",
-            spread.mHighMax <= 3 * mean);
+        UNSCOPED_INFO("structured payloads must not pile up in the low bits");
+        CHECK(spread.mLowMax <= 3 * mean);
+        UNSCOPED_INFO("structured payloads must not pile up in the high bits");
+        CHECK(spread.mHighMax <= 3 * mean);
     }
 
     // Degenerate inputs: the null UUID must not hash to the zero sentinel, and
     // the 128 one-bit values must all land somewhere different.
-    template<> template<>
-    void lluuid_object_t::test<19>()
+    TEST_CASE("LLUUID: the null UUID hashes nonzero and the one-bit values hash apart", "[LLUUID]")
     {
-        ensure_not_equals("the null UUID must not hash to zero",
-            hash_value(LLUUID::null), (size_t)0);
+        UNSCOPED_INFO("the null UUID must not hash to zero");
+        CHECK(hash_value(LLUUID::null) != (size_t)0);
 
         std::set<size_t> seen;
         for (int bit = 0; bit < UUID_BYTES * 8; ++bit)
         {
             seen.insert(hash_value(make_bit_id(bit)));
         }
-        ensure_equals("each of the 128 one-bit values hashes differently",
-            seen.size(), (size_t)(UUID_BYTES * 8));
+        UNSCOPED_INFO("each of the 128 one-bit values hashes differently");
+        REQUIRE(seen.size() == (size_t)(UUID_BYTES * 8));
     }
 
     // Pinned values for the hash. Nothing persists a hash of an LLUUID, so
@@ -579,8 +593,7 @@ namespace tut
     // on purpose means updating these three lines, deliberately.
     //
     // The values assume a little-endian host, as test<8> does.
-    template<> template<>
-    void lluuid_object_t::test<20>()
+    TEST_CASE("LLUUID: hash_value gives its pinned values on 64-bit hosts", "[LLUUID]")
     {
         if constexpr (sizeof(size_t) == 8)
         {
@@ -589,19 +602,18 @@ namespace tut
             LLUUID ones;
             std::memset(ones.mData, 0xff, UUID_BYTES);
 
-            ensure_equals("pinned hash of the null UUID",
-                (U64)hash_value(LLUUID::null), 0xc64369fbab9cf4d7ULL);
-            ensure_equals("pinned hash of 01020304-0506-0708-090a-0b0c0d0e0f10",
-                (U64)hash_value(sample), 0x47c8de24eeda6e35ULL);
-            ensure_equals("pinned hash of the all-ones UUID",
-                (U64)hash_value(ones), 0x24af15be29dd63f0ULL);
+            UNSCOPED_INFO("pinned hash of the null UUID");
+            CHECK((U64)hash_value(LLUUID::null) == 0xc64369fbab9cf4d7ULL);
+            UNSCOPED_INFO("pinned hash of 01020304-0506-0708-090a-0b0c0d0e0f10");
+            CHECK((U64)hash_value(sample) == 0x47c8de24eeda6e35ULL);
+            UNSCOPED_INFO("pinned hash of the all-ones UUID");
+            CHECK((U64)hash_value(ones) == 0x24af15be29dd63f0ULL);
         }
     }
 
     // The containers the viewer actually keys by LLUUID, exercised with the
     // structured corpus rather than with random UUIDs.
-    template<> template<>
-    void lluuid_object_t::test<21>()
+    TEST_CASE("LLUUID: the viewer's LLUUID-keyed maps hold and find every structured key", "[LLUUID]")
     {
         std::vector<LLUUID> corpus;
         build_structured_corpus(corpus);
@@ -613,18 +625,24 @@ namespace tut
             flat.emplace(corpus[i], i);
             node.emplace(corpus[i], i);
         }
-        ensure_equals("flat map holds every distinct key", flat.size(), corpus.size());
-        ensure_equals("node map holds every distinct key", node.size(), corpus.size());
+        UNSCOPED_INFO("flat map holds every distinct key");
+        REQUIRE(flat.size() == corpus.size());
+        UNSCOPED_INFO("node map holds every distinct key");
+        REQUIRE(node.size() == corpus.size());
 
         for (size_t i = 0; i < corpus.size(); ++i)
         {
             auto fit = flat.find(corpus[i]);
-            ensure("flat map finds every key", fit != flat.end());
-            ensure_equals("flat map returns the right value", fit->second, i);
+            UNSCOPED_INFO("flat map finds every key");
+            REQUIRE(fit != flat.end());
+            UNSCOPED_INFO("flat map returns the right value");
+            REQUIRE(fit->second == i);
 
             auto nit = node.find(corpus[i]);
-            ensure("node map finds every key", nit != node.end());
-            ensure_equals("node map returns the right value", nit->second, i);
+            UNSCOPED_INFO("node map finds every key");
+            REQUIRE(nit != node.end());
+            UNSCOPED_INFO("node map returns the right value");
+            REQUIRE(nit->second == i);
         }
 
         // A key built from the same bytes by a different route still matches.
@@ -632,7 +650,7 @@ namespace tut
         probe.set(kSampleStr);
         LLUUID same;
         fill_sample(same);
-        ensure_equals("equal bytes hash equally regardless of how they arrived",
-            hash_value(probe), hash_value(same));
+        UNSCOPED_INFO("equal bytes hash equally regardless of how they arrived");
+        CHECK(hash_value(probe) == hash_value(same));
     }
 }

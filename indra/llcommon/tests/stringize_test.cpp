@@ -46,7 +46,7 @@
 // other Linden headers
 #include "../llsd.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace tut
 {
@@ -81,46 +81,40 @@ namespace tut
         std::wstring def;
         LLSD        llsd;
     };
-    typedef test_group<stringize_data> stringize_group;
-    typedef stringize_group::object stringize_object;
-    tut::stringize_group strzgrp("stringize_h");
 
-    template<> template<>
-    void stringize_object::test<1>()
+    TEST_CASE_METHOD(stringize_data, "stringize_h: stringize renders each type and LLSD notation", "[stringize_h]")
     {
-        ensure_equals(stringize(c),    "c");
-        ensure_equals(stringize(s),    "17");
-        ensure_equals(stringize(i),    "34");
-        ensure_equals(stringize(l),    "68");
-        ensure_equals(stringize(f),    "3.14159");
-        ensure_equals(stringize(d),    "3.14159");
-        ensure_equals(stringize(abc),  "abc def");
+        CHECK(stringize(c) == "c");
+        CHECK(stringize(s) == "17");
+        CHECK(stringize(i) == "34");
+        CHECK(stringize(l) == "68");
+        CHECK(stringize(f) == "3.14159");
+        CHECK(stringize(d) == "3.14159");
+        CHECK(stringize(abc) == "abc def");
         //ensure_equals(stringize(def),  "def ghi"); //Will generate LL_WARNS() due to narrowing.
         // LLSDNotationFormatter emits Reals at full round-trip precision
-        ensure_equals(stringize(llsd), "{'abc':'abc def','d':r3.14159265358979,'i':i34}");
+        CHECK(stringize(llsd) == "{'abc':'abc def','d':r3.14159265358979,'i':i34}");
     }
 
-    template<> template<>
-    void stringize_object::test<2>()
+    TEST_CASE_METHOD(stringize_data, "stringize_h: STRINGIZE streams an expression with manipulators", "[stringize_h]")
     {
-        ensure_equals(STRINGIZE("c is " << c), "c is c");
-        ensure_equals(STRINGIZE(std::setprecision(4) << d), "3.142");
+        CHECK(STRINGIZE("c is " << c) == "c is c");
+        CHECK(STRINGIZE(std::setprecision(4) << d) == "3.142");
     }
 
-    template<> template<>
-    void stringize_object::test<3>()
+    TEST_CASE_METHOD(stringize_data, "stringize_h: wstringize renders each type on Windows", "[stringize_h]")
     {
         //Tests rely on validity of wstring_to_utf8str()
 #if LL_WINDOWS // Windows wstring is a 2byte UTF16 type
-        ensure_equals(ll_convert<std::string>(wstringize(c)), ll_convert<std::string>(std::wstring(L"c")));
-        ensure_equals(ll_convert<std::string>(wstringize(s)), ll_convert<std::string>(std::wstring(L"17")));
-        ensure_equals(ll_convert<std::string>(wstringize(i)), ll_convert<std::string>(std::wstring(L"34")));
-        ensure_equals(ll_convert<std::string>(wstringize(l)), ll_convert<std::string>(std::wstring(L"68")));
-        ensure_equals(ll_convert<std::string>(wstringize(f)), ll_convert<std::string>(std::wstring(L"3.14159")));
-        ensure_equals(ll_convert<std::string>(wstringize(d)), ll_convert<std::string>(std::wstring(L"3.14159")));
-        ensure_equals(ll_convert<std::string>(wstringize(abc)), ll_convert<std::string>(std::wstring(L"abc def")));
-        ensure_equals(ll_convert<std::string>(wstringize(abc)), ll_convert<std::string>(wstringize(abc.c_str())));
-        ensure_equals(ll_convert<std::string>(wstringize(def)), ll_convert<std::string>(std::wstring(L"def ghi")));
+        REQUIRE(ll_convert<std::string>(wstringize(c)) == ll_convert<std::string>(std::wstring(L"c")));
+        REQUIRE(ll_convert<std::string>(wstringize(s)) == ll_convert<std::string>(std::wstring(L"17")));
+        REQUIRE(ll_convert<std::string>(wstringize(i)) == ll_convert<std::string>(std::wstring(L"34")));
+        REQUIRE(ll_convert<std::string>(wstringize(l)) == ll_convert<std::string>(std::wstring(L"68")));
+        REQUIRE(ll_convert<std::string>(wstringize(f)) == ll_convert<std::string>(std::wstring(L"3.14159")));
+        REQUIRE(ll_convert<std::string>(wstringize(d)) == ll_convert<std::string>(std::wstring(L"3.14159")));
+        REQUIRE(ll_convert<std::string>(wstringize(abc)) == ll_convert<std::string>(std::wstring(L"abc def")));
+        REQUIRE(ll_convert<std::string>(wstringize(abc)) == ll_convert<std::string>(wstringize(abc.c_str())));
+        REQUIRE(ll_convert<std::string>(wstringize(def)) == ll_convert<std::string>(std::wstring(L"def ghi")));
 #else
         // ensure_equals(ll_convert<std::string>(wstringize(c)),    wstring_to_utf8str(U"c"));
         // ensure_equals(ll_convert<std::string>(wstringize(s)),    wstring_to_utf8str(U"17"));

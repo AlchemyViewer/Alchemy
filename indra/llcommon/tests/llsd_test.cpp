@@ -27,7 +27,7 @@
 
 #define LLSD_DEBUG_INFO
 #include "linden_common.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "llsd.h"
 
 #include "llsdtraits.h"
@@ -48,8 +48,8 @@ namespace tut
         {
             const U32 outstanding = llsd::outstandingCount();
             body();
-            ensure_equals("SDCleanupCheck",
-                llsd::outstandingCount(), outstanding);
+            UNSCOPED_INFO("SDCleanupCheck");
+            REQUIRE(llsd::outstandingCount() == outstanding);
         }
 
         // ...and the body allocated exactly as many LLSD values as expected.
@@ -59,11 +59,11 @@ namespace tut
             const U32 outstanding = llsd::outstandingCount();
             const U32 allocations = llsd::allocationCount();
             body();
-            ensure_equals(message + " SDAllocationCheck",
-                llsd::allocationCount() - allocations,
+            UNSCOPED_INFO(message + " SDAllocationCheck");
+            REQUIRE(llsd::allocationCount() - allocations ==
                 expectedAllocations);
-            ensure_equals("SDCleanupCheck",
-                llsd::outstandingCount(), outstanding);
+            UNSCOPED_INFO("SDCleanupCheck");
+            REQUIRE(llsd::outstandingCount() == outstanding);
         }
     } // anonymous namespace
 
@@ -80,8 +80,10 @@ namespace tut
 
         std::string s(msg);
 
-        ensure(         s + " type",    traits.checkType(actual));
-        ensure_equals(  s + " value",   traits.get(actual), expectedValue);
+        UNSCOPED_INFO(s + " type");
+        REQUIRE(traits.checkType(actual));
+        UNSCOPED_INFO(s + " value");
+        REQUIRE(traits.get(actual) == expectedValue);
     }
 
     template<class T>
@@ -92,18 +94,11 @@ namespace tut
 
         std::string s(msg);
 
-        ensure(         s + " type",    traits.checkType(actual));
-        ensure_equals(  s + " value",   traits.get(actual), expectedValue);
+        UNSCOPED_INFO(s + " type");
+        REQUIRE(traits.checkType(actual));
+        UNSCOPED_INFO(s + " value");
+        REQUIRE(traits.get(actual) == expectedValue);
     }
-
-    struct SDTestData
-    {
-    };
-
-    typedef test_group<SDTestData>  SDTestGroup;
-    typedef SDTestGroup::object     SDTestObject;
-
-    SDTestGroup sdTestGroup("LLSD(new)");
 
     // template<> template<>
     // void SDTestObject::test<1>()
@@ -115,8 +110,7 @@ namespace tut
     //  ensure("is undefined", u.isUndefined());
     // }
 
-    template<> template<>
-    void SDTestObject::test<2>()
+    TEST_CASE("LLSD(new): setting and fetching scalar types", "[LLSD_new]")
         // setting and fetching scalar types
     {
         ensure_cleaned_up([&]
@@ -134,7 +128,8 @@ namespace tut
 
             v = 3.14159265359;
                             ensureTypeAndValue("set to pi", v, 3.14159265359);
-                            ensure_not_equals("isn't float", v.asReal(),
+                            UNSCOPED_INFO("isn't float");
+                            REQUIRE(v.asReal() !=
                                 (float)3.14159265359);
             v = 6.7e256;    ensureTypeAndValue("set to big", v, 6.7e256);
 
@@ -170,12 +165,12 @@ namespace tut
             v = data;       ensureTypeAndRefValue("set to data", v, data);
 
             v.clear();
-            ensure("reset to undefined", v.type() == LLSD::TypeUndefined);
+            UNSCOPED_INFO("reset to undefined");
+            REQUIRE(v.type() == LLSD::TypeUndefined);
         });
     }
 
-    template<> template<>
-    void SDTestObject::test<3>()
+    TEST_CASE("LLSD(new): construction and initialization from scalar values", "[LLSD_new]")
         // construction via scalar values
         // tests both constructor and initialize forms
     {
@@ -230,19 +225,24 @@ namespace tut
     {
         std::string s(msg);
 
-        ensure_equals(s+" to bool", v.asBoolean(),  eBoolean);
-        ensure_equals(s+" to int",  v.asInteger(),  eInteger);
+        UNSCOPED_INFO(s+" to bool");
+        REQUIRE(v.asBoolean() == eBoolean);
+        UNSCOPED_INFO(s+" to int");
+        REQUIRE(v.asInteger() == eInteger);
         if (eReal == eReal)
         {
-            ensure_equals(s+" to real", v.asReal(),     eReal);
-            ensure_equals(s+" to string",   v.asString(),   eString);
+            UNSCOPED_INFO(s+" to real");
+            REQUIRE(v.asReal() == eReal);
+            UNSCOPED_INFO(s+" to string");
+            REQUIRE(v.asString() == eString);
         }
         else
         {
             int left  = fpclassify(v.asReal());
             int right = fpclassify(eReal);
 
-            ensure_equals(s+" to real",     left,           right);
+            UNSCOPED_INFO(s+" to real");
+            REQUIRE(left == right);
             // ensure_equals(s+" to string", v.asString(), eString);
             // I've commented this check out, since there doesn't
             // seem to be uniform string representation for NaN on
@@ -252,8 +252,7 @@ namespace tut
         }
     }
 
-    template<> template<>
-    void SDTestObject::test<4>()
+    TEST_CASE("LLSD(new): conversion of undefined and scalars to the basic scalar types", "[LLSD_new]")
         // conversion between undefined and basic scalar types:
         //  boolean, integer, real and string
     {
@@ -303,18 +302,19 @@ namespace tut
         std::string str = actual.asString();
 
         if (sExpected) {
-            ensure_equals(msg + " string", str, sExpected);
+            UNSCOPED_INFO(msg + " string");
+            REQUIRE(str == sExpected);
         }
 
         LLSD u(str);
         LLSDTraits<T> traits;
 
-        ensure_equals(msg + " value", traits.get(u), vExpected);
+        UNSCOPED_INFO(msg + " value");
+        REQUIRE(traits.get(u) == vExpected);
     }
 
 
-    template<> template<>
-    void SDTestObject::test<5>()
+    TEST_CASE("LLSD(new): UUID and Date and URI convert to and from String", "[LLSD_new]")
         // conversion of String to and from UUID, Date and URI.
     {
         ensure_cleaned_up([&]
@@ -352,8 +352,7 @@ namespace tut
         });
     }
 
-    template<> template<>
-    void SDTestObject::test<6>()
+    TEST_CASE("LLSD(new): copies made by construction or assignment change independently", "[LLSD_new]")
         // copy construction and assignment
         // checking for shared values after constr. or assignment
         // checking in both the same type and change of type case
@@ -430,8 +429,7 @@ namespace tut
     }
 
 
-    template<> template<>
-    void SDTestObject::test<7>()
+    TEST_CASE("LLSD(new): assigning and casting LLSD to scalar types converts", "[LLSD_new]")
         // Test assignment and casting to various scalar types.  These
         // assignments should invoke the right conversion without it being
         // mentioned explicitly.  The few exceptions are marked SAD.
@@ -441,26 +439,27 @@ namespace tut
             LLSD v("  42.375");
 
             bool b = false;
-            b = v;              ensure_equals("assign to bool", b, true);
-            b = (bool)v;        ensure_equals("cast to bool", b, true);
+            b = v;              UNSCOPED_INFO("assign to bool"); REQUIRE(b == true);
+            b = (bool)v;        UNSCOPED_INFO("cast to bool"); REQUIRE(b == true);
 
             int i = 99;
-            i = v;              ensure_equals("assign to int", i, 42);
-            i = (int)v;         ensure_equals("cast to int", i, 42);
+            i = v;              UNSCOPED_INFO("assign to int"); REQUIRE(i == 42);
+            i = (int)v;         UNSCOPED_INFO("cast to int"); REQUIRE(i == 42);
 
             double d = 3.14159;
-            d = v;              ensure_equals("assign to double", d, 42.375);
-            d = (double)v;      ensure_equals("cast to double", d, 42.375);
+            d = v;              UNSCOPED_INFO("assign to double"); REQUIRE(d == 42.375);
+            d = (double)v;      UNSCOPED_INFO("cast to double"); REQUIRE(d == 42.375);
 
             std::string s = "yo";
     // SAD  s = v;              ensure_equals("assign to string", s, "  42.375");
-            s = (std::string)v; ensure_equals("cast to string", s, "  42.375");
+            s = (std::string)v; UNSCOPED_INFO("cast to string"); REQUIRE(s == "  42.375");
 
             std::string uuidStr = "b1e50c2b-b627-4d23-8a86-a65d97b6319b";
             v = uuidStr;
             LLUUID u;
             u = v;
-                        ensure_equals("assign to LLUUID", u, LLUUID(uuidStr));
+                        UNSCOPED_INFO("assign to LLUUID");
+                        REQUIRE(u == LLUUID(uuidStr));
     // SAD  u = (LLUUID)v;
     //                  ensure_equals("cast to LLUUID", u, LLUUID(uuidStr));
 
@@ -468,7 +467,8 @@ namespace tut
             v = dateStr;
             LLDate date;
             date = v;
-                        ensure_equals("assign to LLDate", date.asString(), dateStr);
+                        UNSCOPED_INFO("assign to LLDate");
+                        REQUIRE(date.asString() == dateStr);
     // SAD  date = (LLDate)v;
     //                  ensure_equals("cast to LLDate", date.asString(), dateStr);
 
@@ -476,14 +476,14 @@ namespace tut
             v = uriStr;
             LLURI uri;
             uri = v;
-                        ensure_equals("assign to LLURI", uri.asString(), uriStr);
+                        UNSCOPED_INFO("assign to LLURI");
+                        REQUIRE(uri.asString() == uriStr);
     // SAD  uri = (LLURI)v;
     //                  ensure_equals("cast to LLURI", uri.asString(), uriStr);
         });
     }
 
-    template<> template<>
-    void SDTestObject::test<8>()
+    TEST_CASE("LLSD(new): constructing scalar types from LLSD converts", "[LLSD_new]")
         // Test construction of various scalar types from LLSD.
         // Test both construction and initialization forms.
         // These should invoke the right conversion without it being
@@ -493,51 +493,60 @@ namespace tut
         {
             LLSD v("  42.375");
 
-            bool b1(v);     ensure_equals("contruct bool", b1, true);
-            bool b2 = v;    ensure_equals("initialize bool", b2, true);
+            bool b1(v);     UNSCOPED_INFO("contruct bool"); REQUIRE(b1 == true);
+            bool b2 = v;    UNSCOPED_INFO("initialize bool"); REQUIRE(b2 == true);
 
-            int i1(v);      ensure_equals("contruct int", i1, 42);
-            int i2 = v;     ensure_equals("initialize int", i2, 42);
+            int i1(v);      UNSCOPED_INFO("contruct int"); REQUIRE(i1 == 42);
+            int i2 = v;     UNSCOPED_INFO("initialize int"); REQUIRE(i2 == 42);
 
-            double d1(v);   ensure_equals("contruct double", d1, 42.375);
-            double d2 = v;  ensure_equals("initialize double", d2, 42.375);
+            double d1(v);   UNSCOPED_INFO("contruct double"); REQUIRE(d1 == 42.375);
+            double d2 = v;  UNSCOPED_INFO("initialize double"); REQUIRE(d2 == 42.375);
 
             std::string s1(v);
             std::string s2 = v;
-                            ensure_equals("contruct string", s1, "  42.375");
-                            ensure_equals("initialize string", s2, "  42.375");
+                            UNSCOPED_INFO("contruct string");
+                            REQUIRE(s1 == "  42.375");
+                            UNSCOPED_INFO("initialize string");
+                            REQUIRE(s2 == "  42.375");
 
             std::string t1(v);
             std::string t2 = v.asString();      // SAD
-                            ensure_equals("contruct std::string", t1, "  42.375");
-                            ensure_equals("initialize std::string", t2, "  42.375");
+                            UNSCOPED_INFO("contruct std::string");
+                            REQUIRE(t1 == "  42.375");
+                            UNSCOPED_INFO("initialize std::string");
+                            REQUIRE(t2 == "  42.375");
 
             std::string uuidStr = "b1e50c2b-b627-4d23-8a86-a65d97b6319b";
             v = uuidStr;
             LLUUID uuid1(v.asUUID());       // SAD
             LLUUID uuid2 = v;
-                    ensure_equals("contruct LLUUID", uuid1, LLUUID(uuidStr));
-                    ensure_equals("initialize LLUUID", uuid2, LLUUID(uuidStr));
+                    UNSCOPED_INFO("contruct LLUUID");
+                    REQUIRE(uuid1 == LLUUID(uuidStr));
+                    UNSCOPED_INFO("initialize LLUUID");
+                    REQUIRE(uuid2 == LLUUID(uuidStr));
 
             std::string dateStr = "2005-10-24T15:00:00Z";
             v = dateStr;
             LLDate date1(v.asDate());       // SAD
             LLDate date2 = v;
-                    ensure_equals("contruct LLDate", date1.asString(), dateStr);
-                    ensure_equals("initialize LLDate", date2.asString(), dateStr);
+                    UNSCOPED_INFO("contruct LLDate");
+                    REQUIRE(date1.asString() == dateStr);
+                    UNSCOPED_INFO("initialize LLDate");
+                    REQUIRE(date2.asString() == dateStr);
 
             std::string uriStr = "http://secondlife.com";
             v = uriStr;
             LLURI uri1(v.asURI());          // SAD
             LLURI uri2 = v;
-                    ensure_equals("contruct LLURI", uri1.asString(), uriStr);
-                    ensure_equals("initialize LLURI", uri2.asString(), uriStr);
+                    UNSCOPED_INFO("contruct LLURI");
+                    REQUIRE(uri1.asString() == uriStr);
+                    UNSCOPED_INFO("initialize LLURI");
+                    REQUIRE(uri2.asString() == uriStr);
         });
     }
 
 
-    template<> template<>
-    void SDTestObject::test<9>()
+    TEST_CASE("LLSD(new): the string 0 is true as a bool but 0 as an int", "[LLSD_new]")
         // test to make sure v is interpreted as a bool in a various
         // scenarios.
     {
@@ -546,107 +555,134 @@ namespace tut
             LLSD v = "0";
             // magic value that is interpreted as boolean true, but integer false!
 
-            ensure_equals("trinary operator bool", (v ? true : false), true);
-            ensure_equals("convert to int, then bool",
-                                                ((int)v ? true : false), false);
+            UNSCOPED_INFO("trinary operator bool");
+            REQUIRE((v ? true : false) == true);
+            UNSCOPED_INFO("convert to int, then bool");
+            REQUIRE(((int)v ? true : false) == false);
 
             if(v)
             {
-                ensure("if converted to bool", true);
+                UNSCOPED_INFO("if converted to bool");
+                REQUIRE(true);
             }
             else
             {
-                fail("bool did not convert to a bool in if statement.");
+                FAIL("bool did not convert to a bool in if statement.");
             }
 
             if(!v)
             {
-                fail("bool did not convert to a bool in negated if statement.");
+                FAIL("bool did not convert to a bool in negated if statement.");
             }
         });
     }
 
-    template<> template<>
-    void SDTestObject::test<10>()
+    TEST_CASE("LLSD(new): map has/get/insert/erase and copy", "[LLSD_new]")
         // map operations
     {
         ensure_cleaned_up([&]
         {
             LLSD v;
-            ensure("undefined has no members", !v.has("amy"));
-            ensure("undefined get() is undefined", v.get("bob").isUndefined());
+            UNSCOPED_INFO("undefined has no members");
+            REQUIRE_FALSE(v.has("amy"));
+            UNSCOPED_INFO("undefined get() is undefined");
+            REQUIRE(v.get("bob").isUndefined());
 
             v = LLSD::emptyMap();
-            ensure("empty map is a map", v.isMap());
-            ensure("empty map has no members", !v.has("cam"));
-            ensure("empty map get() is undefined", v.get("don").isUndefined());
+            UNSCOPED_INFO("empty map is a map");
+            REQUIRE(v.isMap());
+            UNSCOPED_INFO("empty map has no members");
+            REQUIRE_FALSE(v.has("cam"));
+            UNSCOPED_INFO("empty map get() is undefined");
+            REQUIRE(v.get("don").isUndefined());
 
             v.clear();
             v.insert("eli", 43);
-            ensure("insert converts to map", v.isMap());
-            ensure("inserted key is present", v.has("eli"));
+            UNSCOPED_INFO("insert converts to map");
+            REQUIRE(v.isMap());
+            UNSCOPED_INFO("inserted key is present");
+            REQUIRE(v.has("eli"));
             ensureTypeAndValue("inserted value", v.get("eli"), 43);
 
             v.insert("fra", false);
-            ensure("first key still present", v.has("eli"));
-            ensure("second key is present", v.has("fra"));
+            UNSCOPED_INFO("first key still present");
+            REQUIRE(v.has("eli"));
+            UNSCOPED_INFO("second key is present");
+            REQUIRE(v.has("fra"));
             ensureTypeAndValue("first value", v.get("eli"), 43);
             ensureTypeAndValue("second value", v.get("fra"), false);
 
             v.erase("eli");
-            ensure("first key now gone", !v.has("eli"));
-            ensure("second key still present", v.has("fra"));
-            ensure("first value gone", v.get("eli").isUndefined());
+            UNSCOPED_INFO("first key now gone");
+            REQUIRE_FALSE(v.has("eli"));
+            UNSCOPED_INFO("second key still present");
+            REQUIRE(v.has("fra"));
+            UNSCOPED_INFO("first value gone");
+            REQUIRE(v.get("eli").isUndefined());
             ensureTypeAndValue("second value sill there", v.get("fra"), false);
 
             v.erase("fra");
-            ensure("second key now gone", !v.has("fra"));
-            ensure("second value gone", v.get("fra").isUndefined());
+            UNSCOPED_INFO("second key now gone");
+            REQUIRE_FALSE(v.has("fra"));
+            UNSCOPED_INFO("second value gone");
+            REQUIRE(v.get("fra").isUndefined());
 
             v["gil"] = (std::string)"good morning";
-            ensure("third key present", v.has("gil"));
+            UNSCOPED_INFO("third key present");
+            REQUIRE(v.has("gil"));
             ensureTypeAndValue("third key value", v.get("gil"), "good morning");
 
             const LLSD& cv = v; // FIX ME IF POSSIBLE
-            ensure("missing key", cv["ham"].isUndefined());
-            ensure("key not present", !v.has("ham"));
+            UNSCOPED_INFO("missing key");
+            REQUIRE(cv["ham"].isUndefined());
+            UNSCOPED_INFO("key not present");
+            REQUIRE_FALSE(v.has("ham"));
 
             LLSD w = 43;
             const LLSD& cw = w; // FIX ME IF POSSIBLE
             int i = cw["ian"];
             ensureTypeAndValue("other missing value", i, 0);
-            ensure("other missing key", !w.has("ian"));
-            ensure("no conversion", w.isInteger());
+            UNSCOPED_INFO("other missing key");
+            REQUIRE_FALSE(w.has("ian"));
+            UNSCOPED_INFO("no conversion");
+            REQUIRE(w.isInteger());
 
             LLSD x;
             x = v;
-            ensure("copy map type", x.isMap());
+            UNSCOPED_INFO("copy map type");
+            REQUIRE(x.isMap());
             ensureTypeAndValue("copy map value gil", x.get("gil"), "good morning");
         });
     }
 
 
-    template<> template<>
-    void SDTestObject::test<11>()
+    TEST_CASE("LLSD(new): array append/insert/set/erase and copy", "[LLSD_new]")
         // array operations
     {
         ensure_cleaned_up([&]
         {
             LLSD v;
-            ensure_equals("undefined has no size", v.size(), 0);
-            ensure("undefined get() is undefined", v.get(0).isUndefined());
+            UNSCOPED_INFO("undefined has no size");
+            REQUIRE(v.size() == 0);
+            UNSCOPED_INFO("undefined get() is undefined");
+            REQUIRE(v.get(0).isUndefined());
 
             v = LLSD::emptyArray();
-            ensure("empty array is an array", v.isArray());
-            ensure_equals("empty array has no size", v.size(), 0);
-            ensure("empty map get() is undefined", v.get(0).isUndefined());
+            UNSCOPED_INFO("empty array is an array");
+            REQUIRE(v.isArray());
+            UNSCOPED_INFO("empty array has no size");
+            REQUIRE(v.size() == 0);
+            UNSCOPED_INFO("empty map get() is undefined");
+            REQUIRE(v.get(0).isUndefined());
 
             v.clear();
             v.append(88);
             v.append("noodle");
             v.append(true);
-            ensure_equals("appened array size", v.size(), 3);
-            ensure("append array is an array", v.isArray());
+            UNSCOPED_INFO("appened array size");
+            REQUIRE(v.size() == 3);
+            UNSCOPED_INFO("append array is an array");
+            REQUIRE(v.isArray());
             ensureTypeAndValue("append 0", v[0], 88);
             ensureTypeAndValue("append 1", v[1], "noodle");
             ensureTypeAndValue("append 2", v[2], true);
@@ -654,7 +690,8 @@ namespace tut
             v.insert(0, 77);
             v.insert(2, "soba");
             v.insert(4, false);
-            ensure_equals("inserted array size", v.size(), 6);
+            UNSCOPED_INFO("inserted array size");
+            REQUIRE(v.size() == 6);
             ensureTypeAndValue("post insert 0", v[0], 77);
             ensureTypeAndValue("post insert 1", v[1], 88);
             ensureTypeAndValue("post insert 2", v[2], "soba");
@@ -664,9 +701,12 @@ namespace tut
 
             LLSD beyond;
             beyond.insert(2, "far");
-            ensure_equals("beyond-end insert size", beyond.size(), 3);
-            ensure("beyond-end insert pad 0", beyond[0].isUndefined());
-            ensure("beyond-end insert pad 1", beyond[1].isUndefined());
+            UNSCOPED_INFO("beyond-end insert size");
+            REQUIRE(beyond.size() == 3);
+            UNSCOPED_INFO("beyond-end insert pad 0");
+            REQUIRE(beyond[0].isUndefined());
+            UNSCOPED_INFO("beyond-end insert pad 1");
+            REQUIRE(beyond[1].isUndefined());
             ensureTypeAndValue("beyond-end insert value", beyond[2], "far");
 
             ensureTypeAndValue("get 1", v.get(1), 88);
@@ -674,7 +714,8 @@ namespace tut
             ensureTypeAndValue("set 1", v.get(1), "hot");
 
             v.erase(3);
-            ensure_equals("post erase array size", v.size(), 5);
+            UNSCOPED_INFO("post erase array size");
+            REQUIRE(v.size() == 5);
             ensureTypeAndValue("post erase 0", v[0], 77);
             ensureTypeAndValue("post erase 1", v[1], "hot");
             ensureTypeAndValue("post erase 2", v[2], "soba");
@@ -682,13 +723,16 @@ namespace tut
             ensureTypeAndValue("post erase 4", v[4], true);
 
             v.append(34);
-            ensure_equals("size after append", v.size(), 6);
+            UNSCOPED_INFO("size after append");
+            REQUIRE(v.size() == 6);
             ensureTypeAndValue("post append 5", v[5], 34);
 
             LLSD w;
             w = v;
-            ensure("copy array type", w.isArray());
-            ensure_equals("copy array size", w.size(), 6);
+            UNSCOPED_INFO("copy array type");
+            REQUIRE(w.isArray());
+            UNSCOPED_INFO("copy array size");
+            REQUIRE(w.size() == 6);
             ensureTypeAndValue("copy array 0", w[0], 77);
             ensureTypeAndValue("copy array 1", w[1], "hot");
             ensureTypeAndValue("copy array 2", w[2], "soba");
@@ -699,8 +743,7 @@ namespace tut
     }
 
 
-    template<> template<>
-    void SDTestObject::test<12>()
+    TEST_CASE("LLSD(new): a copy shares no values with its original", "[LLSD_new]")
         // no sharing
     {
         ensure_cleaned_up([&]
@@ -741,8 +784,7 @@ namespace tut
         });
     }
 
-    template<> template<>
-    void SDTestObject::test<13>()
+    TEST_CASE("LLSD(new): copies share their implementation and scalars never allocate", "[LLSD_new]")
         // sharing implementation
     {
         ensure_cleaned_up([&]
@@ -826,36 +868,41 @@ namespace tut
         });
     }
 
-    template<> template<>
-    void SDTestObject::test<14>()
+    TEST_CASE("LLSD(new): assigning a null char pointer makes a string without crashing", "[LLSD_new]")
         // make sure that assignment of char* NULL in a string does not crash.
     {
         LLSD v;
         v = (const char*)NULL;
-        ensure("type is a string", v.isString());
+        UNSCOPED_INFO("type is a string");
+        CHECK(v.isString());
     }
 
-    template<> template<>
-    void SDTestObject::test<15>()
+    TEST_CASE("LLSD(new): asXMLRPCValue serializes each type", "[LLSD_new]")
         // XMLRPC value serialization
     {
         ensure_cleaned_up([&]
         {
-            ensure_equals("xmlrpc undef", LLSD().asXMLRPCValue(),
+            UNSCOPED_INFO("xmlrpc undef");
+            REQUIRE(LLSD().asXMLRPCValue() ==
                 "<value><nil/></value>");
-            ensure_equals("xmlrpc bool", LLSD(true).asXMLRPCValue(),
+            UNSCOPED_INFO("xmlrpc bool");
+            REQUIRE(LLSD(true).asXMLRPCValue() ==
                 "<value><boolean>1</boolean></value>");
-            ensure_equals("xmlrpc int", LLSD(3).asXMLRPCValue(),
+            UNSCOPED_INFO("xmlrpc int");
+            REQUIRE(LLSD(3).asXMLRPCValue() ==
                 "<value><int>3</int></value>");
-            ensure_equals("xmlrpc real", LLSD(1.5).asXMLRPCValue(),
+            UNSCOPED_INFO("xmlrpc real");
+            REQUIRE(LLSD(1.5).asXMLRPCValue() ==
                 "<value><double>1.5</double></value>");
-            ensure_equals("xmlrpc string", LLSD("a<b").asXMLRPCValue(),
+            UNSCOPED_INFO("xmlrpc string");
+            REQUIRE(LLSD("a<b").asXMLRPCValue() ==
                 "<value><string>a&lt;b</string></value>");
 
             LLSD array = LLSD::emptyArray();
             array.append(1);
             array.append("two");
-            ensure_equals("xmlrpc array", array.asXMLRPCValue(),
+            UNSCOPED_INFO("xmlrpc array");
+            REQUIRE(array.asXMLRPCValue() ==
                 "<value><array><data>"
                 "<value><int>1</int></value>"
                 "<value><string>two</string></value>"
@@ -863,7 +910,8 @@ namespace tut
 
             LLSD map = LLSD::emptyMap();
             map["a"] = 1;
-            ensure_equals("xmlrpc map", map.asXMLRPCValue(),
+            UNSCOPED_INFO("xmlrpc map");
+            REQUIRE(map.asXMLRPCValue() ==
                 "<value><struct>"
                 "<member><name>a</name><value><int>1</int></value></member>"
                 "</struct></value>");

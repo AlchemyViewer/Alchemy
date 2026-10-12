@@ -27,7 +27,8 @@
  */
 
 #include "linden_common.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include "m4math.h"
 #include "v2math.h"
 #include "v2math.h"
@@ -43,7 +44,7 @@
 #include <set>
 #include <boost/range.hpp>
 
-namespace tut
+namespace
 {
     struct llsdutil_data
     {
@@ -62,7 +63,8 @@ namespace tut
                     // This test is supposed to succeed. Comparing to the
                     // empty string ensures that if the test fails, it will
                     // display the string received so we can tell what failed.
-                    ensure_equals("match", match, "");
+                    UNSCOPED_INFO("match");
+                    REQUIRE(match == "");
                 }
                 else
                 {
@@ -70,53 +72,49 @@ namespace tut
                     // the string 'match' will be empty, which doesn't tell us
                     // much about which case went awry. So construct a more
                     // detailed description string.
-                    ensure(proto_key + " shouldn't match " + pi->first, ! match.empty());
+                    UNSCOPED_INFO(proto_key + " shouldn't match " + pi->first);
+                    REQUIRE_FALSE(match.empty());
                 }
             }
         }
     };
-    typedef test_group<llsdutil_data> llsdutil_test;;
-    typedef llsdutil_test::object llsdutil_object;
-    tut::llsdutil_test tut_llsdutil("llsdutil");
+    ;
 
-    template<> template<>
-    void llsdutil_object::test<1>()
+    TEST_CASE_METHOD(llsdutil_data, "llsdutil: ll_sd_from_U64 round-trips a U64", "[llsdutil]")
     {
         LLSD sd;
         U64 valueIn , valueOut;
         valueIn = U64L(0xFEDCBA9876543210);
         sd = ll_sd_from_U64(valueIn);
         valueOut = ll_U64_from_sd(sd);
-        ensure_equals("U64 valueIn->sd->valueOut", valueIn, valueOut);
+        UNSCOPED_INFO("U64 valueIn->sd->valueOut");
+        CHECK(valueIn == valueOut);
     }
 
-    template<> template<>
-    void llsdutil_object::test<2>()
+    TEST_CASE_METHOD(llsdutil_data, "llsdutil: ll_sd_from_U32 round-trips a U32", "[llsdutil]")
     {
         LLSD sd;
         U32 valueIn, valueOut;
         valueIn = 0x87654321;
         sd = ll_sd_from_U32(valueIn);
         valueOut = ll_U32_from_sd(sd);
-        ensure_equals("U32 valueIn->sd->valueOut", valueIn, valueOut);
+        UNSCOPED_INFO("U32 valueIn->sd->valueOut");
+        CHECK(valueIn == valueOut);
     }
 
-    template<> template<>
-    void llsdutil_object::test<3>()
+    TEST_CASE_METHOD(llsdutil_data, "llsdutil: ll_sd_from_ipaddr round-trips an address", "[llsdutil]")
     {
         U32 valueIn, valueOut;
         valueIn = 0x87654321;
         LLSD sd;
         sd = ll_sd_from_ipaddr(valueIn);
         valueOut = ll_ipaddr_from_sd(sd);
-        ensure_equals("valueIn->sd->valueOut", valueIn, valueOut);
+        UNSCOPED_INFO("valueIn->sd->valueOut");
+        CHECK(valueIn == valueOut);
     }
 
-    template<> template<>
-    void llsdutil_object::test<4>()
+    TEST_CASE_METHOD(llsdutil_data, "llsdutil: llsd_matches and llsd_equals across every LLSD type", "[llsdutil]")
     {
-        set_test_name("llsd_matches");
-
         // for this test, construct a map of all possible LLSD types
         LLSD map;
         map.insert("empty",     LLSD());
@@ -144,7 +142,8 @@ namespace tut
         // empty prototype matches anything
         for (mi = map.beginMap(); mi != mend; ++mi)
         {
-            ensure_equals(std::string("empty matches ") + mi->first, llsd_matches(LLSD(), mi->second), "");
+            UNSCOPED_INFO(std::string("empty matches ") + mi->first);
+            REQUIRE(llsd_matches(LLSD(), mi->second) == "");
         }
 
         LLSD proto_array, data_array;
@@ -157,27 +156,33 @@ namespace tut
         // prototype array matches only array
         for (mi = map.beginMap(); mi != mend; ++mi)
         {
-            ensure(std::string("array doesn't match ") + mi->first,
-                   ! llsd_matches(proto_array, mi->second).empty());
+            UNSCOPED_INFO(std::string("array doesn't match ") + mi->first);
+            REQUIRE_FALSE(llsd_matches(proto_array, mi->second).empty());
         }
 
         // data array must be at least as long as prototype array
         proto_array.append(LLSD());
-        ensure_equals("data array too short", llsd_matches(proto_array, data_array),
+        UNSCOPED_INFO("data array too short");
+        CHECK(llsd_matches(proto_array, data_array) ==
                       "Array size 4 required instead of Array size 3");
         data_array.append(LLSD());
-        ensure_equals("data array just right", llsd_matches(proto_array, data_array), "");
+        UNSCOPED_INFO("data array just right");
+        CHECK(llsd_matches(proto_array, data_array) == "");
         data_array.append(LLSD());
-        ensure_equals("data array longer", llsd_matches(proto_array, data_array), "");
+        UNSCOPED_INFO("data array longer");
+        CHECK(llsd_matches(proto_array, data_array) == "");
 
         // array element matching
         data_array[0] = LLSD::String();
-        ensure_equals("undefined prototype array entry", llsd_matches(proto_array, data_array), "");
+        UNSCOPED_INFO("undefined prototype array entry");
+        CHECK(llsd_matches(proto_array, data_array) == "");
         proto_array[0] = LLSD::Binary();
-        ensure_equals("scalar prototype array entry", llsd_matches(proto_array, data_array),
+        UNSCOPED_INFO("scalar prototype array entry");
+        CHECK(llsd_matches(proto_array, data_array) ==
                       "[0]: Binary required instead of String");
         data_array[0] = LLSD::Binary();
-        ensure_equals("matching prototype array entry", llsd_matches(proto_array, data_array), "");
+        UNSCOPED_INFO("matching prototype array entry");
+        CHECK(llsd_matches(proto_array, data_array) == "");
 
         // build a coupla maps
         LLSD proto_map, data_map;
@@ -194,34 +199,46 @@ namespace tut
         // prototype map matches only map
         for (mi = map.beginMap(); mi != mend; ++mi)
         {
-            ensure(std::string("map doesn't match ") + mi->first,
-                   ! llsd_matches(proto_map, mi->second).empty());
+            UNSCOPED_INFO(std::string("map doesn't match ") + mi->first);
+            REQUIRE_FALSE(llsd_matches(proto_map, mi->second).empty());
         }
 
         // data map must contain all keys in prototype map
         std::string error(llsd_matches(proto_map, data_map));
-        ensure_contains("missing keys", error, "missing keys");
-        ensure_contains("missing foo", error, "foo");
-        ensure_contains("missing bar", error, "bar");
-        ensure_does_not_contain("found found", error, "found");
-        ensure_does_not_contain("got got", error, "got");
+        UNSCOPED_INFO("missing keys");
+        CHECK_THAT(error, Catch::Matchers::ContainsSubstring("missing keys"));
+        UNSCOPED_INFO("missing foo");
+        CHECK_THAT(error, Catch::Matchers::ContainsSubstring("foo"));
+        UNSCOPED_INFO("missing bar");
+        CHECK_THAT(error, Catch::Matchers::ContainsSubstring("bar"));
+        UNSCOPED_INFO("found found");
+        CHECK_THAT(error, !Catch::Matchers::ContainsSubstring("found"));
+        UNSCOPED_INFO("got got");
+        CHECK_THAT(error, !Catch::Matchers::ContainsSubstring("got"));
         data_map["bar"] = LLSD();
         error = llsd_matches(proto_map, data_map);
-        ensure_contains("missing foo", error, "foo");
-        ensure_does_not_contain("got bar", error, "bar");
+        UNSCOPED_INFO("missing foo");
+        CHECK_THAT(error, Catch::Matchers::ContainsSubstring("foo"));
+        UNSCOPED_INFO("got bar");
+        CHECK_THAT(error, !Catch::Matchers::ContainsSubstring("bar"));
         data_map["foo"] = LLSD();
-        ensure_equals("data map just right", llsd_matches(proto_map, data_map), "");
+        UNSCOPED_INFO("data map just right");
+        CHECK(llsd_matches(proto_map, data_map) == "");
         data_map["extra"] = LLSD();
-        ensure_equals("data map with extra", llsd_matches(proto_map, data_map), "");
+        UNSCOPED_INFO("data map with extra");
+        CHECK(llsd_matches(proto_map, data_map) == "");
 
         // map element matching
         data_map["foo"] = LLSD::String();
-        ensure_equals("undefined prototype map entry", llsd_matches(proto_map, data_map), "");
+        UNSCOPED_INFO("undefined prototype map entry");
+        CHECK(llsd_matches(proto_map, data_map) == "");
         proto_map["foo"] = LLSD::Binary();
-        ensure_equals("scalar prototype map entry", llsd_matches(proto_map, data_map),
+        UNSCOPED_INFO("scalar prototype map entry");
+        CHECK(llsd_matches(proto_map, data_map) ==
                       "['foo']: Binary required instead of String");
         data_map["foo"] = LLSD::Binary();
-        ensure_equals("matching prototype map entry", llsd_matches(proto_map, data_map), "");
+        UNSCOPED_INFO("matching prototype map entry");
+        CHECK(llsd_matches(proto_map, data_map) == "");
 
         // String
         {
@@ -276,8 +293,8 @@ namespace tut
                 // interest, e.g "String::Integer".
                 // We expect the values (xmi->second) to be equal if and only
                 // if the type names (xmi->first) are equal.
-                ensure(STRINGIZE(lmi->first << "::" << rmi->first),
-                       bool(lmi->first == rmi->first) ==
+                UNSCOPED_INFO((STRINGIZE(lmi->first << "::" << rmi->first)));
+                REQUIRE(bool(lmi->first == rmi->first) ==
                        bool(llsd_equals(lmi->second, rmi->second)));
             }
         }
@@ -288,15 +305,19 @@ namespace tut
         rarray.append(2);
         rarray.append("3");
         LLSD larray(rarray);
-        ensure("llsd_equals(equal arrays)", llsd_equals(larray, rarray));
+        UNSCOPED_INFO("llsd_equals(equal arrays)");
+        CHECK(llsd_equals(larray, rarray));
         rarray[2] = "4";
-        ensure("llsd_equals(different [2])", ! llsd_equals(larray, rarray));
+        UNSCOPED_INFO("llsd_equals(different [2])");
+        CHECK_FALSE(llsd_equals(larray, rarray));
         rarray = larray;
         rarray.append(LLSD::Date());
-        ensure("llsd_equals(longer right array)", ! llsd_equals(larray, rarray));
+        UNSCOPED_INFO("llsd_equals(longer right array)");
+        CHECK_FALSE(llsd_equals(larray, rarray));
         rarray = larray;
         rarray.erase(2);
-        ensure("llsd_equals(shorter right array)", ! llsd_equals(larray, rarray));
+        UNSCOPED_INFO("llsd_equals(shorter right array)");
+        CHECK_FALSE(llsd_equals(larray, rarray));
 
         // Map cases
         LLSD rmap;
@@ -304,57 +325,66 @@ namespace tut
         rmap["Phoenix"] = 92;
         rmap["Boston"] = 77;
         LLSD lmap(rmap);
-        ensure("llsd_equals(equal maps)", llsd_equals(lmap, rmap));
+        UNSCOPED_INFO("llsd_equals(equal maps)");
+        CHECK(llsd_equals(lmap, rmap));
         rmap["Boston"] = 80;
-        ensure("llsd_equals(different [\"Boston\"])", ! llsd_equals(lmap, rmap));
+        UNSCOPED_INFO("llsd_equals(different [\"Boston\"])");
+        CHECK_FALSE(llsd_equals(lmap, rmap));
         rmap = lmap;
         rmap["Atlanta"] = 95;
-        ensure("llsd_equals(superset right map)", ! llsd_equals(lmap, rmap));
+        UNSCOPED_INFO("llsd_equals(superset right map)");
+        CHECK_FALSE(llsd_equals(lmap, rmap));
         rmap = lmap;
         lmap["Seattle"] = 72;
-        ensure("llsd_equals(superset left map)", ! llsd_equals(lmap, rmap));
+        UNSCOPED_INFO("llsd_equals(superset left map)");
+        CHECK_FALSE(llsd_equals(lmap, rmap));
     }
 
-    template<> template<>
-    void llsdutil_object::test<5>()
+    TEST_CASE_METHOD(llsdutil_data, "llsdutil: hashing LLSD follows its type and contents", "[llsdutil]")
     {
-        set_test_name("llsd_hashing");
-
         {
             LLSD data_s1 = LLSD::String("The quick brown aardvark jumped over the lazy lemming.");
             LLSD data_s2 = LLSD::String("The quick brown aardvark jumped over the lazy lemming.");
 
-            ensure("hash: Identical string hashes match.", boost::hash<LLSD>{}(data_s1) == boost::hash<LLSD>{}(data_s2));
+            UNSCOPED_INFO("hash: Identical string hashes match.");
+            CHECK(boost::hash<LLSD>{}(data_s1) == boost::hash<LLSD>{}(data_s2));
         }
         {
             LLSD data_r1 = LLSD::Real(3.0f);
             LLSD data_i1 = LLSD::Integer(3);
-            ensure("hash: equivalent values but different types do not match.", boost::hash<LLSD>{}(data_r1) != boost::hash<LLSD>{}(data_i1));
+            UNSCOPED_INFO("hash: equivalent values but different types do not match.");
+            CHECK(boost::hash<LLSD>{}(data_r1) != boost::hash<LLSD>{}(data_i1));
         }
         {
             LLSD data_a1 = llsd::array("A", "B", "C");
             LLSD data_a2 = llsd::array("A", "B", "C");
 
-            ensure("hash: identical arrays produce identical results", boost::hash<LLSD>{}(data_a1) == boost::hash<LLSD>{}(data_a2));
+            UNSCOPED_INFO("hash: identical arrays produce identical results");
+            CHECK(boost::hash<LLSD>{}(data_a1) == boost::hash<LLSD>{}(data_a2));
 
             data_a2.append(llsd::array(1, 2));
 
-            ensure("hash: changing the array changes the hash.", boost::hash<LLSD>{}(data_a1) != boost::hash<LLSD>{}(data_a2));
+            UNSCOPED_INFO("hash: changing the array changes the hash.");
+            CHECK(boost::hash<LLSD>{}(data_a1) != boost::hash<LLSD>{}(data_a2));
 
             data_a1.append(llsd::array(1, 2));
-            ensure("hash: identical arrays produce identical results with nested arrays", boost::hash<LLSD>{}(data_a1) == boost::hash<LLSD>{}(data_a2));
+            UNSCOPED_INFO("hash: identical arrays produce identical results with nested arrays");
+            CHECK(boost::hash<LLSD>{}(data_a1) == boost::hash<LLSD>{}(data_a2));
         }
         {
             LLSD data_m1 = LLSDMap("key1", LLSD::Real(3.0))("key2", "value2")("key3", llsd::array(1, 2, 3));
             LLSD data_m2 = LLSDMap("key1", LLSD::Real(3.0))("key2", "value2")("key3", llsd::array(1, 2, 3));
 
-            ensure("hash: identical maps produce identical results", boost::hash<LLSD>{}(data_m1) == boost::hash<LLSD>{}(data_m2));
+            UNSCOPED_INFO("hash: identical maps produce identical results");
+            CHECK(boost::hash<LLSD>{}(data_m1) == boost::hash<LLSD>{}(data_m2));
 
             LLSD data_m3 = LLSDMap("key1", LLSD::Real(5.0))("key2", "value2")("key3", llsd::array(1, 2, 3));
-            ensure("hash: Different values in the map produce different hashes.", boost::hash<LLSD>{}(data_m1) != boost::hash<LLSD>{}(data_m3));
+            UNSCOPED_INFO("hash: Different values in the map produce different hashes.");
+            CHECK(boost::hash<LLSD>{}(data_m1) != boost::hash<LLSD>{}(data_m3));
 
             LLSD data_m4 = LLSDMap("keyA", LLSD::Real(3.0))("key2", "value2")("key3", llsd::array(1, 2, 3));
-            ensure("hash: Different keys in the map produce different hashes.", boost::hash<LLSD>{}(data_m1) != boost::hash<LLSD>{}(data_m4));
+            UNSCOPED_INFO("hash: Different keys in the map produce different hashes.");
+            CHECK(boost::hash<LLSD>{}(data_m1) != boost::hash<LLSD>{}(data_m4));
 
         }
     }

@@ -18,7 +18,7 @@
 #include <atomic>
 // external library headers
 // other Linden headers
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "../test/sync.h"
 #include "llthread.h"               // on_main_thread()
 #include "lleventtimer.h"
@@ -27,7 +27,7 @@
 /*****************************************************************************
 *   TUT
 *****************************************************************************/
-namespace tut
+namespace
 {
     struct llmainthreadtask_data
     {
@@ -41,26 +41,21 @@ namespace tut
             on_main_thread();
         }
     };
-    typedef test_group<llmainthreadtask_data> llmainthreadtask_group;
-    typedef llmainthreadtask_group::object object;
-    llmainthreadtask_group llmainthreadtaskgrp("llmainthreadtask");
 
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(llmainthreadtask_data, "llmainthreadtask: dispatch on the main thread runs the task inline", "[llmainthreadtask]")
     {
-        set_test_name("inline");
         bool ran = false;
         bool result = LLMainThreadTask::dispatch(
             [&ran]()->bool{
                 ran = true;
                 return true;
             });
-        ensure("didn't run lambda", ran);
-        ensure("didn't return result", result);
+        UNSCOPED_INFO("didn't run lambda");
+        CHECK(ran);
+        UNSCOPED_INFO("didn't return result");
+        CHECK(result);
     }
 
-    namespace
-    {
         // LockStatic finds its one instance a process by the type's name, even
         // in an anonymous namespace, so the name is this test's own.
         struct MainThreadTaskStatic
@@ -69,13 +64,10 @@ namespace tut
             bool ran{false};
         };
         typedef llthread::LockStatic<MainThreadTaskStatic> LockStatic;
-    } // anonymous namespace
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(llmainthreadtask_data, "llmainthreadtask: dispatch from another thread runs the task on the main thread", "[llmainthreadtask]")
     {
-        set_test_name("cross-thread");
-        skip("This test is prone to build-time hangs");
+        SKIP("This test is prone to build-time hangs");
         std::atomic_bool result(false);
         // wrapping our thread lambda in a packaged_task will catch any
         // exceptions it might throw and deliver them via future
@@ -107,8 +99,10 @@ namespace tut
             // try to acquire the lock, should block because thread has it
             LockStatic lk;
             // wake up when dispatch() unlocks the static mutex
-            ensure("shouldn't have run yet", !lk->ran);
-            ensure("shouldn't have returned yet", !result);
+            UNSCOPED_INFO("shouldn't have run yet");
+            CHECK_FALSE(lk->ran);
+            UNSCOPED_INFO("shouldn't have returned yet");
+            CHECK_FALSE(result);
             // unlock so the task can acquire the lock
             lk.unlock();
             // run the task -- should unblock thread, which will immediately block
@@ -116,8 +110,10 @@ namespace tut
             LLEventTimer::updateClass();
             // 'lk', having unlocked, can no longer be used to access; relock with
             // a new LockStatic instance
-            ensure("should now have run", LockStatic()->ran);
-            ensure("returned too early", !result);
+            UNSCOPED_INFO("should now have run");
+            CHECK(LockStatic()->ran);
+            UNSCOPED_INFO("returned too early");
+            CHECK_FALSE(result);
             // okay, let thread perform the assignment
             mSync.set(3);
         }
@@ -136,7 +132,9 @@ namespace tut
         thread.join();
         // deliver any exception thrown by thread_work
         thread_result.get();
-        ensure("ran changed", LockStatic()->ran);
-        ensure("didn't run on main thread", result);
+        UNSCOPED_INFO("ran changed");
+        CHECK(LockStatic()->ran);
+        UNSCOPED_INFO("didn't run on main thread");
+        CHECK(result);
     }
-} // namespace tut
+} // anonymous namespace

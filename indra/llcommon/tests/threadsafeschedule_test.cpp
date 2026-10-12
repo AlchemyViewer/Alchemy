@@ -18,7 +18,7 @@
 #include <chrono>
 // external library headers
 // other Linden headers
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 using namespace std::literals::chrono_literals; // ms suffix
 using namespace std::literals::string_literals; // s suffix
@@ -27,20 +27,15 @@ using Queue = LL::ThreadSafeSchedule<std::string>;
 /*****************************************************************************
 *   TUT
 *****************************************************************************/
-namespace tut
+namespace
 {
     struct threadsafeschedule_data
     {
         Queue queue;
     };
-    typedef test_group<threadsafeschedule_data> threadsafeschedule_group;
-    typedef threadsafeschedule_group::object object;
-    threadsafeschedule_group threadsafeschedulegrp("threadsafeschedule");
 
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(threadsafeschedule_data, "threadsafeschedule: entries pop in timestamp order and a closed queue drains", "[threadsafeschedule]")
     {
-        set_test_name("push");
         // Simply calling push() a few times might result in indeterminate
         // delivery order if the resolution of steady_clock is coarser than
         // the real time required for each push() call. Explicitly increment
@@ -54,17 +49,25 @@ namespace tut
         queue.push(now + 100ms, "def"s);
         queue.close();
         auto entry = queue.pop();
-        ensure_equals("failed to pop first", std::get<0>(entry), "abc"s);
+        UNSCOPED_INFO("failed to pop first");
+        CHECK(std::get<0>(entry) == "abc"s);
         entry = queue.pop();
-        ensure_equals("failed to pop second", std::get<0>(entry), "def"s);
-        ensure("queue not closed", queue.isClosed());
-        ensure("queue prematurely done", ! queue.done());
+        UNSCOPED_INFO("failed to pop second");
+        CHECK(std::get<0>(entry) == "def"s);
+        UNSCOPED_INFO("queue not closed");
+        CHECK(queue.isClosed());
+        UNSCOPED_INFO("queue prematurely done");
+        CHECK_FALSE(queue.done());
         std::string s;
         bool popped = queue.tryPopFor(1s, s);
-        ensure("failed to pop third", popped);
-        ensure_equals("third is wrong", s, "ghi"s);
+        UNSCOPED_INFO("failed to pop third");
+        CHECK(popped);
+        UNSCOPED_INFO("third is wrong");
+        CHECK(s == "ghi"s);
         popped = queue.tryPop(s);
-        ensure("queue not empty", ! popped);
-        ensure("queue not done", queue.done());
+        UNSCOPED_INFO("queue not empty");
+        CHECK_FALSE(popped);
+        UNSCOPED_INFO("queue not done");
+        CHECK(queue.done());
     }
-} // namespace tut
+} // anonymous namespace

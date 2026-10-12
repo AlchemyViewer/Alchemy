@@ -45,7 +45,8 @@ typedef U32 uint32_t;
 #include "llformat.h"
 #include "llmemorystream.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 #include "stringize.h"
 #include "wrapllerrs.h"
 #include <functional>
@@ -58,7 +59,7 @@ static std::vector<U8> string_to_vector(const std::string& str)
     return std::vector<U8>(str.begin(), str.end());
 }
 
-namespace tut
+namespace
 {
     struct sd_xml_data
     {
@@ -72,16 +73,12 @@ namespace tut
         {
             std::ostringstream ostr;
             mFormatter->format(mSD, ostr);
-            ensure_equals(name, ostr.str(), expected);
+            UNSCOPED_INFO(name);
+            REQUIRE(ostr.str() == expected);
         }
     };
 
-    typedef test_group<sd_xml_data> sd_xml_test;
-    typedef sd_xml_test::object sd_xml_object;
-    tut::sd_xml_test sd_xml_stream("LLSDXMLFormatter");
-
-    template<> template<>
-    void sd_xml_object::test<1>()
+    TEST_CASE_METHOD(sd_xml_data, "LLSDXMLFormatter: formats each scalar type", "[LLSDXMLFormatter]")
     {
         // random atomic tests
         std::string expected;
@@ -129,8 +126,7 @@ namespace tut
         xml_test("binary", expected);
     }
 
-    template<> template<>
-    void sd_xml_object::test<2>()
+    TEST_CASE_METHOD(sd_xml_data, "LLSDXMLFormatter: booleans format as words or digits by boolalpha", "[LLSDXMLFormatter]")
     {
         // tests with boolean values.
         std::string expected;
@@ -153,8 +149,7 @@ namespace tut
     }
 
 
-    template<> template<>
-    void sd_xml_object::test<3>()
+    TEST_CASE_METHOD(sd_xml_data, "LLSDXMLFormatter: reals format shortest by default or by realFormat", "[LLSDXMLFormatter]")
     {
         // tests with real values.
         std::string expected;
@@ -188,8 +183,7 @@ namespace tut
         xml_test("no decimal real number", expected);
     }
 
-    template<> template<>
-    void sd_xml_object::test<4>()
+    TEST_CASE_METHOD(sd_xml_data, "LLSDXMLFormatter: arrays format empty and with elements", "[LLSDXMLFormatter]")
     {
         // tests with arrays
         std::string expected;
@@ -207,8 +201,7 @@ namespace tut
         xml_test("2 element array", expected);
     }
 
-    template<> template<>
-    void sd_xml_object::test<5>()
+    TEST_CASE_METHOD(sd_xml_data, "LLSDXMLFormatter: maps format empty and with their keys sorted", "[LLSDXMLFormatter]")
     {
         // tests with arrays
         std::string expected;
@@ -226,8 +219,7 @@ namespace tut
         xml_test("2 element map", expected);
     }
 
-    template<> template<>
-    void sd_xml_object::test<6>()
+    TEST_CASE_METHOD(sd_xml_data, "LLSDXMLFormatter: binary formats as base64", "[LLSDXMLFormatter]")
     {
         // tests with binary
         std::string expected;
@@ -242,8 +234,7 @@ namespace tut
         xml_test("binary", expected);
     }
 
-    template<> template<>
-    void sd_xml_object::test<7>()
+    TEST_CASE_METHOD(sd_xml_data, "LLSDXMLFormatter: a single-line document deserializes without a spurious error", "[LLSDXMLFormatter]")
     {
         // A complete, single-line legacy <llsd> document (no embedded '\n') is
         // read entirely into the header buffer by LLSDSerialize::deserialize and
@@ -258,18 +249,19 @@ namespace tut
                 std::istringstream input(xml);
                 LLSD parsed;
                 bool ok = LLSDSerialize::deserialize(parsed, input, xml.size());
-                ensure(STRINGIZE("deserialize " << xml << " succeeded"), ok);
-                ensure_equals(STRINGIZE("deserialize " << xml << " value"), parsed, expected);
-                ensure(STRINGIZE("no spurious parse error for " << xml),
-                       capture.messageWith("Unexpected XML parsing error", false).empty());
+                UNSCOPED_INFO((STRINGIZE("deserialize " << xml << " succeeded")));
+                REQUIRE(ok);
+                UNSCOPED_INFO((STRINGIZE("deserialize " << xml << " value")));
+                REQUIRE_THAT(parsed, ll_test::LLSDEquals(expected));
+                UNSCOPED_INFO((STRINGIZE("no spurious parse error for " << xml)));
+                REQUIRE(capture.messageWith("Unexpected XML parsing error", false).empty());
             };
 
         deserialize_no_spurious_error("<llsd><map /></llsd>\n", LLSD::emptyMap());
         deserialize_no_spurious_error("<llsd><array /></llsd>\n", LLSD::emptyArray());
     }
 
-    template<> template<>
-    void sd_xml_object::test<8>()
+    TEST_CASE_METHOD(sd_xml_data, "LLSDXMLFormatter: format restores the stream's precision and exception bits", "[LLSDXMLFormatter]")
     {
         // Test that stream state (precision and exceptions) is correctly restored after format()
         {
@@ -287,15 +279,16 @@ namespace tut
             S32 result = mFormatter->format(mSD, ostr);
 
             // Verify formatting succeeded
-            ensure("format should succeed", result >= 0);
+            UNSCOPED_INFO("format should succeed");
+            CHECK(result >= 0);
 
             // Verify precision was restored
-            ensure_equals("precision should be restored",
-                ostr.precision(), 10);
+            UNSCOPED_INFO("precision should be restored");
+            CHECK(ostr.precision() == 10);
 
             // Verify exceptions were restored
-            ensure_equals("exception bits should be restored",
-                ostr.exceptions(), original_exceptions);
+            UNSCOPED_INFO("exception bits should be restored");
+            CHECK(ostr.exceptions() == original_exceptions);
         }
 
         // Test with no bits set
@@ -308,15 +301,16 @@ namespace tut
             S32 result = mFormatter->format(mSD, ostr);
 
             // Verify formatting succeeded
-            ensure("format should succeed", result >= 0);
+            UNSCOPED_INFO("format should succeed");
+            CHECK(result >= 0);
 
             // Verify exceptions were removed
-            ensure_equals("exception bits should remain unchanged",
-                ostr.exceptions(), original_exceptions);
+            UNSCOPED_INFO("exception bits should remain unchanged");
+            CHECK(ostr.exceptions() == original_exceptions);
 
             // Verify precision was still restored even on failure
-            ensure_equals("precision should be restored even on stream failure",
-                ostr.precision(), (std::streamsize)5);
+            UNSCOPED_INFO("precision should be restored even on stream failure");
+            CHECK(ostr.precision() == (std::streamsize)5);
         }
     }
 
@@ -376,7 +370,8 @@ namespace tut
 
         try
         {
-            ensure_equals(msg, w, v);
+            UNSCOPED_INFO(msg);
+            REQUIRE_THAT(w, ll_test::LLSDEquals(v));
         }
         catch (...)
         {
@@ -582,97 +577,6 @@ namespace tut
         checkRoundTrip(msg + " many nested maps", v);
     }
 
-    typedef tut::test_group<TestLLSDSerializeData> TestLLSDSerializeGroup;
-    typedef TestLLSDSerializeGroup::object TestLLSDSerializeObject;
-    TestLLSDSerializeGroup gTestLLSDSerializeGroup("llsd serialization");
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<1>()
-    {
-        setFormatterParser(new LLSDNotationFormatter(false, "", LLSDFormatter::OPTIONS_PRETTY_BINARY),
-                           new LLSDNotationParser());
-        doRoundTripTests("pretty binary notation serialization");
-    }
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<2>()
-    {
-        setFormatterParser(new LLSDNotationFormatter(false, "", LLSDFormatter::OPTIONS_NONE),
-                           new LLSDNotationParser());
-        doRoundTripTests("raw binary notation serialization");
-    }
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<3>()
-    {
-        setFormatterParser(new LLSDXMLFormatter(), new LLSDXMLParser());
-        doRoundTripTests("xml serialization");
-    }
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<4>()
-    {
-        setFormatterParser(new LLSDBinaryFormatter(), new LLSDBinaryParser());
-        doRoundTripTests("binary serialization");
-    }
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<5>()
-    {
-        mFormatter = [](const LLSD& sd, std::ostream& str)
-        {
-            LLSDSerialize::serialize(sd, str, LLSDSerialize::LLSD_BINARY);
-        };
-        setParser(LLSDSerialize::deserialize);
-        doRoundTripTests("serialize(LLSD_BINARY)");
-    };
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<6>()
-    {
-        mFormatter = [](const LLSD& sd, std::ostream& str)
-        {
-            LLSDSerialize::serialize(sd, str, LLSDSerialize::LLSD_XML);
-        };
-        setParser(LLSDSerialize::deserialize);
-        doRoundTripTests("serialize(LLSD_XML)");
-    };
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<7>()
-    {
-        mFormatter = [](const LLSD& sd, std::ostream& str)
-        {
-            LLSDSerialize::serialize(sd, str, LLSDSerialize::LLSD_NOTATION);
-        };
-        setParser(LLSDSerialize::deserialize);
-        // In this test, serialize(LLSD_NOTATION) emits a header recognized by
-        // deserialize().
-        doRoundTripTests("serialize(LLSD_NOTATION)");
-    };
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<8>()
-    {
-        setFormatterParser(new LLSDNotationFormatter(false, "", LLSDFormatter::OPTIONS_NONE),
-                           new LLSDNotationParser());
-        setParser(LLSDSerialize::deserialize);
-        // This is an interesting test because LLSDNotationFormatter does not
-        // emit an llsd/notation header.
-        doRoundTripTests("LLSDNotationFormatter -> deserialize");
-    };
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<9>()
-    {
-        setFormatterParser(new LLSDXMLFormatter(false, "", LLSDFormatter::OPTIONS_NONE),
-                           new LLSDXMLParser());
-        setParser(LLSDSerialize::deserialize);
-        // This is an interesting test because LLSDXMLFormatter does not
-        // emit an LLSD/XML header.
-        doRoundTripTests("LLSDXMLFormatter -> deserialize");
-    };
-
 /*==========================================================================*|
     // We do not expect this test to succeed. Without a header, neither
     // notation LLSD nor binary LLSD reliably start with a distinct character,
@@ -689,174 +593,6 @@ namespace tut
         doRoundTripTests("LLSDBinaryFormatter -> deserialize");
     };
 |*==========================================================================*/
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<10>()
-    {
-        // deserialize() with SIZE_UNLIMITED must not turn the unlimited
-        // byte budget into a bogus negative one when a header line is
-        // present; sized payloads (binary strings) used to fail the
-        // resulting negative budget check.
-        LLSD sd;
-        sd["foo"] = "bar";
-        sd["bin"] = LLSD::Binary{1, 2, 3};
-
-        for (auto fmt : {LLSDSerialize::LLSD_BINARY,
-                         LLSDSerialize::LLSD_XML,
-                         LLSDSerialize::LLSD_NOTATION})
-        {
-            std::stringstream stream;
-            LLSDSerialize::serialize(sd, stream, fmt);
-            LLSD parsed;
-            ensure(STRINGIZE("deserialize unlimited fmt " << int(fmt)),
-                   LLSDSerialize::deserialize(parsed, stream, LLSDSerialize::SIZE_UNLIMITED));
-            ensure_equals(STRINGIZE("deserialize unlimited fmt " << int(fmt) << " value"),
-                          parsed, sd);
-        }
-    }
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<11>()
-    {
-        // strip_deprecated_header() must consume the newline following the
-        // header (the binary parser does not tolerate leading whitespace)
-        // and report the actual number of bytes skipped.
-        LLSD sd;
-        sd["int"] = 17;
-        sd["str"] = "hello";
-
-        std::stringstream binstream;
-        LLSDSerialize::toBinary(sd, binstream);
-        const std::string body = binstream.str();
-
-        // header with trailing newline, as LLSDSerialize::serialize() writes it
-        {
-            std::string payload = "<? LLSD/Binary ?>\n" + body;
-            std::vector<char> buf(payload.begin(), payload.end());
-            llssize cur_size = (llssize)buf.size();
-            llssize header_size = 0;
-            char* p = strip_deprecated_header(buf.data(), cur_size, &header_size);
-            ensure_equals("stripped header+newline", header_size, llssize(18));
-            ensure_equals("stripped size", cur_size, llssize(body.size()));
-            LLMemoryStream mstr((U8*)p, (S32)cur_size);
-            LLSD parsed;
-            ensure("parse after strip",
-                   LLSDSerialize::fromBinary(parsed, mstr, cur_size) > 0);
-            ensure_equals("value after strip", parsed, sd);
-        }
-
-        // bare header with no newline
-        {
-            std::string payload = "<? LLSD/Binary ?>" + body;
-            std::vector<char> buf(payload.begin(), payload.end());
-            llssize cur_size = (llssize)buf.size();
-            llssize header_size = 0;
-            char* p = strip_deprecated_header(buf.data(), cur_size, &header_size);
-            ensure_equals("stripped bare header", header_size, llssize(17));
-            ensure_equals("stripped bare size", cur_size, llssize(body.size()));
-            LLMemoryStream mstr((U8*)p, (S32)cur_size);
-            LLSD parsed;
-            ensure("parse after bare strip",
-                   LLSDSerialize::fromBinary(parsed, mstr, cur_size) > 0);
-            ensure_equals("value after bare strip", parsed, sd);
-        }
-    }
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<12>()
-    {
-        // zip_llsd/unzip_llsd round trip, and clean rejection of a
-        // corrupted compressed stream
-        LLSD sd;
-        sd["message"] = "destination unknown";
-        sd["mode"] = 7;
-        LLSD arr = LLSD::emptyArray();
-        for (S32 i = 0; i < 256; ++i)
-        {
-            arr.append(i * 0.25);
-        }
-        sd["samples"] = arr;
-
-        std::string compressed = zip_llsd(sd);
-        ensure("zip_llsd produced data", !compressed.empty());
-
-        LLSD out;
-        ensure_equals("unzip_llsd ok",
-                      LLUZipHelper::unzip_llsd(out,
-                                               (const U8*)compressed.data(),
-                                               (S32)compressed.size()),
-                      LLUZipHelper::ZR_OK);
-        ensure_equals("unzip_llsd round trip", out, sd);
-
-        std::string corrupt(compressed);
-        for (size_t i = corrupt.size() / 2; i < corrupt.size(); ++i)
-        {
-            corrupt[i] ^= 0x5A;
-        }
-        LLSD out2;
-        ensure("corrupt unzip_llsd rejected",
-               LLUZipHelper::unzip_llsd(out2,
-                                        (const U8*)corrupt.data(),
-                                        (S32)corrupt.size()) != LLUZipHelper::ZR_OK);
-    }
-
-    template<> template<>
-    void TestLLSDSerializeObject::test<13>()
-    {
-        // unzip_llsdNavMesh: gzip round trip, and clean failure on a
-        // corrupted stream after partial output has been produced (this
-        // path used to realloc a freed buffer and double-free on error)
-        std::string payload;
-        payload.reserve(96 * 1024);
-        while (payload.size() < 96 * 1024)
-        {
-            payload += "navmesh payload block ";
-        }
-
-        z_stream strm{};
-        int ret = deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
-                               15 + 16, // gzip wrapper
-                               8, Z_DEFAULT_STRATEGY);
-        ensure_equals("deflateInit2", ret, Z_OK);
-        std::string compressed(deflateBound(&strm, (uLong)payload.size()) + 32, '\0');
-        strm.next_in = (Bytef*)payload.data();
-        strm.avail_in = (uInt)payload.size();
-        strm.next_out = (Bytef*)&compressed[0];
-        strm.avail_out = (uInt)compressed.size();
-        ret = deflate(&strm, Z_FINISH);
-        ensure_equals("deflate finish", ret, Z_STREAM_END);
-        compressed.resize(compressed.size() - strm.avail_out);
-        deflateEnd(&strm);
-
-        {
-            std::istringstream in(compressed);
-            bool valid = false;
-            size_t outsize = 0;
-            U8* out = unzip_llsdNavMesh(valid, outsize, in, (S32)compressed.size());
-            ensure("navmesh unzip valid", valid);
-            ensure("navmesh unzip buffer", out != NULL);
-            ensure_equals("navmesh unzip size", outsize, payload.size());
-            ensure("navmesh unzip content",
-                   payload.compare(0, payload.size(),
-                                   (const char*)out, outsize) == 0);
-            free(out);
-        }
-
-        {
-            // corrupt the deflate tail and gzip trailer
-            std::string corrupt(compressed);
-            for (size_t i = corrupt.size() - 16; i < corrupt.size(); ++i)
-            {
-                corrupt[i] ^= 0x5A;
-            }
-            std::istringstream in(corrupt);
-            bool valid = true;
-            size_t outsize = 0;
-            U8* out = unzip_llsdNavMesh(valid, outsize, in, (S32)corrupt.size());
-            ensure("corrupt navmesh rejected", !valid);
-            ensure("corrupt navmesh returns null", out == NULL);
-        }
-    }
 
     /**
      * @class TestLLSDParsing
@@ -884,14 +620,16 @@ namespace tut
             LLSD parsed_result;
             mParser->reset();   // reset() call is needed since test code re-uses mParser
             S32 parsed_count = mParser->parse(input, parsed_result, in.size(), depth_limit);
-            ensure_equals(msg.c_str(), parsed_result, expected_value);
+            UNSCOPED_INFO(msg.c_str());
+            REQUIRE_THAT(parsed_result, ll_test::LLSDEquals(expected_value));
 
             // This count check is really only useful for expected
             // parse failures, since the ensures equal will already
             // require equality.
             std::string count_msg(msg);
             count_msg += " (count)";
-            ensure_equals(count_msg, parsed_count, expected_count);
+            UNSCOPED_INFO(count_msg);
+            REQUIRE(parsed_count == expected_count);
         }
 
         LLPointer<parser_t> mParser;
@@ -908,12 +646,7 @@ namespace tut
         TestLLSDXMLParsing() {}
     };
 
-    typedef tut::test_group<TestLLSDXMLParsing> TestLLSDXMLParsingGroup;
-    typedef TestLLSDXMLParsingGroup::object TestLLSDXMLParsingObject;
-    TestLLSDXMLParsingGroup gTestLLSDXMLParsingGroup("llsd XML parsing");
-
-    template<> template<>
-    void TestLLSDXMLParsingObject::test<1>()
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: xml that is not llsd fails to parse", "[llsd_XML_parsing]")
     {
         // test handling of xml not recognized as llsd results in an
         // LLSD Undefined
@@ -940,8 +673,7 @@ namespace tut
     }
 
 
-    template<> template<>
-    void TestLLSDXMLParsingObject::test<2>()
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: a value of unknown type parses as undefined", "[llsd_XML_parsing]")
     {
         // test handling of unrecognized or unparseable llsd values
         LLSD v;
@@ -960,8 +692,7 @@ namespace tut
             static_cast<S32>(v.size()) + 1);
     }
 
-    template<> template<>
-    void TestLLSDXMLParsingObject::test<3>()
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: html inside maps and arrays is skipped", "[llsd_XML_parsing]")
     {
         // test handling of nested bad data
 
@@ -1041,8 +772,7 @@ namespace tut
             static_cast<S32>(v.size()) + 1);
     }
 
-    template<> template<>
-    void TestLLSDXMLParsingObject::test<4>()
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: base64 binary parses on one line or many", "[llsd_XML_parsing]")
     {
         // test handling of binary object in XML
         std::string xml;
@@ -1078,8 +808,7 @@ namespace tut
             1);
     }
 
-    template<> template<>
-    void TestLLSDXMLParsingObject::test<5>()
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: deeply nested maps parse", "[llsd_XML_parsing]")
     {
         // test deeper nested levels
         LLSD level_5 = LLSD::emptyMap();      level_5["level_5"] = 42.f;
@@ -1114,8 +843,7 @@ namespace tut
     }
 
 
-    template<> template<>
-    void TestLLSDXMLParsingObject::test<6>()
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: empty binary parses as empty Binary not undefined", "[llsd_XML_parsing]")
     {
         // empty binary must parse to an empty LLSD::Binary, not undef
         ensureParse(
@@ -1154,13 +882,414 @@ namespace tut
         TestLLSDNotationParsing() {}
     };
 
-    typedef tut::test_group<TestLLSDNotationParsing> TestLLSDNotationParsingGroup;
-    typedef TestLLSDNotationParsingGroup::object TestLLSDNotationParsingObject;
-    TestLLSDNotationParsingGroup gTestLLSDNotationParsingGroup(
-        "llsd notation parsing");
+    /**
+     * @class TestLLSDBinaryParsing
+     * @brief Concrete instance of a parse tester.
+     */
+    class TestLLSDBinaryParsing : public TestLLSDParsing<LLSDBinaryParser>
+    {
+    public:
+        TestLLSDBinaryParsing() {}
+    };
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<1>()
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: a string parses only with the right size", "[llsd_binary_parsing]")
+    {
+        std::vector<U8> vec;
+        vec.resize(6);
+        vec[0] = 'a'; vec[1] = 'b'; vec[2] = 'c';
+        vec[3] = '3'; vec[4] = '2'; vec[5] = '1';
+        std::string string_expected((char*)&vec[0], vec.size());
+        LLSD value = string_expected;
+
+        vec.resize(11);
+        vec[0] = 's'; // for string
+        vec[5] = 'a'; vec[6] = 'b'; vec[7] = 'c';
+        vec[8] = '3'; vec[9] = '2'; vec[10] = '1';
+
+        uint32_t size = htonl(6);
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        std::string str_good((char*)&vec[0], vec.size());
+        ensureParse("correct string parse", str_good, value, 1);
+
+        size = htonl(7);
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        std::string str_bad_1((char*)&vec[0], vec.size());
+        ensureParse(
+            "incorrect size string parse",
+            str_bad_1,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+
+        size = htonl(100000);
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        std::string str_bad_2((char*)&vec[0], vec.size());
+        ensureParse(
+            "incorrect size string parse",
+            str_bad_2,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+    }
+
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: binary parses only with the right size", "[llsd_binary_parsing]")
+    {
+        std::vector<U8> vec;
+        vec.resize(6);
+        vec[0] = 'a'; vec[1] = 'b'; vec[2] = 'c';
+        vec[3] = '3'; vec[4] = '2'; vec[5] = '1';
+        LLSD value = vec;
+
+        vec.resize(11);
+        vec[0] = 'b';  // for binary
+        vec[5] = 'a'; vec[6] = 'b'; vec[7] = 'c';
+        vec[8] = '3'; vec[9] = '2'; vec[10] = '1';
+
+        uint32_t size = htonl(6);
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        std::string str_good((char*)&vec[0], vec.size());
+        ensureParse("correct binary parse", str_good, value, 1);
+
+        size = htonl(7);
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        std::string str_bad_1((char*)&vec[0], vec.size());
+        ensureParse(
+            "incorrect size binary parse 1",
+            str_bad_1,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+
+        size = htonl(100000);
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        std::string str_bad_2((char*)&vec[0], vec.size());
+        ensureParse(
+            "incorrect size binary parse 2",
+            str_bad_2,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+    }
+
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: malformed input fails to parse", "[llsd_binary_parsing]")
+    {
+        // test handling of xml not recognized as llsd results in an
+        // LLSD Undefined
+        ensureParse(
+            "malformed binary map",
+            "{'ha ha'",
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+        ensureParse(
+            "malformed binary array",
+            "['ha ha'",
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+        ensureParse(
+            "malformed binary string",
+            "'ha ha",
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+        ensureParse(
+            "bad noise",
+            "g48ejlnfr",
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+    }
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: undef parses", "[llsd_binary_parsing]")
+    {
+        ensureParse("valid undef", "!", LLSD(), 1);
+    }
+
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: booleans parse from 0 and 1 only", "[llsd_binary_parsing]")
+    {
+        LLSD val = false;
+        ensureParse("valid boolean false 2", "0", val, 1);
+        val = true;
+        ensureParse("valid boolean true 2", "1", val, 1);
+
+        val.clear();
+        ensureParse("invalid true", "t", val, LLSDParser::PARSE_FAILURE);
+        ensureParse("invalid false", "f", val, LLSDParser::PARSE_FAILURE);
+    }
+
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: a map parses only with the right sizes and terminator", "[llsd_binary_parsing]")
+    {
+        std::vector<U8> vec;
+        vec.push_back('{');
+        vec.resize(vec.size() + 4);
+        uint32_t size = htonl(1);
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        vec.push_back('k');
+        auto key_size_loc = vec.size();
+        size = htonl(1); // 1 too short
+        vec.resize(vec.size() + 4);
+        memcpy(&vec[key_size_loc], &size, sizeof(uint32_t));
+        vec.push_back('a'); vec.push_back('m'); vec.push_back('y');
+        vec.push_back('i');
+        auto integer_loc = vec.size();
+        vec.resize(vec.size() + 4);
+        uint32_t val_int = htonl(23);
+        memcpy(&vec[integer_loc], &val_int, sizeof(uint32_t));
+        std::string str_bad_1((char*)&vec[0], vec.size());
+        ensureParse(
+            "invalid key size",
+            str_bad_1,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+
+        // check with correct size, but unterminated map (missing '}')
+        size = htonl(3); // correct size
+        memcpy(&vec[key_size_loc], &size, sizeof(uint32_t));
+        std::string str_bad_2((char*)&vec[0], vec.size());
+        ensureParse(
+            "valid key size, unterminated map",
+            str_bad_2,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+
+        // check w/ correct size and correct map termination
+        LLSD val;
+        val["amy"] = 23;
+        vec.push_back('}');
+        std::string str_good((char*)&vec[0], vec.size());
+        ensureParse(
+            "valid map",
+            str_good,
+            val,
+            2);
+
+        // check w/ incorrect sizes and correct map termination
+        size = htonl(0); // 1 too few (for the map entry)
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        std::string str_bad_3((char*)&vec[0], vec.size());
+        ensureParse(
+            "invalid map too long",
+            str_bad_3,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+
+        size = htonl(2); // 1 too many
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        std::string str_bad_4((char*)&vec[0], vec.size());
+        ensureParse(
+            "invalid map too short",
+            str_bad_4,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+    }
+
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: an array parses only with the right size and terminator", "[llsd_binary_parsing]")
+    {
+        std::vector<U8> vec;
+        vec.push_back('[');
+        vec.resize(vec.size() + 4);
+        uint32_t size = htonl(1); // 1 too short
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        vec.push_back('"'); vec.push_back('a'); vec.push_back('m');
+        vec.push_back('y'); vec.push_back('"'); vec.push_back('i');
+        auto integer_loc = vec.size();
+        vec.resize(vec.size() + 4);
+        uint32_t val_int = htonl(23);
+        memcpy(&vec[integer_loc], &val_int, sizeof(uint32_t));
+
+        std::string str_bad_1((char*)&vec[0], vec.size());
+        ensureParse(
+            "invalid array size",
+            str_bad_1,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+
+        // check with correct size, but unterminated map (missing ']')
+        size = htonl(2); // correct size
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        std::string str_bad_2((char*)&vec[0], vec.size());
+        ensureParse(
+            "unterminated array",
+            str_bad_2,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+
+        // check w/ correct size and correct map termination
+        LLSD val;
+        val.append("amy");
+        val.append(23);
+        vec.push_back(']');
+        std::string str_good((char*)&vec[0], vec.size());
+        ensureParse(
+            "valid array",
+            str_good,
+            val,
+            3);
+
+        // check with too many elements
+        size = htonl(3); // 1 too long
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        std::string str_bad_3((char*)&vec[0], vec.size());
+        ensureParse(
+            "array too short",
+            str_bad_3,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+    }
+
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: an empty map parses", "[llsd_binary_parsing]")
+    {
+        std::vector<U8> vec;
+        vec.push_back('{');
+        vec.resize(vec.size() + 4);
+        memset(&vec[1], 0, 4);
+        vec.push_back('}');
+        std::string str_good((char*)&vec[0], vec.size());
+        LLSD val = LLSD::emptyMap();
+        ensureParse(
+            "empty map",
+            str_good,
+            val,
+            1);
+    }
+
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: an empty array parses", "[llsd_binary_parsing]")
+    {
+        std::vector<U8> vec;
+        vec.push_back('[');
+        vec.resize(vec.size() + 4);
+        memset(&vec[1], 0, 4);
+        vec.push_back(']');
+        std::string str_good((char*)&vec[0], vec.size());
+        LLSD val = LLSD::emptyArray();
+        ensureParse(
+            "empty array",
+            str_good,
+            val,
+            1);
+    }
+
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: a uri parses only with the right length", "[llsd_binary_parsing]")
+    {
+        std::vector<U8> vec;
+        vec.push_back('l');
+        vec.resize(vec.size() + 4);
+        uint32_t size = htonl(14); // 1 too long
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        vec.push_back('h'); vec.push_back('t'); vec.push_back('t');
+        vec.push_back('p'); vec.push_back(':'); vec.push_back('/');
+        vec.push_back('/'); vec.push_back('s'); vec.push_back('l');
+        vec.push_back('.'); vec.push_back('c'); vec.push_back('o');
+        vec.push_back('m');
+        std::string str_bad((char*)&vec[0], vec.size());
+        ensureParse(
+            "invalid uri length size",
+            str_bad,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+
+        LLSD val;
+        val = LLURI("http://sl.com");
+        size = htonl(13); // correct length
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        std::string str_good((char*)&vec[0], vec.size());
+        ensureParse(
+            "valid key size",
+            str_good,
+            val,
+            1);
+    }
+
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: hostile and negative sizes fail", "[llsd_binary_parsing]")
+    {
+        // hostile size fields must not be trusted
+        std::vector<U8> vec;
+        vec.push_back('[');
+        vec.resize(vec.size() + 4);
+        uint32_t size = htonl(0x7FFFFFFF);
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        vec.push_back('i');
+        auto integer_loc = vec.size();
+        vec.resize(vec.size() + 4);
+        uint32_t val_int = htonl(23);
+        memcpy(&vec[integer_loc], &val_int, sizeof(uint32_t));
+        vec.push_back(']');
+        std::string str_huge((char*)&vec[0], vec.size());
+        ensureParse(
+            "array size lies huge",
+            str_huge,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+
+        // negative (unrepresentable) sizes used to sign-extend into a
+        // multi-gigabyte reserve() request
+        size = htonl(0xFFFFFFFF);
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        std::string str_neg_array((char*)&vec[0], vec.size());
+        ensureParse(
+            "negative array size",
+            str_neg_array,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+
+        vec[0] = '{';
+        vec.back() = '}';
+        std::string str_neg_map((char*)&vec[0], vec.size());
+        ensureParse(
+            "negative map size",
+            str_neg_map,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+
+        std::vector<U8> bin;
+        bin.push_back('b');
+        bin.resize(bin.size() + 4);
+        memcpy(&bin[1], &size, sizeof(uint32_t));
+        std::string str_neg_bin((char*)&bin[0], bin.size());
+        ensureParse(
+            "negative binary size",
+            str_neg_bin,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+    }
+
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: truncated fixed-width payloads fail", "[llsd_binary_parsing]")
+    {
+        // truncated fixed-width payloads must fail, not parse as zero
+        ensureParse(
+            "truncated integer",
+            std::string("i\x00\x01", 3),
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+        ensureParse(
+            "truncated real",
+            std::string("r\x3f\xf0\x00\x00", 5),
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+        ensureParse(
+            "truncated uuid",
+            std::string("u\x01\x02\x03\x04\x05\x06\x07\x08", 9),
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+    }
+
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: a bogus map key marker fails", "[llsd_binary_parsing]")
+    {
+        // a map key must be marked 'k' or quoted; anything else used to be
+        // swallowed silently as an empty key, desynchronizing the stream
+        std::vector<U8> vec;
+        vec.push_back('{');
+        vec.resize(vec.size() + 4);
+        uint32_t size = htonl(1);
+        memcpy(&vec[1], &size, sizeof(uint32_t));
+        vec.push_back('x'); // bogus key marker
+        vec.push_back('i');
+        auto integer_loc = vec.size();
+        vec.resize(vec.size() + 4);
+        uint32_t val_int = htonl(23);
+        memcpy(&vec[integer_loc], &val_int, sizeof(uint32_t));
+        vec.push_back('}');
+        std::string str_bad((char*)&vec[0], vec.size());
+        ensureParse(
+            "bogus map key marker",
+            str_bad,
+            LLSD(),
+            LLSDParser::PARSE_FAILURE);
+    }
+
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: malformed input fails to parse", "[llsd_notation_parsing]")
     {
         // test handling of xml not recognized as llsd results in an
         // LLSD Undefined
@@ -1186,14 +1315,12 @@ namespace tut
             LLSDParser::PARSE_FAILURE);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<2>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: undef parses", "[llsd_notation_parsing]")
     {
         ensureParse("valid undef", "!", LLSD(), 1);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<3>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: booleans parse in every spelling and fail when cut short", "[llsd_notation_parsing]")
     {
         LLSD val = false;
         ensureParse("valid boolean false 0", "false", val, 1);
@@ -1213,8 +1340,7 @@ namespace tut
         ensureParse("invalid false", "FAL", val, LLSDParser::PARSE_FAILURE);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<4>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: integers parse with a sign and fail when malformed", "[llsd_notation_parsing]")
     {
         LLSD val = 123;
         ensureParse("valid integer", "i123", val, 1);
@@ -1229,8 +1355,7 @@ namespace tut
                     "i" + std::string(100, '1'), val, LLSDParser::PARSE_FAILURE);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<5>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: reals parse signed and scientific and infinite", "[llsd_notation_parsing]")
     {
         LLSD val = 456.7;
         ensureParse("valid real", "r456.7", val, 1);
@@ -1252,8 +1377,7 @@ namespace tut
                     "r0." + std::string(600, '3'), val, LLSDParser::PARSE_FAILURE);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<6>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: a uuid parses only when well-formed", "[llsd_notation_parsing]")
     {
         LLUUID id;
         LLSD val = id;
@@ -1269,8 +1393,7 @@ namespace tut
         ensureParse("valid uuid", uuid_str.c_str(), val, 1);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<7>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: strings parse quoted or sized", "[llsd_notation_parsing]")
     {
         LLSD val = std::string("foolish");
         ensureParse("valid string 1", "\"foolish\"", val, 1);
@@ -1282,8 +1405,7 @@ namespace tut
         ensureParse("valid string 4", "s(8)\"whatever\"", val, 1);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<8>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: a sized string with the wrong size fails", "[llsd_notation_parsing]")
     {
         ensureParse(
             "invalid string 1",
@@ -1297,22 +1419,19 @@ namespace tut
             LLSDParser::PARSE_FAILURE);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<9>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: a uri parses", "[llsd_notation_parsing]")
     {
         LLSD val = LLURI("http://www.google.com");
         ensureParse("valid uri", "l\"http://www.google.com\"", val, 1);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<10>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: a date parses", "[llsd_notation_parsing]")
     {
         LLSD val = LLDate("2007-12-28T09:22:53.10Z");
         ensureParse("valid date", "d\"2007-12-28T09:22:53.10Z\"", val, 1);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<11>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: binary parses as b64 or b16 or raw", "[llsd_notation_parsing]")
     {
         std::vector<U8> vec;
         vec.push_back((U8)'a'); vec.push_back((U8)'b'); vec.push_back((U8)'c');
@@ -1323,8 +1442,7 @@ namespace tut
         ensureParse("valid bainry raw", "b(6)\"abc321\"", val, 1);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<12>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: binary with too long a length fails", "[llsd_notation_parsing]")
     {
         ensureParse(
             "invalid -- binary length specified too long",
@@ -1338,8 +1456,7 @@ namespace tut
             LLSDParser::PARSE_FAILURE);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<13>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: maps parse flat and nested", "[llsd_notation_parsing]")
     {
         LLSD val;
         val["amy"] = 23;
@@ -1356,8 +1473,7 @@ namespace tut
             5);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<14>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: arrays parse flat and nested", "[llsd_notation_parsing]")
     {
         LLSD val;
         val.append(23);
@@ -1369,8 +1485,7 @@ namespace tut
         ensureParse("nested array", "[i23,['bicycle'],r1.23]", val, 5);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<15>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: maps and arrays nest in each other", "[llsd_notation_parsing]")
     {
         LLSD val;
         val["amy"] = 23;
@@ -1393,8 +1508,7 @@ namespace tut
             11);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<16>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: a string size past the end of input fails", "[llsd_notation_parsing]")
     {
         // text to make sure that incorrect sizes bail because
         std::string bad_str("s(5)\"hi\"");
@@ -1405,8 +1519,7 @@ namespace tut
             LLSDParser::PARSE_FAILURE);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<17>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: a binary size past the end of input fails", "[llsd_notation_parsing]")
     {
         // text to make sure that incorrect sizes bail because
         std::string bad_bin("b(5)\"hi\"");
@@ -1417,8 +1530,7 @@ namespace tut
             LLSDParser::PARSE_FAILURE);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<18>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: nesting 5 deep parses within a depth limit of 5", "[llsd_notation_parsing]")
     {
         LLSD level_1 = LLSD::emptyMap();        level_1["level_2"] = 99;
         LLSD level_0 = LLSD::emptyMap();        level_0["level_1"] = level_1;
@@ -1437,8 +1549,7 @@ namespace tut
             5); // 4 '{' plus i99 also counts as llsd, so real depth is 5
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<19>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: nesting 12 deep parses within a depth limit of 15", "[llsd_notation_parsing]")
     {
         LLSD level_9 = LLSD::emptyMap();      level_9["level_9"] = (S32)99;
         LLSD level_8 = LLSD::emptyMap();      level_8["level_8"] = level_9;
@@ -1463,8 +1574,7 @@ namespace tut
             15);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<20>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: nesting over 50 deep parses with no depth limit", "[llsd_notation_parsing]")
     {
         LLSD end = LLSD::emptyMap();          end["end"] = (S32)99;
 
@@ -1545,8 +1655,7 @@ namespace tut
             53);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<21>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: nesting past the depth limit fails", "[llsd_notation_parsing]")
     {
         ensureParse(
             "nested notation 10 deep",
@@ -1557,8 +1666,7 @@ namespace tut
             9);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<22>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: b16 that is empty parses and odd or unterminated fails", "[llsd_notation_parsing]")
     {
         // b16 edge cases
         ensureParse("empty b16", "b16\"\"", LLSD(LLSD::Binary()), 1);
@@ -1576,8 +1684,7 @@ namespace tut
             LLSDParser::PARSE_FAILURE);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<23>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: b64 empty or with whitespace parses and invalid or unterminated fails", "[llsd_notation_parsing]")
     {
         // b64 edge cases
         ensureParse("empty b64", "b64\"\"", LLSD(LLSD::Binary()), 1);
@@ -1600,8 +1707,7 @@ namespace tut
             LLSDParser::PARSE_FAILURE);
     }
 
-    template<> template<>
-    void TestLLSDNotationParsingObject::test<24>()
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: negative raw sizes fail", "[llsd_notation_parsing]")
     {
         // negative sizes must not be fed to resize()
         ensureParse(
@@ -1616,429 +1722,261 @@ namespace tut
             LLSDParser::PARSE_FAILURE);
     }
 
-    /**
-     * @class TestLLSDBinaryParsing
-     * @brief Concrete instance of a parse tester.
-     */
-    class TestLLSDBinaryParsing : public TestLLSDParsing<LLSDBinaryParser>
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: pretty binary notation round-trips", "[llsd_serialization]")
     {
-    public:
-        TestLLSDBinaryParsing() {}
+        setFormatterParser(new LLSDNotationFormatter(false, "", LLSDFormatter::OPTIONS_PRETTY_BINARY),
+                           new LLSDNotationParser());
+        doRoundTripTests("pretty binary notation serialization");
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: raw binary notation round-trips", "[llsd_serialization]")
+    {
+        setFormatterParser(new LLSDNotationFormatter(false, "", LLSDFormatter::OPTIONS_NONE),
+                           new LLSDNotationParser());
+        doRoundTripTests("raw binary notation serialization");
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: xml round-trips", "[llsd_serialization]")
+    {
+        setFormatterParser(new LLSDXMLFormatter(), new LLSDXMLParser());
+        doRoundTripTests("xml serialization");
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: binary round-trips", "[llsd_serialization]")
+    {
+        setFormatterParser(new LLSDBinaryFormatter(), new LLSDBinaryParser());
+        doRoundTripTests("binary serialization");
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: serialize(LLSD_BINARY) round-trips through deserialize", "[llsd_serialization]")
+    {
+        mFormatter = [](const LLSD& sd, std::ostream& str)
+        {
+            LLSDSerialize::serialize(sd, str, LLSDSerialize::LLSD_BINARY);
+        };
+        setParser(LLSDSerialize::deserialize);
+        doRoundTripTests("serialize(LLSD_BINARY)");
     };
 
-    typedef tut::test_group<TestLLSDBinaryParsing> TestLLSDBinaryParsingGroup;
-    typedef TestLLSDBinaryParsingGroup::object TestLLSDBinaryParsingObject;
-    TestLLSDBinaryParsingGroup gTestLLSDBinaryParsingGroup(
-        "llsd binary parsing");
-
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<1>()
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: serialize(LLSD_XML) round-trips through deserialize", "[llsd_serialization]")
     {
-        std::vector<U8> vec;
-        vec.resize(6);
-        vec[0] = 'a'; vec[1] = 'b'; vec[2] = 'c';
-        vec[3] = '3'; vec[4] = '2'; vec[5] = '1';
-        std::string string_expected((char*)&vec[0], vec.size());
-        LLSD value = string_expected;
+        mFormatter = [](const LLSD& sd, std::ostream& str)
+        {
+            LLSDSerialize::serialize(sd, str, LLSDSerialize::LLSD_XML);
+        };
+        setParser(LLSDSerialize::deserialize);
+        doRoundTripTests("serialize(LLSD_XML)");
+    };
 
-        vec.resize(11);
-        vec[0] = 's'; // for string
-        vec[5] = 'a'; vec[6] = 'b'; vec[7] = 'c';
-        vec[8] = '3'; vec[9] = '2'; vec[10] = '1';
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: serialize(LLSD_NOTATION) round-trips through deserialize", "[llsd_serialization]")
+    {
+        mFormatter = [](const LLSD& sd, std::ostream& str)
+        {
+            LLSDSerialize::serialize(sd, str, LLSDSerialize::LLSD_NOTATION);
+        };
+        setParser(LLSDSerialize::deserialize);
+        // In this test, serialize(LLSD_NOTATION) emits a header recognized by
+        // deserialize().
+        doRoundTripTests("serialize(LLSD_NOTATION)");
+    };
 
-        uint32_t size = htonl(6);
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        std::string str_good((char*)&vec[0], vec.size());
-        ensureParse("correct string parse", str_good, value, 1);
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: LLSDNotationFormatter output without a header deserializes", "[llsd_serialization]")
+    {
+        setFormatterParser(new LLSDNotationFormatter(false, "", LLSDFormatter::OPTIONS_NONE),
+                           new LLSDNotationParser());
+        setParser(LLSDSerialize::deserialize);
+        // This is an interesting test because LLSDNotationFormatter does not
+        // emit an llsd/notation header.
+        doRoundTripTests("LLSDNotationFormatter -> deserialize");
+    };
 
-        size = htonl(7);
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        std::string str_bad_1((char*)&vec[0], vec.size());
-        ensureParse(
-            "incorrect size string parse",
-            str_bad_1,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: LLSDXMLFormatter output without a header deserializes", "[llsd_serialization]")
+    {
+        setFormatterParser(new LLSDXMLFormatter(false, "", LLSDFormatter::OPTIONS_NONE),
+                           new LLSDXMLParser());
+        setParser(LLSDSerialize::deserialize);
+        // This is an interesting test because LLSDXMLFormatter does not
+        // emit an LLSD/XML header.
+        doRoundTripTests("LLSDXMLFormatter -> deserialize");
+    };
 
-        size = htonl(100000);
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        std::string str_bad_2((char*)&vec[0], vec.size());
-        ensureParse(
-            "incorrect size string parse",
-            str_bad_2,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: deserialize with SIZE_UNLIMITED reads every format", "[llsd_serialization]")
+    {
+        // deserialize() with SIZE_UNLIMITED must not turn the unlimited
+        // byte budget into a bogus negative one when a header line is
+        // present; sized payloads (binary strings) used to fail the
+        // resulting negative budget check.
+        LLSD sd;
+        sd["foo"] = "bar";
+        sd["bin"] = LLSD::Binary{1, 2, 3};
+
+        for (auto fmt : {LLSDSerialize::LLSD_BINARY,
+                         LLSDSerialize::LLSD_XML,
+                         LLSDSerialize::LLSD_NOTATION})
+        {
+            std::stringstream stream;
+            LLSDSerialize::serialize(sd, stream, fmt);
+            LLSD parsed;
+            UNSCOPED_INFO((STRINGIZE("deserialize unlimited fmt " << int(fmt))));
+            REQUIRE(LLSDSerialize::deserialize(parsed, stream, LLSDSerialize::SIZE_UNLIMITED));
+            UNSCOPED_INFO((STRINGIZE("deserialize unlimited fmt " << int(fmt) << " value")));
+            REQUIRE_THAT(parsed, ll_test::LLSDEquals(sd));
+        }
     }
 
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<2>()
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: strip_deprecated_header skips a header with or without a newline", "[llsd_serialization]")
     {
-        std::vector<U8> vec;
-        vec.resize(6);
-        vec[0] = 'a'; vec[1] = 'b'; vec[2] = 'c';
-        vec[3] = '3'; vec[4] = '2'; vec[5] = '1';
-        LLSD value = vec;
+        // strip_deprecated_header() must consume the newline following the
+        // header (the binary parser does not tolerate leading whitespace)
+        // and report the actual number of bytes skipped.
+        LLSD sd;
+        sd["int"] = 17;
+        sd["str"] = "hello";
 
-        vec.resize(11);
-        vec[0] = 'b';  // for binary
-        vec[5] = 'a'; vec[6] = 'b'; vec[7] = 'c';
-        vec[8] = '3'; vec[9] = '2'; vec[10] = '1';
+        std::stringstream binstream;
+        LLSDSerialize::toBinary(sd, binstream);
+        const std::string body = binstream.str();
 
-        uint32_t size = htonl(6);
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        std::string str_good((char*)&vec[0], vec.size());
-        ensureParse("correct binary parse", str_good, value, 1);
+        // header with trailing newline, as LLSDSerialize::serialize() writes it
+        {
+            std::string payload = "<? LLSD/Binary ?>\n" + body;
+            std::vector<char> buf(payload.begin(), payload.end());
+            llssize cur_size = (llssize)buf.size();
+            llssize header_size = 0;
+            char* p = strip_deprecated_header(buf.data(), cur_size, &header_size);
+            UNSCOPED_INFO("stripped header+newline");
+            CHECK(header_size == llssize(18));
+            UNSCOPED_INFO("stripped size");
+            REQUIRE(cur_size == llssize(body.size()));
+            LLMemoryStream mstr((U8*)p, (S32)cur_size);
+            LLSD parsed;
+            UNSCOPED_INFO("parse after strip");
+            CHECK(LLSDSerialize::fromBinary(parsed, mstr, cur_size) > 0);
+            UNSCOPED_INFO("value after strip");
+            CHECK_THAT(parsed, ll_test::LLSDEquals(sd));
+        }
 
-        size = htonl(7);
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        std::string str_bad_1((char*)&vec[0], vec.size());
-        ensureParse(
-            "incorrect size binary parse 1",
-            str_bad_1,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-
-        size = htonl(100000);
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        std::string str_bad_2((char*)&vec[0], vec.size());
-        ensureParse(
-            "incorrect size binary parse 2",
-            str_bad_2,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
+        // bare header with no newline
+        {
+            std::string payload = "<? LLSD/Binary ?>" + body;
+            std::vector<char> buf(payload.begin(), payload.end());
+            llssize cur_size = (llssize)buf.size();
+            llssize header_size = 0;
+            char* p = strip_deprecated_header(buf.data(), cur_size, &header_size);
+            UNSCOPED_INFO("stripped bare header");
+            CHECK(header_size == llssize(17));
+            UNSCOPED_INFO("stripped bare size");
+            REQUIRE(cur_size == llssize(body.size()));
+            LLMemoryStream mstr((U8*)p, (S32)cur_size);
+            LLSD parsed;
+            UNSCOPED_INFO("parse after bare strip");
+            CHECK(LLSDSerialize::fromBinary(parsed, mstr, cur_size) > 0);
+            UNSCOPED_INFO("value after bare strip");
+            CHECK_THAT(parsed, ll_test::LLSDEquals(sd));
+        }
     }
 
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<3>()
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: zip_llsd round-trips and unzip_llsd rejects corruption", "[llsd_serialization]")
     {
-        // test handling of xml not recognized as llsd results in an
-        // LLSD Undefined
-        ensureParse(
-            "malformed binary map",
-            "{'ha ha'",
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-        ensureParse(
-            "malformed binary array",
-            "['ha ha'",
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-        ensureParse(
-            "malformed binary string",
-            "'ha ha",
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-        ensureParse(
-            "bad noise",
-            "g48ejlnfr",
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-    }
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<4>()
-    {
-        ensureParse("valid undef", "!", LLSD(), 1);
-    }
+        // zip_llsd/unzip_llsd round trip, and clean rejection of a
+        // corrupted compressed stream
+        LLSD sd;
+        sd["message"] = "destination unknown";
+        sd["mode"] = 7;
+        LLSD arr = LLSD::emptyArray();
+        for (S32 i = 0; i < 256; ++i)
+        {
+            arr.append(i * 0.25);
+        }
+        sd["samples"] = arr;
 
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<5>()
-    {
-        LLSD val = false;
-        ensureParse("valid boolean false 2", "0", val, 1);
-        val = true;
-        ensureParse("valid boolean true 2", "1", val, 1);
+        std::string compressed = zip_llsd(sd);
+        UNSCOPED_INFO("zip_llsd produced data");
+        REQUIRE_FALSE(compressed.empty());
 
-        val.clear();
-        ensureParse("invalid true", "t", val, LLSDParser::PARSE_FAILURE);
-        ensureParse("invalid false", "f", val, LLSDParser::PARSE_FAILURE);
+        LLSD out;
+        UNSCOPED_INFO("unzip_llsd ok");
+        REQUIRE(LLUZipHelper::unzip_llsd(out,
+                                               (const U8*)compressed.data(),
+                                               (S32)compressed.size()) ==
+                      LLUZipHelper::ZR_OK);
+        UNSCOPED_INFO("unzip_llsd round trip");
+        CHECK_THAT(out, ll_test::LLSDEquals(sd));
+
+        std::string corrupt(compressed);
+        for (size_t i = corrupt.size() / 2; i < corrupt.size(); ++i)
+        {
+            corrupt[i] ^= 0x5A;
+        }
+        LLSD out2;
+        UNSCOPED_INFO("corrupt unzip_llsd rejected");
+        REQUIRE(LLUZipHelper::unzip_llsd(out2,
+                                        (const U8*)corrupt.data(),
+                                        (S32)corrupt.size()) != LLUZipHelper::ZR_OK);
     }
 
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<6>()
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: unzip_llsdNavMesh round-trips and rejects corruption", "[llsd_serialization]")
     {
-        std::vector<U8> vec;
-        vec.push_back('{');
-        vec.resize(vec.size() + 4);
-        uint32_t size = htonl(1);
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        vec.push_back('k');
-        auto key_size_loc = vec.size();
-        size = htonl(1); // 1 too short
-        vec.resize(vec.size() + 4);
-        memcpy(&vec[key_size_loc], &size, sizeof(uint32_t));
-        vec.push_back('a'); vec.push_back('m'); vec.push_back('y');
-        vec.push_back('i');
-        auto integer_loc = vec.size();
-        vec.resize(vec.size() + 4);
-        uint32_t val_int = htonl(23);
-        memcpy(&vec[integer_loc], &val_int, sizeof(uint32_t));
-        std::string str_bad_1((char*)&vec[0], vec.size());
-        ensureParse(
-            "invalid key size",
-            str_bad_1,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
+        // unzip_llsdNavMesh: gzip round trip, and clean failure on a
+        // corrupted stream after partial output has been produced (this
+        // path used to realloc a freed buffer and double-free on error)
+        std::string payload;
+        payload.reserve(96 * 1024);
+        while (payload.size() < 96 * 1024)
+        {
+            payload += "navmesh payload block ";
+        }
 
-        // check with correct size, but unterminated map (missing '}')
-        size = htonl(3); // correct size
-        memcpy(&vec[key_size_loc], &size, sizeof(uint32_t));
-        std::string str_bad_2((char*)&vec[0], vec.size());
-        ensureParse(
-            "valid key size, unterminated map",
-            str_bad_2,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
+        z_stream strm{};
+        int ret = deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
+                               15 + 16, // gzip wrapper
+                               8, Z_DEFAULT_STRATEGY);
+        UNSCOPED_INFO("deflateInit2");
+        CHECK(ret == Z_OK);
+        std::string compressed(deflateBound(&strm, (uLong)payload.size()) + 32, '\0');
+        strm.next_in = (Bytef*)payload.data();
+        strm.avail_in = (uInt)payload.size();
+        strm.next_out = (Bytef*)&compressed[0];
+        strm.avail_out = (uInt)compressed.size();
+        ret = deflate(&strm, Z_FINISH);
+        UNSCOPED_INFO("deflate finish");
+        CHECK(ret == Z_STREAM_END);
+        compressed.resize(compressed.size() - strm.avail_out);
+        deflateEnd(&strm);
 
-        // check w/ correct size and correct map termination
-        LLSD val;
-        val["amy"] = 23;
-        vec.push_back('}');
-        std::string str_good((char*)&vec[0], vec.size());
-        ensureParse(
-            "valid map",
-            str_good,
-            val,
-            2);
+        {
+            std::istringstream in(compressed);
+            bool valid = false;
+            size_t outsize = 0;
+            U8* out = unzip_llsdNavMesh(valid, outsize, in, (S32)compressed.size());
+            UNSCOPED_INFO("navmesh unzip valid");
+            CHECK(valid);
+            UNSCOPED_INFO("navmesh unzip buffer");
+            REQUIRE(out != NULL);
+            UNSCOPED_INFO("navmesh unzip size");
+            REQUIRE(outsize == payload.size());
+            UNSCOPED_INFO("navmesh unzip content");
+            REQUIRE(payload.compare(0, payload.size(),
+                                   (const char*)out, outsize) == 0);
+            free(out);
+        }
 
-        // check w/ incorrect sizes and correct map termination
-        size = htonl(0); // 1 too few (for the map entry)
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        std::string str_bad_3((char*)&vec[0], vec.size());
-        ensureParse(
-            "invalid map too long",
-            str_bad_3,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-
-        size = htonl(2); // 1 too many
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        std::string str_bad_4((char*)&vec[0], vec.size());
-        ensureParse(
-            "invalid map too short",
-            str_bad_4,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-    }
-
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<7>()
-    {
-        std::vector<U8> vec;
-        vec.push_back('[');
-        vec.resize(vec.size() + 4);
-        uint32_t size = htonl(1); // 1 too short
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        vec.push_back('"'); vec.push_back('a'); vec.push_back('m');
-        vec.push_back('y'); vec.push_back('"'); vec.push_back('i');
-        auto integer_loc = vec.size();
-        vec.resize(vec.size() + 4);
-        uint32_t val_int = htonl(23);
-        memcpy(&vec[integer_loc], &val_int, sizeof(uint32_t));
-
-        std::string str_bad_1((char*)&vec[0], vec.size());
-        ensureParse(
-            "invalid array size",
-            str_bad_1,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-
-        // check with correct size, but unterminated map (missing ']')
-        size = htonl(2); // correct size
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        std::string str_bad_2((char*)&vec[0], vec.size());
-        ensureParse(
-            "unterminated array",
-            str_bad_2,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-
-        // check w/ correct size and correct map termination
-        LLSD val;
-        val.append("amy");
-        val.append(23);
-        vec.push_back(']');
-        std::string str_good((char*)&vec[0], vec.size());
-        ensureParse(
-            "valid array",
-            str_good,
-            val,
-            3);
-
-        // check with too many elements
-        size = htonl(3); // 1 too long
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        std::string str_bad_3((char*)&vec[0], vec.size());
-        ensureParse(
-            "array too short",
-            str_bad_3,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-    }
-
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<8>()
-    {
-        std::vector<U8> vec;
-        vec.push_back('{');
-        vec.resize(vec.size() + 4);
-        memset(&vec[1], 0, 4);
-        vec.push_back('}');
-        std::string str_good((char*)&vec[0], vec.size());
-        LLSD val = LLSD::emptyMap();
-        ensureParse(
-            "empty map",
-            str_good,
-            val,
-            1);
-    }
-
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<9>()
-    {
-        std::vector<U8> vec;
-        vec.push_back('[');
-        vec.resize(vec.size() + 4);
-        memset(&vec[1], 0, 4);
-        vec.push_back(']');
-        std::string str_good((char*)&vec[0], vec.size());
-        LLSD val = LLSD::emptyArray();
-        ensureParse(
-            "empty array",
-            str_good,
-            val,
-            1);
-    }
-
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<10>()
-    {
-        std::vector<U8> vec;
-        vec.push_back('l');
-        vec.resize(vec.size() + 4);
-        uint32_t size = htonl(14); // 1 too long
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        vec.push_back('h'); vec.push_back('t'); vec.push_back('t');
-        vec.push_back('p'); vec.push_back(':'); vec.push_back('/');
-        vec.push_back('/'); vec.push_back('s'); vec.push_back('l');
-        vec.push_back('.'); vec.push_back('c'); vec.push_back('o');
-        vec.push_back('m');
-        std::string str_bad((char*)&vec[0], vec.size());
-        ensureParse(
-            "invalid uri length size",
-            str_bad,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-
-        LLSD val;
-        val = LLURI("http://sl.com");
-        size = htonl(13); // correct length
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        std::string str_good((char*)&vec[0], vec.size());
-        ensureParse(
-            "valid key size",
-            str_good,
-            val,
-            1);
-    }
-
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<11>()
-    {
-        // hostile size fields must not be trusted
-        std::vector<U8> vec;
-        vec.push_back('[');
-        vec.resize(vec.size() + 4);
-        uint32_t size = htonl(0x7FFFFFFF);
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        vec.push_back('i');
-        auto integer_loc = vec.size();
-        vec.resize(vec.size() + 4);
-        uint32_t val_int = htonl(23);
-        memcpy(&vec[integer_loc], &val_int, sizeof(uint32_t));
-        vec.push_back(']');
-        std::string str_huge((char*)&vec[0], vec.size());
-        ensureParse(
-            "array size lies huge",
-            str_huge,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-
-        // negative (unrepresentable) sizes used to sign-extend into a
-        // multi-gigabyte reserve() request
-        size = htonl(0xFFFFFFFF);
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        std::string str_neg_array((char*)&vec[0], vec.size());
-        ensureParse(
-            "negative array size",
-            str_neg_array,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-
-        vec[0] = '{';
-        vec.back() = '}';
-        std::string str_neg_map((char*)&vec[0], vec.size());
-        ensureParse(
-            "negative map size",
-            str_neg_map,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-
-        std::vector<U8> bin;
-        bin.push_back('b');
-        bin.resize(bin.size() + 4);
-        memcpy(&bin[1], &size, sizeof(uint32_t));
-        std::string str_neg_bin((char*)&bin[0], bin.size());
-        ensureParse(
-            "negative binary size",
-            str_neg_bin,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-    }
-
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<12>()
-    {
-        // truncated fixed-width payloads must fail, not parse as zero
-        ensureParse(
-            "truncated integer",
-            std::string("i\x00\x01", 3),
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-        ensureParse(
-            "truncated real",
-            std::string("r\x3f\xf0\x00\x00", 5),
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-        ensureParse(
-            "truncated uuid",
-            std::string("u\x01\x02\x03\x04\x05\x06\x07\x08", 9),
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
-    }
-
-    template<> template<>
-    void TestLLSDBinaryParsingObject::test<13>()
-    {
-        // a map key must be marked 'k' or quoted; anything else used to be
-        // swallowed silently as an empty key, desynchronizing the stream
-        std::vector<U8> vec;
-        vec.push_back('{');
-        vec.resize(vec.size() + 4);
-        uint32_t size = htonl(1);
-        memcpy(&vec[1], &size, sizeof(uint32_t));
-        vec.push_back('x'); // bogus key marker
-        vec.push_back('i');
-        auto integer_loc = vec.size();
-        vec.resize(vec.size() + 4);
-        uint32_t val_int = htonl(23);
-        memcpy(&vec[integer_loc], &val_int, sizeof(uint32_t));
-        vec.push_back('}');
-        std::string str_bad((char*)&vec[0], vec.size());
-        ensureParse(
-            "bogus map key marker",
-            str_bad,
-            LLSD(),
-            LLSDParser::PARSE_FAILURE);
+        {
+            // corrupt the deflate tail and gzip trailer
+            std::string corrupt(compressed);
+            for (size_t i = corrupt.size() - 16; i < corrupt.size(); ++i)
+            {
+                corrupt[i] ^= 0x5A;
+            }
+            std::istringstream in(corrupt);
+            bool valid = true;
+            size_t outsize = 0;
+            U8* out = unzip_llsdNavMesh(valid, outsize, in, (S32)corrupt.size());
+            UNSCOPED_INFO("corrupt navmesh rejected");
+            CHECK_FALSE(valid);
+            UNSCOPED_INFO("corrupt navmesh returns null");
+            REQUIRE(out == NULL);
+        }
     }
 
    /**
@@ -2062,31 +2000,27 @@ namespace tut
                 actual_value_bin,
                 str1,
                 LLSDSerialize::SIZE_UNLIMITED);
-            ensure_equals(
-                "ensureBinaryAndNotation binary count",
-                count2,
+            UNSCOPED_INFO("ensureBinaryAndNotation binary count");
+            REQUIRE(count2 ==
                 count1);
 
             // to notation and back again
             std::stringstream str2;
             S32 count3 = LLSDSerialize::toNotation(actual_value_bin, str2);
-            ensure_equals(
-                "ensureBinaryAndNotation notation count1",
-                count3,
+            UNSCOPED_INFO("ensureBinaryAndNotation notation count1");
+            REQUIRE(count3 ==
                 count2);
             LLSD actual_value_notation;
             S32 count4 = LLSDSerialize::fromNotation(
                 actual_value_notation,
                 str2,
                 LLSDSerialize::SIZE_UNLIMITED);
-            ensure_equals(
-                "ensureBinaryAndNotation notation count2",
-                count4,
+            UNSCOPED_INFO("ensureBinaryAndNotation notation count2");
+            REQUIRE(count4 ==
                 count3);
-            ensure_equals(
-                (msg + " (binaryandnotation)").c_str(),
-                actual_value_notation,
-                input);
+            UNSCOPED_INFO((msg + " (binaryandnotation)").c_str());
+            REQUIRE_THAT(actual_value_notation,
+                ll_test::LLSDEquals(input));
         }
 
         void ensureBinaryAndXML(
@@ -2101,35 +2035,27 @@ namespace tut
                 actual_value_bin,
                 str1,
                 LLSDSerialize::SIZE_UNLIMITED);
-            ensure_equals(
-                "ensureBinaryAndXML binary count",
-                count2,
+            UNSCOPED_INFO("ensureBinaryAndXML binary count");
+            REQUIRE(count2 ==
                 count1);
 
             // to xml and back again
             std::stringstream str2;
             S32 count3 = LLSDSerialize::toXML(actual_value_bin, str2);
-            ensure_equals(
-                "ensureBinaryAndXML xml count1",
-                count3,
+            UNSCOPED_INFO("ensureBinaryAndXML xml count1");
+            REQUIRE(count3 ==
                 count2);
             LLSD actual_value_xml;
             S32 count4 = LLSDSerialize::fromXML(actual_value_xml, str2);
-            ensure_equals(
-                "ensureBinaryAndXML xml count2",
-                count4,
+            UNSCOPED_INFO("ensureBinaryAndXML xml count2");
+            REQUIRE(count4 ==
                 count3);
-            ensure_equals((msg + " (binaryandxml)").c_str(), actual_value_xml, input);
+            UNSCOPED_INFO((msg + " (binaryandxml)").c_str());
+            REQUIRE_THAT(actual_value_xml, ll_test::LLSDEquals(input));
         }
     };
 
-    typedef tut::test_group<TestLLSDCrossCompatible> TestLLSDCompatibleGroup;
-    typedef TestLLSDCompatibleGroup::object TestLLSDCompatibleObject;
-    TestLLSDCompatibleGroup gTestLLSDCompatibleGroup(
-        "llsd serialize compatible");
-
-    template<> template<>
-    void TestLLSDCompatibleObject::test<1>()
+    TEST_CASE_METHOD(TestLLSDCrossCompatible, "llsd serialize compatible: scalars round-trip via binary into notation and XML", "[llsd_serialize_compatible]")
     {
         LLSD test;
         ensureBinaryAndNotation("undef", test);
@@ -2160,8 +2086,7 @@ namespace tut
         ensureBinaryAndXML("real negative", test);
     }
 
-    template<> template<>
-    void TestLLSDCompatibleObject::test<2>()
+    TEST_CASE_METHOD(TestLLSDCrossCompatible, "llsd serialize compatible: a string round-trips via binary into notation and XML", "[llsd_serialize_compatible]")
     {
         LLSD test;
         test = "foobar";
@@ -2169,8 +2094,7 @@ namespace tut
         ensureBinaryAndXML("string", test);
     }
 
-    template<> template<>
-    void TestLLSDCompatibleObject::test<3>()
+    TEST_CASE_METHOD(TestLLSDCrossCompatible, "llsd serialize compatible: a uuid round-trips via binary into notation and XML", "[llsd_serialize_compatible]")
     {
         LLSD test;
         LLUUID id;
@@ -2180,8 +2104,7 @@ namespace tut
         ensureBinaryAndXML("uuid", test);
     }
 
-    template<> template<>
-    void TestLLSDCompatibleObject::test<4>()
+    TEST_CASE_METHOD(TestLLSDCrossCompatible, "llsd serialize compatible: a date round-trips via binary into notation and XML", "[llsd_serialize_compatible]")
     {
         LLSD test;
         test = LLDate(12345.0);
@@ -2189,8 +2112,7 @@ namespace tut
         ensureBinaryAndXML("date", test);
     }
 
-    template<> template<>
-    void TestLLSDCompatibleObject::test<5>()
+    TEST_CASE_METHOD(TestLLSDCrossCompatible, "llsd serialize compatible: a uri round-trips via binary into notation and XML", "[llsd_serialize_compatible]")
     {
         LLSD test;
         test = LLURI("http://www.secondlife.com/");
@@ -2198,8 +2120,7 @@ namespace tut
         ensureBinaryAndXML("uri", test);
     }
 
-    template<> template<>
-    void TestLLSDCompatibleObject::test<6>()
+    TEST_CASE_METHOD(TestLLSDCrossCompatible, "llsd serialize compatible: random binary round-trips via binary into notation and XML", "[llsd_serialize_compatible]")
     {
         LLSD test;
         typedef std::vector<U8> buf_t;
@@ -2218,8 +2139,7 @@ namespace tut
         ensureBinaryAndXML("binary", test);
     }
 
-    template<> template<>
-    void TestLLSDCompatibleObject::test<7>()
+    TEST_CASE_METHOD(TestLLSDCrossCompatible, "llsd serialize compatible: an array round-trips via binary into notation and XML", "[llsd_serialize_compatible]")
     {
         LLSD test;
         test = LLSD::emptyArray();
@@ -2229,8 +2149,7 @@ namespace tut
         ensureBinaryAndXML("array", test);
     }
 
-    template<> template<>
-    void TestLLSDCompatibleObject::test<8>()
+    TEST_CASE_METHOD(TestLLSDCrossCompatible, "llsd serialize compatible: a map round-trips via binary into notation and XML", "[llsd_serialize_compatible]")
     {
         LLSD test;
         test = LLSD::emptyArray();

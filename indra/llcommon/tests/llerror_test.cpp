@@ -35,7 +35,8 @@
 #include "../llerrorcontrol.h"
 #include "../llsd.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 namespace
 {
@@ -129,7 +130,8 @@ namespace tut
                 std::ostringstream test_name;
                 test_name << "testing message " << n << ", not enough messages";
 
-                tut::ensure(test_name.str(), n < countMessages());
+                UNSCOPED_INFO(test_name.str());
+                REQUIRE(n < countMessages());
                 return mMessages[n];
             }
 
@@ -188,14 +190,16 @@ namespace tut
 
         void ensure_message_count(int expectedCount)
         {
-            ensure_equals("message count", countMessages(), expectedCount);
+            UNSCOPED_INFO("message count");
+            REQUIRE(countMessages() == expectedCount);
         }
 
         std::string message_field(int msgnum, LogFieldIndex fieldnum)
         {
             std::ostringstream test_name;
             test_name << "testing message " << msgnum << ", not enough messages";
-            tut::ensure(test_name.str(), msgnum < countMessages());
+            UNSCOPED_INFO(test_name.str());
+            REQUIRE(msgnum < countMessages());
 
             std::string msg(message(msgnum));
 
@@ -247,7 +251,8 @@ namespace tut
              std::ostringstream test_name;
              test_name << "testing message " << msgnum << " field " << FieldName[fieldnum] << "\n  message: \"" << message(msgnum) << "\"\n  ";
 
-             ensure_equals(test_name.str(), message_field(msgnum, fieldnum), expectedText);
+             UNSCOPED_INFO(test_name.str());
+             REQUIRE(message_field(msgnum, fieldnum) == expectedText);
          }
 
         void ensure_message_does_not_contain(int n, const std::string& expectedText)
@@ -255,17 +260,12 @@ namespace tut
             std::ostringstream test_name;
             test_name << "testing message " << n;
 
-            ensure_does_not_contain(test_name.str(), message(n), expectedText);
+            UNSCOPED_INFO(test_name.str());
+            REQUIRE_THAT(message(n), !Catch::Matchers::ContainsSubstring(expectedText));
         }
     };
 
-    typedef test_group<ErrorTestData>   ErrorTestGroup;
-    typedef ErrorTestGroup::object      ErrorTestObject;
-
-    ErrorTestGroup errorTestGroup("error");
-
-    template<> template<>
-    void ErrorTestObject::test<1>()
+    TEST_CASE_METHOD(ErrorTestData, "error: messages reach the recorder in order", "[error]")
         // basic test of output
     {
         LL_INFOS() << "test" << LL_ENDL;
@@ -289,12 +289,11 @@ namespace
 
 namespace tut
 {
-    template<> template<>
-    void ErrorTestObject::test<2>()
+    TEST_CASE_METHOD(ErrorTestData, "error: the default level filters messages", "[error]")
         // messages are filtered based on default level
     {
 #ifdef LL_DISABLE_DEBUG_LOGGING
-        skip("Debug messages disabled");
+        SKIP("Debug messages disabled");
 #endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         writeSome();
@@ -335,12 +334,11 @@ namespace tut
         ensure_message_count(10);
     }
 
-    template<> template<>
-    void ErrorTestObject::test<3>()
+    TEST_CASE_METHOD(ErrorTestData, "error: the output names the level of each message", "[error]")
         // error type string in output
     {
 #ifdef LL_DISABLE_DEBUG_LOGGING
-        skip("Debug messages disabled");
+        SKIP("Debug messages disabled");
 #endif
         writeSome();
         ensure_message_field_equals(0, LEVEL_FIELD, "DEBUG");
@@ -350,8 +348,7 @@ namespace tut
         ensure_message_count(4);
     }
 
-    template<> template<>
-    void ErrorTestObject::test<4>()
+    TEST_CASE_METHOD(ErrorTestData, "error: abbreviateFile strips the source root and leaves other paths", "[error]")
         // file abbreviation
     {
         std::string prev, abbreviateFile = __FILE__;
@@ -370,12 +367,11 @@ namespace tut
             // argument unchanged, THEN check.
         } while (abbreviateFile != prev);
 
-        ensure_ends_with("file name abbreviation",
-            abbreviateFile,
-            "llcommon/tests/llerror_test.cpp"
-            );
-        ensure_does_not_contain("file name abbreviation",
-            abbreviateFile, "indra");
+        UNSCOPED_INFO("file name abbreviation");
+        CHECK_THAT(abbreviateFile,
+            Catch::Matchers::EndsWith("llcommon/tests/llerror_test.cpp"));
+        UNSCOPED_INFO("file name abbreviation");
+        CHECK_THAT(abbreviateFile, !Catch::Matchers::ContainsSubstring("indra"));
 
         std::string someFile =
 #if LL_WINDOWS
@@ -386,8 +382,8 @@ namespace tut
             ;
         std::string someAbbreviation = LLError::abbreviateFile(someFile);
 
-        ensure_equals("non-indra file abbreviation",
-            someAbbreviation, someFile);
+        UNSCOPED_INFO("non-indra file abbreviation");
+        CHECK(someAbbreviation == someFile);
     }
 }
 
@@ -505,7 +501,7 @@ namespace
             std::stringstream ss;
             ss << message << ": " << "expected to find a copy of '" << expected
                << "' in actual '" << actual << "'";
-            throw tut::failure(ss.str().c_str());
+            FAIL(ss.str().c_str());
         }
     }
 
@@ -551,12 +547,11 @@ namespace
 
 namespace tut
 {
-    template<> template<>
-    void ErrorTestObject::test<5>()
+    TEST_CASE_METHOD(ErrorTestData, "error: multiline output leaves backslashes and line breaks unescaped", "[error]")
         // backslash, return, and newline are not escaped with backslashes
     {
 #ifdef LL_DISABLE_DEBUG_LOGGING
-        skip("Debug messages disabled");
+        SKIP("Debug messages disabled");
 #endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         setWantsMultiline(true);
@@ -573,9 +568,8 @@ namespace tut
 
 namespace tut
 {
-    template<> template<>
-        //  class/function information in output
-    void ErrorTestObject::test<6>()
+    //  class/function information in output
+    TEST_CASE_METHOD(ErrorTestData, "error: messages name the function and class they came from", "[error]")
     {
         testLogName(mRecorder, logFromGlobal);
         testLogName(mRecorder, logFromStatic);
@@ -623,9 +617,8 @@ namespace
 
 namespace tut
 {
-    template<> template<>
-        // handle nested logging
-    void ErrorTestObject::test<7>()
+    // handle nested logging
+    TEST_CASE_METHOD(ErrorTestData, "error: logging while building a message logs both", "[error]")
     {
         outerLogger();
         ensure_message_field_equals(0, MSG_FIELD, "inside");
@@ -638,9 +631,8 @@ namespace tut
         ensure_message_count(4);
     }
 
-    template<> template<>
-        // special handling of LL_ERRS() calls
-    void ErrorTestObject::test<8>()
+    // special handling of LL_ERRS() calls
+    TEST_CASE_METHOD(ErrorTestData, "error: LL_ERRS logs its location and calls the fatal function", "[error]")
     {
         std::string location = errorReturningLocation();
 
@@ -648,7 +640,8 @@ namespace tut
         ensure_message_field_equals(0, MSG_FIELD, "die");
         ensure_message_count(1);
 
-        ensure("fatal callback called", fatalWasCalled);
+        UNSCOPED_INFO("fatal callback called");
+        CHECK(fatalWasCalled);
     }
 }
 
@@ -667,9 +660,8 @@ namespace
 
 namespace tut
 {
-    template<> template<>
-        // time in output (for recorders that need it)
-    void ErrorTestObject::test<9>()
+    // time in output (for recorders that need it)
+    TEST_CASE_METHOD(ErrorTestData, "error: a recorder gets the time only when it asks for it", "[error]")
     {
         LLError::setTimeFunction(roswell);
 
@@ -684,9 +676,8 @@ namespace tut
         ensure_message_field_equals(1, TIME_FIELD, roswell());
     }
 
-    template<> template<>
-        // output order
-    void ErrorTestObject::test<10>()
+    // output order
+    TEST_CASE_METHOD(ErrorTestData, "error: fields come in time level tags location function message order", "[error]")
     {
         LLError::setTimeFunction(roswell);
         setWantsTime(true);
@@ -695,14 +686,13 @@ namespace tut
                     function;
         writeReturningLocationAndFunction(location, function);
 
-        ensure_equals("order is time level tags location function message",
-                      message(0),
+        UNSCOPED_INFO("order is time level tags location function message");
+        CHECK(message(0) ==
                       roswell() + " INFO " + "# " /* no tag */ + location + " " + function + " : " + "apple");
     }
 
-    template<> template<>
-        // multiple recorders
-    void ErrorTestObject::test<11>()
+    // multiple recorders
+    TEST_CASE_METHOD(ErrorTestData, "error: every recorder gets each message with its own time setting", "[error]")
     {
         LLError::RecorderPtr altRecorder(new TestRecorder());
         LLError::addRecorder(altRecorder);
@@ -710,8 +700,10 @@ namespace tut
         LL_INFOS() << "boo" << LL_ENDL;
 
         ensure_message_field_equals(0, MSG_FIELD, "boo");
-        ensure_equals("alt recorder count", std::dynamic_pointer_cast<TestRecorder>(altRecorder)->countMessages(), 1);
-        ensure_contains("alt recorder message 0", std::dynamic_pointer_cast<TestRecorder>(altRecorder)->message(0), "boo");
+        UNSCOPED_INFO("alt recorder count");
+        CHECK(std::dynamic_pointer_cast<TestRecorder>(altRecorder)->countMessages() == 1);
+        UNSCOPED_INFO("alt recorder message 0");
+        CHECK_THAT(std::dynamic_pointer_cast<TestRecorder>(altRecorder)->message(0), Catch::Matchers::ContainsSubstring("boo"));
 
         LLError::setTimeFunction(roswell);
 
@@ -724,10 +716,14 @@ namespace tut
         std::string when = roswell();
 
         ensure_message_does_not_contain(1, when);
-        ensure_equals("alt recorder count", std::dynamic_pointer_cast<TestRecorder>(altRecorder)->countMessages(), 2);
-        ensure_does_not_contain("alt recorder message 1", std::dynamic_pointer_cast<TestRecorder>(altRecorder)->message(1), when);
-        ensure_equals("another recorder count", std::dynamic_pointer_cast<TestRecorder>(anotherRecorder)->countMessages(), 1);
-        ensure_contains("another recorder message 0", std::dynamic_pointer_cast<TestRecorder>(anotherRecorder)->message(0), when);
+        UNSCOPED_INFO("alt recorder count");
+        CHECK(std::dynamic_pointer_cast<TestRecorder>(altRecorder)->countMessages() == 2);
+        UNSCOPED_INFO("alt recorder message 1");
+        CHECK_THAT(std::dynamic_pointer_cast<TestRecorder>(altRecorder)->message(1), !Catch::Matchers::ContainsSubstring(when));
+        UNSCOPED_INFO("another recorder count");
+        CHECK(std::dynamic_pointer_cast<TestRecorder>(anotherRecorder)->countMessages() == 1);
+        UNSCOPED_INFO("another recorder message 0");
+        CHECK_THAT(std::dynamic_pointer_cast<TestRecorder>(anotherRecorder)->message(0), Catch::Matchers::ContainsSubstring(when));
 
         LLError::removeRecorder(altRecorder);
         LLError::removeRecorder(anotherRecorder);
@@ -758,9 +754,8 @@ public:
 
 namespace tut
 {
-    template<> template<>
-        // filtering by class
-    void ErrorTestObject::test<12>()
+    // filtering by class
+    TEST_CASE_METHOD(ErrorTestData, "error: a class level overrides the default level", "[error]")
     {
         LLError::setDefaultLevel(LLError::LEVEL_WARN);
         LLError::setClassLevel("TestBeta", LLError::LEVEL_INFO);
@@ -776,9 +771,8 @@ namespace tut
         ensure_message_count(5);
     }
 
-    template<> template<>
-        // filtering by function, and that it will override class filtering
-    void ErrorTestObject::test<13>()
+    // filtering by function, and that it will override class filtering
+    TEST_CASE_METHOD(ErrorTestData, "error: a function level overrides the class level", "[error]")
     {
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         LLError::setClassLevel("TestBeta", LLError::LEVEL_WARN);
@@ -791,10 +785,9 @@ namespace tut
         ensure_message_count(2);
     }
 
-    template<> template<>
-        // filtering by file
-        // and that it is overridden by both class and function filtering
-    void ErrorTestObject::test<14>()
+    // filtering by file
+    // and that it is overridden by both class and function filtering
+    TEST_CASE_METHOD(ErrorTestData, "error: a file level yields to class and function levels", "[error]")
     {
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         LLError::setFileLevel(LLError::abbreviateFile(__FILE__),
@@ -813,39 +806,43 @@ namespace tut
         ensure_message_count(3);
     }
 
-    template<> template<>
-        // proper cached, efficient lookup of filtering
-    void ErrorTestObject::test<15>()
+    // proper cached, efficient lookup of filtering
+    TEST_CASE_METHOD(ErrorTestData, "error: filter lookups are cached until the levels change", "[error]")
     {
         LLError::setDefaultLevel(LLError::LEVEL_NONE);
 
         TestAlpha::doInfo();
         ensure_message_count(0);
-        ensure_equals("first check", LLError::shouldLogCallCount(), 1);
+        UNSCOPED_INFO("first check");
+        CHECK(LLError::shouldLogCallCount() == 1);
         TestAlpha::doInfo();
         ensure_message_count(0);
-        ensure_equals("second check", LLError::shouldLogCallCount(), 1);
+        UNSCOPED_INFO("second check");
+        CHECK(LLError::shouldLogCallCount() == 1);
 
         LLError::setClassLevel("TestAlpha", LLError::LEVEL_DEBUG);
         TestAlpha::doInfo();
         ensure_message_count(1);
-        ensure_equals("third check", LLError::shouldLogCallCount(), 2);
+        UNSCOPED_INFO("third check");
+        CHECK(LLError::shouldLogCallCount() == 2);
         TestAlpha::doInfo();
         ensure_message_count(2);
-        ensure_equals("fourth check", LLError::shouldLogCallCount(), 2);
+        UNSCOPED_INFO("fourth check");
+        CHECK(LLError::shouldLogCallCount() == 2);
 
         LLError::setClassLevel("TestAlpha", LLError::LEVEL_WARN);
         TestAlpha::doInfo();
         ensure_message_count(2);
-        ensure_equals("fifth check", LLError::shouldLogCallCount(), 3);
+        UNSCOPED_INFO("fifth check");
+        CHECK(LLError::shouldLogCallCount() == 3);
         TestAlpha::doInfo();
         ensure_message_count(2);
-        ensure_equals("sixth check", LLError::shouldLogCallCount(), 3);
+        UNSCOPED_INFO("sixth check");
+        CHECK(LLError::shouldLogCallCount() == 3);
     }
 
-    template<> template<>
-        // configuration from LLSD
-    void ErrorTestObject::test<16>()
+    // configuration from LLSD
+    TEST_CASE_METHOD(ErrorTestData, "error: configure sets levels from LLSD and can be run again", "[error]")
     {
         LLSD config;
         config["print-location"] = true;
@@ -895,12 +892,11 @@ namespace tut
 
 namespace tut
 {
-    template<> template<>
-    void ErrorTestObject::test<17>()
+    TEST_CASE_METHOD(ErrorTestData, "error: single-line output escapes backslashes and line breaks", "[error]")
         // backslash, return, and newline are escaped with backslashes
     {
 #ifdef LL_DISABLE_DEBUG_LOGGING
-        skip("Debug messages disabled");
+        SKIP("Debug messages disabled");
 #endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         writeMsgNeedsEscaping();
@@ -925,12 +921,11 @@ namespace
 
 namespace tut
 {
-    template<> template<>
-    void ErrorTestObject::test<18>()
+    TEST_CASE_METHOD(ErrorTestData, "error: a space in a tag is an error", "[error]")
         // space character is not allowed in a tag
     {
 #ifdef LL_DISABLE_DEBUG_LOGGING
-        skip("Debug messages disabled");
+        SKIP("Debug messages disabled");
 #endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         fatalWasCalled = false;
@@ -939,7 +934,8 @@ namespace tut
         std::string expected = "Space is not allowed in a log tag at " + location;
         ensure_message_field_equals(0, LEVEL_FIELD, "ERROR");
         ensure_message_field_equals(0, MSG_FIELD, expected);
-        ensure("fatal callback called", fatalWasCalled);
+        UNSCOPED_INFO("fatal callback called");
+        CHECK(fatalWasCalled);
     }
 }
 

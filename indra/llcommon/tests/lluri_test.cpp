@@ -30,9 +30,9 @@
 #include "../llsd.h"
 #include "../lluri.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct URITestData {
         void checkParts(const LLURI& u,
@@ -42,79 +42,82 @@ namespace tut
                 const char* expectedPath,
                 const char* expectedQuery = "")
         {
-            ensure_equals("scheme",     u.scheme(),     expectedScheme);
-            ensure_equals("opaque",     u.opaque(),     expectedOpaque);
-            ensure_equals("authority",  u.authority(),  expectedAuthority);
-            ensure_equals("path",       u.path(),       expectedPath);
-            ensure_equals("query",      u.query(),      expectedQuery);
+            UNSCOPED_INFO("scheme");
+            REQUIRE(u.scheme() == expectedScheme);
+            UNSCOPED_INFO("opaque");
+            REQUIRE(u.opaque() == expectedOpaque);
+            UNSCOPED_INFO("authority");
+            REQUIRE(u.authority() == expectedAuthority);
+            UNSCOPED_INFO("path");
+            REQUIRE(u.path() == expectedPath);
+            UNSCOPED_INFO("query");
+            REQUIRE(u.query() == expectedQuery);
         }
 
         void escapeRoundTrip(const std::string& uri_raw_1)
         {
             std::string uri_esc_1(LLURI::escape(uri_raw_1));
             std::string uri_raw_2(LLURI::unescape(uri_esc_1));
-            ensure_equals("escape/unescape raw", uri_raw_2, uri_raw_1);
+            UNSCOPED_INFO("escape/unescape raw");
+            REQUIRE(uri_raw_2 == uri_raw_1);
             std::string uri_esc_2(LLURI::escape(uri_raw_2));
-            ensure_equals("escape/unescape escaped", uri_esc_2, uri_esc_1);
+            UNSCOPED_INFO("escape/unescape escaped");
+            REQUIRE(uri_esc_2 == uri_esc_1);
         }
     };
 
-    typedef test_group<URITestData> URITestGroup;
-    typedef URITestGroup::object    URITestObject;
-
-    URITestGroup uriTestGroup("LLURI");
-
-    template<> template<>
-    void URITestObject::test<1>()
+    TEST_CASE_METHOD(URITestData, "LLURI: parts and query map of an http URI", "[LLURI]")
     {
         LLURI u("http://abc.com/def/ghi?x=37&y=hello");
 
-        ensure_equals("scheme",     u.scheme(),     "http");
-        ensure_equals("authority",  u.authority(),  "abc.com");
-        ensure_equals("path",       u.path(),       "/def/ghi");
-        ensure_equals("query",      u.query(),      "x=37&y=hello");
+        UNSCOPED_INFO("scheme");
+        CHECK(u.scheme() == "http");
+        UNSCOPED_INFO("authority");
+        CHECK(u.authority() == "abc.com");
+        UNSCOPED_INFO("path");
+        CHECK(u.path() == "/def/ghi");
+        UNSCOPED_INFO("query");
+        CHECK(u.query() == "x=37&y=hello");
 
-        ensure_equals("host name", u.hostName(), "abc.com");
-        ensure_equals("host port", u.hostPort(), 80);
+        UNSCOPED_INFO("host name");
+        CHECK(u.hostName() == "abc.com");
+        UNSCOPED_INFO("host port");
+        CHECK(u.hostPort() == 80);
 
         LLSD query = u.queryMap();
-        ensure_equals("query x", query["x"].asInteger(), 37);
-        ensure_equals("query y", query["y"].asString(), "hello");
+        UNSCOPED_INFO("query x");
+        CHECK(query["x"].asInteger() == 37);
+        UNSCOPED_INFO("query y");
+        CHECK(query["y"].asString() == "hello");
 
         query = LLURI::queryMap("x=22.23&y=https://lindenlab.com/");
-        ensure_equals("query x", query["x"].asReal(), 22.23);
-        ensure_equals("query y", query["y"].asURI().asString(), "https://lindenlab.com/");
+        UNSCOPED_INFO("query x");
+        CHECK(query["x"].asReal() == 22.23);
+        UNSCOPED_INFO("query y");
+        CHECK(query["y"].asURI().asString() == "https://lindenlab.com/");
     }
 
-    template<> template<>
-    void URITestObject::test<2>()
+    TEST_CASE_METHOD(URITestData, "LLURI: an empty string has no parts", "[LLURI]")
     {
-        set_test_name("empty string");
         checkParts(LLURI(""), "", "", "", "");
     }
 
-    template<> template<>
-    void URITestObject::test<3>()
+    TEST_CASE_METHOD(URITestData, "LLURI: without a scheme the whole string is opaque", "[LLURI]")
     {
-        set_test_name("no scheme");
         checkParts(LLURI("foo"), "", "foo", "", "");
         checkParts(LLURI("foo%3A"), "", "foo:", "", "");
     }
 
-    template<> template<>
-    void URITestObject::test<4>()
+    TEST_CASE_METHOD(URITestData, "LLURI: a scheme without paths leaves no authority or path", "[LLURI]")
     {
-        set_test_name("scheme w/o paths");
         checkParts(LLURI("mailto:zero@ll.com"),
             "mailto", "zero@ll.com", "", "");
         checkParts(LLURI("silly://abc/def?foo"),
             "silly", "//abc/def?foo", "", "");
     }
 
-    template<> template<>
-    void URITestObject::test<5>()
+    TEST_CASE_METHOD(URITestData, "LLURI: the authority ends at the first unescaped slash or question mark", "[LLURI]")
     {
-        set_test_name("authority section");
         checkParts(LLURI("http:///"),
             "http", "///", "", "/");
 
@@ -128,10 +131,8 @@ namespace tut
             "http", "//host?", "host", "");
     }
 
-    template<> template<>
-    void URITestObject::test<6>()
+    TEST_CASE_METHOD(URITestData, "LLURI: the path is unescaped and keeps colons and trailing slashes", "[LLURI]")
     {
-        set_test_name("path section");
         checkParts(LLURI("http://host/a/b/"),
                 "http", "//host/a/b/", "host", "/a/b/");
 
@@ -142,10 +143,8 @@ namespace tut
                 "http", "//host/a:b/", "host", "/a:b/");
     }
 
-    template<> template<>
-    void URITestObject::test<7>()
+    TEST_CASE_METHOD(URITestData, "LLURI: the query follows the first question mark and is unescaped", "[LLURI]")
     {
-        set_test_name("query string");
         checkParts(LLURI("http://host/?"),
                 "http", "//host/?", "host", "/", "");
 
@@ -159,8 +158,7 @@ namespace tut
                 "http", "//host/??", "host", "/", "?");
     }
 
-    template<> template<>
-    void URITestObject::test<8>()
+    TEST_CASE_METHOD(URITestData, "LLURI: buildHTTP joins and escapes path parts and a query map", "[LLURI]")
     {
         LLSD path;
         path.append("x");
@@ -175,36 +173,34 @@ namespace tut
             "http", "//host/x/123?123=12&abcd=abc",
             "host", "/x/123", "123=12&abcd=abc");
 
-        ensure_equals(LLURI::buildHTTP("host", "").asString(),
+        CHECK(LLURI::buildHTTP("host", "").asString() ==
                       "http://host");
-        ensure_equals(LLURI::buildHTTP("host", "/").asString(),
+        CHECK(LLURI::buildHTTP("host", "/").asString() ==
                       "http://host/");
-        ensure_equals(LLURI::buildHTTP("host", "//").asString(),
+        CHECK(LLURI::buildHTTP("host", "//").asString() ==
                       "http://host/");
-        ensure_equals(LLURI::buildHTTP("host", "dir name").asString(),
+        CHECK(LLURI::buildHTTP("host", "dir name").asString() ==
                       "http://host/dir%20name");
-        ensure_equals(LLURI::buildHTTP("host", "dir name/").asString(),
+        CHECK(LLURI::buildHTTP("host", "dir name/").asString() ==
                       "http://host/dir%20name/");
-        ensure_equals(LLURI::buildHTTP("host", "/dir name").asString(),
+        CHECK(LLURI::buildHTTP("host", "/dir name").asString() ==
                       "http://host/dir%20name");
-        ensure_equals(LLURI::buildHTTP("host", "/dir name/").asString(),
+        CHECK(LLURI::buildHTTP("host", "/dir name/").asString() ==
                       "http://host/dir%20name/");
-        ensure_equals(LLURI::buildHTTP("host", "dir name/subdir name").asString(),
+        CHECK(LLURI::buildHTTP("host", "dir name/subdir name").asString() ==
                       "http://host/dir%20name/subdir%20name");
-        ensure_equals(LLURI::buildHTTP("host", "dir name/subdir name/").asString(),
+        CHECK(LLURI::buildHTTP("host", "dir name/subdir name/").asString() ==
                       "http://host/dir%20name/subdir%20name/");
-        ensure_equals(LLURI::buildHTTP("host", "/dir name/subdir name").asString(),
+        CHECK(LLURI::buildHTTP("host", "/dir name/subdir name").asString() ==
                       "http://host/dir%20name/subdir%20name");
-        ensure_equals(LLURI::buildHTTP("host", "/dir name/subdir name/").asString(),
+        CHECK(LLURI::buildHTTP("host", "/dir name/subdir name/").asString() ==
                       "http://host/dir%20name/subdir%20name/");
-        ensure_equals(LLURI::buildHTTP("host", "//dir name//subdir name//").asString(),
+        CHECK(LLURI::buildHTTP("host", "//dir name//subdir name//").asString() ==
                       "http://host/dir%20name/subdir%20name/");
     }
 
-    template<> template<>
-    void URITestObject::test<9>()
+    TEST_CASE_METHOD(URITestData, "LLURI: buildHTTP takes path parts with unescaped special characters", "[LLURI]")
     {
-        set_test_name("test unescaped path components");
         LLSD path;
         path.append("x@*//*$&^");
         path.append("123");
@@ -212,10 +208,8 @@ namespace tut
             "http", "//host/x@*//*$&^/123", "host", "/x@*//*$&^/123");
     }
 
-    template<> template<>
-    void URITestObject::test<10>()
+    TEST_CASE_METHOD(URITestData, "LLURI: buildHTTP takes a query with unescaped special characters", "[LLURI]")
     {
-        set_test_name("test unescaped query components");
         LLSD path;
         path.append("x");
         path.append("123");
@@ -227,10 +221,8 @@ namespace tut
             "host", "/x/123", "**@&?//=abc&123=?&*#//");
     }
 
-    template<> template<>
-    void URITestObject::test<11>()
+    TEST_CASE_METHOD(URITestData, "LLURI: buildHTTP takes a host with unescaped special characters", "[LLURI]")
     {
-        set_test_name("test unescaped host components");
         LLSD path;
         path.append("x");
         path.append("123");
@@ -242,11 +234,8 @@ namespace tut
             "hi123*33--}{:portstuffs", "/x/123", "123=12&abcd=abc");
     }
 
-    template<> template<>
-    void URITestObject::test<12>()
+    TEST_CASE_METHOD(URITestData, "LLURI: buildHTTP takes a host_port that is really a URI prefix", "[LLURI]")
     {
-        set_test_name("test funky host_port values that are actually prefixes");
-
         checkParts(LLURI::buildHTTP("http://example.com:8080", LLSD()),
             "http", "//example.com:8080",
             "example.com:8080", "");
@@ -260,18 +249,18 @@ namespace tut
             "example.com:8080", "/a/b");
     }
 
-    template<> template<>
-    void URITestObject::test<13>()
+    TEST_CASE_METHOD(URITestData, "LLURI: escape percent-encodes all but the allowed characters", "[LLURI]")
     {
         const std::string unreserved =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
             "0123456789"
             "-._~";
-        set_test_name("test escape");
-        ensure_equals("escaping", LLURI::escape("abcdefg", "abcdef"), "abcdef%67");
-        ensure_equals("escaping", LLURI::escape("|/&\\+-_!@", ""), "%7C%2F%26%5C%2B%2D%5F%21%40");
-        ensure_equals("escaping as query variable",
-                      LLURI::escape("http://10.0.1.4:12032/agent/god/agent-id/map/layer/?resume=http://station3.ll.com:12032/agent/203ad6df-b522-491d-ba48-4e24eb57aeff/send-postcard", unreserved + ":@!$'()*+,="),
+        UNSCOPED_INFO("escaping");
+        CHECK(LLURI::escape("abcdefg", "abcdef") == "abcdef%67");
+        UNSCOPED_INFO("escaping");
+        CHECK(LLURI::escape("|/&\\+-_!@", "") == "%7C%2F%26%5C%2B%2D%5F%21%40");
+        UNSCOPED_INFO("escaping as query variable");
+        CHECK(LLURI::escape("http://10.0.1.4:12032/agent/god/agent-id/map/layer/?resume=http://station3.ll.com:12032/agent/203ad6df-b522-491d-ba48-4e24eb57aeff/send-postcard", unreserved + ":@!$'()*+,=") ==
                       "http:%2F%2F10.0.1.4:12032%2Fagent%2Fgod%2Fagent-id%2Fmap%2Flayer%2F%3Fresume=http:%2F%2Fstation3.ll.com:12032%2Fagent%2F203ad6df-b522-491d-ba48-4e24eb57aeff%2Fsend-postcard");
         // French cedilla (C with squiggle, like in the word Francais) is UTF-8 C3 A7
 
@@ -282,24 +271,23 @@ namespace tut
         std::string cedilla;
         cedilla.push_back( (char)0xC3 );
         cedilla.push_back( (char)0xA7 );
-        ensure_equals("escape UTF8", LLURI::escape( cedilla, unreserved), "%C3%A7");
+        UNSCOPED_INFO("escape UTF8");
+        CHECK(LLURI::escape( cedilla, unreserved) == "%C3%A7");
     }
 
 
-    template<> template<>
-    void URITestObject::test<14>()
+    TEST_CASE_METHOD(URITestData, "LLURI: escape and unescape of an empty string are empty", "[LLURI]")
     {
-        set_test_name("make sure escape and unescape of empty strings return empty strings.");
         std::string uri_esc(LLURI::escape(""));
-        ensure("escape string empty", uri_esc.empty());
+        UNSCOPED_INFO("escape string empty");
+        REQUIRE(uri_esc.empty());
         std::string uri_raw(LLURI::unescape(""));
-        ensure("unescape string empty", uri_raw.empty());
+        UNSCOPED_INFO("unescape string empty");
+        REQUIRE(uri_raw.empty());
     }
 
-    template<> template<>
-    void URITestObject::test<15>()
+    TEST_CASE_METHOD(URITestData, "LLURI: escape and unescape round-trip URIs", "[LLURI]")
     {
-        set_test_name("do some round-trip tests");
         escapeRoundTrip("http://secondlife.com");
         escapeRoundTrip("http://secondlife.com/url with spaces");
         escapeRoundTrip("http://bad[domain]name.com/");
@@ -307,26 +295,20 @@ namespace tut
         escapeRoundTrip("");
     }
 
-    template<> template<>
-    void URITestObject::test<16>()
+    TEST_CASE_METHOD(URITestData, "LLURI: escape by default escapes colons and slashes too", "[LLURI]")
     {
-        set_test_name("Test the default escaping");
         // yes -- this mangles the url. This is expected behavior
         std::string simple("http://secondlife.com");
-        ensure_equals(
-            "simple http",
-            LLURI::escape(simple),
+        UNSCOPED_INFO("simple http");
+        CHECK(LLURI::escape(simple) ==
             "http%3A%2F%2Fsecondlife.com");
-        ensure_equals(
-            "needs escape",
-            LLURI::escape("http://get.secondlife.com/windows viewer"),
+        UNSCOPED_INFO("needs escape");
+        CHECK(LLURI::escape("http://get.secondlife.com/windows viewer") ==
             "http%3A%2F%2Fget.secondlife.com%2Fwindows%20viewer");
     }
 
-    template<> template<>
-    void URITestObject::test<17>()
+    TEST_CASE_METHOD(URITestData, "LLURI: escape and unescape round-trip very long strings", "[LLURI]")
     {
-        set_test_name("do some round-trip tests with very long strings.");
         escapeRoundTrip("Welcome to Second Life.We hope you'll have a richly rewarding experience, filled with creativity, self expression and fun.The goals of the Community Standards are simple: treat each other with respect and without harassment, adhere to local standards as indicated by simulator ratings, and refrain from any hate activity which slurs a real-world individual or real-world community. Behavioral Guidelines - The Big Six");
         escapeRoundTrip(
             "'asset_data':b(12100){'task_id':ucc706f2d-0b68-68f8-11a4-f1043ff35ca0}\n{\n\tname\tObject|\n\tpermissions 0\n\t{\n\t\tbase_mask\t7fffffff\n\t\towner_mask\t7fffffff\n\t\tgroup_mask\t00000000\n\t\teveryone_mask\t00000000\n\t\tnext_owner_mask\t7fffffff\n\t\tcreator_id\t13fd9595-a47b-4d64-a5fb-6da645f038e0\n\t\towner_id\t3c115e51-04f4-523c-9fa6-98aff1034730\n\t\tlast_owner_id\t3c115e51-04f4-523c-9fa6-98aff1034730\n\t\tgroup_id\t00000000-0000-0000-0000-000000000000\n\t}\n\tlocal_id\t217444921\n\ttotal_crc\t323\n\ttype\t2\n\ttask_valid\t2\n\ttravel_access\t13\n\tdisplayopts\t2\n\tdisplaytype\tv\n\tpos\t-0.368634403\t0.00781063363\t-0.569040775\n\toldpos\t150.117996\t25.8658009\t8.19664001\n\trotation\t-0.06293071806430816650390625\t-0.6995697021484375\t-0.7002241611480712890625\t0.1277817934751510620117188\n\tchildpos\t-0.00499999989\t-0.0359999985\t0.307999998\n\tchildrot\t-0.515492737293243408203125\t-0.46601200103759765625\t0.529055416584014892578125\t0.4870323240756988525390625\n\tscale"
@@ -347,75 +329,89 @@ namespace tut
     }
 
 
-    template<> template<>
-    void URITestObject::test<18>()
+    TEST_CASE_METHOD(URITestData, "LLURI: a secondlife URI splits with or without an authority", "[LLURI]")
     {
         LLURI u("secondlife:///app/login?first_name=Testert4&last_name=Tester&web_login_key=test");
         // if secondlife is the scheme, LLURI should parse /app/login as path, with no authority
-        ensure_equals("scheme",     u.scheme(),     "secondlife");
-        ensure_equals("authority",  u.authority(),  "");
-        ensure_equals("path",       u.path(),       "/app/login");
-        ensure_equals("pathmap",    u.pathArray()[0].asString(),    "app");
-        ensure_equals("pathmap",    u.pathArray()[1].asString(),    "login");
-        ensure_equals("query",      u.query(),      "first_name=Testert4&last_name=Tester&web_login_key=test");
-        ensure_equals("query map element", u.queryMap()["last_name"].asString(), "Tester");
+        UNSCOPED_INFO("scheme");
+        CHECK(u.scheme() == "secondlife");
+        UNSCOPED_INFO("authority");
+        CHECK(u.authority() == "");
+        UNSCOPED_INFO("path");
+        CHECK(u.path() == "/app/login");
+        UNSCOPED_INFO("pathmap");
+        CHECK(u.pathArray()[0].asString() == "app");
+        UNSCOPED_INFO("pathmap");
+        CHECK(u.pathArray()[1].asString() == "login");
+        UNSCOPED_INFO("query");
+        CHECK(u.query() == "first_name=Testert4&last_name=Tester&web_login_key=test");
+        UNSCOPED_INFO("query map element");
+        CHECK(u.queryMap()["last_name"].asString() == "Tester");
 
         u = LLURI("secondlife://Da Boom/128/128/128");
         // if secondlife is the scheme, LLURI should parse /128/128/128 as path, with Da Boom as authority
-        ensure_equals("scheme",     u.scheme(),     "secondlife");
-        ensure_equals("authority",  u.authority(),  "Da Boom");
-        ensure_equals("path",       u.path(),       "/128/128/128");
-        ensure_equals("pathmap",    u.pathArray()[0].asString(),    "128");
-        ensure_equals("pathmap",    u.pathArray()[1].asString(),    "128");
-        ensure_equals("pathmap",    u.pathArray()[2].asString(),    "128");
-        ensure_equals("query",      u.query(),      "");
+        UNSCOPED_INFO("scheme");
+        CHECK(u.scheme() == "secondlife");
+        UNSCOPED_INFO("authority");
+        CHECK(u.authority() == "Da Boom");
+        UNSCOPED_INFO("path");
+        CHECK(u.path() == "/128/128/128");
+        UNSCOPED_INFO("pathmap");
+        CHECK(u.pathArray()[0].asString() == "128");
+        UNSCOPED_INFO("pathmap");
+        CHECK(u.pathArray()[1].asString() == "128");
+        UNSCOPED_INFO("pathmap");
+        CHECK(u.pathArray()[2].asString() == "128");
+        UNSCOPED_INFO("query");
+        CHECK(u.query() == "");
     }
 
-    template<> template<>
-    void URITestObject::test<19>()
+    TEST_CASE_METHOD(URITestData, "LLURI: an about: URI has a path and a query", "[LLURI]")
     {
-        set_test_name("Parse about: schemes");
         LLURI u("about:blank?redirect-http-hack=secondlife%3A%2F%2F%2Fapp%2Flogin%3Ffirst_name%3DCallum%26last_name%3DLinden%26location%3Dspecify%26grid%3Dvaak%26region%3D%2FMorris%2F128%2F128%26web_login_key%3Defaa4795-c2aa-4c58-8966-763c27931e78");
-        ensure_equals("scheme",     u.scheme(),     "about");
-        ensure_equals("authority",  u.authority(),  "");
-        ensure_equals("path",       u.path(),       "blank");
-        ensure_equals("pathmap",    u.pathArray()[0].asString(),    "blank");
-        ensure_equals("query",      u.query(),      "redirect-http-hack=secondlife:///app/login?first_name=Callum&last_name=Linden&location=specify&grid=vaak&region=/Morris/128/128&web_login_key=efaa4795-c2aa-4c58-8966-763c27931e78");
-        ensure_equals("query map element", u.queryMap()["redirect-http-hack"].asString(), "secondlife:///app/login?first_name=Callum&last_name=Linden&location=specify&grid=vaak&region=/Morris/128/128&web_login_key=efaa4795-c2aa-4c58-8966-763c27931e78");
+        UNSCOPED_INFO("scheme");
+        CHECK(u.scheme() == "about");
+        UNSCOPED_INFO("authority");
+        CHECK(u.authority() == "");
+        UNSCOPED_INFO("path");
+        CHECK(u.path() == "blank");
+        UNSCOPED_INFO("pathmap");
+        CHECK(u.pathArray()[0].asString() == "blank");
+        UNSCOPED_INFO("query");
+        CHECK(u.query() == "redirect-http-hack=secondlife:///app/login?first_name=Callum&last_name=Linden&location=specify&grid=vaak&region=/Morris/128/128&web_login_key=efaa4795-c2aa-4c58-8966-763c27931e78");
+        UNSCOPED_INFO("query map element");
+        CHECK(u.queryMap()["redirect-http-hack"].asString() == "secondlife:///app/login?first_name=Callum&last_name=Linden&location=specify&grid=vaak&region=/Morris/128/128&web_login_key=efaa4795-c2aa-4c58-8966-763c27931e78");
     }
 
-    template<> template<>
-    void URITestObject::test<20>()
+    TEST_CASE_METHOD(URITestData, "LLURI: escapePathAndData escapes paths and data and leaves escapes alone", "[LLURI]")
     {
-        set_test_name("escapePathAndData uri test");
-
         // Basics scheme:[//authority]path[?query][#fragment]
-        ensure_equals(LLURI::escapePathAndData("dirname?query"),
+        CHECK(LLURI::escapePathAndData("dirname?query") ==
             "dirname?query");
-        ensure_equals(LLURI::escapePathAndData("dirname?query=data"),
+        CHECK(LLURI::escapePathAndData("dirname?query=data") ==
             "dirname?query=data");
-        ensure_equals(LLURI::escapePathAndData("host://dirname/subdir name?query#fragment"),
+        CHECK(LLURI::escapePathAndData("host://dirname/subdir name?query#fragment") ==
             "host://dirname/subdir%20name?query#fragment");
-        ensure_equals(LLURI::escapePathAndData("host://dirname/subdir name?query=some@>data#fragment"),
+        CHECK(LLURI::escapePathAndData("host://dirname/subdir name?query=some@>data#fragment") ==
             "host://dirname/subdir%20name?query=some@%3Edata#fragment");
-        ensure_equals(LLURI::escapePathAndData("host://dir[name/subdir name?query=some[data#fra[gment"),
+        CHECK(LLURI::escapePathAndData("host://dir[name/subdir name?query=some[data#fra[gment") ==
             "host://dir[name/subdir%20name?query=some%5Bdata#fra[gment");
-        ensure_equals(LLURI::escapePathAndData("mailto:zero@ll.com"),
+        CHECK(LLURI::escapePathAndData("mailto:zero@ll.com") ==
             "mailto:zero@ll.com");
         // pre-escaped
-        ensure_equals(LLURI::escapePathAndData("host://dirname/subdir%20name"),
+        CHECK(LLURI::escapePathAndData("host://dirname/subdir%20name") ==
             "host://dirname/subdir%20name");
 
         // data:[<mediatype>][;base64],<data>
-        ensure_equals(LLURI::escapePathAndData("data:,Hello, World!"),
+        CHECK(LLURI::escapePathAndData("data:,Hello, World!") ==
             "data:,Hello%2C%20World%21");
-        ensure_equals(LLURI::escapePathAndData("data:text/html,<h1>Hello, World!</h1>"),
+        CHECK(LLURI::escapePathAndData("data:text/html,<h1>Hello, World!</h1>") ==
             "data:text/html,%3Ch1%3EHello%2C%20World%21%3C%2Fh1%3E");
         // pre-escaped
-        ensure_equals(LLURI::escapePathAndData("data:text/html,%3Ch1%3EHello%2C%20World!</h1>"),
+        CHECK(LLURI::escapePathAndData("data:text/html,%3Ch1%3EHello%2C%20World!</h1>") ==
             "data:text/html,%3Ch1%3EHello%2C%20World%21%3C%2Fh1%3E");
         // assume that base64 does not need escaping
-        ensure_equals(LLURI::escapePathAndData("data:image;base64,SGVs/bG8sIFd/vcmxkIQ%3D%3D!-&*?="),
+        CHECK(LLURI::escapePathAndData("data:image;base64,SGVs/bG8sIFd/vcmxkIQ%3D%3D!-&*?=") ==
             "data:image;base64,SGVs/bG8sIFd/vcmxkIQ%3D%3D!-&*?=");
     }
 }

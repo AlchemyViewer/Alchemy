@@ -34,7 +34,9 @@
 // std headers
 // external library headers
 // other Linden headers
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
+#include "altestmatchers.h"
 #include "stringize.h"
 #include "llsdutil.h"
 #include "listener.h"
@@ -160,7 +162,7 @@ public:
 /*****************************************************************************
 *   TUT
 *****************************************************************************/
-namespace tut
+namespace
 {
     struct filter_data
     {
@@ -179,18 +181,13 @@ namespace tut
 
         void check_listener(const std::string& desc, const Listener& listener, const LLSD& got)
         {
-            ensure_equals(STRINGIZE(listener << ' ' << desc),
-                          listener.getLastEvent(), got);
+            UNSCOPED_INFO((STRINGIZE(listener << ' ' << desc)));
+            REQUIRE_THAT(listener.getLastEvent(), ll_test::LLSDEquals(got));
         }
     };
-    typedef test_group<filter_data> filter_group;
-    typedef filter_group::object filter_object;
-    filter_group filtergrp("lleventfilter");
 
-    template<> template<>
-    void filter_object::test<1>()
+    TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventMatching passes only events that match its pattern", "[lleventfilter]")
     {
-        set_test_name("LLEventMatching");
         LLEventPump& driver(pumps.obtain("driver"));
         listener0.reset(0);
         // Listener isn't derived from LLEventTrackable specifically to test
@@ -221,10 +218,8 @@ namespace tut
         check_listener("filtered", listener1, data);
     }
 
-    template<> template<>
-    void filter_object::test<2>()
+    TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventTimeout::actionAfter() acts only when it times out", "[lleventfilter]")
     {
-        set_test_name("LLEventTimeout::actionAfter()");
         LLEventPump& driver(pumps.obtain("driver"));
         TestEventTimeout filter(driver);
         listener0.reset(0);
@@ -292,10 +287,8 @@ namespace tut
         check_listener("no timeout 6", listener1, LLSD(0));
     }
 
-    template<> template<>
-    void filter_object::test<3>()
+    TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventTimeout::eventAfter() posts only when it times out", "[lleventfilter]")
     {
-        set_test_name("LLEventTimeout::eventAfter()");
         LLEventPump& driver(pumps.obtain("driver"));
         TestEventTimeout filter(driver);
         listener0.reset(0);
@@ -329,10 +322,8 @@ namespace tut
         check_listener("no timeout 3", listener0, LLSD(0));
     }
 
-    template<> template<>
-    void filter_object::test<4>()
+    TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventTimeout::errorAfter() raises an error only on timeout", "[lleventfilter]")
     {
-        set_test_name("LLEventTimeout::errorAfter()");
         WrapLLErrs capture;
         LLEventPump& driver(pumps.obtain("driver"));
         TestEventTimeout filter(driver);
@@ -361,7 +352,8 @@ namespace tut
         std::string threw = capture.catch_llerrs([this](){
                 mainloop.post(17);
             });
-        ensure_contains("errorAfter() timeout exception", threw, "timeout");
+        UNSCOPED_INFO("errorAfter() timeout exception");
+        CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("timeout"));
         // Timing out cancels the timer. Verify that.
         listener0.reset(0);
         filter.forceTimeout();
@@ -369,10 +361,8 @@ namespace tut
         check_listener("no timeout 3", listener0, LLSD(0));
     }
 
-    template<> template<>
-    void filter_object::test<5>()
+    TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventThrottle delivers at most one event an interval", "[lleventfilter]")
     {
-        set_test_name("LLEventThrottle");
         TestEventThrottle throttle(3);
         Concat cat;
         throttle.listen("concat", boost::ref(cat));
@@ -381,33 +371,41 @@ namespace tut
         //  1: post(): event immediately passed to listeners, next no sooner than 4
         throttle.advance(1);
         throttle.post("1");
-        ensure_equals("1", cat.result, "1"); // delivered immediately
+        UNSCOPED_INFO("1");
+        CHECK(cat.result == "1"); // delivered immediately
         //  2: post(): deferred: waiting for 3 seconds to elapse
         throttle.advance(1);
         throttle.post("2");
-        ensure_equals("2", cat.result, "1"); // "2" not yet delivered
+        UNSCOPED_INFO("2");
+        CHECK(cat.result == "1"); // "2" not yet delivered
         //  3: post(): deferred
         throttle.advance(1);
         throttle.post("3");
-        ensure_equals("3", cat.result, "1"); // "3" not yet delivered
+        UNSCOPED_INFO("3");
+        CHECK(cat.result == "1"); // "3" not yet delivered
         //  4: no post() call, but event delivered to listeners; next no sooner than 7
         throttle.advance(1);
-        ensure_equals("4", cat.result, "13"); // "3" delivered
+        UNSCOPED_INFO("4");
+        CHECK(cat.result == "13"); // "3" delivered
         //  6: post(): deferred
         throttle.advance(2);
         throttle.post("6");
-        ensure_equals("6", cat.result, "13"); // "6" not yet delivered
+        UNSCOPED_INFO("6");
+        CHECK(cat.result == "13"); // "6" not yet delivered
         //  7: no post() call, but event delivered; next no sooner than 10
         throttle.advance(1);
-        ensure_equals("7", cat.result, "136"); // "6" delivered
+        UNSCOPED_INFO("7");
+        CHECK(cat.result == "136"); // "6" delivered
         // 12: post(): immediately passed to listeners, next no sooner than 15
         throttle.advance(5);
         throttle.post(";12");
-        ensure_equals("12", cat.result, "136;12"); // "12" delivered
+        UNSCOPED_INFO("12");
+        CHECK(cat.result == "136;12"); // "12" delivered
         // 17: post(): immediately passed to listeners, next no sooner than 20
         throttle.advance(5);
         throttle.post(";17");
-        ensure_equals("17", cat.result, "136;12;17"); // "17" delivered
+        UNSCOPED_INFO("17");
+        CHECK(cat.result == "136;12;17"); // "17" delivered
     }
 
     // A PUMP keeps what no listener consumed, and replays it on the next listen().
@@ -433,7 +431,8 @@ namespace tut
             pump.post("first");
         }
         // first post() should certainly be received by listener
-        ensure_equals("first", data, llsd::array("first"));
+        UNSCOPED_INFO("first");
+        REQUIRE_THAT(data, ll_test::LLSDEquals(llsd::array("first")));
         // the question is, since consumed was true, did it queue the value?
         data = LLSD::emptyArray();
         {
@@ -441,7 +440,8 @@ namespace tut
             // listen() call
             LLTempBoundListener conn = pump.listen("lambda", lambda);
         }
-        ensure_equals("empty1", data, LLSD::emptyArray());
+        UNSCOPED_INFO("empty1");
+        REQUIRE_THAT(data, ll_test::LLSDEquals(LLSD::emptyArray()));
         data = LLSD::emptyArray();
         // now let's NOT consume the posted data
         consumed = false;
@@ -451,7 +451,8 @@ namespace tut
             pump.post("third");
         }
         // the two events still arrive
-        ensure_equals("second,third1", data, llsd::array("second", "third"));
+        UNSCOPED_INFO("second,third1");
+        REQUIRE_THAT(data, ll_test::LLSDEquals(llsd::array("second", "third")));
         data = LLSD::emptyArray();
         {
             // when we reconnect, these should be delivered again
@@ -460,29 +461,27 @@ namespace tut
             LLTempBoundListener conn = pump.listen("lambda", lambda);
         }
         // unconsumed events were delivered again
-        ensure_equals("second,third2", data, llsd::array("second", "third"));
+        UNSCOPED_INFO("second,third2");
+        REQUIRE_THAT(data, ll_test::LLSDEquals(llsd::array("second", "third")));
         data = LLSD::emptyArray();
         {
             // when we reconnect this time, no more unconsumed events
             LLTempBoundListener conn = pump.listen("lambda", lambda);
         }
-        ensure_equals("empty2", data, LLSD::emptyArray());
+        UNSCOPED_INFO("empty2");
+        REQUIRE_THAT(data, ll_test::LLSDEquals(LLSD::emptyArray()));
     }
 
-    template<> template<>
-    void filter_object::test<6>()
+    TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventMailDrop replays unconsumed events on the next listen", "[lleventfilter]")
     {
-        set_test_name("LLEventMailDrop");
         check_mail_drop_replay<LLEventMailDrop>();
     }
 
-    template<> template<>
-    void filter_object::test<7>()
+    TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventLogProxyFor<LLEventMailDrop> replays unconsumed events", "[lleventfilter]")
     {
-        set_test_name("LLEventLogProxyFor<LLEventMailDrop>");
         check_mail_drop_replay< LLEventLogProxyFor<LLEventMailDrop> >();
     }
-} // namespace tut
+} // anonymous namespace
 
 // (llsdutil symbols formerly pulled in via #include "llsdutil.cpp" now come from
 // the linked llcommon library -- including the .cpp here double-defines them and

@@ -30,7 +30,7 @@
 #include "lltrace.h"
 #include "lltracethreadrecorder.h"
 #include "lltracerecording.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #ifdef LL_WINDOWS
 #pragma warning(disable : 4244) // possible loss of data on conversions
@@ -59,12 +59,10 @@ LL_DECLARE_UNIT_TYPEDEFS(LLUnits, Grams);
 LL_DECLARE_UNIT_TYPEDEFS(LLUnits, Milligrams);
 
 
-namespace tut
+namespace
 {
     using namespace LLTrace;
 
-    namespace
-    {
         // A ThreadRecorder makes itself this thread's recorder, with its own
         // timer stack and current accumulators, and leaves all of them null
         // when it goes. This takes the main thread's as they were before the
@@ -88,7 +86,6 @@ namespace tut
                 LLThreadLocalSingletonPointer<TimeBlockAccumulator>::setInstance(mTimers);
             }
         };
-    } // anonymous namespace
 
     struct trace
     {
@@ -96,10 +93,6 @@ namespace tut
         ThreadRecorderRestore mRestore;
         ThreadRecorder        mRecorder;
     };
-
-    typedef test_group<trace> trace_t;
-    typedef trace_t::object trace_object_t;
-    tut::trace_t tut_lltrace("LLTrace");
 
     static CountStatHandle<S32> sCupsOfCoffeeConsumed("coffeeconsumed", "Delicious cup of dark roast.");
     static SampleStatHandle<F32Milligrams> sCaffeineLevelStat("caffeinelevel", "Coffee buzz quotient");
@@ -121,8 +114,7 @@ namespace tut
     }
 
     // basic data collection
-    template<> template<>
-    void trace_object_t::test<1>()
+    TEST_CASE_METHOD(trace, "LLTrace: recordings collect counts and events and samples only while active", "[LLTrace]")
     {
         sample(sCaffeineLevelStat, sCaffeineLevel);
 
@@ -150,30 +142,42 @@ namespace tut
         //after_3pm.stop();
         //all_day.stop();
 
-        ensure("count stats are counted when recording is active",
-            at_work.getSum(sCupsOfCoffeeConsumed) == 3
-                && all_day.getSum(sCupsOfCoffeeConsumed) == 5
-                && after_3pm.getSum(sCupsOfCoffeeConsumed) == 2);
-        ensure("measurement sums are counted when recording is active",
-            at_work.getSum(sOuncesPerCup) == S32Ounces(48)
-                && all_day.getSum(sOuncesPerCup) == S32Ounces(80)
-                && after_3pm.getSum(sOuncesPerCup) == S32Ounces(36));
-        ensure("measurement min is specific to when recording is active",
-            at_work.getMin(sOuncesPerCup) == S32GrandeCup(1)
-                && all_day.getMin(sOuncesPerCup) == S32TallCup(1)
-                && after_3pm.getMin(sOuncesPerCup) == S32GrandeCup(1));
-        ensure("measurement max is specific to when recording is active",
-            at_work.getMax(sOuncesPerCup) == S32GrandeCup(1)
-                && all_day.getMax(sOuncesPerCup) == S32VentiCup(1)
-                && after_3pm.getMax(sOuncesPerCup) == S32VentiCup(1));
-        ensure("sample min is specific to when recording is active",
-            at_work.getMin(sCaffeineLevelStat) == sCaffeinePerOz * ((S32Ounces)S32TallCup(1)).value()
-                && all_day.getMin(sCaffeineLevelStat) == F32Milligrams(0.f)
-                && after_3pm.getMin(sCaffeineLevelStat) == sCaffeinePerOz * ((S32Ounces)S32TallCup(1) + (S32Ounces)S32GrandeCup(2)).value());
-        ensure("sample max is specific to when recording is active",
-            at_work.getMax(sCaffeineLevelStat) == sCaffeinePerOz * ((S32Ounces)S32TallCup(1) + (S32Ounces)S32GrandeCup(3)).value()
-                && all_day.getMax(sCaffeineLevelStat) == sCaffeinePerOz * ((S32Ounces)S32TallCup(1) + (S32Ounces)S32GrandeCup(3) + (S32Ounces)S32VentiCup(1)).value()
-                && after_3pm.getMax(sCaffeineLevelStat) == sCaffeinePerOz * ((S32Ounces)S32TallCup(1) + (S32Ounces)S32GrandeCup(3) + (S32Ounces)S32VentiCup(1)).value());
+        {
+            INFO("count stats are counted when recording is active");
+            CHECK(at_work.getSum(sCupsOfCoffeeConsumed) == 3);
+            CHECK(all_day.getSum(sCupsOfCoffeeConsumed) == 5);
+            CHECK(after_3pm.getSum(sCupsOfCoffeeConsumed) == 2);
+        }
+        {
+            INFO("measurement sums are counted when recording is active");
+            CHECK(at_work.getSum(sOuncesPerCup) == S32Ounces(48));
+            CHECK(all_day.getSum(sOuncesPerCup) == S32Ounces(80));
+            CHECK(after_3pm.getSum(sOuncesPerCup) == S32Ounces(36));
+        }
+        {
+            INFO("measurement min is specific to when recording is active");
+            CHECK(at_work.getMin(sOuncesPerCup) == S32GrandeCup(1));
+            CHECK(all_day.getMin(sOuncesPerCup) == S32TallCup(1));
+            CHECK(after_3pm.getMin(sOuncesPerCup) == S32GrandeCup(1));
+        }
+        {
+            INFO("measurement max is specific to when recording is active");
+            CHECK(at_work.getMax(sOuncesPerCup) == S32GrandeCup(1));
+            CHECK(all_day.getMax(sOuncesPerCup) == S32VentiCup(1));
+            CHECK(after_3pm.getMax(sOuncesPerCup) == S32VentiCup(1));
+        }
+        {
+            INFO("sample min is specific to when recording is active");
+            CHECK(at_work.getMin(sCaffeineLevelStat) == sCaffeinePerOz * ((S32Ounces)S32TallCup(1)).value());
+            CHECK(all_day.getMin(sCaffeineLevelStat) == F32Milligrams(0.f));
+            CHECK(after_3pm.getMin(sCaffeineLevelStat) == sCaffeinePerOz * ((S32Ounces)S32TallCup(1) + (S32Ounces)S32GrandeCup(2)).value());
+        }
+        {
+            INFO("sample max is specific to when recording is active");
+            CHECK(at_work.getMax(sCaffeineLevelStat) == sCaffeinePerOz * ((S32Ounces)S32TallCup(1) + (S32Ounces)S32GrandeCup(3)).value());
+            CHECK(all_day.getMax(sCaffeineLevelStat) == sCaffeinePerOz * ((S32Ounces)S32TallCup(1) + (S32Ounces)S32GrandeCup(3) + (S32Ounces)S32VentiCup(1)).value());
+            CHECK(after_3pm.getMax(sCaffeineLevelStat) == sCaffeinePerOz * ((S32Ounces)S32TallCup(1) + (S32Ounces)S32GrandeCup(3) + (S32Ounces)S32VentiCup(1)).value());
+        }
     }
 
 }
