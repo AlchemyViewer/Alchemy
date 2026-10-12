@@ -114,6 +114,21 @@ TEST_CASE("BufferStream Tests: BufferArrayStream holds a reference on an empty B
 }
 
 
+TEST_CASE("BufferStream Tests: BufferArrayStreamBuf over an empty BufferArray seeks to its start and reads nothing", "[BufferStream_Tests]")
+{
+    // create a new ref counted BufferArray with implicit reference
+    BufferArray * ba = new BufferArray;
+    BufferArrayStreamBuf bsb(ba);
+    ba->release();
+    ba = NULL;
+
+    CHECK(bsb.seekoff(0, std::ios_base::beg, std::ios_base::in) == std::streampos(0));
+    CHECK(bsb.seekoff(0, std::ios_base::end, std::ios_base::in) == std::streampos(0));
+    CHECK(tst_traits_t::eof() == bsb.underflow());
+    CHECK(tst_traits_t::eof() == bsb.pbackfail(tst_traits_t::eof()));
+}
+
+
 TEST_CASE("BufferStream Tests: BufferArrayStreamBuf reads and appends and seeks a BufferArray", "[BufferStream_Tests]")
 {
     // create a new ref counted BufferArray with implicit reference
@@ -152,11 +167,26 @@ TEST_CASE("BufferStream Tests: BufferArrayStreamBuf reads and appends and seeks 
     CHECK(bsb->seekoff(4, std::ios_base::cur, std::ios_base::in) == std::streampos(4));
     UNSCOPED_INFO("showmanyc() picks up seekoff");
     CHECK(bsb->showmanyc() == (c_len + 5 - 4));
-    CHECK(bsb->seekoff(0, std::ios_base::end, std::ios_base::in) == std::streampos(c_len + 4));
-    // The seek to the end leaves the read position on the last character, the '!',
-    // so pbackfail() refuses the '!' and puts back the 'a' before it
-    CHECK(tst_traits_t::eof() == bsb->pbackfail('!'));
-    CHECK(bsb->pbackfail('a') == 'a');
+    UNSCOPED_INFO("the end is past the last character");
+    CHECK(bsb->seekoff(0, std::ios_base::end, std::ios_base::in) == std::streampos(c_len + 5));
+    CHECK(tst_traits_t::eof() == bsb->underflow());
+    CHECK(bsb->showmanyc() == 0);
+    // so the last character, the '!', is the one that puts back there
+    CHECK(tst_traits_t::eof() == bsb->pbackfail('a'));
+    CHECK(bsb->pbackfail('!') == '!');
+    UNSCOPED_INFO("an offset from the end counts back from it");
+    CHECK(bsb->seekoff(-2, std::ios_base::end, std::ios_base::in) == std::streampos(c_len + 3));
+    CHECK(bsb->underflow() == 'a');
+    UNSCOPED_INFO("past the end is the end");
+    CHECK(bsb->seekoff(1, std::ios_base::end, std::ios_base::in) == std::streampos(c_len + 5));
+    UNSCOPED_INFO("before the start fails and leaves the position");
+    CHECK(bsb->seekoff(-1, std::ios_base::beg, std::ios_base::in) == std::streampos(-1));
+    CHECK(bsb->seekoff(0, std::ios_base::cur, std::ios_base::in) == std::streampos(c_len + 5));
+    UNSCOPED_INFO("a write from the end overwrites the last character");
+    CHECK(bsb->seekoff(-1, std::ios_base::end, std::ios_base::out) == std::streampos(c_len + 4));
+    CHECK(bsb->xsputn("?", 1) == 1);
+    CHECK(bsb->seekoff(-1, std::ios_base::end, std::ios_base::in) == std::streampos(c_len + 4));
+    CHECK(bsb->underflow() == '?');
 
     // the stream buffer is not ref counted; deleting it drops the BufferArray's last reference
     delete bsb;
