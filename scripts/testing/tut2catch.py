@@ -57,6 +57,10 @@ decided by the types clang resolved, not by its text:
                std::string_views. Operands are parenthesised where a macro
                or an operator would split or rebind them; a condition
                Catch2 cannot decompose (||, ?:) is parenthesised whole.
+               None of this reaches into a macro the test used: a && or
+               parentheses a macro made (WRAP(a && b), a && in a macro's
+               body) are not split or dropped, and the condition goes as
+               the test wrote it, macro and all.
   includes     lltut.h and tut.hpp give way to the Catch2 headers the file
                now uses, and altestmatchers.h, altestname.h or
                altestfailure.h where it uses them.
@@ -719,24 +723,6 @@ def unparenthesised(node):
     return node
 
 
-def and_terms(node):
-    """The terms of a && chain, each as the test wrote it, or [node]."""
-    node = skip_implicit(node)
-    while node.get("kind") == "ParenExpr":
-        inner = [c for c in node.get("inner", []) if "kind" in c]
-        if not inner:
-            break
-        inside = skip_implicit(inner[0])
-        if inside.get("kind") != "BinaryOperator" or inside.get("opcode") != "&&":
-            break
-        node = inside
-    if node.get("kind") == "BinaryOperator" and node.get("opcode") == "&&":
-        inner = [c for c in node.get("inner", []) if "kind" in c]
-        if len(inner) == 2:
-            return and_terms(inner[0]) + and_terms(inner[1])
-    return [node]
-
-
 def operands(node):
     """A comparison's two operands, implicit nodes and all, or None."""
     node = skip_implicit(node)
@@ -1385,7 +1371,71 @@ class Converter:
             return None
         return rng[0], rng[1]
 
-    def assertion(self, node, span, negate):
+    @staticmethod
+    def expansion(loc):
+        """Where the macro whose expansion holds loc was used, or None for a
+        place in the file's own text."""
+        if loc and "expansionLoc" in loc:
+            return loc["expansionLoc"].get("_f"), loc["expansionLoc"].get("offset")
+        return None
+
+    def call_span(self, node, record):
+        """[start, end) of a node written in its call's own text, or None:
+        where the call is in the file, no end of the node is a macro's;
+        where the call is in a macro's argument, the node is in it too. A
+        node one end of which a macro made, as the ( of WRAP(a && b) or
+        the 2 of ID(2), has no text of its own to rewrite."""
+        span = self.plain_span(node)
+        rng = node.get("range") or {}
+        if span is None:
+            return None
+        own = self.expansion(record["node"].get("range", {}).get("begin"))
+        if self.expansion(rng.get("begin")) != own or self.expansion(rng.get("end")) != own:
+            return None
+        return span
+
+    def written_parens(self, node, record):
+        """Whether a ParenExpr's parentheses are the call's own text, not a
+        macro's."""
+        span = self.call_span(node, record)
+        return span is not None and self.src.masked[span[0]:span[0] + 1] == b"(" and \
+            self.src.masked[span[1] - 1:span[1]] == b")"
+
+    def bare(self, node, record):
+        """node, without the parentheses the test wrote around a whole Catch2
+        can decompose (a macro's stay), and without the implicit nodes
+        around that."""
+        node = skip_implicit(node)
+        while node.get("kind") == "ParenExpr" and self.written_parens(node, record):
+            inner = [c for c in node.get("inner", []) if "kind" in c]
+            if not inner or not decomposable(inner[0]):
+                break
+            node = skip_implicit(inner[0])
+        return node
+
+    def and_terms(self, node, record):
+        """The terms of a && chain, each as the test wrote it, or [node].
+        Only a && and parentheses written in the call's own text are split
+        or seen through: one a macro made (WRAP(a && b), or the && of a
+        macro's body) would take the macro with it."""
+        node = skip_implicit(node)
+        while node.get("kind") == "ParenExpr" and self.written_parens(node, record):
+            inner = [c for c in node.get("inner", []) if "kind" in c]
+            if not inner:
+                break
+            inside = skip_implicit(inner[0])
+            if inside.get("kind") != "BinaryOperator" or inside.get("opcode") != "&&":
+                break
+            node = inside
+        if node.get("kind") == "BinaryOperator" and node.get("opcode") == "&&":
+            inner = [c for c in node.get("inner", []) if "kind" in c]
+            spans = [self.call_span(c, record) for c in inner]
+            if len(inner) == 2 and None not in spans and \
+                    self.src.masked[spans[0][1]:spans[1][0]].strip() in (b"&&", b"and"):
+                return self.and_terms(inner[0], record) + self.and_terms(inner[1], record)
+        return [node]
+
+    def assertion(self, node, span, negate, record):
         """(suffix, text) of the one assertion a condition is: "" or "_FALSE"
         after CHECK or REQUIRE, and what goes between its parentheses.
         Parentheses the test wrote around a whole Catch2 decomposes go, so
@@ -1394,28 +1444,28 @@ class Converter:
         itself; and strcmp() is compared as std::string_view, which prints."""
         suffix = "_FALSE" if negate else ""
         whole = self.render(*span)
-        node = unparenthesised(node)
-        nspan = self.plain_span(node)
+        node = self.bare(node, record)
+        nspan = self.call_span(node, record)
         if nspan is None:
             return suffix, whole if decomposable(node) else "(" + whole + ")"
         pair = operands(node)
         op = node.get("opcode") if pair else None
         if op in ("==", "!="):
             left, right = (skip_implicit(p) for p in pair)
-            spans = [self.plain_span(p) for p in pair]
+            spans = [self.call_span(p, record) for p in pair]
             if None not in spans:
                 for lit, other, other_span in ((left, right, spans[1]), (right, left, spans[0])):
                     if lit.get("kind") == "CXXBoolLiteralExpr" and value_type(other) == "bool":
                         truth = (lit.get("value") is True) == (op == "==")
-                        other_node = unparenthesised(other)
-                        inner = self.render(*(self.plain_span(other_node) or other_span))
+                        other_node = self.bare(other, record)
+                        inner = self.render(*(self.call_span(other_node, record) or other_span))
                         if not decomposable(other_node) and not wrapped(inner):
                             inner = "(" + inner + ")"
                         return ("" if truth != negate else "_FALSE"), inner
                 for zero, call in ((left, right), (right, left)):
                     args = strcmp_args(call)
                     if args and zero.get("kind") == "IntegerLiteral" and zero.get("value") == "0":
-                        text = self.string_views(args, op)
+                        text = self.string_views(args, op, record)
                         if text:
                             return suffix, text
                 if is_literal(left) and not is_literal(right):
@@ -1423,24 +1473,24 @@ class Converter:
         if node.get("kind") == "UnaryOperator" and node.get("opcode") == "!":
             inner = [c for c in node.get("inner", []) if "kind" in c]
             args = strcmp_args(inner[0]) if inner else None
-            text = self.string_views(args, "==") if args else None
+            text = self.string_views(args, "==", record) if args else None
             if text:
                 return suffix, text
             # !x is x, asserted false, so that x prints.
-            operand = unparenthesised(inner[0]) if inner else None
-            ospan = self.plain_span(operand) if operand else None
+            operand = self.bare(inner[0], record) if inner else None
+            ospan = self.call_span(operand, record) if operand else None
             if ospan:
                 text = self.render(*ospan)
                 return ("" if negate else "_FALSE"), text if decomposable(operand) else "(" + text + ")"
         args = strcmp_args(node)
-        text = self.string_views(args, "!=") if args else None
+        text = self.string_views(args, "!=", record) if args else None
         if text:
             return suffix, text
         text = self.render(*nspan)
         return suffix, text if decomposable(node) else "(" + text + ")"
 
-    def string_views(self, args, op):
-        spans = [self.plain_span(a) for a in args]
+    def string_views(self, args, op, record):
+        spans = [self.call_span(a, record) for a in args]
         if None in spans:
             return None
         texts = []
@@ -1461,8 +1511,15 @@ class Converter:
             open_paren = self.src.masked.find(b"(", start, end)
             return [(self.src.skip_space(open_paren + 1), self.src.skip_space_back(end - 1))]
         begins = []
+        own = self.expansion(record["node"].get("range", {}).get("begin"))
         for arg in record["args"]:
-            begin = self.loc(arg.get("range", {}).get("begin")).in_text()
+            loc = arg.get("range", {}).get("begin")
+            where = self.loc(loc)
+            begin = where.in_text()
+            # An argument a macro begins, as ID(x) does with x, begins where
+            # the macro was used, not at the x inside it.
+            if where.how == "macro-arg" and where.expansion and self.expansion(loc) != own:
+                begin = where.expansion[0]
             if begin is None or not (start < begin < end):
                 return None
             begins.append(begin)
@@ -1600,15 +1657,15 @@ class Converter:
             condition = args[n - 1]
             # A && chain is as many assertions, each printing its operands,
             # each as strong as its own term needs.
-            terms = and_terms(condition) if name == "ensure" else [condition]
-            if len(terms) > 1 and any(self.plain_span(t) is None for t in terms):
+            terms = self.and_terms(condition, record) if name == "ensure" else [condition]
+            if len(terms) > 1 and any(self.call_span(t, record) is None for t in terms):
                 terms = [condition]
 
             def build():
                 out = []
                 for term in terms:
-                    span = ranges[n - 1] if len(terms) == 1 else self.plain_span(term)
-                    suffix, text = self.assertion(term, span, name == "ensure_not")
+                    span = ranges[n - 1] if len(terms) == 1 else self.call_span(term, record)
+                    suffix, text = self.assertion(term, span, name == "ensure_not", record)
                     strength = req if len(terms) == 1 else self.strength(record, [term])
                     out.append(f"{strength}{suffix}({text})")
                 msg = message(0) if n == 2 else []
