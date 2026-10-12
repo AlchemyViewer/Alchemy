@@ -57,10 +57,25 @@ target_precompile_headers(llprimitive REUSE_FROM llprecompiled)
 
 # add unit tests
 if(AL_BUILD_TESTS)
-  foreach(test llmediaentry llgltfmaterial llmaterialid llmaterial)
-    al_add_test(${test} PROJECT llprimitive LIBRARIES llprimitive)
-  endforeach()
+  # llgltfmaterial_test.cpp is the one file that defines tinygltf's and stb's
+  # implementations, which the library leaves to the viewer.
+  al_add_test_binary(
+    llprimitive_tests
+    PROJECT llprimitive
+    SOURCES
+      tests/llgltfmaterial_test.cpp
+      tests/llmaterial_test.cpp
+      tests/llmaterialid_test.cpp
+      tests/llmediaentry_test.cpp
+    LIBRARIES llprimitive
+  )
   # This one stubs LLMaterialID and LLPrimTextureList, which the library
   # defines, so it compiles the one file it tests instead of linking it.
-  al_add_test(llprimitive UNIT PROJECT llprimitive LIBRARIES llmessage)
+  al_add_test_binary(
+    llprimitive_test
+    PROJECT llprimitive
+    SOURCES tests/llprimitive_test.cpp
+    UNIT llprimitive.cpp
+    LIBRARIES llmessage llmath llcommon
+  )
 endif()

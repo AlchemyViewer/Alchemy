@@ -1,5 +1,5 @@
 /**
- * @file lluserrelations_tut.cpp
+ * @file lluserrelations_test.cpp
  * @author Phoenix
  * @date 2006-10-12
  * @brief Unit tests for the LLRelationship class.
@@ -26,134 +26,82 @@
  * $/LicenseInfo$
  */
 
-#include <tut/tut.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include "linden_common.h"
 #include "lluserrelations.h"
 
-namespace tut
-{
 namespace
 {
     struct user_relationship
     {
         LLRelationship mRelationship;
     };
-    typedef test_group<user_relationship> user_relationship_t;
-    typedef user_relationship_t::object user_relationship_object_t;
-    tut::user_relationship_t tut_user_relationship("relationships");
-}
 
-    template<> template<>
-    void user_relationship_object_t::test<1>()
+    TEST_CASE_METHOD(user_relationship, "relationships: a default relationship grants nothing and is offline", "[relationships]")
     {
         // Test the default construction
-        ensure(
-            "No granted rights to",
-            !mRelationship.isRightGrantedTo(
-                LLRelationship::GRANT_ONLINE_STATUS));
-        ensure(
-            "No granted rights from",
-            !mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_ONLINE_STATUS));
-        ensure("No online status",!mRelationship.isOnline());
+        CHECK_FALSE(mRelationship.isRightGrantedTo(LLRelationship::GRANT_ONLINE_STATUS));
+        CHECK_FALSE(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
+        CHECK_FALSE(mRelationship.isOnline());
     }
 
-    template<> template<>
-    void user_relationship_object_t::test<2>()
+    TEST_CASE_METHOD(user_relationship, "relationships: grantRights grants rights to and from separately", "[relationships]")
     {
         // Test some granting
         mRelationship.grantRights(
             LLRelationship::GRANT_ONLINE_STATUS,
             LLRelationship::GRANT_MODIFY_OBJECTS);
-        ensure(
-            "Granted rights to has online",
-            mRelationship.isRightGrantedTo(
-                LLRelationship::GRANT_ONLINE_STATUS));
-        ensure(
-            "Granted rights from does not have online",
-            !mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_ONLINE_STATUS));
-        ensure(
-            "Granted rights to does not have modify",
-            !mRelationship.isRightGrantedTo(
-                LLRelationship::GRANT_MODIFY_OBJECTS));
-        ensure(
-            "Granted rights from has modify",
-            mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_MODIFY_OBJECTS));
+        CHECK(mRelationship.isRightGrantedTo(LLRelationship::GRANT_ONLINE_STATUS));
+        CHECK_FALSE(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
+        CHECK_FALSE(mRelationship.isRightGrantedTo(LLRelationship::GRANT_MODIFY_OBJECTS));
+        CHECK(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_MODIFY_OBJECTS));
     }
 
-    template<> template<>
-    void user_relationship_object_t::test<3>()
+    TEST_CASE_METHOD(user_relationship, "relationships: revokeRights removes only the rights it names", "[relationships]")
     {
         // Test revoking
         mRelationship.grantRights(
             LLRelationship::GRANT_ONLINE_STATUS
             | LLRelationship::GRANT_MAP_LOCATION,
             LLRelationship::GRANT_ONLINE_STATUS);
-        ensure(
-            "Granted rights to has online and map",
-            mRelationship.isRightGrantedTo(
+        CHECK(mRelationship.isRightGrantedTo(
                 LLRelationship::GRANT_ONLINE_STATUS
                 | LLRelationship::GRANT_MAP_LOCATION));
-        ensure(
-            "Granted rights from has online",
-            mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_ONLINE_STATUS));
+        CHECK(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
 
         mRelationship.revokeRights(
             LLRelationship::GRANT_MAP_LOCATION,
             LLRelationship::GRANT_NONE);
-        ensure(
-            "Granted rights revoked map",
-            !mRelationship.isRightGrantedTo(
+        UNSCOPED_INFO("map revoked");
+        CHECK_FALSE(mRelationship.isRightGrantedTo(
                 LLRelationship::GRANT_ONLINE_STATUS
                 | LLRelationship::GRANT_MAP_LOCATION));
-        ensure(
-            "Granted rights revoked still has online",
-            mRelationship.isRightGrantedTo(
-                LLRelationship::GRANT_ONLINE_STATUS));
+        UNSCOPED_INFO("online kept after revoking map");
+        CHECK(mRelationship.isRightGrantedTo(LLRelationship::GRANT_ONLINE_STATUS));
 
         mRelationship.grantRights(
             LLRelationship::GRANT_NONE,
             LLRelationship::GRANT_MODIFY_OBJECTS);
-        ensure(
-            "Granted rights from still has online",
-            mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_ONLINE_STATUS));
-        ensure(
-            "Granted rights from has full grant",
-            mRelationship.isRightGrantedFrom(
+        UNSCOPED_INFO("online kept after granting modify");
+        CHECK(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
+        CHECK(mRelationship.isRightGrantedFrom(
                 LLRelationship::GRANT_ONLINE_STATUS
                 | LLRelationship::GRANT_MODIFY_OBJECTS));
         mRelationship.revokeRights(
             LLRelationship::GRANT_NONE,
             LLRelationship::GRANT_MODIFY_OBJECTS);
-        ensure(
-            "Granted rights from still has online",
-            mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_ONLINE_STATUS));
-        ensure(
-            "Granted rights from no longer modify",
-            !mRelationship.isRightGrantedFrom(
-                LLRelationship::GRANT_MODIFY_OBJECTS));
+        UNSCOPED_INFO("online kept after revoking modify");
+        CHECK(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
+        CHECK_FALSE(mRelationship.isRightGrantedFrom(LLRelationship::GRANT_MODIFY_OBJECTS));
     }
 
-    template<> template<>
-    void user_relationship_object_t::test<4>()
+    TEST_CASE_METHOD(user_relationship, "relationships: online sets the online status", "[relationships]")
     {
-        ensure("No online status", !mRelationship.isOnline());
+        CHECK_FALSE(mRelationship.isOnline());
         mRelationship.online(true);
-        ensure("Online status", mRelationship.isOnline());
+        CHECK(mRelationship.isOnline());
         mRelationship.online(false);
-        ensure("No online status", !mRelationship.isOnline());
+        CHECK_FALSE(mRelationship.isOnline());
     }
-
-/*
-    template<> template<>
-    void user_relationship_object_t::test<>()
-    {
-    }
-*/
 }

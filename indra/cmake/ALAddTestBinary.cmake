@@ -9,7 +9,7 @@ if(NOT AL_BUILD_TESTS)
   return()
 endif()
 
-# al_add_test_binary(<name> PROJECT <project> SOURCES <test file>...
+# al_add_test_binary(<name> PROJECT <project> SOURCES <test file>... [UNIT <file>...]
 #                    [LIBRARIES <target>...] [SUPPORT <object library>...]
 #                    [INCLUDES <dir>...] [DEFINES <define>...] [ENVIRONMENT <VAR=value>...]
 #                    [GL] [PYTHON] [ISA_TIER <tier>] [RESOURCE_LOCK <name>...] [COMBINED])
@@ -21,6 +21,12 @@ endif()
 # archive the linker drops what nothing references, and the registrations
 # with it, so the tests would vanish without a word. DEFINES and INCLUDES are
 # the binary's, for every file in it.
+#
+# UNIT names files of PROJECT, the library, compiled into the binary instead
+# of linked, for a test that stubs what they call: its stubs would duplicate
+# the library's own definitions. The binary sees the library's include
+# directories, and LIBRARIES is all it links. Such a test is a binary of its
+# own, since every other test links the code it tests.
 #
 # Each test file is a CTest entry, <name>/<file stem>, that runs the file's
 # test cases -- chosen by the tag Catch2's --filenames-as-tags gives each case
@@ -38,9 +44,10 @@ endif()
 # <name>/combined runs all of them in one process. It is labelled
 # combined_pending and manual, which the default run leaves out, until the
 # binary's tests are known to share a process: then COMBINED labels it
-# combined, and it runs with the rest. With AL_TEST_PER_CASE, each test case is
-# an entry of its own instead, found when ctest runs, with the environment and
-# labels a file's entry would have.
+# combined, and it runs with the rest. A binary of one file has none: that
+# file's entry already runs every case in one process. With AL_TEST_PER_CASE,
+# each test case is an entry of its own instead, found when ctest runs, with
+# the environment and labels a file's entry would have.
 #
 # ENVIRONMENT sets variables for the runs, VAR=value each. GL, PYTHON and
 # ISA_TIER mean what they mean to al_add_test: a GL binary is labelled gl and
@@ -56,7 +63,7 @@ function(al_add_test_binary name)
     arg
     "GL;PYTHON;COMBINED"
     "PROJECT;ISA_TIER"
-    "SOURCES;LIBRARIES;SUPPORT;INCLUDES;DEFINES;ENVIRONMENT;RESOURCE_LOCK"
+    "SOURCES;UNIT;LIBRARIES;SUPPORT;INCLUDES;DEFINES;ENVIRONMENT;RESOURCE_LOCK"
   )
   if(NOT arg_PROJECT)
     message(FATAL_ERROR "al_add_test_binary(${name}): PROJECT is required")
@@ -109,9 +116,15 @@ function(al_add_test_binary name)
   # vcpkg's toolchain hangs an app-local copy step on every executable it
   # sees declared; a test runs from the build tree, as al_add_test explains.
   set(VCPKG_APPLOCAL_DEPS OFF)
-  add_executable(${target} ${arg_SOURCES})
+  add_executable(${target} ${arg_SOURCES} ${arg_UNIT})
   target_link_libraries(${target} PRIVATE al::flags al_test_support ${arg_SUPPORT} ${arg_LIBRARIES})
   target_include_directories(${target} PRIVATE ${arg_INCLUDES} ${INDRA_SOURCE_DIR}/test)
+  if(arg_UNIT)
+    target_include_directories(
+      ${target}
+      PRIVATE $<TARGET_PROPERTY:${arg_PROJECT},INTERFACE_INCLUDE_DIRECTORIES>
+    )
+  endif()
   if(arg_DEFINES)
     target_compile_definitions(${target} PRIVATE ${arg_DEFINES})
   endif()
@@ -260,34 +273,36 @@ function(al_add_test_binary name)
       PROPERTIES ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}" LABELS "${labels}" TIMEOUT 60
     )
 
-    # As long as the files take, but no longer than an hour: a hang, which
-    # the combined run is there to find, holds one CI row only so long.
     list(LENGTH stems file_count)
-    math(EXPR combined_timeout "${timeout} * ${file_count}")
-    if(combined_timeout GREATER 3600)
-      set(combined_timeout 3600)
-    endif()
-    set(combined_label "combined_pending;manual")
-    if(arg_COMBINED)
-      set(combined_label combined)
-    endif()
-    add_test(
-      NAME ${target}/combined
-      COMMAND $<TARGET_FILE:${target}> ${arguments}
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    )
-    set_tests_properties(
-      ${target}/combined
-      PROPERTIES
-        ENVIRONMENT "${environment}"
-        ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
-        LABELS "${labels};${combined_label}"
-        DISABLED ${disabled}
-        SKIP_RETURN_CODE 125
-        TIMEOUT ${combined_timeout}
-    )
-    if(arg_RESOURCE_LOCK)
-      set_tests_properties(${target}/combined PROPERTIES RESOURCE_LOCK "${arg_RESOURCE_LOCK}")
+    if(file_count GREATER 1)
+      # As long as the files take, but no longer than an hour: a hang, which
+      # the combined run is there to find, holds one CI row only so long.
+      math(EXPR combined_timeout "${timeout} * ${file_count}")
+      if(combined_timeout GREATER 3600)
+        set(combined_timeout 3600)
+      endif()
+      set(combined_label "combined_pending;manual")
+      if(arg_COMBINED)
+        set(combined_label combined)
+      endif()
+      add_test(
+        NAME ${target}/combined
+        COMMAND $<TARGET_FILE:${target}> ${arguments}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      )
+      set_tests_properties(
+        ${target}/combined
+        PROPERTIES
+          ENVIRONMENT "${environment}"
+          ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+          LABELS "${labels};${combined_label}"
+          DISABLED ${disabled}
+          SKIP_RETURN_CODE 125
+          TIMEOUT ${combined_timeout}
+      )
+      if(arg_RESOURCE_LOCK)
+        set_tests_properties(${target}/combined PROPERTIES RESOURCE_LOCK "${arg_RESOURCE_LOCK}")
+      endif()
     endif()
   endif()
 

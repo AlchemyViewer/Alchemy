@@ -41,14 +41,17 @@
 #include <string>
 #include <vector>
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include "altestmatchers.h"
 
 namespace
 {
     // q and -q are the same rotation, so compare through the absolute dot product.
-    void ensure_quat_equals(const char* msg, const LLQuaternion& actual, const LLQuaternion& expected)
+    void require_same_rotation(const char* what, const LLQuaternion& actual, const LLQuaternion& expected)
     {
-        tut::ensure_approximately_equals_range(msg, fabsf(dot(actual, expected)), 1.f, 1e-5f);
+        INFO(what);
+        REQUIRE_THAT(fabsf(dot(actual, expected)), Catch::Matchers::WithinAbs(1.f, 1e-5f));
     }
 }
 
@@ -105,8 +108,6 @@ namespace
     };
 }
 
-namespace tut
-{
 namespace
 {
     struct llcharacter_data
@@ -121,7 +122,7 @@ namespace
         {
             mParamInfos.push_back(std::make_unique<ALTestVisualParamInfo>(id, name, sex));
             ALTestVisualParam* param = new ALTestVisualParam();
-            ensure("the parameter takes its info", param->setInfo(mParamInfos.back().get()));
+            REQUIRE(param->setInfo(mParamInfos.back().get()));
             mCharacter.addVisualParam(param);
             return param;
         }
@@ -131,10 +132,10 @@ namespace
         ALTestMotion* startFreshMotion(LLUUID& id, LLMotionConstructor create = ALTestMotion::create)
         {
             id = LLUUID::generateNewID();
-            ensure("registerMotion", mCharacter.registerMotion(id, create));
-            ensure("startMotion", mCharacter.startMotion(id));
+            REQUIRE(mCharacter.registerMotion(id, create));
+            REQUIRE(mCharacter.startMotion(id));
             LLMotion* motion = mCharacter.findMotion(id);
-            ensure("started motion is findable", motion != nullptr);
+            REQUIRE(motion != nullptr);
             return static_cast<ALTestMotion*>(motion);
         }
 
@@ -143,7 +144,7 @@ namespace
         void animateJoint(ALTestMotion* motion, const char* joint_name)
         {
             LLJoint* joint = mCharacter.getJoint(joint_name);
-            ensure("joint resolves", joint != nullptr);
+            REQUIRE(joint != nullptr);
             motion->addJoint(joint, LLJointState::ROT);
         }
 
@@ -161,73 +162,71 @@ namespace
             return mCharacter.getMotionController().getActiveMotions(blend_type);
         }
     };
-    typedef test_group<llcharacter_data> llcharacter_test;
-    typedef llcharacter_test::object llcharacter_object;
-    tut::llcharacter_test llcharacter_testcase("LLCharacter");
-}
 
-    template<> template<>
-    void llcharacter_object::test<1>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: joints resolve by name and index with their numbers and parents", "[LLCharacter]")
     {
         LLJoint* pelvis = mCharacter.getJoint("mPelvis");
-        ensure("pelvis resolves", pelvis != nullptr);
-        ensure_equals("pelvis joint number", pelvis->getJointNum(), 0);
-        ensure("pelvis hangs off the root", pelvis->getParent() == mCharacter.getRootJoint());
+        REQUIRE(pelvis != nullptr);
+        CHECK(pelvis->getJointNum() == 0);
+        CHECK(pelvis->getParent() == mCharacter.getRootJoint());
 
         LLJoint* head = mCharacter.getJoint("mHead");
-        ensure("head resolves", head != nullptr);
-        ensure_equals("head joint number", head->getJointNum(), 4);
-        ensure_equals("head parent", head->getParent()->getName(), std::string("mNeck"));
+        REQUIRE(head != nullptr);
+        CHECK(head->getJointNum() == 4);
+        LLJoint* neck = head->getParent();
+        REQUIRE(neck != nullptr);
+        CHECK(neck->getName() == std::string("mNeck"));
 
-        ensure("character joint by index", mCharacter.getCharacterJoint(2) == mCharacter.getJoint("mChest"));
-        ensure("unknown joint is null", mCharacter.getJoint("mNope") == nullptr);
+        CHECK(mCharacter.getCharacterJoint(2) == mCharacter.getJoint("mChest"));
+        CHECK(mCharacter.getJoint("mNope") == nullptr);
     }
 
-    template<> template<>
-    void llcharacter_object::test<2>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: registerMotion refuses duplicates and createMotion builds one instance", "[LLCharacter]")
     {
         LLUUID id = LLUUID::generateNewID();
-        ensure("registerMotion accepts a new id", mCharacter.registerMotion(id, ALTestMotion::create));
-        ensure("registerMotion refuses a duplicate", !mCharacter.registerMotion(id, ALTestMotion::create));
+        CHECK(mCharacter.registerMotion(id, ALTestMotion::create));
+        CHECK_FALSE(mCharacter.registerMotion(id, ALTestMotion::create));
 
         LLMotion* motion = mCharacter.createMotion(id);
-        ensure("createMotion builds an instance", motion != nullptr);
-        ensure("findMotion returns the same instance", mCharacter.findMotion(id) == motion);
-        ensure("createMotion again returns the same instance", mCharacter.createMotion(id) == motion);
-        ensure_equals("onInitialize ran once", static_cast<ALTestMotion*>(motion)->mInitializeCount, 1);
-        ensure("created motion is not active", !mCharacter.isMotionActive(id));
+        REQUIRE(motion != nullptr);
+        CHECK(mCharacter.findMotion(id) == motion);
+        CHECK(mCharacter.createMotion(id) == motion);
+        CHECK(static_cast<ALTestMotion*>(motion)->mInitializeCount == 1);
+        CHECK_FALSE(mCharacter.isMotionActive(id));
     }
 
-    template<> template<>
-    void llcharacter_object::test<3>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: a started motion updates on normal updates until stopped", "[LLCharacter]")
     {
         LLUUID id;
         ALTestMotion* motion = startFreshMotion(id);
-        ensure("motion is active", mCharacter.isMotionActive(id));
-        ensure_equals("onActivate ran once", motion->mActivateCount, 1);
-        ensure_equals("activation primes with one onUpdate", motion->mUpdateCount, 1);
+        CHECK(mCharacter.isMotionActive(id));
+        CHECK(motion->mActivateCount == 1);
+        UNSCOPED_INFO("activation primes with one onUpdate");
+        CHECK(motion->mUpdateCount == 1);
 
         const LLQuaternion rot(0.7f, LLVector3::y_axis);
         LLJoint* pelvis = mCharacter.getJoint("mPelvis");
         motion->addJoint(pelvis, LLJointState::ROT)->setRotation(rot);
 
         mCharacter.updateMotions(LLCharacter::HIDDEN_UPDATE);
-        ensure_equals("hidden update does not run onUpdate", motion->mUpdateCount, 1);
+        UNSCOPED_INFO("hidden update does not run onUpdate");
+        CHECK(motion->mUpdateCount == 1);
 
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
-        ensure_equals("normal update runs onUpdate", motion->mUpdateCount, 2);
-        ensure_quat_equals("normal update blends the pose into the skeleton", pelvis->getRotation(), rot);
+        UNSCOPED_INFO("normal update runs onUpdate");
+        CHECK(motion->mUpdateCount == 2);
+        require_same_rotation("normal update blends the pose into the skeleton", pelvis->getRotation(), rot);
 
-        ensure("stopMotion", mCharacter.stopMotion(id, true));
-        ensure("stopped motion is inactive", !mCharacter.isMotionActive(id));
-        ensure_equals("onDeactivate ran once", motion->mDeactivateCount, 1);
+        CHECK(mCharacter.stopMotion(id, true));
+        CHECK_FALSE(mCharacter.isMotionActive(id));
+        CHECK(motion->mDeactivateCount == 1);
 
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
-        ensure_equals("inactive motion is not updated", motion->mUpdateCount, 2);
+        UNSCOPED_INFO("inactive motion is not updated");
+        CHECK(motion->mUpdateCount == 2);
     }
 
-    template<> template<>
-    void llcharacter_object::test<4>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: a motion whose onUpdate returns false is stopped", "[LLCharacter]")
     {
         // A motion that reports completion from onUpdate is stopped by the controller.
         LLUUID id;
@@ -235,11 +234,10 @@ namespace
         motion->mUpdateResult = false;
 
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
-        ensure("self-completing motion is marked stopped", motion->isStopped());
+        CHECK(motion->isStopped());
     }
 
-    template<> template<>
-    void llcharacter_object::test<5>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: motions are listed newest first and additive ones update first", "[LLCharacter]")
     {
         // The playing motions are kept newest first in a list per blend type,
         // and an update walks the whole additive list before the normal one:
@@ -257,24 +255,31 @@ namespace
 
         const LLMotionController::motion_list_t& normals = activeMotions(LLMotion::NORMAL_BLEND);
         const LLMotionController::motion_list_t& additives = activeMotions(LLMotion::ADDITIVE_BLEND);
-        ensure_equals("two normal motions", normals.size(), 2u);
-        ensure("normal list is newest first", normals[0] == normal_second && normals[1] == normal_first);
-        ensure_equals("two additive motions", additives.size(), 2u);
-        ensure("additive list is newest first", additives[0] == additive_second && additives[1] == additive_first);
+        REQUIRE(normals.size() == 2u);
+        CHECK(normals[0] == normal_second);
+        CHECK(normals[1] == normal_first);
+        REQUIRE(additives.size() == 2u);
+        CHECK(additives[0] == additive_second);
+        CHECK(additives[1] == additive_first);
 
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
-        ensure("newest additive motion is updated first", additive_second->mUpdateSerial < additive_first->mUpdateSerial);
-        ensure("the additive pass finishes before the normal pass begins", additive_first->mUpdateSerial < normal_second->mUpdateSerial);
-        ensure("newest normal motion is updated first", normal_second->mUpdateSerial < normal_first->mUpdateSerial);
+        UNSCOPED_INFO("newest additive motion is updated first");
+        CHECK(additive_second->mUpdateSerial < additive_first->mUpdateSerial);
+        UNSCOPED_INFO("the additive pass finishes before the normal pass begins");
+        CHECK(additive_first->mUpdateSerial < normal_second->mUpdateSerial);
+        UNSCOPED_INFO("newest normal motion is updated first");
+        CHECK(normal_second->mUpdateSerial < normal_first->mUpdateSerial);
 
-        ensure("stopMotion", mCharacter.stopMotion(additive_first_id, true));
-        ensure_equals("stopping an additive motion shortens the additive list", additives.size(), 1u);
-        ensure("the other additive motion stays", additives[0] == additive_second);
-        ensure_equals("and leaves the normal list alone", normals.size(), 2u);
+        CHECK(mCharacter.stopMotion(additive_first_id, true));
+        UNSCOPED_INFO("stopping an additive motion shortens the additive list");
+        REQUIRE(additives.size() == 1u);
+        UNSCOPED_INFO("the other additive motion stays");
+        CHECK(additives[0] == additive_second);
+        UNSCOPED_INFO("and leaves the normal list alone");
+        CHECK(normals.size() == 2u);
     }
 
-    template<> template<>
-    void llcharacter_object::test<6>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: a motion leaving the list mid-update skips no other motion", "[LLCharacter]")
     {
         // A motion that finishes easing out takes itself off the list while
         // the list is being walked. The older motion behind it moves into its
@@ -286,7 +291,7 @@ namespace
         animateJoint(oldest, "mPelvis");
         animateJoint(ending, "mTorso");
         animateJoint(newest, "mChest");
-        ensure("stopMotion", mCharacter.stopMotion(ending_id, false));
+        CHECK(mCharacter.stopMotion(ending_id, false));
 
         S32 frames = 0;
         while (mCharacter.isMotionActive(ending_id) && frames < 20)
@@ -294,18 +299,23 @@ namespace
             runFrame();
             ++frames;
         }
-        ensure("the ending motion left the list", !mCharacter.isMotionActive(ending_id));
-        ensure_equals("the ending motion was deactivated once", ending->mDeactivateCount, 1);
-        ensure_equals("the motion behind it was updated every frame", oldest->mUpdateCount, 1 + frames);
-        ensure_equals("the motion ahead of it was updated every frame", newest->mUpdateCount, 1 + frames);
+        CHECK_FALSE(mCharacter.isMotionActive(ending_id));
+        CHECK(ending->mDeactivateCount == 1);
+        UNSCOPED_INFO("the motion behind it was updated every frame");
+        CHECK(oldest->mUpdateCount == 1 + frames);
+        UNSCOPED_INFO("the motion ahead of it was updated every frame");
+        CHECK(newest->mUpdateCount == 1 + frames);
 
         const LLMotionController::motion_list_t& normals = activeMotions(LLMotion::NORMAL_BLEND);
-        ensure_equals("two motions remain", normals.size(), 2u);
-        ensure("remaining motions are still newest first", normals[0] == newest && normals[1] == oldest);
+        REQUIRE(normals.size() == 2u);
+        {
+            INFO("remaining motions are still newest first");
+            CHECK(normals[0] == newest);
+            CHECK(normals[1] == oldest);
+        }
     }
 
-    template<> template<>
-    void llcharacter_object::test<7>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: the pixel area is asked once per pass and not per motion", "[LLCharacter]")
     {
         // The LOD test compares every motion against the character's pixel
         // area, which is the same for all of them and a virtual call. It is
@@ -323,11 +333,10 @@ namespace
         animateJoint(startFreshMotion(id, ALTestMotion::createAdditive), "mNeck");
         mCharacter.mPixelAreaQueries = 0;
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
-        ensure_equals("pixel area is not asked once per motion", mCharacter.mPixelAreaQueries, queries_with_one_motion);
+        CHECK(mCharacter.mPixelAreaQueries == queries_with_one_motion);
     }
 
-    template<> template<>
-    void llcharacter_object::test<8>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: flushAllMotions restarts normal and additive motions", "[LLCharacter]")
     {
         // A flush restarts every playing motion, whichever list it was on.
         LLUUID normal_id, additive_id;
@@ -335,14 +344,13 @@ namespace
         startFreshMotion(additive_id, ALTestMotion::createAdditive);
 
         mCharacter.flushAllMotions();
-        ensure("normal motion restarted", mCharacter.isMotionActive(normal_id));
-        ensure("additive motion restarted", mCharacter.isMotionActive(additive_id));
-        ensure_equals("one normal motion", activeMotions(LLMotion::NORMAL_BLEND).size(), 1u);
-        ensure_equals("one additive motion", activeMotions(LLMotion::ADDITIVE_BLEND).size(), 1u);
+        CHECK(mCharacter.isMotionActive(normal_id));
+        CHECK(mCharacter.isMotionActive(additive_id));
+        CHECK(activeMotions(LLMotion::NORMAL_BLEND).size() == 1u);
+        CHECK(activeMotions(LLMotion::ADDITIVE_BLEND).size() == 1u);
     }
 
-    template<> template<>
-    void llcharacter_object::test<9>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: a hidden update drops every stopped motion in one pass", "[LLCharacter]")
     {
         // Hidden, the controller drops every stopped motion in one pass, and
         // a motion leaving the list must not hide the stopped one behind it.
@@ -350,18 +358,18 @@ namespace
         startFreshMotion(oldest_id);
         startFreshMotion(middle_id);
         startFreshMotion(newest_id);
-        ensure("stop middle", mCharacter.stopMotion(middle_id, false));
-        ensure("stop oldest", mCharacter.stopMotion(oldest_id, false));
+        CHECK(mCharacter.stopMotion(middle_id, false));
+        CHECK(mCharacter.stopMotion(oldest_id, false));
 
         mCharacter.updateMotions(LLCharacter::HIDDEN_UPDATE);
-        ensure("the stopped middle motion left the list", !mCharacter.isMotionActive(middle_id));
-        ensure("the stopped motion behind it left the list too", !mCharacter.isMotionActive(oldest_id));
-        ensure("the running motion stayed", mCharacter.isMotionActive(newest_id));
-        ensure_equals("one motion remains", activeMotions(LLMotion::NORMAL_BLEND).size(), 1u);
+        CHECK_FALSE(mCharacter.isMotionActive(middle_id));
+        UNSCOPED_INFO("the stopped motion behind it left the list too");
+        CHECK_FALSE(mCharacter.isMotionActive(oldest_id));
+        CHECK(mCharacter.isMotionActive(newest_id));
+        CHECK(activeMotions(LLMotion::NORMAL_BLEND).size() == 1u);
     }
 
-    template<> template<>
-    void llcharacter_object::test<10>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: setTimeStep snaps only a stopped motion's stop time", "[LLCharacter]")
     {
         // Moving onto the coarse clock snaps every playing motion's timestamps
         // to the quantum. A running motion has no stop time to snap, and
@@ -372,21 +380,24 @@ namespace
         ALTestMotion* running = startFreshMotion(running_id);
         ALTestMotion* stopped = startFreshMotion(stopped_id);
         runFrame();
-        ensure("stopMotion", mCharacter.stopMotion(stopped_id, false));
+        CHECK(mCharacter.stopMotion(stopped_id, false));
         stopped->mStopTimeCalls = 0;
         running->mStopTimeCalls = 0;
 
         mCharacter.getMotionController().setTimeStep(0.25f);
-        ensure("the running motion is still running", !running->isStopped());
-        ensure_equals("its stop time was never set", running->mStopTimeCalls, 0);
-        ensure_equals("and it still reads as never stopped", running->getStopTime(), 0.0);
-        ensure("a motion that never ends keeps its open send-stop time", running->sendStopTimestamp() == F32_MAX);
-        ensure("the stopped motion is still stopped", stopped->isStopped());
-        ensure_equals("its stop time sits on the quantum", fmod(stopped->getStopTime(), 0.25), 0.0);
+        CHECK_FALSE(running->isStopped());
+        UNSCOPED_INFO("its stop time was never set");
+        CHECK(running->mStopTimeCalls == 0);
+        UNSCOPED_INFO("and it still reads as never stopped");
+        CHECK(running->getStopTime() == 0.0);
+        UNSCOPED_INFO("a motion that never ends keeps its open send-stop time");
+        CHECK(running->sendStopTimestamp() == F32_MAX);
+        CHECK(stopped->isStopped());
+        UNSCOPED_INFO("its stop time sits on the quantum");
+        CHECK(fmod(stopped->getStopTime(), 0.25) == 0.0);
     }
 
-    template<> template<>
-    void llcharacter_object::test<11>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: a motion started during an update waits for the next frame", "[LLCharacter]")
     {
         // A motion's update can start another motion -- an emote's does when
         // it finds the sit animation is for the wrong sex -- and the new one
@@ -407,42 +418,54 @@ namespace
         newest->mEaseInDuration = 10.f;
 
         const LLUUID started_id = LLUUID::generateNewID();
-        ensure("registerMotion", mCharacter.registerMotion(started_id, ALTestMotion::create));
+        CHECK(mCharacter.registerMotion(started_id, ALTestMotion::create));
         middle->mStartOnUpdate = started_id;
 
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
-        ensure("the started motion is playing", mCharacter.isMotionActive(started_id));
-        ensure_equals("the motion ahead of the starter was updated once", newest->mUpdateCount, 2);
-        ensure_equals("the starter was updated once", middle->mUpdateCount, 2);
-        ensure_equals("the motion behind the starter was updated once", oldest->mUpdateCount, 2);
+        CHECK(mCharacter.isMotionActive(started_id));
+        UNSCOPED_INFO("the motion ahead of the starter was updated once");
+        CHECK(newest->mUpdateCount == 2);
+        UNSCOPED_INFO("the starter was updated once");
+        CHECK(middle->mUpdateCount == 2);
+        UNSCOPED_INFO("the motion behind the starter was updated once");
+        CHECK(oldest->mUpdateCount == 2);
         ALTestMotion* started = static_cast<ALTestMotion*>(mCharacter.findMotion(started_id));
-        ensure_equals("the new motion had only its activation update", started->mUpdateCount, 1);
+        REQUIRE(started != nullptr);
+        UNSCOPED_INFO("the new motion had only its activation update");
+        CHECK(started->mUpdateCount == 1);
 
         const LLMotionController::motion_list_t& normals = activeMotions(LLMotion::NORMAL_BLEND);
-        ensure_equals("four motions listed", normals.size(), 4u);
-        ensure("newest first, the started one ahead of them all",
-               normals[0] == started && normals[1] == newest && normals[2] == middle && normals[3] == oldest);
+        REQUIRE(normals.size() == 4u);
+        {
+            INFO("newest first, the started one ahead of them all");
+            CHECK(normals[0] == started);
+            CHECK(normals[1] == newest);
+            CHECK(normals[2] == middle);
+            CHECK(normals[3] == oldest);
+        }
     }
 
-    template<> template<>
-    void llcharacter_object::test<12>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: animation data is a slot and the hand pose request a copy", "[LLCharacter]")
     {
         // The values motions hand one another are slots on the character: set
         // by whoever owns the value, empty when nobody does.
         F32 speed = 3.f;
-        ensure("an unset channel reads empty", mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == nullptr);
+        CHECK(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == nullptr);
         mCharacter.setAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED, &speed);
-        ensure("a set channel reads back what was set", mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == &speed);
-        ensure("the other channels are untouched",
-               mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_POINT_AT_POINT) == nullptr
-               && mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT) == nullptr);
+        CHECK(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == &speed);
+        {
+            INFO("the other channels are untouched");
+            CHECK(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_POINT_AT_POINT) == nullptr);
+            CHECK(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT) == nullptr);
+        }
         mCharacter.removeAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED);
-        ensure("a removed channel reads empty", mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == nullptr);
+        CHECK(mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == nullptr);
 
         // The hand pose is not a slot but a copy, so the request stands after
         // whatever it was read from has changed or gone, and it is dropped
         // with the motions on a flush.
-        ensure("no hand pose is asked for to begin with", !mCharacter.hasHandPoseRequest());
+        UNSCOPED_INFO("no hand pose is asked for to begin with");
+        CHECK_FALSE(mCharacter.hasHandPoseRequest());
         {
             S32 pose = 1;
             S32 priority = 2;
@@ -450,19 +473,21 @@ namespace
             pose = 5;
             priority = 4;
         }
-        ensure("a request stands", mCharacter.hasHandPoseRequest());
-        ensure_equals("with the pose asked for", mCharacter.getHandPoseRequest(), 1);
-        ensure_equals("at the priority asked at", mCharacter.getHandPoseRequestPriority(), 2);
+        UNSCOPED_INFO("a request stands");
+        CHECK(mCharacter.hasHandPoseRequest());
+        UNSCOPED_INFO("with the pose asked for");
+        CHECK(mCharacter.getHandPoseRequest() == 1);
+        UNSCOPED_INFO("at the priority asked at");
+        CHECK(mCharacter.getHandPoseRequestPriority() == 2);
         mCharacter.clearHandPoseRequest();
-        ensure("a cleared request is gone", !mCharacter.hasHandPoseRequest());
+        CHECK_FALSE(mCharacter.hasHandPoseRequest());
 
         mCharacter.requestHandPose(1, 2);
         mCharacter.flushAllMotions();
-        ensure("a flush drops the hand pose", !mCharacter.hasHandPoseRequest());
+        CHECK_FALSE(mCharacter.hasHandPoseRequest());
     }
 
-    template<> template<>
-    void llcharacter_object::test<13>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: a motion stopped while easing in never rises in weight", "[LLCharacter]")
     {
         // A motion stopped before it finished easing in gets one more update,
         // to hand it the stop time it never saw, and then deactivates. It
@@ -478,28 +503,29 @@ namespace
         runFrame();
         runFrame();
         const F32 easing_in = motion->getPose()->getWeight();
-        ensure("the motion is still easing in", easing_in < 0.5f);
+        UNSCOPED_INFO("the motion is still easing in");
+        CHECK(easing_in < 0.5f);
 
         mCharacter.stopMotion(id);
         runFrame();
 
-        ensure("the last update does not raise the weight",
-               motion->getPose()->getWeight() <= easing_in);
-        ensure("the motion is still around for its last update",
-               activeMotions(LLMotion::NORMAL_BLEND).size() == 1u);
+        UNSCOPED_INFO("the last update does not raise the weight");
+        CHECK(motion->getPose()->getWeight() <= easing_in);
+        UNSCOPED_INFO("the motion is still around for its last update");
+        CHECK(activeMotions(LLMotion::NORMAL_BLEND).size() == 1u);
 
         runFrame();
-        ensure("and is gone the frame after", activeMotions(LLMotion::NORMAL_BLEND).empty());
+        UNSCOPED_INFO("and is gone the frame after");
+        CHECK(activeMotions(LLMotion::NORMAL_BLEND).empty());
     }
 
-    template<> template<>
-    void llcharacter_object::test<14>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: a motion still easing in does not mask the one under it", "[LLCharacter]")
     {
         // The mask that lets a motion's joints go unread is built from motions
         // at full weight and no others. One still easing in has claimed
         // nothing, so what is under it is still blended and still shows.
         LLJoint* joint = mCharacter.getJoint("mPelvis");
-        ensure("the joint resolves", joint != nullptr);
+        REQUIRE(joint != nullptr);
 
         const LLQuaternion under_rot(0.9f, LLVector3::x_axis);
         const LLQuaternion over_rot(-1.4f, LLVector3::y_axis);
@@ -518,22 +544,22 @@ namespace
         runFrame();
         runFrame();
 
-        ensure("the one easing in has not reached full weight",
-               over->getPose()->getWeight() < 0.5f);
-        ensure("so the one underneath is what the joint shows",
-               fabsf(dot(joint->getRotation(), under_rot)) > 0.99f);
+        UNSCOPED_INFO("the one easing in has not reached full weight");
+        CHECK(over->getPose()->getWeight() < 0.5f);
+        UNSCOPED_INFO("so the one underneath is what the joint shows");
+        CHECK(fabsf(dot(joint->getRotation(), under_rot)) > 0.99f);
 
         // and once it is all the way in, it owns the joint
         over->mEaseInDuration = 0.f;
         runFrame();
 
-        ensure_equals("it is at full weight now", over->getPose()->getWeight(), 1.f);
-        ensure("and the joint is what it asked for",
-               fabsf(dot(joint->getRotation(), over_rot)) > 0.99f);
+        UNSCOPED_INFO("it is at full weight now");
+        CHECK(over->getPose()->getWeight() == 1.f);
+        UNSCOPED_INFO("and the joint is what it asked for");
+        CHECK(fabsf(dot(joint->getRotation(), over_rot)) > 0.99f);
     }
 
-    template<> template<>
-    void llcharacter_object::test<15>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: updateVisualParams applies only parameters whose weight moved", "[LLCharacter]")
     {
         // The sweep applies a parameter whose weight has moved and leaves the
         // rest alone, and says whether it did anything.
@@ -542,29 +568,35 @@ namespace
 
         // A parameter arrives at its default weight, which is the weight it
         // was last applied at, so there is nothing to do for either of them.
-        ensure("a sweep with nothing to do says so", !mCharacter.updateVisualParams());
-        ensure_equals("and applies nothing", first->mApplied, 0);
-        ensure_equals("to either of them", second->mApplied, 0);
+        UNSCOPED_INFO("a sweep with nothing to do says so");
+        CHECK_FALSE(mCharacter.updateVisualParams());
+        UNSCOPED_INFO("and applies nothing");
+        CHECK(first->mApplied == 0);
+        CHECK(second->mApplied == 0);
 
         first->setWeight(0.5f);
-        ensure("a sweep after a weight moves says so", mCharacter.updateVisualParams());
-        ensure_equals("the parameter that moved is applied", first->mApplied, 1);
-        ensure_equals("and the one that did not is not", second->mApplied, 0);
+        UNSCOPED_INFO("a sweep after a weight moves says so");
+        CHECK(mCharacter.updateVisualParams());
+        UNSCOPED_INFO("the parameter that moved is applied");
+        CHECK(first->mApplied == 1);
+        UNSCOPED_INFO("and the one that did not is not");
+        CHECK(second->mApplied == 0);
 
-        ensure("and once it has settled again there is nothing to do",
-               !mCharacter.updateVisualParams());
-        ensure_equals("with nothing applied a second time", first->mApplied, 1);
+        UNSCOPED_INFO("and once it has settled again there is nothing to do");
+        CHECK_FALSE(mCharacter.updateVisualParams());
+        UNSCOPED_INFO("with nothing applied a second time");
+        CHECK(first->mApplied == 1);
 
         // Both of them at once.
         first->setWeight(0.25f);
         second->setWeight(0.75f);
-        ensure("a sweep with two to do says so", mCharacter.updateVisualParams());
-        ensure_equals("and applies the first", first->mApplied, 2);
-        ensure_equals("and the second", second->mApplied, 1);
+        UNSCOPED_INFO("a sweep with two to do says so");
+        CHECK(mCharacter.updateVisualParams());
+        CHECK(first->mApplied == 2);
+        CHECK(second->mApplied == 1);
     }
 
-    template<> template<>
-    void llcharacter_object::test<16>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: updateVisualParams skips animating and other-sex parameters", "[LLCharacter]")
     {
         // A parameter that is animating is left to the animation, and one for
         // the other sex is applied at its default rather than its weight.
@@ -577,23 +609,24 @@ namespace
 
         animating->setAnimating(true);
         animating->setWeight(0.5f);
-        ensure("an animating parameter is not swept", !mCharacter.updateVisualParams());
-        ensure_equals("and not applied", animating->mApplied, settled);
+        UNSCOPED_INFO("an animating parameter is not swept");
+        CHECK_FALSE(mCharacter.updateVisualParams());
+        CHECK(animating->mApplied == settled);
 
         animating->setAnimating(false);
-        ensure("once it stops animating the sweep takes it", mCharacter.updateVisualParams());
+        UNSCOPED_INFO("once it stops animating the sweep takes it");
+        CHECK(mCharacter.updateVisualParams());
 
         // The female parameter settled at its default under a male sex, so
         // moving its weight changes nothing the sweep can see.
         const S32 female_settled = female->mApplied;
         female->setWeight(0.75f);
-        ensure("a parameter for the other sex has nothing to apply",
-               !mCharacter.updateVisualParams());
-        ensure_equals("and is not applied", female->mApplied, female_settled);
+        UNSCOPED_INFO("a parameter for the other sex has nothing to apply");
+        CHECK_FALSE(mCharacter.updateVisualParams());
+        CHECK(female->mApplied == female_settled);
     }
 
-    template<> template<>
-    void llcharacter_object::test<17>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: visual parameters are found by name in any case and walked by id", "[LLCharacter]")
     {
         // Parameters are found by name whatever case the name is asked in,
         // and the sweep walks them in the order of their ids however they
@@ -602,7 +635,7 @@ namespace
         addParam(10, "First");
         addParam(20, "Second");
 
-        ensure_equals("every parameter is counted", mCharacter.getVisualParamCount(), 3);
+        CHECK(mCharacter.getVisualParamCount() == 3);
 
         std::vector<S32> ids;
         for (LLVisualParam* param = mCharacter.getFirstVisualParam();
@@ -611,65 +644,56 @@ namespace
         {
             ids.push_back(param->getID());
         }
-        ensure_equals("all three are walked", ids.size(), 3u);
-        ensure_equals("in id order, not the order they arrived", ids[0], 10);
-        ensure_equals("second", ids[1], 20);
-        ensure_equals("third", ids[2], 30);
+        REQUIRE(ids.size() == 3u);
+        UNSCOPED_INFO("in id order, not the order they arrived");
+        CHECK(ids[0] == 10);
+        CHECK(ids[1] == 20);
+        CHECK(ids[2] == 30);
 
         LLVisualParam* by_name = mCharacter.getVisualParam("Second");
-        ensure("a parameter is found by its name", by_name != nullptr);
-        ensure_equals("and it is the right one", by_name->getID(), 20);
+        REQUIRE(by_name != nullptr);
+        CHECK(by_name->getID() == 20);
 
-        ensure_equals("the name is matched without regard to case",
-                      mCharacter.getVisualParam("sEcOnD"), by_name);
-        ensure_equals("in either direction",
-                      mCharacter.getVisualParam("SECOND"), by_name);
-        ensure("a name nobody has is not found",
-               mCharacter.getVisualParam("NotAParameter") == nullptr);
+        CHECK(mCharacter.getVisualParam("sEcOnD") == by_name);
+        CHECK(mCharacter.getVisualParam("SECOND") == by_name);
+        CHECK(mCharacter.getVisualParam("NotAParameter") == nullptr);
 
         // And by id, which is the other way in.
-        ensure_equals("a parameter is found by its id",
-                      mCharacter.getVisualParam(20), by_name);
+        CHECK(mCharacter.getVisualParam(20) == by_name);
 
-        ensure("setting a weight by name finds it",
-               mCharacter.setVisualParamWeight("SeCoNd", 0.25f));
-        ensure_approximately_equals("and sets it",
-                                    mCharacter.getVisualParamWeight("second"), 0.25f, 16);
-        ensure("setting one nobody has does not",
-               !mCharacter.setVisualParamWeight("NotAParameter", 0.25f));
+        UNSCOPED_INFO("setting a weight by name finds it");
+        CHECK(mCharacter.setVisualParamWeight("SeCoNd", 0.25f));
+        CHECK_THAT(mCharacter.getVisualParamWeight("second"), ll_test::WithinBits(0.25f, 16));
+        CHECK_FALSE(mCharacter.setVisualParamWeight("NotAParameter", 0.25f));
     }
 
-    template<> template<>
-    void llcharacter_object::test<18>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: a parameter added under a taken id replaces the old one", "[LLCharacter]")
     {
         // A parameter added under an id that is already taken replaces the one
         // there, in the list the sweep walks as well as in the map.
         ALTestVisualParam* first = addParam(7, "First");
         ALTestVisualParam* second = addParam(7, "Second");
 
-        ensure_equals("the second one took the first one's place",
-                      mCharacter.getVisualParamCount(), 1);
-        ensure_equals("and it is the one that is found",
-                      mCharacter.getVisualParam(7), (LLVisualParam*)second);
+        UNSCOPED_INFO("the second one took the first one's place");
+        CHECK(mCharacter.getVisualParamCount() == 1);
+        CHECK(mCharacter.getVisualParam(7) == (LLVisualParam*)second);
 
         S32 walked = 0;
         for (LLVisualParam* param = mCharacter.getFirstVisualParam();
              param;
              param = mCharacter.getNextVisualParam())
         {
-            ensure_equals("the list holds the one that is found",
-                          param, (LLVisualParam*)second);
+            REQUIRE(param == (LLVisualParam*)second);
             walked++;
         }
-        ensure_equals("once", walked, 1);
+        CHECK(walked == 1);
 
         // The one it replaced is nobody's now, so the character will not free
         // it and this test has to.
         delete first;
     }
 
-    template<> template<>
-    void llcharacter_object::test<19>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: setVisualParamWeight writes this character's own copy by id", "[LLCharacter]")
     {
         // Setting a weight through a parameter looks the parameter up by its
         // id and writes whatever this character has under that id, which is
@@ -681,29 +705,27 @@ namespace
 
         ALTestVisualParamInfo foreign_info(5, "Mine");
         ALTestVisualParam foreign;
-        ensure("the foreign parameter takes its info", foreign.setInfo(&foreign_info));
+        REQUIRE(foreign.setInfo(&foreign_info));
 
-        ensure("a foreign parameter with a known id is taken",
-               mCharacter.setVisualParamWeight(&foreign, 0.5f));
-        ensure_approximately_equals("and this character's own is what moved",
-                                    mine->getWeight(), 0.5f, 16);
-        ensure_approximately_equals("not the one that was handed over",
-                                    foreign.getWeight(), 0.f, 16);
+        UNSCOPED_INFO("a foreign parameter with a known id is taken");
+        CHECK(mCharacter.setVisualParamWeight(&foreign, 0.5f));
+        UNSCOPED_INFO("and this character's own is what moved");
+        CHECK_THAT(mine->getWeight(), ll_test::WithinBits(0.5f, 16));
+        UNSCOPED_INFO("not the one that was handed over");
+        CHECK_THAT(foreign.getWeight(), ll_test::WithinBits(0.f, 16));
 
         // Handed this character's own, the lookup finds that same one, which
         // is what lets a caller who already has it write to it directly.
-        ensure_equals("the id finds the one that was added",
-                      mCharacter.getVisualParam(5), (LLVisualParam*)mine);
+        CHECK(mCharacter.getVisualParam(5) == (LLVisualParam*)mine);
 
         ALTestVisualParamInfo unknown_info(6, "Unknown");
         ALTestVisualParam unknown;
-        ensure("the unknown parameter takes its info", unknown.setInfo(&unknown_info));
-        ensure("a parameter with an id this character has not got is refused",
-               !mCharacter.setVisualParamWeight(&unknown, 0.5f));
+        REQUIRE(unknown.setInfo(&unknown_info));
+        UNSCOPED_INFO("a parameter with an id this character has not got is refused");
+        CHECK_FALSE(mCharacter.setVisualParamWeight(&unknown, 0.5f));
     }
 
-    template<> template<>
-    void llcharacter_object::test<20>()
+    TEST_CASE_METHOD(llcharacter_data, "LLCharacter: speedMultiplier pins at the maximum instead of changing sign", "[LLCharacter]")
     {
         // The walk servo asks how much faster the animation has to play for
         // the planted foot to keep up with the ground, and the answer changes
@@ -719,35 +741,35 @@ namespace
 
         // A planted foot is going nowhere, so the foot speed is the avatar's
         // and the animation plays as authored.
-        ensure_approximately_equals("a planted foot plays the animation as it is",
-                                    multiplier(1.5f, 1.5f), 1.f, 16);
+        UNSCOPED_INFO("a planted foot plays the animation as it is");
+        CHECK_THAT(multiplier(1.5f, 1.5f), ll_test::WithinBits(1.f, 16));
 
         // A foot that is not keeping up asks for more.
-        ensure_approximately_equals("a foot falling behind asks for more",
-                                    multiplier(1.5f, 1.0f), 1.5f, 16);
-        ensure_approximately_equals("but no more than it is allowed",
-                                    multiplier(1.5f, 0.1f), max_multiplier, 16);
+        UNSCOPED_INFO("a foot falling behind asks for more");
+        CHECK_THAT(multiplier(1.5f, 1.0f), ll_test::WithinBits(1.5f, 16));
+        UNSCOPED_INFO("but no more than it is allowed");
+        CHECK_THAT(multiplier(1.5f, 0.1f), ll_test::WithinBits(max_multiplier, 16));
 
         // A foot going forward exactly as fast as the avatar cannot say how
         // much faster to play, and the answer is as fast as allowed.
-        ensure_approximately_equals("a foot going with the avatar asks for all of it",
-                                    multiplier(1.5f, 0.f), max_multiplier, 16);
+        UNSCOPED_INFO("a foot going with the avatar asks for all of it");
+        CHECK_THAT(multiplier(1.5f, 0.f), ll_test::WithinBits(max_multiplier, 16));
 
         // And one going forward faster than the avatar is the case that used
         // to come out as the slowest multiplier there is: the animation slowed,
         // which made the foot slip further, which kept the answer negative.
-        ensure_approximately_equals("and one going faster than the avatar does too",
-                                    multiplier(1.5f, -0.2f), max_multiplier, 16);
-        ensure_approximately_equals("however much faster",
-                                    multiplier(1.5f, -50.f), max_multiplier, 16);
+        UNSCOPED_INFO("and one going faster than the avatar does too");
+        CHECK_THAT(multiplier(1.5f, -0.2f), ll_test::WithinBits(max_multiplier, 16));
+        UNSCOPED_INFO("however much faster");
+        CHECK_THAT(multiplier(1.5f, -50.f), ll_test::WithinBits(max_multiplier, 16));
 
-        ensure("a foot going forward faster is never read as standing still",
-               multiplier(1.5f, -0.2f) > min_multiplier);
+        UNSCOPED_INFO("a foot going forward faster is never read as standing still");
+        CHECK(multiplier(1.5f, -0.2f) > min_multiplier);
 
         // Running asks for far more than it is allowed, so it sits at the top
         // of the range and never goes near the sign change at all. That is why
         // it was the walk that stuck.
-        ensure_approximately_equals("running is pinned at the ceiling",
-                                    multiplier(5.f, 0.5f), max_multiplier, 16);
+        UNSCOPED_INFO("running is pinned at the ceiling");
+        CHECK_THAT(multiplier(5.f, 0.5f), ll_test::WithinBits(max_multiplier, 16));
     }
 }

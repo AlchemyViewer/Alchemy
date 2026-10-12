@@ -140,20 +140,34 @@ namespace
         xform_obj.clearChanged(LLXform::TRANSLATED | LLXform::ROTATED | LLXform::SCALED);
         CHECK_FALSE(xform_obj.isChanged());
 
+        // isChanged(bits) is true when any of the bits is set, so each flag
+        // is asked about on its own.
         LLVector3 llvect3(12.4f, -5.6f, 0.34f);
         xform_obj.setScale(llvect3);
         CHECK(xform_obj.isChanged(LLXform::SCALED));
+        CHECK_FALSE(xform_obj.isChanged(LLXform::TRANSLATED));
+        CHECK_FALSE(xform_obj.isChanged(LLXform::ROTATED));
+
         xform_obj.setPosition(1.2f, 2.3f, 3.4f);
         CHECK(xform_obj.isChanged(LLXform::TRANSLATED));
         UNSCOPED_INFO("setPosition must not clear SCALED");
-        CHECK(xform_obj.isChanged(LLXform::TRANSLATED | LLXform::SCALED));
+        CHECK(xform_obj.isChanged(LLXform::SCALED));
+        CHECK_FALSE(xform_obj.isChanged(LLXform::ROTATED));
+
         xform_obj.clearChanged(LLXform::SCALED);
         CHECK_FALSE(xform_obj.isChanged(LLXform::SCALED));
+        UNSCOPED_INFO("clearing SCALED must leave TRANSLATED");
+        CHECK(xform_obj.isChanged(LLXform::TRANSLATED));
+
         xform_obj.setRotation(1, 2, 3, 4);
-        UNSCOPED_INFO("setRotation must set ROTATED");
-        CHECK(xform_obj.isChanged(LLXform::TRANSLATED | LLXform::ROTATED));
+        CHECK(xform_obj.isChanged(LLXform::ROTATED));
+        CHECK_FALSE(xform_obj.isChanged(LLXform::SCALED));
+
+        // MOVED is the three together.
         xform_obj.setScale(llvect3);
-        CHECK(xform_obj.isChanged(LLXform::MOVED));
+        CHECK(xform_obj.isChanged(LLXform::SCALED));
+        xform_obj.clearChanged(LLXform::MOVED);
+        CHECK_FALSE(xform_obj.isChanged());
     }
 
     //to test init() and getWorldMatrix() fns.
@@ -182,19 +196,20 @@ namespace
     }
 
     //to test mMin.clearVec() and mMax.clearVec() fns
-    TEST_CASE("LLXForm: getMinMax after init puts the minimum corner at the origin", "[LLXForm]")
+    TEST_CASE("LLXForm: getMinMax after init puts both corners at the origin", "[LLXForm]")
     {
         LLXformMatrix formMatrix_obj;
         formMatrix_obj.init();
-        LLVector3 llmin_vec3;
-        LLVector3 llmax_vec3;
+        // Not zero to begin with, so the zeros below are getMinMax's.
+        LLVector3 llmin_vec3(1.f, 1.f, 1.f);
+        LLVector3 llmax_vec3(1.f, 1.f, 1.f);
         formMatrix_obj.getMinMax(llmin_vec3, llmax_vec3);
         CHECK(llmin_vec3.mV[0] == 0.f);
         CHECK(llmin_vec3.mV[1] == 0.f);
         CHECK(llmin_vec3.mV[2] == 0.f);
-        CHECK(llmin_vec3.mV[0] == 0.f);
-        CHECK(llmin_vec3.mV[1] == 0.f);
-        CHECK(llmin_vec3.mV[2] == 0.f);
+        CHECK(llmax_vec3.mV[0] == 0.f);
+        CHECK(llmax_vec3.mV[1] == 0.f);
+        CHECK(llmax_vec3.mV[2] == 0.f);
     }
 
     //test case of update() fn.

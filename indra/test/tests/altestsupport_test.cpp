@@ -39,6 +39,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include <catch2/reporters/catch_reporter_event_listener.hpp>
+#include <catch2/reporters/catch_reporter_registrars.hpp>
 
 #include <cstdlib>
 #include <limits>
@@ -63,7 +65,24 @@ namespace
         setenv(name, "1", 1);
 #endif
     }
+
+    // A library's state, which its own listener adds a check for as the run
+    // starts, as a library's tests do.
+    int sLibraryState = 0;
+
+    class LibraryChecks : public Catch::EventListenerBase
+    {
+    public:
+        using Catch::EventListenerBase::EventListenerBase;
+
+        void testRunStarting(Catch::TestRunInfo const&) override
+        {
+            ll_test::StateGuard::add("the library's state", [] { return std::to_string(sLibraryState); });
+        }
+    };
 }
+
+CATCH_REGISTER_LISTENER(LibraryChecks)
 
 TEST_CASE("WithinBits holds to the bits asked for, and no further", "[altestsupport]")
 {
@@ -101,6 +120,9 @@ TEST_CASE("LLSDEquals compares all the way down and says where two differ", "[al
     // LLDate's own == holds a NaN date equal to any.
     const LLSD nan_date = LLDate(std::numeric_limits<F64>::quiet_NaN());
     CHECK_FALSE(ll_test::LLSDEquals(LLDate(0.0)).match(nan_date));
+    // Nor a NaN number, which MSVC's /fp:fast compare would hold equal.
+    const LLSD nan_real = std::numeric_limits<F64>::quiet_NaN();
+    CHECK_FALSE(ll_test::LLSDEquals(0.0).match(nan_real));
     CHECK_THAT(LLSD(LLDate(1.0)), ll_test::LLSDEquals(LLDate(1.0)));
 }
 
@@ -149,6 +171,12 @@ TEST_CASE("Teardown runs each step once, newest first", "[altestsupport]")
 TEST_CASE("a test case that leaves the environment changed", "[.guard-leak]")
 {
     setLeak("AL_TEST_SUPPORT_LEAK");
+    SUCCEED();
+}
+
+TEST_CASE("a test case that leaves a library's state changed", "[.library-leak]")
+{
+    sLibraryState = 1;
     SUCCEED();
 }
 

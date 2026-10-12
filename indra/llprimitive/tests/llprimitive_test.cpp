@@ -26,7 +26,9 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+
+#include <memory>
 
 #include "../llprimitive.h"
 
@@ -131,8 +133,6 @@ public:
 };
 }
 
-namespace tut
-{
 namespace
 {
     struct llprimitive
@@ -140,138 +140,122 @@ namespace
         PRIMITIVE_TEST_SETUP setup_class;
     };
 
-    typedef test_group<llprimitive> llprimitive_t;
-    typedef llprimitive_t::object llprimitive_object_t;
-    tut::llprimitive_t tut_llprimitive("LLPrimitive");
-}
 
-    template<> template<>
-    void llprimitive_object_t::test<1>()
+    TEST_CASE_METHOD(llprimitive, "LLPrimitive: a default primitive constructs and destroys cleanly", "[LLPrimitive]")
     {
-        set_test_name("Test LLPrimitive Instantiation");
         LLPrimitive test;
     }
 
-    template<> template<>
-    void llprimitive_object_t::test<2>()
+    TEST_CASE_METHOD(llprimitive, "LLPrimitive: getPCode starts at zero and returns what setPCode set", "[LLPrimitive]")
     {
-        set_test_name("Test LLPrimitive PCode setter and getter.");
         LLPrimitive test;
-        ensure_equals(test.getPCode(), 0);
+        CHECK(test.getPCode() == 0);
         LLPCode code = 1;
         test.setPCode(code);
-        ensure_equals(test.getPCode(), code);
+        CHECK(test.getPCode() == code);
     }
 
-    template<> template<>
-    void llprimitive_object_t::test<3>()
+    TEST_CASE_METHOD(llprimitive, "LLPrimitive: init_primitive sets the PCode", "[LLPrimitive]")
     {
-        set_test_name("Test llprimitive constructor and initer.");
         LLPCode code = 1;
         LLPrimitive primitive;
         primitive.init_primitive(code);
-        ensure_equals(primitive.getPCode(), code);
+        CHECK(primitive.getPCode() == code);
     }
 
-    template<> template<>
-    void llprimitive_object_t::test<4>()
+    TEST_CASE_METHOD(llprimitive, "LLPrimitive: createPrimitive makes a primitive with the PCode", "[LLPrimitive]")
     {
-        set_test_name("Test Static llprimitive constructor and initer.");
         LLPCode code = 1;
-        LLPrimitive * primitive = LLPrimitive::createPrimitive(code);
-        ensure(primitive != NULL);
-        ensure_equals(primitive->getPCode(), code);
+        const std::unique_ptr<LLPrimitive> primitive(LLPrimitive::createPrimitive(code));
+        REQUIRE(primitive != nullptr);
+        CHECK(primitive->getPCode() == code);
     }
 
-    template<> template<>
-    void llprimitive_object_t::test<5>()
+    TEST_CASE_METHOD(llprimitive, "LLPrimitive: setVolume of a unique volume replaces it only when params change", "[LLPrimitive]")
     {
-        set_test_name("Test setVolume creation of new unique volume.");
         LLPrimitive primitive;
         LLVolumeParams params;
 
         // Make sure volume starts off null
-        ensure(primitive.getVolume() == NULL);
+        CHECK(primitive.getVolume() == NULL);
 
         // Make sure we have no texture entries before setting the volume
-        ensure_equals(primitive.getNumTEs(), 0);
+        CHECK(primitive.getNumTEs() == 0);
 
         // Test that GEOMETRY has not been flagged as changed.
-        ensure(!primitive.isChanged(LLXform::GEOMETRY));
+        CHECK_FALSE(primitive.isChanged(LLXform::GEOMETRY));
 
         // Make sure setVolume returns true
-        ensure(primitive.setVolume(params, 0, true) == true);
+        CHECK(primitive.setVolume(params, 0, true));
         LLVolume* new_volume = primitive.getVolume();
 
         // make sure new volume was actually created
-        ensure(new_volume != NULL);
+        REQUIRE(new_volume != NULL);
 
         // Make sure that now that we've set the volume we have texture entries
-        ensure_not_equals(primitive.getNumTEs(), 0);
+        CHECK(primitive.getNumTEs() != 0);
 
         // Make sure that the number of texture entries equals the number of faces in the volume (should be 6)
-        ensure_equals(new_volume->getNumFaces(), 6);
-        ensure_equals(primitive.getNumTEs(), new_volume->getNumFaces());
+        CHECK(new_volume->getNumFaces() == 6);
+        CHECK(primitive.getNumTEs() == new_volume->getNumFaces());
 
         // Test that GEOMETRY has been flagged as changed.
-        ensure(primitive.isChanged(LLXform::GEOMETRY));
+        CHECK(primitive.isChanged(LLXform::GEOMETRY));
 
         // Run it twice to make sure it doesn't create a different one if params are the same
-        ensure(primitive.setVolume(params, 0, true) == false);
-        ensure(new_volume == primitive.getVolume());
+        CHECK_FALSE(primitive.setVolume(params, 0, true));
+        CHECK(new_volume == primitive.getVolume());
 
         // Change the param definition and try setting it again.
         params.setRevolutions(4);
-        ensure(primitive.setVolume(params, 0, true) == true);
+        CHECK(primitive.setVolume(params, 0, true));
 
         // Ensure that we now have a different volume
-        ensure(new_volume != primitive.getVolume());
+        CHECK(new_volume != primitive.getVolume());
     }
 
-    template<> template<>
-    void llprimitive_object_t::test<6>()
+    TEST_CASE_METHOD(llprimitive, "LLPrimitive: setVolume of a shared volume replaces it only when params change", "[LLPrimitive]")
     {
-        set_test_name("Test setVolume creation of new NOT-unique volume.");
         LLPrimitive primitive;
         LLVolumeParams params;
 
         // Make sure volume starts off null
-        ensure(primitive.getVolume() == NULL);
+        CHECK(primitive.getVolume() == NULL);
 
         // Make sure we have no texture entries before setting the volume
-        ensure_equals(primitive.getNumTEs(), 0);
+        CHECK(primitive.getNumTEs() == 0);
 
         // Test that GEOMETRY has not been flagged as changed.
-        ensure(!primitive.isChanged(LLXform::GEOMETRY));
+        CHECK_FALSE(primitive.isChanged(LLXform::GEOMETRY));
 
         // Make sure setVolume returns true
-        ensure(primitive.setVolume(params, 0, false) == true);
+        CHECK(primitive.setVolume(params, 0, false));
 
         LLVolume* new_volume = primitive.getVolume();
 
         // make sure new volume was actually created
-        ensure(new_volume != NULL);
+        REQUIRE(new_volume != NULL);
 
         // Make sure that now that we've set the volume we have texture entries
-        ensure_not_equals(primitive.getNumTEs(), 0);
+        CHECK(primitive.getNumTEs() != 0);
 
         // Make sure that the number of texture entries equals the number of faces in the volume (should be 6)
-        ensure_equals(new_volume->getNumFaces(), 6);
-        ensure_equals(primitive.getNumTEs(), new_volume->getNumFaces());
+        CHECK(new_volume->getNumFaces() == 6);
+        CHECK(primitive.getNumTEs() == new_volume->getNumFaces());
 
         // Test that GEOMETRY has been flagged as changed.
-        ensure(primitive.isChanged(LLXform::GEOMETRY));
+        CHECK(primitive.isChanged(LLXform::GEOMETRY));
 
         // Run it twice to make sure it doesn't create a different one if params are the same
-        ensure(primitive.setVolume(params, 0, false) == false);
-        ensure(new_volume == primitive.getVolume());
+        CHECK_FALSE(primitive.setVolume(params, 0, false));
+        CHECK(new_volume == primitive.getVolume());
 
         // Change the param definition and try setting it again.
         params.setRevolutions(4);
-        ensure(primitive.setVolume(params, 0, false) == true);
+        CHECK(primitive.setVolume(params, 0, false));
 
         // Ensure that we now have a different volume
-        ensure(new_volume != primitive.getVolume());
+        CHECK(new_volume != primitive.getVolume());
     }
 }
 
