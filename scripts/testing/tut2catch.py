@@ -20,9 +20,10 @@ decided by the types clang resolved, not by its text:
                number; Catch2 runs cases as declared, so a test declared
                before one TUT ran ahead of it moves later in the file,
                never earlier, to just after it. A move stays in its
-               namespace block and #if branch; where one cannot, the order
-               is left (each group's tests still put in numeric order where
-               they can be) and the file marked. The group's typedefs, its
+               namespace (a later block of it is the same scope) and #if
+               branch; where one cannot, the order is left (each group's
+               tests still put in numeric order where they can be) and the
+               file marked. The group's typedefs, its
                test_group object and a class derived from test_group only
                to name it go; a class derived from it that holds more (a
                constructor's body, a destructor, members) stays, with its
@@ -973,6 +974,7 @@ class Converter:
         self.body_reads = {}      # id of a test's body -> (offset, declaration) of what it reads
         self.body_bare = {}       # id of a test's body -> the variables it declares without an initializer
         self.body_writes = {}     # id of a test's body -> (offset, variable) of what it writes
+        self.live = None          # the masked text with code under #if 0 blanked too
         source.find_conditionals(active_lines)
 
     # ---- helpers -------------------------------------------------------
@@ -2522,10 +2524,11 @@ class Converter:
         TUT's run order, a test declared before the one TUT ran just ahead
         of it moves later in the file, never earlier, to just after the
         latest-declared of those placed so far. A move stays in its own
-        namespace block and #if branch: where one would have to leave them,
-        the cases' order is left as declared, but for each group's tests,
-        put in their numeric order where they can be, and the file is
-        marked, since its cases run in another order than TUT ran them."""
+        namespace, though it may pass into a later block of it, and in its
+        #if branch: where one would have to leave them, the cases' order is
+        left as declared, but for each group's tests, put in their numeric
+        order where they can be, and the file is marked, since its cases
+        run in another order than TUT ran them."""
         # A test this host does not compile is in another #if branch: never
         # declared beside these, it has no place in their order.
         tests = [t for t in self.tests if not t.macro and t.body_end is not None and t.catch2_name
@@ -2541,10 +2544,10 @@ class Converter:
         first = min(stuck, key=lambda t: t.start)
         groups = ", ".join(dict.fromkeys(t.group.name for t in run))
         self.check(first.start, f"TUT ran this file's groups by name ({groups}), each group's tests by number, and "
-                                f"{first.group.name} test<{first.n}> cannot move to its place in that order across "
-                                f"a namespace block or an #if: these cases run in another order than TUT's")
-        self.notes.append("the cases run in another order than TUT ran them: a move across a namespace block or "
-                          "an #if was needed")
+                                f"{first.group.name} test<{first.n}> cannot move to its place in that order out "
+                                f"of its namespace or #if: these cases run in another order than TUT's")
+        self.notes.append("the cases run in another order than TUT ran them: a move out of a namespace or an #if "
+                          "was needed")
         for group in self.groups.values():
             own = [t for t in run if t.group is group]
             if [t.n for t in sorted(own, key=lambda t: t.start)] == [t.n for t in own]:
@@ -2553,7 +2556,7 @@ class Converter:
             if stuck:
                 for t in stuck:
                     self.check(t.start, f"test<{t.n}> is declared out of TUT's numeric order, and cannot move to "
-                                        f"its place across an #if or a namespace block")
+                                        f"its place out of its namespace or #if")
                 continue
             self.move(own, slot)
             self.notes.append(f"{group.name}: tests moved into TUT's numeric order")
@@ -2561,7 +2564,7 @@ class Converter:
     def slots(self, run):
         """For tests in the order TUT ran them, the test each goes just after
         (itself, where it stays), and those that would leave their
-        namespace block or #if branch to get there."""
+        namespace or #if branch to get there."""
         slot = {}
         latest = None
         for test in run:
@@ -2582,22 +2585,47 @@ class Converter:
             if members == [test]:
                 continue
             parts = [chunks[id(m)] for m in members]
-            plan = Plan(chunks[id(test)][0], chunks[id(test)][1], None)
+            start, end = chunks[id(test)]
+            if not members:
+                # A test moved away takes the blank line after it along,
+                # where nothing else is planned there.
+                after = self.src.line_end(end)
+                if end < len(self.src.data) and self.src.data[end:after].strip() == b"" and \
+                        not any(end <= p.start <= after or (p.start < end < p.end) for p in self.plans):
+                    end = min(after + 1, len(self.src.data))
+            plan = Plan(start, end, None)
             plan.render = lambda conv, plan, parts=parts: "\n".join(
                 conv.render(s, e, skip=conv.slot_at.get(s)) for s, e in parts)
             self.slot_at[plan.start] = plan
             self.plans.append(plan)
 
     def nesting(self, offset):
-        """Where offset is: the brace that opens the block around it (a
-        namespace's, for a test), and its #if branches."""
-        stack = []
-        for m in re.finditer(rb"[{}]", self.src.masked[:offset]):
+        """Where offset is, for a move: the namespaces around it, by name,
+        where it is directly in one, since every block of a namespace is
+        one scope and a later block of it has declared all an earlier one
+        did; else the brace of the block it is in; and its #if branches."""
+        if self.live is None:
+            # Code under #if 0 need not even be C++: none of its braces count.
+            live = bytearray(self.src.masked)
+            for start, end, what in self.src.regions:
+                if what == "dead":
+                    live[start:end] = re.sub(rb"[^\n]", b" ", bytes(live[start:end]))
+            self.live = bytes(live)
+        stack = []  # (where a { is, the namespace it opens or None)
+        last = 0
+        for m in re.finditer(rb"[{};]", self.live[:offset]):
             if m.group(0) == b"{":
-                stack.append(m.start())
-            elif stack:
+                head = b" ".join(line for line in self.live[last:m.start()].split(b"\n")
+                                 if not line.strip().startswith(b"#"))
+                name = re.fullmatch(rb"\s*(?:inline\s+)?namespace\s*([\w:]*)\s*", head)
+                stack.append((m.start(), name.group(1).decode() if name else None))
+            elif m.group(0) == b"}" and stack:
                 stack.pop()
-        return (stack[-1] if stack else None), self.branch_of(offset)
+            last = m.end()
+        if any(name is None for _, name in stack):
+            return ("block", stack[-1][0]), self.branch_of(offset)
+        path = tuple(part for _, name in stack for part in (name.split("::") if name else [""]))
+        return ("namespace", path), self.branch_of(offset)
 
     def chunk(self, test):
         """A test's text with the comment lines right above it, through the end
