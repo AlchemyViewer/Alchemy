@@ -3239,13 +3239,13 @@ SHA1 指紋：[MD5_DIGEST]
 		將快照儲存於[PATH]時失敗：目錄不存在。
 	</notification>
 	<notification name="PresetNotSaved">
-		儲存預設名稱[NAME]時出錯。
+		儲存預設名稱&lt;nolink&gt;[NAME]&lt;/nolink&gt;時出錯。
 	</notification>
 	<notification name="DefaultPresetNotSaved">
 		無法覆蓋預先設定。
 	</notification>
 	<notification name="PresetNotDeleted">
-		刪除預設名稱[NAME]時出錯。
+		刪除預設名稱&lt;nolink&gt;[NAME]&lt;/nolink&gt;時出錯。
 	</notification>
 	<notification name="UnableToFindHelpTopic">
 		找不到這個元件的幫助主題。

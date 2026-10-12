@@ -2462,9 +2462,9 @@ Per sicurezza, verranno bloccati per alcuni secondi.</notification>
 	<notification name="AppearanceToXMLFailed">Salvataggio aspetto in formato XML non riuscito.</notification>
 	<notification name="SnapshotToComputerFailed">Salvataggio istantanea in [PATH] non riuscito: Il disco è pieno. Sono necessari [NEED_MEMORY] KB ma sono disponibili solo [FREE_MEMORY] KB .</notification>
 	<notification name="SnapshotToLocalDirNotExist">Salvataggio istantanea in [PATH] non riuscito: La cartella non esiste.</notification>
-	<notification name="PresetNotSaved">Errore durante il salvataggio del valore predefinito [NAME].</notification>
+	<notification name="PresetNotSaved">Errore durante il salvataggio del valore predefinito &lt;nolink&gt;[NAME]&lt;/nolink&gt;.</notification>
 	<notification name="DefaultPresetNotSaved">Impossibile sovrascrivere l’impostazione predefinita.</notification>
-	<notification name="PresetNotDeleted">Errore durante l'eliminazione del valore predefinito [NAME].</notification>
+	<notification name="PresetNotDeleted">Errore durante l'eliminazione del valore predefinito &lt;nolink&gt;[NAME]&lt;/nolink&gt;.</notification>
 	<notification name="UnableToFindHelpTopic">Impossibile trovare l'argomento nell'aiuto per questo elemento.</notification>
 	<notification name="ObjectMediaFailure">
 		Errore del server: mancato aggiornamento o ottenimento del media.

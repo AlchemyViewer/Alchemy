@@ -40,6 +40,7 @@
 #include "llagentui.h"
 #include "llavatarnamecache.h"
 #include "llcorehttputil.h"
+#include "llaisapi.h"
 #include "llappviewer.h"
 #include "llassetstorage.h"
 #include "llcallbacklist.h"
@@ -1081,13 +1082,26 @@ namespace
     // An item made for a text that never went up, taken away again while
     // it is still empty, so that no empty notecard is left in the inventory
     // for the user to wonder at, or to give away as the one they meant.
-    void removeNotecardNeverWritten(const LLUUID& item_id)
+    //
+    // Removing takes AIS: without it remove_inventory_item only logs, and
+    // the empty notecard stays -- on a grid without AIS, or where the
+    // region's capabilities went with a teleport. Then `why` is told so,
+    // for the failure that is said to say it too.
+    void removeNotecardNeverWritten(const LLUUID& item_id, std::string& why)
     {
         const LLViewerInventoryItem* item = gInventory.getItem(item_id);
-        if (item && item->getAssetUUID().isNull())
+        if (!item || item->getAssetUUID().notNull())
         {
-            remove_inventory_item(item_id, LLPointer<LLInventoryCallback>());
+            return;
         }
+        if (!AISAPI::isAvailable())
+        {
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = item->getName();
+            why += LLTrans::getString("WorkspaceEmptyNotecardLeft", args);
+            return;
+        }
+        remove_inventory_item(item_id, LLPointer<LLInventoryCallback>());
     }
 } // namespace
 
@@ -1109,15 +1123,6 @@ bool ALScriptWorkspace::createNotecardWithText(const std::string& name, const st
     // and could say both that it failed and that it was made. What a timer
     // can say without that risk is that there is no answer yet -- not that
     // there will be none -- and a late answer is then heard as any other.
-    //
-    // Follow-up: find a way to learn that a create failed that does not
-    // change create_inventory_item for every caller. Leads: the reply's
-    // SimApproved, which the viewer ignores, and whether the simulators send
-    // a reply at all when they refuse (LLInventoryCallbackManager::fire
-    // would drop one with a null id); a failure callback on the reliable
-    // send, for a request the simulator never acknowledged; and AIS3, whose
-    // create has an HTTP failure but which does not make notecards yet
-    // (USE_AIS_FOR_NC in llviewerinventory.cpp).
     const std::shared_ptr<bool> answered = std::make_shared<bool>(false);
     LLPointer<LLBoostFuncInventoryCallback> made = new LLBoostFuncInventoryCallback(create_notecard_cb);
     made->addOnFireFunc([answered, text, callback](const LLUUID& item_id) {
@@ -1127,20 +1132,21 @@ bool ALScriptWorkspace::createNotecardWithText(const std::string& name, const st
         const bool        sent = ALScriptWorkspace::getInstance()->saveNotecard(
             ref, text, {},
             [callback](const ALScriptCompileResult& result) {
-                if (!result.success)
+                ALScriptCompileResult told = result;
+                if (!told.success)
                 {
-                    removeNotecardNeverWritten(result.ref.item);
+                    removeNotecardNeverWritten(told.ref.item, told.error);
                 }
                 if (callback)
                 {
-                    callback(result);
+                    callback(told);
                 }
             },
             why);
         if (!sent)
         {
             // The region, or its capability, gone between the create and now.
-            removeNotecardNeverWritten(item_id);
+            removeNotecardNeverWritten(item_id, why);
             ALScriptCompileResult result;
             result.ref   = ref;
             result.kind  = ALScriptKind::Notecard;

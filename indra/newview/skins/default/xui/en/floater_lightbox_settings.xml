@@ -82,6 +82,10 @@
 		Only a notecard in your inventory can be dropped here. To import a Look from an object, open its notecard and press Apply Look.
 	</floater.string>
 	<floater.string
+	 name="look_drop_one">
+		Drop one Look notecard at a time.
+	</floater.string>
+	<floater.string
 	 name="look_drop_no_copy">
 		This notecard cannot be copied, so its Look cannot be read. Ask whoever gave it for one you can copy.
 	</floater.string>

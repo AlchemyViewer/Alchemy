@@ -1258,6 +1258,7 @@ floats were single precision; SLua's numbers are doubles, which do neither.</str
 	     and the sentences an import's toast adds for what else happened. A
 	     Look's name may be a stranger's, so it stands inside nolink here, as
 	     in the notifications these sentences go into. -->
+	<string name="WorkspaceEmptyNotecardLeft"> (an empty notecard, '&lt;nolink&gt;[NAME]&lt;/nolink&gt;', was left in your inventory, and can be deleted)</string>
 	<string name="LightBoxLookNotecardDescription">Lightbox Look</string>
 	<string name="LightBoxLookImportFallbackName">Shared Look</string>
 	<string name="LightBoxLookImportUndoNote">Ctrl+Z in the Lightbox takes it back.</string>

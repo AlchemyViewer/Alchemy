@@ -50,6 +50,7 @@
 #include "alcurvemodel.h"
 #include "allookformat.h"
 #include "allooknotecard.h"
+#include "alscriptworkspace.h"
 #include "altoolscenepicker.h"
 #include "alwhitebalancesolver.h"
 #include "llagent.h"
@@ -61,6 +62,7 @@
 #include "llpanel.h"
 #include "llpresetsmanager.h"
 #include "llsdutil.h"
+#include "lltooldraganddrop.h"
 #include "llsettingsvo.h"
 #include "llsliderctrl.h"
 #include "llspinctrl.h"
@@ -2433,11 +2435,28 @@ bool ALFloaterLightBox::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, ED
     // dragged across the screen, and nothing else here wants a notecard.
     // One from an object's contents cannot be read from here -- the drop
     // carries the agent's own -- but its own window makes the same offer.
+    // One at a time: a drop imports the one notecard it carries, and a drag
+    // of several would be shown as taken and then do nothing.
+    if (LLToolDragAndDrop::getInstance()->getCargoCount() > 1)
+    {
+        *accept     = ACCEPT_NO;
+        tooltip_msg = getString("look_drop_one");
+        return true;
+    }
     const LLViewerInventoryItem* held = get_dropped_notecard(cargo_type, cargo_data);
     if (!held)
     {
         *accept     = ACCEPT_NO;
         tooltip_msg = getString("look_drop_inventory_only");
+        return true;
+    }
+    // Nor one RLVa keeps from being read (@viewnote), which the read
+    // (ALScriptWorkspace::load) would refuse after the drop.
+    const std::string rlv = ALScriptWorkspace::rlvRefusal(nullptr, LLAssetType::AT_NOTECARD, ALScriptRlvUse::See);
+    if (!rlv.empty())
+    {
+        *accept     = ACCEPT_NO;
+        tooltip_msg = rlv;
         return true;
     }
     // Refused on the way over, not after the drop: a notecard is read only

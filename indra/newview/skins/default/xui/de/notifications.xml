@@ -2474,9 +2474,9 @@ Diese werden für ein paar Sekunden sicherheitshalber gesperrt.</notification>
 	<notification name="AppearanceToXMLFailed">Fehler beim Speichern des Erscheinungsbilds als XML.</notification>
 	<notification name="SnapshotToComputerFailed">Fehler beim Speichern des Bildes unter [PATH]: Zu wenig Speicherplatz auf dem Medium. [NEED_MEMORY]KB werden benötigt, es stehen jedoch nur [FREE_MEMORY]KB zur Verfügung.</notification>
 	<notification name="SnapshotToLocalDirNotExist">Fehler beim Speichern des Bildes unter [PATH]: Verzeichnis nicht vorhanden.</notification>
-	<notification name="PresetNotSaved">Fehler beim Speichern der Voreinstellung [NAME].</notification>
+	<notification name="PresetNotSaved">Fehler beim Speichern der Voreinstellung &lt;nolink&gt;[NAME]&lt;/nolink&gt;.</notification>
 	<notification name="DefaultPresetNotSaved">Die Standart-Voreinstellung kann nicht überschrieben werden.</notification>
-	<notification name="PresetNotDeleted">Fehler beim Löschen der Voreinstellung [NAME].</notification>
+	<notification name="PresetNotDeleted">Fehler beim Löschen der Voreinstellung &lt;nolink&gt;[NAME]&lt;/nolink&gt;.</notification>
 	<notification name="UnableToFindHelpTopic">Hilfethema für dieses Element wurde nicht gefunden.</notification>
 	<notification name="ObjectMediaFailure">
 		Serverfehler: Medienaktualisierung oder Fehler

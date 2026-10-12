@@ -2460,9 +2460,9 @@ Elles vont être bloquées pendant quelques secondes pour votre sécurité.</not
 	<notification name="AppearanceToXMLFailed">Échec de l’enregistrement de l’apparence au format XML.</notification>
 	<notification name="SnapshotToComputerFailed">Échec d’enregistrement de la photo dans [PATH] : Le disque est plein. [NEED_MEMORY]KB est nécessaire mais l'espace libre est de seulement [FREE_MEMORY]KB.</notification>
 	<notification name="SnapshotToLocalDirNotExist">Échec d’enregistrement de la photo dans [PATH] : Le répertoire n'existe pas.</notification>
-	<notification name="PresetNotSaved">Erreur d’enregistrement du préréglage [NAME].</notification>
+	<notification name="PresetNotSaved">Erreur d’enregistrement du préréglage &lt;nolink&gt;[NAME]&lt;/nolink&gt;.</notification>
 	<notification name="DefaultPresetNotSaved">Impossible de remplacer le préréglage par défaut.</notification>
-	<notification name="PresetNotDeleted">Erreur de suppression du préréglage [NAME].</notification>
+	<notification name="PresetNotDeleted">Erreur de suppression du préréglage &lt;nolink&gt;[NAME]&lt;/nolink&gt;.</notification>
 	<notification name="UnableToFindHelpTopic">Impossible de trouver l'aide.</notification>
 	<notification name="ObjectMediaFailure">
 		Erreur serveur : Échec de la mise à jour ou de l'obtention du média.

@@ -79,6 +79,7 @@
     <floater.string name="LookApply">Apply Look</floater.string>
     <floater.string name="LookAdd">Add to Looks</floater.string>
     <floater.string name="LookNotNow">Not Now</floater.string>
+    <floater.string name="LookSaveFirst">Save the notecard first: the Look is taken from the notecard as it was saved, and your changes are not.</floater.string>
     <icon
      follows="top|right"
      height="18"
