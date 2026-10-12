@@ -119,6 +119,9 @@ function(al_add_test_binary name)
   add_executable(${target} ${arg_SOURCES} ${arg_UNIT})
   target_link_libraries(${target} PRIVATE al::flags al_test_support ${arg_SUPPORT} ${arg_LIBRARIES})
   target_include_directories(${target} PRIVATE ${arg_INCLUDES} ${INDRA_SOURCE_DIR}/test)
+  # For the helpers in test/ that TUT tests still share, so each fails a
+  # test the way its framework does.
+  target_compile_definitions(${target} PRIVATE AL_TEST_CATCH2=1)
   if(arg_UNIT)
     target_include_directories(
       ${target}

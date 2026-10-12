@@ -17,10 +17,18 @@
 #define LL_SYNC_H
 
 #include "llcond.h"
-#include "lltut.h"
 #include "stringize.h"
 #include "llerror.h"
 #include "llcoros.h"
+
+// A timeout fails the test the way the test's framework does, until the
+// last TUT test that uses this is converted: al_add_test_binary defines
+// AL_TEST_CATCH2 for a Catch2 binary.
+#if AL_TEST_CATCH2
+#include <catch2/catch_test_macros.hpp>
+#else
+#include "lltut.h"
+#endif
 
 /**
  * Instantiate Sync in any test in which we need to suspend one coroutine
@@ -105,9 +113,14 @@ private:
         LL_DEBUGS() << name << " yield_until(" << until << ") suspending" << LL_ENDL;
         if (! mCond.wait_for_equal(mTimeout, until))
         {
+#if AL_TEST_CATCH2
+            FAIL(name << ' ' << func << '(' << arg << ") timed out after " << int(mTimeout.value())
+                      << "ms (expected " << until << ", actual " << mCond.get() << ')');
+#else
             tut::fail(STRINGIZE(name << ' ' << func << '(' << arg << ") timed out after "
                                 << int(mTimeout.value()) << "ms (expected " << until
                                 << ", actual " << mCond.get() << ')'));
+#endif
         }
         // each time we wake up, bump mCond
         bump();
