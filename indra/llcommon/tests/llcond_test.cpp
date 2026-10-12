@@ -44,10 +44,12 @@ namespace
             [this]()
             {
                 // Lambda immediately entered -- control comes here first.
-                REQUIRE(cond.get() == 0);
+                // CHECKs: a REQUIRE that failed would end the coroutine before
+                // it set what the test waits for, and the case would hang.
+                CHECK(cond.get() == 0);
                 cond.set_all(1);
                 cond.wait_equal(2);
-                REQUIRE(cond.get() == 2);
+                CHECK(cond.get() == 2);
                 cond.set_all(3);
             });
         // Main coroutine is resumed only when the lambda waits.

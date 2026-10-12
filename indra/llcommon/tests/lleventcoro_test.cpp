@@ -170,7 +170,9 @@ namespace
             debug("about to suspend");
             stringdata = future.get();
             mSync.bump();
-            REQUIRE(stringdata == "received");
+            // A CHECK: a REQUIRE's throw would leave this coroutine for
+            // LLCoros to rethrow in whichever case came next.
+            CHECK(stringdata == "received");
         }
         END
     }

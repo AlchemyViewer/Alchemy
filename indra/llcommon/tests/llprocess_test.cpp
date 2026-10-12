@@ -1642,7 +1642,9 @@ namespace tut
             bool postend(const LLSD&)
             {
                 mTriggered = true;
-                REQUIRE(mReadPipe.read(mReadPipe.size()) == mExpect);
+                // A CHECK: a REQUIRE's throw would go back through LLProcess's
+                // own handling of the child's end, mid-post.
+                CHECK(mReadPipe.read(mReadPipe.size()) == mExpect);
                 return false;
             }
 
