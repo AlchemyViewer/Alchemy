@@ -37,6 +37,7 @@
 #include "../llline.h"
 #include "../llmath.h"
 #include "../v3math.h"
+#include "../v3dmath.h"
 
 #include <cmath>
 
@@ -235,7 +236,8 @@ namespace
 
     struct line_data
     {
-        // The intersects and two-planes cases seed the main thread's generator.
+        // The intersects, nearest-approach and two-planes cases seed the main
+        // thread's generator.
         ~line_data() { ll_test::reseedRandomFromEntropy(); }
     };
 
@@ -303,23 +305,38 @@ namespace
         }
     }
 
-    TEST_CASE_METHOD(line_data, "LLLine: nearestApproach is disabled for DEV-16600", "[LLLine]")
+    TEST_CASE_METHOD(line_data, "LLLine: nearestApproach finds each line's point nearest the other", "[LLLine]")
     {
-          /*
-            These tests fail intermittently on all platforms - see DEV-16600
-            Commenting this out until dev has time to investigate.
-
-        // this is a test for LLLine::nearestApproach(LLLIne) method
+        // this is a test for LLLine::nearestApproach(LLLine) method
         // which computes the point on a line nearest another line
 
-        // these tests will have some floating point error,
-        // so we need to specify how much error is ok
-        // TODO -- make nearestApproach() algorithm more accurate so
-        // we can tighten the allowable_error.  Most tests are tighter
-        // than one milimeter, however when doing randomized testing
-        // you can walk into inaccurate cases.
+        // Two lines whose nearest points are known exactly: the x axis, and
+        // a line along y through (3, 0, 5).
+        LLLine x_axis(LLVector3(0.f, 0.f, 0.f), LLVector3(1.f, 0.f, 0.f));
+        LLLine above(LLVector3(3.f, -1.f, 5.f), LLVector3(3.f, 1.f, 5.f));
+        CHECK(dist_vec(x_axis.nearestApproach(above), LLVector3(3.f, 0.f, 0.f)) < 1e-5f);
+        CHECK(dist_vec(above.nearestApproach(x_axis), LLVector3(3.f, 0.f, 5.f)) < 1e-5f);
+
+        // Random lines, held to the nearest points worked out in double from
+        // the lines as they were made. Not to the points they were built
+        // through: making a line in float moves it, and where the two lines
+        // are near parallel that moves their nearest points by far more than
+        // nearestApproach's own error. That, not nearestApproach, was the
+        // intermittent failure DEV-16600 commented this test out for.
+        auto nearest_in_double = [](const LLLine& line, const LLLine& other)
+        {
+            const LLVector3d p1(line.getPoint()), d1(line.getDirection());
+            const LLVector3d p2(other.getPoint()), d2(other.getDirection());
+            const LLVector3d between = p1 - p2;
+            const F64 aa = d1 * d1, ab = d1 * d2, bb = d2 * d2, a_between = d1 * between, b_between = d2 * between;
+            const F64 along = (ab * b_between - bb * a_between) / (aa * bb - ab * ab);
+            return LLVector3(p1 + d1 * along);
+        };
+
         F32 allowable_relative_error = 0.001f;
         S32 number_of_tests = 100;
+        // A fixed seed, so a failure draws the same lines when run again.
+        ll_rand_seed(16600);
         for (S32 test = 0; test < number_of_tests; ++test)
         {
             // generate two points to be our known nearest approaches
@@ -375,6 +392,10 @@ namespace
             LLVector3 some_computed_point = first_line.nearestApproach(second_line);
             LLVector3 another_computed_point = second_line.nearestApproach(first_line);
 
+            // what they should be, for the lines as made
+            some_point = nearest_in_double(first_line, second_line);
+            another_point = nearest_in_double(second_line, first_line);
+
             // compute the error
             F32 first_error = (some_point - some_computed_point).length();
             F32 scale = llmax((some_point - another_point).length(), some_point.length());
@@ -385,32 +406,11 @@ namespace
             F32 second_error = (another_point - another_computed_point).length();
             F32 second_relative_error = second_error / scale;
 
-            //if (first_relative_error > allowable_relative_error)
-            //{
-            //  std::cout << "first_error = " << first_error
-            //      << "  first_relative_error = " << first_relative_error
-            //      << "  scale = " << scale
-            //      << "  dir_dot = " << (first_dir * second_dir)
-            //      << std::endl;
-            //}
-            //if (second_relative_error > allowable_relative_error)
-            //{
-            //  std::cout << "second_error = " << second_error
-            //      << "  second_relative_error = " << second_relative_error
-            //      << "  scale = " << scale
-            //      << "  dist = " << (some_point - another_point).length()
-            //      << "  dir_dot = " << (first_dir * second_dir)
-            //      << std::endl;
-            //}
-
             // test that the errors are small
-
-            ensure("first line should accurately compute its closest approach",
-                    first_relative_error <= allowable_relative_error);
-            ensure("second line should accurately compute its closest approach",
-                    second_relative_error <= allowable_relative_error);
+            CAPTURE(test, scale, first_dir * second_dir);
+            REQUIRE(first_relative_error <= allowable_relative_error);
+            REQUIRE(second_relative_error <= allowable_relative_error);
         }
-          */
     }
 
     F32 ALMOST_PARALLEL = 0.99f;
