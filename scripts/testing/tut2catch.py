@@ -37,10 +37,12 @@ decided by the types clang resolved, not by its text:
                position compared with end() or npos; a size, an emptiness,
                a presence: has(), has_value(), found() and the like); a
                condition that calls what makes it (a non-const member
-               function returning bool, ensure(m.setInverse(n)), or a call
-               returning bool that fills an argument passed by reference or
-               address), where the test reads that object or argument
-               after it; a term of a split && chain whose variable a later
+               function returning bool, or a call returning bool that fills
+               an argument passed by reference or address), where that
+               object or argument is a local declared without an
+               initializer, written by nothing since, that the test reads
+               after it (LLMatrix4a m; ensure(m.setInverse(n))), so
+               indeterminate had the call failed; a term of a split && chain whose variable a later
                term of it leans on for its safety, dereferencing it or
                indexing by it (TUT's ensure stopped the test at the first
                term that failed; v.mV[VX] == 0 && v.mV[VY] == 0 stays two
@@ -969,6 +971,8 @@ class Converter:
         self.friend_names = set() # tut:: types production code befriends
         self.tut_namespaces = []  # NamespaceDecl nodes named tut, with their parents
         self.body_reads = {}      # id of a test's body -> (offset, declaration) of what it reads
+        self.body_bare = {}       # id of a test's body -> the variables it declares without an initializer
+        self.body_writes = {}     # id of a test's body -> (offset, variable) of what it writes
         source.find_conditionals(active_lines)
 
     # ---- helpers -------------------------------------------------------
@@ -1420,17 +1424,22 @@ class Converter:
         return False
 
     def prepares(self, node, record):
-        """Whether a condition calls what makes the state the test reads
-        after it: a call returning bool, to a non-const member function of
-        an object, or with an argument it may fill (one passed by non-const
-        reference, or by address), where the test's body reads that object
-        or argument again after the assertion. A false answer is that what
-        it goes on to read was never made, as with
-        ensure(inverse.setInverse(m)) before inverse is used."""
+        """Whether a condition calls what makes state the test reads after
+        it, state that is indeterminate where the call failed: a call
+        returning bool, to a non-const member function of an object, or
+        with an argument it may fill (one passed by non-const reference, or
+        by address), where that object or argument is a local of the test
+        declared without an initializer and written by nothing since, and
+        its body reads it again after the assertion, as with LLMatrix4a
+        inverse; ensure(inverse.setInverse(m)), or S32 value;
+        ensure(convertToS32(s, value)). A local initialised or written
+        before (LLMatrix4a m; m.setIdentity()), a member or a parameter
+        holds a value whatever the call did."""
         test = self.test_containing(record["range"][0])
         body = test_body(test) if test else None
         if body is None:
             return False
+        bare = self.bare_locals(body)
         made = set()
         stack = [node]
         while stack:
@@ -1445,15 +1454,68 @@ class Converter:
                         callee.get("name") != "operator bool":
                     base = [c for c in callee.get("inner", []) if "kind" in c]
                     if base and not const_object(base[0], callee.get("isArrow")):
-                        made |= variables(base[0])
+                        made.add(written_root(base[0]))
                 for arg in inner[1:]:
                     if fills(arg):
-                        made |= variables(arg)
+                        made.add(written_root(arg))
             stack.extend(inner)
+        # Bare, and not written between its declaration and this call.
+        at = record["range"][0]
+        made = {d for d in made if d in bare and
+                not any(bare[d] < where < at and decl == d for where, decl in self.writes(body))}
         if not made:
             return False
         after = record["range"][1]
         return any(at >= after and decl in made for at, decl in self.reads(body))
+
+    def bare_locals(self, body):
+        """The variables a test's body declares without an initializer, each
+        with where its declaration ends, once per body."""
+        cache = self.body_bare
+        if id(body) not in cache:
+            found = {}
+            for n in iter_nodes(body):
+                if n.get("kind") == "VarDecl" and declared_bare(n):
+                    rng = self.node_range(n)
+                    if rng:
+                        found[n.get("id")] = rng[1]
+            cache[id(body)] = found
+        return cache[id(body)]
+
+    def writes(self, body):
+        """(offset, variable) of every write a test's body makes to a
+        variable of its own, as written_root() finds it: an assignment, an
+        increment, a non-const member call on it, a call it is filled by.
+        Once per body."""
+        cache = self.body_writes
+        if id(body) not in cache:
+            found = []
+            for n in iter_nodes(body):
+                kind = n.get("kind")
+                inner = [c for c in n.get("inner", []) if isinstance(c, dict) and "kind" in c]
+                targets = []
+                if kind in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode", "").endswith("=") \
+                        and n.get("opcode") not in ("==", "!=", "<=", ">=") and inner:
+                    targets.append(inner[0])
+                elif kind == "UnaryOperator" and n.get("opcode") in ("++", "--") and inner:
+                    targets.append(inner[0])
+                elif kind == "CXXOperatorCallExpr" and len(inner) >= 2:
+                    name = skip_implicit(inner[0]).get("referencedDecl", {}).get("name", "")
+                    if re.fullmatch(r"operator(?:[-+*/%^&|]|<<|>>)?=|operator(?:\+\+|--)", name):
+                        targets.append(inner[1])
+                elif kind == "CXXMemberCallExpr" and inner and inner[0].get("kind") == "MemberExpr":
+                    base = [c for c in inner[0].get("inner", []) if "kind" in c]
+                    if base and not const_object(base[0], inner[0].get("isArrow")):
+                        targets.append(base[0])
+                if kind in ("CallExpr", "CXXMemberCallExpr", "CXXConstructExpr"):
+                    targets += [a for a in (inner if kind == "CXXConstructExpr" else inner[1:]) if fills(a)]
+                for target in targets:
+                    decl = written_root(target)
+                    where = self.loc(n.get("range", {}).get("begin")).in_text()
+                    if decl and where is not None:
+                        found.append((where, decl))
+            cache[id(body)] = found
+        return cache[id(body)]
 
     def reads(self, body):
         """(offset, declaration) of every variable and field a test's body
@@ -2812,6 +2874,44 @@ def leaned_on(node):
                     found |= variables(offset, constants=False)
         stack.extend(inner)
     return found
+
+
+def declared_bare(decl):
+    """Whether a variable is declared without an initializer: none at all,
+    or, for a class, its default constructor called with nothing written.
+    Whether that constructor sets the members is not in the AST read here
+    (the class is a header's; its JSON says nothing of it), and an empty
+    one, as LLVector4a's, leaves them indeterminate: a class counts, set
+    or not."""
+    if "init" not in decl:
+        return True
+    if decl.get("init") != "call":
+        return False
+    inner = [c for c in decl.get("inner", []) if isinstance(c, dict) and "kind" in c]
+    if len(inner) != 1 or inner[0].get("kind") != "CXXConstructExpr" or inner[0].get("list"):
+        return False
+    return all(a.get("kind") == "CXXDefaultArgExpr" for a in inner[0].get("inner", []) if "kind" in a)
+
+
+def written_root(node):
+    """The variable an expression a call writes through is part of: x of
+    x, x.m, x[i] where x is an array, &x; None where it is no variable's
+    own (what a pointer points at, a container's element)."""
+    while True:
+        kind = node.get("kind")
+        inner = [c for c in node.get("inner", []) if isinstance(c, dict) and "kind" in c]
+        if kind == "DeclRefExpr":
+            ref = node.get("referencedDecl", {})
+            return ref.get("id") if ref.get("kind") == "VarDecl" else None
+        if not inner:
+            return None
+        if kind in ("ImplicitCastExpr", "ParenExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") or \
+                (kind == "MemberExpr" and not node.get("isArrow")) or \
+                (kind == "UnaryOperator" and node.get("opcode") == "&") or \
+                (kind == "ArraySubscriptExpr" and "[" in value_type(skip_implicit_casts(inner[0]))):
+            node = skip_implicit_casts(inner[0]) if kind == "ArraySubscriptExpr" else inner[0]
+            continue
+        return None
 
 
 def const_object(base, arrow):
