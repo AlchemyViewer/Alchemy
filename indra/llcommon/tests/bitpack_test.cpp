@@ -36,7 +36,6 @@
 
 namespace
 {
-    // pack -> unpack
     TEST_CASE("LLBitPack: a string packed then unpacked comes back unchanged", "[LLBitPack]")
     {
         U8 packbuffer[255];
@@ -53,13 +52,10 @@ namespace
 
         LLBitPack bitunpack(packbuffer, pack_bufsize*8);
         unpack_bufsize = bitunpack.bitUnpack(unpackbuffer, len*8);
-        UNSCOPED_INFO("bitPack: unpack size should be same as string size prior to pack");
         CHECK(len == unpack_bufsize);
-        UNSCOPED_INFO("str->bitPack->bitUnpack should be equal to string");
         CHECK_THAT(ll_test::Memory(str, len), ll_test::MemoryMatches(unpackbuffer, unpack_bufsize));
     }
 
-    // pack large, unpack in individual bytes
     TEST_CASE("LLBitPack: a packed string unpacks a byte at a time", "[LLBitPack]")
     {
         U8 packbuffer[255];
@@ -75,29 +71,21 @@ namespace
 
         LLBitPack bitunpack(packbuffer, pack_bufsize*8);
         bitunpack.bitUnpack(&unpackbuffer[0], 8);
-        UNSCOPED_INFO("bitPack: individual unpack: 0");
         CHECK(unpackbuffer[0] == (U8) str[0]);
         bitunpack.bitUnpack(&unpackbuffer[0], 8);
-        UNSCOPED_INFO("bitPack: individual unpack: 1");
         CHECK(unpackbuffer[0] == (U8) str[1]);
         bitunpack.bitUnpack(&unpackbuffer[0], 8);
-        UNSCOPED_INFO("bitPack: individual unpack: 2");
         CHECK(unpackbuffer[0] == (U8) str[2]);
         bitunpack.bitUnpack(&unpackbuffer[0], 8);
-        UNSCOPED_INFO("bitPack: individual unpack: 3");
         CHECK(unpackbuffer[0] == (U8) str[3]);
         bitunpack.bitUnpack(&unpackbuffer[0], 8);
-        UNSCOPED_INFO("bitPack: individual unpack: 4");
         CHECK(unpackbuffer[0] == (U8) str[4]);
         bitunpack.bitUnpack(&unpackbuffer[0], 8);
-        UNSCOPED_INFO("bitPack: individual unpack: 5");
         CHECK(unpackbuffer[0] == (U8) str[5]);
         bitunpack.bitUnpack(unpackbuffer, 8*4); // Life
-        UNSCOPED_INFO("bitPack: 4 bytes unpack:");
-        REQUIRE_THAT(ll_test::Memory(unpackbuffer, 4), ll_test::MemoryMatches(str+6, 4));
+        CHECK_THAT(ll_test::Memory(unpackbuffer, 4), ll_test::MemoryMatches(str+6, 4));
     }
 
-    // U32 packing
     TEST_CASE("LLBitPack: a U32 packed then unpacked comes back unchanged", "[LLBitPack]")
     {
         U8 packbuffer[255];
@@ -113,7 +101,6 @@ namespace
         // since packing and unpacking is done on same machine in the unit test run,
         // endianness should not matter
         bitunpack.bitUnpack((U8*) &res, sizeof(res)*8);
-        UNSCOPED_INFO("U32->bitPack->bitUnpack->U32 should be equal");
         CHECK(num == res);
     }
 }

@@ -58,25 +58,23 @@ static std::string apr_strerror_helper(apr_status_t rv)
 *   Helpers
 *****************************************************************************/
 
-#define ensure_equals_(left, right) \
+#define require_equals_(left, right) \
 do { \
     auto _left_val = (left); \
     auto _right_val = (right); \
     if (_left_val != _right_val) { \
-        std::string _msg = std::string(#left) + " != " + std::string(#right); \
-        UNSCOPED_INFO(_msg); REQUIRE_THAT(_left_val, ll_test::LLSDEquals(_right_val)); \
+        UNSCOPED_INFO(#left " != " #right); REQUIRE_THAT(_left_val, ll_test::LLSDEquals(_right_val)); \
     } else { \
         REQUIRE_THAT(_left_val, ll_test::LLSDEquals(_right_val)); \
     } \
 } while(0)
 
-#define aprchk(expr) aprchk_(#expr, (expr))
-static void aprchk_(const char* call, apr_status_t rv, apr_status_t expected=APR_SUCCESS)
+#define require_apr(expr) require_apr_(#expr, (expr))
+static void require_apr_(const char* call, apr_status_t rv, apr_status_t expected=APR_SUCCESS)
 {
     if (rv != expected)
     {
-        std::string msg = std::string(call) + " => " + std::to_string(rv) + ": " + apr_strerror_helper(rv);
-        UNSCOPED_INFO(msg);
+        UNSCOPED_INFO(call << " => " << rv << ": " << apr_strerror_helper(rv));
         REQUIRE_THAT(rv, ll_test::LLSDEquals(expected));
     }
     else
@@ -105,8 +103,7 @@ static std::string readfile(const std::filesystem::path& pathname, const std::st
     std::string output;
     if (!std::getline(inf, output))
     {
-        UNSCOPED_INFO("No output " + use_desc);
-        REQUIRE(false);
+        FAIL("No output " << use_desc);
     }
     std::string more;
     while (std::getline(inf, more))
@@ -151,8 +148,7 @@ static void waitfor(LLProcess& proc, int timeout=60)
     }
     // Pump once more after the process exits to flush any final events such as EOF.
     yield(0);
-    std::string msg = "process took longer than " + std::to_string(timeout) + " seconds to terminate";
-    UNSCOPED_INFO(msg);
+    INFO("process took longer than " << timeout << " seconds to terminate");
     REQUIRE(i < timeout);
 }
 
@@ -165,8 +161,7 @@ static void waitfor(LLProcess::handle h, const std::string& desc, int timeout=60
     }
     // Pump once more after the process exits to flush any final events such as EOF.
     yield(0);
-    std::string msg = "process took longer than " + std::to_string(timeout) + " seconds to terminate";
-    UNSCOPED_INFO(msg);
+    INFO("process took longer than " << timeout << " seconds to terminate");
     REQUIRE(i < timeout);
 }
 
@@ -204,8 +199,7 @@ struct PythonProcessLauncher
         try
         {
             mPy = LLProcess::create(mParams);
-            std::string msg = "Couldn't launch " + mDesc + " script";
-            UNSCOPED_INFO(msg);
+            UNSCOPED_INFO("Couldn't launch " << mDesc << " script");
             REQUIRE(bool(mPy));
         }
         catch (const ll_test::Failure&)
@@ -433,10 +427,7 @@ namespace
             Sleep(AUTOKILL_HELPER_POLL_INTERVAL_MS);
             LLEventPumps::instance().obtain("mainloop").post(LLSD());
         }
-        UNSCOPED_INFO((STRINGIZE("expected " << expected_count
-                                << " child pids within " << timeout
-                                << " seconds")));
-        REQUIRE(false);
+        FAIL("expected " << expected_count << " child pids within " << timeout << " seconds");
         return {};
     }
 
@@ -457,7 +448,6 @@ namespace
         params.executable = get_current_executable_path();
         params.desc = desc + " helper";
         LLProcessPtr helper = LLProcess::create(params);
-        UNSCOPED_INFO("helper launched");
         REQUIRE(bool(helper));
 
         std::vector<DWORD> pids = wait_for_helper_pids(pidfile.getPath().string(), child_count);
@@ -468,7 +458,7 @@ namespace
             // SYNCHRONIZE lets the test wait for the child to terminate, while
             // PROCESS_QUERY_LIMITED_INFORMATION keeps the requested access minimal.
             HANDLE handle = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
-            UNSCOPED_INFO((STRINGIZE("opened child process handle for pid " << pid)));
+            CAPTURE(pid);
             REQUIRE(handle != nullptr);
             handles.push_back(handle);
         }
@@ -479,8 +469,7 @@ namespace
         }
 
         waitfor(*helper);
-        UNSCOPED_INFO("helper exited");
-        REQUIRE(helper->getStatus().mState == LLProcess::EXITED);
+        CHECK(helper->getStatus().mState == LLProcess::EXITED);
 
         for (HANDLE handle : handles)
         {
@@ -685,9 +674,9 @@ namespace tut
 
         // Run the child process.
         apr_procattr_t *procattr = NULL;
-        aprchk(apr_procattr_create(&procattr, pool.getAPRPool()));
-        aprchk(apr_procattr_io_set(procattr, APR_CHILD_BLOCK, APR_CHILD_BLOCK, APR_CHILD_BLOCK));
-        aprchk(apr_procattr_cmdtype_set(procattr, APR_PROGRAM_PATH));
+        require_apr(apr_procattr_create(&procattr, pool.getAPRPool()));
+        require_apr(apr_procattr_io_set(procattr, APR_CHILD_BLOCK, APR_CHILD_BLOCK, APR_CHILD_BLOCK));
+        require_apr(apr_procattr_cmdtype_set(procattr, APR_PROGRAM_PATH));
 
         std::vector<const char*> argv;
         apr_proc_t child;
@@ -701,11 +690,11 @@ namespace tut
         argv.push_back(scriptname.c_str());
         argv.push_back(NULL);
 
-        aprchk(apr_proc_create(&child, argv[0],
-                               &argv[0],
-                               NULL, // if we wanted to pass explicit environment
-                               procattr,
-                               pool.getAPRPool()));
+        require_apr(apr_proc_create(&child, argv[0],
+                                    &argv[0],
+                                    NULL, // if we wanted to pass explicit environment
+                                    procattr,
+                                    pool.getAPRPool()));
 
         // We do not want this child process to outlive our APR pool. On
         // destruction of the pool, forcibly kill the process. Tell APR to try
@@ -763,7 +752,7 @@ namespace tut
                     ++history.back().tries;
                     continue;
                 }
-                aprchk_("apr_file_gets(buf, sizeof(buf), dfli->second)", rv);
+                require_apr_("apr_file_gets(buf, sizeof(buf), dfli->second)", rv);
                 // Is it even possible to get APR_SUCCESS but read 0 bytes?
                 // Hope not, but defend against that anyway.
                 if (buf[0])
@@ -805,35 +794,35 @@ namespace tut
             wi.rv = apr_proc_wait(wi.child, &wi.rc, &wi.why, APR_NOWAIT);
         }
 //      std::cout << "child done: rv = " << rv << " (" << manager.strerror(rv) << "), why = " << why << ", rc = " << rc << '\n';
-        aprchk_("apr_proc_wait(wi->child, &wi->rc, &wi->why, APR_NOWAIT)", wi.rv, APR_CHILD_DONE);
+        require_apr_("apr_proc_wait(wi->child, &wi->rc, &wi->why, APR_NOWAIT)", wi.rv, APR_CHILD_DONE);
 
         // Beyond merely executing all the above successfully, verify that we
         // obtained expected output -- and that we duly got control while
         // waiting, proving the non-blocking nature of these pipes.
         try
         {
-            // Perform these ensure_equals_() within this try/catch so that if
+            // Perform these require_equals_() within this try/catch so that if
             // we don't get expected results, we'll dump whatever we did get
             // to help diagnose.
-            ensure_equals_(wi.why, APR_PROC_EXIT);
-            ensure_equals_(wi.rc, 0);
+            require_equals_(wi.why, APR_PROC_EXIT);
+            require_equals_(wi.rc, 0);
 
             unsigned i = 0;
             UNSCOPED_INFO("blocking I/O on child pipe (0)");
             CHECK(history[i].tries);
-            ensure_equals_(history[i].which, "out");
-            ensure_equals_(history[i].what,  "stdout after wait" EOL);
+            require_equals_(history[i].which, "out");
+            require_equals_(history[i].what,  "stdout after wait" EOL);
 //          ++i;
-//          ensure_equals_(history[i].which, "out");
-//          ensure_equals_(history[i].what,  "*eof*");
+//          require_equals_(history[i].which, "out");
+//          require_equals_(history[i].what,  "*eof*");
             ++i;
             UNSCOPED_INFO("blocking I/O on child pipe (1)");
             CHECK(history[i].tries);
-            ensure_equals_(history[i].which, "err");
-            ensure_equals_(history[i].what,  "stderr after wait" EOL);
+            require_equals_(history[i].which, "err");
+            require_equals_(history[i].what,  "stderr after wait" EOL);
 //          ++i;
-//          ensure_equals_(history[i].which, "err");
-//          ensure_equals_(history[i].what,  "*eof*");
+//          require_equals_(history[i].which, "err");
+//          require_equals_(history[i].what,  "*eof*");
         }
         catch (const ll_test::Failure&)
         {
@@ -901,20 +890,20 @@ namespace tut
         boost::split_iterator<std::string::const_iterator>
             li(output, boost::first_finder("\n")), lend;
         UNSCOPED_INFO("didn't get first arg");
-        CHECK(li != lend);
+        REQUIRE(li != lend);
         std::string arg(li->begin(), li->end());
         CHECK(arg == "first arg");
         ++li;
         UNSCOPED_INFO("didn't get second arg");
-        CHECK(li != lend);
+        REQUIRE(li != lend);
         arg.assign(li->begin(), li->end());
         CHECK(arg == "second arg");
         ++li;
         UNSCOPED_INFO("didn't get output filename?!");
-        CHECK(li != lend);
+        REQUIRE(li != lend);
         arg.assign(li->begin(), li->end());
         UNSCOPED_INFO("output filename empty?!");
-        REQUIRE_FALSE(arg.empty());
+        CHECK_FALSE(arg.empty());
         ++li;
         UNSCOPED_INFO("too many args");
         CHECK(li == lend);
@@ -926,9 +915,7 @@ namespace tut
                                  "import sys\n"
                                  "sys.exit(0)\n");
         py.run();
-        UNSCOPED_INFO("Status.mState");
         CHECK(py.mPy->getStatus().mState == LLProcess::EXITED);
-        UNSCOPED_INFO("Status.mData");
         CHECK(py.mPy->getStatus().mData == 0);
     }
 
@@ -938,9 +925,7 @@ namespace tut
                                  "import sys\n"
                                  "sys.exit(2)\n");
         py.run();
-        UNSCOPED_INFO("Status.mState");
         CHECK(py.mPy->getStatus().mState == LLProcess::EXITED);
-        UNSCOPED_INFO("Status.mData");
         CHECK(py.mPy->getStatus().mData == 2);
     }
 
@@ -952,9 +937,7 @@ namespace tut
         py.mParams.files.add(LLProcess::FileParam()); // inherit stdout
         py.mParams.files.add(LLProcess::FileParam().type("pipe")); // pipe for stderr
         py.run();
-        UNSCOPED_INFO("Status.mState");
         CHECK(py.mPy->getStatus().mState == LLProcess::EXITED);
-        UNSCOPED_INFO("Status.mData");
         CHECK(py.mPy->getStatus().mData == 1);
         std::istream& rpipe(py.mPy->getReadPipe(LLProcess::STDERR).get_istream());
         std::vector<char> buffer(4096);
@@ -963,8 +946,7 @@ namespace tut
         UNSCOPED_INFO("Nothing read from stderr pipe");
         CHECK(got);
         std::string data(&buffer[0], got);
-        UNSCOPED_INFO("Didn't find 'SyntaxError:'");
-        REQUIRE(data.find("\nSyntaxError:") != std::string::npos);
+        CHECK(data.find("\nSyntaxError:") != std::string::npos);
     }
 
     TEST_CASE_METHOD(llprocess_data, "llprocess: kill() stops a sleeping child before it writes again", "[llprocess]")
@@ -998,20 +980,15 @@ namespace tut
         // wait for the script to terminate... one way or another.
         waitfor(*py.mPy);
 #if LL_WINDOWS
-        UNSCOPED_INFO("Status.mState");
-        REQUIRE(py.mPy->getStatus().mState == LLProcess::EXITED);
-        UNSCOPED_INFO("Status.mData");
-        REQUIRE(py.mPy->getStatus().mData == -1);
+        CHECK(py.mPy->getStatus().mState == LLProcess::EXITED);
+        CHECK(py.mPy->getStatus().mData == -1);
 #else
-        UNSCOPED_INFO("Status.mState");
         CHECK(py.mPy->getStatus().mState == LLProcess::KILLED);
-        UNSCOPED_INFO("Status.mData");
         CHECK(py.mPy->getStatus().mData == SIGTERM);
 #endif
         // If kill() failed, the script would have woken up on its own and
         // overwritten the file with 'bad'. But if kill() succeeded, it should
         // not have had that chance.
-        UNSCOPED_INFO(ll_test::currentTestName() + " script output");
         CHECK(readfile(out.getPath()) == "ok");
     }
 
@@ -1053,7 +1030,6 @@ namespace tut
         // If kill() failed, the script would have woken up on its own and
         // overwritten the file with 'bad'. But if kill() succeeded, it should
         // not have had that chance.
-        UNSCOPED_INFO(ll_test::currentTestName() + " script output");
         CHECK(readfile(out.getPath()) == "ok");
     }
 
@@ -1113,7 +1089,6 @@ namespace tut
         waitfor(phandle, "autokill script");
         // If the LLProcess destructor implicitly called kill(), the
         // script could not have written 'ack' as we expect.
-        UNSCOPED_INFO(ll_test::currentTestName() + " script output");
         CHECK(readfile(from.getPath()) == "ack");
     }
 
@@ -1176,7 +1151,6 @@ namespace tut
         waitfor(phandle, "autokill script");
         // If the LLProcess destructor implicitly called kill(), the
         // script could not have written 'ack' as we expect.
-        UNSCOPED_INFO(ll_test::currentTestName() + " script output");
         CHECK(readfile(from.getPath()) == "ack");
     }
 
@@ -1188,10 +1162,8 @@ namespace tut
             "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam("bogus"));
         py.mPy = LLProcess::create(py.mParams);
-        UNSCOPED_INFO("should have rejected 'bogus'");
-        REQUIRE_FALSE(py.mPy);
+        CHECK_FALSE(py.mPy);
         std::string message(recorder.messageWith("bogus"));
-        UNSCOPED_INFO("did not name 'stdin'");
         CHECK_THAT(message, Catch::Matchers::ContainsSubstring("stdin"));
     }
 
@@ -1205,8 +1177,7 @@ namespace tut
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam("file"));
         py.mPy = LLProcess::create(py.mParams);
-        UNSCOPED_INFO("should have rejected 'file'");
-        REQUIRE_FALSE(py.mPy);
+        CHECK_FALSE(py.mPy);
     }
 
     TEST_CASE_METHOD(llprocess_data, "llprocess: the unimplemented tpipe type is rejected and its slot named", "[llprocess]")
@@ -1220,10 +1191,8 @@ namespace tut
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam("tpipe"));
         py.mPy = LLProcess::create(py.mParams);
-        UNSCOPED_INFO("should have rejected 'tpipe'");
-        REQUIRE_FALSE(py.mPy);
+        CHECK_FALSE(py.mPy);
         std::string message(recorder.messageWith("tpipe"));
-        UNSCOPED_INFO("did not name 'stdout'");
         CHECK_THAT(message, Catch::Matchers::ContainsSubstring("stdout"));
     }
 
@@ -1239,10 +1208,8 @@ namespace tut
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam("npipe"));
         py.mPy = LLProcess::create(py.mParams);
-        UNSCOPED_INFO("should have rejected 'npipe'");
-        REQUIRE_FALSE(py.mPy);
+        CHECK_FALSE(py.mPy);
         std::string message(recorder.messageWith("npipe"));
-        UNSCOPED_INFO("did not name 'stderr'");
         CHECK_THAT(message, Catch::Matchers::ContainsSubstring("stderr"));
     }
 
@@ -1254,9 +1221,7 @@ namespace tut
                                  "sys.exit(7)\n");
         py.mParams.files.add(LLProcess::FileParam("pipe", "somename"));
         py.run();                   // verify that it did launch anyway
-        UNSCOPED_INFO("Status.mState");
         CHECK(py.mPy->getStatus().mState == LLProcess::EXITED);
-        UNSCOPED_INFO("Status.mData");
         CHECK(py.mPy->getStatus().mData == 7);
         std::string message(recorder.messageWith("not yet supported"));
         UNSCOPED_INFO("log message did not mention internal pipe name");
@@ -1270,7 +1235,7 @@ namespace tut
         std::string threw;                                              \
         /* Both the following calls should work. */                     \
         (PROCESS).GETPIPE(VALID);                                       \
-        UNSCOPED_INFO((#GETOPTPIPE "(" #VALID ") failed")); REQUIRE((bool((PROCESS).GETOPTPIPE(VALID)))); \
+        UNSCOPED_INFO(#GETOPTPIPE "(" #VALID ") failed"); REQUIRE(bool((PROCESS).GETOPTPIPE(VALID))); \
         /* pass obviously bogus PIPESLOT */                             \
         CATCH_IN(threw, LLProcess::NoPipe, (PROCESS).GETPIPE(LLProcess::FILESLOT(4))); \
         UNSCOPED_INFO("didn't reject bad slot"); REQUIRE_THAT(threw, Catch::Matchers::ContainsSubstring("no slot"));    \
@@ -1296,14 +1261,14 @@ namespace tut
         (THREW) = catch_what<EXCEPTION>([&](){                          \
                 CODE;                                                   \
             });                                                         \
-        UNSCOPED_INFO(("failed to throw " #EXCEPTION ": " #CODE)); REQUIRE((! (THREW).empty())); \
+        UNSCOPED_INFO("failed to throw " #EXCEPTION ": " #CODE); REQUIRE_FALSE((THREW).empty()); \
     } while (0)
 
 #define EXPECT_FAIL_WITH_LOG(EXPECT, CODE)                              \
     do                                                                  \
     {                                                                   \
         CaptureLog recorder;                                            \
-        UNSCOPED_INFO((#CODE " succeeded")); REQUIRE((! (CODE)));                           \
+        UNSCOPED_INFO(#CODE " succeeded"); REQUIRE_FALSE(CODE);                     \
         recorder.messageWith(EXPECT);                                   \
     } while (0)
 
@@ -1349,18 +1314,14 @@ namespace tut
         }
         UNSCOPED_INFO("script never started");
         CHECK(i < timeout);
-        UNSCOPED_INFO("bad wakeup from stdin/stdout script");
         CHECK(childout.getline() == "ok");
         // important to get the implicit flush from std::endl
         py.mPy->getWritePipe().get_ostream() << "go" << std::endl;
         waitfor(*py.mPy);
         UNSCOPED_INFO("script never replied");
         CHECK(childout.contains("\n"));
-        UNSCOPED_INFO("child didn't ack");
         CHECK(childout.getline() == "ack");
-        UNSCOPED_INFO("bad child termination");
         CHECK(py.mPy->getStatus().mState == LLProcess::EXITED);
-        UNSCOPED_INFO("bad child exit code");
         CHECK(py.mPy->getStatus().mData == 0);
     }
 
@@ -1388,7 +1349,7 @@ namespace tut
             {
                 try
                 {
-                    // we expect this lambda to contain tut::ensure() calls
+                    // we expect this lambda to contain REQUIRE() calls
                     std::forward<CALLABLE>(code)(mHistory);
                 }
                 catch (const ll_test::Failure&)
@@ -1460,23 +1421,17 @@ namespace tut
                 auto li(history.begin()), lend(history.end());
                 UNSCOPED_INFO("no events");
                 REQUIRE(li != lend);
-                UNSCOPED_INFO("history[0]");
                 REQUIRE((*li)["data"].asString() == "abc");
-                UNSCOPED_INFO("history[0] len");
                 REQUIRE((*li)["len"].asInteger() == 3);
                 ++li;
                 UNSCOPED_INFO("only 1 event");
                 REQUIRE(li != lend);
-                UNSCOPED_INFO("history[1]");
                 REQUIRE((*li)["data"].asString() == "abcdef");
-                UNSCOPED_INFO("history[0] len");
                 REQUIRE((*li)["len"].asInteger() == 6);
                 ++li;
                 UNSCOPED_INFO("only 2 events");
                 REQUIRE(li != lend);
-                UNSCOPED_INFO("history[2]");
                 REQUIRE((*li)["data"].asString() == "abcdefghi" EOL);
-                UNSCOPED_INFO("history[0] len");
                 REQUIRE((*li)["len"].asInteger() == 9 + sizeof(EOL) - 1);
                 ++li;
                 // We DO NOT expect a whole new event for the second line because we
@@ -1540,7 +1495,6 @@ namespace tut
         EventListener listener(childout.getPump());
         // but set limit
         childout.setLimit(10);
-        UNSCOPED_INFO("getLimit() after setlimit(10)");
         CHECK(childout.getLimit() == 10);
         // okay, pump I/O to pick up output from child
         waitfor(*py.mPy);
@@ -1551,9 +1505,7 @@ namespace tut
                 REQUIRE_FALSE(history.empty());
                 // For all we know, that data could have arrived in several different
                 // bursts... probably not, but anyway, only check the last one.
-                UNSCOPED_INFO("event[\"len\"]");
                 REQUIRE(history.back()["len"].asInteger() == abc.length());
-                UNSCOPED_INFO("length of setLimit(10) data");
                 REQUIRE(history.back()["data"].asString().length() == 10);
             });
     }
@@ -1572,69 +1524,41 @@ namespace tut
         // okay, pump I/O to pick up output from child
         waitfor(*py.mPy);
         // peek() with substr args
-        UNSCOPED_INFO("peek()");
         CHECK(childout.peek() == abc);
-        UNSCOPED_INFO("peek(23)");
         CHECK(childout.peek(23) == abc.substr(23));
-        UNSCOPED_INFO("peek(5, 3)");
         CHECK(childout.peek(5, 3) == abc.substr(5, 3));
-        UNSCOPED_INFO("peek(27, 2)");
         CHECK(childout.peek(27, 2) == "");
-        UNSCOPED_INFO("peek(23, 5)");
         CHECK(childout.peek(23, 5) == "xyz");
         // contains() -- we don't exercise as thoroughly as find() because the
         // contains() implementation is trivially (and visibly) based on find()
-        UNSCOPED_INFO("contains(\":\")");
         CHECK_FALSE(childout.contains(":"));
-        UNSCOPED_INFO("contains(':')");
         CHECK_FALSE(childout.contains(':'));
-        UNSCOPED_INFO("contains(\"d\")");
         CHECK(childout.contains("d"));
-        UNSCOPED_INFO("contains('d')");
         CHECK(childout.contains('d'));
-        UNSCOPED_INFO("contains(\"klm\")");
         CHECK(childout.contains("klm"));
-        UNSCOPED_INFO("contains(\"klx\")");
         CHECK_FALSE(childout.contains("klx"));
         // find()
-        UNSCOPED_INFO("find(\":\")");
-        REQUIRE(childout.find(":") == LLProcess::ReadPipe::npos);
-        UNSCOPED_INFO("find(':')");
-        REQUIRE(childout.find(':') == LLProcess::ReadPipe::npos);
-        UNSCOPED_INFO("find(\"d\")");
+        CHECK(childout.find(":") == LLProcess::ReadPipe::npos);
+        CHECK(childout.find(':') == LLProcess::ReadPipe::npos);
         CHECK(childout.find("d") == 3);
-        UNSCOPED_INFO("find('d')");
         CHECK(childout.find('d') == 3);
-        UNSCOPED_INFO("find(\"d\", 3)");
         CHECK(childout.find("d", 3) == 3);
-        UNSCOPED_INFO("find('d', 3)");
         CHECK(childout.find('d', 3) == 3);
-        UNSCOPED_INFO("find(\"d\", 4)");
-        REQUIRE(childout.find("d", 4) == LLProcess::ReadPipe::npos);
-        UNSCOPED_INFO("find('d', 4)");
-        REQUIRE(childout.find('d', 4) == LLProcess::ReadPipe::npos);
+        CHECK(childout.find("d", 4) == LLProcess::ReadPipe::npos);
+        CHECK(childout.find('d', 4) == LLProcess::ReadPipe::npos);
         // The case of offset == end and offset > end are different. In the
         // first case, we can form a valid (albeit empty) iterator range and
         // search that. In the second, guard logic in the implementation must
         // realize we can't form a valid iterator range.
-        UNSCOPED_INFO("find(\"d\", 26)");
-        REQUIRE(childout.find("d", 26) == LLProcess::ReadPipe::npos);
-        UNSCOPED_INFO("find('d', 26)");
-        REQUIRE(childout.find('d', 26) == LLProcess::ReadPipe::npos);
-        UNSCOPED_INFO("find(\"d\", 27)");
-        REQUIRE(childout.find("d", 27) == LLProcess::ReadPipe::npos);
-        UNSCOPED_INFO("find('d', 27)");
-        REQUIRE(childout.find('d', 27) == LLProcess::ReadPipe::npos);
-        UNSCOPED_INFO("find(\"ghi\")");
+        CHECK(childout.find("d", 26) == LLProcess::ReadPipe::npos);
+        CHECK(childout.find('d', 26) == LLProcess::ReadPipe::npos);
+        CHECK(childout.find("d", 27) == LLProcess::ReadPipe::npos);
+        CHECK(childout.find('d', 27) == LLProcess::ReadPipe::npos);
         CHECK(childout.find("ghi") == 6);
-        UNSCOPED_INFO("find(\"ghi\", 6)");
         CHECK(childout.find("ghi") == 6);
-        UNSCOPED_INFO("find(\"ghi\", 7)");
-        REQUIRE(childout.find("ghi", 7) == LLProcess::ReadPipe::npos);
-        UNSCOPED_INFO("find(\"ghi\", 26)");
-        REQUIRE(childout.find("ghi", 26) == LLProcess::ReadPipe::npos);
-        UNSCOPED_INFO("find(\"ghi\", 27)");
-        REQUIRE(childout.find("ghi", 27) == LLProcess::ReadPipe::npos);
+        CHECK(childout.find("ghi", 7) == LLProcess::ReadPipe::npos);
+        CHECK(childout.find("ghi", 26) == LLProcess::ReadPipe::npos);
+        CHECK(childout.find("ghi", 27) == LLProcess::ReadPipe::npos);
     }
 
     TEST_CASE_METHOD(llprocess_data, "llprocess: postend reports a launch that failed validation", "[llprocess]")
@@ -1645,28 +1569,21 @@ namespace tut
         params.desc = ll_test::currentTestName();
         params.postend = pumpname;
         LLProcessPtr child = LLProcess::create(params);
-        UNSCOPED_INFO("shouldn't have launched");
-        REQUIRE_FALSE(child);
+        CHECK_FALSE(child);
         listener.checkHistory(
             [&params](const EventListener::Listory& history)
             {
-                UNSCOPED_INFO("number of postend events");
                 REQUIRE(history.size() == 1);
                 LLSD postend(history.front());
-                UNSCOPED_INFO("has id");
                 REQUIRE_FALSE(postend.has("id"));
-                UNSCOPED_INFO("desc");
                 REQUIRE(postend["desc"].asString() == std::string(params.desc));
-                UNSCOPED_INFO("state");
                 REQUIRE(postend["state"].asInteger() == LLProcess::UNSTARTED);
-                UNSCOPED_INFO("has data");
                 REQUIRE_FALSE(postend.has("data"));
                 std::string error(postend["string"]);
                 // All we get from canned parameter validation is a bool, so the
                 // "validation failed" message we ourselves generate can't mention
                 // "executable" by name. Just check that it's nonempty.
                 //ensure_contains("error", error, "executable");
-                UNSCOPED_INFO("string");
                 REQUIRE_FALSE(error.empty());
             });
     }
@@ -1693,21 +1610,14 @@ namespace tut
             {
                 UNSCOPED_INFO("no postend event");
                 REQUIRE(i < timeout);
-                UNSCOPED_INFO("number of postend events");
                 REQUIRE(history.size() == 1);
                 LLSD postend(history.front());
-                UNSCOPED_INFO("id");
                 REQUIRE(postend["id"].asInteger() == childid);
-                UNSCOPED_INFO("desc empty");
                 REQUIRE_FALSE(postend["desc"].asString().empty());
-                UNSCOPED_INFO("state");
                 REQUIRE(postend["state"].asInteger() == LLProcess::EXITED);
-                UNSCOPED_INFO("data");
                 REQUIRE(postend["data"].asInteger() == 35);
                 std::string str(postend["string"]);
-                UNSCOPED_INFO("string");
                 REQUIRE_THAT(str, Catch::Matchers::ContainsSubstring("exited"));
-                UNSCOPED_INFO("string");
                 REQUIRE_THAT(str, Catch::Matchers::ContainsSubstring("35"));
             });
     }
@@ -1732,7 +1642,6 @@ namespace tut
             bool postend(const LLSD&)
             {
                 mTriggered = true;
-                UNSCOPED_INFO("postend listener");
                 REQUIRE(mReadPipe.read(mReadPipe.size()) == mExpect);
                 return false;
             }
@@ -1759,7 +1668,6 @@ namespace tut
                                  pumpname,
                                  "partial line");
         waitfor(*py.mPy);
-        UNSCOPED_INFO("postend never triggered");
         CHECK(listener.mTriggered);
     }
 
@@ -1796,12 +1704,9 @@ namespace tut
         CHECK(i < timeout);
         UNSCOPED_INFO("child never replied");
         CHECK(childout.contains("\n"));
-        UNSCOPED_INFO("large stdin ack");
         CHECK(childout.getline() == "ok");
         waitfor(*py.mPy);
-        UNSCOPED_INFO("bad child termination");
         CHECK(py.mPy->getStatus().mState == LLProcess::EXITED);
-        UNSCOPED_INFO("bad child exit code");
         CHECK(py.mPy->getStatus().mData == 0);
     }
 
@@ -1832,9 +1737,7 @@ namespace tut
         UNSCOPED_INFO("initial output timeout");
         CHECK(i < timeout);
 
-        UNSCOPED_INFO("stdout message");
         CHECK(childout.getline() == "stdout message");
-        UNSCOPED_INFO("stderr message");
         CHECK(childerr.getline() == "stderr message");
 
         py.mPy->getWritePipe().get_ostream() << "test input" << std::endl;
@@ -1842,7 +1745,6 @@ namespace tut
         waitfor(*py.mPy);
         UNSCOPED_INFO("script never replied");
         CHECK(childout.contains("\n"));
-        UNSCOPED_INFO("echo response");
         CHECK(childout.getline() == "received: test input");
     }
 
@@ -1856,17 +1758,13 @@ namespace tut
 
         // Immediately after launch
         LLProcess::Status status = py.mPy->getStatus();
-        UNSCOPED_INFO("post-launch state");
         CHECK(status.mState == LLProcess::RUNNING);
-        UNSCOPED_INFO("process is running");
         CHECK(py.mPy->isRunning());
 
         // After completion
         waitfor(*py.mPy);
         status = py.mPy->getStatus();
-        UNSCOPED_INFO("post-completion state");
         CHECK(status.mState == LLProcess::EXITED);
-        UNSCOPED_INFO("process is not running");
         CHECK_FALSE(py.mPy->isRunning());
     }
 
@@ -1895,11 +1793,9 @@ namespace tut
                 for (const LLSD& event : history)
                 {
                     const std::string data = event["data"].asString();
-                    UNSCOPED_INFO("event data within limit");
                     REQUIRE(data.length() <= 50);
                     saw_data = saw_data || !data.empty();
                 }
-                UNSCOPED_INFO("saw at least one data event");
                 REQUIRE(saw_data);
             });
     }
@@ -1914,16 +1810,13 @@ namespace tut
         EventListener listener(LLEventPumps::instance().obtain(pumpname));
 
         LLProcessPtr child = LLProcess::create(params);
-        UNSCOPED_INFO("should not create invalid process");
-        REQUIRE_FALSE(child);
+        CHECK_FALSE(child);
 
         listener.checkHistory(
             [](const EventListener::Listory& history)
             {
-                UNSCOPED_INFO("got failure event");
                 REQUIRE(history.size() == 1);
                 LLSD event = history.front();
-                UNSCOPED_INFO("state is UNSTARTED");
                 REQUIRE(event["state"].asInteger() == LLProcess::UNSTARTED);
                 UNSCOPED_INFO("has error string");
                 REQUIRE_FALSE(event["string"].asString().empty());
@@ -1940,23 +1833,17 @@ namespace tut
         LLProcess::id pid = py.mPy->getProcessID();
         LLProcess::handle handle = py.mPy->getProcessHandle();
 
-        UNSCOPED_INFO("PID is valid");
         CHECK(pid != 0);
-        UNSCOPED_INFO("handle is valid");
         CHECK(handle != 0);
 
 #if LL_WINDOWS
         // On Windows, verify handle is a valid process handle
         DWORD exitCode;
-        UNSCOPED_INFO("GetExitCodeProcess succeeds");
-        REQUIRE((GetExitCodeProcess(handle, &exitCode) != 0));
-        UNSCOPED_INFO("process still running");
-        REQUIRE(exitCode == STILL_ACTIVE);
+        REQUIRE(GetExitCodeProcess(handle, &exitCode) != 0);
+        CHECK(exitCode == STILL_ACTIVE);
 #else
         // On POSIX, PID and handle should be the same
-        UNSCOPED_INFO("PID equals handle");
         CHECK(pid == handle);
-        UNSCOPED_INFO("process still running");
         CHECK(py.mPy->isRunning());
 #endif
 
@@ -1976,25 +1863,18 @@ namespace tut
         waitfor(*py.mPy);
 
         // Test find at exact end
-        UNSCOPED_INFO("find at end succeeds");
-        REQUIRE(childout.find("xyz", 23) != LLProcess::ReadPipe::npos);
-        UNSCOPED_INFO("find past end returns npos");
-        REQUIRE(childout.find("a", 30) == LLProcess::ReadPipe::npos);
+        CHECK(childout.find("xyz", 23) != LLProcess::ReadPipe::npos);
+        CHECK(childout.find("a", 30) == LLProcess::ReadPipe::npos);
 
         // Test empty string search
-        UNSCOPED_INFO("contains empty string");
         CHECK(childout.contains(""));
 
         // Test single char at boundaries
-        UNSCOPED_INFO("find 'a' at 0");
         CHECK(childout.find('a', 0) == 0);
-        UNSCOPED_INFO("find 'z' at end");
         CHECK(childout.find('z') == 25);
 
         // Test peek at boundaries
-        UNSCOPED_INFO("peek at exact size");
         CHECK(childout.peek(26) == "");
-        UNSCOPED_INFO("peek past end");
         CHECK(childout.peek(30, 10) == "");
     }
 
@@ -2008,9 +1888,8 @@ namespace tut
                                      "import sys\n"
                                      "sys.exit(0)\n");
             py.run();
-            UNSCOPED_INFO("quick exit status");
+            CAPTURE(i);
             REQUIRE(py.mPy->getStatus().mState == LLProcess::EXITED);
-            UNSCOPED_INFO("quick exit code");
             REQUIRE(py.mPy->getStatus().mData == 0);
             // Let the process object destroy
         }
@@ -2049,34 +1928,29 @@ namespace tut
             LLEventPumps::instance().obtain("mainloop").post(LLSD());
         }
 
-        UNSCOPED_INFO("stdout size");
-        REQUIRE(childout.size() == 0);
-        UNSCOPED_INFO("stderr size");
-        REQUIRE(childerr.size() == 0);
-        UNSCOPED_INFO("process exited");
+        CHECK(childout.size() == 0);
+        CHECK(childerr.size() == 0);
         CHECK(py.mPy->getStatus().mState == LLProcess::EXITED);
 
-        auto check_eof = [](const EventListener::Listory& history, const std::string& which)
+        auto require_eof = [](const EventListener::Listory& history, const std::string& which)
         {
-            UNSCOPED_INFO((STRINGIZE(which << " events")));
+            CAPTURE(which);
             REQUIRE(history.size() == 1);
             const LLSD& event = history.front();
-            UNSCOPED_INFO((STRINGIZE(which << " eof event")));
             REQUIRE(event["eof"].asBoolean());
-            UNSCOPED_INFO((STRINGIZE(which << " len")));
             REQUIRE(event["len"].asInteger() == 0);
         };
 
         outListener.checkHistory(
             [&](const EventListener::Listory& history)
             {
-                check_eof(history, "stdout");
+                require_eof(history, "stdout");
             });
 
         errListener.checkHistory(
             [&](const EventListener::Listory& history)
             {
-                check_eof(history, "stderr");
+                require_eof(history, "stderr");
             });
     }
 
@@ -2094,7 +1968,6 @@ namespace tut
 
         // Wait for the process to start up
         yield();
-        UNSCOPED_INFO("process started");
         CHECK(py.mPy->isRunning());
 
         // Send the kill signal
@@ -2111,7 +1984,6 @@ namespace tut
         auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start).count();
 
-        UNSCOPED_INFO((STRINGIZE("tick() took " << elapsed_ms << " ms, expected < 75 ms")));
         CHECK(elapsed_ms < 75);
 
         // Let the process fully exit so cleanup is orderly
@@ -2132,7 +2004,6 @@ namespace tut
 
         // Wait for the process to start up
         yield();
-        UNSCOPED_INFO("process started");
         CHECK(py.mPy->isRunning());
 
         // Kill the process (sets mKillCalled = true)
@@ -2144,7 +2015,6 @@ namespace tut
         auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start).count();
 
-        UNSCOPED_INFO((STRINGIZE("destructor took " << elapsed_ms << " ms, expected < 75 ms")));
         CHECK(elapsed_ms < 75);
     }
 
@@ -2204,7 +2074,6 @@ namespace tut
         waitfor(phandle, "kill() script");
         // Had the destructor detached instead, the script would have woken on
         // its own and overwritten the file with 'bad'.
-        UNSCOPED_INFO(ll_test::currentTestName() + " script output");
         CHECK(readfile(out.getPath()) == "ok");
     }
 } // namespace tut

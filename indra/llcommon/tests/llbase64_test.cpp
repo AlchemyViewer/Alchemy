@@ -41,17 +41,14 @@ namespace
         std::string result;
 
         result = LLBase64::encode(NULL, 0);
-        UNSCOPED_INFO("encode nothing");
         CHECK(result == "");
 
         LLUUID nothing;
         result = LLBase64::encode(&nothing.mData[0], UUID_BYTES);
-        UNSCOPED_INFO("encode blank uuid");
         CHECK(result == "AAAAAAAAAAAAAAAAAAAAAA==");
 
         LLUUID id("526a1e07-a19d-baed-84c4-ff08a488d15e");
         result = LLBase64::encode(&id.mData[0], UUID_BYTES);
-        UNSCOPED_INFO("encode random uuid");
         CHECK(result == "UmoeB6Gduu2ExP8IpIjRXg==");
 
     }
@@ -62,7 +59,6 @@ namespace
 
         U8 blob[40] = { 115, 223, 172, 255, 140, 70, 49, 125, 236, 155, 45, 199, 101, 17, 164, 131, 230, 19, 80, 64, 112, 53, 135, 98, 237, 12, 26, 72, 126, 14, 145, 143, 118, 196, 11, 177, 132, 169, 195, 134 };
         result = LLBase64::encode(&blob[0], 40);
-        UNSCOPED_INFO("encode 40 bytes");
         CHECK(result == "c9+s/4xGMX3smy3HZRGkg+YTUEBwNYdi7QwaSH4OkY92xAuxhKnDhg==");
     }
 

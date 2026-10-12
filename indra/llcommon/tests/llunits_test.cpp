@@ -68,35 +68,27 @@ namespace
     TEST_CASE("LLUnit: units convert between storage types and integers truncate", "[LLUnit]")
     {
         LLUnit<F32, Quatloos> float_quatloos;
-        UNSCOPED_INFO("default float unit is zero");
         CHECK(float_quatloos == F32Quatloos(0.f));
 
         LLUnit<F32, Quatloos> float_initialize_quatloos(1);
-        UNSCOPED_INFO("non-zero initialized unit");
         CHECK(float_initialize_quatloos == F32Quatloos(1.f));
 
         LLUnit<S32, Quatloos> int_quatloos;
-        UNSCOPED_INFO("default int unit is zero");
         CHECK(int_quatloos == S32Quatloos(0));
 
         int_quatloos = S32Quatloos(42);
-        UNSCOPED_INFO("int assignment is preserved");
         CHECK(int_quatloos == S32Quatloos(42));
         float_quatloos = int_quatloos;
-        UNSCOPED_INFO("float assignment from int preserves value");
         CHECK(float_quatloos == F32Quatloos(42.f));
 
         int_quatloos = float_quatloos;
-        UNSCOPED_INFO("int assignment from float preserves value");
         CHECK(int_quatloos == S32Quatloos(42));
 
         float_quatloos = F32Quatloos(42.1f);
         int_quatloos = float_quatloos;
-        UNSCOPED_INFO("int units truncate float units on assignment");
         CHECK(int_quatloos == S32Quatloos(42));
 
         LLUnit<U32, Quatloos> unsigned_int_quatloos(float_quatloos);
-        UNSCOPED_INFO("unsigned int can be initialized from signed int");
         CHECK(unsigned_int_quatloos == S32Quatloos(42));
 
         S32Solari int_solari(1);
@@ -116,12 +108,10 @@ namespace
     {
         LLUnit<F32, Quatloos> quatloos(1.f);
         LLUnit<F32, Latinum> latinum_bars(quatloos);
-        UNSCOPED_INFO("conversion between units is automatic via initialization");
         CHECK(latinum_bars == F32Latinum(1.f / 4.f));
 
         latinum_bars = S32Latinum(256);
         quatloos = latinum_bars;
-        UNSCOPED_INFO("conversion between units is automatic via assignment, and bidirectional");
         CHECK(quatloos == S32Quatloos(1024));
 
         LLUnit<S32, Quatloos> single_quatloo(1);
@@ -139,7 +129,6 @@ namespace
         CHECK(solari == S32Solari(4096));
 
         LLUnit<F32, Latinum> latinum_bars = solari;
-        UNSCOPED_INFO("Non base units can be converted between each other");
         CHECK(latinum_bars == S32Latinum(256));
     }
 
@@ -195,22 +184,14 @@ namespace
     TEST_CASE("LLUnit: units compare across storage types and units", "[LLUnit]")
     {
         LLUnit<S32, Quatloos> quatloos(1);
-        UNSCOPED_INFO("can perform less than comparison against same type");
         CHECK(quatloos < S32Quatloos(2));
-        UNSCOPED_INFO("can perform less than comparison against different storage type");
         CHECK(quatloos < F32Quatloos(2.f));
-        UNSCOPED_INFO("can perform less than comparison against different units");
         CHECK(quatloos < S32Latinum(5));
-        UNSCOPED_INFO("can perform less than comparison against different storage type and units");
         CHECK(quatloos < F32Latinum(5.f));
 
-        UNSCOPED_INFO("can perform greater than comparison against same type");
         CHECK(quatloos > S32Quatloos(0));
-        UNSCOPED_INFO("can perform greater than comparison against different storage type");
         CHECK(quatloos > F32Quatloos(0.f));
-        UNSCOPED_INFO("can perform greater than comparison against different units");
         CHECK(quatloos > S32Latinum(0));
-        UNSCOPED_INFO("can perform greater than comparison against different storage type and units");
         CHECK(quatloos > F32Latinum(0.f));
 
     }
@@ -224,9 +205,7 @@ namespace
     TEST_CASE("LLUnit: unit values pass as function arguments", "[LLUnit]")
     {
         S32Quatloos quatloos(1);
-        UNSCOPED_INFO("can pass unit values as argument");
         CHECK(accept_explicit_quatloos(S32Quatloos(1)));
-        UNSCOPED_INFO("can pass unit values as argument");
         CHECK(accept_explicit_quatloos(quatloos));
     }
 
@@ -235,14 +214,11 @@ namespace
     {
         LLUnit<F32, Quatloos> quatloos;
         LLUnitImplicit<F32, Quatloos> quatloos_implicit = quatloos + S32Quatloos(1);
-        UNSCOPED_INFO("can initialize implicit unit from explicit");
         CHECK(quatloos_implicit == 1);
 
         quatloos = quatloos_implicit;
-        UNSCOPED_INFO("can assign implicit unit to explicit unit");
         CHECK(quatloos == S32Quatloos(1));
         quatloos += quatloos_implicit;
-        UNSCOPED_INFO("can perform math operation using mixture of implicit and explicit units");
         CHECK(quatloos == S32Quatloos(2));
 
         // math operations on implicits
@@ -275,42 +251,29 @@ namespace
 
         // implicit conversion to POD
         F32 float_val = quatloos_implicit;
-        UNSCOPED_INFO("implicit units convert implicitly to regular values");
         CHECK(float_val == 16);
 
         S32 int_val = (S32)quatloos_implicit;
-        UNSCOPED_INFO("implicit units convert implicitly to regular values");
         CHECK(int_val == 16);
 
         // conversion of implicits
         LLUnitImplicit<F32, Latinum> latinum_implicit(2);
-        UNSCOPED_INFO("implicit units of different types are comparable");
         CHECK(latinum_implicit * 2 == quatloos_implicit);
 
         quatloos_implicit += F32Quatloos(10);
-        UNSCOPED_INFO("can add-assign explicit units");
         CHECK(quatloos_implicit == 26);
 
         quatloos_implicit -= F32Quatloos(10);
-        UNSCOPED_INFO("can subtract-assign explicit units");
         CHECK(quatloos_implicit == 16);
 
         // comparisons
-        UNSCOPED_INFO("can compare greater than implicit unit");
         CHECK(quatloos_implicit > F32QuatloosImplicit(0.f));
-        UNSCOPED_INFO("can compare greater than non-implicit unit");
         CHECK(quatloos_implicit > F32Quatloos(0.f));
-        UNSCOPED_INFO("can compare greater than or equal to implicit unit");
         CHECK(quatloos_implicit >= F32QuatloosImplicit(0.f));
-        UNSCOPED_INFO("can compare greater than or equal to non-implicit unit");
         CHECK(quatloos_implicit >= F32Quatloos(0.f));
-        UNSCOPED_INFO("can compare less than implicit unit");
         CHECK(quatloos_implicit < F32QuatloosImplicit(20.f));
-        UNSCOPED_INFO("can compare less than non-implicit unit");
         CHECK(quatloos_implicit < F32Quatloos(20.f));
-        UNSCOPED_INFO("can compare less than or equal to implicit unit");
         CHECK(quatloos_implicit <= F32QuatloosImplicit(20.f));
-        UNSCOPED_INFO("can compare less than or equal to non-implicit unit");
         CHECK(quatloos_implicit <= F32Quatloos(20.f));
     }
 
@@ -323,11 +286,9 @@ namespace
         CHECK(mega_bytes == (S32Megabytes)4095);
 
         mega_bytes = (S32Megabytes)-5 + (U32Megabytes)1;
-        UNSCOPED_INFO("can mix signed and unsigned in units addition");
         CHECK(mega_bytes == (S32Megabytes)-4);
 
         mega_bytes = (U32Megabytes)5 + (S32Megabytes)-1;
-        UNSCOPED_INFO("can mix unsigned and signed in units addition");
         CHECK(mega_bytes == (S32Megabytes)4);
     }
 
@@ -339,19 +300,14 @@ namespace
         U32Kilobytes KB(GB);
         U32Bytes B(GB);
 
-        UNSCOPED_INFO("GB -> MB conversion");
         CHECK(MB.value() == 1024);
-        UNSCOPED_INFO("GB -> KB conversion");
         CHECK(KB.value() == 1024 * 1024);
-        UNSCOPED_INFO("GB -> B conversion");
         CHECK(B.value() == 1024 * 1024 * 1024);
 
         KB = U32Kilobytes(1);
         U32Kilobits Kb(KB);
         U32Bits b(KB);
-        UNSCOPED_INFO("KB -> Kb conversion");
         CHECK(Kb.value() == 8);
-        UNSCOPED_INFO("KB -> b conversion");
         CHECK(b.value() == 8 * 1024);
 
         U32Days days(1);
@@ -360,13 +316,9 @@ namespace
         U32Seconds seconds(days);
         U32Milliseconds ms(days);
 
-        UNSCOPED_INFO("days -> hours conversion");
         CHECK(hours.value() == 24);
-        UNSCOPED_INFO("days -> minutes conversion");
         CHECK(minutes.value() == 24 * 60);
-        UNSCOPED_INFO("days -> seconds conversion");
         CHECK(seconds.value() == 24 * 60 * 60);
-        UNSCOPED_INFO("days -> ms conversion");
         CHECK(ms.value() == 24 * 60 * 60 * 1000);
 
         U32Kilometers km(1);
@@ -374,11 +326,8 @@ namespace
         U32Centimeters cm(km);
         U32Millimeters mm(km);
 
-        UNSCOPED_INFO("km -> m conversion");
         CHECK(m.value() == 1000);
-        UNSCOPED_INFO("km -> cm conversion");
         CHECK(cm.value() == 1000 * 100);
-        UNSCOPED_INFO("km -> mm conversion");
         CHECK(mm.value() == 1000 * 1000);
 
         U32Gigahertz GHz(1);
@@ -386,26 +335,20 @@ namespace
         U32Kilohertz KHz(GHz);
         U32Hertz     Hz(GHz);
 
-        UNSCOPED_INFO("GHz -> MHz conversion");
         CHECK(MHz.value() == 1000);
-        UNSCOPED_INFO("GHz -> KHz conversion");
         CHECK(KHz.value() == 1000 * 1000);
-        UNSCOPED_INFO("GHz -> Hz conversion");
         CHECK(Hz.value() == 1000 * 1000 * 1000);
 
         F32Radians rad(6.2831853071795f);
         S32Degrees deg(rad);
-        UNSCOPED_INFO("radians -> degrees conversion");
         CHECK(deg.value() == 360);
 
         F32Percent percent(50);
         F32Ratio ratio(percent);
-        UNSCOPED_INFO("percent -> ratio conversion");
         CHECK(ratio.value() == 0.5f);
 
         U32Kilotriangles ktris(1);
         U32Triangles tris(ktris);
-        UNSCOPED_INFO("kilotriangles -> triangles conversion");
         CHECK(tris.value() == 1000);
     }
 
@@ -419,20 +362,16 @@ namespace
     {
         F32Celcius float_celcius(100);
         F32Fahrenheit float_fahrenheit(float_celcius);
-        UNSCOPED_INFO("floating point celcius -> fahrenheit conversion using linear transform");
         CHECK(value_near(float_fahrenheit.value(), 212, 0.1f));
 
         float_celcius = float_fahrenheit;
-        UNSCOPED_INFO("floating point fahrenheit -> celcius conversion using linear transform (round trip)");
         CHECK(value_near(float_celcius.value(), 100.f, 0.1f));
 
         S32Celcius int_celcius(100);
         S32Fahrenheit int_fahrenheit(int_celcius);
-        UNSCOPED_INFO("integer celcius -> fahrenheit conversion using linear transform");
         CHECK(int_fahrenheit.value() == 212);
 
         int_celcius = int_fahrenheit;
-        UNSCOPED_INFO("integer fahrenheit -> celcius conversion using linear transform (round trip)");
         CHECK(int_celcius.value() == 100);
     }
 }

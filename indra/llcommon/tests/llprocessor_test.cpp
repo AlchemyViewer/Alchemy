@@ -43,14 +43,9 @@ namespace
         std::string brand =  pi.getCPUBrandName();
         //std::string steam =  pi.getCPUFeatureDescription();
 
-        UNSCOPED_INFO("Unknown Brand name");
         CHECK(brand != "Unknown");
-        UNSCOPED_INFO("Unknown Family name");
         CHECK(family != "Unknown");
-        {
-            INFO("Reasonable CPU Frequency > 100 && < 10000");
-            CHECK(freq > 100);
-            CHECK(freq < 10000);
-        }
+        CHECK(freq > 100);
+        CHECK(freq < 10000);
     }
 }

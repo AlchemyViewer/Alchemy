@@ -40,7 +40,7 @@ namespace
     static_assert(LLUUID{}.mData[0] == 0, "default LLUUID is zero-initialised at compile time");
     // LLUUID::null / LLTransactionID::tnull are exported out-of-line constants
     // (dllimport in consumers), so they are no longer constexpr. Their all-zero
-    // value is verified at runtime in test<1> instead.
+    // value is verified at runtime in the default-construction case instead.
 
     constexpr U8 kConstexprBytes[UUID_BYTES] = {
         0xde, 0xad, 0xbe, 0xef, 0xfe, 0xed, 0xfa, 0xce,
@@ -57,7 +57,7 @@ namespace
     }
 
     // ---------------------------------------------------------------------
-    // Helpers for the hash group (tests 9, 15-21).
+    // Helpers for the hash cases.
     //
     // An LLUUID is sixteen bytes, and the viewer uses it as its general
     // 16-byte key, not only as a random v4 UUID: tracking ids, composed asset
@@ -91,33 +91,33 @@ namespace
         return z ^ (z >> 31);
     }
 
-        // Occupancy of a 256-bucket table indexed from one end of the hash or the
-        // other: containers take the index from the low bits (MSVC's
-        // std::unordered_map, any hand-rolled `h & (n-1)`) or from the high bits
-        // (boost's open-addressing tables), so both ends have to be mixed.
-        struct BucketSpread
-        {
-            static constexpr size_t NUM_BUCKETS = 256;
-            int mLowMax = 0, mHighMax = 0, mLowEmpty = 0, mHighEmpty = 0;
+    // Occupancy of a 256-bucket table indexed from one end of the hash or the
+    // other: containers take the index from the low bits (MSVC's
+    // std::unordered_map, any hand-rolled `h & (n-1)`) or from the high bits
+    // (boost's open-addressing tables), so both ends have to be mixed.
+    struct BucketSpread
+    {
+        static constexpr size_t NUM_BUCKETS = 256;
+        int mLowMax = 0, mHighMax = 0, mLowEmpty = 0, mHighEmpty = 0;
 
-            explicit BucketSpread(const std::vector<LLUUID>& ids)
+        explicit BucketSpread(const std::vector<LLUUID>& ids)
+        {
+            std::vector<int> low(NUM_BUCKETS, 0), high(NUM_BUCKETS, 0);
+            for (const LLUUID& id : ids)
             {
-                std::vector<int> low(NUM_BUCKETS, 0), high(NUM_BUCKETS, 0);
-                for (const LLUUID& id : ids)
-                {
-                    const size_t h = hash_value(id);
-                    ++low[h & (NUM_BUCKETS - 1)];
-                    ++high[(h >> (sizeof(size_t) * 8 - 8)) & (NUM_BUCKETS - 1)];
-                }
-                for (size_t i = 0; i < NUM_BUCKETS; ++i)
-                {
-                    if (low[i]  > mLowMax)  mLowMax  = low[i];
-                    if (high[i] > mHighMax) mHighMax = high[i];
-                    if (!low[i])  ++mLowEmpty;
-                    if (!high[i]) ++mHighEmpty;
-                }
+                const size_t h = hash_value(id);
+                ++low[h & (NUM_BUCKETS - 1)];
+                ++high[(h >> (sizeof(size_t) * 8 - 8)) & (NUM_BUCKETS - 1)];
             }
-        };
+            for (size_t i = 0; i < NUM_BUCKETS; ++i)
+            {
+                if (low[i]  > mLowMax)  mLowMax  = low[i];
+                if (high[i] > mHighMax) mHighMax = high[i];
+                if (!low[i])  ++mLowEmpty;
+                if (!high[i]) ++mHighEmpty;
+            }
+        }
+    };
 
     // Structured payloads: a counter walking each 8-byte window, every
     // one-bit value, a pair of small ints in the outermost lanes, and short
@@ -169,7 +169,8 @@ namespace
 
     // The hash tells boost::unordered's open-addressing tables that it is
     // already mixed, which makes them skip their own mulx pass. Every property
-    // measured in tests 15-19 is what backs that claim.
+    // measured in the cases from both halves to the degenerate inputs is what
+    // backs that claim.
     static_assert(boost::hash_is_avalanching<boost::hash<LLUUID>>::value,
         "boost::hash<LLUUID> must be declared avalanching");
     static_assert(boost::hash_is_avalanching<std::hash<LLUUID>>::value,
@@ -179,38 +180,30 @@ namespace
     TEST_CASE("LLUUID: default construction is null and so are null and tnull", "[LLUUID]")
     {
         LLUUID id;
-        UNSCOPED_INFO("default-constructed isNull");
         CHECK(id.isNull());
-        UNSCOPED_INFO("default-constructed !notNull");
         CHECK_FALSE(id.notNull());
-        UNSCOPED_INFO("default-constructed == LLUUID::null");
         CHECK(id == LLUUID::null);
         // null / tnull are the all-zero UUID (verified at runtime since they are
         // exported out-of-line constants, no longer constexpr).
-        UNSCOPED_INFO("LLUUID::null isNull");
         CHECK(LLUUID::null.isNull());
-        UNSCOPED_INFO("LLTransactionID::tnull isNull");
         CHECK(LLTransactionID::tnull.isNull());
         for (int i = 0; i < UUID_BYTES; ++i)
         {
-            UNSCOPED_INFO("default byte zero");
+            CAPTURE(i);
             REQUIRE((int)id.mData[i] == 0);
         }
     }
 
-    // setNull zeroes every byte.
     TEST_CASE("LLUUID: setNull zeroes every byte", "[LLUUID]")
     {
         LLUUID id;
         fill_sample(id);
-        UNSCOPED_INFO("filled UUID is not null");
         CHECK(id.notNull());
         id.setNull();
-        UNSCOPED_INFO("setNull -> isNull");
         CHECK(id.isNull());
         for (int i = 0; i < UUID_BYTES; ++i)
         {
-            UNSCOPED_INFO("setNull byte zero");
+            CAPTURE(i);
             REQUIRE((int)id.mData[i] == 0);
         }
     }
@@ -219,32 +212,25 @@ namespace
     TEST_CASE("LLUUID: set() parses a string that asString() gives back", "[LLUUID]")
     {
         LLUUID id;
-        UNSCOPED_INFO("set valid string");
-        REQUIRE(id.set(kSampleStr));
-        UNSCOPED_INFO("asString round-trips");
+        CHECK(id.set(kSampleStr));
         CHECK(id.asString() == kSampleStr);
         for (int i = 0; i < UUID_BYTES; ++i)
         {
-            UNSCOPED_INFO("byte parsed correctly");
+            CAPTURE(i);
             REQUIRE((int)id.mData[i] == i + 1);
         }
     }
 
-    // set() with an empty string clears to null; invalid input also nulls.
     TEST_CASE("LLUUID: set() with an empty string clears to null; invalid input also nulls", "[LLUUID]")
     {
         LLUUID id;
         fill_sample(id);
 
-        UNSCOPED_INFO("empty string set returns true");
         CHECK(id.set(std::string()));
-        UNSCOPED_INFO("empty string -> null");
         CHECK(id.isNull());
 
         fill_sample(id);
-        UNSCOPED_INFO("bogus string set returns false");
         CHECK_FALSE(id.set(std::string("not-a-uuid"), false));
-        UNSCOPED_INFO("bogus string -> null");
         CHECK(id.isNull());
     }
 
@@ -257,13 +243,9 @@ namespace
         fill_sample(c);
         c.mData[UUID_BYTES - 1] ^= 0x01;
 
-        UNSCOPED_INFO("a == b");
         CHECK(a == b);
-        UNSCOPED_INFO("!(a != b)");
         CHECK_FALSE(a != b);
-        UNSCOPED_INFO("a != c");
         CHECK(a != c);
-        UNSCOPED_INFO("!(a == c)");
         CHECK_FALSE(a == c);
     }
 
@@ -278,13 +260,9 @@ namespace
         low.mData[1]  = 0x01; // word value 0x100 on LE
         high.mData[0] = 0x01; // word value 0x001 on LE — but first byte wins
 
-        UNSCOPED_INFO("byte-lex: low < high");
         CHECK(low <  high);
-        UNSCOPED_INFO("byte-lex: high > low");
         CHECK(high >  low);
-        UNSCOPED_INFO("irreflexive: !(low < low)");
         CHECK_FALSE(low < low);
-        UNSCOPED_INFO("irreflexive: !(low > low)");
         CHECK_FALSE(low > low);
     }
 
@@ -299,15 +277,12 @@ namespace
         b.set("11223344-5566-7788-99aa-bbccddeeff00");
 
         LLUUID xored = a ^ b;
-        UNSCOPED_INFO("XOR changes value");
         CHECK(xored != a);
 
         LLUUID xored_twice = xored ^ b;
-        UNSCOPED_INFO("double XOR cancels");
         CHECK(xored_twice == original);
 
         LLUUID xored_self = a ^ a;
-        UNSCOPED_INFO("self-XOR yields null");
         CHECK(xored_self.isNull());
     }
 
@@ -317,19 +292,15 @@ namespace
     // compare these checksums are unaffected.
     TEST_CASE("LLUUID: getCRC32 and getCRC16 give their pinned values", "[LLUUID]")
     {
-        UNSCOPED_INFO("null CRC32 == 0");
         CHECK(LLUUID::null.getCRC32() == (U32)0);
-        UNSCOPED_INFO("null CRC16 == 0");
         CHECK(LLUUID::null.getCRC16() == (U16)0);
 
         LLUUID id;
         fill_sample(id);
         // mData = {0x01, 0x02, ..., 0x10}
         // LE U32s: 0x04030201, 0x08070605, 0x0c0b0a09, 0x100f0e0d — sum 0x2824201C
-        UNSCOPED_INFO("sample CRC32");
         CHECK(id.getCRC32() == (U32)0x2824201C);
         // LE U16s sum: high bytes (2+4+...+16)=72=0x48; low bytes (1+3+...+15)=64=0x40
-        UNSCOPED_INFO("sample CRC16");
         CHECK(id.getCRC16() == (U16)0x4840);
     }
 
@@ -339,26 +310,20 @@ namespace
         LLUUID a, b;
         fill_sample(a);
         fill_sample(b);
-        UNSCOPED_INFO("equal IDs equal std::hash");
         CHECK(std::hash<LLUUID>{}(a) == std::hash<LLUUID>{}(b));
-        UNSCOPED_INFO("std::hash matches hash_value");
         CHECK(std::hash<LLUUID>{}(a) == hash_value(b));
-        UNSCOPED_INFO("boost::hash matches hash_value");
         CHECK(boost::hash<LLUUID>{}(a) == hash_value(b));
 
         // A different UUID should (overwhelmingly likely) hash differently.
         LLUUID c;
         c.set("ffffffff-ffff-ffff-ffff-ffffffffffff");
-        UNSCOPED_INFO("distinct IDs typically hash differently");
         CHECK(std::hash<LLUUID>{}(a) != std::hash<LLUUID>{}(c));
 
         // LLTransactionID and LLAssetID reach the same hash through the base.
         LLTransactionID tid;
         fill_sample(tid);
-        UNSCOPED_INFO("LLTransactionID hashes as its LLUUID bytes");
         CHECK(boost::hash<LLTransactionID>{}(tid) == hash_value(a));
         const LLAssetID aid = a;
-        UNSCOPED_INFO("LLAssetID hashes as its LLUUID bytes");
         CHECK(std::hash<LLAssetID>{}(aid) == hash_value(a));
     }
 
@@ -367,14 +332,10 @@ namespace
     {
         LLUUID a = LLUUID::generateNewID();
         LLUUID b = LLUUID::generateNewID();
-        UNSCOPED_INFO("generated id is not null");
         CHECK(a.notNull());
-        UNSCOPED_INFO("generated id is not null (2)");
         CHECK(b.notNull());
-        UNSCOPED_INFO("two generated ids differ");
         CHECK(a != b);
         // validate() should accept the generated string form
-        UNSCOPED_INFO("generated id validates");
         CHECK(LLUUID::validate(a.asString()));
     }
 
@@ -385,35 +346,26 @@ namespace
         id.set(kSampleStr);
         char buf[UUID_STR_LENGTH] = {};
         id.to_chars(buf);
-        UNSCOPED_INFO("to_chars matches set string");
         CHECK(std::string(buf) == kSampleStr);
-        UNSCOPED_INFO("to_chars length");
         CHECK(strlen(buf) == (size_t)(UUID_STR_LENGTH - 1));
     }
 
-    // ostream insertion delegates to the canonical 36-char form.
     TEST_CASE("LLUUID: ostream insertion delegates to the canonical 36-char form", "[LLUUID]")
     {
         LLUUID id;
         id.set(kSampleStr);
         std::ostringstream os;
         os << id;
-        UNSCOPED_INFO("operator<< matches asString");
         CHECK(os.str() == id.asString());
     }
 
-    // validate() accepts canonical forms and rejects garbage.
     TEST_CASE("LLUUID: validate() accepts canonical forms and rejects garbage", "[LLUUID]")
     {
-        UNSCOPED_INFO("validate canonical");
         CHECK(LLUUID::validate(kSampleStr));
-        UNSCOPED_INFO("reject short string");
         CHECK_FALSE(LLUUID::validate("abc"));
-        UNSCOPED_INFO("reject non-hex characters");
         CHECK_FALSE(LLUUID::validate("zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz"));
     }
 
-    // std::set<LLUUID> via the default operator< yields byte-lex iteration.
     TEST_CASE("LLUUID: std::set<LLUUID> via the default operator< yields byte-lex iteration", "[LLUUID]")
     {
         LLUUID one, two;
@@ -427,10 +379,8 @@ namespace
         s.insert(one);
 
         auto it = s.begin();
-        UNSCOPED_INFO("first sorted entry has lowest first byte");
         CHECK((int)it->mData[0] == 1);
         ++it;
-        UNSCOPED_INFO("second sorted entry has next first byte");
         CHECK((int)it->mData[0] == 2);
     }
 
@@ -501,14 +451,9 @@ namespace
         for (int o = 0; o < kOutputBits; ++o)
         {
             const double rate = (double)flips[o] / (double)trials;
-            {
-                INFO("every output bit must flip near half the time for a "
-                   "single-bit input change (output bit "
-                   + std::to_string(o) + " flipped "
-                   + std::to_string(rate) + " of the time)");
-                REQUIRE(rate >= 0.35);
-                REQUIRE(rate <= 0.65);
-            }
+            CAPTURE(o);
+            REQUIRE(rate >= 0.35);
+            REQUIRE(rate <= 0.65);
         }
     }
 
@@ -532,15 +477,11 @@ namespace
 
             const BucketSpread spread(ids);
             const int mean = (int)(ids.size() / BucketSpread::NUM_BUCKETS); // 16
-            const std::string where = " (lane " + std::to_string(lane) + ")";
 
-            UNSCOPED_INFO("counter in one lane must not pile up in the low bits" + where);
+            CAPTURE(lane);
             REQUIRE(spread.mLowMax <= 3 * mean);
-            UNSCOPED_INFO("counter in one lane must not pile up in the high bits" + where);
             REQUIRE(spread.mHighMax <= 3 * mean);
-            UNSCOPED_INFO("counter in one lane must reach every low-bit bucket" + where);
             REQUIRE(spread.mLowEmpty == 0);
-            UNSCOPED_INFO("counter in one lane must reach every high-bit bucket" + where);
             REQUIRE(spread.mHighEmpty == 0);
         }
     }
@@ -560,14 +501,11 @@ namespace
         {
             if (!seen.insert(hash_value(id)).second) ++collisions;
         }
-        UNSCOPED_INFO("structured 16-byte payloads must not collide outright");
         CHECK(collisions == 0);
 
         const BucketSpread spread(corpus);
         const int mean = (int)(corpus.size() / BucketSpread::NUM_BUCKETS);
-        UNSCOPED_INFO("structured payloads must not pile up in the low bits");
         CHECK(spread.mLowMax <= 3 * mean);
-        UNSCOPED_INFO("structured payloads must not pile up in the high bits");
         CHECK(spread.mHighMax <= 3 * mean);
     }
 
@@ -575,7 +513,6 @@ namespace
     // the 128 one-bit values must all land somewhere different.
     TEST_CASE("LLUUID: the null UUID hashes nonzero and the one-bit values hash apart", "[LLUUID]")
     {
-        UNSCOPED_INFO("the null UUID must not hash to zero");
         CHECK(hash_value(LLUUID::null) != (size_t)0);
 
         std::set<size_t> seen;
@@ -583,8 +520,7 @@ namespace
         {
             seen.insert(hash_value(make_bit_id(bit)));
         }
-        UNSCOPED_INFO("each of the 128 one-bit values hashes differently");
-        REQUIRE(seen.size() == (size_t)(UUID_BYTES * 8));
+        CHECK(seen.size() == (size_t)(UUID_BYTES * 8));
     }
 
     // Pinned values for the hash. Nothing persists a hash of an LLUUID, so
@@ -592,7 +528,7 @@ namespace
     // reversed half -- rather than to freeze the algorithm. Changing the hash
     // on purpose means updating these three lines, deliberately.
     //
-    // The values assume a little-endian host, as test<8> does.
+    // The values assume a little-endian host, as the CRC regression does.
     TEST_CASE("LLUUID: hash_value gives its pinned values on 64-bit hosts", "[LLUUID]")
     {
         if constexpr (sizeof(size_t) == 8)
@@ -602,11 +538,9 @@ namespace
             LLUUID ones;
             std::memset(ones.mData, 0xff, UUID_BYTES);
 
-            UNSCOPED_INFO("pinned hash of the null UUID");
             CHECK((U64)hash_value(LLUUID::null) == 0xc64369fbab9cf4d7ULL);
-            UNSCOPED_INFO("pinned hash of 01020304-0506-0708-090a-0b0c0d0e0f10");
+            UNSCOPED_INFO("the sample is 01020304-0506-0708-090a-0b0c0d0e0f10");
             CHECK((U64)hash_value(sample) == 0x47c8de24eeda6e35ULL);
-            UNSCOPED_INFO("pinned hash of the all-ones UUID");
             CHECK((U64)hash_value(ones) == 0x24af15be29dd63f0ULL);
         }
     }
@@ -625,23 +559,17 @@ namespace
             flat.emplace(corpus[i], i);
             node.emplace(corpus[i], i);
         }
-        UNSCOPED_INFO("flat map holds every distinct key");
-        REQUIRE(flat.size() == corpus.size());
-        UNSCOPED_INFO("node map holds every distinct key");
-        REQUIRE(node.size() == corpus.size());
+        CHECK(flat.size() == corpus.size());
+        CHECK(node.size() == corpus.size());
 
         for (size_t i = 0; i < corpus.size(); ++i)
         {
             auto fit = flat.find(corpus[i]);
-            UNSCOPED_INFO("flat map finds every key");
             REQUIRE(fit != flat.end());
-            UNSCOPED_INFO("flat map returns the right value");
             REQUIRE(fit->second == i);
 
             auto nit = node.find(corpus[i]);
-            UNSCOPED_INFO("node map finds every key");
             REQUIRE(nit != node.end());
-            UNSCOPED_INFO("node map returns the right value");
             REQUIRE(nit->second == i);
         }
 
@@ -650,7 +578,6 @@ namespace
         probe.set(kSampleStr);
         LLUUID same;
         fill_sample(same);
-        UNSCOPED_INFO("equal bytes hash equally regardless of how they arrived");
         CHECK(hash_value(probe) == hash_value(same));
     }
 }

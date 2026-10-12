@@ -97,20 +97,15 @@ namespace
     TEST_CASE_METHOD(alfilewrite_data, "alfilewrite: whole writes a new file or over an old and leaves nothing beside it", "[alfilewrite]")
     {
         const std::string file = in("script.lsl");
-        UNSCOPED_INFO("a new file");
         CHECK(ALFileWrite::whole(file, "default {}\n"));
-        UNSCOPED_INFO("its text");
         CHECK(read(file) == std::string("default {}\n"));
-        UNSCOPED_INFO("over it");
         CHECK(ALFileWrite::whole(file, "x"));
         UNSCOPED_INFO("the new text, all of the old gone");
         CHECK(read(file) == std::string("x"));
         UNSCOPED_INFO("empty is a text too");
         CHECK(ALFileWrite::whole(file, ""));
-        UNSCOPED_INFO("and the file is empty");
         CHECK(read(file) == std::string());
         std::error_code ec;
-        UNSCOPED_INFO("nothing left beside it");
         CHECK_FALSE(fs::exists(fsyspath(ALFileWrite::besideOf(file)), ec));
     }
 
@@ -124,11 +119,9 @@ namespace
         put(file, "what was there");
         std::error_code ec;
         fs::permissions(fsyspath(file), fs::perms::owner_read, fs::perm_options::replace, ec);
-        UNSCOPED_INFO("refused");
         CHECK_FALSE(ALFileWrite::whole(file, "new text"));
         UNSCOPED_INFO("the old text, whole");
         CHECK(read(file) == std::string("what was there"));
-        UNSCOPED_INFO("nothing left beside it");
         CHECK_FALSE(fs::exists(fsyspath(ALFileWrite::besideOf(file)), ec));
     }
 
@@ -140,11 +133,9 @@ namespace
         // be written as.
         std::error_code ec;
         fs::create_directories(fsyspath(ALFileWrite::besideOf(file)), ec);
-        UNSCOPED_INFO("written");
         CHECK(ALFileWrite::whole(file, "new text"));
         UNSCOPED_INFO("in place");
         CHECK(read(file) == std::string("new text"));
-        UNSCOPED_INFO("the folder by that name left");
         CHECK(fs::is_directory(fsyspath(ALFileWrite::besideOf(file)), ec));
     }
 
@@ -157,9 +148,7 @@ namespace
         put(file, "old");
         std::error_code ec;
         fs::permissions(fsyspath(file), fs::perms::owner_read | fs::perms::owner_write, fs::perm_options::replace, ec);
-        UNSCOPED_INFO("written");
         CHECK(ALFileWrite::whole(file, "new"));
-        UNSCOPED_INFO("the new text");
         CHECK(read(file) == std::string("new"));
         UNSCOPED_INFO("its permissions as they were");
         CHECK(fs::status(fsyspath(file)).permissions() == (fs::perms::owner_read | fs::perms::owner_write));
@@ -170,9 +159,7 @@ namespace
         {
             SKIP("no links here");
         }
-        UNSCOPED_INFO("through the link");
         CHECK(ALFileWrite::whole(link, "through"));
-        UNSCOPED_INFO("still a link");
         CHECK(fs::is_symlink(fsyspath(link)));
         UNSCOPED_INFO("the file it names written");
         CHECK(read(file) == std::string("through"));
@@ -181,7 +168,6 @@ namespace
         fs::create_symlink(fsyspath(in("nowhere.lsl")), fsyspath(dangling), ec);
         UNSCOPED_INFO("a link to nothing has nowhere to write");
         CHECK_FALSE(ALFileWrite::whole(dangling, "lost"));
-        UNSCOPED_INFO("and is left a link");
         CHECK(fs::is_symlink(fsyspath(dangling)));
 #endif
     }
@@ -203,7 +189,6 @@ namespace
         fs::permissions(fsyspath(sub), fs::perms::owner_read | fs::perms::owner_exec, fs::perm_options::replace, ec);
         const bool written = ALFileWrite::whole(file, "new");
         fs::permissions(fsyspath(sub), fs::perms::owner_all, fs::perm_options::replace, ec);
-        UNSCOPED_INFO("written");
         CHECK(written);
         UNSCOPED_INFO("in place");
         CHECK(read(file) == std::string("new"));
@@ -213,17 +198,12 @@ namespace
     TEST_CASE_METHOD(alfilewrite_data, "alfilewrite: a durable write is whole or nothing and never in place", "[alfilewrite]")
     {
         const std::string file = in("journal.llsd");
-        UNSCOPED_INFO("a new one");
         CHECK(ALFileWrite::whole(file, "one", /*durable*/ true));
-        UNSCOPED_INFO("over it");
         CHECK(ALFileWrite::whole(file, "two", /*durable*/ true));
-        UNSCOPED_INFO("the new text");
         CHECK(read(file) == std::string("two"));
         std::error_code ec;
-        UNSCOPED_INFO("nothing left beside it");
         REQUIRE_FALSE(fs::exists(fsyspath(ALFileWrite::besideOf(file)), ec));
         fs::create_directories(fsyspath(ALFileWrite::besideOf(file)), ec);
-        UNSCOPED_INFO("refused");
         CHECK_FALSE(ALFileWrite::whole(file, "three", /*durable*/ true));
         UNSCOPED_INFO("the old text, whole");
         CHECK(read(file) == std::string("two"));
@@ -234,9 +214,7 @@ namespace
         const std::string file = in("include.lsl");
         put(file, "integer x;\n");
         std::string text = "left over";
-        UNSCOPED_INFO("read");
         CHECK(ALFileRead::whole(file, text, 64));
-        UNSCOPED_INFO("whole");
         CHECK(text == std::string("integer x;\n"));
         {
             INFO("at the limit");
@@ -248,15 +226,13 @@ namespace
             CHECK_FALSE(ALFileRead::whole(file, text, 10));
             REQUIRE(text.empty());
         }
-        UNSCOPED_INFO("a folder is not read");
         CHECK_FALSE(ALFileRead::whole(folder, text, 64));
-        UNSCOPED_INFO("nothing is not read");
+        UNSCOPED_INFO("a missing file is not read");
         CHECK_FALSE(ALFileRead::whole(in("gone.lsl"), text, 64));
 #if !LL_WINDOWS
         const std::string pipe = in("pipe");
         if (mkfifo(pipe.c_str(), 0600) == 0)
         {
-            UNSCOPED_INFO("a pipe is not read");
             CHECK_FALSE(ALFileRead::whole(pipe, text, 64));
         }
 #endif
@@ -265,11 +241,8 @@ namespace
     TEST_CASE_METHOD(alfilewrite_data, "alfilewrite: temp writes in place for the user alone and never through a link", "[alfilewrite]")
     {
         const std::string file = in("sl_script_x_id.lsl");
-        UNSCOPED_INFO("written");
         CHECK(ALFileWrite::temp(file, "default {}"));
-        UNSCOPED_INFO("its text");
         CHECK(read(file) == std::string("default {}"));
-        UNSCOPED_INFO("again, shorter");
         CHECK(ALFileWrite::temp(file, "x"));
         UNSCOPED_INFO("all of the old gone");
         CHECK(read(file) == std::string("x"));
@@ -283,7 +256,6 @@ namespace
         fs::create_symlink(fsyspath(target), fsyspath(link), ec);
         if (!ec)
         {
-            UNSCOPED_INFO("not through a link");
             CHECK_FALSE(ALFileWrite::temp(link, "mine"));
             UNSCOPED_INFO("what it names untouched");
             CHECK(read(target) == std::string("somebody's"));

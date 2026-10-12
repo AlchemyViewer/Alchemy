@@ -70,12 +70,12 @@ namespace
         }
 
         // A key's texts, newest first, each read whole.
-        static std::string texts(const ALSaveHistory& history, const std::string& key)
+        static std::string require_texts(const ALSaveHistory& history, const std::string& key)
         {
+            CAPTURE(key);
             std::string out;
             for (ALSavedText one : history.list(key))
             {
-                UNSCOPED_INFO("read whole");
                 REQUIRE(history.load(one));
                 out += (out.empty() ? "" : "|") + one.text;
             }
@@ -88,16 +88,11 @@ namespace
         ALSaveHistory history(folder);
         // Within the age: dated from now.
         const F64 now = LLDate::now().secondsSinceEpoch();
-        UNSCOPED_INFO("kept");
         CHECK(history.keep(saved("item:a", "one", now - 60.0)));
-        UNSCOPED_INFO("kept");
         CHECK(history.keep(saved("item:a", "two", now - 30.0)));
-        UNSCOPED_INFO("another's");
         CHECK(history.keep(saved("item:b", "other", now - 45.0)));
         const std::vector<ALSavedText> listed = history.list("item:a");
-        UNSCOPED_INFO("two of its own");
         REQUIRE(listed.size() == 2U);
-        UNSCOPED_INFO("newest first");
         CHECK(listed[0].when.secondsSinceEpoch() > listed[1].when.secondsSinceEpoch());
         {
             INFO("what a listing reads");
@@ -113,9 +108,8 @@ namespace
             REQUIRE(listed[0].text.empty());
         }
         UNSCOPED_INFO("read on asking");
-        CHECK(texts(history, "item:a") == std::string("two|one"));
-        UNSCOPED_INFO("the other key's");
-        CHECK(texts(history, "item:b") == std::string("other"));
+        CHECK(require_texts(history, "item:a") == std::string("two|one"));
+        CHECK(require_texts(history, "item:b") == std::string("other"));
         UNSCOPED_INFO("none for a key never saved");
         REQUIRE(history.list("item:c").empty());
     }
@@ -124,16 +118,12 @@ namespace
     {
         ALSaveHistory history(folder);
         const F64     now = LLDate::now().secondsSinceEpoch();
-        UNSCOPED_INFO("kept");
         CHECK(history.keep(saved("item:a", "one", now - 60.0)));
-        UNSCOPED_INFO("not again");
         CHECK_FALSE(history.keep(saved("item:a", "one", now - 50.0)));
-        UNSCOPED_INFO("kept");
         CHECK(history.keep(saved("item:a", "two", now - 40.0)));
         UNSCOPED_INFO("back to one is a change");
         CHECK(history.keep(saved("item:a", "one", now - 30.0)));
-        UNSCOPED_INFO("three");
-        CHECK(texts(history, "item:a") == std::string("one|two|one"));
+        CHECK(require_texts(history, "item:a") == std::string("one|two|one"));
         UNSCOPED_INFO("no key, nothing");
         CHECK_FALSE(history.keep(saved("", "x", now)));
     }
@@ -147,8 +137,7 @@ namespace
         {
             history.keep(saved("item:a", std::to_string(i), now - 100.0 + i));
         }
-        UNSCOPED_INFO("the newest three");
-        CHECK(texts(history, "item:a") == std::string("5|4|3"));
+        CHECK(require_texts(history, "item:a") == std::string("5|4|3"));
 
         ALSaveHistory aged(folder + "/aged");
         aged.limit(50, 10.0 * DAY, ALSaveHistory::MAX_BYTES);
@@ -156,10 +145,10 @@ namespace
         aged.keep(saved("item:a", "new", THEN + 8.0 * DAY));
         aged.prune(LLDate(THEN + 9.0 * DAY));
         UNSCOPED_INFO("both within the age");
-        CHECK(texts(aged, "item:a") == std::string("new|old"));
+        CHECK(require_texts(aged, "item:a") == std::string("new|old"));
         aged.prune(LLDate(THEN + 12.0 * DAY));
         UNSCOPED_INFO("the old one past it");
-        CHECK(texts(aged, "item:a") == std::string("new"));
+        CHECK(require_texts(aged, "item:a") == std::string("new"));
         aged.prune(LLDate(THEN + 30.0 * DAY));
         UNSCOPED_INFO("and then the other");
         REQUIRE(aged.list("item:a").empty());
@@ -180,9 +169,9 @@ namespace
         history.limit(50, 1e12, room);
         history.prune();
         UNSCOPED_INFO("the oldest gone");
-        CHECK(texts(history, "item:a") == std::string("cccccccccc"));
+        CHECK(require_texts(history, "item:a") == std::string("cccccccccc"));
         UNSCOPED_INFO("another key's newer one kept");
-        CHECK(texts(history, "item:b") == std::string("bbbbbbbbbb"));
+        CHECK(require_texts(history, "item:b") == std::string("bbbbbbbbbb"));
     }
 
     TEST_CASE_METHOD(alsavehistory_data, "ALSaveHistory: rekey moves a key's saves behind another's under the new key", "[ALSaveHistory]")
@@ -192,15 +181,12 @@ namespace
         history.keep(saved("task:p:old", "one", now - 60.0));
         history.keep(saved("task:p:old", "two", now - 50.0));
         history.keep(saved("task:p:new", "three", now - 40.0));
-        UNSCOPED_INFO("moved");
         CHECK(history.rekey("task:p:old", "task:p:new"));
-        UNSCOPED_INFO("none left");
         REQUIRE(history.list("task:p:old").empty());
         UNSCOPED_INFO("all under the new, in time's order");
-        CHECK(texts(history, "task:p:new") == std::string("three|two|one"));
+        CHECK(require_texts(history, "task:p:new") == std::string("three|two|one"));
         for (const ALSavedText& one : history.list("task:p:new"))
         {
-            UNSCOPED_INFO("saying the new key");
             REQUIRE(one.key == std::string("task:p:new"));
         }
         UNSCOPED_INFO("nothing to move");
@@ -230,7 +216,7 @@ namespace
         UNSCOPED_INFO("the half-written swept");
         CHECK_FALSE(LLFile::isfile(dir + "2.llsd" + std::string(ALFileWrite::BESIDE)));
         UNSCOPED_INFO("the save still there");
-        CHECK(texts(history, "item:a") == std::string("one"));
+        CHECK(require_texts(history, "item:a") == std::string("one"));
     }
 
     TEST_CASE_METHOD(alsavehistory_data, "ALSaveHistory: count counts a key's saves by file name and not half writes", "[ALSaveHistory]")
@@ -239,16 +225,12 @@ namespace
         const F64     now = LLDate::now().secondsSinceEpoch();
         UNSCOPED_INFO("none for a key never saved");
         REQUIRE(history.count("item:a") == 0U);
-        UNSCOPED_INFO("none for no key");
         REQUIRE(history.count("") == 0U);
         history.keep(saved("item:a", "one", now - 60.0));
         history.keep(saved("item:a", "two", now - 50.0));
         history.keep(saved("item:b", "other", now - 40.0));
-        UNSCOPED_INFO("as many as listed");
         REQUIRE(history.count("item:a") == history.list("item:a").size());
-        UNSCOPED_INFO("two");
         REQUIRE(history.count("item:a") == 2U);
-        UNSCOPED_INFO("the other key's");
         REQUIRE(history.count("item:b") == 1U);
         const std::string kept = history.list("item:a").front().path;
         const std::string dir  = kept.substr(0, kept.find_last_of('/') + 1);

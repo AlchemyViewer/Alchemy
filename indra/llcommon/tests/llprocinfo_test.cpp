@@ -52,9 +52,7 @@ TEST_CASE_METHOD(procinfo_test, "LLProcInfo: getCPUUsage() writes both its argum
 
     LLProcInfo::getCPUUsage(user, system);
 
-    UNSCOPED_INFO("getCPUUsage() writes to its user argument");
     CHECK(user != bad_user);
-    UNSCOPED_INFO("getCPUUsage() writes to its system argument");
     CHECK(system != bad_system);
 }
 
@@ -74,10 +72,8 @@ TEST_CASE_METHOD(procinfo_test, "LLProcInfo: getCPUUsage() never goes down over 
 
     LLProcInfo::getCPUUsage(user2, system2);
 
-    UNSCOPED_INFO("getCPUUsage() user value doesn't decrease over time");
-    CHECK((user2 >= user) == true);
-    UNSCOPED_INFO("getCPUUsage() system value doesn't decrease over time");
-    CHECK((system2 >= system) == true);
+    CHECK(user2 >= user);
+    CHECK(system2 >= system);
 }
 
 

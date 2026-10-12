@@ -101,7 +101,7 @@ namespace
 }
 
 /*****************************************************************************
-*   tut test group
+*   Tests
 *****************************************************************************/
 namespace
 {
@@ -111,7 +111,6 @@ namespace
     TEST_CASE("LLPtrTo: LLPtrTo of a refcounted class holds a reference", "[LLPtrTo]")
     {
         LLPtrTo<RCFoo>::type ptr(new RCFoo);
-        UNSCOPED_INFO("one reference");
         CHECK(ptr->getNumRefs() == 1);
     }
 }

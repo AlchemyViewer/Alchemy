@@ -166,10 +166,8 @@ namespace
         deps.add("lazy");
         CHECK(sorted_keys(deps) == StringList{"lazy"});
         deps.add("jumps");
-        UNSCOPED_INFO("found lazy");
-        REQUIRE(deps.get("lazy"));
-        UNSCOPED_INFO("not found dog.");
-        REQUIRE_FALSE(deps.get("dog."));
+        CHECK(deps.get("lazy"));
+        CHECK_FALSE(deps.get("dog."));
         // NOTE: Maybe it's overkill to test each of these intermediate
         // results before all the interdependencies have been specified. My
         // thought is simply that if the order changes, I'd like to know why.
@@ -181,7 +179,6 @@ namespace
         // Test key accessors
         UNSCOPED_INFO("empty before deps for missing key");
         CHECK(is_empty(deps.get_before_range("bogus")));
-        UNSCOPED_INFO("empty before deps for jumps");
         CHECK(is_empty(deps.get_before_range("jumps")));
         CHECK(instance_from_range< std::set<std::string> >(deps.get_before_range("The")) == std::set<std::string>{ "dog.", "fox" });
         // resume building dependencies
@@ -271,7 +268,7 @@ namespace
 
         // test all iterator-flavored versions of get_after_range()
         StringList def{"def"};
-        UNSCOPED_INFO("empty abc before list");
+        UNSCOPED_INFO("abc has nothing before it");
         CHECK(is_empty(nideps.get_before_range(nideps.get_range().begin())));
         CHECK(instance_from_range<StringList>(nideps.get_after_range(nideps.get_range().begin())) ==
                       def);

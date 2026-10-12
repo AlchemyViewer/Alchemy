@@ -244,10 +244,8 @@ namespace
              pni != end; ++pni)
         {
 //          std::cout << (*pni)->name() << '\n';
-            UNSCOPED_INFO("LLLinkedIter<PlainNode>(NULL)");
-            REQUIRE(false);
+            FAIL("LLLinkedIter<PlainNode>(NULL) should not iterate");
         }
-        UNSCOPED_INFO(desc1);
         CHECK(verify(desc1,
                       boost::make_iterator_range(LLLinkedIter<PlainNode>(first,
                                                                          boost::bind(&PlainNode::mNext, _1)),
@@ -257,7 +255,6 @@ namespace
 //      std::cout << desc2 << ":\n";
 //      for (LLLinkedIter<PlainNode> pni(first, boost::bind(&PlainNode::next, _1)); ! (pni == end); ++pni)
 //          std::cout << (**pni).name() << '\n';
-        UNSCOPED_INFO(desc2);
         CHECK(verify(desc2,
                       boost::make_iterator_range(LLLinkedIter<PlainNode>(first,
                                                                          boost::bind(&PlainNode::next, _1)),
@@ -270,9 +267,7 @@ namespace
         }
         {
             LLLinkedIter<PlainNode> pni(first, boost::bind(&PlainNode::next, _1));
-            UNSCOPED_INFO("first");
             CHECK((*pni++)->name() == "a");
-            UNSCOPED_INFO("second");
             CHECK((*pni  )->name() == "b");
         }
     }
@@ -346,15 +341,15 @@ namespace
         }
 //      std::cout << "Now the LLLinkedIter<RCNode> is the only remaining reference to RCNode chain\n";
         CHECK(last_RCNode_destroyed == "");
-        CHECK(rcni != end2);
+        REQUIRE(rcni != end2);
         CHECK((*rcni)->name() == "x");
         ++rcni;
         CHECK(last_RCNode_destroyed == "x");
-        CHECK(rcni != end2);
+        REQUIRE(rcni != end2);
         CHECK((*rcni)->name() == "y");
         ++rcni;
         CHECK(last_RCNode_destroyed == "y");
-        CHECK(rcni != end2);
+        REQUIRE(rcni != end2);
         CHECK((*rcni)->name() == "z");
         ++rcni;
         CHECK(last_RCNode_destroyed == "z");
@@ -1126,7 +1121,6 @@ namespace
         {
 //          std::cout << node->name() << '\n';
         }
-        UNSCOPED_INFO(desc1);
         CHECK(verify(desc1, getRootRange<LLTreeIter::UP>(tnB2b), RootExpected<LLTreeIter::UP>()));
 
         EnhancedTreeNodePtr etnroot(example_tree<EnhancedTreeNode>());
@@ -1151,7 +1145,6 @@ namespace
         {
 //          std::cout << node->name() << '\n';
         }
-        UNSCOPED_INFO(desc2);
         CHECK(verify(desc2, etnB2b->getRootRange<LLTreeIter::UP>(), RootExpected<LLTreeIter::UP>()));
     }
 
@@ -1165,17 +1158,14 @@ namespace
         // TreeNode, using helper function
         TreeNodePtr tnroot(example_tree<TreeNode>());
         std::string desc_tnpre("getWalkRange<LLTreeIter::DFS_PRE>(tnroot)");
-        UNSCOPED_INFO(desc_tnpre);
         CHECK(verify(desc_tnpre,
                       getWalkRange<LLTreeIter::DFS_PRE>(tnroot),
                       WalkExpected<LLTreeIter::DFS_PRE>()));
         std::string desc_tnpost("getWalkRange<LLTreeIter::DFS_POST>(tnroot)");
-        UNSCOPED_INFO(desc_tnpost);
         CHECK(verify(desc_tnpost,
                       getWalkRange<LLTreeIter::DFS_POST>(tnroot),
                       WalkExpected<LLTreeIter::DFS_POST>()));
         std::string desc_tnb("getWalkRange<LLTreeIter::BFS>(tnroot)");
-        UNSCOPED_INFO(desc_tnb);
         CHECK(verify(desc_tnb,
                       getWalkRange<LLTreeIter::BFS>(tnroot),
                       WalkExpected<LLTreeIter::BFS>()));
@@ -1183,17 +1173,14 @@ namespace
         // EnhancedTreeNode, using method
         EnhancedTreeNodePtr etnroot(example_tree<EnhancedTreeNode>());
         std::string desc_etnpre("etnroot->getWalkRange<LLTreeIter::DFS_PRE>()");
-        UNSCOPED_INFO(desc_etnpre);
         CHECK(verify(desc_etnpre,
                       etnroot->getWalkRange<LLTreeIter::DFS_PRE>(),
                       WalkExpected<LLTreeIter::DFS_PRE>()));
         std::string desc_etnpost("etnroot->getWalkRange<LLTreeIter::DFS_POST>()");
-        UNSCOPED_INFO(desc_etnpost);
         CHECK(verify(desc_etnpost,
                       etnroot->getWalkRange<LLTreeIter::DFS_POST>(),
                       WalkExpected<LLTreeIter::DFS_POST>()));
         std::string desc_etnb("etnroot->getWalkRange<LLTreeIter::BFS>()");
-        UNSCOPED_INFO(desc_etnb);
         CHECK(verify(desc_etnb,
                       etnroot->getWalkRange<LLTreeIter::BFS>(),
                       WalkExpected<LLTreeIter::BFS>()));
@@ -1202,17 +1189,14 @@ namespace
         PlainTree* ptroot(example_tree<PlainTree>());
         Cleanup<PlainTree*> cleanup(ptroot);
         std::string desc_ptpre("getWalkRange<LLTreeIter::DFS_PRE>(ptroot)");
-        UNSCOPED_INFO(desc_ptpre);
         CHECK(verify(desc_ptpre,
                       getWalkRange<LLTreeIter::DFS_PRE>(ptroot),
                       WalkExpected<LLTreeIter::DFS_PRE>()));
         std::string desc_ptpost("getWalkRange<LLTreeIter::DFS_POST>(ptroot)");
-        UNSCOPED_INFO(desc_ptpost);
         CHECK(verify(desc_ptpost,
                       getWalkRange<LLTreeIter::DFS_POST>(ptroot),
                       WalkExpected<LLTreeIter::DFS_POST>()));
         std::string desc_ptb("getWalkRange<LLTreeIter::BFS>(ptroot)");
-        UNSCOPED_INFO(desc_ptb);
         CHECK(verify(desc_ptb,
                       getWalkRange<LLTreeIter::BFS>(ptroot),
                       WalkExpected<LLTreeIter::BFS>()));

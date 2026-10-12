@@ -325,9 +325,9 @@ void freenb(NPARAMSb)
 *****************************************************************************/
 namespace tut
 {
-    static void ensure_has(const std::string& outer, const std::string& inner)
+    static void require_contains(const std::string& outer, const std::string& inner)
     {
-        UNSCOPED_INFO(stringize("'", outer, "' does not contain '", inner, "'"));
+        CAPTURE(outer, inner);
         REQUIRE(outer.find(inner) != std::string::npos);
     }
 
@@ -336,7 +336,7 @@ namespace tut
     {
         std::string what =
             catch_what<LLEventDispatcher::DispatchError>(std::forward<CALLABLE>(func));
-        ensure_has(what, exc_frag);
+        require_contains(what, exc_frag);
         return what;
     }
 
@@ -636,12 +636,10 @@ namespace tut
             DescMap forgotten(descs.begin(), descs.end());
             for (LLEventDispatcher::NameDesc nd: work)
             {
+                CAPTURE(nd.first);
                 DescMap::iterator found = forgotten.find(nd.first);
-                UNSCOPED_INFO(stringize("LLEventDispatcher records function '", nd.first,
-                                 "' we didn't enter"));
+                UNSCOPED_INFO("LLEventDispatcher records a function we didn't enter");
                 REQUIRE(found != forgotten.end());
-                UNSCOPED_INFO(stringize("LLEventDispatcher desc '", nd.second,
-                                        "' doesn't match what we entered: '", found->second, "'"));
                 REQUIRE(nd.second == found->second);
                 // found in our map the name from LLEventDispatcher, good, erase
                 // our map entry
@@ -663,10 +661,9 @@ namespace tut
 
         Vars* varsfor(const std::string& name)
         {
+            CAPTURE(name);
             VarsMap::const_iterator found = funcvars.find(name);
-            UNSCOPED_INFO(stringize("No Vars* for ", name));
             REQUIRE(found != funcvars.end());
-            UNSCOPED_INFO(stringize("NULL Vars* for ", name));
             REQUIRE(found->second);
             return found->second;
         }
@@ -695,8 +692,8 @@ namespace tut
 
         LLSD getMetadata(const std::string& name)
         {
+            CAPTURE(name);
             LLSD meta(work.getMetadata(name));
-            UNSCOPED_INFO(stringize("No metadata for ", name));
             REQUIRE(meta.isDefined());
             return meta;
         }
@@ -715,25 +712,10 @@ namespace tut
             return map;
         }
 
-        // If I call this ensure_equals(), it blocks visibility of all other
-        // ensure_equals() overloads. Normally I could say 'using
-        // baseclass::ensure_equals;' and fix that, but I don't know what the
-        // base class is!
-        void ensure_llsd(const std::string& msg, const LLSD& actual, const LLSD& expected, U32 bits)
+        void require_llsd_equals(const LLSD& actual, const LLSD& expected, U32 bits)
         {
-            std::ostringstream out;
-            if (! msg.empty())
-            {
-                out << msg << ": ";
-            }
-            out << "expected " << expected << ", actual " << actual;
-            UNSCOPED_INFO(out.str());
+            CAPTURE(expected, actual);
             REQUIRE(llsd_equals(actual, expected, bits));
-        }
-
-        void ensure_llsd(const LLSD& actual, const LLSD& expected, U32 bits)
-        {
-            ensure_llsd("", actual, expected, bits);
         }
     };
 
@@ -767,7 +749,7 @@ namespace tut
             std::string threw = catch_what<std::exception>([this, &ae](){
                     work.add("freena_err", "freena", freena, ae);
                 });
-            ensure_has(threw, "must be an array");
+            require_contains(threw, "must be an array");
         }
     }
 
@@ -776,7 +758,7 @@ namespace tut
         std::string threw = catch_what<std::exception>([this](){
                 work.add("freena_err", "freena", freena, llsd::array("a", "b"), 17);
             });
-        ensure_has(threw, "must be a map or an array");
+        require_contains(threw, "must be a map or an array");
     }
 
     TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: map-style registration with too many array defaults", "[lleventdispatcher]")
@@ -786,7 +768,7 @@ namespace tut
                          llsd::array("a", "b"),
                          llsd::array(17, 0.9, "gack"));
             });
-        ensure_has(threw, "shorter than");
+        require_contains(threw, "shorter than");
     }
 
     TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: map-style registration with too many map defaults", "[lleventdispatcher]")
@@ -796,9 +778,9 @@ namespace tut
                          llsd::array("a", "b"),
                          LLSDMap("b", 17)("foo", 3.14)("bar", "sinister"));
             });
-        ensure_has(threw, "nonexistent params");
-        ensure_has(threw, "foo");
-        ensure_has(threw, "bar");
+        require_contains(threw, "nonexistent params");
+        require_contains(threw, "foo");
+        require_contains(threw, "bar");
     }
 
     TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: query all lists every registered name and desc", "[lleventdispatcher]")
@@ -808,9 +790,7 @@ namespace tut
 
     TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: query all after remove() omits only the removed name", "[lleventdispatcher]")
     {
-        UNSCOPED_INFO("remove('bogus') returned true");
         CHECK_FALSE(work.remove("bogus"));
-        UNSCOPED_INFO("remove('real') returned false");
         CHECK(work.remove("free1"));
         // Of course, remove that from 'descs' too...
         descs.erase("free1");
@@ -828,21 +808,16 @@ namespace tut
         for (LLSD nm: inArray(names))
         {
             LLSD metadata(getMetadata(nm));
-            UNSCOPED_INFO("name mismatch");
             REQUIRE_THAT(metadata["name"], ll_test::LLSDEquals(nm));
             REQUIRE(metadata["desc"].asString() == descs[nm]);
-            UNSCOPED_INFO("should not have required structure");
             REQUIRE(metadata["required"].isUndefined());
-            UNSCOPED_INFO("should not have optional");
             REQUIRE(metadata["optional"].isUndefined());
 
             std::string name_req(nm.asString() + "_req");
             metadata = getMetadata(name_req);
             REQUIRE(metadata["name"].asString() == name_req);
             REQUIRE(metadata["desc"].asString() == descs[name_req]);
-            UNSCOPED_INFO("required mismatch");
             REQUIRE_THAT(required, ll_test::LLSDEquals(metadata["required"]));
-            UNSCOPED_INFO("should not have optional");
             REQUIRE(metadata["optional"].isUndefined());
         }
     }
@@ -866,13 +841,11 @@ namespace tut
                 req[arity - 1] = LLSD();
             for (LLSD nm: inArray(names))
             {
+                CAPTURE(nm);
                 LLSD metadata(getMetadata(nm));
-                UNSCOPED_INFO("name mismatch");
                 REQUIRE_THAT(metadata["name"], ll_test::LLSDEquals(nm));
                 REQUIRE(metadata["desc"].asString() == descs[nm]);
-                UNSCOPED_INFO(stringize("mismatched required for ", nm.asString()));
                 REQUIRE_THAT(metadata["required"], ll_test::LLSDEquals(req));
-                UNSCOPED_INFO("should not have optional");
                 REQUIRE(metadata["optional"].isUndefined());
             }
         }
@@ -886,12 +859,9 @@ namespace tut
         for (LLSD nm: inArray(names))
         {
             LLSD metadata(getMetadata(nm));
-            UNSCOPED_INFO("name mismatch");
             REQUIRE_THAT(metadata["name"], ll_test::LLSDEquals(nm));
             REQUIRE(metadata["desc"].asString() == descs[nm]);
-            UNSCOPED_INFO("should not have required");
             REQUIRE((metadata["required"].isUndefined() || metadata["required"].size() == 0));
-            UNSCOPED_INFO("should not have optional");
             REQUIRE(metadata["optional"].isUndefined());
         }
     }
@@ -916,20 +886,17 @@ namespace tut
         {
             LLSD adft(eq[0]);
             LLSD mdft(eq[1]);
+            CAPTURE(adft, mdft);
             // We can't just compare the results of the two getMetadata()
             // calls, because they contain ["name"], which are different. So
             // capture them, verify that each ["name"] is as expected, then
             // remove for comparing the rest.
             LLSD ameta(getMetadata(adft));
             LLSD mmeta(getMetadata(mdft));
-            UNSCOPED_INFO("adft name");
             REQUIRE_THAT(adft, ll_test::LLSDEquals(ameta["name"]));
-            UNSCOPED_INFO("mdft name");
             REQUIRE_THAT(mdft, ll_test::LLSDEquals(mmeta["name"]));
             ameta.erase("name");
             mmeta.erase("name");
-            UNSCOPED_INFO(stringize("metadata for ", adft.asString(),
-                                    " vs. ", mdft.asString()));
             REQUIRE_THAT(ameta, ll_test::LLSDEquals(mmeta));
         }
     }
@@ -1033,14 +1000,11 @@ namespace tut
             // Loop through 'names'
             for (LLSD nm: inArray(names))
             {
+                CAPTURE(nm);
                 LLSD metadata(getMetadata(nm));
-                UNSCOPED_INFO("name mismatch");
                 REQUIRE_THAT(metadata["name"], ll_test::LLSDEquals(nm));
-                UNSCOPED_INFO(nm.asString());
                 REQUIRE(metadata["desc"].asString() == descs[nm]);
-                UNSCOPED_INFO(stringize(nm, " required mismatch"));
                 REQUIRE_THAT(metadata["required"], ll_test::LLSDEquals(required));
-                UNSCOPED_INFO(stringize(nm, " optional mismatch"));
                 REQUIRE_THAT(metadata["optional"], ll_test::LLSDEquals(optional));
             }
         }
@@ -1048,13 +1012,9 @@ namespace tut
 
     TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: try_call() returns whether it found the name", "[lleventdispatcher]")
     {
-        UNSCOPED_INFO("try_call(bogus name, LLSD()) returned true");
         CHECK_FALSE(work.try_call("freek", LLSD()));
-        UNSCOPED_INFO("try_call(bogus name) returned true");
         CHECK_FALSE(work.try_call(LLSDMap("op", "freek")));
-        UNSCOPED_INFO("try_call(real name, LLSD()) returned false");
         CHECK(work.try_call("free0_array", LLSD()));
-        UNSCOPED_INFO("try_call(real name) returned false");
         CHECK(work.try_call(LLSDMap("op", "free0_map")));
     }
 
@@ -1062,8 +1022,8 @@ namespace tut
     {
         call_exc("freek", LLSD(), "not found");
         std::string threw = call_exc("", LLSDMap("op", "freek"), "bad");
-        ensure_has(threw, "op");
-        ensure_has(threw, "freek");
+        require_contains(threw, "op");
+        require_contains(threw, "freek");
     }
 
     TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: call with event key", "[lleventdispatcher]")
@@ -1107,7 +1067,6 @@ namespace tut
             // Should be able to pass 'answer' to Callables registered
             // without 'required'.
             work(tr.name, answer);
-            UNSCOPED_INFO("answer mismatch");
             REQUIRE_THAT(tr.llsd, ll_test::LLSDEquals(answer));
             // Should NOT be able to pass 'answer' to Callables registered
             // with 'required'.
@@ -1115,7 +1074,6 @@ namespace tut
             // But SHOULD be able to pass 'matching' to Callables registered
             // with 'required'.
             work(tr.name_req, matching);
-            UNSCOPED_INFO("matching mismatch");
             REQUIRE_THAT(tr.llsd, ll_test::LLSDEquals(matching));
         }
     }
@@ -1216,12 +1174,12 @@ namespace tut
         {
             for (LLSD::String a: ab)
             {
+                CAPTURE(funcsab[a], a);
                 // Reset the Vars instance before each call
                 Vars* vars(varsfor(funcsab[a]));
                 *vars = Vars();
                 work(funcsab[a], args[a]);
-                ensure_llsd(stringize(funcsab[a].asString(), ": expect[\"", a, "\"] mismatch"),
-                            vars->inspect(), expect[a], 7); // 7 bits ~= 2 decimal digits
+                require_llsd_equals(vars->inspect(), expect[a], 7); // 7 bits ~= 2 decimal digits
             }
         }
     }
@@ -1309,12 +1267,12 @@ namespace tut
             {
                 for (LLSD::String name: inArray(names[a]))
                 {
+                    CAPTURE(name, a);
                     // Reset the Vars instance
                     Vars* vars(varsfor(name));
                     *vars = Vars();
                     work(name, args[a]);
-                    ensure_llsd(stringize(name, ": expect[\"", a, "\"] mismatch"),
-                                vars->inspect(), expect[a], 7); // 7 bits, 2 decimal digits
+                    require_llsd_equals(vars->inspect(), expect[a], 7); // 7 bits, 2 decimal digits
                     // intercept LL_WARNS for the two overfull cases?
                 }
             }
@@ -1363,7 +1321,6 @@ namespace tut
     {
         DispatchResult service;
         LLSD result{ service("strfunc", "a string") };
-        UNSCOPED_INFO("strfunc() mismatch");
         CHECK(result.asString() == "got a string");
     }
 
@@ -1371,15 +1328,13 @@ namespace tut
     {
         DispatchResult service;
         LLSD result{ service("voidfunc", LLSD()) };
-        UNSCOPED_INFO("voidfunc() returned defined");
-        REQUIRE(result.isUndefined());
+        CHECK(result.isUndefined());
     }
 
     TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: Integer result", "[lleventdispatcher]")
     {
         DispatchResult service;
         LLSD result{ service("intfunc", -17) };
-        UNSCOPED_INFO("intfunc() mismatch");
         CHECK(result.asInteger() == 17);
     }
 
@@ -1387,7 +1342,6 @@ namespace tut
     {
         DispatchResult service;
         LLSD result{ service("llsdfunc", llsd::map("op", "llsdfunc", "reqid", 17)) };
-        UNSCOPED_INFO("llsdfunc() mismatch");
         CHECK_THAT(result,
                       ll_test::LLSDEquals(llsd::map("op", "llsdfunc", "reqid", 17, "with", "string")));
     }
@@ -1396,7 +1350,6 @@ namespace tut
     {
         DispatchResult service;
         LLSD result{ service("mapfunc", llsd::array(-12, "value")) };
-        UNSCOPED_INFO("mapfunc() mismatch");
         CHECK_THAT(result, ll_test::LLSDEquals(llsd::map("i", 12, "str", "got value")));
     }
 
@@ -1404,7 +1357,6 @@ namespace tut
     {
         DispatchResult service;
         LLSD result{ service("arrayfunc", llsd::array(-8, "word")) };
-        UNSCOPED_INFO("arrayfunc() mismatch");
         CHECK_THAT(result, ll_test::LLSDEquals(llsd::array(8, "got word")));
     }
 
@@ -1423,11 +1375,9 @@ namespace tut
         LLCaptureListener<LLSD> result;
         service.post(llsd::map("op", "nosuchfunc", "reqid", 17, "reply", result.getName()));
         LLSD reply{ result.get() };
-        UNSCOPED_INFO("no reply");
         REQUIRE(reply.isDefined());
-        UNSCOPED_INFO("reqid not echoed");
         CHECK(reply["reqid"].asInteger() == 17);
-        ensure_has(reply["error"].asString(), "nosuchfunc");
+        require_contains(reply["error"].asString(), "nosuchfunc");
     }
 
     TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: listener call to void function", "[lleventdispatcher]")
@@ -1441,7 +1391,7 @@ namespace tut
                              "op", func,
                              "reqid", 17,
                              "reply", result.getName()));
-            UNSCOPED_INFO("reply from " + func);
+            CAPTURE(func);
             REQUIRE(result.get().asString() == "non-empty");
         }
     }
@@ -1456,9 +1406,7 @@ namespace tut
                          "reqid", 17,
                          "reply", result.getName()));
         LLSD reply{ result.get() };
-        UNSCOPED_INFO("reqid not echoed");
         CHECK(reply["reqid"].asInteger() == 17);
-        UNSCOPED_INFO("bad reply from strfunc");
         CHECK(reply["data"].asString() == "got a string");
     }
 
@@ -1472,11 +1420,8 @@ namespace tut
                          "reqid", 17,
                          "reply", result.getName()));
         LLSD reply{ result.get() };
-        UNSCOPED_INFO("reqid not echoed");
         CHECK(reply["reqid"].asInteger() == 17);
-        UNSCOPED_INFO("bad i from mapfunc");
         CHECK(reply["i"].asInteger() == 7);
-        UNSCOPED_INFO("bad str from mapfunc");
         CHECK(reply["str"] == "got value");
     }
 
@@ -1493,10 +1438,8 @@ namespace tut
                          "reqid", 17,
                          "reply", result.getName()));
         LLSD reply{ result.get() };
-        UNSCOPED_INFO("reqid not echoed");
         CHECK(reply["reqid"].asInteger() == 17);
         reply.erase("reqid");
-        UNSCOPED_INFO("bad map batch");
         CHECK_THAT(reply,
             ll_test::LLSDEquals(llsd::map(
                 "strfunc", "got some string",
@@ -1520,14 +1463,12 @@ namespace tut
                          "reqid", 17,
                          "reply", result.getName()));
         LLSD reply{ result.get() };
-        UNSCOPED_INFO("reqid not echoed");
         CHECK(reply["reqid"].asInteger() == 17);
         reply.erase("reqid");
         auto error{ reply["error"].asString() };
         reply.erase("error");
-        ensure_has(error, "badfunc");
-        ensure_has(error, "missing");
-        UNSCOPED_INFO("bad partial batch");
+        require_contains(error, "badfunc");
+        require_contains(error, "missing");
         CHECK_THAT(reply,
             ll_test::LLSDEquals(llsd::map(
                 "strfunc", "got some string",
@@ -1554,7 +1495,7 @@ namespace tut
                 // no "reply"
             },
             "badfunc");
-        ensure_has(error, "missing");
+        require_contains(error, "missing");
     }
 
     TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: batched array success", "[lleventdispatcher]")
@@ -1576,10 +1517,8 @@ namespace tut
                          "reqid", 17,
                          "reply", result.getName()));
         LLSD reply{ result.get() };
-        UNSCOPED_INFO("reqid not echoed");
         CHECK(reply["reqid"].asInteger() == 17);
         reply.erase("reqid");
-        UNSCOPED_INFO("bad array batch");
         CHECK_THAT(reply,
             ll_test::LLSDEquals(llsd::map(
                 "data", llsd::array(
@@ -1608,14 +1547,12 @@ namespace tut
                          "reqid", 17,
                          "reply", result.getName()));
         LLSD reply{ result.get() };
-        UNSCOPED_INFO("reqid not echoed");
         CHECK(reply["reqid"].asInteger() == 17);
         reply.erase("reqid");
         auto error{ reply["error"] };
         reply.erase("error");
-        ensure_has(error, "[1]");
-        ensure_has(error, "unsupported");
-        UNSCOPED_INFO("bad array batch");
+        require_contains(error, "[1]");
+        require_contains(error, "unsupported");
         CHECK_THAT(reply,
                       ll_test::LLSDEquals(llsd::map("data", llsd::array("got some string"))));
     }
@@ -1642,6 +1579,6 @@ namespace tut
                 // no "reply"
             },
             "[1]");
-        ensure_has(error, "unsupported");
+        require_contains(error, "unsupported");
     }
 } // namespace tut

@@ -82,59 +82,55 @@ namespace tut
         std::string  expected_string;
         bool result;
         expected_string = VALID_DATE;
-        UNSCOPED_INFO("Valid Date failed");
         CHECK(expected_string == date.asString());
 
         result = date.fromString(VALID_DATE_LEAP);
         expected_string = VALID_DATE_LEAP;
-        UNSCOPED_INFO("VALID_DATE_LEAP failed");
         CHECK(expected_string == date.asString());
 
         result = date.fromString(VALID_DATE_HOUR_BOUNDARY);
         expected_string = VALID_DATE_HOUR_BOUNDARY;
-        UNSCOPED_INFO("VALID_DATE_HOUR_BOUNDARY failed");
         CHECK(expected_string == date.asString());
 
         result = date.fromString(VALID_DATE_FRACTIONAL_SECS);
         expected_string = VALID_DATE_FRACTIONAL_SECS;
-        UNSCOPED_INFO("VALID_DATE_FRACTIONAL_SECS failed");
         CHECK(expected_string == date.asString());
 
         result = date.fromString(INVALID_DATE_MISSING_YEAR);
         UNSCOPED_INFO("INVALID_DATE_MISSING_YEAR should have failed");
-        CHECK(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_MONTH);
         UNSCOPED_INFO("INVALID_DATE_MISSING_MONTH should have failed");
-        CHECK(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_DATE);
         UNSCOPED_INFO("INVALID_DATE_MISSING_DATE should have failed");
-        CHECK(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_T);
         UNSCOPED_INFO("INVALID_DATE_MISSING_T should have failed");
-        CHECK(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_HOUR);
         UNSCOPED_INFO("INVALID_DATE_MISSING_HOUR should have failed");
-        CHECK(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_MIN);
         UNSCOPED_INFO("INVALID_DATE_MISSING_MIN should have failed");
-        CHECK(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_SEC);
         UNSCOPED_INFO("INVALID_DATE_MISSING_SEC should have failed");
-        CHECK(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_Z);
         UNSCOPED_INFO("INVALID_DATE_MISSING_Z should have failed");
-        CHECK(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_EMPTY);
         UNSCOPED_INFO("INVALID_DATE_EMPTY should have failed");
-        CHECK(result == false);
+        CHECK_FALSE(result);
     }
 
     /* Invalid Value Handling */
@@ -147,37 +143,37 @@ namespace tut
 
         result = date.fromString(INVALID_DATE_24HOUR_BOUNDARY);
         UNSCOPED_INFO("INVALID_DATE_24HOUR_BOUNDARY should have failed");
-        REQUIRE(result == false);
-        UNSCOPED_INFO("INVALID_DATE_24HOUR_BOUNDARY date still set to old value on failure!");
-        REQUIRE(date.secondsSinceEpoch() == 0);
+        CHECK_FALSE(result);
+        UNSCOPED_INFO("a failed parse leaves the date unchanged");
+        CHECK(date.secondsSinceEpoch() == 0);
 
         result = date.fromString(INVALID_DATE_LEAP);
         UNSCOPED_INFO("INVALID_DATE_LEAP should have failed");
-        REQUIRE(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_HOUR);
         UNSCOPED_INFO("INVALID_DATE_HOUR should have failed");
-        REQUIRE(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MIN);
         UNSCOPED_INFO("INVALID_DATE_MIN should have failed");
-        REQUIRE(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_SEC);
         UNSCOPED_INFO("INVALID_DATE_SEC should have failed");
-        REQUIRE(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_YEAR);
         UNSCOPED_INFO("INVALID_DATE_YEAR should have failed");
-        REQUIRE(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MONTH);
         UNSCOPED_INFO("INVALID_DATE_MONTH should have failed");
-        REQUIRE(result == false);
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_DAY);
         UNSCOPED_INFO("INVALID_DATE_DAY should have failed");
-        REQUIRE(result == false);
+        CHECK_FALSE(result);
 #endif
     }
 
@@ -188,7 +184,6 @@ namespace tut
         std::istringstream stream(VALID_DATE);
         std::string  expected_string = VALID_DATE;
         date.fromStream(stream);
-        UNSCOPED_INFO("fromStream failed");
         CHECK(date.asString() == expected_string);
     }
 
@@ -196,7 +191,6 @@ namespace tut
     {
         LLDate date1(VALID_DATE);
         LLDate date2(date1);
-        UNSCOPED_INFO("LLDate(const LLDate& date) constructor failed");
         CHECK(date1.asString() == date2.asString());
     }
 
@@ -204,9 +198,7 @@ namespace tut
     {
         LLDate date1(VALID_DATE);
         LLDate date2(date1.secondsSinceEpoch());
-        UNSCOPED_INFO("secondsSinceEpoch not equal");
         CHECK(date1.secondsSinceEpoch() == date2.secondsSinceEpoch());
-        UNSCOPED_INFO("LLDate created using secondsSinceEpoch not equal");
         CHECK(date1.asString() == date2.asString());
     }
 
@@ -216,7 +208,6 @@ namespace tut
         std::ostringstream stream;
         stream << date;
         std::string expected_str = VALID_DATE;
-        UNSCOPED_INFO("ostringstream failed");
         CHECK(expected_str == stream.str());
     }
 
@@ -229,9 +220,7 @@ namespace tut
         std::ostringstream out_stream;
         out_stream << date;
 
-        UNSCOPED_INFO("<< failed");
         CHECK(date.asString() == expected_str);
-        UNSCOPED_INFO("<< to >> failed");
         CHECK(stream.str() == out_stream.str());
     }
 
@@ -242,25 +231,15 @@ namespace tut
         LLDate later(2000.0);
         LLDate also_earlier(1000.0);
 
-        UNSCOPED_INFO("earlier < later");
         CHECK(earlier < later);
-        UNSCOPED_INFO("later > earlier");
         CHECK(later > earlier);
-        UNSCOPED_INFO("earlier <= later");
         CHECK(earlier <= later);
-        UNSCOPED_INFO("later >= earlier");
         CHECK(later >= earlier);
-        UNSCOPED_INFO("equal <=");
         CHECK(earlier <= also_earlier);
-        UNSCOPED_INFO("equal >=");
         CHECK(earlier >= also_earlier);
-        UNSCOPED_INFO("equal ==");
         CHECK(earlier == also_earlier);
-        UNSCOPED_INFO("differ !=");
         CHECK(earlier != later);
-        UNSCOPED_INFO("!(equal <)");
         CHECK_FALSE(earlier < also_earlier);
-        UNSCOPED_INFO("!(equal >)");
         CHECK_FALSE(earlier > also_earlier);
     }
 
@@ -268,21 +247,15 @@ namespace tut
     TEST_CASE("LLDate: isNull and notNull follow the seconds set", "[LLDate]")
     {
         LLDate d;
-        UNSCOPED_INFO("default isNull");
         CHECK(d.isNull());
-        UNSCOPED_INFO("default !notNull");
         CHECK_FALSE(d.notNull());
 
         d.secondsSinceEpoch(1234.5);
-        UNSCOPED_INFO("after set, !isNull");
         CHECK_FALSE(d.isNull());
-        UNSCOPED_INFO("after set, notNull");
         CHECK(d.notNull());
-        UNSCOPED_INFO("getter round-trips");
         CHECK(d.secondsSinceEpoch() == 1234.5);
 
         d.secondsSinceEpoch(0.0);
-        UNSCOPED_INFO("zero -> isNull again");
         CHECK(d.isNull());
     }
 
@@ -291,14 +264,11 @@ namespace tut
     TEST_CASE("LLDate: the date string formatters give output for the epoch value", "[LLDate]")
     {
         LLDate d;
-        UNSCOPED_INFO("toLocalDateString does not throw");
-        REQUIRE(d.toLocalDateString(std::string("%Y-%m-%d")).size() > 0);
-        UNSCOPED_INFO("toHTTPDateString does not throw");
-        REQUIRE(d.toHTTPDateString(std::string("%Y-%m-%d")).size() > 0);
+        CHECK(d.toLocalDateString(std::string("%Y-%m-%d")).size() > 0);
+        CHECK(d.toHTTPDateString(std::string("%Y-%m-%d")).size() > 0);
         // RFC1123 wraps toHTTPDateString; verifies the day-of-week token
         // is present (a strftime success indicator that doesn't pin locale).
         std::string rfc = d.asRFC1123();
-        UNSCOPED_INFO("asRFC1123 produces output");
-        REQUIRE(rfc.size() > 0);
+        CHECK(rfc.size() > 0);
     }
 }

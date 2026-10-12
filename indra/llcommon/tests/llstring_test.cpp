@@ -40,87 +40,84 @@ namespace
     {
         std::string llstr1;
         {
-            INFO("Empty std::string");
-            REQUIRE(llstr1.size() == 0);
-            REQUIRE(llstr1.empty());
+            INFO("default-constructed");
+            CHECK(llstr1.size() == 0);
+            CHECK(llstr1.empty());
         }
 
         std::string llstr2("Hello");
         {
-            INFO("std::string = Hello");
+            INFO("from a C string");
             CHECK(std::string_view(llstr2.c_str()) == "Hello");
-            REQUIRE(llstr2.size() == 5);
-            REQUIRE_FALSE(llstr2.empty());
+            CHECK(llstr2.size() == 5);
+            CHECK_FALSE(llstr2.empty());
         }
 
         std::string llstr3(llstr2);
         {
-            INFO("std::string = std::string(std::string)");
+            INFO("copy");
             CHECK(std::string_view(llstr3.c_str()) == "Hello");
-            REQUIRE(llstr3.size() == 5);
-            REQUIRE_FALSE(llstr3.empty());
+            CHECK(llstr3.size() == 5);
+            CHECK_FALSE(llstr3.empty());
         }
 
         std::string str("Hello World");
         std::string llstr4(str, 6);
         {
-            INFO("std::string = std::string(s, size_type pos, size_type n = npos)");
+            INFO("from a position");
             CHECK(std::string_view(llstr4.c_str()) == "World");
-            REQUIRE(llstr4.size() == 5);
-            REQUIRE_FALSE(llstr4.empty());
+            CHECK(llstr4.size() == 5);
+            CHECK_FALSE(llstr4.empty());
         }
 
         std::string llstr5(str, str.size());
         {
-            INFO("std::string = std::string(s, size_type pos, size_type n = npos)");
-            REQUIRE(llstr5.size() == 0);
-            REQUIRE(llstr5.empty());
+            INFO("from the end position");
+            CHECK(llstr5.size() == 0);
+            CHECK(llstr5.empty());
         }
 
         std::string llstr6(5, 'A');
         {
-            INFO("std::string = std::string(count, c)");
+            INFO("count copies of a character");
             CHECK(std::string_view(llstr6.c_str()) == "AAAAA");
-            REQUIRE(llstr6.size() == 5);
-            REQUIRE_FALSE(llstr6.empty());
+            CHECK(llstr6.size() == 5);
+            CHECK_FALSE(llstr6.empty());
         }
 
         std::string llstr7("Hello World", 5);
         {
-            INFO("std::string(s, n)");
+            INFO("the first n characters");
             CHECK(std::string_view(llstr7.c_str()) == "Hello");
-            REQUIRE(llstr7.size() == 5);
-            REQUIRE_FALSE(llstr7.empty());
+            CHECK(llstr7.size() == 5);
+            CHECK_FALSE(llstr7.empty());
         }
 
         std::string llstr8("Hello World", 6, 5);
         {
-            INFO("std::string(s, n, count)");
+            INFO("n characters from a position");
             CHECK(std::string_view(llstr8.c_str()) == "World");
-            REQUIRE(llstr8.size() == 5);
-            REQUIRE_FALSE(llstr8.empty());
+            CHECK(llstr8.size() == 5);
+            CHECK_FALSE(llstr8.empty());
         }
 
         std::string llstr9("Hello World", sizeof("Hello World")-1, 5); // go past end
         {
-            INFO("std::string(s, n, count) goes past end");
-            REQUIRE(llstr9.size() == 0);
-            REQUIRE(llstr9.empty());
+            INFO("from the end position, asking for more");
+            CHECK(llstr9.size() == 0);
+            CHECK(llstr9.empty());
         }
     }
 
     TEST_CASE("LLString: isValidIndex accepts indexes up to and including the length", "[LLString]")
     {
         std::string str("Len=5");
-        {
-            INFO("isValidIndex failed");
-            CHECK(LLStringUtil::isValidIndex(str, 0));
-            CHECK(LLStringUtil::isValidIndex(str, 5));
-            CHECK_FALSE(LLStringUtil::isValidIndex(str, 6));
-        }
+        CHECK(LLStringUtil::isValidIndex(str, 0));
+        CHECK(LLStringUtil::isValidIndex(str, 5));
+        CHECK_FALSE(LLStringUtil::isValidIndex(str, 6));
 
         std::string str1;
-        UNSCOPED_INFO("isValidIndex failed fo rempty string");
+        UNSCOPED_INFO("an empty string");
         CHECK_FALSE(LLStringUtil::isValidIndex(str1, 0));
     }
 
@@ -128,12 +125,10 @@ namespace
     {
         std::string str_val("               Testing the extra whitespaces   ");
         LLStringUtil::trimHead(str_val);
-        UNSCOPED_INFO("1: trimHead failed");
         CHECK(str_val == "Testing the extra whitespaces   ");
 
         std::string str_val1("\n\t\r\n  Testing the extra whitespaces   ");
         LLStringUtil::trimHead(str_val1);
-        UNSCOPED_INFO("2: trimHead failed");
         CHECK(str_val1 == "Testing the extra whitespaces   ");
     }
 
@@ -141,12 +136,10 @@ namespace
     {
         std::string str_val("  Testing the   extra     whitespaces         ");
         LLStringUtil::trimTail(str_val);
-        UNSCOPED_INFO("1: trimTail failed");
         CHECK(str_val == "  Testing the   extra     whitespaces");
 
         std::string str_val1("\n  Testing the extra whitespaces  \n\t\r\n   ");
         LLStringUtil::trimTail(str_val1);
-        UNSCOPED_INFO("2: trimTail failed");
         CHECK(str_val1 == "\n  Testing the extra whitespaces");
     }
 
@@ -155,7 +148,6 @@ namespace
     {
         std::string str_val("  \t \r Testing the   extra     \r\n whitespaces     \n \t    ");
         LLStringUtil::trim(str_val);
-        UNSCOPED_INFO("1: trim failed");
         CHECK(str_val == "Testing the   extra     \r\n whitespaces");
     }
 
@@ -163,12 +155,10 @@ namespace
     {
         std::string str("Second LindenLabs");
         LLStringUtil::truncate(str, 6);
-        UNSCOPED_INFO("1: truncate");
         CHECK(str == "Second");
 
         // further truncate more than the length
         LLStringUtil::truncate(str, 0);
-        UNSCOPED_INFO("2: truncate");
         CHECK(str == "");
     }
 
@@ -176,7 +166,6 @@ namespace
     {
         std::string str_val("SecondLife Source");
         LLStringUtil::toUpper(str_val);
-        UNSCOPED_INFO("toUpper failed");
         CHECK(str_val == "SECONDLIFE SOURCE");
     }
 
@@ -184,19 +173,15 @@ namespace
     {
         std::string str_val("SecondLife Source");
         LLStringUtil::toLower(str_val);
-        UNSCOPED_INFO("toLower failed");
         CHECK(str_val == "secondlife source");
     }
 
     TEST_CASE("LLString: isHead matches a prefix and never an empty string", "[LLString]")
     {
         std::string str_val("Second");
-        UNSCOPED_INFO("1. isHead failed");
         CHECK(LLStringUtil::isHead(str_val, "SecondLife Source"));
-        UNSCOPED_INFO("2. isHead failed");
         CHECK_FALSE(LLStringUtil::isHead(str_val, " SecondLife Source"));
         std::string str_val2("");
-        UNSCOPED_INFO("3. isHead failed");
         CHECK_FALSE(LLStringUtil::isHead(str_val2, ""));
     }
 
@@ -205,10 +190,8 @@ namespace
         std::string str_val("Hello.\n\n Lindenlabs. \n This is \na simple test.\n");
         std::string orig_str_val(str_val);
         LLStringUtil::addCRLF(str_val);
-        UNSCOPED_INFO("addCRLF failed");
         CHECK(str_val == "Hello.\r\n\r\n Lindenlabs. \r\n This is \r\na simple test.\r\n");
         LLStringUtil::removeCRLF(str_val);
-        UNSCOPED_INFO("removeCRLF failed");
         CHECK(str_val == orig_str_val);
     }
 
@@ -217,15 +200,14 @@ namespace
         std::string str_val("Hello.\n\n\t \t Lindenlabs. \t\t");
         std::string orig_str_val(str_val);
         LLStringUtil::replaceTabsWithSpaces(str_val, 1);
-        UNSCOPED_INFO("replaceTabsWithSpaces failed");
         CHECK(str_val == "Hello.\n\n    Lindenlabs.   ");
         LLStringUtil::replaceTabsWithSpaces(orig_str_val, 0);
-        UNSCOPED_INFO("replaceTabsWithSpaces failed for 0");
+        UNSCOPED_INFO("a width of zero");
         CHECK(orig_str_val == "Hello.\n\n  Lindenlabs. ");
 
         str_val = "\t\t\t\t";
         LLStringUtil::replaceTabsWithSpaces(str_val, 0);
-        UNSCOPED_INFO("replaceTabsWithSpaces failed for all tabs");
+        UNSCOPED_INFO("only tabs");
         CHECK(str_val == "");
     }
 
@@ -233,7 +215,6 @@ namespace
     {
         std::string str_val("Hello.\n\n\t\t\r\nLindenlabsX.");
         LLStringUtil::replaceNonstandardASCII(str_val, 'X');
-        UNSCOPED_INFO("replaceNonstandardASCII failed");
         CHECK(str_val == "Hello.\n\nXXX\nLindenlabsX.");
     }
 
@@ -241,7 +222,6 @@ namespace
     {
         std::string str_val("Hello.\n\t\r\nABCDEFGHIABABAB");
         LLStringUtil::replaceChar(str_val, 'A', 'X');
-        UNSCOPED_INFO("1: replaceChar failed");
         CHECK(str_val == "Hello.\n\t\r\nXBCDEFGHIXBXBXB");
         std::string str_val1("Hello.\n\t\r\nABCDEFGHIABABAB");
     }
@@ -249,11 +229,9 @@ namespace
     TEST_CASE("LLString: containsNonprintable finds controls and separators but not text", "[LLString]")
     {
         std::string str_val("Hello.\n\r\t");
-        UNSCOPED_INFO("containsNonprintable failed");
         CHECK(LLStringUtil::containsNonprintable(str_val));
 
         str_val = "ABC ";
-        UNSCOPED_INFO("containsNonprintable failed");
         CHECK_FALSE(LLStringUtil::containsNonprintable(str_val));
 
         // Controls above the ASCII range are two bytes, and neither of them
@@ -284,17 +262,16 @@ namespace
     {
         std::string str_val("Hello.\n\r\t Again!");
         LLStringUtil::stripNonprintable(str_val);
-        UNSCOPED_INFO("stripNonprintable failed");
         CHECK(str_val == "Hello. Again!");
 
         str_val = "\r\n\t\t";
         LLStringUtil::stripNonprintable(str_val);
-        UNSCOPED_INFO("stripNonprintable resulting in empty string failed");
+        UNSCOPED_INFO("only controls");
         CHECK(str_val == "");
 
         str_val = "";
         LLStringUtil::stripNonprintable(str_val);
-        UNSCOPED_INFO("stripNonprintable of empty string resulting in empty string failed");
+        UNSCOPED_INFO("empty string");
         CHECK(str_val == "");
 
         // A control above the ASCII range goes whole, taking both its bytes.
@@ -314,81 +291,44 @@ namespace
     {
         bool value;
         std::string str_val("1");
-        {
-            INFO("convertToBOOL 1 failed");
-            REQUIRE(LLStringUtil::convertToBOOL(str_val, value));
-            CHECK(value);
-        }
+        REQUIRE(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK(value);
         str_val = "T";
-        {
-            INFO("convertToBOOL T failed");
-            CHECK(LLStringUtil::convertToBOOL(str_val, value));
-            CHECK(value);
-        }
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK(value);
         str_val = "t";
-        {
-            INFO("convertToBOOL t failed");
-            CHECK(LLStringUtil::convertToBOOL(str_val, value));
-            CHECK(value);
-        }
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK(value);
         str_val = "TRUE";
-        {
-            INFO("convertToBOOL TRUE failed");
-            CHECK(LLStringUtil::convertToBOOL(str_val, value));
-            CHECK(value);
-        }
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK(value);
         str_val = "True";
-        {
-            INFO("convertToBOOL True failed");
-            CHECK(LLStringUtil::convertToBOOL(str_val, value));
-            CHECK(value);
-        }
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK(value);
         str_val = "true";
-        {
-            INFO("convertToBOOL true failed");
-            CHECK(LLStringUtil::convertToBOOL(str_val, value));
-            CHECK(value);
-        }
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK(value);
 
         str_val = "0";
-        {
-            INFO("convertToBOOL 0 failed");
-            CHECK(LLStringUtil::convertToBOOL(str_val, value));
-            CHECK_FALSE(value);
-        }
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(value);
         str_val = "F";
-        {
-            INFO("convertToBOOL F failed");
-            CHECK(LLStringUtil::convertToBOOL(str_val, value));
-            CHECK_FALSE(value);
-        }
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(value);
         str_val = "f";
-        {
-            INFO("convertToBOOL f failed");
-            CHECK(LLStringUtil::convertToBOOL(str_val, value));
-            CHECK_FALSE(value);
-        }
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(value);
         str_val = "FALSE";
-        {
-            INFO("convertToBOOL FASLE failed");
-            CHECK(LLStringUtil::convertToBOOL(str_val, value));
-            CHECK_FALSE(value);
-        }
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(value);
         str_val = "False";
-        {
-            INFO("convertToBOOL False failed");
-            CHECK(LLStringUtil::convertToBOOL(str_val, value));
-            CHECK_FALSE(value);
-        }
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(value);
         str_val = "false";
-        {
-            INFO("convertToBOOL false failed");
-            CHECK(LLStringUtil::convertToBOOL(str_val, value));
-            CHECK_FALSE(value);
-        }
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(value);
 
         str_val = "Tblah";
-        UNSCOPED_INFO("convertToBOOL false failed");
         CHECK_FALSE(LLStringUtil::convertToBOOL(str_val, value));
     }
 
@@ -396,25 +336,17 @@ namespace
     {
         U8 value;
         std::string str_val("255");
-        {
-            INFO("1: convertToU8 failed");
-            REQUIRE(LLStringUtil::convertToU8(str_val, value));
-            CHECK(value == 255);
-        }
+        REQUIRE(LLStringUtil::convertToU8(str_val, value));
+        CHECK(value == 255);
 
         str_val = "0";
-        {
-            INFO("2: convertToU8 failed");
-            CHECK(LLStringUtil::convertToU8(str_val, value));
-            CHECK(value == 0);
-        }
+        CHECK(LLStringUtil::convertToU8(str_val, value));
+        CHECK(value == 0);
 
         str_val = "-1";
-        UNSCOPED_INFO("3: convertToU8 failed");
         CHECK_FALSE(LLStringUtil::convertToU8(str_val, value));
 
         str_val = "256"; // bigger than MAX_U8
-        UNSCOPED_INFO("4: convertToU8 failed");
         CHECK_FALSE(LLStringUtil::convertToU8(str_val, value));
     }
 
@@ -422,32 +354,21 @@ namespace
     {
         S8 value;
         std::string str_val("127");
-        {
-            INFO("1: convertToS8 failed");
-            REQUIRE(LLStringUtil::convertToS8(str_val, value));
-            CHECK(value == 127);
-        }
+        REQUIRE(LLStringUtil::convertToS8(str_val, value));
+        CHECK(value == 127);
 
         str_val = "0";
-        {
-            INFO("2: convertToS8 failed");
-            CHECK(LLStringUtil::convertToS8(str_val, value));
-            CHECK(value == 0);
-        }
+        CHECK(LLStringUtil::convertToS8(str_val, value));
+        CHECK(value == 0);
 
         str_val = "-128";
-        {
-            INFO("3: convertToS8 failed");
-            CHECK(LLStringUtil::convertToS8(str_val, value));
-            CHECK(value == -128);
-        }
+        CHECK(LLStringUtil::convertToS8(str_val, value));
+        CHECK(value == -128);
 
         str_val = "128"; // bigger than MAX_S8
-        UNSCOPED_INFO("4: convertToS8 failed");
         CHECK_FALSE(LLStringUtil::convertToS8(str_val, value));
 
         str_val = "-129";
-        UNSCOPED_INFO("5: convertToS8 failed");
         CHECK_FALSE(LLStringUtil::convertToS8(str_val, value));
     }
 
@@ -455,32 +376,21 @@ namespace
     {
         S16 value;
         std::string str_val("32767");
-        {
-            INFO("1: convertToS16 failed");
-            REQUIRE(LLStringUtil::convertToS16(str_val, value));
-            CHECK(value == 32767);
-        }
+        REQUIRE(LLStringUtil::convertToS16(str_val, value));
+        CHECK(value == 32767);
 
         str_val = "0";
-        {
-            INFO("2: convertToS16 failed");
-            CHECK(LLStringUtil::convertToS16(str_val, value));
-            CHECK(value == 0);
-        }
+        CHECK(LLStringUtil::convertToS16(str_val, value));
+        CHECK(value == 0);
 
         str_val = "-32768";
-        {
-            INFO("3: convertToS16 failed");
-            CHECK(LLStringUtil::convertToS16(str_val, value));
-            CHECK(value == -32768);
-        }
+        CHECK(LLStringUtil::convertToS16(str_val, value));
+        CHECK(value == -32768);
 
         str_val = "32768";
-        UNSCOPED_INFO("4: convertToS16 failed");
         CHECK_FALSE(LLStringUtil::convertToS16(str_val, value));
 
         str_val = "-32769";
-        UNSCOPED_INFO("5: convertToS16 failed");
         CHECK_FALSE(LLStringUtil::convertToS16(str_val, value));
     }
 
@@ -488,25 +398,17 @@ namespace
     {
         U16 value;
         std::string str_val("65535"); //0xFFFF
-        {
-            INFO("1: convertToU16 failed");
-            REQUIRE(LLStringUtil::convertToU16(str_val, value));
-            CHECK(value == 65535);
-        }
+        REQUIRE(LLStringUtil::convertToU16(str_val, value));
+        CHECK(value == 65535);
 
         str_val = "0";
-        {
-            INFO("2: convertToU16 failed");
-            CHECK(LLStringUtil::convertToU16(str_val, value));
-            CHECK(value == 0);
-        }
+        CHECK(LLStringUtil::convertToU16(str_val, value));
+        CHECK(value == 0);
 
         str_val = "-1";
-        UNSCOPED_INFO("3: convertToU16 failed");
         CHECK_FALSE(LLStringUtil::convertToU16(str_val, value));
 
         str_val = "65536";
-        UNSCOPED_INFO("4: convertToU16 failed");
         CHECK_FALSE(LLStringUtil::convertToU16(str_val, value));
     }
 
@@ -514,21 +416,14 @@ namespace
     {
         U32 value;
         std::string str_val("4294967295"); //0xFFFFFFFF
-        {
-            INFO("1: convertToU32 failed");
-            REQUIRE(LLStringUtil::convertToU32(str_val, value));
-            CHECK(value == 4294967295UL);
-        }
+        REQUIRE(LLStringUtil::convertToU32(str_val, value));
+        CHECK(value == 4294967295UL);
 
         str_val = "0";
-        {
-            INFO("2: convertToU32 failed");
-            CHECK(LLStringUtil::convertToU32(str_val, value));
-            CHECK(value == 0);
-        }
+        CHECK(LLStringUtil::convertToU32(str_val, value));
+        CHECK(value == 0);
 
         str_val = "4294967296";
-        UNSCOPED_INFO("3: convertToU32 failed");
         CHECK_FALSE(LLStringUtil::convertToU32(str_val, value));
 
         // A negative is rejected rather than wrapped. convertToU8 and
@@ -536,79 +431,54 @@ namespace
         // after parsing as signed -- so this is the unsigned form agreeing with
         // its own siblings. Stream extraction let num_get negate it instead.
         str_val = "-1";
-        UNSCOPED_INFO("4: convertToU32 failed");
         CHECK_FALSE(LLStringUtil::convertToU32(str_val, value));
 
         // A leading '+' is still accepted, as it was through the stream.
         str_val = "+7";
-        {
-            INFO("5: convertToU32 failed");
-            CHECK(LLStringUtil::convertToU32(str_val, value));
-            CHECK(value == 7);
-        }
+        CHECK(LLStringUtil::convertToU32(str_val, value));
+        CHECK(value == 7);
     }
 
     TEST_CASE("LLString: convertToS32 reads the S32 range with a sign or spaces or trailing text", "[LLString]")
     {
         S32 value;
         std::string str_val("2147483647"); //0x7FFFFFFF
-        {
-            INFO("1: convertToS32 failed");
-            REQUIRE(LLStringUtil::convertToS32(str_val, value));
-            CHECK(value == 2147483647);
-        }
+        REQUIRE(LLStringUtil::convertToS32(str_val, value));
+        CHECK(value == 2147483647);
 
         str_val = "0";
-        {
-            INFO("2: convertToS32 failed");
-            CHECK(LLStringUtil::convertToS32(str_val, value));
-            CHECK(value == 0);
-        }
+        CHECK(LLStringUtil::convertToS32(str_val, value));
+        CHECK(value == 0);
 
         // Avoid "unary minus operator applied to unsigned type" warning on VC++. JC
         S32 min_val = -2147483647 - 1;
         str_val = "-2147483648";
-        {
-            INFO("3: convertToS32 failed");
-            CHECK(LLStringUtil::convertToS32(str_val, value));
-            CHECK(value == min_val);
-        }
+        CHECK(LLStringUtil::convertToS32(str_val, value));
+        CHECK(value == min_val);
 
         str_val = "2147483648";
-        UNSCOPED_INFO("4: convertToS32 failed");
         CHECK_FALSE(LLStringUtil::convertToS32(str_val, value));
 
         str_val = "-2147483649";
-        UNSCOPED_INFO("5: convertToS32 failed");
         CHECK_FALSE(LLStringUtil::convertToS32(str_val, value));
 
         // from_chars does not take a leading '+' on its own; the conversions
         // strip it so they keep accepting what stream extraction accepted.
         str_val = "+42";
-        {
-            INFO("6: convertToS32 failed");
-            CHECK(LLStringUtil::convertToS32(str_val, value));
-            CHECK(value == 42);
-        }
+        CHECK(LLStringUtil::convertToS32(str_val, value));
+        CHECK(value == 42);
 
         // Surrounding space is trimmed, and a parse that stops early still
         // reports what it read -- both as the stream did.
         str_val = "  13  ";
-        {
-            INFO("7: convertToS32 failed");
-            CHECK(LLStringUtil::convertToS32(str_val, value));
-            CHECK(value == 13);
-        }
+        CHECK(LLStringUtil::convertToS32(str_val, value));
+        CHECK(value == 13);
 
         str_val = "12abc";
-        {
-            INFO("8: convertToS32 failed");
-            CHECK(LLStringUtil::convertToS32(str_val, value));
-            CHECK(value == 12);
-        }
+        CHECK(LLStringUtil::convertToS32(str_val, value));
+        CHECK(value == 12);
 
         str_val = "abc";
-        UNSCOPED_INFO("9: convertToS32 failed");
         CHECK_FALSE(LLStringUtil::convertToS32(str_val, value));
     }
 
@@ -616,18 +486,12 @@ namespace
     {
         F32 value;
         std::string str_val("2147483647"); //0x7FFFFFFF
-        {
-            INFO("1: convertToF32 failed");
-            REQUIRE(LLStringUtil::convertToF32(str_val, value));
-            CHECK(value == 2147483647.f);
-        }
+        REQUIRE(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == 2147483647.f);
 
         str_val = "0";
-        {
-            INFO("2: convertToF32 failed");
-            CHECK(LLStringUtil::convertToF32(str_val, value));
-            CHECK(value == 0);
-        }
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == 0);
 
         /* Need to find max/min F32 values
         str_val = "-2147483648";
@@ -644,42 +508,26 @@ namespace
         // a leading '+' all read the same as they did through the stream, and
         // the decimal point stays a point whatever the C locale is set to.
         str_val = "1.5";
-        {
-            INFO("6: convertToF32 failed");
-            CHECK(LLStringUtil::convertToF32(str_val, value));
-            CHECK(value == 1.5f);
-        }
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == 1.5f);
 
         str_val = "-2.25";
-        {
-            INFO("7: convertToF32 failed");
-            CHECK(LLStringUtil::convertToF32(str_val, value));
-            CHECK(value == -2.25f);
-        }
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == -2.25f);
 
         str_val = "+0.5";
-        {
-            INFO("8: convertToF32 failed");
-            CHECK(LLStringUtil::convertToF32(str_val, value));
-            CHECK(value == 0.5f);
-        }
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == 0.5f);
 
         str_val = "1.5e2";
-        {
-            INFO("9: convertToF32 failed");
-            CHECK(LLStringUtil::convertToF32(str_val, value));
-            CHECK(value == 150.f);
-        }
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == 150.f);
 
         str_val = "  0.25  ";
-        {
-            INFO("10: convertToF32 failed");
-            CHECK(LLStringUtil::convertToF32(str_val, value));
-            CHECK(value == 0.25f);
-        }
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == 0.25f);
 
         str_val = "nonsense";
-        UNSCOPED_INFO("11: convertToF32 failed");
         CHECK_FALSE(LLStringUtil::convertToF32(str_val, value));
     }
 
@@ -687,18 +535,12 @@ namespace
     {
         F64 value;
         std::string str_val("9223372036854775807"); //0x7FFFFFFFFFFFFFFF
-        {
-            INFO("1: convertToF64 failed");
-            REQUIRE(LLStringUtil::convertToF64(str_val, value));
-            CHECK(value == 9223372036854775807.0);
-        }
+        REQUIRE(LLStringUtil::convertToF64(str_val, value));
+        CHECK(value == 9223372036854775807.0);
 
         str_val = "0";
-        {
-            INFO("2: convertToF64 failed");
-            CHECK(LLStringUtil::convertToF64(str_val, value));
-            CHECK(value == 0.0F);
-        }
+        CHECK(LLStringUtil::convertToF64(str_val, value));
+        CHECK(value == 0.0F);
 
         /* Need to find max/min F64 values
         str_val = "-2147483648";
@@ -717,21 +559,16 @@ namespace
         const char* str1 = NULL;
         const char* str2 = NULL;
 
-        UNSCOPED_INFO("1: compareStrings failed");
         CHECK(LLStringUtil::compareStrings(str1, str2) == 0);
         str2 = "A";
-        UNSCOPED_INFO("2: compareStrings failed");
         CHECK(LLStringUtil::compareStrings(str1, str2) > 0);
-        UNSCOPED_INFO("3: compareStrings failed");
         CHECK(LLStringUtil::compareStrings(str2, str1) < 0);
 
         str1 = "A is smaller than B";
         str2 = "B is greater than A";
-        UNSCOPED_INFO("4: compareStrings failed");
         CHECK(LLStringUtil::compareStrings(str1, str2) < 0);
 
         str2 = "A is smaller than B";
-        UNSCOPED_INFO("5: compareStrings failed");
         CHECK(LLStringUtil::compareStrings(str1, str2) == 0);
     }
 
@@ -740,17 +577,13 @@ namespace
         const char* str1 = NULL;
         const char* str2 = NULL;
 
-        UNSCOPED_INFO("1: compareInsensitive failed");
         CHECK(LLStringUtil::compareInsensitive(str1, str2) == 0);
         str2 = "A";
-        UNSCOPED_INFO("2: compareInsensitive failed");
         CHECK(LLStringUtil::compareInsensitive(str1, str2) > 0);
-        UNSCOPED_INFO("3: compareInsensitive failed");
         CHECK(LLStringUtil::compareInsensitive(str2, str1) < 0);
 
         str1 = "A is equal to a";
         str2 = "a is EQUAL to A";
-        UNSCOPED_INFO("4: compareInsensitive failed");
         CHECK(LLStringUtil::compareInsensitive(str1, str2) == 0);
 
         // Ignoring case is not the same as uppercasing both sides, which is
@@ -777,32 +610,23 @@ namespace
     {
         std::string lhs_str("PROgraM12files");
         std::string rhs_str("PROgram12Files");
-        UNSCOPED_INFO("compareDict 1 failed");
         CHECK(LLStringUtil::compareDict(lhs_str, rhs_str) < 0);
-        UNSCOPED_INFO("precedesDict 1 failed");
         CHECK(LLStringUtil::precedesDict(lhs_str, rhs_str));
 
         lhs_str = "PROgram12Files";
         rhs_str = "PROgram12Files";
-        UNSCOPED_INFO("compareDict 2 failed");
         CHECK(LLStringUtil::compareDict(lhs_str, rhs_str) == 0);
-        UNSCOPED_INFO("precedesDict 2 failed");
         CHECK_FALSE(LLStringUtil::precedesDict(lhs_str, rhs_str));
 
         lhs_str = "PROgram12Files";
         rhs_str = "PROgRAM12FILES";
-        UNSCOPED_INFO("compareDict 3 failed");
         CHECK(LLStringUtil::compareDict(lhs_str, rhs_str) > 0);
-        UNSCOPED_INFO("precedesDict 3 failed");
         CHECK_FALSE(LLStringUtil::precedesDict(lhs_str, rhs_str));
 
         // Uppercase sorts first, which is a tertiary-level ordering. The
         // caseless form drops that level and so sees no difference at all.
-        UNSCOPED_INFO("compareDictInsensitive case");
         CHECK(LLStringUtil::compareDictInsensitive(lhs_str, rhs_str) == 0);
-        UNSCOPED_INFO("compareDict case");
         CHECK(LLStringUtil::compareDict(std::string("abc"), std::string("ABC")) > 0);
-        UNSCOPED_INFO("compareDict case 2");
         CHECK(LLStringUtil::compareDict(std::string("Apple"), std::string("apple")) < 0);
 
         // Digit runs compare as the numbers they spell.
@@ -831,10 +655,10 @@ namespace
         char str2[100];
 
         LLStringUtil::copy(str2, str1, 100);
-        UNSCOPED_INFO("LLStringUtil::copy with enough dest length failed");
+        UNSCOPED_INFO("enough room");
         CHECK(std::string_view(str2) == std::string_view(str1));
         LLStringUtil::copy(str2, str1, sizeof("First"));
-        UNSCOPED_INFO("LLStringUtil::copy with less dest length failed");
+        UNSCOPED_INFO("too little room");
         CHECK(std::string_view(str2) == "First");
     }
 
@@ -849,12 +673,10 @@ namespace
 
         dest = str1;
         LLStringUtil::copyInto(dest, str3, str2.length());
-        UNSCOPED_INFO("LLStringUtil::copyInto insert failed");
         CHECK(dest == str4);
 
         dest = str1;
         LLStringUtil::copyInto(dest, str3, dest.length());
-        UNSCOPED_INFO("LLStringUtil::copyInto append failed");
         CHECK(dest == str5);
     }
 
@@ -866,7 +688,7 @@ namespace
         // should not be altered.
         std::string simple_text = "Hello, world!";
         stripped = LLStringFn::strip_invalid_xml(simple_text);
-        UNSCOPED_INFO("Simple text passed unchanged");
+        UNSCOPED_INFO("plain text unchanged");
         CHECK(stripped == simple_text);
 
         // Control characters should be removed
@@ -882,7 +704,7 @@ namespace
         allowed_control_chars.push_back( (char)0x0d );
 
         stripped = LLStringFn::strip_invalid_xml(control_chars);
-        UNSCOPED_INFO("Only tab, LF, CR control characters allowed");
+        UNSCOPED_INFO("only tab, LF and CR kept");
         CHECK(stripped == allowed_control_chars);
 
         // UTF-8 should be passed intact, including high byte
@@ -892,7 +714,7 @@ namespace
         french.push_back( (char)0xA7 );
         french += "ais";
         stripped = LLStringFn::strip_invalid_xml( french );
-        UNSCOPED_INFO("UTF-8 high byte text is allowed");
+        UNSCOPED_INFO("UTF-8 kept");
         CHECK(french == stripped);
     }
 
@@ -921,17 +743,15 @@ namespace
             // Test when source string is entirely one key
             std::string s1 = (std::string)iter->first;
             std::string s2 = (std::string)iter->second;
+            CAPTURE(s1);
             subcount = LLStringUtil::format(s1, fmt_map);
-            UNSCOPED_INFO("LLStringUtil::format: Raw interpolation result");
             REQUIRE(s1 == s2);
             if (s1 == "?" || s1 == "[]") // no interp expected
             {
-                UNSCOPED_INFO("LLStringUtil::format: Raw interpolation result count");
                 REQUIRE(0 == subcount);
             }
             else
             {
-                UNSCOPED_INFO("LLStringUtil::format: Raw interpolation result count");
                 REQUIRE(1 == subcount);
             }
         }
@@ -941,18 +761,16 @@ namespace
             // Test when source string is one key, duplicated
             std::string s1 = (std::string)iter->first;
             std::string s2 = (std::string)iter->second;
+            CAPTURE(s1);
             s = s1 + s1 + s1 + s1;
             subcount = LLStringUtil::format(s, fmt_map);
-            UNSCOPED_INFO("LLStringUtil::format: Rawx4 interpolation result");
             REQUIRE(s == s2 + s2 + s2 + s2);
             if (s1 == "?" || s1 == "[]") // no interp expected
             {
-                UNSCOPED_INFO("LLStringUtil::format: Rawx4 interpolation result count");
                 REQUIRE(0 == subcount);
             }
             else
             {
-                UNSCOPED_INFO("LLStringUtil::format: Rawx4 interpolation result count");
                 REQUIRE(4 == subcount);
             }
         }
@@ -961,54 +779,42 @@ namespace
         std::string srcs = "!!!!!!!!!!!!!!!!";
         s = srcs;
         subcount = LLStringUtil::format(s, fmt_map);
-        UNSCOPED_INFO("LLStringUtil::format: No key test result");
         CHECK(s == srcs);
-        UNSCOPED_INFO("LLStringUtil::format: No key test result count");
         CHECK(0 == subcount);
 
         // Test when source string has no keys and is empty
         std::string srcs3;
         s = srcs3;
         subcount = LLStringUtil::format(s, fmt_map);
-        UNSCOPED_INFO("LLStringUtil::format: No key test3 result");
-        REQUIRE(s.empty());
-        UNSCOPED_INFO("LLStringUtil::format: No key test3 result count");
+        CHECK(s.empty());
         CHECK(0 == subcount);
 
         // Test a substitution where a key is substituted with blankness
         std::string srcs2 = "[DELETE]";
         s = srcs2;
         subcount = LLStringUtil::format(s, fmt_map);
-        UNSCOPED_INFO("LLStringUtil::format: Delete key test2 result");
-        REQUIRE(s.empty());
-        UNSCOPED_INFO("LLStringUtil::format: Delete key test2 result count");
+        CHECK(s.empty());
         CHECK(1 == subcount);
 
         // Test an assorted substitution
         std::string srcs4 = "[TRICK1][A][B][AAA][BBB][TRICK2][KEYLONGER][KEYSHORTER]?[DELETE]";
         s = srcs4;
         subcount = LLStringUtil::format(s, fmt_map);
-        UNSCOPED_INFO("LLStringUtil::format: Assorted Test1 result");
         CHECK(s == "[A]abaaabbb[A]shortAm I not a long string??");
-        UNSCOPED_INFO("LLStringUtil::format: Assorted Test1 result count");
         CHECK(9 == subcount);
 
         // Test an assorted substitution
         std::string srcs5 = "[DELETE]?[KEYSHORTER][KEYLONGER][TRICK2][BBB][AAA][B][A][TRICK1]";
         s = srcs5;
         subcount = LLStringUtil::format(s, fmt_map);
-        UNSCOPED_INFO("LLStringUtil::format: Assorted Test2 result");
         CHECK(s == "?Am I not a long string?short[A]bbbaaaba[A]");
-        UNSCOPED_INFO("LLStringUtil::format: Assorted Test2 result count");
         CHECK(9 == subcount);
 
         // Test on nested brackets
         std::string srcs6 = "[[TRICK1]][[A]][[B]][[AAA]][[BBB]][[TRICK2]][[KEYLONGER]][[KEYSHORTER]]?[[DELETE]]";
         s = srcs6;
         subcount = LLStringUtil::format(s, fmt_map);
-        UNSCOPED_INFO("LLStringUtil::format: Assorted Test2 result");
         CHECK(s == "[[A]][a][b][aaa][bbb][[A]][short][Am I not a long string?]?[]");
-        UNSCOPED_INFO("LLStringUtil::format: Assorted Test2 result count");
         CHECK(9 == subcount);
 
 
@@ -1016,9 +822,7 @@ namespace
         std::string srcs8 = "foo[DELETE]bar?";
         s = srcs8;
         subcount = LLStringUtil::format(s, fmt_map);
-        UNSCOPED_INFO("LLStringUtil::format: Assorted Test3 result");
         CHECK(s == "foobar?");
-        UNSCOPED_INFO("LLStringUtil::format: Assorted Test3 result count");
         CHECK(1 == subcount);
     }
 
@@ -1033,18 +837,14 @@ namespace
         std::string srcs6 = "12345";
         s = srcs6;
         subcount = LLStringUtil::format(s, blank_fmt_map);
-        UNSCOPED_INFO("LLStringUtil::format: Blankfmt Test1 result");
         CHECK(s == "12345");
-        UNSCOPED_INFO("LLStringUtil::format: Blankfmt Test1 result count");
         CHECK(0 == subcount);
 
         // Test substituting a blank string out of a blank format_map
         std::string srcs7;
         s = srcs7;
         subcount = LLStringUtil::format(s, blank_fmt_map);
-        UNSCOPED_INFO("LLStringUtil::format: Blankfmt Test2 result");
-        REQUIRE(s.empty());
-        UNSCOPED_INFO("LLStringUtil::format: Blankfmt Test2 result count");
+        CHECK(s.empty());
         CHECK(0 == subcount);
     }
 
@@ -1061,18 +861,14 @@ namespace
         std::string srcs6 = "12345";
         s = srcs6;
         subcount = LLStringUtil::format(s, nasty_fmt_map);
-        UNSCOPED_INFO("LLStringUtil::format: Nastyfmt Test1 result");
         CHECK(s == "12345");
-        UNSCOPED_INFO("LLStringUtil::format: Nastyfmt Test1 result count");
         CHECK(0 == subcount);
 
         // Test substituting a blank string out of a nasty format_map
         std::string srcs7;
         s = srcs7;
         subcount = LLStringUtil::format(s, nasty_fmt_map);
-        UNSCOPED_INFO("LLStringUtil::format: Nastyfmt Test2 result");
-        REQUIRE(s.empty());
-        UNSCOPED_INFO("LLStringUtil::format: Nastyfmt Test2 result count");
+        CHECK(s.empty());
         CHECK(0 == subcount);
     }
 
@@ -1081,7 +877,6 @@ namespace
         // Make sure startsWith works
         std::string string("anybody in there?");
         std::string substr("anybody");
-        UNSCOPED_INFO("startsWith works.");
         CHECK(LLStringUtil::startsWith(string, substr));
     }
 
@@ -1090,7 +885,6 @@ namespace
         // Make sure startsWith correctly fails
         std::string string("anybody in there?");
         std::string substr("there");
-        UNSCOPED_INFO("startsWith fails.");
         CHECK_FALSE(LLStringUtil::startsWith(string, substr));
     }
 
@@ -1099,11 +893,8 @@ namespace
         // startsWith fails on empty strings
         std::string value("anybody in there?");
         std::string empty;
-        UNSCOPED_INFO("empty string.");
         CHECK_FALSE(LLStringUtil::startsWith(value, empty));
-        UNSCOPED_INFO("empty substr.");
         CHECK_FALSE(LLStringUtil::startsWith(empty, value));
-        UNSCOPED_INFO("empty everything.");
         CHECK_FALSE(LLStringUtil::startsWith(empty, empty));
     }
 
@@ -1112,7 +903,6 @@ namespace
         // Make sure endsWith works correctly
         std::string string("anybody in there?");
         std::string substr("there?");
-        UNSCOPED_INFO("endsWith works.");
         CHECK(LLStringUtil::endsWith(string, substr));
     }
 
@@ -1121,13 +911,10 @@ namespace
         // Make sure endsWith correctly fails
         std::string string("anybody in there?");
         std::string substr("anybody");
-        UNSCOPED_INFO("endsWith fails.");
         CHECK_FALSE(LLStringUtil::endsWith(string, substr));
         substr = "there";
-        UNSCOPED_INFO("endsWith fails.");
         CHECK_FALSE(LLStringUtil::endsWith(string, substr));
         substr = "ther?";
-        UNSCOPED_INFO("endsWith fails.");
         CHECK_FALSE(LLStringUtil::endsWith(string, substr));
     }
 
@@ -1136,11 +923,8 @@ namespace
         // endsWith fails on empty strings
         std::string value("anybody in there?");
         std::string empty;
-        UNSCOPED_INFO("empty string.");
         CHECK_FALSE(LLStringUtil::endsWith(value, empty));
-        UNSCOPED_INFO("empty substr.");
         CHECK_FALSE(LLStringUtil::endsWith(empty, value));
-        UNSCOPED_INFO("empty everything.");
         CHECK_FALSE(LLStringUtil::endsWith(empty, empty));
     }
 
@@ -1166,31 +950,29 @@ namespace
     // don't pass a string of escape characters, when you pass an empty string
     // (different overloads), and when you pass a string of characters that
     // aren't actually present.
-    static void ensure_getTokens(const std::string& desc,
-                                 const std::string& string,
-                                 const std::string& drop_delims,
-                                 const std::string& keep_delims,
-                                 const std::string& quotes,
-                                 const std::vector<std::string>& expect)
+    static void require_tokens(const std::string& desc,
+                               const std::string& string,
+                               const std::string& drop_delims,
+                               const std::string& keep_delims,
+                               const std::string& quotes,
+                               const std::vector<std::string>& expect)
     {
-        UNSCOPED_INFO(desc + " - no esc");
+        INFO(desc);
         REQUIRE(LLStringUtil::getTokens(string, drop_delims, keep_delims, quotes) ==
                       expect);
-        UNSCOPED_INFO(desc + " - empty esc");
         REQUIRE(LLStringUtil::getTokens(string, drop_delims, keep_delims, quotes, "") ==
                       expect);
-        UNSCOPED_INFO(desc + " - unused esc");
         REQUIRE(LLStringUtil::getTokens(string, drop_delims, keep_delims, quotes, "!") ==
                       expect);
     }
 
-    static void ensure_getTokens(const std::string& desc,
-                                 const std::string& string,
-                                 const std::string& drop_delims,
-                                 const std::string& keep_delims,
-                                 const std::vector<std::string>& expect)
+    static void require_tokens(const std::string& desc,
+                               const std::string& string,
+                               const std::string& drop_delims,
+                               const std::string& keep_delims,
+                               const std::vector<std::string>& expect)
     {
-        ensure_getTokens(desc, string, drop_delims, keep_delims, "", expect);
+        require_tokens(desc, string, drop_delims, keep_delims, "", expect);
     }
 
     TEST_CASE("LLString: getTokens keeps delimiters and handles quotes and escapes", "[LLString]")
@@ -1200,37 +982,37 @@ namespace
         // If you omit keep_delims, you get the older function (test above).
 
         // cases like the getTokens(string, delims) tests above
-        ensure_getTokens("empty string", "", " ", "", StringVec());
-        ensure_getTokens("only delims",
-                         "   \r\n   ", " \r\n", "", StringVec());
-        ensure_getTokens("sequence of delims",
-                         ",,, one ,,,", ", ", "", StringVec{"one"});
+        require_tokens("empty string", "", " ", "", StringVec());
+        require_tokens("only delims",
+                       "   \r\n   ", " \r\n", "", StringVec());
+        require_tokens("sequence of delims",
+                       ",,, one ,,,", ", ", "", StringVec{"one"});
         // Note contrast with the case in the previous method
-        ensure_getTokens("noncontiguous tokens",
-                         ", ,, , one ,,,", ", ", "", StringVec{"one"});
-        ensure_getTokens("space-padded tokens",
-                         ",    one  ,  two  ,", ", ", "",
-                         StringVec{"one", "two"});
-        ensure_getTokens("no delims", "one", ",", "", StringVec{ "one" });
+        require_tokens("noncontiguous tokens",
+                       ", ,, , one ,,,", ", ", "", StringVec{"one"});
+        require_tokens("space-padded tokens",
+                       ",    one  ,  two  ,", ", ", "",
+                       StringVec{"one", "two"});
+        require_tokens("no delims", "one", ",", "", StringVec{ "one" });
 
         // drop_delims vs. keep_delims
-        ensure_getTokens("arithmetic",
-                         " ab+def  / xx*  yy ", " ", "+-*/", { "ab", "+", "def", "/", "xx", "*", "yy" });
+        require_tokens("arithmetic",
+                       " ab+def  / xx*  yy ", " ", "+-*/", { "ab", "+", "def", "/", "xx", "*", "yy" });
 
         // quotes
-        ensure_getTokens("no quotes",
-                         "She said, \"Don't go.\"", " ", ",", "", { "She", "said", ",", "\"Don't", "go.\"" });
-        ensure_getTokens("quotes",
-                         "She said, \"Don't go.\"", " ", ",", "\"", { "She", "said", ",", "Don't go." });
-        ensure_getTokens("quotes and delims",
-                         "run c:/'Documents and Settings'/someone", " ", "", "'",
-                         { "run", "c:/Documents and Settings/someone" });
-        ensure_getTokens("unmatched quote",
-                         "baby don't leave", " ", "", "'", { "baby", "don't", "leave" });
-        ensure_getTokens("adjacent quoted",
-                         "abc'def \"ghi'\"jkl' mno\"pqr", " ", "", "\"'", { "abcdef \"ghijkl' mnopqr" });
-        ensure_getTokens("quoted empty string",
-                         "--set SomeVar ''", " ", "", "'", { "--set", "SomeVar", "" });
+        require_tokens("no quotes",
+                       "She said, \"Don't go.\"", " ", ",", "", { "She", "said", ",", "\"Don't", "go.\"" });
+        require_tokens("quotes",
+                       "She said, \"Don't go.\"", " ", ",", "\"", { "She", "said", ",", "Don't go." });
+        require_tokens("quotes and delims",
+                       "run c:/'Documents and Settings'/someone", " ", "", "'",
+                       { "run", "c:/Documents and Settings/someone" });
+        require_tokens("unmatched quote",
+                       "baby don't leave", " ", "", "'", { "baby", "don't", "leave" });
+        require_tokens("adjacent quoted",
+                       "abc'def \"ghi'\"jkl' mno\"pqr", " ", "", "\"'", { "abcdef \"ghijkl' mnopqr" });
+        require_tokens("quoted empty string",
+                       "--set SomeVar ''", " ", "", "'", { "--set", "SomeVar", "" });
 
         // escapes
         // Don't use backslash as an escape for these tests -- you'll go nuts
@@ -1301,25 +1083,20 @@ namespace
 
         for (const char* src : untouched)
         {
+            CAPTURE(src);
             std::string s(src);
-            UNSCOPED_INFO(std::string("format_map count: ") + src);
             REQUIRE(0 == LLStringUtil::format(s, fmt_map));
-            UNSCOPED_INFO(std::string("format_map result: ") + src);
             REQUIRE(s == std::string(src));
 
             std::string s2(src);
-            UNSCOPED_INFO(std::string("LLSD count: ") + src);
             REQUIRE(0 == LLStringUtil::format(s2, sd_map));
-            UNSCOPED_INFO(std::string("LLSD result: ") + src);
             REQUIRE(s2 == std::string(src));
         }
 
         // A real substitution still fires, and the surrounding text — including
         // brackets that are not a key — survives it.
         std::string s("no [FOO] here [MISSING] -=[Stylized Name]=-");
-        UNSCOPED_INFO("mixed count");
         CHECK(1 == LLStringUtil::format(s, fmt_map));
-        UNSCOPED_INFO("mixed result");
         CHECK(s ==
                       std::string("no bar here [MISSING] -=[Stylized Name]=-"));
     }

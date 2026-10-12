@@ -69,65 +69,45 @@ namespace
                      const LLSD::URI& uri, const LLSD::Binary& bin)
         {
             called = true;
-            UNSCOPED_INFO("b mismatch");
             REQUIRE(b == statics::b);
-            UNSCOPED_INFO("i mismatch");
             REQUIRE(i == statics::i);
-            UNSCOPED_INFO("f mismatch");
             REQUIRE(f == statics::f);
-            UNSCOPED_INFO("s mismatch");
             REQUIRE(s == statics::s);
-            UNSCOPED_INFO("uu mismatch");
             REQUIRE(uu == statics::uu);
-            UNSCOPED_INFO("dt mismatch");
             REQUIRE(dt == statics::dt);
-            UNSCOPED_INFO("uri mismatch");
             REQUIRE(uri.asString() == statics::uri.asString());
-            UNSCOPED_INFO("bin mismatch");
             REQUIRE(bin == statics::bin);
         }
 
         static void strings(std::string s0, std::string s1, std::string s2, std::string s3, std::string s4)
         {
             called = true;
-            UNSCOPED_INFO("s0 mismatch");
             REQUIRE(s0 == statics::quick[0]);
-            UNSCOPED_INFO("s1 mismatch");
             REQUIRE(s1 == statics::quick[1]);
-            UNSCOPED_INFO("s2 mismatch");
             REQUIRE(s2 == statics::quick[2]);
-            UNSCOPED_INFO("s3 mismatch");
             REQUIRE(s3 == statics::quick[3]);
-            UNSCOPED_INFO("s4 mismatch");
             REQUIRE(s4 == statics::quick[4]);
         }
 
         static void ints(int i0, int i1, int i2, int i3, int i4)
         {
             called = true;
-            UNSCOPED_INFO("i0 mismatch");
             REQUIRE(i0 == statics::fibs[0]);
-            UNSCOPED_INFO("i1 mismatch");
             REQUIRE(i1 == statics::fibs[1]);
-            UNSCOPED_INFO("i2 mismatch");
             REQUIRE(i2 == statics::fibs[2]);
-            UNSCOPED_INFO("i3 mismatch");
             REQUIRE(i3 == statics::fibs[3]);
-            UNSCOPED_INFO("i4 mismatch");
             REQUIRE(i4 == statics::fibs[4]);
         }
 
         static void sdfunc(const LLSD& sd)
         {
             called = true;
-            UNSCOPED_INFO("sd mismatch");
             REQUIRE(sd.asInteger() == statics::i);
         }
 
         static void intfunc(int i)
         {
             called = true;
-            UNSCOPED_INFO("i mismatch");
             REQUIRE(i == statics::i);
         }
 
@@ -166,21 +146,18 @@ namespace
         LL::apply(statics::various,
                   std::make_tuple(statics::b, statics::i, statics::f, statics::s,
                                   statics::uu, statics::dt, statics::uri, statics::bin));
-        UNSCOPED_INFO("apply(tuple) failed");
         CHECK(statics::called);
     }
 
     TEST_CASE_METHOD(apply_data, "apply: apply(array) passes each element as an argument", "[apply]")
     {
         LL::apply(statics::ints, statics::fibs);
-        UNSCOPED_INFO("apply(array) failed");
         CHECK(statics::called);
     }
 
     TEST_CASE_METHOD(apply_data, "apply: apply(vector) passes each element as an argument", "[apply]")
     {
         LL::apply(statics::strings, statics::quick);
-        UNSCOPED_INFO("apply(vector) failed");
         CHECK(statics::called);
     }
 
@@ -189,14 +166,12 @@ namespace
     TEST_CASE_METHOD(apply_data, "apply: apply(LLSD()) calls a function of no arguments", "[apply]")
     {
         LL::apply(statics::voidfunc, LLSD());
-        UNSCOPED_INFO("apply(LLSD()) failed");
         CHECK(statics::called);
     }
 
     TEST_CASE_METHOD(apply_data, "apply: apply with an LLSD scalar converts it for an int parameter", "[apply]")
     {
         LL::apply(statics::intfunc, LLSD(statics::i));
-        UNSCOPED_INFO("apply(fn(int), LLSD scalar) failed");
         CHECK(statics::called);
     }
 
@@ -205,7 +180,6 @@ namespace
         // This test verifies that LLSDParam<LLSD> doesn't send the compiler
         // into infinite recursion when the target is itself LLSD.
         LL::apply(statics::sdfunc, LLSD(statics::i));
-        UNSCOPED_INFO("apply(fn(LLSD), LLSD scalar) failed");
         CHECK(statics::called);
     }
 
@@ -214,7 +188,6 @@ namespace
         LL::apply(statics::various,
                   llsd::array(statics::b, statics::i, statics::f, statics::s,
                               statics::uu, statics::dt, statics::uri, statics::bin));
-        UNSCOPED_INFO("apply(LLSD array) failed");
         CHECK(statics::called);
     }
 
@@ -230,9 +203,7 @@ namespace
         // LL::apply(statics::collect, strray);
         // That's what VAPPLY() is for.
         VAPPLY(statics::collect, strray);
-        UNSCOPED_INFO("VAPPLY() failed");
         CHECK(statics::called);
-        UNSCOPED_INFO("collected mismatch");
         CHECK(statics::collected == statics::quick);
     }
 } // anonymous namespace

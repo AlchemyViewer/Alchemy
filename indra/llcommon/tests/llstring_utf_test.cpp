@@ -181,17 +181,17 @@ namespace
         return removed;
     }
 
-    // llutf16string element types have no std::ostream operator<<, so
-    // ensure_equals fails to instantiate its failure formatter. Compare by
-    // value and format diagnostics ourselves.
-    void ensure_wstring_equals(const std::string& msg,
-                               const std::u32string& actual,
-                               const std::u32string& expected)
+    // char32_t has no std::ostream operator<<, so a failed comparison of
+    // two std::u32strings could not show them. Compare by value and format
+    // diagnostics ourselves.
+    void require_same_u32(const std::string& what,
+                          const std::u32string& actual,
+                          const std::u32string& expected)
     {
         if (actual == expected) return;
 
         std::ostringstream oss;
-        oss << msg << ": std::u32string mismatch (actual.size=" << actual.size()
+        oss << what << ": std::u32string mismatch (actual.size=" << actual.size()
             << " expected.size=" << expected.size() << ")\n  actual: ";
         oss << std::hex << std::uppercase;
         for (llwchar c : actual) oss << "U+" << (U32)c << ' ';
@@ -202,10 +202,10 @@ namespace
 
 }
 
-namespace tut
+namespace
 {
     struct llstring_utf_data {};
-    // Tests are numbered by category:
+    // The cases come in categories, which TUT numbered:
     //   1x  conversion       (utf8 <-> wstring/utf16, basic round-trips)
     //   2x  validation       (well-formed input pins)
     //   3x  case             (ICU-backed casing)
@@ -219,9 +219,7 @@ namespace tut
     //   11x utf8str helpers  (substChar/makeASCII/removeCRLF/split/preview)
     //   12x utf8 walkers     (byte-offset segmentation against its wide twin)
     //   14x trim             (Unicode whitespace, and what is not whitespace)
-    // The TUT default registers only test<1>..test<50>, but the explicit
-    // test_group<..., 150> below raises that ceiling. Keep this index in
-    // sync with categories used below.
+    // Keep this index in sync with the categories used below.
 
     // ---------------------------------------------------------------
     //                      round-trip coverage
@@ -234,10 +232,8 @@ namespace tut
         const std::u32string     wascii (ascii.begin(), ascii.end());
         const llutf16string u16ascii(ascii.begin(), ascii.end());
 
-        ensure_wstring_equals  ("utf8->wstring ASCII",  to_u32 (ascii),   wascii);
-        UNSCOPED_INFO("wstring->utf8 ASCII");
+        require_same_u32("utf8->wstring ASCII", to_u32 (ascii), wascii);
         CHECK(to_utf8 (wascii) == ascii);
-        UNSCOPED_INFO("utf16->utf8 ASCII");
         CHECK(utf16str_to_utf8str(u16ascii) == ascii);
     }
 
@@ -248,10 +244,8 @@ namespace tut
         const std::u32string     w    = { (llwchar)'H', (llwchar)0x00E9, (llwchar)'l', (llwchar)'l', (llwchar)'o' };
         const llutf16string u16  = { (char16_t)'H', (char16_t)0x00E9, (char16_t)'l', (char16_t)'l', (char16_t)'o' };
 
-        ensure_wstring_equals  ("utf8->wstring 2-byte",  to_u32 (utf8), w);
-        UNSCOPED_INFO("wstring->utf8 2-byte");
+        require_same_u32("utf8->wstring 2-byte", to_u32 (utf8), w);
         CHECK(to_utf8 (w) == utf8);
-        UNSCOPED_INFO("utf16->utf8 2-byte");
         CHECK(utf16str_to_utf8str(u16) == utf8);
     }
 
@@ -262,10 +256,8 @@ namespace tut
         const std::u32string     w    = { (llwchar)0x65E5, (llwchar)0x672C };
         const llutf16string u16  = { (char16_t)0x65E5, (char16_t)0x672C };
 
-        ensure_wstring_equals  ("utf8->wstring 3-byte",  to_u32 (utf8), w);
-        UNSCOPED_INFO("wstring->utf8 3-byte");
+        require_same_u32("utf8->wstring 3-byte", to_u32 (utf8), w);
         CHECK(to_utf8 (w) == utf8);
-        UNSCOPED_INFO("utf16->utf8 3-byte");
         CHECK(utf16str_to_utf8str(u16) == utf8);
     }
 
@@ -276,10 +268,8 @@ namespace tut
         const std::u32string     w    = { (llwchar)0x1F680 };
         const llutf16string u16  = { (char16_t)0xD83D, (char16_t)0xDE80 };
 
-        ensure_wstring_equals  ("utf8->wstring astral",  to_u32 (utf8), w);
-        UNSCOPED_INFO("wstring->utf8 astral");
+        require_same_u32("utf8->wstring astral", to_u32 (utf8), w);
         CHECK(to_utf8 (w) == utf8);
-        UNSCOPED_INFO("utf16->utf8 astral");
         CHECK(utf16str_to_utf8str(u16) == utf8);
     }
 
@@ -292,21 +282,16 @@ namespace tut
         const std::u32string     w    = { (llwchar)'A', (llwchar)0x65E5, (llwchar)0x1F680, (llwchar)'B' };
         const llutf16string u16  = { (char16_t)'A', (char16_t)0x65E5, (char16_t)0xD83D, (char16_t)0xDE80, (char16_t)'B' };
 
-        ensure_wstring_equals  ("utf8->wstring mixed",  to_u32 (utf8), w);
-        UNSCOPED_INFO("wstring->utf8 mixed");
+        require_same_u32("utf8->wstring mixed", to_u32 (utf8), w);
         CHECK(to_utf8 (w) == utf8);
-        UNSCOPED_INFO("utf16->utf8 mixed");
         CHECK(utf16str_to_utf8str(u16) == utf8);
     }
 
     // Empty inputs produce empty outputs in every direction.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: empty input converts to empty output in every direction", "[LLStringUTF]")
     {
-        UNSCOPED_INFO("utf8->wstring empty");
-        REQUIRE(to_u32 (std::string()).size() == size_t(0));
-        UNSCOPED_INFO("wstring->utf8 empty");
+        CHECK(to_u32 (std::string()).size() == size_t(0));
         CHECK(to_utf8 (std::u32string()) == std::string());
-        UNSCOPED_INFO("utf16->utf8 empty");
         CHECK(utf16str_to_utf8str(llutf16string()) == std::string());
     }
 
@@ -314,7 +299,6 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: rawstr_to_utf8 leaves valid UTF-8 as it is", "[LLStringUTF]")
     {
         const std::string mixed = "A\xE6\x97\xA5\xF0\x9F\x9A\x80" "B";
-        UNSCOPED_INFO("rawstr_to_utf8 preserves valid utf8");
         CHECK(rawstr_to_utf8(mixed) == mixed);
     }
 
@@ -323,9 +307,7 @@ namespace tut
     {
         const std::string   bytes = "\xF0\x9F\x9A\x80";
         const std::u8string u8    = str_to_u8str(bytes);
-        UNSCOPED_INFO("str_to_u8str size");
-        REQUIRE(u8.size() == bytes.size());
-        UNSCOPED_INFO("u8 round-trip");
+        CHECK(u8.size() == bytes.size());
         CHECK(u8str_to_str(u8) == bytes);
     }
 
@@ -339,36 +321,22 @@ namespace tut
         char buf[8];
         std::memset(buf, 0xAA, sizeof(buf));
 
-        UNSCOPED_INFO("'A' len");
         CHECK(wchar_to_utf8chars(0x41,    buf) == std::ptrdiff_t(1));
-        UNSCOPED_INFO("'A' b0");
         CHECK((U32)(U8)buf[0] == U32(0x41));
 
-        UNSCOPED_INFO("é len");
         CHECK(wchar_to_utf8chars(0x00E9,  buf) == std::ptrdiff_t(2));
-        UNSCOPED_INFO("é b0");
         CHECK((U32)(U8)buf[0] == U32(0xC3));
-        UNSCOPED_INFO("é b1");
         CHECK((U32)(U8)buf[1] == U32(0xA9));
 
-        UNSCOPED_INFO("日 len");
         CHECK(wchar_to_utf8chars(0x65E5,  buf) == std::ptrdiff_t(3));
-        UNSCOPED_INFO("日 b0");
         CHECK((U32)(U8)buf[0] == U32(0xE6));
-        UNSCOPED_INFO("日 b1");
         CHECK((U32)(U8)buf[1] == U32(0x97));
-        UNSCOPED_INFO("日 b2");
         CHECK((U32)(U8)buf[2] == U32(0xA5));
 
-        UNSCOPED_INFO("🚀 len");
         CHECK(wchar_to_utf8chars(0x1F680, buf) == std::ptrdiff_t(4));
-        UNSCOPED_INFO("🚀 b0");
         CHECK((U32)(U8)buf[0] == U32(0xF0));
-        UNSCOPED_INFO("🚀 b1");
         CHECK((U32)(U8)buf[1] == U32(0x9F));
-        UNSCOPED_INFO("🚀 b2");
         CHECK((U32)(U8)buf[2] == U32(0x9A));
-        UNSCOPED_INFO("🚀 b3");
         CHECK((U32)(U8)buf[3] == U32(0x80));
     }
 
@@ -380,15 +348,11 @@ namespace tut
         char buf[8];
         std::memset(buf, 0xAA, sizeof(buf));
 
-        UNSCOPED_INFO("5-byte len");
         CHECK(wchar_to_utf8chars(0x00200000, buf) == std::ptrdiff_t(5));
-        UNSCOPED_INFO("5-byte lead");
         CHECK((U32)((U8)buf[0] & 0xF8) == U32(0xF8));
 
         std::memset(buf, 0xAA, sizeof(buf));
-        UNSCOPED_INFO("6-byte len");
         CHECK(wchar_to_utf8chars(0x04000000, buf) == std::ptrdiff_t(6));
-        UNSCOPED_INFO("6-byte lead");
         CHECK((U32)((U8)buf[0] & 0xFC) == U32(0xFC));
     }
 
@@ -398,17 +362,11 @@ namespace tut
 
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: wchar_utf8_length counts one to six bytes", "[LLStringUTF]")
     {
-        UNSCOPED_INFO("wchar_utf8_length ASCII");
         CHECK(wchar_utf8_length(0x00000041) == S32(1));
-        UNSCOPED_INFO("wchar_utf8_length 2-byte");
         CHECK(wchar_utf8_length(0x000000E9) == S32(2));
-        UNSCOPED_INFO("wchar_utf8_length 3-byte");
         CHECK(wchar_utf8_length(0x000065E5) == S32(3));
-        UNSCOPED_INFO("wchar_utf8_length 4-byte");
         CHECK(wchar_utf8_length(0x0001F680) == S32(4));
-        UNSCOPED_INFO("wchar_utf8_length 5-byte");
         CHECK(wchar_utf8_length(0x00200000) == S32(5));
-        UNSCOPED_INFO("wchar_utf8_length 6-byte");
         CHECK(wchar_utf8_length(0x04000000) == S32(6));
     }
 
@@ -422,10 +380,8 @@ namespace tut
         w.push_back((wchar_t)0xDE80);
         w.push_back(L'B');
         // 4 UTF-16 units = 3 codepoints.
-        UNSCOPED_INFO("wide_wstring_length 4u -> 3cp");
-        REQUIRE(wide_wstring_length(w, 4) == S32(3));
-        UNSCOPED_INFO("wide_wstring_length 0");
-        REQUIRE(wide_wstring_length(w, 0) == S32(0));
+        CHECK(wide_wstring_length(w, 4) == S32(3));
+        CHECK(wide_wstring_length(w, 0) == S32(0));
     }
 #endif
 
@@ -436,13 +392,9 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_truncate cuts ASCII at the length given", "[LLStringUTF]")
     {
         const std::string s = "Hello";
-        UNSCOPED_INFO("truncate noop");
         CHECK(utf8str_truncate(s, 10) == s);
-        UNSCOPED_INFO("truncate exact");
         CHECK(utf8str_truncate(s, 5) == s);
-        UNSCOPED_INFO("truncate to 3");
         CHECK(utf8str_truncate(s, 3) == std::string("Hel"));
-        UNSCOPED_INFO("truncate to 0");
         CHECK(utf8str_truncate(s, 0) == std::string());
     }
 
@@ -454,24 +406,17 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_truncate backs off only from inside a character", "[LLStringUTF]")
     {
         const std::string s = "A\xE6\x97\xA5" "B";
-        UNSCOPED_INFO("trunc 2 inside 日");
         CHECK(utf8str_truncate(s, 2) == std::string("A"));
-        UNSCOPED_INFO("trunc 3 inside 日");
         CHECK(utf8str_truncate(s, 3) == std::string("A"));
-        UNSCOPED_INFO("trunc 4 on 'B'");
         CHECK(utf8str_truncate(s, 4) == std::string("A\xE6\x97\xA5"));
-        UNSCOPED_INFO("trunc 5 whole");
         CHECK(utf8str_truncate(s, 5) == s);
     }
 
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_substr takes a start and a length", "[LLStringUTF]")
     {
         const std::string s = "ABCDE";
-        UNSCOPED_INFO("substr 1,3");
         CHECK(utf8str_substr(s, 1, 3) == std::string("BCD"));
-        UNSCOPED_INFO("substr 3,2");
         CHECK(utf8str_substr(s, 3, 2) == std::string("DE"));
-        UNSCOPED_INFO("substr 0,0");
         CHECK(utf8str_substr(s, 0, 0) == std::string());
     }
 
@@ -480,15 +425,10 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_symbol_truncate returns the first N complete UTF-8 symbols", "[LLStringUTF]")
     {
         const std::string s = "A\xE6\x97\xA5\xF0\x9F\x9A\x80" "B";
-        UNSCOPED_INFO("sym 4 whole");
         CHECK(utf8str_symbol_truncate(s, 4) == s);
-        UNSCOPED_INFO("sym 3");
         CHECK(utf8str_symbol_truncate(s, 3) == std::string("A\xE6\x97\xA5\xF0\x9F\x9A\x80"));
-        UNSCOPED_INFO("sym 2");
         CHECK(utf8str_symbol_truncate(s, 2) == std::string("A\xE6\x97\xA5"));
-        UNSCOPED_INFO("sym 1");
         CHECK(utf8str_symbol_truncate(s, 1) == std::string("A"));
-        UNSCOPED_INFO("sym 0");
         CHECK(utf8str_symbol_truncate(s, 0) == std::string());
     }
 
@@ -502,22 +442,17 @@ namespace tut
     {
         for (const std::string& bad : { std::string("\x80"), std::string("\xFF") })
         {
-            UNSCOPED_INFO("rejected outright");
             REQUIRE_FALSE(utf8str_is_valid(bad));
 
             // The decoder gives one replacement character per bad byte, so a
             // walk driven off it always advances.
             const std::u32string w = to_u32(bad);
-            UNSCOPED_INFO("one bad byte, one character");
             REQUIRE(w.size() == size_t(1));
-            UNSCOPED_INFO("decodes to U+FFFD");
             REQUIRE((U32)w[0] == U32(0xFFFD));
 
             // Repair substitutes LL_UNKNOWN_CHAR, and the result is valid.
             const std::string fixed = utf8str_sanitize(bad);
-            UNSCOPED_INFO("repaired to one byte");
             REQUIRE(fixed == std::string(1, LL_UNKNOWN_CHAR));
-            UNSCOPED_INFO("repair is valid");
             REQUIRE(utf8str_is_valid(fixed));
         }
     }
@@ -530,18 +465,13 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: an overlong two-byte NUL is two bad bytes", "[LLStringUTF]")
     {
         const std::string overlong("\xC0\x80");
-        UNSCOPED_INFO("overlong NUL rejected");
         CHECK_FALSE(utf8str_is_valid(overlong));
 
         const std::u32string w = to_u32(overlong);
-        UNSCOPED_INFO("overlong NUL size");
         REQUIRE(w.size() == size_t(2));
-        UNSCOPED_INFO("overlong NUL[0]");
         CHECK((U32)w[0] == U32(0xFFFD));
-        UNSCOPED_INFO("overlong NUL[1]");
         CHECK((U32)w[1] == U32(0xFFFD));
 
-        UNSCOPED_INFO("repaired byte for byte");
         CHECK(utf8str_sanitize(overlong) == std::string(2, LL_UNKNOWN_CHAR));
     }
 
@@ -552,20 +482,14 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: a truncated three-byte sequence is two bad bytes", "[LLStringUTF]")
     {
         const std::string truncated("A\xE6\x97");
-        UNSCOPED_INFO("truncated rejected");
         CHECK_FALSE(utf8str_is_valid(truncated));
 
         const std::u32string w = to_u32(truncated);
-        UNSCOPED_INFO("truncated size");
         REQUIRE(w.size() == size_t(3));
-        UNSCOPED_INFO("truncated[0]='A'");
         CHECK((U32)w[0] == U32('A'));
-        UNSCOPED_INFO("truncated[1]");
         CHECK((U32)w[1] == U32(0xFFFD));
-        UNSCOPED_INFO("truncated[2]");
         CHECK((U32)w[2] == U32(0xFFFD));
 
-        UNSCOPED_INFO("the good byte survives the repair");
         CHECK(utf8str_sanitize(truncated) == std::string("A??"));
     }
 
@@ -576,19 +500,16 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: a legacy five-byte sequence is five bad bytes", "[LLStringUTF]")
     {
         const std::string legacy("\xF8\x88\x80\x80\x80");
-        UNSCOPED_INFO("5-byte legacy rejected");
         CHECK_FALSE(utf8str_is_valid(legacy));
 
         const std::u32string w = to_u32(legacy);
-        UNSCOPED_INFO("5-byte legacy size");
-        REQUIRE(w.size() == size_t(5));
+        CHECK(w.size() == size_t(5));
         for (size_t i = 0; i < w.size(); ++i)
         {
-            UNSCOPED_INFO("5-byte legacy[i]");
+            CAPTURE(i);
             REQUIRE((U32)w[i] == U32(0xFFFD));
         }
 
-        UNSCOPED_INFO("every byte repaired");
         CHECK(utf8str_sanitize(legacy) == std::string(5, LL_UNKNOWN_CHAR));
     }
 
@@ -600,11 +521,8 @@ namespace tut
     {
         const llutf16string bad = { (char16_t)0xD83D, (char16_t)0x0041 };
         const std::string out = utf16str_to_utf8str(bad);
-        UNSCOPED_INFO("lone surrogate + 'A' size");
         REQUIRE(out.size() == size_t(2));
-        UNSCOPED_INFO("lone surrogate -> '?'");
         CHECK((U32)(U8)out[0] == U32((U8)LL_UNKNOWN_CHAR));
-        UNSCOPED_INFO("'A' preserved");
         CHECK((U32)(U8)out[1] == U32('A'));
     }
 
@@ -618,19 +536,14 @@ namespace tut
         // so composition regressions surface before we diagnose them through
         // callers.
         const std::string mixed = "H\xC3\xA9LLO \xE6\x97\xA5";
-        UNSCOPED_INFO("utf8str_trim passthrough");
         CHECK(utf8str_trim(mixed) == mixed);
-        UNSCOPED_INFO("utf8str_tolower preserves BMP non-ASCII");
         CHECK(utf8str_tolower(mixed) == std::string("h\xC3\xA9llo \xE6\x97\xA5"));
     }
 
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_compare_insensitive orders regardless of case", "[LLStringUTF]")
     {
-        UNSCOPED_INFO("compare_insensitive eq");
         CHECK(utf8str_compare_insensitive("Hello", "hello") == S32(0));
-        UNSCOPED_INFO("compare_insensitive lt");
         CHECK(utf8str_compare_insensitive("abc", "abd") < 0);
-        UNSCOPED_INFO("compare_insensitive gt");
         CHECK(utf8str_compare_insensitive("abd", "abc") > 0);
     }
 
@@ -655,7 +568,6 @@ namespace tut
         // A BMP emoji, which the old astral-only range could never see.
         UNSCOPED_INFO("isEmoji watch");
         CHECK(LLStringOps::isEmoji((llwchar)0x231A));
-        UNSCOPED_INFO("not isEmoji 'A'");
         CHECK_FALSE(LLStringOps::isEmoji((llwchar)'A'));
         UNSCOPED_INFO("not isEmoji ©");
         CHECK_FALSE(LLStringOps::isEmoji((llwchar)0x00A9));
@@ -672,28 +584,22 @@ namespace tut
     {
         std::u32string ws = { (llwchar)'H', (llwchar)0x1F680, (llwchar)0x1F681, (llwchar)'i' };
         const std::u32string expected = { (llwchar)'H', (llwchar)'i' };
-        UNSCOPED_INFO("remove_emojis returned true");
         CHECK(wstring_remove_emojis(ws));
-        ensure_wstring_equals("consecutive emojis stripped", ws, expected);
+        require_same_u32("consecutive emojis stripped", ws, expected);
 
         std::u32string none = { (llwchar)'H', (llwchar)'i' };
-        UNSCOPED_INFO("remove_emojis returned false");
         CHECK_FALSE(wstring_remove_emojis(none));
-        ensure_wstring_equals("unchanged when no emojis", none, expected);
+        require_same_u32("unchanged when no emojis", none, expected);
     }
 
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_remove_emojis strips whole clusters from UTF-8", "[LLStringUTF]")
     {
         std::string s = "Hi\xF0\x9F\x9A\x80" "!";
-        UNSCOPED_INFO("utf8str_remove_emojis found");
         CHECK(utf8str_remove_emojis(s));
-        UNSCOPED_INFO("utf8 stripped");
         CHECK(s == std::string("Hi!"));
 
         std::string clean = "Hello";
-        UNSCOPED_INFO("utf8str_remove_emojis clean");
         CHECK_FALSE(utf8str_remove_emojis(clean));
-        UNSCOPED_INFO("clean unchanged");
         CHECK(clean == std::string("Hello"));
 
         // Heart-on-fire ❤️‍🔥 round-trips through utf8 encoding without
@@ -701,9 +607,7 @@ namespace tut
         // bounds. UTF-8 byte sequence: U+2764 (E2 9D A4) U+FE0F (EF B8 8F)
         // U+200D (E2 80 8D) U+1F525 (F0 9F 94 A5).
         std::string fire = "A" "\xE2\x9D\xA4" "\xEF\xB8\x8F" "\xE2\x80\x8D" "\xF0\x9F\x94\xA5" "B";
-        UNSCOPED_INFO("utf8 heart-on-fire found");
         CHECK(utf8str_remove_emojis(fire));
-        UNSCOPED_INFO("utf8 heart-on-fire stripped");
         CHECK(fire == std::string("AB"));
 
         // Subdivision flag 🏴󠁧󠁢󠁥󠁮󠁧󠁿 — base + 5 tag chars + CANCEL TAG, all
@@ -713,9 +617,7 @@ namespace tut
                                 "\xF3\xA0\x81\xA7" "\xF3\xA0\x81\xA2" "\xF3\xA0\x81\xB3"
                                 "\xF3\xA0\x81\xA3" "\xF3\xA0\x81\xB4" "\xF3\xA0\x81\xBF"
                             "]";
-        UNSCOPED_INFO("utf8 subdiv flag found");
         CHECK(utf8str_remove_emojis(flag));
-        UNSCOPED_INFO("utf8 subdiv flag stripped");
         CHECK(flag == std::string("[]"));
     }
 
@@ -730,9 +632,8 @@ namespace tut
                          (llwchar)0x1F467,
                          (llwchar)'i' };
         const std::u32string expected = { (llwchar)'H', (llwchar)'i' };
-        UNSCOPED_INFO("ZWJ family found");
         CHECK(wstring_remove_emojis(ws));
-        ensure_wstring_equals("ZWJ family stripped", ws, expected);
+        require_same_u32("ZWJ family stripped", ws, expected);
     }
 
     // Skin-tone modifier (U+1F3FB..FF) must strip together with its base emoji.
@@ -742,9 +643,8 @@ namespace tut
                          (llwchar)0x1F468, (llwchar)0x1F3FB,
                          (llwchar)'X' };
         const std::u32string expected = { (llwchar)'M', (llwchar)'X' };
-        UNSCOPED_INFO("skin tone found");
         CHECK(wstring_remove_emojis(ws));
-        ensure_wstring_equals("skin tone stripped", ws, expected);
+        require_same_u32("skin tone stripped", ws, expected);
     }
 
     // Regional indicator flag (🇺🇸 = U+1F1FA U+1F1F8). Both code points are in
@@ -754,9 +654,8 @@ namespace tut
     {
         std::u32string ws = { (llwchar)0x1F1FA, (llwchar)0x1F1F8, (llwchar)'!' };
         const std::u32string expected = { (llwchar)'!' };
-        UNSCOPED_INFO("flag found");
         CHECK(wstring_remove_emojis(ws));
-        ensure_wstring_equals("flag stripped", ws, expected);
+        require_same_u32("flag stripped", ws, expected);
     }
 
     // Trailing VS16 (U+FE0F) after an astral emoji must be consumed together
@@ -765,9 +664,8 @@ namespace tut
     {
         std::u32string ws = { (llwchar)0x1F680, (llwchar)0xFE0F, (llwchar)'!' };
         const std::u32string expected = { (llwchar)'!' };
-        UNSCOPED_INFO("VS16 found");
         CHECK(wstring_remove_emojis(ws));
-        ensure_wstring_equals("VS16 stripped with base", ws, expected);
+        require_same_u32("VS16 stripped with base", ws, expected);
     }
 
     // Bare ZWJ or VS16 (no adjacent emoji) are not emoji themselves and must
@@ -777,9 +675,8 @@ namespace tut
     {
         std::u32string ws = { (llwchar)'a', (llwchar)0x200D, (llwchar)'b' };
         const std::u32string expected = ws;
-        UNSCOPED_INFO("bare ZWJ not found");
         CHECK_FALSE(wstring_remove_emojis(ws));
-        ensure_wstring_equals("bare ZWJ preserved", ws, expected);
+        require_same_u32("bare ZWJ preserved", ws, expected);
     }
 
     // Broad-contract rewrite: wstring_remove_emojis now drives off the
@@ -792,18 +689,16 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: a heart with VS16 strips but a bare heart stays", "[LLStringUTF]")
     {
         std::u32string ws = { (llwchar)0x2764, (llwchar)0xFE0F };
-        UNSCOPED_INFO("BMP heart+VS16 stripped");
         CHECK(wstring_remove_emojis(ws));
-        ensure_wstring_equals("BMP heart+VS16 cleared", ws, std::u32string());
+        require_same_u32("BMP heart+VS16 cleared", ws, std::u32string());
 
         // Bare BMP heart (no VS-16) is not a cluster — single-codepoint
         // pictograph, shaped via the 1:1 path. Outside isEmoji's narrow
         // range too. Must pass through.
         std::u32string bare_heart = { (llwchar)0x2764 };
         const std::u32string bare_expected = bare_heart;
-        UNSCOPED_INFO("bare heart not stripped");
         CHECK_FALSE(wstring_remove_emojis(bare_heart));
-        ensure_wstring_equals("bare heart preserved", bare_heart, bare_expected);
+        require_same_u32("bare heart preserved", bare_heart, bare_expected);
     }
 
     // ---------------------------------------------------------------
@@ -822,9 +717,8 @@ namespace tut
                          (llwchar)0x200D, (llwchar)0x1F525,
                          (llwchar)'B' };
         const std::u32string expected = { (llwchar)'A', (llwchar)'B' };
-        UNSCOPED_INFO("heart-on-fire found");
         CHECK(wstring_remove_emojis(ws));
-        ensure_wstring_equals("heart-on-fire cleared", ws, expected);
+        require_same_u32("heart-on-fire cleared", ws, expected);
     }
 
     // Keycap `1️⃣` (`'1' + VS-16 + U+20E3`): no codepoint inside the cluster
@@ -836,27 +730,23 @@ namespace tut
     {
         std::u32string digit_kc = { (llwchar)'1', (llwchar)0xFE0F, (llwchar)0x20E3, (llwchar)'!' };
         const std::u32string expected = { (llwchar)'!' };
-        UNSCOPED_INFO("digit keycap found");
         CHECK(wstring_remove_emojis(digit_kc));
-        ensure_wstring_equals("digit keycap cleared", digit_kc, expected);
+        require_same_u32("digit keycap cleared", digit_kc, expected);
 
         std::u32string hash_kc = { (llwchar)'#', (llwchar)0xFE0F, (llwchar)0x20E3 };
-        UNSCOPED_INFO("hash keycap found");
         CHECK(wstring_remove_emojis(hash_kc));
-        ensure_wstring_equals("hash keycap cleared", hash_kc, std::u32string());
+        require_same_u32("hash keycap cleared", hash_kc, std::u32string());
 
         std::u32string star_kc = { (llwchar)'*', (llwchar)0xFE0F, (llwchar)0x20E3 };
-        UNSCOPED_INFO("star keycap found");
         CHECK(wstring_remove_emojis(star_kc));
-        ensure_wstring_equals("star keycap cleared", star_kc, std::u32string());
+        require_same_u32("star keycap cleared", star_kc, std::u32string());
 
         // Bare digit (no VS-16 + combiner) must pass through. The cluster
         // walker rejects it as a starter; nothing to strip.
         std::u32string bare_digit = { (llwchar)'9' };
         const std::u32string bare_expected = bare_digit;
-        UNSCOPED_INFO("bare digit not stripped");
         CHECK_FALSE(wstring_remove_emojis(bare_digit));
-        ensure_wstring_equals("bare digit preserved", bare_digit, bare_expected);
+        require_same_u32("bare digit preserved", bare_digit, bare_expected);
     }
 
     // Subdivision flag 🏴󠁧󠁢󠁥󠁮󠁧󠁿 (U+1F3F4 + tag bytes + U+E007F CANCEL TAG).
@@ -872,9 +762,8 @@ namespace tut
                          (llwchar)0xE007F,
                          (llwchar)'>' };
         const std::u32string expected = { (llwchar)'<', (llwchar)'>' };
-        UNSCOPED_INFO("subdivision flag found");
         CHECK(wstring_remove_emojis(ws));
-        ensure_wstring_equals("subdivision flag cleared", ws, expected);
+        require_same_u32("subdivision flag cleared", ws, expected);
     }
 
     // Astral emoji + VS-15 (U+FE0E text-presentation selector) — VS-15 is
@@ -886,9 +775,8 @@ namespace tut
     {
         std::u32string ws = { (llwchar)0x1F680, (llwchar)0xFE0E, (llwchar)'!' };
         const std::u32string expected = { (llwchar)'!' };
-        UNSCOPED_INFO("VS-15 cluster found");
         CHECK(wstring_remove_emojis(ws));
-        ensure_wstring_equals("VS-15 cluster cleared", ws, expected);
+        require_same_u32("VS-15 cluster cleared", ws, expected);
     }
 
     // Two flags back-to-back 🇺🇸🇯🇵 — distinct clusters [0,2) and [2,4).
@@ -899,9 +787,8 @@ namespace tut
                          (llwchar)0x1F1EF, (llwchar)0x1F1F5,
                          (llwchar)'!' };
         const std::u32string expected = { (llwchar)'!' };
-        UNSCOPED_INFO("two flags found");
         CHECK(wstring_remove_emojis(ws));
-        ensure_wstring_equals("two flags cleared", ws, expected);
+        require_same_u32("two flags cleared", ws, expected);
     }
 
     // ZWSP (U+200B) is not an emoji extender — it must pass through even
@@ -912,9 +799,8 @@ namespace tut
     {
         std::u32string ws = { (llwchar)0x1F680, (llwchar)0x200B, (llwchar)'X' };
         const std::u32string expected = { (llwchar)0x200B, (llwchar)'X' };
-        UNSCOPED_INFO("rocket+ZWSP found");
         CHECK(wstring_remove_emojis(ws));
-        ensure_wstring_equals("rocket stripped, ZWSP kept", ws, expected);
+        require_same_u32("rocket stripped, ZWSP kept", ws, expected);
     }
 
     // ---------------------------------------------------------------
@@ -929,33 +815,23 @@ namespace tut
     {
         for (char c : std::string("0123456789abcdefABCDEF"))
         {
-            UNSCOPED_INFO("is_char_hex yes");
+            CAPTURE(c);
             REQUIRE(is_char_hex(c));
         }
-        UNSCOPED_INFO("is_char_hex 'g'");
         CHECK_FALSE(is_char_hex('g'));
-        UNSCOPED_INFO("is_char_hex 'Z'");
         CHECK_FALSE(is_char_hex('Z'));
-        UNSCOPED_INFO("is_char_hex ' '");
         CHECK_FALSE(is_char_hex(' '));
     }
 
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: hex_as_nybble reads either case and gives 0 otherwise", "[LLStringUTF]")
     {
-        UNSCOPED_INFO("nybble '0'");
         CHECK((U32)hex_as_nybble('0') == U32(0));
-        UNSCOPED_INFO("nybble '9'");
         CHECK((U32)hex_as_nybble('9') == U32(9));
-        UNSCOPED_INFO("nybble 'a'");
         CHECK((U32)hex_as_nybble('a') == U32(10));
-        UNSCOPED_INFO("nybble 'f'");
         CHECK((U32)hex_as_nybble('f') == U32(15));
-        UNSCOPED_INFO("nybble 'A'");
         CHECK((U32)hex_as_nybble('A') == U32(10));
-        UNSCOPED_INFO("nybble 'F'");
         CHECK((U32)hex_as_nybble('F') == U32(15));
         // Non-hex inputs fall through to 0 (undefined-but-documented behavior).
-        UNSCOPED_INFO("nybble 'g' -> 0");
         CHECK((U32)hex_as_nybble('g') == U32(0));
     }
 
@@ -968,20 +844,15 @@ namespace tut
     // the 1:1 codepoint path, so the detector must return no runs.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: text that needs no shaping has no emoji clusters", "[LLStringUTF]")
     {
-        UNSCOPED_INFO("empty");
-        REQUIRE(wstring_find_emoji_clusters(std::u32string()).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(std::u32string()).size() == size_t(0));
         std::u32string ascii = { (llwchar)'H', (llwchar)'i', (llwchar)'!' };
-        UNSCOPED_INFO("ascii");
-        REQUIRE(wstring_find_emoji_clusters(ascii).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(ascii).size() == size_t(0));
         std::u32string cjk   = { (llwchar)0x65E5, (llwchar)0x672C };
-        UNSCOPED_INFO("cjk");
-        REQUIRE(wstring_find_emoji_clusters(cjk).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(cjk).size() == size_t(0));
         std::u32string lone  = { (llwchar)0x1F680 };
-        UNSCOPED_INFO("lone emoji");
-        REQUIRE(wstring_find_emoji_clusters(lone).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(lone).size() == size_t(0));
         std::u32string pair  = { (llwchar)0x1F680, (llwchar)0x1F681 };
-        UNSCOPED_INFO("two adj em");
-        REQUIRE(wstring_find_emoji_clusters(pair).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(pair).size() == size_t(0));
     }
 
     // ZWJ family 👨‍👩‍👧 = U+1F468 U+200D U+1F469 U+200D U+1F467 — must emerge
@@ -992,11 +863,8 @@ namespace tut
                          (llwchar)0x1F469, (llwchar)0x200D,
                          (llwchar)0x1F467 };
         auto runs = wstring_find_emoji_clusters(ws);
-        UNSCOPED_INFO("one run");
         REQUIRE(runs.size() == size_t(1));
-        UNSCOPED_INFO("run begin");
         CHECK(runs[0].first == size_t(0));
-        UNSCOPED_INFO("run end");
         CHECK(runs[0].second == size_t(5));
     }
 
@@ -1005,9 +873,7 @@ namespace tut
     {
         std::u32string ws = { (llwchar)0x1F468, (llwchar)0x1F3FB };
         auto runs = wstring_find_emoji_clusters(ws);
-        UNSCOPED_INFO("skintone runs");
         REQUIRE(runs.size() == size_t(1));
-        UNSCOPED_INFO("skintone end");
         CHECK(runs[0].second == size_t(2));
     }
 
@@ -1017,9 +883,7 @@ namespace tut
     {
         std::u32string ws = { (llwchar)0x1F680, (llwchar)0xFE0F };
         auto runs = wstring_find_emoji_clusters(ws);
-        UNSCOPED_INFO("vs16 runs");
         REQUIRE(runs.size() == size_t(1));
-        UNSCOPED_INFO("vs16 end");
         CHECK(runs[0].second == size_t(2));
     }
 
@@ -1029,21 +893,15 @@ namespace tut
     {
         std::u32string ws = { (llwchar)0x1F1FA, (llwchar)0x1F1F8 };
         auto runs = wstring_find_emoji_clusters(ws);
-        UNSCOPED_INFO("flag runs");
         REQUIRE(runs.size() == size_t(1));
-        UNSCOPED_INFO("flag end");
         CHECK(runs[0].second == size_t(2));
         // Four RIs in a row form two separate flags.
         std::u32string four = { (llwchar)0x1F1FA, (llwchar)0x1F1F8,
                            (llwchar)0x1F1EB, (llwchar)0x1F1F7 };
         auto more = wstring_find_emoji_clusters(four);
-        UNSCOPED_INFO("two flags");
         REQUIRE(more.size() == size_t(2));
-        UNSCOPED_INFO("flag0 end");
         CHECK(more[0].second == size_t(2));
-        UNSCOPED_INFO("flag1 begin");
         CHECK(more[1].first == size_t(2));
-        UNSCOPED_INFO("flag1 end");
         CHECK(more[1].second == size_t(4));
     }
 
@@ -1055,16 +913,12 @@ namespace tut
     {
         std::u32string digit_kc = { (llwchar)'9', (llwchar)0xFE0F, (llwchar)0x20E3 };
         auto runs = wstring_find_emoji_clusters(digit_kc);
-        UNSCOPED_INFO("keycap runs");
         REQUIRE(runs.size() == size_t(1));
-        UNSCOPED_INFO("keycap end");
         CHECK(runs[0].second == size_t(3));
         std::u32string hash_kc = { (llwchar)'#', (llwchar)0xFE0F, (llwchar)0x20E3 };
-        UNSCOPED_INFO("hash keycap");
-        REQUIRE(wstring_find_emoji_clusters(hash_kc).size() == size_t(1));
+        CHECK(wstring_find_emoji_clusters(hash_kc).size() == size_t(1));
         std::u32string bare = { (llwchar)'5' };
-        UNSCOPED_INFO("bare digit");
-        REQUIRE(wstring_find_emoji_clusters(bare).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(bare).size() == size_t(0));
     }
 
     // Subdivision flag — base 🏴 (U+1F3F4) + tag characters (U+E0020..U+E007F)
@@ -1076,11 +930,8 @@ namespace tut
                          (llwchar)0xE0063, (llwchar)0xE0074,
                          (llwchar)0xE007F };
         auto runs = wstring_find_emoji_clusters(ws);
-        UNSCOPED_INFO("tag runs");
         REQUIRE(runs.size() == size_t(1));
-        UNSCOPED_INFO("tag begin");
         CHECK(runs[0].first == size_t(0));
-        UNSCOPED_INFO("tag end");
         CHECK(runs[0].second == size_t(7));
     }
 
@@ -1096,15 +947,10 @@ namespace tut
                          (llwchar)0x1F467,
                          (llwchar)'!' };
         auto runs = wstring_find_emoji_clusters(ws);
-        UNSCOPED_INFO("two runs");
         REQUIRE(runs.size() == size_t(2));
-        UNSCOPED_INFO("run0 begin");
         CHECK(runs[0].first == size_t(1));
-        UNSCOPED_INFO("run0 end");
         CHECK(runs[0].second == size_t(3));
-        UNSCOPED_INFO("run1 begin");
         CHECK(runs[1].first == size_t(4));
-        UNSCOPED_INFO("run1 end");
         CHECK(runs[1].second == size_t(9));
     }
 
@@ -1114,18 +960,15 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: bare extenders and malformed sequences cluster as pinned", "[LLStringUTF]")
     {
         std::u32string zwj  = { (llwchar)'a', (llwchar)0x200D, (llwchar)'b' };
-        UNSCOPED_INFO("bare zwj");
-        REQUIRE(wstring_find_emoji_clusters(zwj).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(zwj).size() == size_t(0));
         std::u32string vs16 = { (llwchar)'a', (llwchar)0xFE0F, (llwchar)'b' };
-        UNSCOPED_INFO("bare vs16");
-        REQUIRE(wstring_find_emoji_clusters(vs16).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(vs16).size() == size_t(0));
 
         // Malformed inputs: leading/trailing extenders, lone modifiers, and
         // singletons that need a partner. Pin current behavior so future
         // refactors don't silently change cluster boundaries on broken input.
         std::u32string lead_zwj  = { (llwchar)0x200D, (llwchar)0x1F468 };
-        UNSCOPED_INFO("leading zwj");
-        REQUIRE(wstring_find_emoji_clusters(lead_zwj).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(lead_zwj).size() == size_t(0));
         std::u32string trail_zwj = { (llwchar)0x1F468, (llwchar)0x200D };
         // Trailing ZWJ: is_shaping_starter accepts the base because the
         // next codepoint is a ZWJ, but advance_shaping_run hits the
@@ -1133,34 +976,26 @@ namespace tut
         // the resulting length-1 "run" so the result matches the doc
         // contract (isolated single-codepoint emoji are intentionally
         // absent from the cluster list).
-        UNSCOPED_INFO("trailing zwj");
-        REQUIRE(wstring_find_emoji_clusters(trail_zwj).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(trail_zwj).size() == size_t(0));
         // Same shape but with VS-16 instead of ZWJ: 'is_shaping_starter'
         // accepts because VS-16 is a valid extender, advance consumes it,
         // run length is 2 → real 2-codepoint cluster. Confirm we didn't
         // over-trim and accidentally drop legitimate 2-codepoint clusters.
         std::u32string base_vs16 = { (llwchar)0x1F680, (llwchar)0xFE0F };
         auto vs_runs = wstring_find_emoji_clusters(base_vs16);
-        UNSCOPED_INFO("base+VS16 count");
         REQUIRE(vs_runs.size() == size_t(1));
-        UNSCOPED_INFO("base+VS16 begin");
         CHECK(vs_runs[0].first == size_t(0));
-        UNSCOPED_INFO("base+VS16 end");
         CHECK(vs_runs[0].second == size_t(2));
         std::u32string lone_skin = { (llwchar)0x1F3FB };
-        UNSCOPED_INFO("lone skintone");
-        REQUIRE(wstring_find_emoji_clusters(lone_skin).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(lone_skin).size() == size_t(0));
         std::u32string lone_ri = { (llwchar)0x1F1FA };
-        UNSCOPED_INFO("lone RI");
-        REQUIRE(wstring_find_emoji_clusters(lone_ri).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(lone_ri).size() == size_t(0));
 
         // Range boundaries on isPictographBase's astral / BMP windows.
         std::u32string just_below_astral = { (llwchar)0x1FFF };
-        UNSCOPED_INFO("U+1FFF no run");
-        REQUIRE(wstring_find_emoji_clusters(just_below_astral).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(just_below_astral).size() == size_t(0));
         std::u32string just_above_bmp    = { (llwchar)0x3300 };
-        UNSCOPED_INFO("U+3300 no run");
-        REQUIRE(wstring_find_emoji_clusters(just_above_bmp).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(just_above_bmp).size() == size_t(0));
 
         // Back-to-back ZWJ families with no separator. Pin current behavior:
         // each MAN-ZWJ-WOMAN sub-sequence registers as its own cluster, so we
@@ -1168,15 +1003,10 @@ namespace tut
         std::u32string two_fam = { (llwchar)0x1F468, (llwchar)0x200D, (llwchar)0x1F469,
                               (llwchar)0x1F468, (llwchar)0x200D, (llwchar)0x1F469 };
         auto two_fam_runs = wstring_find_emoji_clusters(two_fam);
-        UNSCOPED_INFO("two_fam count");
         REQUIRE(two_fam_runs.size() == size_t(2));
-        UNSCOPED_INFO("two_fam[0].first");
         CHECK(two_fam_runs[0].first == size_t(0));
-        UNSCOPED_INFO("two_fam[0].second");
         CHECK(two_fam_runs[0].second == size_t(3));
-        UNSCOPED_INFO("two_fam[1].first");
         CHECK(two_fam_runs[1].first == size_t(3));
-        UNSCOPED_INFO("two_fam[1].second");
         CHECK(two_fam_runs[1].second == size_t(6));
 
         // ZWJ followed by a non-pictograph: starter accepts the base
@@ -1184,45 +1014,35 @@ namespace tut
         // non-pictograph 'A' afterwards, breaks orphan-ZWJ. Length-1 run
         // gets discarded by the cluster walker. No cluster emitted.
         std::u32string zwj_plus_nonemoji = { (llwchar)0x1F468, (llwchar)0x200D, (llwchar)'A' };
-        UNSCOPED_INFO("ZWJ+non-pictograph");
-        REQUIRE(wstring_find_emoji_clusters(zwj_plus_nonemoji).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(zwj_plus_nonemoji).size() == size_t(0));
 
         // Double ZWJ (ZWJ + ZWJ between bases): advance hits the first
         // ZWJ, looks at the next codepoint, finds another ZWJ which is
         // not a pictograph base. Orphan-ZWJ break. Length 1, discarded.
         std::u32string double_zwj = { (llwchar)0x1F468, (llwchar)0x200D, (llwchar)0x200D, (llwchar)0x1F469 };
-        UNSCOPED_INFO("double ZWJ");
-        REQUIRE(wstring_find_emoji_clusters(double_zwj).size() == size_t(0));
+        CHECK(wstring_find_emoji_clusters(double_zwj).size() == size_t(0));
 
         // Truncated subdivision flag — base 🏴 + a couple of tag bytes,
         // no U+E007F terminator. Pin: walker greedily eats every tag
         // codepoint to end-of-string. Real implementation behavior.
         std::u32string trunc_tag = { (llwchar)0x1F3F4, (llwchar)0xE0067, (llwchar)0xE0062 };
         auto trunc_runs = wstring_find_emoji_clusters(trunc_tag);
-        UNSCOPED_INFO("trunc tag count");
         REQUIRE(trunc_runs.size() == size_t(1));
-        UNSCOPED_INFO("trunc tag begin");
         CHECK(trunc_runs[0].first == size_t(0));
-        UNSCOPED_INFO("trunc tag end");
         CHECK(trunc_runs[0].second == size_t(3));
 
         // Three RIs — first two form a flag at [0,2), third RI alone is
         // not a starter (no partner). Pin: one cluster, length 2.
         std::u32string three_ri = { (llwchar)0x1F1FA, (llwchar)0x1F1F8, (llwchar)0x1F1F8 };
         auto three_ri_runs = wstring_find_emoji_clusters(three_ri);
-        UNSCOPED_INFO("three RI count");
         REQUIRE(three_ri_runs.size() == size_t(1));
-        UNSCOPED_INFO("three RI begin");
         CHECK(three_ri_runs[0].first == size_t(0));
-        UNSCOPED_INFO("three RI end");
         CHECK(three_ri_runs[0].second == size_t(2));
 
         // Star keycap '*' + VS-16 + U+20E3. Pin parity with digit/hash.
         std::u32string star_kc = { (llwchar)'*', (llwchar)0xFE0F, (llwchar)0x20E3 };
         auto star_runs = wstring_find_emoji_clusters(star_kc);
-        UNSCOPED_INFO("star kc count");
         REQUIRE(star_runs.size() == size_t(1));
-        UNSCOPED_INFO("star kc end");
         CHECK(star_runs[0].second == size_t(3));
     }
 
@@ -1236,11 +1056,8 @@ namespace tut
         std::u32string ws = { (llwchar)0x2764, (llwchar)0xFE0F,
                          (llwchar)0x200D, (llwchar)0x1F525 };
         auto runs = wstring_find_emoji_clusters(ws);
-        UNSCOPED_INFO("bmp zwj runs");
         REQUIRE(runs.size() == size_t(1));
-        UNSCOPED_INFO("bmp zwj begin");
         CHECK(runs[0].first == size_t(0));
-        UNSCOPED_INFO("bmp zwj end");
         CHECK(runs[0].second == size_t(4));
     }
 
@@ -1255,11 +1072,8 @@ namespace tut
     {
         // Pure ASCII — one codepoint per step, clamped at size.
         std::u32string ascii = { (llwchar)'a', (llwchar)'b', (llwchar)'c' };
-        UNSCOPED_INFO("ascii 0->1");
         CHECK(wstring_step_grapheme_forward(ascii, 0) == size_t(1));
-        UNSCOPED_INFO("ascii 2->3");
         CHECK(wstring_step_grapheme_forward(ascii, 2) == size_t(3));
-        UNSCOPED_INFO("ascii at end stays");
         CHECK(wstring_step_grapheme_forward(ascii, 3) == size_t(3));
 
         // ZWJ family in the middle: H, 👨, ZWJ, 👩, ZWJ, 👧, i
@@ -1269,18 +1083,15 @@ namespace tut
                           (llwchar)0x1F469, (llwchar)0x200D,
                           (llwchar)0x1F467,
                           (llwchar)'i' };
-        UNSCOPED_INFO("H->fam start");
         CHECK(wstring_step_grapheme_forward(fam, 0) == size_t(1));
         UNSCOPED_INFO("fam start jumps past cluster");
         CHECK(wstring_step_grapheme_forward(fam, 1) == size_t(6));
         UNSCOPED_INFO("from mid-cluster snaps past");
         CHECK(wstring_step_grapheme_forward(fam, 3) == size_t(6));
-        UNSCOPED_INFO("fam end -> 'i'");
         CHECK(wstring_step_grapheme_forward(fam, 6) == size_t(7));
 
         // Regional indicator flag: US = U+1F1FA U+1F1F8. One step covers both.
         std::u32string flag = { (llwchar)0x1F1FA, (llwchar)0x1F1F8 };
-        UNSCOPED_INFO("flag 0->past both");
         CHECK(wstring_step_grapheme_forward(flag, 0) == size_t(2));
     }
 
@@ -1289,11 +1100,8 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: stepping back crosses one character or one whole cluster", "[LLStringUTF]")
     {
         std::u32string ascii = { (llwchar)'a', (llwchar)'b', (llwchar)'c' };
-        UNSCOPED_INFO("ascii 3->2");
         CHECK(wstring_step_grapheme_backward(ascii, 3) == size_t(2));
-        UNSCOPED_INFO("ascii 1->0");
         CHECK(wstring_step_grapheme_backward(ascii, 1) == size_t(0));
-        UNSCOPED_INFO("ascii at 0 stays");
         CHECK(wstring_step_grapheme_backward(ascii, 0) == size_t(0));
 
         std::u32string fam = { (llwchar)'H',
@@ -1311,7 +1119,7 @@ namespace tut
         CHECK(wstring_step_grapheme_backward(fam, 1) == size_t(0));
 
         std::u32string flag = { (llwchar)0x1F1FA, (llwchar)0x1F1F8 };
-        UNSCOPED_INFO("flag end -> 0 (whole flag is one cluster)");
+        UNSCOPED_INFO("the whole flag is one cluster");
         CHECK(wstring_step_grapheme_backward(flag, 2) == size_t(0));
     }
 
@@ -1336,26 +1144,18 @@ namespace tut
         UNSCOPED_INFO("isPictographBase registered");
         CHECK(LLStringOps::isPictographBase((llwchar)0x00AE));
         // Plain ASCII / digits never qualify.
-        UNSCOPED_INFO("not isPictographBase 'A'");
         CHECK_FALSE(LLStringOps::isPictographBase((llwchar)'A'));
-        UNSCOPED_INFO("not isPictographBase '0'");
         CHECK_FALSE(LLStringOps::isPictographBase((llwchar)'0'));
         // ZWJ and VS-16 are extenders, not bases.
-        UNSCOPED_INFO("not isPictographBase ZWJ");
         CHECK_FALSE(LLStringOps::isPictographBase((llwchar)0x200D));
-        UNSCOPED_INFO("not isPictographBase VS-16");
         CHECK_FALSE(LLStringOps::isPictographBase((llwchar)0xFE0F));
-        UNSCOPED_INFO("not isPictographBase U+20000");
         CHECK_FALSE(LLStringOps::isPictographBase((llwchar)0x20000));
-        UNSCOPED_INFO("not isPictographBase U+1FFF");
         CHECK_FALSE(LLStringOps::isPictographBase((llwchar)0x1FFF));
-        UNSCOPED_INFO("not isPictographBase U+3300 boundary");
         CHECK_FALSE(LLStringOps::isPictographBase((llwchar)0x3300));
 
         // A flag is two regional indicators and nothing else. Unicode does
         // not call them pictographic, so they are named here separately;
         // reading Extended_Pictographic alone would stop flags clustering.
-        UNSCOPED_INFO("isPictographBase regional indicator");
         CHECK(LLStringOps::isPictographBase((llwchar)0x1F1FA));
 
         // The old range ran from U+2000 to U+3300, which swept up punctuation,
@@ -1390,98 +1190,81 @@ namespace tut
         auto on_lead   = wstring_emoji_range_at(fam, 1);
         auto inside    = wstring_emoji_range_at(fam, 3);
         auto on_end    = wstring_emoji_range_at(fam, 6);
-        UNSCOPED_INFO("fam pos==first.first");
         CHECK(on_lead.first == size_t(1));
-        UNSCOPED_INFO("fam pos==first.second");
         CHECK(on_lead.second == size_t(6));
-        UNSCOPED_INFO("fam mid.first");
         CHECK(inside.first == size_t(1));
-        UNSCOPED_INFO("fam mid.second");
         CHECK(inside.second == size_t(6));
         // pos == run.second is past the cluster — falls through to the
         // codepoint there ('i', non-emoji), so empty range.
-        UNSCOPED_INFO("fam past-end empty");
         CHECK(on_end.first == on_end.second);
 
         // Plain ASCII: empty range everywhere.
         std::u32string ascii = { (llwchar)'a', (llwchar)'b', (llwchar)'c' };
         auto a0 = wstring_emoji_range_at(ascii, 0);
         auto a2 = wstring_emoji_range_at(ascii, 2);
-        UNSCOPED_INFO("ascii 0 empty");
         CHECK(a0.first == a0.second);
-        UNSCOPED_INFO("ascii 2 empty");
         CHECK(a2.first == a2.second);
 
         // Single-codepoint emoji 😀 (U+1F600): not in cluster list, but
         // the helper synthesises [pos, pos+1).
         std::u32string lone = { (llwchar)0x1F600 };
         auto le = wstring_emoji_range_at(lone, 0);
-        UNSCOPED_INFO("lone emoji.first");
         CHECK(le.first == size_t(0));
-        UNSCOPED_INFO("lone emoji.second");
         CHECK(le.second == size_t(1));
 
         // Out-of-bounds and exact-end positions are empty.
         auto at_end   = wstring_emoji_range_at(ascii, 3);
         auto past_end = wstring_emoji_range_at(ascii, 99);
-        UNSCOPED_INFO("ascii at-end empty");
         CHECK(at_end.first == at_end.second);
-        UNSCOPED_INFO("ascii oob empty");
         CHECK(past_end.first == past_end.second);
 
         // Empty wstring: empty range.
         auto empty = wstring_emoji_range_at(std::u32string(), 0);
-        UNSCOPED_INFO("empty wstr empty");
         CHECK(empty.first == empty.second);
 
         // Flag pair 🇺🇸 — one cluster spanning [0, 2).
         std::u32string flag = { (llwchar)0x1F1FA, (llwchar)0x1F1F8 };
         auto f0 = wstring_emoji_range_at(flag, 0);
         auto f1 = wstring_emoji_range_at(flag, 1);
-        UNSCOPED_INFO("flag at lead.first");
         CHECK(f0.first == size_t(0));
-        UNSCOPED_INFO("flag at lead.second");
         CHECK(f0.second == size_t(2));
-        UNSCOPED_INFO("flag mid.first");
         CHECK(f1.first == size_t(0));
-        UNSCOPED_INFO("flag mid.second");
         CHECK(f1.second == size_t(2));
 
         // BMP pictographs — the orthodox cross bug. isPictographBase accepts
         // U+2000..U+33FF plus © U+00A9 and ® U+00AE; isEmoji rejects them.
         // Tooltip lookup must still find them.
-        auto check_bmp = [](llwchar cp, const char* tag) {
+        auto require_single_range = [](llwchar cp, const char* tag) {
             std::u32string ws { cp };
             auto r = wstring_emoji_range_at(ws, 0);
-            UNSCOPED_INFO(std::string(tag) + ".first");
+            INFO(tag);
             REQUIRE(r.first == size_t(0));
-            UNSCOPED_INFO(std::string(tag) + ".second");
             REQUIRE(r.second == size_t(1));
         };
-        check_bmp((llwchar)0x2626, "orthodox cross");
-        check_bmp((llwchar)0x00A9, "copyright");
-        check_bmp((llwchar)0x00AE, "registered");
-        check_bmp((llwchar)0x2764, "heart");
-        check_bmp((llwchar)0x2693, "anchor");
+        require_single_range((llwchar)0x2626, "orthodox cross");
+        require_single_range((llwchar)0x00A9, "copyright");
+        require_single_range((llwchar)0x00AE, "registered");
+        require_single_range((llwchar)0x2764, "heart");
+        require_single_range((llwchar)0x2693, "anchor");
 
         // Bare extenders / out-of-range codepoints get an empty range —
         // isPictographBase explicitly rejects these so they don't trigger
         // a tooltip lookup on their own.
-        auto check_no_range = [](llwchar cp, const char* tag) {
+        auto require_no_range = [](llwchar cp, const char* tag) {
             std::u32string ws { cp };
             auto r = wstring_emoji_range_at(ws, 0);
-            UNSCOPED_INFO(std::string(tag) + " empty");
+            INFO(tag);
             REQUIRE(r.first == r.second);
         };
-        check_no_range((llwchar)0x200D, "bare ZWJ");
-        check_no_range((llwchar)0xFE0F, "bare VS-16");
-        check_no_range((llwchar)0xFE0E, "bare VS-15");
-        check_no_range((llwchar)0x20E3, "bare keycap combiner");
-        check_no_range((llwchar)0x1F3FB, "bare skintone");
-        check_no_range((llwchar)0xE0067, "bare tag char");
-        check_no_range((llwchar)0x1FFF, "U+1FFF below astral");
-        check_no_range((llwchar)0x3300, "U+3300 above BMP");
-        check_no_range((llwchar)0x20000, "U+20000 above astral");
+        require_no_range((llwchar)0x200D, "bare ZWJ");
+        require_no_range((llwchar)0xFE0F, "bare VS-16");
+        require_no_range((llwchar)0xFE0E, "bare VS-15");
+        require_no_range((llwchar)0x20E3, "bare keycap combiner");
+        require_no_range((llwchar)0x1F3FB, "bare skintone");
+        require_no_range((llwchar)0xE0067, "bare tag char");
+        require_no_range((llwchar)0x1FFF, "U+1FFF below astral");
+        require_no_range((llwchar)0x3300, "U+3300 above BMP");
+        require_no_range((llwchar)0x20000, "U+20000 above astral");
 
         // Back-to-back flags 🇺🇸🇯🇵 — pos lookup must find the *second* run
         // when pos has passed the first. Exercises the ordered-iteration
@@ -1491,17 +1274,11 @@ namespace tut
         auto tf0 = wstring_emoji_range_at(two_flags, 0);
         auto tf2 = wstring_emoji_range_at(two_flags, 2);
         auto tf3 = wstring_emoji_range_at(two_flags, 3);
-        UNSCOPED_INFO("two_flags[0].first");
         CHECK(tf0.first == size_t(0));
-        UNSCOPED_INFO("two_flags[0].second");
         CHECK(tf0.second == size_t(2));
-        UNSCOPED_INFO("two_flags[2].first");
         CHECK(tf2.first == size_t(2));
-        UNSCOPED_INFO("two_flags[2].second");
         CHECK(tf2.second == size_t(4));
-        UNSCOPED_INFO("two_flags mid 2nd flag");
         CHECK(tf3.first == size_t(2));
-        UNSCOPED_INFO("two_flags mid 2nd second");
         CHECK(tf3.second == size_t(4));
 
         // Mixed "A 🚀 B": ASCII positions return empty, the rocket position
@@ -1510,13 +1287,9 @@ namespace tut
         auto m0 = wstring_emoji_range_at(mixed, 0);
         auto m1 = wstring_emoji_range_at(mixed, 1);
         auto m2 = wstring_emoji_range_at(mixed, 2);
-        UNSCOPED_INFO("mixed A empty");
         CHECK(m0.first == m0.second);
-        UNSCOPED_INFO("mixed rocket.first");
         CHECK(m1.first == size_t(1));
-        UNSCOPED_INFO("mixed rocket.second");
         CHECK(m1.second == size_t(2));
-        UNSCOPED_INFO("mixed B empty");
         CHECK(m2.first == m2.second);
     }
 
@@ -1536,9 +1309,8 @@ namespace tut
         std::u32string ascii = { (llwchar)'a', (llwchar)'b', (llwchar)'c' };
         for (size_t p = 0; p <= ascii.size(); ++p)
         {
-            UNSCOPED_INFO("ascii align_backward");
+            CAPTURE(p);
             REQUIRE(wstring_grapheme_align_backward(ascii, p) == p);
-            UNSCOPED_INFO("ascii align_forward");
             REQUIRE(wstring_grapheme_align_forward(ascii, p) == p);
         }
 
@@ -1551,42 +1323,31 @@ namespace tut
 
         // Endpoint short-circuits: pos == 0 stays 0 (backward); pos >= size
         // stays size (forward) regardless of trailing emoji.
-        UNSCOPED_INFO("fam align_backward(0)");
         CHECK(wstring_grapheme_align_backward(fam, 0) == size_t(0));
-        UNSCOPED_INFO("fam align_backward(size)");
-        REQUIRE(wstring_grapheme_align_backward(fam, fam.size()) == fam.size());
-        UNSCOPED_INFO("fam align_forward(size)");
-        REQUIRE(wstring_grapheme_align_forward(fam, fam.size()) == fam.size());
-        UNSCOPED_INFO("fam align_forward(99)");
-        REQUIRE(wstring_grapheme_align_forward(fam, 99) == fam.size());
+        CHECK(wstring_grapheme_align_backward(fam, fam.size()) == fam.size());
+        CHECK(wstring_grapheme_align_forward(fam, fam.size()) == fam.size());
+        CHECK(wstring_grapheme_align_forward(fam, 99) == fam.size());
 
         // pos == run.first — strictly outside, returned unchanged. This is
         // the contract LLTextEditor::prevWordPos relies on: a word-walk
         // that already landed on a cluster start is fine and must not be
         // pulled backward into something else.
-        UNSCOPED_INFO("fam align_backward(1)");
         CHECK(wstring_grapheme_align_backward(fam, 1) == size_t(1));
-        UNSCOPED_INFO("fam align_forward(1)");
         CHECK(wstring_grapheme_align_forward(fam, 1) == size_t(1));
         // pos == run.second — also strictly outside, unchanged.
-        UNSCOPED_INFO("fam align_backward(6)");
         CHECK(wstring_grapheme_align_backward(fam, 6) == size_t(6));
-        UNSCOPED_INFO("fam align_forward(6)");
         CHECK(wstring_grapheme_align_forward(fam, 6) == size_t(6));
 
         // pos strictly inside [2..5] — backward snaps to 1, forward to 6.
         for (size_t p = 2; p <= 5; ++p)
         {
-            UNSCOPED_INFO("fam mid align_backward");
+            CAPTURE(p);
             REQUIRE(wstring_grapheme_align_backward(fam, p) == size_t(1));
-            UNSCOPED_INFO("fam mid align_forward");
             REQUIRE(wstring_grapheme_align_forward(fam, p) == size_t(6));
         }
 
         // Outside the cluster — surrounding ASCII positions unchanged.
-        UNSCOPED_INFO("fam align_backward(7)");
         CHECK(wstring_grapheme_align_backward(fam, 7) == size_t(7));
-        UNSCOPED_INFO("fam align_forward(7)");
         CHECK(wstring_grapheme_align_forward(fam, 7) == size_t(7));
 
         // Two disjoint clusters in one string — flag at [1,3), family at
@@ -1602,25 +1363,19 @@ namespace tut
                           (llwchar)0x1F467,
                           (llwchar)'!' };
         // Flag interior (pos == 2) → flag.first 1.
-        UNSCOPED_INFO("two flag mid backward");
         CHECK(wstring_grapheme_align_backward(two, 2) == size_t(1));
-        UNSCOPED_INFO("two flag mid forward");
         CHECK(wstring_grapheme_align_forward(two, 2) == size_t(3));
         // Family interior (pos == 6) → family bounds [4, 9).
-        UNSCOPED_INFO("two fam mid backward");
         CHECK(wstring_grapheme_align_backward(two, 6) == size_t(4));
-        UNSCOPED_INFO("two fam mid forward");
         CHECK(wstring_grapheme_align_forward(two, 6) == size_t(9));
         // Between the two clusters (the space at pos 3) — unchanged.
-        UNSCOPED_INFO("two between backward");
         CHECK(wstring_grapheme_align_backward(two, 3) == size_t(3));
-        UNSCOPED_INFO("two between forward");
         CHECK(wstring_grapheme_align_forward(two, 3) == size_t(3));
     }
 
     // ---------------------------------------------------------------
     // step_grapheme + emoji_range_at: malformed-input pins. The simple
-    // ZWJ-family / flag cases are covered above (tests 100/101/103/104);
+    // ZWJ-family / flag cases are covered by the cases above;
     // here we cover the rougher edges that show up in user-pasted text:
     // empty strings, out-of-bounds positions, clusters at the very ends
     // of the buffer, two clusters back-to-back with no separator, and
@@ -1633,47 +1388,35 @@ namespace tut
     {
         // Empty wstring — no grapheme moves possible.
         std::u32string empty;
-        UNSCOPED_INFO("empty step_forward");
         CHECK(wstring_step_grapheme_forward(empty, 0) == size_t(0));
-        UNSCOPED_INFO("empty step_backward");
         CHECK(wstring_step_grapheme_backward(empty, 0) == size_t(0));
 
         // Out-of-bounds position — both directions clamp into [0, size], as the
         // header says. The old walker returned pos-1 here, handing a caller an
         // index past the end of its own string.
         std::u32string ascii = { (llwchar)'a', (llwchar)'b' };
-        UNSCOPED_INFO("oob step_forward");
         CHECK(wstring_step_grapheme_forward(ascii, 99) == size_t(2));
-        UNSCOPED_INFO("oob step_backward");
         CHECK(wstring_step_grapheme_backward(ascii, 99) == size_t(2));
 
         // Cluster at start of string — backward from inside or just-past
         // snaps to 0 (cluster.first).
         std::u32string lead = { (llwchar)0x1F1FA, (llwchar)0x1F1F8, (llwchar)'X' };
-        UNSCOPED_INFO("lead flag step_forward(0)");
         CHECK(wstring_step_grapheme_forward(lead, 0) == size_t(2));
-        UNSCOPED_INFO("lead flag step_backward(2)");
         CHECK(wstring_step_grapheme_backward(lead, 2) == size_t(0));
 
         // Cluster at end of string — forward from inside snaps to size.
         std::u32string trail = { (llwchar)'X', (llwchar)0x1F1FA, (llwchar)0x1F1F8 };
-        UNSCOPED_INFO("trail flag step_forward(1)");
         CHECK(wstring_step_grapheme_forward(trail, 1) == size_t(3));
-        UNSCOPED_INFO("trail flag step_backward(size)");
-        REQUIRE(wstring_step_grapheme_backward(trail, trail.size()) == size_t(1));
+        CHECK(wstring_step_grapheme_backward(trail, trail.size()) == size_t(1));
 
         // Two clusters back-to-back with no separator: step_forward from
         // inside cluster A must land at A.end (which is also B.first), not
         // skip into cluster B.
         std::u32string two_flags = { (llwchar)0x1F1FA, (llwchar)0x1F1F8,
                                 (llwchar)0x1F1EF, (llwchar)0x1F1F5 };
-        UNSCOPED_INFO("two flags forward");
         CHECK(wstring_step_grapheme_forward(two_flags, 0) == size_t(2));
-        UNSCOPED_INFO("two flags forward 2nd");
         CHECK(wstring_step_grapheme_forward(two_flags, 2) == size_t(4));
-        UNSCOPED_INFO("two flags backward");
         CHECK(wstring_step_grapheme_backward(two_flags, 4) == size_t(2));
-        UNSCOPED_INFO("two flags backward 1st");
         CHECK(wstring_step_grapheme_backward(two_flags, 2) == size_t(0));
 
         // emoji_range_at on a tag char inside a subdivision flag — the
@@ -1690,17 +1433,14 @@ namespace tut
         for (size_t p = 1; p < 8; ++p)
         {
             auto r = wstring_emoji_range_at(subdiv, p);
-            UNSCOPED_INFO("subdiv begin");
+            CAPTURE(p);
             REQUIRE(r.first == size_t(1));
-            UNSCOPED_INFO("subdiv end");
             REQUIRE(r.second == size_t(8));
         }
         // pos on the surrounding ASCII falls outside the cluster.
         auto pre  = wstring_emoji_range_at(subdiv, 0);
         auto post = wstring_emoji_range_at(subdiv, 8);
-        UNSCOPED_INFO("subdiv pre empty");
         CHECK(pre.first == pre.second);
-        UNSCOPED_INFO("subdiv post empty");
         CHECK(post.first == post.second);
     }
 
@@ -1715,7 +1455,7 @@ namespace tut
 
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_emoji_range_at answers the same given the cluster list", "[LLStringUTF]")
     {
-        // Same mixed-content string used in test<104>: ASCII + flag +
+        // Same mixed-content string as the align case above: ASCII + flag +
         // space + ZWJ family + ASCII. Two disjoint clusters at [1,3) and
         // [4,9), so the loop bodies exercise both early-out and middle-
         // of-vector iteration.
@@ -1728,8 +1468,7 @@ namespace tut
                           (llwchar)'!' };
         const std::string utf8 = to_utf8(two);
         const auto clusters = utf8str_find_emoji_clusters(utf8);
-        UNSCOPED_INFO("two clusters");
-        REQUIRE(clusters.size() == size_t(2));
+        CHECK(clusters.size() == size_t(2));
 
         // Handing the list in has to give the same answer as building it
         // inside, at every position including the ones inside a character.
@@ -1737,16 +1476,14 @@ namespace tut
         {
             auto r1 = utf8str_emoji_range_at(utf8, p);
             auto r2 = utf8str_emoji_range_at(utf8, p, clusters);
-            UNSCOPED_INFO("range_at first");
+            CAPTURE(p);
             REQUIRE(r1.first == r2.first);
-            UNSCOPED_INFO("range_at second");
             REQUIRE(r1.second == r2.second);
         }
 
         // Empty string -- pinning that the with-clusters overload handles a
         // degenerate empty cluster vector identically to the no-clusters form.
         const EmojiClusterList no_clusters;
-        UNSCOPED_INFO("empty range_at first overload");
         CHECK(utf8str_emoji_range_at(std::string_view(), 0).first ==
                       utf8str_emoji_range_at(std::string_view(), 0, no_clusters).first);
     }
@@ -1758,12 +1495,10 @@ namespace tut
     {
         const std::string in  = "A\xF0\x9F\x9A\x80" "B\xF0\x9F\x9A\x80" "C";
         const std::string out = utf8str_substChar(in, (llwchar)0x1F680, (llwchar)'X');
-        UNSCOPED_INFO("substChar astral -> ASCII");
         CHECK(out == std::string("AXBXC"));
 
         const std::string in2  = "A\xE6\x97\xA5" "B";
         const std::string out2 = utf8str_substChar(in2, (llwchar)0x65E5, (llwchar)'.');
-        UNSCOPED_INFO("substChar BMP -> ASCII");
         CHECK(out2 == std::string("A.B"));
     }
 
@@ -1773,9 +1508,7 @@ namespace tut
     {
         const std::string mixed = "A\xE6\x97\xA5" "B\xF0\x9F\x9A\x80" "C";
         const std::string expected = "A?B?C";
-        UNSCOPED_INFO("utf8str_makeASCII");
         CHECK(utf8str_makeASCII(mixed) == expected);
-        UNSCOPED_INFO("utf8str_makeASCII ascii passthrough");
         CHECK(utf8str_makeASCII("Hello") == std::string("Hello"));
     }
 
@@ -1785,20 +1518,15 @@ namespace tut
     {
         const std::string mixed = "A\xE6\x97\xA5" "B";
         const std::string expected = "A???B";
-        UNSCOPED_INFO("mbcsstring_makeASCII");
         CHECK(mbcsstring_makeASCII(mixed) == expected);
     }
 
     // utf8str_removeCRLF strips CR (0x0D) only — LF is preserved.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_removeCRLF strips CR and keeps LF", "[LLStringUTF]")
     {
-        UNSCOPED_INFO("removeCRLF crlf");
         CHECK(utf8str_removeCRLF("a\r\nb") == std::string("a\nb"));
-        UNSCOPED_INFO("removeCRLF cr");
         CHECK(utf8str_removeCRLF("a\rb") == std::string("ab"));
-        UNSCOPED_INFO("removeCRLF lf");
         CHECK(utf8str_removeCRLF("a\nb") == std::string("a\nb"));
-        UNSCOPED_INFO("removeCRLF empty");
         CHECK(utf8str_removeCRLF("") == std::string());
     }
 
@@ -1810,22 +1538,16 @@ namespace tut
         {
             std::list<std::string> out;
             utf8str_split(out, "Hello there world", 10, ' ');
-            UNSCOPED_INFO("split 3 parts");
             REQUIRE(out.size() == size_t(3));
             auto it = out.begin();
-            UNSCOPED_INFO("split[0]");
             CHECK(*it++ == std::string("Hello"));
-            UNSCOPED_INFO("split[1]");
             CHECK(*it++ == std::string("there "));
-            UNSCOPED_INFO("split[2]");
             CHECK(*it == std::string("world"));
         }
         {
             std::list<std::string> out;
             utf8str_split(out, "short", 10, ' ');
-            UNSCOPED_INFO("split single");
             REQUIRE(out.size() == size_t(1));
-            UNSCOPED_INFO("split single val");
             CHECK(out.front() == std::string("short"));
         }
     }
@@ -1834,14 +1556,11 @@ namespace tut
     // the decoded UTF-8 byte sequence also in hex.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: wchar_utf8_preview gives the code point and its UTF-8 bytes in hex", "[LLStringUTF]")
     {
-        UNSCOPED_INFO("preview ASCII");
         CHECK(wchar_utf8_preview((llwchar)'A') == std::string("41"));
         // é = U+00E9 -> 0xC3 0xA9
-        UNSCOPED_INFO("preview 2-byte");
         CHECK(wchar_utf8_preview((llwchar)0x00E9) ==
                       std::string("E9 [C3, A9]"));
         // Rocket = U+1F680 -> 0xF0 0x9F 0x9A 0x80
-        UNSCOPED_INFO("preview astral");
         CHECK(wchar_utf8_preview((llwchar)0x1F680) ==
                       std::string("1F680 [F0, 9F, 9A, 80]"));
     }
@@ -1854,66 +1573,51 @@ namespace tut
         // "e" + COMBINING ACUTE, then "x". The base and its mark are one
         // cluster; the old walker split them.
         const std::u32string combining = { (llwchar)'e', (llwchar)0x0301, (llwchar)'x' };
-        UNSCOPED_INFO("combining fwd from 0");
         CHECK(wstring_step_grapheme_forward(combining, 0) == size_t(2));
-        UNSCOPED_INFO("combining back from 2");
         CHECK(wstring_step_grapheme_backward(combining, 2) == size_t(0));
-        UNSCOPED_INFO("combining align back mid");
         CHECK(wstring_grapheme_align_backward(combining, 1) == size_t(0));
-        UNSCOPED_INFO("combining align fwd mid");
         CHECK(wstring_grapheme_align_forward(combining, 1) == size_t(2));
 
         // Hangul LVT: HANGUL SYLLABLE inputs as jamo L + V + T are one cluster.
         const std::u32string hangul = { (llwchar)0x1100, (llwchar)0x1161, (llwchar)0x11A8, (llwchar)'!' };
-        UNSCOPED_INFO("hangul fwd from 0");
         CHECK(wstring_step_grapheme_forward(hangul, 0) == size_t(3));
-        UNSCOPED_INFO("hangul back from 3");
         CHECK(wstring_step_grapheme_backward(hangul, 3) == size_t(0));
 
         // Regional indicator pairs still pair up, and a third RI starts a new
         // cluster rather than joining the first two.
         const std::u32string flags = { (llwchar)0x1F1FA, (llwchar)0x1F1F8, (llwchar)0x1F1FA };
-        UNSCOPED_INFO("flag pair fwd");
         CHECK(wstring_step_grapheme_forward(flags, 0) == size_t(2));
-        UNSCOPED_INFO("third RI is its own");
         CHECK(wstring_step_grapheme_forward(flags, 2) == size_t(3));
 
         // ZWJ family stays one cluster, as before.
         const std::u32string family = { (llwchar)0x1F468, (llwchar)0x200D, (llwchar)0x1F469,
                                    (llwchar)0x200D, (llwchar)0x1F467, (llwchar)'!' };
-        UNSCOPED_INFO("zwj family fwd");
         CHECK(wstring_step_grapheme_forward(family, 0) == size_t(5));
-        UNSCOPED_INFO("zwj family back");
         CHECK(wstring_step_grapheme_backward(family, 5) == size_t(0));
 
         // GB4 breaks after LF, which is also what bounds the backward scan.
         const std::u32string lines = { (llwchar)'a', (llwchar)'\n', (llwchar)'e', (llwchar)0x0301 };
-        UNSCOPED_INFO("break after lf");
         CHECK(wstring_step_grapheme_backward(lines, 2) == size_t(1));
         UNSCOPED_INFO("cluster after lf");
         CHECK(wstring_step_grapheme_backward(lines, 4) == size_t(2));
 
         // Degenerate input: empty, and positions past the end clamp.
         const std::u32string empty;
-        UNSCOPED_INFO("empty fwd");
         CHECK(wstring_step_grapheme_forward(empty, 0) == size_t(0));
-        UNSCOPED_INFO("empty back");
         CHECK(wstring_step_grapheme_backward(empty, 0) == size_t(0));
-        UNSCOPED_INFO("past end fwd");
-        REQUIRE(wstring_step_grapheme_forward(combining, 99) == combining.size());
-        UNSCOPED_INFO("past end align");
-        REQUIRE(wstring_grapheme_align_forward(combining, 99) == combining.size());
+        CHECK(wstring_step_grapheme_forward(combining, 99) == combining.size());
+        CHECK(wstring_grapheme_align_forward(combining, 99) == combining.size());
 
         // Stepping forward from every position must strictly advance, and
         // backward must strictly retreat, or a caret can wedge.
         for (size_t p = 0; p < family.size(); ++p)
         {
-            UNSCOPED_INFO("fwd advances");
+            CAPTURE(p);
             REQUIRE(wstring_step_grapheme_forward(family, p) > p);
         }
         for (size_t p = 1; p <= family.size(); ++p)
         {
-            UNSCOPED_INFO("back retreats");
+            CAPTURE(p);
             REQUIRE(wstring_step_grapheme_backward(family, p) < p);
         }
     }
@@ -1923,13 +1627,9 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: word stepping lands on the start of each word", "[LLStringUTF]")
     {
         const std::u32string two_words = to_u32("foo bar");
-        UNSCOPED_INFO("fwd to next word");
         CHECK(wstring_step_word_forward(two_words, 0) == size_t(4));
-        UNSCOPED_INFO("fwd from next word");
         CHECK(wstring_step_word_forward(two_words, 4) == size_t(7));
-        UNSCOPED_INFO("back from end");
         CHECK(wstring_step_word_backward(two_words, 7) == size_t(4));
-        UNSCOPED_INFO("back over the space");
         CHECK(wstring_step_word_backward(two_words, 4) == size_t(0));
         UNSCOPED_INFO("back from mid-word");
         CHECK(wstring_step_word_backward(two_words, 5) == size_t(4));
@@ -1938,7 +1638,6 @@ namespace tut
         // example.com and 3.14 to hold together (WB6/WB7, FULL STOP is
         // MidNumLet). So the word here is "foo.bar" and the next one is "baz".
         const std::u32string dotted = to_u32("foo.bar baz");
-        UNSCOPED_INFO("dot does not split");
         CHECK(wstring_step_word_forward(dotted, 0) == size_t(8));
         UNSCOPED_INFO("fwd from inside the dot word");
         CHECK(wstring_step_word_forward(dotted, 3) == size_t(8));
@@ -1958,14 +1657,12 @@ namespace tut
         // An apostrophe is inside the word, not a break in it. The old walk
         // stopped at index 3, mid-word.
         const std::u32string contraction = to_u32("don't stop");
-        UNSCOPED_INFO("contraction is one word");
         CHECK(wstring_step_word_forward(contraction, 0) == size_t(6));
         UNSCOPED_INFO("back over a contraction");
         CHECK(wstring_step_word_backward(contraction, 10) == size_t(6));
 
         // Tabs are whitespace to step over; the old test was == ' ' only.
         const std::u32string tabbed = to_u32("foo\tbar");
-        UNSCOPED_INFO("fwd over a tab");
         CHECK(wstring_step_word_forward(tabbed, 0) == size_t(4));
 
         // Neither direction crosses a newline, matching what the old walk did
@@ -1983,43 +1680,32 @@ namespace tut
         // Trailing whitespace has no word after it, so the line's end is where
         // forward stops.
         const std::u32string trailing = to_u32("foo   ");
-        UNSCOPED_INFO("fwd into trailing space");
         CHECK(wstring_step_word_forward(trailing, 0) == size_t(6));
 
         // Degenerate input.
         const std::u32string empty;
-        UNSCOPED_INFO("empty fwd");
         CHECK(wstring_step_word_forward(empty, 0) == size_t(0));
-        UNSCOPED_INFO("empty back");
         CHECK(wstring_step_word_backward(empty, 0) == size_t(0));
-        UNSCOPED_INFO("past end fwd");
-        REQUIRE(wstring_step_word_forward(two_words, 99) == two_words.size());
-        UNSCOPED_INFO("past end back");
+        CHECK(wstring_step_word_forward(two_words, 99) == two_words.size());
         CHECK(wstring_step_word_backward(two_words, 99) == size_t(4));
 
         // Scripts without spaces still segment, rather than swallowing the
         // whole run the way an alnum test would.
         const std::u32string cjk = to_u32("\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E ok");
-        UNSCOPED_INFO("cjk advances");
         CHECK(wstring_step_word_forward(cjk, 0) > size_t(0));
-        UNSCOPED_INFO("cjk terminates");
-        REQUIRE(wstring_step_word_forward(cjk, 0) <= cjk.size());
+        CHECK(wstring_step_word_forward(cjk, 0) <= cjk.size());
 
         // Adjacent emoji are separate words, so a word step crosses exactly
         // one. Callers must not pre-step a grapheme and then ask for the next
         // word -- that lands two emoji away.
         const std::u32string two_emoji = { (llwchar)0x1F436, (llwchar)0x1F431, (llwchar)'x' };
-        UNSCOPED_INFO("one emoji forward");
         CHECK(wstring_step_word_forward(two_emoji, 0) == size_t(1));
-        UNSCOPED_INFO("one emoji back");
         CHECK(wstring_step_word_backward(two_emoji, 2) == size_t(1));
 
         // A ZWJ sequence is a single word, however many codepoints it spans.
         const std::u32string flag_then_dog = { (llwchar)0x1F3F3, (llwchar)0xFE0F, (llwchar)0x200D,
                                           (llwchar)0x26A7, (llwchar)0xFE0F, (llwchar)0x1F436 };
-        UNSCOPED_INFO("zwj sequence is one word");
         CHECK(wstring_step_word_forward(flag_then_dog, 0) == size_t(5));
-        UNSCOPED_INFO("back over the zwj sequence");
         CHECK(wstring_step_word_backward(flag_then_dog, 6) == size_t(5));
     }
 
@@ -2033,69 +1719,54 @@ namespace tut
         // space and the next one starts on the word. This is what the old
         // start_of_last_word tracking computed, and it has to stay that way.
         wstring_line_break_opportunities(to_u32("hello world"), breaks);
-        UNSCOPED_INFO("two opportunities");
         REQUIRE(breaks.size() == size_t(2));
-        UNSCOPED_INFO("after the space");
         CHECK(breaks[0] == size_t(6));
-        UNSCOPED_INFO("and the end");
         CHECK(breaks[1] == size_t(11));
 
         // The string's end is always an opportunity; 0 never is.
         wstring_line_break_opportunities(to_u32("unbroken"), breaks);
-        UNSCOPED_INFO("single word, one opportunity");
         REQUIRE(breaks.size() == size_t(1));
-        UNSCOPED_INFO("at the end");
         CHECK(breaks[0] == size_t(8));
 
         // A non-breaking space is glue. The old code special-cased U+00A0 by
         // hand; here it simply produces no opportunity.
         wstring_line_break_opportunities(to_u32("a\xC2\xA0" "b"), breaks);
-        UNSCOPED_INFO("nbsp does not break");
         REQUIRE(breaks.size() == size_t(1));
-        UNSCOPED_INFO("only the end");
         CHECK(breaks[0] == size_t(3));
 
         // CJK ideographs may be split between characters...
         const std::u32string cjk = to_u32("\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E");
         wstring_line_break_opportunities(cjk, breaks);
-        UNSCOPED_INFO("cjk splits between characters");
-        REQUIRE(breaks.size() > size_t(1));
+        CHECK(breaks.size() > size_t(1));
 
         // ...but a line may not begin with closing punctuation, so there is no
         // opportunity immediately before U+3002 IDEOGRAPHIC FULL STOP. The old
         // ideograph-range test would have broken there happily.
         const std::u32string cjk_stop = to_u32("\xE6\x97\xA5\xE6\x9C\xAC\xE3\x80\x82");
         wstring_line_break_opportunities(cjk_stop, breaks);
-        UNSCOPED_INFO("no break before the full stop");
-        REQUIRE(std::find(breaks.begin(), breaks.end(), size_t(2)) == breaks.end());
+        CHECK(std::find(breaks.begin(), breaks.end(), size_t(2)) == breaks.end());
 
         // Every opportunity is in range and strictly ascending, since the
         // consumer walks them with a single forward cursor.
         const std::u32string mixed = to_u32("one two\xC2\xA0three, four");
         wstring_line_break_opportunities(mixed, breaks);
-        UNSCOPED_INFO("mixed has opportunities");
         REQUIRE_FALSE(breaks.empty());
         for (size_t k = 0; k < breaks.size(); ++k)
         {
-            {
-                INFO("in range");
-                REQUIRE(breaks[k] > 0);
-                REQUIRE(breaks[k] <= mixed.size());
-            }
+            CAPTURE(k);
+            REQUIRE(breaks[k] > 0);
+            REQUIRE(breaks[k] <= mixed.size());
             if (k > 0)
             {
-                UNSCOPED_INFO("ascending");
                 REQUIRE(breaks[k] > breaks[k - 1]);
             }
         }
-        UNSCOPED_INFO("ends at the end");
-        REQUIRE(breaks.back() == mixed.size());
+        CHECK(breaks.back() == mixed.size());
 
         // Empty input clears the caller's buffer rather than leaving it alone,
         // since the buffer is reused across lines.
         wstring_line_break_opportunities(std::u32string(), breaks);
-        UNSCOPED_INFO("empty clears");
-        REQUIRE(breaks.empty());
+        CHECK(breaks.empty());
     }
 
     // Case conversion, and the index map that lets a search fold its haystack
@@ -2105,37 +1776,29 @@ namespace tut
         // Uppercasing sharp s produces two characters. towupper could not do
         // this at all -- it maps one codepoint to one codepoint.
         std::string sharp_s = "stra\xC3\x9F" "e";
-        UNSCOPED_INFO("sharp s starts at 7 bytes");
-        REQUIRE(sharp_s.size() == size_t(7));
+        CHECK(sharp_s.size() == size_t(7));
         LLStringUtil::toUpper(sharp_s);
-        UNSCOPED_INFO("uppercased grows");
         CHECK(sharp_s == std::string("STRASSE"));
 
         std::string plain = "Hello";
         LLStringUtil::toLower(plain);
-        UNSCOPED_INFO("ordinary lowercase");
         CHECK(plain == std::string("hello"));
 
         // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE lowercases to two
         // characters, so every offset after it shifts. This is the case that
         // breaks an offset taken from a folded copy.
         const std::string dotted_i = "a\xC4\xB0" "b";
-        UNSCOPED_INFO("four bytes in");
         REQUIRE(dotted_i.size() == size_t(4));
 
         std::string folded = dotted_i;
         LLStringUtil::toLower(folded);
-        UNSCOPED_INFO("fold grew");
-        REQUIRE(folded.size() > dotted_i.size());
+        CHECK(folded.size() > dotted_i.size());
 
         // The point of all this: find 'b' in the folded copy and land on the
         // right byte in the original. Taken raw, the offset would be past it.
         const size_t folded_at = folded.find('b');
-        UNSCOPED_INFO("found in fold");
         REQUIRE(folded_at != std::string::npos);
-        UNSCOPED_INFO("raw offset would be wrong");
         CHECK(folded_at != size_t(3));
-        UNSCOPED_INFO("mapped offset is right");
         CHECK(utf8str_bytes_from_cased_bytes(dotted_i, folded_at, false) == size_t(3));
 
         // Every prefix of the fold maps back onto a character boundary of the
@@ -2143,9 +1806,8 @@ namespace tut
         for (size_t k = 0; k <= folded.size(); ++k)
         {
             const size_t back = utf8str_bytes_from_cased_bytes(dotted_i, k, false);
-            UNSCOPED_INFO("never past the end");
+            CAPTURE(k);
             REQUIRE(back <= dotted_i.size());
-            UNSCOPED_INFO("lands on a character start");
             REQUIRE((back == dotted_i.size()
                    || (((unsigned char)dotted_i[back]) & 0xC0) != 0x80));
         }
@@ -2154,7 +1816,7 @@ namespace tut
         const std::string ascii = "ABC";
         for (size_t k = 0; k <= ascii.size(); ++k)
         {
-            UNSCOPED_INFO("ascii maps to itself");
+            CAPTURE(k);
             REQUIRE(utf8str_bytes_from_cased_bytes(ascii, k, false) == k);
         }
 
@@ -2166,15 +1828,13 @@ namespace tut
         const std::string strasse = "stra\xC3\x9F" "e";
         std::string upper = strasse;
         LLStringUtil::toUpper(upper);
-        UNSCOPED_INFO("same byte length");
         REQUIRE(upper.size() == strasse.size());
-        UNSCOPED_INFO("but one more character");
         CHECK(utf8str_codepoint_count(upper) == utf8str_codepoint_count(strasse) + 1);
 
         const size_t back_from[] = { 0, 1, 2, 3, 4, 4, 6, 7 };
         for (size_t k = 0; k <= upper.size(); ++k)
         {
-            UNSCOPED_INFO("cased offset " + std::to_string(k) + " maps back");
+            CAPTURE(k);
             REQUIRE(utf8str_bytes_from_cased_bytes(strasse, k, true) == back_from[k]);
         }
     }
@@ -2185,24 +1845,20 @@ namespace tut
     {
         std::string s = "stra\xC3\x9F" "e";
         LLStringUtil::toUpper(s);
-        UNSCOPED_INFO("narrow toUpper is unicode");
         CHECK(s == std::string("STRASSE"));
 
         std::string acc = "\xC3\xA9" "cole";
         LLStringUtil::toUpper(acc);
-        UNSCOPED_INFO("narrow toUpper accents");
         CHECK(acc == std::string("\xC3\x89" "COLE"));
 
         std::string upper = "\xC3\x89" "COLE";
         LLStringUtil::toLower(upper);
-        UNSCOPED_INFO("narrow toLower accents");
         CHECK(upper == std::string("\xC3\xA9" "cole"));
 
         // ASCII is untouched, which is what the identifier and protocol callers
         // rely on.
         std::string ascii = "Image.PNG";
         LLStringUtil::toLower(ascii);
-        UNSCOPED_INFO("ascii unchanged");
         CHECK(ascii == std::string("image.png"));
 
         // The ff ligature uppercases to "FF": three bytes become two, so an
@@ -2213,15 +1869,11 @@ namespace tut
             std::string key = label;
             LLStringUtil::toUpper(key);
             const size_t at = key.find("XYZ");
-            UNSCOPED_INFO("found in the key");
             REQUIRE(at != std::string::npos);
-            UNSCOPED_INFO("the ligature expanded, so the key is shorter");
-            REQUIRE(key.size() < label.size());
+            CHECK(key.size() < label.size());
 
             // xyz begins at byte 6 of the label and byte 5 of the key.
-            UNSCOPED_INFO("offset maps onto the label's own bytes");
             CHECK(utf8str_bytes_from_cased_bytes(label, at, true) == size_t(6));
-            UNSCOPED_INFO("the raw offset would have been wrong");
             CHECK(at != size_t(6));
         }
 
@@ -2232,33 +1884,25 @@ namespace tut
         std::string key = label;
         LLStringUtil::toUpper(key);
         const size_t at = key.find("XYZ");
-        UNSCOPED_INFO("found in the key");
         REQUIRE(at != std::string::npos);
-        UNSCOPED_INFO("same byte length either cased or not");
-        REQUIRE(key.size() == label.size());
+        CHECK(key.size() == label.size());
 
         const size_t mapped = utf8str_bytes_from_cased_bytes(label, at, true);
-        UNSCOPED_INFO("mapped to the label's own byte offset");
         CHECK(mapped == size_t(8));
 
         // And the matched span's own length, which is not the key's.
         const size_t span_begin = utf8str_bytes_from_cased_bytes(label, 0, true);
         const size_t span_end = utf8str_bytes_from_cased_bytes(label, key.find(' '), true);
-        UNSCOPED_INFO("word before the space is seven bytes");
         CHECK(span_end - span_begin == size_t(7));
 
         // Offset 0 and a whole-string offset are the degenerate ends.
-        UNSCOPED_INFO("zero maps to zero");
         CHECK(utf8str_bytes_from_cased_bytes(label, 0, true) == size_t(0));
-        UNSCOPED_INFO("whole string maps to its byte count");
-        REQUIRE(utf8str_bytes_from_cased_bytes(label, key.size(), true) == size_t(11));
+        CHECK(utf8str_bytes_from_cased_bytes(label, key.size(), true) == size_t(11));
 
         // ASCII text maps one-to-one, so existing offsets are unaffected.
         const std::string plain = "hello world";
-        UNSCOPED_INFO("ascii maps straight through");
         CHECK(utf8str_bytes_from_cased_bytes(plain, 6, true) == size_t(6));
 
-        UNSCOPED_INFO("empty");
         CHECK(utf8str_bytes_from_cased_bytes(std::string(), 4, true) == size_t(0));
     }
 
@@ -2271,27 +1915,22 @@ namespace tut
         // A contraction is one word. The alnum-or-underscore walk this replaced
         // stopped at the apostrophe and offered "don" or "t".
         auto word = wstring_word_range_at(text, 0);
-        UNSCOPED_INFO("contraction begin");
         CHECK(word.first == size_t(0));
-        UNSCOPED_INFO("contraction end");
         CHECK(word.second == size_t(5));
 
         // Anywhere inside it gives the same word.
         for (size_t p = 0; p < 5; ++p)
         {
             const auto at = wstring_word_range_at(text, p);
-            UNSCOPED_INFO("same word from inside");
+            CAPTURE(p);
             REQUIRE(at.first == size_t(0));
-            UNSCOPED_INFO("same word end");
             REQUIRE(at.second == size_t(5));
         }
 
         // Whitespace and punctuation are segments too, and neither is a word.
         const auto space = wstring_word_range_at(text, 5);
-        UNSCOPED_INFO("space is not a word");
         CHECK(space.first == space.second);
         const auto comma = wstring_word_range_at(text, 10);
-        UNSCOPED_INFO("comma is not a word");
         CHECK(comma.first == comma.second);
 
         // Iterating: each call yields the next word, skipping what is between.
@@ -2305,52 +1944,38 @@ namespace tut
             found.push_back(to_utf8(text.substr(next.first, next.second - next.first)));
             at = next.second;
         }
-        UNSCOPED_INFO("three words");
         REQUIRE(found.size() == size_t(3));
-        UNSCOPED_INFO("first");
         CHECK(found[0] == std::string("don't"));
-        UNSCOPED_INFO("second");
         CHECK(found[1] == std::string("stop"));
-        UNSCOPED_INFO("third");
         CHECK(found[2] == std::string("ok"));
 
         // Iteration crosses lines, which the spell checker relies on.
         const std::u32string lines = to_u32("one\ntwo");
         const auto first = wstring_next_word_range(lines, 0);
-        UNSCOPED_INFO("first line word end");
         CHECK(first.second == size_t(3));
         const auto second = wstring_next_word_range(lines, first.second);
-        UNSCOPED_INFO("second line word begin");
         CHECK(second.first == size_t(4));
-        UNSCOPED_INFO("second line word end");
         CHECK(second.second == size_t(7));
 
         // Past the end, and past the last word, both terminate.
         const auto none = wstring_next_word_range(lines, 7);
-        UNSCOPED_INFO("no more words");
         CHECK(none.first == none.second);
         const auto oob = wstring_word_range_at(lines, 99);
-        UNSCOPED_INFO("past end is empty");
         CHECK(oob.first == oob.second);
 
         const std::u32string empty;
         const auto on_empty = wstring_word_range_at(empty, 0);
-        UNSCOPED_INFO("empty string");
         CHECK(on_empty.first == on_empty.second);
 
         // A whole string that is one word -- what autoreplace validates a
         // keyword with.
         const std::u32string keyword = to_u32("don't");
         const auto whole = wstring_word_range_at(keyword, 0);
-        {
-            INFO("keyword is one word");
-            CHECK(whole.first == size_t(0));
-            REQUIRE(whole.second == keyword.size());
-        }
+        CHECK(whole.first == size_t(0));
+        CHECK(whole.second == keyword.size());
         const std::u32string two_words = to_u32("not one");
         const auto partial = wstring_word_range_at(two_words, 0);
-        UNSCOPED_INFO("two words is not one");
-        REQUIRE(partial.second != two_words.size());
+        CHECK(partial.second != two_words.size());
     }
 
     // Classification above the BMP. Every one of these codepoints used to be
@@ -2368,21 +1993,13 @@ namespace tut
         const llwchar MATH_BOLD_A   = 0x1D400;  // -> U+D400, a lone surrogate
         const llwchar GRINNING_FACE = 0x1F600;
 
-        UNSCOPED_INFO("CJK ideograph is not whitespace");
         CHECK_FALSE(LLStringOps::isSpace(CJK_EXT_B_A));
-        UNSCOPED_INFO("CJK ideograph is alphanumeric");
         CHECK(LLStringOps::isAlnum(CJK_EXT_B_A));
-        UNSCOPED_INFO("CJK ideograph is not a digit");
         CHECK_FALSE(LLStringOps::isDigit(CJK_EXT_B_ONE));
-        UNSCOPED_INFO("CJK ideograph is alphanumeric");
         CHECK(LLStringOps::isAlnum(CJK_EXT_B_ONE));
-        UNSCOPED_INFO("Linear B is not whitespace");
         CHECK_FALSE(LLStringOps::isSpace(LINEAR_B));
-        UNSCOPED_INFO("math capital is a letter");
         CHECK(LLStringOps::isAlpha(MATH_BOLD_A));
-        UNSCOPED_INFO("emoji is not alphanumeric");
         CHECK_FALSE(LLStringOps::isAlnum(GRINNING_FACE));
-        UNSCOPED_INFO("emoji is not whitespace");
         CHECK_FALSE(LLStringOps::isSpace(GRINNING_FACE));
 
         // Case above the BMP: this used to return an unrelated codepoint
@@ -2391,11 +2008,8 @@ namespace tut
         // failure message rather than compared as they stand.
         const auto cased = [](llwchar c) { return (U32)c; };
 
-        UNSCOPED_INFO("Deseret capital is upper");
         CHECK(LLStringOps::isUpper(DESERET_CAP));
-        UNSCOPED_INFO("Deseret capital lowercases within Deseret");
         CHECK(cased(LLStringOps::toLower(DESERET_CAP)) == cased(DESERET_SMALL));
-        UNSCOPED_INFO("Deseret small uppercases back");
         CHECK(cased(LLStringOps::toUpper(DESERET_SMALL)) == cased(DESERET_CAP));
 
         // Case inside the BMP, which towlower left alone entirely.
@@ -2421,17 +2035,11 @@ namespace tut
         CHECK(LLStringOps::isAlnum(llwchar(0x0660)));
 
         // ASCII keeps answering as it always did.
-        UNSCOPED_INFO("A is upper");
         CHECK(LLStringOps::isUpper(llwchar('A')));
-        UNSCOPED_INFO("a is lower");
         CHECK(LLStringOps::isLower(llwchar('a')));
-        UNSCOPED_INFO("5 is a digit");
         CHECK(LLStringOps::isDigit(llwchar('5')));
-        UNSCOPED_INFO("space is space");
         CHECK(LLStringOps::isSpace(llwchar(' ')));
-        UNSCOPED_INFO("dot is punct");
         CHECK(LLStringOps::isPunct(llwchar('.')));
-        UNSCOPED_INFO("A lowercases");
         CHECK(cased(LLStringOps::toLower(llwchar('A'))) == cased(llwchar('a')));
     }
 
@@ -2448,11 +2056,9 @@ namespace tut
         // so the cursor stops at the first. Reading their low halves as line
         // feeds made all three of the ideographs and the space look like one
         // gap, and the cursor jumped clear to "cd" at 5.
-        UNSCOPED_INFO("cursor stops at the ideograph");
         CHECK(wstring_step_word_forward(text, 0) == size_t(2));
 
         const auto range = wstring_word_range_at(text, 2);
-        UNSCOPED_INFO("an ideograph is a word");
         CHECK(range.first != range.second);
     }
 
@@ -2465,7 +2071,7 @@ namespace tut
         const std::string ascii = "abcd";
         for (size_t i = 0; i <= ascii.size(); ++i)
         {
-            UNSCOPED_INFO("ascii is all boundaries");
+            CAPTURE(i);
             REQUIRE(utf8str_grapheme_align_backward(ascii, i) == i);
         }
 
@@ -2495,18 +2101,14 @@ namespace tut
         const std::string flag = "\xF0\x9F\x87\xBA\xF0\x9F\x87\xB8";
         for (size_t i = 1; i < flag.size(); ++i)
         {
-            UNSCOPED_INFO("no half flags");
+            CAPTURE(i);
             REQUIRE(utf8str_grapheme_align_backward(flag, i) == size_t(0));
         }
-        UNSCOPED_INFO("whole flag survives");
-        REQUIRE(utf8str_grapheme_align_backward(flag, flag.size()) == flag.size());
+        CHECK(utf8str_grapheme_align_backward(flag, flag.size()) == flag.size());
 
         // Degenerate input.
-        UNSCOPED_INFO("zero");
         CHECK(utf8str_grapheme_align_backward(cjk, 0) == size_t(0));
-        UNSCOPED_INFO("past end");
-        REQUIRE(utf8str_grapheme_align_backward(cjk, 99) == cjk.size());
-        UNSCOPED_INFO("empty");
+        CHECK(utf8str_grapheme_align_backward(cjk, 99) == cjk.size());
         CHECK(utf8str_grapheme_align_backward(std::string(), 0) == size_t(0));
     }
 
@@ -2523,7 +2125,6 @@ namespace tut
             "\xF0\x9F\x87\xBA\xF0\x9F\x87\xB8"      // flag: two codepoints, one cluster
             " end";
         // a=0 b=1 sp=2 CJK=3,6 sp=9 e=10 acute=11 sp=13 flag=14 sp=22 end=23.
-        UNSCOPED_INFO("layout");
         REQUIRE(utf8.size() == size_t(26));
 
         // Every grapheme boundary, written out. The combining acute and the
@@ -2535,19 +2136,17 @@ namespace tut
         for (size_t i = 1; i < count; ++i)
         {
             at = utf8str_step_grapheme_forward(utf8, at);
-            UNSCOPED_INFO("forward boundary " + std::to_string(i));
+            CAPTURE(i);
             REQUIRE(at == boundaries[i]);
         }
-        UNSCOPED_INFO("forward walk ended at the end");
-        REQUIRE(at == utf8.size());
+        CHECK(at == utf8.size());
 
         for (size_t i = count - 1; i > 0; --i)
         {
             at = utf8str_step_grapheme_backward(utf8, at);
-            UNSCOPED_INFO("backward boundary " + std::to_string(i - 1));
+            CAPTURE(i);
             REQUIRE(at == boundaries[i - 1]);
         }
-        UNSCOPED_INFO("backward walk came back to nothing");
         CHECK(at == size_t(0));
 
         // Every offset inside a cluster snaps to that cluster's edges.
@@ -2555,10 +2154,9 @@ namespace tut
         {
             for (size_t inside = boundaries[i - 1] + 1; inside < boundaries[i]; ++inside)
             {
-                UNSCOPED_INFO("aligns back");
+                CAPTURE(i, inside);
                 REQUIRE(utf8str_grapheme_align_backward(utf8, inside) ==
                               boundaries[i - 1]);
-                UNSCOPED_INFO("aligns forward");
                 REQUIRE(utf8str_grapheme_align_forward(utf8, inside) ==
                               boundaries[i]);
             }
@@ -2570,47 +2168,37 @@ namespace tut
         for (size_t i = 0; i < sizeof(word_starts) / sizeof(word_starts[0]); ++i)
         {
             word_at = utf8str_step_word_forward(utf8, word_at);
-            UNSCOPED_INFO("word start " + std::to_string(i));
+            CAPTURE(i);
             REQUIRE(word_at == word_starts[i]);
         }
 
         // The word under the first ideograph is the ideograph pair.
         const auto cjk_word = utf8str_word_range_at(utf8, 3);
-        UNSCOPED_INFO("CJK word begins");
         CHECK(cjk_word.first == size_t(3));
-        UNSCOPED_INFO("CJK word ends");
         CHECK(cjk_word.second == size_t(9));
 
         // Line break opportunities: after each space, between the ideographs,
         // and at the end. Never inside a character or a flag.
         std::vector<size_t> breaks;
         utf8str_line_break_opportunities(utf8, breaks);
-        {
-            INFO("the end is always an opportunity");
-            REQUIRE_FALSE(breaks.empty());
-            REQUIRE(breaks.back() == utf8.size());
-        }
+        REQUIRE_FALSE(breaks.empty());
+        CHECK(breaks.back() == utf8.size());
         for (size_t where : breaks)
         {
-            UNSCOPED_INFO("never zero");
+            CAPTURE(where);
             REQUIRE(where != 0);
-            UNSCOPED_INFO("always on a grapheme boundary");
             REQUIRE(std::find(boundaries, boundaries + count, where) != boundaries + count);
         }
-        UNSCOPED_INFO("CJK may be split between the ideographs");
-        REQUIRE(std::find(breaks.begin(), breaks.end(), size_t(6)) != breaks.end());
-        UNSCOPED_INFO("a flag may not be split");
-        REQUIRE(std::find(breaks.begin(), breaks.end(), size_t(18)) == breaks.end());
+        CHECK(std::find(breaks.begin(), breaks.end(), size_t(6)) != breaks.end());
+        CHECK(std::find(breaks.begin(), breaks.end(), size_t(18)) == breaks.end());
 
         // A flag is one cluster of eight bytes, and nothing cuts it in half.
         const size_t flag = utf8.find("\xF0\x9F\x87\xBA");
-        UNSCOPED_INFO("flag steps whole");
         CHECK(utf8str_step_grapheme_forward(utf8, flag) == flag + 8);
         for (size_t inside = 1; inside < 8; ++inside)
         {
-            UNSCOPED_INFO("inside the flag aligns back to its start");
+            CAPTURE(inside);
             REQUIRE(utf8str_grapheme_align_backward(utf8, flag + inside) == flag);
-            UNSCOPED_INFO("and forward to its end");
             REQUIRE(utf8str_grapheme_align_forward(utf8, flag + inside) == flag + 8);
         }
     }
@@ -2658,24 +2246,19 @@ namespace tut
             {13,  true,  0, 13},    // heart on fire, 3+3+3+4
             {16,  true,  4, 15},    // a + ideograph + ZWJ pair + z
         };
-        UNSCOPED_INFO("every corpus entry is accounted for");
         REQUIRE(corpus.size() == sizeof(expected) / sizeof(expected[0]));
 
         for (size_t c = 0; c < corpus.size(); ++c)
         {
             const std::string utf8 = to_utf8(corpus[c]);
-            const std::string tag  = "corpus " + std::to_string(c);
-            UNSCOPED_INFO(tag + ": byte length");
+            CAPTURE(c);
             REQUIRE(utf8.size() == expected[c].bytes);
 
             const auto runs = utf8str_find_emoji_clusters(utf8);
-            UNSCOPED_INFO(tag + ": run count");
             REQUIRE(runs.size() == (expected[c].has_run ? size_t(1) : size_t(0)));
             if (expected[c].has_run)
             {
-                UNSCOPED_INFO(tag + ": run begin");
                 REQUIRE(runs[0].first == expected[c].begin);
-                UNSCOPED_INFO(tag + ": run end");
                 REQUIRE(runs[0].second == expected[c].end);
             }
         }
@@ -2690,15 +2273,11 @@ namespace tut
                            (llwchar)0x1F468, (llwchar)0x200D, (llwchar)0x1F469,
                            (llwchar)'z' };
         const std::string utf8 = to_utf8(wide);
-        UNSCOPED_INFO("byte length");
         REQUIRE(utf8.size() == size_t(1 + 3 + 4 + 3 + 4 + 1));
 
         const auto runs = utf8str_find_emoji_clusters(utf8);
-        UNSCOPED_INFO("one run");
         REQUIRE(runs.size() == size_t(1));
-        UNSCOPED_INFO("begins past 'a' and the ideograph");
         CHECK(runs[0].first == size_t(4));
-        UNSCOPED_INFO("ends before 'z'");
         CHECK(runs[0].second == size_t(15));
 
     }
@@ -2708,11 +2287,11 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: malformed UTF-8 neither stalls the walk nor invents a cluster", "[LLStringUTF]")
     {
         UNSCOPED_INFO("lone continuation");
-        REQUIRE(utf8str_find_emoji_clusters("\x80\x80\x80").size() == size_t(0));
+        CHECK(utf8str_find_emoji_clusters("\x80\x80\x80").size() == size_t(0));
         UNSCOPED_INFO("truncated four-byte");
-        REQUIRE(utf8str_find_emoji_clusters("\xF0\x9F\x91").size() == size_t(0));
+        CHECK(utf8str_find_emoji_clusters("\xF0\x9F\x91").size() == size_t(0));
         UNSCOPED_INFO("bad lead");
-        REQUIRE(utf8str_find_emoji_clusters("\xFF\xFE").size() == size_t(0));
+        CHECK(utf8str_find_emoji_clusters("\xFF\xFE").size() == size_t(0));
 
         // A bad byte in front of a real cluster still leaves the cluster
         // findable, at the offset that byte pushed it to.
@@ -2720,12 +2299,9 @@ namespace tut
         text += to_utf8(std::u32string{ (llwchar)0x1F468, (llwchar)0x200D,
                                               (llwchar)0x1F469 });
         const auto runs = utf8str_find_emoji_clusters(text);
-        UNSCOPED_INFO("one run past the bad byte");
         REQUIRE(runs.size() == size_t(1));
-        UNSCOPED_INFO("begins at byte 1");
         CHECK(runs[0].first == size_t(1));
-        UNSCOPED_INFO("ends at the end");
-        REQUIRE(runs[0].second == text.size());
+        CHECK(runs[0].second == text.size());
     }
 
     // utf8str_emoji_range_at answered at every position in the string --
@@ -2744,7 +2320,6 @@ namespace tut
         const std::string utf8 = to_utf8(wide);
 
         // a=0 heart=1 VS16=4 ideograph=7 man=10 ZWJ=14 woman=17 (c)=21 z=23.
-        UNSCOPED_INFO("layout");
         REQUIRE(utf8.size() == size_t(24));
 
         // The range every byte offset belongs to, written out. Inside a
@@ -2766,39 +2341,32 @@ namespace tut
         for (const Expect& e : expected)
         {
             const auto got = utf8str_emoji_range_at(utf8, e.at);
-            UNSCOPED_INFO("range begin at " + std::to_string(e.at));
+            CAPTURE(e.at);
             REQUIRE(got.first == e.begin);
-            UNSCOPED_INFO("range end at "   + std::to_string(e.at));
             REQUIRE(got.second == e.end);
         }
 
         // The heart carries a presentation selector, so it is a cluster and
         // its range spans both codepoints -- three bytes plus three.
         const auto heart = utf8str_emoji_range_at(utf8, 1);
-        UNSCOPED_INFO("heart begins at 1");
         CHECK(heart.first == size_t(1));
-        UNSCOPED_INFO("heart spans VS16");
         CHECK(heart.second == size_t(7));
 
         // The lone copyright sign is no cluster, but it is a pictograph base,
         // so it reports its own two bytes rather than an empty range.
         const size_t copy_at = 1 + 6 + 3 + 11;
         const auto copyright = utf8str_emoji_range_at(utf8, copy_at);
-        UNSCOPED_INFO("(c) begins");
         CHECK(copyright.first == copy_at);
-        UNSCOPED_INFO("(c) is two bytes");
         CHECK(copyright.second == copy_at + 2);
 
         // A position inside the ideograph is not a character start and so
         // belongs to nothing.
         const auto split = utf8str_emoji_range_at(utf8, 8);
-        UNSCOPED_INFO("mid-character is empty");
         CHECK(split.first == split.second);
 
         // Past the end reports an empty range at the position asked about,
         // not at the end of the string.
         const auto past = utf8str_emoji_range_at(utf8, utf8.size() + 4);
-        UNSCOPED_INFO("past the end is empty");
         CHECK(past.first == past.second);
     }
 
@@ -2806,18 +2374,14 @@ namespace tut
     // compared against, so it has to agree with the UTF-32 form's size().
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_codepoint_count agrees with the UTF-32 size", "[LLStringUTF]")
     {
-        UNSCOPED_INFO("empty");
         CHECK(utf8str_codepoint_count("") == size_t(0));
-        UNSCOPED_INFO("ascii");
         CHECK(utf8str_codepoint_count("abc") == size_t(3));
 
         const std::u32string wide = { (llwchar)'a', (llwchar)0x00E9, (llwchar)0x65E5,
                                  (llwchar)0x1F600, (llwchar)0x200D, (llwchar)0x1F600 };
         const std::string utf8 = to_utf8(wide);
-        UNSCOPED_INFO("bytes");
-        REQUIRE(utf8.size() == size_t(1 + 2 + 3 + 4 + 3 + 4));
-        UNSCOPED_INFO("agrees with the wide size");
-        REQUIRE(utf8str_codepoint_count(utf8) == wide.size());
+        CHECK(utf8.size() == size_t(1 + 2 + 3 + 4 + 3 + 4));
+        CHECK(utf8str_codepoint_count(utf8) == wide.size());
 
         // Malformed bytes count one each, so the count never disagrees with a
         // walk over the same text.
@@ -2838,9 +2402,7 @@ namespace tut
         const std::string utf8 = to_utf8(wide);
 
         // Bytes 1 + 2 + 3 + 4 + 1; code units 1 + 1 + 1 + 2 + 1.
-        UNSCOPED_INFO("bytes");
         REQUIRE(utf8.size() == size_t(11));
-        UNSCOPED_INFO("units");
         CHECK(utf8str_utf16_length(utf8, 0, S32_MAX) == S32(6));
 
         // Every prefix, by hand: the byte offset of each character start and
@@ -2849,7 +2411,7 @@ namespace tut
         const S32 unit_at[] = { 0, 1, 2, 3,  5,  6 };
         for (size_t cp = 0; cp < 6; ++cp)
         {
-            UNSCOPED_INFO("prefix at " + std::to_string(cp));
+            CAPTURE(cp);
             REQUIRE(utf8str_utf16_length(utf8, 0, byte_at[cp]) == unit_at[cp]);
         }
 
@@ -2859,21 +2421,17 @@ namespace tut
         for (S32 units = 0; units <= 6; ++units)
         {
             bool unaligned = false;
-            UNSCOPED_INFO("bytes for " + std::to_string(units) + " units");
+            CAPTURE(units);
             REQUIRE(utf8str_length_from_utf16_length(utf8, 0, units, &unaligned) ==
                           bytes_for_units[units]);
-            UNSCOPED_INFO("unaligned only mid-pair");
             REQUIRE(unaligned == (units == 4));
         }
 
         // Offsets are honoured, not just whole-string calls.
-        UNSCOPED_INFO("offset form");
         CHECK(utf8str_utf16_length(utf8, 3, S32_MAX) == S32(4));
 
         // Out of range clamps rather than running off.
-        UNSCOPED_INFO("past the end");
         CHECK(utf8str_utf16_length(utf8, 999, 999) == S32(0));
-        UNSCOPED_INFO("no budget");
         CHECK(utf8str_length_from_utf16_length(utf8, 0, 0) == S32(0));
     }
 
@@ -2883,21 +2441,17 @@ namespace tut
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_sanitize returns valid text byte for byte", "[LLStringUTF]")
     {
         const std::string ascii = "plain ascii";
-        UNSCOPED_INFO("ascii untouched");
         CHECK(utf8str_sanitize(ascii) == ascii);
 
         const std::u32string wide = { (llwchar)'a', (llwchar)0x00E9, (llwchar)0x65E5,
                                  (llwchar)0x1F600, (llwchar)'z' };
         const std::string mixed = to_utf8(wide);
-        UNSCOPED_INFO("mixed untouched");
         CHECK(utf8str_sanitize(mixed) == mixed);
 
-        UNSCOPED_INFO("empty");
         CHECK(utf8str_sanitize(std::string_view()) == std::string());
 
         // Embedded NUL is valid UTF-8 and must survive; string_view carries it.
         const std::string with_nul("a\0b", 3);
-        UNSCOPED_INFO("nul survives");
         CHECK(utf8str_sanitize(with_nul) == with_nul);
     }
 
@@ -2930,18 +2484,12 @@ namespace tut
             REQUIRE_FALSE(is_valid(s));
             // The predicate the widgets ask before deciding whether to repair
             // has to agree with simdutf, or a widget skips a repair it needed.
-            UNSCOPED_INFO("utf8str_is_valid agrees with simdutf");
             REQUIRE(utf8str_is_valid(s) == is_valid(s));
             const std::string fixed = utf8str_sanitize(s);
-            UNSCOPED_INFO("output is valid");
             REQUIRE(is_valid(fixed));
-            UNSCOPED_INFO("and the predicate says so too");
-            REQUIRE(utf8str_is_valid(fixed) == true);
-            {
-                INFO("the good bytes are still there");
-                REQUIRE(fixed.find("ok") == 0);
-                REQUIRE(fixed.rfind("ok") == fixed.size() - 2);
-            }
+            REQUIRE(utf8str_is_valid(fixed));
+            REQUIRE(fixed.find("ok") == 0);
+            REQUIRE(fixed.rfind("ok") == fixed.size() - 2);
         }
     }
 
@@ -2964,22 +2512,16 @@ namespace tut
         {
             const std::string s(c.bytes);
             const LLCodepointAt at = utf8str_decode_at(s, 0);
-            UNSCOPED_INFO(std::string(c.what) + " decodes to the replacement");
+            INFO(c.what);
             REQUIRE((S32)at.cp == (S32)0xFFFD);
-            UNSCOPED_INFO(std::string(c.what) + " consumes exactly one byte");
             REQUIRE((S32)at.next == 1);
         }
 
         // The shapes that are legal still decode whole.
-        UNSCOPED_INFO("ASCII");
         CHECK((S32)utf8str_decode_at(std::string("A"), 0).cp == (S32)'A');
-        UNSCOPED_INFO("two-byte");
         CHECK((S32)utf8str_decode_at(std::string("\xC3\xA9"), 0).cp == (S32)0xE9);
-        UNSCOPED_INFO("three-byte");
         CHECK((S32)utf8str_decode_at(std::string("\xE6\x97\xA5"), 0).cp == (S32)0x65E5);
-        UNSCOPED_INFO("four-byte");
         CHECK((S32)utf8str_decode_at(std::string("\xF0\x9F\x90\xB6"), 0).cp == (S32)0x1F436);
-        UNSCOPED_INFO("four-byte spans four");
         CHECK((S32)utf8str_decode_at(std::string("\xF0\x9F\x90\xB6"), 0).next == (S32)4);
     }
 
@@ -2995,16 +2537,13 @@ namespace tut
         for (S32 budget = 1; budget <= 5; ++budget)
         {
             const std::string cut = utf8str_symbol_truncate(text, budget);
-            UNSCOPED_INFO("a budget under the first cluster still returns text");
+            CAPTURE(budget);
             REQUIRE_FALSE(cut.empty());
-            UNSCOPED_INFO("and returns the whole of that cluster");
             REQUIRE(cut == family);
         }
 
         // Once the budget clears the cluster the next characters come too.
-        UNSCOPED_INFO("budget past the cluster takes the next character");
         CHECK(utf8str_symbol_truncate(text, 6) == family + "a");
-        UNSCOPED_INFO("input already short enough is untouched");
         CHECK(utf8str_symbol_truncate(std::string("abc"), 10) == std::string("abc"));
     }
 
@@ -3012,23 +2551,17 @@ namespace tut
     // never allowed cannot pass for the one it did.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: LLStringUtil::isEqualInsensitiveASCII folds ASCII and nothing else", "[LLStringUTF]")
     {
-        UNSCOPED_INFO("same word, different case");
         CHECK(LLStringUtil::isEqualInsensitiveASCII(std::string("llsd/binary"), std::string("LLSD/Binary")));
-        UNSCOPED_INFO("a different length never matches");
         CHECK_FALSE(LLStringUtil::isEqualInsensitiveASCII(std::string("llsd"), std::string("llsd/binary")));
         // Fullwidth 'l' is its own character, whatever a collator makes of it.
-        UNSCOPED_INFO("fullwidth is not the ASCII letter");
         CHECK_FALSE(LLStringUtil::isEqualInsensitiveASCII(
                    std::string("\xEF\xBD\x8C\xEF\xBD\x8Csd/binary"), std::string("llsd/binary")));
         // A soft hyphen is a character, not an absence of one.
-        UNSCOPED_INFO("an ignorable is still a difference");
         CHECK_FALSE(LLStringUtil::isEqualInsensitiveASCII(
                    std::string("llsd/bin\xC2\xAD" "ary"), std::string("llsd/binary")));
         // Above ASCII nothing is folded -- these are simply different bytes.
-        UNSCOPED_INFO("no folding above ASCII");
         CHECK_FALSE(LLStringUtil::isEqualInsensitiveASCII(
                    std::string("caf\xC3\xA9"), std::string("caf\xC3\x89")));
-        UNSCOPED_INFO("empty equals empty");
         CHECK(LLStringUtil::isEqualInsensitiveASCII(std::string(), std::string()));
     }
 
@@ -3040,42 +2573,29 @@ namespace tut
     {
         // ASCII first, so the byte answers can be read against the wide test.
         const std::string two_words = "foo bar";
-        UNSCOPED_INFO("fwd to next word");
         CHECK(utf8str_step_word_forward(two_words, 0) == size_t(4));
-        UNSCOPED_INFO("fwd from next word");
         CHECK(utf8str_step_word_forward(two_words, 4) == size_t(7));
-        UNSCOPED_INFO("back from end");
         CHECK(utf8str_step_word_backward(two_words, 7) == size_t(4));
-        UNSCOPED_INFO("back over the space");
         CHECK(utf8str_step_word_backward(two_words, 4) == size_t(0));
 
         // And where a character is not a byte. "café bar": the accent makes
         // the second word start at byte 6 where it is codepoint 5, so these
         // numbers are wrong under any reading but the byte one.
         const std::string accented = "caf\xC3\xA9 bar";
-        UNSCOPED_INFO("the fixture string is nine bytes");
         REQUIRE(accented.size() == size_t(9));
-        UNSCOPED_INFO("fwd over an accented word");
         CHECK(utf8str_step_word_forward(accented, 0) == size_t(6));
-        UNSCOPED_INFO("fwd from the last word runs to the end");
         CHECK(utf8str_step_word_forward(accented, 6) == size_t(9));
-        UNSCOPED_INFO("back from the end");
         CHECK(utf8str_step_word_backward(accented, 9) == size_t(6));
-        UNSCOPED_INFO("back over the space");
         CHECK(utf8str_step_word_backward(accented, 6) == size_t(0));
 
         // An offset inside the accent is still inside the first word.
-        UNSCOPED_INFO("stepping from inside a character");
         CHECK(utf8str_step_word_forward(accented, 4) == size_t(6));
 
         // The walkers stay on their line -- LLTextEditor::nextWordPos crosses
         // the break itself, and would stall on every newline if this changed.
         const std::string lines = "ab\ncd";
-        UNSCOPED_INFO("fwd stops at eol");
         CHECK(utf8str_step_word_forward(lines, 0) == size_t(2));
-        UNSCOPED_INFO("fwd parked on eol");
         CHECK(utf8str_step_word_forward(lines, 2) == size_t(2));
-        UNSCOPED_INFO("back parked on bol");
         CHECK(utf8str_step_word_backward(lines, 3) == size_t(3));
     }
 
@@ -3089,16 +2609,13 @@ namespace tut
         for (size_t at : { size_t(0), size_t(2), size_t(3), size_t(4) })
         {
             const auto range = utf8str_word_range_at(accented, at);
-            UNSCOPED_INFO("word range begins at 0");
+            CAPTURE(at);
             REQUIRE(range.first == size_t(0));
-            UNSCOPED_INFO("word range ends after the accent");
             REQUIRE(range.second == size_t(5));
         }
 
         const auto second = utf8str_word_range_at(accented, 7);
-        UNSCOPED_INFO("second word begins at 6");
         CHECK(second.first == size_t(6));
-        UNSCOPED_INFO("second word ends at 9");
         CHECK(second.second == size_t(9));
 
         // next_word_range finds the word whose end lies past the position --
@@ -3106,24 +2623,18 @@ namespace tut
         // the following word. From inside the first word that is still the
         // first word.
         const auto from_start = utf8str_next_word_range(accented, 0);
-        UNSCOPED_INFO("from 0 the word is the one at 0");
         CHECK(from_start.first == size_t(0));
-        UNSCOPED_INFO("and it ends after the accent");
         CHECK(from_start.second == size_t(5));
 
         // Standing on the space, the answer is the word after it.
         const auto from_space = utf8str_next_word_range(accented, 5);
-        UNSCOPED_INFO("from the space the next word begins at 6");
         CHECK(from_space.first == size_t(6));
-        UNSCOPED_INFO("and ends at 9");
         CHECK(from_space.second == size_t(9));
 
         // Past the last word there is nothing further to select.
         const auto none = utf8str_next_word_range(accented, accented.size());
-        UNSCOPED_INFO("nothing begins past the end");
-        REQUIRE(none.first == accented.size());
-        UNSCOPED_INFO("nothing ends past the end");
-        REQUIRE(none.second == accented.size());
+        CHECK(none.first == accented.size());
+        CHECK(none.second == accented.size());
     }
 
     // The caret forms differ from the raw walkers in exactly one way: they
@@ -3135,51 +2646,40 @@ namespace tut
         const std::string lines = "one two\nthree four";
 
         // Away from a break the two are the same walk.
-        UNSCOPED_INFO("forward agrees mid-line");
         CHECK(utf8str_caret_word_forward(lines, 0) ==
                       utf8str_step_word_forward(lines, 0));
-        UNSCOPED_INFO("backward agrees mid-line");
         CHECK(utf8str_caret_word_backward(lines, 7) ==
                       utf8str_step_word_backward(lines, 7));
 
         // A caret already at the edge of a word must not skip the adjacent
         // word, and a caret inside a word must land at that word's start.
         const std::string adjacent = "foo bar";
-        UNSCOPED_INFO("forward from a word end reaches the adjacent word");
         CHECK(utf8str_caret_word_forward(adjacent, 3) == size_t(4));
-        UNSCOPED_INFO("backward from inside a word reaches its start");
         CHECK(utf8str_caret_word_backward(adjacent, 5) == size_t(4));
 
         // On the break the raw walker has nowhere to go and says so.
-        UNSCOPED_INFO("the raw walker stalls on the newline");
         CHECK(utf8str_step_word_forward(lines, 7) == size_t(7));
-        UNSCOPED_INFO("the caret walker crosses it");
         CHECK(utf8str_caret_word_forward(lines, 7) > size_t(7));
 
         // And at a line start, going back.
-        UNSCOPED_INFO("the raw walker stalls at the line start");
         CHECK(utf8str_step_word_backward(lines, 8) == size_t(8));
-        UNSCOPED_INFO("the caret walker crosses back");
         CHECK(utf8str_caret_word_backward(lines, 8) < size_t(8));
 
         // Neither runs off either end.
-        UNSCOPED_INFO("nothing before the beginning");
         CHECK(utf8str_caret_word_backward(lines, 0) == size_t(0));
-        UNSCOPED_INFO("nothing after the end");
-        REQUIRE(utf8str_caret_word_forward(lines, lines.size()) == lines.size());
+        CHECK(utf8str_caret_word_forward(lines, lines.size()) == lines.size());
 
         // Repeated stepping terminates rather than parking.
         size_t at = 0;
         for (int i = 0; i < 32 && at < lines.size(); ++i)
         {
             const size_t next = utf8str_caret_word_forward(lines, at);
-            UNSCOPED_INFO("forward never moves backward");
+            CAPTURE(at);
             REQUIRE(next >= at);
             if (next == at) break;
             at = next;
         }
-        UNSCOPED_INFO("stepping forward reaches the end");
-        REQUIRE(at == lines.size());
+        CHECK(at == lines.size());
     }
 
     // ---------------------------------------------------------------
@@ -3199,33 +2699,27 @@ namespace tut
 
         std::string s = nbsp + "Rye" + nbsp;
         LLStringUtil::trim(s);
-        UNSCOPED_INFO("a no-break space is whitespace");
         CHECK(s == std::string("Rye"));
 
         s = ideo + cjk + ideo;
         LLStringUtil::trim(s);
-        UNSCOPED_INFO("an ideographic space is whitespace");
         CHECK(s == cjk);
 
         s = em + narrow + " \tx\t " + narrow + em;
         LLStringUtil::trim(s);
-        UNSCOPED_INFO("ASCII and Unicode spaces mixed");
         CHECK(s == std::string("x"));
 
         s = nbsp + "a";
         LLStringUtil::trimHead(s);
-        UNSCOPED_INFO("trimHead crosses one");
         CHECK(s == std::string("a"));
 
         s = "a" + nbsp;
         LLStringUtil::trimTail(s);
-        UNSCOPED_INFO("trimTail crosses one");
         CHECK(s == std::string("a"));
 
         s = nbsp + ideo + em;
         LLStringUtil::trim(s);
-        UNSCOPED_INFO("all whitespace trims to nothing");
-        REQUIRE(s.empty());
+        CHECK(s.empty());
     }
 
     // What is not White_Space stays, and malformed bytes are content: a trim
@@ -3237,35 +2731,29 @@ namespace tut
 
         std::string s = zwsp + "a" + zwsp;
         LLStringUtil::trim(s);
-        UNSCOPED_INFO("a zero-width space is not whitespace");
         CHECK(s == zwsp + "a" + zwsp);
 
         s = bom + "a" + bom;
         LLStringUtil::trim(s);
-        UNSCOPED_INFO("a byte order mark is not whitespace");
         CHECK(s == bom + "a" + bom);
 
         s = std::string("\x80") + "a" + std::string("\x80");
         LLStringUtil::trim(s);
-        UNSCOPED_INFO("a stray continuation byte is content");
-        REQUIRE(s.size() == size_t(3));
+        CHECK(s.size() == size_t(3));
 
         // U+3000 missing its last byte. The lead byte it shares with a real
         // ideographic space must not be enough to cut it.
         s = std::string("a") + "\xE3\x80";
         LLStringUtil::trim(s);
-        UNSCOPED_INFO("a truncated character is left whole");
-        REQUIRE(s.size() == size_t(3));
+        CHECK(s.size() == size_t(3));
 
         s = "  hello  ";
         LLStringUtil::trim(s);
-        UNSCOPED_INFO("ASCII trims as it always did");
         CHECK(s == std::string("hello"));
 
         s.clear();
         LLStringUtil::trim(s);
-        UNSCOPED_INFO("an empty string survives");
-        REQUIRE(s.empty());
+        CHECK(s.empty());
     }
 
     // The view forms cut where the string forms cut, and utf8str_trim shares
@@ -3277,15 +2765,12 @@ namespace tut
 
         std::string owned = src;
         LLStringUtil::trim(owned);
-        UNSCOPED_INFO("the string form");
         CHECK(owned == expected);
 
         std::string_view view = src;
         LLStringUtil::trim(view);
-        UNSCOPED_INFO("the view form cuts the same place");
         CHECK(std::string(view) == expected);
 
-        UNSCOPED_INFO("utf8str_trim agrees");
         CHECK(utf8str_trim(src) == expected);
     }
 
@@ -3305,15 +2790,10 @@ namespace tut
         {
             stepped.push_back(at);
         }
-        UNSCOPED_INFO("the same stops");
-        REQUIRE(utf8str_grapheme_starts(utf8, utf8.size()) == stepped);
-        UNSCOPED_INFO("those before the end asked for");
+        CHECK(utf8str_grapheme_starts(utf8, utf8.size()) == stepped);
         CHECK(utf8str_grapheme_starts(utf8, 11) == std::vector<size_t>({ 0, 1, 2, 3, 6, 9, 10 }));
-        {
-            INFO("nothing of nothing");
-            REQUIRE(utf8str_grapheme_starts(std::string(), 5).empty());
-            REQUIRE(utf8str_grapheme_starts(utf8, 0).empty());
-        }
+        CHECK(utf8str_grapheme_starts(std::string(), 5).empty());
+        CHECK(utf8str_grapheme_starts(utf8, 0).empty());
     }
 
     // Every word at once is every word utf8str_next_word_range finds one at
@@ -3350,12 +2830,11 @@ namespace tut
             }
             std::vector<std::pair<size_t, size_t>> all = { { 9, 9 } };
             utf8str_word_ranges(text, all);
-            UNSCOPED_INFO("the same words in \"" + text + "\"");
+            CAPTURE(text);
             REQUIRE(all == stepped);
         }
         std::vector<std::pair<size_t, size_t>> words;
         utf8str_word_ranges("don't stop", words);
-        UNSCOPED_INFO("a contraction is one word");
         CHECK(words == std::vector<std::pair<size_t, size_t>>({ { 0, 5 }, { 6, 10 } }));
     }
 }

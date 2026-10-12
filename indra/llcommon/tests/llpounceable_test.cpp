@@ -82,8 +82,7 @@ namespace
         // before LLPounceable's constructor runs. That's the whole point of
         // implementing it with an LLSingleton queue. This models (say)
         // LLPounceableStatic<LLMessageSystem*, LLPounceableStatic>.
-        UNSCOPED_INFO("static_check should still be null");
-        REQUIRE_FALSE(static_check);
+        CHECK_FALSE(static_check);
         Data myData("test<1>");
         // gForward and static_check let go of myData with the test, however
         // it ends, rather than point past it at whatever runs next.
@@ -96,8 +95,7 @@ namespace
             }
         } let_go;
         gForward = &myData;         // should run setter
-        UNSCOPED_INFO("static_check should be &myData");
-        REQUIRE(static_check == &myData);
+        CHECK(static_check == &myData);
     }
 
     TEST_CASE("llpounceable: each LLPounceableQueue instance has its own queue", "[llpounceable]")
@@ -109,20 +107,15 @@ namespace
         LLPounceable<Data*> a, b;
         a.callWhenReady(boost::bind(setter, &aptr, _1));
         b.callWhenReady(boost::bind(setter, &bptr, _1));
-        UNSCOPED_INFO("aptr should be null");
-        REQUIRE_FALSE(aptr);
-        UNSCOPED_INFO("bptr should be null");
-        REQUIRE_FALSE(bptr);
+        CHECK_FALSE(aptr);
+        CHECK_FALSE(bptr);
         Data adata("a"), bdata("b");
         a = &adata;
-        UNSCOPED_INFO("aptr should be &adata");
-        REQUIRE(aptr == &adata);
+        CHECK(aptr == &adata);
         // but we haven't yet set b
-        UNSCOPED_INFO("bptr should still be null");
-        REQUIRE_FALSE(bptr);
+        CHECK_FALSE(bptr);
         b = &bdata;
-        UNSCOPED_INFO("bptr should be &bdata");
-        REQUIRE(bptr == &bdata);
+        CHECK(bptr == &bdata);
     }
 
     TEST_CASE("llpounceable: each LLPounceableStatic instance has its own queue", "[llpounceable]")
@@ -134,20 +127,15 @@ namespace
         LLPounceable<Data*, LLPounceableStatic> a, b;
         a.callWhenReady(boost::bind(setter, &aptr, _1));
         b.callWhenReady(boost::bind(setter, &bptr, _1));
-        UNSCOPED_INFO("aptr should be null");
-        REQUIRE_FALSE(aptr);
-        UNSCOPED_INFO("bptr should be null");
-        REQUIRE_FALSE(bptr);
+        CHECK_FALSE(aptr);
+        CHECK_FALSE(bptr);
         Data adata("a"), bdata("b");
         a = &adata;
-        UNSCOPED_INFO("aptr should be &adata");
-        REQUIRE(aptr == &adata);
+        CHECK(aptr == &adata);
         // but we haven't yet set b
-        UNSCOPED_INFO("bptr should still be null");
-        REQUIRE_FALSE(bptr);
+        CHECK_FALSE(bptr);
         b = &bdata;
-        UNSCOPED_INFO("bptr should be &bdata");
-        REQUIRE(bptr == &bdata);
+        CHECK(bptr == &bdata);
     }
 
     TEST_CASE("llpounceable: LLPounceable<T> looks like T", "[llpounceable]")
@@ -162,18 +150,13 @@ namespace
         LLPounceable<Data*> pounceable(&a);
         // should be able to pass LLPounceable<T> to function accepting T
         setter(&aptr, pounceable);
-        UNSCOPED_INFO("aptr should be &a");
-        REQUIRE(aptr == &a);
+        CHECK(aptr == &a);
         // should be able to dereference with *
-        UNSCOPED_INFO("deref with *");
         CHECK((*pounceable).mData == "a");
         // should be able to dereference with ->
-        UNSCOPED_INFO("deref with ->");
         CHECK(pounceable->mData == "a");
         // bool operations
-        UNSCOPED_INFO("test with operator bool()");
-        REQUIRE(pounceable);
-        UNSCOPED_INFO("test with operator !()");
+        CHECK(pounceable);
         CHECK_FALSE(! pounceable);
     }
 
@@ -186,42 +169,26 @@ namespace
         pounceable.callWhenReady(boost::bind(setter, &p1, _1));
         pounceable.callWhenReady(boost::bind(setter, &p2, _1));
         // should still be pending
-        UNSCOPED_INFO("p1 should be null");
-        REQUIRE_FALSE(p1);
-        UNSCOPED_INFO("p2 should be null");
-        REQUIRE_FALSE(p2);
-        UNSCOPED_INFO("p3 should be null");
-        REQUIRE_FALSE(p3);
+        CHECK_FALSE(p1);
+        CHECK_FALSE(p2);
+        CHECK_FALSE(p3);
         pounceable = 0;
         // assigning a new empty value shouldn't flush the queue
-        UNSCOPED_INFO("p1 should still be null");
-        REQUIRE_FALSE(p1);
-        UNSCOPED_INFO("p2 should still be null");
-        REQUIRE_FALSE(p2);
-        UNSCOPED_INFO("p3 should still be null");
-        REQUIRE_FALSE(p3);
+        CHECK_FALSE(p1);
+        CHECK_FALSE(p2);
+        CHECK_FALSE(p3);
         // using whichever syntax
         pounceable.reset(0);
-        // try to make ensure messages distinct... tough to pin down which
-        // ensure() failed if multiple ensure() calls in the same test<n> have
-        // the same message!
-        UNSCOPED_INFO("p1 should again be null");
-        REQUIRE_FALSE(p1);
-        UNSCOPED_INFO("p2 should again be null");
-        REQUIRE_FALSE(p2);
-        UNSCOPED_INFO("p3 should again be null");
-        REQUIRE_FALSE(p3);
+        CHECK_FALSE(p1);
+        CHECK_FALSE(p2);
+        CHECK_FALSE(p3);
         pounceable.reset(&a);       // should flush queue
-        UNSCOPED_INFO("p1 should be &a");
-        REQUIRE(p1 == &a);
-        UNSCOPED_INFO("p2 should be &a");
-        REQUIRE(p2 == &a);
-        UNSCOPED_INFO("p3 still not set");
-        REQUIRE_FALSE(p3);
+        CHECK(p1 == &a);
+        CHECK(p2 == &a);
+        CHECK_FALSE(p3);
         // immediate call
         pounceable.callWhenReady(boost::bind(setter, &p3, _1));
-        UNSCOPED_INFO("p3 should be &a");
-        REQUIRE(p3 == &a);
+        CHECK(p3 == &a);
     }
 
     TEST_CASE("llpounceable: queued calls run in order and firing empties the queue", "[llpounceable]")

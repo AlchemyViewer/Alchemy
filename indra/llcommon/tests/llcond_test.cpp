@@ -33,9 +33,7 @@ namespace
     TEST_CASE_METHOD(llcond_data, "llcond: a wait for the value it already holds returns at once", "[llcond]")
     {
         cond.set_one(1);
-        UNSCOPED_INFO("wait_for_equal() failed");
         CHECK(cond.wait_for_equal(F32Milliseconds(1), 1));
-        UNSCOPED_INFO("wait_for_unequal() should have failed");
         CHECK_FALSE(cond.wait_for_unequal(F32Milliseconds(1), 1));
     }
 

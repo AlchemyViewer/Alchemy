@@ -127,10 +127,6 @@ namespace tut
 
             std::string message(int n)
             {
-                std::ostringstream test_name;
-                test_name << "testing message " << n << ", not enough messages";
-
-                UNSCOPED_INFO(test_name.str());
                 REQUIRE(n < countMessages());
                 return mMessages[n];
             }
@@ -188,17 +184,13 @@ namespace tut
             return std::dynamic_pointer_cast<TestRecorder>(mRecorder)->message(n);
         }
 
-        void ensure_message_count(int expectedCount)
+        void require_message_count(int expectedCount)
         {
-            UNSCOPED_INFO("message count");
             REQUIRE(countMessages() == expectedCount);
         }
 
         std::string message_field(int msgnum, LogFieldIndex fieldnum)
         {
-            std::ostringstream test_name;
-            test_name << "testing message " << msgnum << ", not enough messages";
-            UNSCOPED_INFO(test_name.str());
             REQUIRE(msgnum < countMessages());
 
             std::string msg(message(msgnum));
@@ -246,21 +238,15 @@ namespace tut
             return msg.substr(start_field, fieldlen);
         }
 
-        void ensure_message_field_equals(int msgnum, LogFieldIndex fieldnum, const std::string& expectedText)
+        void require_message_field(int msgnum, LogFieldIndex fieldnum, const std::string& expectedText)
          {
-             std::ostringstream test_name;
-             test_name << "testing message " << msgnum << " field " << FieldName[fieldnum] << "\n  message: \"" << message(msgnum) << "\"\n  ";
-
-             UNSCOPED_INFO(test_name.str());
+             INFO("message " << msgnum << " field " << FieldName[fieldnum] << ": \"" << message(msgnum) << "\"");
              REQUIRE(message_field(msgnum, fieldnum) == expectedText);
          }
 
-        void ensure_message_does_not_contain(int n, const std::string& expectedText)
+        void require_message_lacks(int n, const std::string& expectedText)
         {
-            std::ostringstream test_name;
-            test_name << "testing message " << n;
-
-            UNSCOPED_INFO(test_name.str());
+            CAPTURE(n);
             REQUIRE_THAT(message(n), !Catch::Matchers::ContainsSubstring(expectedText));
         }
     };
@@ -271,8 +257,8 @@ namespace tut
         LL_INFOS() << "test" << LL_ENDL;
         LL_INFOS() << "bob" << LL_ENDL;
 
-        ensure_message_field_equals(0, MSG_FIELD, "test");
-        ensure_message_field_equals(1, MSG_FIELD, "bob");
+        require_message_field(0, MSG_FIELD, "test");
+        require_message_field(1, MSG_FIELD, "bob");
     }
 }
 
@@ -297,41 +283,41 @@ namespace tut
 #endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         writeSome();
-        ensure_message_field_equals(0, MSG_FIELD, "one");
-        ensure_message_field_equals(0, LEVEL_FIELD, "DEBUG");
-        ensure_message_field_equals(0, TAGS_FIELD, "#WriteTag#AnotherTag#");
-        ensure_message_field_equals(1, MSG_FIELD, "two");
-        ensure_message_field_equals(1, LEVEL_FIELD, "INFO");
-        ensure_message_field_equals(1, TAGS_FIELD, "#WriteTag#");
-        ensure_message_field_equals(2, MSG_FIELD, "three");
-        ensure_message_field_equals(2, LEVEL_FIELD, "WARNING");
-        ensure_message_field_equals(2, TAGS_FIELD, "#WriteTag#");
-        ensure_message_field_equals(3, MSG_FIELD, "four");
-        ensure_message_field_equals(3, LEVEL_FIELD, "ERROR");
-        ensure_message_field_equals(3, TAGS_FIELD, "#WriteTag#");
-        ensure_message_count(4);
+        require_message_field(0, MSG_FIELD, "one");
+        require_message_field(0, LEVEL_FIELD, "DEBUG");
+        require_message_field(0, TAGS_FIELD, "#WriteTag#AnotherTag#");
+        require_message_field(1, MSG_FIELD, "two");
+        require_message_field(1, LEVEL_FIELD, "INFO");
+        require_message_field(1, TAGS_FIELD, "#WriteTag#");
+        require_message_field(2, MSG_FIELD, "three");
+        require_message_field(2, LEVEL_FIELD, "WARNING");
+        require_message_field(2, TAGS_FIELD, "#WriteTag#");
+        require_message_field(3, MSG_FIELD, "four");
+        require_message_field(3, LEVEL_FIELD, "ERROR");
+        require_message_field(3, TAGS_FIELD, "#WriteTag#");
+        require_message_count(4);
 
         LLError::setDefaultLevel(LLError::LEVEL_INFO);
         writeSome();
-        ensure_message_field_equals(4, MSG_FIELD, "two");
-        ensure_message_field_equals(5, MSG_FIELD, "three");
-        ensure_message_field_equals(6, MSG_FIELD, "four");
-        ensure_message_count(7);
+        require_message_field(4, MSG_FIELD, "two");
+        require_message_field(5, MSG_FIELD, "three");
+        require_message_field(6, MSG_FIELD, "four");
+        require_message_count(7);
 
         LLError::setDefaultLevel(LLError::LEVEL_WARN);
         writeSome();
-        ensure_message_field_equals(7, MSG_FIELD, "three");
-        ensure_message_field_equals(8, MSG_FIELD, "four");
-        ensure_message_count(9);
+        require_message_field(7, MSG_FIELD, "three");
+        require_message_field(8, MSG_FIELD, "four");
+        require_message_count(9);
 
         LLError::setDefaultLevel(LLError::LEVEL_ERROR);
         writeSome();
-        ensure_message_field_equals(9, MSG_FIELD, "four");
-        ensure_message_count(10);
+        require_message_field(9, MSG_FIELD, "four");
+        require_message_count(10);
 
         LLError::setDefaultLevel(LLError::LEVEL_NONE);
         writeSome();
-        ensure_message_count(10);
+        require_message_count(10);
     }
 
     TEST_CASE_METHOD(ErrorTestData, "error: the output names the level of each message", "[error]")
@@ -341,11 +327,11 @@ namespace tut
         SKIP("Debug messages disabled");
 #endif
         writeSome();
-        ensure_message_field_equals(0, LEVEL_FIELD, "DEBUG");
-        ensure_message_field_equals(1, LEVEL_FIELD, "INFO");
-        ensure_message_field_equals(2, LEVEL_FIELD, "WARNING");
-        ensure_message_field_equals(3, LEVEL_FIELD, "ERROR");
-        ensure_message_count(4);
+        require_message_field(0, LEVEL_FIELD, "DEBUG");
+        require_message_field(1, LEVEL_FIELD, "INFO");
+        require_message_field(2, LEVEL_FIELD, "WARNING");
+        require_message_field(3, LEVEL_FIELD, "ERROR");
+        require_message_count(4);
     }
 
     TEST_CASE_METHOD(ErrorTestData, "error: abbreviateFile strips the source root and leaves other paths", "[error]")
@@ -367,10 +353,8 @@ namespace tut
             // argument unchanged, THEN check.
         } while (abbreviateFile != prev);
 
-        UNSCOPED_INFO("file name abbreviation");
         CHECK_THAT(abbreviateFile,
             Catch::Matchers::EndsWith("llcommon/tests/llerror_test.cpp"));
-        UNSCOPED_INFO("file name abbreviation");
         CHECK_THAT(abbreviateFile, !Catch::Matchers::ContainsSubstring("indra"));
 
         std::string someFile =
@@ -382,7 +366,6 @@ namespace tut
             ;
         std::string someAbbreviation = LLError::abbreviateFile(someFile);
 
-        UNSCOPED_INFO("non-indra file abbreviation");
         CHECK(someAbbreviation == someFile);
     }
 }
@@ -492,21 +475,19 @@ namespace
     std::string logFromClassWithLogTypeMember(bool id) { ClassWithLogType c; return c.logFromMember(id); }
     std::string logFromClassWithLogTypeStatic(bool id) { return ClassWithLogType::logFromStatic(id); }
 
-    void ensure_has(const std::string& message,
+    void require_has(const std::string& message,
         const std::string& actual, const std::string& expected)
     {
         std::string::size_type n1 = actual.find(expected);
         if (n1 == std::string::npos)
         {
-            std::stringstream ss;
-            ss << message << ": " << "expected to find a copy of '" << expected
-               << "' in actual '" << actual << "'";
-            FAIL(ss.str().c_str());
+            FAIL(message << ": " << "expected to find a copy of '" << expected
+                 << "' in actual '" << actual << "'");
         }
     }
 
     typedef std::string (*LogFromFunction)(bool);
-    void testLogName(LLError::RecorderPtr recorder, LogFromFunction f,
+    void require_log_name(LLError::RecorderPtr recorder, LogFromFunction f,
         const std::string& class_name = "")
     {
         std::dynamic_pointer_cast<tut::TestRecorder>(recorder)->clearMessages();
@@ -516,16 +497,16 @@ namespace
         std::string messageWithoutName = std::dynamic_pointer_cast<tut::TestRecorder>(recorder)->message(0);
         std::string messageWithName = std::dynamic_pointer_cast<tut::TestRecorder>(recorder)->message(1);
 
-        ensure_has(name + " logged without name",
+        require_has(name + " logged without name",
             messageWithoutName, name);
-        ensure_has(name + " logged with name",
+        require_has(name + " logged with name",
             messageWithName, name);
 
         if (!class_name.empty())
         {
-            ensure_has(name + "logged without name",
+            require_has(name + " logged without name",
                 messageWithoutName, class_name);
-            ensure_has(name + "logged with name",
+            require_has(name + " logged with name",
                 messageWithName, class_name);
         }
     }
@@ -556,13 +537,13 @@ namespace tut
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         setWantsMultiline(true);
         writeMsgNeedsEscaping(); // but should not be now
-        ensure_message_field_equals(0, MSG_FIELD, "backslash\\");
-        ensure_message_field_equals(1, MSG_FIELD, "newline\nafternewline");
-        ensure_message_field_equals(2, MSG_FIELD, "return\rafterreturn");
-        ensure_message_field_equals(3, MSG_FIELD, "backslash\\backslash\\");
-        ensure_message_field_equals(4, MSG_FIELD, "backslash\\newline\nanothernewline\nafternewline");
-        ensure_message_field_equals(5, MSG_FIELD, "backslash\\returnnewline\r\n\\afterbackslash");
-        ensure_message_count(6);
+        require_message_field(0, MSG_FIELD, "backslash\\");
+        require_message_field(1, MSG_FIELD, "newline\nafternewline");
+        require_message_field(2, MSG_FIELD, "return\rafterreturn");
+        require_message_field(3, MSG_FIELD, "backslash\\backslash\\");
+        require_message_field(4, MSG_FIELD, "backslash\\newline\nanothernewline\nafternewline");
+        require_message_field(5, MSG_FIELD, "backslash\\returnnewline\r\n\\afterbackslash");
+        require_message_count(6);
     }
 }
 
@@ -571,12 +552,12 @@ namespace tut
     //  class/function information in output
     TEST_CASE_METHOD(ErrorTestData, "error: messages name the function and class they came from", "[error]")
     {
-        testLogName(mRecorder, logFromGlobal);
-        testLogName(mRecorder, logFromStatic);
-        testLogName(mRecorder, logFromAnon);
-        testLogName(mRecorder, logFromNamespace);
-        testLogName(mRecorder, logFromClassWithLogTypeMember, "ClassWithLogType");
-        testLogName(mRecorder, logFromClassWithLogTypeStatic, "ClassWithLogType");
+        require_log_name(mRecorder, logFromGlobal);
+        require_log_name(mRecorder, logFromStatic);
+        require_log_name(mRecorder, logFromAnon);
+        require_log_name(mRecorder, logFromNamespace);
+        require_log_name(mRecorder, logFromClassWithLogTypeMember, "ClassWithLogType");
+        require_log_name(mRecorder, logFromClassWithLogTypeStatic, "ClassWithLogType");
     }
 }
 
@@ -621,14 +602,14 @@ namespace tut
     TEST_CASE_METHOD(ErrorTestData, "error: logging while building a message logs both", "[error]")
     {
         outerLogger();
-        ensure_message_field_equals(0, MSG_FIELD, "inside");
-        ensure_message_field_equals(1, MSG_FIELD, "outside(moo)");
-        ensure_message_count(2);
+        require_message_field(0, MSG_FIELD, "inside");
+        require_message_field(1, MSG_FIELD, "outside(moo)");
+        require_message_count(2);
 
         metaLogger();
-        ensure_message_field_equals(2, MSG_FIELD, "logging");
-        ensure_message_field_equals(3, MSG_FIELD, "meta(baz)");
-        ensure_message_count(4);
+        require_message_field(2, MSG_FIELD, "logging");
+        require_message_field(3, MSG_FIELD, "meta(baz)");
+        require_message_count(4);
     }
 
     // special handling of LL_ERRS() calls
@@ -636,11 +617,10 @@ namespace tut
     {
         std::string location = errorReturningLocation();
 
-        ensure_message_field_equals(0, LOCATION_FIELD, location);
-        ensure_message_field_equals(0, MSG_FIELD, "die");
-        ensure_message_count(1);
+        require_message_field(0, LOCATION_FIELD, location);
+        require_message_field(0, MSG_FIELD, "die");
+        require_message_count(1);
 
-        UNSCOPED_INFO("fatal callback called");
         CHECK(fatalWasCalled);
     }
 }
@@ -667,13 +647,13 @@ namespace tut
 
         setWantsTime(false);
         ufoSighting();
-        ensure_message_field_equals(0, MSG_FIELD, "ufo");
-        ensure_message_does_not_contain(0, roswell());
+        require_message_field(0, MSG_FIELD, "ufo");
+        require_message_lacks(0, roswell());
 
         setWantsTime(true);
         ufoSighting();
-        ensure_message_field_equals(1, MSG_FIELD, "ufo");
-        ensure_message_field_equals(1, TIME_FIELD, roswell());
+        require_message_field(1, MSG_FIELD, "ufo");
+        require_message_field(1, TIME_FIELD, roswell());
     }
 
     // output order
@@ -686,7 +666,6 @@ namespace tut
                     function;
         writeReturningLocationAndFunction(location, function);
 
-        UNSCOPED_INFO("order is time level tags location function message");
         CHECK(message(0) ==
                       roswell() + " INFO " + "# " /* no tag */ + location + " " + function + " : " + "apple");
     }
@@ -699,10 +678,8 @@ namespace tut
 
         LL_INFOS() << "boo" << LL_ENDL;
 
-        ensure_message_field_equals(0, MSG_FIELD, "boo");
-        UNSCOPED_INFO("alt recorder count");
+        require_message_field(0, MSG_FIELD, "boo");
         CHECK(std::dynamic_pointer_cast<TestRecorder>(altRecorder)->countMessages() == 1);
-        UNSCOPED_INFO("alt recorder message 0");
         CHECK_THAT(std::dynamic_pointer_cast<TestRecorder>(altRecorder)->message(0), Catch::Matchers::ContainsSubstring("boo"));
 
         LLError::setTimeFunction(roswell);
@@ -715,14 +692,10 @@ namespace tut
 
         std::string when = roswell();
 
-        ensure_message_does_not_contain(1, when);
-        UNSCOPED_INFO("alt recorder count");
+        require_message_lacks(1, when);
         CHECK(std::dynamic_pointer_cast<TestRecorder>(altRecorder)->countMessages() == 2);
-        UNSCOPED_INFO("alt recorder message 1");
         CHECK_THAT(std::dynamic_pointer_cast<TestRecorder>(altRecorder)->message(1), !Catch::Matchers::ContainsSubstring(when));
-        UNSCOPED_INFO("another recorder count");
         CHECK(std::dynamic_pointer_cast<TestRecorder>(anotherRecorder)->countMessages() == 1);
-        UNSCOPED_INFO("another recorder message 0");
         CHECK_THAT(std::dynamic_pointer_cast<TestRecorder>(anotherRecorder)->message(0), Catch::Matchers::ContainsSubstring(when));
 
         LLError::removeRecorder(altRecorder);
@@ -763,12 +736,12 @@ namespace tut
         TestAlpha::doAll();
         TestBeta::doAll();
 
-        ensure_message_field_equals(0, MSG_FIELD, "aim west");
-        ensure_message_field_equals(1, MSG_FIELD, "ate eels");
-        ensure_message_field_equals(2, MSG_FIELD, "buy iron");
-        ensure_message_field_equals(3, MSG_FIELD, "bad word");
-        ensure_message_field_equals(4, MSG_FIELD, "big easy");
-        ensure_message_count(5);
+        require_message_field(0, MSG_FIELD, "aim west");
+        require_message_field(1, MSG_FIELD, "ate eels");
+        require_message_field(2, MSG_FIELD, "buy iron");
+        require_message_field(3, MSG_FIELD, "bad word");
+        require_message_field(4, MSG_FIELD, "big easy");
+        require_message_count(5);
     }
 
     // filtering by function, and that it will override class filtering
@@ -780,9 +753,9 @@ namespace tut
         LLError::setFunctionLevel("TestBeta::doError", LLError::LEVEL_NONE);
 
         TestBeta::doAll();
-        ensure_message_field_equals(0, MSG_FIELD, "buy iron");
-        ensure_message_field_equals(1, MSG_FIELD, "bad word");
-        ensure_message_count(2);
+        require_message_field(0, MSG_FIELD, "buy iron");
+        require_message_field(1, MSG_FIELD, "bad word");
+        require_message_count(2);
     }
 
     // filtering by file
@@ -800,10 +773,10 @@ namespace tut
 
         TestAlpha::doAll();
         TestBeta::doAll();
-        ensure_message_field_equals(0, MSG_FIELD, "any idea");
-        ensure_message_field_equals(1, MSG_FIELD, "aim west");
-        ensure_message_field_equals(2, MSG_FIELD, "bad word");
-        ensure_message_count(3);
+        require_message_field(0, MSG_FIELD, "any idea");
+        require_message_field(1, MSG_FIELD, "aim west");
+        require_message_field(2, MSG_FIELD, "bad word");
+        require_message_count(3);
     }
 
     // proper cached, efficient lookup of filtering
@@ -812,32 +785,26 @@ namespace tut
         LLError::setDefaultLevel(LLError::LEVEL_NONE);
 
         TestAlpha::doInfo();
-        ensure_message_count(0);
-        UNSCOPED_INFO("first check");
+        require_message_count(0);
         CHECK(LLError::shouldLogCallCount() == 1);
         TestAlpha::doInfo();
-        ensure_message_count(0);
-        UNSCOPED_INFO("second check");
+        require_message_count(0);
         CHECK(LLError::shouldLogCallCount() == 1);
 
         LLError::setClassLevel("TestAlpha", LLError::LEVEL_DEBUG);
         TestAlpha::doInfo();
-        ensure_message_count(1);
-        UNSCOPED_INFO("third check");
+        require_message_count(1);
         CHECK(LLError::shouldLogCallCount() == 2);
         TestAlpha::doInfo();
-        ensure_message_count(2);
-        UNSCOPED_INFO("fourth check");
+        require_message_count(2);
         CHECK(LLError::shouldLogCallCount() == 2);
 
         LLError::setClassLevel("TestAlpha", LLError::LEVEL_WARN);
         TestAlpha::doInfo();
-        ensure_message_count(2);
-        UNSCOPED_INFO("fifth check");
+        require_message_count(2);
         CHECK(LLError::shouldLogCallCount() == 3);
         TestAlpha::doInfo();
-        ensure_message_count(2);
-        UNSCOPED_INFO("sixth check");
+        require_message_count(2);
         CHECK(LLError::shouldLogCallCount() == 3);
     }
 
@@ -869,10 +836,10 @@ namespace tut
 
         TestAlpha::doAll();
         TestBeta::doAll();
-        ensure_message_field_equals(0, MSG_FIELD, "any idea");
-        ensure_message_field_equals(1, MSG_FIELD, "aim west");
-        ensure_message_field_equals(2, MSG_FIELD, "bad word");
-        ensure_message_count(3);
+        require_message_field(0, MSG_FIELD, "any idea");
+        require_message_field(1, MSG_FIELD, "aim west");
+        require_message_field(2, MSG_FIELD, "bad word");
+        require_message_count(3);
 
         // make sure reconfiguring works
         LLSD config2;
@@ -882,11 +849,11 @@ namespace tut
 
         TestAlpha::doAll();
         TestBeta::doAll();
-        ensure_message_field_equals(3, MSG_FIELD, "aim west");
-        ensure_message_field_equals(4, MSG_FIELD, "ate eels");
-        ensure_message_field_equals(5, MSG_FIELD, "bad word");
-        ensure_message_field_equals(6, MSG_FIELD, "big easy");
-        ensure_message_count(7);
+        require_message_field(3, MSG_FIELD, "aim west");
+        require_message_field(4, MSG_FIELD, "ate eels");
+        require_message_field(5, MSG_FIELD, "bad word");
+        require_message_field(6, MSG_FIELD, "big easy");
+        require_message_count(7);
     }
 }
 
@@ -900,13 +867,13 @@ namespace tut
 #endif
         LLError::setDefaultLevel(LLError::LEVEL_DEBUG);
         writeMsgNeedsEscaping();
-        ensure_message_field_equals(0, MSG_FIELD, "backslash\\\\");
-        ensure_message_field_equals(1, MSG_FIELD, "newline\\nafternewline");
-        ensure_message_field_equals(2, MSG_FIELD, "return\\rafterreturn");
-        ensure_message_field_equals(3, MSG_FIELD, "backslash\\\\backslash\\\\");
-        ensure_message_field_equals(4, MSG_FIELD, "backslash\\\\newline\\nanothernewline\\nafternewline");
-        ensure_message_field_equals(5, MSG_FIELD, "backslash\\\\returnnewline\\r\\n\\\\afterbackslash");
-        ensure_message_count(6);
+        require_message_field(0, MSG_FIELD, "backslash\\\\");
+        require_message_field(1, MSG_FIELD, "newline\\nafternewline");
+        require_message_field(2, MSG_FIELD, "return\\rafterreturn");
+        require_message_field(3, MSG_FIELD, "backslash\\\\backslash\\\\");
+        require_message_field(4, MSG_FIELD, "backslash\\\\newline\\nanothernewline\\nafternewline");
+        require_message_field(5, MSG_FIELD, "backslash\\\\returnnewline\\r\\n\\\\afterbackslash");
+        require_message_count(6);
     }
 }
 
@@ -932,9 +899,8 @@ namespace tut
 
         std::string location = writeTagWithSpaceReturningLocation();
         std::string expected = "Space is not allowed in a log tag at " + location;
-        ensure_message_field_equals(0, LEVEL_FIELD, "ERROR");
-        ensure_message_field_equals(0, MSG_FIELD, expected);
-        UNSCOPED_INFO("fatal callback called");
+        require_message_field(0, LEVEL_FIELD, "ERROR");
+        require_message_field(0, MSG_FIELD, expected);
         CHECK(fatalWasCalled);
     }
 }

@@ -35,33 +35,27 @@
 namespace
 {
     struct URITestData {
-        void checkParts(const LLURI& u,
+        void require_parts(const LLURI& u,
                 const char* expectedScheme,
                 const char* expectedOpaque,
                 const char* expectedAuthority,
                 const char* expectedPath,
                 const char* expectedQuery = "")
         {
-            UNSCOPED_INFO("scheme");
+            INFO("uri " << u.asString());
             REQUIRE(u.scheme() == expectedScheme);
-            UNSCOPED_INFO("opaque");
             REQUIRE(u.opaque() == expectedOpaque);
-            UNSCOPED_INFO("authority");
             REQUIRE(u.authority() == expectedAuthority);
-            UNSCOPED_INFO("path");
             REQUIRE(u.path() == expectedPath);
-            UNSCOPED_INFO("query");
             REQUIRE(u.query() == expectedQuery);
         }
 
-        void escapeRoundTrip(const std::string& uri_raw_1)
+        void require_escape_round_trip(const std::string& uri_raw_1)
         {
             std::string uri_esc_1(LLURI::escape(uri_raw_1));
             std::string uri_raw_2(LLURI::unescape(uri_esc_1));
-            UNSCOPED_INFO("escape/unescape raw");
             REQUIRE(uri_raw_2 == uri_raw_1);
             std::string uri_esc_2(LLURI::escape(uri_raw_2));
-            UNSCOPED_INFO("escape/unescape escaped");
             REQUIRE(uri_esc_2 == uri_esc_1);
         }
     };
@@ -70,91 +64,81 @@ namespace
     {
         LLURI u("http://abc.com/def/ghi?x=37&y=hello");
 
-        UNSCOPED_INFO("scheme");
         CHECK(u.scheme() == "http");
-        UNSCOPED_INFO("authority");
         CHECK(u.authority() == "abc.com");
-        UNSCOPED_INFO("path");
         CHECK(u.path() == "/def/ghi");
-        UNSCOPED_INFO("query");
         CHECK(u.query() == "x=37&y=hello");
 
-        UNSCOPED_INFO("host name");
         CHECK(u.hostName() == "abc.com");
-        UNSCOPED_INFO("host port");
         CHECK(u.hostPort() == 80);
 
         LLSD query = u.queryMap();
-        UNSCOPED_INFO("query x");
         CHECK(query["x"].asInteger() == 37);
-        UNSCOPED_INFO("query y");
         CHECK(query["y"].asString() == "hello");
 
         query = LLURI::queryMap("x=22.23&y=https://lindenlab.com/");
-        UNSCOPED_INFO("query x");
         CHECK(query["x"].asReal() == 22.23);
-        UNSCOPED_INFO("query y");
         CHECK(query["y"].asURI().asString() == "https://lindenlab.com/");
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: an empty string has no parts", "[LLURI]")
     {
-        checkParts(LLURI(""), "", "", "", "");
+        require_parts(LLURI(""), "", "", "", "");
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: without a scheme the whole string is opaque", "[LLURI]")
     {
-        checkParts(LLURI("foo"), "", "foo", "", "");
-        checkParts(LLURI("foo%3A"), "", "foo:", "", "");
+        require_parts(LLURI("foo"), "", "foo", "", "");
+        require_parts(LLURI("foo%3A"), "", "foo:", "", "");
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: a scheme without paths leaves no authority or path", "[LLURI]")
     {
-        checkParts(LLURI("mailto:zero@ll.com"),
+        require_parts(LLURI("mailto:zero@ll.com"),
             "mailto", "zero@ll.com", "", "");
-        checkParts(LLURI("silly://abc/def?foo"),
+        require_parts(LLURI("silly://abc/def?foo"),
             "silly", "//abc/def?foo", "", "");
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: the authority ends at the first unescaped slash or question mark", "[LLURI]")
     {
-        checkParts(LLURI("http:///"),
+        require_parts(LLURI("http:///"),
             "http", "///", "", "/");
 
-        checkParts(LLURI("http://abc"),
+        require_parts(LLURI("http://abc"),
             "http", "//abc", "abc", "");
 
-        checkParts(LLURI("http://a%2Fb/cd"),
+        require_parts(LLURI("http://a%2Fb/cd"),
             "http", "//a/b/cd", "a/b", "/cd");
 
-        checkParts(LLURI("http://host?"),
+        require_parts(LLURI("http://host?"),
             "http", "//host?", "host", "");
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: the path is unescaped and keeps colons and trailing slashes", "[LLURI]")
     {
-        checkParts(LLURI("http://host/a/b/"),
+        require_parts(LLURI("http://host/a/b/"),
                 "http", "//host/a/b/", "host", "/a/b/");
 
-        checkParts(LLURI("http://host/a%3Fb/"),
+        require_parts(LLURI("http://host/a%3Fb/"),
                 "http", "//host/a?b/", "host", "/a?b/");
 
-        checkParts(LLURI("http://host/a:b/"),
+        require_parts(LLURI("http://host/a:b/"),
                 "http", "//host/a:b/", "host", "/a:b/");
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: the query follows the first question mark and is unescaped", "[LLURI]")
     {
-        checkParts(LLURI("http://host/?"),
+        require_parts(LLURI("http://host/?"),
                 "http", "//host/?", "host", "/", "");
 
-        checkParts(LLURI("http://host/?x"),
+        require_parts(LLURI("http://host/?x"),
                 "http", "//host/?x", "host", "/", "x");
 
-        checkParts(LLURI("http://host/??"),
+        require_parts(LLURI("http://host/??"),
                 "http", "//host/??", "host", "/", "?");
 
-        checkParts(LLURI("http://host/?%3F"),
+        require_parts(LLURI("http://host/?%3F"),
                 "http", "//host/??", "host", "/", "?");
     }
 
@@ -163,13 +147,13 @@ namespace
         LLSD path;
         path.append("x");
         path.append("123");
-        checkParts(LLURI::buildHTTP("host", path),
+        require_parts(LLURI::buildHTTP("host", path),
             "http", "//host/x/123", "host", "/x/123");
 
         LLSD query;
         query["123"] = "12";
         query["abcd"] = "abc";
-        checkParts(LLURI::buildHTTP("host", path, query),
+        require_parts(LLURI::buildHTTP("host", path, query),
             "http", "//host/x/123?123=12&abcd=abc",
             "host", "/x/123", "123=12&abcd=abc");
 
@@ -204,7 +188,7 @@ namespace
         LLSD path;
         path.append("x@*//*$&^");
         path.append("123");
-        checkParts(LLURI::buildHTTP("host", path),
+        require_parts(LLURI::buildHTTP("host", path),
             "http", "//host/x@*//*$&^/123", "host", "/x@*//*$&^/123");
     }
 
@@ -216,7 +200,7 @@ namespace
         LLSD query;
         query["123"] = "?&*#//";
         query["**@&?//"] = "abc";
-        checkParts(LLURI::buildHTTP("host", path, query),
+        require_parts(LLURI::buildHTTP("host", path, query),
             "http", "//host/x/123?**@&?//=abc&123=?&*#//",
             "host", "/x/123", "**@&?//=abc&123=?&*#//");
     }
@@ -229,22 +213,22 @@ namespace
         LLSD query;
         query["123"] = "12";
         query["abcd"] = "abc";
-        checkParts(LLURI::buildHTTP("hi123*33--}{:portstuffs", path, query),
+        require_parts(LLURI::buildHTTP("hi123*33--}{:portstuffs", path, query),
             "http", "//hi123*33--}{:portstuffs/x/123?123=12&abcd=abc",
             "hi123*33--}{:portstuffs", "/x/123", "123=12&abcd=abc");
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: buildHTTP takes a host_port that is really a URI prefix", "[LLURI]")
     {
-        checkParts(LLURI::buildHTTP("http://example.com:8080", LLSD()),
+        require_parts(LLURI::buildHTTP("http://example.com:8080", LLSD()),
             "http", "//example.com:8080",
             "example.com:8080", "");
 
-        checkParts(LLURI::buildHTTP("http://example.com:8080/", LLSD()),
+        require_parts(LLURI::buildHTTP("http://example.com:8080/", LLSD()),
             "http", "//example.com:8080/",
             "example.com:8080", "/");
 
-        checkParts(LLURI::buildHTTP("http://example.com:8080/a/b", LLSD()),
+        require_parts(LLURI::buildHTTP("http://example.com:8080/a/b", LLSD()),
             "http", "//example.com:8080/a/b",
             "example.com:8080", "/a/b");
     }
@@ -255,9 +239,7 @@ namespace
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
             "0123456789"
             "-._~";
-        UNSCOPED_INFO("escaping");
         CHECK(LLURI::escape("abcdefg", "abcdef") == "abcdef%67");
-        UNSCOPED_INFO("escaping");
         CHECK(LLURI::escape("|/&\\+-_!@", "") == "%7C%2F%26%5C%2B%2D%5F%21%40");
         UNSCOPED_INFO("escaping as query variable");
         CHECK(LLURI::escape("http://10.0.1.4:12032/agent/god/agent-id/map/layer/?resume=http://station3.ll.com:12032/agent/203ad6df-b522-491d-ba48-4e24eb57aeff/send-postcard", unreserved + ":@!$'()*+,=") ==
@@ -271,7 +253,6 @@ namespace
         std::string cedilla;
         cedilla.push_back( (char)0xC3 );
         cedilla.push_back( (char)0xA7 );
-        UNSCOPED_INFO("escape UTF8");
         CHECK(LLURI::escape( cedilla, unreserved) == "%C3%A7");
     }
 
@@ -279,38 +260,34 @@ namespace
     TEST_CASE_METHOD(URITestData, "LLURI: escape and unescape of an empty string are empty", "[LLURI]")
     {
         std::string uri_esc(LLURI::escape(""));
-        UNSCOPED_INFO("escape string empty");
-        REQUIRE(uri_esc.empty());
+        CHECK(uri_esc.empty());
         std::string uri_raw(LLURI::unescape(""));
-        UNSCOPED_INFO("unescape string empty");
-        REQUIRE(uri_raw.empty());
+        CHECK(uri_raw.empty());
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: escape and unescape round-trip URIs", "[LLURI]")
     {
-        escapeRoundTrip("http://secondlife.com");
-        escapeRoundTrip("http://secondlife.com/url with spaces");
-        escapeRoundTrip("http://bad[domain]name.com/");
-        escapeRoundTrip("ftp://bill.gates@ms/micro$oft.com/c:\\autoexec.bat");
-        escapeRoundTrip("");
+        require_escape_round_trip("http://secondlife.com");
+        require_escape_round_trip("http://secondlife.com/url with spaces");
+        require_escape_round_trip("http://bad[domain]name.com/");
+        require_escape_round_trip("ftp://bill.gates@ms/micro$oft.com/c:\\autoexec.bat");
+        require_escape_round_trip("");
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: escape by default escapes colons and slashes too", "[LLURI]")
     {
         // yes -- this mangles the url. This is expected behavior
         std::string simple("http://secondlife.com");
-        UNSCOPED_INFO("simple http");
         CHECK(LLURI::escape(simple) ==
             "http%3A%2F%2Fsecondlife.com");
-        UNSCOPED_INFO("needs escape");
         CHECK(LLURI::escape("http://get.secondlife.com/windows viewer") ==
             "http%3A%2F%2Fget.secondlife.com%2Fwindows%20viewer");
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: escape and unescape round-trip very long strings", "[LLURI]")
     {
-        escapeRoundTrip("Welcome to Second Life.We hope you'll have a richly rewarding experience, filled with creativity, self expression and fun.The goals of the Community Standards are simple: treat each other with respect and without harassment, adhere to local standards as indicated by simulator ratings, and refrain from any hate activity which slurs a real-world individual or real-world community. Behavioral Guidelines - The Big Six");
-        escapeRoundTrip(
+        require_escape_round_trip("Welcome to Second Life.We hope you'll have a richly rewarding experience, filled with creativity, self expression and fun.The goals of the Community Standards are simple: treat each other with respect and without harassment, adhere to local standards as indicated by simulator ratings, and refrain from any hate activity which slurs a real-world individual or real-world community. Behavioral Guidelines - The Big Six");
+        require_escape_round_trip(
             "'asset_data':b(12100){'task_id':ucc706f2d-0b68-68f8-11a4-f1043ff35ca0}\n{\n\tname\tObject|\n\tpermissions 0\n\t{\n\t\tbase_mask\t7fffffff\n\t\towner_mask\t7fffffff\n\t\tgroup_mask\t00000000\n\t\teveryone_mask\t00000000\n\t\tnext_owner_mask\t7fffffff\n\t\tcreator_id\t13fd9595-a47b-4d64-a5fb-6da645f038e0\n\t\towner_id\t3c115e51-04f4-523c-9fa6-98aff1034730\n\t\tlast_owner_id\t3c115e51-04f4-523c-9fa6-98aff1034730\n\t\tgroup_id\t00000000-0000-0000-0000-000000000000\n\t}\n\tlocal_id\t217444921\n\ttotal_crc\t323\n\ttype\t2\n\ttask_valid\t2\n\ttravel_access\t13\n\tdisplayopts\t2\n\tdisplaytype\tv\n\tpos\t-0.368634403\t0.00781063363\t-0.569040775\n\toldpos\t150.117996\t25.8658009\t8.19664001\n\trotation\t-0.06293071806430816650390625\t-0.6995697021484375\t-0.7002241611480712890625\t0.1277817934751510620117188\n\tchildpos\t-0.00499999989\t-0.0359999985\t0.307999998\n\tchildrot\t-0.515492737293243408203125\t-0.46601200103759765625\t0.529055416584014892578125\t0.4870323240756988525390625\n\tscale"
             "\t0.074629\t0.289956\t0.01\n\tsit_offset\t0\t0\t0\n\tcamera_eye_offset\t0\t0\t0\n\tcamera_at_offset\t0\t0\t0\n\tsit_quat\t0\t0\t0\t1\n\tsit_hint\t0\n\tstate\t160\n\tmaterial\t3\n\tsoundid\t00000000-0000-0000-0000-000000000000\n\tsoundgain\t0\n\tsoundradius\t0\n\tsoundflags\t0\n\ttextcolor\t0 0 0 1\n\tselected\t0\n\tselector\t00000000-0000-0000-0000-000000000000\n\tusephysics\t0\n\trotate_x\t1\n\trotate_y\t1\n\trotate_z\t1\n\tphantom\t0\n\tremote_script_access_pin\t0\n\tvolume_detect\t0\n\tblock_grabs\t0\n\tdie_at_edge\t0\n\treturn_at_edge\t0\n\ttemporary\t0\n\tsandbox\t0\n\tsandboxhome\t0\t0\t0\n\tshape 0\n\t{\n\t\tpath 0\n\t\t{\n\t\t\tcurve\t16\n\t\t\tbegin\t0\n\t\t\tend\t1\n\t\t\tscale_x\t1\n\t\t\tscale_y\t1\n\t\t\tshear_x\t0\n\t\t\tshear_y\t0\n\t\t\ttwist\t0\n\t\t\ttwist_begin\t0\n\t\t\tradius_offset\t0\n\t\t\ttaper_x\t0\n\t\t\ttaper_y\t0\n\t\t\trevolutions\t1\n\t\t\tskew\t0\n\t\t}\n\t\tprofile 0\n\t\t{\n\t\t\tcurve\t1\n\t\t\tbegin\t0\n\t\t\tend\t1\n\t\t\thollow\t0\n\t\t}\n\t}\n\tf"
             "aces\t6\n\t{\n\t\timageid\tddde1ffc-678b-3cda-1748-513086bdf01b\n\t\tcolors\t0.937255 0.796078 0.494118 1\n\t\tscales\t1\n\t\tscalet\t1\n\t\toffsets\t0\n\t\toffsett\t0\n\t\timagerot\t0\n\t\tbump\t0\n\t\tfullbright\t0\n\t\tmedia_flags\t0\n\t}\n\t{\n\t\timageid\tf54a0c32-3cd1-d49a-5b4f-7b792bebc204\n\t\tcolors\t0.937255 0.796078 0.494118 1\n\t\tscales\t1\n\t\tscalet\t1\n\t\toffsets\t0\n\t\toffsett\t0\n\t\timagerot\t0\n\t\tbump\t0\n\t\tfullbright\t0\n\t\tmedia_flags\t0\n\t}\n\t{\n\t\timageid\tf54a0c32-3cd1-d49a-5b4f-7b792bebc204\n\t\tcolors\t0.937255 0.796078 0.494118 1\n\t\tscales\t1\n\t\tscalet\t1\n\t\toffsets\t0\n\t\toffsett\t0\n\t\timagerot\t0\n\t\tbump\t0\n\t\tfullbright\t0\n\t\tmedia_flags\t0\n\t}\n\t{\n\t\timageid\tf54a0c32-3cd1-d49a-5b4f-7b792bebc204\n\t\tcolors\t0.937255 0.796078 0.494118 1\n\t\tscales\t1\n\t\tscalet\t1\n\t\toffsets\t0\n\t\toffsett\t0\n\t\timagerot\t0\n\t\tbump\t0\n\t\tfullbright\t0\n\t\tmedia_flags\t0\n\t}\n\t{\n\t\timageid\tf54a0c32-3cd1-d49a-5b4f-7b792bebc204"
@@ -333,53 +310,33 @@ namespace
     {
         LLURI u("secondlife:///app/login?first_name=Testert4&last_name=Tester&web_login_key=test");
         // if secondlife is the scheme, LLURI should parse /app/login as path, with no authority
-        UNSCOPED_INFO("scheme");
         CHECK(u.scheme() == "secondlife");
-        UNSCOPED_INFO("authority");
         CHECK(u.authority() == "");
-        UNSCOPED_INFO("path");
         CHECK(u.path() == "/app/login");
-        UNSCOPED_INFO("pathmap");
         CHECK(u.pathArray()[0].asString() == "app");
-        UNSCOPED_INFO("pathmap");
         CHECK(u.pathArray()[1].asString() == "login");
-        UNSCOPED_INFO("query");
         CHECK(u.query() == "first_name=Testert4&last_name=Tester&web_login_key=test");
-        UNSCOPED_INFO("query map element");
         CHECK(u.queryMap()["last_name"].asString() == "Tester");
 
         u = LLURI("secondlife://Da Boom/128/128/128");
         // if secondlife is the scheme, LLURI should parse /128/128/128 as path, with Da Boom as authority
-        UNSCOPED_INFO("scheme");
         CHECK(u.scheme() == "secondlife");
-        UNSCOPED_INFO("authority");
         CHECK(u.authority() == "Da Boom");
-        UNSCOPED_INFO("path");
         CHECK(u.path() == "/128/128/128");
-        UNSCOPED_INFO("pathmap");
         CHECK(u.pathArray()[0].asString() == "128");
-        UNSCOPED_INFO("pathmap");
         CHECK(u.pathArray()[1].asString() == "128");
-        UNSCOPED_INFO("pathmap");
         CHECK(u.pathArray()[2].asString() == "128");
-        UNSCOPED_INFO("query");
         CHECK(u.query() == "");
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: an about: URI has a path and a query", "[LLURI]")
     {
         LLURI u("about:blank?redirect-http-hack=secondlife%3A%2F%2F%2Fapp%2Flogin%3Ffirst_name%3DCallum%26last_name%3DLinden%26location%3Dspecify%26grid%3Dvaak%26region%3D%2FMorris%2F128%2F128%26web_login_key%3Defaa4795-c2aa-4c58-8966-763c27931e78");
-        UNSCOPED_INFO("scheme");
         CHECK(u.scheme() == "about");
-        UNSCOPED_INFO("authority");
         CHECK(u.authority() == "");
-        UNSCOPED_INFO("path");
         CHECK(u.path() == "blank");
-        UNSCOPED_INFO("pathmap");
         CHECK(u.pathArray()[0].asString() == "blank");
-        UNSCOPED_INFO("query");
         CHECK(u.query() == "redirect-http-hack=secondlife:///app/login?first_name=Callum&last_name=Linden&location=specify&grid=vaak&region=/Morris/128/128&web_login_key=efaa4795-c2aa-4c58-8966-763c27931e78");
-        UNSCOPED_INFO("query map element");
         CHECK(u.queryMap()["redirect-http-hack"].asString() == "secondlife:///app/login?first_name=Callum&last_name=Linden&location=specify&grid=vaak&region=/Morris/128/128&web_login_key=efaa4795-c2aa-4c58-8966-763c27931e78");
     }
 

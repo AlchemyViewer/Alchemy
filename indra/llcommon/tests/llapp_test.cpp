@@ -70,9 +70,7 @@ namespace
         mApp->setOptionData(LLApp::PRIORITY_DEFAULT, defaults);
 
         LLSD datadir_sd = mApp->getOption("datadir");
-        UNSCOPED_INFO("data type");
         CHECK(datadir_sd.type() == LLSD::TypeString);
-        UNSCOPED_INFO("data value");
         CHECK(datadir_sd.asString() == std::string("data"));
     }
 
@@ -81,11 +79,9 @@ namespace
         LLSD options;
         options["boolean-test"] = true;
         mApp->setOptionData(LLApp::PRIORITY_GENERAL_CONFIGURATION, options);
-        UNSCOPED_INFO("bool set");
         CHECK(mApp->getOption("boolean-test").asBoolean());
         options["boolean-test"] = false;
         mApp->setOptionData(LLApp::PRIORITY_RUNTIME_OVERRIDE, options);
-        UNSCOPED_INFO("bool unset");
         CHECK_FALSE(mApp->getOption("boolean-test").asBoolean());
     }
 }

@@ -49,25 +49,19 @@ namespace
         queue.push(now + 100ms, "def"s);
         queue.close();
         auto entry = queue.pop();
-        UNSCOPED_INFO("failed to pop first");
         CHECK(std::get<0>(entry) == "abc"s);
         entry = queue.pop();
-        UNSCOPED_INFO("failed to pop second");
         CHECK(std::get<0>(entry) == "def"s);
-        UNSCOPED_INFO("queue not closed");
         CHECK(queue.isClosed());
-        UNSCOPED_INFO("queue prematurely done");
         CHECK_FALSE(queue.done());
         std::string s;
         bool popped = queue.tryPopFor(1s, s);
         UNSCOPED_INFO("failed to pop third");
         CHECK(popped);
-        UNSCOPED_INFO("third is wrong");
         CHECK(s == "ghi"s);
         popped = queue.tryPop(s);
         UNSCOPED_INFO("queue not empty");
         CHECK_FALSE(popped);
-        UNSCOPED_INFO("queue not done");
         CHECK(queue.done());
     }
 } // anonymous namespace

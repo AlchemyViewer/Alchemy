@@ -144,7 +144,6 @@ namespace
         ALWatchedFile watched(file, hear());
         UNSCOPED_INFO("nothing yet");
         CHECK_FALSE(looked(watched));
-        UNSCOPED_INFO("nobody told");
         REQUIRE(heard.empty());
 
         put("print(2)\n", 200);
@@ -154,9 +153,7 @@ namespace
         CHECK(watched.check());
         UNSCOPED_INFO("told once");
         REQUIRE(heard.size() == size_t(1));
-        UNSCOPED_INFO("of the file");
         CHECK(heard[0] == file);
-        UNSCOPED_INFO("which held what was written");
         CHECK(held[0] == std::string("print(2)\n"));
         UNSCOPED_INFO("and not again");
         CHECK_FALSE(looked(watched));
@@ -167,19 +164,14 @@ namespace
         put("a = 1\n", 100);
         ALWatchedFile watched(file, hear());
         put("a = 2\n", 300);
-        UNSCOPED_INFO("the first");
         CHECK(looked(watched));
         // The same size, the same second: the time alone tells them apart.
         put("a = 3\n", 500);
-        UNSCOPED_INFO("the second");
         CHECK(looked(watched));
         // The same time, a size of its own.
         put("a = 40\n", 500);
-        UNSCOPED_INFO("the third");
         CHECK(looked(watched));
-        UNSCOPED_INFO("each heard");
         REQUIRE(heard.size() == size_t(3));
-        UNSCOPED_INFO("the last as it was written");
         CHECK(held[2] == std::string("a = 40\n"));
     }
 
@@ -201,9 +193,7 @@ namespace
         put("four\n", 400);
         UNSCOPED_INFO("the editor's save after it is heard");
         CHECK(looked(watched));
-        UNSCOPED_INFO("two heard");
         REQUIRE(heard.size() == size_t(2));
-        UNSCOPED_INFO("the editor's");
         CHECK(held[1] == std::string("four\n"));
     }
 
@@ -218,11 +208,8 @@ namespace
         put("local x = 2\n", 300);
         UNSCOPED_INFO("filled: moved again");
         CHECK_FALSE(watched.check());
-        UNSCOPED_INFO("still");
         CHECK(watched.check());
-        UNSCOPED_INFO("heard once");
         REQUIRE(heard.size() == size_t(1));
-        UNSCOPED_INFO("filled");
         CHECK(held[0] == std::string("local x = 2\n"));
     }
 
@@ -242,7 +229,6 @@ namespace
         fs::last_write_time(fsyspath(file), second, ec);
         UNSCOPED_INFO("older");
         CHECK(looked(watched));
-        UNSCOPED_INFO("three heard");
         REQUIRE(heard.size() == size_t(3));
     }
 
@@ -252,9 +238,7 @@ namespace
         UNSCOPED_INFO("nothing there, nothing heard");
         CHECK_FALSE(looked(watched));
         put("made\n", 100);
-        UNSCOPED_INFO("made");
         CHECK(looked(watched));
-        UNSCOPED_INFO("its text");
         CHECK(held.at(0) == std::string("made\n"));
     }
 
@@ -271,10 +255,9 @@ namespace
         put("after\n", 200);
         ALWatchedFile& watch = *watched;
         UNSCOPED_INFO("moving");
-        CHECK_FALSE(watch.check());
+        REQUIRE_FALSE(watch.check());
         UNSCOPED_INFO("heard, and let go");
         CHECK(watch.check());
-        UNSCOPED_INFO("gone");
         REQUIRE_FALSE(watched);
         UNSCOPED_INFO("told of the file all the same");
         CHECK(told == file);
@@ -292,9 +275,7 @@ namespace
         });
         watched.poll(0.05f);
         put("print(2)\n", 200);
-        UNSCOPED_INFO("heard");
         REQUIRE(pumped([&]() { return !heard.empty(); }));
-        UNSCOPED_INFO("what was written");
         CHECK(held.at(0) == std::string("print(2)\n"));
         UNSCOPED_INFO("told on the main loop's thread");
         CHECK(told_on == here);
@@ -327,15 +308,12 @@ namespace
             llofstream out(other, std::ios::binary | std::ios::trunc);
             out << "default { state_entry() {} }\n";
         }
-        UNSCOPED_INFO("heard");
         REQUIRE(pumped([&]() { return !heard.empty(); }));
-        UNSCOPED_INFO("and let go");
         REQUIRE_FALSE(kept);
         LLTimer timer;
         pumped([&]() { return timer.getElapsedTimeF32() > 0.4f; });
         UNSCOPED_INFO("the one kept, only");
         REQUIRE(heard.size() == size_t(1));
-        UNSCOPED_INFO("which is the file");
         CHECK(heard[0] == file);
     }
 
@@ -343,16 +321,13 @@ namespace
     {
         put("12345", 250);
         const ALFileStamp stamp = ALFileStamp::of(file);
-        UNSCOPED_INFO("there");
         CHECK(stamp.exists);
-        UNSCOPED_INFO("its size");
         REQUIRE(stamp.size == std::uintmax_t(5));
         put("12345", 251);
         UNSCOPED_INFO("a millisecond later is another time");
         CHECK_FALSE(ALFileStamp::of(file) == stamp);
         UNSCOPED_INFO("a folder is no file");
         CHECK_FALSE(ALFileStamp::of(folder).exists);
-        UNSCOPED_INFO("nothing is nothing");
         CHECK_FALSE(ALFileStamp::of(file + ".gone").exists);
     }
 
@@ -368,14 +343,11 @@ namespace
         CHECK(watched.stamp() == before);
         UNSCOPED_INFO("what came after it heard");
         CHECK(looked(watched));
-        UNSCOPED_INFO("once");
         REQUIRE(heard.size() == size_t(1));
-        UNSCOPED_INFO("as it is now");
         CHECK(held.at(0) == std::string("print(2)\n"));
 
         // From a look that found the file as it is: nothing to hear.
         ALWatchedFile current(file, ALFileStamp::of(file), hear());
-        UNSCOPED_INFO("nothing");
         CHECK_FALSE(looked(current));
 
         // From a look that found nothing there -- the stamp of no file,
@@ -386,7 +358,6 @@ namespace
         CHECK_FALSE(none.there());
         UNSCOPED_INFO("the file there now heard");
         CHECK(looked(none));
-        UNSCOPED_INFO("twice in all");
         REQUIRE(heard.size() == size_t(2));
 
         // And seen() takes the file as it is, whatever look it began from.
@@ -395,7 +366,6 @@ namespace
         owned.seen();
         UNSCOPED_INFO("the owner's own is no change");
         CHECK_FALSE(looked(owned));
-        UNSCOPED_INFO("still twice");
         REQUIRE(heard.size() == size_t(2));
     }
 }

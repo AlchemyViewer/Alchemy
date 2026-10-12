@@ -83,7 +83,6 @@ namespace
         size_t same_as_hash1 = llhash(same_as_str1);
 
 
-        UNSCOPED_INFO("Hashes from identical strings should be equal");
         CHECK(hash1 == same_as_hash1);
 
         char str[100];
@@ -95,7 +94,6 @@ namespace
 
         size_t hash3 = llhash(str);
 
-        UNSCOPED_INFO("Hashes from same pointer but different string should not be equal");
         CHECK(hash2 != hash3);
     }
 
@@ -106,9 +104,7 @@ namespace
         std::string hello;
         std::string world;
         mem >> hello >> world;
-        UNSCOPED_INFO("first word");
         CHECK(hello == std::string("hello"));
-        UNSCOPED_INFO("second word");
         CHECK(world == std::string("world"));
     }
 
@@ -120,19 +116,12 @@ namespace
         LLMemoryStream mstr((U8*)str.c_str(), static_cast<S32>(str.size()));
         LLSD response;
         S32 count = LLSDSerialize::fromNotation(response, mstr, str.size());
-        UNSCOPED_INFO("stream parsed");
-        REQUIRE(response.isDefined());
-        UNSCOPED_INFO("stream parse count");
+        CHECK(response.isDefined());
         CHECK(count == 13);
-        UNSCOPED_INFO("sd type");
         CHECK(response.type() == LLSD::TypeMap);
-        UNSCOPED_INFO("map element count");
-        REQUIRE(response.size() == 6);
-        UNSCOPED_INFO("value connect");
-        CHECK(response["connect"].asBoolean() == true);
-        UNSCOPED_INFO("value region_x");
+        CHECK(response.size() == 6);
+        CHECK(response["connect"].asBoolean());
         CHECK(response["region_x"].asInteger() == 8192);
-        UNSCOPED_INFO("value region_y");
         CHECK(response["region_y"].asInteger() == 8192);
     }
 
@@ -151,28 +140,22 @@ namespace
         sd = buf;
         std::stringstream str;
         S32 count = LLSDSerialize::toNotation(sd, str);
-        UNSCOPED_INFO("output count");
         CHECK(count == 1);
         std::string actual(str.str());
-        UNSCOPED_INFO("formatted binary encoding");
         CHECK(actual == streamed);
         sd.clear();
         LLSDSerialize::fromNotation(sd, str, str.str().size());
         std::vector<U8> after;
         after = sd.asBinary();
-        UNSCOPED_INFO("binary decoded size");
         REQUIRE(after.size() == decoded.size());
-        UNSCOPED_INFO("binary decoding");
-        REQUIRE(memcmp(
-                                       &after[0],
-                                       decoded.c_str(),
-                                       decoded.size()) == 0);
+        CHECK(memcmp(&after[0], decoded.c_str(), decoded.size()) == 0);
     }
 
     TEST_CASE("LLSD: random binary round-trips through notation", "[LLSD]")
     {
         for(S32 i = 0; i < 100; ++i)
         {
+            CAPTURE(i);
             // gen up a starting point
             typedef std::vector<U8> buf_t;
             buf_t source;
@@ -186,20 +169,12 @@ namespace
             std::stringstream str;
             S32 count = LLSDSerialize::toNotation(sd, str);
             sd.clear();
-            UNSCOPED_INFO("format count");
             REQUIRE(count == 1);
             LLSD sd2;
             count = LLSDSerialize::fromNotation(sd2, str, str.str().size());
-            UNSCOPED_INFO("parse count");
             REQUIRE(count == 1);
             buf_t dest = sd2.asBinary();
-            str.str("");
-            str << "binary encoding size " << i;
-            UNSCOPED_INFO(str.str().c_str());
             REQUIRE(dest.size() == source.size());
-            str.str("");
-            str << "binary encoding " << i;
-            UNSCOPED_INFO(str.str().c_str());
             REQUIRE(source == dest);
         }
     }
@@ -218,9 +193,7 @@ namespace
             sd,
             serialized,
             serialized.str().size());
-        UNSCOPED_INFO("parse count");
         CHECK(count == 1);
-        UNSCOPED_INFO("String streaming");
         CHECK(sd.asString() == expected);
     }
 
@@ -228,6 +201,7 @@ namespace
     {
         for(S32 i = 0; i < 100; ++i)
         {
+            CAPTURE(i);
             // gen up a starting point
             typedef std::vector<U8> buf_t;
             buf_t source;
@@ -243,12 +217,9 @@ namespace
             str << "\"";
             LLSD sd;
             S32 count = LLSDSerialize::fromNotation(sd, str, str.str().size());
-            UNSCOPED_INFO("binary parse");
             REQUIRE(count == 1);
             buf_t actual = sd.asBinary();
-            UNSCOPED_INFO("binary size");
             REQUIRE(actual.size() == (size_t)size);
-            UNSCOPED_INFO("binary data");
             REQUIRE(memcmp(&source[0], &actual[0], size) == 0);
         }
     }
@@ -262,12 +233,9 @@ namespace
         str << "'";
         LLSD sd;
         S32 count = LLSDSerialize::fromNotation(sd, str, str.str().size());
-        UNSCOPED_INFO("parse count");
         CHECK(count == 1);
         std::string actual = sd.asString();
-        UNSCOPED_INFO("string sizes");
-        REQUIRE(actual.size() == expected.size());
-        UNSCOPED_INFO("string content");
+        CHECK(actual.size() == expected.size());
         CHECK(actual == expected);
     }
 
@@ -284,23 +252,14 @@ namespace
             sd,
             stream,
             stream.str().size());
-        UNSCOPED_INFO("parse count");
         CHECK(count == 12);
-        UNSCOPED_INFO("bool value");
-        CHECK(sd["connect"].asBoolean() == true);
-        UNSCOPED_INFO("message value");
+        CHECK(sd["connect"].asBoolean());
         CHECK(sd["message"].asString() == msg);
-        UNSCOPED_INFO("pos x");
         CHECK(sd["position"][0].asReal() == 45.65);
-        UNSCOPED_INFO("pos y");
         CHECK(sd["position"][1].asReal() == 100.1);
-        UNSCOPED_INFO("pos z");
         CHECK(sd["position"][2].asReal() == 25.5);
-        UNSCOPED_INFO("look x");
         CHECK(sd["look_at"][0].asReal() == 0.0);
-        UNSCOPED_INFO("look y");
         CHECK(sd["look_at"][1].asReal() == 1.0);
-        UNSCOPED_INFO("look z");
         CHECK(sd["look_at"][2].asReal() == 0.0);
     }
 
@@ -313,15 +272,10 @@ namespace
             response,
             resp,
             resp.str().size());
-        UNSCOPED_INFO("parse count");
         CHECK(count == 5);
-        UNSCOPED_INFO("sd type");
         CHECK(response.type() == LLSD::TypeMap);
-        UNSCOPED_INFO("map element count");
-        REQUIRE(response.size() == 4);
-        UNSCOPED_INFO("singlechar");
+        CHECK(response.size() == 4);
         CHECK(response["singlechar"].asString() == "a");
-        UNSCOPED_INFO("empty");
         CHECK(response["empty"].asString() == "");
     }
 
@@ -333,27 +287,19 @@ namespace
         LLSD sd;
         LLMemoryStream mstr((U8*)str.c_str(), static_cast<S32>(str.size()));
         S32 count = LLSDSerialize::fromNotation(sd, mstr, str.size());
-        UNSCOPED_INFO("parse count");
         CHECK(count == 5);
-        UNSCOPED_INFO("sd created");
         REQUIRE(sd.isDefined());
-        UNSCOPED_INFO("sd type");
         CHECK(sd.type() == LLSD::TypeMap);
-        UNSCOPED_INFO("map element count");
         REQUIRE(sd.size() == 4);
-        UNSCOPED_INFO("label");
         CHECK(sd["label"].asString() ==
             "short binary test");
         std::vector<U8> bin =  sd["singlebinary"].asBinary();
         std::vector<U8> expected;
         expected.resize(1);
         expected[0] = 'A';
-        UNSCOPED_INFO("single binary");
         CHECK(memcmp(&bin[0], &expected[0], 1) == 0);
-        UNSCOPED_INFO("single string");
         CHECK(sd["singlerawstring"].asString() ==
             std::string("A"));
-        UNSCOPED_INFO("end");
         CHECK(sd["endoftest"].asString() == "end");
     }
 
@@ -366,16 +312,12 @@ namespace
             << "'}";
         std::string expected_str("{'message':'parcel \\'\\' is naughty.'}");
         std::string actual_str = str.str();
-        UNSCOPED_INFO("stream contents");
         CHECK(actual_str == expected_str);
         LLSD sd;
         S32 count = LLSDSerialize::fromNotation(sd, str, actual_str.size());
-        UNSCOPED_INFO("parse count");
         CHECK(count == 2);
-        UNSCOPED_INFO("valid parse");
-        REQUIRE(sd.isDefined());
+        CHECK(sd.isDefined());
         std::string actual = sd["message"].asString();
-        UNSCOPED_INFO("message contents");
         CHECK(actual == message);
     }
 
@@ -386,9 +328,7 @@ namespace
         str << "'" << LLSDNotationFormatter::escapeString(expected) << "'";
         LLSD sd;
         S32 count = LLSDSerialize::fromNotation(sd, str, str.str().size());
-        UNSCOPED_INFO("parse count");
         CHECK(count == 1);
-        UNSCOPED_INFO("string value");
         CHECK(sd.asString() == expected);
     }
 
@@ -399,9 +339,7 @@ namespace
         str << "'" << LLSDNotationFormatter::escapeString(expected) << "'";
         LLSD sd;
         S32 count = LLSDSerialize::fromNotation(sd, str, str.str().size());
-        UNSCOPED_INFO("parse count");
         CHECK(count == 1);
-        UNSCOPED_INFO("string value");
         CHECK(sd.asString() == expected);
     }
 
@@ -409,6 +347,7 @@ namespace
     {
         for(S32 i = 0; i < 1000; ++i)
         {
+            CAPTURE(i);
             // gen up a starting point
             std::string expected;
             srand(1337 + i);        /* Flawfinder: ignore */
@@ -421,7 +360,6 @@ namespace
             str << "'" << LLSDNotationFormatter::escapeString(expected) << "'";
             LLSD sd;
             S32 count = LLSDSerialize::fromNotation(sd, str, expected.size());
-            UNSCOPED_INFO("parse count");
             REQUIRE(count == 1);
             std::string actual = sd.asString();
 /*
@@ -453,7 +391,6 @@ namespace
                 LL_WARNS() << "actual:      " << a_str.str() << LL_ENDL;
             }
 */
-            UNSCOPED_INFO("string value");
             REQUIRE(actual == expected);
         }
     }
@@ -468,20 +405,14 @@ namespace
         istr.str(param);
         LLSD param_sd;
         LLSDSerialize::fromNotation(param_sd, istr, param.size());
-        UNSCOPED_INFO("parsed type");
         CHECK(param_sd.type() == LLSD::TypeArray);
         LLSD version_sd = param_sd[0];
-        UNSCOPED_INFO("version type");
         CHECK(version_sd.type() == LLSD::TypeMap);
-        UNSCOPED_INFO("has version");
-        REQUIRE(version_sd.has("version"));
-        UNSCOPED_INFO("version number");
+        CHECK(version_sd.has("version"));
         CHECK(version_sd["version"].asInteger() == 1);
         LLSD src_sd = param_sd[1];
-        UNSCOPED_INFO("src type");
         CHECK(src_sd.type() == LLSD::TypeMap);
         LLSD dst_sd = param_sd[2];
-        UNSCOPED_INFO("dst type");
         CHECK(dst_sd.type() == LLSD::TypeMap);
     }
 
@@ -492,19 +423,13 @@ namespace
         istr.str(val);
         LLSD sd;
         LLSDSerialize::fromNotation(sd, istr, val.size());
-        UNSCOPED_INFO("parsed type");
         CHECK(sd.type() == LLSD::TypeArray);
-        UNSCOPED_INFO("parsed size");
         REQUIRE(sd.size() == 1);
         LLSD failures = sd[0]["failures"];
-        UNSCOPED_INFO("no failures.");
-        REQUIRE(failures.isUndefined());
+        CHECK(failures.isUndefined());
         LLSD success = sd[0]["successfuls"];
-        UNSCOPED_INFO("success type");
         CHECK(success.type() == LLSD::TypeArray);
-        UNSCOPED_INFO("success size");
         REQUIRE(success.size() == 1);
-        UNSCOPED_INFO("success instance type");
         CHECK(success[0].type() == LLSD::TypeUUID);
     }
 
@@ -515,32 +440,20 @@ namespace
         istr.str(val);
         LLSD sd;
         LLSDSerialize::fromNotation(sd, istr, val.size());
-        UNSCOPED_INFO("parsed type");
         CHECK(sd.type() == LLSD::TypeArray);
-        UNSCOPED_INFO("parsed size");
         REQUIRE(sd.size() == 5);
-        UNSCOPED_INFO("element 0 false");
-        CHECK(sd[0].asBoolean() == false);
-        UNSCOPED_INFO("element 1 true");
-        CHECK(sd[1].asBoolean() == true);
-        UNSCOPED_INFO("element 2 false");
-        CHECK(sd[2].asBoolean() == false);
-        UNSCOPED_INFO("element 3 true");
-        CHECK(sd[3].asBoolean() == true);
+        CHECK_FALSE(sd[0].asBoolean());
+        CHECK(sd[1].asBoolean());
+        CHECK_FALSE(sd[2].asBoolean());
+        CHECK(sd[3].asBoolean());
         LLSD map = sd[4];
-        UNSCOPED_INFO("element 4 type");
         CHECK(map.type() == LLSD::TypeMap);
-        UNSCOPED_INFO("map foo type");
         CHECK(map["foo"].type() == LLSD::TypeBoolean);
-        UNSCOPED_INFO("map foo value");
-        CHECK(map["foo"].asBoolean() == true);
-        UNSCOPED_INFO("map bar type");
+        CHECK(map["foo"].asBoolean());
         CHECK(map["bar"].type() == LLSD::TypeBoolean);
-        UNSCOPED_INFO("map bar value");
-        CHECK(map["bar"].asBoolean() == false);
+        CHECK_FALSE(map["bar"].asBoolean());
     }
 
-    // U64_to_str
     TEST_CASE("U64_conversion: U64_to_str writes the digits and truncates to the buffer", "[U64_conversion]")
     {
         U64 val;
@@ -553,21 +466,18 @@ namespace
 
         U64_to_str(val, result, sizeof(result));
         result_str = (const char*) result;
-        UNSCOPED_INFO("U64_to_str converted 1.1");
         CHECK(val_str == result_str);
 
         val = 0;
         val_str = "0";
         U64_to_str(val, result, sizeof(result));
         result_str = (const char*) result;
-        UNSCOPED_INFO("U64_to_str converted 1.2");
         CHECK(val_str == result_str);
 
         val = U64L(18446744073709551615); // 0xFFFFFFFFFFFFFFFF
         val_str = "18446744073709551615";
         U64_to_str(val, result, sizeof(result));
         result_str = (const char*) result;
-        UNSCOPED_INFO("U64_to_str converted 1.3");
         CHECK(val_str == result_str);
 
         // overflow - will result in warning at compile time
@@ -575,28 +485,24 @@ namespace
         val_str = "0";
         U64_to_str(val, result, sizeof(result));
         result_str = (const char*) result;
-        UNSCOPED_INFO("U64_to_str converted 1.4");
         CHECK(val_str == result_str);
 
         val = U64(-1); // 0xFFFFFFFFFFFFFFFF == 18446744073709551615
         val_str = "18446744073709551615";
         U64_to_str(val, result, sizeof(result));
         result_str = (const char*) result;
-        UNSCOPED_INFO("U64_to_str converted 1.5");
         CHECK(val_str == result_str);
 
         val = U64L(10000000000000000000); // testing preserving of 0s
         val_str = "10000000000000000000";
         U64_to_str(val, result, sizeof(result));
         result_str = (const char*) result;
-        UNSCOPED_INFO("U64_to_str converted 1.6");
         CHECK(val_str == result_str);
 
         val = 1; // testing no leading 0s
         val_str = "1";
         U64_to_str(val, result, sizeof(result));
         result_str = (const char*) result;
-        UNSCOPED_INFO("U64_to_str converted 1.7");
         CHECK(val_str == result_str);
 
         val = U64L(18446744073709551615); // testing exact sized buffer for result
@@ -604,7 +510,6 @@ namespace
         memset(result, 'A', sizeof(result)); // initialize buffer with all 'A'
         U64_to_str(val, result, sizeof("18446744073709551615")); //pass in the exact size
         result_str = (const char*) result;
-        UNSCOPED_INFO("U64_to_str converted 1.8");
         CHECK(val_str == result_str);
 
         val = U64L(18446744073709551615); // testing smaller sized buffer for result
@@ -612,11 +517,9 @@ namespace
         memset(result, 'A', sizeof(result)); // initialize buffer with all 'A'
         U64_to_str(val, result, 5); //pass in a size of 5. should only copy first 4 integers and add a null terminator
         result_str = (const char*) result;
-        UNSCOPED_INFO("U64_to_str converted 1.9");
         CHECK(val_str == result_str);
     }
 
-    // str_to_U64
     TEST_CASE("U64_conversion: str_to_U64 reads the first run of digits and wraps on overflow", "[U64_conversion]")
     {
         U64 val;
@@ -624,59 +527,48 @@ namespace
 
         val = U64L(18446744073709551610); // slightly less than MAX_U64
         result = str_to_U64("18446744073709551610");
-        UNSCOPED_INFO("str_to_U64 converted 2.1");
         CHECK(val == result);
 
         val = U64L(0); // empty string
         result = str_to_U64(LLStringUtil::null);
-        UNSCOPED_INFO("str_to_U64 converted 2.2");
         CHECK(val == result);
 
         val = U64L(0); // 0
         result = str_to_U64("0");
-        UNSCOPED_INFO("str_to_U64 converted 2.3");
         CHECK(val == result);
 
         val = U64L(18446744073709551615); // 0xFFFFFFFFFFFFFFFF
         result = str_to_U64("18446744073709551615");
-        UNSCOPED_INFO("str_to_U64 converted 2.4");
         CHECK(val == result);
 
         // overflow - will result in warning at compile time
         val = U64L(18446744073709551615) + 1; // overflow 0xFFFFFFFFFFFFFFFF + 1 == 0
         result = str_to_U64("18446744073709551616");
-        UNSCOPED_INFO("str_to_U64 converted 2.5");
         CHECK(val == result);
 
         val = U64L(1234); // process till first non-integral character
         result = str_to_U64("1234A5678");
-        UNSCOPED_INFO("str_to_U64 converted 2.6");
         CHECK(val == result);
 
         val = U64L(5678); // skip all non-integral characters
         result = str_to_U64("ABCD5678");
-        UNSCOPED_INFO("str_to_U64 converted 2.7");
         CHECK(val == result);
 
         // should it skip negative sign and process
         // rest of string or return 0
         val = U64L(1234); // skip initial negative sign
         result = str_to_U64("-1234");
-        UNSCOPED_INFO("str_to_U64 converted 2.8");
         CHECK(val == result);
 
         val = U64L(5678); // stop at negative sign in the middle
         result = str_to_U64("5678-1234");
-        UNSCOPED_INFO("str_to_U64 converted 2.9");
         CHECK(val == result);
 
         val = U64L(0); // no integers
         result = str_to_U64("AaCD");
-        UNSCOPED_INFO("str_to_U64 converted 2.10");
         CHECK(val == result);
     }
 
-    // U64_to_F64
     TEST_CASE("U64_conversion: U64_to_F64 converts values from zero to the largest U64", "[U64_conversion]")
     {
         F64 val;
@@ -684,38 +576,31 @@ namespace
 
         result = 18446744073709551610.0;
         val = U64_to_F64(U64L(18446744073709551610));
-        UNSCOPED_INFO("U64_to_F64 converted 3.1");
         CHECK(val == result);
 
         result = 18446744073709551615.0; // 0xFFFFFFFFFFFFFFFF
         val = U64_to_F64(U64L(18446744073709551615));
-        UNSCOPED_INFO("U64_to_F64 converted 3.2");
         CHECK(val == result);
 
         result = 0.0; // overflow 0xFFFFFFFFFFFFFFFF + 1 == 0
         // overflow - will result in warning at compile time
         val = U64_to_F64(U64L(18446744073709551615)+1);
-        UNSCOPED_INFO("U64_to_F64 converted 3.3");
         CHECK(val == result);
 
         result = 0.0; // 0
         val = U64_to_F64(U64L(0));
-        UNSCOPED_INFO("U64_to_F64 converted 3.4");
         CHECK(val == result);
 
         result = 1.0; // odd
         val = U64_to_F64(U64L(1));
-        UNSCOPED_INFO("U64_to_F64 converted 3.5");
         CHECK(val == result);
 
         result = 2.0; // even
         val = U64_to_F64(U64L(2));
-        UNSCOPED_INFO("U64_to_F64 converted 3.6");
         CHECK(val == result);
 
         result = F64(0x7FFFFFFFFFFFFFFF) * 1.0; // 0x7FFFFFFFFFFFFFFF
         val = U64_to_F64(U64L(0x7FFFFFFFFFFFFFFF));
-        UNSCOPED_INFO("U64_to_F64 converted 3.7");
         CHECK(val == result);
     }
 }

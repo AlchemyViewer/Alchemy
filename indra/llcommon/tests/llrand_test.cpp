@@ -42,18 +42,15 @@
 // In llrand.h, every function is documented to return less than the high end
 // -- specifically, because you can pass a negative extent, they're documented
 // never to return a value equal to the extent.
-// So that we don't need two different versions of ensure_in_range(), when
+// So that we don't need two different versions of require_in_range(), when
 // testing extent < 0, negate the return value and the extent before passing
-// into ensure_in_range().
+// into require_in_range().
 template <typename NUMBER>
-static void ensure_in_range(const std::string_view& name,
-                            NUMBER value, NUMBER low, NUMBER high)
+static void require_in_range(const std::string_view& name,
+                             NUMBER value, NUMBER low, NUMBER high)
 {
-    auto failmsg{ stringize(name, " >= ", low, " (", value, ')') };
-    UNSCOPED_INFO(failmsg);
+    INFO(name);
     REQUIRE(value >= low);
-    failmsg = stringize(name, " < ", high, " (", value, ')');
-    UNSCOPED_INFO(failmsg);
     REQUIRE(value < high);
 }
 
@@ -77,7 +74,7 @@ namespace
     }
 
     // That `draws` spread over `counts` as evenly as chance allows.
-    void ensure_uniform(const std::string& name, const std::vector<U64>& counts, U64 draws)
+    void require_uniform(const std::string& name, const std::vector<U64>& counts, U64 draws)
     {
         const F64 expected = F64(draws) / F64(counts.size());
         F64 stat = 0.0;
@@ -87,12 +84,12 @@ namespace
             stat += off * off / expected;
         }
         const F64 limit = chi_square_limit(counts.size() - 1);
-        UNSCOPED_INFO(stringize(name, ": chi-square ", stat, " under ", limit));
+        INFO(name << ": chi-square");
         REQUIRE(stat < limit);
     }
 
     // That draws uniform over [0, 1) have its mean, 1/2, and variance, 1/12.
-    void ensure_unit_moments(const std::string& name, F64 sum, F64 sum_of_squares, U64 draws)
+    void require_unit_moments(const std::string& name, F64 sum, F64 sum_of_squares, U64 draws)
     {
         const F64 n        = F64(draws);
         const F64 mean     = sum / n;
@@ -101,9 +98,9 @@ namespace
         // fourth central moment, 1/80, less its square, over n.
         const F64 mean_bound     = ONE_IN_A_MILLION_Z * std::sqrt(1.0 / 12.0 / n);
         const F64 variance_bound = ONE_IN_A_MILLION_Z * std::sqrt((1.0 / 80.0 - 1.0 / 144.0) / n);
-        UNSCOPED_INFO(stringize(name, ": mean ", mean));
+        INFO(name);
+        CAPTURE(mean, variance);
         REQUIRE(std::fabs(mean - 0.5) < mean_bound);
-        UNSCOPED_INFO(stringize(name, ": variance ", variance));
         REQUIRE(std::fabs(variance - 1.0 / 12.0) < variance_bound);
     }
 
@@ -147,7 +144,7 @@ namespace
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
-            ensure_in_range("frand", ll_frand(), 0.0f, 1.0f);
+            require_in_range("frand", ll_frand(), 0.0f, 1.0f);
         }
     }
 
@@ -155,7 +152,7 @@ namespace
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
-            ensure_in_range("drand", ll_drand(), 0.0, 1.0);
+            require_in_range("drand", ll_drand(), 0.0, 1.0);
         }
     }
 
@@ -163,7 +160,7 @@ namespace
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
-            ensure_in_range("frand(2.0f)", ll_frand(2.0f) - 1.0f, -1.0f, 1.0f);
+            require_in_range("frand(2.0f)", ll_frand(2.0f) - 1.0f, -1.0f, 1.0f);
         }
     }
 
@@ -173,7 +170,7 @@ namespace
         {
             // Negate the result so we don't have to allow a templated low-end
             // comparison as well.
-            ensure_in_range("-frand(-7.0)", -ll_frand(-7.0), 0.0f, 7.0f);
+            require_in_range("-frand(-7.0)", -ll_frand(-7.0), 0.0f, 7.0f);
         }
     }
 
@@ -181,7 +178,7 @@ namespace
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
-            ensure_in_range("-drand(-2.0)", -ll_drand(-2.0), 0.0, 2.0);
+            require_in_range("-drand(-2.0)", -ll_drand(-2.0), 0.0, 2.0);
         }
     }
 
@@ -189,7 +186,7 @@ namespace
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
-            ensure_in_range("rand(100)", ll_rand(100), 0, 100);
+            require_in_range("rand(100)", ll_rand(100), 0, 100);
         }
     }
 
@@ -197,38 +194,34 @@ namespace
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
-            ensure_in_range("-rand(-127)", -ll_rand(-127), 0, 127);
+            require_in_range("-rand(-127)", -ll_rand(-127), 0, 127);
         }
     }
 
-    // Tests 8 to 15 hold for any generator under llrand. Tests 16 to 18 are
-    // what the generator itself draws, and change when it does.
+    // The cases from here to the one on scaling unit values hold for any
+    // generator under llrand. The last three are what the generator itself
+    // draws, and change when it does.
 
     TEST_CASE_METHOD(random, "LLSeedRand: extents of zero or one give zero and the widest extents stay in range", "[LLSeedRand]")
     {
         ll_rand_seed(8);
         for (S32 ii = 0; ii < 10000; ++ii)
         {
-            UNSCOPED_INFO("rand(0)");
             REQUIRE(ll_rand(0) == 0);
-            UNSCOPED_INFO("rand(1)");
             REQUIRE(ll_rand(1) == 0);
-            UNSCOPED_INFO("rand(-1)");
             REQUIRE(ll_rand(-1) == 0);
-            UNSCOPED_INFO("frand(0)");
             REQUIRE(ll_frand(0.f) == 0.f);
-            UNSCOPED_INFO("drand(0)");
             REQUIRE(ll_drand(0.0) == 0.0);
 
-            ensure_in_range("rand(INT_MAX)", ll_rand(INT_MAX), 0, INT_MAX);
+            require_in_range("rand(INT_MAX)", ll_rand(INT_MAX), 0, INT_MAX);
             const S32 lowest = ll_rand(INT_MIN);
-            UNSCOPED_INFO(stringize("rand(INT_MIN) in (INT_MIN, 0] (", lowest, ')'));
+            CAPTURE(lowest);
             REQUIRE((lowest > INT_MIN && lowest <= 0));
 
-            ensure_in_range("frand(FLT_MAX)", ll_frand(std::numeric_limits<F32>::max()), 0.f, std::numeric_limits<F32>::max());
-            ensure_in_range("frand(FLT_MIN)", ll_frand(std::numeric_limits<F32>::min()), 0.f, std::numeric_limits<F32>::min());
-            ensure_in_range("drand(DBL_MAX)", ll_drand(std::numeric_limits<F64>::max()), 0.0, std::numeric_limits<F64>::max());
-            ensure_in_range("drand(DBL_MIN)", ll_drand(std::numeric_limits<F64>::min()), 0.0, std::numeric_limits<F64>::min());
+            require_in_range("frand(FLT_MAX)", ll_frand(std::numeric_limits<F32>::max()), 0.f, std::numeric_limits<F32>::max());
+            require_in_range("frand(FLT_MIN)", ll_frand(std::numeric_limits<F32>::min()), 0.f, std::numeric_limits<F32>::min());
+            require_in_range("drand(DBL_MAX)", ll_drand(std::numeric_limits<F64>::max()), 0.0, std::numeric_limits<F64>::max());
+            require_in_range("drand(DBL_MIN)", ll_drand(std::numeric_limits<F64>::min()), 0.0, std::numeric_limits<F64>::min());
         }
     }
 
@@ -237,7 +230,6 @@ namespace
         ll_rand_seed(1234);
         const std::vector<F64> first = draw_each(16);
         ll_rand_seed(1234);
-        UNSCOPED_INFO("the same seed draws the same");
         CHECK(draw_each(16) == first);
 
         std::vector<F64> elsewhere;
@@ -245,11 +237,9 @@ namespace
             ll_rand_seed(1234);
             elsewhere = draw_each(16);
         }).join();
-        UNSCOPED_INFO("on another thread too");
         CHECK(elsewhere == first);
 
         ll_rand_seed(1235);
-        UNSCOPED_INFO("another seed draws otherwise");
         CHECK(draw_each(16) != first);
     }
 
@@ -264,7 +254,7 @@ namespace
             {
                 ++counts.at(ll_rand(n));
             }
-            ensure_uniform(stringize("rand(", n, ")"), counts, draws);
+            require_uniform(stringize("rand(", n, ")"), counts, draws);
         }
 
         std::vector<U64> counts(7);
@@ -272,7 +262,7 @@ namespace
         {
             ++counts.at(-ll_rand(-7));
         }
-        ensure_uniform("rand(-7)", counts, draws);
+        require_uniform("rand(-7)", counts, draws);
     }
 
     TEST_CASE_METHOD(random, "LLSeedRand: frand() and drand() spread evenly over the unit interval", "[LLSeedRand]")
@@ -295,10 +285,10 @@ namespace
             drand_sum += d;
             drand_squares += d * d;
         }
-        ensure_uniform("frand", frand_bins, draws);
-        ensure_uniform("drand", drand_bins, draws);
-        ensure_unit_moments("frand", frand_sum, frand_squares, draws);
-        ensure_unit_moments("drand", drand_sum, drand_squares, draws);
+        require_uniform("frand", frand_bins, draws);
+        require_uniform("drand", drand_bins, draws);
+        require_unit_moments("frand", frand_sum, frand_squares, draws);
+        require_unit_moments("drand", drand_sum, drand_squares, draws);
     }
 
     TEST_CASE_METHOD(random, "LLSeedRand: rand_u32() draws each byte evenly and sets each bit half the time", "[LLSeedRand]")
@@ -321,11 +311,11 @@ namespace
         }
         for (U32 byte = 0; byte < 4; ++byte)
         {
-            ensure_uniform(stringize("byte ", byte), bytes[byte], draws);
+            require_uniform(stringize("byte ", byte), bytes[byte], draws);
         }
         for (U32 bit = 0; bit < 32; ++bit)
         {
-            ensure_uniform(stringize("bit ", bit), { ones[bit], draws - ones[bit] }, draws);
+            require_uniform(stringize("bit ", bit), { ones[bit], draws - ones[bit] }, draws);
         }
     }
 
@@ -337,13 +327,9 @@ namespace
         first.join();
         second.join();
         const std::vector<F64> here = draw_drand(8);
-        UNSCOPED_INFO("two threads draw apart");
         CHECK(one != two);
-        {
-            INFO("and apart from this one");
-            CHECK(one != here);
-            CHECK(two != here);
-        }
+        CHECK(one != here);
+        CHECK(two != here);
     }
 
     TEST_CASE_METHOD(random, "LLSeedRand: seeding and drawing on another thread leaves this thread's draws alone", "[LLSeedRand]")
@@ -358,7 +344,6 @@ namespace
         drawn.insert(drawn.end(), after.begin(), after.end());
 
         ll_rand_seed(14);
-        UNSCOPED_INFO("this thread's draws went on as if alone");
         CHECK(draw_drand(8) == drawn);
     }
 
@@ -368,44 +353,29 @@ namespace
         const F64 top53 = 1.0 - 0x1p-53;
         const F64 top48 = 1.0 - 0x1p-48;
 
-        UNSCOPED_INFO("0 of 100");
         CHECK(extentS32(0.0, 100) == 0);
-        UNSCOPED_INFO("a half of 100");
         CHECK(extentS32(0.5, 100) == 50);
-        UNSCOPED_INFO("the top of 100, to 48 bits");
         CHECK(extentS32(top48, 100) == 99);
-        UNSCOPED_INFO("the top of 100, to 53 bits");
         CHECK(extentS32(top53, 100) == 99);
-        UNSCOPED_INFO("the top of INT_MAX");
         CHECK(extentS32(top53, INT_MAX) == INT_MAX - 1);
-        UNSCOPED_INFO("the top of 2^30");
         CHECK(extentS32(top53, 1 << 30) == (1 << 30) - 1);
-        UNSCOPED_INFO("a half of -7, toward zero");
         CHECK(extentS32(0.5, -7) == -3);
-        UNSCOPED_INFO("the top of -7");
         CHECK(extentS32(top53, -7) == -6);
-        UNSCOPED_INFO("the top of INT_MIN");
         CHECK(extentS32(top53, INT_MIN) == INT_MIN + 1);
         UNSCOPED_INFO("a unit of 1 gives 0, not the extent");
         CHECK(extentS32(1.0, 100) == 0);
-        UNSCOPED_INFO("nor the negative extent");
+        UNSCOPED_INFO("a unit of 1 gives 0, not the negative extent");
         CHECK(extentS32(1.0, -100) == 0);
 
-        UNSCOPED_INFO("a half of 2");
         CHECK(extentReal<F32>(0.5f, 2.f) == 1.f);
-        UNSCOPED_INFO("a half of -7");
         CHECK(extentReal<F32>(0.5f, -7.f) == -3.5f);
-        UNSCOPED_INFO("0 of 0");
         CHECK(extentReal<F64>(0.5, 0.0) == 0.0);
-        UNSCOPED_INFO("the top F32 of 3 stays under 3");
         CHECK(extentReal<F32>(1.f - 0x1p-24f, 3.f) < 3.f);
-        UNSCOPED_INFO("the top F64 of 3 stays under 3");
         CHECK(extentReal<F64>(top53, 3.0) < 3.0);
-        UNSCOPED_INFO("the top F64 of -3 stays over -3");
         CHECK(extentReal<F64>(top53, -3.0) > -3.0);
         UNSCOPED_INFO("a unit of 1 gives 0, not the extent");
         CHECK(extentReal<F32>(1.f, 2.f) == 0.f);
-        UNSCOPED_INFO("nor the negative extent");
+        UNSCOPED_INFO("a unit of 1 gives 0, not the negative extent");
         CHECK(extentReal<F64>(1.0, -2.0) == 0.0);
     }
 
@@ -414,20 +384,15 @@ namespace
         using namespace ALRandMap;
         const U64 all = ~U64(0);
 
-        UNSCOPED_INFO("0");
         CHECK(unitF64(0) == 0.0);
-        UNSCOPED_INFO("a half");
         CHECK(unitF64(U64(1) << 63) == 0.5);
-        UNSCOPED_INFO("the top");
         CHECK(unitF64(all) == 1.0 - 0x1p-53);
         UNSCOPED_INFO("the low 11 bits are passed over");
         CHECK(unitF64(0x7FF) == 0.0);
         UNSCOPED_INFO("the lowest bit used");
         CHECK(unitF64(0x800) == 0x1p-53);
 
-        UNSCOPED_INFO("0");
         CHECK(unitF32(0) == 0.f);
-        UNSCOPED_INFO("a half");
         CHECK(unitF32(U64(1) << 63) == 0.5f);
         UNSCOPED_INFO("the top, which does not round up to 1");
         CHECK(unitF32(all) == 1.f - 0x1p-24f);
@@ -436,11 +401,8 @@ namespace
         UNSCOPED_INFO("the lowest bit used");
         CHECK(unitF32(U64(1) << 40) == 0x1p-24f);
 
-        UNSCOPED_INFO("the bits of 0");
         CHECK(bitsU32(0) == 0u);
-        UNSCOPED_INFO("the top 32 bits");
         CHECK(bitsU32(0x123456789ABCDEF0) == 0x12345678u);
-        UNSCOPED_INFO("the bits of the top");
         CHECK(bitsU32(all) == 0xFFFFFFFFu);
     }
 
@@ -456,25 +418,25 @@ namespace
         ll_rand_seed(42);
         for (S32 ii = 0; ii < 8; ++ii)
         {
-            UNSCOPED_INFO(stringize("drand ", ii));
+            CAPTURE(ii);
             REQUIRE(ll_drand() == drand[ii]);
         }
         ll_rand_seed(42);
         for (S32 ii = 0; ii < 8; ++ii)
         {
-            UNSCOPED_INFO(stringize("frand ", ii));
+            CAPTURE(ii);
             REQUIRE(ll_frand() == frand[ii]);
         }
         ll_rand_seed(42);
         for (S32 ii = 0; ii < 8; ++ii)
         {
-            UNSCOPED_INFO(stringize("rand(100) ", ii));
+            CAPTURE(ii);
             REQUIRE(ll_rand(100) == rand100[ii]);
         }
         ll_rand_seed(42);
         for (S32 ii = 0; ii < 8; ++ii)
         {
-            UNSCOPED_INFO(stringize("rand_u32 ", ii));
+            CAPTURE(ii);
             REQUIRE(ll_rand_u32() == u32[ii]);
         }
     }
@@ -486,13 +448,14 @@ namespace
         bool frand_last_bit = false;
         for (S32 ii = 0; ii < 100000; ++ii)
         {
+            CAPTURE(ii);
             const F64 drawn = std::ldexp(ll_drand(), 53);
-            UNSCOPED_INFO(stringize("drand ", ii, " is a multiple of 2^-53"));
+            UNSCOPED_INFO("drand is a multiple of 2^-53");
             REQUIRE(drawn == std::floor(drawn));
             drand_last_bit = drand_last_bit || std::fmod(drawn, 2.0) != 0.0;
 
             const F64 drawn_f = std::ldexp(F64(ll_frand()), 24);
-            UNSCOPED_INFO(stringize("frand ", ii, " is a multiple of 2^-24"));
+            UNSCOPED_INFO("frand is a multiple of 2^-24");
             REQUIRE(drawn_f == std::floor(drawn_f));
             frand_last_bit = frand_last_bit || std::fmod(drawn_f, 2.0) != 0.0;
         }

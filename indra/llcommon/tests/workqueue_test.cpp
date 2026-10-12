@@ -44,12 +44,9 @@ namespace
 
     TEST_CASE_METHOD(workqueue_data, "workqueue: a schedule is findable by name and an unnamed one gets a default", "[workqueue]")
     {
-        UNSCOPED_INFO("didn't capture name");
         CHECK(queue.getKey() == "queue");
-        UNSCOPED_INFO("not findable");
         CHECK(WorkSchedule::getInstance("queue") == queue.getWeak().lock());
         WorkSchedule q2;
-        UNSCOPED_INFO("has no name");
         CHECK(LLStringUtil::startsWith(q2.getKey(), "WorkQueue"));
     }
 
@@ -63,7 +60,6 @@ namespace
         UNSCOPED_INFO("ran too soon");
         CHECK_FALSE(wasRun);
         queue.runUntilClose();
-        UNSCOPED_INFO("didn't run");
         CHECK(wasRun);
     }
 
@@ -111,7 +107,6 @@ namespace
         }
         // Take a copy of the captured deque.
         Shared result = data.get();
-        UNSCOPED_INFO("called wrong number of times");
         REQUIRE(result.size() == 3);
         // postEvery() assumes you want the first call to happen right away.
         // Pretend our start time was (interval) earlier than that, to make
@@ -123,10 +118,9 @@ namespace
             start += interval;
             try
             {
-                UNSCOPED_INFO((STRINGIZE("call " << i << " too soon")));
-                REQUIRE((diff >= interval));
-                UNSCOPED_INFO((STRINGIZE("call " << i << " too late")));
-                REQUIRE((diff < interval*1.5));
+                CAPTURE(i);
+                REQUIRE(diff >= interval);
+                REQUIRE(diff < interval*1.5);
             }
             catch (const ll_test::Failure&)
             {
@@ -156,7 +150,6 @@ namespace
         qptr->runOne();
         // this should run the callback
         main.runOne();
-        UNSCOPED_INFO("failed to run int callback");
         CHECK(result == 17);
 
         std::string alpha;
@@ -167,7 +160,6 @@ namespace
             [&alpha](const std::string& s){ alpha = s; });
         qptr->runPending();
         main.runPending();
-        UNSCOPED_INFO("failed to run string callback");
         CHECK(alpha == "abc");
     }
 
@@ -186,7 +178,6 @@ namespace
             [&observe](){ observe.append(";main"); });
         qptr->runOne();
         main.runOne();
-        UNSCOPED_INFO("failed to run both lambdas");
         CHECK(observe == "queue;main");
     }
 
@@ -199,11 +190,11 @@ namespace
                 [this, &stored](){ stored = queue.waitForResult(
                         [](){ return "should throw"; }); }) };
         UNSCOPED_INFO("lambda should not have run");
-        REQUIRE(stored.empty());
+        CHECK(stored.empty());
         UNSCOPED_INFO("waitForResult() should have thrown");
-        REQUIRE_FALSE(what.empty());
-        UNSCOPED_INFO((STRINGIZE("should mention waitForResult: " << what)));
-        REQUIRE(what.find("waitForResult") != std::string::npos);
+        CHECK_FALSE(what.empty());
+        UNSCOPED_INFO("exception: " << what);
+        CHECK(what.find("waitForResult") != std::string::npos);
 
         // Call waitForResult() on a coroutine, with a string result.
         LLCoros::instance().launch(
@@ -217,7 +208,6 @@ namespace
         // 'queue'. Service it.
         queue.runOne();
         llcoro::suspend();
-        UNSCOPED_INFO("bad waitForResult return");
         CHECK(stored == "string result");
 
         // Call waitForResult() on a coroutine, with a void callable.
@@ -233,7 +223,6 @@ namespace
         llcoro::suspend();
         queue.runOne();
         llcoro::suspend();
-        UNSCOPED_INFO("didn't run coroutine");
         CHECK(stored == "ran");
         UNSCOPED_INFO("void waitForResult() didn't return");
         CHECK(done);

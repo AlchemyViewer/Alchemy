@@ -49,7 +49,6 @@ namespace
         LLFrameTimer timer;
         timer.setExpiryAt(seconds_since_epoch);
         F64 expires_at = timer.expiresAt();
-        UNSCOPED_INFO("set expiry matches get expiry");
         CHECK_THAT(expires_at,
             ll_test::WithinDistance<double>(seconds_since_epoch,
             0.001));
@@ -62,14 +61,12 @@ namespace
         LLFrameTimer timer;
         timer.setExpiryAt(seconds_since_epoch);
         F64 expires_at = timer.expiresAt();
-        UNSCOPED_INFO("set expiry matches get expiry 1");
         CHECK_THAT(expires_at,
             ll_test::WithinDistance<double>(seconds_since_epoch,
             0.001));
         seconds_since_epoch += 10.0;
         timer.setExpiryAt(seconds_since_epoch);
         expires_at = timer.expiresAt();
-        UNSCOPED_INFO("set expiry matches get expiry 2");
         CHECK_THAT(expires_at,
             ll_test::WithinDistance<double>(seconds_since_epoch,
             0.001));
@@ -101,7 +98,6 @@ namespace
             LLFrameTimer::updateFrameTime();
             iterations_until_expiration++;
         }
-        UNSCOPED_INFO("timer took too long to expire");
         CHECK(iterations_until_expiration <= 10);
     }
 
@@ -131,7 +127,6 @@ namespace
         LLFrameTimer::updateFrameTime();
         const F32 ran = timer.getElapsedTimeF32();
         timer.stop();
-        UNSCOPED_INFO("stopped");
         CHECK_FALSE(timer.getStarted());
         UNSCOPED_INFO("the time it ran");
         CHECK_THAT(timer.getElapsedTimeF32(), ll_test::WithinBits(ran, 12));
@@ -154,7 +149,6 @@ namespace
         LLFrameTimer::updateFrameTime();
         timer.pause();
         timer.reset();
-        UNSCOPED_INFO("still paused");
         CHECK_FALSE(timer.getStarted());
         UNSCOPED_INFO("no time run");
         CHECK_THAT(timer.getElapsedTimeF32(), ll_test::WithinBits(0.f, 12));
@@ -167,7 +161,6 @@ namespace
         CHECK_THAT(timer.getElapsedTimeF32(), ll_test::WithinBits(0.f, 12));
         timer.pause();
         timer.start();
-        UNSCOPED_INFO("started");
         CHECK(timer.getStarted());
         UNSCOPED_INFO("start() runs from zero, paused or not");
         CHECK_THAT(timer.getElapsedTimeF32(), ll_test::WithinBits(0.f, 12));

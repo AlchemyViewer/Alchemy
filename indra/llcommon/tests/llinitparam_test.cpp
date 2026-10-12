@@ -129,10 +129,10 @@ struct ChoiceOfThings : public LLInitParam::ChoiceBlock<ChoiceOfThings>
     {}
 };
 
-// The same, built only by test 9. A choice block starts with its first
-// alternative chosen only when it is the first of its type, the one whose
-// construction builds the type's descriptor: with a type of its own, test 9
-// sees that whatever ran before it.
+// The same, built only by the case on choosing one alternative. A choice block
+// starts with its first alternative chosen only when it is the first of its
+// type, the one whose construction builds the type's descriptor: with a type of
+// its own, that case sees that whatever ran before it.
 struct FirstChoiceOfThings : public LLInitParam::ChoiceBlock<FirstChoiceOfThings>
 {
     Alternative<S32>            number;
@@ -241,15 +241,10 @@ namespace
     {
         SimpleBlock block;
 
-        UNSCOPED_INFO("nothing provided yet");
         CHECK_FALSE(block.name.isProvided());
-        UNSCOPED_INFO("nothing provided yet");
         CHECK_FALSE(block.count.isProvided());
-        UNSCOPED_INFO("declared default survives");
         CHECK(block.count() == 7);
-        UNSCOPED_INFO("declared default survives");
-        CHECK(block.flag() == false);
-        UNSCOPED_INFO("block itself is not provided");
+        CHECK_FALSE(block.flag());
         CHECK_FALSE(block.isProvided());
     }
 
@@ -258,13 +253,9 @@ namespace
         SimpleBlock block;
         block.count = 42;
 
-        UNSCOPED_INFO("assignment provides");
         CHECK(block.count.isProvided());
-        UNSCOPED_INFO("assignment stores");
         CHECK(block.count() == 42);
-        UNSCOPED_INFO("sibling untouched");
         CHECK_FALSE(block.flag.isProvided());
-        UNSCOPED_INFO("block became provided");
         CHECK(block.isProvided());
     }
 
@@ -275,7 +266,6 @@ namespace
         CHECK_FALSE(block.validateBlock(false));
 
         block.name = std::string("widget");
-        UNSCOPED_INFO("supplied mandatory passes validation");
         CHECK(block.validateBlock(false));
     }
 
@@ -285,9 +275,7 @@ namespace
         block.count = 3;    // declared on SimpleBlock
         block.scale = 2.f;  // declared on DerivedBlock
 
-        UNSCOPED_INFO("base parameter readable");
         CHECK(block.count() == 3);
-        UNSCOPED_INFO("derived parameter readable");
         CHECK(block.scale() == 2.f);
 
         // The base's Mandatory is aggregated into the derived table, so it
@@ -295,32 +283,24 @@ namespace
         UNSCOPED_INFO("inherited mandatory still required");
         CHECK_FALSE(block.validateBlock(false));
         block.name = std::string("derived");
-        UNSCOPED_INFO("inherited mandatory satisfied");
         CHECK(block.validateBlock(false));
     }
 
     TEST_CASE("llinitparam: named values resolve by name and by number", "[llinitparam]")
     {
         S32 value = 0;
-        UNSCOPED_INFO("known name resolves");
         CHECK(TestNames::getValueFromName("two", value));
-        UNSCOPED_INFO("known name resolves to its value");
         CHECK(value == 2);
-        UNSCOPED_INFO("unknown name does not resolve");
         CHECK_FALSE(TestNames::getValueFromName("nine", value));
 
         SimpleBlock block;
         block.named = std::string("one");
-        UNSCOPED_INFO("assignment by name sets the value");
         CHECK(block.named() == 1);
-        UNSCOPED_INFO("assignment by name records the name");
         CHECK(block.named.getValueName() == std::string("one"));
 
         block.named = 2;
-        UNSCOPED_INFO("assignment by value sets the value");
         CHECK(block.named() == 2);
-        UNSCOPED_INFO("assignment by value clears the name");
-        REQUIRE(block.named.getValueName().empty());
+        CHECK(block.named.getValueName().empty());
     }
 
     TEST_CASE("llinitparam: Multiple counts elements and enforces its range", "[llinitparam]")
@@ -328,8 +308,7 @@ namespace
         OuterBlock block;
         UNSCOPED_INFO("empty list is below AtLeast<2>");
         CHECK_FALSE(block.list.isValid());
-        UNSCOPED_INFO("empty list has no elements");
-        REQUIRE(block.list.size() == size_t(0));
+        CHECK(block.list.size() == size_t(0));
 
         block.list.add(10);
         UNSCOPED_INFO("one element is still below AtLeast<2>");
@@ -337,25 +316,19 @@ namespace
 
         block.list.add(20);
         UNSCOPED_INFO("two elements satisfy AtLeast<2>");
-        CHECK(block.list.isValid());
-        UNSCOPED_INFO("elements are kept in order");
+        REQUIRE(block.list.isValid());
         CHECK(block.list()[0]() == 10);
-        UNSCOPED_INFO("elements are kept in order");
         CHECK(block.list()[1]() == 20);
     }
 
     TEST_CASE("llinitparam: a parameter that is a block is provided by its children", "[llinitparam]")
     {
         OuterBlock block;
-        UNSCOPED_INFO("untouched sub-block is not provided");
         CHECK_FALSE(block.inner.isProvided());
 
         block.inner.a = 5;
-        UNSCOPED_INFO("setting a child provides the sub-block");
         CHECK(block.inner.isProvided());
-        UNSCOPED_INFO("and provides the enclosing block");
         CHECK(block.isProvided());
-        UNSCOPED_INFO("child value readable");
         CHECK(block.inner.a() == 5);
         UNSCOPED_INFO("sibling child keeps its default");
         CHECK(block.inner.b() == 0);
@@ -371,13 +344,11 @@ namespace
         destination.count = 1;
 
         destination.fillFrom(source);
-        UNSCOPED_INFO("fillFrom leaves a provided value alone");
         CHECK(destination.count() == 1);
         UNSCOPED_INFO("fillFrom supplies an absent value");
-        CHECK(destination.flag() == true);
+        CHECK(destination.flag());
 
         destination.overwriteFrom(source);
-        UNSCOPED_INFO("overwriteFrom replaces a provided value");
         CHECK(destination.count() == 100);
     }
 
@@ -388,19 +359,13 @@ namespace
         CHECK(choice.number.isChosen());
 
         choice.text = std::string("hello");
-        UNSCOPED_INFO("assignment chooses");
         CHECK(choice.text.isChosen());
-        UNSCOPED_INFO("and unchooses the previous alternative");
         CHECK_FALSE(choice.number.isChosen());
-        UNSCOPED_INFO("the displaced alternative is no longer provided");
         CHECK_FALSE(choice.number.isProvided());
-        UNSCOPED_INFO("the chosen alternative reads back");
         CHECK(choice.text() == std::string("hello"));
 
         choice.number = 3;
-        UNSCOPED_INFO("choosing back works");
         CHECK(choice.number.isChosen());
-        UNSCOPED_INFO("and displaces the other");
         CHECK_FALSE(choice.text.isProvided());
     }
 
@@ -415,22 +380,16 @@ namespace
         LLParamSDParser parser;
         parser.writeSD(sd, written);
 
-        UNSCOPED_INFO("provided scalars are written");
         REQUIRE(sd.has("count"));
-        UNSCOPED_INFO("written value is the one set");
         CHECK(sd["count"].asInteger() == 55);
 
         SimpleBlock read;
         LLParamSDParser reader;
         reader.readSD(sd, read);
 
-        UNSCOPED_INFO("string survives");
         CHECK(read.name() == std::string("round"));
-        UNSCOPED_INFO("integer survives");
         CHECK(read.count() == 55);
-        UNSCOPED_INFO("boolean survives");
-        CHECK(read.flag() == true);
-        UNSCOPED_INFO("reading marks parameters provided");
+        CHECK(read.flag());
         CHECK(read.count.isProvided());
     }
 
@@ -447,20 +406,15 @@ namespace
         LLParamSDParser parser;
         parser.writeSD(sd, written);
 
-        UNSCOPED_INFO("sub-block is written under its own name");
         REQUIRE(sd.has("inner"));
-        UNSCOPED_INFO("sub-block child is written");
         CHECK(sd["inner"]["a"].asInteger() == 11);
 
         OuterBlock read;
         LLParamSDParser reader;
         reader.readSD(sd, read);
 
-        UNSCOPED_INFO("nested value survives");
         CHECK(read.inner.a() == 11);
-        UNSCOPED_INFO("nested value survives");
         CHECK(read.inner.b() == 22);
-        UNSCOPED_INFO("list length survives");
         REQUIRE(read.list.size() == size_t(3));
         UNSCOPED_INFO("list order survives");
         CHECK(read.list()[2]() == 3);
@@ -475,16 +429,13 @@ namespace
         LLParamSDParser parser;
         parser.writeSD(sd, written);
 
-        UNSCOPED_INFO("the name is what gets written");
         CHECK(sd["named"].asString() == std::string("two"));
 
         SimpleBlock read;
         LLParamSDParser reader;
         reader.readSD(sd, read);
 
-        UNSCOPED_INFO("the name resolves back to its value");
         CHECK(read.named() == 2);
-        UNSCOPED_INFO("and the name is remembered");
         CHECK(read.named.getValueName() == std::string("two"));
     }
 
@@ -497,9 +448,7 @@ namespace
         LLParamSDParser parser;
         parser.readSD(sd, block);
 
-        UNSCOPED_INFO("the synonym provided the parameter");
         CHECK(block.width.isProvided());
-        UNSCOPED_INFO("through to the same storage");
         CHECK(block.width() == 64);
     }
 
@@ -513,7 +462,6 @@ namespace
         LLParamSDParser parser;
         parser.readSD(sd, block);
 
-        UNSCOPED_INFO("the live parameter is read");
         CHECK(block.kept() == 5);
         UNSCOPED_INFO("the block is valid despite the ignored key");
         CHECK(block.validateBlock(false));
@@ -523,19 +471,15 @@ namespace
     {
         PointBlock whole;
         whole.point.set(TestPoint(3, 4));
-        UNSCOPED_INFO("whole assignment reaches the value");
         CHECK(whole.point().mX == 3);
-        UNSCOPED_INFO("whole assignment reaches the value");
         CHECK(whole.point().mY == 4);
-        UNSCOPED_INFO("and splats out to the components");
+        UNSCOPED_INFO("whole assignment splats out to the components");
         CHECK(whole.point.x() == 3);
 
         PointBlock components;
         components.point.x = 8;
         components.point.y = 9;
-        UNSCOPED_INFO("component assignment builds the value");
         CHECK(components.point().mX == 8);
-        UNSCOPED_INFO("component assignment builds the value");
         CHECK(components.point().mY == 9);
     }
 
@@ -553,9 +497,7 @@ namespace
         LLParamSDParser reader;
         reader.readSD(sd, read);
 
-        UNSCOPED_INFO("x survives");
         CHECK(read.point().mX == 12);
-        UNSCOPED_INFO("y survives");
         CHECK(read.point().mY == 34);
     }
 
@@ -564,14 +506,12 @@ namespace
         // Lazy<> keeps its block on the heap rather than deriving from it, so
         // an untouched one costs a pointer and serialises to nothing at all.
         OuterBlock untouched;
-        UNSCOPED_INFO("lazy sub-block starts unprovided");
         CHECK_FALSE(untouched.lazy_inner.isProvided());
 
         LLSD empty_sd;
         LLParamSDParser empty_parser;
         empty_parser.writeSD(empty_sd, untouched);
-        UNSCOPED_INFO("an unfilled lazy block writes nothing");
-        REQUIRE_FALSE(empty_sd.has("lazy_inner"));
+        CHECK_FALSE(empty_sd.has("lazy_inner"));
 
         LLSD sd;
         sd["lazy_inner"]["a"] = 77;
@@ -580,9 +520,7 @@ namespace
         LLParamSDParser parser;
         parser.readSD(sd, filled);
 
-        UNSCOPED_INFO("parsing into it provides it");
         CHECK(filled.lazy_inner.isProvided());
-        UNSCOPED_INFO("and the value is reachable");
         CHECK(filled.lazy_inner().a() == 77);
     }
 
@@ -594,18 +532,13 @@ namespace
 
         SimpleBlock copy(original);
 
-        UNSCOPED_INFO("values copy");
         CHECK(copy.count() == 99);
-        UNSCOPED_INFO("values copy");
         CHECK(copy.name() == std::string("copy me"));
-        UNSCOPED_INFO("provided-ness copies");
         CHECK(copy.count.isProvided());
-        UNSCOPED_INFO("unprovided stays unprovided");
         CHECK_FALSE(copy.flag.isProvided());
 
         // The copy must own its storage: changing it must not disturb the original.
         copy.count = 1;
-        UNSCOPED_INFO("the original is untouched");
         CHECK(original.count() == 99);
     }
 
@@ -623,7 +556,7 @@ namespace
             LLInitParam::BlockDescriptor::getAllDescriptors();
 
         UNSCOPED_INFO("every constructed block type registered");
-        REQUIRE(all.size() >= 5);
+        CHECK(all.size() >= 5);
 
         size_t named_entries = 0;
         for (const LLInitParam::BlockDescriptor* descriptor : all)
@@ -635,15 +568,12 @@ namespace
 
         // DerivedBlock aggregates SimpleBlock's four parameters on top of its
         // own, which is the duplication the census exists to measure.
-        UNSCOPED_INFO("a derived block carries its base's parameters too");
-        REQUIRE(DerivedBlock::getBlockDescriptor().namedParams().size() ==
-                      SimpleBlock::getBlockDescriptor().namedParams().size() + 1);
+        CHECK(DerivedBlock::getBlockDescriptor().namedParams().size() ==
+                    SimpleBlock::getBlockDescriptor().namedParams().size() + 1);
 
         const std::string report = LLInitParam::BlockDescriptor::getStatsReport();
-        UNSCOPED_INFO("the census reports something");
-        REQUIRE_FALSE(report.empty());
-        UNSCOPED_INFO("the census names what it counted");
-        REQUIRE(report.find("block types registered") != std::string::npos);
+        CHECK_FALSE(report.empty());
+        CHECK(report.find("block types registered") != std::string::npos);
     }
 
     TEST_CASE("llinitparam: merging reports whether it actually took anything", "[llinitparam]")
@@ -653,24 +583,18 @@ namespace
         // one looked modified by a merge that moved nothing.
         OuterBlock empty_source;
         OuterBlock destination;
-        UNSCOPED_INFO("filling from an empty block changes nothing");
-        REQUIRE_FALSE(destination.fillFrom(empty_source));
-        UNSCOPED_INFO("and leaves the list alone");
-        REQUIRE(destination.list.size() == size_t(0));
+        CHECK_FALSE(destination.fillFrom(empty_source));
+        CHECK(destination.list.size() == size_t(0));
 
         OuterBlock source;
         source.list.add(1);
         source.list.add(2);
-        UNSCOPED_INFO("filling from a block with values does change it");
         CHECK(destination.fillFrom(source));
-        UNSCOPED_INFO("which arrive in the destination");
-        REQUIRE(destination.list.size() == size_t(2));
+        CHECK(destination.list.size() == size_t(2));
 
         // Already-filled destination, still-empty source.
-        UNSCOPED_INFO("an empty source still changes nothing");
         CHECK_FALSE(destination.fillFrom(empty_source));
-        UNSCOPED_INFO("and does not disturb what is there");
-        REQUIRE(destination.list.size() == size_t(2));
+        CHECK(destination.list.size() == size_t(2));
     }
 
     TEST_CASE("llinitparam: a value filling in its own components is not a choice", "[llinitparam]")
@@ -688,9 +612,7 @@ namespace
 
         PointChoice choice;
 
-        UNSCOPED_INFO("nothing has been chosen yet");
         CHECK_FALSE(choice.point.isChosen());
-        UNSCOPED_INFO("nothing has been chosen yet");
         CHECK_FALSE(choice.scalar.isChosen());
     }
 
@@ -698,19 +620,14 @@ namespace
     {
         PointChoice choice;
         choice.scalar = 5;
-        UNSCOPED_INFO("the provided alternative is the choice");
         CHECK(choice.scalar.isChosen());
-        UNSCOPED_INFO("and reads back");
         CHECK(choice.scalar() == 5);
 
         // Reaching into the components of the other alternative counts as
         // providing it, the same way assigning the whole value would.
         choice.point.x = 3;
-        UNSCOPED_INFO("the later alternative takes over");
         CHECK(choice.point.isChosen());
-        UNSCOPED_INFO("and the earlier one steps down");
         CHECK_FALSE(choice.scalar.isChosen());
-        UNSCOPED_INFO("the component drives the value");
         CHECK(choice.point().mX == 3);
     }
 
@@ -727,11 +644,8 @@ namespace
         PointChoice destination;
         destination.fillFrom(source);
 
-        UNSCOPED_INFO("the source's choice carried over");
         CHECK(destination.scalar.isChosen());
-        UNSCOPED_INFO("the untouched alternative did not seize it");
         CHECK_FALSE(destination.point.isChosen());
-        UNSCOPED_INFO("and the value came with it");
         CHECK(destination.scalar() == 5);
     }
 }

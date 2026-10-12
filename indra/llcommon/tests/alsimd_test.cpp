@@ -104,21 +104,21 @@ namespace
         return (U32)(d < 0 ? -d : d);
     }
 
-    void ensure_lanes_bits(const std::string& what, f32x4 got, U32 x, U32 y, U32 z, U32 w)
+    void require_lanes_bits(const std::string& what, f32x4 got, U32 x, U32 y, U32 z, U32 w)
     {
         const Lanes l = lanes_of(got);
         const U32 expected[4] = {x, y, z, w};
         for (int i = 0; i < 4; ++i)
         {
-            UNSCOPED_INFO(what + " lane " + std::to_string(i));
+            INFO(what << " lane " << i);
             REQUIRE(bits_of(l.v[i]) == expected[i]);
         }
     }
 
 #if AL_SIMD_DISTINCT_MASK
-    void ensure_lanes_bits(const std::string& what, mask4 got, U32 x, U32 y, U32 z, U32 w)
+    void require_lanes_bits(const std::string& what, mask4 got, U32 x, U32 y, U32 z, U32 w)
     {
-        ensure_lanes_bits(what, as_f32(got), x, y, z, w);
+        require_lanes_bits(what, as_f32(got), x, y, z, w);
     }
 #endif
 
@@ -128,9 +128,9 @@ namespace
         return as_i32(set(std::bit_cast<F32>(x), std::bit_cast<F32>(y), std::bit_cast<F32>(z), std::bit_cast<F32>(w)));
     }
 
-    void ensure_lanes(const std::string& what, f32x4 got, F32 x, F32 y, F32 z, F32 w)
+    void require_lanes(const std::string& what, f32x4 got, F32 x, F32 y, F32 z, F32 w)
     {
-        ensure_lanes_bits(what, got, bits_of(x), bits_of(y), bits_of(z), bits_of(w));
+        require_lanes_bits(what, got, bits_of(x), bits_of(y), bits_of(z), bits_of(w));
     }
 
     std::string precise(double v)
@@ -143,14 +143,14 @@ namespace
     // The error is measured in double, so that the fast floating-point
     // contract the test itself is built under cannot approximate the
     // division that measures an approximation.
-    void ensure_lanes_relative(const std::string& what, f32x4 got, const double* expected, double relative)
+    void require_lanes_relative(const std::string& what, f32x4 got, const double* expected, double relative)
     {
         const Lanes l = lanes_of(got);
         for (int i = 0; i < 4; ++i)
         {
             const double err = std::fabs((double)l.v[i] - expected[i]) / std::fabs(expected[i]);
-            UNSCOPED_INFO(what + " lane " + std::to_string(i) + ": " + precise(l.v[i]) + " is off " +
-                       precise(err) + " relative from " + precise(expected[i]));
+            INFO(what << " lane " << i << ": " << precise(l.v[i]) << " is off " << precise(err) << " relative from "
+                      << precise(expected[i]));
             REQUIRE(err <= relative);
         }
     }
@@ -178,79 +178,65 @@ namespace
         f32x4 b() const { return set(float_of(pb[0]), float_of(pb[1]), float_of(pb[2]), float_of(pb[3])); }
     };
 
-    // The register is sixteen bytes at sixteen, on every target.
     TEST_CASE_METHOD(alsimd_data, "alsimd: the register is sixteen bytes at sixteen on every target", "[alsimd]")
     {
-        UNSCOPED_INFO("sizeof f32x4");
         CHECK(sizeof(f32x4) == (size_t)16);
-        UNSCOPED_INFO("alignof f32x4");
         CHECK(alignof(f32x4) == (size_t)16);
-        UNSCOPED_INFO("sizeof mask4");
         CHECK(sizeof(mask4) == (size_t)16);
-        UNSCOPED_INFO("sizeof i32x4");
         CHECK(sizeof(i32x4) == (size_t)16);
     }
 
-    // Loads and stores move bits.
     TEST_CASE_METHOD(alsimd_data, "alsimd: loads and stores move bits", "[alsimd]")
     {
         alignas(16) F32 src[5] = {float_of(pa[0]), float_of(pa[1]), float_of(pa[2]), float_of(pa[3]), 99.f};
-        ensure_lanes_bits("load", load(src), pa[0], pa[1], pa[2], pa[3]);
-        ensure_lanes_bits("loadu", loadu(src + 1), pa[1], pa[2], pa[3], bits_of(99.f));
-        ensure_lanes_bits("load3", load3(src), pa[0], pa[1], pa[2], 0u);
-        ensure_lanes_bits("load3 offset", load3(src + 1), pa[1], pa[2], pa[3], 0u);
+        require_lanes_bits("load", load(src), pa[0], pa[1], pa[2], pa[3]);
+        require_lanes_bits("loadu", loadu(src + 1), pa[1], pa[2], pa[3], bits_of(99.f));
+        require_lanes_bits("load3", load3(src), pa[0], pa[1], pa[2], 0u);
+        require_lanes_bits("load3 offset", load3(src + 1), pa[1], pa[2], pa[3], 0u);
 
         alignas(16) F32 dst[8] = {};
         store(dst, a());
-        UNSCOPED_INFO("store");
         CHECK(std::memcmp(dst, src, 16) == 0);
         storeu(dst + 1, a());
-        UNSCOPED_INFO("storeu");
         CHECK(std::memcmp(dst + 1, src, 16) == 0);
 
-        ensure_lanes_bits("set", a(), pa[0], pa[1], pa[2], pa[3]);
-        ensure_lanes("set1", set1(-2.5f), -2.5f, -2.5f, -2.5f, -2.5f);
-        ensure_lanes("zero", zero(), 0.f, 0.f, 0.f, 0.f);
+        require_lanes_bits("set", a(), pa[0], pa[1], pa[2], pa[3]);
+        require_lanes("set1", set1(-2.5f), -2.5f, -2.5f, -2.5f, -2.5f);
+        require_lanes("zero", zero(), 0.f, 0.f, 0.f, 0.f);
     }
 
-    // Lanes and permutations are bit moves.
     TEST_CASE_METHOD(alsimd_data, "alsimd: lanes and permutations are bit moves", "[alsimd]")
     {
-        UNSCOPED_INFO("lane<0>");
         CHECK(bits_of(lane<0>(a())) == pa[0]);
-        UNSCOPED_INFO("lane<1>");
         CHECK(bits_of(lane<1>(a())) == pa[1]);
-        UNSCOPED_INFO("lane<2>");
         CHECK(bits_of(lane<2>(a())) == pa[2]);
-        UNSCOPED_INFO("lane<3>");
         CHECK(bits_of(lane<3>(a())) == pa[3]);
 
-        ensure_lanes_bits("splat<0>", splat<0>(a()), pa[0], pa[0], pa[0], pa[0]);
-        ensure_lanes_bits("splat<1>", splat<1>(a()), pa[1], pa[1], pa[1], pa[1]);
-        ensure_lanes_bits("splat<2>", splat<2>(a()), pa[2], pa[2], pa[2], pa[2]);
-        ensure_lanes_bits("splat<3>", splat<3>(a()), pa[3], pa[3], pa[3], pa[3]);
+        require_lanes_bits("splat<0>", splat<0>(a()), pa[0], pa[0], pa[0], pa[0]);
+        require_lanes_bits("splat<1>", splat<1>(a()), pa[1], pa[1], pa[1], pa[1]);
+        require_lanes_bits("splat<2>", splat<2>(a()), pa[2], pa[2], pa[2], pa[2]);
+        require_lanes_bits("splat<3>", splat<3>(a()), pa[3], pa[3], pa[3], pa[3]);
 
-        ensure_lanes_bits("shuffle yzxw", shuffle<1, 2, 0, 3>(a()), pa[1], pa[2], pa[0], pa[3]);
-        ensure_lanes_bits("shuffle zxyw", shuffle<2, 0, 1, 3>(a()), pa[2], pa[0], pa[1], pa[3]);
-        ensure_lanes_bits("shuffle yxwz", shuffle<1, 0, 3, 2>(a()), pa[1], pa[0], pa[3], pa[2]);
-        ensure_lanes_bits("shuffle zwxy", shuffle<2, 3, 0, 1>(a()), pa[2], pa[3], pa[0], pa[1]);
-        ensure_lanes_bits("shuffle wwwx", shuffle<3, 3, 3, 0>(a()), pa[3], pa[3], pa[3], pa[0]);
-        ensure_lanes_bits("shuffle xyyx", shuffle<0, 1, 1, 0>(a()), pa[0], pa[1], pa[1], pa[0]);
-        ensure_lanes_bits("shuffle zzyw", shuffle<2, 2, 1, 3>(a()), pa[2], pa[2], pa[1], pa[3]);
-        ensure_lanes_bits("shuffle wzyx", shuffle<3, 2, 1, 0>(a()), pa[3], pa[2], pa[1], pa[0]);
+        require_lanes_bits("shuffle yzxw", shuffle<1, 2, 0, 3>(a()), pa[1], pa[2], pa[0], pa[3]);
+        require_lanes_bits("shuffle zxyw", shuffle<2, 0, 1, 3>(a()), pa[2], pa[0], pa[1], pa[3]);
+        require_lanes_bits("shuffle yxwz", shuffle<1, 0, 3, 2>(a()), pa[1], pa[0], pa[3], pa[2]);
+        require_lanes_bits("shuffle zwxy", shuffle<2, 3, 0, 1>(a()), pa[2], pa[3], pa[0], pa[1]);
+        require_lanes_bits("shuffle wwwx", shuffle<3, 3, 3, 0>(a()), pa[3], pa[3], pa[3], pa[0]);
+        require_lanes_bits("shuffle xyyx", shuffle<0, 1, 1, 0>(a()), pa[0], pa[1], pa[1], pa[0]);
+        require_lanes_bits("shuffle zzyw", shuffle<2, 2, 1, 3>(a()), pa[2], pa[2], pa[1], pa[3]);
+        require_lanes_bits("shuffle wzyx", shuffle<3, 2, 1, 0>(a()), pa[3], pa[2], pa[1], pa[0]);
 
-        ensure_lanes_bits("shuffle2", shuffle2<0, 2, 1, 3>(a(), b()), pa[0], pa[2], pb[1], pb[3]);
-        ensure_lanes_bits("shuffle2 movelh", shuffle2<0, 1, 0, 1>(a(), b()), pa[0], pa[1], pb[0], pb[1]);
-        ensure_lanes_bits("shuffle2 high", shuffle2<2, 3, 2, 3>(a(), b()), pa[2], pa[3], pb[2], pb[3]);
-        ensure_lanes_bits("shuffle2 wxzy", shuffle2<3, 0, 2, 1>(a(), b()), pa[3], pa[0], pb[2], pb[1]);
+        require_lanes_bits("shuffle2", shuffle2<0, 2, 1, 3>(a(), b()), pa[0], pa[2], pb[1], pb[3]);
+        require_lanes_bits("shuffle2 movelh", shuffle2<0, 1, 0, 1>(a(), b()), pa[0], pa[1], pb[0], pb[1]);
+        require_lanes_bits("shuffle2 high", shuffle2<2, 3, 2, 3>(a(), b()), pa[2], pa[3], pb[2], pb[3]);
+        require_lanes_bits("shuffle2 wxzy", shuffle2<3, 0, 2, 1>(a(), b()), pa[3], pa[0], pb[2], pb[1]);
 
-        ensure_lanes_bits("movelh", movelh(a(), b()), pa[0], pa[1], pb[0], pb[1]);
-        ensure_lanes_bits("movehl", movehl(a(), b()), pb[2], pb[3], pa[2], pa[3]);
-        ensure_lanes_bits("unpacklo", unpacklo(a(), b()), pa[0], pb[0], pa[1], pb[1]);
-        ensure_lanes_bits("unpackhi", unpackhi(a(), b()), pa[2], pb[2], pa[3], pb[3]);
+        require_lanes_bits("movelh", movelh(a(), b()), pa[0], pa[1], pb[0], pb[1]);
+        require_lanes_bits("movehl", movehl(a(), b()), pb[2], pb[3], pa[2], pa[3]);
+        require_lanes_bits("unpacklo", unpacklo(a(), b()), pa[0], pb[0], pa[1], pb[1]);
+        require_lanes_bits("unpackhi", unpackhi(a(), b()), pa[2], pb[2], pa[3], pb[3]);
     }
 
-    // Arithmetic is one rounding per lane.
     TEST_CASE_METHOD(alsimd_data, "alsimd: arithmetic is one rounding per lane", "[alsimd]")
     {
         const F32 xs[4] = {1.5f, -3.25f, 1e-3f, 65535.f};
@@ -259,6 +245,7 @@ namespace
         const f32x4 y = loadu(ys);
         for (int i = 0; i < 4; ++i)
         {
+            CAPTURE(i);
             volatile F32 sum = xs[i] + ys[i];
             volatile F32 diff = xs[i] - ys[i];
             volatile F32 prod = xs[i] * ys[i];
@@ -267,22 +254,18 @@ namespace
             const Lanes d = lanes_of(sub(x, y));
             const Lanes p = lanes_of(mul(x, y));
             const Lanes q = lanes_of(div(x, y));
-            UNSCOPED_INFO("add");
             REQUIRE(bits_of(s.v[i]) == bits_of(sum));
-            UNSCOPED_INFO("sub");
             REQUIRE(bits_of(d.v[i]) == bits_of(diff));
-            UNSCOPED_INFO("mul");
             REQUIRE(bits_of(p.v[i]) == bits_of(prod));
-            UNSCOPED_INFO("div within an ulp");
             REQUIRE(ulps_between(q.v[i], quot) <= 1);
         }
 
         // A negative zero as its bits, in and out: /fp:fast lets the compiler
         // take -0.f for 0.f, and MSVC for arm64 does.
         const f32x4 sign = set1_bits(0x80000000u);
-        ensure_lanes_bits("neg", neg(or_(set(1.f, -2.f, 0.f, 0.f), and_(sign, mask_lane<3>()))),
+        require_lanes_bits("neg", neg(or_(set(1.f, -2.f, 0.f, 0.f), and_(sign, mask_lane<3>()))),
                           bits_of(-1.f), bits_of(2.f), 0x80000000u, 0u);
-        ensure_lanes_bits("abs", abs(or_(set(1.f, -2.f, 0.f, -INF), and_(sign, mask_lane<2>()))),
+        require_lanes_bits("abs", abs(or_(set(1.f, -2.f, 0.f, -INF), and_(sign, mask_lane<2>()))),
                           bits_of(1.f), bits_of(2.f), 0u, bits_of(INF));
         UNSCOPED_INFO("neg keeps a NaN payload");
         CHECK(bits_of(lane<2>(neg(a()))) == (pa[2] ^ 0x80000000u));
@@ -290,8 +273,8 @@ namespace
         CHECK(bits_of(lane<2>(abs(neg(a())))) == pa[2]);
 
         // Denormals pass through: the ops do not rely on flush-to-zero.
-        ensure_lanes("denormal mul", mul(set(DENORMAL, DENORMAL_BIG, 0.f, 0.f), set1(1.f)), DENORMAL, DENORMAL_BIG, 0.f, 0.f);
-        ensure_lanes("denormal add", add(set(DENORMAL, 0.f, 0.f, 0.f), set(DENORMAL, 0.f, 0.f, 0.f)), 2 * DENORMAL, 0.f, 0.f, 0.f);
+        require_lanes("denormal mul", mul(set(DENORMAL, DENORMAL_BIG, 0.f, 0.f), set1(1.f)), DENORMAL, DENORMAL_BIG, 0.f, 0.f);
+        require_lanes("denormal add", add(set(DENORMAL, 0.f, 0.f, 0.f), set(DENORMAL, 0.f, 0.f, 0.f)), 2 * DENORMAL, 0.f, 0.f, 0.f);
     }
 
     // Fused multiply-add: exact against fma where the machine fuses, exact
@@ -310,6 +293,7 @@ namespace
         const Lanes r_lane = lanes_of(fmadd_lane<2>(a, b, c));
         for (int i = 0; i < 4; ++i)
         {
+            CAPTURE(i);
             F32 e_fmadd, e_fmsub, e_fnmadd, e_lane;
             if constexpr (AL_SIMD_FMA)
             {
@@ -327,13 +311,9 @@ namespace
                 e_fnmadd = cs[i] - p;
                 e_lane = pl + cs[i];
             }
-            UNSCOPED_INFO("fmadd");
             REQUIRE(bits_of(r_fmadd.v[i]) == bits_of(e_fmadd));
-            UNSCOPED_INFO("fmsub");
             REQUIRE(bits_of(r_fmsub.v[i]) == bits_of(e_fmsub));
-            UNSCOPED_INFO("fnmadd");
             REQUIRE(bits_of(r_fnmadd.v[i]) == bits_of(e_fnmadd));
-            UNSCOPED_INFO("fmadd_lane");
             REQUIRE(bits_of(r_lane.v[i]) == bits_of(e_lane));
         }
     }
@@ -344,15 +324,15 @@ namespace
     {
         const f32x4 x = set(1.f, -2.f, 3.5f, -INF);
         const f32x4 y = set(0.5f, -1.f, 3.5f, 4.f);
-        ensure_lanes("min", min(x, y), 0.5f, -2.f, 3.5f, -INF);
-        ensure_lanes("max", max(x, y), 1.f, -1.f, 3.5f, 4.f);
+        require_lanes("min", min(x, y), 0.5f, -2.f, 3.5f, -INF);
+        require_lanes("max", max(x, y), 1.f, -1.f, 3.5f, 4.f);
 
         const F32 sq[4] = {4.f, 2.f, 1e-6f, 1e12f};
         const f32x4 s = sqrt(loadu(sq));
         const Lanes l = lanes_of(s);
         for (int i = 0; i < 4; ++i)
         {
-            UNSCOPED_INFO("sqrt");
+            CAPTURE(i);
             REQUIRE(bits_of(l.v[i]) == bits_of(std::sqrt(sq[i])));
         }
     }
@@ -374,10 +354,10 @@ namespace
         // arithmetic around it adds its own few ulps.
         const double fast = 1.0 / 2048.0;
         const double full = 1.0 / 1048576.0;
-        ensure_lanes_relative("rsqrt_fast", rsqrt_fast(x), e_rsqrt, fast);
-        ensure_lanes_relative("rsqrt", rsqrt(x), e_rsqrt, full);
-        ensure_lanes_relative("rcp_fast", rcp_fast(x), e_rcp, fast);
-        ensure_lanes_relative("rcp", rcp(x), e_rcp, full);
+        require_lanes_relative("rsqrt_fast", rsqrt_fast(x), e_rsqrt, fast);
+        require_lanes_relative("rsqrt", rsqrt(x), e_rsqrt, full);
+        require_lanes_relative("rcp_fast", rcp_fast(x), e_rcp, fast);
+        require_lanes_relative("rcp", rcp(x), e_rcp, full);
 
         const F32 small[4] = {1e-10f, 2.f, 1e-20f, 7.f};
         double e_small_rsqrt[4], e_small_rcp[4];
@@ -386,8 +366,8 @@ namespace
             e_small_rsqrt[i] = 1.0 / std::sqrt((double)small[i]);
             e_small_rcp[i] = 1.0 / (double)small[i];
         }
-        ensure_lanes_relative("rsqrt small", rsqrt(loadu(small)), e_small_rsqrt, full);
-        ensure_lanes_relative("rcp small", rcp(loadu(small)), e_small_rcp, full);
+        require_lanes_relative("rsqrt small", rsqrt(loadu(small)), e_small_rsqrt, full);
+        require_lanes_relative("rcp small", rcp(loadu(small)), e_small_rcp, full);
     }
 
     // Rounding: nearest with ties to even, floor and ceiling, including the
@@ -408,107 +388,88 @@ namespace
             for (int i = 0; i < 4; ++i)
             {
                 const F32 v = xs[base + i];
-                UNSCOPED_INFO("round " + std::to_string(v));
+                CAPTURE(v);
                 REQUIRE(bits_of(r.v[i]) == bits_of(std::nearbyint(v)));
-                UNSCOPED_INFO("floor " + std::to_string(v));
                 REQUIRE(bits_of(f.v[i]) == bits_of(std::floor(v)));
-                UNSCOPED_INFO("ceil " + std::to_string(v));
                 REQUIRE(bits_of(c.v[i]) == bits_of(std::ceil(v)));
-                UNSCOPED_INFO("cvt_round " + std::to_string(v));
                 REQUIRE(int_lane(cr, i) == (S32)std::nearbyint(v));
-                UNSCOPED_INFO("cvt_trunc " + std::to_string(v));
                 REQUIRE(int_lane(ct, i) == (S32)v);
             }
         }
         const f32x4 near_zero = set(-0.f, -0.25f, 0.f, -0.5f);
         if constexpr (AL_SIMD_SSE4 || AL_SIMD_NEON)
         {
-            ensure_lanes("round keeps the sign of zero", round(near_zero), -0.f, -0.f, 0.f, -0.f);
-            ensure_lanes("ceil keeps the sign of zero", ceil(near_zero), -0.f, -0.f, 0.f, -0.f);
-            ensure_lanes("floor keeps the sign of zero", floor(set(-0.f, 0.f, 0.25f, 0.f)), -0.f, 0.f, 0.f, 0.f);
+            require_lanes("round keeps the sign of zero", round(near_zero), -0.f, -0.f, 0.f, -0.f);
+            require_lanes("ceil keeps the sign of zero", ceil(near_zero), -0.f, -0.f, 0.f, -0.f);
+            require_lanes("floor keeps the sign of zero", floor(set(-0.f, 0.f, 0.25f, 0.f)), -0.f, 0.f, 0.f, 0.f);
         }
         else
         {
-            ensure_lanes("round to zero below SSE4", round(near_zero), 0.f, 0.f, 0.f, 0.f);
-            ensure_lanes("ceil to zero below SSE4", ceil(near_zero), 0.f, 0.f, 0.f, 0.f);
+            require_lanes("round to zero below SSE4", round(near_zero), 0.f, 0.f, 0.f, 0.f);
+            require_lanes("ceil to zero below SSE4", ceil(near_zero), 0.f, 0.f, 0.f, 0.f);
         }
 
-        ensure_lanes("to_float", to_float(ints(0, -1, 16777216, -12345678)), 0.f, -1.f, 16777216.f, -12345678.f);
+        require_lanes("to_float", to_float(ints(0, -1, 16777216, -12345678)), 0.f, -1.f, 16777216.f, -12345678.f);
         const Lanes back = lanes_of(cvt_trunc(set(0.f, -1.f, 16777216.f, -12345678.f)));
         UNSCOPED_INFO("cvt_trunc round trip");
         CHECK(int_lane(back, 3) == -12345678);
     }
 
-    // Bit operations move bits.
     TEST_CASE_METHOD(alsimd_data, "alsimd: bit operations move bits", "[alsimd]")
     {
-        ensure_lanes_bits("and", and_(a(), b()), pa[0] & pb[0], pa[1] & pb[1], pa[2] & pb[2], pa[3] & pb[3]);
-        ensure_lanes_bits("andnot", andnot(a(), b()), ~pa[0] & pb[0], ~pa[1] & pb[1], ~pa[2] & pb[2], ~pa[3] & pb[3]);
-        ensure_lanes_bits("or", or_(a(), b()), pa[0] | pb[0], pa[1] | pb[1], pa[2] | pb[2], pa[3] | pb[3]);
-        ensure_lanes_bits("xor", xor_(a(), b()), pa[0] ^ pb[0], pa[1] ^ pb[1], pa[2] ^ pb[2], pa[3] ^ pb[3]);
-        ensure_lanes_bits("as_i32 round trip", as_f32(as_i32(a())), pa[0], pa[1], pa[2], pa[3]);
-        ensure_lanes_bits("as_mask round trip", as_f32(as_mask(a())), pa[0], pa[1], pa[2], pa[3]);
+        require_lanes_bits("and", and_(a(), b()), pa[0] & pb[0], pa[1] & pb[1], pa[2] & pb[2], pa[3] & pb[3]);
+        require_lanes_bits("andnot", andnot(a(), b()), ~pa[0] & pb[0], ~pa[1] & pb[1], ~pa[2] & pb[2], ~pa[3] & pb[3]);
+        require_lanes_bits("or", or_(a(), b()), pa[0] | pb[0], pa[1] | pb[1], pa[2] | pb[2], pa[3] | pb[3]);
+        require_lanes_bits("xor", xor_(a(), b()), pa[0] ^ pb[0], pa[1] ^ pb[1], pa[2] ^ pb[2], pa[3] ^ pb[3]);
+        require_lanes_bits("as_i32 round trip", as_f32(as_i32(a())), pa[0], pa[1], pa[2], pa[3]);
+        require_lanes_bits("as_mask round trip", as_f32(as_mask(a())), pa[0], pa[1], pa[2], pa[3]);
     }
 
     // Masks: the constants, the comparisons with a NaN in play, and what
     // reads them.
     TEST_CASE_METHOD(alsimd_data, "alsimd: mask constants and comparisons with a NaN and what reads them", "[alsimd]")
     {
-        ensure_lanes_bits("mask_none", mask_none(), MASK_OFF, MASK_OFF, MASK_OFF, MASK_OFF);
-        ensure_lanes_bits("mask_all", mask_all(), MASK_ON, MASK_ON, MASK_ON, MASK_ON);
-        ensure_lanes_bits("mask_lane<0>", mask_lane<0>(), MASK_ON, MASK_OFF, MASK_OFF, MASK_OFF);
-        ensure_lanes_bits("mask_lane<2>", mask_lane<2>(), MASK_OFF, MASK_OFF, MASK_ON, MASK_OFF);
-        ensure_lanes_bits("mask_lane<3>", mask_lane<3>(), MASK_OFF, MASK_OFF, MASK_OFF, MASK_ON);
-        ensure_lanes_bits("mask_xyz", mask_xyz(), MASK_ON, MASK_ON, MASK_ON, MASK_OFF);
-        ensure_lanes_bits("mask_not", mask_not(mask_lane<1>()), MASK_ON, MASK_OFF, MASK_ON, MASK_ON);
+        require_lanes_bits("mask_none", mask_none(), MASK_OFF, MASK_OFF, MASK_OFF, MASK_OFF);
+        require_lanes_bits("mask_all", mask_all(), MASK_ON, MASK_ON, MASK_ON, MASK_ON);
+        require_lanes_bits("mask_lane<0>", mask_lane<0>(), MASK_ON, MASK_OFF, MASK_OFF, MASK_OFF);
+        require_lanes_bits("mask_lane<2>", mask_lane<2>(), MASK_OFF, MASK_OFF, MASK_ON, MASK_OFF);
+        require_lanes_bits("mask_lane<3>", mask_lane<3>(), MASK_OFF, MASK_OFF, MASK_OFF, MASK_ON);
+        require_lanes_bits("mask_xyz", mask_xyz(), MASK_ON, MASK_ON, MASK_ON, MASK_OFF);
+        require_lanes_bits("mask_not", mask_not(mask_lane<1>()), MASK_ON, MASK_OFF, MASK_ON, MASK_ON);
 
         const f32x4 x = set(1.f, 2.f, NAN_QUIET, -0.f);
         const f32x4 y = set(2.f, 2.f, 2.f, 0.f);
-        ensure_lanes_bits("cmplt", cmplt(x, y), MASK_ON, MASK_OFF, MASK_OFF, MASK_OFF);
-        ensure_lanes_bits("cmple", cmple(x, y), MASK_ON, MASK_ON, MASK_OFF, MASK_ON);
-        ensure_lanes_bits("cmpgt", cmpgt(x, y), MASK_OFF, MASK_OFF, MASK_OFF, MASK_OFF);
-        ensure_lanes_bits("cmpge", cmpge(x, y), MASK_OFF, MASK_ON, MASK_OFF, MASK_ON);
-        ensure_lanes_bits("cmpeq", cmpeq(x, y), MASK_OFF, MASK_ON, MASK_OFF, MASK_ON);
-        ensure_lanes_bits("cmpne", cmpne(x, y), MASK_ON, MASK_OFF, MASK_ON, MASK_OFF);
+        require_lanes_bits("cmplt", cmplt(x, y), MASK_ON, MASK_OFF, MASK_OFF, MASK_OFF);
+        require_lanes_bits("cmple", cmple(x, y), MASK_ON, MASK_ON, MASK_OFF, MASK_ON);
+        require_lanes_bits("cmpgt", cmpgt(x, y), MASK_OFF, MASK_OFF, MASK_OFF, MASK_OFF);
+        require_lanes_bits("cmpge", cmpge(x, y), MASK_OFF, MASK_ON, MASK_OFF, MASK_ON);
+        require_lanes_bits("cmpeq", cmpeq(x, y), MASK_OFF, MASK_ON, MASK_OFF, MASK_ON);
+        require_lanes_bits("cmpne", cmpne(x, y), MASK_ON, MASK_OFF, MASK_ON, MASK_OFF);
 
         const f32x4 n = set(INF, -INF, NAN_QUIET, std::numeric_limits<F32>::max());
-        ensure_lanes_bits("nonfinite", nonfinite(n), MASK_ON, MASK_ON, MASK_ON, MASK_OFF);
+        require_lanes_bits("nonfinite", nonfinite(n), MASK_ON, MASK_ON, MASK_ON, MASK_OFF);
         const f32x4 f = set(0.f, -0.f, DENORMAL, -1.f);
-        ensure_lanes_bits("nonfinite on finite", nonfinite(f), MASK_OFF, MASK_OFF, MASK_OFF, MASK_OFF);
+        require_lanes_bits("nonfinite on finite", nonfinite(f), MASK_OFF, MASK_OFF, MASK_OFF, MASK_OFF);
 
         const mask4 m = cmplt(x, y);
-        ensure_lanes_bits("select", select(m, a(), b()), pa[0], pb[1], pb[2], pb[3]);
-        ensure_lanes_bits("select inverted", select(mask_not(m), a(), b()), pb[0], pa[1], pa[2], pa[3]);
-        ensure_lanes_bits("select xyz", select(mask_xyz(), a(), b()), pa[0], pa[1], pa[2], pb[3]);
+        require_lanes_bits("select", select(m, a(), b()), pa[0], pb[1], pb[2], pb[3]);
+        require_lanes_bits("select inverted", select(mask_not(m), a(), b()), pb[0], pa[1], pa[2], pa[3]);
+        require_lanes_bits("select xyz", select(mask_xyz(), a(), b()), pa[0], pa[1], pa[2], pb[3]);
 
-        UNSCOPED_INFO("bits none");
         CHECK(bits(mask_none()) == 0u);
-        UNSCOPED_INFO("bits all");
         CHECK(bits(mask_all()) == 0xFu);
-        UNSCOPED_INFO("bits lane 2");
         CHECK(bits(mask_lane<2>()) == 4u);
-        UNSCOPED_INFO("bits xyz");
         CHECK(bits(mask_xyz()) == 7u);
-        UNSCOPED_INFO("bits cmpge");
         CHECK(bits(cmpge(x, y)) == 0xAu);
 
-        UNSCOPED_INFO("any none");
         CHECK_FALSE(any(mask_none()));
-        UNSCOPED_INFO("any lane 3");
         CHECK(any(mask_lane<3>()));
-        UNSCOPED_INFO("all all");
         CHECK(all(mask_all()));
-        UNSCOPED_INFO("all xyz is not all");
         CHECK_FALSE(all(mask_xyz()));
-        UNSCOPED_INFO("any3 lane 3 is not any3");
         CHECK_FALSE(any3(mask_lane<3>()));
-        UNSCOPED_INFO("any3 lane 1");
         CHECK(any3(mask_lane<1>()));
-        UNSCOPED_INFO("all3 xyz");
         CHECK(all3(mask_xyz()));
-        UNSCOPED_INFO("all3 with lane 1 clear");
         CHECK_FALSE(all3(mask_not(mask_lane<1>())));
-        UNSCOPED_INFO("all3 with only lane 3 clear");
         CHECK(all3(mask_not(mask_lane<3>())));
     }
 
@@ -530,8 +491,8 @@ namespace
         volatile F32 zw = p2 + p3;
         const F32 d3 = xy + p2;
         const F32 d4 = xy + zw;
-        ensure_lanes("dot3", dot3(a, b), d3, d3, d3, d3);
-        ensure_lanes("dot4", dot4(a, b), d4, d4, d4, d4);
+        require_lanes("dot3", dot3(a, b), d3, d3, d3, d3);
+        require_lanes("dot4", dot4(a, b), d4, d4, d4, d4);
 
         // a.yzx * b.zxy - a.zxy * b.yzx
         volatile F32 first[3] = {as[1] * bs[2], as[2] * bs[0], as[0] * bs[1]};
@@ -554,23 +515,20 @@ namespace
         const Lanes c = lanes_of(cross3(a, b));
         for (int i = 0; i < 3; ++i)
         {
-            UNSCOPED_INFO("cross3 lane " + std::to_string(i));
+            CAPTURE(i);
             REQUIRE(bits_of(c.v[i]) == bits_of(expected[i]));
         }
-        UNSCOPED_INFO("cross3 w");
         CHECK(c.v[3] == 0.f);
 
         // The cross product of two axes is the third.
-        ensure_lanes("x cross y", cross3(set(1.f, 0.f, 0.f, 0.f), set(0.f, 1.f, 0.f, 0.f)), 0.f, 0.f, 1.f, 0.f);
-        ensure_lanes("y cross z", cross3(set(0.f, 1.f, 0.f, 0.f), set(0.f, 0.f, 1.f, 0.f)), 1.f, 0.f, 0.f, 0.f);
+        require_lanes("x cross y", cross3(set(1.f, 0.f, 0.f, 0.f), set(0.f, 1.f, 0.f, 0.f)), 0.f, 0.f, 1.f, 0.f);
+        require_lanes("y cross z", cross3(set(0.f, 1.f, 0.f, 0.f), set(0.f, 0.f, 1.f, 0.f)), 1.f, 0.f, 0.f, 0.f);
     }
 
-    // The feature macros describe the build they came from.
     TEST_CASE_METHOD(alsimd_data, "alsimd: the feature macros describe the build they came from", "[alsimd]")
     {
         UNSCOPED_INFO("one architecture");
         CHECK(AL_SIMD_X86 + AL_SIMD_NEON == 1);
-        UNSCOPED_INFO("a width");
         CHECK((AL_SIMD_WIDTH == 4 || AL_SIMD_WIDTH == 8 || AL_SIMD_WIDTH == 16));
         if constexpr (AL_SIMD_AVX512)
         {
@@ -643,12 +601,9 @@ namespace
                     unsigned char* dst = dst_line + dst_off;
                     std::memset(dst - 16, 0xEE, size + 32);
                     copy_aligned16(reinterpret_cast<char*>(dst), reinterpret_cast<const char*>(src), size);
-                    const std::string what = "copy of " + std::to_string(size) + " at " + std::to_string(src_off) + "/" + std::to_string(dst_off);
-                    UNSCOPED_INFO(what + " moved every byte");
+                    CAPTURE(size, src_off, dst_off);
                     REQUIRE(std::memcmp(dst, src, size) == 0);
-                    UNSCOPED_INFO(what + " left the byte before");
                     REQUIRE(dst[-1] == 0xEE);
-                    UNSCOPED_INFO(what + " left the byte after");
                     REQUIRE(dst[size] == 0xEE);
                 }
             }

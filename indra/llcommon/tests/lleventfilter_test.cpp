@@ -37,7 +37,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "altestmatchers.h"
-#include "stringize.h"
 #include "llsdutil.h"
 #include "listener.h"
 #include "tests/wrapllerrs.h"
@@ -179,9 +178,9 @@ namespace
         Listener listener0;
         Listener listener1;
 
-        void check_listener(const std::string& desc, const Listener& listener, const LLSD& got)
+        void require_last_event(const std::string& desc, const Listener& listener, const LLSD& got)
         {
-            UNSCOPED_INFO((STRINGIZE(listener << ' ' << desc)));
+            INFO(listener << ' ' << desc);
             REQUIRE_THAT(listener.getLastEvent(), ll_test::LLSDEquals(got));
         }
     };
@@ -207,15 +206,15 @@ namespace
         LLTempBoundListener temp2(
             listener1.listenTo(filter));
         driver.post(1);
-        check_listener("direct", listener0, LLSD(1));
-        check_listener("filtered", listener1, LLSD(0));
+        require_last_event("direct", listener0, LLSD(1));
+        require_last_event("filtered", listener1, LLSD(0));
         // Okay, construct an LLSD map matching the pattern
         LLSD data;
         data["foo"] = "bar";
         data["random"] = 17;
         driver.post(data);
-        check_listener("direct", listener0, data);
-        check_listener("filtered", listener1, data);
+        require_last_event("direct", listener0, data);
+        require_last_event("filtered", listener1, data);
     }
 
     TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventTimeout::actionAfter() acts only when it times out", "[lleventfilter]")
@@ -235,15 +234,15 @@ namespace
         // when we pump mainloop. Do that right now to take the logic path
         // before either the anticipated event arrives or the timer expires.
         mainloop.post(17);
-        check_listener("no timeout 1", listener1, LLSD(0));
+        require_last_event("no timeout 1", listener1, LLSD(0));
         // Expected event arrives...
         driver.post(1);
-        check_listener("event passed thru", listener0, LLSD(1));
+        require_last_event("event passed thru", listener0, LLSD(1));
         // Should have canceled the timer. Verify that by asserting that the
         // time has expired, then pumping mainloop again.
         filter.forceTimeout();
         mainloop.post(17);
-        check_listener("no timeout 2", listener1, LLSD(0));
+        require_last_event("no timeout 2", listener1, LLSD(0));
         // Verify chained actionAfter() calls, that is, that a second
         // actionAfter() resets the timer established by the first
         // actionAfter().
@@ -262,29 +261,29 @@ namespace
                            boost::bind(&Listener::call, boost::ref(listener1), LLSD("timeout")));
         // Look ma, no timeout!
         mainloop.post(17);
-        check_listener("no timeout 3", listener1, LLSD(0));
+        require_last_event("no timeout 3", listener1, LLSD(0));
         // Now let the updated actionAfter() timer expire.
         filter.forceTimeout();
         // Notice the timeout.
         mainloop.post(17);
-        check_listener("timeout", listener1, LLSD("timeout"));
+        require_last_event("timeout", listener1, LLSD("timeout"));
         // Timing out cancels the timer. Verify that.
         listener1.reset(0);
         filter.forceTimeout();
         mainloop.post(17);
-        check_listener("no timeout 4", listener1, LLSD(0));
+        require_last_event("no timeout 4", listener1, LLSD(0));
         // Reset the timer and then cancel() it.
         filter.actionAfter(20,
                            boost::bind(&Listener::call, boost::ref(listener1), LLSD("timeout")));
         // neither expired nor satisified
         mainloop.post(17);
-        check_listener("no timeout 5", listener1, LLSD(0));
+        require_last_event("no timeout 5", listener1, LLSD(0));
         // cancel
         filter.cancel();
         // timeout!
         filter.forceTimeout();
         mainloop.post(17);
-        check_listener("no timeout 6", listener1, LLSD(0));
+        require_last_event("no timeout 6", listener1, LLSD(0));
     }
 
     TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventTimeout::eventAfter() posts only when it times out", "[lleventfilter]")
@@ -299,27 +298,27 @@ namespace
         // when we pump mainloop. Do that right now to take the logic path
         // before either the anticipated event arrives or the timer expires.
         mainloop.post(17);
-        check_listener("no timeout 1", listener0, LLSD(0));
+        require_last_event("no timeout 1", listener0, LLSD(0));
         // Expected event arrives...
         driver.post(1);
-        check_listener("event passed thru", listener0, LLSD(1));
+        require_last_event("event passed thru", listener0, LLSD(1));
         // Should have canceled the timer. Verify that by asserting that the
         // time has expired, then pumping mainloop again.
         filter.forceTimeout();
         mainloop.post(17);
-        check_listener("no timeout 2", listener0, LLSD(1));
+        require_last_event("no timeout 2", listener0, LLSD(1));
         // Set timer again.
         filter.eventAfter(20, LLSD("timeout"));
         // Now let the timer expire.
         filter.forceTimeout();
         // Notice the timeout.
         mainloop.post(17);
-        check_listener("timeout", listener0, LLSD("timeout"));
+        require_last_event("timeout", listener0, LLSD("timeout"));
         // Timing out cancels the timer. Verify that.
         listener0.reset(0);
         filter.forceTimeout();
         mainloop.post(17);
-        check_listener("no timeout 3", listener0, LLSD(0));
+        require_last_event("no timeout 3", listener0, LLSD(0));
     }
 
     TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventTimeout::errorAfter() raises an error only on timeout", "[lleventfilter]")
@@ -335,15 +334,15 @@ namespace
         // when we pump mainloop. Do that right now to take the logic path
         // before either the anticipated event arrives or the timer expires.
         mainloop.post(17);
-        check_listener("no timeout 1", listener0, LLSD(0));
+        require_last_event("no timeout 1", listener0, LLSD(0));
         // Expected event arrives...
         driver.post(1);
-        check_listener("event passed thru", listener0, LLSD(1));
+        require_last_event("event passed thru", listener0, LLSD(1));
         // Should have canceled the timer. Verify that by asserting that the
         // time has expired, then pumping mainloop again.
         filter.forceTimeout();
         mainloop.post(17);
-        check_listener("no timeout 2", listener0, LLSD(1));
+        require_last_event("no timeout 2", listener0, LLSD(1));
         // Set timer again.
         filter.errorAfter(20, "timeout");
         // Now let the timer expire.
@@ -352,13 +351,12 @@ namespace
         std::string threw = capture.catch_llerrs([this](){
                 mainloop.post(17);
             });
-        UNSCOPED_INFO("errorAfter() timeout exception");
         CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("timeout"));
         // Timing out cancels the timer. Verify that.
         listener0.reset(0);
         filter.forceTimeout();
         mainloop.post(17);
-        check_listener("no timeout 3", listener0, LLSD(0));
+        require_last_event("no timeout 3", listener0, LLSD(0));
     }
 
     TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventThrottle delivers at most one event an interval", "[lleventfilter]")
@@ -371,46 +369,38 @@ namespace
         //  1: post(): event immediately passed to listeners, next no sooner than 4
         throttle.advance(1);
         throttle.post("1");
-        UNSCOPED_INFO("1");
         CHECK(cat.result == "1"); // delivered immediately
         //  2: post(): deferred: waiting for 3 seconds to elapse
         throttle.advance(1);
         throttle.post("2");
-        UNSCOPED_INFO("2");
         CHECK(cat.result == "1"); // "2" not yet delivered
         //  3: post(): deferred
         throttle.advance(1);
         throttle.post("3");
-        UNSCOPED_INFO("3");
         CHECK(cat.result == "1"); // "3" not yet delivered
         //  4: no post() call, but event delivered to listeners; next no sooner than 7
         throttle.advance(1);
-        UNSCOPED_INFO("4");
         CHECK(cat.result == "13"); // "3" delivered
         //  6: post(): deferred
         throttle.advance(2);
         throttle.post("6");
-        UNSCOPED_INFO("6");
         CHECK(cat.result == "13"); // "6" not yet delivered
         //  7: no post() call, but event delivered; next no sooner than 10
         throttle.advance(1);
-        UNSCOPED_INFO("7");
         CHECK(cat.result == "136"); // "6" delivered
         // 12: post(): immediately passed to listeners, next no sooner than 15
         throttle.advance(5);
         throttle.post(";12");
-        UNSCOPED_INFO("12");
         CHECK(cat.result == "136;12"); // "12" delivered
         // 17: post(): immediately passed to listeners, next no sooner than 20
         throttle.advance(5);
         throttle.post(";17");
-        UNSCOPED_INFO("17");
         CHECK(cat.result == "136;12;17"); // "17" delivered
     }
 
     // A PUMP keeps what no listener consumed, and replays it on the next listen().
     template<class PUMP>
-    static void check_mail_drop_replay()
+    static void require_mail_drop_replay()
     {
         PUMP pump(typeid(PUMP).name());
         LLSD data{LLSD::emptyArray()};
@@ -431,7 +421,6 @@ namespace
             pump.post("first");
         }
         // first post() should certainly be received by listener
-        UNSCOPED_INFO("first");
         REQUIRE_THAT(data, ll_test::LLSDEquals(llsd::array("first")));
         // the question is, since consumed was true, did it queue the value?
         data = LLSD::emptyArray();
@@ -440,7 +429,6 @@ namespace
             // listen() call
             LLTempBoundListener conn = pump.listen("lambda", lambda);
         }
-        UNSCOPED_INFO("empty1");
         REQUIRE_THAT(data, ll_test::LLSDEquals(LLSD::emptyArray()));
         data = LLSD::emptyArray();
         // now let's NOT consume the posted data
@@ -451,7 +439,6 @@ namespace
             pump.post("third");
         }
         // the two events still arrive
-        UNSCOPED_INFO("second,third1");
         REQUIRE_THAT(data, ll_test::LLSDEquals(llsd::array("second", "third")));
         data = LLSD::emptyArray();
         {
@@ -461,25 +448,23 @@ namespace
             LLTempBoundListener conn = pump.listen("lambda", lambda);
         }
         // unconsumed events were delivered again
-        UNSCOPED_INFO("second,third2");
         REQUIRE_THAT(data, ll_test::LLSDEquals(llsd::array("second", "third")));
         data = LLSD::emptyArray();
         {
             // when we reconnect this time, no more unconsumed events
             LLTempBoundListener conn = pump.listen("lambda", lambda);
         }
-        UNSCOPED_INFO("empty2");
         REQUIRE_THAT(data, ll_test::LLSDEquals(LLSD::emptyArray()));
     }
 
     TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventMailDrop replays unconsumed events on the next listen", "[lleventfilter]")
     {
-        check_mail_drop_replay<LLEventMailDrop>();
+        require_mail_drop_replay<LLEventMailDrop>();
     }
 
     TEST_CASE_METHOD(filter_data, "lleventfilter: LLEventLogProxyFor<LLEventMailDrop> replays unconsumed events", "[lleventfilter]")
     {
-        check_mail_drop_replay< LLEventLogProxyFor<LLEventMailDrop> >();
+        require_mail_drop_replay< LLEventLogProxyFor<LLEventMailDrop> >();
     }
 } // anonymous namespace
 

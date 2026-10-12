@@ -92,7 +92,6 @@ namespace
         // 'register' still a keyword until C++17
         MyRegistrar regster;
         LLEventPumps::instance().obtain("Test").post(llsd::map("op", "set", "data", "hey"));
-        UNSCOPED_INFO("failed to set data");
         CHECK(data.asString() == "hey");
     }
 
@@ -102,8 +101,7 @@ namespace
         // it has been destroyed, we fully expect NOT to reach a MyListener
         // instance with this post.
         LLEventPumps::instance().obtain("Test").post(llsd::map("op", "set", "data", "moot"));
-        UNSCOPED_INFO("accidentally set data");
-        REQUIRE_FALSE(data.isDefined());
+        CHECK_FALSE(data.isDefined());
     }
 
     TEST_CASE_METHOD(lazyeventapi_data, "lazyeventapi: instance_snapshot finds a LazyEventAPI and its metadata", "[lazyeventapi]")
@@ -121,25 +119,17 @@ namespace
         UNSCOPED_INFO("Failed to find MyRegistrar via LLInstanceTracker");
         REQUIRE(found);
 
-        UNSCOPED_INFO("wrong API name");
         CHECK(found->getName() == "Test");
-        UNSCOPED_INFO("wrong API desc");
         CHECK_THAT(found->getDesc(), Catch::Matchers::ContainsSubstring("test LLEventAPI"));
-        UNSCOPED_INFO("wrong API field");
         CHECK(found->getDispatchKey() == "op");
         // Normally we'd just iterate over *found. But for test purposes,
         // actually capture the range of NameDesc pairs in a vector.
         std::vector<LL::LazyEventAPIBase::NameDesc> ops{ found->begin(), found->end() };
-        UNSCOPED_INFO("failed to find operations");
         REQUIRE(ops.size() == 1);
-        UNSCOPED_INFO("wrong operation name");
         CHECK(ops[0].first == "set");
-        UNSCOPED_INFO("wrong operation desc");
         CHECK_THAT(ops[0].second, Catch::Matchers::ContainsSubstring("set operation"));
         LLSD metadata{ found->getMetadata(ops[0].first) };
-        UNSCOPED_INFO("bad metadata name");
         CHECK(metadata["name"].asString() == ops[0].first);
-        UNSCOPED_INFO("bad metadata desc");
         CHECK(metadata["desc"].asString() == ops[0].second);
     }
 } // anonymous namespace

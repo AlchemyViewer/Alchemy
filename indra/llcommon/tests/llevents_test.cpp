@@ -49,7 +49,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "catch_and_store_what_in.h"
-#include "stringize.h"
 
 template<typename T>
 static T make(const T& value)
@@ -91,9 +90,9 @@ struct events_data
     Listener listener0;
     Listener listener1;
 
-    void check_listener(const std::string& desc, const Listener& listener, LLSD::Integer got)
+    void require_last_event(const std::string& desc, const Listener& listener, LLSD::Integer got)
     {
-        UNSCOPED_INFO((STRINGIZE(listener << ' ' << desc)));
+        INFO(listener << ' ' << desc);
         REQUIRE(listener.getLastEvent().asInteger() == got);
     }
 };
@@ -106,12 +105,9 @@ TEST_CASE_METHOD(events_data, "events: basic operations", "[events]")
     // ensure_equals("initial pump", pumps.mPumpMap.size(), 1);
     size_t initial_pumps(pumps.mPumpMap.size());
     LLEventPump& per_frame(pumps.obtain("per-frame"));
-    UNSCOPED_INFO("first explicit pump");
-    REQUIRE(pumps.mPumpMap.size() == initial_pumps + 1);
+    CHECK(pumps.mPumpMap.size() == initial_pumps + 1);
     // Verify that per_frame was instantiated as an LLEventStream.
-    UNSCOPED_INFO("LLEventStream leaf class");
-    REQUIRE(dynamic_cast<LLEventStream*> (&per_frame));
-    UNSCOPED_INFO("enabled");
+    CHECK(dynamic_cast<LLEventStream*> (&per_frame));
     CHECK(per_frame.enabled());
     // Trivial test, but posting an event to an EventPump with no
     // listeners should not blow up. The test is relevant because defining
@@ -121,34 +117,27 @@ TEST_CASE_METHOD(events_data, "events: basic operations", "[events]")
     // last listener, which is meaningless if there were no listeners.
     per_frame.post(0);
     LLBoundListener connection = listener0.listenTo(per_frame);
-    UNSCOPED_INFO("connected");
     CHECK(connection.connected());
-    UNSCOPED_INFO("not blocked");
     CHECK_FALSE(connection.blocked());
     per_frame.post(1);
-    check_listener("received", listener0, 1);
+    require_last_event("received", listener0, 1);
     { // block the connection
         LLEventPump::Blocker block(connection);
-        UNSCOPED_INFO("blocked");
         CHECK(connection.blocked());
         per_frame.post(2);
-        check_listener("not updated", listener0, 1);
+        require_last_event("not updated", listener0, 1);
     } // unblock
-    UNSCOPED_INFO("unblocked");
     CHECK_FALSE(connection.blocked());
     per_frame.post(3);
-    check_listener("unblocked", listener0, 3);
+    require_last_event("unblocked", listener0, 3);
     LLBoundListener sameConnection = per_frame.getListener(listener0.getName());
-    UNSCOPED_INFO("still connected");
     CHECK(sameConnection.connected());
-    UNSCOPED_INFO("still not blocked");
     CHECK_FALSE(sameConnection.blocked());
     { // block it again
         LLEventPump::Blocker block(sameConnection);
-        UNSCOPED_INFO("re-blocked");
         CHECK(sameConnection.blocked());
         per_frame.post(4);
-        check_listener("re-blocked", listener0, 3);
+        require_last_event("re-blocked", listener0, 3);
     } // unblock
     std::string threw = catch_what<LLEventPump::DupListenerName>(
         [&per_frame, this](){
@@ -167,27 +156,25 @@ TEST_CASE_METHOD(events_data, "events: basic operations", "[events]")
     // do it right this time
     listener1.listenTo(per_frame);
     per_frame.post(5);
-    check_listener("got", listener0, 5);
-    check_listener("got", listener1, 5);
+    require_last_event("got", listener0, 5);
+    require_last_event("got", listener1, 5);
     per_frame.enable(false);
     per_frame.post(6);
-    check_listener("didn't get", listener0, 5);
-    check_listener("didn't get", listener1, 5);
+    require_last_event("didn't get", listener0, 5);
+    require_last_event("didn't get", listener1, 5);
     per_frame.enable();
     per_frame.post(7);
-    check_listener("got", listener0, 7);
-    check_listener("got", listener1, 7);
+    require_last_event("got", listener0, 7);
+    require_last_event("got", listener1, 7);
     per_frame.stopListening(listener0.getName());
-    UNSCOPED_INFO("disconnected 0");
     CHECK_FALSE(connection.connected());
-    UNSCOPED_INFO("disconnected 1");
     CHECK_FALSE(sameConnection.connected());
     per_frame.post(8);
-    check_listener("disconnected", listener0, 7);
-    check_listener("still connected", listener1, 8);
+    require_last_event("disconnected", listener0, 7);
+    require_last_event("still connected", listener1, 8);
     per_frame.stopListening(listener1.getName());
     per_frame.post(9);
-    check_listener("disconnected", listener1, 8);
+    require_last_event("disconnected", listener1, 8);
 }
 
 TEST_CASE_METHOD(events_data, "events: callstop() returning true", "[events]")
@@ -199,20 +186,15 @@ TEST_CASE_METHOD(events_data, "events: callstop() returning true", "[events]")
     LLBoundListener bound1 = listener1.listenTo(per_frame, &Listener::call,
                                                 // after listener0
                                                 make<LLEventPump::NameList>(LLEventPump::NameList{ listener0.getName() }));
-    UNSCOPED_INFO("enabled");
     CHECK(per_frame.enabled());
-    UNSCOPED_INFO("connected 0");
     CHECK(bound0.connected());
-    UNSCOPED_INFO("unblocked 0");
     CHECK_FALSE(bound0.blocked());
-    UNSCOPED_INFO("connected 1");
     CHECK(bound1.connected());
-    UNSCOPED_INFO("unblocked 1");
     CHECK_FALSE(bound1.blocked());
     per_frame.post(1);
-    check_listener("got", listener0, 1);
+    require_last_event("got", listener0, 1);
     // Because listener0.callstop() returns true, control never reaches listener1.call().
-    check_listener("got", listener1, 0);
+    require_last_event("got", listener1, 0);
 }
 
 TEST_CASE_METHOD(events_data, "events: an explicit LLEventStream registers itself until destroyed", "[events]")
@@ -226,24 +208,16 @@ TEST_CASE_METHOD(events_data, "events: an explicit LLEventStream registers itsel
         LLEventStream myEventStream("stream");
         localInstance = &myEventStream;
         LLEventPump& stream(pumps.obtain("stream"));
-        UNSCOPED_INFO("found named LLEventStream instance");
         CHECK(&stream == localInstance);
-        UNSCOPED_INFO("registered new instance");
-        REQUIRE(pumps.mPumpMap.size() == registered + 1);
-        UNSCOPED_INFO("explicit instance not owned");
-        REQUIRE(pumps.mOurPumps.size() == owned);
+        CHECK(pumps.mPumpMap.size() == registered + 1);
+        CHECK(pumps.mOurPumps.size() == owned);
     } // destroy myEventStream -- should unregister
-    UNSCOPED_INFO("destroyed instance unregistered");
-    REQUIRE(pumps.mPumpMap.size() == registered);
-    UNSCOPED_INFO("destroyed instance not owned");
-    REQUIRE(pumps.mOurPumps.size() == owned);
+    CHECK(pumps.mPumpMap.size() == registered);
+    CHECK(pumps.mOurPumps.size() == owned);
     LLEventPump& stream(pumps.obtain("stream"));
-    UNSCOPED_INFO("new LLEventStream instance");
     CHECK(&stream != localInstance);
-    UNSCOPED_INFO("obtain()ed instance registered");
-    REQUIRE(pumps.mPumpMap.size() == registered + 1);
-    UNSCOPED_INFO("obtain()ed instance owned");
-    REQUIRE(pumps.mOurPumps.size() == owned + 1);
+    CHECK(pumps.mPumpMap.size() == registered + 1);
+    CHECK(pumps.mOurPumps.size() == owned + 1);
 }
 
 TEST_CASE_METHOD(events_data, "events: stopListening() frees the name and a bogus name has no connection", "[events]")
@@ -254,9 +228,7 @@ TEST_CASE_METHOD(events_data, "events: stopListening() frees the name and a bogu
     // should not throw because stopListening() should have removed name
     listener0.listenTo(login, &Listener::callstop);
     LLBoundListener wrong = login.getListener("bogus");
-    UNSCOPED_INFO("bogus connection disconnected");
     CHECK_FALSE(wrong.connected());
-    UNSCOPED_INFO("bogus connection blocked");
     CHECK(wrong.blocked());
 }
 
@@ -275,12 +247,12 @@ TEST_CASE_METHOD(events_data, "events: chaining LLEventPump instances", "[events
     listener0.reset(0);
     listener1.reset(0);
     upstream.post(1);
-    check_listener("got unfiltered", listener0, 1);
-    check_listener("got unfiltered", listener1, 1);
+    require_last_event("got unfiltered", listener0, 1);
+    require_last_event("got unfiltered", listener1, 1);
     filter0.enable(false);
     upstream.post(2);
-    check_listener("didn't get filtered", listener0, 1);
-    check_listener("got filtered", listener1, 2);
+    require_last_event("didn't get filtered", listener0, 1);
+    require_last_event("got filtered", listener1, 2);
 }
 
 TEST_CASE_METHOD(events_data, "events: listener dependency order", "[events]")
@@ -322,21 +294,15 @@ TEST_CASE_METHOD(events_data, "events: listener dependency order", "[events]")
     // change; go ahead and change the test to match.
     // Establish that it contains:
     // - the name and runtime type of the LLEventPump
-    UNSCOPED_INFO("LLEventPump type");
-    REQUIRE_THAT(threw, Catch::Matchers::ContainsSubstring(typeid(button).name()));
-    UNSCOPED_INFO("LLEventPump name");
+    CHECK_THAT(threw, Catch::Matchers::ContainsSubstring(typeid(button).name()));
     CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("'button'"));
     // - the name of the new listener that caused the problem
-    UNSCOPED_INFO("new listener name");
     CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("'spot'"));
     // - a synopsis of the problematic dependencies.
-    UNSCOPED_INFO("cyclic dependencies");
     CHECK_THAT(threw,
                     Catch::Matchers::ContainsSubstring("\"Mary\" -> before (\"spot\")"));
-    UNSCOPED_INFO("cyclic dependencies");
     CHECK_THAT(threw,
                     Catch::Matchers::ContainsSubstring("after (\"spot\") -> \"checked\""));
-    UNSCOPED_INFO("cyclic dependencies");
     CHECK_THAT(threw,
                     Catch::Matchers::ContainsSubstring("after (\"Mary\", \"checked\") -> \"spot\""));
     button.listen("yellow",
@@ -356,18 +322,14 @@ TEST_CASE_METHOD(events_data, "events: listener dependency order", "[events]")
     // Same remarks about the specific wording of the exception. Just
     // ensure that it contains enough information to clarify the
     // problem and what must be done to resolve it.
-    UNSCOPED_INFO("LLEventPump type");
-    REQUIRE_THAT(threw, Catch::Matchers::ContainsSubstring(typeid(button).name()));
-    UNSCOPED_INFO("LLEventPump name");
+    CHECK_THAT(threw, Catch::Matchers::ContainsSubstring(typeid(button).name()));
     CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("'button'"));
     UNSCOPED_INFO("new listener name");
     CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("'of'"));
     UNSCOPED_INFO("prev listener name");
     CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("'yellow'"));
     // std::cout << "Thrown Exception: " << threw << std::endl;
-    UNSCOPED_INFO("old order");
     CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("was: Mary, checked, yellow, shoelaces"));
-    UNSCOPED_INFO("new order");
     CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("now: Mary, checked, shoelaces, of, yellow"));
     button.post(4);
     CHECK(collector.result == make<StringVec>(StringVec{ "Mary", "checked", "yellow", "shoelaces" }));
@@ -383,19 +345,16 @@ TEST_CASE_METHOD(events_data, "events: tweaked and untweaked LLEventPump instanc
                 // then another with a duplicate name.
                 LLEventStream bob2("bob");
             });
-        UNSCOPED_INFO("Caught DupPumpName");
-        REQUIRE_FALSE(threw.empty());
+        CHECK_FALSE(threw.empty());
     }   // delete first 'bob'
     LLEventStream bob("bob");       // should work, previous one unregistered
     LLEventStream bob1("bob", true);// allowed to tweak name
-    UNSCOPED_INFO("tweaked LLEventStream name");
     CHECK(bob1.getName() == "bob1");
     std::vector<std::shared_ptr<LLEventStream> > streams;
     for (int i = 2; i <= 10; ++i)
     {
         streams.push_back(std::shared_ptr<LLEventStream>(new LLEventStream("bob", true)));
     }
-    UNSCOPED_INFO("last tweaked LLEventStream name");
     CHECK(streams.back()->getName() == "bob10");
 }
 
@@ -411,21 +370,20 @@ TEST_CASE_METHOD(events_data, "events: LLListenerOrPumpName calls a listener or 
     // Passing a boost::bind() expression to LLListenerOrPumpName
     listener0.reset(0);
     eventSource(boost::bind(&Listener::call, boost::ref(listener0), _1));
-    check_listener("got by listener", listener0, 17);
+    require_last_event("got by listener", listener0, 17);
     // Passing a string LLEventPump name to LLListenerOrPumpName
     listener0.reset(0);
     LLEventStream random("random");
     listener0.listenTo(random);
     eventSource("random");
-    check_listener("got by pump name", listener0, 17);
+    require_last_event("got by pump name", listener0, 17);
     std::string threw = catch_what<LLListenerOrPumpName::Empty>(
         [](){
             LLListenerOrPumpName empty;
             empty(17);
         });
 
-    UNSCOPED_INFO("threw Empty");
-    REQUIRE_FALSE(threw.empty());
+    CHECK_FALSE(threw.empty());
 }
 
 
@@ -464,7 +422,7 @@ TEST_CASE_METHOD(events_data, "events: a destroyed plain listener still looks co
                                                  boost::ref(tempListener),
                                                  _1));
         heaptest.post(1);
-        check_listener("received", tempListener, 1);
+        require_last_event("received", tempListener, 1);
     } // presumably this will make newListener go away?
     // verify that
     UNSCOPED_INFO("TempListener destroyed");
@@ -501,7 +459,7 @@ TEST_CASE_METHOD(events_data, "events: destroying a bound LLEventTrackable disco
                                      boost::bind(&TempTrackableListener::call,
                                                  boost::ref(tempListener), _1));
         heaptest.post(1);
-        check_listener("received", tempListener, 1);
+        require_last_event("received", tempListener, 1);
     } // presumably this will make tempListener go away?
     // verify that
     UNSCOPED_INFO("TempTrackableListener destroyed");
@@ -525,7 +483,7 @@ TEST_CASE_METHOD(events_data, "events: deleting a bound LLEventTrackable pointer
                                      boost::bind(&TempTrackableListener::call,
                                                  newListener, _1));
         heaptest.post(1);
-        check_listener("received", *newListener, 1);
+        require_last_event("received", *newListener, 1);
         // explicitly destroy newListener
         delete newListener;
     }

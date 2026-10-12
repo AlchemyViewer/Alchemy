@@ -48,7 +48,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct stringize_data
     {
@@ -106,15 +106,15 @@ namespace tut
     {
         //Tests rely on validity of wstring_to_utf8str()
 #if LL_WINDOWS // Windows wstring is a 2byte UTF16 type
-        REQUIRE(ll_convert<std::string>(wstringize(c)) == ll_convert<std::string>(std::wstring(L"c")));
-        REQUIRE(ll_convert<std::string>(wstringize(s)) == ll_convert<std::string>(std::wstring(L"17")));
-        REQUIRE(ll_convert<std::string>(wstringize(i)) == ll_convert<std::string>(std::wstring(L"34")));
-        REQUIRE(ll_convert<std::string>(wstringize(l)) == ll_convert<std::string>(std::wstring(L"68")));
-        REQUIRE(ll_convert<std::string>(wstringize(f)) == ll_convert<std::string>(std::wstring(L"3.14159")));
-        REQUIRE(ll_convert<std::string>(wstringize(d)) == ll_convert<std::string>(std::wstring(L"3.14159")));
-        REQUIRE(ll_convert<std::string>(wstringize(abc)) == ll_convert<std::string>(std::wstring(L"abc def")));
-        REQUIRE(ll_convert<std::string>(wstringize(abc)) == ll_convert<std::string>(wstringize(abc.c_str())));
-        REQUIRE(ll_convert<std::string>(wstringize(def)) == ll_convert<std::string>(std::wstring(L"def ghi")));
+        CHECK(ll_convert<std::string>(wstringize(c)) == ll_convert<std::string>(std::wstring(L"c")));
+        CHECK(ll_convert<std::string>(wstringize(s)) == ll_convert<std::string>(std::wstring(L"17")));
+        CHECK(ll_convert<std::string>(wstringize(i)) == ll_convert<std::string>(std::wstring(L"34")));
+        CHECK(ll_convert<std::string>(wstringize(l)) == ll_convert<std::string>(std::wstring(L"68")));
+        CHECK(ll_convert<std::string>(wstringize(f)) == ll_convert<std::string>(std::wstring(L"3.14159")));
+        CHECK(ll_convert<std::string>(wstringize(d)) == ll_convert<std::string>(std::wstring(L"3.14159")));
+        CHECK(ll_convert<std::string>(wstringize(abc)) == ll_convert<std::string>(std::wstring(L"abc def")));
+        CHECK(ll_convert<std::string>(wstringize(abc)) == ll_convert<std::string>(wstringize(abc.c_str())));
+        CHECK(ll_convert<std::string>(wstringize(def)) == ll_convert<std::string>(std::wstring(L"def ghi")));
 #else
         // ensure_equals(ll_convert<std::string>(wstringize(c)),    wstring_to_utf8str(U"c"));
         // ensure_equals(ll_convert<std::string>(wstringize(s)),    wstring_to_utf8str(U"17"));
@@ -128,4 +128,4 @@ namespace tut
 #endif
  //       ensure_equals(wstring_to_utf8str(wstringize(llsd)), wstring_to_utf8str(L"{'abc':'abc def','d':r3.14159,'i':i34}"));
     }
-} // namespace tut
+} // anonymous namespace

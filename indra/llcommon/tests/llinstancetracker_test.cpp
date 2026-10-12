@@ -75,9 +75,9 @@ struct Unkeyed: public LLInstanceTracker<Unkeyed>
 } // anonymous namespace
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
-namespace tut
+namespace
 {
     TEST_CASE("llinstancetracker: Keyed instances are found by key and forgotten when destroyed", "[llinstancetracker]")
     {
@@ -87,23 +87,21 @@ namespace tut
             CHECK(Keyed::instanceCount() == 1);
             auto found = Keyed::getInstance("one");
             UNSCOPED_INFO("couldn't find stack Keyed");
-            REQUIRE(bool(found));
-            UNSCOPED_INFO("found wrong Keyed instance");
-            REQUIRE(found.get() == &one);
+            CHECK(bool(found));
+            CHECK(found.get() == &one);
             {
                 std::unique_ptr<Keyed> two(new Keyed("two"));
                 CHECK(Keyed::instanceCount() == 2);
                 auto found = Keyed::getInstance("two");
                 UNSCOPED_INFO("couldn't find heap Keyed");
-                REQUIRE(bool(found));
-                UNSCOPED_INFO("found wrong Keyed instance");
-                REQUIRE(found.get() == two.get());
+                CHECK(bool(found));
+                CHECK(found.get() == two.get());
             }
             CHECK(Keyed::instanceCount() == 1);
         }
         auto found = Keyed::getInstance("one");
         UNSCOPED_INFO("Keyed key lives too long");
-        REQUIRE_FALSE(found);
+        CHECK_FALSE(found);
         CHECK(Keyed::instanceCount() == 0);
     }
 
@@ -125,7 +123,6 @@ namespace tut
             dangling = found;
         } // make that instance vanish
         // check the now-invalid pointer to the destroyed instance
-        UNSCOPED_INFO("weak_ptr<Unkeyed> failed to track destruction");
         CHECK(dangling.expired());
         CHECK(Unkeyed::instanceCount() == 0);
     }
@@ -148,7 +145,7 @@ namespace tut
         // Use ensure() here because ensure_equals would want to display
         // mismatched values, and frankly that wouldn't help much.
         UNSCOPED_INFO("didn't reach end");
-        REQUIRE(ki == keys.end());
+        CHECK(ki == keys.end());
 
         // Use a somewhat different approach to order independence with
         // instance_snapshot(): explicitly capture the instances we know in a
@@ -164,7 +161,7 @@ namespace tut
             REQUIRE(instances.erase(&ref) == 1);
         }
         UNSCOPED_INFO("unreported instance");
-        REQUIRE(instances.size() == 0);
+        CHECK(instances.size() == 0);
     }
 
     TEST_CASE("llinstancetracker: instance_snapshot lists each Unkeyed once", "[llinstancetracker]")
@@ -184,7 +181,7 @@ namespace tut
         }
 
         UNSCOPED_INFO("unreported instance");
-        REQUIRE(instances.size() == 0);
+        CHECK(instances.size() == 0);
     }
 
     TEST_CASE("llinstancetracker: delete Keyed with outstanding instance_snapshot", "[llinstancetracker]")
@@ -198,7 +195,7 @@ namespace tut
         // traversing the snapshot should reflect the deletion
         // avoid ensure_equals() because it requires the ability to stream the
         // two values to std::ostream
-        REQUIRE(snapshot.begin() == snapshot.end());
+        CHECK(snapshot.begin() == snapshot.end());
     }
 
     TEST_CASE("llinstancetracker: delete Keyed with outstanding key_snapshot", "[llinstancetracker]")
@@ -212,7 +209,7 @@ namespace tut
         // traversing the snapshot should reflect the deletion
         // avoid ensure_equals() because it requires the ability to stream the
         // two values to std::ostream
-        REQUIRE(snapshot.begin() == snapshot.end());
+        CHECK(snapshot.begin() == snapshot.end());
     }
 
     TEST_CASE("llinstancetracker: delete Unkeyed with outstanding instance_snapshot", "[llinstancetracker]")
@@ -226,7 +223,7 @@ namespace tut
         // traversing the snapshot should reflect the deletion
         // avoid ensure_equals() because it requires the ability to stream the
         // two values to std::ostream
-        REQUIRE(snapshot.begin() == snapshot.end());
+        CHECK(snapshot.begin() == snapshot.end());
     }
 
     TEST_CASE("llinstancetracker: a throwing subclass constructor leaves no instance behind", "[llinstancetracker]")
@@ -267,4 +264,4 @@ namespace tut
             REQUIRE(existing.find(&ref) != existing.end());
         }
     }
-} // namespace tut
+} // anonymous namespace

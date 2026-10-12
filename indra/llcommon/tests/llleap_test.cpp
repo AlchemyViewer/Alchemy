@@ -78,9 +78,8 @@ static void waitfor(const LLLeapVector& instances, int timeout=60)
         sleep(1);
         LLEventPumps::instance().obtain("mainloop").post(LLSD());
     }
-    UNSCOPED_INFO((STRINGIZE("at least 1 of " << instances.size()
-                          << " LLLeap instances timed out ("
-                          << timeout << " seconds) without terminating")));
+    INFO("at least 1 of " << instances.size()
+         << " LLLeap instances timed out (" << timeout << " seconds) without terminating");
     REQUIRE(i < timeout);
 }
 
@@ -240,7 +239,6 @@ namespace tut
         CaptureLog log(LLError::LEVEL_WARN);
         waitfor(LLLeap::create(ll_test::currentTestName(),
                                StringVec{PYTHON, script.getPath().string()}));
-        UNSCOPED_INFO("error log line");
         CHECK_THAT(log.messageWith("invalid protocol"), Catch::Matchers::ContainsSubstring("Hello from Python!"));
     }
 
@@ -253,7 +251,6 @@ namespace tut
         CaptureLog log(LLError::LEVEL_WARN);
         waitfor(LLLeap::create(ll_test::currentTestName(),
                                StringVec{PYTHON, script.getPath().string()}));
-        UNSCOPED_INFO("error log line");
         CHECK_THAT(log.messageWith("Discarding"), Catch::Matchers::ContainsSubstring("Hello from Python!"));
     }
 
@@ -265,7 +262,6 @@ namespace tut
         CaptureLog log(LLError::LEVEL_WARN);
         waitfor(LLLeap::create(ll_test::currentTestName(),
                                StringVec{PYTHON, script.getPath().string()}));
-        UNSCOPED_INFO("error log line");
         CHECK_THAT(log.messageWith("invalid protocol"), Catch::Matchers::ContainsSubstring("5a2:"));
     }
 
@@ -274,11 +270,9 @@ namespace tut
         std::string threw = catch_what<LLLeap::Error>([](){
                 LLLeap::create("empty", StringVec());
             });
-        UNSCOPED_INFO("LLLeap::Error");
         CHECK_THAT(threw, Catch::Matchers::ContainsSubstring("no plugin"));
         // try the suppress-exception variant
-        UNSCOPED_INFO("bad launch returned non-NULL");
-        REQUIRE_FALSE(LLLeap::create("empty", StringVec(), false));
+        CHECK_FALSE(LLLeap::create("empty", StringVec(), false));
     }
 
     TEST_CASE_METHOD(llleap_data, "llleap: create with a missing executable throws or returns null", "[llleap]")
@@ -294,8 +288,7 @@ namespace tut
         log.messageWith("failed");
         log.messageWith(BADPYTHON);
         // try the suppress-exception variant
-        UNSCOPED_INFO("bad launch returned non-NULL");
-        REQUIRE_FALSE(LLLeap::create("bad exe", BADPYTHON, false));
+        CHECK_FALSE(LLLeap::create("bad exe", BADPYTHON, false));
     }
 
     namespace
@@ -352,9 +345,9 @@ namespace tut
                 return false;
             }
 
-            void ensure() const
+            void require_success() const
             {
-                UNSCOPED_INFO(std::string("never posted to ") + getName());
+                UNSCOPED_INFO("never posted to " << getName());
                 REQUIRE(mData.isDefined());
                 // Post an empty string for success, non-empty string is failure message.
                 UNSCOPED_INFO(mData);
@@ -381,7 +374,7 @@ namespace tut
                                 "send(pump='" << result.getName() << "', data=result)\n";});
         waitfor(LLLeap::create(ll_test::currentTestName(),
                                StringVec{PYTHON, script.getPath().string()}));
-        result.ensure();
+        result.require_success();
     }
 
     namespace
@@ -442,11 +435,11 @@ namespace tut
                                 "send(pump='" << result.getName() << "', data=result)\n";});
         waitfor(LLLeap::create(ll_test::currentTestName(), StringVec{PYTHON, script.getPath().string()}),
                 300);               // needs more realtime than most tests
-        result.ensure();
+        result.require_success();
     }
 
-    // This is the body of test<10>, extracted so we can run it over a number
-    // of large-message sizes.
+    // This is the body of the very large message test, extracted so we can
+    // run it over a number of large-message sizes.
     static void test_large_message(const std::string& PYTHON, const std::string& reader_module,
                                    const std::string& test_name, size_t size)
     {
@@ -509,7 +502,7 @@ namespace tut
         waitfor(LLLeap::create(test_name,
                                StringVec{PYTHON, script.getPath().string(), stringize(size)}),
                 180);               // try a longer timeout
-        result.ensure();
+        result.require_success();
     }
 
     namespace

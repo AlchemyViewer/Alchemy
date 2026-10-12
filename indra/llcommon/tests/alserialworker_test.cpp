@@ -77,14 +77,11 @@ namespace
         ALSerialWorker worker("alserialworker_test_1");
         for (int n = 0; n < 50; ++n)
         {
-            UNSCOPED_INFO("taken");
             REQUIRE(worker.post([this, n] { note(n); }));
         }
-        UNSCOPED_INFO("all done");
-        CHECK(waitFor(50));
+        REQUIRE(waitFor(50));
         for (int n = 0; n < 50; ++n)
         {
-            UNSCOPED_INFO("in the order posted");
             REQUIRE(done[n] == n);
             {
                 INFO("on one thread, not this one");
@@ -127,11 +124,8 @@ namespace
         UNSCOPED_INFO("it returned, and nothing waiting ran");
         REQUIRE(done.size() == size_t(1));
         bool ran = false;
-        {
-            INFO("refused after");
-            CHECK_FALSE(worker.post([&ran] { ran = true; }));
-            CHECK_FALSE(ran);
-        }
+        CHECK_FALSE(worker.post([&ran] { ran = true; }));
+        CHECK_FALSE(ran);
         worker.close();
         UNSCOPED_INFO("closed twice is closed");
         CHECK(worker.closing());
@@ -140,17 +134,13 @@ namespace
     TEST_CASE_METHOD(alserialworker_data, "alserialworker: the viewer starting to quit closes it at once", "[alserialworker]")
     {
         ALSerialWorker worker("alserialworker_test_3");
-        UNSCOPED_INFO("taken");
         CHECK(worker.post([this] { note(1); }));
-        UNSCOPED_INFO("done");
         CHECK(waitFor(1));
         LLEventPumps::instance().obtain("LLApp").post(llsd::map("status", "running"));
         UNSCOPED_INFO("running is nothing");
         CHECK_FALSE(worker.closing());
         LLEventPumps::instance().obtain("LLApp").post(llsd::map("status", "quitting"));
-        UNSCOPED_INFO("closed");
         CHECK(worker.closing());
-        UNSCOPED_INFO("refused");
         CHECK_FALSE(worker.post([this] { note(2); }));
     }
 }

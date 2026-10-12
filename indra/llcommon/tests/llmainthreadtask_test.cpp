@@ -50,20 +50,18 @@ namespace
                 ran = true;
                 return true;
             });
-        UNSCOPED_INFO("didn't run lambda");
         CHECK(ran);
-        UNSCOPED_INFO("didn't return result");
         CHECK(result);
     }
 
-        // LockStatic finds its one instance a process by the type's name, even
-        // in an anonymous namespace, so the name is this test's own.
-        struct MainThreadTaskStatic
-        {
-            std::mutex mMutex;          // LockStatic looks for mMutex
-            bool ran{false};
-        };
-        typedef llthread::LockStatic<MainThreadTaskStatic> LockStatic;
+    // LockStatic finds its one instance a process by the type's name, even
+    // in an anonymous namespace, so the name is this test's own.
+    struct MainThreadTaskStatic
+    {
+        std::mutex mMutex;          // LockStatic looks for mMutex
+        bool ran{false};
+    };
+    typedef llthread::LockStatic<MainThreadTaskStatic> LockStatic;
 
     TEST_CASE_METHOD(llmainthreadtask_data, "llmainthreadtask: dispatch from another thread runs the task on the main thread", "[llmainthreadtask]")
     {
@@ -73,7 +71,7 @@ namespace
         // exceptions it might throw and deliver them via future
         std::packaged_task<void()> thread_work(
             [this, &result](){
-                // unblock test<2>()'s yield_until(1)
+                // unblock the test's yield_until(1)
                 mSync.set(1);
                 // dispatch work to main thread -- should block here
                 bool on_main(
@@ -84,7 +82,7 @@ namespace
                             // indicate whether task was run on the main thread
                             return on_main_thread();
                         }));
-                // wait for test<2>() to unblock us again
+                // wait for the test to unblock us again
                 mSync.yield_until(3);
                 result = on_main;
             });
@@ -132,7 +130,6 @@ namespace
         thread.join();
         // deliver any exception thrown by thread_work
         thread_result.get();
-        UNSCOPED_INFO("ran changed");
         CHECK(LockStatic()->ran);
         UNSCOPED_INFO("didn't run on main thread");
         CHECK(result);

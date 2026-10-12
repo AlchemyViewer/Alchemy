@@ -40,25 +40,17 @@ namespace
 
     TEST_CASE_METHOD(llmutex_data, "llmutex: lock marks ownership and unlock clears it", "[llmutex]")
     {
-        UNSCOPED_INFO("unlocked mutex reports self-locked");
         CHECK_FALSE(mMutex.isSelfLocked());
-        UNSCOPED_INFO("unlocked mutex has an owner");
         CHECK(mMutex.lockingThread() == LLThread::id_t());
 
         mMutex.lock();
-        UNSCOPED_INFO("locked mutex does not report self-locked");
         CHECK(mMutex.isSelfLocked());
-        UNSCOPED_INFO("locking thread not recorded");
         CHECK(mMutex.lockingThread() == LLThread::currentID());
-        UNSCOPED_INFO("isLocked() false while held");
         CHECK(mMutex.isLocked());
 
         mMutex.unlock();
-        UNSCOPED_INFO("still self-locked after unlock");
         CHECK_FALSE(mMutex.isSelfLocked());
-        UNSCOPED_INFO("owner not cleared on unlock");
         CHECK(mMutex.lockingThread() == LLThread::id_t());
-        UNSCOPED_INFO("isLocked() true after unlock");
         CHECK_FALSE(mMutex.isLocked());
     }
 
@@ -68,7 +60,6 @@ namespace
         mMutex.lock();
         mMutex.lock();
 
-        UNSCOPED_INFO("self-lock lost during recursion");
         CHECK(mMutex.isSelfLocked());
 
         mMutex.unlock();
@@ -79,23 +70,19 @@ namespace
         CHECK(mMutex.isLocked());
         mMutex.unlock();
 
-        UNSCOPED_INFO("not released after balanced unlocks");
         CHECK_FALSE(mMutex.isLocked());
-        UNSCOPED_INFO("still self-locked after balanced unlocks");
         CHECK_FALSE(mMutex.isSelfLocked());
     }
 
     TEST_CASE_METHOD(llmutex_data, "llmutex: trylock recurses on a self-held mutex", "[llmutex]")
     {
         mMutex.lock();
-        UNSCOPED_INFO("trylock failed on a mutex this thread already holds");
         CHECK(mMutex.trylock());
 
         mMutex.unlock();
         UNSCOPED_INFO("recursive trylock did not need a matching unlock");
         CHECK(mMutex.isLocked());
         mMutex.unlock();
-        UNSCOPED_INFO("not released after balanced unlocks");
         CHECK_FALSE(mMutex.isLocked());
     }
 
@@ -140,18 +127,14 @@ namespace
     {
         {
             LLMutexTrylock lock(&mMutex);
-            UNSCOPED_INFO("trylock scope failed on a free mutex");
             CHECK(lock.isLocked());
-            UNSCOPED_INFO("trylock scope did not take ownership");
             CHECK(mMutex.isSelfLocked());
         }
-        UNSCOPED_INFO("trylock scope did not release");
         CHECK_FALSE(mMutex.isLocked());
 
         // A null mutex is legal and locks nothing -- callers pass member pointers that
         // may not be constructed yet.
         LLMutexTrylock null_lock(nullptr);
-        UNSCOPED_INFO("null trylock scope claimed a lock");
         CHECK_FALSE(null_lock.isLocked());
     }
 

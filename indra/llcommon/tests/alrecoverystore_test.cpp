@@ -75,20 +75,20 @@ namespace
 
         // Entries as a listing reads them, read whole: what they say of
         // their text is only there then.
-        static std::vector<ALRecoveryEntry> whole(const ALRecoveryStore& store, std::vector<ALRecoveryEntry> entries)
+        static std::vector<ALRecoveryEntry> require_whole(const ALRecoveryStore& store, std::vector<ALRecoveryEntry> entries)
         {
             for (ALRecoveryEntry& one : entries)
             {
-                UNSCOPED_INFO("read whole: " + one.key);
+                CAPTURE(one.key);
                 REQUIRE(store.load(one));
             }
             return entries;
         }
-        static std::optional<ALRecoveryEntry> whole(const ALRecoveryStore& store, std::optional<ALRecoveryEntry> one)
+        static std::optional<ALRecoveryEntry> require_whole(const ALRecoveryStore& store, std::optional<ALRecoveryEntry> one)
         {
             if (one)
             {
-                UNSCOPED_INFO("read whole: " + one->key);
+                CAPTURE(one->key);
                 REQUIRE(store.load(*one));
             }
             return one;
@@ -111,9 +111,7 @@ namespace
         const std::string task      = ALRecoveryStore::keyOf(object, item, std::string());
         const std::string inventory = ALRecoveryStore::keyOf(LLUUID::null, item, std::string());
         const std::string file      = ALRecoveryStore::keyOf(LLUUID::null, LLUUID::null, "/scripts/lib.lsl");
-        UNSCOPED_INFO("an object's item and the inventory's differ");
         CHECK(task != inventory);
-        UNSCOPED_INFO("a file is its path");
         CHECK(file == "disk:/scripts/lib.lsl");
         UNSCOPED_INFO("and a key is the same asked twice");
         CHECK(ALRecoveryStore::keyOf(object, item, std::string()) == task);
@@ -135,32 +133,20 @@ namespace
         was.compileTarget          = "luau";
         was.baseAsset              = LLUUID::generateNewID();
         ALRecoveryEntry back;
-        UNSCOPED_INFO("it reads");
         REQUIRE(ALRecoveryEntry::fromLLSD(was.asLLSD(), back));
         UNSCOPED_INFO("the text, whatever is in it");
         CHECK(back.text == was.text);
-        UNSCOPED_INFO("kept");
         CHECK(back.state == ALRecoveryEntry::State::Kept);
-        UNSCOPED_INFO("when");
         CHECK(back.when.secondsSinceEpoch() == was.when.secondsSinceEpoch());
-        {
-            INFO("the object and the item");
-            CHECK(back.object == was.object);
-            CHECK(back.item == was.item);
-        }
-        {
-            INFO("where it was");
-            CHECK(back.objectName == "Door");
-            CHECK(back.region == "Ahern");
-        }
-        {
-            INFO("what it is");
-            CHECK(back.lua);
-            CHECK_FALSE(back.notecard);
-            CHECK(back.wrapped);
-            CHECK(back.compileTarget == "luau");
-            CHECK(back.baseAsset == was.baseAsset);
-        }
+        CHECK(back.object == was.object);
+        CHECK(back.item == was.item);
+        CHECK(back.objectName == "Door");
+        CHECK(back.region == "Ahern");
+        CHECK(back.lua);
+        CHECK_FALSE(back.notecard);
+        CHECK(back.wrapped);
+        CHECK(back.compileTarget == "luau");
+        CHECK(back.baseAsset == was.baseAsset);
         {
             INFO("no history said, none read");
             REQUIRE_FALSE(back.history.isDefined());
@@ -172,18 +158,11 @@ namespace
         was.history      = history;
         was.caretLine    = 4;
         was.caretColumn  = 7;
-        UNSCOPED_INFO("it reads again");
         CHECK(ALRecoveryEntry::fromLLSD(was.asLLSD(), back));
-        {
-            INFO("the history as it was written");
-            CHECK(back.history["undo"][0]["label"].asString() == "rename");
-            CHECK(back.history["saved"].asInteger() == 0);
-        }
-        {
-            INFO("and where the caret stood");
-            CHECK(back.caretLine == 4);
-            CHECK(back.caretColumn == 7);
-        }
+        CHECK(back.history["undo"][0]["label"].asString() == "rename");
+        CHECK(back.history["saved"].asInteger() == 0);
+        CHECK(back.caretLine == 4);
+        CHECK(back.caretColumn == 7);
         UNSCOPED_INFO("something that is no entry is not read as one");
         CHECK_FALSE(ALRecoveryEntry::fromLLSD(LLSD("text"), back));
     }
@@ -191,30 +170,23 @@ namespace
     TEST_CASE_METHOD(alrecoverystore_data, "alrecoverystore: a session's entry is written whole then over by its next and forgotten", "[alrecoverystore]")
     {
         ALRecoveryStore store(folder, "session-a");
-        UNSCOPED_INFO("written");
         CHECK(store.write(entry("item:x", "first")));
-        UNSCOPED_INFO("written again");
         CHECK(store.write(entry("item:x", "second")));
-        const std::vector<ALRecoveryEntry> all = whole(store, store.list());
+        const std::vector<ALRecoveryEntry> all = require_whole(store, store.list());
         UNSCOPED_INFO("one entry for one key");
         REQUIRE(all.size() == size_t(1));
-        UNSCOPED_INFO("the last text");
         CHECK(all.front().text == std::string("second"));
-        UNSCOPED_INFO("this session's");
         CHECK(all.front().session == std::string("session-a"));
-        UNSCOPED_INFO("unsaved");
         CHECK(all.front().state == ALRecoveryEntry::State::Unsaved);
         for (const std::string& name : files())
         {
-            UNSCOPED_INFO("nothing half written left beside it: " + name);
+            CAPTURE(name);
             REQUIRE(name.find(".tmp") == std::string::npos);
         }
         UNSCOPED_INFO("this session's own is nothing to offer");
         CHECK_FALSE(store.hasOffers());
-        UNSCOPED_INFO("nor left by another");
         REQUIRE(store.left().empty());
         store.forget("item:x");
-        UNSCOPED_INFO("forgotten");
         REQUIRE(store.list().empty());
     }
 
@@ -224,24 +196,16 @@ namespace
         ALRecoveryStore now(folder, "now");
         UNSCOPED_INFO("the crashed session's");
         CHECK(before.write(entry("task:o:i", "left behind")));
-        UNSCOPED_INFO("this session's");
         CHECK(now.write(entry("task:o:i", "typed since")));
         UNSCOPED_INFO("both kept");
         REQUIRE(now.list().size() == size_t(2));
-        const std::vector<ALRecoveryEntry> left = whole(now, now.left());
-        UNSCOPED_INFO("one left by another session");
+        const std::vector<ALRecoveryEntry> left = require_whole(now, now.left());
         REQUIRE(left.size() == size_t(1));
-        UNSCOPED_INFO("its text");
         CHECK(left.front().text == std::string("left behind"));
-        const std::optional<ALRecoveryEntry> found = whole(now, now.leftFor("task:o:i"));
-        {
-            INFO("found by its key");
-            REQUIRE(found.has_value());
-            CHECK(found->text == "left behind");
-        }
-        UNSCOPED_INFO("nothing for another key");
+        const std::optional<ALRecoveryEntry> found = require_whole(now, now.leftFor("task:o:i"));
+        REQUIRE(found.has_value());
+        CHECK(found->text == "left behind");
         REQUIRE_FALSE(now.leftFor("task:o:j").has_value());
-        UNSCOPED_INFO("something to offer");
         CHECK(now.hasOffers());
         now.forget("task:o:i");
         UNSCOPED_INFO("this session forgetting its own leaves the other's");
@@ -258,31 +222,21 @@ namespace
     {
         ALRecoveryStore store(folder, "mine");
         ALRecoveryStore other(folder, "theirs");
-        UNSCOPED_INFO("written");
         CHECK(store.write(entry("item:gone", "thrown away")));
-        UNSCOPED_INFO("and another session's");
         CHECK(other.write(entry("item:kept", "never thrown away")));
         {
             const std::vector<ALRecoveryEntry> written = store.list();
             const auto mine = std::find_if(written.begin(), written.end(), [](const ALRecoveryEntry& one) { return one.key == "item:gone"; });
-            {
-                INFO("discarded");
-                REQUIRE(mine != written.end());
-                CHECK(store.discard(*mine));
-            }
+            REQUIRE(mine != written.end());
+            CHECK(store.discard(*mine));
         }
-        std::vector<ALRecoveryEntry> all = whole(store, store.list());
+        std::vector<ALRecoveryEntry> all = require_whole(store, store.list());
         UNSCOPED_INFO("both still listed");
         REQUIRE(all.size() == size_t(2));
         const auto discarded = std::find_if(all.begin(), all.end(), [](const ALRecoveryEntry& one) { return one.key == "item:gone"; });
-        {
-            INFO("the discarded one");
-            REQUIRE(discarded != all.end());
-            CHECK(discarded->state == ALRecoveryEntry::State::Discarded);
-        }
-        UNSCOPED_INFO("with its text");
+        REQUIRE(discarded != all.end());
+        CHECK(discarded->state == ALRecoveryEntry::State::Discarded);
         CHECK(discarded->text == std::string("thrown away"));
-        UNSCOPED_INFO("in the folder beside");
         REQUIRE(files("/discarded").size() == size_t(1));
         UNSCOPED_INFO("not among what was left unsaved");
         CHECK(store.leftFor("item:gone") == std::nullopt);
@@ -298,22 +252,17 @@ namespace
         REQUIRE(store.leftFor("item:kept").has_value());
         // Another session's, discarded from the list of what was left.
         const std::optional<ALRecoveryEntry> theirs = store.leftFor("item:kept");
-        UNSCOPED_INFO("discarded too");
         CHECK(store.discard(*theirs));
-        UNSCOPED_INFO("gone from what was left");
         REQUIRE_FALSE(store.leftFor("item:kept").has_value());
-        UNSCOPED_INFO("into the folder beside");
         REQUIRE(files("/discarded").size() == size_t(1));
     }
 
     TEST_CASE_METHOD(alrecoverystore_data, "alrecoverystore: a file that cannot be read is passed over and left in place", "[alrecoverystore]")
     {
         ALRecoveryStore store(folder, "mine");
-        UNSCOPED_INFO("written");
         CHECK(store.write(entry("item:ok", "fine")));
         {
             LLFILE* broken = LLFile::fopen(folder + "/0000.someone.llsd", LLFILE_MODE("wb"));
-            UNSCOPED_INFO("made");
             REQUIRE(broken != nullptr);
             fputs("<llsd><map><key>text</key><string>half", broken);
             fclose(broken);
@@ -321,7 +270,6 @@ namespace
         const std::vector<ALRecoveryEntry> all = store.list();
         UNSCOPED_INFO("the one that reads");
         REQUIRE(all.size() == size_t(1));
-        UNSCOPED_INFO("is the good one");
         CHECK(all.front().key == std::string("item:ok"));
         UNSCOPED_INFO("the other is still there");
         CHECK(LLFile::isfile(folder + "/0000.someone.llsd"));
@@ -339,28 +287,20 @@ namespace
         second["item_id"] = LLUUID::generateNewID();
         second["name"]    = "Home";
         card.embedded     = LLSD::emptyArray().with(0, first).with(1, second);
-        UNSCOPED_INFO("written");
         CHECK(store.write(card));
-        const std::vector<ALRecoveryEntry> all = whole(store, store.list());
-        UNSCOPED_INFO("one");
+        const std::vector<ALRecoveryEntry> all = require_whole(store, store.list());
         REQUIRE(all.size() == size_t(1));
-        UNSCOPED_INFO("a notecard");
         CHECK(all.front().notecard);
         UNSCOPED_INFO("its text, the placeholders in it byte for byte");
         CHECK(all.front().text == card.text);
-        UNSCOPED_INFO("both items");
         REQUIRE(all.front().embedded.size() == 2);
-        {
-            INFO("in the order the text stands them");
-            CHECK(all.front().embedded[0]["name"].asString() == "Sunset");
-            CHECK(all.front().embedded[1]["name"].asString() == "Home");
-        }
+        CHECK(all.front().embedded[0]["name"].asString() == "Sunset");
+        CHECK(all.front().embedded[1]["name"].asString() == "Home");
         UNSCOPED_INFO("each whole");
         CHECK(all.front().embedded[1]["item_id"].asUUID() == second["item_id"].asUUID());
         // Discarded, it keeps them too.
-        UNSCOPED_INFO("discarded");
         CHECK(store.discard(all.front()));
-        const std::vector<ALRecoveryEntry> thrown = whole(store, store.list());
+        const std::vector<ALRecoveryEntry> thrown = require_whole(store, store.list());
         {
             INFO("the items go with it");
             REQUIRE(thrown.size() == 1);
@@ -368,26 +308,19 @@ namespace
         }
         // A script has none, and says so as an empty list.
         ALRecoveryEntry script;
-        UNSCOPED_INFO("read");
         REQUIRE(ALRecoveryEntry::fromLLSD(entry("item:s", "x").asLLSD(), script));
-        {
-            INFO("no items");
-            REQUIRE(script.embedded.isArray());
-            REQUIRE(script.embedded.size() == 0);
-        }
+        REQUIRE(script.embedded.isArray());
+        REQUIRE(script.embedded.size() == 0);
     }
 
     TEST_CASE_METHOD(alrecoverystore_data, "alrecoverystore: setAside leaves its source; prune sweeps halves; an XML entry reads", "[alrecoverystore]")
     {
         ALRecoveryStore store(folder, "mine");
         ALRecoveryStore other(folder, "theirs");
-        UNSCOPED_INFO("another session's");
         CHECK(other.write(entry("item:a", "left")));
-        UNSCOPED_INFO("set aside");
         CHECK(store.setAside(entry("item:a", "thrown")));
-        UNSCOPED_INFO("among the discarded");
         REQUIRE(files("/discarded").size() == size_t(1));
-        const std::optional<ALRecoveryEntry> left = whole(store, store.leftFor("item:a"));
+        const std::optional<ALRecoveryEntry> left = require_whole(store, store.leftFor("item:a"));
         {
             INFO("what it came from still left");
             REQUIRE(left.has_value());
@@ -395,20 +328,16 @@ namespace
         }
         UNSCOPED_INFO("and only that is left");
         REQUIRE(store.left().size() == size_t(1));
-        const std::vector<ALRecoveryEntry> all = whole(store, store.list());
+        const std::vector<ALRecoveryEntry> all = require_whole(store, store.list());
         const auto thrown = std::find_if(all.begin(), all.end(), [](const ALRecoveryEntry& one) { return one.text == "thrown"; });
-        {
-            INFO("set aside by this session");
-            REQUIRE(thrown != all.end());
-            REQUIRE(thrown->session == "mine");
-            CHECK(thrown->state == ALRecoveryEntry::State::Discarded);
-        }
+        REQUIRE(thrown != all.end());
+        REQUIRE(thrown->session == "mine");
+        CHECK(thrown->state == ALRecoveryEntry::State::Discarded);
 
         // Written half by a session that went, and by this one.
         for (const char* name : { "/0001.theirs.llsd.tmp", "/0002.mine.llsd.tmp" })
         {
             LLFILE* half = LLFile::fopen(folder + name, LLFILE_MODE("wb"));
-            UNSCOPED_INFO("made");
             REQUIRE(half != nullptr);
             fputs("<? llsd/notation ?>\n{'key':'ite", half);
             fclose(half);
@@ -426,15 +355,13 @@ namespace
             ALRecoveryEntry was = entry("item:old", "from before");
             was.session               = "older";
             LLFILE* xml = LLFile::fopen(folder + "/0003.older.llsd", LLFILE_MODE("wb"));
-            UNSCOPED_INFO("made");
             REQUIRE(xml != nullptr);
             std::ostringstream text;
             LLSDSerialize::toPrettyXML(was.asLLSD(), text);
             fputs(text.str().c_str(), xml);
             fclose(xml);
         }
-        const std::vector<ALRecoveryEntry> now = whole(store, store.left());
-        UNSCOPED_INFO("read");
+        const std::vector<ALRecoveryEntry> now = require_whole(store, store.left());
         CHECK(std::any_of(now.begin(), now.end(), [](const ALRecoveryEntry& one) { return one.text == "from before"; }));
     }
 
@@ -442,12 +369,9 @@ namespace
     {
         ALRecoveryStore store(folder, "mine");
         ALRecoveryStore other(folder, "theirs");
-        UNSCOPED_INFO("left by another session");
         CHECK(other.write(entry("item:x", "left before")));
         const std::optional<ALRecoveryEntry> took = store.leftFor("item:x");
-        UNSCOPED_INFO("found");
         REQUIRE(took.has_value());
-        UNSCOPED_INFO("kept by this one");
         CHECK(store.write(entry("item:x", "typed since")));
 
         ALRecoveryStore::Parting parting;
@@ -455,18 +379,15 @@ namespace
         parting.unsaved = entry("item:x", "typed since, then closed");
         parting.tookUp  = took;
         parting.settled = true;
-        UNSCOPED_INFO("let go of");
         CHECK(store.letGo(parting));
 
-        const std::vector<ALRecoveryEntry> all = whole(store, store.list());
-        UNSCOPED_INFO("one entry");
+        const std::vector<ALRecoveryEntry> all = require_whole(store, store.list());
         REQUIRE(all.size() == size_t(1));
         {
             INFO("set aside, as it stood");
             CHECK(all.front().state == ALRecoveryEntry::State::Discarded);
             CHECK(all.front().text == "typed since, then closed");
         }
-        UNSCOPED_INFO("by this session");
         CHECK(all.front().session == "mine");
         {
             INFO("what it took up gone");
@@ -479,16 +400,13 @@ namespace
     {
         ALRecoveryStore store(folder, "mine");
         ALRecoveryStore other(folder, "theirs");
-        UNSCOPED_INFO("left by another session");
         CHECK(other.write(entry("item:x", "left before")));
         const std::optional<ALRecoveryEntry> took = store.leftFor("item:x");
-        UNSCOPED_INFO("kept by this one");
         CHECK(store.write(entry("item:x", "typed since")));
         // A file where the folder of the discarded would be: nothing can be
         // written there.
         {
             LLFILE* blocking = LLFile::fopen(folder + "/discarded", LLFILE_MODE("wb"));
-            UNSCOPED_INFO("made");
             REQUIRE(blocking != nullptr);
             fclose(blocking);
         }
@@ -498,10 +416,9 @@ namespace
         parting.unsaved = entry("item:x", "typed since, then closed");
         parting.tookUp  = took;
         parting.settled = true;
-        UNSCOPED_INFO("said to have failed");
         CHECK_FALSE(store.letGo(parting));
 
-        const std::vector<ALRecoveryEntry> all = whole(store, store.list());
+        const std::vector<ALRecoveryEntry> all = require_whole(store, store.list());
         const auto own = std::find_if(all.begin(), all.end(), [](const ALRecoveryEntry& one) { return one.session == "mine"; });
         {
             INFO("its own entry still there");
@@ -510,7 +427,6 @@ namespace
         }
         UNSCOPED_INFO("and the one it took up");
         REQUIRE(store.leftFor("item:x").has_value());
-        UNSCOPED_INFO("a set-aside that fails is said");
         CHECK_FALSE(store.setAside(entry("item:y", "anything")));
     }
 
@@ -518,18 +434,15 @@ namespace
     {
         ALRecoveryStore store(folder, "mine");
         ALRecoveryStore other(folder, "theirs");
-        UNSCOPED_INFO("left by another session");
         CHECK(other.write(entry("item:x", "left before")));
 
         // Holding the kept text where nothing can save it -- the script may
         // no longer be changed, or never loaded: left to be offered again.
-        UNSCOPED_INFO("kept by this one");
         CHECK(store.write(entry("item:x", "typed since")));
         ALRecoveryStore::Parting stuck;
         stuck.key     = "item:x";
         stuck.tookUp  = store.leftFor("item:x");
         stuck.settled = false;
-        UNSCOPED_INFO("let go of");
         CHECK(store.letGo(stuck));
         const std::vector<ALRecoveryEntry> after = store.list();
         UNSCOPED_INFO("its own forgotten");
@@ -544,7 +457,6 @@ namespace
         clean.key     = "item:x";
         clean.tookUp  = store.leftFor("item:x");
         clean.settled = true;
-        UNSCOPED_INFO("let go of");
         CHECK(store.letGo(clean));
         UNSCOPED_INFO("what it took up gone");
         REQUIRE_FALSE(store.leftFor("item:x").has_value());
@@ -566,10 +478,8 @@ namespace
         moved.key      = "item:moved";
         moved.tookUp   = entry("item:moved", "typed in the other window");
         moved.carrying = true;
-        UNSCOPED_INFO("let go of");
         CHECK(store.letGo(moved));
-        const std::vector<ALRecoveryEntry> all = whole(store, store.list());
-        UNSCOPED_INFO("one entry");
+        const std::vector<ALRecoveryEntry> all = require_whole(store, store.list());
         REQUIRE(all.size() == size_t(1));
         {
             INFO("the carried text set aside");
@@ -579,13 +489,11 @@ namespace
 
         // Opened to take up another session's entry, and closed before it
         // loaded: that entry is still what it was, to be offered again.
-        UNSCOPED_INFO("left by another session");
         CHECK(other.write(entry("item:left", "left before")));
         ALRecoveryStore::Parting waiting;
         waiting.key      = "item:left";
         waiting.tookUp   = store.leftFor("item:left");
         waiting.carrying = true;
-        UNSCOPED_INFO("let go of");
         CHECK(store.letGo(waiting));
         UNSCOPED_INFO("the entry left");
         REQUIRE(store.leftFor("item:left").has_value());
@@ -593,25 +501,19 @@ namespace
         REQUIRE(files("/discarded").size() == size_t(1));
 
         // A new item opened with a text of its own: nothing to keep.
-        UNSCOPED_INFO("kept");
         CHECK(store.write(entry("item:new", "template")));
         ALRecoveryStore::Parting fresh;
         fresh.key      = "item:new";
         fresh.carrying = true;
-        UNSCOPED_INFO("let go of");
         CHECK(store.letGo(fresh));
         const std::vector<ALRecoveryEntry> after = store.list();
-        UNSCOPED_INFO("forgotten");
         CHECK(std::none_of(after.begin(), after.end(), [](const ALRecoveryEntry& one) { return one.key == "item:new"; }));
     }
 
     TEST_CASE_METHOD(alrecoverystore_data, "alrecoverystore: a failed load is retried with delays tripling and a few times only", "[alrecoverystore]")
     {
-        UNSCOPED_INFO("after the first");
         CHECK(ALRecoveryRetry::delayAfter(1) == ALRecoveryRetry::FIRST);
-        UNSCOPED_INFO("after the second");
         CHECK(ALRecoveryRetry::delayAfter(2) == ALRecoveryRetry::FIRST * 3.0);
-        UNSCOPED_INFO("after the third");
         CHECK(ALRecoveryRetry::delayAfter(3) == ALRecoveryRetry::FIRST * 9.0);
         UNSCOPED_INFO("none yet is as the first");
         CHECK(ALRecoveryRetry::delayAfter(0) == ALRecoveryRetry::FIRST);
@@ -634,11 +536,9 @@ namespace
         history["redo"]    = LLSD::emptyArray();
         history["saved"]   = -1;
         awkward.history    = history;
-        UNSCOPED_INFO("written");
         CHECK(store.write(awkward));
         {
             const std::vector<std::string> names = files();
-            UNSCOPED_INFO("one file");
             REQUIRE(names.size() == size_t(1));
             std::error_code   ec;
             const std::string written = LLFile::getContents(fsyspath(folder + "/" + names.front()), ec);
@@ -656,30 +556,22 @@ namespace
             CHECK((written.compare(line + 1, 8, "{'caret'") == 0 || written.compare(line + 1, 10, "{'history'") == 0 ||
                                         written.compare(line + 1, 7, "{'text'") == 0));
         }
-        const std::vector<ALRecoveryEntry> back = whole(store, store.list());
-        {
-            INFO("the text as it was");
-            REQUIRE(back.size() == 1);
-            CHECK(back.front().text == awkward.text);
-        }
-        {
-            INFO("the history as it was");
-            CHECK(back.front().history["undo"][0]["edits"][0][5].asString() == awkward.text);
-            CHECK(back.front().history["undo"][0]["label"].asString() == "it's");
-        }
+        const std::vector<ALRecoveryEntry> back = require_whole(store, store.list());
+        REQUIRE(back.size() == 1);
+        CHECK(back.front().text == awkward.text);
+        CHECK(back.front().history["undo"][0]["edits"][0][5].asString() == awkward.text);
+        CHECK(back.front().history["undo"][0]["label"].asString() == "it's");
 
         // Set aside for another session, and two a moment apart.
         ALRecoveryEntry theirs = entry("item:b", "theirs");
         theirs.session               = "theirs";
-        UNSCOPED_INFO("set aside");
         CHECK(store.setAside(theirs));
         // Apart by more than the centisecond a date is written to.
         ms_sleep(20);
-        UNSCOPED_INFO("and another");
         CHECK(store.setAside(entry("item:b", "mine, later")));
         UNSCOPED_INFO("both kept");
         REQUIRE(files("/discarded").size() == size_t(2));
-        const std::vector<ALRecoveryEntry> all = whole(store, store.list());
+        const std::vector<ALRecoveryEntry> all = require_whole(store, store.list());
         UNSCOPED_INFO("the session it was set aside for");
         CHECK(std::any_of(all.begin(), all.end(), [](const ALRecoveryEntry& one) { return one.text == "theirs" && one.session == "theirs"; }));
         UNSCOPED_INFO("this one where none was named");
@@ -688,33 +580,25 @@ namespace
         // Left by other sessions: the newest first.
         ALRecoveryStore older(folder, "older");
         ALRecoveryStore newer(folder, "newer");
-        UNSCOPED_INFO("older");
         CHECK(older.write(entry("item:c", "older")));
         // Apart by more than the centisecond a date is written to.
         ms_sleep(20);
-        UNSCOPED_INFO("newer");
         CHECK(newer.write(entry("item:d", "newer")));
-        const std::vector<ALRecoveryEntry> left = whole(store, store.left());
-        {
-            INFO("newest first");
-            REQUIRE(left.size() == 2);
-            CHECK(left.front().text == "newer");
-            CHECK(left.back().text == "older");
-        }
+        const std::vector<ALRecoveryEntry> left = require_whole(store, store.left());
+        REQUIRE(left.size() == 2);
+        CHECK(left.front().text == "newer");
+        CHECK(left.back().text == "older");
     }
 
     TEST_CASE_METHOD(alrecoverystore_data, "alrecoverystore: a discard whose name says no time is pruned by what it says inside", "[alrecoverystore]")
     {
         ALRecoveryStore store(folder, "mine");
-        UNSCOPED_INFO("set aside");
         CHECK(store.setAside(entry("item:a", "old")));
         // Renamed to say nothing of when, and then to say it badly.
         const std::vector<std::string> names = files("/discarded");
-        UNSCOPED_INFO("one");
         REQUIRE(names.size() == size_t(1));
         const std::string stamped = folder + "/discarded/" + names.front();
         const std::string bare    = folder + "/discarded/0000.mine.llsd";
-        UNSCOPED_INFO("renamed");
         CHECK(LLFile::rename(stamped, bare) == 0);
         store.prune(60.0, LLDate(LLDate::now().secondsSinceEpoch() + 30.0));
         UNSCOPED_INFO("young by what it says, it stays");
@@ -723,10 +607,8 @@ namespace
         UNSCOPED_INFO("old by what it says, it goes");
         CHECK_FALSE(LLFile::isfile(bare));
 
-        UNSCOPED_INFO("set aside");
         CHECK(store.setAside(entry("item:b", "old")));
         const std::string garbled = folder + "/discarded/0001.mine.soon.llsd";
-        UNSCOPED_INFO("renamed");
         CHECK(LLFile::rename(folder + "/discarded/" + files("/discarded").front(), garbled) == 0);
         store.prune(60.0, LLDate(LLDate::now().secondsSinceEpoch() + 30.0));
         UNSCOPED_INFO("a stamp that is no number read past");
@@ -746,19 +628,18 @@ namespace
             }
             store.writeSoon(entry("item:y", "other"));
             store.flush();
-            const std::vector<ALRecoveryEntry> all = whole(store, store.list());
+            const std::vector<ALRecoveryEntry> all = require_whole(store, store.list());
             UNSCOPED_INFO("one entry a key");
             REQUIRE(all.size() == size_t(2));
             for (const ALRecoveryEntry& one : all)
             {
-                UNSCOPED_INFO("the newest of x: " + one.text);
+                CAPTURE(one.key, one.text);
                 REQUIRE((one.key != "item:x" || one.text == "typed 19"));
-                UNSCOPED_INFO("this session's");
                 REQUIRE(one.session == "session-a");
             }
             for (const std::string& name : files())
             {
-                UNSCOPED_INFO("nothing half written: " + name);
+                CAPTURE(name);
                 REQUIRE(name.find(".tmp") == std::string::npos);
             }
             // Forgotten right after it was asked to be written: the write
@@ -768,18 +649,17 @@ namespace
             store.flush();
             const std::vector<ALRecoveryEntry> after = store.list();
             {
-                INFO("x gone: " + std::to_string(after.size()));
+                INFO("x gone");
                 REQUIRE(after.size() == 1);
                 CHECK(after.front().key == "item:y");
             }
-            UNSCOPED_INFO("nothing failed");
             REQUIRE(store.takeFailures().empty());
             // Left waiting as the store goes: written all the same.
             store.writeSoon(entry("item:z", "as it went"));
         }
         ALRecoveryStore again(folder, "session-a");
         bool z = false;
-        for (const ALRecoveryEntry& one : whole(again, again.list()))
+        for (const ALRecoveryEntry& one : require_whole(again, again.list()))
         {
             z |= one.key == "item:z" && one.text == "as it went";
         }
@@ -795,11 +675,8 @@ namespace
         nowhere.writeSoon(entry("item:w", "lost"));
         nowhere.flush();
         const std::vector<std::string> failed = nowhere.takeFailures();
-        {
-            INFO("failed, by key");
-            REQUIRE(failed.size() == 1);
-            CHECK(failed.front() == "item:w");
-        }
+        REQUIRE(failed.size() == 1);
+        CHECK(failed.front() == "item:w");
         UNSCOPED_INFO("and said once");
         REQUIRE(nowhere.takeFailures().empty());
         // Each asking of its own key leaves another's.
@@ -821,16 +698,13 @@ namespace
         one.when                = LLDate(1758772800.0);
         const std::string said  = one.whenSaid();
         // The day and the hour are the local zone's; the shape is not.
-        UNSCOPED_INFO("YYYY-MM-DD HH:MM: " + said);
+        CAPTURE(said);
+        UNSCOPED_INFO("YYYY-MM-DD HH:MM");
         REQUIRE(said.size() == size_t(16));
-        {
-            INFO("dashes and a colon: " + said);
-            CHECK(said[4] == '-');
-            CHECK(said[7] == '-');
-            CHECK(said[10] == ' ');
-            CHECK(said[13] == ':');
-        }
-        UNSCOPED_INFO("the year: " + said);
+        CHECK(said[4] == '-');
+        CHECK(said[7] == '-');
+        CHECK(said[10] == ' ');
+        CHECK(said[13] == ':');
         CHECK(said.starts_with("2025-09-2"));
     }
 
@@ -844,11 +718,8 @@ namespace
         REQUIRE_FALSE(store.leftFor("task:a:b"));
 
         const std::optional<ALRecoveryEntry> back = store.reclaim("task:a:b");
-        UNSCOPED_INFO("reclaimed");
         REQUIRE(back.has_value());
-        UNSCOPED_INFO("its text");
         CHECK(back->text == went.text);
-        UNSCOPED_INFO("set aside");
         CHECK(back->state == ALRecoveryEntry::State::Discarded);
         UNSCOPED_INFO("when it was written, not when it was set aside");
         CHECK(back->when.secondsSinceEpoch() == written.secondsSinceEpoch());
@@ -857,13 +728,12 @@ namespace
             REQUIRE(files().empty());
             REQUIRE(files("/discarded").size() == 1);
         }
-        UNSCOPED_INFO("where it is now");
         REQUIRE(back->path.find("discarded") != std::string::npos);
 
         store.forget("task:a:b");
         UNSCOPED_INFO("a tab opened clean forgets nothing of it");
         REQUIRE(files("/discarded").size() == 1);
-        const std::vector<ALRecoveryEntry> listed = whole(store, store.list());
+        const std::vector<ALRecoveryEntry> listed = require_whole(store, store.list());
         {
             INFO("offered under Recover Unsaved Changes");
             REQUIRE(listed.size() == 1);
@@ -892,10 +762,8 @@ namespace
         big.caretLine             = 3;
         big.caretColumn           = 4;
         big.historyWritten        = "{'version':i2,'undo':[{'label':'it\\'s','edits':[]}],'redo':[],'saved':i-1}";
-        UNSCOPED_INFO("written");
         CHECK(other.write(big));
         const std::vector<ALRecoveryEntry> listed = store.left();
-        UNSCOPED_INFO("listed");
         REQUIRE(listed.size() == size_t(1));
         {
             INFO("with what it shows");
@@ -910,18 +778,11 @@ namespace
             CHECK(listed.front().caretLine < 0);
         }
         ALRecoveryEntry taken = listed.front();
-        UNSCOPED_INFO("read whole");
         CHECK(store.load(taken));
-        {
-            INFO("its text");
-            CHECK(taken.whole);
-            CHECK(taken.text == big.text);
-        }
-        {
-            INFO("its caret");
-            CHECK(taken.caretLine == 3);
-            CHECK(taken.caretColumn == 4);
-        }
+        CHECK(taken.whole);
+        CHECK(taken.text == big.text);
+        CHECK(taken.caretLine == 3);
+        CHECK(taken.caretColumn == 4);
         {
             INFO("its history, written as notation, read back");
             CHECK(taken.history["undo"][0]["label"].asString() == "it's");
@@ -938,7 +799,6 @@ namespace
         CHECK_FALSE(store.load(gone));
         // Set aside from a listing, it is read whole first: nothing of its
         // text is lost among the discarded.
-        UNSCOPED_INFO("written again");
         CHECK(other.write(big));
         const std::optional<ALRecoveryEntry> again = store.leftFor("item:big");
         {
@@ -946,24 +806,18 @@ namespace
             REQUIRE(again);
             CHECK_FALSE(again->whole);
         }
-        UNSCOPED_INFO("discarded");
         CHECK(store.discard(*again));
-        const std::vector<ALRecoveryEntry> thrown = whole(store, store.list());
-        {
-            INFO("with its text");
-            REQUIRE(thrown.size() == 1);
-            CHECK(thrown.front().text == big.text);
-            REQUIRE(thrown.front().history["undo"].size() == 1);
-        }
+        const std::vector<ALRecoveryEntry> thrown = require_whole(store, store.list());
+        REQUIRE(thrown.size() == 1);
+        CHECK(thrown.front().text == big.text);
+        REQUIRE(thrown.front().history["undo"].size() == 1);
     }
 
     TEST_CASE_METHOD(alrecoverystore_data, "alrecoverystore: offers expire; discards are capped; offers are counted once a moment", "[alrecoverystore]")
     {
         ALRecoveryStore store(folder, "mine");
         ALRecoveryStore other(folder, "theirs");
-        UNSCOPED_INFO("nothing to offer");
         CHECK_FALSE(store.hasOffers());
-        UNSCOPED_INFO("left by another session");
         CHECK(other.write(entry("item:a", "left")));
         UNSCOPED_INFO("counted a moment ago: not yet seen");
         CHECK_FALSE(store.hasOffers());
@@ -986,8 +840,7 @@ namespace
             REQUIRE(store.left().size() == 1);
             REQUIRE(store.leftFor("item:a").has_value());
         }
-        UNSCOPED_INFO("and read");
-        CHECK(whole(store, store.leftFor("item:a"))->text == "left");
+        CHECK(require_whole(store, store.leftFor("item:a"))->text == "left");
         store.markOffered(store.left(), LLDate(offered.secondsSinceEpoch() + 100.0));
         UNSCOPED_INFO("marked once");
         CHECK(files().front() == names.front());
@@ -1000,11 +853,11 @@ namespace
             REQUIRE(files().empty());
             CHECK_FALSE(store.hasOffers());
         }
-        UNSCOPED_INFO("this session's own is never offered");
+        // This session's own is never offered, nor marked.
         CHECK(store.write(entry("item:mine", "mine")));
         store.markOffered(store.list());
         {
-            INFO("nor marked");
+            INFO("this session's own not marked");
             REQUIRE(files().size() == 1);
             REQUIRE(files().front().find(".mine.llsd") != std::string::npos);
         }
@@ -1013,13 +866,11 @@ namespace
         store.limitDiscarded(3, 1024 * 1024);
         for (int i = 0; i < 5; ++i)
         {
-            UNSCOPED_INFO("set aside");
             REQUIRE(store.setAside(entry("item:d" + std::to_string(i), "discarded " + std::to_string(i))));
             // Apart by more than the millisecond their names say.
             ms_sleep(5);
         }
-        std::vector<ALRecoveryEntry> kept = whole(store, store.list());
-        UNSCOPED_INFO("three kept");
+        std::vector<ALRecoveryEntry> kept = require_whole(store, store.list());
         REQUIRE(files("/discarded").size() == size_t(3));
         {
             INFO("the newest");

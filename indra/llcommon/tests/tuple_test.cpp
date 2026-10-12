@@ -31,11 +31,8 @@ namespace
         std::tuple<std::string, int> tup2;
         int i;
         std::tie(i, tup2) = tuple_split(ptup);
-        UNSCOPED_INFO("tuple_car() fail");
         CHECK(i == 34);
-        UNSCOPED_INFO("tuple_cdr() (0) fail");
         CHECK(std::get<0>(tup2) == "abc");
-        UNSCOPED_INFO("tuple_cdr() (1) fail");
         CHECK(std::get<1>(tup2) == 17);
     }
 } // anonymous namespace

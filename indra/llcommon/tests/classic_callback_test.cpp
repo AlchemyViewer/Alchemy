@@ -135,13 +135,9 @@ namespace
         // effect.
         auto occb{ makeClassicCallback<complex_callback>(std::move(ocb)) };
         std::string result{ otherAPI(occb.get_callback(), occb.get_userdata()) };
-        UNSCOPED_INFO("failed to return callback result");
         CHECK(result == "hello back!");
-        UNSCOPED_INFO("failed to set int");
         CHECK(sData.mi == 17);
-        UNSCOPED_INFO("failed to set string");
         CHECK(sData.ms == "hello world");
-        UNSCOPED_INFO("failed to set double");
         CHECK(sData.mf == 3.0);
     }
 } // anonymous namespace

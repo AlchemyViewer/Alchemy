@@ -46,10 +46,8 @@ namespace
     TEST_CASE_METHOD(timer_data, "LLTimer: a new timer reads expired until it is given an expiry", "[LLTimer]")
     {
         LLTimer timer;
-        UNSCOPED_INFO("expired");
         CHECK(timer.hasExpired());
         timer.setTimerExpirySec(10.f);
-        UNSCOPED_INFO("not expired once given ten seconds");
         CHECK_FALSE(timer.hasExpired());
     }
 
@@ -58,11 +56,8 @@ namespace
         LLTimer timer;
         ms_sleep(50);
         timer.resetWithExpiry(10.f);
-        UNSCOPED_INFO("not expired");
         CHECK_FALSE(timer.hasExpired());
-        UNSCOPED_INFO("the whole expiry to run");
         CHECK(timer.getRemainingTimeF32() > 9.9f);
-        UNSCOPED_INFO("restarted");
         CHECK(timer.getElapsedTimeF32() < 0.04f);
     }
 
@@ -71,7 +66,6 @@ namespace
         LLTimer timer;
         timer.setTimerExpirySec(10.f);
         timer.start();
-        UNSCOPED_INFO("start() cleared the expiry");
         CHECK(timer.hasExpired());
     }
 
@@ -80,7 +74,6 @@ namespace
         LLTimer timer;
         ms_sleep(50);
         timer.reset();
-        UNSCOPED_INFO("the timer was just reset");
         CHECK(timer.getElapsedTimeF64() < 0.04);
         UNSCOPED_INFO("the uptime runs from before the reset");
         CHECK(LLTimer::getUptimeSeconds() > timer.getElapsedTimeF64());
@@ -91,7 +84,6 @@ namespace
         const auto calendar = std::chrono::system_clock::now().time_since_epoch();
         const F64  calendar_seconds = std::chrono::duration<F64>(calendar).count();
         const F64  total = LLTimer::getTotalSeconds();
-        UNSCOPED_INFO("anchored to the calendar");
         CHECK(std::fabs(total - calendar_seconds) < 1.0);
 
         const auto steady_start = std::chrono::steady_clock::now();
@@ -99,7 +91,6 @@ namespace
         ms_sleep(200);
         const F64 steady = std::chrono::duration<F64>(std::chrono::steady_clock::now() - steady_start).count();
         const F64 counted = (F64)((U64)totalTime() - total_start) / 1000000.0;
-        UNSCOPED_INFO("counts as the steady clock does");
         CHECK(std::fabs(counted - steady) < 0.005);
     }
 
@@ -131,9 +122,7 @@ namespace
         }
         const F64 steady = std::chrono::duration<F64>(std::chrono::steady_clock::now() - steady_start).count();
         const F64 counted = (F64)((U64)totalTime() - total_start) / 1000000.0;
-        UNSCOPED_INFO("no thread saw it step back");
         CHECK_FALSE(stepped_back);
-        UNSCOPED_INFO("counted no faster than the steady clock");
         CHECK(counted < steady + 0.005);
     }
 }

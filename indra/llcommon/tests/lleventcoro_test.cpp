@@ -170,7 +170,6 @@ namespace
             debug("about to suspend");
             stringdata = future.get();
             mSync.bump();
-            UNSCOPED_INFO("Got it");
             REQUIRE(stringdata == "received");
         }
         END
@@ -300,7 +299,7 @@ namespace
         LLSD first{LLSDMap("desc", "first")("value", 0)};
         bool consumed = pump.post(first);
         UNSCOPED_INFO("should not have consumed first");
-        REQUIRE_FALSE(consumed);
+        CHECK_FALSE(consumed);
         // now launch the coro
         LL_DEBUGS() << "test() launching listener coro" << LL_ENDL;
         running = true;
@@ -329,7 +328,7 @@ namespace
         LLSD second{llsd::map("desc", "second", "value", 1)};
         consumed = pump.post(second);
         UNSCOPED_INFO("should have consumed second");
-        REQUIRE(consumed);
+        CHECK(consumed);
         // This is a key point: even though we've post()ed the value for which
         // the coroutine is waiting, it's actually still suspended until we
         // pause for some other reason. The coroutine will only pick up one
@@ -339,7 +338,7 @@ namespace
         LLSD third{llsd::map("desc", "third", "value", 2)};
         consumed = pump.post(third);
         UNSCOPED_INFO("should NOT yet have consumed third");
-        REQUIRE_FALSE(consumed);
+        CHECK_FALSE(consumed);
         // now just wait for coro to finish -- which it eventually will, given
         // that all its suspend calls have short timeouts.
         while (running)
@@ -348,9 +347,7 @@ namespace
             llcoro::suspendUntilTimeout(0.1f);
         }
         // okay, verify expected results
-        UNSCOPED_INFO("should have received three values");
-        REQUIRE_THAT(data,
-                      ll_test::LLSDEquals(llsd::array(first, second, third)));
+        CHECK_THAT(data, ll_test::LLSDEquals(llsd::array(first, second, third)));
         LL_DEBUGS() << "test() done" << LL_ENDL;
     }
 

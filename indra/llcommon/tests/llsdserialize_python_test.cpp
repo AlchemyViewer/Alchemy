@@ -50,7 +50,6 @@
 #include "altestfailure.h"
 #include "altestmatchers.h"
 #include "../test/namedtempfile.h"
-#include "stringize.h"
 #include "StringVec.h"
 #include <functional>
 
@@ -73,6 +72,7 @@ namespace tut
         UNSCOPED_INFO("Set $PYTHON to the Python interpreter");
         REQUIRE_FALSE(PYTHON.empty());
 
+        INFO(desc << " script");
         NamedTempFile scriptfile("py", script);
 
 #if LL_WINDOWS
@@ -85,12 +85,10 @@ namespace tut
         {
             char buffer[256];
             strerror_s(buffer, errno); // C++ can infer the buffer size!  :-O
-            UNSCOPED_INFO((STRINGIZE("Couldn't run Python " << desc << "script: " << buffer)));
-            REQUIRE(false);
+            FAIL("couldn't run Python: " << buffer);
         }
         else
         {
-            UNSCOPED_INFO(STRINGIZE(desc << " script terminated with rc " << rc));
             REQUIRE(rc == expect);
         }
 
@@ -103,7 +101,7 @@ namespace tut
             params.args.add(arg);
         }
         LLProcessPtr py(LLProcess::create(params));
-        UNSCOPED_INFO((STRINGIZE("Couldn't launch " << desc << " script")));
+        UNSCOPED_INFO("couldn't launch");
         REQUIRE(bool(py));
         // Implementing timeout would mean messing with alarm() and
         // catching SIGALRM... later maybe...
@@ -111,8 +109,7 @@ namespace tut
         if (waitpid(py->getProcessID(), &status, 0) == -1)
         {
             int waitpid_errno(errno);
-            UNSCOPED_INFO((STRINGIZE("Couldn't retrieve rc from " << desc << " script: "
-                                    "waitpid() errno " << waitpid_errno)));
+            UNSCOPED_INFO("couldn't retrieve rc: waitpid() failed");
             REQUIRE(waitpid_errno == ECHILD);
         }
         else
@@ -120,18 +117,15 @@ namespace tut
             if (WIFEXITED(status))
             {
                 int rc(WEXITSTATUS(status));
-                UNSCOPED_INFO((STRINGIZE(desc << " script terminated with rc " << rc)));
                 REQUIRE(rc == expect);
             }
             else if (WIFSIGNALED(status))
             {
-                UNSCOPED_INFO((STRINGIZE(desc << " script terminated by signal " << WTERMSIG(status))));
-                REQUIRE(false);
+                FAIL("terminated by signal " << WTERMSIG(status));
             }
             else
             {
-                UNSCOPED_INFO((STRINGIZE(desc << " script produced impossible status " << status)));
-                REQUIRE(false);
+                FAIL("produced impossible status " << status);
             }
         }
 #endif
@@ -376,14 +370,13 @@ namespace tut
         LLSD item;
         try
         {
-            UNSCOPED_INFO("Failed to read LLSD::Integer from Python");
+            UNSCOPED_INFO("reading the Integer");
             REQUIRE(itemFromStream(inf, item, parse));
             REQUIRE(item.asInteger() == 17);
-            UNSCOPED_INFO("Failed to read LLSD::Real from Python");
+            UNSCOPED_INFO("reading the Real");
             REQUIRE(itemFromStream(inf, item, parse));
-            UNSCOPED_INFO("Bad LLSD::Real value from Python");
             REQUIRE_THAT(item.asReal(), ll_test::WithinBits(3.14, 7)); // 7 bits ~= 0.01
-            UNSCOPED_INFO("Failed to read LLSD::String from Python");
+            UNSCOPED_INFO("reading the String");
             REQUIRE(itemFromStream(inf, item, parse));
             REQUIRE(item.asString() ==
                           "This string\n"
