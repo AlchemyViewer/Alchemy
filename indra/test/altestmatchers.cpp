@@ -30,12 +30,22 @@
 #include "llsdserialize.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace ll_test
 {
     namespace
     {
+        // A NaN equals nothing, itself included. Under /fp:fast, which the
+        // optimised Windows builds use, MSVC compiles == without its test for
+        // an unordered result, so a NaN would equal anything: it is asked
+        // about apart.
+        bool sameNumber(F64 actual, F64 expected)
+        {
+            return !std::isnan(actual) && !std::isnan(expected) && actual == expected;
+        }
+
         // Where actual and expected first differ: a path from the top, as in
         // ["key"][3], and what differs there. Empty "what" means equal.
         struct Difference
@@ -62,7 +72,7 @@ namespace ll_test
                     same = actual.asInteger() == expected.asInteger();
                     break;
                 case LLSD::TypeReal:
-                    same = actual.asReal() == expected.asReal();
+                    same = sameNumber(actual.asReal(), expected.asReal());
                     break;
                 case LLSD::TypeString:
                     same = actual.asString() == expected.asString();
@@ -73,7 +83,7 @@ namespace ll_test
                 case LLSD::TypeDate:
                     // Not LLDate's ==, which is made of < and so holds a NaN
                     // date equal to every date; TUT compared the seconds.
-                    same = actual.asDate().secondsSinceEpoch() == expected.asDate().secondsSinceEpoch();
+                    same = sameNumber(actual.asDate().secondsSinceEpoch(), expected.asDate().secondsSinceEpoch());
                     break;
                 case LLSD::TypeURI:
                     same = actual.asURI().asString() == expected.asURI().asString();
