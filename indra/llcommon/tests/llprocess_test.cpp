@@ -29,6 +29,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "altestfailure.h"
+#include "altesthelper.h"
 #include "altestmatchers.h"
 #include "altestname.h"
 #include "../test/namedtempfile.h"
@@ -404,6 +405,16 @@ namespace
         std::exit(0);
     }
 
+    // verify_autokill_on_helper_exit's helper: this binary run again as
+    // nothing but run_autokill_helper_from_environment(), which exits the
+    // process itself once the test releases it.
+    AL_TEST_HELPER(llprocess_autokill)
+    {
+        run_autokill_helper_from_environment();
+        // It returns only when the environment names no script.
+        return AUTOKILL_HELPER_INVALID_ENV_EXIT;
+    }
+
     std::vector<DWORD> wait_for_helper_pids(
         const std::string& pidfile,
         int expected_count,
@@ -446,6 +457,7 @@ namespace
 
         LLProcess::Params params;
         params.executable = get_current_executable_path();
+        params.args.add(ll_test::Helper::argument("llprocess_autokill"));
         params.desc = desc + " helper";
         LLProcessPtr helper = LLProcess::create(params);
         REQUIRE(bool(helper));
@@ -538,13 +550,6 @@ namespace tut
 {
     struct llprocess_data
     {
-        llprocess_data()
-        {
-#if LL_WINDOWS
-            run_autokill_helper_from_environment();
-#endif
-        }
-
         LLAPRPool pool;
     };
 
