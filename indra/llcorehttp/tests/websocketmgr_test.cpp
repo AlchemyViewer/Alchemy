@@ -24,7 +24,8 @@
 
 #include "linden_common.h"
 
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "llwebsocketmgr.h"
 #include "lljsonrpcws.h"
@@ -424,8 +425,6 @@ namespace
     };
 }
 
-namespace tut
-{
 namespace
 {
     struct WebsocketMgrTestData
@@ -440,25 +439,20 @@ namespace
         }
     };
 
-    typedef test_group<WebsocketMgrTestData> WebsocketMgrTestGroupType;
-    typedef WebsocketMgrTestGroupType::object WebsocketMgrTestObjectType;
-    WebsocketMgrTestGroupType WebsocketMgrTestGroup("LLWebsocketMgr Tests");
-}
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<1>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a program sending no origin is let in and a page sending one refused", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("a program, which sends no origin, is let in; a page, which always does, is refused");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         const std::string name = "origin_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
-        ensure("added", manager.addServer(std::make_shared<LLWebsocketMgr::WSServer>(name, port, true)));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(std::make_shared<LLWebsocketMgr::WSServer>(name, port, true)));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         const int program = TestClient().open(port);
         const int page    = TestClient().open(port, "https://example.com");
@@ -466,29 +460,32 @@ namespace
         const int local   = TestClient().open(port, "http://127.0.0.1:8080");
         manager.removeServer(name);
 
-        ensure_equals("no origin: in", program, 101);
-        ensure_equals("a web page: refused", page, 403);
-        ensure_equals("a page with an opaque origin, a sandboxed frame or a file: refused", opaque, 403);
-        ensure_equals("a page served from this machine: refused", local, 403);
+        UNSCOPED_INFO("no origin: in");
+        CHECK(program == 101);
+        UNSCOPED_INFO("a web page: refused");
+        CHECK(page == 403);
+        UNSCOPED_INFO("a page with an opaque origin, a sandboxed frame or a file: refused");
+        CHECK(opaque == 403);
+        UNSCOPED_INFO("a page served from this machine: refused");
+        CHECK(local == 403);
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<2>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a request is answered from a main loop the server thread never waits on", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("a request read on the server's thread is answered from the main loop, which that thread does not wait on");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         // The main loop, drained here by hand: a server's thread that
         // waited on it would wait until the answer's own time ran out.
         LL::WorkQueue     mainloop("mainloop");
         const std::string name = "rpc_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
-        ensure("added", manager.addServer(std::make_shared<TestRPCServer>(name, port, true)));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(std::make_shared<TestRPCServer>(name, port, true)));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         TestClient client;
         const bool opened = client.open(port) == 101;
@@ -507,52 +504,59 @@ namespace
         std::ostringstream here;
         here << std::this_thread::get_id();
         LLSD answer;
-        ensure("opened", opened);
-        ensure("sent", sent);
-        ensure("closed by the client", closed);
-        ensure("answered", LlsdFromJsonString(reply, answer));
-        ensure_equals("to the request", answer["id"].asString(), std::string("req_1"));
-        ensure_equals("run on the thread that drains the main loop", answer["result"]["thread"].asString(), here.str());
-        ensure_equals("with its params", answer["result"]["item_id"].asString(), params["item_id"].asString());
-        ensure_equals("all of them", answer["result"]["lines"][0].asString(), std::string("default {}"));
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
+        UNSCOPED_INFO("sent");
+        CHECK(sent);
+        UNSCOPED_INFO("closed by the client");
+        CHECK(closed);
+        UNSCOPED_INFO("answered");
+        REQUIRE(LlsdFromJsonString(reply, answer));
+        UNSCOPED_INFO("to the request");
+        CHECK(answer["id"].asString() == std::string("req_1"));
+        UNSCOPED_INFO("run on the thread that drains the main loop");
+        CHECK(answer["result"]["thread"].asString() == here.str());
+        UNSCOPED_INFO("with its params");
+        CHECK(answer["result"]["item_id"].asString() == params["item_id"].asString());
+        UNSCOPED_INFO("all of them");
+        CHECK(answer["result"]["lines"][0].asString() == std::string("default {}"));
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<3>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a request asking for no upgrade is told to ask for one", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("a request asking for no upgrade is told to ask for one");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         const std::string name    = "http_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
-        ensure("added", manager.addServer(std::make_shared<LLWebsocketMgr::WSServer>(name, port, true)));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(std::make_shared<LLWebsocketMgr::WSServer>(name, port, true)));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         const int status = TestClient().get(port);
         manager.removeServer(name);
 
-        ensure_equals("426 Upgrade Required", status, 426);
+        UNSCOPED_INFO("426 Upgrade Required");
+        CHECK(status == 426);
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<4>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: messages go before the close with its code and reason and none after", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("messages sent just before a close go first, the close carries its code and reason, and nothing goes after it");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         const std::string name    = "close_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        ensure("added", manager.addServer(server));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(server));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         TestClient client;
         const bool opened     = client.open(port) == 101 && waitFor([&]() { return server->opened() != nullptr; });
@@ -579,31 +583,38 @@ namespace
         const bool told = waitFor([&]() { return server->closed() == 1; });
         manager.removeServer(name);
 
-        ensure("opened", opened);
-        ensure("sent", sent);
-        ensure("the messages first, in order", in_order);
-        ensure("then the close", last.closed);
-        ensure_equals("with its code", last.code, U16(1000));
-        ensure_equals("and its reason", last.reason, std::string("done"));
-        ensure("a send after the close refused", !after_close);
-        ensure("the server told it closed", told);
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
+        UNSCOPED_INFO("sent");
+        CHECK(sent);
+        UNSCOPED_INFO("the messages first, in order");
+        CHECK(in_order);
+        UNSCOPED_INFO("then the close");
+        CHECK(last.closed);
+        UNSCOPED_INFO("with its code");
+        CHECK(last.code == U16(1000));
+        UNSCOPED_INFO("and its reason");
+        CHECK(last.reason == std::string("done"));
+        UNSCOPED_INFO("a send after the close refused");
+        CHECK_FALSE(after_close);
+        UNSCOPED_INFO("the server told it closed");
+        CHECK(told);
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<5>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: sends from two threads at once arrive whole and in each thread's order", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("messages sent from two threads at once each arrive whole, and each thread's in its order");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         const std::string name    = "threads_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        ensure("added", manager.addServer(server));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(server));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         TestClient client;
         const bool opened     = client.open(port) == 101 && waitFor([&]() { return server->opened() != nullptr; });
@@ -648,28 +659,32 @@ namespace
         const bool closed = opened && client.close();
         manager.removeServer(name);
 
-        ensure("opened", opened);
-        ensure("closed by the client", closed);
-        ensure("each whole, and in its thread's order", whole);
-        ensure_equals("all of the first thread's", next_a, count);
-        ensure_equals("all of the second's", next_b, count);
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
+        UNSCOPED_INFO("closed by the client");
+        CHECK(closed);
+        UNSCOPED_INFO("each whole, and in its thread's order");
+        CHECK(whole);
+        UNSCOPED_INFO("all of the first thread's");
+        CHECK(next_a == count);
+        UNSCOPED_INFO("all of the second's");
+        CHECK(next_b == count);
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<6>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: stopping closes clients as going away and tells the server at once", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("stopping closes each client as going away, and says so to the server without waiting out the deadline");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         const std::string name    = "stop_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        ensure("added", manager.addServer(server));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(server));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         TestClient client;
         const bool opened = client.open(port) == 101 && waitFor([&]() { return server->opened() != nullptr; });
@@ -685,29 +700,34 @@ namespace
         const bool running = server->isRunning();
         manager.removeServer(name);
 
-        ensure("opened", opened);
-        ensure("the client closed", received.closed);
-        ensure_equals("as going away", received.code, U16(1001));
-        ensure_equals("the server told, once", closed, 1);
-        ensure("stopped", !running);
-        ensure("without waiting out the deadline", took < std::chrono::milliseconds(900));
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
+        UNSCOPED_INFO("the client closed");
+        CHECK(received.closed);
+        UNSCOPED_INFO("as going away");
+        CHECK(received.code == U16(1001));
+        UNSCOPED_INFO("the server told, once");
+        CHECK(closed == 1);
+        UNSCOPED_INFO("stopped");
+        CHECK_FALSE(running);
+        UNSCOPED_INFO("without waiting out the deadline");
+        CHECK((took < std::chrono::milliseconds(900)));
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<7>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: stopping waits little on a client that never answers yet says it closed", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("stopping waits little on a client that never answers the close, and still says it closed");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         const std::string name    = "deadline_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        ensure("added", manager.addServer(server));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(server));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         // Opened, and then never read again.
         TestClient client;
@@ -718,20 +738,20 @@ namespace
         const int  closed = server->closed();
         manager.removeServer(name);
 
-        ensure("opened", opened);
-        ensure_equals("the server told, once", closed, 1);
-        ensure("within about the deadline", took < std::chrono::milliseconds(2500));
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
+        UNSCOPED_INFO("the server told, once");
+        CHECK(closed == 1);
+        UNSCOPED_INFO("within about the deadline");
+        CHECK((took < std::chrono::milliseconds(2500)));
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<8>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a port another socket listens on fails the start", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("a port another socket listens on fails the start");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         boost::asio::io_context        io;
         boost::asio::ip::tcp::acceptor holder(io);
@@ -747,36 +767,38 @@ namespace
         }
         if (ec)
         {
-            skip("could not hold the port");
+            SKIP("could not hold the port");
         }
 
         const std::string name    = "busy_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<LLWebsocketMgr::WSServer>(name, port, true);
-        ensure("added", manager.addServer(server));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(server));
         const bool started = manager.startServer(name);
         const bool running = server->isRunning();
         manager.removeServer(name);
 
-        ensure("not started", !started);
-        ensure("not running", !running);
+        UNSCOPED_INFO("not started");
+        CHECK_FALSE(started);
+        UNSCOPED_INFO("not running");
+        CHECK_FALSE(running);
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<9>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a server stopped with a client connected starts again on the same port", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("a server stopped with a client connected starts again on the same port");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         const std::string name    = "restart_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        ensure("added", manager.addServer(server));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(server));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         TestClient first;
         const bool opened = first.open(port) == 101 && waitFor([&]() { return server->opened() != nullptr; });
@@ -788,26 +810,28 @@ namespace
         const int  second    = TestClient().open(port);
         manager.removeServer(name);
 
-        ensure("opened", opened);
-        ensure("started again", restarted);
-        ensure_equals("and opens a connection", second, 101);
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
+        UNSCOPED_INFO("started again");
+        CHECK(restarted);
+        UNSCOPED_INFO("and opens a connection");
+        CHECK(second == 101);
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<10>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a client that stops reading is dropped once too much waits unsent to it", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("a client that stops reading is dropped once what waits unsent to it passes the most it may");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         const std::string name    = "backlog_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        ensure("added", manager.addServer(server));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(server));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         // Opened, and then never read.
         TestClient client;
@@ -825,26 +849,28 @@ namespace
         const bool dropped = waitFor([&]() { return server->closed() == 1; });
         manager.removeServer(name);
 
-        ensure("opened", opened);
-        ensure("dropped", dropped);
-        ensure("before all 128 MB were taken", sent < 128);
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
+        UNSCOPED_INFO("dropped");
+        CHECK(dropped);
+        UNSCOPED_INFO("before all 128 MB were taken");
+        CHECK(sent < 128);
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<11>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a close stuck behind unread messages drops the connection at its deadline", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("a close stuck behind messages the client will not read drops the connection after its deadline");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         const std::string name    = "stuck_close_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        ensure("added", manager.addServer(server));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(server));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         TestClient client;
         const bool opened     = client.open(port) == 101 && waitFor([&]() { return server->opened() != nullptr; });
@@ -866,27 +892,29 @@ namespace
         const auto took    = std::chrono::steady_clock::now() - began;
         manager.removeServer(name);
 
-        ensure("opened", opened);
-        ensure("dropped", dropped);
-        ensure("at the deadline, not before", took > std::chrono::seconds(3));
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
+        UNSCOPED_INFO("dropped");
+        CHECK(dropped);
+        UNSCOPED_INFO("at the deadline, not before");
+        CHECK((took > std::chrono::seconds(3)));
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<12>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a message within a connection's limit is taken and one past it closes it", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("a message within a connection's limit is taken, and one past it closes the connection");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         const std::string name    = "limit_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
         server->mLimit            = 1024;
-        ensure("added", manager.addServer(server));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(server));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         TestClient client;
         const bool opened = client.open(port) == 101;
@@ -903,27 +931,31 @@ namespace
         const bool closed = taken && waitFor([&]() { return server->closed() == 1; });
         manager.removeServer(name);
 
-        ensure("opened", opened);
-        ensure("the small one taken", taken);
-        ensure("the connection closed by the large one", closed);
-        ensure_equals("with only the small one taken", server->messages(), 1);
-        ensure("a close the client read says too big", !seen.closed || seen.code == 1009);
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
+        UNSCOPED_INFO("the small one taken");
+        CHECK(taken);
+        UNSCOPED_INFO("the connection closed by the large one");
+        CHECK(closed);
+        UNSCOPED_INFO("with only the small one taken");
+        CHECK(server->messages() == 1);
+        UNSCOPED_INFO("a close the client read says too big");
+        CHECK((!seen.closed || seen.code == 1009));
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<13>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a connection past the most at once goes unanswered until there is room", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("past the most connections at once, one more is closed unanswered, and taken once there is room");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         const std::string name    = "crowd_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
-        ensure("added", manager.addServer(std::make_shared<LLWebsocketMgr::WSServer>(name, port, true)));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(std::make_shared<LLWebsocketMgr::WSServer>(name, port, true)));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         // Thirty-two connections that never ask for anything: each holds
         // a place while its request is waited on.
@@ -946,25 +978,26 @@ namespace
         const bool taken = waitFor([&]() { return (later = TestClient().open(port)) == 101; });
         manager.removeServer(name);
 
-        ensure_equals("one more is not answered", refused, -1);
-        ensure("once they have gone, one is", taken);
+        UNSCOPED_INFO("one more is not answered");
+        CHECK(refused == -1);
+        UNSCOPED_INFO("once they have gone, one is");
+        CHECK(taken);
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<14>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a malformed request is answered -32600 and a notification not at all", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("a malformed request is answered -32600 with its id; a method needing an id, called without one, is neither run nor answered");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         LL::WorkQueue     mainloop("mainloop");
         const std::string name    = "malformed_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
-        ensure("added", manager.addServer(std::make_shared<TestRPCServer>(name, port, true)));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(std::make_shared<TestRPCServer>(name, port, true)));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         TestClient client;
         const bool opened = client.open(port) == 101;
@@ -985,31 +1018,37 @@ namespace
         manager.removeServer(name);
         mainloop.close();
 
-        ensure("opened", opened);
-        ensure("the malformed one answered", read_malformed);
-        ensure_equals("as an invalid request", malformed["error"]["code"].asInteger(), LLSD::Integer(-32600));
-        ensure_equals("with its id", malformed["id"].asString(), std::string("bad"));
-        ensure("the notification sent", sent_notification);
-        ensure("something answered after it", read_next);
-        ensure_equals("the ping, not the notification", next["id"].asString(), std::string("ping"));
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
+        UNSCOPED_INFO("the malformed one answered");
+        CHECK(read_malformed);
+        UNSCOPED_INFO("as an invalid request");
+        CHECK(malformed["error"]["code"].asInteger() == LLSD::Integer(-32600));
+        UNSCOPED_INFO("with its id");
+        CHECK(malformed["id"].asString() == std::string("bad"));
+        UNSCOPED_INFO("the notification sent");
+        CHECK(sent_notification);
+        UNSCOPED_INFO("something answered after it");
+        CHECK(read_next);
+        UNSCOPED_INFO("the ping, not the notification");
+        CHECK(next["id"].asString() == std::string("ping"));
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<15>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: an unauthenticated connection is refused calls and reads 64 KB at most", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("a connection not yet authenticated is refused what it asks, reads a message within 64 KB, and is closed by one past it");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         LL::WorkQueue     mainloop("mainloop");
         const std::string name    = "gated_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<GatedRPCServer>(name, port, true);
-        ensure("added", manager.addServer(server));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(server));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         TestClient client;
         const bool opened = client.open(port) == 101;
@@ -1033,30 +1072,36 @@ namespace
         manager.removeServer(name);
         mainloop.close();
 
-        ensure("opened", opened);
-        ensure("answered", read);
-        ensure_equals("as unauthorized", refusal["error"]["code"].asInteger(), LLSD::Integer(-32002));
-        ensure("the one within the limit read", read_within);
-        ensure_equals("and answered as not JSON", parse_error["error"]["code"].asInteger(), LLSD::Integer(-32700));
-        ensure("the connection open after it", open_after);
-        ensure("and closed by the one past it", closed);
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
+        UNSCOPED_INFO("answered");
+        CHECK(read);
+        UNSCOPED_INFO("as unauthorized");
+        CHECK(refusal["error"]["code"].asInteger() == LLSD::Integer(-32002));
+        UNSCOPED_INFO("the one within the limit read");
+        CHECK(read_within);
+        UNSCOPED_INFO("and answered as not JSON");
+        CHECK(parse_error["error"]["code"].asInteger() == LLSD::Integer(-32700));
+        UNSCOPED_INFO("the connection open after it");
+        CHECK(open_after);
+        UNSCOPED_INFO("and closed by the one past it");
+        CHECK(closed);
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<16>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a throw is answered as a bare internal error and a refusal says why", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("a handler that throws is answered as an internal error saying nothing of what it threw; one that refuses says why");
-
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         LL::WorkQueue     mainloop("mainloop");
         const std::string name    = "throw_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
-        ensure("added", manager.addServer(std::make_shared<TestRPCServer>(name, port, true)));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(std::make_shared<TestRPCServer>(name, port, true)));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         TestClient client;
         const bool opened = client.open(port) == 101;
@@ -1074,24 +1119,28 @@ namespace
         manager.removeServer(name);
         mainloop.close();
 
-        ensure("opened", opened);
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
         for (const auto& [what, read, answer] : { std::tuple{ "run where it came in", read_sync, sync_answer },
                                                   std::tuple{ "run on the main thread", read_async, async_answer } })
         {
-            ensure(std::string(what) + ": answered", read);
-            ensure_equals(std::string(what) + ": as an internal error", answer["error"]["code"].asInteger(), LLSD::Integer(-32603));
-            ensure_equals(std::string(what) + ": and nothing more", answer["error"]["message"].asString(), std::string("Internal error"));
+            UNSCOPED_INFO(std::string(what) + ": answered");
+            REQUIRE(read);
+            UNSCOPED_INFO(std::string(what) + ": as an internal error");
+            REQUIRE(answer["error"]["code"].asInteger() == LLSD::Integer(-32603));
+            UNSCOPED_INFO(std::string(what) + ": and nothing more");
+            REQUIRE(answer["error"]["message"].asString() == std::string("Internal error"));
         }
-        ensure("the refusal answered", read_refusal);
-        ensure_equals("as invalid params", refusal["error"]["code"].asInteger(), LLSD::Integer(-32602));
-        ensure_contains("saying why", refusal["error"]["message"].asString(), "no such script");
+        UNSCOPED_INFO("the refusal answered");
+        CHECK(read_refusal);
+        UNSCOPED_INFO("as invalid params");
+        CHECK(refusal["error"]["code"].asInteger() == LLSD::Integer(-32602));
+        UNSCOPED_INFO("saying why");
+        CHECK_THAT(refusal["error"]["message"].asString(), Catch::Matchers::ContainsSubstring("no such script"));
     }
 
-    template<> template<>
-    void WebsocketMgrTestObjectType::test<17>()
+    TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: sends while the server thread is busy count against the 32 MB limit", "[LLWebsocketMgr_Tests]")
     {
-        set_test_name("sends taken while the server thread is busy count against the most a connection may hold");
-
         // Holds the server thread as the connection opens, so that nothing
         // sent meanwhile is queued, let alone written, until it is let go.
         class HeldServer : public LLWebsocketMgr::WSServer
@@ -1122,13 +1171,15 @@ namespace
         const U16 port = unusedPort();
         if (!port)
         {
-            skip("no port free to listen on");
+            SKIP("no port free to listen on");
         }
         const std::string name    = "held_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<HeldServer>(name, port, true);
-        ensure("added", manager.addServer(server));
-        ensure("started", manager.startServer(name));
+        UNSCOPED_INFO("added");
+        CHECK(manager.addServer(server));
+        UNSCOPED_INFO("started");
+        CHECK(manager.startServer(name));
 
         TestClient client;
         const bool opened = client.open(port) == 101 && waitFor([&]() { return server->mOpened.load(); });
@@ -1146,9 +1197,13 @@ namespace
         const bool dropped = waitFor([&]() { return server->mClosed == 1; });
         manager.removeServer(name);
 
-        ensure("opened", opened);
-        ensure_equals("taken up to the most it may hold", sent, 31);
-        ensure("and refused after", refused);
-        ensure("dropped", dropped);
+        UNSCOPED_INFO("opened");
+        CHECK(opened);
+        UNSCOPED_INFO("taken up to the most it may hold");
+        CHECK(sent == 31);
+        UNSCOPED_INFO("and refused after");
+        CHECK(refused);
+        UNSCOPED_INFO("dropped");
+        CHECK(dropped);
     }
 }

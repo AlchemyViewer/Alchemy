@@ -14,7 +14,7 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../alnetimpairment.h"
 
@@ -24,8 +24,6 @@
 
 #include <vector>
 
-namespace tut
-{
 namespace
 {
     struct impairment_data
@@ -73,33 +71,27 @@ namespace
         }
     };
 
-    typedef test_group<impairment_data> impairment_group_t;
-    typedef impairment_group_t::object impairment_object_t;
-    tut::impairment_group_t impairment_group("ALNetImpairment");
-}
 
-    template<> template<>
-    void impairment_object_t::test<1>()
+    TEST_CASE_METHOD(impairment_data, "ALNetImpairment: idle by default and lets everything through while off", "[ALNetImpairment]")
     {
-        set_test_name("idle by default, and off means untouched");
-
-        ensure("not active until configured", !mImpairment.isActive());
+        UNSCOPED_INFO("not active until configured");
+        CHECK_FALSE(mImpairment.isActive());
 
         S32 dropped = 0; F32 run = 0.f;
         measureLoss(5000, dropped, run);
-        ensure_equals("nothing is dropped when loss is zero", dropped, 0);
+        UNSCOPED_INFO("nothing is dropped when loss is zero");
+        CHECK(dropped == 0);
 
         std::vector<LLPacketBuffer> released;
-        ensure("nothing is held when reordering is zero", !mImpairment.hold(numbered(1)));
+        UNSCOPED_INFO("nothing is held when reordering is zero");
+        CHECK_FALSE(mImpairment.hold(numbered(1)));
         mImpairment.advance(released);
-        ensure("and nothing comes back", released.empty());
+        UNSCOPED_INFO("and nothing comes back");
+        REQUIRE(released.empty());
     }
 
-    template<> template<>
-    void impairment_object_t::test<2>()
+    TEST_CASE_METHOD(impairment_data, "ALNetImpairment: loss rate follows the setting", "[ALNetImpairment]")
     {
-        set_test_name("loss rate follows the setting");
-
         for (F32 target : { 1.f, 5.f, 20.f, 50.f })
         {
             ALNetImpairment fresh;
@@ -111,16 +103,13 @@ namespace
             measureLoss(count, dropped, run);
 
             const F32 realised = 100.f * (F32)dropped / (F32)count;
-            ensure(llformat("loss near %.0f%%, got %.2f%%", target, realised).c_str(),
-                   fabsf(realised - target) < llmax(0.5f, target * 0.1f));
+            UNSCOPED_INFO(llformat("loss near %.0f%%, got %.2f%%", target, realised).c_str());
+            REQUIRE(fabsf(realised - target) < llmax(0.5f, target * 0.1f));
         }
     }
 
-    template<> template<>
-    void impairment_object_t::test<3>()
+    TEST_CASE_METHOD(impairment_data, "ALNetImpairment: burst length is independent of loss rate", "[ALNetImpairment]")
     {
-        set_test_name("burst length is independent of loss rate");
-
         // Real loss arrives in runs, and the whole point of the burst control is to lengthen
         // those runs without also losing more traffic -- a burst of ten consecutive updates is
         // what strands a moving object, where the same average spread thinly does not.
@@ -136,18 +125,15 @@ namespace
             measureLoss(count, dropped, run);
 
             const F32 realised = 100.f * (F32)dropped / (F32)count;
-            ensure(llformat("burst %.0f still loses ~10%%, got %.2f%%", burst, realised).c_str(),
-                   fabsf(realised - 10.f) < 1.5f);
-            ensure(llformat("run length near %.0f, got %.2f", burst, run).c_str(),
-                   fabsf(run - burst) < llmax(0.35f, burst * 0.15f));
+            UNSCOPED_INFO(llformat("burst %.0f still loses ~10%%, got %.2f%%", burst, realised).c_str());
+            REQUIRE(fabsf(realised - 10.f) < 1.5f);
+            UNSCOPED_INFO(llformat("run length near %.0f, got %.2f", burst, run).c_str());
+            REQUIRE(fabsf(run - burst) < llmax(0.35f, burst * 0.15f));
         }
     }
 
-    template<> template<>
-    void impairment_object_t::test<4>()
+    TEST_CASE_METHOD(impairment_data, "ALNetImpairment: a held packet returns behind the ones that overtook it", "[ALNetImpairment]")
     {
-        set_test_name("a held packet returns behind the ones that overtook it");
-
         mImpairment.setReorderPercent(100.f);   // hold everything eligible
         mImpairment.setReorderDelay(3);
 
@@ -162,7 +148,8 @@ namespace
 
             if (i == 0)
             {
-                ensure("first packet is held", mImpairment.hold(numbered(i)));
+                UNSCOPED_INFO("first packet is held");
+                REQUIRE(mImpairment.hold(numbered(i)));
             }
             else
             {
@@ -177,47 +164,52 @@ namespace
             }
         }
 
-        ensure_equals("everything arrived", (S32)delivered.size(), 6);
+        UNSCOPED_INFO("everything arrived");
+        REQUIRE((S32)delivered.size() == 6);
         // 1, 2, 3, then the held 0, then 4, 5.
-        ensure_equals("overtaken by 1", delivered[0], 1);
-        ensure_equals("overtaken by 2", delivered[1], 2);
-        ensure_equals("overtaken by 3", delivered[2], 3);
-        ensure_equals("held packet lands out of sequence", delivered[3], 0);
-        ensure_equals("stream continues", delivered[4], 4);
-        ensure_equals("stream continues", delivered[5], 5);
+        UNSCOPED_INFO("overtaken by 1");
+        CHECK(delivered[0] == 1);
+        UNSCOPED_INFO("overtaken by 2");
+        CHECK(delivered[1] == 2);
+        UNSCOPED_INFO("overtaken by 3");
+        CHECK(delivered[2] == 3);
+        UNSCOPED_INFO("held packet lands out of sequence");
+        CHECK(delivered[3] == 0);
+        UNSCOPED_INFO("stream continues");
+        CHECK(delivered[4] == 4);
+        UNSCOPED_INFO("stream continues");
+        CHECK(delivered[5] == 5);
     }
 
-    template<> template<>
-    void impairment_object_t::test<5>()
+    TEST_CASE_METHOD(impairment_data, "ALNetImpairment: nothing is stranded when reordering is switched off", "[ALNetImpairment]")
     {
-        set_test_name("nothing is stranded when reordering is switched off");
-
         mImpairment.setReorderPercent(100.f);
         mImpairment.setReorderDelay(50);
 
         for (S32 i = 0; i < 10; ++i)
         {
-            ensure("held", mImpairment.hold(numbered(i)));
+            UNSCOPED_INFO("held");
+            REQUIRE(mImpairment.hold(numbered(i)));
         }
 
         std::vector<LLPacketBuffer> released;
         mImpairment.flush(released);
-        ensure_equals("every held packet comes back", (S32)released.size(), 10);
+        UNSCOPED_INFO("every held packet comes back");
+        REQUIRE((S32)released.size() == 10);
         for (S32 i = 0; i < 10; ++i)
         {
-            ensure_equals("in the order they were held", numberOf(released[i]), i);
+            UNSCOPED_INFO("in the order they were held");
+            REQUIRE(numberOf(released[i]) == i);
         }
 
         released.clear();
         mImpairment.advance(released);
-        ensure("and the queue is empty afterwards", released.empty());
+        UNSCOPED_INFO("and the queue is empty afterwards");
+        REQUIRE(released.empty());
     }
 
-    template<> template<>
-    void impairment_object_t::test<6>()
+    TEST_CASE_METHOD(impairment_data, "ALNetImpairment: the hold queue has a ceiling", "[ALNetImpairment]")
     {
-        set_test_name("the hold queue has a ceiling");
-
         mImpairment.setReorderPercent(100.f);
         mImpairment.setReorderDelay(1000000);   // never due on its own
 
@@ -227,7 +219,8 @@ namespace
             if (mImpairment.hold(numbered((S32)i))) { ++held; }
         }
 
-        ensure_equals("stops holding at the ceiling", (size_t)held, ALNetImpairment::MAX_HELD_PACKETS);
+        UNSCOPED_INFO("stops holding at the ceiling");
+        CHECK((size_t)held == ALNetImpairment::MAX_HELD_PACKETS);
     }
 }
 
@@ -240,15 +233,12 @@ namespace tut
 namespace
 {
     struct impairment_data {};
-    typedef test_group<impairment_data> impairment_group_t;
-    tut::impairment_group_t impairment_group("ALNetImpairment");
 }
 
-    template<> template<>
-    void impairment_group_t::object::test<1>()
+    TEST_CASE_METHOD(impairment_data, "ALNetImpairment: compiled out of release builds", "[ALNetImpairment]")
     {
-        set_test_name("compiled out of release builds");
-        ensure("nothing to check", true);
+        UNSCOPED_INFO("nothing to check");
+        REQUIRE(true);
     }
 }
 

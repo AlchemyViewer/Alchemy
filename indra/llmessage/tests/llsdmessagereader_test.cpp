@@ -25,9 +25,8 @@
  * $/LicenseInfo$
  */
 
-#include <tut/tut.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include "linden_common.h"
-#include "lltut.h"
 #include "v3dmath.h"
 #include "v3math.h"
 #include "v4math.h"
@@ -38,8 +37,6 @@
 #include "llsdutil.h"
 #include "llsdutil_math.h"
 
-namespace tut
-{
 namespace
 {
     struct LLSDMessageReaderTestData {
@@ -49,7 +46,8 @@ namespace
         {
             LLSDMessageReader msg;
             msg.setMessage(LLMessageStringTable::getInstance()->getString(msg_name.c_str()), msg_data);
-            ensure_equals("Ensure name", std::string(msg.getMessageName()),
+            UNSCOPED_INFO("Ensure name");
+            REQUIRE(std::string(msg.getMessageName()) ==
                           expected_name);
         }
 
@@ -59,7 +57,8 @@ namespace
         {
             LLSDMessageReader msg;
             msg.setMessage("fakename", msg_data);
-            ensure_equals("Ensure number of blocks", msg.getNumberOfBlocks(block.c_str()),
+            UNSCOPED_INFO("Ensure number of blocks");
+            REQUIRE(msg.getNumberOfBlocks(block.c_str()) ==
                           expected_number);
         }
 
@@ -68,7 +67,8 @@ namespace
         {
             LLSDMessageReader msg;
             msg.setMessage("fakename", msg_data);
-            ensure_equals(  "Ensure size",  msg.getMessageSize(), expected_size);
+            UNSCOPED_INFO("Ensure size");
+            REQUIRE(msg.getMessageSize() == expected_size);
         }
 
         static void ensureBool(const LLSD& msg_data,
@@ -81,17 +81,13 @@ namespace
             msg.setMessage("fakename", msg_data);
             bool test_data;
             msg.getBOOL(block.c_str(), var.c_str(), test_data, blocknum);
-            ensure_equals(  "Ensure bool field", test_data, expected);
+            UNSCOPED_INFO("Ensure bool field");
+            REQUIRE(test_data == expected);
         }
     };
 
-    typedef test_group<LLSDMessageReaderTestData>   LLSDMessageReaderTestGroup;
-    typedef LLSDMessageReaderTestGroup::object      LLSDMessageReaderTestObject;
-    LLSDMessageReaderTestGroup llsdMessageReaderTestGroup("LLSDMessageReader");
-}
 
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<1>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: an empty map has an empty name no blocks and size zero", "[LLSDMessageReader]")
         // construction and test of empty LLSD
     {
         LLSD message = LLSD::emptyMap();
@@ -101,8 +97,7 @@ namespace
         ensureMessageSize(message, 0);
     }
 
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<2>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: a message with one block keeps its name and counts one block", "[LLSDMessageReader]")
         // construction and test of simple message with one block
     {
         LLSD message = LLSD::emptyMap();
@@ -115,8 +110,7 @@ namespace
         ensureMessageSize(message, 0);
     }
 
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<3>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getBOOL reads each of two blocks and both are counted", "[LLSDMessageReader]")
         // multiple blocks
     {
         LLSD message = LLSD::emptyMap();
@@ -137,8 +131,6 @@ namespace
         ensureMessageSize(message, 0);
     }
 
-namespace
-{
     template<typename T>
     LLSDMessageReader testType(const T& value)
     {
@@ -148,94 +140,91 @@ namespace
         msg.setMessage("fakename", message);
         return msg;
     }
-}
 
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<4>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getS8 reads back a negative S8", "[LLSDMessageReader]")
         // S8
     {
         S8 outValue, inValue = -3;
         LLSDMessageReader msg = testType(inValue);
         msg.getS8("block", "var", outValue);
-        ensure_equals("Ensure S8", outValue, inValue);
+        UNSCOPED_INFO("Ensure S8");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void
-    LLSDMessageReaderTestObject::test<5>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getU8 reads back a U8", "[LLSDMessageReader]")
         // U8
     {
         U8 outValue, inValue = 2;
         LLSDMessageReader msg = testType(inValue);
         msg.getU8("block", "var", outValue);
-        ensure_equals("Ensure U8", outValue, inValue);
+        UNSCOPED_INFO("Ensure U8");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<6>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getS16 reads back an S16", "[LLSDMessageReader]")
         // S16
     {
         S16 outValue, inValue = 90;
         LLSDMessageReader msg = testType(inValue);
         msg.getS16("block", "var", outValue);
-        ensure_equals("Ensure S16", outValue, inValue);
+        UNSCOPED_INFO("Ensure S16");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<7>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getU16 reads back a U16", "[LLSDMessageReader]")
         // U16
     {
         U16 outValue, inValue = 3;
         LLSDMessageReader msg = testType(inValue);
         msg.getU16("block", "var", outValue);
-        ensure_equals("Ensure S16", outValue, inValue);
+        UNSCOPED_INFO("Ensure S16");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<8>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getS32 reads back an S32", "[LLSDMessageReader]")
         // S32
     {
         S32 outValue, inValue = 44;
         LLSDMessageReader msg = testType(inValue);
         msg.getS32("block", "var", outValue);
-        ensure_equals("Ensure S32", outValue, inValue);
+        UNSCOPED_INFO("Ensure S32");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<9>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getF32 reads back an F32", "[LLSDMessageReader]")
         // F32
     {
         F32 outValue, inValue = 121.44f;
         LLSDMessageReader msg = testType(inValue);
         msg.getF32("block", "var", outValue);
-        ensure_equals("Ensure F32", outValue, inValue);
+        UNSCOPED_INFO("Ensure F32");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<10>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getU32 reads back a U32 stored by ll_sd_from_U32", "[LLSDMessageReader]")
         // U32
     {
         U32 outValue, inValue = 88;
         LLSD sdValue = ll_sd_from_U32(inValue);
         LLSDMessageReader msg = testType(sdValue);
         msg.getU32("block", "var", outValue);
-        ensure_equals("Ensure U32", outValue, inValue);
+        UNSCOPED_INFO("Ensure U32");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<11>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getU64 reads back a U64 stored by ll_sd_from_U64", "[LLSDMessageReader]")
         // U64
     {
         U64 outValue, inValue = 121;
         LLSD sdValue = ll_sd_from_U64(inValue);
         LLSDMessageReader msg = testType(sdValue);
         msg.getU64("block", "var", outValue);
-        ensure_equals("Ensure U64", outValue, inValue);
+        UNSCOPED_INFO("Ensure U64");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<12>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getF64 reads back an F64", "[LLSDMessageReader]")
         // F64
     {
         F64 outValue, inValue = 3232143.33;
         LLSDMessageReader msg = testType(inValue);
         msg.getF64("block", "var", outValue);
-        ensure_equals("Ensure F64", outValue, inValue);
+        UNSCOPED_INFO("Ensure F64");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<13>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getString copies a string into a buffer", "[LLSDMessageReader]")
         // String
     {
          std::string outValue, inValue = "testing";
@@ -244,79 +233,79 @@ namespace
         char buffer[MAX_STRING];
         msg.getString("block", "var", MAX_STRING, buffer);
         outValue = buffer;
-        ensure_equals("Ensure String", outValue, inValue);
+        UNSCOPED_INFO("Ensure String");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<14>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getVector3 reads back an LLVector3", "[LLSDMessageReader]")
         // Vector3
     {
          LLVector3 outValue, inValue = LLVector3(1,2,3);
         LLSD sdValue = ll_sd_from_vector3(inValue);
         LLSDMessageReader msg = testType(sdValue);
         msg.getVector3("block", "var", outValue);
-        ensure_equals("Ensure Vector3", outValue, inValue);
+        UNSCOPED_INFO("Ensure Vector3");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<15>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getVector4 reads back an LLVector4", "[LLSDMessageReader]")
         // Vector4
     {
         LLVector4 outValue, inValue = LLVector4(1,2,3,4);
         LLSD sdValue = ll_sd_from_vector4(inValue);
         LLSDMessageReader msg = testType(sdValue);
         msg.getVector4("block", "var", outValue);
-        ensure_equals("Ensure Vector4", outValue, inValue);
+        UNSCOPED_INFO("Ensure Vector4");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<16>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getVector3d reads back an LLVector3d", "[LLSDMessageReader]")
         // Vector3d
     {
          LLVector3d outValue, inValue = LLVector3d(1,2,3);
          LLSD sdValue = ll_sd_from_vector3d(inValue);
         LLSDMessageReader msg = testType(sdValue);
         msg.getVector3d("block", "var", outValue);
-        ensure_equals("Ensure Vector3d", outValue, inValue);
+        UNSCOPED_INFO("Ensure Vector3d");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<17>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getQuat reads back an LLQuaternion", "[LLSDMessageReader]")
         // Quaternion
     {
         LLQuaternion outValue, inValue = LLQuaternion(1,LLVector3(2,3,4));
         LLSD sdValue = ll_sd_from_quaternion(inValue);
         LLSDMessageReader msg = testType(sdValue);
         msg.getQuat("block", "var", outValue);
-        ensure_equals("Ensure Quaternion", outValue, inValue);
+        UNSCOPED_INFO("Ensure Quaternion");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<18>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getUUID reads back a generated UUID", "[LLSDMessageReader]")
         // UUID
     {
         LLUUID outValue, inValue;
         inValue.generate();
         LLSDMessageReader msg = testType(inValue);
         msg.getUUID("block", "var", outValue);
-        ensure_equals("Ensure UUID", outValue, inValue);
+        UNSCOPED_INFO("Ensure UUID");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<19>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getIPAddr reads back an address stored by ll_sd_from_ipaddr", "[LLSDMessageReader]")
         // IPAddr
     {
         U32 outValue, inValue = 12344556;
         LLSD sdValue = ll_sd_from_ipaddr(inValue);
         LLSDMessageReader msg = testType(sdValue);
         msg.getIPAddr("block", "var", outValue);
-        ensure_equals("Ensure IPAddr", outValue, inValue);
+        UNSCOPED_INFO("Ensure IPAddr");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<20>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getIPPort reads back a port", "[LLSDMessageReader]")
         // IPPort
     {
         U16 outValue, inValue = 80;
         LLSDMessageReader msg = testType(inValue);
         msg.getIPPort("block", "var", outValue);
-        ensure_equals("Ensure IPPort", outValue, inValue);
+        UNSCOPED_INFO("Ensure IPPort");
+        CHECK(outValue == inValue);
     }
-    template<> template<>
-    void LLSDMessageReaderTestObject::test<21>()
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getBinaryData reads back two bytes", "[LLSDMessageReader]")
         // Binary
     {
         std::vector<U8> outValue(2), inValue(2);
@@ -325,6 +314,7 @@ namespace
 
         LLSDMessageReader msg = testType(inValue);
         msg.getBinaryData("block", "var", &(outValue[0]), static_cast<S32>(inValue.size()));
-        ensure_equals("Ensure Binary", outValue, inValue);
+        UNSCOPED_INFO("Ensure Binary");
+        CHECK(outValue == inValue);
     }
 }

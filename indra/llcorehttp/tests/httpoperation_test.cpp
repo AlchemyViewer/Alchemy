@@ -25,7 +25,7 @@
  */
 #include "linden_common.h"
 
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "_httpoperation.h"
 #include "httphandler.h"
@@ -54,39 +54,20 @@ public:
 }  // end namespace anonymous
 
 
-namespace tut
-{
 namespace
 {
-    struct HttpOperationTestData
+    TEST_CASE("HttpOperation Tests: a new HttpOpNull has one reference", "[HttpOperation_Tests]")
     {
-        // the test objects inherit from this so the member functions and variables
-        // can be referenced directly inside of the test functions.
-    };
-
-    typedef test_group<HttpOperationTestData> HttpOperationTestGroupType;
-    typedef HttpOperationTestGroupType::object HttpOperationTestObjectType;
-    HttpOperationTestGroupType HttpOperationTestGroup("HttpOperation Tests");
-}
-
-    template <> template <>
-    void HttpOperationTestObjectType::test<1>()
-    {
-        set_test_name("HttpOpNull construction");
-
         // create a new ref counted object with an implicit reference
         HttpOperation::ptr_t op (new HttpOpNull());
-        ensure(op.use_count() == 1);
+        CHECK(op.use_count() == 1);
 
         // release the implicit reference, causing the object to be released
         op.reset();
     }
 
-    template <> template <>
-    void HttpOperationTestObjectType::test<2>()
+    TEST_CASE("HttpOperation Tests: setting a reply handler adds no reference to the op", "[HttpOperation_Tests]")
     {
-        set_test_name("HttpOpNull construction with handlers");
-
         // Get some handlers
         LLCore::HttpHandler::ptr_t h1 (new TestHandler());
 
@@ -97,7 +78,7 @@ namespace
         op->setReplyPath(LLCore::HttpOperation::HttpReplyQueuePtr_t(), h1);
 
         // Check ref count
-        ensure(op.use_count() == 1);
+        CHECK(op.use_count() == 1);
 
         // release the reference, releasing the operation but
         // not the handlers.

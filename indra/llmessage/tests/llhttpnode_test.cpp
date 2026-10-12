@@ -26,12 +26,12 @@
  */
 
 #include "linden_common.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
+#include "altestmatchers.h"
 #include "llhttpnode.h"
 #include "llsdhttpserver.h"
 
-namespace tut
-{
 namespace
 {
     struct HTTPNodeTestData
@@ -67,10 +67,10 @@ namespace
 
             const LLHTTPNode* actualNode = mRoot.traverse(path, mContext);
 
-            ensure_equals("traverse " + path + " node",
-                actualNode, expectedNode);
-            ensure_equals("traverse " + path + " remainder",
-                remainderPath(), expectedRemainder);
+            UNSCOPED_INFO("traverse " + path + " node");
+            REQUIRE(actualNode == expectedNode);
+            UNSCOPED_INFO("traverse " + path + " remainder");
+            REQUIRE(remainderPath() == expectedRemainder);
         }
 
         class Response : public LLHTTPNode::Response
@@ -95,7 +95,8 @@ namespace
         {
             mContext.clear();
             const LLHTTPNode* node = mRoot.traverse(path, mContext);
-            ensure(path + " found", node != NULL);
+            UNSCOPED_INFO(path + " found");
+            REQUIRE(node != NULL);
 
             ResponsePtr response = Response::create();
             node->get(LLHTTPNode::ResponsePtr(response), mContext);
@@ -106,7 +107,8 @@ namespace
         {
             mContext.clear();
             const LLHTTPNode* node = mRoot.traverse(path, mContext);
-            ensure(path + " found", node != NULL);
+            UNSCOPED_INFO(path + " found");
+            REQUIRE(node != NULL);
 
             ResponsePtr response = Response::create();
             node->post(LLHTTPNode::ResponsePtr(response), mContext, input);
@@ -117,8 +119,8 @@ namespace
             const LLSD& actualMap, const std::string& member,
             const std::string& expectedValue)
         {
-            ensure_equals(name + " " + member,
-                actualMap[member].asString(), expectedValue);
+            UNSCOPED_INFO(name + " " + member);
+            REQUIRE(actualMap[member].asString() == expectedValue);
         }
 
 
@@ -138,18 +140,13 @@ namespace
                 }
             }
 
-            fail("didn't find " + expectedValue);
+            FAIL("didn't find " + expectedValue);
         }
 
     };
 
-    typedef test_group<HTTPNodeTestData>    HTTPNodeTestGroup;
-    typedef HTTPNodeTestGroup::object       HTTPNodeTestObject;
-    HTTPNodeTestGroup httpNodeTestGroup("http node");
-}
 
-    template<> template<>
-    void HTTPNodeTestObject::test<1>()
+    TEST_CASE_METHOD(HTTPNodeTestData, "http node: a lone root matches only an empty path and is its own root", "[http_node]")
     {
         // traversal of the lone node
 
@@ -158,11 +155,11 @@ namespace
         ensureRootTraversal("foo", NULL, "foo");
         ensureRootTraversal("foo/bar", NULL, "foo/bar");
 
-        ensure_equals("root of root", mRoot.rootNode(), &mRoot);
+        UNSCOPED_INFO("root of root");
+        REQUIRE(mRoot.rootNode() == &mRoot);
     }
 
-    template<> template<>
-    void HTTPNodeTestObject::test<2>()
+    TEST_CASE_METHOD(HTTPNodeTestData, "http node: a child node matches its name with or without slashes", "[http_node]")
     {
         // simple traversal of a single node
 
@@ -176,11 +173,11 @@ namespace
 
         ensureRootTraversal("hello/there", NULL, "there");
 
-        ensure_equals("root of hello", helloNode->rootNode(), &mRoot);
+        UNSCOPED_INFO("root of hello");
+        REQUIRE(helloNode->rootNode() == &mRoot);
     }
 
-    template<> template<>
-    void HTTPNodeTestObject::test<3>()
+    TEST_CASE_METHOD(HTTPNodeTestData, "http node: traversal finds each leaf of a multi-branched tree", "[http_node]")
     {
         // traversal of mutli-branched tree
 
@@ -206,16 +203,21 @@ namespace
         ensureRootTraversal("greek/gamma", gammaNode, "");
         ensureRootTraversal("hebrew/aleph", alephNode, "");
 
-        ensure_equals("root of greek", greekNode->rootNode(), &mRoot);
-        ensure_equals("root of alpha", alphaNode->rootNode(), &mRoot);
-        ensure_equals("root of beta", betaNode->rootNode(), &mRoot);
-        ensure_equals("root of gamma", gammaNode->rootNode(), &mRoot);
-        ensure_equals("root of hebrew", hebrewNode->rootNode(), &mRoot);
-        ensure_equals("root of aleph", alephNode->rootNode(), &mRoot);
+        UNSCOPED_INFO("root of greek");
+        REQUIRE(greekNode->rootNode() == &mRoot);
+        UNSCOPED_INFO("root of alpha");
+        REQUIRE(alphaNode->rootNode() == &mRoot);
+        UNSCOPED_INFO("root of beta");
+        REQUIRE(betaNode->rootNode() == &mRoot);
+        UNSCOPED_INFO("root of gamma");
+        REQUIRE(gammaNode->rootNode() == &mRoot);
+        UNSCOPED_INFO("root of hebrew");
+        REQUIRE(hebrewNode->rootNode() == &mRoot);
+        UNSCOPED_INFO("root of aleph");
+        REQUIRE(alephNode->rootNode() == &mRoot);
     }
 
-    template<> template<>
-    void HTTPNodeTestObject::test<4>()
+    TEST_CASE_METHOD(HTTPNodeTestData, "http node: addNode creates parents and keeps an existing node", "[http_node]")
     {
         // automatic creation of parent nodes and not overriding existing nodes
 
@@ -240,14 +242,16 @@ namespace
         ensureRootTraversal("greek/gamma", gammaNode, "");
         ensureRootTraversal("hebrew/aleph", alephNode, "");
 
-        ensure_equals("root of alpha", alphaNode->rootNode(), &mRoot);
-        ensure_equals("root of beta", betaNode->rootNode(), &mRoot);
-        ensure_equals("root of gamma", gammaNode->rootNode(), &mRoot);
-        ensure_equals("root of aleph", alephNode->rootNode(), &mRoot);
+        UNSCOPED_INFO("root of alpha");
+        REQUIRE(alphaNode->rootNode() == &mRoot);
+        UNSCOPED_INFO("root of beta");
+        REQUIRE(betaNode->rootNode() == &mRoot);
+        UNSCOPED_INFO("root of gamma");
+        REQUIRE(gammaNode->rootNode() == &mRoot);
+        UNSCOPED_INFO("root of aleph");
+        REQUIRE(alephNode->rootNode() == &mRoot);
     }
 
-namespace
-{
     class IntegerNode : public LLHTTPNode
     {
     public:
@@ -289,10 +293,8 @@ namespace
             response->result(n*n);
         }
     };
-}
 
-    template<> template<>
-    void HTTPNodeTestObject::test<5>()
+    TEST_CASE_METHOD(HTTPNodeTestData, "http node: a wildcard node validates its path element and stores it", "[http_node]")
     {
         // wildcard nodes
 
@@ -305,21 +307,20 @@ namespace
         mRoot.addNode("test/<int>/square", sqNode);
 
         ensureRootTraversal("test/42", iNode, "");
-        ensure_equals("stored integer",
-            context()["extra"]["value"].asInteger(), 42);
+        UNSCOPED_INFO("stored integer");
+        CHECK(context()["extra"]["value"].asInteger() == 42);
 
         ensureRootTraversal("test/bob", NULL, "bob");
-        ensure("nothing stored",
-            context()["extra"]["value"].isUndefined());
+        UNSCOPED_INFO("nothing stored");
+        REQUIRE(context()["extra"]["value"].isUndefined());
 
         ensureRootTraversal("test/3/square", sqNode, "");
         ResponsePtr response = Response::create();
         sqNode->get(LLHTTPNode::ResponsePtr(response), context());
-        ensure_equals("square result", response->mResult.asInteger(), 9);
+        UNSCOPED_INFO("square result");
+        CHECK(response->mResult.asInteger() == 9);
     }
 
-namespace
-{
     class AlphaNode : public LLHTTPNode
     {
     public:
@@ -340,10 +341,8 @@ namespace
             return true;
         }
     };
-}
 
-    template<> template<>
-    void HTTPNodeTestObject::test<6>()
+    TEST_CASE_METHOD(HTTPNodeTestData, "http node: a node that handles remainders takes the paths it accepts", "[http_node]")
     {
         // nodes that handle remainders
 
@@ -363,8 +362,7 @@ namespace
         ensureRootTraversal("test/alpha/zebra", zNode, "");
     }
 
-    template<> template<>
-    void HTTPNodeTestObject::test<7>()
+    TEST_CASE_METHOD(HTTPNodeTestData, "http node: standard services answer web/hello and web/echo", "[http_node]")
     {
         // test auto registration
 
@@ -373,17 +371,18 @@ namespace
 
         {
             LLSD result = get("web/hello");
-            ensure_equals("hello result", result.asString(), "hello");
+            UNSCOPED_INFO("hello result");
+            CHECK(result.asString() == "hello");
         }
         {
             LLSD stuff = 3.14159;
             LLSD result = post("web/echo", stuff);
-            ensure_equals("echo result", result, stuff);
+            UNSCOPED_INFO("echo result");
+            CHECK_THAT(result, ll_test::LLSDEquals(stuff));
         }
     }
 
-    template<> template<>
-    void HTTPNodeTestObject::test<8>()
+    TEST_CASE_METHOD(HTTPNodeTestData, "http node: web/server/api lists the registered paths", "[http_node]")
     {
         // test introspection
 
@@ -395,8 +394,10 @@ namespace
 
         const LLSD result = get("web/server/api");
 
-        ensure("result is array", result.isArray());
-        ensure("result size", result.size() >= 2);
+        UNSCOPED_INFO("result is array");
+        REQUIRE(result.isArray());
+        UNSCOPED_INFO("result size");
+        REQUIRE(result.size() >= 2);
 
         ensureInArray(result, "web/echo");
         ensureInArray(result, "web/hello");
@@ -405,8 +406,7 @@ namespace
         ensureInArray(result, "test/<int>/square");
     }
 
-    template<> template<>
-    void HTTPNodeTestObject::test<9>()
+    TEST_CASE_METHOD(HTTPNodeTestData, "http node: web/server/api describes web/hello and web/echo", "[http_node]")
     {
         // test introspection details
 
@@ -414,24 +414,28 @@ namespace
 
         const LLSD helloDetails = get("web/server/api/web/hello");
 
-        ensure_contains("hello description",
-            helloDetails["description"].asString(), "hello");
-        ensure_equals("method name", helloDetails["api"][0].asString(), std::string("GET"));
+        UNSCOPED_INFO("hello description");
+        CHECK_THAT(helloDetails["description"].asString(), Catch::Matchers::ContainsSubstring("hello"));
+        UNSCOPED_INFO("method name");
+        CHECK(helloDetails["api"][0].asString() == std::string("GET"));
         ensureMemberString("hello", helloDetails, "output", "\"hello\"");
-        ensure_contains("hello __file__",
-            helloDetails["__file__"].asString(), "llsdhttpserver.cpp");
-        ensure("hello line", helloDetails["__line__"].isInteger());
+        UNSCOPED_INFO("hello __file__");
+        CHECK_THAT(helloDetails["__file__"].asString(), Catch::Matchers::ContainsSubstring("llsdhttpserver.cpp"));
+        UNSCOPED_INFO("hello line");
+        CHECK(helloDetails["__line__"].isInteger());
 
 
         const LLSD echoDetails = get("web/server/api/web/echo");
 
-        ensure_contains("echo description",
-            echoDetails["description"].asString(), "echo");
-        ensure_equals("method name", echoDetails["api"][0].asString(), std::string("POST"));
+        UNSCOPED_INFO("echo description");
+        CHECK_THAT(echoDetails["description"].asString(), Catch::Matchers::ContainsSubstring("echo"));
+        UNSCOPED_INFO("method name");
+        CHECK(echoDetails["api"][0].asString() == std::string("POST"));
         ensureMemberString("echo", echoDetails, "input", "<any>");
         ensureMemberString("echo", echoDetails, "output", "<the input>");
-        ensure_contains("echo __file__",
-            echoDetails["__file__"].asString(), "llsdhttpserver.cpp");
-        ensure("echo", echoDetails["__line__"].isInteger());
+        UNSCOPED_INFO("echo __file__");
+        CHECK_THAT(echoDetails["__file__"].asString(), Catch::Matchers::ContainsSubstring("llsdhttpserver.cpp"));
+        UNSCOPED_INFO("echo");
+        CHECK(echoDetails["__line__"].isInteger());
     }
 }

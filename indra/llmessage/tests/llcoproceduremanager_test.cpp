@@ -39,7 +39,7 @@
 #include <boost/fiber/buffered_channel.hpp>
 #include <boost/fiber/unbuffered_channel.hpp>
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "../test/sync.h"
 
 
@@ -69,8 +69,6 @@ LLCore::HttpRequest::~HttpRequest()
 {
 }
 
-namespace tut
-{
 namespace
 {
     struct coproceduremanager_test
@@ -84,14 +82,9 @@ namespace
             LLCoprocedureManager::instance().close();
         }
     };
-    typedef test_group<coproceduremanager_test> coproceduremanager_t;
-    typedef coproceduremanager_t::object coproceduremanager_object_t;
-    tut::coproceduremanager_t tut_coproceduremanager("LLCoprocedureManager");
-}
 
 
-    template<> template<>
-    void coproceduremanager_object_t::test<1>()
+    TEST_CASE_METHOD(coproceduremanager_test, "LLCoprocedureManager: an enqueued coprocedure runs in its pool", "[LLCoprocedureManager]")
     {
         Sync sync;
         int foo = 0;
@@ -103,13 +96,13 @@ namespace
             });
 
         sync.yield();
-        ensure_equals("coprocedure failed to update foo", foo, 1);
+        UNSCOPED_INFO("coprocedure failed to update foo");
+        CHECK(foo == 1);
 
         LLCoprocedureManager::instance().close("PoolName");
     }
 
-    template<> template<>
-    void coproceduremanager_object_t::test<2>()
+    TEST_CASE_METHOD(coproceduremanager_test, "LLCoprocedureManager: a buffered channel hands a function to a fiber", "[LLCoprocedureManager]")
     {
         const size_t capacity = 2;
         boost::fibers::buffered_channel<std::function<void(void)>> chan(capacity);
@@ -125,8 +118,7 @@ namespace
         worker.join();
     }
 
-    template<> template<>
-    void coproceduremanager_object_t::test<3>()
+    TEST_CASE_METHOD(coproceduremanager_test, "LLCoprocedureManager: an unbuffered channel hands a function to a fiber", "[LLCoprocedureManager]")
     {
         boost::fibers::unbuffered_channel<std::function<void(void)>> chan;
 
@@ -141,8 +133,7 @@ namespace
         worker.join();
     }
 
-    template<> template<>
-    void coproceduremanager_object_t::test<4>()
+    TEST_CASE_METHOD(coproceduremanager_test, "LLCoprocedureManager: a worker fiber runs every function until its channel closes", "[LLCoprocedureManager]")
     {
         boost::fibers::buffered_channel<std::function<void(void)>> chan(4);
 
@@ -178,6 +169,7 @@ namespace
         worker.join();
 
         LL_INFOS("CoMain") << "checking count" << LL_ENDL;
-        ensure_equals("coprocedure failed to update counter", counter, 5);
+        UNSCOPED_INFO("coprocedure failed to update counter");
+        CHECK(counter == 5);
     }
-}  // namespace tut
+}  // anonymous namespace

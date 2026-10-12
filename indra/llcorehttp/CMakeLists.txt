@@ -76,31 +76,28 @@ target_precompile_headers(llcorehttp REUSE_FROM llprecompiled)
 
 # tests
 if(AL_BUILD_TESTS)
-  # Each suite runs under a Python peer that serves the requests it makes.
+  # The suites run under a Python peer that serves the requests they make.
   # An http_proxy in the environment would put a proxy between the two, so
   # the run clears it.
-  foreach(
-    suite
-    bufferarray
-    bufferstream
-    httpheaders
-    httpoperation
-    httprequest
-    httprequestqueue
-    httpstatus
-    jsonrpcws
-    refcounted
-    websocketmgr
+  al_add_test_binary(
+    llcorehttp_tests
+    PROJECT llcorehttp
+    SOURCES
+      tests/bufferarray_test.cpp
+      tests/bufferstream_test.cpp
+      tests/httpheaders_test.cpp
+      tests/httpoperation_test.cpp
+      tests/httprequest_test.cpp
+      tests/httprequestqueue_test.cpp
+      tests/httpstatus_test.cpp
+      tests/jsonrpcws_test.cpp
+      tests/refcounted_test.cpp
+      tests/websocketmgr_test.cpp
+    LIBRARIES llcorehttp llmessage llcommon
+    PYTHON
+    LAUNCHER ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_llcorehttp_peer.py"
+    ENVIRONMENT "http_proxy="
   )
-    al_add_test(
-      ${suite}
-      PROJECT llcorehttp
-      LIBRARIES llcorehttp llmessage llcommon
-      PYTHON
-      COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_llcorehttp_peer.py"
-      ENVIRONMENT "http_proxy="
-    )
-  endforeach()
 
   #
   # Example Programs

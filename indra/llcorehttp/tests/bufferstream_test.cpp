@@ -25,7 +25,7 @@
  */
 #include "linden_common.h"
 
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "bufferstream.h"
 
@@ -38,40 +38,32 @@
 using namespace LLCore;
 
 
-namespace tut
-{
 namespace
 {
 
-struct BufferStreamTestData
-{
-    // the test objects inherit from this so the member functions and variables
-    // can be referenced directly inside of the test functions.
-};
-
-typedef test_group<BufferStreamTestData> BufferStreamTestGroupType;
-typedef BufferStreamTestGroupType::object BufferStreamTestObjectType;
-BufferStreamTestGroupType BufferStreamTestGroup("BufferStream Tests");
 typedef BufferArrayStreamBuf::traits_type tst_traits_t;
-}
 
 
-template <> template <>
-void BufferStreamTestObjectType::test<1>()
+TEST_CASE("BufferStream Tests: BufferArrayStreamBuf over a NULL BufferArray fails every call", "[BufferStream_Tests]")
 {
-    set_test_name("BufferArrayStreamBuf construction with NULL BufferArray");
-
     // create a new ref counted object with an implicit reference
     BufferArrayStreamBuf * bsb = new BufferArrayStreamBuf(NULL);
 
     // Not much will work with a NULL
-    ensure("underflow() on NULL fails", tst_traits_t::eof() == bsb->underflow());
-    ensure("uflow() on NULL fails", tst_traits_t::eof() == bsb->uflow());
-    ensure("pbackfail() on NULL fails", tst_traits_t::eof() == bsb->pbackfail('c'));
-    ensure("showmanyc() on NULL fails", bsb->showmanyc() == -1);
-    ensure("overflow() on NULL fails", tst_traits_t::eof() == bsb->overflow('c'));
-    ensure("xsputn() on NULL fails", bsb->xsputn("blah", 4) == 0);
-    ensure("seekoff() on NULL fails", bsb->seekoff(0, std::ios_base::beg, std::ios_base::in) == std::streampos(-1));
+    UNSCOPED_INFO("underflow() on NULL fails");
+    CHECK(tst_traits_t::eof() == bsb->underflow());
+    UNSCOPED_INFO("uflow() on NULL fails");
+    CHECK(tst_traits_t::eof() == bsb->uflow());
+    UNSCOPED_INFO("pbackfail() on NULL fails");
+    CHECK(tst_traits_t::eof() == bsb->pbackfail('c'));
+    UNSCOPED_INFO("showmanyc() on NULL fails");
+    CHECK(bsb->showmanyc() == -1);
+    UNSCOPED_INFO("overflow() on NULL fails");
+    CHECK(tst_traits_t::eof() == bsb->overflow('c'));
+    UNSCOPED_INFO("xsputn() on NULL fails");
+    CHECK(bsb->xsputn("blah", 4) == 0);
+    UNSCOPED_INFO("seekoff() on NULL fails");
+    CHECK(bsb->seekoff(0, std::ios_base::beg, std::ios_base::in) == std::streampos(-1));
 
     // release the implicit reference, causing the object to be released
     delete bsb;
@@ -79,18 +71,18 @@ void BufferStreamTestObjectType::test<1>()
 }
 
 
-template <> template <>
-void BufferStreamTestObjectType::test<2>()
+TEST_CASE("BufferStream Tests: BufferArrayStream over a NULL BufferArray starts out good", "[BufferStream_Tests]")
 {
-    set_test_name("BufferArrayStream construction with NULL BufferArray");
-
     // create a new ref counted object with an implicit reference
     BufferArrayStream * bas = new BufferArrayStream(NULL);
 
     // Not much will work with a NULL here
-    ensure("eof() is false on NULL", ! bas->eof());
-    ensure("fail() is false on NULL", ! bas->fail());
-    ensure("good() on NULL", bas->good());
+    UNSCOPED_INFO("eof() is false on NULL");
+    CHECK_FALSE(bas->eof());
+    UNSCOPED_INFO("fail() is false on NULL");
+    CHECK_FALSE(bas->fail());
+    UNSCOPED_INFO("good() on NULL");
+    CHECK(bas->good());
 
     // release the implicit reference, causing the object to be released
     delete bas;
@@ -98,11 +90,8 @@ void BufferStreamTestObjectType::test<2>()
 }
 
 
-template <> template <>
-void BufferStreamTestObjectType::test<3>()
+TEST_CASE("BufferStream Tests: BufferArrayStreamBuf construction with empty BufferArray", "[BufferStream_Tests]")
 {
-    set_test_name("BufferArrayStreamBuf construction with empty BufferArray");
-
     // create a new ref counted BufferArray with implicit reference
     BufferArray * ba = new BufferArray;
     BufferArrayStreamBuf * bsb = new BufferArrayStreamBuf(ba);
@@ -117,11 +106,8 @@ void BufferStreamTestObjectType::test<3>()
 }
 
 
-template <> template <>
-void BufferStreamTestObjectType::test<4>()
+TEST_CASE("BufferStream Tests: BufferArrayStream construction with empty BufferArray", "[BufferStream_Tests]")
 {
-    set_test_name("BufferArrayStream construction with empty BufferArray");
-
     // create a new ref counted BufferArray with implicit reference
     BufferArray * ba = new BufferArray;
 
@@ -136,11 +122,8 @@ void BufferStreamTestObjectType::test<4>()
 }
 
 
-template <> template <>
-void BufferStreamTestObjectType::test<5>()
+TEST_CASE("BufferStream Tests: BufferArrayStreamBuf reads and appends and seeks a BufferArray", "[BufferStream_Tests]")
 {
-    set_test_name("BufferArrayStreamBuf construction with real BufferArray");
-
     // create a new ref counted BufferArray with implicit reference
     BufferArray * ba = new BufferArray;
     const char * content("This is a string.  A fragment.");
@@ -155,23 +138,40 @@ void BufferStreamTestObjectType::test<5>()
     ba = NULL;
 
     // Various static state
-    ensure("underflow() returns 'T'", bsb->underflow() == 'T');
-    ensure("underflow() returns 'T' again", bsb->underflow() == 'T');
-    ensure("uflow() returns 'T'", bsb->uflow() == 'T');
-    ensure("uflow() returns 'h'", bsb->uflow() == 'h');
-    ensure("pbackfail('i') fails", tst_traits_t::eof() == bsb->pbackfail('i'));
-    ensure("pbackfail('T') fails", tst_traits_t::eof() == bsb->pbackfail('T'));
-    ensure("pbackfail('h') succeeds", bsb->pbackfail('h') == 'h');
-    ensure("showmanyc() is everything but the 'T'", bsb->showmanyc() == (c_len - 1));
-    ensure("overflow() appends", bsb->overflow('c') == 'c');
-    ensure("showmanyc() reflects append", bsb->showmanyc() == (c_len - 1 + 1));
-    ensure("xsputn() appends some more", bsb->xsputn("bla!", 4) == 4);
-    ensure("showmanyc() reflects 2nd append", bsb->showmanyc() == (c_len - 1 + 5));
-    ensure("seekoff() succeeds", bsb->seekoff(0, std::ios_base::beg, std::ios_base::in) == std::streampos(0));
-    ensure("seekoff() succeeds 2", bsb->seekoff(4, std::ios_base::cur, std::ios_base::in) == std::streampos(4));
-    ensure("showmanyc() picks up seekoff", bsb->showmanyc() == (c_len + 5 - 4));
-    ensure("seekoff() succeeds 3", bsb->seekoff(0, std::ios_base::end, std::ios_base::in) == std::streampos(c_len + 4));
-    ensure("pbackfail('!') succeeds", tst_traits_t::eof() == bsb->pbackfail('!'));
+    UNSCOPED_INFO("underflow() returns 'T'");
+    CHECK(bsb->underflow() == 'T');
+    UNSCOPED_INFO("underflow() returns 'T' again");
+    CHECK(bsb->underflow() == 'T');
+    UNSCOPED_INFO("uflow() returns 'T'");
+    CHECK(bsb->uflow() == 'T');
+    UNSCOPED_INFO("uflow() returns 'h'");
+    CHECK(bsb->uflow() == 'h');
+    UNSCOPED_INFO("pbackfail('i') fails");
+    CHECK(tst_traits_t::eof() == bsb->pbackfail('i'));
+    UNSCOPED_INFO("pbackfail('T') fails");
+    CHECK(tst_traits_t::eof() == bsb->pbackfail('T'));
+    UNSCOPED_INFO("pbackfail('h') succeeds");
+    CHECK(bsb->pbackfail('h') == 'h');
+    UNSCOPED_INFO("showmanyc() is everything but the 'T'");
+    CHECK(bsb->showmanyc() == (c_len - 1));
+    UNSCOPED_INFO("overflow() appends");
+    CHECK(bsb->overflow('c') == 'c');
+    UNSCOPED_INFO("showmanyc() reflects append");
+    CHECK(bsb->showmanyc() == (c_len - 1 + 1));
+    UNSCOPED_INFO("xsputn() appends some more");
+    CHECK(bsb->xsputn("bla!", 4) == 4);
+    UNSCOPED_INFO("showmanyc() reflects 2nd append");
+    CHECK(bsb->showmanyc() == (c_len - 1 + 5));
+    UNSCOPED_INFO("seekoff() succeeds");
+    CHECK(bsb->seekoff(0, std::ios_base::beg, std::ios_base::in) == std::streampos(0));
+    UNSCOPED_INFO("seekoff() succeeds 2");
+    CHECK(bsb->seekoff(4, std::ios_base::cur, std::ios_base::in) == std::streampos(4));
+    UNSCOPED_INFO("showmanyc() picks up seekoff");
+    CHECK(bsb->showmanyc() == (c_len + 5 - 4));
+    UNSCOPED_INFO("seekoff() succeeds 3");
+    CHECK(bsb->seekoff(0, std::ios_base::end, std::ios_base::in) == std::streampos(c_len + 4));
+    UNSCOPED_INFO("pbackfail('!') succeeds");
+    CHECK(tst_traits_t::eof() == bsb->pbackfail('!'));
 
     // release the implicit reference, causing the object to be released
     delete bsb;
@@ -179,11 +179,8 @@ void BufferStreamTestObjectType::test<5>()
 }
 
 
-template <> template <>
-void BufferStreamTestObjectType::test<6>()
+TEST_CASE("BufferStream Tests: BufferArrayStream writes to and reads back a BufferArray", "[BufferStream_Tests]")
 {
-    set_test_name("BufferArrayStream construction with real BufferArray");
-
     // create a new ref counted BufferArray with implicit reference
     BufferArray * ba = new BufferArray;
     //const char * content("This is a string.  A fragment.");
@@ -196,11 +193,13 @@ void BufferStreamTestObjectType::test<6>()
 
         // Basic operations
         bas << "Hello" << 27 << ".";
-        ensure("BA length 8", ba->size() == 8);
+        UNSCOPED_INFO("BA length 8");
+        REQUIRE(ba->size() == 8);
 
         std::string str;
         bas >> str;
-        ensure("reads correctly", str == "Hello27.");
+        UNSCOPED_INFO("reads correctly");
+        CHECK(str == "Hello27.");
     }
 
     // release the implicit reference, causing the object to be released
@@ -209,11 +208,8 @@ void BufferStreamTestObjectType::test<6>()
 }
 
 
-template <> template <>
-void BufferStreamTestObjectType::test<7>()
+TEST_CASE("BufferStream Tests: BufferArrayStream with LLSD serialization", "[BufferStream_Tests]")
 {
-    set_test_name("BufferArrayStream with LLSD serialization");
-
     // create a new ref counted BufferArray with implicit reference
     BufferArray * ba = new BufferArray;
 
@@ -241,7 +237,8 @@ void BufferStreamTestObjectType::test<7>()
         std::string str;
         bas >> str;
         // std::cout << "SERIALIZED LLSD:  " << str << std::endl;
-        ensure("Extracted string has reasonable length", str.size() > 60);
+        UNSCOPED_INFO("Extracted string has reasonable length");
+        REQUIRE(str.size() > 60);
     }
 
     // release the implicit reference, causing the object to be released
@@ -250,4 +247,4 @@ void BufferStreamTestObjectType::test<7>()
 }
 
 
-}  // end namespace tut
+}  // anonymous namespace

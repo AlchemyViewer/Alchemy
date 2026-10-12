@@ -25,9 +25,8 @@
  * $/LicenseInfo$
  */
 
-#include <tut/tut.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include "linden_common.h"
-#include "lltut.h"
 #include "llhttpconstants.h"
 #include "llmessageconfig.h"
 #include "llmessagesystem_fixture.h"
@@ -59,8 +58,6 @@ namespace
     };
 }
 
-namespace tut
-{
 namespace
 {
     struct LLMessageSystemTestData
@@ -121,24 +118,18 @@ namespace
         }
     };
 
-    typedef test_group<LLMessageSystemTestData> LLMessageSystemTestGroup;
-    typedef LLMessageSystemTestGroup::object        LLMessageSystemTestObject;
-    LLMessageSystemTestGroup messageTestGroup("LLMessageSystem");
-}
 
-    template<> template<>
-    void LLMessageSystemTestObject::test<1>()
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: dispatch of an unknown message answers HTTP_NOT_FOUND", "[LLMessageSystem]")
         // dispatch unknown message
     {
         const char* name = "notamessasge";
         const LLSD message;
         const LLPointer<Response> response = new Response();
         gMessageSystem->dispatch(name, message, response);
-        ensure_equals(response->mStatus, HTTP_NOT_FOUND);
+        CHECK(response->mStatus == HTTP_NOT_FOUND);
     }
 
-    template<> template<>
-    void LLMessageSystemTestObject::test<2>()
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: a system whose template failed to load still closes its socket", "[LLMessageSystem]")
         // a system whose template failed to load still closes its socket
     {
         U32 port = 0;
@@ -146,23 +137,27 @@ namespace
             // The template loads before the socket opens, so a system
             // without one is not OK, and has a socket all the same.
             LLMessageSystem system("notafile", NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
-            ensure("not OK without its template", !system.isOK());
-            ensure("its socket opened", system.mSocket >= 0);
+            UNSCOPED_INFO("not OK without its template");
+            CHECK_FALSE(system.isOK());
+            UNSCOPED_INFO("its socket opened");
+            CHECK(system.mSocket >= 0);
             port = system.getListenPort();
         }
         // Its port is free again: start_net binds it, rather than moving on
         // to the discovery range as it does from a port in use.
         S32 socket = -1;
         int bound = port;
-        ensure_equals("start_net binds", start_net(socket, bound), 0);
+        UNSCOPED_INFO("start_net binds");
+        CHECK(start_net(socket, bound) == 0);
         end_net(socket);
-        ensure_equals("the port the system had", bound, (int)port);
-        ensure_equals("and end_net leaves no socket", socket, -1);
+        UNSCOPED_INFO("the port the system had");
+        CHECK(bound == (int)port);
+        UNSCOPED_INFO("and end_net leaves no socket");
+        CHECK(socket == -1);
     }
 
 #if !LL_WINDOWS
-    template<> template<>
-    void LLMessageSystemTestObject::test<3>()
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: start_net closes its socket when it finds no port to bind", "[LLMessageSystem]")
         // start_net closes the socket it made when it finds no port to bind
     {
         // Every port start_net would try is taken: the one it is asked for
@@ -200,9 +195,12 @@ namespace
             ::close(holder);
         }
 
-        ensure_equals("no port to bind", result, 3);
-        ensure_equals("and no socket returned", socket, -1);
-        ensure_equals("nor one left open", after, before);
+        UNSCOPED_INFO("no port to bind");
+        CHECK(result == 3);
+        UNSCOPED_INFO("and no socket returned");
+        CHECK(socket == -1);
+        UNSCOPED_INFO("nor one left open");
+        CHECK(after == before);
     }
 #endif
 }

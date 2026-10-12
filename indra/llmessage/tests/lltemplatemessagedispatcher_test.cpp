@@ -25,7 +25,8 @@
  */
 
 #include "lltemplatemessagedispatcher.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <string_view>
 
 #include "llhttpnode.h"
 #include "llhost.h"
@@ -78,8 +79,6 @@ const LLHost& LLMessageSystem::getSender() const
     return host;
 }
 
-namespace tut
-{
 namespace
 {
         static LLTemplateMessageReader::message_template_number_map_t numberMap;
@@ -100,32 +99,22 @@ namespace
             std::string mMessageName;
         };
 
-    typedef test_group<LLTemplateMessageDispatcherData> factory;
-    typedef factory::object object;
-}
 }
 
 namespace
 {
-    tut::factory tf("LLTemplateMessageDispatcher");
-}
-
-namespace tut
-{
     // does an empty message stop processing?
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(LLTemplateMessageDispatcherData, "LLTemplateMessageDispatcher: an empty message stops processing", "[LLTemplateMessageDispatcher]")
     {
         LLTemplateMessageReader* pReader = NULL;
         LLTemplateMessageDispatcher t(*pReader);
         t.dispatch(mMessageName, mMessage, mResponsePtr);
-        ensure(! gUdpDispatchWasCalled);
-        ensure(! gClearRecvWasCalled);
+        CHECK_FALSE(gUdpDispatchWasCalled);
+        CHECK_FALSE(gClearRecvWasCalled);
     }
 
     // does the disaptch invoke the udp send method?
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(LLTemplateMessageDispatcherData, "LLTemplateMessageDispatcher: dispatch hands a valid message to the reader", "[LLTemplateMessageDispatcher]")
     {
         LLTemplateMessageReader* pReader = NULL;
         LLTemplateMessageDispatcher t(*pReader);
@@ -134,12 +123,12 @@ namespace tut
         fillVector(vector_data, gBinaryTemplateData);
         mMessage["body"]["binary-template-data"] = vector_data;
         t.dispatch(mMessageName, mMessage, mResponsePtr);
-        ensure("udp dispatch was called", gUdpDispatchWasCalled);
+        UNSCOPED_INFO("udp dispatch was called");
+        CHECK(gUdpDispatchWasCalled);
     }
 
     // what if the message wasn't valid? We would hope the message gets cleared!
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE_METHOD(LLTemplateMessageDispatcherData, "LLTemplateMessageDispatcher: an invalid message gets cleared", "[LLTemplateMessageDispatcher]")
     {
         LLTemplateMessageReader* pReader = NULL;
         LLTemplateMessageDispatcher t(*pReader);
@@ -148,12 +137,12 @@ namespace tut
         mMessage["body"]["binary-template-data"] = vector_data;
         gValidateMessage = false;
         t.dispatch(mMessageName, mMessage, mResponsePtr);
-        ensure("clear received message was called", gClearRecvWasCalled);
+        UNSCOPED_INFO("clear received message was called");
+        CHECK(gClearRecvWasCalled);
     }
 
     // is the binary data passed through correctly?
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE_METHOD(LLTemplateMessageDispatcherData, "LLTemplateMessageDispatcher: the binary data passes through unchanged", "[LLTemplateMessageDispatcher]")
     {
         LLTemplateMessageReader* pReader = NULL;
         LLTemplateMessageDispatcher t(*pReader);
@@ -162,7 +151,8 @@ namespace tut
         fillVector(vector_data, gBinaryTemplateData);
         mMessage["body"]["binary-template-data"] = vector_data;
         t.dispatch(mMessageName, mMessage, mResponsePtr);
-        ensure("data couriered correctly", strcmp(gBinaryTemplateData, gUdpDispatchedData) == 0);
+        UNSCOPED_INFO("data couriered correctly");
+        CHECK(std::string_view(gBinaryTemplateData) == std::string_view(gUdpDispatchedData));
     }
 }
 

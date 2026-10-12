@@ -25,9 +25,8 @@
  * $/LicenseInfo$
  */
 
-#include <tut/tut.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include "linden_common.h"
-#include "lltut.h"
 
 #include "llmessagesystem_fixture.h"
 #include "llmessagetemplate.h"
@@ -41,8 +40,6 @@
 #include "v3math.h"
 #include "v4math.h"
 
-namespace tut
-{
 namespace
 {
     static LLTemplateMessageBuilder::message_template_name_map_t nameMap;
@@ -104,13 +101,8 @@ namespace
 
     };
 
-    typedef test_group<LLTemplateMessageBuilderTestData, 60>    LLTemplateMessageBuilderTestGroup;
-    typedef LLTemplateMessageBuilderTestGroup::object       LLTemplateMessageBuilderTestObject;
-    LLTemplateMessageBuilderTestGroup templateMessageBuilderTestGroup("LLTemplateMessageBuilder");
-}
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<1>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: a block with no variables builds and reads back", "[LLTemplateMessageBuilder]")
         // construction and test of undefined
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -120,8 +112,7 @@ namespace
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<2>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addBOOL round trips a bool", "[LLTemplateMessageBuilder]")
          // bool
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -131,12 +122,12 @@ namespace
         builder->addBOOL(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getBOOL(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure bool", inValue, outValue);
+        UNSCOPED_INFO("Ensure bool");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<3>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addU8 round trips a U8", "[LLTemplateMessageBuilder]")
          // U8
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -146,12 +137,12 @@ namespace
         builder->addU8(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getU8(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure U8", inValue, outValue);
+        UNSCOPED_INFO("Ensure U8");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<4>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addS16 round trips an S16", "[LLTemplateMessageBuilder]")
          // S16
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -161,12 +152,12 @@ namespace
         builder->addS16(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getS16(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure S16", inValue, outValue);
+        UNSCOPED_INFO("Ensure S16");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<5>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addU16 round trips a U16", "[LLTemplateMessageBuilder]")
          // U16
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -176,12 +167,12 @@ namespace
         builder->addU16(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getU16(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure U16", inValue, outValue);
+        UNSCOPED_INFO("Ensure U16");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<6>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addS32 round trips an S32", "[LLTemplateMessageBuilder]")
          // S32
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -191,12 +182,12 @@ namespace
         builder->addS32(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getS32(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure S32", inValue, outValue);
+        UNSCOPED_INFO("Ensure S32");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<7>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addF32 round trips an F32", "[LLTemplateMessageBuilder]")
          // F32
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -206,12 +197,12 @@ namespace
         builder->addF32(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getF32(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure F32", inValue, outValue);
+        UNSCOPED_INFO("Ensure F32");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<8>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addU32 round trips a U32", "[LLTemplateMessageBuilder]")
          // U32
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -221,12 +212,12 @@ namespace
         builder->addU32(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getU32(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure U32", inValue, outValue);
+        UNSCOPED_INFO("Ensure U32");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<9>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addU64 round trips a U64", "[LLTemplateMessageBuilder]")
          // U64
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -236,12 +227,12 @@ namespace
         builder->addU64(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getU64(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure U64", inValue, outValue);
+        UNSCOPED_INFO("Ensure U64");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<10>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addF64 round trips an F64", "[LLTemplateMessageBuilder]")
          // F64
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -251,12 +242,12 @@ namespace
         builder->addF64(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getF64(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure F64", inValue, outValue);
+        UNSCOPED_INFO("Ensure F64");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<11>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addVector3 round trips an LLVector3", "[LLTemplateMessageBuilder]")
          // Vector3
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -266,12 +257,12 @@ namespace
         builder->addVector3(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getVector3(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure LLVector3", inValue, outValue);
+        UNSCOPED_INFO("Ensure LLVector3");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<12>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addVector4 round trips an LLVector4", "[LLTemplateMessageBuilder]")
          // Vector4
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -281,12 +272,12 @@ namespace
         builder->addVector4(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getVector4(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure LLVector4", inValue, outValue);
+        UNSCOPED_INFO("Ensure LLVector4");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<13>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addVector3d round trips an LLVector3d", "[LLTemplateMessageBuilder]")
          // Vector3d
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -296,12 +287,12 @@ namespace
         builder->addVector3d(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getVector3d(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure LLVector3d", inValue, outValue);
+        UNSCOPED_INFO("Ensure LLVector3d");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<14>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addQuat round trips an LLQuaternion", "[LLTemplateMessageBuilder]")
          // Quaternion
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -312,12 +303,12 @@ namespace
         builder->addQuat(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getQuat(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure LLQuaternion", inValue, outValue);
+        UNSCOPED_INFO("Ensure LLQuaternion");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<15>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addUUID round trips a generated UUID", "[LLTemplateMessageBuilder]")
          // UUID
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -328,12 +319,12 @@ namespace
         builder->addUUID(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getUUID(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure UUID", inValue, outValue);
+        UNSCOPED_INFO("Ensure UUID");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<16>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addIPAddr round trips an address", "[LLTemplateMessageBuilder]")
          // IPAddr
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -343,12 +334,12 @@ namespace
         builder->addIPAddr(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getIPAddr(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure IPAddr", inValue, outValue);
+        UNSCOPED_INFO("Ensure IPAddr");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-     template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<17>()
+     TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addIPPort round trips a port", "[LLTemplateMessageBuilder]")
          // IPPort
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -358,12 +349,12 @@ namespace
         builder->addIPPort(_PREHASH_Test0, inValue);
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getIPPort(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure IPPort", inValue, outValue);
+        UNSCOPED_INFO("Ensure IPPort");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<18>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addString round trips a string", "[LLTemplateMessageBuilder]")
         // String
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -375,12 +366,12 @@ namespace
         char buffer[MAX_STRING];
         reader->getString(_PREHASH_Test0, _PREHASH_Test0, MAX_STRING, buffer);
         outValue = buffer;
-        ensure_equals("Ensure String", inValue, outValue);
+        UNSCOPED_INFO("Ensure String");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<19>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: binary order follows the template and not the block names", "[LLTemplateMessageBuilder]")
         // block name !-> binary order
     {
         U8 buffer1[MAX_BUFFER_SIZE];
@@ -415,12 +406,13 @@ namespace
         bufferSize2 = builder->buildMessage(buffer2, MAX_BUFFER_SIZE, 0);
         delete builder;
 
-        ensure_equals("Ensure Buffer Sizes Equal", bufferSize1, bufferSize2);
-        ensure_equals("Ensure Buffer Contents Equal", memcmp(buffer1, buffer2, bufferSize1), 0);
+        UNSCOPED_INFO("Ensure Buffer Sizes Equal");
+        CHECK(bufferSize1 == bufferSize2);
+        UNSCOPED_INFO("Ensure Buffer Contents Equal");
+        CHECK(memcmp(buffer1, buffer2, bufferSize1) == 0);
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<20>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: binary order follows the template and not the build order", "[LLTemplateMessageBuilder]")
         // block build order !-> binary order
     {
         U8 buffer1[MAX_BUFFER_SIZE];
@@ -450,12 +442,13 @@ namespace
         bufferSize2 = builder->buildMessage(buffer2, MAX_BUFFER_SIZE, 0);
         delete builder;
 
-        ensure_equals("Ensure Buffer Sizes Equal", bufferSize1, bufferSize2);
-        ensure_equals("Ensure Buffer Contents Equal", memcmp(buffer1, buffer2, bufferSize1), 0);
+        UNSCOPED_INFO("Ensure Buffer Sizes Equal");
+        CHECK(bufferSize1 == bufferSize2);
+        UNSCOPED_INFO("Ensure Buffer Contents Equal");
+        CHECK(memcmp(buffer1, buffer2, bufferSize1) == 0);
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<21>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: a block appended to the template appends its data to the bytes", "[LLTemplateMessageBuilder]")
         // block appended in declaration -> data appended in binary
     {
         U8 buffer1[MAX_BUFFER_SIZE];
@@ -487,13 +480,15 @@ namespace
         bufferSize2 = builder->buildMessage(buffer2, MAX_BUFFER_SIZE, 0);
         delete builder;
 
-        ensure_not_equals("Ensure Buffer Sizes Not Equal", bufferSize1, bufferSize2);
-        ensure_equals("Ensure Buffer Prefix Equal", memcmp(buffer1, buffer2, bufferSize1), 0);
-        ensure_not_equals("Ensure Buffer Contents Not Equal", memcmp(buffer1, buffer2, bufferSize2), 0);
+        UNSCOPED_INFO("Ensure Buffer Sizes Not Equal");
+        CHECK(bufferSize1 != bufferSize2);
+        UNSCOPED_INFO("Ensure Buffer Prefix Equal");
+        CHECK(memcmp(buffer1, buffer2, bufferSize1) == 0);
+        UNSCOPED_INFO("Ensure Buffer Contents Not Equal");
+        CHECK(memcmp(buffer1, buffer2, bufferSize2) != 0);
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<22>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: each repeat of a repeated penultimate block reads back", "[LLTemplateMessageBuilder]")
         // repeated penultimate block (crashes when data in LLDynamicArrayIndexed)
     {
         U32 inTest00 = 0, inTest01 = 1, inTest1 = 2;
@@ -511,14 +506,16 @@ namespace
         reader->getU32(_PREHASH_Test0, _PREHASH_Test0, outTest00, 0);
         reader->getU32(_PREHASH_Test0, _PREHASH_Test0, outTest01, 1);
         reader->getU32(_PREHASH_Test1, _PREHASH_Test0, outTest1);
-        ensure_equals("Ensure Test0[0]", inTest00, outTest00);
-        ensure_equals("Ensure Test0[1]", inTest01, outTest01);
-        ensure_equals("Ensure Test1", inTest1, outTest1);
+        UNSCOPED_INFO("Ensure Test0[0]");
+        CHECK(inTest00 == outTest00);
+        UNSCOPED_INFO("Ensure Test0[1]");
+        CHECK(inTest01 == outTest01);
+        UNSCOPED_INFO("Ensure Test1");
+        CHECK(inTest1 == outTest1);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<23>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: a variable block never added reads back with no repeats", "[LLTemplateMessageBuilder]")
         // variable repeated block name never accessed
     {
         U32 inTest = 1, outTest;
@@ -533,13 +530,14 @@ namespace
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         reader->getU32(_PREHASH_Test0, _PREHASH_Test0, outTest);
         S32 blockCount = reader->getNumberOfBlocks(const_cast<char*>(_PREHASH_Test1));
-        ensure_equals("Ensure block count", blockCount, 0);
-        ensure_equals("Ensure Test0", inTest, outTest);
+        UNSCOPED_INFO("Ensure block count");
+        CHECK(blockCount == 0);
+        UNSCOPED_INFO("Ensure Test0");
+        CHECK(inTest == outTest);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<24>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: copyToBuilder forwards a message it read to a new builder", "[LLTemplateMessageBuilder]")
         // forwarding message
     {
         // build template
@@ -564,8 +562,7 @@ namespace
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<25>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: a block with no variables builds and reads back at offset 10", "[LLTemplateMessageBuilder]")
         // non-zero offset with undefined
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -576,8 +573,7 @@ namespace
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<26>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addBOOL round trips a bool built at offset 1", "[LLTemplateMessageBuilder]")
          // non-zero offset with bool
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -588,12 +584,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 1);
         reader->getBOOL(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure bool", inValue, outValue);
+        UNSCOPED_INFO("Ensure bool");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<27>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addU8 round trips a U8 built at offset 255", "[LLTemplateMessageBuilder]")
          // non-zero offset with U8
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -604,12 +600,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 255);
         reader->getU8(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure U8", inValue, outValue);
+        UNSCOPED_INFO("Ensure U8");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<28>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addS16 round trips an S16 built at offset 2", "[LLTemplateMessageBuilder]")
          // non-zero offset with S16
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -620,12 +616,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 2);
         reader->getS16(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure S16", inValue, outValue);
+        UNSCOPED_INFO("Ensure S16");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<29>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addU16 round trips a U16 built at offset 4", "[LLTemplateMessageBuilder]")
          // non-zero offset with U16
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -636,12 +632,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 4);
         reader->getU16(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure U16", inValue, outValue);
+        UNSCOPED_INFO("Ensure U16");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<30>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addS32 round trips an S32 built at offset 4", "[LLTemplateMessageBuilder]")
          // non-zero offset with S32
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -652,12 +648,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 4);
         reader->getS32(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure S32", inValue, outValue);
+        UNSCOPED_INFO("Ensure S32");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<31>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addF32 round trips an F32 built at offset 16", "[LLTemplateMessageBuilder]")
          // non-zero offset with F32
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -668,12 +664,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 16);
         reader->getF32(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure F32", inValue, outValue);
+        UNSCOPED_INFO("Ensure F32");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<32>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addU32 round trips a U32 built at offset 127", "[LLTemplateMessageBuilder]")
          // non-zero offset with U32
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -684,12 +680,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 127);
         reader->getU32(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure U32", inValue, outValue);
+        UNSCOPED_INFO("Ensure U32");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<33>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addU64 round trips a U64 built at offset 32", "[LLTemplateMessageBuilder]")
          // non-zero offset with U64
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -700,12 +696,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 32);
         reader->getU64(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure U64", inValue, outValue);
+        UNSCOPED_INFO("Ensure U64");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<34>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addF64 round trips an F64 built at offset 128", "[LLTemplateMessageBuilder]")
          // non-zero offset with F64
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -716,12 +712,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 128);
         reader->getF64(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure F64", inValue, outValue);
+        UNSCOPED_INFO("Ensure F64");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<35>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addVector3 round trips an LLVector3 built at offset 63", "[LLTemplateMessageBuilder]")
          // non-zero offset with Vector3
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -732,12 +728,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 63);
         reader->getVector3(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure LLVector3", inValue, outValue);
+        UNSCOPED_INFO("Ensure LLVector3");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<36>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addVector4 round trips an LLVector4 built at offset 64", "[LLTemplateMessageBuilder]")
          // non-zero offset with Vector4
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -748,12 +744,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 64);
         reader->getVector4(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure LLVector4", inValue, outValue);
+        UNSCOPED_INFO("Ensure LLVector4");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<37>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addVector3d round trips an LLVector3d built at offset 64", "[LLTemplateMessageBuilder]")
          // non-zero offset with Vector3d
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -764,12 +760,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 64);
         reader->getVector3d(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure LLVector3d", inValue, outValue);
+        UNSCOPED_INFO("Ensure LLVector3d");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<38>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addQuat round trips an LLQuaternion built at offset 12", "[LLTemplateMessageBuilder]")
          // non-zero offset with Quaternion
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -780,12 +776,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 12);
         reader->getQuat(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure LLQuaternion", inValue, outValue);
+        UNSCOPED_INFO("Ensure LLQuaternion");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<39>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addUUID round trips a generated UUID built at offset 31", "[LLTemplateMessageBuilder]")
          // non-zero offset with UUID
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -797,12 +793,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 31);
         reader->getUUID(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure UUID", inValue, outValue);
+        UNSCOPED_INFO("Ensure UUID");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<40>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addIPAddr round trips an address built at offset 32", "[LLTemplateMessageBuilder]")
          // non-zero offset with IPAddr
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -813,12 +809,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 32);
         reader->getIPAddr(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure IPAddr", inValue, outValue);
+        UNSCOPED_INFO("Ensure IPAddr");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-     template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<41>()
+     TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addIPPort round trips a port built at offset 6", "[LLTemplateMessageBuilder]")
          // non-zero offset with IPPort
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -829,12 +825,12 @@ namespace
         LLTemplateMessageReader* reader = setReader(
             messageTemplate, builder, 6);
         reader->getIPPort(_PREHASH_Test0, _PREHASH_Test0, outValue);
-        ensure_equals("Ensure IPPort", inValue, outValue);
+        UNSCOPED_INFO("Ensure IPPort");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<42>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addString round trips a string built at offset 255", "[LLTemplateMessageBuilder]")
         // non-zero offset with String
     {
         LLMessageTemplate messageTemplate = defaultTemplate();
@@ -847,12 +843,12 @@ namespace
         char buffer[MAX_STRING];
         reader->getString(_PREHASH_Test0, _PREHASH_Test0, MAX_STRING, buffer);
         outValue = buffer;
-        ensure_equals("Ensure String", inValue, outValue);
+        UNSCOPED_INFO("Ensure String");
+        CHECK(inValue == outValue);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<43>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: a single block past the end of the message reads as zero", "[LLTemplateMessageBuilder]")
         // read past end of message -> default values (forward compatibility)
     {
         // build message with single block
@@ -879,13 +875,14 @@ namespace
         reader->readMessage(buffer, LLHost());
         reader->getU32(_PREHASH_Test0, _PREHASH_Test0, outValue);
         reader->getU32(_PREHASH_Test1, _PREHASH_Test0, outValue2);
-        ensure_equals("Ensure present value ", outValue, inValue);
-        ensure_equals("Ensure default value ", outValue2, 0);
+        UNSCOPED_INFO("Ensure present value ");
+        CHECK(outValue == inValue);
+        UNSCOPED_INFO("Ensure default value ");
+        CHECK(outValue2 == 0);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<44>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: a variable block past the end of the message has no repeats", "[LLTemplateMessageBuilder]")
         // read variable block past end of message -> 0 repeats
     {
         // build message with single block
@@ -912,13 +909,14 @@ namespace
         reader->readMessage(buffer, LLHost());
         reader->getU32(_PREHASH_Test0, _PREHASH_Test0, outValue);
         outValue2 = reader->getNumberOfBlocks(_PREHASH_Test1);
-        ensure_equals("Ensure present value ", outValue, inValue);
-        ensure_equals("Ensure 0 repeats ", outValue2, 0);
+        UNSCOPED_INFO("Ensure present value ");
+        CHECK(outValue == inValue);
+        UNSCOPED_INFO("Ensure 0 repeats ");
+        CHECK(outValue2 == 0);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<45>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: variable data past the end of the message reads as empty", "[LLTemplateMessageBuilder]")
         // read variable length data past end of message -> 0 length
     {
         // build message with single block
@@ -950,13 +948,14 @@ namespace
         memset(buffer, 0xcc, bufferSize);
         reader->getString(_PREHASH_Test1, _PREHASH_Test0, bufferSize,
                           outBuffer);
-        ensure_equals("Ensure present value ", outValue, inValue);
-        ensure_equals("Ensure unchanged buffer ", strlen(outBuffer), 0);
+        UNSCOPED_INFO("Ensure present value ");
+        CHECK(outValue == inValue);
+        UNSCOPED_INFO("Ensure unchanged buffer ");
+        CHECK(strlen(outBuffer) == 0);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<46>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: a length running past the end of the message clamps to zero", "[LLTemplateMessageBuilder]")
         // variable-length field whose on-wire size claims more bytes than
         // the message contains -> read clamps to 0 length instead of
         // running off the end of the buffer
@@ -983,13 +982,12 @@ namespace
             new LLTemplateMessageReader(numberMap);
         reader->validateMessage(buffer, builtSize, LLHost());
         reader->readMessage(buffer, LLHost());
-        ensure_equals("Ensure malformed length clamped to empty",
-                      reader->getSize(_PREHASH_Test0, _PREHASH_Test0), 0);
+        UNSCOPED_INFO("Ensure malformed length clamped to empty");
+        CHECK(reader->getSize(_PREHASH_Test0, _PREHASH_Test0) == 0);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<47>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: addString truncates an oversized string and leaves the caller's alone", "[LLTemplateMessageBuilder]")
         // stuffing an oversized string into a Variable-1 field truncates the
         // stored copy without writing into the caller's buffer
     {
@@ -998,20 +996,21 @@ namespace
         LLTemplateMessageBuilder* builder = defaultBuilder(messageTemplate);
         std::string in(300, 'x');
         builder->addString(_PREHASH_Test0, in);
-        ensure_equals("Ensure caller buffer untouched", in[254], 'x');
-        ensure_equals("Ensure caller size untouched", in.size(), (size_t)300);
+        UNSCOPED_INFO("Ensure caller buffer untouched");
+        CHECK(in[254] == 'x');
+        UNSCOPED_INFO("Ensure caller size untouched");
+        REQUIRE(in.size() == (size_t)300);
 
         // round-trip: stored copy is clamped to 255 bytes and NUL-terminated
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
         char outBuffer[1024];
         reader->getString(_PREHASH_Test0, _PREHASH_Test0, 1024, outBuffer);
-        ensure_equals("Ensure stored string truncated and terminated",
-                      strlen(outBuffer), (size_t)254);
+        UNSCOPED_INFO("Ensure stored string truncated and terminated");
+        CHECK(strlen(outBuffer) == (size_t)254);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<48>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: 200 repeats of a variable block and the block after round trip", "[LLTemplateMessageBuilder]")
         // A variable block repeated far past 64 times, alongside a second
         // block, all round-trip intact. The old data model keyed each repeat
         // by (block-name pointer + repeat index), walking the string table;
@@ -1040,22 +1039,23 @@ namespace
 
         LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
 
-        ensure_equals("variable block count",
-                      reader->getNumberOfBlocks(_PREHASH_Test0), NUM_BLOCKS);
+        UNSCOPED_INFO("variable block count");
+        CHECK(reader->getNumberOfBlocks(_PREHASH_Test0) == NUM_BLOCKS);
         for (S32 i = 0; i < NUM_BLOCKS; ++i)
         {
             U32 value = 0xffffffff;
             reader->getU32(_PREHASH_Test0, _PREHASH_Test0, value, i);
-            ensure_equals("variable block repeat intact", value, (U32)i);
+            UNSCOPED_INFO("variable block repeat intact");
+            REQUIRE(value == (U32)i);
         }
         U32 single = 0;
         reader->getU32(_PREHASH_Test1, _PREHASH_Test0, single);
-        ensure_equals("adjacent single block intact", single, (U32)0xdeadbeef);
+        UNSCOPED_INFO("adjacent single block intact");
+        CHECK(single == (U32)0xdeadbeef);
         delete reader;
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<49>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: one reader decodes messages of differing repeat counts in turn", "[LLTemplateMessageBuilder]")
         // Decode several messages through one reader to exercise the pooled
         // LLMsgData reuse path: blocks recycle between decodes and no stale
         // block or value leaks across messages of differing repeat counts.
@@ -1105,20 +1105,20 @@ namespace
             reader.validateMessage(buf, sz, LLHost());
             reader.readMessage(buf, LLHost());
 
-            ensure_equals("reuse block count",
-                          reader.getNumberOfBlocks(_PREHASH_Test0), count);
+            UNSCOPED_INFO("reuse block count");
+            REQUIRE(reader.getNumberOfBlocks(_PREHASH_Test0) == count);
             for (S32 i = 0; i < count; ++i)
             {
                 U32 v = 0xffffffff;
                 reader.getU32(_PREHASH_Test0, _PREHASH_Test0, v, i);
-                ensure_equals("reuse repeat value", v, base + (U32)i);
+                UNSCOPED_INFO("reuse repeat value");
+                REQUIRE(v == base + (U32)i);
             }
             reader.clearMessage();
         }
     }
 
-    template<> template<>
-    void LLTemplateMessageBuilderTestObject::test<50>()
+    TEST_CASE_METHOD(LLTemplateMessageBuilderTestData, "LLTemplateMessageBuilder: one builder builds messages of differing repeat counts in turn", "[LLTemplateMessageBuilder]")
         // Reuse one builder across messages to exercise the pooled LLMsgData
         // on the send side: the second build must not inherit blocks or values
         // from the first.
@@ -1152,13 +1152,14 @@ namespace
             LLTemplateMessageReader reader(numberMap);
             reader.validateMessage(buf, sz, LLHost());
             reader.readMessage(buf, LLHost());
-            ensure_equals("builder reuse block count",
-                          reader.getNumberOfBlocks(_PREHASH_Test0), count);
+            UNSCOPED_INFO("builder reuse block count");
+            REQUIRE(reader.getNumberOfBlocks(_PREHASH_Test0) == count);
             for (S32 i = 0; i < count; ++i)
             {
                 U32 v = 0xffffffff;
                 reader.getU32(_PREHASH_Test0, _PREHASH_Test0, v, i);
-                ensure_equals("builder reuse value", v, base + (U32)i);
+                UNSCOPED_INFO("builder reuse value");
+                REQUIRE(v == base + (U32)i);
             }
             builder->clearMessage();
         }

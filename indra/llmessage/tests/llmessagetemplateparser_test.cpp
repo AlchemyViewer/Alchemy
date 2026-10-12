@@ -27,10 +27,8 @@
 
 #include "linden_common.h"
 #include "llmessagetemplateparser.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
-{
 namespace
 {
     struct LLMessageTemplateParserTestData {
@@ -47,8 +45,10 @@ namespace
                          U32 line)
         {
             std::string next = tokens.next();
-            ensure_equals(mMessage + " token matches", next, value);
-            ensure_equals(mMessage + " line matches", tokens.line(), line);
+            UNSCOPED_INFO(mMessage + " token matches");
+            REQUIRE(next == value);
+            UNSCOPED_INFO(mMessage + " line matches");
+            REQUIRE(tokens.line() == line);
         }
 
         char * prehash(const char * name)
@@ -65,11 +65,16 @@ namespace
         {
             const LLMessageBlock * block = message->getBlock(prehash(name));
             identifier = identifier + ":" + message->mName + ":" + name + " block";
-            ensure(identifier + " exists", block != NULL);
-            ensure_equals(identifier + " name", block->mName, prehash(name));
-            ensure_equals(identifier + " type", block->mType, type);
-            ensure_equals(identifier + " number", block->mNumber, number);
-            ensure_equals(identifier + " total size", block->mTotalSize, total_size);
+            UNSCOPED_INFO(identifier + " exists");
+            REQUIRE(block != NULL);
+            UNSCOPED_INFO(identifier + " name");
+            REQUIRE(block->mName == prehash(name));
+            UNSCOPED_INFO(identifier + " type");
+            REQUIRE(block->mType == type);
+            UNSCOPED_INFO(identifier + " number");
+            REQUIRE(block->mNumber == number);
+            UNSCOPED_INFO(identifier + " total size");
+            REQUIRE(block->mTotalSize == total_size);
         }
 
         void ensure_variable_attributes(std::string identifier,
@@ -80,25 +85,22 @@ namespace
         {
             const LLMessageVariable * var = block->getVariable(prehash(name));
             identifier = identifier + ":" + block->mName + ":" + name + " variable";
-            ensure(identifier + " exists", var != NULL);
-            ensure_equals(
-                identifier + " name", var->getName(), prehash(name));
-            ensure_equals(
-                identifier + " type", var->getType(), type);
-            ensure_equals(identifier + " size", var->getSize(), size);
+            UNSCOPED_INFO(identifier + " exists");
+            REQUIRE(var != NULL);
+            UNSCOPED_INFO(identifier + " name");
+            REQUIRE(var->getName() == prehash(name));
+            UNSCOPED_INFO(identifier + " type");
+            REQUIRE(var->getType() == type);
+            UNSCOPED_INFO(identifier + " size");
+            REQUIRE(var->getSize() == size);
         }
 
         std::string mMessage;
 
     };
 
-    typedef test_group<LLMessageTemplateParserTestData> LLMessageTemplateParserTestGroup;
-    typedef LLMessageTemplateParserTestGroup::object LLMessageTemplateParserTestObject;
-    LLMessageTemplateParserTestGroup llMessageTemplateParserTestGroup("LLMessageTemplateParser");
-}
 
-    template<> template<>
-    void LLMessageTemplateParserTestObject::test<1>()
+    TEST_CASE_METHOD(LLMessageTemplateParserTestData, "LLMessageTemplateParser: tokenizer next walks the tokens and counts lines", "[LLMessageTemplateParser]")
         // tests tokenizer constructor and next methods
     {
         mMessage = "test method 1 walkthrough";
@@ -110,56 +112,65 @@ namespace
         ensure_next(tokens, "fourth", 4);
 
         tokens = LLTemplateTokenizer("\n\t{ \t   Test1 Fixed \n 523 }\n\n");
-        ensure(tokens.want("{"));
+        CHECK(tokens.want("{"));
         ensure_next(tokens, "Test1", 2);
         ensure_next(tokens, "Fixed", 2);
         ensure_next(tokens, "523", 3);
-        ensure(tokens.want("}"));
+        CHECK(tokens.want("}"));
 
         tokens = LLTemplateTokenizer("first line\nnext\t line\n\nfourth");
-        ensure(tokens.want("first"));
+        CHECK(tokens.want("first"));
         ensure_next(tokens, "line", 1);
         ensure_next(tokens, "next", 2);
         ensure_next(tokens, "line", 2);
-        ensure(tokens.want("fourth"));
+        CHECK(tokens.want("fourth"));
     }
 
-    template<> template<>
-    void LLMessageTemplateParserTestObject::test<2>()
+    TEST_CASE_METHOD(LLMessageTemplateParserTestData, "LLMessageTemplateParser: tokenizer want consumes only a matching token", "[LLMessageTemplateParser]")
         // tests tokenizer want method
     {
         // *NOTE: order matters
         LLTemplateTokenizer tokens("first line\nnext\t line\n\nfourth");
-        ensure_equals("wants first token", tokens.want("first"), true);
-        ensure_equals("doesn't want blar token", tokens.want("blar"), false);
-        ensure_equals("wants line token", tokens.want("line"), true);
+        UNSCOPED_INFO("wants first token");
+        CHECK(tokens.want("first") == true);
+        UNSCOPED_INFO("doesn't want blar token");
+        CHECK(tokens.want("blar") == false);
+        UNSCOPED_INFO("wants line token");
+        CHECK(tokens.want("line") == true);
     }
 
-    template<> template<>
-    void LLMessageTemplateParserTestObject::test<3>()
+    TEST_CASE_METHOD(LLMessageTemplateParserTestData, "LLMessageTemplateParser: tokenizer is at EOF only once wantEOF steps past the end", "[LLMessageTemplateParser]")
         // tests tokenizer eof methods
     {
         LLTemplateTokenizer tokens("single\n\n");
-        ensure_equals("is not at eof at beginning", tokens.atEOF(), false);
-        ensure_equals("doesn't want eof", tokens.wantEOF(), false);
-        ensure_equals("wants the first token just to consume it",
-                      tokens.want("single"), true);
-        ensure_equals("is not at eof in middle", tokens.atEOF(), false);
-        ensure_equals("wants eof", tokens.wantEOF(), true);
-        ensure_equals("is at eof at end", tokens.atEOF(), true);
+        UNSCOPED_INFO("is not at eof at beginning");
+        CHECK(tokens.atEOF() == false);
+        UNSCOPED_INFO("doesn't want eof");
+        CHECK(tokens.wantEOF() == false);
+        UNSCOPED_INFO("wants the first token just to consume it");
+        CHECK(tokens.want("single") == true);
+        UNSCOPED_INFO("is not at eof in middle");
+        CHECK(tokens.atEOF() == false);
+        UNSCOPED_INFO("wants eof");
+        CHECK(tokens.wantEOF() == true);
+        UNSCOPED_INFO("is at eof at end");
+        CHECK(tokens.atEOF() == true);
     }
 
-    template<> template<>
-    void LLMessageTemplateParserTestObject::test<4>()
+    TEST_CASE_METHOD(LLMessageTemplateParserTestData, "LLMessageTemplateParser: parseVariable reads the name and type and size", "[LLMessageTemplateParser]")
         // tests variable parsing method
     {
         LLTemplateTokenizer tokens(std::string("{    Test0  \n\t\n   U32 \n\n }"));
         LLMessageVariable * var = LLTemplateParser::parseVariable(tokens);
 
-        ensure("test0 var parsed", var != 0);
-        ensure_equals("name of variable", std::string(var->getName()), std::string("Test0"));
-        ensure_equals("type of variable is U32", var->getType(), MVT_U32);
-        ensure_equals("size of variable", var->getSize(), 4);
+        UNSCOPED_INFO("test0 var parsed");
+        REQUIRE(var != 0);
+        UNSCOPED_INFO("name of variable");
+        CHECK(std::string(var->getName()) == std::string("Test0"));
+        UNSCOPED_INFO("type of variable is U32");
+        CHECK(var->getType() == MVT_U32);
+        UNSCOPED_INFO("size of variable");
+        CHECK(var->getSize() == 4);
 
         delete var;
 
@@ -167,10 +178,14 @@ namespace
         tokens = LLTemplateTokenizer(message_string);
         var = LLTemplateParser::parseVariable(tokens);
 
-        ensure("test1 var parsed", var != 0);
-        ensure_equals("name of variable", std::string(var->getName()), std::string("Test1"));
-        ensure_equals("type of variable is Fixed", var->getType(), MVT_FIXED);
-        ensure_equals("size of variable", var->getSize(), 523);
+        UNSCOPED_INFO("test1 var parsed");
+        REQUIRE(var != 0);
+        UNSCOPED_INFO("name of variable");
+        CHECK(std::string(var->getName()) == std::string("Test1"));
+        UNSCOPED_INFO("type of variable is Fixed");
+        CHECK(var->getType() == MVT_FIXED);
+        UNSCOPED_INFO("size of variable");
+        CHECK(var->getSize() == 523);
 
         delete var;
 
@@ -178,58 +193,71 @@ namespace
         // test that  :-(
     }
 
-    template<> template<>
-    void LLMessageTemplateParserTestObject::test<5>()
+    TEST_CASE_METHOD(LLMessageTemplateParserTestData, "LLMessageTemplateParser: parseBlock reads Single and Variable and Multiple blocks", "[LLMessageTemplateParser]")
         // tests block parsing method
     {
         LLTemplateTokenizer tokens("{ BlockA Single { VarX F32 } }");
         LLMessageBlock * block = LLTemplateParser::parseBlock(tokens);
 
-        ensure("blockA block parsed", block != 0);
-        ensure_equals("name of block", std::string(block->mName), std::string("BlockA"));
-        ensure_equals("type of block is Single", block->mType, MBT_SINGLE);
-        ensure_equals("total size of block", block->mTotalSize, 4);
-        ensure_equals("number of block defaults to 1", block->mNumber, 1);
-        ensure_equals("variable type of VarX is F32",
-                      block->getVariableType(prehash("VarX")), MVT_F32);
-        ensure_equals("variable size of VarX",
-                      block->getVariableSize(prehash("VarX")), 4);
+        UNSCOPED_INFO("blockA block parsed");
+        REQUIRE(block != 0);
+        UNSCOPED_INFO("name of block");
+        CHECK(std::string(block->mName) == std::string("BlockA"));
+        UNSCOPED_INFO("type of block is Single");
+        CHECK(block->mType == MBT_SINGLE);
+        UNSCOPED_INFO("total size of block");
+        CHECK(block->mTotalSize == 4);
+        UNSCOPED_INFO("number of block defaults to 1");
+        CHECK(block->mNumber == 1);
+        UNSCOPED_INFO("variable type of VarX is F32");
+        CHECK(block->getVariableType(prehash("VarX")) == MVT_F32);
+        UNSCOPED_INFO("variable size of VarX");
+        CHECK(block->getVariableSize(prehash("VarX")) == 4);
 
         delete block;
 
         tokens = LLTemplateTokenizer("{ Stuff Variable { Id LLUUID } }");
         block = LLTemplateParser::parseBlock(tokens);
 
-        ensure("stuff block parsed", block != 0);
-        ensure_equals("name of block", std::string(block->mName), std::string("Stuff"));
-        ensure_equals("type of block is Multiple", block->mType, MBT_VARIABLE);
-        ensure_equals("total size of block", block->mTotalSize, 16);
-        ensure_equals("number of block defaults to 1", block->mNumber, 1);
-        ensure_equals("variable type of Id is LLUUID",
-                      block->getVariableType(prehash("Id")), MVT_LLUUID);
-        ensure_equals("variable size of Id",
-                      block->getVariableSize(prehash("Id")), 16);
+        UNSCOPED_INFO("stuff block parsed");
+        REQUIRE(block != 0);
+        UNSCOPED_INFO("name of block");
+        CHECK(std::string(block->mName) == std::string("Stuff"));
+        UNSCOPED_INFO("type of block is Multiple");
+        CHECK(block->mType == MBT_VARIABLE);
+        UNSCOPED_INFO("total size of block");
+        CHECK(block->mTotalSize == 16);
+        UNSCOPED_INFO("number of block defaults to 1");
+        CHECK(block->mNumber == 1);
+        UNSCOPED_INFO("variable type of Id is LLUUID");
+        CHECK(block->getVariableType(prehash("Id")) == MVT_LLUUID);
+        UNSCOPED_INFO("variable size of Id");
+        CHECK(block->getVariableSize(prehash("Id")) == 16);
 
         delete block;
 
         tokens = LLTemplateTokenizer("{ Stuff2 Multiple 45 { Shid LLVector3d } }");
         block = LLTemplateParser::parseBlock(tokens);
 
-        ensure("stuff2 block parsed", block != 0);
-        ensure_equals("name of block", std::string(block->mName), std::string("Stuff2"));
-        ensure_equals("type of block is Multiple", block->mType, MBT_MULTIPLE);
-        ensure_equals("total size of block", block->mTotalSize, 24);
-        ensure_equals("number of blocks", block->mNumber, 45);
-        ensure_equals("variable type of Shid is Vector3d",
-                      block->getVariableType(prehash("Shid")), MVT_LLVector3d);
-        ensure_equals("variable size of Shid",
-                      block->getVariableSize(prehash("Shid")), 24);
+        UNSCOPED_INFO("stuff2 block parsed");
+        REQUIRE(block != 0);
+        UNSCOPED_INFO("name of block");
+        CHECK(std::string(block->mName) == std::string("Stuff2"));
+        UNSCOPED_INFO("type of block is Multiple");
+        CHECK(block->mType == MBT_MULTIPLE);
+        UNSCOPED_INFO("total size of block");
+        CHECK(block->mTotalSize == 24);
+        UNSCOPED_INFO("number of blocks");
+        CHECK(block->mNumber == 45);
+        UNSCOPED_INFO("variable type of Shid is Vector3d");
+        CHECK(block->getVariableType(prehash("Shid")) == MVT_LLVector3d);
+        UNSCOPED_INFO("variable size of Shid");
+        CHECK(block->getVariableSize(prehash("Shid")) == 24);
 
         delete block;
     }
 
-    template<> template<>
-    void LLMessageTemplateParserTestObject::test<6>()
+    TEST_CASE_METHOD(LLMessageTemplateParserTestData, "LLMessageTemplateParser: parseMessage reads the header of a simple message", "[LLMessageTemplateParser]")
         // tests message parsing method on a simple message
     {
         std::string message_skel(
@@ -250,22 +278,29 @@ namespace
         LLTemplateTokenizer tokens(message_skel);
         LLMessageTemplate * message = LLTemplateParser::parseMessage(tokens);
 
-        ensure("simple message parsed", message != 0);
-        ensure_equals("name of message", std::string(message->mName), std::string("TestMessage"));
-        ensure_equals("frequency is Low", message->mFrequency, MFT_LOW);
-        ensure_equals("trust is untrusted", message->mTrust, MT_NOTRUST);
-        ensure_equals("message number", message->mMessageNumber, (U32)((255 << 24) | (255 << 16) | 1));
-        ensure_equals("message encoding is zerocoded", message->mEncoding, ME_ZEROCODED);
-        ensure_equals("message deprecation is notdeprecated", message->mDeprecation, MD_NOTDEPRECATED);
+        UNSCOPED_INFO("simple message parsed");
+        REQUIRE(message != 0);
+        UNSCOPED_INFO("name of message");
+        CHECK(std::string(message->mName) == std::string("TestMessage"));
+        UNSCOPED_INFO("frequency is Low");
+        CHECK(message->mFrequency == MFT_LOW);
+        UNSCOPED_INFO("trust is untrusted");
+        CHECK(message->mTrust == MT_NOTRUST);
+        UNSCOPED_INFO("message number");
+        CHECK(message->mMessageNumber == (U32)((255 << 24) | (255 << 16) | 1));
+        UNSCOPED_INFO("message encoding is zerocoded");
+        CHECK(message->mEncoding == ME_ZEROCODED);
+        UNSCOPED_INFO("message deprecation is notdeprecated");
+        CHECK(message->mDeprecation == MD_NOTDEPRECATED);
 
         LLMessageBlock * block = message->getBlock(prehash("NonexistantBlock"));
-        ensure("Nonexistant block does not exist", block == 0);
+        UNSCOPED_INFO("Nonexistant block does not exist");
+        REQUIRE(block == 0);
 
         delete message;
     }
 
-        template<> template<>
-    void LLMessageTemplateParserTestObject::test<7>()
+        TEST_CASE_METHOD(LLMessageTemplateParserTestData, "LLMessageTemplateParser: parseMessage reads a deprecated message", "[LLMessageTemplateParser]")
         // tests message parsing method on a deprecated message
     {
         std::string message_skel(
@@ -279,18 +314,25 @@ namespace
         LLTemplateTokenizer tokens(message_skel);
         LLMessageTemplate * message = LLTemplateParser::parseMessage(tokens);
 
-        ensure("deprecated message parsed", message != 0);
-        ensure_equals("name of message", std::string(message->mName), std::string("TestMessageDeprecated"));
-        ensure_equals("frequency is High", message->mFrequency, MFT_HIGH);
-        ensure_equals("trust is trusted", message->mTrust, MT_TRUST);
-        ensure_equals("message number", message->mMessageNumber, (U32)34);
-        ensure_equals("message encoding is unencoded", message->mEncoding, ME_UNENCODED);
-        ensure_equals("message deprecation is deprecated", message->mDeprecation, MD_DEPRECATED);
+        UNSCOPED_INFO("deprecated message parsed");
+        REQUIRE(message != 0);
+        UNSCOPED_INFO("name of message");
+        CHECK(std::string(message->mName) == std::string("TestMessageDeprecated"));
+        UNSCOPED_INFO("frequency is High");
+        CHECK(message->mFrequency == MFT_HIGH);
+        UNSCOPED_INFO("trust is trusted");
+        CHECK(message->mTrust == MT_TRUST);
+        UNSCOPED_INFO("message number");
+        CHECK(message->mMessageNumber == (U32)34);
+        UNSCOPED_INFO("message encoding is unencoded");
+        CHECK(message->mEncoding == ME_UNENCODED);
+        UNSCOPED_INFO("message deprecation is deprecated");
+        CHECK(message->mDeprecation == MD_DEPRECATED);
 
         delete message;
     }
 
-    template<> template<> void LLMessageTemplateParserTestObject::test<8>()
+    TEST_CASE_METHOD(LLMessageTemplateParserTestData, "LLMessageTemplateParser: parseMessage reads RezMultipleAttachmentsFromInv in full", "[LLMessageTemplateParser]")
         // tests message parsing on RezMultipleAttachmentsFromInv, a possibly-faulty message
     {
         std::string message_skel(
@@ -324,12 +366,18 @@ namespace
         LLTemplateTokenizer tokens(message_skel);
         LLMessageTemplate * message = LLTemplateParser::parseMessage(tokens);
 
-        ensure("RezMultipleAttachmentsFromInv message parsed", message != 0);
-        ensure_equals("name of message", message->mName, prehash("RezMultipleAttachmentsFromInv"));
-        ensure_equals("frequency is low", message->mFrequency, MFT_LOW);
-        ensure_equals("trust is not trusted", message->mTrust, MT_NOTRUST);
-        ensure_equals("message number", message->mMessageNumber, (U32)((255 << 24) | (255 << 16) | 452));
-        ensure_equals("message encoding is zerocoded", message->mEncoding, ME_ZEROCODED);
+        UNSCOPED_INFO("RezMultipleAttachmentsFromInv message parsed");
+        REQUIRE(message != 0);
+        UNSCOPED_INFO("name of message");
+        REQUIRE(message->mName == prehash("RezMultipleAttachmentsFromInv"));
+        UNSCOPED_INFO("frequency is low");
+        CHECK(message->mFrequency == MFT_LOW);
+        UNSCOPED_INFO("trust is not trusted");
+        CHECK(message->mTrust == MT_NOTRUST);
+        UNSCOPED_INFO("message number");
+        CHECK(message->mMessageNumber == (U32)((255 << 24) | (255 << 16) | 452));
+        UNSCOPED_INFO("message encoding is zerocoded");
+        CHECK(message->mEncoding == ME_ZEROCODED);
 
         ensure_block_attributes(
             "RMAFI", message, "AgentData", MBT_SINGLE, 1, 16+16);
