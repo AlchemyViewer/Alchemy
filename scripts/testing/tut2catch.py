@@ -40,12 +40,14 @@ decided by the types clang resolved, not by its text:
                function returning bool, ensure(m.setInverse(n)), or a call
                returning bool that fills an argument passed by reference or
                address), where the test reads that object or argument
-               after it; a term of a split && chain that a later term of it
-               reads a variable of (TUT's ensure stopped the test at the
-               first term that failed); in a loop or a lambda; and in a
-               helper outside a test's body. A plain compare of values
-               stays CHECK. In a destructor, where a throw would end the
-               process, CHECK always. With that macro (X below):
+               after it; a term of a split && chain whose variable a later
+               term of it leans on for its safety, dereferencing it or
+               indexing by it (TUT's ensure stopped the test at the first
+               term that failed; v.mV[VX] == 0 && v.mV[VY] == 0 stays two
+               CHECKs); in a loop or a lambda; and in a helper outside a
+               test's body. A plain compare of values stays CHECK. In a
+               destructor, where a throw would end the process, CHECK
+               always. With that macro (X below):
                ensure(c) -> X(c); ensure(a && b && ...) -> X(a); X(b); ...
                one assertion a term, so that each prints its operands;
                ensure(msg, c) -> UNSCOPED_INFO(msg) then X(c), or, where c
@@ -1771,15 +1773,16 @@ class Converter:
             if len(terms) > 1 and any(self.call_span(t, record) is None for t in terms):
                 terms = [condition]
 
-            # TUT's ensure stopped the test at the first term that failed:
-            # one a later term reads the same variable as ends the case.
+            # TUT's ensure stopped the test at the first term that failed;
+            # a term ends the case where a later one leans on what it read
+            # for its own safety (dereferences it, indexes by it), so that
+            # going on past its failure could crash or read garbage.
             chained = [False] * len(terms)
             if len(terms) > 1 and not self.in_destructor(record):
                 later = set()
                 for i in range(len(terms) - 1, -1, -1):
-                    reads = variables(terms[i], constants=False)
-                    chained[i] = bool(reads & later)
-                    later |= reads
+                    chained[i] = bool(variables(terms[i], constants=False) & later)
+                    later |= leaned_on(terms[i])
 
             def build():
                 out = []
@@ -2761,6 +2764,53 @@ def variables(node, constants=True):
             if constants or not re.fullmatch(r"const\s+" + ARITHMETIC.pattern, text.strip()):
                 found.add(decl)
         stack.extend(c for c in sub.get("inner", []) if isinstance(c, dict) and "kind" in c)
+    return found
+
+
+# What a subscript through a class reads as a pointer would: a handle to
+# something else, not a value of its own.
+HANDLES = re.compile(r"iterator|__wrap_iter|optional|unique_ptr|shared_ptr|weak_ptr|LLPointer|_ptr\b|Ptr\b")
+
+
+def leaned_on(node):
+    """The variables and fields a condition leans on for its own safety:
+    those it dereferences (unary *, ->, a class's operator* or
+    operator->), uses as a subscript or a pointer's offset, or subscripts
+    through where they are a pointer, an iterator, an optional or a smart
+    pointer. A value's member read with a dot, a constant subscript of a
+    value's array (v.mV[VX]) and a call are no such reliance. Constants of
+    arithmetic type are left out, as no state."""
+    found = set()
+    stack = [node]
+    while stack:
+        sub = stack.pop()
+        kind = sub.get("kind")
+        if kind == "CXXDefaultArgExpr":
+            continue
+        inner = [c for c in sub.get("inner", []) if isinstance(c, dict) and "kind" in c]
+        if kind == "UnaryOperator" and sub.get("opcode") == "*" and inner:
+            found |= variables(inner[0], constants=False)
+        elif kind == "MemberExpr" and sub.get("isArrow") and inner:
+            found |= variables(inner[0], constants=False)
+        elif kind == "CXXOperatorCallExpr" and inner:
+            name = skip_implicit(inner[0]).get("referencedDecl", {}).get("name")
+            if name in ("operator*", "operator->") and len(inner) == 2:
+                found |= variables(inner[1], constants=False)
+            elif name == "operator[]" and len(inner) == 3:
+                found |= variables(inner[2], constants=False)
+                if HANDLES.search(value_type(skip_implicit(inner[1]))):
+                    found |= variables(inner[1], constants=False)
+        elif kind == "ArraySubscriptExpr" and len(inner) == 2:
+            found |= variables(inner[1], constants=False)
+            # An array decays to the pointer subscripted; a pointer is one.
+            if "[" not in value_type(skip_implicit_casts(inner[0])):
+                found |= variables(inner[0], constants=False)
+        elif kind in ("BinaryOperator", "CompoundAssignOperator") and sub.get("opcode") in ("+", "-", "+=", "-=") \
+                and len(inner) == 2:
+            for offset, other in ((inner[0], inner[1]), (inner[1], inner[0])):
+                if value_type(other).endswith("*") and not value_type(offset).endswith("*"):
+                    found |= variables(offset, constants=False)
+        stack.extend(inner)
     return found
 
 
