@@ -931,6 +931,10 @@ namespace
         {
             return var && (mTextKeys.contains(var) || mTextParams.contains(var)) ? LST_STRING : lsl;
         }
+        // What an item of a list is written as: as LSL typed it -- NULL_KEY
+        // in a list is LSL's string -- but a key SLua holds as text kept
+        // text, which uuid() would stop the script on where it is no UUID.
+        LSLIType itemType(LSLExpression* e) const { return e->getIType() == LST_KEY && slType(e) == LST_STRING ? LST_STRING : e->getIType(); }
         // What a function of the script's own gives, as SLua holds it: a
         // key as text where the script's keys are.
         LSLIType givenType(LSLSymbol* function) const
@@ -3424,7 +3428,7 @@ namespace
                     gathered.push_back({ rule->key, fields.size(), one });
                     break;
                 }
-                default: text = coerced(v, v->getIType()).text; break;
+                default: text = coerced(v, itemType(v)).text; break;
             }
             sameAs(rule->constant, rule->key);
             fields.push_back(std::string(rule->key) + " = " + text);
@@ -4392,9 +4396,8 @@ namespace
                 std::string out;
                 for (LSLASTNode* item = e->getChild(0); item; item = item->getNext())
                 {
-                    // As LSL typed it: NULL_KEY in a list is LSL's string.
                     auto* each = static_cast<LSLExpression*>(item);
-                    out += (out.empty() ? "" : ", ") + coerced(each, each->getIType()).text;
+                    out += (out.empty() ? "" : ", ") + coerced(each, itemType(each)).text;
                 }
                 return { braced(out) };
             }
@@ -4474,8 +4477,7 @@ namespace
                 out += ",";
             }
             to(begins(item), listIndent(0), i > 0 || mOptions.braceSpaces);
-            // As LSL typed it: NULL_KEY in a list is LSL's string.
-            out += coerced(item, item->getIType()).text;
+            out += coerced(item, itemType(item)).text;
             line = item->getLoc()->last_line;
         }
         to(close, listIndent(-1), mOptions.braceSpaces);
@@ -6392,13 +6394,12 @@ namespace
 
     std::string Writer::itemText(LSLASTNode* item)
     {
-        // As LSL typed it: NULL_KEY in a list is LSL's string.
         if (item->getNodeType() == NODE_CONSTANT)
         {
             return constant(static_cast<LSLConstant*>(item)).text;
         }
         auto* e = static_cast<LSLExpression*>(item);
-        return coerced(e, e->getIType()).text;
+        return coerced(e, itemType(e)).text;
     }
 
     Shared Writer::handedOn(LSLASTNode* read) const

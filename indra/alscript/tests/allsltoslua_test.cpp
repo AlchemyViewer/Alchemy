@@ -3394,6 +3394,7 @@ namespace tut
                                               "    link_message(integer s, integer num, string m, key id) {\n"
                                               "        if (id == \"\") llOwnerSay(\"nobody\");\n"
                                               "        if (id) llOwnerSay(\"someone\");\n"
+                                              "        llOwnerSay(llList2CSV([id, gUser]));\n"
                                               "        key d;\n"
                                               "        if (d == \"\") llOwnerSay(\"no key yet\");\n"
                                               "        if (\"\" != d) llOwnerSay(\"some\");\n"
@@ -3408,6 +3409,7 @@ namespace tut
         ensure("made text as it is: " + r.text, has(r, "print(\"user: \" .. gUser)"));
         ensure("its truth as LSL's key's: " + r.text, has(r, "if (touuid(gUser) or NULL_KEY).istruthy then"));
         ensure("the id, text: " + r.text, has(r, "if id == \"\" then") && has(r, "if (touuid(id) or NULL_KEY).istruthy then"));
+        ensure("keys held as text, in a list as text: " + r.text, has(r, "{ id, gUser }") && !has(r, "{ uuid("));
         ensure("a uuid against no text, a uuid: " + r.text, has(r, "local d = NULL_KEY") && has(r, "if d == uuid(\"\") then") &&
                                                            has(r, "if uuid(\"\") ~= d then"));
         ensure("a UUID written out: " + r.text, has(r, "if d == uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\") then"));
@@ -3433,6 +3435,9 @@ namespace tut
                                 "        key cast = (key)s;\n"
                                 "        if (gOwner) llDialog(gOwner, \"hi\", [\"OK\"], -5);\n"
                                 "        if (gOwner != NULL_KEY && mine(pick())) llOwnerSay((string)cast + (string)((key)\"\"));\n"
+                                "        key odd = (key)\"not-a-uuid\";\n"
+                                "        list values = [odd, k, NULL_KEY];\n"
+                                "        llOwnerSay(llList2CSV(values) + llList2CSV([odd]));\n"
                                 "    }\n"
                                 "    listen(integer c, string n, key id, string m) {\n"
                                 "        if (id == gOwner) llOwnerSay(m);\n"
@@ -3453,6 +3458,7 @@ namespace tut
         ensure("against NULL_KEY, as text: " + r.text, has(r, "gOwner ~= tostring(NULL_KEY)"));
         ensure("a handler's key, made text as it begins: " + r.text, has(r, "function(c: number, n: string, idKey: uuid, m: string)") &&
                                                                    has(r, "local id: string = tostring(idKey)") && has(r, "if id == gOwner then"));
+        ensure("in a list, text as it is: " + r.text, has(r, "local values: { any } = { odd, k, tostring(NULL_KEY) }") && !has(r, "{ uuid("));
         ensure("nothing said of NULL_KEY: " + r.text, !noted(r, "SluaKeyEmpty"));
         checksClean(r);
 
