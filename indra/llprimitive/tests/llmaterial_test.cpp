@@ -220,16 +220,18 @@ namespace
         const LLSD sd = m.asLLSD();
         // Roundtripping the same LLSD should restore the same hash.
         LLMaterial back;
-        back.setAlphaMaskCutoff(99); // make cache dirty + state altered
+        back.setAlphaMaskCutoff(99);           // state altered
+        CHECK(back.getHash() != before);       // and its hash cached
         back.fromLLSD(sd);
         CHECK(back.getHash() == before);
 
         // Now perturb a field through LLSD and check the hash moves.
         LLMaterial perturbed;
         perturbed.fromLLSD(sd);
-        CHECK(perturbed.getHash() == before);
-        perturbed.setEnvironmentIntensity(42);
-        UNSCOPED_INFO("a setter after fromLLSD still invalidates");
+        CHECK(perturbed.getHash() == before);  // caches the unperturbed hash
+        LLSD perturbed_sd = sd;
+        perturbed_sd["EnvIntensity"] = 42;
+        perturbed.fromLLSD(perturbed_sd);
         CHECK(perturbed.getHash() != before);
     }
 

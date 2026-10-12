@@ -135,8 +135,9 @@ namespace
     // written. The previous sizeof(LLGLTFMaterial) tripwire was removed when
     // the canonical hash packing was added — total class size now varies with
     // the hash snapshot/cache members (which aren't part of the hashed
-    // payload), so it stopped being a useful regression check. test<12>
-    // exercises the actual hash invariant directly.
+    // payload), so it stopped being a useful regression check. The case
+    // "getHash covers every field but the local texture tracking map", at the
+    // end of this file, exercises the actual hash invariant directly.
     TEST_CASE("llgltfmaterial: there are four texture infos", "[llgltfmaterial]")
     {
         CHECK((U32)LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT == 4);
@@ -232,7 +233,7 @@ namespace
 
         {
             LLGLTFMaterial texture_transforms_only_material;
-            apply_test_material_texture_ids(texture_transforms_only_material);
+            apply_test_material_texture_transforms(texture_transforms_only_material);
             require_json_round_trip("material with texture transforms only", texture_transforms_only_material);
         }
 
@@ -277,21 +278,40 @@ namespace
             CHECK(render_material == override_material);
         }
         {
+            // The default values, flagged as overrides, set a non-default
+            // material back to the defaults
             LLGLTFMaterial override_material;
             override_material.setAlphaMode(LLGLTFMaterial::ALPHA_MODE_OPAQUE, true);
             override_material.setDoubleSided(false, true);
 
             LLGLTFMaterial render_material;
-            override_material.setAlphaMode(LLGLTFMaterial::ALPHA_MODE_BLEND, false);
-            override_material.setDoubleSided(true, false);
+            render_material.setAlphaMode(LLGLTFMaterial::ALPHA_MODE_BLEND, false);
+            render_material.setDoubleSided(true, false);
 
             render_material.applyOverride(override_material);
-            // Not interested in these flags for equality comparison
+            // applyOverride takes the values, not the override flags
             override_material.mOverrideDoubleSided = false;
             override_material.mOverrideAlphaMode = false;
 
-            UNSCOPED_INFO("default overrides applied over non-defaults");
+            UNSCOPED_INFO("flagged default overrides applied over non-defaults");
             CHECK(render_material == override_material);
+        }
+        {
+            // Without the flags, the same default values are no override at
+            // all and leave a non-default material alone
+            LLGLTFMaterial override_material;
+            override_material.setAlphaMode(LLGLTFMaterial::ALPHA_MODE_OPAQUE, false);
+            override_material.setDoubleSided(false, false);
+
+            LLGLTFMaterial render_material;
+            render_material.setAlphaMode(LLGLTFMaterial::ALPHA_MODE_BLEND, false);
+            render_material.setDoubleSided(true, false);
+            const LLGLTFMaterial before_override = render_material;
+
+            render_material.applyOverride(override_material);
+
+            UNSCOPED_INFO("unflagged default values applied over non-defaults");
+            CHECK(render_material == before_override);
         }
     }
 

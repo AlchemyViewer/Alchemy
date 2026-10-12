@@ -418,7 +418,7 @@ namespace
    {
       CAPTURE(directory, pattern);
 
-      // Scan directory and see if any file1.* files are found
+      // Scan directory for pattern and check that exactly the files correctResult marks are found
       std::string scanResult;
       int   found = 0;
       bool  filesFound[5] = { false, false, false, false, false };
@@ -464,7 +464,7 @@ namespace
       std::string delim = gDirUtilp->getDirDelimiter();
       std::string dirTemp = LLFile::tmpdir();
 
-      // Create the same 5 file names of the two directories
+      // Create the same 5 file names in each of two directories
 
       std::string dir1 = makeTestDir();
       std::string dir2 = makeTestDir();
@@ -481,7 +481,7 @@ namespace
       bool expected1[5] = { true, true, true, true, true };
       require_scan_returns(dir1, "*", expected1);
 
-      // Scan dir2 and see if only the 2 *.xyz files are found
+      // Scan dir1 and see if only the 2 *.xyz files are found
       bool  expected2[5] = { false, false, true, true, false };
       require_scan_returns(dir1, "*.xyz", expected2);
 
@@ -497,7 +497,7 @@ namespace
       bool  expected5[5] = { true, false, true, false, true };
       require_scan_returns(dir1, "file1.*", expected5);
 
-      // Scan dir1 and see if any file1.* files are found
+      // Scan dir1 and see if any file?.abc files are found
       bool  expected6[5] = { true, true, false, false, false };
       require_scan_returns(dir1, "file?.abc", expected6);
 
@@ -505,7 +505,7 @@ namespace
       bool  expected7[5] = { false, false, true, true, false };
       require_scan_returns(dir2, "file?.x?z", expected7);
 
-      // Scan dir2 and see if any file?.??c files are found
+      // Scan dir2 and see if any file?.??c or *.??c files are found
       bool  expected8[5] = { true, true, false, false, false };
       require_scan_returns(dir2, "file?.??c", expected8);
       require_scan_returns(dir2, "*.??c", expected8);

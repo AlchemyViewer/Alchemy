@@ -28,6 +28,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <memory>
+
 #include "../llprimitive.h"
 
 #include "../../llmath/llvolumemgr.h"
@@ -164,8 +166,8 @@ namespace
     TEST_CASE_METHOD(llprimitive, "LLPrimitive: createPrimitive makes a primitive with the PCode", "[LLPrimitive]")
     {
         LLPCode code = 1;
-        LLPrimitive * primitive = LLPrimitive::createPrimitive(code);
-        REQUIRE(primitive != NULL);
+        const std::unique_ptr<LLPrimitive> primitive(LLPrimitive::createPrimitive(code));
+        REQUIRE(primitive != nullptr);
         CHECK(primitive->getPCode() == code);
     }
 
