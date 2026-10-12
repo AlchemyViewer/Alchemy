@@ -204,9 +204,21 @@ namespace tut
             }
             return false;
         }
+        // Any of the notes that LSL ran a binary's right side first.
+        static bool orderNoted(const ALLSLToSLua::Result& r)
+        {
+            for (const ALScriptProblem& p : r.notes)
+            {
+                if (p.key.rfind("SluaRightFirst", 0) == 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     };
 
-    typedef test_group<allsltoslua_data, 100> allsltoslua_group;
+    typedef test_group<allsltoslua_data, 120> allsltoslua_group;
     typedef allsltoslua_group::object    allsltoslua_object;
     tut::allsltoslua_group               allsltoslua_test("ALLSLToSLua");
 
@@ -570,7 +582,7 @@ namespace tut
         ensure("nothing cleared first: " + r.text, !has(r, "gItems = {} return") && !has(r, "gLog = \"\" return"));
         ensure("noted once for each variable: " + r.text, noted(r, "SluaMemoryHack") && count(r, "-- LSL: (gItems = []) + gItems") == 1 &&
                                                          count(r, "-- LSL: (gLog = \"\") + gLog") == 1);
-        ensure("not taken as an order that shows", !noted(r, "SluaRightFirst"));
+        ensure("not taken as an order that shows", !orderNoted(r));
         checksClean(r);
 
         const ALLSLToSLua::Result order = convert("integer gCount;\n"
@@ -581,7 +593,11 @@ namespace tut
                                                   "    integer k = gCount - bump();\n"
                                                   "    llOwnerSay((string)(j + k));\n"
                                                   "} }\n");
-        ensure("an assignment the other side reads", noted(order, "SluaRightFirst"));
+        ensure("an assignment the other side reads, named", noted(order, "SluaRightFirstSet", "i"));
+        ensure("a call that sets what the other side reads, named", noted(order, "SluaRightFirstCall", "bump()"));
+        ensure("said over its line, with what: " + order.text, has(order, "-- LSL: LSL ran the right side of this before the left, and Luau "
+                                                                         "runs the left first: bump() sets gCount, which the other side "
+                                                                         "reads or sets too."));
         ensure("said over its line: " + order.text, has(order, "-- LSL: LSL ran the right side of this before the left"));
         checksClean(order);
 
@@ -593,7 +609,7 @@ namespace tut
                                                   "    string s = \"n: \" + (string)bump();\n"
                                                   "    llOwnerSay(s + (string)(j + (integer)llGetTime()));\n"
                                                   "} }\n");
-        ensure("nothing either side changes the other reads: " + quiet.text, !noted(quiet, "SluaRightFirst"));
+        ensure("nothing either side changes the other reads: " + quiet.text, !orderNoted(quiet));
         checksClean(quiet);
     }
 
@@ -2189,8 +2205,9 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<76>()
     {
-        set_test_name("a key of no text said to be NULL_KEY, and one with capitals said to be written small, cast or given; other text as "
-                      "it was said; the two XorBase64Strings said to be what ll.XorBase64 is not, LSL's kept");
+        set_test_name("a key cast from no text said to be NULL_KEY, and one with capitals said to be written small, cast or given; a key "
+                      "given no text kept text; other text as it was said; the two XorBase64Strings said to be what ll.XorBase64 is not, "
+                      "LSL's kept");
         const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
                                               "    key a = (key)\"\"; key c = (key)\"A2E76FCD-9360-4F6D-A924-938F923DF11D\";\n"
                                               "    if ((key)\"\" == NULL_KEY) llOwnerSay(\"same\");\n"
@@ -2217,14 +2234,16 @@ namespace tut
         }
         checksClean(r);
 
-        // Given rather than cast: the same said, and a UUID written small
+        // Given rather than cast: no text kept as text, as other text that is
+        // no UUID is; capitals the same said, and a UUID written small
         // nothing at all.
         const ALLSLToSLua::Result given = convert("default { touch_start(integer n) {\n"
                                                   "    key b = \"\"; key c = \"A2E76FCD-9360-4F6D-A924-938F923DF11D\";\n"
                                                   "    key l = \"a2e76fcd-9360-4f6d-a924-938f923df11d\";\n"
                                                   "    llOwnerSay((string)llGetOwnerKey(b) + (string)llGetOwnerKey(c) + (string)llGetOwnerKey(l));\n"
                                                   "} }\n");
-        ensure("given no text: " + given.text, noted(given, "SluaKeyEmpty") && noted(given, "SluaKeyCase"));
+        ensure("given no text, text: " + given.text, has(given, "local b = \"\"") && has(given, "ll.GetOwnerKey(b :: any)") &&
+                                                        !noted(given, "SluaKeyEmpty") && noted(given, "SluaKeyCase"));
         ensure("nothing else said of them: " + given.text, !noted(given, "SluaKeyText") && !noted(given, "SluaUuidText"));
         checksClean(given);
     }
@@ -3179,5 +3198,275 @@ namespace tut
         ensure("returned: " + r.text, has(r, "return (math.modf(f))"));
         ensure("a vector's part, an argument: " + r.text, has(r, "gV = vector(gV.x, gV.y, (math.modf(f)))"));
         checksClean(r);
+    }
+    template<> template<>
+    void allsltoslua_object::test<97>()
+    {
+        set_test_name("a local whose Luau name would hide what its reach names, which LSL kept apart, is named apart: Tapple's parameter "
+                      "f2 beside the function f2, a local beside a function the mark gave its name, a parameter named as its own "
+                      "function; a global the mark gave another's name; nothing where nothing is hidden");
+        const ALLSLToSLua::Result r = convert("f1(string f2) {\n"
+                                              "    llOwnerSay(f2);\n"
+                                              "    f2();\n"
+                                              "}\n"
+                                              "\n"
+                                              "f2() {\n"
+                                              "    llOwnerSay(\"world\");\n"
+                                              "}\n"
+                                              "\n"
+                                              "default { state_entry() {\n"
+                                              "    f1(\"hello\");\n"
+                                              "} }\n");
+        ensure("Tapple's, the parameter named apart: " + r.text, has(r, "local function f1(f2_)\n    print(f2_)\n    f2()\nend\n"));
+        ensure("the function as it was: " + r.text, has(r, "local f2\n") && has(r, "function f2()\n"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result detected = convert("integer detected() {\n"
+                                                     "    return 5;\n"
+                                                     "}\n"
+                                                     "\n"
+                                                     "default\n"
+                                                     "{\n"
+                                                     "    touch_start(integer total_number)\n"
+                                                     "    {\n"
+                                                     "        string detected = \"fritz\";\n"
+                                                     "\n"
+                                                     "        llOwnerSay(llDetectedName(0));\n"
+                                                     "        llOwnerSay(detected);\n"
+                                                     "        llOwnerSay((string)(detected() * detected()));\n"
+                                                     "    }\n"
+                                                     "}\n");
+        ensure("Tapple's detected, the function marked: " + detected.text, has(detected, "local function detected_()"));
+        ensure("the local apart from it: " + detected.text, has(detected, "local detected_2 = \"fritz\"") && has(detected, "print(detected_2)"));
+        ensure("the function called: " + detected.text, has(detected, "print(tostring(detected_() * detected_()))"));
+        checksClean(detected);
+
+        const ALLSLToSLua::Result own = convert("integer fact(integer fact) {\n"
+                                                "    if (fact <= 1) return 1;\n"
+                                                "    return fact * fact(fact - 1);\n"
+                                                "}\n"
+                                                "string table = \"t\";\n"
+                                                "string table_ = \"u\";\n"
+                                                "f3(string f2) { llOwnerSay(f2); }\n"
+                                                "f2() { llOwnerSay(\"f2\"); }\n"
+                                                "f4() { f2(); string f2 = \"x\"; llOwnerSay(f2); }\n"
+                                                "default { touch_start(integer n) {\n"
+                                                "    integer was = 1;\n"
+                                                "    integer k = was++ + was;\n"
+                                                "    llOwnerSay(table + table_ + (string)(fact(n) + k));\n"
+                                                "    f3(\"a\"); f4();\n"
+                                                "} }\n");
+        ensure("a parameter named as its function: " + own.text, has(own, "local function fact(fact_)") && has(own, "return fact_ * fact(fact_ - 1)"));
+        ensure("a global the mark gave another's name: " + own.text,
+               has(own, "local table_2 = \"t\"\n") && has(own, "local table_ = \"u\"\n") && has(own, "print(`{table_2}{table_}{fact(n) + k}`)"));
+        ensure("nothing hidden, nothing renamed: " + own.text, has(own, "local function f3(f2)\n    print(f2)\n"));
+        ensure("a call before the local, not in its reach: " + own.text, has(own, "    f2()\n    local f2 = \"x\"\n    print(f2)\n"));
+        ensure("what a step was, under a name the script does not have: " + own.text,
+               has(own, "(function() local was2 = was; was += 1 return was2 end)() + was"));
+        checksClean(own);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<98>()
+    {
+        set_test_name("a state's handlers in its table kept apart by a blank line where the LSL had them so, and together where not");
+        const ALLSLToSLua::Result r = convert("default { state_entry() { state collect; } }\n"
+                                              "state collect {\n"
+                                              "    changed(integer change) {\n"
+                                              "        if (change & CHANGED_INVENTORY) {\n"
+                                              "            llOwnerSay(\"c\");\n"
+                                              "        }\n"
+                                              "    }\n"
+                                              "\n"
+                                              "    on_rez(integer param) {\n"
+                                              "        llOwnerSay(\"r\");\n"
+                                              "    }\n"
+                                              "    touch_start(integer n) { llOwnerSay(\"t\"); }\n"
+                                              "\n"
+                                              "    // listening\n"
+                                              "    listen(integer c, string name, key id, string msg) { llOwnerSay(msg); }\n"
+                                              "}\n");
+        ensure("Tapple's, apart: " + r.text, has(r, "        end\n    end,\n\n    on_rez = function(param)\n"));
+        ensure("together: " + r.text, has(r, "        print(\"r\")\n    end,\n    touch_start = function(detected)\n"));
+        ensure("one blank line over a comment over it: " + r.text, has(r, "    end,\n\n    -- listening\n    listen = function("));
+        ensure("none at the table's top: " + r.text, has(r, "states.collect = {\n    changed = function(change)\n"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<99>()
+    {
+        set_test_name("LSL's right side first noted only where the order could show, naming what: not two sides that only read the "
+                      "world, through a function of the script's too (Tapple's); a call that changes the world beside one that reads it; "
+                      "a call that sets what the other side's function reads; not one beside a function that does not read it");
+        const ALLSLToSLua::Result r = convert("key gSender;\n"
+                                              "string gCache;\n"
+                                              "string myInfo() { return (string)llGetKey(); }\n"
+                                              "string say() { llOwnerSay(\"x\"); return \"y\"; }\n"
+                                              "string cached() { return gCache; }\n"
+                                              "string fill() { gCache = \"z\"; return gCache; }\n"
+                                              "string other() { return \"o\"; }\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    llOwnerSay(\"activeRequestor: \" + llKey2Name(gSender) + \"; llGetKey: \" + llKey2Name(myInfo()));\n"
+                                              "    llOwnerSay(llKey2Name(gSender) + say());\n"
+                                              "    llOwnerSay(cached() + fill());\n"
+                                              "    llOwnerSay(other() + fill());\n"
+                                              "} }\n");
+        ensure("Tapple's, two sides that only read: " + r.text, !noted(r, "SluaRightFirst") && !noted(r, "SluaRightFirstWorld", "myInfo()"));
+        ensure("a call that changes the world, named with the other: " + r.text, noted(r, "SluaRightFirstWorld", "say()") &&
+               has(r, "-- LSL: LSL ran the right side of this before the left, and Luau runs the left first: say() may change what "
+                      "llKey2Name() does or finds outside the script.\n    print(ll.Key2Name(gSender) .. say())"));
+        ensure("a call that sets what the other's reads: " + r.text, noted(r, "SluaRightFirstCall", "fill()") &&
+               has(r, "fill() sets gCache, which the other side reads or sets too.\n    print(cached() .. fill())"));
+        ensure("noted twice, no more: " + r.text, count(r, "LSL ran the right side") == 2);
+        checksClean(r);
+    }
+    template<> template<>
+    void allsltoslua_object::test<100>()
+    {
+        set_test_name("text given where ll takes a key, with keyTextAny off, as it is with no :: any (Tapple's), the note giving the "
+                      "ways to see to it; what the type checker then marks, where it knows the text for text");
+        const std::string lsl = "key inventorySender;\n"
+                                "string myInfo() { return (string)llGetKey(); }\n"
+                                "default { touch_start(integer n) {\n"
+                                "    llOwnerSay(\"activeRequestor: \" + llKey2Name(inventorySender) + \"; llGetKey: \" + llKey2Name(myInfo()));\n"
+                                "    llOwnerSay(llKey2Name(\"a2e76fcd-9360-4f6d-a924-938f923df11d\"));\n"
+                                "} }\n";
+        ALLSLToSLua::Options o;
+        o.keyTextAny                = false;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        ensure("converted", r.converted);
+        ensure("as it is: " + r.text, has(r, "ll.Key2Name(myInfo()))") && !has(r, "myInfo() :: any"));
+        ensure("a UUID written out, still a uuid: " + r.text, has(r, "ll.Key2Name(uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\"))"));
+        ensure("the note with the ways: " + r.text, noted(r, "SluaKeyAsTextBare") && !noted(r, "SluaKeyAsText") &&
+                                                       has(r, "`:: any` quiets it, uuid() stops the script on text that is no UUID"));
+        // What the checker marks as an error, each by its line.
+        const auto marked = [&](const std::string& slua) {
+            std::string said;
+            for (const ALScriptProblem& p : service.check(slua))
+            {
+                said += p.severity == ALScriptProblem::Severity::Error ? llformat("[%d] %s\n", p.line + 1, p.message.c_str()) : std::string();
+            }
+            return said;
+        };
+        // The line the text for a key is on, as marked says it.
+        const auto lineOf = [](const std::string& slua) {
+            const size_t at = slua.find("ll.Key2Name(myInfo())");
+            ensure("written: " + slua, at != std::string::npos);
+            return llformat("[%d] ", static_cast<S32>(std::count(slua.begin(), slua.begin() + at, '\n')) + 1);
+        };
+        // Nonstrict, as the grid has it, takes an untyped function's answer
+        // for anything; typed, as Tapple converts, or strict, it is text.
+        // The old solver's: the new one's nonstrict marks only what must
+        // fail, and its strict cannot yet take LLEvents:on's handlers.
+        if (!newSolver)
+        {
+            o.types                         = true;
+            const ALLSLToSLua::Result typed = ALLSLToSLua::convert(lsl, o);
+            const std::string         said  = marked(typed.text);
+            ensure("typed, the text for a key marked, alone:\n" + said + "---\n" + typed.text,
+                   said.rfind(lineOf(typed.text), 0) == 0 && std::count(said.begin(), said.end(), '\n') == 1);
+            const std::string strict = "--!strict\n" + r.text;
+            const std::string loud   = marked(strict);
+            ensure("strict, the same:\n" + loud + "---\n" + strict, loud.rfind(lineOf(strict), 0) == 0 && std::count(loud.begin(), loud.end(), '\n') == 1);
+        }
+    }
+    template<> template<>
+    void allsltoslua_object::test<101>()
+    {
+        set_test_name("a key given no text holds text, as LSL's did (Tapple's): compared with \"\", sent over a link message, made text "
+                      "and asked its truth as LSL had it; a key that is a uuid compared with no text or a UUID written out as a uuid, "
+                      "other text and NULL_KEY as text");
+        const ALLSLToSLua::Result r = convert("key gUser = \"\";\n"
+                                              "default {\n"
+                                              "    state_entry() {\n"
+                                              "        key k = \"\";\n"
+                                              "        llOwnerSay((string)(k == \"\"));\n"
+                                              "    }\n"
+                                              "    touch_start(integer n) {\n"
+                                              "        if (gUser) llOwnerSay(\"busy\");\n"
+                                              "        gUser = llDetectedKey(0);\n"
+                                              "        llMessageLinked(LINK_SET, 0, \"\", gUser);\n"
+                                              "        gUser = \"\";\n"
+                                              "        llMessageLinked(LINK_SET, 0, \"\", gUser);\n"
+                                              "        llOwnerSay(\"user: \" + (string)gUser);\n"
+                                              "    }\n"
+                                              "    link_message(integer s, integer num, string m, key id) {\n"
+                                              "        if (id == \"\") llOwnerSay(\"nobody\");\n"
+                                              "        if (id) llOwnerSay(\"someone\");\n"
+                                              "        llOwnerSay(llList2CSV([id, gUser]));\n"
+                                              "        key d;\n"
+                                              "        if (d == \"\") llOwnerSay(\"no key yet\");\n"
+                                              "        if (\"\" != d) llOwnerSay(\"some\");\n"
+                                              "        if (d == \"a2e76fcd-9360-4f6d-a924-938f923df11d\") llOwnerSay(\"that one\");\n"
+                                              "        if (d == \"none\") llOwnerSay(\"text\");\n"
+                                              "        if (NULL_KEY != \"\") llOwnerSay(\"NULL_KEY has text\");\n"
+                                              "    }\n"
+                                              "}\n");
+        ensure("Tapple's, text: " + r.text, has(r, "local k = \"\"") && has(r, "print(tostring(if k == \"\" then 1 else 0))"));
+        ensure("a global given no text, text: " + r.text, has(r, "local gUser = \"\"") && has(r, "gUser = tostring(detected[1]:getKey())"));
+        ensure("sent as text, no text and all: " + r.text, count(r, "ll.MessageLinked(LINK_SET, 0, \"\", gUser)") == 2);
+        ensure("made text as it is: " + r.text, has(r, "print(\"user: \" .. gUser)"));
+        ensure("its truth as LSL's key's: " + r.text, has(r, "if (touuid(gUser) or NULL_KEY).istruthy then"));
+        ensure("the id, text: " + r.text, has(r, "if id == \"\" then") && has(r, "if (touuid(id) or NULL_KEY).istruthy then"));
+        ensure("keys held as text, in a list as text: " + r.text, has(r, "{ id, gUser }") && !has(r, "{ uuid("));
+        ensure("a uuid against no text, a uuid: " + r.text, has(r, "local d = NULL_KEY") && has(r, "if d == uuid(\"\") then") &&
+                                                           has(r, "if uuid(\"\") ~= d then"));
+        ensure("a UUID written out: " + r.text, has(r, "if d == uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\") then"));
+        ensure("other text, as text: " + r.text, has(r, "if tostring(d) == \"none\" then"));
+        ensure("NULL_KEY, as LSL's text: " + r.text, has(r, "if tostring(NULL_KEY) ~= \"\" then"));
+        checksClean(r);
+    }
+    template<> template<>
+    void allsltoslua_object::test<102>()
+    {
+        set_test_name("with uuidKeys off, every key of the script's own held as text, as LSL held them (Tapple's preference): its "
+                      "variables, its functions' and handlers' parameters, what its functions give, a cast to a key; what SLua gives as "
+                      "a uuid made text, text given ll as it is; closeToLSL the same");
+        const std::string lsl = "key gOwner;\n"
+                                "key pick() { return llGetOwner(); }\n"
+                                "integer mine(key who) { return who == gOwner; }\n"
+                                "default {\n"
+                                "    state_entry() {\n"
+                                "        key k = \"\";\n"
+                                "        llOwnerSay((string)(k == \"\"));\n"
+                                "        gOwner = llGetOwner();\n"
+                                "        string s = llGetObjectDesc();\n"
+                                "        key cast = (key)s;\n"
+                                "        if (gOwner) llDialog(gOwner, \"hi\", [\"OK\"], -5);\n"
+                                "        if (gOwner != NULL_KEY && mine(pick())) llOwnerSay((string)cast + (string)((key)\"\"));\n"
+                                "        key odd = (key)\"not-a-uuid\";\n"
+                                "        list values = [odd, k, NULL_KEY];\n"
+                                "        llOwnerSay(llList2CSV(values) + llList2CSV([odd]));\n"
+                                "    }\n"
+                                "    listen(integer c, string n, key id, string m) {\n"
+                                "        if (id == gOwner) llOwnerSay(m);\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLToSLua::Options o;
+        o.uuidKeys                  = false;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        ensure("converted: " + (r.problems.empty() ? std::string() : r.problems.front().message), r.converted);
+        ensure("Tapple's: " + r.text, has(r, "local k: string = \"\"\n") && has(r, "print(tostring(if k == \"\" then 1 else 0))"));
+        ensure("a global, LSL's default: " + r.text, has(r, "local gOwner: string = \"\"\n") && has(r, "gOwner = tostring(ll.GetOwner())"));
+        ensure("what a function gives: " + r.text, has(r, "local function pick(): string\n    return tostring(ll.GetOwner())"));
+        ensure("a parameter: " + r.text, has(r, "local function mine(who: string): boolean") && has(r, "who == gOwner"));
+        ensure("a cast, the text as it is: " + r.text, has(r, "local cast: string = s\n") && has(r, "print(cast .. \"\")") && !has(r, "uuid(s)") && !has(r, "uuid(\"\")"));
+        ensure("its truth as LSL's: " + r.text, has(r, "if (touuid(gOwner) or NULL_KEY).istruthy then"));
+        ensure("given ll as it is: " + r.text, has(r, "ll.Dialog(gOwner :: any, \"hi\""));
+        ensure("against NULL_KEY, as text: " + r.text, has(r, "gOwner ~= tostring(NULL_KEY)"));
+        ensure("a handler's key, made text as it begins: " + r.text, has(r, "function(c: number, n: string, idKey: uuid, m: string)") &&
+                                                                   has(r, "local id: string = tostring(idKey)") && has(r, "if id == gOwner then"));
+        ensure("in a list, text as it is: " + r.text, has(r, "local values: { any } = { odd, k, tostring(NULL_KEY) }") && !has(r, "{ uuid("));
+        ensure("nothing said of NULL_KEY: " + r.text, !noted(r, "SluaKeyEmpty"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result close = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
+        ensure("closeToLSL the same: " + close.text, close.converted && has(close, "local gOwner = \"\"\n") && has(close, "local cast = s\n"));
+        checksClean(close);
+
+        const ALLSLToSLua::Result uuids = convert(lsl);
+        ensure("uuids by default: " + uuids.text, has(uuids, "local gOwner = NULL_KEY\n") && has(uuids, "local cast = uuid(s)"));
     }
 }

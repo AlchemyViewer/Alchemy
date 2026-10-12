@@ -3202,4 +3202,53 @@ namespace tut
         ensure_equals("no line above laid out", v.layout().linesLaidOut(), laid);
         ensure("every view hidden", std::none_of(buttons.begin(), buttons.end(), [](LLButton* button) { return button->getVisible(); }));
     }
+    template<> template<>
+    void altextview_object::test<103>()
+    {
+        set_test_name("a drag on a map that scrolls with the text goes where the mouse is at once, and stays there while it rests: "
+                      "its window under the mouse as the ruler's thumb is, held where it was taken; a press on it does not jump");
+        std::string tall;
+        for (S32 i = 0; i < 600; ++i)
+        {
+            tall += llformat("line %d\n", i);
+        }
+        ALTextView& v = make(tall.c_str(), 400, 200);
+        v.setScrollMap(true);
+        v.setScrollMapWidth(80);
+        ALTextRuler* ruler = v.findChild<ALTextRuler>("ruler");
+        S32          top   = 0;
+        S32          bottom = 0;
+        ll_test::TextViewProbe::mapWindow(*ruler, top, bottom);
+        ensure("the window at the map's top", v.scrollY() == 0 && top > 180 && bottom < top);
+        // Taken hold of: no jump, and it moves as far as the mouse.
+        const S32 held = top - 4;
+        ensure("pressed on the window", ruler->handleMouseDown(40, held, MASK_NONE) && v.scrollY() == 0);
+        ruler->handleHover(40, held - 30, MASK_NONE);
+        S32 moved_top = 0;
+        ll_test::TextViewProbe::mapWindow(*ruler, moved_top, bottom);
+        // To a map row, which is two pixels.
+        ensure(llformat("the window under the mouse: %d for %d", top - moved_top, 30), std::abs(top - moved_top - 30) <= 2);
+        // Resting there, frame after frame: where it is.
+        const S32 there = v.scrollY();
+        for (S32 frame = 0; frame < 10; ++frame)
+        {
+            ruler->handleHover(40, held - 30, MASK_NONE);
+        }
+        ensure_equals("still where it went", v.scrollY(), there);
+        ruler->handleHover(40, held, MASK_NONE);
+        ensure_equals("back where it was taken", v.scrollY(), 0);
+        ruler->handleMouseUp(40, held, MASK_NONE);
+
+        // Pressed below it: the line pressed in the middle, then the same.
+        ensure("pressed below the window", ruler->handleMouseDown(40, 60, MASK_NONE) && v.scrollY() > 0);
+        const S32 pressed = v.scrollY();
+        for (S32 frame = 0; frame < 10; ++frame)
+        {
+            ruler->handleHover(40, 60, MASK_NONE);
+        }
+        ensure_equals("not creeping after the mouse", v.scrollY(), pressed);
+        ruler->handleHover(40, 0, MASK_NONE);
+        ensure("down to the end at most", v.scrollY() > pressed && v.scrollY() <= v.layout().totalHeight() - v.textRect().getHeight());
+        ruler->handleMouseUp(40, 0, MASK_NONE);
+    }
 }

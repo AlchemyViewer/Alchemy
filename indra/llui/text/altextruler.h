@@ -31,6 +31,11 @@
 
 class ALTextView;
 
+namespace ll_test
+{
+    struct TextViewProbe;
+}
+
 // The bar down the side of a text view. A ruler at its right while the
 // text is taller than the view: the caret, the find bar's matches and the
 // marks the view's features give (ALTextFeatures::mapMark) or its host
@@ -80,6 +85,7 @@ public:
 
 protected:
     friend class LLUICtrlFactory;
+    friend struct ll_test::TextViewProbe;
     ALTextRuler(const Params& p);
 
 private:
@@ -98,6 +104,13 @@ private:
     S32  mapScroll(const LLRect& map);
     S32  mapLineAt(S32 y);
     void scrollToMapY(S32 y);
+    // The window over the map, the rows the view shows, as drawn: from
+    // the top line's first row to the bottom line's last.
+    void mapWindow(const LLRect& map, S32& top, S32& bottom);
+    // How far the text scrolls for each pixel the window is dragged, so
+    // that the window keeps under the mouse as the map, scrolled in
+    // proportion to the text, moves beneath it.
+    F32 mapDragRatio(const LLRect& map);
     void drawMap(F32 alpha);
     // The runs of one line for the map, by column, as far as `columns`.
     struct MapRun
@@ -109,9 +122,14 @@ private:
     void readMapRuns(S32 line, S32 columns, std::vector<MapRun>& out);
 
     ALTextView& mView;
-    // A press held: where on the thumb it took hold, for the ruler.
-    bool mDragging   = false;
-    S32  mDragOffset = 0;
+    // A press held: where on the thumb it took hold, for the ruler; for
+    // the map, where it was and how far the text was scrolled then, and
+    // how far a pixel of drag scrolls it.
+    bool mDragging        = false;
+    S32  mDragOffset      = 0;
+    S32  mDragStartY      = 0;
+    S32  mDragStartScroll = 0;
+    F32  mDragRatio       = 0.f;
     // Where the mouse rests on the map, or -1: what the preview is of.
     S32  mHoverY     = -1;
 

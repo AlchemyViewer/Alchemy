@@ -399,6 +399,39 @@ void ALTextRuler::scrollToMapY(S32 y)
     mView.setScrollY(mView.layout().lineTop(line) - page / 2);
 }
 
+void ALTextRuler::mapWindow(const LLRect& map, S32& top, S32& bottom)
+{
+    const S32     scroll      = mapScroll(map);
+    ALTextLayout& layout      = mView.layout();
+    const S32     page        = llmax(1, mView.textRect().getHeight());
+    const S32     top_line    = layout.lineAtY(mView.scrollY());
+    const S32     bottom_line = layout.lineAtY(mView.scrollY() + page - 1);
+    // From the top line's first row, its gap's, to the bottom line's own.
+    const auto first_row = [&](S32 line) { return static_cast<S32>(std::lower_bound(mMapLines.begin(), mMapLines.end(), line) - mMapLines.begin()); };
+    const auto own_row   = [&](S32 line) { return static_cast<S32>(std::upper_bound(mMapLines.begin(), mMapLines.end(), line) - mMapLines.begin()) - 1; };
+    top    = map.mTop - MAP_PAD - (first_row(top_line) * MAP_LINE_H - scroll);
+    bottom = map.mTop - MAP_PAD - ((own_row(bottom_line) + 1) * MAP_LINE_H - scroll);
+}
+
+F32 ALTextRuler::mapDragRatio(const LLRect& map)
+{
+    // A map that holds every row stays put, and its window moves a row's
+    // height for a line's. One that scrolls moves its window over what
+    // the map has room for less the window, as a thumb over its track,
+    // while the text moves over all of it less a page.
+    mapScroll(map);
+    const F32 doc_h = static_cast<F32>(mMapLines.size() * MAP_LINE_H);
+    const F32 map_h = static_cast<F32>(map.getHeight() - 2 * MAP_PAD);
+    const F32 total = static_cast<F32>(llmax(1, mView.layout().totalHeight()));
+    const F32 page  = static_cast<F32>(llmax(1, mView.textRect().getHeight()));
+    if (doc_h <= map_h)
+    {
+        return total / llmax(1.f, doc_h);
+    }
+    const F32 window = doc_h * page / total;
+    return llmax(0.f, total - page) / llmax(1.f, map_h - window);
+}
+
 void ALTextRuler::readMapRuns(S32 line, S32 columns, std::vector<MapRun>& out)
 {
     // Each run of glyphs of one kind, by column, as far as the map is
@@ -585,14 +618,9 @@ void ALTextRuler::drawMap(F32 alpha)
     }
     gGL.end();
     // The rows on screen, as a window over the map.
-    const S32  page        = llmax(1, mView.textRect().getHeight());
-    const S32  top_line    = layout.lineAtY(mView.scrollY());
-    const S32  bottom_line = layout.lineAtY(mView.scrollY() + page - 1);
-    // From the top line's first row, its gap's, to the bottom line's own.
-    const auto first_row   = [&](S32 line) { return static_cast<S32>(std::lower_bound(mMapLines.begin(), mMapLines.end(), line) - mMapLines.begin()); };
-    const auto own_row     = [&](S32 line) { return static_cast<S32>(std::upper_bound(mMapLines.begin(), mMapLines.end(), line) - mMapLines.begin()) - 1; };
-    const S32  y0          = map.mTop - MAP_PAD - (first_row(top_line) * MAP_LINE_H - scroll);
-    const S32  y1          = map.mTop - MAP_PAD - ((own_row(bottom_line) + 1) * MAP_LINE_H - scroll);
+    S32 y0 = 0;
+    S32 y1 = 0;
+    mapWindow(map, y0, y1);
     gl_rect_2d(map.mLeft, y0, map.mRight, y1, ink % (alpha * 0.12f));
     gl_rect_2d(map.mLeft, y0, map.mRight, y1, ink % (alpha * 0.3f), false);
 }
@@ -622,8 +650,24 @@ bool ALTextRuler::handleMouseDown(S32 x, S32 y, MASK mask)
     gFocusMgr.setMouseCapture(this);
     if (isMap())
     {
-        // The map: the view goes where it is pressed, and follows a drag.
-        scrollToMapY(y);
+        // The map, as the ruler: its window taken hold of where it was
+        // pressed, or the line pressed brought to the middle of the view.
+        // A drag then moves the text by how far the mouse has gone since,
+        // so that the window keeps under it. The line under the mouse,
+        // looked up again at each move, would be another each frame as the
+        // map scrolls beneath it, and the view would creep after it.
+        const LLRect map    = getLocalRect();
+        S32          top    = 0;
+        S32          bottom = 0;
+        mapWindow(map, top, bottom);
+        if (y > top || y <= bottom)
+        {
+            scrollToMapY(y);
+        }
+        const S32 most   = llmax(0, mView.layout().totalHeight() - mView.textRect().getHeight());
+        mDragStartY      = y;
+        mDragStartScroll = llclamp(mView.scrollY(), 0, most);
+        mDragRatio       = mapDragRatio(map);
         return true;
     }
     // The ruler: its thumb taken hold of where it was pressed, or brought
@@ -653,7 +697,9 @@ bool ALTextRuler::handleHover(S32 x, S32 y, MASK mask)
     {
         if (isMap())
         {
-            scrollToMapY(y);
+            const S32 most  = llmax(0, mView.layout().totalHeight() - mView.textRect().getHeight());
+            const S32 moved = ll_round(static_cast<F32>(mDragStartY - y) * mDragRatio);
+            mView.setScrollY(llclamp(mDragStartScroll + moved, 0, most));
         }
         else
         {

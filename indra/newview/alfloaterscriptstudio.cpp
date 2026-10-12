@@ -8190,8 +8190,10 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     options.detectedTable = gSavedSettings.getBOOL("ALScriptConvertDetectedTable");
     options.sluaCalls     = gSavedSettings.getBOOL("ALScriptConvertSLuaCalls");
     options.idioms        = gSavedSettings.getBOOL("ALScriptConvertIdioms");
+    options.uuidKeys      = gSavedSettings.getBOOL("ALScriptConvertUuidKeys");
     options.handlers      = gSavedSettings.getBOOL("ALScriptConvertHandlerFields") ? ALLSLToSLua::Options::Handlers::Field : ALLSLToSLua::Options::Handlers::On;
     options.types         = gSavedSettings.getBOOL("ALScriptConvertTypes");
+    options.keyTextAny    = gSavedSettings.getBOOL("ALScriptConvertKeyTextAny");
     options.comments      = gSavedSettings.getBOOL("ALScriptConvertComments");
     options.keepComments  = gSavedSettings.getBOOL("ALScriptConvertKeepComments");
     // Its tables' braces as the formatter writes them.
@@ -9627,7 +9629,9 @@ void ALFloaterScriptStudio::addBuildCommands()
     // The settings each turns on and off, heard as the preferences'
     // changes are (pumpPreprocessor).
     for (const auto& [name, setting] :
-         { std::pair{ "preflight", "ALScriptStudioPreflight" }, std::pair{ "preproc_enabled", "ALScriptPreprocEnabled" },
+         { std::pair{ "preflight", "ALScriptStudioPreflight" }, std::pair{ "fix_on_save", "ALScriptFixOnSave" },
+           std::pair{ "format_on_save", "ALScriptFormatOnSave" }, std::pair{ "trim_on_save", "ALScriptTrimOnSave" },
+           std::pair{ "preproc_enabled", "ALScriptPreprocEnabled" },
            std::pair{ "preproc_disk", "ALScriptPreprocDiskIncludes" }, std::pair{ "preproc_switch", "ALScriptPreprocSwitch" },
            std::pair{ "preproc_lazy", "ALScriptPreprocLazyLists" }, std::pair{ "preproc_compress", "ALScriptPreprocCompress" },
            std::pair{ "preproc_extensions", "ALScriptPreprocExtensions" }, std::pair{ "preproc_optimize", "ALScriptPreprocOptimizer" },

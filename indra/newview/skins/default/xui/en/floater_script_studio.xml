@@ -1816,6 +1816,18 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="preflight" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preflight" />
             </menu_item_check>
+            <menu_item_check label="Make Safe Fixes on Save" layout="topleft" name="fix_on_save">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="fix_on_save" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="fix_on_save" />
+            </menu_item_check>
+            <menu_item_check label="Format on Save" layout="topleft" name="format_on_save">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="format_on_save" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="format_on_save" />
+            </menu_item_check>
+            <menu_item_check label="Trim Trailing Spaces on Save" layout="topleft" name="trim_on_save">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="trim_on_save" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="trim_on_save" />
+            </menu_item_check>
             <menu_item_separator layout="topleft" />
             <menu
              label="Preprocessor"

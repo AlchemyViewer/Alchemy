@@ -27,6 +27,7 @@
 #include "alscriptstudiovim.h"
 
 #include "alcodeeditor.h"
+#include "aldiffview.h"
 #include "alscriptnavigation.h"
 #include "alscriptstudiocommands.h"
 #include "alscriptstudiosaves.h"
@@ -169,7 +170,7 @@ void ALScriptStudioVim::connect(ALVimKeymap& vim)
         {
             return std::string();
         }
-        const Doc* doc = docOf(view);
+        const Doc* doc = tabOf(view);
         if (name == '#')
         {
             const Doc* alternate = alternateTab();
@@ -303,6 +304,23 @@ ALScriptStudioVim::Doc* ALScriptStudioVim::docOf(const ALTextView& view)
     return nullptr;
 }
 
+ALScriptStudioVim::Doc* ALScriptStudioVim::tabOf(const ALTextView& view)
+{
+    if (Doc* doc = docOf(view))
+    {
+        return doc;
+    }
+    for (Doc* doc : mServices.openDocs())
+    {
+        if (const ALDiffView* compare = doc->compareView;
+            compare && (&view == compare->left() || &view == compare->right() || &view == compare->inlined()))
+        {
+            return doc;
+        }
+    }
+    return nullptr;
+}
+
 void ALScriptStudioVim::pump()
 {
     Doc* doc = mServices.frontDoc();
@@ -382,7 +400,7 @@ void ALScriptStudioVim::historyWindow(ALTextView& view, llwchar kind, const std:
 
 bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const std::string& args)
 {
-    Doc* doc = docOf(view);
+    Doc* doc = tabOf(view);
     if (!doc)
     {
         return false;
