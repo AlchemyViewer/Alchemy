@@ -1,5 +1,5 @@
 /**
- * @file test_websocketmgr.hpp
+ * @file websocketmgr_test.cpp
  * @brief A WebSocket server lets programs in and turns pages away.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -22,8 +22,9 @@
  * $/LicenseInfo$
  */
 
-#ifndef TEST_LLCORE_WEBSOCKETMGR_H_
-#define TEST_LLCORE_WEBSOCKETMGR_H_
+#include "linden_common.h"
+
+#include "lltut.h"
 
 #include "llwebsocketmgr.h"
 #include "lljsonrpcws.h"
@@ -1151,5 +1152,3 @@ namespace
         ensure("dropped", dropped);
     }
 }
-
-#endif

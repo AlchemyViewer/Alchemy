@@ -1,5 +1,5 @@
 /**
- * @file test_bufferstream.hpp
+ * @file bufferstream_test.cpp
  * @brief unit tests for the LLCore::BufferArrayStreamBuf/BufferArrayStream classes
  *
  * $LicenseInfo:firstyear=2012&license=viewerlgpl$
@@ -23,8 +23,9 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
-#ifndef TEST_LLCORE_BUFFER_STREAM_H_
-#define TEST_LLCORE_BUFFER_STREAM_H_
+#include "linden_common.h"
+
+#include "lltut.h"
 
 #include "bufferstream.h"
 
@@ -250,6 +251,3 @@ void BufferStreamTestObjectType::test<7>()
 
 
 }  // end namespace tut
-
-
-#endif  // TEST_LLCORE_BUFFER_STREAM_H_

@@ -1,5 +1,5 @@
 /**
- * @file test_refcounted.hpp
+ * @file refcounted_test.cpp
  * @brief unit tests for the LLCoreInt::RefCounted class
  *
  * $LicenseInfo:firstyear=2012&license=viewerlgpl$
@@ -23,8 +23,9 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
-#ifndef TEST_LLCOREINT_REF_COUNTED_H_
-#define TEST_LLCOREINT_REF_COUNTED_H_
+#include "linden_common.h"
+
+#include "lltut.h"
 
 #include "_refcounted.h"
 
@@ -123,4 +124,3 @@ namespace
         ensure(rc->getRefCount() == RefCounted::NOT_REF_COUNTED);
     }
 }
-#endif  // TEST_LLCOREINT_REF_COUNTED_H_

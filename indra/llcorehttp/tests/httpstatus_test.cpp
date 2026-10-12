@@ -1,5 +1,5 @@
 /**
- * @file test_llrefcounted
+ * @file httpstatus_test.cpp
  * @brief unit tests for HttpStatus struct
  *
  * $LicenseInfo:firstyear=2012&license=viewerlgpl$
@@ -24,8 +24,9 @@
  * $/LicenseInfo$
  */
 
-#ifndef TEST_HTTP_STATUS_H_
-#define TEST_HTTP_STATUS_H_
+#include "linden_common.h"
+
+#include "lltut.h"
 
 #include "httpcommon.h"
 
@@ -298,6 +299,3 @@ void HttpStatusTestObjectType::test<8>()
 }
 
 } // end namespace tut
-
-#endif  // TEST_HTTP_STATUS_H
-

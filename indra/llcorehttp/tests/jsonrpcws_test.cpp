@@ -1,10 +1,11 @@
 /**
- * @file test_jsonrpcws.hpp
+ * @file jsonrpcws_test.cpp
  * @brief unit tests for LLJSONRPCConnection helpers and dispatch behavior
  */
 
-#ifndef TEST_LLCORE_JSONRPCWS_H_
-#define TEST_LLCORE_JSONRPCWS_H_
+#include "linden_common.h"
+
+#include "lltut.h"
 
 #include "lljsonrpcws.h"
 #include "lltimer.h"
@@ -224,5 +225,3 @@ namespace
         ensure("so nothing is ever told", !called);
     }
 }
-
-#endif

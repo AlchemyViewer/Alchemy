@@ -1,5 +1,5 @@
 /**
- * @file test_httpoperation.hpp
+ * @file httpoperation_test.cpp
  * @brief unit tests for the LLCore::HttpOperation-derived classes
  *
  * $LicenseInfo:firstyear=2012&license=viewerlgpl$
@@ -23,8 +23,9 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
-#ifndef TEST_LLCORE_HTTP_OPERATION_H_
-#define TEST_LLCORE_HTTP_OPERATION_H_
+#include "linden_common.h"
+
+#include "lltut.h"
 
 #include "_httpoperation.h"
 #include "httphandler.h"
@@ -32,6 +33,7 @@
 #include <iostream>
 
 
+using namespace LLCore;
 using namespace LLCoreInt;
 
 
@@ -106,5 +108,3 @@ namespace
     }
 
 }
-
-#endif  // TEST_LLCORE_HTTP_OPERATION_H_

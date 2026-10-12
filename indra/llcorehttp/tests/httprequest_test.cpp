@@ -1,5 +1,5 @@
 /**
- * @file test_httprequest.hpp
+ * @file httprequest_test.cpp
  * @brief unit tests for the LLCore::HttpRequest class
  *
  * $LicenseInfo:firstyear=2012&license=viewerlgpl$
@@ -23,8 +23,9 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
-#ifndef TEST_LLCORE_HTTP_REQUEST_H_
-#define TEST_LLCORE_HTTP_REQUEST_H_
+#include "linden_common.h"
+
+#include "lltut.h"
 
 #include "httprequest.h"
 #include "bufferarray.h"
@@ -39,9 +40,13 @@
 #include "alregex.h"
 #include <sstream>
 
-#include "llcorehttp_test.h"
+#include "llcleanup.h"
+#include "llproxy.h"
+
+#include <iostream>
 
 
+using namespace LLCore;
 using namespace LLCoreInt;
 
 // spin/sleep waiting times for client/server exchange tests
@@ -56,12 +61,78 @@ static const int LOOP_COUNT_LONG(3000);         // 30-second dwell time
 
 namespace
 {
-
 #if defined(WIN32)
 
 void usleep(unsigned long usec);
 
 #endif
+
+// Initialization and cleanup for libcurl: curl's global state and the
+// LLProxy singleton, for the length of a test.
+void init_curl()
+{
+    curl_global_init(CURL_GLOBAL_ALL);
+
+    LLProxy::getInstance();
+}
+
+
+void term_curl()
+{
+    SUBSYSTEM_CLEANUP(LLProxy);
+}
+
+
+class ScopedCurlInit
+{
+public:
+    ScopedCurlInit()
+        {
+            init_curl();
+        }
+
+    ~ScopedCurlInit()
+        {
+            term_curl();
+        }
+};
+
+
+// The peer's address, which test_llcorehttp_peer.py, the program this test
+// runs under, puts in LL_TEST_PORT.
+std::string get_base_url()
+{
+    const char * env(getenv("LL_TEST_PORT"));
+
+    if (! env)
+    {
+        std::cerr << "LL_TEST_PORT environment variable missing." << std::endl;
+        std::cerr << "Test expects to run in test_llcorehttp_peer.py script." << std::endl;
+        tut::ensure("LL_TEST_PORT set in environment", NULL != env);
+    }
+
+    int port(atoi(env));
+    std::ostringstream out;
+    out << "http://localhost:" << port << "/";
+    return out.str();
+}
+
+
+void stop_thread(LLCore::HttpRequest * req)
+{
+    if (req)
+    {
+        req->requestStopThread(LLCore::HttpHandler::ptr_t());
+
+        int count = 0;
+        int limit = 10;
+        while (count++ < limit && ! HttpService::isStopped())
+        {
+            req->update(1000);
+            usleep(100000);
+        }
+    }
+}
 
 }
 
@@ -3042,5 +3113,3 @@ void usleep(unsigned long usec)
 #endif
 
 }
-
-#endif  // TEST_LLCORE_HTTP_REQUEST_H_

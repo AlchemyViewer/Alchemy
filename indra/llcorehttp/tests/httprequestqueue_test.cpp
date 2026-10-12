@@ -1,5 +1,5 @@
 /**
- * @file test_httprequestqueue.hpp
+ * @file httprequestqueue_test.cpp
  * @brief unit tests for the LLCore::HttpRequestQueue class
  *
  * $LicenseInfo:firstyear=2012&license=viewerlgpl$
@@ -23,8 +23,9 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
-#ifndef TEST_LLCORE_HTTP_REQUESTQUEUE_H_
-#define TEST_LLCORE_HTTP_REQUESTQUEUE_H_
+#include "linden_common.h"
+
+#include "lltut.h"
 
 #include "_httprequestqueue.h"
 
@@ -33,6 +34,7 @@
 #include "_httpoperation.h"
 
 
+using namespace LLCore;
 using namespace LLCoreInt;
 
 
@@ -155,6 +157,3 @@ void HttpRequestqueueTestObjectType::test<4>()
 }
 
 }  // end namespace tut
-
-
-#endif  // TEST_LLCORE_HTTP_REQUESTQUEUE_H_

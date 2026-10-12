@@ -1,5 +1,5 @@
 /**
- * @file test_bufferarray.hpp
+ * @file bufferarray_test.cpp
  * @brief unit tests for the LLCore::BufferArray class
  *
  * $LicenseInfo:firstyear=2012&license=viewerlgpl$
@@ -23,8 +23,9 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
-#ifndef TEST_LLCORE_BUFFER_ARRAY_H_
-#define TEST_LLCORE_BUFFER_ARRAY_H_
+#include "linden_common.h"
+
+#include "lltut.h"
 
 #include "bufferarray.h"
 
@@ -378,6 +379,3 @@ void BufferArrayTestObjectType::test<8>()
 }
 
 }  // end namespace tut
-
-
-#endif  // TEST_LLCORE_BUFFER_ARRAY_H_
