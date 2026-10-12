@@ -146,6 +146,7 @@ namespace
         LLSettingsSky::ptr_t half = make_sky(from);
         half->blend(end, 0.5);
         LLSD at_half = half->getAbsorptionConfigs();
+        REQUIRE(at_half.size() == size_t(2));
         require_close("boundary at 0.5", term(at_half[0], LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH), 25000.0f);
         require_close("below the boundary at 0.5", term(at_half[0], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.3f);
         require_close("above the boundary at 0.5", term(at_half[1], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 0.5f);
@@ -175,6 +176,7 @@ namespace
         sky->validate();
 
         LLSD stored = sky->getAbsorptionConfigs();
+        REQUIRE(stored.size() == size_t(2));
         require_close("the layer after the nested array is clamped", term(stored[1], LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM), 10.0f);
 
         LLSD flat = LLSettingsSky::flattenDensityProfile(stored);

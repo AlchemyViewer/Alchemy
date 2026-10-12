@@ -1,5 +1,5 @@
 /**
- * @file llinventoryparcel_tut.cpp
+ * @file llparcel_test.cpp
  * @author Moss
  * @date 2007-04-17
  *

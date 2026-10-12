@@ -1,5 +1,5 @@
 /**
- * @file lluserrelations_tut.cpp
+ * @file lluserrelations_test.cpp
  * @author Phoenix
  * @date 2006-10-12
  * @brief Unit tests for the LLRelationship class.
@@ -104,11 +104,4 @@ namespace
         mRelationship.online(false);
         CHECK_FALSE(mRelationship.isOnline());
     }
-
-/*
-    template<> template<>
-    void user_relationship_object_t::test<>()
-    {
-    }
-*/
 }

@@ -1,5 +1,5 @@
 /**
- * @file llpermissions_tut.cpp
+ * @file llpermissions_test.cpp
  * @author Adroit
  * @date March 2007
  * @brief llpermissions test cases.
@@ -298,55 +298,96 @@ namespace
         CHECK(perm.allowOperationBy(bits,agent1,group));
     }
 
-    TEST_CASE("permission: allowModifyBy allows any agent under the default masks", "[permission]")
+    // allowModifyBy, allowCopyBy and allowMoveBy answer the owner by the
+    // owner mask, a member asking as the object's group by the group mask
+    // (or the everyone mask), and anyone else by the everyone mask. The
+    // system, the null agent, may always. initMasks takes base, owner,
+    // everyone, group, next, in that order.
+    TEST_CASE("permission: allowModifyBy answers the owner and a group member and a stranger by their masks", "[permission]")
     {
         LLPermissions perm;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
-        LLUUID owner;
+        LLUUID owner("68edcf47-ccd7-45b8-9f90-1649d7f12806");
         LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
+        LLUUID member("1f6e2b7c-3d4a-4e5f-8a9b-0c1d2e3f4a5b");
+        LLUUID stranger("7d8e9fa0-b1c2-4d3e-9f40-5a6b7c8d9e0f");
         perm.init(creator,owner,lastOwner,group);
-        LLUUID agent;
-        CHECK(perm.allowModifyBy(agent));
-        CHECK(perm.allowModifyBy(agent,group));
 
-        LLUUID agent1("9c8eca51-53d5-42a7-bb58-cef070395db8");
-        CHECK(perm.allowModifyBy(agent1));
-        CHECK(perm.allowModifyBy(agent1,group));
+        // The owner may modify; the group and everyone may not.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_NONE, PERM_NONE, PERM_ALL);
+        CHECK(perm.allowModifyBy(LLUUID::null));
+        CHECK(perm.allowModifyBy(owner));
+        CHECK_FALSE(perm.allowModifyBy(member, group));
+        CHECK_FALSE(perm.allowModifyBy(stranger));
+
+        // The group may too, but only to a member asking as the group.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_NONE, PERM_MODIFY, PERM_ALL);
+        CHECK(perm.allowModifyBy(member, group));
+        CHECK_FALSE(perm.allowModifyBy(member));
+        CHECK_FALSE(perm.allowModifyBy(stranger));
+
+        // Everyone never may, whatever its mask asks for.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_ALL, PERM_MODIFY, PERM_ALL);
+        CHECK_FALSE(perm.allowModifyBy(stranger));
     }
 
-    TEST_CASE("permission: allowCopyBy allows any agent under the default masks", "[permission]")
+    TEST_CASE("permission: allowCopyBy answers the owner and a group member and a stranger by their masks", "[permission]")
     {
         LLPermissions perm;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
-        LLUUID owner;
+        LLUUID owner("68edcf47-ccd7-45b8-9f90-1649d7f12806");
         LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
+        LLUUID member("1f6e2b7c-3d4a-4e5f-8a9b-0c1d2e3f4a5b");
+        LLUUID stranger("7d8e9fa0-b1c2-4d3e-9f40-5a6b7c8d9e0f");
         perm.init(creator,owner,lastOwner,group);
-        LLUUID agent;
-        CHECK(perm.allowModifyBy(agent));
-        CHECK(perm.allowModifyBy(agent,group));
 
-        LLUUID agent1("9c8eca51-53d5-42a7-bb58-cef070395db8");
-        CHECK(perm.allowCopyBy(agent1));
-        CHECK(perm.allowCopyBy(agent1,group));
+        // The owner may copy; the group and everyone may not.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_NONE, PERM_NONE, PERM_ALL);
+        CHECK(perm.allowCopyBy(LLUUID::null));
+        CHECK(perm.allowCopyBy(owner));
+        CHECK_FALSE(perm.allowCopyBy(member, group));
+        CHECK_FALSE(perm.allowCopyBy(stranger));
+
+        // The group may too, but only to a member asking as the group.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_NONE, PERM_COPY, PERM_ALL);
+        CHECK(perm.allowCopyBy(member, group));
+        CHECK_FALSE(perm.allowCopyBy(member));
+        CHECK_FALSE(perm.allowCopyBy(stranger));
+
+        // And once everyone may, so may a stranger.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_COPY, PERM_COPY, PERM_ALL);
+        CHECK(perm.allowCopyBy(stranger));
     }
 
-    TEST_CASE("permission: allowMoveBy allows any agent under the default masks", "[permission]")
+    TEST_CASE("permission: allowMoveBy answers the owner and a group member and a stranger by their masks", "[permission]")
     {
         LLPermissions perm;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
-        LLUUID owner;
+        LLUUID owner("68edcf47-ccd7-45b8-9f90-1649d7f12806");
         LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
+        LLUUID member("1f6e2b7c-3d4a-4e5f-8a9b-0c1d2e3f4a5b");
+        LLUUID stranger("7d8e9fa0-b1c2-4d3e-9f40-5a6b7c8d9e0f");
         perm.init(creator,owner,lastOwner,group);
-        LLUUID agent;
-        CHECK(perm.allowMoveBy(agent));
-        CHECK(perm.allowMoveBy(agent,group));
 
-        LLUUID agent1("9c8eca51-53d5-42a7-bb58-cef070395db8");
-        CHECK(perm.allowMoveBy(agent1));
-        CHECK(perm.allowMoveBy(agent1,group));
+        // The owner may move; the group and everyone may not.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_NONE, PERM_NONE, PERM_ALL);
+        CHECK(perm.allowMoveBy(LLUUID::null));
+        CHECK(perm.allowMoveBy(owner));
+        CHECK_FALSE(perm.allowMoveBy(member, group));
+        CHECK_FALSE(perm.allowMoveBy(stranger));
+
+        // The group may too, but only to a member asking as the group.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_NONE, PERM_MOVE, PERM_ALL);
+        CHECK(perm.allowMoveBy(member, group));
+        CHECK_FALSE(perm.allowMoveBy(member));
+        CHECK_FALSE(perm.allowMoveBy(stranger));
+
+        // And once everyone may, so may a stranger.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_MOVE, PERM_MOVE, PERM_ALL);
+        CHECK(perm.allowMoveBy(stranger));
     }
 
     TEST_CASE("permission: allowTransferTo allows the null agent while the owner is null", "[permission]")
@@ -456,14 +497,15 @@ namespace
         LLAggregatePermissions AggrPermission1;
         CHECK(AggrPermission.getU8() == 0);
         CHECK(AggrPermission.isEmpty());
-        AggrPermission.getValue(PERM_TRANSFER);
-        CHECK(AggrPermission.getValue(PERM_TRANSFER) == 0x00);
+        CHECK(AggrPermission.getValue(PERM_TRANSFER) == LLAggregatePermissions::AP_EMPTY);
 
         AggrPermission.aggregate(PERM_ITEM_UNRESTRICTED);
         CHECK_FALSE(AggrPermission.isEmpty());
+        CHECK(AggrPermission.getValue(PERM_TRANSFER) == LLAggregatePermissions::AP_ALL);
 
         AggrPermission1.aggregate(AggrPermission);
         CHECK_FALSE(AggrPermission1.isEmpty());
+        CHECK(AggrPermission1.getValue(PERM_TRANSFER) == LLAggregatePermissions::AP_ALL);
 
         std::ostringstream stream1;
         stream1 << AggrPermission;

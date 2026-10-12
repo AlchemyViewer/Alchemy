@@ -1,5 +1,5 @@
 /**
- * @file LLSaleInfo_tut.cpp
+ * @file llsaleinfo_test.cpp
  * @author Adroit
  * @date 2007-03
  * @brief Test cases of llsaleinfo.h
@@ -140,7 +140,8 @@ namespace
         CHECK(ret_type == LLSaleInfo::FS_ORIGINAL);
 
         LLSaleInfo saleinfo(LLSaleInfo::FS_COPY, sale_price);
-        const char* result = LLSaleInfo::lookup(LLSaleInfo::FS_COPY);
+        const char* result = LLSaleInfo::lookup(saleinfo.getSaleType());
+        REQUIRE(result != nullptr);
         CHECK(std::string_view(result) == "copy");
     }
 
@@ -168,12 +169,18 @@ namespace
         CHECK(saleinfo != saleinfonotequal);
     }
 
-    TEST_CASE("llsaleinfo: placeholder for the untested message packing", "[llsaleinfo]")
+    // The LLSD forms of packMessage and unpackMessage. The LLMessageSystem
+    // forms need a message system built from the message template, which
+    // this test does not have.
+    TEST_CASE("llsaleinfo: the LLSD packMessage and unpackMessage round-trip", "[llsaleinfo]")
     {
+        LLSaleInfo saleinfo(LLSaleInfo::FS_CONTENTS, 4321);
+        LLSD message = saleinfo.packMessage();
 
-        //TBD: void LLSaleInfo::packMessage(LLMessageSystem* msg) const
-        //TBD: void LLSaleInfo::unpackMessage(LLMessageSystem* msg, const char* block)
-        //TBD: void LLSaleInfo::unpackMultiMessage(LLMessageSystem* msg, const char* block, S32 block_num)
+        LLSaleInfo saleinfo1;
+        saleinfo1.unpackMessage(message);
+
+        CHECK(saleinfo1.getSaleType() == LLSaleInfo::FS_CONTENTS);
+        CHECK(saleinfo1.getSalePrice() == 4321);
     }
-
 }

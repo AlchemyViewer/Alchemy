@@ -1,5 +1,5 @@
 /**
- * @file inventory.cpp
+ * @file inventorymisc_test.cpp
  * @author Phoenix
  * @date 2005-11-15
  * @brief Functions for inventory test framework
@@ -243,6 +243,7 @@ namespace
         sd = ll_create_sd_from_inventory_item(src);
         //LL_INFOS() << "sd: " << *sd << LL_ENDL;
         successful_parse = dst->fromLLSD(sd);
+        CHECK(successful_parse);
         CHECK(dst->getUUID() == src->getUUID());
         CHECK(dst->getParentUUID() == src->getParentUUID());
         CHECK(dst->getName() == src->getName());
@@ -374,7 +375,7 @@ namespace
             LL_ERRS()<< "Parsing cache failed" << LL_ENDL;
             return;
         }
-        src2->fromLLSD(s_item);
+        CHECK(src2->fromLLSD(s_item));
 
         file.close();
 
@@ -417,18 +418,12 @@ namespace
         CHECK_FALSE(src2->getIsFavorite()); // not supposed to carry over
     }
 
-    TEST_CASE("LLInventory: placeholder for the removed XML export and import", "[LLInventory]")
-    {
-        // Deleted LLInventoryItem::exportFileXML() and LLInventoryItem::importXML()
-        // because I can't find any non-test code references to it. 2009-05-04 JC
-    }
-
     TEST_CASE("LLInventory: an item survives asLLSD and fromLLSD", "[LLInventory]")
     {
         LLPointer<LLInventoryItem> src1 = create_random_inventory_item();
         LLSD retSd = src1->asLLSD();
         LLPointer<LLInventoryItem> src2 = new LLInventoryItem();
-        src2->fromLLSD(retSd);
+        CHECK(src2->fromLLSD(retSd));
 
         CHECK(src1->getUUID() == src2->getUUID());
         CHECK(src1->getParentUUID() == src2->getParentUUID());

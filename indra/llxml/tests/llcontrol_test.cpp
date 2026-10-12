@@ -1,5 +1,5 @@
 /**
- * @file llcontrol_tut.cpp
+ * @file llcontrol_test.cpp
  * @date   February 2008
  * @brief control group unit tests
  *
@@ -44,7 +44,7 @@ namespace
         std::string mTestConfigDir;
         std::string mTestConfigFile;
         std::vector<std::string> mCleanups;
-        static bool mListenerFired;
+        bool mListenerFired = false;
         control_group()
         {
             mCG.reset(new LLControlGroup("foo"));
@@ -80,15 +80,7 @@ namespace
             }
             file.close();
         }
-        static bool handleListenerTest()
-        {
-            control_group::mListenerFired = true;
-            return true;
-        }
     };
-
-    bool control_group::mListenerFired = false;
-
 
     //load settings from files - LLSD
     TEST_CASE_METHOD(control_group, "control_group: loadFromFile reads the settings in an LLSD file", "[control_group]")
@@ -143,7 +135,8 @@ namespace
         int results = mCG->loadFromFile(mTestConfigFile.c_str());
         UNSCOPED_INFO("number of settings");
         REQUIRE(results == 1);
-        mCG->getControl("TestSetting")->getSignal()->connect(boost::bind(&this->handleListenerTest));
+        mCG->getControl("TestSetting")->getSignal()->connect(
+            [this](LLControlVariable*, const LLSD&, const LLSD&) { mListenerFired = true; });
         mCG->setU32("TestSetting", 13);
         CHECK(mListenerFired);
     }

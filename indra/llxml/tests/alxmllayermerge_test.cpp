@@ -382,11 +382,10 @@ namespace
             CHECK(installed.roots == 1);
             ALXmlLayerMerge::setDefaultObserver(nullptr);
 
-            RecordingObserver silent;
             LLXMLNodePtr again;
             CHECK(ALXmlLayerMerge::load({ base, overlay }, again));
             UNSCOPED_INFO("and hears nothing once it is gone");
-            CHECK(silent.roots == 0);
+            CHECK(installed.roots == 1);
         }
     }
 
