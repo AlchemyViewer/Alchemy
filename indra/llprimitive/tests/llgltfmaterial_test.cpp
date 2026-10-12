@@ -24,7 +24,7 @@
  */
 
 #include "linden_common.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <set>
 
@@ -51,17 +51,8 @@
 
 #include <tiny_gltf.h>
 
-namespace tut
-{
 namespace
 {
-    struct llgltfmaterial
-    {
-    };
-    typedef test_group<llgltfmaterial> llgltfmaterial_t;
-    typedef llgltfmaterial_t::object llgltfmaterial_object_t;
-    tut::llgltfmaterial_t tut_llgltfmaterial("llgltfmaterial");
-
     // A positive 32-bit float with a long string representation
     constexpr F32 test_fraction = 1.09045365e-32f;
     // A larger positive 32-bit float for values that get zeroed if below a threshold
@@ -125,19 +116,24 @@ namespace
         std::string warn_msg;
         std::string error_msg;
         bool serialize_success = material_out.fromJSON(json_in, warn_msg, error_msg);
-        ensure_equals("LLGLTFMaterial serialization has no warnings: " + ensure_suffix, "", warn_msg);
-        ensure_equals("LLGLTFMaterial serialization has no errors: " + ensure_suffix, "", error_msg);
-        ensure("LLGLTFMaterial serializes successfully: " + ensure_suffix, serialize_success);
-        ensure("LLGLTFMaterial is preserved when deserialized: " + ensure_suffix, material_in == material_out);
+        UNSCOPED_INFO("LLGLTFMaterial serialization has no warnings: " + ensure_suffix);
+        REQUIRE("" == warn_msg);
+        UNSCOPED_INFO("LLGLTFMaterial serialization has no errors: " + ensure_suffix);
+        REQUIRE("" == error_msg);
+        UNSCOPED_INFO("LLGLTFMaterial serializes successfully: " + ensure_suffix);
+        REQUIRE(serialize_success);
+        UNSCOPED_INFO("LLGLTFMaterial is preserved when deserialized: " + ensure_suffix);
+        REQUIRE(material_in == material_out);
         const std::string json_out = material_out.asJSON();
-        ensure_equals("LLGLTFMaterial is preserved when serialized: " + ensure_suffix, json_in, json_out);
+        UNSCOPED_INFO("LLGLTFMaterial is preserved when serialized: " + ensure_suffix);
+        REQUIRE(json_in == json_out);
     }
 
     void ensure_gltf_material_trimmed(const std::string& material_json, const std::string& must_not_contain)
     {
-        ensure("LLGLTFMaterial serialization trims property '" + must_not_contain + "'", material_json.find(must_not_contain) == std::string::npos);
+        UNSCOPED_INFO("LLGLTFMaterial serialization trims property '" + must_not_contain + "'");
+        REQUIRE(material_json.find(must_not_contain) == std::string::npos);
     }
-}
 
     // Test that GLTF material fields have not changed since these tests were
     // written. The previous sizeof(LLGLTFMaterial) tripwire was removed when
@@ -145,22 +141,21 @@ namespace
     // the hash snapshot/cache members (which aren't part of the hashed
     // payload), so it stopped being a useful regression check. test<12>
     // exercises the actual hash invariant directly.
-    template<> template<>
-    void llgltfmaterial_object_t::test<1>()
+    TEST_CASE("llgltfmaterial: there are four texture infos", "[llgltfmaterial]")
     {
-        ensure_equals("LLGLTFMaterial texture info count", (U32)LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT, 4);
+        UNSCOPED_INFO("LLGLTFMaterial texture info count");
+        CHECK((U32)LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT == 4);
     }
 
     // Test that occlusion and metallicRoughness are the same (They are different for asset validation. See lluploadmaterial.cpp)
-    template<> template<>
-    void llgltfmaterial_object_t::test<2>()
+    TEST_CASE("llgltfmaterial: occlusion and metallicRoughness share a texture info", "[llgltfmaterial]")
     {
-        ensure_equals("LLGLTFMaterial occlusion does not differ from metallic roughness", LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS, LLGLTFMaterial::GLTF_TEXTURE_INFO_OCCLUSION);
+        UNSCOPED_INFO("LLGLTFMaterial occlusion does not differ from metallic roughness");
+        CHECK(LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS == LLGLTFMaterial::GLTF_TEXTURE_INFO_OCCLUSION);
     }
 
     // Ensure double sided and alpha mode overrides serialize as expected
-    template<> template<>
-    void llgltfmaterial_object_t::test<3>()
+    TEST_CASE("llgltfmaterial: double sided and alpha mode overrides set their flag and serialize", "[llgltfmaterial]")
     {
         const bool doubleSideds[] { false, true };
         const LLGLTFMaterial::AlphaMode alphaModes[] { LLGLTFMaterial::ALPHA_MODE_OPAQUE, LLGLTFMaterial::ALPHA_MODE_BLEND, LLGLTFMaterial::ALPHA_MODE_MASK };
@@ -173,7 +168,8 @@ namespace
                 LLGLTFMaterial material;
                 material.setDoubleSided(doubleSided, forOverride);
                 const bool overrideBit = (doubleSided == false) && forOverride;
-                ensure_equals("LLGLTFMaterial: double sided = " + std::to_string(doubleSided) + " override bit when forOverride = " + std::to_string(forOverride), material.mOverrideDoubleSided, overrideBit);
+                UNSCOPED_INFO("LLGLTFMaterial: double sided = " + std::to_string(doubleSided) + " override bit when forOverride = " + std::to_string(forOverride));
+                REQUIRE(material.mOverrideDoubleSided == overrideBit);
                 ensure_gltf_material_serialize("double sided = " + std::to_string(doubleSided), material);
             }
         }
@@ -185,15 +181,15 @@ namespace
                 LLGLTFMaterial material;
                 material.setAlphaMode(alphaMode, forOverride);
                 const bool overrideBit = (alphaMode == LLGLTFMaterial::ALPHA_MODE_OPAQUE) && forOverride;
-                ensure_equals("LLGLTFMaterial: alpha mode = " + std::to_string(alphaMode) + " override bit when forOverride = " + std::to_string(forOverride), material.mOverrideAlphaMode, overrideBit);
+                UNSCOPED_INFO("LLGLTFMaterial: alpha mode = " + std::to_string(alphaMode) + " override bit when forOverride = " + std::to_string(forOverride));
+                REQUIRE(material.mOverrideAlphaMode == overrideBit);
                 ensure_gltf_material_serialize("alpha mode = " + std::to_string(alphaMode), material);
             }
         }
     }
 
     // Test that a GLTF material's transform components serialize as expected
-    template<> template<>
-    void llgltfmaterial_object_t::test<4>()
+    TEST_CASE("llgltfmaterial: a texture transform survives a JSON round trip", "[llgltfmaterial]")
     {
         LLGLTFMaterial material;
         LLGLTFMaterial::TextureTransform& transform = material.mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR];
@@ -206,8 +202,7 @@ namespace
     }
 
     // Test that a GLTF material avoids serializing a material unnecessarily
-    template<> template<>
-    void llgltfmaterial_object_t::test<5>()
+    TEST_CASE("llgltfmaterial: asJSON leaves out default properties and unset textures", "[llgltfmaterial]")
     {
         {
             const LLGLTFMaterial material;
@@ -228,8 +223,7 @@ namespace
     }
 
     // Test that a GLTF material preserves values on serialization
-    template<> template<>
-    void llgltfmaterial_object_t::test<6>()
+    TEST_CASE("llgltfmaterial: full and partial materials survive a JSON round trip", "[llgltfmaterial]")
     {
         {
             const LLGLTFMaterial full_material = create_test_material();
@@ -256,29 +250,28 @@ namespace
     }
 
     // Test that sDefault is a no-op override
-    template<> template<>
-    void llgltfmaterial_object_t::test<7>()
+    TEST_CASE("llgltfmaterial: sDefault is a no-op override", "[llgltfmaterial]")
     {
         const LLGLTFMaterial material_asset = create_test_material();
         LLGLTFMaterial render_material = material_asset;
         render_material.applyOverride(LLGLTFMaterial::sDefault);
-        ensure("LLGLTFMaterial: sDefault is a no-op override", material_asset == render_material);
+        UNSCOPED_INFO("LLGLTFMaterial: sDefault is a no-op override");
+        CHECK(material_asset == render_material);
     }
 
     // Test application of transform overrides
-    template<> template<>
-    void llgltfmaterial_object_t::test<8>()
+    TEST_CASE("llgltfmaterial: applyOverride applies texture transform overrides", "[llgltfmaterial]")
     {
         LLGLTFMaterial override_material;
         apply_test_material_texture_transforms(override_material);
         LLGLTFMaterial render_material;
         render_material.applyOverride(override_material);
-        ensure("LLGLTFMaterial: transform overrides", render_material == override_material);
+        UNSCOPED_INFO("LLGLTFMaterial: transform overrides");
+        CHECK(render_material == override_material);
     }
 
     // Test application of flag-based overrides
-    template<> template<>
-    void llgltfmaterial_object_t::test<9>()
+    TEST_CASE("llgltfmaterial: applyOverride applies alpha mode and double sided overrides", "[llgltfmaterial]")
     {
         {
             LLGLTFMaterial override_material;
@@ -289,7 +282,8 @@ namespace
 
             render_material.applyOverride(override_material);
 
-            ensure("LLGLTFMaterial: extra overrides with non-default values applied over default", render_material == override_material);
+            UNSCOPED_INFO("LLGLTFMaterial: extra overrides with non-default values applied over default");
+            CHECK(render_material == override_material);
         }
         {
             LLGLTFMaterial override_material;
@@ -305,13 +299,13 @@ namespace
             override_material.mOverrideDoubleSided = false;
             override_material.mOverrideAlphaMode = false;
 
-            ensure("LLGLTFMaterial: extra overrides with default values applied over non-default", render_material == override_material);
+            UNSCOPED_INFO("LLGLTFMaterial: extra overrides with default values applied over non-default");
+            CHECK(render_material == override_material);
         }
     }
 
     // Test application of texture overrides
-    template<> template<>
-    void llgltfmaterial_object_t::test<10>()
+    TEST_CASE("llgltfmaterial: applyOverride replaces every texture ID with the override", "[llgltfmaterial]")
     {
         const U32 texture_count = 2;
         const LLUUID override_textures[texture_count] = { LLUUID::null, LLUUID::generateNewID() };
@@ -337,14 +331,14 @@ namespace
             for (LLGLTFMaterial::TextureInfo j = LLGLTFMaterial::TextureInfo(0); j  < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; j = LLGLTFMaterial::TextureInfo(U32(j) + 1))
             {
                 const LLUUID& render_texture = render_material.mTextureId[j];
-                ensure_equals("LLGLTFMaterial: Override texture ID " + override_texture.asString() + " replaces underlying texture ID " + asset_texture.asString(), render_texture, override_texture);
+                UNSCOPED_INFO("LLGLTFMaterial: Override texture ID " + override_texture.asString() + " replaces underlying texture ID " + asset_texture.asString());
+                REQUIRE(render_texture == override_texture);
             }
         }
     }
 
     // Test non-persistence of default value flags in overrides
-    template<> template<>
-    void llgltfmaterial_object_t::test<11>()
+    TEST_CASE("llgltfmaterial: setting a non-default value clears the override flag", "[llgltfmaterial]")
     {
         const S32 non_default_alpha_modes[] = { LLGLTFMaterial::ALPHA_MODE_BLEND, LLGLTFMaterial::ALPHA_MODE_MASK };
         for (S32 non_default_alpha_mode : non_default_alpha_modes)
@@ -352,33 +346,37 @@ namespace
             LLGLTFMaterial material;
             // Set default alpha mode
             material.setAlphaMode(LLGLTFMaterial::ALPHA_MODE_OPAQUE, true);
-            ensure_equals("LLGLTFMaterial: alpha mode override flag set", material.mOverrideAlphaMode, true);
+            UNSCOPED_INFO("LLGLTFMaterial: alpha mode override flag set");
+            REQUIRE(material.mOverrideAlphaMode == true);
             // Set non-default alpha mode
             material.setAlphaMode(non_default_alpha_mode, true);
-            ensure_equals("LLGLTFMaterial: alpha mode override flag unset", material.mOverrideAlphaMode, false);
+            UNSCOPED_INFO("LLGLTFMaterial: alpha mode override flag unset");
+            REQUIRE(material.mOverrideAlphaMode == false);
         }
 
         {
             // Set default double sided
             LLGLTFMaterial material;
             material.setDoubleSided(false, true);
-            ensure_equals("LLGLTFMaterial: double sided override flag set", material.mOverrideDoubleSided, true);
+            UNSCOPED_INFO("LLGLTFMaterial: double sided override flag set");
+            CHECK(material.mOverrideDoubleSided == true);
             // Set non-default double sided
             material.setDoubleSided(true, true);
-            ensure_equals("LLGLTFMaterial: double sided override flag unset", material.mOverrideDoubleSided, false);
+            UNSCOPED_INFO("LLGLTFMaterial: double sided override flag unset");
+            CHECK(material.mOverrideDoubleSided == false);
         }
     }
 
-namespace
-{
     template<typename T>
     void ensure_material_hash_pre(LLGLTFMaterial& material, T& material_field, const T new_value, const std::string& field_name)
     {
-        ensure("LLGLTFMaterial: Hash: Test field " + field_name + " is part of the test material object", (
-                    size_t(&material_field) >= size_t(&material) &&
-                    (size_t(&material_field) + sizeof(material_field)) <= (size_t(&material) + sizeof(material))
-                    ));
-        ensure("LLGLTFMaterial: Hash: " + field_name + " differs and will cause a perturbation worth hashing", material_field != new_value);
+        {
+            INFO("LLGLTFMaterial: Hash: Test field " + field_name + " is part of the test material object");
+            REQUIRE(size_t(&material_field) >= size_t(&material));
+            REQUIRE((size_t(&material_field) + sizeof(material_field)) <= (size_t(&material) + sizeof(material)));
+        }
+        UNSCOPED_INFO("LLGLTFMaterial: Hash: " + field_name + " differs and will cause a perturbation worth hashing");
+        REQUIRE(material_field != new_value);
     }
 
     template<typename T>
@@ -389,7 +387,8 @@ namespace
         const LLGLTFMaterial old_material = material;
         material_field = new_value;
         // If this test fails, consult LLGLTFMaterial::getHash, and optionally consult http://www.catb.org/esr/structure-packing/ for guidance on optimal memory packing (effectiveness is platform-dependent)
-        ensure_equals(("LLGLTFMaterial: Hash: Perturbing " + field_name + " to new value does NOT change the hash").c_str(), material.getHash(), old_material.getHash());
+        UNSCOPED_INFO(("LLGLTFMaterial: Hash: Perturbing " + field_name + " to new value does NOT change the hash").c_str());
+        REQUIRE(material.getHash() == old_material.getHash());
     }
 
     template<typename T>
@@ -400,9 +399,9 @@ namespace
         const LLGLTFMaterial old_material = material;
         material_field = new_value;
         // If this test fails, consult LLGLTFMaterial::getHash, and optionally consult http://www.catb.org/esr/structure-packing/ for guidance on optimal memory packing (effectiveness is platform-dependent)
-        ensure_not_equals(("LLGLTFMaterial: Hash: Perturbing " + field_name + " to new value changes the hash").c_str(), material.getHash(), old_material.getHash());
+        UNSCOPED_INFO(("LLGLTFMaterial: Hash: Perturbing " + field_name + " to new value changes the hash").c_str());
+        REQUIRE(material.getHash() != old_material.getHash());
     }
-}
 
 #define ENSURE_HASH_NOT_CHANGED(HASH_MAT, SOURCE_MAT, FIELD) ensure_material_hash_not_changed(HASH_MAT, HASH_MAT.FIELD, SOURCE_MAT.FIELD, #FIELD)
 #define ENSURE_HASH_CHANGED(HASH_MAT, SOURCE_MAT, FIELD) ensure_material_hash_changed(HASH_MAT, HASH_MAT.FIELD, SOURCE_MAT.FIELD, #FIELD)
@@ -410,8 +409,7 @@ namespace
     // Test LLGLTFMaterial::getHash. The hash is now built from a canonical
     // packing of the meaningful members, so the previous structure-layout
     // fragility is gone.
-    template<> template<>
-    void llgltfmaterial_object_t::test<12>()
+    TEST_CASE("llgltfmaterial: getHash covers every field but the local texture tracking map", "[llgltfmaterial]")
     {
         // *NOTE: Due to direct manipulation of the fields of materials
         // throughout this test, the resulting modified materials may not be

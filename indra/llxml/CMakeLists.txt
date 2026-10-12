@@ -25,7 +25,10 @@ target_precompile_headers(llxml REUSE_FROM llprecompiled)
 
 # tests
 if(AL_BUILD_TESTS)
-  al_add_test(llxmlnode PROJECT llxml LIBRARIES llxml llmath llcommon)
-  al_add_test(llcontrol PROJECT llxml LIBRARIES llxml llmath llcommon)
-  al_add_test(alxmllayermerge PROJECT llxml LIBRARIES llxml llmath llcommon)
+  al_add_test_binary(
+    llxml_tests
+    PROJECT llxml
+    SOURCES tests/alxmllayermerge_test.cpp tests/llcontrol_test.cpp tests/llxmlnode_test.cpp
+    LIBRARIES llxml llmath llcommon
+  )
 endif()

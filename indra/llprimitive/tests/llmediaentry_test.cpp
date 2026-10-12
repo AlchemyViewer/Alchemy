@@ -25,7 +25,8 @@
  */
 
 #include "linden_common.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestname.h"
 
 #include <boost/lexical_cast.hpp>
 
@@ -135,8 +136,6 @@
  </map>\n\
  </llsd>"
 
-namespace tut
-{
 namespace
 {
     // this is fixture data that gets created before each test and destroyed
@@ -158,20 +157,9 @@ namespace
         LLSD defaultMediaEntryLLSD;
     };
 
-    typedef test_group<MediaEntry_test, 55> factory;
-    typedef factory::object object;
-}
 }
 
 
-namespace
-{
-    // this is for naming our tests to make pretty output
-    tut::factory tf("LLMediaEntry");
-}
-
-namespace tut
-{
 namespace
 {
     void ensure_llsd_equals(const std::string& msg, const LLSD& expected, const LLSD& actual)
@@ -184,7 +172,8 @@ namespace
             message += "\n  expected: ";
             message += ll_pretty_print_sd(expected);
             message += "\n";
-            ensure(message, false);
+            UNSCOPED_INFO(message);
+            REQUIRE(false);
         }
     }
 
@@ -211,37 +200,31 @@ namespace
             message += "\ncandidate_url = ";
             message += candidate_url;
         }
-        ensure(message, expected_pass == passed_whitelist);
+        UNSCOPED_INFO(message);
+        REQUIRE(expected_pass == passed_whitelist);
     }
 
     void whitelist_test(int num, const char *whitelist, const char *candidate_url, bool expected_pass)
     {
         whitelist_test(num, true, whitelist, candidate_url, expected_pass);
     }
-}
 
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: a new entry has the default LLSD", "[LLMediaEntry]")
     {
-        set_test_name("Test LLMediaEntry Instantiation");
         LLMediaEntry entry;
-        ensure_llsd_equals(get_test_name() + " failed", defaultMediaEntryLLSD, entry.asLLSD());
+        ensure_llsd_equals(ll_test::currentTestName() + " failed", defaultMediaEntryLLSD, entry.asLLSD());
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: fromLLSD of an empty LLSD gives an empty entry", "[LLMediaEntry]")
     {
-        set_test_name("Test LLMediaEntry Instantiation from LLSD");
         LLMediaEntry entry;
         LLSD sd;
         entry.fromLLSD(sd);
-        ensure_llsd_equals(get_test_name() + " failed", emptyMediaEntryLLSD, entry.asLLSD());
+        ensure_llsd_equals(ll_test::currentTestName() + " failed", emptyMediaEntryLLSD, entry.asLLSD());
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: fromLLSD of a partial LLSD leaves the other keys empty", "[LLMediaEntry]")
     {
-        set_test_name("Test LLMediaEntry Partial Instantiation from LLSD");
         LLMediaEntry entry;
         LLSD sd;
         sd[LLMediaEntry::CURRENT_URL_KEY] = "http://www.example.com";
@@ -249,13 +232,11 @@ namespace
         LLSD golden;
         std::istringstream p(PARTIAL_MEDIA_ENTRY("http://www.example.com"));
         LLSDSerialize::fromXML(golden,p);
-        ensure_llsd_equals(get_test_name() + " failed", golden, entry.asLLSD());
+        ensure_llsd_equals(ll_test::currentTestName() + " failed", golden, entry.asLLSD());
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: asLLSD replaces what the LLSD already held", "[LLMediaEntry]")
     {
-        set_test_name("Test LLMediaEntry::asLLSD()");
         LLMediaEntry entry;
         LLSD sd;
         // Put some cruft in the LLSD
@@ -264,14 +245,12 @@ namespace
         whitelist.append("*.example.com");
         sd[LLMediaEntry::WHITELIST_KEY] = whitelist;
         entry.asLLSD(sd);
-        ensure_llsd_equals(get_test_name() + " failed", defaultMediaEntryLLSD, sd);
+        ensure_llsd_equals(ll_test::currentTestName() + " failed", defaultMediaEntryLLSD, sd);
     }
 
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: fromLLSD of asLLSD output drops a whitelist the source lacks", "[LLMediaEntry]")
     {
-        set_test_name("Test LLMediaEntry::asLLSD() -> LLMediaEntry::fromLLSD()");
         LLMediaEntry entry1, entry2;
         // Add a whitelist to entry2
         std::vector<std::string> whitelist;
@@ -282,72 +261,64 @@ namespace
         entry1.asLLSD(sd);
         // "read" that LLSD into entry 2
         entry2.fromLLSD(sd);
-        ensure_llsd_equals(get_test_name() + " failed", defaultMediaEntryLLSD, entry2.asLLSD());
+        ensure_llsd_equals(ll_test::currentTestName() + " failed", defaultMediaEntryLLSD, entry2.asLLSD());
     }
 
-namespace
-{
     // limit tests
     const char *URL_OK = "http://www.example.com";
     const char *URL_TOO_BIG = "http://www.example.com.qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
-}
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: setCurrentURL accepts a short URL and rejects one over the limit", "[LLMediaEntry]")
     {
-        set_test_name("Test Limits on setting current URL");
         LLMediaEntry entry;
         U32 status = entry.setCurrentURL(URL_OK);
-        ensure(get_test_name() + " ok failed", status == LSL_STATUS_OK);
+        UNSCOPED_INFO(ll_test::currentTestName() + " ok failed");
+        CHECK(status == LSL_STATUS_OK);
         status = entry.setCurrentURL(URL_TOO_BIG);
-        ensure(get_test_name() + " ok failed", status == LSL_STATUS_BOUNDS_ERROR);
+        UNSCOPED_INFO(ll_test::currentTestName() + " ok failed");
+        CHECK(status == LSL_STATUS_BOUNDS_ERROR);
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: setHomeURL accepts a short URL and rejects one over the limit", "[LLMediaEntry]")
     {
-        set_test_name("Test Limits on setting home URL");
         LLMediaEntry entry;
         U32 status = entry.setHomeURL(URL_OK);
-        ensure(get_test_name() + " ok failed", status == LSL_STATUS_OK);
+        UNSCOPED_INFO(ll_test::currentTestName() + " ok failed");
+        CHECK(status == LSL_STATUS_OK);
         status = entry.setHomeURL(URL_TOO_BIG);
-        ensure(get_test_name() + " ok failed", status == LSL_STATUS_BOUNDS_ERROR);
+        UNSCOPED_INFO(ll_test::currentTestName() + " ok failed");
+        CHECK(status == LSL_STATUS_BOUNDS_ERROR);
     }
 
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: setWhiteList accepts a valid list", "[LLMediaEntry]")
     {
-        set_test_name("Test Limits on setting whitelist");
-
         // Test a valid list
         LLMediaEntry entry;
         std::vector<std::string> whitelist;
         whitelist.push_back(std::string(URL_OK));
         S32 status = entry.setWhiteList(whitelist);
-        ensure(get_test_name() + " invalid result", status == LSL_STATUS_OK);
-        ensure(get_test_name() + " failed", whitelist == entry.getWhiteList());
+        UNSCOPED_INFO(ll_test::currentTestName() + " invalid result");
+        CHECK(status == LSL_STATUS_OK);
+        UNSCOPED_INFO(ll_test::currentTestName() + " failed");
+        CHECK(whitelist == entry.getWhiteList());
     }
 
-    template<> template<>
-    void object::test<9>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: setWhiteList rejects a list with an oversized URL and stays empty", "[LLMediaEntry]")
     {
-        set_test_name("Test Limits on setting whitelist too big");
-
         // Test an invalid list
         LLMediaEntry entry;
         std::vector<std::string> whitelist, empty;
         whitelist.push_back(std::string(URL_OK));
         whitelist.push_back(std::string(URL_TOO_BIG));
         S32 status = entry.setWhiteList(whitelist);
-        ensure(get_test_name() + " invalid result", status == LSL_STATUS_BOUNDS_ERROR);
-        ensure(get_test_name() + " failed", empty == entry.getWhiteList());
+        UNSCOPED_INFO(ll_test::currentTestName() + " invalid result");
+        CHECK(status == LSL_STATUS_BOUNDS_ERROR);
+        UNSCOPED_INFO(ll_test::currentTestName() + " failed");
+        CHECK(empty == entry.getWhiteList());
     }
 
-    template<> template<>
-    void object::test<10>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: setWhiteList rejects too many entries and stays empty", "[LLMediaEntry]")
     {
-        set_test_name("Test Limits on setting whitelist too many");
-
         // Test an invalid list
         LLMediaEntry entry;
         std::vector<std::string> whitelist, empty;
@@ -355,33 +326,31 @@ namespace
             whitelist.push_back("Q");
         }
         S32 status = entry.setWhiteList(whitelist);
-        ensure(get_test_name() + " invalid result", status == LSL_STATUS_BOUNDS_ERROR);
-        ensure(get_test_name() + " failed", empty == entry.getWhiteList());
+        UNSCOPED_INFO(ll_test::currentTestName() + " invalid result");
+        CHECK(status == LSL_STATUS_BOUNDS_ERROR);
+        UNSCOPED_INFO(ll_test::currentTestName() + " failed");
+        CHECK(empty == entry.getWhiteList());
     }
 
-    template<> template<>
-    void object::test<11>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: both setWhiteList overloads agree on a valid list", "[LLMediaEntry]")
     {
-        set_test_name("Test to make sure both setWhiteList() functions behave the same");
-
         // Test a valid list
         std::vector<std::string> whitelist, empty;
         LLSD whitelist_llsd;
         whitelist.push_back(std::string(URL_OK));
         whitelist_llsd.append(std::string(URL_OK));
         LLMediaEntry entry1, entry2;
-        ensure(get_test_name() + " setWhiteList(s) don't match",
-               entry1.setWhiteList(whitelist) == LSL_STATUS_OK &&
-               entry2.setWhiteList(whitelist_llsd)== LSL_STATUS_OK );
-        ensure(get_test_name() + " failed",
-               entry1.getWhiteList() == entry2.getWhiteList());
+        {
+            INFO(ll_test::currentTestName() + " setWhiteList(s) don't match");
+            CHECK(entry1.setWhiteList(whitelist) == LSL_STATUS_OK);
+            CHECK(entry2.setWhiteList(whitelist_llsd)== LSL_STATUS_OK);
+        }
+        UNSCOPED_INFO(ll_test::currentTestName() + " failed");
+        CHECK(entry1.getWhiteList() == entry2.getWhiteList());
     }
 
-    template<> template<>
-    void object::test<12>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: both setWhiteList overloads reject an oversized URL", "[LLMediaEntry]")
     {
-        set_test_name("Test to make sure both setWhiteList() functions behave the same");
-
         // Test an invalid list
         std::vector<std::string> whitelist, empty;
         LLSD whitelist_llsd;
@@ -390,19 +359,20 @@ namespace
         whitelist_llsd.append(std::string(URL_OK));
         whitelist_llsd.append(std::string(URL_TOO_BIG));
         LLMediaEntry entry1, entry2;
-        ensure(get_test_name() + " setWhiteList(s) don't match",
-               entry1.setWhiteList(whitelist) == LSL_STATUS_BOUNDS_ERROR &&
-               entry2.setWhiteList(whitelist_llsd) == LSL_STATUS_BOUNDS_ERROR);
-        ensure(get_test_name() + " failed",
-               empty == entry1.getWhiteList() &&
-               empty == entry2.getWhiteList());
+        {
+            INFO(ll_test::currentTestName() + " setWhiteList(s) don't match");
+            CHECK(entry1.setWhiteList(whitelist) == LSL_STATUS_BOUNDS_ERROR);
+            CHECK(entry2.setWhiteList(whitelist_llsd) == LSL_STATUS_BOUNDS_ERROR);
+        }
+        {
+            INFO(ll_test::currentTestName() + " failed");
+            CHECK(empty == entry1.getWhiteList());
+            CHECK(empty == entry2.getWhiteList());
+        }
     }
 
-    template<> template<>
-    void object::test<13>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: both setWhiteList overloads reject too many entries", "[LLMediaEntry]")
     {
-        set_test_name("Test to make sure both setWhiteList() functions behave the same");
-
         // Test an invalid list, too many
         std::vector<std::string> whitelist, empty;
         LLSD whitelist_llsd;
@@ -411,16 +381,19 @@ namespace
             whitelist_llsd.append("Q");
         }
         LLMediaEntry entry1, entry2;
-        ensure(get_test_name() + " invalid result",
-               entry1.setWhiteList(whitelist) == LSL_STATUS_BOUNDS_ERROR &&
-               entry2.setWhiteList(whitelist_llsd) == LSL_STATUS_BOUNDS_ERROR);
-        ensure(get_test_name() + " failed",
-               empty == entry1.getWhiteList() &&
-               empty == entry2.getWhiteList());
+        {
+            INFO(ll_test::currentTestName() + " invalid result");
+            CHECK(entry1.setWhiteList(whitelist) == LSL_STATUS_BOUNDS_ERROR);
+            CHECK(entry2.setWhiteList(whitelist_llsd) == LSL_STATUS_BOUNDS_ERROR);
+        }
+        {
+            INFO(ll_test::currentTestName() + " failed");
+            CHECK(empty == entry1.getWhiteList());
+            CHECK(empty == entry2.getWhiteList());
+        }
     }
 
-    template<> template<>
-    void object::test<14>()
+    TEST_CASE_METHOD(MediaEntry_test, "LLMediaEntry: checkCandidateUrl matches URLs against whitelist patterns", "[LLMediaEntry]")
     {
         // Whitelist check tests
         int n=0;

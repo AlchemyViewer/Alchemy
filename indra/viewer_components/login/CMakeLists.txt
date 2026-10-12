@@ -11,5 +11,7 @@ target_link_libraries(
 )
 
 if(AL_BUILD_TESTS)
-  al_add_test(lllogin PROJECT lllogin LIBRARIES lllogin)
+  # Alone: each case makes an LLTestApp, of which a process may have one at a
+  # time, and its end clears every event pump in the process.
+  al_add_test_binary(lllogin_test PROJECT lllogin SOURCES tests/lllogin_test.cpp LIBRARIES lllogin)
 endif()

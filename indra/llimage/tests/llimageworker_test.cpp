@@ -34,7 +34,7 @@
 // for lltrace class
 #include "../llcommon/lltrace.h"
 // Tut header
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 // -------------------------------------------------------------------------------------------
 // Stubbing: Declarations required to link and run the class being tested
@@ -98,8 +98,6 @@ const std::string& LLImage::getLastThreadError() { static std::string msg; retur
 // TUT
 // -------------------------------------------------------------------------------------------
 
-namespace tut
-{
 namespace
 {
     // Test wrapper declarations
@@ -149,11 +147,6 @@ namespace
         }
     };
 
-    // Tut templating thingamagic: test group, object and test instance
-    typedef test_group<imagedecodethread_test> imagedecodethread_t;
-    typedef imagedecodethread_t::object imagedecodethread_object_t;
-    tut::imagedecodethread_t tut_imagedecodethread("LLImageDecodeThread");
-}
 
     // ---------------------------------------------------------------------------------------
     // Test functions
@@ -167,17 +160,18 @@ namespace
     // Test the LLImageDecodeThread interface
     // ---------------------------------------------------------------------------------------
 
-    template<> template<>
-    void imagedecodethread_object_t::test<1>()
+    TEST_CASE_METHOD(imagedecodethread_test, "LLImageDecodeThread: a threaded decodeImage calls the responder", "[LLImageDecodeThread]")
     {
         // Test a *threaded* instance of the class
         mThread = new LLImageDecodeThread(true);
-        ensure("LLImageDecodeThread: threaded constructor failed", mThread != NULL);
+        UNSCOPED_INFO("LLImageDecodeThread: threaded constructor failed");
+        REQUIRE(mThread != NULL);
         // Insert something in the queue
         bool done = false;
         LLImageDecodeThread::handle_t decodeHandle = mThread->decodeImage(NULL, 0, false, new responder_test(&done));
         // Verifies we get back a valid handle
-        ensure("LLImageDecodeThread:  threaded decodeImage(), returned handle is null", decodeHandle != 0);
+        UNSCOPED_INFO("LLImageDecodeThread:  threaded decodeImage(), returned handle is null");
+        CHECK(decodeHandle != 0);
         // Wait till the thread has time to handle the work order (though it doesn't do much per work order...)
         const U32 INCREMENT_TIME = 500;             // 500 milliseconds
         const U32 MAX_TIME = 20 * INCREMENT_TIME;   // Do the loop 20 times max, i.e. wait 10 seconds but no more
@@ -188,6 +182,7 @@ namespace
             total_time += INCREMENT_TIME;
         }
         // Verifies that the responder has now been called
-        ensure("LLImageDecodeThread: threaded work unit not processed", done == true);
+        UNSCOPED_INFO("LLImageDecodeThread: threaded work unit not processed");
+        CHECK(done);
     }
 }

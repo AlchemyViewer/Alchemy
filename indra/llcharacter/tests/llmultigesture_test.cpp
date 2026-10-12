@@ -28,7 +28,7 @@
 
 #include "lldatapacker.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <memory>
 #include <string>
@@ -75,7 +75,8 @@ namespace
     {
         std::vector<char> buffer(gesture.getMaxSerialSize() + 1, '\0');
         LLDataPackerAsciiBuffer dp(buffer.data(), (S32)buffer.size());
-        tut::ensure("the gesture serializes", gesture.serialize(dp));
+        UNSCOPED_INFO("the gesture serializes");
+        REQUIRE(gesture.serialize(dp));
         buffer.resize(dp.getCurrentSize());
         buffer.back() = '\0';
         return buffer;
@@ -86,7 +87,8 @@ namespace
     {
         std::vector<char> buffer(step.getMaxSerialSize() + 1, '\0');
         LLDataPackerAsciiBuffer dp(buffer.data(), (S32)buffer.size());
-        tut::ensure("the step serializes", step.serialize(dp));
+        UNSCOPED_INFO("the step serializes");
+        REQUIRE(step.serialize(dp));
         buffer.resize(dp.getCurrentSize());
         buffer.back() = '\0';
         return buffer;
@@ -98,9 +100,14 @@ namespace
     {
         const std::string text(bytes.data());
         const size_t last = text.find_last_of('\n');
-        tut::ensure("the step has a last field", last != std::string::npos && last > 0);
+        {
+            INFO("the step has a last field");
+            REQUIRE(last != std::string::npos);
+            REQUIRE(last > 0);
+        }
         const size_t previous = text.find_last_of('\n', last - 1);
-        tut::ensure("and one before it", previous != std::string::npos);
+        UNSCOPED_INFO("and one before it");
+        REQUIRE(previous != std::string::npos);
 
         std::vector<char> shortened(bytes.begin(), bytes.begin() + previous + 1);
         shortened.push_back('\0');
@@ -116,20 +123,9 @@ namespace
     }
 }
 
-namespace tut
-{
 namespace
 {
-    struct llmultigesture_data
-    {
-    };
-    typedef test_group<llmultigesture_data> llmultigesture_test;
-    typedef llmultigesture_test::object llmultigesture_object;
-    tut::llmultigesture_test llmultigesture_testcase("LLMultiGesture");
-}
-
-    template<> template<>
-    void llmultigesture_object::test<1>()
+    TEST_CASE("LLMultiGesture: a gesture it wrote reads back", "[LLMultiGesture]")
     {
         // What it writes it reads back.
         std::unique_ptr<LLMultiGesture> written = sample_gesture();
@@ -137,24 +133,29 @@ namespace
 
         LLMultiGesture read;
         LLDataPackerAsciiBuffer dp(bytes.data(), (S32)bytes.size());
-        ensure("a gesture it wrote is accepted", read.deserialize(dp));
+        UNSCOPED_INFO("a gesture it wrote is accepted");
+        REQUIRE(read.deserialize(dp));
 
-        ensure_equals("key", read.mKey, written->mKey);
-        ensure_equals("mask", read.mMask, written->mMask);
-        ensure_equals("trigger", read.mTrigger, written->mTrigger);
-        ensure_equals("replace text", read.mReplaceText, written->mReplaceText);
-        ensure_equals("step count", read.mSteps.size(), written->mSteps.size());
+        UNSCOPED_INFO("key");
+        CHECK(read.mKey == written->mKey);
+        UNSCOPED_INFO("mask");
+        CHECK(read.mMask == written->mMask);
+        UNSCOPED_INFO("trigger");
+        CHECK(read.mTrigger == written->mTrigger);
+        UNSCOPED_INFO("replace text");
+        CHECK(read.mReplaceText == written->mReplaceText);
+        UNSCOPED_INFO("step count");
+        REQUIRE(read.mSteps.size() == written->mSteps.size());
 
-        ensure_equals("the animation step came back",
-                      static_cast<LLGestureStepAnimation*>(read.mSteps[0])->mAnimName,
+        UNSCOPED_INFO("the animation step came back");
+        CHECK(static_cast<LLGestureStepAnimation*>(read.mSteps[0])->mAnimName ==
                       std::string("express_wave"));
-        ensure_equals("the chat step came back",
-                      static_cast<LLGestureStepChat*>(read.mSteps[2])->mChatText,
+        UNSCOPED_INFO("the chat step came back");
+        CHECK(static_cast<LLGestureStepChat*>(read.mSteps[2])->mChatText ==
                       std::string("hello"));
     }
 
-    template<> template<>
-    void llmultigesture_object::test<2>()
+    TEST_CASE("LLMultiGesture: a gesture cut short anywhere is refused", "[LLMultiGesture]")
     {
         // Cut anywhere, and it is refused rather than half read. Every prefix
         // of a real gesture, so the cut lands in each field in turn.
@@ -173,12 +174,12 @@ namespace
 
             LLMultiGesture read;
             LLDataPackerAsciiBuffer dp(truncated.data(), (S32)truncated.size());
-            ensure("a gesture cut short is refused", !read.deserialize(dp));
+            UNSCOPED_INFO("a gesture cut short is refused");
+            REQUIRE_FALSE(read.deserialize(dp));
         }
     }
 
-    template<> template<>
-    void llmultigesture_object::test<3>()
+    TEST_CASE("LLMultiGesture: a step count with no steps behind it is refused", "[LLMultiGesture]")
     {
         // The step count says how many to read and arrives in the asset. Set
         // against a body that has none of them, it used to be the number of
@@ -198,12 +199,13 @@ namespace
 
         LLMultiGesture read;
         LLDataPackerAsciiBuffer dp(bytes.data(), (S32)bytes.size());
-        ensure("a step count with no steps behind it is refused", !read.deserialize(dp));
-        ensure("and nothing was built from it", read.mSteps.empty());
+        UNSCOPED_INFO("a step count with no steps behind it is refused");
+        REQUIRE_FALSE(read.deserialize(dp));
+        UNSCOPED_INFO("and nothing was built from it");
+        REQUIRE(read.mSteps.empty());
     }
 
-    template<> template<>
-    void llmultigesture_object::test<4>()
+    TEST_CASE("LLMultiGesture: a step count past one real step is refused", "[LLMultiGesture]")
     {
         // The same, with one real step in front of the lie: what was read is
         // kept, the gesture is still refused, and the count does not turn into
@@ -226,13 +228,13 @@ namespace
 
         LLMultiGesture read;
         LLDataPackerAsciiBuffer dp(bytes.data(), (S32)bytes.size());
-        ensure("still refused", !read.deserialize(dp));
-        ensure("and stopped at the one step the body actually held",
-               read.mSteps.size() <= 1u);
+        UNSCOPED_INFO("still refused");
+        REQUIRE_FALSE(read.deserialize(dp));
+        UNSCOPED_INFO("and stopped at the one step the body actually held");
+        REQUIRE(read.mSteps.size() <= 1u);
     }
 
-    template<> template<>
-    void llmultigesture_object::test<5>()
+    TEST_CASE("LLMultiGesture: each step reads back and refuses a missing last field", "[LLMultiGesture]")
     {
         // Each step reads back what it wrote, and refuses what is missing its
         // last field. Through a whole gesture the difference does not show --
@@ -246,13 +248,16 @@ namespace
             const std::vector<char> bytes = serialize_step(full);
 
             LLGestureStepAnimation whole;
-            ensure("the animation step reads back", step_accepts(whole, bytes));
-            ensure_equals("with its name", whole.mAnimName, full.mAnimName);
-            ensure_equals("and its flags", whole.mFlags, full.mFlags);
+            UNSCOPED_INFO("the animation step reads back");
+            CHECK(step_accepts(whole, bytes));
+            UNSCOPED_INFO("with its name");
+            CHECK(whole.mAnimName == full.mAnimName);
+            UNSCOPED_INFO("and its flags");
+            CHECK(whole.mFlags == full.mFlags);
 
             LLGestureStepAnimation cut;
-            ensure("an animation step missing its flags is refused",
-                   !step_accepts(cut, without_last_field(bytes)));
+            UNSCOPED_INFO("an animation step missing its flags is refused");
+            CHECK_FALSE(step_accepts(cut, without_last_field(bytes)));
         }
         {
             LLGestureStepSound full;
@@ -262,12 +267,14 @@ namespace
             const std::vector<char> bytes = serialize_step(full);
 
             LLGestureStepSound whole;
-            ensure("the sound step reads back", step_accepts(whole, bytes));
-            ensure_equals("with its name", whole.mSoundName, full.mSoundName);
+            UNSCOPED_INFO("the sound step reads back");
+            CHECK(step_accepts(whole, bytes));
+            UNSCOPED_INFO("with its name");
+            CHECK(whole.mSoundName == full.mSoundName);
 
             LLGestureStepSound cut;
-            ensure("a sound step missing its flags is refused",
-                   !step_accepts(cut, without_last_field(bytes)));
+            UNSCOPED_INFO("a sound step missing its flags is refused");
+            CHECK_FALSE(step_accepts(cut, without_last_field(bytes)));
         }
         {
             LLGestureStepChat full;
@@ -276,13 +283,16 @@ namespace
             const std::vector<char> bytes = serialize_step(full);
 
             LLGestureStepChat whole;
-            ensure("the chat step reads back", step_accepts(whole, bytes));
-            ensure_equals("with its text", whole.mChatText, full.mChatText);
-            ensure_equals("and its flags", whole.mFlags, full.mFlags);
+            UNSCOPED_INFO("the chat step reads back");
+            CHECK(step_accepts(whole, bytes));
+            UNSCOPED_INFO("with its text");
+            CHECK(whole.mChatText == full.mChatText);
+            UNSCOPED_INFO("and its flags");
+            CHECK(whole.mFlags == full.mFlags);
 
             LLGestureStepChat cut;
-            ensure("a chat step missing its flags is refused",
-                   !step_accepts(cut, without_last_field(bytes)));
+            UNSCOPED_INFO("a chat step missing its flags is refused");
+            CHECK_FALSE(step_accepts(cut, without_last_field(bytes)));
         }
         {
             LLGestureStepWait full;
@@ -291,17 +301,18 @@ namespace
             const std::vector<char> bytes = serialize_step(full);
 
             LLGestureStepWait whole;
-            ensure("the wait step reads back", step_accepts(whole, bytes));
-            ensure_equals("with its flags", whole.mFlags, full.mFlags);
+            UNSCOPED_INFO("the wait step reads back");
+            CHECK(step_accepts(whole, bytes));
+            UNSCOPED_INFO("with its flags");
+            CHECK(whole.mFlags == full.mFlags);
 
             LLGestureStepWait cut;
-            ensure("a wait step missing its flags is refused",
-                   !step_accepts(cut, without_last_field(bytes)));
+            UNSCOPED_INFO("a wait step missing its flags is refused");
+            CHECK_FALSE(step_accepts(cut, without_last_field(bytes)));
         }
     }
 
-    template<> template<>
-    void llmultigesture_object::test<6>()
+    TEST_CASE("LLMultiGesture: a bad header is refused and an empty step list loads", "[LLMultiGesture]")
     {
         // The header, one thing wrong at a time. Each of these is a line in
         // the file, and the file comes from whoever sent the gesture.
@@ -314,26 +325,27 @@ namespace
             return gesture.deserialize(dp);
         };
 
-        ensure("a version from another format is refused",
-               !read("1\n71\n0\n/wave\n\n0\n"));
-        ensure("and so is one from no format at all",
-               !read("999\n71\n0\n/wave\n\n0\n"));
-        ensure("a negative step count is refused",
-               !read("2\n71\n0\n/wave\n\n-5\n"));
-        ensure("a step type off the end of the list is refused",
-               !read("2\n71\n0\n/wave\n\n1\n99\n"));
-        ensure("a negative step type is refused",
-               !read("2\n71\n0\n/wave\n\n1\n-1\n"));
-        ensure("nothing at all is refused", !read(""));
-        ensure("and so is a lone newline", !read("\n"));
+        UNSCOPED_INFO("a version from another format is refused");
+        CHECK_FALSE(read("1\n71\n0\n/wave\n\n0\n"));
+        UNSCOPED_INFO("and so is one from no format at all");
+        CHECK_FALSE(read("999\n71\n0\n/wave\n\n0\n"));
+        UNSCOPED_INFO("a negative step count is refused");
+        CHECK_FALSE(read("2\n71\n0\n/wave\n\n-5\n"));
+        UNSCOPED_INFO("a step type off the end of the list is refused");
+        CHECK_FALSE(read("2\n71\n0\n/wave\n\n1\n99\n"));
+        UNSCOPED_INFO("a negative step type is refused");
+        CHECK_FALSE(read("2\n71\n0\n/wave\n\n1\n-1\n"));
+        UNSCOPED_INFO("nothing at all is refused");
+        CHECK_FALSE(read(""));
+        UNSCOPED_INFO("and so is a lone newline");
+        CHECK_FALSE(read("\n"));
 
         // A gesture with no steps in it is a gesture, and loads.
-        ensure("no steps is not the same as broken",
-               read("2\n71\n0\n/wave\n\n0\n"));
+        UNSCOPED_INFO("no steps is not the same as broken");
+        CHECK(read("2\n71\n0\n/wave\n\n0\n"));
     }
 
-    template<> template<>
-    void llmultigesture_object::test<7>()
+    TEST_CASE("LLMultiGesture: a step count smaller than the body reads only that many", "[LLMultiGesture]")
     {
         // A count smaller than the body leaves the rest unread, which is not
         // an error: the reader takes what it was told to take.
@@ -349,12 +361,15 @@ namespace
         {
             at = text.find('\n', at) + 1;
         }
-        ensure("the step count line was found", text[at] == '4');
+        UNSCOPED_INFO("the step count line was found");
+        CHECK(text[at] == '4');
         fewer[at] = '2';
 
         LLMultiGesture read;
         LLDataPackerAsciiBuffer dp(fewer.data(), (S32)fewer.size());
-        ensure("a gesture that claims fewer steps than it holds is taken", read.deserialize(dp));
-        ensure_equals("with the number it claimed", read.mSteps.size(), 2u);
+        UNSCOPED_INFO("a gesture that claims fewer steps than it holds is taken");
+        REQUIRE(read.deserialize(dp));
+        UNSCOPED_INFO("with the number it claimed");
+        REQUIRE(read.mSteps.size() == 2u);
     }
 }

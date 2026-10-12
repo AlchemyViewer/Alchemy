@@ -26,24 +26,19 @@
  */
 
 #include "linden_common.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "../lldiriterator.h"
 
 
-namespace tut
-{
-
 namespace
 {
+
     struct LLDirIteratorFixture
     {
         LLDirIteratorFixture()
         {
         }
     };
-    typedef test_group<LLDirIteratorFixture> LLDirIteratorTest_factory;
-    typedef LLDirIteratorTest_factory::object LLDirIteratorTest_t;
-    LLDirIteratorTest_factory tf("LLDirIterator");
 
     /*
     CHOP-662 was originally introduced to deal with crashes deleting files from
@@ -57,10 +52,8 @@ namespace
         LLDirIterator iter1(".","))--@---bad-group-name2((?\?-??.*\\.txt");
         LLDirIterator iter2(".","__^v--x)Cuide d sua vida(x--v^__?\?-??.*");
     }
-}
 
-    template<> template<>
-    void LLDirIteratorTest_t::test<1>()
+    TEST_CASE_METHOD(LLDirIteratorFixture, "LLDirIterator: glob patterns full of regex characters do not crash", "[LLDirIterator]")
     {
        test_chop_662();
     }
