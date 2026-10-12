@@ -218,7 +218,7 @@ namespace tut
         }
     };
 
-    typedef test_group<allsltoslua_data, 100> allsltoslua_group;
+    typedef test_group<allsltoslua_data, 120> allsltoslua_group;
     typedef allsltoslua_group::object    allsltoslua_object;
     tut::allsltoslua_group               allsltoslua_test("ALLSLToSLua");
 
@@ -3367,5 +3367,26 @@ namespace tut
             const std::string loud   = marked(strict);
             ensure("strict, the same:\n" + loud + "---\n" + strict, loud.rfind(lineOf(strict), 0) == 0 && std::count(loud.begin(), loud.end(), '\n') == 1);
         }
+    }
+    template<> template<>
+    void allsltoslua_object::test<101>()
+    {
+        set_test_name("a key compared with no text or a UUID written out is compared as a uuid, the text made one as the key was "
+                      "(Tapple's): NULL_KEY's text is not \"\"; other text, and NULL_KEY, which LSL had as text, still as text");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    key k = \"\";\n"
+                                              "    llOwnerSay((string)(k == \"\"));\n"
+                                              "    if (\"\" != k) llOwnerSay(\"some\");\n"
+                                              "    if (k == \"a2e76fcd-9360-4f6d-a924-938f923df11d\") llOwnerSay(\"that one\");\n"
+                                              "    if (k == \"none\") llOwnerSay(\"text\");\n"
+                                              "    if (NULL_KEY != \"\") llOwnerSay(\"NULL_KEY has text\");\n"
+                                              "} }\n");
+        ensure("Tapple's: " + r.text, has(r, "local k = uuid(\"\")") && has(r, "print(tostring(if k == uuid(\"\") then 1 else 0))"));
+        ensure("either way round: " + r.text, has(r, "if uuid(\"\") ~= k then"));
+        ensure("a UUID written out: " + r.text, has(r, "if k == uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\") then"));
+        ensure("other text, as text: " + r.text, has(r, "if tostring(k) == \"none\" then"));
+        ensure("NULL_KEY, as LSL's text: " + r.text, has(r, "if tostring(NULL_KEY) ~= \"\" then"));
+        ensure("said once: " + r.text, noted(r, "SluaKeyEmpty") && count(r, "-- LSL: SLua's uuid of no text is NULL_KEY") == 1);
+        checksClean(r);
     }
 }

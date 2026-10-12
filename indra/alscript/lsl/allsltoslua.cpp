@@ -4081,7 +4081,27 @@ namespace
                 }
                 if ((lt == LST_KEY && rt == LST_STRING) || (lt == LST_STRING && rt == LST_KEY))
                 {
-                    // A key against a string, as LSL compares them: as text.
+                    // A key against no text, or a UUID, written out: as
+                    // uuids, the text made one as a key given it was. A key
+                    // given no text is NULL_KEY, whose text is not "". Not
+                    // NULL_KEY and the constants like it, which LSL had as
+                    // their text, and compared as text.
+                    LSLExpression* text = unbracketed(lt == LST_STRING ? lhs : rhs);
+                    LSLExpression* key  = lt == LST_KEY ? lhs : rhs;
+                    if (key->getIType() == LST_KEY && text && text->getNodeSubType() == NODE_CONSTANT_EXPRESSION &&
+                        text->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
+                    {
+                        const std::string_view written = static_cast<LSLStringConstant*>(text->getChild(0))->getValue();
+                        if (written.empty() || ALLSLTraits::isUuid(written))
+                        {
+                            const Expr a = coerced(lhs, LST_KEY);
+                            const Expr b = coerced(rhs, LST_KEY);
+                            return { bracketed(a, COMPARE) + (eq ? " == " : " ~= ") + bracketed(b, COMPARE + 1), COMPARE, true };
+                        }
+                    }
+                    // Against any other text, as LSL compares them: as text.
+                    // Made a uuid, text that is no UUID would stop the
+                    // script, and a uuid holds none.
                     const Expr a = coerced(lhs, LST_STRING);
                     const Expr b = coerced(rhs, LST_STRING);
                     return { bracketed(a, COMPARE) + (eq ? " == " : " ~= ") + bracketed(b, COMPARE + 1), COMPARE, true };
