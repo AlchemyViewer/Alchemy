@@ -642,4 +642,56 @@ namespace
         UNSCOPED_INFO("the refused read leaves its argument alone");
         CHECK(value == 11);
     }
+
+    // A line of binary data that claims more bytes than it holds gives what
+    // it holds and fails, rather than reading on past the end of the line.
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer unpackBinaryData reads no further than its line", "[datapacker_test]")
+    {
+        char text[] = "0000000100 01 02 \n";
+        LLDataPackerAsciiBuffer reader(text, sizeof(text));
+        U8 value[128] = {};
+        S32 size = -1;
+        CHECK_FALSE(reader.unpackBinaryData(value, sizeof(value), size, "data"));
+        CHECK(size == 2);
+        CHECK(value[0] == 1);
+        CHECK(value[1] == 2);
+        CHECK(value[2] == 0);
+    }
+
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer unpackBinaryDataFixed reads no further than its line", "[datapacker_test]")
+    {
+        char text[] = "01 02 \n";
+        LLDataPackerAsciiBuffer reader(text, sizeof(text));
+        U8 value[4] = {};
+        CHECK_FALSE(reader.unpackBinaryDataFixed(value, sizeof(value), "data"));
+        CHECK(value[0] == 1);
+        CHECK(value[1] == 2);
+        CHECK(value[2] == 0);
+    }
+
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer unpackBinaryData refuses a line with no size", "[datapacker_test]")
+    {
+        char text[] = "lots 01 02 \n";
+        LLDataPackerAsciiBuffer reader(text, sizeof(text));
+        U8 value[4] = {};
+        S32 size = -1;
+        CHECK_FALSE(reader.unpackBinaryData(value, sizeof(value), size, "data"));
+        CHECK(size == 0);
+    }
+
+    TEST_CASE("datapacker_test: LLDataPackerAsciiFile unpackBinaryData and unpackBinaryDataFixed read no further than their lines", "[datapacker_test]")
+    {
+        std::istringstream istr("data\t0000000100 01 02 \nfixed\t01 02 \n");
+        LLDataPackerAsciiFile reader(istr, 2);
+        U8 value[128] = {};
+        S32 size = -1;
+        CHECK_FALSE(reader.unpackBinaryData(value, sizeof(value), size, "data"));
+        CHECK(size == 2);
+        CHECK(value[2] == 0);
+
+        U8 fixed[4] = {};
+        CHECK_FALSE(reader.unpackBinaryDataFixed(fixed, sizeof(fixed), "fixed"));
+        CHECK(fixed[1] == 2);
+        CHECK(fixed[2] == 0);
+    }
 }
