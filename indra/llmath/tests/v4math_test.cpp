@@ -28,6 +28,7 @@
 
 #include "linden_common.h"
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include "altestmatchers.h"
 #include "llsd.h"
 
@@ -182,20 +183,24 @@ namespace
         CHECK(y ==  vec4[1]);
         CHECK(z ==  vec4[2]);
         CHECK(w ==  vec4[3]);
-        x = 23.f, y = -.2361f, z = 3.25;
-        vec4.setVec(x,y,z);
+        // The non-const subscript is a reference to the component itself.
         F32 &ref1 = vec4[0];
-        CHECK(ref1 ==  vec4[0]);
-        F32 &ref2 = vec4[1];
-        CHECK(ref2 ==  vec4[1]);
-        F32 &ref3 = vec4[2];
-        CHECK(ref3 ==  vec4[2]);
-        F32 &ref4 = vec4[3];
-        CHECK(ref4 ==  vec4[3]);
+        CHECK(&ref1 == &vec4.mV[VX]);
+        ref1 = 23.f;
+        vec4[1] = -.2361f;
+        vec4[2] = 3.25f;
+        vec4[3] = 7.5f;
+        CHECK(vec4.mV[VX] == 23.f);
+        CHECK(vec4.mV[VY] == -.2361f);
+        CHECK(vec4.mV[VZ] == 3.25f);
+        CHECK(vec4.mV[VW] == 7.5f);
     }
 
-    TEST_CASE("v4math_h: rotVec by a matrix and by a quaternion is repeatable", "[v4math_h]")
+    TEST_CASE("v4math_h: rotVec by a matrix and by a quaternion", "[v4math_h]")
     {
+        using Catch::Matchers::WithinAbs;
+
+        // By a matrix: the row vector times the matrix, all four components.
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         const  F32 val[16] = {
             1.f,  2.f,   3.f,    0.f,
@@ -204,18 +209,37 @@ namespace
             .89f, 0.f,   0.f,    0.f
         };
         LLMatrix4 mat(val);
-        LLVector4 vec4(x,y,z,w),vec4a;
+        LLVector4 vec4(x,y,z,w);
         vec4.rotVec(mat);
-        vec4a.setVec(x,y,z,w);
-        vec4a.rotVec(mat);
-        CHECK(vec4a == vec4);
-        F32 a = 2.32f, b = -23.2f, c = -34.1112f, d = 1.010112f;
-        LLQuaternion q(a,b,c,d);
-        LLVector4 vec4b(a,b,c,d),vec4c;
+        const F64 v[4] = { x, y, z, w };
+        for (int col = 0; col < 4; ++col)
+        {
+            F64 expected = 0.0;
+            for (int row = 0; row < 4; ++row)
+            {
+                expected += v[row] * val[row * 4 + col];
+            }
+            CAPTURE(col);
+            CHECK_THAT(vec4.mV[col], WithinAbs(expected, 1e-4));
+        }
+
+        // By a quaternion: x, y and z turn as an LLVector3 does, and w stays.
+        LLVector4 quarter(1.f, 0.f, 0.f, 3.f);
+        quarter.rotVec(LLQuaternion(F_PI_BY_TWO, LLVector3(0.f, 0.f, 1.f)));
+        CHECK_THAT(quarter.mV[VX], WithinAbs(0.f, 1e-6));
+        CHECK_THAT(quarter.mV[VY], WithinAbs(1.f, 1e-6));
+        CHECK_THAT(quarter.mV[VZ], WithinAbs(0.f, 1e-6));
+        CHECK(quarter.mV[VW] == 3.f);
+
+        // A vector off the turn's axis, which the turn moves.
+        const LLQuaternion q(1.3f, LLVector3(2.32f, -23.2f, -34.1112f));
+        LLVector4 vec4b(1.f, 2.f, 3.f, 1.010112f);
         vec4b.rotVec(q);
-        vec4c.setVec(a, b, c, d);
-        vec4c.rotVec(q);
-        CHECK(vec4b == vec4c);
+        const LLVector3 turned = LLVector3(1.f, 2.f, 3.f) * q;
+        CHECK(vec4b.mV[VX] == turned.mV[VX]);
+        CHECK(vec4b.mV[VY] == turned.mV[VY]);
+        CHECK(vec4b.mV[VZ] == turned.mV[VZ]);
+        CHECK(vec4b.mV[VW] == 1.010112f);
     }
 
     TEST_CASE("v4math_h: operator<< prints equal vectors the same", "[v4math_h]")

@@ -31,54 +31,17 @@
 #include "altestmatchers.h"
 #include "m4math.h"
 #include "v2math.h"
-#include "v2math.h"
 #include "v3color.h"
 #include "v3math.h"
 #include "v3dmath.h"
 #include "v4coloru.h"
 #include "v4math.h"
 #include "llquaternion.h"
-#include "llsdutil.h"
 #include "llsdutil_math.h"
-#include "stringize.h"
-#include <set>
-#include <boost/range.hpp>
 
 namespace
 {
-    struct llsdutil_math_data
-    {
-        void test_matches(const std::string& proto_key, const LLSD& possibles,
-                          const char** begin, const char** end)
-        {
-            std::set<std::string> succeed(begin, end);
-            LLSD prototype(possibles[proto_key]);
-            for (LLSD::map_const_iterator pi(possibles.beginMap()), pend(possibles.endMap());
-                 pi != pend; ++pi)
-            {
-                std::string match(llsd_matches(prototype, pi->second));
-                std::set<std::string>::const_iterator found = succeed.find(pi->first);
-                if (found != succeed.end())
-                {
-                    // This test is supposed to succeed. Comparing to the
-                    // empty string ensures that if the test fails, it will
-                    // display the string received so we can tell what failed.
-                    REQUIRE(match == "");
-                }
-                else
-                {
-                    // This test is supposed to fail. If we get a false match,
-                    // the string 'match' will be empty, which doesn't tell us
-                    // much about which case went awry. So construct a more
-                    // detailed description string.
-                    INFO(proto_key << " shouldn't match " << pi->first);
-                    REQUIRE_FALSE(match.empty());
-                }
-            }
-        }
-    };
-
-    TEST_CASE_METHOD(llsdutil_math_data, "llsdutil_math: LLVector3 round-trips through LLSD", "[llsdutil_math]")
+    TEST_CASE("llsdutil_math: LLVector3 round-trips through LLSD", "[llsdutil_math]")
     {
         LLSD sd;
         LLVector3 vec1(-1.0, 2.0, -3.0);
@@ -97,7 +60,7 @@ namespace
         sd.clear();
     }
 
-    TEST_CASE_METHOD(llsdutil_math_data, "llsdutil_math: LLVector3d round-trips through LLSD", "[llsdutil_math]")
+    TEST_CASE("llsdutil_math: LLVector3d round-trips through LLSD", "[llsdutil_math]")
     {
         LLSD sd;
         LLVector3d vec1((F64)(U64L(0xFEDCBA9876543210) << 2), -1., 0);
@@ -109,7 +72,7 @@ namespace
         CHECK(vec1 == vec3);
     }
 
-    TEST_CASE_METHOD(llsdutil_math_data, "llsdutil_math: LLVector2 and its LLSD round-trip both ways", "[llsdutil_math]")
+    TEST_CASE("llsdutil_math: LLVector2 and its LLSD round-trip both ways", "[llsdutil_math]")
     {
         LLSD sd;
         LLVector2 vec((F32) -3., (F32) 4.2);
@@ -121,7 +84,7 @@ namespace
         CHECK_THAT(sd, ll_test::LLSDEquals(sd2));
     }
 
-    TEST_CASE_METHOD(llsdutil_math_data, "llsdutil_math: LLQuaternion and its LLSD round-trip both ways", "[llsdutil_math]")
+    TEST_CASE("llsdutil_math: LLQuaternion and its LLSD round-trip both ways", "[llsdutil_math]")
     {
         LLSD sd;
         LLQuaternion quat((F32) 1., (F32) -0.98, (F32) 2.3, (F32) 0xffff);
@@ -133,7 +96,7 @@ namespace
         CHECK_THAT(sd, ll_test::LLSDEquals(sd2));
     }
 
-    TEST_CASE_METHOD(llsdutil_math_data, "llsdutil_math: LLColor4 and its LLSD round-trip both ways", "[llsdutil_math]")
+    TEST_CASE("llsdutil_math: LLColor4 and its LLSD round-trip both ways", "[llsdutil_math]")
     {
         LLSD sd;
         LLColor4 c(1.0f, 2.2f, 4.0f, 7.f);

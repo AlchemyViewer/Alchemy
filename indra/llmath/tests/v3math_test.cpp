@@ -28,6 +28,7 @@
 
 #include "linden_common.h"
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include "llsd.h"
 
 #include "../v3dmath.h"
@@ -74,9 +75,16 @@ namespace
 
     TEST_CASE("v3math_h: LLSD constructor and getValue round trip", "[v3math_h]")
     {
-        S32 a = 231;
-        LLSD llsd(a);
+        // An array of three: a vector reads sd[0], sd[1] and sd[2], so a
+        // scalar LLSD would make every component zero.
+        LLSD llsd;
+        llsd[0] = 2.32;
+        llsd[1] = 1.212;
+        llsd[2] = -.12;
         LLVector3 vec3(llsd);
+        CHECK(vec3.mV[VX] == 2.32f);
+        CHECK(vec3.mV[VY] == 1.212f);
+        CHECK(vec3.mV[VZ] == -.12f);
         LLSD sd = vec3.getValue();
         LLVector3 vec3a(sd);
         CHECK(vec3 == vec3a);
@@ -84,11 +92,11 @@ namespace
 
     TEST_CASE("v3math_h: assignment copies every component", "[v3math_h]")
     {
-        S32 a = 231;
-        LLSD llsd(a);
-        LLVector3 vec3(llsd),vec3a;
+        LLVector3 vec3(2.32f, 1.212f, -.12f), vec3a;
         vec3a = vec3;
-        CHECK(vec3 == vec3a);
+        CHECK(vec3a.mV[VX] == 2.32f);
+        CHECK(vec3a.mV[VY] == 1.212f);
+        CHECK(vec3a.mV[VZ] == -.12f);
     }
 
     TEST_CASE("v3math_h: isFinite and the clearVec/setVec/zeroVec setters", "[v3math_h]")
@@ -193,15 +201,43 @@ namespace
         CHECK_FALSE(vec3.isExactlyZero());
     }
 
-    TEST_CASE("v3math_h: rotVec by an angle about an axis is repeatable", "[v3math_h]")
+    TEST_CASE("v3math_h: rotVec turns a vector by an angle about an axis", "[v3math_h]")
     {
-        F32 x =20.0f, y = 30.0f, z = 15.f ;
-        F32 angle = 100.f;
-        LLVector3 vec3(x,y,z),vec3a(1.f,2.f,3.f);
-        vec3a = vec3a.rotVec(angle, vec3);
-        LLVector3 vec3b(1.f,2.f,3.f);
-        vec3b = vec3b.rotVec(angle, vec3);
-        CHECK(vec3b == vec3a);
+        using Catch::Matchers::WithinAbs;
+
+        // A quarter turn about z takes x to y.
+        LLVector3 quarter(1.f, 0.f, 0.f);
+        quarter.rotVec(F_PI_BY_TWO, LLVector3(0.f, 0.f, 1.f));
+        CHECK_THAT(quarter.mV[VX], WithinAbs(0.f, 1e-6));
+        CHECK_THAT(quarter.mV[VY], WithinAbs(1.f, 1e-6));
+        CHECK_THAT(quarter.mV[VZ], WithinAbs(0.f, 1e-6));
+
+        // Any angle about any axis, against Rodrigues' formula in double:
+        // v cos a + (k x v) sin a + k (k . v)(1 - cos a), k the unit axis.
+        const F64 angle = 100.0;
+        const F64 axis_length = sqrt(20.0 * 20.0 + 30.0 * 30.0 + 15.0 * 15.0);
+        const F64 k[3] = { 20.0 / axis_length, 30.0 / axis_length, 15.0 / axis_length };
+        const F64 v[3] = { 1.0, 2.0, 3.0 };
+        const F64 k_dot_v = k[0] * v[0] + k[1] * v[1] + k[2] * v[2];
+        const F64 k_cross_v[3] = { k[1] * v[2] - k[2] * v[1], k[2] * v[0] - k[0] * v[2], k[0] * v[1] - k[1] * v[0] };
+        F64 expected[3];
+        for (int i = 0; i < 3; ++i)
+        {
+            expected[i] = v[i] * cos(angle) + k_cross_v[i] * sin(angle) + k[i] * k_dot_v * (1.0 - cos(angle));
+        }
+
+        LLVector3 vec3((F32)v[0], (F32)v[1], (F32)v[2]);
+        vec3.rotVec((F32)angle, LLVector3(20.f, 30.f, 15.f));
+        CHECK_THAT(vec3.mV[VX], WithinAbs(expected[0], 1e-4));
+        CHECK_THAT(vec3.mV[VY], WithinAbs(expected[1], 1e-4));
+        CHECK_THAT(vec3.mV[VZ], WithinAbs(expected[2], 1e-4));
+
+        // No turn about a zero axis, or by a zero angle.
+        LLVector3 still(1.f, 2.f, 3.f);
+        still.rotVec((F32)angle, LLVector3::zero);
+        CHECK(still == LLVector3(1.f, 2.f, 3.f));
+        still.rotVec(0.f, LLVector3(20.f, 30.f, 15.f));
+        CHECK(still == LLVector3(1.f, 2.f, 3.f));
     }
 
     TEST_CASE("v3math_h: subscript operator reads components and returns references", "[v3math_h]")
@@ -212,15 +248,15 @@ namespace
         CHECK(y ==  vec3[1]);
         CHECK(z ==  vec3[2]);
 
-        vec3.clearVec();
-        x = 23.f, y = -.2361f, z = 3.25;
-        vec3.setVec(x,y,z);
+        // The non-const subscript is a reference to the component itself.
         F32 &ref1 = vec3[0];
-        CHECK(ref1 ==  vec3[0]);
-        F32 &ref2 = vec3[1];
-        CHECK(ref2 ==  vec3[1]);
-        F32 &ref3 = vec3[2];
-        CHECK(ref3 ==  vec3[2]);
+        CHECK(&ref1 == &vec3.mV[VX]);
+        ref1 = 23.f;
+        vec3[1] = -.2361f;
+        vec3[2] = 3.25f;
+        CHECK(vec3.mV[VX] == 23.f);
+        CHECK(vec3.mV[VY] == -.2361f);
+        CHECK(vec3.mV[VZ] == 3.25f);
     }
 
     TEST_CASE("v3math_h: operator+ adds componentwise", "[v3math_h]")
@@ -376,19 +412,21 @@ namespace
 
     TEST_CASE("v3math_h: operator!= for different and equal vectors", "[v3math_h]")
     {
-        F32 x1 =1.f, y1 = 2.f,z1 = 1.2f, x2 =112.f, y2 = 2.234f,z2 = 11.2f;;
+        F32 x1 =1.f, y1 = 2.f,z1 = 1.2f, x2 =112.f, y2 = 2.234f,z2 = 11.2f;
         LLVector3 vec3(x1,y1,z1), vec3a(x2,y2,z2);
         CHECK(vec3a != vec3);
 
-        vec3.clearVec();
-        vec3.clearVec();
+        // One component apart is enough.
+        vec3a.setVec(x1, y1, z2);
+        CHECK(vec3a != vec3);
+
         vec3a.setVec(vec3);
         CHECK_FALSE(vec3a != vec3);
     }
 
     TEST_CASE("v3math_h: operator+= adds componentwise", "[v3math_h]")
     {
-        F32 x1 =1.f, y1 = 2.f,z1 = 1.2f, x2 =112.f, y2 = 2.2f,z2 = 11.2f;;
+        F32 x1 =1.f, y1 = 2.f,z1 = 1.2f, x2 =112.f, y2 = 2.2f,z2 = 11.2f;
         LLVector3 vec3(x1,y1,z1), vec3a(x2,y2,z2);
         vec3a += vec3;
         F32 val1, val2, val3;
@@ -402,7 +440,7 @@ namespace
 
     TEST_CASE("v3math_h: operator-= subtracts componentwise", "[v3math_h]")
     {
-        F32 x1 =1.f, y1 = 2.f,z1 = 1.2f, x2 =112.f, y2 = 2.2f,z2 = 11.2f;;
+        F32 x1 =1.f, y1 = 2.f,z1 = 1.2f, x2 =112.f, y2 = 2.2f,z2 = 11.2f;
         LLVector3 vec3(x1,y1,z1), vec3a(x2,y2,z2);
         vec3a -= vec3;
         F32 val1, val2, val3;
@@ -479,19 +517,19 @@ namespace
         CHECK(stream1.str() == stream2.str());
     }
 
-    TEST_CASE("v3math_h: operator< orders vectors by x first", "[v3math_h]")
+    TEST_CASE("v3math_h: operator< orders by x, then y, then z", "[v3math_h]")
     {
-        F32 x1 =-2.3f, y1 = 2.f,z1 = 1.2f, x2 = 1.3f, y2 = 1.11f, z2 = 1234.234f;
-        LLVector3 vec3(x1,y1,z1), vec3a(x2,y2,z2);
-        CHECK(vec3 < vec3a);
-        x1 =-2.3f, y1 = 2.f,z1 = 1.2f, x2 = 1.3f, y2 = 2.f, z2 = 1234.234f;
-        vec3.setVec(x1,y1,z1);
-        vec3a.setVec(x2,y2,z2);
-        CHECK(vec3 < vec3a);
-        x1 =2.3f, y1 = 2.f,z1 = 1.2f, x2 = 1.3f,
-        vec3.setVec(x1,y1,z1);
-        vec3a.setVec(x2,y2,z2);
-        CHECK_FALSE(vec3 < vec3a);
+        // x decides wherever the two differ in it, whatever y and z say.
+        CHECK(LLVector3(-2.3f, 2.f, 1.2f) < LLVector3(1.3f, 1.11f, 1234.234f));
+        CHECK_FALSE(LLVector3(2.3f, 2.f, 1.2f) < LLVector3(1.3f, 2.f, 1234.234f));
+        // Equal in x, y decides.
+        CHECK(LLVector3(1.f, 2.f, 9.f) < LLVector3(1.f, 3.f, 0.f));
+        CHECK_FALSE(LLVector3(1.f, 3.f, 0.f) < LLVector3(1.f, 2.f, 9.f));
+        // Equal in x and y, z decides.
+        CHECK(LLVector3(1.f, 2.f, 3.f) < LLVector3(1.f, 2.f, 4.f));
+        CHECK_FALSE(LLVector3(1.f, 2.f, 4.f) < LLVector3(1.f, 2.f, 3.f));
+        // Strict: no vector is less than itself.
+        CHECK_FALSE(LLVector3(1.f, 2.f, 3.f) < LLVector3(1.f, 2.f, 3.f));
     }
 
     TEST_CASE("v3math_h: parseVector3 reads three numbers", "[v3math_h]")

@@ -144,10 +144,11 @@ namespace
 
         CHECK(bbox1.getExtentLocal() == LLVector3(2.0f, 2.0f, 2.0f));
 
+        // Local: the rotation and position do not enter into it.
         LLBBox bbox2(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(ANGLE, LLVector3(0.0f, 0.0f, 1.0f)),
-                     LLVector3(2.0f, 2.0f, 2.0f), LLVector3(4.0f, 4.0f, 4.0f));
+                     LLVector3(2.0f, 2.0f, 2.0f), LLVector3(4.0f, 5.0f, 6.0f));
 
-        CHECK(bbox1.getExtentLocal() == LLVector3(2.0f, 2.0f, 2.0f));
+        CHECK(bbox2.getExtentLocal() == LLVector3(2.0f, 3.0f, 4.0f));
     }
 
     TEST_CASE("LLBBox: addPointLocal grows the box", "[LLBBox]")
@@ -217,9 +218,6 @@ namespace
 
     TEST_CASE("LLBBox: addBBoxLocal after addPointAgent on a rotated box", "[LLBBox]")
     {
-        //
-        // test the addBBoxAgent() method
-        //
 
         LLBBox bbox1(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(1.0, 0.0, 0.0, 1.0),
                      LLVector3(2.0f, 2.0f, 2.0f), LLVector3(4.0f, 4.0f, 4.0f));
@@ -234,6 +232,36 @@ namespace
         CHECK(bbox1.getCenterAgent() == LLVector3(6.0f, -10.0f, 8.0f));
         CHECK(bbox1.getMinLocal() == LLVector3(0.0f, 0.0f, -4.0f));
         CHECK(bbox1.getMaxLocal() == LLVector3(10.0f, 10.0f, 10.0f));
+    }
+
+    TEST_CASE("LLBBox: addBBoxAgent into an empty box takes the other box's frame", "[LLBBox]")
+    {
+        const LLQuaternion quarter(ANGLE, LLVector3(0.0f, 0.0f, 1.0f));
+        LLBBox bbox1;
+        bbox1.addBBoxAgent(LLBBox(LLVector3(1.0f, 2.0f, 3.0f), quarter,
+                                  LLVector3(0.0f, 0.0f, 0.0f), LLVector3(2.0f, 4.0f, 6.0f)));
+
+        CHECK(bbox1.getPositionAgent() == LLVector3(1.0f, 2.0f, 3.0f));
+        CHECK(bbox1.getRotation() == quarter);
+        CHECK(APPROX_EQUAL(bbox1.getMinLocal(), LLVector3(0.0f, 0.0f, 0.0f)));
+        CHECK(APPROX_EQUAL(bbox1.getMaxLocal(), LLVector3(2.0f, 4.0f, 6.0f)));
+    }
+
+    TEST_CASE("LLBBox: addBBoxAgent grows a box by the other box's corners in agent space", "[LLBBox]")
+    {
+        // An axis-aligned box at the origin, holding only the origin.
+        LLBBox bbox1;
+        bbox1.addPointLocal(LLVector3(0.0f, 0.0f, 0.0f));
+
+        // Two by one by one, turned a quarter about z, at (10, 0, 0): x goes
+        // to y and y to -x, so its corners span x 9 to 10, y 0 to 2, z 0 to 1.
+        bbox1.addBBoxAgent(LLBBox(LLVector3(10.0f, 0.0f, 0.0f), LLQuaternion(ANGLE, LLVector3(0.0f, 0.0f, 1.0f)),
+                                  LLVector3(0.0f, 0.0f, 0.0f), LLVector3(2.0f, 1.0f, 1.0f)));
+
+        CHECK(bbox1.getPositionAgent() == LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(bbox1.getRotation() == LLQuaternion());
+        CHECK(APPROX_EQUAL(bbox1.getMinLocal(), LLVector3(0.0f, 0.0f, 0.0f)));
+        CHECK(APPROX_EQUAL(bbox1.getMaxLocal(), LLVector3(10.0f, 2.0f, 1.0f)));
     }
 
     TEST_CASE("LLBBox: expand by zero then a positive then a negative amount", "[LLBBox]")

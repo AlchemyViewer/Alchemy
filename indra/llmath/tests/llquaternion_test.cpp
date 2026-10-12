@@ -28,6 +28,7 @@
 
 #include "linden_common.h"
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <string_view>
 
 #include "../v4math.h"
@@ -49,7 +50,45 @@ namespace
         CHECK(llquat.mQ[3] == 1.f);
     }
 
+    // The rotation of a matrix comes back as the quaternion it was made from,
+    // or its negation, which is the same rotation.
+    void require_same_rotation(const LLQuaternion& actual, const LLQuaternion& expected)
+    {
+        using Catch::Matchers::WithinAbs;
+        INFO("expected " << expected << ", got " << actual);
+        const F32 sign = dot(actual, expected) < 0.f ? -1.f : 1.f;
+        for (int i = 0; i < 4; ++i)
+        {
+            CAPTURE(i);
+            REQUIRE_THAT(actual.mQ[i], WithinAbs(sign * expected.mQ[i], 1e-6));
+        }
+    }
+
     //test case for explicit LLQuaternion(const LLMatrix4 &mat) fn.
+    TEST_CASE("LLQuaternion: from an LLMatrix4, the matrix's rotation, its translation ignored", "[LLQuaternion]")
+    {
+        CHECK(LLQuaternion(LLMatrix4()) == LLQuaternion::DEFAULT);
+
+        const LLQuaternion turn(1.1f, LLVector3(2.f, -1.f, 3.f));
+        require_same_rotation(LLQuaternion(LLMatrix4(turn)), turn);
+        require_same_rotation(LLQuaternion(LLMatrix4(turn, LLVector4(5.f, -6.f, 7.f, 1.f))), turn);
+
+        // Past a half turn, where w is negative.
+        const LLQuaternion wide(4.f, LLVector3(-1.f, 0.5f, 0.25f));
+        require_same_rotation(LLQuaternion(LLMatrix4(wide)), wide);
+    }
+
+    //test case for explicit LLQuaternion(const LLMatrix3 &mat) fn.
+    TEST_CASE("LLQuaternion: from an LLMatrix3, the matrix's rotation", "[LLQuaternion]")
+    {
+        CHECK(LLQuaternion(LLMatrix3()) == LLQuaternion::DEFAULT);
+
+        const LLQuaternion turn(1.1f, LLVector3(2.f, -1.f, 3.f));
+        require_same_rotation(LLQuaternion(LLMatrix3(turn)), turn);
+        const LLQuaternion wide(4.f, LLVector3(-1.f, 0.5f, 0.25f));
+        require_same_rotation(LLQuaternion(LLMatrix3(wide)), wide);
+    }
+
     TEST_CASE("LLQuaternion: LLMatrix4 initRows fills the matrix row by row", "[LLQuaternion]")
     {
         LLMatrix4 llmat;
@@ -121,12 +160,6 @@ namespace
 
         res_quat.setQuatInit(x_val, y_val, z_val, w_val);
         res_quat.normQuat();
-
-        CHECK(is_approx_equal(0.0f, res_quat.mQ[0]));
-        CHECK(is_approx_equal(0.0f, res_quat.mQ[1]));
-        CHECK(is_approx_equal(0.0f, res_quat.mQ[2]));
-        CHECK(is_approx_equal(1.0f, res_quat.mQ[3]));
-
 
         CHECK(is_approx_equal(0.0f, res_quat.mQ[0]));
         CHECK(is_approx_equal(0.0f, res_quat.mQ[1]));
@@ -229,7 +262,7 @@ namespace
         CHECK(is_approx_equal_fraction(0.283559f, res_nlerp.mQ[2], 16));
         CHECK(is_approx_equal_fraction(0.898506f, res_nlerp.mQ[3], 16));
 
-        //test case for nlerp(F32 t, const LLQuaternion &q) fn.
+        //test case for slerp(F32 u, const LLQuaternion &q) fn.
         res_slerp = slerp(value1, quat1);
         CHECK(is_approx_equal_fraction(1.0f, res_slerp.mQ[0], 16));
         CHECK(is_approx_equal_fraction(2.0f, res_slerp.mQ[1], 16));
@@ -519,9 +552,10 @@ namespace
         result = OrderToString(LLQuaternion::ZXY);
         CHECK(std::string_view(result) == "ZXY");
         CHECK(std::string_view(result) != "XYZ");
+        CHECK(std::string_view(result) != "YZX");
+        CHECK(std::string_view(result) != "XZY");
         CHECK(std::string_view(result) != "YXZ");
         CHECK(std::string_view(result) != "ZYX");
-        CHECK(std::string_view(result) != "XYZ");
 
         result = OrderToString(LLQuaternion::XZY);
         CHECK(std::string_view(result) == "XZY");
@@ -569,19 +603,33 @@ namespace
         CHECK(is_approx_equal_fraction(0.945733f, vect.mV[0], 16));
     }
 
-    TEST_CASE("LLQuaternion: getEulerAngles leaves an identity quaternion unchanged", "[LLQuaternion]")
+    TEST_CASE("LLQuaternion: getEulerAngles gives back the angles setEulerAngles took", "[LLQuaternion]")
     {
         //test case for void LLQuaternion::getEulerAngles(F32 *roll, F32 *pitch, F32 *yaw) const fn
+        using Catch::Matchers::WithinAbs;
+
+        // The identity has no angles, whatever the outputs held before.
         F32 roll = -12.0f;
         F32 pitch = -22.43f;
         F32 yaw = 11.0f;
-
         LLQuaternion llquat;
         llquat.getEulerAngles(&roll, &pitch, &yaw);
-        CHECK(is_approx_equal(0.000f, llquat.mQ[0]));
-        CHECK(is_approx_equal(0.000f, llquat.mQ[1]));
-        CHECK(is_approx_equal(0.000f, llquat.mQ[2]));
-        CHECK(is_approx_equal(1.000f, llquat.mQ[3]));
+        CHECK_THAT(roll, WithinAbs(0.f, 1e-6));
+        CHECK_THAT(pitch, WithinAbs(0.f, 1e-6));
+        CHECK_THAT(yaw, WithinAbs(0.f, 1e-6));
+
+        // Angles within range, pitch short of a quarter turn, round trip.
+        const F32 angles[][3] = { { 0.3f, -0.2f, 1.1f }, { -2.5f, 1.2f, -0.4f }, { 1.f, 0.f, 0.f } };
+        for (const auto& set : angles)
+        {
+            CAPTURE(set[0], set[1], set[2]);
+            LLQuaternion turned;
+            turned.setEulerAngles(set[0], set[1], set[2]);
+            turned.getEulerAngles(&roll, &pitch, &yaw);
+            CHECK_THAT(roll, WithinAbs(set[0], 1e-5));
+            CHECK_THAT(pitch, WithinAbs(set[1], 1e-5));
+            CHECK_THAT(yaw, WithinAbs(set[2], 1e-5));
+        }
     }
 
     TEST_CASE("LLQuaternion: product and dot evaluate at compile time", "[LLQuaternion]")
