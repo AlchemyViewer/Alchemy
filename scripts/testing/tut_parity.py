@@ -39,7 +39,8 @@ Parity holds for a file when:
     none is tagged [!mayfail] or [!shouldfail], under which Catch2 passes a
     case whatever it does, and the run's exit code fits its cases: 0 when
     some passed and none failed, 125 when all skipped, neither when any
-    failed;
+    failed -- or, where none failed, 1 when the harness says its state
+    guard found a change, but not when it says a teardown step threw;
   - each case's assertions, counted in the converted file (read as
     tut2catch.py reads it: comments, literals and #if 0 code left out),
     number its TUT test's ensure, fail and skip calls, as the mapping
@@ -285,15 +286,17 @@ def catch2_results(test, timeout):
 
 def exit_fits(code, cases, output):
     """Whether a run's exit code says what its cases do: 0 when some passed
-    and none failed (1 when the state guard found a change, which it says),
-    the skip code when every case skipped, and neither when any failed or
-    none ran -- a filter that matches nothing exits 2."""
+    and none failed, the skip code when every case skipped, and neither when
+    any failed or none ran -- a filter that matches nothing exits 2. Where
+    none failed, the harness exits 1 for the state guard's finding a change,
+    which is listed, and for a teardown step's throwing, which is not: a
+    check at static destruction ended a TUT process."""
     results = {c["result"] for c in cases}
     if "fail" in results or not results:
         return code not in (0, SKIP_CODE, "timeout")
-    if results == {"skip"}:
-        return code == SKIP_CODE
-    return code == 0 or (code == 1 and "The state guard found" in output)
+    if code == 1 and "The state guard found" in output and "teardown step(s) threw" not in output:
+        return True
+    return code == (SKIP_CODE if results == {"skip"} else 0)
 
 
 _CONVERTER = None
@@ -553,8 +556,11 @@ def check_run(args, label, path, entry_name, test, recorded, entries, file_cases
         counts = {}
         for case in cases:
             counts[case["result"]] = counts.get(case["result"], 0) + 1
+        said = [line.strip() for line in output.splitlines()
+                if "teardown step(s) threw" in line or "The state guard found" in line]
         problems.append(f"{label}: {entry_name} exited {code}, which does not fit its cases ("
-                        + (", ".join(f"{v} {k}" for k, v in sorted(counts.items())) or "none") + ")")
+                        + (", ".join(f"{v} {k}" for k, v in sorted(counts.items())) or "none") + ")"
+                        + "".join(f"; it said: {line}" for line in said))
     tut_results = {(r["group"], r["n"]): r for r in recorded["results"]}
     # Counted in the body that ran: a test<N> in both branches of an #if is
     # two cases of one name in the file, and the run names the line of its.
