@@ -101,10 +101,12 @@ traceback is that file's error, and the other files go on). It never
 drops a test or an assertion: --mapping writes, as {"tests": [...],
 "files": [...]}, one entry per test, with the TUT-side assertion calls in
 its body and the Catch2 assertions now in it, and one per file, with the
-sha256 of the TUT source it read and the TUT assertion calls outside every
-test's body, in code not under #if 0 (tut_outside_calls), with the Catch2
-assertions they became (catch2_outside_expected), all of which
-scripts/testing/tut_parity.py checks.
+sha256 of the TUT source it read (tut_sha256) and of the Catch2 text it
+wrote, or would have under --dry-run (catch2_sha256), so that a file edited
+since shows, and the TUT assertion calls outside every test's body, in
+code not under #if 0 (tut_outside_calls), with the Catch2 assertions they
+became (catch2_outside_expected), all of which scripts/testing/tut_parity.py
+checks.
 
 Needs the build tree's compile_commands.json (CMake writes it; the presets
 turn it on) and the compiler it names, which must be clang: the AST comes
@@ -3250,6 +3252,7 @@ def convert_file(path, build_dir, config, dry_run, output_dir=None, names=None):
     checks = [{"file": os.path.relpath(path, ROOT), "line": source.line_of(o), "why": w}
               for o, w in sorted(conv.checks)]
     totals = {"file": os.path.relpath(path, ROOT), "tut_sha256": hashlib.sha256(source.data).hexdigest(),
+              "catch2_sha256": hashlib.sha256(converted.encode("utf-8", "surrogateescape")).hexdigest(),
               "tut_outside_calls": tut_outside, "catch2_outside_expected": catch_outside}
     return {"file": os.path.relpath(path, ROOT), "tests": tests, "totals": totals, "checks": checks,
             "notes": conv.notes,
