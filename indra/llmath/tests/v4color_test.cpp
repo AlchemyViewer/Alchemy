@@ -218,14 +218,15 @@ namespace
         CHECK(g ==  llcolor4[1]);
         CHECK(b ==  llcolor4[2]);
 
-        r = 0xA20, g = 0xFBFF, b = 0xFFF;
-        llcolor4.setVec(r,g,b);
+        // The non-const subscript is a reference to the component itself.
         F32 &ref1 = llcolor4[0];
-        CHECK(ref1 ==  llcolor4[0]);
-        F32 &ref2 = llcolor4[1];
-        CHECK(ref2 ==  llcolor4[1]);
-        F32 &ref3 = llcolor4[2];
-        CHECK(ref3 ==  llcolor4[2]);
+        CHECK(&ref1 == &llcolor4.mV[VRED]);
+        ref1 = 0xA20;
+        llcolor4[1] = 0xFBFF;
+        llcolor4[2] = 0xFFF;
+        CHECK(llcolor4.mV[VRED] == 0xA20);
+        CHECK(llcolor4.mV[VGREEN] == 0xFBFF);
+        CHECK(llcolor4.mV[VBLUE] == 0xFFF);
     }
 
     TEST_CASE("v4color_h: assignment from LLColor3 and construction from LLSD", "[v4color_h]")

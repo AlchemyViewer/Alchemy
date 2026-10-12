@@ -46,28 +46,38 @@ namespace
         CHECK(vec3D.mdV[VY] == 0);
         CHECK(vec3D.mdV[VZ] == 0);
 
-        F64 x = 2.32f, y = 1.212f, z = -.12f;
+        F64 x = 2.32, y = 1.212, z = -.12;
         LLVector3d vec3Da(x,y,z);
-        CHECK(vec3Da.mdV[VX] == 2.32f);
-        CHECK(vec3Da.mdV[VY] == 1.212f);
-        CHECK(vec3Da.mdV[VZ] == -.12f);
+        CHECK(vec3Da.mdV[VX] == 2.32);
+        CHECK(vec3Da.mdV[VY] == 1.212);
+        CHECK(vec3Da.mdV[VZ] == -.12);
 
-        const F64 vec[3] = {1.2f ,3.2f, -4.2f};
+        const F64 vec[3] = {1.2 ,3.2, -4.2};
         LLVector3d vec3Db(vec);
-        CHECK(vec3Db.mdV[VX] == 1.2f);
-        CHECK(vec3Db.mdV[VY] == 3.2f);
-        CHECK(vec3Db.mdV[VZ] == -4.2f);
+        CHECK(vec3Db.mdV[VX] == 1.2);
+        CHECK(vec3Db.mdV[VY] == 3.2);
+        CHECK(vec3Db.mdV[VZ] == -4.2);
 
-        LLVector3 vec3((F32)x,(F32)y,(F32)z);
+        // From an LLVector3, each float widened exactly.
+        LLVector3 vec3(2.32f, 1.212f, -.12f);
         LLVector3d vec3Dc(vec3);
-        CHECK(vec3Da == vec3Dc);
+        CHECK(vec3Dc.mdV[VX] == F64(2.32f));
+        CHECK(vec3Dc.mdV[VY] == F64(1.212f));
+        CHECK(vec3Dc.mdV[VZ] == F64(-.12f));
     }
 
     TEST_CASE("v3dmath_h: LLSD constructor and getValue round trip", "[v3dmath_h]")
     {
-        S32 a = -235;
-        LLSD llsd(a);
+        // An array of three: a vector reads sd[0], sd[1] and sd[2], so a
+        // scalar LLSD would make every component zero.
+        LLSD llsd;
+        llsd[0] = -235.0;
+        llsd[1] = 232345521.411132;
+        llsd[2] = -.12;
         LLVector3d vec3d(llsd);
+        CHECK(vec3d.mdV[VX] == -235.0);
+        CHECK(vec3d.mdV[VY] == 232345521.411132);
+        CHECK(vec3d.mdV[VZ] == -.12);
         LLSD sd = vec3d.getValue();
         LLVector3d vec3da(sd);
         CHECK(vec3d == vec3da);
@@ -75,12 +85,18 @@ namespace
 
     TEST_CASE("v3dmath_h: setValue and getValue round trip", "[v3dmath_h]")
     {
-        F64 a = 232345521.411132;
-        LLSD llsd(a);
+        LLSD llsd;
+        llsd[0] = 232345521.411132;
+        llsd[1] = -0.000001;
+        llsd[2] = 12345.2343;
         LLVector3d vec3d;
         vec3d.setValue(llsd);
+        CHECK(vec3d.mdV[VX] == 232345521.411132);
+        CHECK(vec3d.mdV[VY] == -0.000001);
+        CHECK(vec3d.mdV[VZ] == 12345.2343);
         LLSD sd = vec3d.getValue();
-        LLVector3d vec3da(sd);
+        LLVector3d vec3da;
+        vec3da.setValue(sd);
         CHECK(vec3d == vec3da);
     }
 
@@ -100,6 +116,7 @@ namespace
 
     TEST_CASE("v3dmath_h: clearVec/zeroVec and the setVec overloads", "[v3dmath_h]")
     {
+        // Values a float holds, so the trip through an LLVector3 below is exact.
         F64 x = 2.32f, y = 1.212f, z = -.12f;
         LLVector3d vec3D(x,y,z);
         vec3D.clearVec();
@@ -164,15 +181,15 @@ namespace
         CHECK(x ==  vec3D[0]);
         CHECK(y ==  vec3D[1]);
         CHECK(z ==  vec3D[2]);
-        vec3D.clearVec();
-        x = 23.23, y = -.2361, z = 3.25;
-        vec3D.setVec(x,y,z);
+        // The non-const subscript is a reference to the component itself.
         F64 &ref1 = vec3D[0];
-        CHECK(ref1 ==  vec3D[0]);
-        F64 &ref2 = vec3D[1];
-        CHECK(ref2 ==  vec3D[1]);
-        F64 &ref3 = vec3D[2];
-        CHECK(ref3 ==  vec3D[2]);
+        CHECK(&ref1 == &vec3D.mdV[VX]);
+        ref1 = 23.23;
+        vec3D[1] = -.2361;
+        vec3D[2] = 3.25;
+        CHECK(vec3D.mdV[VX] == 23.23);
+        CHECK(vec3D.mdV[VY] == -.2361);
+        CHECK(vec3D.mdV[VZ] == 3.25);
     }
 
     TEST_CASE("v3dmath_h: assignment from LLVector4", "[v3dmath_h]")

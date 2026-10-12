@@ -236,9 +236,13 @@ namespace
         CHECK(is_approx_equal(r1+r2 ,llcolor3a.mV[0]));
         CHECK(is_approx_equal(g1+g2,llcolor3a.mV[1]));
         CHECK(is_approx_equal(b1+b2,llcolor3a.mV[2]));
+
+        // Again on other values, and it hands back the color it changed.
+        r1 = -.235f, g1 = -24.32f, b1 = 2.13f, r2 = .5f, g2 = 1.f, b2 = -34.21f;
         llcolor3.setVec(r1,g1,b1);
         llcolor3a.setVec(r2,g2,b2);
-        llcolor3a += llcolor3;
+        const LLColor3& sum = (llcolor3a += llcolor3);
+        CHECK(&sum == &llcolor3a);
         CHECK(is_approx_equal(r1+r2 ,llcolor3a.mV[0]));
         CHECK(is_approx_equal(g1+g2,llcolor3a.mV[1]));
         CHECK(is_approx_equal(b1+b2,llcolor3a.mV[2]));
@@ -252,9 +256,13 @@ namespace
         CHECK(is_approx_equal(r2-r1, llcolor3a.mV[0]));
         CHECK(is_approx_equal(g2-g1, llcolor3a.mV[1]));
         CHECK(is_approx_equal(b2-b1, llcolor3a.mV[2]));
+
+        // Again on other values, and it hands back the color it changed.
+        r1 = -.235f, g1 = -24.32f, b1 = 2.13f, r2 = .5f, g2 = 1.f, b2 = -34.21f;
         llcolor3.setVec(r1,g1,b1);
         llcolor3a.setVec(r2,g2,b2);
-        llcolor3a -= llcolor3;
+        const LLColor3& difference = (llcolor3a -= llcolor3);
+        CHECK(&difference == &llcolor3a);
         CHECK(is_approx_equal(r2-r1, llcolor3a.mV[0]));
         CHECK(is_approx_equal(g2-g1, llcolor3a.mV[1]));
         CHECK(is_approx_equal(b2-b1, llcolor3a.mV[2]));

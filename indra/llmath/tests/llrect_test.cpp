@@ -311,8 +311,25 @@ namespace
         CHECK_FALSE(rect1 == rect2);
         CHECK(rect1 != rect2);
 
-        CHECK(rect1 == rect1);
-        CHECK_FALSE(rect1 != rect1);
+        // Another rect with the same edges, not the same rect.
+        LLRectf same;
+        same.set(-1.0f, 1.0f, 1.0f, -1.0f);
+        CHECK(rect1 == same);
+        CHECK_FALSE(rect1 != same);
+
+        // Each edge counts.
+        const LLRectf apart[] = {
+            LLRectf(-1.5f, 1.0f, 1.0f, -1.0f),
+            LLRectf(-1.0f, 1.5f, 1.0f, -1.0f),
+            LLRectf(-1.0f, 1.0f, 1.5f, -1.0f),
+            LLRectf(-1.0f, 1.0f, 1.0f, -1.5f),
+        };
+        for (const LLRectf& other : apart)
+        {
+            CAPTURE(other);
+            CHECK(rect1 != other);
+            CHECK_FALSE(rect1 == other);
+        }
     }
 
     TEST_CASE("LLRect: copy constructor gives an equal rect", "[LLRect]")
@@ -478,7 +495,10 @@ namespace
         LLRectf rect(1.0f, 3.0f, 3.0f, 1.0f);
 
         CHECK(rect.localPointInRect(0.0f, 0.0f));
-        CHECK_FALSE(rect.localPointInRect(-0.0001f, -0.001f));
+        CHECK_FALSE(rect.localPointInRect(-0.0001f, -0.0001f));
+        // Just outside on one side is outside.
+        CHECK_FALSE(rect.localPointInRect(-0.0001f, 0.0f));
+        CHECK_FALSE(rect.localPointInRect(0.0f, -0.0001f));
         CHECK(rect.localPointInRect(1.0f, 1.0f));
         CHECK_FALSE(rect.localPointInRect(2.0f, 2.0f));
         CHECK(rect.localPointInRect(1.999f, 1.999f));
