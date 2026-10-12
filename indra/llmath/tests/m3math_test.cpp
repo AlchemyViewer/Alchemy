@@ -42,11 +42,6 @@
 #pragma warning(disable: 4702)
 #endif
 
-#if LL_WINDOWS
-// disable unreachable code warnings caused by usage of skip.
-#pragma warning(disable: 4702)
-#endif
-
 namespace
 {
     //test case for setIdentity() fn.
