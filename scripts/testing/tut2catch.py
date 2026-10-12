@@ -52,7 +52,10 @@ decided by the types clang resolved, not by its text:
                destructor, where a throw would end the process, CHECK
                always. With that macro (X below):
                ensure(c) -> X(c); ensure(a && b && ...) -> X(a); X(b); ...
-               one assertion a term, so that each prints its operands;
+               one assertion a term, so that each prints its operands
+               (whole, where a term after the first changes something, ++,
+               -- or an assignment, which TUT's && ran only past the terms
+               before it);
                ensure(msg, c) -> UNSCOPED_INFO(msg) then X(c), or, where c
                split, { INFO(msg); X(a); X(b); } so the message goes with
                each; braced where the call was a lone statement of an if,
@@ -1837,7 +1840,10 @@ class Converter:
             # A && chain is as many assertions, each printing its operands,
             # each as strong as its own term needs.
             terms = self.and_terms(condition, record) if name == "ensure" else [condition]
-            if len(terms) > 1 and any(self.call_span(t, record) is None for t in terms):
+            # A later term that changes something ran only where the ones
+            # before it held: split, it would run regardless.
+            if len(terms) > 1 and (any(self.call_span(t, record) is None for t in terms) or
+                                   any(side_effect(t) for t in terms[1:])):
                 terms = [condition]
 
             # TUT's ensure stopped the test at the first term that failed;
@@ -2864,6 +2870,30 @@ def variables(node, constants=True):
 # What a subscript through a class reads as a pointer would: a handle to
 # something else, not a value of its own.
 HANDLES = re.compile(r"iterator|__wrap_iter|optional|unique_ptr|shared_ptr|weak_ptr|LLPointer|_ptr\b|Ptr\b")
+
+
+def side_effect(node):
+    """Whether evaluating node changes something of itself: ++ or --, an
+    assignment or compound assignment, built in or overloaded. A call may
+    too, but is not looked in: calls are too common in a condition, and
+    those whose failure leaves garbage are REQUIRE's business."""
+    stack = [node]
+    while stack:
+        sub = stack.pop()
+        kind = sub.get("kind")
+        if kind in ("LambdaExpr", "CXXDefaultArgExpr"):
+            continue
+        inner = [c for c in sub.get("inner", []) if isinstance(c, dict) and "kind" in c]
+        if kind == "UnaryOperator" and sub.get("opcode") in ("++", "--"):
+            return True
+        if kind == "CompoundAssignOperator" or (kind == "BinaryOperator" and sub.get("opcode") == "="):
+            return True
+        if kind == "CXXOperatorCallExpr" and inner:
+            name = skip_implicit(inner[0]).get("referencedDecl", {}).get("name", "")
+            if re.fullmatch(r"operator(?:[-+*/%^&|]|<<|>>)?=|operator(?:\+\+|--)", name):
+                return True
+        stack.extend(inner)
+    return False
 
 
 def leaned_on(node):
