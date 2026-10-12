@@ -32,6 +32,8 @@
 #include "llhttpnode.h"
 #include "llsdhttpserver.h"
 
+#include <memory>
+
 namespace
 {
     struct HTTPNodeTestData
@@ -215,13 +217,20 @@ namespace
         LLHTTPNode* alphaNode = new LLHTTPNode;
         LLHTTPNode* betaNode = new LLHTTPNode;
         LLHTTPNode* gammaNode = new LLHTTPNode;
-        LLHTTPNode* gamma2Node = new LLHTTPNode;
+        // addNode refuses a node for a path that has one, and the refused node stays its caller's.
+        auto gamma2Node = std::make_unique<LLHTTPNode>();
 
         mRoot.addNode("greek/alpha", alphaNode);
         mRoot.addNode("greek/beta", betaNode);
 
         mRoot.addNode("greek/gamma", gammaNode);
-        mRoot.addNode("greek/gamma", gamma2Node);
+        mRoot.addNode("greek/gamma", gamma2Node.get());
+        const bool refused = gamma2Node->rootNode() == gamma2Node.get();
+        CHECK(refused);
+        if (!refused)
+        {
+            (void)gamma2Node.release(); // mRoot took it, and deletes it
+        }
 
         LLHTTPNode* alephNode = new LLHTTPNode;
 

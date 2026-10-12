@@ -86,7 +86,7 @@ namespace
         requestSize = 16384-1;
         CHECK(buf.createSegment(channel, requestSize, segment));
         CHECK(segment.size() == requestSize);
-        // second request for remainign 1 byte
+        // second request for the remaining 1 byte
 
         requestSize = 1;
         CHECK(buf.createSegment(channel, requestSize, segment));
@@ -98,7 +98,7 @@ namespace
 
         LLHeapBuffer buf1(bigSize);
 
-        // requst for more than default size but less than total sizeit should fail now.
+        // a request for more than the default size but less than this buffer's size succeeds.
         requestSize = 16384 + 1;
         CHECK(buf1.createSegment(channel, requestSize, segment));
         CHECK(segment.size() == requestSize);
@@ -108,6 +108,7 @@ namespace
         CHECK(buf2.createSegment(channel, requestSize, segment));
         REQUIRE(segment.size() == requestSize);
         CHECK(memcmp(segment.data(), (U8*) str, requestSize) == 0);
+        // it is full now, so it refuses any request, even one it would otherwise cut down to fit.
         requestSize = smallSize+1;
         CHECK_FALSE(buf2.createSegment(channel, requestSize, segment));
     }
@@ -190,6 +191,8 @@ namespace
         char buf[100];
         S32 len2 = len;
         bufferArray1.readAfter(channelDescriptors.in(), NULL, (U8*)buf, len2);
+        // the terminator is the last byte read, so a short read leaves buf unterminated
+        REQUIRE(len2 == len);
         CHECK(buf == str);
     }
 
@@ -225,7 +228,9 @@ namespace
         U8* last = bufferArray.readAfter(0, 0, (U8*)buf, len1);
         bufferArray.splitAfter(last);
         LLBufferArray::segment_iterator_t iterator = bufferArray.beginSegment();
+        REQUIRE(iterator != bufferArray.endSegment());
         ++iterator;
+        REQUIRE(iterator != bufferArray.endSegment());
         std::string str(((char*)(*iterator).data()), (*iterator).size());
         CHECK(str == std::string(" is a Virtual World"));
     }

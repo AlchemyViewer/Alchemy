@@ -1,7 +1,7 @@
 /**
- * @file lldatapacker_tut.cpp
+ * @file message_test.cpp
  * @date 2007-04
- * @brief LLDataPacker test cases.
+ * @brief LLMessageSystem test cases.
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -54,7 +54,7 @@ namespace
         }
         virtual void extendedResult(S32 code, const std::string& message, const LLSD& headers) { }
         virtual void extendedResult(S32 code, const LLSD& result, const LLSD& headers) { }
-        S32 mStatus;
+        S32 mStatus = 0; // no status() yet
     };
 }
 

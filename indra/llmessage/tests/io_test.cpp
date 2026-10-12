@@ -74,6 +74,7 @@ namespace
         S32 count = mBuffer.countAfter(ch.in(), NULL);
         CHECK(count == str_len);
         LLBufferArray::segment_iterator_t it = mBuffer.beginSegment();
+        REQUIRE(it != mBuffer.endSegment());
         U8* first = (*it).data();
         count = mBuffer.countAfter(ch.in(), first);
         CHECK(count == str_len - 1);
@@ -89,6 +90,7 @@ namespace
         S32 count = mBuffer.countAfter(ch.in(), NULL);
         CHECK(count == 2 * str_len);
         LLBufferArray::segment_iterator_t it = mBuffer.beginSegment();
+        REQUIRE(it != mBuffer.endSegment());
         U8* first = (*it).data();
         count = mBuffer.countAfter(ch.in(), first);
         CHECK(count == (2 * str_len) - 1);
@@ -141,6 +143,7 @@ namespace
         char buffer[255];   /* Flawfinder: ignore */
         S32 len = 5;
         LLBufferArray::segment_iterator_t it = mBuffer.beginSegment();
+        REQUIRE(it != mBuffer.endSegment());
         U8* addr = (*it).data();
         mBuffer.readAfter(ch.in(), addr, (U8*)buffer, len);
         CHECK(len == 5);
@@ -197,14 +200,14 @@ namespace
         std::string last_line;
         for(i = 0; i < LINE_COUNT; ++i)
         {
+            CAPTURE(i);
             len = BUFFER_LEN;
             last = mBuffer.readAfter(ch.in(), last, (U8*)buf, len);
-            char* newline = strchr((char*)buf, '\n');
+            // buf holds len bytes and no terminator, so the line ends among those bytes or not at all.
+            const char* newline = static_cast<const char*>(memchr(buf, '\n', len));
+            REQUIRE(newline != NULL);
             S32 offset = -((len - 1) - (S32)(newline - buf));
-            ++newline;
-            *newline = '\0';
-            last_line.assign(buf);
-            CAPTURE(i);
+            last_line.assign(buf, newline - buf + 1);
             REQUIRE(last_line == lines[i]);
             last = mBuffer.seek(ch.in(), last, offset);
         }
@@ -383,9 +386,11 @@ namespace
         mBuffer.splitAfter(last);
         LLBufferArray::segment_iterator_t it = mBuffer.beginSegment();
         LLBufferArray::segment_iterator_t end = mBuffer.endSegment();
+        REQUIRE(it != end);
         std::string first((char*)((*it).data()), (*it).size());
         CHECK(first == std::string("zippity"));
         ++it;
+        REQUIRE(it != end);
         std::string second((char*)((*it).data()), (*it).size());
         CHECK(second == std::string(" do da!"));
         ++it;
@@ -450,8 +455,8 @@ namespace
         char buf[BUF_LEN];      /* Flawfinder: ignore */
         S32 actual_len = BUF_LEN;
         (void) mBuffer.readAfter(ch.out(), NULL, (U8*)buf, actual_len);
-        buf[actual_len] = '\0';
-        std::string actual(buf);
+        // The read may fill buf, which then has no room for a terminator.
+        std::string actual(buf, actual_len);
         std::string expected(ostr.str());
         CHECK(actual.size() == expected.size());
         CHECK(actual == expected);

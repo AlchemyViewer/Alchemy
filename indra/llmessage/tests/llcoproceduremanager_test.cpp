@@ -35,10 +35,6 @@
 
 #include <functional>
 
-#include <boost/fiber/fiber.hpp>
-#include <boost/fiber/buffered_channel.hpp>
-#include <boost/fiber/unbuffered_channel.hpp>
-
 #include <catch2/catch_test_macros.hpp>
 #include "../test/sync.h"
 
@@ -101,73 +97,25 @@ namespace
         LLCoprocedureManager::instance().close("PoolName");
     }
 
-    TEST_CASE_METHOD(coproceduremanager_test, "LLCoprocedureManager: a buffered channel hands a function to a fiber", "[LLCoprocedureManager]")
+    TEST_CASE_METHOD(coproceduremanager_test, "LLCoprocedureManager: a pool runs every coprocedure enqueued on it", "[LLCoprocedureManager]")
     {
-        const size_t capacity = 2;
-        boost::fibers::buffered_channel<std::function<void(void)>> chan(capacity);
-
-        boost::fibers::fiber worker([&chan]() {
-            chan.value_pop()();
-        });
-
-        chan.push([]() {
-            LL_INFOS("Test") << "test 1" << LL_ENDL;
-        });
-
-        worker.join();
-    }
-
-    TEST_CASE_METHOD(coproceduremanager_test, "LLCoprocedureManager: an unbuffered channel hands a function to a fiber", "[LLCoprocedureManager]")
-    {
-        boost::fibers::unbuffered_channel<std::function<void(void)>> chan;
-
-        boost::fibers::fiber worker([&chan]() {
-            chan.value_pop()();
-        });
-
-        chan.push([]() {
-            LL_INFOS("Test") << "test 1" << LL_ENDL;
-        });
-
-        worker.join();
-    }
-
-    TEST_CASE_METHOD(coproceduremanager_test, "LLCoprocedureManager: a worker fiber runs every function until its channel closes", "[LLCoprocedureManager]")
-    {
-        boost::fibers::buffered_channel<std::function<void(void)>> chan(4);
-
-        boost::fibers::fiber worker([&chan]() {
-            std::function<void(void)> f;
-
-            // using namespace std::chrono_literals;
-            // const auto timeout = 5s;
-            // boost::fibers::channel_op_status status;
-            while (chan.pop(f) != boost::fibers::channel_op_status::closed)
-            {
-                LL_INFOS("CoWorker") << "got coproc" << LL_ENDL;
-                f();
-            }
-            LL_INFOS("CoWorker") << "got closed" << LL_ENDL;
-        });
-
+        // More than the pool has coroutines, so at least one of them goes back for another.
+        const int COPROC_COUNT = 12;
+        Sync sync;
         int counter = 0;
-
-        for (int i = 0; i < 5; ++i)
+        LLCoprocedureManager::instance().initializePool("EveryCoproc");
+        for (int i = 0; i < COPROC_COUNT; ++i)
         {
-            LL_INFOS("CoMain") << "pushing coproc " << i << LL_ENDL;
-            chan.push([&counter]() {
-                LL_INFOS("CoProc") << "in coproc" << LL_ENDL;
-                ++counter;
-            });
+            LLCoprocedureManager::instance().enqueueCoprocedure("EveryCoproc", "Count",
+                [&counter, &sync] (LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t & ptr, const LLUUID & id) {
+                    ++counter;
+                    sync.bump();
+                });
         }
 
-        LL_INFOS("CoMain") << "closing channel" << LL_ENDL;
-        chan.close();
+        sync.yield_until(COPROC_COUNT);
+        CHECK(counter == COPROC_COUNT);
 
-        LL_INFOS("CoMain") << "joining worker" << LL_ENDL;
-        worker.join();
-
-        LL_INFOS("CoMain") << "checking count" << LL_ENDL;
-        CHECK(counter == 5);
+        LLCoprocedureManager::instance().close("EveryCoproc");
     }
 }  // anonymous namespace

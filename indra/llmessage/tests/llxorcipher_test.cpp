@@ -91,7 +91,7 @@ namespace
         // it should not be the same as original data!
         CHECK(memcmp(str, str1, str_len) != 0);
         xorCipher1.decrypt((U8 *) str, str_len);
-        // it should not be the same as original data!
+        // it should be the original data again
         CHECK_THAT(ll_test::Memory(str, str_len), ll_test::MemoryMatches(str1, str_len));
     }
 }
