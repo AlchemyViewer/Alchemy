@@ -10,7 +10,9 @@ Two steps, either side of scripts/testing/tut2catch.py:
            A test TUT never reported (a dummy test<N> slot) is not a test.
            With them it keeps the sha256 of the TUT source, the one
            indra/**/tests/<stem>.cpp git tracks, and it refuses an
-           executable built before that source last changed. A test built at other
+           executable built before that source last changed: the entry's
+           own target, wherever it is in the command (llcorehttp's runs
+           under a Python peer). A test built at other
            x86-64 tiers too (an entry ending _baseline, _v2, _v3, _v4) is
            kept a tier apart, under <stem>@<tier>.
   check    after converting and building: runs each converted file's CTest
@@ -184,6 +186,18 @@ def tut_identity(name):
     return (m.group(1)[:-len(tier) - 1] if tier else m.group(1)) + "_test", tier
 
 
+def tut_executable(name, command):
+    """The test executable in a TUT entry's command: the file named for the
+    entry's target, INTEGRATION_TEST_<test> for INTEGRATION_TEST_RUNNER_<test>
+    and the entry's own name otherwise, wherever a launcher put it; else the
+    command's first word."""
+    target = name.replace("INTEGRATION_TEST_RUNNER_", "INTEGRATION_TEST_", 1)
+    for word in command:
+        if os.path.splitext(os.path.basename(word))[0] == target and os.path.isfile(word):
+            return word
+    return command[0] if command else None
+
+
 def tut_source(stem):
     """The TUT source a stem names, as git tracks it under ROOT, and the
     sha256 of its bytes: (None, None) unless exactly one
@@ -223,10 +237,10 @@ def record(args):
                   file=sys.stderr)
         # An executable older than its source is not of it: its results
         # would stand for tests the file no longer has.
-        command = test["command"]
-        if source is not None and command and os.path.isfile(command[0]) and \
-                os.path.getmtime(os.path.join(ROOT, source)) > os.path.getmtime(command[0]):
-            print(f"{name}: {source} changed since {command[0]} was built; build it again to record it",
+        executable = tut_executable(name, test["command"])
+        if source is not None and executable and os.path.isfile(executable) and \
+                os.path.getmtime(os.path.join(ROOT, source)) > os.path.getmtime(executable):
+            print(f"{name}: {source} changed since {executable} was built; build it again to record it",
                   file=sys.stderr)
             return 2
         code, text = run(test, ["-v"], args.timeout)
