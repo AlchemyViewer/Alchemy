@@ -480,9 +480,12 @@ def check_run(args, label, path, entry_name, test, recorded, entries, file_cases
         problems.append(f"{label}: {entry_name} exited {code}, which does not fit its cases ("
                         + (", ".join(f"{v} {k}" for k, v in sorted(counts.items())) or "none") + ")")
     tut_results = {(r["group"], r["n"]): r for r in recorded["results"]}
+    # Counted in the body that ran: a test<N> in both branches of an #if is
+    # two cases of one name in the file, and the run names the line of its.
     counted = {}
-    for c in file_cases:
-        counted.setdefault(c["name"], len(c["sites"]))
+    for name, case in by_name.items():
+        body = body_of(case, file_cases)
+        counted[name] = len(body["sites"]) if body else None
     # An assertion counted is not one that ran: a case passes as well when a
     # loop around its CHECK never turns. Each site in a passing case's body
     # must have reported at least once.
