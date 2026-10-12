@@ -64,8 +64,9 @@ decided by the types clang resolved, not by its text:
                ll_test::WithinDistance<T>, which, as TUT's did, fails a
                value on the border and works in T, the type TUT's
                template took; ensure_approximately_equals_range ->
-               WithinAbs, the actual narrowed to F32 as TUT's parameter
-               narrowed it (a NaN, which TUT's let pass, fails it);
+               WithinAbs, the actual, the expected and the delta narrowed
+               to F32 where they are not, as TUT's parameters narrowed them
+               (a NaN, which TUT's let pass, fails it);
                ensure_approximately_equals -> ll_test::WithinBits, at the
                precision of the overload TUT chose; ensure_contains,
                _does_not_contain, _starts_with, _ends_with -> the string
@@ -1905,9 +1906,10 @@ class Converter:
                     # TUT's: strictly inside, worked in its own type.
                     matcher = f"ll_test::WithinDistance<{kind.split('-', 1)[1]}>("
                 else:
-                    # TUT's parameters were F32: the actual was narrowed.
-                    if value_type(skip_implicit_casts(args[a])) not in ("float", "F32"):
-                        actual = f"F32({actual})"
+                    # TUT's parameters were F32: all three were narrowed.
+                    narrow = [value_type(skip_implicit_casts(args[a + i])) not in ("float", "F32") for i in range(3)]
+                    actual, expected, margin = (f"F32({t})" if cast else t
+                                                for t, cast in zip((actual, expected, margin), narrow))
                     matcher = "Catch::Matchers::WithinAbs("
                 return msg + [f"{req}_THAT({actual},{self.separator(ranges, a)}{matcher}"
                               f"{expected},{self.separator(ranges, a + 1)}{margin}))"]
@@ -3123,7 +3125,7 @@ def text_statements(name, texts, macro, kind=None):
         if n != 4:
             return None
         a, e, d = texts[-3:]
-        return message(texts[0]) + [f"REQUIRE_THAT(F32({a}), Catch::Matchers::WithinAbs({e}, {d}))"]
+        return message(texts[0]) + [f"REQUIRE_THAT(F32({a}), Catch::Matchers::WithinAbs(F32({e}), F32({d})))"]
     if name == "ensure_approximately_equals" and kind in ("bits-F32", "bits-F64"):
         if n not in (3, 4):
             return None
