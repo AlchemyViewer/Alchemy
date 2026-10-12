@@ -32,6 +32,8 @@
 #include "lltimer.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include "alteststateguard.h"
+#include "altestteardown.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -40,6 +42,23 @@
 
 namespace
 {
+    // The stores write on one thread for the process, ALRecoveryWriter's,
+    // which the viewer stops in its cleanup. Here it is made once, before the
+    // first case that writes would make it, and stopped by the harness's
+    // teardown: that it then runs is no change a case made.
+    void makeRecoveryWriter()
+    {
+        static bool sMade = false;
+        if (!sMade)
+        {
+            sMade = true;
+            ALRecoveryWriter::getInstance();
+            ll_test::Teardown::add([] { ALRecoveryWriter::deleteSingleton(); });
+            ll_test::StateGuard::accept("the live thread pools");
+            ll_test::StateGuard::accept("the live work queues");
+        }
+    }
+
     struct alrecoverystore_data
     {
         // A folder of its own for each test, gone after it.
@@ -47,6 +66,7 @@ namespace
 
         alrecoverystore_data()
         {
+            makeRecoveryWriter();
             folder = fsyspath(std::filesystem::temp_directory_path() / fsyspath("alrecoverystore_" + LLUUID::generateNewID().asString())).string();
             std::error_code ec;
             std::filesystem::create_directories(fsyspath(folder), ec);

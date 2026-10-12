@@ -295,6 +295,13 @@ target_link_libraries(
 )
 
 if(AL_BUILD_TESTS)
+  # The state guard's checks on what llcommon keeps for the process, and the
+  # event pumps' end after every case, in every binary of llcommon's tests
+  # that shares a process between files.
+  add_library(llcommon_test_checks OBJECT tests/llcommon_test_checks.cpp)
+  target_link_libraries(llcommon_test_checks PRIVATE al::flags al_test_support llcommon)
+  set_target_properties(llcommon_test_checks PROPERTIES FOLDER "Tests/llcommon")
+
   # One Catch2 binary for llcommon's tests, each test file run in a process
   # of its own. None of them may delete every singleton: the files will
   # share a process.
@@ -355,6 +362,7 @@ if(AL_BUILD_TESTS)
       tests/threadsafeschedule_test.cpp
       tests/tuple_test.cpp
       tests/workqueue_test.cpp
+    SUPPORT llcommon_test_checks
     LIBRARIES llcommon
   )
 
@@ -366,6 +374,7 @@ if(AL_BUILD_TESTS)
     llcommon_python_tests
     PROJECT llcommon
     SOURCES tests/llleap_test.cpp tests/llprocess_test.cpp tests/llsdserialize_python_test.cpp
+    SUPPORT llcommon_test_checks
     LIBRARIES llcommon
     PYTHON
     ENVIRONMENT PYTHONDONTWRITEBYTECODE=1
