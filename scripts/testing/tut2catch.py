@@ -198,10 +198,19 @@ class ConvertError(Exception):
 # --------------------------------------------------------------------------
 # The source text
 # --------------------------------------------------------------------------
+def mask_literal(data, out, start, end):
+    """Masks a literal's inside, but for each line splice in it."""
+    for k in range(start, end):
+        if data[k] == 0x0A or (data[k] == 0x5C and k + 1 < len(data) and data[k + 1] == 0x0A):
+            continue
+        out[k] = 0x5F
+
+
 def mask_source(data):
     """The text with comments blanked (newlines kept) and the insides of string
     and character literals replaced, so a search of it finds only code. Every
-    offset means what it meant."""
+    offset means what it meant, and every line: a line splice in a literal,
+    a backslash and its newline, stays, as one in code does."""
     out = bytearray(data)
     n = len(data)
     i = 0
@@ -247,8 +256,7 @@ def mask_source(data):
                 if data[j] == 0x5C:
                     j += 1
                 j += 1
-            for k in range(i + 1, min(j, n)):
-                out[k] = 0x5F
+            mask_literal(data, out, i + 1, min(j, n))
             i = j + 1
         elif c == 0x27:  # '
             # A digit separator, inside a number, is no literal.
@@ -263,8 +271,7 @@ def mask_source(data):
                 if data[j] == 0x5C:
                     j += 1
                 j += 1
-            for k in range(i + 1, min(j, n)):
-                out[k] = 0x5F
+            mask_literal(data, out, i + 1, min(j, n))
             i = j + 1
         else:
             i += 1
