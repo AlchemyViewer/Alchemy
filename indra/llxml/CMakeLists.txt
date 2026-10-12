@@ -25,7 +25,17 @@ target_precompile_headers(llxml REUSE_FROM llprecompiled)
 
 # tests
 if(AL_BUILD_TESTS)
-  al_add_test(llxmlnode PROJECT llxml LIBRARIES llxml llmath llcommon)
-  al_add_test(llcontrol PROJECT llxml LIBRARIES llxml llmath llcommon)
-  al_add_test(alxmllayermerge PROJECT llxml LIBRARIES llxml llmath llcommon)
+  # The state guard's checks on what llxml keeps for the process, for every
+  # test binary that links it.
+  add_library(llxml_test_checks OBJECT tests/llxml_test_checks.cpp)
+  target_link_libraries(llxml_test_checks PRIVATE al::flags al_test_support llxml)
+  set_target_properties(llxml_test_checks PROPERTIES FOLDER "Tests/llxml")
+
+  al_add_test_binary(
+    llxml_tests
+    PROJECT llxml
+    SOURCES tests/alxmllayermerge_test.cpp tests/llcontrol_test.cpp tests/llxmlnode_test.cpp
+    LIBRARIES llxml llmath llcommon
+    SUPPORT llxml_test_checks
+  )
 endif()

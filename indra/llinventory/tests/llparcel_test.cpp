@@ -1,5 +1,5 @@
 /**
- * @file llinventoryparcel_tut.cpp
+ * @file llparcel_test.cpp
  * @author Moss
  * @date 2007-04-17
  *
@@ -31,42 +31,29 @@
 
 #include "../llparcel.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
-{
 namespace
 {
-    struct llinventoryparcel_data
-    {
-    };
-    typedef test_group<llinventoryparcel_data> llinventoryparcel_test;
-    typedef llinventoryparcel_test::object llinventoryparcel_object;
-    tut::llinventoryparcel_test llinventoryparcel("LLInventoryParcel");
-}
-
-    template<> template<>
-    void llinventoryparcel_object::test<1>()
+    TEST_CASE("LLInventoryParcel: each category's string and UI string map back to it", "[LLInventoryParcel]")
     {
         for (S32 i=0; i<LLParcel::C_COUNT; ++i)
         {
+            CAPTURE(i);
             const std::string& catstring =  LLParcel::getCategoryString(LLParcel::ECategory(i));
-            ensure("LLParcel::getCategoryString(i)",
-                   !catstring.empty());
+            REQUIRE_FALSE(catstring.empty());
 
             const std::string& catuistring =  LLParcel::getCategoryUIString(LLParcel::ECategory(i));
-            ensure("LLParcel::getCategoryUIString(i)",
-                   !catuistring.empty());
+            REQUIRE_FALSE(catuistring.empty());
 
-            ensure_equals("LLParcel::ECategory mapping of string back to enum", LLParcel::getCategoryFromString(catstring), i);
-            ensure_equals("LLParcel::ECategory mapping of uistring back to enum", LLParcel::getCategoryFromUIString(catuistring), i);
+            REQUIRE(LLParcel::getCategoryFromString(catstring) == i);
+            REQUIRE(LLParcel::getCategoryFromUIString(catuistring) == i);
         }
 
         // test the C_ANY case, which has to work for UI strings
         const std::string& catuistring =  LLParcel::getCategoryUIString(LLParcel::C_ANY);
-        ensure("LLParcel::getCategoryUIString(C_ANY)",
-               !catuistring.empty());
+        CHECK_FALSE(catuistring.empty());
 
-        ensure_equals("LLParcel::ECategory mapping of uistring back to enum", LLParcel::getCategoryFromUIString(catuistring), LLParcel::C_ANY);
+        CHECK(LLParcel::getCategoryFromUIString(catuistring) == LLParcel::C_ANY);
     }
 }

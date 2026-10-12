@@ -32,148 +32,126 @@
 
 #include "../lljoint.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 
 
-namespace tut
-{
 namespace
 {
-    struct lljoint_data
-    {
-    };
-    typedef test_group<lljoint_data> lljoint_test;
-    typedef lljoint_test::object lljoint_object;
-    tut::lljoint_test lljoint_testcase("LLJoint");
-}
-
-    template<> template<>
-    void lljoint_object::test<1>()
+    TEST_CASE("LLJoint: a lone joint has no parent and is its own root", "[LLJoint]")
     {
         LLJoint lljoint;
         LLJoint* jnt = lljoint.getParent();
-        ensure("getParent() failed ", (NULL == jnt));
-        ensure("getRoot() failed ", (&lljoint == lljoint.getRoot()));
+        CHECK(jnt == NULL);
+        CHECK(&lljoint == lljoint.getRoot());
     }
 
-    template<> template<>
-    void lljoint_object::test<2>()
+    TEST_CASE("LLJoint: setup attaches a joint to its parent", "[LLJoint]")
     {
         std::string str = "LLJoint";
         LLJoint parent(str), child;
         child.setup(str, &parent);
         LLJoint* jnt = child.getParent();
-        ensure("setup() failed ", (&parent == jnt));
+        CHECK(&parent == jnt);
     }
 
-    template<> template<>
-    void lljoint_object::test<3>()
+    TEST_CASE("LLJoint: findJoint finds a child by name", "[LLJoint]")
     {
         LLJoint parent, child;
         std::string str = "LLJoint";
         child.setup(str, &parent);
         LLJoint* jnt = parent.findJoint(str);
-        ensure("findJoint() failed ", (&child == jnt));
+        CHECK(&child == jnt);
     }
 
-    template<> template<>
-    void lljoint_object::test<4>()
+    TEST_CASE("LLJoint: setName and getName round-trip", "[LLJoint]")
     {
         LLJoint parent;
         std::string str1 = "LLJoint", str2;
         parent.setName(str1);
         str2 = parent.getName();
-        ensure("setName() failed ", (str1 == str2));
+        CHECK(str1 == str2);
     }
 
-    template<> template<>
-    void lljoint_object::test<5>()
+    TEST_CASE("LLJoint: setPosition and getPosition round-trip", "[LLJoint]")
     {
         LLJoint lljoint;
         LLVector3 vec3(2.3f,30.f,10.f);
         // SL-315
         lljoint.setPosition(vec3);
         LLVector3 pos = lljoint.getPosition();
-        ensure("setPosition()/getPosition() failed ", (vec3 == pos));
+        CHECK(vec3 == pos);
     }
 
-    template<> template<>
-    void lljoint_object::test<6>()
+    TEST_CASE("LLJoint: setWorldPosition sets the world and last world positions", "[LLJoint]")
     {
         LLJoint lljoint;
         LLVector3 vec3(2.3f,30.f,10.f);
         // SL-315
         lljoint.setWorldPosition(vec3);
         LLVector3 pos = lljoint.getWorldPosition();
-        ensure("1:setWorldPosition()/getWorldPosition() failed ", (vec3 == pos));
+        CHECK(vec3 == pos);
         LLVector3 lastPos = lljoint.getLastWorldPosition();
-        ensure("2:getLastWorldPosition failed ", (vec3 == lastPos));
+        CHECK(vec3 == lastPos);
     }
 
-    template<> template<>
-    void lljoint_object::test<7>()
+    TEST_CASE("LLJoint: setRotation and getRotation round-trip", "[LLJoint]")
     {
         LLJoint lljoint("LLJoint");
         LLQuaternion q(2.3f,30.f,10.f,1.f);
         lljoint.setRotation(q);
         LLQuaternion rot = lljoint.getRotation();
-        ensure("setRotation()/getRotation() failed ", (q == rot));
+        CHECK(q == rot);
     }
-    template<> template<>
-    void lljoint_object::test<8>()
+    TEST_CASE("LLJoint: setWorldRotation sets the world and last world rotations", "[LLJoint]")
     {
         LLJoint lljoint("LLJoint");
         LLQuaternion q(2.3f,30.f,10.f,1.f);
         lljoint.setWorldRotation(q);
         LLQuaternion rot = lljoint.getWorldRotation();
-        ensure("1:setWorldRotation()/getWorldRotation() failed ", (q == rot));
+        CHECK(q == rot);
         LLQuaternion lastRot = lljoint.getLastWorldRotation();
-        ensure("2:getLastWorldRotation failed ", (q == lastRot));
+        CHECK(q == lastRot);
     }
 
-    template<> template<>
-    void lljoint_object::test<9>()
+    TEST_CASE("LLJoint: setScale and getScale round-trip", "[LLJoint]")
     {
         LLJoint lljoint;
         LLVector3 vec3(2.3f,30.f,10.f);
         lljoint.setScale(vec3);
         LLVector3 scale = lljoint.getScale();
-        ensure("setScale()/getScale failed ", (vec3 == scale));
+        CHECK(vec3 == scale);
     }
 
-    template<> template<>
-    void lljoint_object::test<10>()
+    TEST_CASE("LLJoint: setWorldMatrix and getWorldMatrix round-trip the identity", "[LLJoint]")
     {
         LLJoint lljoint("LLJoint");
         LLMatrix4 mat;
         mat.setIdentity();
         lljoint.setWorldMatrix(mat);//giving warning setWorldMatrix not correctly implemented;
         LLMatrix4 mat4 = lljoint.getWorldMatrix().toMatrix4();
-        ensure("setWorldMatrix()/getWorldMatrix failed ", (mat4 == mat));
+        CHECK(mat4 == mat);
     }
 
-    template<> template<>
-    void lljoint_object::test<11>()
+    TEST_CASE("LLJoint: the constructor stores the joint number", "[LLJoint]")
     {
         S32 joint_num = 12;
         LLJoint lljoint(joint_num);
         lljoint.setName("parent");
         S32 jointNum =  lljoint.getJointNum();
-        ensure("getJointNum failed ", (jointNum == joint_num));
+        CHECK(jointNum == joint_num);
     }
 
-    template<> template<>
-    void lljoint_object::test<12>()
+    TEST_CASE("LLJoint: setSkinOffset and getSkinOffset round-trip", "[LLJoint]")
     {
         LLJoint lljoint;
         LLVector3 vec3(2.3f,30.f,10.f);
         lljoint.setSkinOffset(vec3);
         LLVector3 offset = lljoint.getSkinOffset();
-        ensure("1:setSkinOffset()/getSkinOffset() failed ", (vec3 == offset));
+        CHECK(vec3 == offset);
     }
 
-    template<> template<>
-    void lljoint_object::test<13>()
+    TEST_CASE("LLJoint: addChild and removeChild keep the tree's links and lookups", "[LLJoint]")
     {
         LLJoint lljointgp("gparent");
         LLJoint lljoint("parent");
@@ -186,28 +164,27 @@ namespace
 
         LLJoint* jnt = NULL;
         jnt = lljoint2.getParent();
-        ensure("addChild() failed ", (&lljoint == jnt));
+        CHECK(&lljoint == jnt);
         LLJoint* jnt1 = lljoint.findJoint("child3");
-        ensure("findJoint() failed ", (&lljoint3 == jnt1));
+        CHECK(&lljoint3 == jnt1);
         lljoint.removeChild(&lljoint3);
         LLJoint* jnt2 = lljoint.findJoint("child3");
-        ensure("removeChild() failed ", (NULL == jnt2));
+        CHECK(jnt2 == NULL);
 
         lljointgp.addChild(&lljoint);
-        ensure("GetParent() failed ", (&lljoint== lljoint2.getParent()));
-        ensure("getRoot() failed ", (&lljointgp == lljoint2.getRoot()));
+        CHECK(&lljointgp == lljoint.getParent());
+        CHECK(&lljointgp == lljoint2.getRoot());
 
-        ensure("getRoot() failed ", &lljoint1 == lljoint.findJoint("child1"));
+        CHECK(&lljoint1 == lljoint.findJoint("child1"));
 
         lljointgp.removeAllChildren();
         // parent removed from grandparent - so should not be able to locate child
-        ensure("removeAllChildren() failed ", (NULL == lljointgp.findJoint("child1")));
+        CHECK(lljointgp.findJoint("child1") == NULL);
         // it should still exist in parent though
-        ensure("removeAllChildren() failed ", (&lljoint1 == lljoint.findJoint("child1")));
+        CHECK(&lljoint1 == lljoint.findJoint("child1"));
     }
 
-    template<> template<>
-    void lljoint_object::test<14>()
+    TEST_CASE("LLJoint: addChild takes a child away from its previous parent", "[LLJoint]")
     {
         LLJoint lljointgp("gparent");
 
@@ -220,12 +197,11 @@ namespace
         llparent1.addChild(&lladoptedchild);
 
         llparent2.addChild(&lladoptedchild);
-        ensure("1. addChild failed to remove prior parent", lladoptedchild.getParent() == &llparent2);
-        ensure("2. addChild failed to remove prior parent", llparent1.findJoint("child2") == NULL);
+        CHECK(lladoptedchild.getParent() == &llparent2);
+        CHECK(llparent1.findJoint("child2") == NULL);
     }
 
-    template<> template<>
-    void lljoint_object::test<15>()
+    TEST_CASE("LLJoint: updateWorldMatrixChildren recomputes only dirty updating joints", "[LLJoint]")
     {
         // updateWorldMatrixChildren() reports how many world matrices it
         // recomputed. A joint is recomputed only while MATRIX_DIRTY is set,
@@ -237,33 +213,40 @@ namespace
         c.setup("c", &a);
         d.setup("d", &root);
 
-        ensure_equals("fresh tree recomputes every joint", root.updateWorldMatrixChildren(), 5);
-        ensure_equals("clean tree recomputes nothing", root.updateWorldMatrixChildren(), 0);
+        UNSCOPED_INFO("fresh tree recomputes every joint");
+        CHECK(root.updateWorldMatrixChildren() == 5);
+        UNSCOPED_INFO("clean tree recomputes nothing");
+        CHECK(root.updateWorldMatrixChildren() == 0);
 
         root.setRotation(LLQuaternion(0.5f, LLVector3::x_axis));
-        ensure_equals("root rotation dirties the whole tree", root.updateWorldMatrixChildren(), 5);
+        UNSCOPED_INFO("root rotation dirties the whole tree");
+        CHECK(root.updateWorldMatrixChildren() == 5);
 
         a.setRotation(LLQuaternion(0.25f, LLVector3::y_axis));
-        ensure_equals("mid-level rotation dirties its subtree", root.updateWorldMatrixChildren(), 3);
+        UNSCOPED_INFO("mid-level rotation dirties its subtree");
+        CHECK(root.updateWorldMatrixChildren() == 3);
 
         root.setPosition(root.getPosition());
-        ensure_equals("unchanged position dirties nothing", root.updateWorldMatrixChildren(), 0);
+        UNSCOPED_INFO("unchanged position dirties nothing");
+        CHECK(root.updateWorldMatrixChildren() == 0);
 
         root.setPosition(LLVector3(1.f, 2.f, 3.f));
-        ensure_equals("root position dirties the whole tree", root.updateWorldMatrixChildren(), 5);
+        UNSCOPED_INFO("root position dirties the whole tree");
+        CHECK(root.updateWorldMatrixChildren() == 5);
 
         a.setUpdateXform(false);
         root.setRotation(LLQuaternion(0.75f, LLVector3::z_axis));
-        ensure_equals("subtree without mUpdateXform is skipped", root.updateWorldMatrixChildren(), 2);
+        UNSCOPED_INFO("subtree without mUpdateXform is skipped");
+        CHECK(root.updateWorldMatrixChildren() == 2);
 
         // Coming back into the sweep rebuilds what was missed while out of it.
         a.setUpdateXform(true);
-        ensure_equals("rejoining the sweep recomputes the subtree", root.updateWorldMatrixChildren(), 3);
+        UNSCOPED_INFO("rejoining the sweep recomputes the subtree");
+        CHECK(root.updateWorldMatrixChildren() == 3);
     }
 
 
-    template<> template<>
-    void lljoint_object::test<16>()
+    TEST_CASE("LLJoint: rewriting the same rotation does not dirty the joint", "[LLJoint]")
     {
         // Writing an unchanged rotation must not dirty the joint, since
         // touch() would carry that down the entire subtree.
@@ -272,22 +255,24 @@ namespace
         child.setup("child", &root);
 
         root.updateWorldMatrixChildren();
-        ensure_equals("tree starts clean", root.updateWorldMatrixChildren(), 0);
+        UNSCOPED_INFO("tree starts clean");
+        CHECK(root.updateWorldMatrixChildren() == 0);
 
         const LLQuaternion rot(0.4f, LLVector3::y_axis);
         root.setRotation(rot);
-        ensure_equals("a new rotation dirties the subtree", root.updateWorldMatrixChildren(), 2);
+        UNSCOPED_INFO("a new rotation dirties the subtree");
+        CHECK(root.updateWorldMatrixChildren() == 2);
 
         root.setRotation(rot);
-        ensure_equals("rewriting the same rotation dirties nothing", root.updateWorldMatrixChildren(), 0);
+        CHECK(root.updateWorldMatrixChildren() == 0);
 
         root.setRotation(LLQuaternion(0.9f, LLVector3::z_axis));
-        ensure_equals("a different rotation dirties the subtree again", root.updateWorldMatrixChildren(), 2);
+        UNSCOPED_INFO("a different rotation dirties the subtree again");
+        CHECK(root.updateWorldMatrixChildren() == 2);
     }
 
 
-    template<> template<>
-    void lljoint_object::test<17>()
+    TEST_CASE("LLJoint: touchIfXformParentMoved dirties the tree when the seat moves", "[LLJoint]")
     {
         // A sitting avatar hangs its root joint off the seat's transform,
         // which is no joint, and then writes seat relative values into the
@@ -304,27 +289,32 @@ namespace
         root.getXform()->setParent(&seat);
 
         root.updateWorldMatrixChildren();
-        ensure_equals("tree starts clean", root.updateWorldMatrixChildren(), 0);
+        UNSCOPED_INFO("tree starts clean");
+        CHECK(root.updateWorldMatrixChildren() == 0);
 
         seat.setPosition(LLVector3(5.f, 0.f, 0.f));
         seat.updateMatrix();
-        ensure_equals("a moved seat dirties nothing on its own", root.updateWorldMatrixChildren(), 0);
+        UNSCOPED_INFO("a moved seat dirties nothing on its own");
+        CHECK(root.updateWorldMatrixChildren() == 0);
 
         root.touchIfXformParentMoved();
-        ensure_equals("the seat's move dirties the whole tree", root.updateWorldMatrixChildren(), 2);
-        ensure("the root followed the seat", root.getWorldPosition() == LLVector3(5.f, 0.f, 0.f));
+        UNSCOPED_INFO("the seat's move dirties the whole tree");
+        CHECK(root.updateWorldMatrixChildren() == 2);
+        UNSCOPED_INFO("the root followed the seat");
+        CHECK(root.getWorldPosition() == LLVector3(5.f, 0.f, 0.f));
 
         root.touchIfXformParentMoved();
-        ensure_equals("a still seat dirties nothing", root.updateWorldMatrixChildren(), 0);
+        UNSCOPED_INFO("a still seat dirties nothing");
+        CHECK(root.updateWorldMatrixChildren() == 0);
 
         seat.setRotation(LLQuaternion(0.5f, LLVector3::z_axis));
         seat.updateMatrix();
         root.touchIfXformParentMoved();
-        ensure_equals("a rotated seat dirties the whole tree", root.updateWorldMatrixChildren(), 2);
+        UNSCOPED_INFO("a rotated seat dirties the whole tree");
+        CHECK(root.updateWorldMatrixChildren() == 2);
     }
 
-    template<> template<>
-    void lljoint_object::test<18>()
+    TEST_CASE("LLJoint: a root slerping onto a still target stops dirtying the tree", "[LLJoint]")
     {
         // The avatar root is written every frame from a slerp toward a target
         // that has stopped moving, with an interpolant taken from the frame
@@ -353,20 +343,19 @@ namespace
             const F32 u = (0.010f + 0.006f * (frame % 5)) / 0.4f;
             root.setWorldRotationIfMoved(slerp(u, root.getWorldRotation(), target));
         }
-        ensure_equals("a root that has caught up with its target stops dirtying the tree",
-                      root.updateWorldMatrixChildren(), 0);
+        CHECK(root.updateWorldMatrixChildren() == 0);
 
         // What it stopped short by is the whole cost of the tolerance.
-        ensure("the root stopped within a hundredth of a degree of its target",
-               root.getWorldRotation().isEqualEps(target, 1.e-4f));
+        UNSCOPED_INFO("the root stopped within a hundredth of a degree of its target");
+        CHECK(root.getWorldRotation().isEqualEps(target, 1.e-4f));
 
         // A real turn still has to reach the skeleton.
         root.setWorldRotationIfMoved(LLQuaternion(0.4f + 1.f * DEG_TO_RAD, LLVector3::y_axis));
-        ensure_equals("a real turn dirties the whole tree", root.updateWorldMatrixChildren(), 2);
+        UNSCOPED_INFO("a real turn dirties the whole tree");
+        CHECK(root.updateWorldMatrixChildren() == 2);
     }
 
-    template<> template<>
-    void lljoint_object::test<19>()
+    TEST_CASE("LLJoint: the sweep descends only into marked subtrees", "[LLJoint]")
     {
         // The sweep walks only where something told it to. A joint carrying
         // neither a dirty matrix of its own nor the mark left by a write below
@@ -381,27 +370,29 @@ namespace
         e.setup("e", &d);
 
         root.updateWorldMatrixChildren();
-        ensure_equals("tree starts clean", root.updateWorldMatrixChildren(), 0);
+        UNSCOPED_INFO("tree starts clean");
+        CHECK(root.updateWorldMatrixChildren() == 0);
 
         c.setRotation(LLQuaternion(0.3f, LLVector3::x_axis));
-        ensure("the write is announced all the way up",
-               (root.mDirtyFlags & LLJoint::SUBTREE_DIRTY) != 0);
-        ensure("the sibling branch is left alone", d.mDirtyFlags == 0);
+        UNSCOPED_INFO("the write is announced all the way up");
+        CHECK((root.mDirtyFlags & LLJoint::SUBTREE_DIRTY) != 0);
+        UNSCOPED_INFO("the sibling branch is left alone");
+        CHECK(d.mDirtyFlags == 0);
 
         // Dirty a joint behind the sweep's back, below a branch nothing
         // marked. The sweep must stop at that branch's root and never look at
         // it -- the old walk visited every joint and would have rebuilt it.
         e.mDirtyFlags |= LLJoint::MATRIX_DIRTY;
-        ensure_equals("only the marked path is walked", root.updateWorldMatrixChildren(), 1);
-        ensure("the unmarked branch was never descended into",
-               (e.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0);
+        UNSCOPED_INFO("only the marked path is walked");
+        CHECK(root.updateWorldMatrixChildren() == 1);
+        UNSCOPED_INFO("the unmarked branch was never descended into");
+        CHECK((e.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0);
 
-        ensure("the mark is cleared once the subtree is clean",
-               (root.mDirtyFlags & LLJoint::SUBTREE_DIRTY) == 0);
+        UNSCOPED_INFO("the mark is cleared once the subtree is clean");
+        CHECK((root.mDirtyFlags & LLJoint::SUBTREE_DIRTY) == 0);
     }
 
-    template<> template<>
-    void lljoint_object::test<20>()
+    TEST_CASE("LLJoint: getWorldMatrix leaves the subtree mark for the sweep", "[LLJoint]")
     {
         // getWorldMatrix rebuilds this joint and the ones above it on the
         // spot, without ever walking down. It must not carry the subtree mark
@@ -413,21 +404,23 @@ namespace
         b.setup("b", &a);
 
         root.updateWorldMatrixChildren();
-        ensure_equals("tree starts clean", root.updateWorldMatrixChildren(), 0);
+        UNSCOPED_INFO("tree starts clean");
+        CHECK(root.updateWorldMatrixChildren() == 0);
 
         root.setRotation(LLQuaternion(0.3f, LLVector3::z_axis));
         b.setRotation(LLQuaternion(0.2f, LLVector3::x_axis));
-        ensure("the root carries both its own dirt and the mark",
-               (root.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0 &&
-               (root.mDirtyFlags & LLJoint::SUBTREE_DIRTY) != 0);
+        {
+            INFO("the root carries both its own dirt and the mark");
+            CHECK((root.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0);
+            CHECK((root.mDirtyFlags & LLJoint::SUBTREE_DIRTY) != 0);
+        }
 
         root.getWorldMatrix();
-        ensure_equals("the joints below still get their turn",
-                      root.updateWorldMatrixChildren(), 2);
+        UNSCOPED_INFO("the joints below still get their turn");
+        CHECK(root.updateWorldMatrixChildren() == 2);
     }
 
-    template<> template<>
-    void lljoint_object::test<21>()
+    TEST_CASE("LLJoint: world transforms are current without a sweep in between", "[LLJoint]")
     {
         // A culled avatar does not get swept at all, which is only safe
         // because skipping the sweep costs nothing but time: the dirty flags
@@ -440,21 +433,20 @@ namespace
         root.updateWorldMatrixChildren();
 
         root.setPosition(LLVector3(1.f, 0.f, 0.f));
-        ensure("a world position is current with no sweep in between",
-               b.getWorldPosition() == LLVector3(1.f, 0.f, 0.f));
-        ensure_equals("and the sweep still owes the matrices",
-                      root.updateWorldMatrixChildren(), 3);
+        UNSCOPED_INFO("a world position is current with no sweep in between");
+        CHECK(b.getWorldPosition() == LLVector3(1.f, 0.f, 0.f));
+        UNSCOPED_INFO("and the sweep still owes the matrices");
+        CHECK(root.updateWorldMatrixChildren() == 3);
 
         root.setPosition(LLVector3(2.f, 0.f, 0.f));
         const LLVector3 world_translation(b.getWorldMatrix().getTranslation().getF32ptr());
-        ensure("a world matrix is current with no sweep in between",
-               world_translation == LLVector3(2.f, 0.f, 0.f));
-        ensure_equals("and asking for it was the sweep's work",
-                      root.updateWorldMatrixChildren(), 0);
+        UNSCOPED_INFO("a world matrix is current with no sweep in between");
+        CHECK(world_translation == LLVector3(2.f, 0.f, 0.f));
+        UNSCOPED_INFO("and asking for it was the sweep's work");
+        CHECK(root.updateWorldMatrixChildren() == 0);
     }
 
-    template<> template<>
-    void lljoint_object::test<22>()
+    TEST_CASE("LLJoint: a joint healed before the sweep still sends it to its children", "[LLJoint]")
     {
         // The joint that was written is healed before the sweep -- the avatar
         // asks its root for a world matrix right after moving it -- and the
@@ -470,18 +462,18 @@ namespace
         root.touch();
         root.setWorldPosition(LLVector3(1.f, 0.f, 0.f));
         root.getWorldMatrix();
-        ensure_equals("a healed root still sends the sweep down to its children",
-                      root.updateWorldMatrixChildren(), 2);
+        UNSCOPED_INFO("a healed root still sends the sweep down to its children");
+        CHECK(root.updateWorldMatrixChildren() == 2);
 
         a.setRotation(LLQuaternion(0.3f, LLVector3::x_axis));
         a.getWorldMatrix();
-        ensure_equals("and so does a healed joint in the middle of the tree",
-                      root.updateWorldMatrixChildren(), 1);
-        ensure_equals("after which the tree is clean", root.updateWorldMatrixChildren(), 0);
+        UNSCOPED_INFO("and so does a healed joint in the middle of the tree");
+        CHECK(root.updateWorldMatrixChildren() == 1);
+        UNSCOPED_INFO("after which the tree is clean");
+        CHECK(root.updateWorldMatrixChildren() == 0);
     }
 
-    template<> template<>
-    void lljoint_object::test<23>()
+    TEST_CASE("LLJoint: an unchanged scale does not dirty the joint", "[LLJoint]")
     {
         // A scale written back unchanged is not a change. The pose blender
         // writes every channel of a joint each interpolated frame, so a
@@ -491,18 +483,24 @@ namespace
         a.setup("a", &root);
         root.setScale(LLVector3(2.f, 2.f, 2.f));
         root.updateWorldMatrixChildren();
-        ensure("tree starts clean", root.mDirtyFlags == 0 && a.mDirtyFlags == 0);
+        {
+            INFO("tree starts clean");
+            CHECK(root.mDirtyFlags == 0);
+            CHECK(a.mDirtyFlags == 0);
+        }
 
         root.setScale(LLVector3(2.f, 2.f, 2.f));
-        ensure("the same scale again dirties nothing", root.mDirtyFlags == 0 && a.mDirtyFlags == 0);
+        CHECK(root.mDirtyFlags == 0);
+        CHECK(a.mDirtyFlags == 0);
 
         root.setScale(LLVector3(3.f, 2.f, 2.f));
-        ensure("a different scale dirties the joint", (root.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0);
-        ensure("and its children", (a.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0);
+        UNSCOPED_INFO("a different scale dirties the joint");
+        CHECK((root.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0);
+        UNSCOPED_INFO("and its children");
+        CHECK((a.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0);
     }
 
-    template<> template<>
-    void lljoint_object::test<24>()
+    TEST_CASE("LLJoint: setWorldRotation round-trips whatever the parent's scale", "[LLJoint]")
     {
         // A world rotation asked for is the world rotation that comes back.
         // This is the route the foot solver takes six times a frame for a
@@ -532,13 +530,11 @@ namespace
             child.setWorldRotation(wanted);
 
             const LLQuaternion got = child.getWorldRotation();
-            ensure_approximately_equals("the world rotation asked for is the one that comes back",
-                                        fabsf(dot(got, wanted)), 1.f, 16);
+            REQUIRE_THAT(fabsf(dot(got, wanted)), ll_test::WithinBits(1.f, 16));
         }
     }
 
-    template<> template<>
-    void lljoint_object::test<25>()
+    TEST_CASE("LLJoint: setWorldRotation matches the matrix route under an unscaled parent", "[LLJoint]")
     {
         // With an unscaled parent it is the same local rotation the matrix
         // route arrived at, so the joints that were already getting the right
@@ -563,12 +559,10 @@ namespace
 
         child.setWorldRotation(wanted);
 
-        ensure_approximately_equals("the two routes agree on the local rotation",
-                                    fabsf(dot(child.getRotation(), through_the_matrix)), 1.f, 16);
+        CHECK_THAT(fabsf(dot(child.getRotation(), through_the_matrix)), ll_test::WithinBits(1.f, 16));
     }
 
-    template<> template<>
-    void lljoint_object::test<26>()
+    TEST_CASE("LLJoint: a scaled parent defeats the matrix route but not setWorldRotation", "[LLJoint]")
     {
         // The route this replaced could not do that. It built the answer out
         // of matrices, and LLMatrix4::invert transposes -- which inverts a
@@ -598,14 +592,13 @@ namespace
         child.setWorldRotation(wanted);
         const LLQuaternion now = child.getWorldRotation();
 
-        ensure_approximately_equals("a scaled parent gives back what was asked for",
-                                    fabsf(dot(now, wanted)), 1.f, 16);
-        ensure("which the matrix route it replaced did not",
-               fabsf(dot(through_the_matrix, wanted)) < 0.999f);
+        UNSCOPED_INFO("a scaled parent gives back what was asked for");
+        CHECK_THAT(fabsf(dot(now, wanted)), ll_test::WithinBits(1.f, 16));
+        UNSCOPED_INFO("which the matrix route it replaced did not");
+        CHECK(fabsf(dot(through_the_matrix, wanted)) < 0.999f);
     }
 
-    template<> template<>
-    void lljoint_object::test<27>()
+    TEST_CASE("LLJoint: setWorldRotation undoes a parent rotation that is not unit length", "[LLJoint]")
     {
         // Nothing normalizes a rotation on its way into a joint, so a parent
         // can be carrying one that has drifted off unit length. The world
@@ -616,8 +609,8 @@ namespace
         LLJoint child("child", &parent);
 
         LLQuaternion drifted(0.3f, 0.4f, 0.5f, 0.6f);
-        ensure("the parent's rotation is not unit length",
-               fabsf(drifted.mQ[0]*drifted.mQ[0] + drifted.mQ[1]*drifted.mQ[1]
+        UNSCOPED_INFO("the parent's rotation is not unit length");
+        CHECK(fabsf(drifted.mQ[0]*drifted.mQ[0] + drifted.mQ[1]*drifted.mQ[1]
                    + drifted.mQ[2]*drifted.mQ[2] + drifted.mQ[3]*drifted.mQ[3] - 1.f) > 0.05f);
         parent.setRotation(drifted);
 
@@ -627,8 +620,7 @@ namespace
         const LLQuaternion got = child.getWorldRotation();
         for (S32 i = 0; i < 4; ++i)
         {
-            ensure_approximately_equals("the world rotation comes back as it was asked for",
-                                        got.mQ[i], wanted.mQ[i], 14);
+            REQUIRE_THAT(got.mQ[i], ll_test::WithinBits(wanted.mQ[i], 14));
         }
     }
 

@@ -32,6 +32,10 @@ target_precompile_headers(llfilesystem REUSE_FROM llprecompiled)
 
 # Add tests
 if(AL_BUILD_TESTS)
-  al_add_test(lldiriterator PROJECT llfilesystem LIBRARIES llfilesystem)
-  al_add_test(lldir PROJECT llfilesystem LIBRARIES llmath llcommon llfilesystem)
+  al_add_test_binary(
+    llfilesystem_tests
+    PROJECT llfilesystem
+    SOURCES tests/lldir_test.cpp tests/lldiriterator_test.cpp
+    LIBRARIES llfilesystem llmath llcommon
+  )
 endif()

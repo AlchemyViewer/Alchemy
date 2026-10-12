@@ -57,15 +57,16 @@ target_precompile_headers(llinventory REUSE_FROM llprecompiled)
 
 # add unit tests
 if(AL_BUILD_TESTS)
-  foreach(
-    test
-    inventorymisc
-    llparcel
-    llpermissions
-    llsaleinfo
-    llsettingssky
-    lluserrelations
+  al_add_test_binary(
+    llinventory_tests
+    PROJECT llinventory
+    SOURCES
+      tests/inventorymisc_test.cpp
+      tests/llparcel_test.cpp
+      tests/llpermissions_test.cpp
+      tests/llsaleinfo_test.cpp
+      tests/llsettingssky_test.cpp
+      tests/lluserrelations_test.cpp
+    LIBRARIES llinventory llmath llcorehttp llfilesystem
   )
-    al_add_test(${test} PROJECT llinventory LIBRARIES llinventory llmath llcorehttp llfilesystem)
-  endforeach()
 endif()

@@ -42,25 +42,13 @@
 // other Linden headers
 #include "../../../test/debug.h"
 #include "../../../test/lltestapp.h"
-#include "../../../test/lltut.h"
+#include "alteststateguard.h"
+#include "altestteardown.h"
+#include <catch2/catch_test_macros.hpp>
 #include "llevents.h"
 #include "lleventcoro.h"
 #include "llsd.h"
 #include "stringize.h"
-
-#if LL_WINDOWS
-#define skipwin(arg) skip(arg)
-#define skipmac(arg)
-#define skiplinux(arg)
-#elif LL_DARWIN
-#define skipwin(arg)
-#define skipmac(arg) skip(arg)
-#define skiplinux(arg)
-#elif LL_LINUX
-#define skipwin(arg)
-#define skipmac(arg)
-#define skiplinux(arg) skip(arg)
-#endif
 
 /*****************************************************************************
 *   Helper classes
@@ -114,8 +102,8 @@ public:
             std::chrono::duration<double> elapsed = (now - start);
             if (elapsed.count() > seconds)
             {
-                tut::fail(STRINGIZE("LoginListener::waitFor() took more than "
-                                    << seconds << " seconds waiting for " << desc));
+                FAIL("LoginListener::waitFor() took more than "
+                     << seconds << " seconds waiting for " << desc);
             }
             // haven't yet received the new call, nor have we timed out --
             // just wait
@@ -202,32 +190,44 @@ public:
 }
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
-namespace tut
-{
 namespace
 {
+    // One LLTestApp for the process. An LLApp sets LLCommon up as it is made
+    // and tears it down as it ends, APR and all, so one a case made and ended
+    // would leave the cases after it without APR, and LLTrace without a
+    // master recorder. This one ends with the harness's teardown.
+    void makeTestApp()
+    {
+        static LLTestApp* sApp = nullptr;
+        if (!sApp)
+        {
+            sApp = new LLTestApp;
+            ll_test::Teardown::add([] { delete sApp; });
+            // What making it changes on purpose: the LLApp, and the master
+            // recorder LLCommon puts in place of the harness's.
+            ll_test::StateGuard::accept("the LLApp");
+            ll_test::StateGuard::accept("the LLTrace master recorder");
+        }
+    }
+
     struct llviewerlogin_data
     {
         llviewerlogin_data() :
             pumps(LLEventPumps::instance())
-        {}
+        {
+            makeTestApp();
+        }
         ~llviewerlogin_data()
         {
             pumps.clear();
         }
         LLEventPumps& pumps;
-        LLTestApp testApp;
     };
 
-    typedef test_group<llviewerlogin_data> llviewerlogin_group;
-    typedef llviewerlogin_group::object llviewerlogin_object;
-    llviewerlogin_group llviewerlogingrp("LLViewerLogin");
-}
 
-    template<> template<>
-    void llviewerlogin_object::test<1>()
+    TEST_CASE_METHOD(llviewerlogin_data, "LLViewerLogin: an immediate XMLRPC response still reaches the online state", "[LLViewerLogin]")
     {
         DEBUG;
         // Testing login with an immediate response from XMLPRC
@@ -257,12 +257,10 @@ namespace
             [&listener]()->bool{ return listener.lastEvent()["state"].asString() == "online"; });
     }
 
-    template<> template<>
-    void llviewerlogin_object::test<2>()
+    TEST_CASE_METHOD(llviewerlogin_data, "LLViewerLogin: a complete response refusing the login goes offline", "[LLViewerLogin]")
     {
         DEBUG;
         // Test completed response, that fails to login.
-        set_test_name("LLLogin valid response, failure (eg. bad credentials)");
 
         // Testing normal login procedure.
         LLEventStream xmlrpcPump("LLXMLRPCTransaction"); // Dummy XMLRPC pump
@@ -282,7 +280,7 @@ namespace
         login.connect("login.bar.com", credentials);
         llcoro::suspend();
 
-        ensure_equals("Auth state", listener.lastEvent()["change"].asString(), "authenticating");
+        CHECK(listener.lastEvent()["change"].asString() == "authenticating");
 
         auto prev = listener.getCalls();
 
@@ -300,15 +298,13 @@ namespace
         // giving up
         listener.waitFor(prev, 11.0);
 
-        ensure_equals("Failed to offline", listener.lastEvent()["state"].asString(), "offline");
+        CHECK(listener.lastEvent()["state"].asString() == "offline");
     }
 
-    template<> template<>
-    void llviewerlogin_object::test<3>()
+    TEST_CASE_METHOD(llviewerlogin_data, "LLViewerLogin: an incomplete response ends the attempt offline", "[LLViewerLogin]")
     {
         DEBUG;
         // Test incomplete response, that end the attempt.
-        set_test_name("LLLogin valid response, failure (eg. bad credentials)");
 
         // Testing normal login procedure.
         LLEventStream xmlrpcPump("LLXMLRPCTransaction"); // Dummy XMLRPC pump
@@ -328,7 +324,7 @@ namespace
         login.connect("login.bar.com", credentials);
         llcoro::suspend();
 
-        ensure_equals("Auth state", listener.lastEvent()["change"].asString(), "authenticating");
+        CHECK(listener.lastEvent()["change"].asString() == "authenticating");
 
         auto prev = listener.getCalls();
 
@@ -345,6 +341,6 @@ namespace
         // giving up
         listener.waitFor(prev, 11.0);
 
-        ensure_equals("Failed to offline", listener.lastEvent()["state"].asString(), "offline");
+        CHECK(listener.lastEvent()["state"].asString() == "offline");
     }
 }

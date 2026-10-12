@@ -1,5 +1,5 @@
 /**
- * @file inventory.cpp
+ * @file inventorymisc_test.cpp
  * @author Phoenix
  * @date 2005-11-15
  * @brief Functions for inventory test framework
@@ -31,7 +31,7 @@
 #include "llsdserialize.h"
 
 #include "../llinventory.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "../test/namedtempfile.h"
 
 
@@ -127,86 +127,71 @@ LLPointer<LLInventoryCategory> create_random_inventory_cat()
 }
 }
 
-namespace tut
-{
 namespace
 {
-    struct inventory_data
-    {
-    };
-    typedef test_group<inventory_data> inventory_test;
-    typedef inventory_test::object inventory_object;
-    tut::inventory_test inv("LLInventory");
-}
-
 //***class LLInventoryType***//
 
 
-    template<> template<>
-    void inventory_object::test<1>()
+    TEST_CASE("LLInventory: LLInventoryType::lookup maps a name to its type", "[LLInventory]")
     {
         LLInventoryType::EType retType =  LLInventoryType::lookup(std::string("sound"));
-        ensure("1.LLInventoryType::lookup(char*) failed", retType == LLInventoryType::IT_SOUND);
+        CHECK(retType == LLInventoryType::IT_SOUND);
 
         retType = LLInventoryType::lookup(std::string("snapshot"));
-        ensure("2.LLInventoryType::lookup(char*) failed", retType == LLInventoryType::IT_SNAPSHOT);
+        CHECK(retType == LLInventoryType::IT_SNAPSHOT);
     }
 
-    template<> template<>
-    void inventory_object::test<2>()
+    TEST_CASE("LLInventory: LLInventoryType::lookup maps a type to its name", "[LLInventory]")
     {
         static std::string retType =  LLInventoryType::lookup(LLInventoryType::IT_CALLINGCARD);
-        ensure("1.LLInventoryType::lookup(EType) failed", (retType == "callcard"));
+        CHECK(retType == "callcard");
 
         retType = LLInventoryType::lookup(LLInventoryType::IT_LANDMARK);
-        ensure("2.LLInventoryType::lookup(EType) failed", (retType == "landmark"));
+        CHECK(retType == "landmark");
 
     }
 
-    template<> template<>
-    void inventory_object::test<3>()
+    TEST_CASE("LLInventory: lookupHumanReadable gives a type's display name", "[LLInventory]")
     {
         static std::string retType =  LLInventoryType::lookupHumanReadable(LLInventoryType::IT_CALLINGCARD);
-        ensure("1.LLInventoryType::lookupHumanReadable(EType) failed", (retType == "calling card"));
+        CHECK(retType == "calling card");
 
         retType =  LLInventoryType::lookupHumanReadable(LLInventoryType::IT_LANDMARK);
-        ensure("2.LLInventoryType::lookupHumanReadable(EType) failed", (retType == "landmark"));
+        CHECK(retType == "landmark");
     }
 
-    template<> template<>
-    void inventory_object::test<4>()
+    TEST_CASE("LLInventory: defaultForAssetType gives an asset type's inventory type", "[LLInventory]")
     {
         static LLInventoryType::EType retType =  LLInventoryType::defaultForAssetType(LLAssetType::AT_TEXTURE);
-        ensure("1.LLInventoryType::defaultForAssetType(LLAssetType EType) failed", retType == LLInventoryType::IT_TEXTURE);
+        CHECK(retType == LLInventoryType::IT_TEXTURE);
 
         retType =  LLInventoryType::defaultForAssetType(LLAssetType::AT_LANDMARK);
-        ensure("2.LLInventoryType::defaultForAssetType(LLAssetType EType) failed", retType == LLInventoryType::IT_LANDMARK);
+        CHECK(retType == LLInventoryType::IT_LANDMARK);
     }
 
 //*****class LLInventoryItem*****//
 
-    template<> template<>
-    void inventory_object::test<5>()
+    TEST_CASE("LLInventory: an item survives an LLSD round trip before and after changes", "[LLInventory]")
     {
         LLPointer<LLInventoryItem> src = create_random_inventory_item();
         LLSD sd = ll_create_sd_from_inventory_item(src);
         //LL_INFOS() << "sd: " << *sd << LL_ENDL;
         LLPointer<LLInventoryItem> dst = new LLInventoryItem;
         bool successful_parse = dst->fromLLSD(sd);
-        ensure_equals("0.LLInventoryItem::fromLLSD()", successful_parse, true);
-        ensure_equals("1.item id::getUUID() failed", dst->getUUID(), src->getUUID());
-        ensure_equals("2.parent::getParentUUID() failed", dst->getParentUUID(), src->getParentUUID());
-        ensure_equals("3.name::getName() failed", dst->getName(), src->getName());
-        ensure_equals("4.type::getType() failed", dst->getType(), src->getType());
+        CHECK(successful_parse);
+        CHECK(dst->getUUID() == src->getUUID());
+        CHECK(dst->getParentUUID() == src->getParentUUID());
+        CHECK(dst->getName() == src->getName());
+        CHECK(dst->getType() == src->getType());
 
-        ensure_equals("5.permissions::getPermissions() failed", dst->getPermissions(), src->getPermissions());
-        ensure_equals("6.description::getDescription() failed", dst->getDescription(), src->getDescription());
-        ensure_equals("7.sale type::getSaleType() failed", dst->getSaleInfo().getSaleType(), src->getSaleInfo().getSaleType());
-        ensure_equals("8.sale price::getSalePrice() failed", dst->getSaleInfo().getSalePrice(), src->getSaleInfo().getSalePrice());
-        ensure_equals("9.asset id::getAssetUUID() failed", dst->getAssetUUID(), src->getAssetUUID());
-        ensure_equals("10.inventory type::getInventoryType() failed", dst->getInventoryType(), src->getInventoryType());
-        ensure_equals("11.flags::getFlags() failed", dst->getFlags(), src->getFlags());
-        ensure_equals("12.creation::getCreationDate() failed", dst->getCreationDate(), src->getCreationDate());
+        CHECK(dst->getPermissions() == src->getPermissions());
+        CHECK(dst->getDescription() == src->getDescription());
+        CHECK(dst->getSaleInfo().getSaleType() == src->getSaleInfo().getSaleType());
+        CHECK(dst->getSaleInfo().getSalePrice() == src->getSaleInfo().getSalePrice());
+        CHECK(dst->getAssetUUID() == src->getAssetUUID());
+        CHECK(dst->getInventoryType() == src->getInventoryType());
+        CHECK(dst->getFlags() == src->getFlags());
+        CHECK(dst->getCreationDate() == src->getCreationDate());
 
         LLUUID new_item_id, new_parent_id;
         new_item_id.generate();
@@ -258,24 +243,24 @@ namespace
         sd = ll_create_sd_from_inventory_item(src);
         //LL_INFOS() << "sd: " << *sd << LL_ENDL;
         successful_parse = dst->fromLLSD(sd);
-        ensure_equals("13.item id::getUUID() failed", dst->getUUID(), src->getUUID());
-        ensure_equals("14.parent::getParentUUID() failed", dst->getParentUUID(), src->getParentUUID());
-        ensure_equals("15.name::getName() failed", dst->getName(), src->getName());
-        ensure_equals("16.type::getType() failed", dst->getType(), src->getType());
+        CHECK(successful_parse);
+        CHECK(dst->getUUID() == src->getUUID());
+        CHECK(dst->getParentUUID() == src->getParentUUID());
+        CHECK(dst->getName() == src->getName());
+        CHECK(dst->getType() == src->getType());
 
-        ensure_equals("17.permissions::getPermissions() failed", dst->getPermissions(), src->getPermissions());
-        ensure_equals("18.description::getDescription() failed", dst->getDescription(), src->getDescription());
-        ensure_equals("19.sale type::getSaleType() failed type", dst->getSaleInfo().getSaleType(), src->getSaleInfo().getSaleType());
-        ensure_equals("20.sale price::getSalePrice() failed price", dst->getSaleInfo().getSalePrice(), src->getSaleInfo().getSalePrice());
-        ensure_equals("21.asset id::getAssetUUID() failed id", dst->getAssetUUID(), src->getAssetUUID());
-        ensure_equals("22.inventory type::getInventoryType() failed type", dst->getInventoryType(), src->getInventoryType());
-        ensure_equals("23.flags::getFlags() failed", dst->getFlags(), src->getFlags());
-        ensure_equals("24.creation::getCreationDate() failed", dst->getCreationDate(), src->getCreationDate());
+        CHECK(dst->getPermissions() == src->getPermissions());
+        CHECK(dst->getDescription() == src->getDescription());
+        CHECK(dst->getSaleInfo().getSaleType() == src->getSaleInfo().getSaleType());
+        CHECK(dst->getSaleInfo().getSalePrice() == src->getSaleInfo().getSalePrice());
+        CHECK(dst->getAssetUUID() == src->getAssetUUID());
+        CHECK(dst->getInventoryType() == src->getInventoryType());
+        CHECK(dst->getFlags() == src->getFlags());
+        CHECK(dst->getCreationDate() == src->getCreationDate());
 
     }
 
-    template<> template<>
-    void inventory_object::test<6>()
+    TEST_CASE("LLInventory: copyItem copies an item and generateUUID gives it a new id", "[LLInventory]")
     {
         LLPointer<LLInventoryItem> src = create_random_inventory_item();
 
@@ -331,32 +316,31 @@ namespace
         LLSD sd = ll_create_sd_from_inventory_item(src);
         LLPointer<LLInventoryItem> dst = new LLInventoryItem;
         bool successful_parse = dst->fromLLSD(sd);
-        ensure_equals("0.LLInventoryItem::fromLLSD()", successful_parse, true);
+        CHECK(successful_parse);
 
         LLPointer<LLInventoryItem> src1 = create_random_inventory_item();
         src1->copyItem(src);
 
-        ensure_equals("1.item id::getUUID() failed", dst->getUUID(), src1->getUUID());
-        ensure_equals("2.parent::getParentUUID() failed", dst->getParentUUID(), src1->getParentUUID());
-        ensure_equals("3.name::getName() failed", dst->getName(), src1->getName());
-        ensure_equals("4.type::getType() failed", dst->getType(), src1->getType());
+        CHECK(dst->getUUID() == src1->getUUID());
+        CHECK(dst->getParentUUID() == src1->getParentUUID());
+        CHECK(dst->getName() == src1->getName());
+        CHECK(dst->getType() == src1->getType());
 
-        ensure_equals("5.permissions::getPermissions() failed", dst->getPermissions(), src1->getPermissions());
-        ensure_equals("6.description::getDescription() failed", dst->getDescription(), src1->getDescription());
-        ensure_equals("7.sale type::getSaleType() failed type", dst->getSaleInfo().getSaleType(), src1->getSaleInfo().getSaleType());
-        ensure_equals("8.sale price::getSalePrice() failed price", dst->getSaleInfo().getSalePrice(), src1->getSaleInfo().getSalePrice());
-        ensure_equals("9.asset id::getAssetUUID() failed id", dst->getAssetUUID(), src1->getAssetUUID());
-        ensure_equals("10.inventory type::getInventoryType() failed type", dst->getInventoryType(), src1->getInventoryType());
-        ensure_equals("11.flags::getFlags() failed", dst->getFlags(), src1->getFlags());
-        ensure_equals("12.creation::getCreationDate() failed", dst->getCreationDate(), src1->getCreationDate());
+        CHECK(dst->getPermissions() == src1->getPermissions());
+        CHECK(dst->getDescription() == src1->getDescription());
+        CHECK(dst->getSaleInfo().getSaleType() == src1->getSaleInfo().getSaleType());
+        CHECK(dst->getSaleInfo().getSalePrice() == src1->getSaleInfo().getSalePrice());
+        CHECK(dst->getAssetUUID() == src1->getAssetUUID());
+        CHECK(dst->getInventoryType() == src1->getInventoryType());
+        CHECK(dst->getFlags() == src1->getFlags());
+        CHECK(dst->getCreationDate() == src1->getCreationDate());
 
         // quick test to make sure generateUUID() really works
         src1->generateUUID();
-        ensure_not_equals("13.item id::generateUUID() failed", src->getUUID(), src1->getUUID());
+        CHECK(src->getUUID() != src1->getUUID());
     }
 
-    template<> template<>
-    void inventory_object::test<7>()
+    TEST_CASE("LLInventory: an item survives asLLSD through a notation file", "[LLInventory]")
     {
         NamedTempFile temp_file("linden_file", "", ".dat");
         std::string filename(temp_file.getPath().string());
@@ -391,26 +375,25 @@ namespace
             LL_ERRS()<< "Parsing cache failed" << LL_ENDL;
             return;
         }
-        src2->fromLLSD(s_item);
+        CHECK(src2->fromLLSD(s_item));
 
         file.close();
 
-        ensure_equals("1.item id::getUUID() failed", src1->getUUID(), src2->getUUID());
-        ensure_equals("2.parent::getParentUUID() failed", src1->getParentUUID(), src2->getParentUUID());
-        ensure_equals("3.permissions::getPermissions() failed", src1->getPermissions(), src2->getPermissions());
-        ensure_equals("4.sale price::getSalePrice() failed price", src1->getSaleInfo().getSalePrice(), src2->getSaleInfo().getSalePrice());
-        ensure_equals("5.asset id::getAssetUUID() failed id", src1->getAssetUUID(), src2->getAssetUUID());
-        ensure_equals("6.type::getType() failed", src1->getType(), src2->getType());
-        ensure_equals("7.inventory type::getInventoryType() failed type", src1->getInventoryType(), src2->getInventoryType());
-        ensure_equals("8.name::getName() failed", src1->getName(), src2->getName());
-        ensure_equals("9.description::getDescription() failed", src1->getDescription(), src2->getDescription());
-        ensure_equals("10.creation::getCreationDate() failed", src1->getCreationDate(), src2->getCreationDate());
-        ensure_equals("13.thumbnails::getThumbnailUUID() failed", src1->getThumbnailUUID(), src2->getThumbnailUUID());
-        ensure_equals("14.favorites::getIsFavorite() failed", src1->getIsFavorite(), src2->getIsFavorite());
+        CHECK(src1->getUUID() == src2->getUUID());
+        CHECK(src1->getParentUUID() == src2->getParentUUID());
+        CHECK(src1->getPermissions() == src2->getPermissions());
+        CHECK(src1->getSaleInfo().getSalePrice() == src2->getSaleInfo().getSalePrice());
+        CHECK(src1->getAssetUUID() == src2->getAssetUUID());
+        CHECK(src1->getType() == src2->getType());
+        CHECK(src1->getInventoryType() == src2->getInventoryType());
+        CHECK(src1->getName() == src2->getName());
+        CHECK(src1->getDescription() == src2->getDescription());
+        CHECK(src1->getCreationDate() == src2->getCreationDate());
+        CHECK(src1->getThumbnailUUID() == src2->getThumbnailUUID());
+        CHECK(src1->getIsFavorite() == src2->getIsFavorite());
     }
 
-    template<> template<>
-    void inventory_object::test<8>()
+    TEST_CASE("LLInventory: an item survives the legacy stream but its favorite does not", "[LLInventory]")
     {
         LLPointer<LLInventoryItem> src1 = create_random_inventory_item();
 
@@ -421,76 +404,66 @@ namespace
         LLPointer<LLInventoryItem> src2 = new LLInventoryItem();
         src2->importLegacyStream(istream);
 
-        ensure_equals("1.item id::getUUID() failed", src1->getUUID(), src2->getUUID());
-        ensure_equals("2.parent::getParentUUID() failed", src1->getParentUUID(), src2->getParentUUID());
-        ensure_equals("3.permissions::getPermissions() failed", src1->getPermissions(), src2->getPermissions());
-        ensure_equals("4.sale price::getSalePrice() failed price", src1->getSaleInfo().getSalePrice(), src2->getSaleInfo().getSalePrice());
-        ensure_equals("5.asset id::getAssetUUID() failed id", src1->getAssetUUID(), src2->getAssetUUID());
-        ensure_equals("6.type::getType() failed", src1->getType(), src2->getType());
-        ensure_equals("7.inventory type::getInventoryType() failed type", src1->getInventoryType(), src2->getInventoryType());
-        ensure_equals("8.name::getName() failed", src1->getName(), src2->getName());
-        ensure_equals("9.description::getDescription() failed", src1->getDescription(), src2->getDescription());
-        ensure_equals("10.creation::getCreationDate() failed", src1->getCreationDate(), src2->getCreationDate());
-        ensure_equals("11.thumbnails::getThumbnailUUID() failed", src1->getThumbnailUUID(), src2->getThumbnailUUID());
-        ensure_equals("12.favorites::getIsFavorite() failed", false, src2->getIsFavorite()); // not supposed to carry over
+        CHECK(src1->getUUID() == src2->getUUID());
+        CHECK(src1->getParentUUID() == src2->getParentUUID());
+        CHECK(src1->getPermissions() == src2->getPermissions());
+        CHECK(src1->getSaleInfo().getSalePrice() == src2->getSaleInfo().getSalePrice());
+        CHECK(src1->getAssetUUID() == src2->getAssetUUID());
+        CHECK(src1->getType() == src2->getType());
+        CHECK(src1->getInventoryType() == src2->getInventoryType());
+        CHECK(src1->getName() == src2->getName());
+        CHECK(src1->getDescription() == src2->getDescription());
+        CHECK(src1->getCreationDate() == src2->getCreationDate());
+        CHECK(src1->getThumbnailUUID() == src2->getThumbnailUUID());
+        CHECK_FALSE(src2->getIsFavorite()); // not supposed to carry over
     }
 
-    template<> template<>
-    void inventory_object::test<9>()
-    {
-        // Deleted LLInventoryItem::exportFileXML() and LLInventoryItem::importXML()
-        // because I can't find any non-test code references to it. 2009-05-04 JC
-    }
-
-    template<> template<>
-    void inventory_object::test<11>()
+    TEST_CASE("LLInventory: an item survives asLLSD and fromLLSD", "[LLInventory]")
     {
         LLPointer<LLInventoryItem> src1 = create_random_inventory_item();
         LLSD retSd = src1->asLLSD();
         LLPointer<LLInventoryItem> src2 = new LLInventoryItem();
-        src2->fromLLSD(retSd);
+        CHECK(src2->fromLLSD(retSd));
 
-        ensure_equals("1.item id::getUUID() failed", src1->getUUID(), src2->getUUID());
-        ensure_equals("2.parent::getParentUUID() failed", src1->getParentUUID(), src2->getParentUUID());
-        ensure_equals("3.permissions::getPermissions() failed", src1->getPermissions(), src2->getPermissions());
-        ensure_equals("4.asset id::getAssetUUID() failed id", src1->getAssetUUID(), src2->getAssetUUID());
-        ensure_equals("5.type::getType() failed", src1->getType(), src2->getType());
-        ensure_equals("6.inventory type::getInventoryType() failed type", src1->getInventoryType(), src2->getInventoryType());
-        ensure_equals("7.flags::getFlags() failed", src1->getFlags(), src2->getFlags());
-        ensure_equals("8.sale type::getSaleType() failed type", src1->getSaleInfo().getSaleType(), src2->getSaleInfo().getSaleType());
-        ensure_equals("9.sale price::getSalePrice() failed price", src1->getSaleInfo().getSalePrice(), src2->getSaleInfo().getSalePrice());
-        ensure_equals("10.name::getName() failed", src1->getName(), src2->getName());
-        ensure_equals("11.description::getDescription() failed", src1->getDescription(), src2->getDescription());
-        ensure_equals("12.creation::getCreationDate() failed", src1->getCreationDate(), src2->getCreationDate());
-        ensure_equals("13.thumbnails::getThumbnailUUID() failed", src1->getThumbnailUUID(), src2->getThumbnailUUID());
-        ensure_equals("14.favorites::getIsFavorite() failed", src1->getIsFavorite(), src2->getIsFavorite());
+        CHECK(src1->getUUID() == src2->getUUID());
+        CHECK(src1->getParentUUID() == src2->getParentUUID());
+        CHECK(src1->getPermissions() == src2->getPermissions());
+        CHECK(src1->getAssetUUID() == src2->getAssetUUID());
+        CHECK(src1->getType() == src2->getType());
+        CHECK(src1->getInventoryType() == src2->getInventoryType());
+        CHECK(src1->getFlags() == src2->getFlags());
+        CHECK(src1->getSaleInfo().getSaleType() == src2->getSaleInfo().getSaleType());
+        CHECK(src1->getSaleInfo().getSalePrice() == src2->getSaleInfo().getSalePrice());
+        CHECK(src1->getName() == src2->getName());
+        CHECK(src1->getDescription() == src2->getDescription());
+        CHECK(src1->getCreationDate() == src2->getCreationDate());
+        CHECK(src1->getThumbnailUUID() == src2->getThumbnailUUID());
+        CHECK(src1->getIsFavorite() == src2->getIsFavorite());
     }
 
 //******class LLInventoryCategory*******//
 
-    template<> template<>
-    void inventory_object::test<12>()
+    TEST_CASE("LLInventory: a category survives an LLSD round trip with its preferred type", "[LLInventory]")
     {
         LLPointer<LLInventoryCategory> src = create_random_inventory_cat();
         LLSD sd = ll_create_sd_from_inventory_category(src);
         LLPointer<LLInventoryCategory> dst = ll_create_category_from_sd(sd);
 
-        ensure_equals("1.item id::getUUID() failed", dst->getUUID(), src->getUUID());
-        ensure_equals("2.parent::getParentUUID() failed", dst->getParentUUID(), src->getParentUUID());
-        ensure_equals("3.name::getName() failed", dst->getName(), src->getName());
-        ensure_equals("4.type::getType() failed", dst->getType(), src->getType());
-        ensure_equals("5.preferred type::getPreferredType() failed", dst->getPreferredType(), src->getPreferredType());
+        CHECK(dst->getUUID() == src->getUUID());
+        CHECK(dst->getParentUUID() == src->getParentUUID());
+        CHECK(dst->getName() == src->getName());
+        CHECK(dst->getType() == src->getType());
+        CHECK(dst->getPreferredType() == src->getPreferredType());
 
         src->setPreferredType( LLFolderType::FT_TEXTURE);
         sd = ll_create_sd_from_inventory_category(src);
         dst = ll_create_category_from_sd(sd);
-        ensure_equals("6.preferred type::getPreferredType() failed", dst->getPreferredType(), src->getPreferredType());
+        CHECK(dst->getPreferredType() == src->getPreferredType());
 
 
     }
 
-    template<> template<>
-    void inventory_object::test<13>()
+    TEST_CASE("LLInventory: a category survives exportLLSD through a notation file", "[LLInventory]")
     {
         NamedTempFile temp_file("linden_file", "", ".dat");
         std::string filename(temp_file.getPath().string());
@@ -529,17 +502,16 @@ namespace
         LLPointer<LLInventoryCategory> src2 = new LLInventoryCategory();
         src2->importLLSDMap(s_item);
 
-        ensure_equals("1.item id::getUUID() failed", src1->getUUID(), src2->getUUID());
-        ensure_equals("2.parent::getParentUUID() failed", src1->getParentUUID(), src2->getParentUUID());
-        ensure_equals("3.type::getType() failed", src1->getType(), src2->getType());
-        ensure_equals("4.preferred type::getPreferredType() failed", src1->getPreferredType(), src2->getPreferredType());
-        ensure_equals("5.name::getName() failed", src1->getName(), src2->getName());
-        ensure_equals("6.thumbnails::getThumbnailUUID() failed", src1->getThumbnailUUID(), src2->getThumbnailUUID());
-        ensure_equals("7.favorites::getIsFavorite() failed", src1->getIsFavorite(), src2->getIsFavorite());
+        CHECK(src1->getUUID() == src2->getUUID());
+        CHECK(src1->getParentUUID() == src2->getParentUUID());
+        CHECK(src1->getType() == src2->getType());
+        CHECK(src1->getPreferredType() == src2->getPreferredType());
+        CHECK(src1->getName() == src2->getName());
+        CHECK(src1->getThumbnailUUID() == src2->getThumbnailUUID());
+        CHECK(src1->getIsFavorite() == src2->getIsFavorite());
     }
 
-    template<> template<>
-    void inventory_object::test<14>()
+    TEST_CASE("LLInventory: a category survives the legacy stream but its favorite does not", "[LLInventory]")
     {
         LLPointer<LLInventoryCategory> src1 = create_random_inventory_cat();
 
@@ -550,12 +522,12 @@ namespace
         LLPointer<LLInventoryCategory> src2 = new LLInventoryCategory();
         src2->importLegacyStream(istream);
 
-        ensure_equals("1.item id::getUUID() failed", src1->getUUID(), src2->getUUID());
-        ensure_equals("2.parent::getParentUUID() failed", src1->getParentUUID(), src2->getParentUUID());
-        ensure_equals("3.type::getType() failed", src1->getType(), src2->getType());
-        ensure_equals("4.preferred type::getPreferredType() failed", src1->getPreferredType(), src2->getPreferredType());
-        ensure_equals("5.name::getName() failed", src1->getName(), src2->getName());
-        ensure_equals("13.thumbnails::getThumbnailUUID() failed", src1->getThumbnailUUID(), src2->getThumbnailUUID());
-        ensure_equals("14.favorites::getIsFavorite() failed", false, src2->getIsFavorite()); // currently not supposed to carry over
+        CHECK(src1->getUUID() == src2->getUUID());
+        CHECK(src1->getParentUUID() == src2->getParentUUID());
+        CHECK(src1->getType() == src2->getType());
+        CHECK(src1->getPreferredType() == src2->getPreferredType());
+        CHECK(src1->getName() == src2->getName());
+        CHECK(src1->getThumbnailUUID() == src2->getThumbnailUUID());
+        CHECK_FALSE(src2->getIsFavorite()); // currently not supposed to carry over
     }
 }

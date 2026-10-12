@@ -220,7 +220,8 @@ namespace ll_test
 
     void StateGuard::add(std::string name, Describe describe, Restore restore)
     {
-        checks().push_back({ std::move(name), std::move(describe), std::move(restore), {} });
+        std::string first = describe();
+        checks().push_back({ std::move(name), std::move(describe), std::move(restore), std::move(first) });
     }
 
     void StateGuard::addCommonChecks()

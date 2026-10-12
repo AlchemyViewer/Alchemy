@@ -1,5 +1,5 @@
 /**
- * @file llpermissions_tut.cpp
+ * @file llpermissions_test.cpp
  * @author Adroit
  * @date March 2007
  * @brief llpermissions test cases.
@@ -26,29 +26,17 @@
  * $/LicenseInfo$
  */
 
-#include <tut/tut.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include "linden_common.h"
 
-#include "lltut.h"
 
 #include "message.h"
 #include "llpermissions.h"
 
 
-namespace tut
-{
 namespace
 {
-    struct permission
-    {
-    };
-    typedef test_group<permission> permission_t;
-    typedef permission_t::object permission_object_t;
-    tut::permission_t tut_permission("permission");
-}
-
-    template<> template<>
-    void permission_object_t::test<1>()
+    TEST_CASE("permission: a default LLPermissions has null ids and full masks and no owner", "[permission]")
     {
         LLPermissions permissions;
         LLUUID  uuid = permissions.getCreator();
@@ -56,15 +44,22 @@ namespace
         LLUUID  uuid2 = permissions.getGroup();
         LLUUID  uuid3 = permissions.getLastOwner();
 
-        ensure("LLPermission Get Functions failed", (uuid == LLUUID::null && uuid1 == LLUUID::null &&
-            uuid2 == LLUUID::null && uuid3 == LLUUID::null));
-        ensure("LLPermission Get Functions failed", (permissions.getMaskBase() == PERM_ALL && permissions.getMaskOwner() == PERM_ALL &&
-            permissions.getMaskGroup() == PERM_ALL && permissions.getMaskEveryone() == PERM_ALL && permissions.getMaskNextOwner() == PERM_ALL));
-        ensure("Ownership functions failed", ((! permissions.isGroupOwned()) && (! permissions.isOwned())));
+        CHECK(uuid == LLUUID::null);
+        CHECK(uuid1 == LLUUID::null);
+        CHECK(uuid2 == LLUUID::null);
+        CHECK(uuid3 == LLUUID::null);
+
+        CHECK(permissions.getMaskBase() == PERM_ALL);
+        CHECK(permissions.getMaskOwner() == PERM_ALL);
+        CHECK(permissions.getMaskGroup() == PERM_ALL);
+        CHECK(permissions.getMaskEveryone() == PERM_ALL);
+        CHECK(permissions.getMaskNextOwner() == PERM_ALL);
+
+        CHECK_FALSE(permissions.isGroupOwned());
+        CHECK_FALSE(permissions.isOwned());
     }
 
-    template<> template<>
-    void permission_object_t::test<2>()
+    TEST_CASE("permission: init sets the creator and owner and last owner and group", "[permission]")
     {
         LLPermissions permissions;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
@@ -73,14 +68,13 @@ namespace
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
         permissions.init(creator, owner, lastOwner, group);
 
-        ensure_equals("init/getCreator():failed to return the creator ", creator, permissions.getCreator());
-        ensure_equals("init/getOwner():failed to return the owner ", owner, permissions.getOwner());
-        ensure_equals("init/getLastOwner():failed to return the group ", lastOwner, permissions.getLastOwner());
-        ensure_equals("init/getGroup():failed to return the group ", group, permissions.getGroup());
+        CHECK(creator == permissions.getCreator());
+        CHECK(owner == permissions.getOwner());
+        CHECK(lastOwner == permissions.getLastOwner());
+        CHECK(group == permissions.getGroup());
     }
 
-    template<> template<>
-    void permission_object_t::test<3>()
+    TEST_CASE("permission: initMasks fixes the masks and the mask setters keep them as given", "[permission]")
     {
         LLPermissions permissions;
         U32 base = PERM_ALL;
@@ -96,27 +90,27 @@ namespace
         U32 fixednext = PERM_NONE;
 
         permissions.initMasks(base, owner, everyone, group, next); // will fix perms if not allowed.
-        ensure_equals("initMasks/getMaskBase():failed to return the MaskBase ", fixedbase, permissions.getMaskBase());
-        ensure_equals("initMasks/getMaskOwner():failed to return the MaskOwner ", fixedowner, permissions.getMaskOwner());
-        ensure_equals("initMasks/getMaskEveryone():failed to return the MaskGroup ", fixedgroup, permissions.getMaskGroup());
-        ensure_equals("initMasks/getMaskEveryone():failed to return the MaskEveryone ", fixedeveryone, permissions.getMaskEveryone());
-        ensure_equals("initMasks/getMaskNextOwner():failed to return the MaskNext ", fixednext, permissions.getMaskNextOwner());
+        CHECK(fixedbase == permissions.getMaskBase());
+        CHECK(fixedowner == permissions.getMaskOwner());
+        CHECK(fixedgroup == permissions.getMaskGroup());
+        CHECK(fixedeveryone == permissions.getMaskEveryone());
+        CHECK(fixednext == permissions.getMaskNextOwner());
 
         // explictly set should maintain the values
         permissions.setMaskBase(base); //no fixing
-        ensure_equals("setMaskBase/getMaskBase():failed to return the MaskBase ", base, permissions.getMaskBase());
+        CHECK(base == permissions.getMaskBase());
 
         permissions.setMaskOwner(owner);
-        ensure_equals("setMaskOwner/getMaskOwner():failed to return the MaskOwner ", owner, permissions.getMaskOwner());
+        CHECK(owner == permissions.getMaskOwner());
 
         permissions.setMaskEveryone(everyone);
-        ensure_equals("setMaskEveryone/getMaskEveryone():failed to return the MaskEveryone ", everyone, permissions.getMaskEveryone());
+        CHECK(everyone == permissions.getMaskEveryone());
 
         permissions.setMaskGroup(group);
-        ensure_equals("setMaskGroup/getMaskEveryone():failed to return the MaskGroup ", group, permissions.getMaskGroup());
+        CHECK(group == permissions.getMaskGroup());
 
         permissions.setMaskNext(next);
-        ensure_equals("setMaskNext/getMaskNextOwner():failed to return the MaskNext ", next, permissions.getMaskNextOwner());
+        CHECK(next == permissions.getMaskNextOwner());
 
         // further tests can be added to ensure perms for owner/group/everyone etc. get properly fixed.
         // code however suggests that there is no explict check if the perms are correct and the user of this
@@ -124,8 +118,7 @@ namespace
         // perm combinations.
     }
 
-    template<> template<>
-    void permission_object_t::test<4>()
+    TEST_CASE("permission: set copies the ids of another LLPermissions", "[permission]")
     {
         LLPermissions perm,perm1;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
@@ -134,12 +127,13 @@ namespace
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
         perm1.init(creator,owner,lastOwner,group);
         perm.set(perm1);
-        ensure("set():failed to set ", (creator == perm.getCreator()) && (owner == perm.getOwner())&&
-                                    (lastOwner == perm.getLastOwner())&& (group == perm.getGroup()));
-        }
+        CHECK(creator == perm.getCreator());
+        CHECK(owner == perm.getOwner());
+        CHECK(lastOwner == perm.getLastOwner());
+        CHECK(group == perm.getGroup());
+    }
 
-    template<> template<>
-    void permission_object_t::test<5>()
+    TEST_CASE("permission: accumulate restricts the masks to those both allow", "[permission]")
     {
         LLPermissions perm,perm1;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
@@ -174,15 +168,14 @@ namespace
         U32 fixedeveryone = PERM_TRANSFER;
         U32 fixednext = PERM_NONE;
 
-        ensure_equals("accumulate failed ", fixedbase, perm.getMaskBase());
-        ensure_equals("accumulate failed ", fixedowner, perm.getMaskOwner());
-        ensure_equals("accumulate failed ", fixedgroup, perm.getMaskGroup());
-        ensure_equals("accumulate failed ", fixedeveryone, perm.getMaskEveryone());
-        ensure_equals("accumulate failed ", fixednext, perm.getMaskNextOwner());
+        CHECK(fixedbase == perm.getMaskBase());
+        CHECK(fixedowner == perm.getMaskOwner());
+        CHECK(fixedgroup == perm.getMaskGroup());
+        CHECK(fixedeveryone == perm.getMaskEveryone());
+        CHECK(fixednext == perm.getMaskNextOwner());
     }
 
-    template<> template<>
-    void permission_object_t::test<6>()
+    TEST_CASE("permission: getSafeOwner is the owner or the group where there is none", "[permission]")
     {
         LLPermissions perm;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
@@ -190,20 +183,19 @@ namespace
         LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
         perm.init(creator,owner,lastOwner,group);
-        ensure_equals("getSafeOwner:failed ", owner,perm.getSafeOwner());
+        CHECK(owner == perm.getSafeOwner());
 
         ///NULL Owner
         perm.init(creator,LLUUID::null,lastOwner,group);
-        ensure_equals("getSafeOwner:failed ", group, perm.getSafeOwner());
+        CHECK(group == perm.getSafeOwner());
     }
 
-        template<> template<>
-    void permission_object_t::test<7>()
+    TEST_CASE("permission: getOwnership gives the owner or else the owning group", "[permission]")
     {
         LLPermissions perm1;
         LLUUID uuid;
         bool is_group_owned = false;
-        ensure("1:getOwnership:failed ", ! perm1.getOwnership(uuid,is_group_owned));
+        CHECK_FALSE(perm1.getOwnership(uuid,is_group_owned));
 
         LLPermissions perm;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
@@ -212,15 +204,16 @@ namespace
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
         perm.init(creator,owner,lastOwner,group);
         perm.getOwnership(uuid,is_group_owned);
-        ensure("2:getOwnership:failed ", ((uuid == owner) && (! is_group_owned)));
+        CHECK(uuid == owner);
+        CHECK_FALSE(is_group_owned);
 
         perm.init(creator,LLUUID::null,lastOwner,group);
         perm.getOwnership(uuid,is_group_owned);
-        ensure("3:getOwnership:failed ", ((uuid == group) && is_group_owned));
+        CHECK(uuid == group);
+        CHECK(is_group_owned);
     }
 
-    template<> template<>
-    void permission_object_t::test<8>()
+    TEST_CASE("permission: equal LLPermissions have the same CRC32", "[permission]")
     {
         LLPermissions perm,perm1;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
@@ -229,161 +222,192 @@ namespace
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
         perm.init(creator,owner,lastOwner,group);
         perm1.init(creator,owner,lastOwner,group);
-        ensure_equals("getCRC32:failed ", perm.getCRC32(),perm1.getCRC32());
+        CHECK(perm.getCRC32() == perm1.getCRC32());
     }
 
-    template<> template<>
-    void permission_object_t::test<9>()
+    TEST_CASE("permission: setOwnerAndGroup needs the agent to be the current owner", "[permission]")
     {
         LLPermissions perm;
         LLUUID agent("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
         LLUUID owner("68edcf47-ccd7-45b8-9f90-1649d7f12806");
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
         bool is_atomic = true;
-        ensure("setOwnerAndGroup():failed ", perm.setOwnerAndGroup(agent,owner,group,is_atomic));
+        REQUIRE(perm.setOwnerAndGroup(agent,owner,group,is_atomic));
 
         LLUUID owner2("68edcf47-ccd7-45b8-9f90-1649d7f12807");
         LLUUID group2("9c8eca51-53d5-42a7-bb58-cef070395db9");
 
         // cant change - agent need to be current owner
-        ensure("setOwnerAndGroup():failed ", ! perm.setOwnerAndGroup(agent,owner2,group2,is_atomic));
+        CHECK_FALSE(perm.setOwnerAndGroup(agent,owner2,group2,is_atomic));
 
         // should be able to change - agent and owner same as current owner
-        ensure("setOwnerAndGroup():failed ", perm.setOwnerAndGroup(owner,owner,group2,is_atomic));
+        CHECK(perm.setOwnerAndGroup(owner,owner,group2,is_atomic));
     }
 
-    template<> template<>
-    void permission_object_t::test<10>()
+    TEST_CASE("permission: the system can deed to a group", "[permission]")
     {
         LLPermissions perm;
         LLUUID agent;
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
-        ensure("deedToGroup():failed ", perm.deedToGroup(agent,group));
+        CHECK(perm.deedToGroup(agent,group));
     }
-    template<> template<>
-    void permission_object_t::test<11>()
+    TEST_CASE("permission: the system but not a stranger sets base and owner bits", "[permission]")
     {
         LLPermissions perm;
         LLUUID agent;
         bool set = true;
         U32 bits = PERM_TRANSFER | PERM_MODIFY;
-        ensure("setBaseBits():failed ", perm.setBaseBits(agent, set, bits));
-        ensure("setOwnerBits():failed ", perm.setOwnerBits(agent, set, bits));
+        CHECK(perm.setBaseBits(agent, set, bits));
+        CHECK(perm.setOwnerBits(agent, set, bits));
 
         LLUUID agent1("9c8eca51-53d5-42a7-bb58-cef070395db8");
-        ensure("setBaseBits():failed ", ! perm.setBaseBits(agent1, set, bits));
-        ensure("setOwnerBits():failed ", ! perm.setOwnerBits(agent1, set, bits));
+        CHECK_FALSE(perm.setBaseBits(agent1, set, bits));
+        CHECK_FALSE(perm.setOwnerBits(agent1, set, bits));
     }
 
-    template<> template<>
-    void permission_object_t::test<12>()
+    TEST_CASE("permission: the system but not a stranger sets group and everyone and next bits", "[permission]")
     {
         LLPermissions perm;
         LLUUID agent;
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
         bool set = true;
         U32 bits = 10;
-        ensure("setGroupBits():failed ", perm.setGroupBits(agent,group, set, bits));
-        ensure("setEveryoneBits():failed ", perm.setEveryoneBits(agent,group, set, bits));
-        ensure("setNextOwnerBits():failed ", perm.setNextOwnerBits(agent,group, set, bits));
+        CHECK(perm.setGroupBits(agent,group, set, bits));
+        CHECK(perm.setEveryoneBits(agent,group, set, bits));
+        CHECK(perm.setNextOwnerBits(agent,group, set, bits));
 
         LLUUID agent1("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
-        ensure("setGroupBits():failed ", ! perm.setGroupBits(agent1,group, set, bits));
-        ensure("setEveryoneBits():failed ", ! perm.setEveryoneBits(agent1,group, set, bits));
-        ensure("setNextOwnerBits():failed ", ! perm.setNextOwnerBits(agent1,group, set, bits));
+        CHECK_FALSE(perm.setGroupBits(agent1,group, set, bits));
+        CHECK_FALSE(perm.setEveryoneBits(agent1,group, set, bits));
+        CHECK_FALSE(perm.setNextOwnerBits(agent1,group, set, bits));
     }
 
-    template<> template<>
-    void permission_object_t::test<13>()
+    TEST_CASE("permission: allowOperationBy allows the system and a member of the group", "[permission]")
     {
         LLPermissions perm;
         LLUUID agent;
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
         U32 bits = 10;
-        ensure("allowOperationBy():failed ", perm.allowOperationBy(bits,agent,group));
+        CHECK(perm.allowOperationBy(bits,agent,group));
 
         LLUUID agent1("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
         LLUUID owner("68edcf47-ccd7-45b8-9f90-1649d7f12806");
         LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
         perm.init(creator,owner,lastOwner,group);
-        ensure("allowOperationBy():failed ", perm.allowOperationBy(bits,agent1,group));
+        CHECK(perm.allowOperationBy(bits,agent1,group));
     }
 
-    template<> template<>
-    void permission_object_t::test<14>()
+    // allowModifyBy, allowCopyBy and allowMoveBy answer the owner by the
+    // owner mask, a member asking as the object's group by the group mask
+    // (or the everyone mask), and anyone else by the everyone mask. The
+    // system, the null agent, may always. initMasks takes base, owner,
+    // everyone, group, next, in that order.
+    TEST_CASE("permission: allowModifyBy answers the owner and a group member and a stranger by their masks", "[permission]")
+    {
+        LLPermissions perm;
+        LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
+        LLUUID owner("68edcf47-ccd7-45b8-9f90-1649d7f12806");
+        LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
+        LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
+        LLUUID member("1f6e2b7c-3d4a-4e5f-8a9b-0c1d2e3f4a5b");
+        LLUUID stranger("7d8e9fa0-b1c2-4d3e-9f40-5a6b7c8d9e0f");
+        perm.init(creator,owner,lastOwner,group);
+
+        // The owner may modify; the group and everyone may not.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_NONE, PERM_NONE, PERM_ALL);
+        CHECK(perm.allowModifyBy(LLUUID::null));
+        CHECK(perm.allowModifyBy(owner));
+        CHECK_FALSE(perm.allowModifyBy(member, group));
+        CHECK_FALSE(perm.allowModifyBy(stranger));
+
+        // The group may too, but only to a member asking as the group.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_NONE, PERM_MODIFY, PERM_ALL);
+        CHECK(perm.allowModifyBy(member, group));
+        CHECK_FALSE(perm.allowModifyBy(member));
+        CHECK_FALSE(perm.allowModifyBy(stranger));
+
+        // Everyone never may, whatever its mask asks for.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_ALL, PERM_MODIFY, PERM_ALL);
+        CHECK_FALSE(perm.allowModifyBy(stranger));
+    }
+
+    TEST_CASE("permission: allowCopyBy answers the owner and a group member and a stranger by their masks", "[permission]")
+    {
+        LLPermissions perm;
+        LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
+        LLUUID owner("68edcf47-ccd7-45b8-9f90-1649d7f12806");
+        LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
+        LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
+        LLUUID member("1f6e2b7c-3d4a-4e5f-8a9b-0c1d2e3f4a5b");
+        LLUUID stranger("7d8e9fa0-b1c2-4d3e-9f40-5a6b7c8d9e0f");
+        perm.init(creator,owner,lastOwner,group);
+
+        // The owner may copy; the group and everyone may not.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_NONE, PERM_NONE, PERM_ALL);
+        CHECK(perm.allowCopyBy(LLUUID::null));
+        CHECK(perm.allowCopyBy(owner));
+        CHECK_FALSE(perm.allowCopyBy(member, group));
+        CHECK_FALSE(perm.allowCopyBy(stranger));
+
+        // The group may too, but only to a member asking as the group.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_NONE, PERM_COPY, PERM_ALL);
+        CHECK(perm.allowCopyBy(member, group));
+        CHECK_FALSE(perm.allowCopyBy(member));
+        CHECK_FALSE(perm.allowCopyBy(stranger));
+
+        // And once everyone may, so may a stranger.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_COPY, PERM_COPY, PERM_ALL);
+        CHECK(perm.allowCopyBy(stranger));
+    }
+
+    TEST_CASE("permission: allowMoveBy answers the owner and a group member and a stranger by their masks", "[permission]")
+    {
+        LLPermissions perm;
+        LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
+        LLUUID owner("68edcf47-ccd7-45b8-9f90-1649d7f12806");
+        LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
+        LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
+        LLUUID member("1f6e2b7c-3d4a-4e5f-8a9b-0c1d2e3f4a5b");
+        LLUUID stranger("7d8e9fa0-b1c2-4d3e-9f40-5a6b7c8d9e0f");
+        perm.init(creator,owner,lastOwner,group);
+
+        // The owner may move; the group and everyone may not.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_NONE, PERM_NONE, PERM_ALL);
+        CHECK(perm.allowMoveBy(LLUUID::null));
+        CHECK(perm.allowMoveBy(owner));
+        CHECK_FALSE(perm.allowMoveBy(member, group));
+        CHECK_FALSE(perm.allowMoveBy(stranger));
+
+        // The group may too, but only to a member asking as the group.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_NONE, PERM_MOVE, PERM_ALL);
+        CHECK(perm.allowMoveBy(member, group));
+        CHECK_FALSE(perm.allowMoveBy(member));
+        CHECK_FALSE(perm.allowMoveBy(stranger));
+
+        // And once everyone may, so may a stranger.
+        perm.initMasks(PERM_ALL, PERM_ALL, PERM_MOVE, PERM_MOVE, PERM_ALL);
+        CHECK(perm.allowMoveBy(stranger));
+    }
+
+    TEST_CASE("permission: allowTransferTo allows the null agent while the owner is null", "[permission]")
     {
         LLPermissions perm;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
         LLUUID owner;
         LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
-        perm.init(creator,owner,lastOwner,group);
         LLUUID agent;
-        ensure("1:allowModifyBy():failed ", perm.allowModifyBy(agent));
-        ensure("2:allowModifyBy():failed ", perm.allowModifyBy(agent,group));
-
-        LLUUID agent1("9c8eca51-53d5-42a7-bb58-cef070395db8");
-        ensure("3:allowModifyBy():failed ", perm.allowModifyBy(agent1));
-        ensure("4:allowModifyBy():failed ", perm.allowModifyBy(agent1,group));
-    }
-
-    template<> template<>
-    void permission_object_t::test<15>()
-    {
-        LLPermissions perm;
-        LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
-        LLUUID owner;
-        LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
-        LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
-        perm.init(creator,owner,lastOwner,group);
-        LLUUID agent;
-        ensure("1:allowCopyBy():failed ", perm.allowModifyBy(agent));
-        ensure("2:allowCopyBy():failed ", perm.allowModifyBy(agent,group));
-
-        LLUUID agent1("9c8eca51-53d5-42a7-bb58-cef070395db8");
-        ensure("3:allowCopyBy():failed ", perm.allowCopyBy(agent1));
-        ensure("4:allowCopyBy():failed ", perm.allowCopyBy(agent1,group));
-    }
-
-    template<> template<>
-    void permission_object_t::test<16>()
-    {
-        LLPermissions perm;
-        LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
-        LLUUID owner;
-        LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
-        LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
-        perm.init(creator,owner,lastOwner,group);
-        LLUUID agent;
-        ensure("1:allowMoveBy():failed ", perm.allowMoveBy(agent));
-        ensure("2:allowMoveBy():failed ", perm.allowMoveBy(agent,group));
-
-        LLUUID agent1("9c8eca51-53d5-42a7-bb58-cef070395db8");
-        ensure("3:allowMoveBy():failed ", perm.allowMoveBy(agent1));
-        ensure("4:allowMoveBy():failed ", perm.allowMoveBy(agent1,group));
-    }
-
-    template<> template<>
-    void permission_object_t::test<17>()
-    {
-        LLPermissions perm;
-        LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
-        LLUUID owner;
-        LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
-        LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
-        LLUUID agent;
-        ensure("1:allowMoveBy():failed ", perm.allowTransferTo(agent));
+        CHECK(perm.allowTransferTo(agent));
 
         perm.init(creator,owner,lastOwner,group);
-        ensure("2:allowMoveBy():failed ", perm.allowTransferTo(agent));
+        CHECK(perm.allowTransferTo(agent));
     }
 
-    template<> template<>
-    void permission_object_t::test<18>()
+    TEST_CASE("permission: operator== holds for defaults and after assignment", "[permission]")
     {
         LLPermissions perm,perm1;
-        ensure_equals("1:Operator==:failed ", perm, perm1);
+        CHECK(perm == perm1);
 
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
         LLUUID owner("68edcf47-ccd7-45b8-9f90-1649d7f12806");
@@ -391,11 +415,10 @@ namespace
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
         perm.init(creator,owner,lastOwner,group);
         perm = perm1;
-        ensure_equals("2:Operator==:failed ", perm, perm1);
+        CHECK(perm == perm1);
     }
 
-    template<> template<>
-    void permission_object_t::test<19>()
+    TEST_CASE("permission: operator!= tells an initialised LLPermissions from a default one", "[permission]")
     {
         LLPermissions perm,perm1;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
@@ -403,11 +426,10 @@ namespace
         LLUUID lastOwner("5e47a0dc-97bf-44e0-8b40-de06718cee9d");
         LLUUID group("9c8eca51-53d5-42a7-bb58-cef070395db8");
         perm.init(creator,owner,lastOwner,group);
-        ensure_not_equals("2:Operator==:failed ", perm, perm1);
+        CHECK(perm != perm1);
     }
 
-    template<> template<>
-    void permission_object_t::test<20>()
+    TEST_CASE("permission: the legacy stream export and import round-trip", "[permission]")
     {
         LLPermissions perm,perm1;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
@@ -429,11 +451,10 @@ namespace
         std::istringstream istream(ostream.str());
         perm1.importLegacyStream(istream);
 
-        ensure_equals("exportStream()/importStream():failed to export and import the data ", perm1, perm);
+        CHECK(perm1 == perm);
     }
 
-    template<> template<>
-    void permission_object_t::test<21>()
+    TEST_CASE("permission: operator<< writes equal LLPermissions alike", "[permission]")
     {
         LLPermissions perm,perm1;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
@@ -445,11 +466,10 @@ namespace
         stream1 << perm;
         perm1.init(creator,owner,lastOwner,group);
         stream2 << perm1;
-        ensure_equals("1:operator << failed", stream1.str(), stream2.str());
+        CHECK(stream1.str() == stream2.str());
     }
 
-    template<> template<>
-    void permission_object_t::test<22>()
+    TEST_CASE("permission: LLPermissions survive an LLSD round trip", "[permission]")
     {
         LLPermissions perm,perm1;
         LLUUID creator("abf0d56b-82e5-47a2-a8ad-74741bb2c29e");
@@ -468,27 +488,27 @@ namespace
 
         LLSD sd = ll_create_sd_from_permissions(perm);
         perm1 = ll_permissions_from_sd(sd);
-        ensure_equals("ll_permissions_from_sd() and ll_create_sd_from_permissions()functions failed", perm, perm1);
+        CHECK(perm == perm1);
     }
 
-    template<> template<>
-    void permission_object_t::test<23>()
+    TEST_CASE("permission: LLAggregatePermissions aggregates masks and prints them", "[permission]")
     {
         LLAggregatePermissions AggrPermission;
         LLAggregatePermissions AggrPermission1;
-        ensure_equals("getU8() function failed", AggrPermission.getU8(), 0);
-        ensure("isEmpty() function failed", AggrPermission.isEmpty());
-        AggrPermission.getValue(PERM_TRANSFER);
-        ensure_equals("getValue() function failed", AggrPermission.getValue(PERM_TRANSFER), 0x00);
+        CHECK(AggrPermission.getU8() == 0);
+        CHECK(AggrPermission.isEmpty());
+        CHECK(AggrPermission.getValue(PERM_TRANSFER) == LLAggregatePermissions::AP_EMPTY);
 
         AggrPermission.aggregate(PERM_ITEM_UNRESTRICTED);
-        ensure("aggregate() function failed", ! AggrPermission.isEmpty());
+        CHECK_FALSE(AggrPermission.isEmpty());
+        CHECK(AggrPermission.getValue(PERM_TRANSFER) == LLAggregatePermissions::AP_ALL);
 
         AggrPermission1.aggregate(AggrPermission);
-        ensure("aggregate() function failed", ! AggrPermission1.isEmpty());
+        CHECK_FALSE(AggrPermission1.isEmpty());
+        CHECK(AggrPermission1.getValue(PERM_TRANSFER) == LLAggregatePermissions::AP_ALL);
 
         std::ostringstream stream1;
         stream1 << AggrPermission;
-        ensure_equals("operator<< failed", stream1.str(), "{PI_COPY=All, PI_MODIFY=All, PI_TRANSFER=All}");
+        CHECK(stream1.str() == "{PI_COPY=All, PI_MODIFY=All, PI_TRANSFER=All}");
     }
 }

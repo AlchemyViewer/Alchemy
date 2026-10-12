@@ -25,7 +25,7 @@
  */
 
 #include "linden_common.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../llxmlnode.h"
 
@@ -34,56 +34,42 @@
 #include <string>
 #include <vector>
 
-namespace tut
-{
 namespace
 {
-    struct llxmlnode_data
-    {
-    };
-    typedef test_group<llxmlnode_data> llxmlnode_test;
-    typedef llxmlnode_test::object llxmlnode_object;
-    tut::llxmlnode_test llxmlnode_testcase("llxmlnode");
-}
-
     // Element name, id, attributes (string + int) and text value round-trip.
-    template<> template<>
-    void llxmlnode_object::test<1>()
+    TEST_CASE("llxmlnode: parseBuffer gives the element name and id and attributes and text", "[llxmlnode]")
     {
         const std::string xml =
             "<thing id=\"abc\" name=\"hello world\" count=\"42\">body text</thing>";
         LLXMLNodePtr node;
-        ensure("parseBuffer succeeds",
-               LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        ensure("node non-null", node.notNull());
-        ensure("node name", node->hasName("thing"));
-        ensure_equals("id attribute", node->getID(), std::string("abc"));
-        ensure_equals("text value", node->getValue(), std::string("body text"));
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        REQUIRE(node.notNull());
+        CHECK(node->hasName("thing"));
+        CHECK(node->getID() == std::string("abc"));
+        CHECK(node->getValue() == std::string("body text"));
 
         std::string name;
-        ensure("name attr present", node->getAttributeString("name", name));
-        ensure_equals("name attr value", name, std::string("hello world"));
+        REQUIRE(node->getAttributeString("name", name));
+        CHECK(name == std::string("hello world"));
 
         S32 count = 0;
-        ensure("count attr present", node->getAttributeS32("count", count));
-        ensure_equals("count attr value", count, 42);
+        CHECK(node->getAttributeS32("count", count));
+        CHECK(count == 42);
     }
 
     // Escaped-string handling: a value wholly wrapped in double quotes is
     // unescaped (\" -> ", \\ -> \) since sStripEscapedStrings defaults to true.
-    template<> template<>
-    void llxmlnode_object::test<2>()
+    TEST_CASE("llxmlnode: a value wholly in double quotes is unescaped", "[llxmlnode]")
     {
         const std::string xml = "<v>\"abc\\\"def\"</v>"; // raw: <v>"abc\"def"</v>
         LLXMLNodePtr node;
-        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        ensure_equals("unescaped value", node->getValue(), std::string("abc\"def"));
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        CHECK(node->getValue() == std::string("abc\"def"));
     }
 
     // A long body taken through parseStream rather than parseBuffer. Guards the
     // stream path and value accumulation (the append path).
-    template<> template<>
-    void llxmlnode_object::test<3>()
+    TEST_CASE("llxmlnode: parseStream keeps the whole of a long body", "[llxmlnode]")
     {
         const size_t N = 5000;
         std::string xml = "<big>";
@@ -91,142 +77,130 @@ namespace
         xml += "</big>";
         std::istringstream stream(xml);
         LLXMLNodePtr node;
-        ensure("parseStream", LLXMLNode::parseStream(stream, node, nullptr));
-        ensure_equals("accumulated length", node->getValue().size(), N);
-        ensure("all content preserved", node->getValue() == std::string(N, 'x'));
+        REQUIRE(LLXMLNode::parseStream(stream, node, nullptr));
+        UNSCOPED_INFO("accumulated length");
+        REQUIRE(node->getValue().size() == N);
+        CHECK(node->getValue() == std::string(N, 'x'));
     }
 
     // Typed float array parsing via a child element.
-    template<> template<>
-    void llxmlnode_object::test<4>()
+    TEST_CASE("llxmlnode: getFloatValue parses a typed float array in a child element", "[llxmlnode]")
     {
         const std::string xml =
             "<root><pos type=\"float\">1.5 -2.25 3.0</pos></root>";
         LLXMLNodePtr node;
-        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
 
         LLXMLNodePtr pos;
-        ensure("getChild pos", node->getChild("pos", pos));
+        REQUIRE(node->getChild("pos", pos));
         F32 v[3] = { 0.f, 0.f, 0.f };
-        ensure_equals("3 floats parsed", (S32)pos->getFloatValue(3, v), 3);
-        ensure("v0", std::fabs(v[0] - 1.5f) < 1e-5f);
-        ensure("v1", std::fabs(v[1] + 2.25f) < 1e-5f);
-        ensure("v2", std::fabs(v[2] - 3.0f) < 1e-5f);
+        CHECK((S32)pos->getFloatValue(3, v) == 3);
+        CHECK(std::fabs(v[0] - 1.5f) < 1e-5f);
+        CHECK(std::fabs(v[1] + 2.25f) < 1e-5f);
+        CHECK(std::fabs(v[2] - 3.0f) < 1e-5f);
     }
 
     // Boolean array serialization (guards the whitespace-joined append path).
-    template<> template<>
-    void llxmlnode_object::test<5>()
+    TEST_CASE("llxmlnode: setBoolValue writes a space-joined array getBoolValue reads", "[llxmlnode]")
     {
         LLXMLNodePtr node = new LLXMLNode("flags", false);
         const bool vals[3] = { true, false, true };
         node->setBoolValue(3, vals);
-        ensure_equals("bool serialization", node->getValue(),
-                      std::string("true false true"));
+        CHECK(node->getValue() == std::string("true false true"));
 
         bool out[3] = { false, false, false };
-        ensure_equals("read back count", (S32)node->getBoolValue(3, out), 3);
-        ensure("b0", out[0] == true);
-        ensure("b1", out[1] == false);
-        ensure("b2", out[2] == true);
+        CHECK((S32)node->getBoolValue(3, out) == 3);
+        CHECK(out[0]);
+        CHECK_FALSE(out[1]);
+        CHECK(out[2]);
     }
 
-    // XML escaping of the five special characters.
-    template<> template<>
-    void llxmlnode_object::test<6>()
+    TEST_CASE("llxmlnode: escapeXML escapes the five special characters", "[llxmlnode]")
     {
-        ensure_equals("escapeXML",
-                      LLXMLNode::escapeXML("a<b>&\"'c"),
-                      std::string("a&lt;b&gt;&amp;&quot;&apos;c"));
+        CHECK(LLXMLNode::escapeXML("a<b>&\"'c") == std::string("a&lt;b&gt;&amp;&quot;&apos;c"));
     }
 
     // deepCopy uses the copy constructor; verify fields survive the copy.
-    template<> template<>
-    void llxmlnode_object::test<7>()
+    TEST_CASE("llxmlnode: deepCopy keeps the name and id and value and attributes", "[llxmlnode]")
     {
         const std::string xml = "<a id=\"i1\" k=\"v\">text</a>";
         LLXMLNodePtr node;
-        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
 
         LLXMLNodePtr copy = node->deepCopy();
-        ensure("copy non-null", copy.notNull());
-        ensure("copy name", copy->hasName("a"));
-        ensure_equals("copy id", copy->getID(), std::string("i1"));
-        ensure_equals("copy value", copy->getValue(), std::string("text"));
+        REQUIRE(copy.notNull());
+        CHECK(copy->hasName("a"));
+        CHECK(copy->getID() == std::string("i1"));
+        CHECK(copy->getValue() == std::string("text"));
 
         std::string k;
-        ensure("copy attr present", copy->getAttributeString("k", k));
-        ensure_equals("copy attr value", k, std::string("v"));
+        REQUIRE(copy->getAttributeString("k", k));
+        CHECK(k == std::string("v"));
     }
 
     // A quotation inside a longer run keeps its quotes: the escaped-string
     // strip applies to a value that is wholly quoted, and this one is not.
-    template<> template<>
-    void llxmlnode_object::test<8>()
+    TEST_CASE("llxmlnode: a quotation inside a longer run keeps its quotes", "[llxmlnode]")
     {
         const std::string xml = "<v>he said &quot;hello&quot; loudly</v>";
         LLXMLNodePtr node;
-        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        ensure_equals("quotes preserved", node->getValue(),
-                      std::string("he said \"hello\" loudly"));
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        CHECK(node->getValue() == std::string("he said \"hello\" loudly"));
 
         std::istringstream stream(xml);
         LLXMLNodePtr snode;
-        ensure("parseStream", LLXMLNode::parseStream(stream, snode, nullptr));
-        ensure_equals("stream agrees", snode->getValue(), node->getValue());
+        REQUIRE(LLXMLNode::parseStream(stream, snode, nullptr));
+        UNSCOPED_INFO("parseStream agrees with parseBuffer");
+        CHECK(snode->getValue() == node->getValue());
     }
 
     // The same run with nothing either side is wholly quoted, so it is stripped.
-    template<> template<>
-    void llxmlnode_object::test<9>()
+    TEST_CASE("llxmlnode: the same quotation with nothing either side is stripped", "[llxmlnode]")
     {
         const std::string xml = "<v>&quot;hello&quot;</v>";
         LLXMLNodePtr node;
-        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        ensure_equals("outer quotes stripped", node->getValue(), std::string("hello"));
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        CHECK(node->getValue() == std::string("hello"));
     }
 
     // CDATA reaches the value verbatim, entities and all.
-    template<> template<>
-    void llxmlnode_object::test<10>()
+    TEST_CASE("llxmlnode: CDATA reaches the value verbatim with its entities", "[llxmlnode]")
     {
         const std::string xml = "<v><![CDATA[raw <x> &amp; y]]></v>";
         LLXMLNodePtr node;
-        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        ensure_equals("cdata verbatim", node->getValue(), std::string("raw <x> &amp; y"));
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        CHECK(node->getValue() == std::string("raw <x> &amp; y"));
     }
 
     // Text either side of a child element concatenates, including the run
     // between two children that is nothing but whitespace.
-    template<> template<>
-    void llxmlnode_object::test<11>()
+    TEST_CASE("llxmlnode: text either side of child elements concatenates", "[llxmlnode]")
     {
         const std::string xml = "<a>x<b/>   <c/>y</a>";
         LLXMLNodePtr node;
-        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        ensure_equals("interior whitespace kept", node->getValue(), std::string("x   y"));
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        UNSCOPED_INFO("interior whitespace kept");
+        CHECK(node->getValue() == std::string("x   y"));
     }
 
-    // Line numbers are reported for elements and for their attributes.
-    template<> template<>
-    void llxmlnode_object::test<12>()
+    TEST_CASE("llxmlnode: line numbers are reported for elements and their attributes", "[llxmlnode]")
     {
         const std::string xml = "<a>\n  <b k=\"v\"/>\n  <c/>\n</a>";
         LLXMLNodePtr node;
-        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
-        ensure_equals("root line", node->getLineNumber(), 1);
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        CHECK(node->getLineNumber() == 1);
 
         LLXMLNodePtr b;
-        ensure("getChild b", node->getChild("b", b));
-        ensure_equals("b line", b->getLineNumber(), 2);
+        REQUIRE(node->getChild("b", b));
+        CHECK(b->getLineNumber() == 2);
 
         LLXMLNodePtr attr;
-        ensure("attribute node", b->getAttribute("k", attr));
-        ensure_equals("attribute line", attr->getLineNumber(), 2);
+        REQUIRE(b->getAttribute("k", attr));
+        CHECK(attr->getLineNumber() == 2);
 
         LLXMLNodePtr c;
-        ensure("getChild c", node->getChild("c", c));
-        ensure_equals("c line", c->getLineNumber(), 3);
+        REQUIRE(node->getChild("c", c));
+        CHECK(c->getLineNumber() == 3);
     }
 
     // Siblings that share a name. The child map is a multimap keyed by the
@@ -237,8 +211,7 @@ namespace
     // its place in the run, getChild must answer the first in document
     // order, and getChildren all of them. Eight children make the tree deep
     // enough that a descent rarely lands on the first.
-    template<> template<>
-    void llxmlnode_object::test<13>()
+    TEST_CASE("llxmlnode: same-named siblings are found in order and each can be deleted", "[llxmlnode]")
     {
         const std::string xml =
             "<root>"
@@ -247,30 +220,36 @@ namespace
             "<other/>"
             "</root>";
         LLXMLNodePtr root;
-        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), root, nullptr));
-        ensure_equals("nine children", root->getChildCount(), 9u);
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), root, nullptr));
+        CHECK(root->getChildCount() == 9u);
 
         LLXMLNodePtr first;
-        ensure("getChild finds one", root->getChild("s", first));
+        REQUIRE(root->getChild("s", first));
         std::string n;
-        ensure("it has n", first->getAttributeString("n", n));
-        ensure_equals("and is the first in the file", n, std::string("0"));
+        REQUIRE(first->getAttributeString("n", n));
+        UNSCOPED_INFO("getChild answers the first in the file");
+        CHECK(n == std::string("0"));
 
         LLXMLNodeList all;
         root->getChildren("s", all);
-        ensure_equals("getChildren finds them all", all.size(), 8u);
+        UNSCOPED_INFO("getChildren finds them all");
+        CHECK(all.size() == 8u);
 
         // Delete in document order: each deletion is of the front of the
         // run, which is where a descent is least likely to land.
         for (int expected = 0; expected < 8; ++expected)
         {
+            CAPTURE(expected);
             LLXMLNodePtr child;
-            ensure("still one to find", root->getChild("s", child));
-            ensure("attribute", child->getAttributeString("n", n));
-            ensure_equals("in document order", n, std::to_string(expected));
-            ensure("deleted", root->deleteChild(child));
-            ensure("and orphaned", child->mParent == nullptr);
-            ensure_equals("count follows", root->getChildCount(), (U32)(8 - expected));
+            UNSCOPED_INFO("still one to find");
+            REQUIRE(root->getChild("s", child));
+            REQUIRE(child->getAttributeString("n", n));
+            UNSCOPED_INFO("in document order");
+            REQUIRE(n == std::to_string(expected));
+            REQUIRE(root->deleteChild(child));
+            UNSCOPED_INFO("and orphaned");
+            REQUIRE(child->mParent == nullptr);
+            REQUIRE(root->getChildCount() == (U32)(8 - expected));
 
             // The sibling list agrees with the map about what is left.
             U32 listed = 0;
@@ -278,19 +257,20 @@ namespace
             {
                 ++listed;
             }
-            ensure_equals("sibling list agrees", listed, root->getChildCount());
+            UNSCOPED_INFO("sibling list agrees");
+            REQUIRE(listed == root->getChildCount());
         }
 
         LLXMLNodePtr none;
-        ensure("no s is left", !root->getChild("s", none));
+        CHECK_FALSE(root->getChild("s", none));
         LLXMLNodePtr other;
-        ensure("the other child remains", root->getChild("other", other));
+        UNSCOPED_INFO("the other child remains");
+        CHECK(root->getChild("other", other));
     }
 
     // The same run deleted from the back and from the middle, so the
     // target is never at the front of the equal range either.
-    template<> template<>
-    void llxmlnode_object::test<14>()
+    TEST_CASE("llxmlnode: same-named siblings delete from the back and the middle", "[llxmlnode]")
     {
         const std::string xml =
             "<root>"
@@ -298,20 +278,23 @@ namespace
             "<s n=\"4\"/><s n=\"5\"/><s n=\"6\"/><s n=\"7\"/>"
             "</root>";
         LLXMLNodePtr root;
-        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), root, nullptr));
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), root, nullptr));
 
         std::vector<LLXMLNodePtr> children;
         for (LLXMLNodePtr c = root->getFirstChild(); c.notNull(); c = c->getNextSibling())
         {
             children.push_back(c);
         }
-        ensure_equals("eight in the list", children.size(), 8u);
+        REQUIRE(children.size() == 8u);
 
         for (size_t index : { 7u, 3u, 0u, 5u, 1u, 6u, 2u, 4u })
         {
-            ensure("deleted from wherever it sits", root->deleteChild(children[index]));
+            CAPTURE(index);
+            UNSCOPED_INFO("deleted from wherever it sits");
+            REQUIRE(root->deleteChild(children[index]));
         }
-        ensure_equals("none left", root->getChildCount(), 0u);
-        ensure("and the list is empty", root->getFirstChild().isNull());
+        CHECK(root->getChildCount() == 0u);
+        UNSCOPED_INFO("and the list is empty");
+        CHECK(root->getFirstChild().isNull());
     }
 }
