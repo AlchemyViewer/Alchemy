@@ -418,6 +418,28 @@ namespace
         CHECK(actual == expected);
     }
 
+    TEST_CASE_METHOD(buffer_and_stream_data, "buffer_stream: flush after filling the put segment keeps the segment after it", "[buffer_stream]")
+    {
+        LLChannelDescriptors ch = mBuffer.nextChannel();
+        LLBufferStream str(ch, &mBuffer);
+
+        // The first character makes the put area, a segment of the stream's own size.
+        str << 'x';
+        LLBufferArray::segment_iterator_t it = mBuffer.beginSegment();
+        REQUIRE(it != mBuffer.endSegment());
+        const S32 segment_size = (*it).size();
+
+        // Fill it to its last byte, and put a segment on another channel after it.
+        str << std::string(segment_size - 1, 'x');
+        const char TAIL[] = "tail";
+        const S32 tail_len = static_cast<S32>(strlen(TAIL));
+        mBuffer.append(ch.in(), (U8*)TAIL, tail_len);
+        str.flush();
+
+        CHECK(mBuffer.countAfter(ch.out(), NULL) == segment_size);
+        CHECK(mBuffer.countAfter(ch.in(), NULL) == tail_len);
+    }
+
     TEST_CASE_METHOD(buffer_and_stream_data, "buffer_stream: seekp on the stream matches seekp on an ostringstream", "[buffer_stream]")
     {
         LLChannelDescriptors ch = mBuffer.nextChannel();

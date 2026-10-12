@@ -235,6 +235,23 @@ namespace
         CHECK(str == std::string(" is a Virtual World"));
     }
 
+    TEST_CASE("buffer: splitAfter the last byte of a segment adds no empty segment", "[buffer]")
+    {
+        const char array[] = "SecondLife";
+        S32 len = static_cast<S32>(strlen(array));
+        LLBufferArray bufferArray;
+        bufferArray.append(0, (U8*)array, len);
+
+        char buf[255];
+        S32 len1 = len;
+        U8* last = bufferArray.readAfter(0, 0, (U8*)buf, len1);
+        REQUIRE(len1 == len);
+        LLBufferArray::segment_iterator_t iterator = bufferArray.splitAfter(last);
+        REQUIRE(iterator != bufferArray.endSegment());
+        CHECK((*iterator).size() == len);
+        CHECK(++iterator == bufferArray.endSegment());
+    }
+
     TEST_CASE("buffer: eraseSegment removes the segment makeSegment made", "[buffer]")
     {
         LLBufferArray bufferArray;
