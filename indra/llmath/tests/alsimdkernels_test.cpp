@@ -35,7 +35,7 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "llthread.h"
 #include "../llmath.h"
 #include "../llsimdmath.h"
@@ -57,8 +57,6 @@
 using namespace alsimd;
 using namespace alsimd::kernels;
 
-namespace tut
-{
 namespace
 {
     std::string precise(double v)
@@ -80,20 +78,21 @@ namespace
         return true;
     }
 
-    void ensure_same_bits(const std::string& what, const LLVector4a& got, const LLVector4a& expected)
+    void require_same_bits(const std::string& what, const LLVector4a& got, const LLVector4a& expected)
     {
-        ensure(what + ": " + precise(got[0]) + " " + precise(got[1]) + " " + precise(got[2]) + " " + precise(got[3]) +
-                   " vs " + precise(expected[0]) + " " + precise(expected[1]) + " " + precise(expected[2]) + " " + precise(expected[3]),
-               same_bits(got, expected));
+        INFO(what << ": " << precise(got[0]) << " " << precise(got[1]) << " " << precise(got[2]) << " " << precise(got[3])
+                  << " vs " << precise(expected[0]) << " " << precise(expected[1]) << " " << precise(expected[2]) << " " << precise(expected[3]));
+        REQUIRE(same_bits(got, expected));
     }
 
     // The error relative to the size of the terms that made the value,
     // which is where the rounding happened, not to the value itself.
-    void ensure_close(const std::string& what, F32 got, double expected, double relative, double magnitude = 0.0)
+    void require_close(const std::string& what, F32 got, double expected, double relative, double magnitude = 0.0)
     {
         const double scale = llmax(1.0, llmax(std::fabs(expected), magnitude));
         const double err = std::fabs((double)got - expected) / scale;
-        ensure(what + ": " + precise(got) + " is off " + precise(err) + " from " + precise(expected), err <= relative);
+        INFO(what << ": " << precise(got) << " is off " << precise(err) << " from " << precise(expected));
+        REQUIRE(err <= relative);
     }
 
     // The counts that leave every tail a width can have.
@@ -170,26 +169,14 @@ namespace
 
         State mSaved;
     };
-}
-} // namespace tut
+} // anonymous namespace
 
-namespace tut
-{
 namespace
 {
-    struct alsimdkernels_data
-    {
-    };
-    typedef test_group<alsimdkernels_data> alsimdkernels_test;
-    typedef alsimdkernels_test::object alsimdkernels_object;
-    tut::alsimdkernels_test alsimdkernels_testcase("alsimdkernels");
-}
-
     // Points, with w from the rows and with w set, against
     // affineTransform, bit for bit, at every count and width; nothing
     // written past the count.
-    template<> template<>
-    void alsimdkernels_object::test<1>()
+    TEST_CASE("alsimdkernels: transform_points against affineTransform at every count and width", "[alsimdkernels]")
     {
         const LLMatrix4a m = some_matrix();
         for (size_t n : COUNTS)
@@ -210,14 +197,16 @@ namespace
                 transform_impl<W, true, W_LANE::FROM_ROWS>(m, src.data(), dst.data(), n, 0.f);
                 for (size_t i = 0; i <= n; ++i)
                 {
-                    ensure_same_bits(std::string("transform_points ") + width + " n " + std::to_string(n) + " at " + std::to_string(i), dst[i], expected[i]);
+                    CAPTURE(width, n, i);
+                    require_same_bits("transform_points", dst[i], expected[i]);
                 }
 
                 std::vector<LLVector4a> dst_w(n + 1, SENTINEL);
                 transform_impl<W, true, W_LANE::SET>(m, src.data(), dst_w.data(), n, 7.5f);
                 for (size_t i = 0; i <= n; ++i)
                 {
-                    ensure_same_bits(std::string("transform_points with w ") + width + " n " + std::to_string(n) + " at " + std::to_string(i), dst_w[i], expected_w[i]);
+                    CAPTURE(width, n, i);
+                    require_same_bits("transform_points with w", dst_w[i], expected_w[i]);
                 }
             });
         }
@@ -233,14 +222,14 @@ namespace
             m.affineTransform(src[i], expected[i]);
             for (int lane = 0; lane < 4; ++lane)
             {
-                ensure_close("public transform_points at " + std::to_string(i) + " lane " + std::to_string(lane), dst[i][lane], expected[i][lane], 4e-7, 1000.0);
+                CAPTURE(i, lane);
+                require_close("public transform_points", dst[i][lane], expected[i][lane], 4e-7, 1000.0);
             }
         }
     }
 
     // Directions, with w from the rows and with w kept, against rotate.
-    template<> template<>
-    void alsimdkernels_object::test<2>()
+    TEST_CASE("alsimdkernels: transform_directions against rotate at every count and width", "[alsimdkernels]")
     {
         const LLMatrix4a m = some_matrix();
         for (size_t n : COUNTS)
@@ -261,14 +250,16 @@ namespace
                 transform_impl<W, false, W_LANE::FROM_ROWS>(m, src.data(), dst.data(), n, 0.f);
                 for (size_t i = 0; i <= n; ++i)
                 {
-                    ensure_same_bits(std::string("transform_directions ") + width + " n " + std::to_string(n) + " at " + std::to_string(i), dst[i], expected[i]);
+                    CAPTURE(width, n, i);
+                    require_same_bits("transform_directions", dst[i], expected[i]);
                 }
 
                 std::vector<LLVector4a> dst_w(n + 1, SENTINEL);
                 transform_impl<W, false, W_LANE::KEEP>(m, src.data(), dst_w.data(), n, 0.f);
                 for (size_t i = 0; i <= n; ++i)
                 {
-                    ensure_same_bits(std::string("transform_directions_keep_w ") + width + " n " + std::to_string(n) + " at " + std::to_string(i), dst_w[i], expected_w[i]);
+                    CAPTURE(width, n, i);
+                    require_same_bits("transform_directions_keep_w", dst_w[i], expected_w[i]);
                 }
             });
         }
@@ -277,8 +268,7 @@ namespace
     // Texture coordinates: two per vector, against the scalar arithmetic
     // in double within the two roundings the fused form takes, and every
     // width bit for bit against the first.
-    template<> template<>
-    void alsimdkernels_object::test<3>()
+    TEST_CASE("alsimdkernels: texture coordinates against double and every width against the first", "[alsimdkernels]")
     {
         const F32 cos_ang = 0.8f, sin_ang = 0.6f;
         const LLVector4a trans(-0.5f);
@@ -301,11 +291,12 @@ namespace
                     const double t = (double)src[i][2 * pair + 1] - 0.5;
                     const double es = (s * cos_ang + t * sin_ang) * 2.0 + 0.75;
                     const double et = (s * -sin_ang + t * cos_ang) * 0.25 - 1.5;
-                    ensure_close("texcoord s n " + std::to_string(n) + " at " + std::to_string(i), narrow[i][2 * pair], es, 1e-6, 400.0);
-                    ensure_close("texcoord t n " + std::to_string(n) + " at " + std::to_string(i), narrow[i][2 * pair + 1], et, 1e-6, 400.0);
+                    CAPTURE(n, i, pair);
+                    require_close("texcoord s", narrow[i][2 * pair], es, 1e-6, 400.0);
+                    require_close("texcoord t", narrow[i][2 * pair + 1], et, 1e-6, 400.0);
                 }
             }
-            ensure_same_bits("texcoords write within n", narrow[n], SENTINEL);
+            require_same_bits("texcoords write within n", narrow[n], SENTINEL);
 
             for_each_width([&]<class W>(const char* width)
             {
@@ -313,7 +304,8 @@ namespace
                 transform_texcoords_impl<W>(reinterpret_cast<const F32*>(src.data()), reinterpret_cast<F32*>(dst.data()), n, trans, rot0, rot1, scale, offset);
                 for (size_t i = 0; i <= n; ++i)
                 {
-                    ensure_same_bits(std::string("texcoords ") + width + " n " + std::to_string(n) + " at " + std::to_string(i), dst[i], narrow[i]);
+                    CAPTURE(width, n, i);
+                    require_same_bits("texcoords", dst[i], narrow[i]);
                 }
             });
         }
@@ -321,8 +313,7 @@ namespace
 
     // Index offsets: bit for bit, wrapping, unaligned on both sides, every
     // count.
-    template<> template<>
-    void alsimdkernels_object::test<4>()
+    TEST_CASE("alsimdkernels: offset_indices_u16 wraps and writes only its unaligned range", "[alsimdkernels]")
     {
         std::mt19937 rng(4);
         std::uniform_int_distribution<int> any(0, 65535);
@@ -343,7 +334,8 @@ namespace
                     offset_indices_u16_impl<W>(src.data() + 1, dst.data() + 1, n, offset);
                     for (size_t i = 0; i < n + 3; ++i)
                     {
-                        ensure_equals(std::string("offset_indices_u16 ") + width + " n " + std::to_string(n) + " offset " + std::to_string(offset) + " at " + std::to_string(i), dst[i], expected[i]);
+                        CAPTURE(width, n, offset, i);
+                        REQUIRE(dst[i] == expected[i]);
                     }
                 });
             }
@@ -354,8 +346,7 @@ namespace
     // reference within the two roundings a tier without FMA takes, w from
     // bias, the last vertex read without its neighbour, every width bit
     // for bit.
-    template<> template<>
-    void alsimdkernels_object::test<5>()
+    TEST_CASE("alsimdkernels: dequantize_u16x3 against double with w from bias", "[alsimdkernels]")
     {
         std::mt19937 rng(5);
         std::uniform_int_distribution<int> any(0, 65535);
@@ -387,11 +378,13 @@ namespace
                 {
                     const double term = (double)values[3 * i + lane] * scale[lane];
                     const double expected = term + bias[lane];
-                    ensure_close("dequantize_u16x3 n " + std::to_string(n) + " at " + std::to_string(i) + " lane " + std::to_string(lane), narrow[i][lane], expected, 5e-7, std::fabs(term) + std::fabs(bias[lane]));
+                    CAPTURE(n, i, lane);
+                    require_close("dequantize_u16x3", narrow[i][lane], expected, 5e-7, std::fabs(term) + std::fabs(bias[lane]));
                 }
-                ensure_equals("dequantize_u16x3 w is bias", narrow[i][3], bias[3]);
+                CAPTURE(n, i);
+                REQUIRE(narrow[i][3] == bias[3]);
             }
-            ensure_same_bits("dequantize_u16x3 writes within n", narrow[n], SENTINEL);
+            require_same_bits("dequantize_u16x3 writes within n", narrow[n], SENTINEL);
 
             for_each_width([&]<class W>(const char* width)
             {
@@ -399,7 +392,8 @@ namespace
                 dequantize_u16x3_impl<W>(bytes.data(), n, scale, bias, dst.data());
                 for (size_t i = 0; i <= n; ++i)
                 {
-                    ensure_same_bits(std::string("dequantize_u16x3 ") + width + " n " + std::to_string(n) + " at " + std::to_string(i), dst[i], narrow[i]);
+                    CAPTURE(width, n, i);
+                    require_same_bits("dequantize_u16x3", dst[i], narrow[i]);
                 }
             });
         }
@@ -407,8 +401,7 @@ namespace
 
     // Two 16-bit values per vertex, two vertices per vector, the odd tail's
     // upper pair at bias.
-    template<> template<>
-    void alsimdkernels_object::test<6>()
+    TEST_CASE("alsimdkernels: dequantize_u16x2 packs two vertices a vector and an odd tail at bias", "[alsimdkernels]")
     {
         std::mt19937 rng(6);
         std::uniform_int_distribution<int> any(0, 65535);
@@ -436,22 +429,24 @@ namespace
                 {
                     const double term = (double)values[2 * i + lane] * scale[base + lane];
                     const double expected = term + bias[base + lane];
-                    ensure_close("dequantize_u16x2 n " + std::to_string(n) + " at " + std::to_string(i) + " lane " + std::to_string(lane), v[base + lane], expected, 5e-7, std::fabs(term) + std::fabs(bias[base + lane]));
+                    CAPTURE(n, i, lane);
+                    require_close("dequantize_u16x2", v[base + lane], expected, 5e-7, std::fabs(term) + std::fabs(bias[base + lane]));
                 }
             }
             if (n & 1)
             {
-                ensure_equals("odd tail upper u is bias", dst[vectors - 1][2], bias[2]);
-                ensure_equals("odd tail upper v is bias", dst[vectors - 1][3], bias[3]);
+                UNSCOPED_INFO("odd tail upper u is bias");
+                REQUIRE(dst[vectors - 1][2] == bias[2]);
+                UNSCOPED_INFO("odd tail upper v is bias");
+                REQUIRE(dst[vectors - 1][3] == bias[3]);
             }
-            ensure_same_bits("dequantize_u16x2 writes within its vectors", dst[vectors], SENTINEL);
+            require_same_bits("dequantize_u16x2 writes within its vectors", dst[vectors], SENTINEL);
         }
     }
 
     // The skinning blend against a double reference, and the skinned points
     // against the blend and two transforms done one at a time.
-    template<> template<>
-    void alsimdkernels_object::test<7>()
+    TEST_CASE("alsimdkernels: skin_blend against double and skin_points against two transforms", "[alsimdkernels]")
     {
         constexpr U32 JOINTS = 6;
         LLMatrix4a palette[JOINTS];
@@ -497,7 +492,8 @@ namespace
                 {
                     expected += frac[k] / sum * palette[idx[k]].getF32ptr()[e];
                 }
-                ensure_close("skin_blend element " + std::to_string(e) + " of " + precise(w[0]), got[e], expected, 2e-6, 100.0);
+                INFO("element " << e << " of " << precise(w[0]));
+                require_close("skin_blend", got[e], expected, 2e-6, 100.0);
             }
 
             for_each_width([&]<class W>(const char* width)
@@ -506,7 +502,8 @@ namespace
                 skin_blend_impl<W>(w, palette, JOINTS, wide);
                 for (int r = 0; r < 4; ++r)
                 {
-                    ensure_same_bits(std::string("skin_blend ") + width + " row " + std::to_string(r), wide.mMatrix[r], narrow.mMatrix[r]);
+                    CAPTURE(width, r);
+                    require_same_bits("skin_blend", wide.mMatrix[r], narrow.mMatrix[r]);
                 }
             });
         }
@@ -536,7 +533,8 @@ namespace
                 skin_points_impl<W>(vertex_weights.data(), palette, JOINTS, bind, src.data(), dst.data(), n);
                 for (size_t i = 0; i <= n; ++i)
                 {
-                    ensure_same_bits(std::string("skin_points ") + width + " n " + std::to_string(n) + " at " + std::to_string(i), dst[i], expected[i]);
+                    CAPTURE(width, n, i);
+                    require_same_bits("skin_points", dst[i], expected[i]);
                 }
             });
         }
@@ -544,8 +542,7 @@ namespace
 
     // Extents against the scalar minimum and maximum, bit for bit, every
     // count and width; an empty range leaves them alone.
-    template<> template<>
-    void alsimdkernels_object::test<8>()
+    TEST_CASE("alsimdkernels: extents against the scalar minimum and maximum bit for bit", "[alsimdkernels]")
     {
         for (size_t n : COUNTS)
         {
@@ -566,13 +563,15 @@ namespace
                 extents_impl<W>(src.data(), n, lo, hi);
                 if (n == 0)
                 {
-                    ensure_same_bits(std::string("extents ") + width + " of nothing leaves min", lo, SENTINEL);
-                    ensure_same_bits(std::string("extents ") + width + " of nothing leaves max", hi, SENTINEL);
+                    CAPTURE(width);
+                    require_same_bits("extents of nothing leaves min", lo, SENTINEL);
+                    require_same_bits("extents of nothing leaves max", hi, SENTINEL);
                 }
                 else
                 {
-                    ensure_same_bits(std::string("extents ") + width + " min n " + std::to_string(n), lo, expected_min);
-                    ensure_same_bits(std::string("extents ") + width + " max n " + std::to_string(n), hi, expected_max);
+                    CAPTURE(width, n);
+                    require_same_bits("extents min", lo, expected_min);
+                    require_same_bits("extents max", hi, expected_max);
                 }
             });
         }
@@ -584,8 +583,7 @@ namespace
     // fast estimate's twelve bits, since one ulp of input can cross a step
     // of its table. With and without a mask and clothing weights, a
     // degenerate binormal delta included.
-    template<> template<>
-    void alsimdkernels_object::test<9>()
+    TEST_CASE("alsimdkernels: morph_apply against the loop it replaces", "[alsimdkernels]")
     {
         constexpr size_t MORPH = 37;
         constexpr size_t MESH = 50;
@@ -696,20 +694,22 @@ namespace
             apply.tex_coords = got.tex.data();
             morph_apply_impl(apply);
 
-            const std::string tag = " variant " + std::to_string(variant);
+            CAPTURE(variant);
             for (size_t v = 0; v < MESH; ++v)
             {
+                CAPTURE(v);
                 for (int lane = 0; lane < 4; ++lane)
                 {
-                    ensure_close("coords" + tag + " at " + std::to_string(v), got.coords[v][lane], expected.coords[v][lane], 2e-6, 4.0);
-                    ensure_close("scaled normals" + tag, got.scaled_normals[v][lane], expected.scaled_normals[v][lane], 2e-6, 4.0);
-                    ensure_close("normals" + tag, got.normals[v][lane], expected.normals[v][lane], 6e-4, 1.0);
-                    ensure_close("scaled binormals" + tag, got.scaled_binormals[v][lane], expected.scaled_binormals[v][lane], 2e-6, 4.0);
-                    ensure_close("binormals" + tag, got.binormals[v][lane], expected.binormals[v][lane], 6e-4, 1.0);
-                    ensure_close("clothing" + tag, got.clothing[v][lane], expected.clothing[v][lane], 2e-6, 4.0);
+                    CAPTURE(lane);
+                    require_close("coords", got.coords[v][lane], expected.coords[v][lane], 2e-6, 4.0);
+                    require_close("scaled normals", got.scaled_normals[v][lane], expected.scaled_normals[v][lane], 2e-6, 4.0);
+                    require_close("normals", got.normals[v][lane], expected.normals[v][lane], 6e-4, 1.0);
+                    require_close("scaled binormals", got.scaled_binormals[v][lane], expected.scaled_binormals[v][lane], 2e-6, 4.0);
+                    require_close("binormals", got.binormals[v][lane], expected.binormals[v][lane], 6e-4, 1.0);
+                    require_close("clothing", got.clothing[v][lane], expected.clothing[v][lane], 2e-6, 4.0);
                 }
-                ensure_close("tex u" + tag, got.tex[v].mV[0], expected.tex[v].mV[0], 2e-6, 4.0);
-                ensure_close("tex v" + tag, got.tex[v].mV[1], expected.tex[v].mV[1], 2e-6, 4.0);
+                require_close("tex u", got.tex[v].mV[0], expected.tex[v].mV[0], 2e-6, 4.0);
+                require_close("tex v", got.tex[v].mV[1], expected.tex[v].mV[1], 2e-6, 4.0);
             }
         }
     }
@@ -718,8 +718,7 @@ namespace
     // is a denormal float; under the flush-to-zero mode the render thread
     // runs in it has to come through every width and the public entry
     // untouched.
-    template<> template<>
-    void alsimdkernels_object::test<10>()
+    TEST_CASE("alsimdkernels: a denormal texture index in w survives flush-to-zero", "[alsimdkernels]")
     {
         FPModeRestorer restore_fp_mode;
         set_thread_fp_mode();
@@ -736,8 +735,8 @@ namespace
                     transform_impl<W, true, W_LANE::SET>(m, src.data(), dst.data(), n, w);
                     for (size_t i = 0; i < n; ++i)
                     {
-                        ensure_equals(std::string("index in w ") + width + " index " + std::to_string(index) + " n " + std::to_string(n) + " at " + std::to_string(i),
-                                      std::bit_cast<S32>(dst[i][3]), index);
+                        CAPTURE(width, index, n, i);
+                        REQUIRE(std::bit_cast<S32>(dst[i][3]) == index);
                     }
                 });
 
@@ -745,8 +744,9 @@ namespace
                 alsimd::transform_points(m, src.data(), dst.data(), n, w);
                 for (size_t i = 0; i < n; ++i)
                 {
-                    ensure_equals("index in w through the library index " + std::to_string(index) + " n " + std::to_string(n) + " at " + std::to_string(i),
-                                  std::bit_cast<S32>(dst[i][3]), index);
+                    INFO("through the library");
+                    CAPTURE(index, n, i);
+                    REQUIRE(std::bit_cast<S32>(dst[i][3]) == index);
                 }
             }
         }

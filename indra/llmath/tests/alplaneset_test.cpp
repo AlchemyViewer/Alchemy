@@ -30,7 +30,7 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "../llmath.h"
 #include "../llsimdmath.h"
 #include "../llvector4a.h"
@@ -41,8 +41,6 @@
 #include <random>
 #include <string>
 
-namespace tut
-{
 namespace
 {
     // A camera at the origin looking down +X, with a frustum from the
@@ -95,11 +93,8 @@ namespace
         boxes.push_back(near_touch);
         return boxes;
     }
-}
-} // namespace tut
+} // anonymous namespace
 
-namespace tut
-{
 namespace
 {
     struct alplaneset_data
@@ -122,89 +117,97 @@ namespace
             return no_far ? mCamera.AABBInFrustumNoFarClip(b.center, b.radius, planes) : mCamera.AABBInFrustum(b.center, b.radius, planes);
         }
     };
-    typedef test_group<alplaneset_data> alplaneset_test;
-    typedef alplaneset_test::object alplaneset_object;
-    tut::alplaneset_test alplaneset_testcase("ALPlaneSet");
-}
 
     // An empty set contains everything; a set with one plane splits space.
-    template<> template<>
-    void alplaneset_object::test<1>()
+    TEST_CASE_METHOD(alplaneset_data, "ALPlaneSet: an empty set contains everything and one plane splits space", "[ALPlaneSet]")
     {
         ALPlaneSet empty;
         const LLVector4a somewhere(1e6f, -1e6f, 3.f, 0.f);
         const LLVector4a big(1e5f, 1e5f, 1e5f, 0.f);
-        ensure_equals("nothing is outside an empty set", empty.aabbTest(somewhere, big), 2);
+        UNSCOPED_INFO("nothing is outside an empty set");
+        CHECK(empty.aabbTest(somewhere, big) == 2);
 
         // x <= 10 is inside: normal +x, constant -10
         ALPlaneSet one;
         LLPlane plane(LLVector3(10.f, 0.f, 0.f), LLVector3(1.f, 0.f, 0.f));
         one.set(3, plane, plane.calcPlaneMask());
-        ensure_equals("well inside", one.aabbTest(LLVector4a(0.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f)), 2);
-        ensure_equals("well outside", one.aabbTest(LLVector4a(20.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f)), 0);
-        ensure_equals("straddling", one.aabbTest(LLVector4a(10.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f)), 1);
-        ensure_equals("the skipped lane does not count", one.aabbTest(LLVector4a(20.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f), 3), 2);
+        UNSCOPED_INFO("well inside");
+        CHECK(one.aabbTest(LLVector4a(0.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f)) == 2);
+        UNSCOPED_INFO("well outside");
+        CHECK(one.aabbTest(LLVector4a(20.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f)) == 0);
+        UNSCOPED_INFO("straddling");
+        CHECK(one.aabbTest(LLVector4a(10.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f)) == 1);
+        UNSCOPED_INFO("the skipped lane does not count");
+        CHECK(one.aabbTest(LLVector4a(20.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f), 3) == 2);
         one.disable(3);
-        ensure_equals("a disabled lane does not count", one.aabbTest(LLVector4a(20.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f)), 2);
+        UNSCOPED_INFO("a disabled lane does not count");
+        CHECK(one.aabbTest(LLVector4a(20.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f)) == 2);
     }
 
     // The camera's set against its loop, over thousands of boxes, with and
     // without the far plane.
-    template<> template<>
-    void alplaneset_object::test<2>()
+    TEST_CASE_METHOD(alplaneset_data, "ALPlaneSet: the camera's set agrees with its loop with and without the far plane", "[ALPlaneSet]")
     {
         int outside = 0, crossing = 0, inside = 0;
         for (const Box& b : some_boxes(2, FAR_X))
         {
+            CAPTURE(b.center);
             const S32 expected = by_loop(b);
             const S32 got = mCamera.AABBInFrustum(b.center, b.radius);
-            ensure_equals("AABBInFrustum at " + std::to_string(b.center[0]) + " " + std::to_string(b.center[1]) + " " + std::to_string(b.center[2]), got, expected);
+            REQUIRE(got == expected);
             outside += expected == 0;
             crossing += expected == 1;
             inside += expected == 2;
 
             const S32 expected_no_far = by_loop(b, true);
-            ensure_equals("AABBInFrustumNoFarClip at " + std::to_string(b.center[0]), mCamera.AABBInFrustumNoFarClip(b.center, b.radius), expected_no_far);
+            REQUIRE(mCamera.AABBInFrustumNoFarClip(b.center, b.radius) == expected_no_far);
         }
-        ensure("the boxes fell on every side: " + std::to_string(outside) + " " + std::to_string(crossing) + " " + std::to_string(inside),
-               outside > 100 && crossing > 100 && inside > 100);
+        CHECK(outside > 100);
+        CHECK(crossing > 100);
+        CHECK(inside > 100);
 
         // the obvious three
-        ensure_equals("a box in the middle is inside", mCamera.AABBInFrustum(LLVector4a(50.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f)), 2);
-        ensure_equals("a box behind the camera is outside", mCamera.AABBInFrustum(LLVector4a(-50.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f)), 0);
-        ensure_equals("a box across the far plane crosses", mCamera.AABBInFrustum(LLVector4a(FAR_X, 0.f, 0.f), LLVector4a(5.f, 5.f, 5.f)), 1);
-        ensure_equals("and is inside without the far plane", mCamera.AABBInFrustumNoFarClip(LLVector4a(FAR_X, 0.f, 0.f), LLVector4a(5.f, 5.f, 5.f)), 2);
+        UNSCOPED_INFO("a box in the middle is inside");
+        CHECK(mCamera.AABBInFrustum(LLVector4a(50.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f)) == 2);
+        UNSCOPED_INFO("a box behind the camera is outside");
+        CHECK(mCamera.AABBInFrustum(LLVector4a(-50.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f)) == 0);
+        UNSCOPED_INFO("a box across the far plane crosses");
+        CHECK(mCamera.AABBInFrustum(LLVector4a(FAR_X, 0.f, 0.f), LLVector4a(5.f, 5.f, 5.f)) == 1);
+        UNSCOPED_INFO("and is inside without the far plane");
+        CHECK(mCamera.AABBInFrustumNoFarClip(LLVector4a(FAR_X, 0.f, 0.f), LLVector4a(5.f, 5.f, 5.f)) == 2);
     }
 
     // A user clip plane joins the set when enabled and leaves it when
     // disabled; an ignored plane leaves it.
-    template<> template<>
-    void alplaneset_object::test<3>()
+    TEST_CASE_METHOD(alplaneset_data, "ALPlaneSet: user clip planes join and leave the set and ignored planes leave it", "[ALPlaneSet]")
     {
         // z <= 5 is inside
         LLPlane clip(LLVector3(0.f, 0.f, 5.f), LLVector3(0.f, 0.f, 1.f));
         mCamera.setUserClipPlane(clip);
         const Box above = {LLVector4a(50.f, 0.f, 20.f, 0.f), LLVector4a(1.f, 1.f, 1.f, 0.f)};
-        ensure_equals("above the clip plane is outside", mCamera.AABBInFrustum(above.center, above.radius), 0);
-        ensure_equals("and the loop agrees", by_loop(above), 0);
+        UNSCOPED_INFO("above the clip plane is outside");
+        CHECK(mCamera.AABBInFrustum(above.center, above.radius) == 0);
+        CHECK(by_loop(above) == 0);
         for (const Box& b : some_boxes(3, FAR_X))
         {
-            ensure_equals("with the clip plane", mCamera.AABBInFrustum(b.center, b.radius), by_loop(b));
+            CAPTURE(b.center);
+            REQUIRE(mCamera.AABBInFrustum(b.center, b.radius) == by_loop(b));
         }
 
         mCamera.disableUserClipPlane();
-        ensure_equals("above the disabled clip plane is inside", mCamera.AABBInFrustum(above.center, above.radius), 2);
-        ensure_equals("and the loop agrees", by_loop(above), 2);
+        UNSCOPED_INFO("above the disabled clip plane is inside");
+        CHECK(mCamera.AABBInFrustum(above.center, above.radius) == 2);
+        CHECK(by_loop(above) == 2);
 
         mCamera.ignoreAgentFrustumPlane(LLCamera::AGENT_PLANE_FAR);
         const Box beyond = {LLVector4a(FAR_X + 50.f, 0.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f, 0.f)};
-        ensure_equals("beyond an ignored far plane is inside", mCamera.AABBInFrustum(beyond.center, beyond.radius), 2);
-        ensure_equals("and the loop agrees", by_loop(beyond), 2);
+        UNSCOPED_INFO("beyond an ignored far plane is inside");
+        CHECK(mCamera.AABBInFrustum(beyond.center, beyond.radius) == 2);
+        CHECK(by_loop(beyond) == 2);
     }
 
     // The region set is the agent set shifted, far plane aside.
-    template<> template<>
-    void alplaneset_object::test<4>()
+    TEST_CASE_METHOD(alplaneset_data, "ALPlaneSet: the region set is the agent set shifted apart from the far plane", "[ALPlaneSet]")
     {
         const LLVector3 shift(-256.f, 128.f, 30.f);
         mCamera.calcRegionFrustumPlanes(shift, FAR_X);
@@ -212,41 +215,45 @@ namespace
         {
             Box in_agent = b;
             in_agent.center.set(b.center[0] + shift.mV[0], b.center[1] + shift.mV[1], b.center[2] + shift.mV[2], 0.f);
-            ensure_equals("AABBInRegionFrustumNoFarClip at " + std::to_string(b.center[0]),
-                          mCamera.AABBInRegionFrustumNoFarClip(b.center, b.radius), by_loop(in_agent, true));
+            CAPTURE(b.center);
+            REQUIRE(mCamera.AABBInRegionFrustumNoFarClip(b.center, b.radius) == by_loop(in_agent, true));
         }
-        ensure_equals("a region box past the region far clip is outside",
-                      mCamera.AABBInRegionFrustum(LLVector4a(FAR_X + 50.f - shift.mV[0], -shift.mV[1], -shift.mV[2], 0.f), LLVector4a(1.f, 1.f, 1.f)), 0);
+        UNSCOPED_INFO("a region box past the region far clip is outside");
+        CHECK(mCamera.AABBInRegionFrustum(LLVector4a(FAR_X + 50.f - shift.mV[0], -shift.mV[1], -shift.mV[2], 0.f), LLVector4a(1.f, 1.f, 1.f)) == 0);
     }
 
     // A plane replaced one at a time, the way the shadow passes move the
     // near plane back behind the casters, is what the set tests against.
-    template<> template<>
-    void alplaneset_object::test<5>()
+    TEST_CASE_METHOD(alplaneset_data, "ALPlaneSet: setAgentPlane replaces a plane the set tests against", "[ALPlaneSet]")
     {
         // between the eye and the near plane, within the side planes
         const Box behind = {LLVector4a(0.5f, 0.f, 0.f, 0.f), LLVector4a(0.1f, 0.1f, 0.1f, 0.f)};
-        ensure_equals("behind the near plane is outside", mCamera.AABBInFrustum(behind.center, behind.radius), 0);
+        UNSCOPED_INFO("behind the near plane is outside");
+        CHECK(mCamera.AABBInFrustum(behind.center, behind.radius) == 0);
 
         // the near plane moved back to x = -50, still facing back
         LLPlane moved(LLVector3(-50.f, 0.f, 0.f), LLVector3(-1.f, 0.f, 0.f));
         mCamera.setAgentPlane(LLCamera::AGENT_PLANE_NEAR, moved);
-        ensure("the plane reads back", mCamera.getAgentPlane(LLCamera::AGENT_PLANE_NEAR).equal(moved));
-        ensure_equals("behind the old near plane is now inside", mCamera.AABBInFrustum(behind.center, behind.radius), 2);
-        ensure_equals("and the loop agrees", by_loop(behind), 2);
+        CHECK(mCamera.getAgentPlane(LLCamera::AGENT_PLANE_NEAR).equal(moved));
+        UNSCOPED_INFO("behind the old near plane is now inside");
+        CHECK(mCamera.AABBInFrustum(behind.center, behind.radius) == 2);
+        CHECK(by_loop(behind) == 2);
         for (const Box& b : some_boxes(5, FAR_X))
         {
-            ensure_equals("with the near plane moved", mCamera.AABBInFrustum(b.center, b.radius), by_loop(b));
-            ensure_equals("with the near plane moved, far ignored", mCamera.AABBInFrustumNoFarClip(b.center, b.radius), by_loop(b, true));
+            CAPTURE(b.center);
+            REQUIRE(mCamera.AABBInFrustum(b.center, b.radius) == by_loop(b));
+            REQUIRE(mCamera.AABBInFrustumNoFarClip(b.center, b.radius) == by_loop(b, true));
         }
 
         // a plane facing the other way takes its octant with it: x >= 50 is now outside
         LLPlane flipped(LLVector3(50.f, 0.f, 0.f), LLVector3(1.f, 0.f, 0.f));
         mCamera.setAgentPlane(LLCamera::AGENT_PLANE_NEAR, flipped);
         const Box straddling = {LLVector4a(50.f, 0.f, 0.f, 0.f), LLVector4a(2.f, 1.f, 1.f, 0.f)};
-        ensure_equals("a box across the flipped plane is partly in", mCamera.AABBInFrustum(straddling.center, straddling.radius), 1);
-        ensure_equals("and the loop agrees", by_loop(straddling), 1);
-        ensure_equals("beyond the flipped plane is outside", mCamera.AABBInFrustum(LLVector4a(70.f, 0.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f, 0.f)), 0);
-        ensure_equals("and the loop agrees", by_loop({LLVector4a(70.f, 0.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f, 0.f)}), 0);
+        UNSCOPED_INFO("a box across the flipped plane is partly in");
+        CHECK(mCamera.AABBInFrustum(straddling.center, straddling.radius) == 1);
+        CHECK(by_loop(straddling) == 1);
+        UNSCOPED_INFO("beyond the flipped plane is outside");
+        CHECK(mCamera.AABBInFrustum(LLVector4a(70.f, 0.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f, 0.f)) == 0);
+        CHECK(by_loop({LLVector4a(70.f, 0.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f, 0.f)}) == 0);
     }
 }

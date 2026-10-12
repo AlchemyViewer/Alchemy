@@ -21,6 +21,7 @@ set(
   AL_BUILD_APPEARANCE_UTILITY
   AL_BUILD_TESTS
   AL_ENABLE_GL_TESTS
+  AL_TEST_PER_CASE
   AL_BUILD_DOCS
   AL_VCPKG_INSTALL
   AL_BUILD_DULLAHAN_EXAMPLE
@@ -346,11 +347,14 @@ function(al_configuration_report)
 
   if(AL_BUILD_TESTS)
     _al_count_tests("${INDRA_SOURCE_DIR}" test_count)
-    if(AL_ENABLE_GL_TESTS)
-      _al_report_row("Tests" "on, ${test_count} registered")
-    else()
-      _al_report_row("Tests" "on, ${test_count} registered; the GL suites disabled")
+    set(tests "on, ${test_count} registered")
+    if(NOT AL_ENABLE_GL_TESTS)
+      string(APPEND tests "; the GL suites disabled")
     endif()
+    if(AL_TEST_PER_CASE)
+      string(APPEND tests "; Catch2 test cases one entry each, found when ctest runs")
+    endif()
+    _al_report_row("Tests" "${tests}")
   else()
     _al_report_row("Tests" "off")
   endif()

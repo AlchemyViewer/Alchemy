@@ -103,42 +103,54 @@ target_precompile_headers(llmath REUSE_FROM llprecompiled)
 
 # Add tests
 if(AL_BUILD_TESTS)
-  # Each links the library rather than compiling a copy of the file it
-  # tests, so the code under test is the code the viewer runs.
-  foreach(
-    test
-    llbboxlocal
-    llmodularmath
-    llrect
-    v2math
-    v3color
-    v4color
-    v4coloru
-    alignment
-    alplaneset
-    llsdutil_math
-    mathmisc
-    m3math
-    llmatrix3a
-    llmatrix4a
-    llvector4a
-    llbbox
-    llquaternion
-    llquaternion2
-    v3dmath
-    v3math
-    v4math
-    xform
+  # One Catch2 binary for llmath's tests, each test file run in a process of
+  # its own. Each links the library rather than compiling a copy of the file
+  # it tests, so the code under test is the code the viewer runs.
+  al_add_test_binary(
+    llmath_tests
+    PROJECT llmath
+    SOURCES
+      tests/alignment_test.cpp
+      tests/alplaneset_test.cpp
+      tests/alsimdkernels_test.cpp
+      tests/llbbox_test.cpp
+      tests/llbboxlocal_test.cpp
+      tests/llmatrix3a_test.cpp
+      tests/llmatrix4a_test.cpp
+      tests/llmodularmath_test.cpp
+      tests/llquaternion2_test.cpp
+      tests/llquaternion_test.cpp
+      tests/llrect_test.cpp
+      tests/llsdutil_math_test.cpp
+      tests/llvector4a_test.cpp
+      tests/m3math_test.cpp
+      tests/mathmisc_test.cpp
+      tests/v2math_test.cpp
+      tests/v3color_test.cpp
+      tests/v3dmath_test.cpp
+      tests/v3math_test.cpp
+      tests/v4color_test.cpp
+      tests/v4coloru_test.cpp
+      tests/v4math_test.cpp
+      tests/xform_test.cpp
+    LIBRARIES llmath llcommon
   )
-    al_add_test(${test} PROJECT llmath LIBRARIES llmath llcommon)
-  endforeach()
 
-  # The batch kernels at every width, at the tree's tier and, where the
-  # tiers differ, at each of them; a variant the host cannot run skips.
-  al_add_test(alsimdkernels PROJECT llmath LIBRARIES llmath llcommon)
+  # The batch kernels again at each other x86-64 tier, one binary a tier: code
+  # the linker folds across files would otherwise run one tier's instructions
+  # in another's test. The tree's own tier is llmath_tests'; a variant the
+  # host cannot run skips.
   if(BUILD_TARGET_IS_X86_64 AND NOT DARWIN)
     foreach(tier baseline v2 v3 v4)
-      al_add_test(alsimdkernels PROJECT llmath LIBRARIES llmath llcommon ISA_TIER ${tier})
+      if(NOT tier STREQUAL AL_ISA_TIER)
+        al_add_test_binary(
+          simd_tests
+          PROJECT llmath
+          SOURCES tests/alsimdkernels_test.cpp
+          LIBRARIES llmath llcommon
+          ISA_TIER ${tier}
+        )
+      endif()
     endforeach()
   endif()
 

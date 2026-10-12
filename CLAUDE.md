@@ -57,10 +57,12 @@ The viewer executable lands at `build-<OS>-<preset>/newview/<CONFIG>/` (e.g., `S
 Tests are off by default. To enable: add `-DAL_BUILD_TESTS=ON` to the configure command. Then run via CTest:
 
 ```
-ctest --test-dir build-<OS>-<preset> --output-on-failure
+ctest --test-dir build-<OS>-<preset> --output-on-failure -LE manual
 ```
 
-Unit tests live alongside the library they test in `indra/<library>/tests/` directories. The test framework is TUT (Template Unit Test). Test targets are defined by the `LL_ADD_PROJECT_UNIT_TESTS` macro in `indra/cmake/LLAddBuildTest.cmake`. Integration tests are in `indra/integration_tests/`.
+`-LE manual` leaves out the benchmarks and the pending one-process runs of Catch2 binaries (label `combined_pending`), as the build's own test target does.
+
+Unit tests live alongside the library they test in `indra/<library>/tests/` directories. They are moving from TUT (Template Unit Test) to Catch2 a library at a time. TUT test targets are defined by the `LL_ADD_PROJECT_UNIT_TESTS` macro in `indra/cmake/LLAddBuildTest.cmake`; a converted library builds its files into one Catch2 binary with `al_add_test_binary` (`indra/cmake/ALAddTestBinary.cmake`), on the harness in `indra/test/`. Integration tests are in `indra/integration_tests/`.
 
 ## Architecture
 

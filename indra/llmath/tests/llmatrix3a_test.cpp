@@ -30,7 +30,7 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "../llmath.h"
 #include "../llsimdmath.h"
 #include "../llvector4a.h"
@@ -41,22 +41,12 @@
 
 #include <bit>
 #include <cmath>
-#include <cstdio>
 #include <limits>
 #include <string>
 #include <vector>
 
-namespace tut
-{
 namespace
 {
-    std::string precise(double v)
-    {
-        char buffer[32];
-        std::snprintf(buffer, sizeof(buffer), "%.9g", v);
-        return buffer;
-    }
-
     // The 3x3 as doubles, m[row][col]
     struct Rows
     {
@@ -76,17 +66,17 @@ namespace
         return r;
     }
 
-    void ensure_rows(const std::string& what, const LLMatrix3a& got, const Rows& expected, double tolerance)
+    void require_rows_near(const std::string& what, const LLMatrix3a& got, const Rows& expected, double tolerance)
     {
+        INFO(what);
         for (int row = 0; row < 3; ++row)
         {
             for (int col = 0; col < 3; ++col)
             {
                 const double g = got.getRow(row)[col];
                 const double e = expected.m[row][col];
-                ensure(what + " row " + std::to_string(row) + " column " + std::to_string(col) + ": " +
-                           precise(g) + " vs " + precise(e),
-                       std::fabs(g - e) <= tolerance * llmax(1.0, std::fabs(e)));
+                CAPTURE(row, col, g, e);
+                REQUIRE(std::fabs(g - e) <= tolerance * llmax(1.0, std::fabs(e)));
             }
         }
     }
@@ -143,48 +133,39 @@ namespace
         LLQuaternion(0.9f, LLVector3(0.577f, 0.577f, 0.577f)),
         LLQuaternion(3.14159f, LLVector3(-0.3f, 0.8f, 0.5f)),
     };
-}
-} // namespace tut
+} // anonymous namespace
 
-namespace tut
-{
 namespace
 {
-    struct llmatrix3a_data
-    {
-    };
-    typedef test_group<llmatrix3a_data> llmatrix3a_test;
-    typedef llmatrix3a_test::object llmatrix3a_object;
-    tut::llmatrix3a_test llmatrix3a_testcase("LLMatrix3a");
-}
-
     // Plain data of three registers; the identity; set and get by row and
     // by column.
-    template<> template<>
-    void llmatrix3a_object::test<1>()
+    TEST_CASE("LLMatrix3a: plain data of three registers; the identity; rows and columns", "[LLMatrix3a]")
     {
-        ensure_equals("sizeof LLMatrix3a", sizeof(LLMatrix3a), (size_t)48);
-        ensure_equals("alignof LLMatrix3a", alignof(LLMatrix3a), (size_t)16);
-        ensure_equals("sizeof LLRotation", sizeof(LLRotation), (size_t)48);
-        ensure("trivially copyable", std::is_trivially_copyable<LLRotation>::value);
+        CHECK(sizeof(LLMatrix3a) == (size_t)48);
+        CHECK(alignof(LLMatrix3a) == (size_t)16);
+        CHECK(sizeof(LLRotation) == (size_t)48);
+        CHECK(std::is_trivially_copyable<LLRotation>::value);
 
         const LLMatrix3a& identity = LLMatrix3a::getIdentity();
         for (int row = 0; row < 3; ++row)
         {
             for (int col = 0; col < 3; ++col)
             {
-                ensure_equals("identity", identity.getRow(row)[col], row == col ? 1.f : 0.f);
+                CAPTURE(row, col);
+                REQUIRE(identity.getRow(row)[col] == (row == col ? 1.f : 0.f));
             }
         }
 
         const LLMatrix3a m = odd_matrix();
-        ensure_equals("getRow 1 y", m.getRow(1)[1], 5.5f);
-        ensure_equals("getRow 2 w", m.getRow(2)[3], 300.f);
-        ensure("getRow<N> is getRow(N)", same_bits(m.getRow<0>(), m.getRow(0)) && same_bits(m.getRow<1>(), m.getRow(1)) && same_bits(m.getRow<2>(), m.getRow(2)));
+        CHECK(m.getRow(1)[1] == 5.5f);
+        CHECK(m.getRow(2)[3] == 300.f);
+        CHECK(same_bits(m.getRow<0>(), m.getRow(0)));
+        CHECK(same_bits(m.getRow<1>(), m.getRow(1)));
+        CHECK(same_bits(m.getRow<2>(), m.getRow(2)));
 
         LLMatrix3a by_rows;
         by_rows.setRows(m.getRow<0>(), m.getRow<1>(), m.getRow<2>());
-        ensure("setRows", same_bits(by_rows, m));
+        CHECK(same_bits(by_rows, m));
 
         LLMatrix3a by_columns;
         by_columns.setColumns(m.getRow<0>(), m.getRow<1>(), m.getRow<2>());
@@ -192,14 +173,13 @@ namespace
         {
             for (int col = 0; col < 3; ++col)
             {
-                ensure_equals("setColumns is the transpose of setRows", by_columns.getRow(row)[col], m.getRow(col)[row]);
+                CAPTURE(row, col);
+                REQUIRE(by_columns.getRow(row)[col] == m.getRow(col)[row]);
             }
         }
     }
 
-    // loadu takes the scalar matrix row by row.
-    template<> template<>
-    void llmatrix3a_object::test<2>()
+    TEST_CASE("LLMatrix3a: loadu takes the scalar matrix row by row", "[LLMatrix3a]")
     {
         const F32 values[9] = {1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f};
         const LLMatrix3 m3(values);
@@ -207,18 +187,19 @@ namespace
         m.loadu(m3);
         for (int i = 0; i < 3; ++i)
         {
+            CAPTURE(i);
             for (int j = 0; j < 3; ++j)
             {
-                ensure_equals("loadu", m.getRow(i)[j], m3.mMatrix[i][j]);
+                CAPTURE(j);
+                REQUIRE(m.getRow(i)[j] == m3.mMatrix[i][j]);
             }
-            ensure_equals("loadu w is zero", m.getRow(i)[3], 0.f);
+            REQUIRE(m.getRow(i)[3] == 0.f);
         }
     }
 
     // The transpose swaps rows and columns, twice is the identity, and
     // the fourth lanes are what the header says they are.
-    template<> template<>
-    void llmatrix3a_object::test<3>()
+    TEST_CASE("LLMatrix3a: setTranspose swaps rows and columns and twice gives the matrix back", "[LLMatrix3a]")
     {
         const LLMatrix3a m = odd_matrix();
         LLMatrix3a t;
@@ -227,26 +208,26 @@ namespace
         {
             for (int col = 0; col < 3; ++col)
             {
-                ensure_equals("setTranspose", t.getRow(row)[col], m.getRow(col)[row]);
+                CAPTURE(row, col);
+                REQUIRE(t.getRow(row)[col] == m.getRow(col)[row]);
             }
         }
-        ensure_equals("transpose row 0 w", t.getRow(0)[3], m.getRow(2)[1]);
-        ensure_equals("transpose row 1 w", t.getRow(1)[3], m.getRow(2)[0]);
-        ensure_equals("transpose row 2 w", t.getRow(2)[3], m.getRow(2)[0]);
+        CHECK(t.getRow(0)[3] == m.getRow(2)[1]);
+        CHECK(t.getRow(1)[3] == m.getRow(2)[0]);
+        CHECK(t.getRow(2)[3] == m.getRow(2)[0]);
 
         LLMatrix3a back;
         back.setTranspose(t);
-        ensure("transpose twice", same_bits3(back, m));
+        CHECK(same_bits3(back, m));
 
         // in place
         LLMatrix3a self = m;
         self.setTranspose(self);
-        ensure("setTranspose in place", same_bits(self, t));
+        CHECK(same_bits(self, t));
     }
 
     // rotate is the scalar type's v * M, and setRotated is rotate.
-    template<> template<>
-    void llmatrix3a_object::test<4>()
+    TEST_CASE("LLMatrix3a: rotate is the scalar type's v * M and setRotated is rotate", "[LLMatrix3a]")
     {
         const LLMatrix3a m = odd_matrix();
         const Rows r = rows_of(m);
@@ -257,20 +238,20 @@ namespace
         for (int col = 0; col < 3; ++col)
         {
             const double expected = v[0] * r.m[0][col] + v[1] * r.m[1][col] + v[2] * r.m[2][col];
-            ensure("rotate lane " + std::to_string(col) + ": " + precise(rotated[col]) + " vs " + precise(expected),
-                   std::fabs(rotated[col] - expected) <= 1e-6 * llmax(1.0, std::fabs(expected)));
+            CAPTURE(col, rotated[col], expected);
+            REQUIRE(std::fabs(rotated[col] - expected) <= 1e-6 * llmax(1.0, std::fabs(expected)));
         }
 
         LLRotation rot;
         rot.setRows(m.getRow<0>(), m.getRow<1>(), m.getRow<2>());
         LLVector4a set_rotated;
         set_rotated.setRotated(rot, v);
-        ensure("setRotated is rotate", same_bits(set_rotated, rotated));
+        CHECK(same_bits(set_rotated, rotated));
 
         // in place
         LLVector4a self = v;
         m.rotate(self, self);
-        ensure("rotate in place", same_bits(self, rotated));
+        CHECK(same_bits(self, rotated));
 
         for (const LLQuaternion& q : ROTATIONS)
         {
@@ -281,15 +262,14 @@ namespace
             const LLVector3 expected = v3 * m3;
             LLVector4a got;
             a.rotate(v, got);
-            ensure("rotate is v * LLMatrix3", got.equals3(LLVector4a(expected.mV[0], expected.mV[1], expected.mV[2]), 1e-5f));
+            REQUIRE(got.equals3(LLVector4a(expected.mV[0], expected.mV[1], expected.mV[2]), 1e-5f));
         }
     }
 
     // The product against double, the identity on both sides, and the
     // property that names it: rotating by the product is rotating by the
     // left one and then the right.
-    template<> template<>
-    void llmatrix3a_object::test<5>()
+    TEST_CASE("LLMatrix3a: setMul against double and the identity and as a then b", "[LLMatrix3a]")
     {
         const LLMatrix3a a = odd_matrix();
         const LLMatrix3a b(LLVector4a(0.5f, -1.f, 2.f, 1.f),
@@ -309,7 +289,7 @@ namespace
 
         LLMatrix3a product;
         product.setMul(a, b);
-        ensure_rows("setMul", product, expected, 1e-6);
+        require_rows_near("setMul", product, expected, 1e-6);
 
         // the scalar type agrees on the order
         LLMatrix3 a3, b3;
@@ -324,33 +304,34 @@ namespace
         const LLMatrix3 product3 = a3 * b3;
         LLMatrix3a from_scalar;
         from_scalar.loadu(product3);
-        ensure("setMul(a, b) is LLMatrix3 a * b", product.isApproximatelyEqual(from_scalar, 1e-4f));
+        UNSCOPED_INFO("setMul(a, b) is LLMatrix3 a * b");
+        CHECK(product.isApproximatelyEqual(from_scalar, 1e-4f));
 
         LLMatrix3a left, right;
         left.setMul(LLMatrix3a::getIdentity(), a);
         right.setMul(a, LLMatrix3a::getIdentity());
-        ensure("identity on the left", same_bits(left, a));
-        ensure("identity on the right", same_bits3(right, a));
+        CHECK(same_bits(left, a));
+        CHECK(same_bits3(right, a));
 
         // aliasing either operand
         LLMatrix3a alias = a;
         alias.setMul(alias, b);
-        ensure("setMul aliasing a", same_bits(alias, product));
+        CHECK(same_bits(alias, product));
         alias = b;
         alias.setMul(a, alias);
-        ensure("setMul aliasing b", same_bits(alias, product));
+        CHECK(same_bits(alias, product));
 
         const LLVector4a v(1.f, -2.f, 0.5f, 0.f);
         LLVector4a by_a, then_b, by_product;
         a.rotate(v, by_a);
         b.rotate(by_a, then_b);
         product.rotate(v, by_product);
-        ensure("v * (ab) is (v * a) * b", by_product.equals3(then_b, 1e-4f));
+        UNSCOPED_INFO("v * (ab) is (v * a) * b");
+        CHECK(by_product.equals3(then_b, 1e-4f));
     }
 
     // The determinant, both forms, against double.
-    template<> template<>
-    void llmatrix3a_object::test<6>()
+    TEST_CASE("LLMatrix3a: getDeterminant in both forms against double", "[LLMatrix3a]")
     {
         const LLMatrix3a m = odd_matrix();
         const Rows r = rows_of(m);
@@ -360,62 +341,64 @@ namespace
             r.m[0][2] * (r.m[1][0] * r.m[2][1] - r.m[1][1] * r.m[2][0]);
 
         const F32 det = m.getDeterminant().getF32();
-        ensure("getDeterminant: " + precise(det) + " vs " + precise(expected), std::fabs(det - expected) <= 1e-5 * std::fabs(expected));
+        CAPTURE(det, expected);
+        CHECK(std::fabs(det - expected) <= 1e-5 * std::fabs(expected));
 
         LLVector4a all;
         m.getDeterminant(all);
         for (int i = 0; i < 4; ++i)
         {
-            ensure_equals("getDeterminant(LLVector4a) lane " + std::to_string(i), all[i], det);
+            CAPTURE(i);
+            REQUIRE(all[i] == det);
         }
 
-        ensure_equals("identity determinant", LLMatrix3a::getIdentity().getDeterminant().getF32(), 1.f);
+        CHECK(LLMatrix3a::getIdentity().getDeterminant().getF32() == 1.f);
     }
 
     // A rotation is one; a scale, a shear and a reflection are not.
-    template<> template<>
-    void llmatrix3a_object::test<7>()
+    TEST_CASE("LLMatrix3a: a rotation is one; a scale or a shear or a reflection is not", "[LLMatrix3a]")
     {
         for (const LLQuaternion& q : ROTATIONS)
         {
             LLRotation r;
             r.loadu(q.getMatrix3());
-            ensure("a rotation isOkRotation", r.isOkRotation());
-            ensure("a rotation is finite", r.isFinite());
+            REQUIRE(r.isOkRotation());
+            REQUIRE(r.isFinite());
         }
 
         LLRotation scaled;
         scaled.setRows(LLVector4a(2.f, 0.f, 0.f), LLVector4a(0.f, 2.f, 0.f), LLVector4a(0.f, 0.f, 2.f));
-        ensure("a scale is not a rotation", !scaled.isOkRotation());
+        CHECK_FALSE(scaled.isOkRotation());
 
         LLRotation sheared;
         sheared.setRows(LLVector4a(1.f, 0.f, 0.f), LLVector4a(0.5f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
-        ensure("a shear is not a rotation", !sheared.isOkRotation());
+        CHECK_FALSE(sheared.isOkRotation());
 
         LLRotation reflected;
         reflected.setRows(LLVector4a(-1.f, 0.f, 0.f), LLVector4a(0.f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
-        ensure("a reflection is not a rotation", !reflected.isOkRotation());
+        CHECK_FALSE(reflected.isOkRotation());
 
         LLRotation nan;
         nan.setRows(LLVector4a(std::numeric_limits<F32>::quiet_NaN(), 0.f, 0.f), LLVector4a(0.f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
-        ensure("a NaN is not finite", !nan.isFinite());
-        ensure("a NaN is not a rotation", !nan.isOkRotation());
+        CHECK_FALSE(nan.isFinite());
+        CHECK_FALSE(nan.isOkRotation());
 
         LLRotation inf_in_w;
         inf_in_w.setRows(LLVector4a(1.f, 0.f, 0.f, std::numeric_limits<F32>::infinity()), LLVector4a(0.f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
-        ensure("the fourth lane is not looked at", inf_in_w.isFinite());
+        UNSCOPED_INFO("the fourth lane is not looked at");
+        CHECK(inf_in_w.isFinite());
     }
 
     // batchTransform is rotate over an array, every count, including the
     // odd one the loop peels.
-    template<> template<>
-    void llmatrix3a_object::test<8>()
+    TEST_CASE("LLMatrix3a: batchTransform is rotate over an array of every count", "[LLMatrix3a]")
     {
         LLRotation r;
         r.loadu(ROTATIONS[4].getMatrix3());
 
         for (int count : {0, 1, 2, 3, 7, 16})
         {
+            CAPTURE(count);
             std::vector<LLVector4a> src(count + 1), dst(count + 1);
             for (int i = 0; i < count; ++i)
             {
@@ -429,16 +412,15 @@ namespace
             {
                 LLVector4a one;
                 r.rotate(src[i], one);
-                ensure("batchTransform count " + std::to_string(count) + " element " + std::to_string(i),
-                       same_bits(dst[i], one));
+                CAPTURE(i);
+                REQUIRE(same_bits(dst[i], one));
             }
-            ensure("batchTransform stays within count", same_bits(dst[count], LLVector4a(9.f, 9.f, 9.f, 9.f)));
+            UNSCOPED_INFO("batchTransform stays within count");
+            REQUIRE(same_bits(dst[count], LLVector4a(9.f, 9.f, 9.f, 9.f)));
         }
     }
 
-    // setLerp and the tolerance compare.
-    template<> template<>
-    void llmatrix3a_object::test<9>()
+    TEST_CASE("LLMatrix3a: setLerp and the tolerance compare", "[LLMatrix3a]")
     {
         const LLMatrix3a a = odd_matrix();
         const LLMatrix3a b(LLVector4a(0.5f, -1.f, 2.f, 1.f),
@@ -449,8 +431,8 @@ namespace
         at_zero.setLerp(a, b, 0.f);
         at_one.setLerp(a, b, 1.f);
         at_quarter.setLerp(a, b, 0.25f);
-        ensure("setLerp at 0", same_bits(at_zero, a));
-        ensure("setLerp at 1", at_one.isApproximatelyEqual(b, 1e-6f));
+        CHECK(same_bits(at_zero, a));
+        CHECK(at_one.isApproximatelyEqual(b, 1e-6f));
 
         const Rows ra = rows_of(a);
         const Rows rb = rows_of(b);
@@ -462,13 +444,14 @@ namespace
                 expected.m[row][col] = ra.m[row][col] + (rb.m[row][col] - ra.m[row][col]) * 0.25;
             }
         }
-        ensure_rows("setLerp at a quarter", at_quarter, expected, 1e-6);
+        require_rows_near("setLerp at a quarter", at_quarter, expected, 1e-6);
 
         LLMatrix3a nearby = a;
         LLVector4a nudged = nearby.getRow<1>();
         nudged.add(LLVector4a(0.f, 1e-6f, 0.f, 50.f));
         nearby.setRows(nearby.getRow<0>(), nudged, nearby.getRow<2>());
-        ensure("isApproximatelyEqual within tolerance, w ignored", nearby.isApproximatelyEqual(a));
-        ensure("isApproximatelyEqual outside tolerance", !nearby.isApproximatelyEqual(a, 1e-7f));
+        UNSCOPED_INFO("isApproximatelyEqual within tolerance, w ignored");
+        CHECK(nearby.isApproximatelyEqual(a));
+        CHECK_FALSE(nearby.isApproximatelyEqual(a, 1e-7f));
     }
 }
