@@ -59,7 +59,7 @@ namespace
             return pathOutput.str();
         }
 
-        void ensureRootTraversal(const std::string& path,
+        void require_root_traversal(const std::string& path,
             const LLHTTPNode* expectedNode,
             const char* expectedRemainder)
         {
@@ -67,9 +67,8 @@ namespace
 
             const LLHTTPNode* actualNode = mRoot.traverse(path, mContext);
 
-            UNSCOPED_INFO("traverse " + path + " node");
+            INFO("traverse " << path);
             REQUIRE(actualNode == expectedNode);
-            UNSCOPED_INFO("traverse " + path + " remainder");
             REQUIRE(remainderPath() == expectedRemainder);
         }
 
@@ -95,7 +94,7 @@ namespace
         {
             mContext.clear();
             const LLHTTPNode* node = mRoot.traverse(path, mContext);
-            UNSCOPED_INFO(path + " found");
+            CAPTURE(path);
             REQUIRE(node != NULL);
 
             ResponsePtr response = Response::create();
@@ -107,7 +106,7 @@ namespace
         {
             mContext.clear();
             const LLHTTPNode* node = mRoot.traverse(path, mContext);
-            UNSCOPED_INFO(path + " found");
+            CAPTURE(path);
             REQUIRE(node != NULL);
 
             ResponsePtr response = Response::create();
@@ -115,16 +114,16 @@ namespace
             return response->mResult;
         }
 
-        void ensureMemberString(const std::string& name,
+        void require_member_string(const std::string& name,
             const LLSD& actualMap, const std::string& member,
             const std::string& expectedValue)
         {
-            UNSCOPED_INFO(name + " " + member);
+            CAPTURE(name, member);
             REQUIRE(actualMap[member].asString() == expectedValue);
         }
 
 
-        void ensureInArray(const LLSD& actualArray,
+        void require_in_array(const LLSD& actualArray,
             const std::string& expectedValue)
         {
             LLSD::array_const_iterator i = actualArray.beginArray();
@@ -150,13 +149,12 @@ namespace
     {
         // traversal of the lone node
 
-        ensureRootTraversal("", &mRoot, "");
-        ensureRootTraversal("/", &mRoot, "");
-        ensureRootTraversal("foo", NULL, "foo");
-        ensureRootTraversal("foo/bar", NULL, "foo/bar");
+        require_root_traversal("", &mRoot, "");
+        require_root_traversal("/", &mRoot, "");
+        require_root_traversal("foo", NULL, "foo");
+        require_root_traversal("foo/bar", NULL, "foo/bar");
 
-        UNSCOPED_INFO("root of root");
-        REQUIRE(mRoot.rootNode() == &mRoot);
+        CHECK(mRoot.rootNode() == &mRoot);
     }
 
     TEST_CASE_METHOD(HTTPNodeTestData, "http node: a child node matches its name with or without slashes", "[http_node]")
@@ -166,15 +164,14 @@ namespace
         LLHTTPNode* helloNode = new LLHTTPNode;
         mRoot.addNode("hello", helloNode);
 
-        ensureRootTraversal("hello", helloNode, "");
-        ensureRootTraversal("/hello", helloNode, "");
-        ensureRootTraversal("hello/", helloNode, "");
-        ensureRootTraversal("/hello/", helloNode, "");
+        require_root_traversal("hello", helloNode, "");
+        require_root_traversal("/hello", helloNode, "");
+        require_root_traversal("hello/", helloNode, "");
+        require_root_traversal("/hello/", helloNode, "");
 
-        ensureRootTraversal("hello/there", NULL, "there");
+        require_root_traversal("hello/there", NULL, "there");
 
-        UNSCOPED_INFO("root of hello");
-        REQUIRE(helloNode->rootNode() == &mRoot);
+        CHECK(helloNode->rootNode() == &mRoot);
     }
 
     TEST_CASE_METHOD(HTTPNodeTestData, "http node: traversal finds each leaf of a multi-branched tree", "[http_node]")
@@ -197,24 +194,18 @@ namespace
         hebrewNode->addNode("aleph", alephNode);
         mRoot.addNode("hebrew", hebrewNode);
 
-        ensureRootTraversal("greek/alpha", alphaNode, "");
-        ensureRootTraversal("greek/beta", betaNode, "");
-        ensureRootTraversal("greek/delta", NULL, "delta");
-        ensureRootTraversal("greek/gamma", gammaNode, "");
-        ensureRootTraversal("hebrew/aleph", alephNode, "");
+        require_root_traversal("greek/alpha", alphaNode, "");
+        require_root_traversal("greek/beta", betaNode, "");
+        require_root_traversal("greek/delta", NULL, "delta");
+        require_root_traversal("greek/gamma", gammaNode, "");
+        require_root_traversal("hebrew/aleph", alephNode, "");
 
-        UNSCOPED_INFO("root of greek");
-        REQUIRE(greekNode->rootNode() == &mRoot);
-        UNSCOPED_INFO("root of alpha");
-        REQUIRE(alphaNode->rootNode() == &mRoot);
-        UNSCOPED_INFO("root of beta");
-        REQUIRE(betaNode->rootNode() == &mRoot);
-        UNSCOPED_INFO("root of gamma");
-        REQUIRE(gammaNode->rootNode() == &mRoot);
-        UNSCOPED_INFO("root of hebrew");
-        REQUIRE(hebrewNode->rootNode() == &mRoot);
-        UNSCOPED_INFO("root of aleph");
-        REQUIRE(alephNode->rootNode() == &mRoot);
+        CHECK(greekNode->rootNode() == &mRoot);
+        CHECK(alphaNode->rootNode() == &mRoot);
+        CHECK(betaNode->rootNode() == &mRoot);
+        CHECK(gammaNode->rootNode() == &mRoot);
+        CHECK(hebrewNode->rootNode() == &mRoot);
+        CHECK(alephNode->rootNode() == &mRoot);
     }
 
     TEST_CASE_METHOD(HTTPNodeTestData, "http node: addNode creates parents and keeps an existing node", "[http_node]")
@@ -236,20 +227,16 @@ namespace
 
         mRoot.addNode("hebrew/aleph", alephNode);
 
-        ensureRootTraversal("greek/alpha", alphaNode, "");
-        ensureRootTraversal("greek/beta", betaNode, "");
-        ensureRootTraversal("greek/delta", NULL, "delta");
-        ensureRootTraversal("greek/gamma", gammaNode, "");
-        ensureRootTraversal("hebrew/aleph", alephNode, "");
+        require_root_traversal("greek/alpha", alphaNode, "");
+        require_root_traversal("greek/beta", betaNode, "");
+        require_root_traversal("greek/delta", NULL, "delta");
+        require_root_traversal("greek/gamma", gammaNode, "");
+        require_root_traversal("hebrew/aleph", alephNode, "");
 
-        UNSCOPED_INFO("root of alpha");
-        REQUIRE(alphaNode->rootNode() == &mRoot);
-        UNSCOPED_INFO("root of beta");
-        REQUIRE(betaNode->rootNode() == &mRoot);
-        UNSCOPED_INFO("root of gamma");
-        REQUIRE(gammaNode->rootNode() == &mRoot);
-        UNSCOPED_INFO("root of aleph");
-        REQUIRE(alephNode->rootNode() == &mRoot);
+        CHECK(alphaNode->rootNode() == &mRoot);
+        CHECK(betaNode->rootNode() == &mRoot);
+        CHECK(gammaNode->rootNode() == &mRoot);
+        CHECK(alephNode->rootNode() == &mRoot);
     }
 
     class IntegerNode : public LLHTTPNode
@@ -306,18 +293,15 @@ namespace
         mRoot.addNode("test/<int>", iNode);
         mRoot.addNode("test/<int>/square", sqNode);
 
-        ensureRootTraversal("test/42", iNode, "");
-        UNSCOPED_INFO("stored integer");
+        require_root_traversal("test/42", iNode, "");
         CHECK(context()["extra"]["value"].asInteger() == 42);
 
-        ensureRootTraversal("test/bob", NULL, "bob");
-        UNSCOPED_INFO("nothing stored");
-        REQUIRE(context()["extra"]["value"].isUndefined());
+        require_root_traversal("test/bob", NULL, "bob");
+        CHECK(context()["extra"]["value"].isUndefined());
 
-        ensureRootTraversal("test/3/square", sqNode, "");
+        require_root_traversal("test/3/square", sqNode, "");
         ResponsePtr response = Response::create();
         sqNode->get(LLHTTPNode::ResponsePtr(response), context());
-        UNSCOPED_INFO("square result");
         CHECK(response->mResult.asInteger() == 9);
     }
 
@@ -354,12 +338,12 @@ namespace
         mRoot.addNode("test/alpha", aNode);
         mRoot.addNode("test/alpha/zebra", zNode);
 
-        ensureRootTraversal("test/alpha", aNode, "");
-        ensureRootTraversal("test/alpha/abe", aNode, "abe");
-        ensureRootTraversal("test/alpha/abe/amy", aNode, "abe/amy");
-        ensureRootTraversal("test/alpha/abe/bea", NULL, "abe/bea");
-        ensureRootTraversal("test/alpha/bob", NULL, "bob");
-        ensureRootTraversal("test/alpha/zebra", zNode, "");
+        require_root_traversal("test/alpha", aNode, "");
+        require_root_traversal("test/alpha/abe", aNode, "abe");
+        require_root_traversal("test/alpha/abe/amy", aNode, "abe/amy");
+        require_root_traversal("test/alpha/abe/bea", NULL, "abe/bea");
+        require_root_traversal("test/alpha/bob", NULL, "bob");
+        require_root_traversal("test/alpha/zebra", zNode, "");
     }
 
     TEST_CASE_METHOD(HTTPNodeTestData, "http node: standard services answer web/hello and web/echo", "[http_node]")
@@ -371,13 +355,11 @@ namespace
 
         {
             LLSD result = get("web/hello");
-            UNSCOPED_INFO("hello result");
             CHECK(result.asString() == "hello");
         }
         {
             LLSD stuff = 3.14159;
             LLSD result = post("web/echo", stuff);
-            UNSCOPED_INFO("echo result");
             CHECK_THAT(result, ll_test::LLSDEquals(stuff));
         }
     }
@@ -394,16 +376,14 @@ namespace
 
         const LLSD result = get("web/server/api");
 
-        UNSCOPED_INFO("result is array");
         REQUIRE(result.isArray());
-        UNSCOPED_INFO("result size");
         REQUIRE(result.size() >= 2);
 
-        ensureInArray(result, "web/echo");
-        ensureInArray(result, "web/hello");
-        ensureInArray(result, "test/misc");
-        ensureInArray(result, "test/<int>");
-        ensureInArray(result, "test/<int>/square");
+        require_in_array(result, "web/echo");
+        require_in_array(result, "web/hello");
+        require_in_array(result, "test/misc");
+        require_in_array(result, "test/<int>");
+        require_in_array(result, "test/<int>/square");
     }
 
     TEST_CASE_METHOD(HTTPNodeTestData, "http node: web/server/api describes web/hello and web/echo", "[http_node]")
@@ -414,28 +394,20 @@ namespace
 
         const LLSD helloDetails = get("web/server/api/web/hello");
 
-        UNSCOPED_INFO("hello description");
         CHECK_THAT(helloDetails["description"].asString(), Catch::Matchers::ContainsSubstring("hello"));
-        UNSCOPED_INFO("method name");
         CHECK(helloDetails["api"][0].asString() == std::string("GET"));
-        ensureMemberString("hello", helloDetails, "output", "\"hello\"");
-        UNSCOPED_INFO("hello __file__");
+        require_member_string("hello", helloDetails, "output", "\"hello\"");
         CHECK_THAT(helloDetails["__file__"].asString(), Catch::Matchers::ContainsSubstring("llsdhttpserver.cpp"));
-        UNSCOPED_INFO("hello line");
         CHECK(helloDetails["__line__"].isInteger());
 
 
         const LLSD echoDetails = get("web/server/api/web/echo");
 
-        UNSCOPED_INFO("echo description");
         CHECK_THAT(echoDetails["description"].asString(), Catch::Matchers::ContainsSubstring("echo"));
-        UNSCOPED_INFO("method name");
         CHECK(echoDetails["api"][0].asString() == std::string("POST"));
-        ensureMemberString("echo", echoDetails, "input", "<any>");
-        ensureMemberString("echo", echoDetails, "output", "<the input>");
-        UNSCOPED_INFO("echo __file__");
+        require_member_string("echo", echoDetails, "input", "<any>");
+        require_member_string("echo", echoDetails, "output", "<the input>");
         CHECK_THAT(echoDetails["__file__"].asString(), Catch::Matchers::ContainsSubstring("llsdhttpserver.cpp"));
-        UNSCOPED_INFO("echo");
         CHECK(echoDetails["__line__"].isInteger());
     }
 }

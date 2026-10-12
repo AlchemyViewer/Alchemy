@@ -69,120 +69,79 @@ namespace
         LLPartSysData llpsysdata;
         LLDataPackerBinaryBuffer dp1(msg, sizeof(msg));
 
-        UNSCOPED_INFO("LLPartSysData::unpack failed.");
         REQUIRE(llpsysdata.unpack(dp1));
 
 
         //mCRC  1   unsigned int
-        UNSCOPED_INFO("mCRC different after unpacking");
         CHECK(llpsysdata.mCRC == (U32) 1);
         //mFlags    0   unsigned int
-        UNSCOPED_INFO("mFlags different after unpacking");
         CHECK(llpsysdata.mFlags == (U32) 0);
         //mPattern  1 ''   unsigned char
-        UNSCOPED_INFO("mPattern different after unpacking");
         CHECK(llpsysdata.mPattern == (U8) 1);
         //mInnerAngle   0.00000000  float
-        UNSCOPED_INFO("mInnerAngle different after unpacking");
         CHECK_THAT(llpsysdata.mInnerAngle, ll_test::WithinBits(0.f, 8));
         //mOuterAngle   0.00000000  float
-        UNSCOPED_INFO("mOuterAngle different after unpacking");
         CHECK_THAT(llpsysdata.mOuterAngle, ll_test::WithinBits(0.f, 8));
         //mAngularVelocity  0,0,0
-        UNSCOPED_INFO("mAngularVelocity.mV[0] different after unpacking");
         CHECK_THAT(llpsysdata.mAngularVelocity.mV[0], ll_test::WithinBits(0.f, 8));
-        UNSCOPED_INFO("mAngularVelocity.mV[0] different after unpacking");
         CHECK_THAT(llpsysdata.mAngularVelocity.mV[1], ll_test::WithinBits(0.f, 8));
-        UNSCOPED_INFO("mAngularVelocity.mV[0] different after unpacking");
         CHECK_THAT(llpsysdata.mAngularVelocity.mV[2], ll_test::WithinBits(0.f, 8));
         //mBurstRate    0.097656250 float
-        UNSCOPED_INFO("mBurstRate different after unpacking");
         CHECK_THAT(llpsysdata.mBurstRate, ll_test::WithinBits(0.097656250f, 8));
         //mBurstPartCount   1 ''   unsigned char
-        UNSCOPED_INFO("mBurstPartCount different after unpacking");
         CHECK(llpsysdata.mBurstPartCount == (U8) 1);
         //mBurstRadius  0.00000000  float
-        UNSCOPED_INFO("mBurstRadius different after unpacking");
         CHECK_THAT(llpsysdata.mBurstRadius, ll_test::WithinBits(0.f, 8));
         //mBurstSpeedMin    1.0000000   float
-        UNSCOPED_INFO("mBurstSpeedMin different after unpacking");
         CHECK_THAT(llpsysdata.mBurstSpeedMin, ll_test::WithinBits(1.f, 8));
         //mBurstSpeedMax    1.0000000   float
-        UNSCOPED_INFO("mBurstSpeedMax different after unpacking");
         CHECK_THAT(llpsysdata.mBurstSpeedMax, ll_test::WithinBits(1.f, 8));
         //mMaxAge   0.00000000  float
-        UNSCOPED_INFO("mMaxAge different after unpacking");
         CHECK_THAT(llpsysdata.mMaxAge, ll_test::WithinBits(0.f, 8));
         //mStartAge 0.00000000  float
-        UNSCOPED_INFO("mStartAge different after unpacking");
         CHECK_THAT(llpsysdata.mStartAge, ll_test::WithinBits(0.f, 8));
         //mPartAccel    <0,0,0>
-        UNSCOPED_INFO("mPartAccel.mV[0] different after unpacking");
         CHECK_THAT(llpsysdata.mPartAccel.mV[0], ll_test::WithinBits(0.f, 7));
-        UNSCOPED_INFO("mPartAccel.mV[1] different after unpacking");
         CHECK_THAT(llpsysdata.mPartAccel.mV[1], ll_test::WithinBits(0.f, 7));
-        UNSCOPED_INFO("mPartAccel.mV[2] different after unpacking");
         CHECK_THAT(llpsysdata.mPartAccel.mV[2], ll_test::WithinBits(0.f, 7));
 
         //mPartData
         LLPartData& data = llpsysdata.mPartData;
 
         //mFlags    132354  unsigned int
-        UNSCOPED_INFO("mPartData.mFlags different after unpacking");
         CHECK(data.mFlags == (U32) 132354);
         //mMaxAge   10.000000   float
-        UNSCOPED_INFO("mPartData.mMaxAge different after unpacking");
         CHECK_THAT(data.mMaxAge, ll_test::WithinBits(10.f, 8));
         //mStartColor   <1,1,1,1>
-        UNSCOPED_INFO("mPartData.mStartColor.mV[0] different after unpacking");
         CHECK_THAT(data.mStartColor.mV[0], ll_test::WithinBits(1.f, 8));
-        UNSCOPED_INFO("mPartData.mStartColor.mV[1] different after unpacking");
         CHECK_THAT(data.mStartColor.mV[1], ll_test::WithinBits(1.f, 8));
-        UNSCOPED_INFO("mPartData.mStartColor.mV[2] different after unpacking");
         CHECK_THAT(data.mStartColor.mV[2], ll_test::WithinBits(1.f, 8));
-        UNSCOPED_INFO("mPartData.mStartColor.mV[3] different after unpacking");
         CHECK_THAT(data.mStartColor.mV[3], ll_test::WithinBits(1.f, 8));
         //mEndColor <1,1,0,0>
-        UNSCOPED_INFO("mPartData.mEndColor.mV[0] different after unpacking");
         CHECK_THAT(data.mEndColor.mV[0], ll_test::WithinBits(1.f, 8));
-        UNSCOPED_INFO("mPartData.mEndColor.mV[1] different after unpacking");
         CHECK_THAT(data.mEndColor.mV[1], ll_test::WithinBits(1.f, 8));
-        UNSCOPED_INFO("mPartData.mEndColor.mV[2] different after unpacking");
         CHECK_THAT(data.mEndColor.mV[2], ll_test::WithinBits(0.f, 8));
-        UNSCOPED_INFO("mPartData.mEndColor.mV[3] different after unpacking");
         CHECK_THAT(data.mEndColor.mV[3], ll_test::WithinBits(0.f, 8));
         //mStartScale   <1,1>
-        UNSCOPED_INFO("mPartData.mStartScale.mV[0] different after unpacking");
         CHECK_THAT(data.mStartScale.mV[0], ll_test::WithinBits(1.f, 8));
-        UNSCOPED_INFO("mPartData.mStartScale.mV[1] different after unpacking");
         CHECK_THAT(data.mStartScale.mV[1], ll_test::WithinBits(1.f, 8));
         //mEndScale <0,0>
-        UNSCOPED_INFO("mPartData.mEndScale.mV[0] different after unpacking");
         CHECK_THAT(data.mEndScale.mV[0], ll_test::WithinBits(0.f, 8));
-        UNSCOPED_INFO("mPartData.mEndScale.mV[1] different after unpacking");
         CHECK_THAT(data.mEndScale.mV[1], ll_test::WithinBits(0.f, 8));
         //mPosOffset    <0,0,0>
-        UNSCOPED_INFO("mPartData.mPosOffset.mV[0] different after unpacking");
         CHECK_THAT(data.mPosOffset.mV[0], ll_test::WithinBits(0.f, 8));
-        UNSCOPED_INFO("mPartData.mPosOffset.mV[1] different after unpacking");
         CHECK_THAT(data.mPosOffset.mV[1], ll_test::WithinBits(0.f, 8));
-        UNSCOPED_INFO("mPartData.mPosOffset.mV[2] different after unpacking");
         CHECK_THAT(data.mPosOffset.mV[2], ll_test::WithinBits(0.f, 8));
         //mParameter    0.00000000  float
-        UNSCOPED_INFO("mPartData.mParameter different after unpacking");
         CHECK_THAT(data.mParameter, ll_test::WithinBits(0.f, 8));
 
         //mStartGlow    0.00000000  float
-        UNSCOPED_INFO("mPartData.mStartGlow different after unpacking");
         CHECK_THAT(data.mStartGlow, ll_test::WithinBits(0.f, 8));
         //mEndGlow  0.00000000  float
-        UNSCOPED_INFO("mPartData.mEndGlow different after unpacking");
         CHECK_THAT(data.mEndGlow, ll_test::WithinBits(0.f, 8));
         //mBlendFuncSource  2 ''   unsigned char
-        UNSCOPED_INFO("mPartData.mBlendFuncSource different after unpacking");
         CHECK(data.mBlendFuncSource == (U8) 2);
         //mBlendFuncDest    1 ''   unsigned char
-        UNSCOPED_INFO("mPartData.mBlendFuncDest different after unpacking");
         CHECK(data.mBlendFuncDest == (U8) 1);
     }
 }

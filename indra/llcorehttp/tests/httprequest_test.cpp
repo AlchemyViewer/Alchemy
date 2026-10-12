@@ -108,8 +108,8 @@ std::string get_base_url()
     {
         std::cerr << "LL_TEST_PORT environment variable missing." << std::endl;
         std::cerr << "Test expects to run in test_llcorehttp_peer.py script." << std::endl;
-        UNSCOPED_INFO("LL_TEST_PORT set in environment");
-        REQUIRE(NULL != env);
+        INFO("LL_TEST_PORT set in environment");
+        REQUIRE(env != NULL);
     }
 
     int port(atoi(env));
@@ -164,18 +164,13 @@ public:
         {
             if (LLCORE_HTTP_HANDLE_INVALID != mExpectHandle)
             {
-                UNSCOPED_INFO("Expected handle received in handler");
                 REQUIRE(mExpectHandle == handle);
             }
-            UNSCOPED_INFO("Handler got a response");
-            REQUIRE(NULL != response);
+            REQUIRE(response != NULL);
             if (response && mState)
             {
                 const HttpStatus actual_status(response->getStatus());
-                std::ostringstream test;
-                test << "Expected HttpStatus received in response.  Wanted:  "
-                     << mState->mStatus.toHex() << " Received:  " << actual_status.toHex();
-                UNSCOPED_INFO(test.str().c_str());
+                INFO("wanted status " << mState->mStatus.toHex() << ", received " << actual_status.toHex());
                 REQUIRE(actual_status == mState->mStatus);
             }
             if (mState)
@@ -184,10 +179,8 @@ public:
             }
             if (! mHeadersRequired.empty() || ! mHeadersDisallowed.empty())
             {
-                UNSCOPED_INFO("Response required with header check");
                 REQUIRE(response != NULL);
                 HttpHeaders::ptr_t header(response->getHeaders());  // Will not hold onto this
-                UNSCOPED_INFO("Some quantity of headers returned");
                 REQUIRE(header != NULL);
 
                 if (! mHeadersRequired.empty())
@@ -209,11 +202,7 @@ public:
                                 break;
                             }
                         }
-                        std::ostringstream str;
-                        str << "Required header #" << i << " "
-                            << mHeadersRequired[i].first << "=" << mHeadersRequired[i].second
-                            << " not found in response";
-                        UNSCOPED_INFO(str.str());
+                        INFO("required header " << mHeadersRequired[i].first << "=" << mHeadersRequired[i].second);
                         REQUIRE(found);
                     }
                 }
@@ -229,12 +218,8 @@ public:
                             if (mHeadersDisallowed[i].first.match((*iter).first) &&
                                 mHeadersDisallowed[i].second.match((*iter).second))
                             {
-                                std::ostringstream str;
-                                str << "Disallowed header #" << i << " "
-                                    << mHeadersDisallowed[i].first << "=" << mHeadersDisallowed[i].second
-                                    << " found in response";
-                                UNSCOPED_INFO(str.str());
-                                REQUIRE(false);
+                                FAIL("disallowed header " << mHeadersDisallowed[i].first << "="
+                                     << mHeadersDisallowed[i].second << " found in response");
                             }
                         }
                     }
@@ -243,10 +228,8 @@ public:
 
             if (! mCheckContentType.empty())
             {
-                UNSCOPED_INFO("Response required with content type check");
                 REQUIRE(response != NULL);
                 std::string con_type(response->getContentType());
-                UNSCOPED_INFO("Content-Type as expected (" + mCheckContentType + ")");
                 REQUIRE(mCheckContentType == con_type);
             }
 
@@ -306,7 +289,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a NoOp queued with no 
 
         // Issue a NoOp
         HttpHandle handle = req->requestNoOp(LLCore::HttpHandler::ptr_t());
-        UNSCOPED_INFO("Request issued");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // release the request object
@@ -314,7 +296,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a NoOp queued with no 
         req = NULL;
 
         // Request queue should have two references:  global singleton & service object
-        UNSCOPED_INFO("Two references to request queue");
         CHECK(HttpRequestQueue::instanceOf()->getRefCount() == 2);
 
         // Okay, tear it down
@@ -358,7 +339,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a NoOp is answered and
 
         // Issue a NoOp
         HttpHandle handle = req->requestNoOp(handlerp);
-        UNSCOPED_INFO("Valid handle returned for first request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -371,12 +351,10 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a NoOp is answered and
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -389,7 +367,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a NoOp is answered and
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -399,7 +376,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a NoOp is answered and
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release the request object
@@ -409,7 +385,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a NoOp is answered and
         // Shut down service
         HttpRequest::destroyService();
 
-        UNSCOPED_INFO("Two handler calls on the way out");
         CHECK(mHandlerCalls == 2);
     }
     catch (...)
@@ -453,12 +428,10 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: two HttpRequest instan
 
         // Issue some NoOps
         HttpHandle handle = req1->requestNoOp(handler1p);
-        UNSCOPED_INFO("Valid handle returned for first request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         handler1.mExpectHandle = handle;
 
         handle = req2->requestNoOp(handler2p);
-        UNSCOPED_INFO("Valid handle returned for first request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         handler2.mExpectHandle = handle;
 
@@ -473,12 +446,10 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: two HttpRequest instan
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 2);
 
         // Okay, request a shutdown of the servicing thread
         handle = req2->requestStopThread(handler2p);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         handler2.mExpectHandle = handle;
 
@@ -493,7 +464,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: two HttpRequest instan
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 3);
 
         // See that we actually shutdown the thread
@@ -503,7 +473,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: two HttpRequest instan
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release the request object
@@ -515,7 +484,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: two HttpRequest instan
         // Shut down service
         HttpRequest::destroyService();
 
-        UNSCOPED_INFO("Two handler calls on the way out");
         CHECK(mHandlerCalls == 3);
     }
     catch (...)
@@ -559,12 +527,10 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a NoOp is answered beh
 
         // Issue a Spin
         HttpHandle handle = req->requestSpin(1);
-        UNSCOPED_INFO("Valid handle returned for spin request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Issue a NoOp
         handle = req->requestNoOp(handlerp);
-        UNSCOPED_INFO("Valid handle returned for no-op request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -575,7 +541,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a NoOp is answered beh
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("NoOp notification received");
         CHECK(mHandlerCalls == 1);
 
         // release the request object
@@ -626,12 +591,10 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a hard spin keeps a No
 
         // Issue a Spin
         HttpHandle handle = req->requestSpin(0);        // Hard spin
-        UNSCOPED_INFO("Valid handle returned for spin request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Issue a NoOp
         handle = req->requestNoOp(handlerp);
-        UNSCOPED_INFO("Valid handle returned for no-op request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -642,7 +605,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a hard spin keeps a No
             req->update(1000000);
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("No notifications received");
         CHECK(mHandlerCalls == 0);
 
         // release the request object
@@ -701,7 +663,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a dead port f
                                                      opts,
                                                      HttpHeaders::ptr_t(),
                                                      handlerp);
-        UNSCOPED_INFO("Valid handle returned for ranged request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -714,13 +675,11 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a dead port f
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -733,7 +692,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a dead port f
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -743,7 +701,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a dead port f
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release options
@@ -756,7 +713,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a dead port f
         // Shut down service
         HttpRequest::destroyService();
 
-        UNSCOPED_INFO("Two handler calls on the way out");
         CHECK(mHandlerCalls == 2);
     }
     catch (...)
@@ -805,7 +761,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to the peer is a
                                             HttpOptions::ptr_t(),
                                             HttpHeaders::ptr_t(),
                                             handlerp);
-        UNSCOPED_INFO("Valid handle returned for ranged request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -818,13 +773,11 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to the peer is a
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -837,7 +790,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to the peer is a
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -847,7 +799,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to the peer is a
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release the request object
@@ -857,7 +808,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to the peer is a
         // Shut down service
         HttpRequest::destroyService();
 
-        UNSCOPED_INFO("Two handler calls on the way out");
         CHECK(mHandlerCalls == 2);
     }
     catch (...)
@@ -907,7 +857,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: requestGetByteRange wi
                                                      HttpOptions::ptr_t(),
                                                      HttpHeaders::ptr_t(),
                                                      handlerp);
-        UNSCOPED_INFO("Valid handle returned for ranged request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -920,13 +869,11 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: requestGetByteRange wi
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -939,7 +886,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: requestGetByteRange wi
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -949,7 +895,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: requestGetByteRange wi
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release the request object
@@ -959,7 +904,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: requestGetByteRange wi
         // Shut down service
         HttpRequest::destroyService();
 
-        UNSCOPED_INFO("Two handler calls on the way out");
         CHECK(mHandlerCalls == 2);
     }
     catch (...)
@@ -1011,7 +955,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT with a body to t
                                             HttpOptions::ptr_t(),
                                             HttpHeaders::ptr_t(),
                                             handlerp);
-        UNSCOPED_INFO("Valid handle returned for ranged request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -1024,13 +967,11 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT with a body to t
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -1043,7 +984,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT with a body to t
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -1053,7 +993,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT with a body to t
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // Lose the request body
@@ -1067,7 +1006,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT with a body to t
         // Shut down service
         HttpRequest::destroyService();
 
-        UNSCOPED_INFO("Two handler calls on the way out");
         CHECK(mHandlerCalls == 2);
     }
     catch (...)
@@ -1122,7 +1060,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST with a body to 
                                              HttpOptions::ptr_t(),
                                              HttpHeaders::ptr_t(),
                                              handlerp);
-        UNSCOPED_INFO("Valid handle returned for ranged request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -1135,13 +1072,11 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST with a body to 
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -1154,7 +1089,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST with a body to 
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -1164,7 +1098,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST with a body to 
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // Lose the request body
@@ -1178,7 +1111,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST with a body to 
         // Shut down service
         HttpRequest::destroyService();
 
-        UNSCOPED_INFO("Two handler calls on the way out");
         CHECK(mHandlerCalls == 2);
     }
     catch (...)
@@ -1234,7 +1166,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET with tracing on 
                                                      HttpOptions::ptr_t(),
                                                      HttpHeaders::ptr_t(),
                                                      handlerp);
-        UNSCOPED_INFO("Valid handle returned for ranged request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -1247,13 +1178,11 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET with tracing on 
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -1266,7 +1195,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET with tracing on 
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -1276,7 +1204,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET with tracing on 
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release the request object
@@ -1286,7 +1213,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET with tracing on 
         // Shut down service
         HttpRequest::destroyService();
 
-        UNSCOPED_INFO("Two handler calls on the way out");
         CHECK(mHandlerCalls == 2);
     }
     catch (...)
@@ -1351,7 +1277,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET that wants heade
                                                      opts,
                                                      HttpHeaders::ptr_t(),
                                                      handlerp);
-        UNSCOPED_INFO("Valid handle returned for ranged request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // release options
@@ -1367,14 +1292,12 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET that wants heade
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handler.mHeadersRequired.clear();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -1387,7 +1310,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET that wants heade
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -1397,7 +1319,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET that wants heade
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release the request object
@@ -1407,7 +1328,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET that wants heade
         // Shut down service
         HttpRequest::destroyService();
 
-        UNSCOPED_INFO("Two handler calls on the way out");
         CHECK(mHandlerCalls == 2);
     }
     catch (...)
@@ -1461,7 +1381,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a peer that s
                                                      opts,
                                                      HttpHeaders::ptr_t(),
                                                      handlerp);
-        UNSCOPED_INFO("Valid handle returned for ranged request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -1474,13 +1393,11 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a peer that s
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -1493,7 +1410,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a peer that s
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -1503,7 +1419,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a peer that s
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release options
@@ -1516,7 +1431,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a peer that s
         // Shut down service
         HttpRequest::destroyService();
 
-        UNSCOPED_INFO("Two handler calls on the way out");
         CHECK(mHandlerCalls == 2);
     }
     catch (...)
@@ -1571,7 +1485,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET reports the resp
                                             HttpOptions::ptr_t(),
                                             HttpHeaders::ptr_t(),
                                             handlerp);
-        UNSCOPED_INFO("Valid handle returned for ranged request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -1584,14 +1497,12 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET reports the resp
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         handler.mCheckContentType.clear();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -1604,7 +1515,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET reports the resp
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -1614,7 +1524,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET reports the resp
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release the request object
@@ -1624,7 +1533,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET reports the resp
         // Shut down service
         HttpRequest::destroyService();
 
-        UNSCOPED_INFO("Two handler calls on the way out");
         CHECK(mHandlerCalls == 2);
     }
     catch (...)
@@ -1730,7 +1638,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET sends default he
                                             options,
                                             HttpHeaders::ptr_t(),
                                             handlerp);
-        UNSCOPED_INFO("Valid handle returned for get request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -1743,7 +1650,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET sends default he
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
         // Do a texture-style fetch
@@ -1809,7 +1715,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET sends default he
                                           options,
                                           headers,
                                           handlerp);
-        UNSCOPED_INFO("Valid handle returned for ranged request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -1822,7 +1727,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET sends default he
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 2);
 
 
@@ -1831,7 +1735,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET sends default he
         handler.mHeadersRequired.clear();
         handler.mHeadersDisallowed.clear();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -1844,7 +1747,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET sends default he
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 3);
 
         // See that we actually shutdown the thread
@@ -1854,7 +1756,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET sends default he
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release options & headers
@@ -1990,7 +1891,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST sends default h
                                              options,
                                              HttpHeaders::ptr_t(),
                                              handlerp);
-        UNSCOPED_INFO("Valid handle returned for get request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         ba->release();
         ba = NULL;
@@ -2005,7 +1905,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST sends default h
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
 
@@ -2014,7 +1913,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST sends default h
         handler.mHeadersRequired.clear();
         handler.mHeadersDisallowed.clear();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -2027,7 +1925,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST sends default h
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -2037,7 +1934,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a POST sends default h
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release options & headers
@@ -2179,7 +2075,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT sends default he
                                             options,
                                             HttpHeaders::ptr_t(),
                                             handlerp);
-        UNSCOPED_INFO("Valid handle returned for get request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         ba->release();
         ba = NULL;
@@ -2194,7 +2089,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT sends default he
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
 
@@ -2203,7 +2097,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT sends default he
         handler.mHeadersRequired.clear();
         handler.mHeadersDisallowed.clear();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -2216,7 +2109,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT sends default he
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -2226,7 +2118,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a PUT sends default he
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release options & headers
@@ -2381,7 +2272,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a GET
                                             options,
                                             headers,
                                             handlerp);
-        UNSCOPED_INFO("Valid handle returned for get request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump.
@@ -2394,7 +2284,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a GET
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
         // Okay, request a shutdown of the servicing thread
@@ -2402,7 +2291,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a GET
         handler.mHeadersRequired.clear();
         handler.mHeadersDisallowed.clear();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -2415,7 +2303,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a GET
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -2425,7 +2312,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a GET
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release options & headers
@@ -2593,7 +2479,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a POS
                                              options,
                                              headers,
                                              handlerp);
-        UNSCOPED_INFO("Valid handle returned for get request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         ba->release();
         ba = NULL;
@@ -2608,7 +2493,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a POS
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
 
@@ -2617,7 +2501,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a POS
         handler.mHeadersRequired.clear();
         handler.mHeadersDisallowed.clear();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -2630,7 +2513,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a POS
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -2640,7 +2522,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: headers given to a POS
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release options & headers
@@ -2805,7 +2686,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the last of several Co
                                             options,
                                             headers,
                                             handlerp);
-        UNSCOPED_INFO("Valid handle returned for get request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         ba->release();
         ba = NULL;
@@ -2820,7 +2700,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the last of several Co
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == 1);
 
 
@@ -2829,7 +2708,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the last of several Co
         handler.mHeadersRequired.clear();
         handler.mHeadersDisallowed.clear();
         handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -2842,7 +2720,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the last of several Co
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 2);
 
         // See that we actually shutdown the thread
@@ -2852,7 +2729,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the last of several Co
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release options & headers
@@ -2933,7 +2809,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: BUG-2295 a 206 with a 
                                                          options,
                                                          HttpHeaders::ptr_t(),
                                                          handlerp);
-            UNSCOPED_INFO("Valid handle returned for ranged request");
             REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         }
 
@@ -2947,7 +2822,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: BUG-2295 a 206 with a 
         }
         UNSCOPED_INFO("Request executed in reasonable time - ms1");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for each request - ms1");
         CHECK(mHandlerCalls == test_count);
 
         // ======================================
@@ -2967,7 +2841,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: BUG-2295 a 206 with a 
                                                          options,
                                                          HttpHeaders::ptr_t(),
                                                          handlerp);
-            UNSCOPED_INFO("Valid handle returned for ranged request");
             REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         }
 
@@ -2981,7 +2854,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: BUG-2295 a 206 with a 
         }
         UNSCOPED_INFO("Request executed in reasonable time - ms2");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for each request - ms2");
         CHECK(mHandlerCalls == test2_count);
 
         // ======================================
@@ -3001,7 +2873,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: BUG-2295 a 206 with a 
                                                          options,
                                                          HttpHeaders::ptr_t(),
                                                          handlerp);
-            UNSCOPED_INFO("Valid handle returned for ranged request");
             REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         }
 
@@ -3015,7 +2886,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: BUG-2295 a 206 with a 
         }
         UNSCOPED_INFO("Request executed in reasonable time - ms3");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for each request - ms3");
         CHECK(mHandlerCalls == test3_count);
 
         // ======================================
@@ -3024,7 +2894,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: BUG-2295 a 206 with a 
         mStatus = HttpStatus();
         mHandlerCalls = 0;
         HttpHandle handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -3037,7 +2906,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: BUG-2295 a 206 with a 
         }
         UNSCOPED_INFO("Shutdown request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Shutdown handler invocation");
         CHECK(mHandlerCalls == 1);
 
         // See that we actually shutdown the thread
@@ -3047,7 +2915,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: BUG-2295 a 206 with a 
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release options
@@ -3120,9 +2987,7 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 with
                                                          HttpHeaders::ptr_t(),
                                                          handlerp);
 
-            std::ostringstream testtag;
-            testtag << "Valid handle returned for 503 request #" << i;
-            UNSCOPED_INFO(testtag.str());
+            CAPTURE(i);
             REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
         }
 
@@ -3137,14 +3002,12 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 with
         }
         UNSCOPED_INFO("Request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("One handler invocation for request");
         CHECK(mHandlerCalls == url_limit);
 
         // Okay, request a shutdown of the servicing thread
         mStatus = HttpStatus();
         mHandlerCalls = 0;
         HttpHandle handle = req->requestStopThread(handlerp);
-        UNSCOPED_INFO("Valid handle returned for second request");
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
         // Run the notification pump again
@@ -3157,7 +3020,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 with
         }
         UNSCOPED_INFO("Second request executed in reasonable time");
         CHECK(count < limit);
-        UNSCOPED_INFO("Second handler invocation");
         CHECK(mHandlerCalls == 1);
 
         // See that we actually shutdown the thread
@@ -3167,7 +3029,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 with
         {
             usleep(LOOP_SLEEP_INTERVAL);
         }
-        UNSCOPED_INFO("Thread actually stopped running");
         CHECK(HttpService::isStopped());
 
         // release options

@@ -37,15 +37,10 @@ namespace
         params["value"] = 42;
         LLSD env = LLJSONRPCConnection::makeEnvelope(LLSD(), "runtime.debug", params, LLSD(), LLSD());
 
-        UNSCOPED_INFO("jsonrpc field should exist");
-        REQUIRE(env.has("jsonrpc"));
-        UNSCOPED_INFO("jsonrpc version");
+        CHECK(env.has("jsonrpc"));
         CHECK(env["jsonrpc"].asString() == "2.0");
-        UNSCOPED_INFO("notification should omit id");
-        REQUIRE_FALSE(env.has("id"));
-        UNSCOPED_INFO("method");
+        CHECK_FALSE(env.has("id"));
         CHECK(env["method"].asString() == "runtime.debug");
-        UNSCOPED_INFO("param round trip");
         CHECK(env["params"]["value"].asInteger() == 42);
     }
 
@@ -53,11 +48,8 @@ namespace
     {
         LLSD env = LLJSONRPCConnection::makeEnvelope(LLSD(), std::string(), LLSD(), LLSD("ok"), LLSD());
 
-        UNSCOPED_INFO("response should include id");
-        REQUIRE(env.has("id"));
-        UNSCOPED_INFO("response should not include method");
-        REQUIRE_FALSE(env.has("method"));
-        UNSCOPED_INFO("result");
+        CHECK(env.has("id"));
+        CHECK_FALSE(env.has("method"));
         CHECK(env["result"].asString() == "ok");
     }
 
@@ -71,12 +63,10 @@ namespace
         LLSD params = LLSD::emptyMap();
         params["timestamp"] = 123;
         valid["params"] = params;
-        UNSCOPED_INFO("valid request should pass");
         CHECK(conn.validateMessage(valid, true));
 
         LLSD invalid = valid;
         invalid["params"] = "not-an-array-or-object";
-        UNSCOPED_INFO("invalid params type should fail");
         CHECK_FALSE(conn.validateMessage(invalid, true));
     }
 
@@ -91,7 +81,6 @@ namespace
             [&](const std::string& method, const LLSD& id, const LLSD& params) -> LLSD
             {
                 called = true;
-                UNSCOPED_INFO("method propagated");
                 REQUIRE(method == "runtime.debug");
                 seen_id = id;
                 seen_params = params;
@@ -103,11 +92,8 @@ namespace
         LLSD notification = LLJSONRPCConnection::makeEnvelope(LLSD(), "runtime.debug", params, LLSD(), LLSD());
         conn.processMessage(notification);
 
-        UNSCOPED_INFO("handler should be called");
         CHECK(called);
-        UNSCOPED_INFO("notification id should be undefined");
-        REQUIRE(seen_id.isUndefined());
-        UNSCOPED_INFO("payload should be forwarded");
+        CHECK(seen_id.isUndefined());
         CHECK(seen_params["message"].asString() == "hello");
     }
 
@@ -122,26 +108,21 @@ namespace
             [&](const LLSD& result, const LLSD& error)
             {
                 callback_called = true;
-                UNSCOPED_INFO("timed out result should be undefined");
                 REQUIRE(result.isUndefined());
-                UNSCOPED_INFO("timeout code");
                 REQUIRE(error["code"].asInteger() ==
                     LLJSONRPCConnection::RPCError::REQUEST_TIMEOUT);
             });
 
-        UNSCOPED_INFO("pending request should be tracked");
         CHECK(conn.testPendingRequestCount() == (size_t)1);
         conn.testSweepTimeouts();
-        UNSCOPED_INFO("timeout callback should be called");
         CHECK(callback_called);
-        UNSCOPED_INFO("pending request should be removed");
         CHECK(conn.testPendingRequestCount() == (size_t)0);
     }
 
     TEST_CASE("LLJSONRPCConnection Tests: an unauthenticated connection dispatches nothing until authenticated", "[LLJSONRPCConnection_Tests]")
     {
         TestJSONRPCConnection conn;
-        UNSCOPED_INFO("authenticated unless it says otherwise");
+        UNSCOPED_INFO("authenticated by default");
         CHECK(conn.isAuthenticated());
 
         int calls = 0;
@@ -153,18 +134,15 @@ namespace
             });
 
         conn.setAuthenticated(false);
-        UNSCOPED_INFO("not authenticated");
         CHECK_FALSE(conn.isAuthenticated());
         const LLSD request = LLJSONRPCConnection::makeEnvelope(LLSD("req_1"), "object.list", LLSD::emptyMap(), LLSD(), LLSD());
         conn.processMessage(request);
         const LLSD notification = LLJSONRPCConnection::makeEnvelope(LLSD(), "object.list", LLSD::emptyMap(), LLSD(), LLSD());
         conn.processMessage(notification);
-        UNSCOPED_INFO("neither a request nor a notification reaches the handler");
         CHECK(calls == 0);
 
         conn.setAuthenticated(true);
         conn.processMessage(request);
-        UNSCOPED_INFO("dispatched once authenticated");
         CHECK(calls == 1);
     }
 
@@ -179,7 +157,6 @@ namespace
             LLTimer::getTotalSeconds() + 60.0,
             [&](const LLSD& result, const LLSD& error)
             {
-                UNSCOPED_INFO("no error");
                 REQUIRE(error.isUndefined());
                 answer = result;
             });
@@ -187,9 +164,7 @@ namespace
         LLSD result;
         result["challenge_response"] = "secret";
         conn.processMessage(LLJSONRPCConnection::makeEnvelope(LLSD("rpc_1"), std::string(), LLSD(), result, LLSD()));
-        UNSCOPED_INFO("the answer reached the caller");
         CHECK(answer["challenge_response"].asString() == std::string("secret"));
-        UNSCOPED_INFO("and it is answered");
         CHECK(conn.testPendingRequestCount() == 0);
     }
 
@@ -203,19 +178,16 @@ namespace
             [&](const LLSD&, const LLSD& error) { told = error; });
 
         conn.onClose();
-        UNSCOPED_INFO("closed");
         CHECK(conn.isClosed());
-        UNSCOPED_INFO("the waiting call told it closed");
         CHECK(told["code"].asInteger() == LLJSONRPCConnection::RPCError::CONNECTION_CLOSED);
 
         bool called = false;
         const LLSD id = conn.call("session.handshake", LLSD(), [&](const LLSD&, const LLSD&) { called = true; }, 30.0);
-        UNSCOPED_INFO("not sent");
-        REQUIRE(id.isUndefined());
-        UNSCOPED_INFO("and nothing waiting");
+        UNSCOPED_INFO("the call was not sent");
+        CHECK(id.isUndefined());
         CHECK(conn.testPendingRequestCount() == (size_t)0);
         conn.testSweepTimeouts();
-        UNSCOPED_INFO("so nothing is ever told");
+        UNSCOPED_INFO("a refused call is never told");
         CHECK_FALSE(called);
     }
 }

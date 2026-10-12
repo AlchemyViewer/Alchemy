@@ -120,163 +120,136 @@ namespace
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addBOOL round trips a bool through the reader", "[LLSDMessageBuilder]")
-         // bool
     {
       bool outValue, inValue = true;
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addBOOL("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getBOOL("block", "var", outValue);
-      UNSCOPED_INFO("Ensure bool");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addU8 round trips a U8 through the reader", "[LLSDMessageBuilder]")
-         // U8
     {
       U8 outValue, inValue = 2;
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addU8("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getU8("block", "var", outValue);
-      UNSCOPED_INFO("Ensure U8");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addS16 round trips an S16 through the reader", "[LLSDMessageBuilder]")
-         // S16
     {
       S16 outValue, inValue = 90;
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addS16("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getS16("block", "var", outValue);
-      UNSCOPED_INFO("Ensure S16");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addU16 round trips a U16 through the reader", "[LLSDMessageBuilder]")
-         // U16
     {
       U16 outValue, inValue = 3;
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addU16("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getU16("block", "var", outValue);
-      UNSCOPED_INFO("Ensure U16");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addS32 round trips an S32 through the reader", "[LLSDMessageBuilder]")
-         // S32
     {
       S32 outValue, inValue = 44;
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addS32("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getS32("block", "var", outValue);
-      UNSCOPED_INFO("Ensure S32");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addF32 round trips an F32 through the reader", "[LLSDMessageBuilder]")
-         // F32
     {
       F32 outValue, inValue = 121.44f;
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addF32("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getF32("block", "var", outValue);
-      UNSCOPED_INFO("Ensure F32");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addU32 round trips a U32 through the reader", "[LLSDMessageBuilder]")
-         // U32
     {
       U32 outValue, inValue = 88;
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addU32("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getU32("block", "var", outValue);
-      UNSCOPED_INFO("Ensure U32");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addU64 round trips a U64 through the reader", "[LLSDMessageBuilder]")
-         // U64
     {
       U64 outValue, inValue = 121;
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addU64("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getU64("block", "var", outValue);
-      UNSCOPED_INFO("Ensure U64");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addF64 round trips an F64 through the reader", "[LLSDMessageBuilder]")
-         // F64
     {
       F64 outValue, inValue = 3232143.33;
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addF64("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getF64("block", "var", outValue);
-      UNSCOPED_INFO("Ensure F64");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addVector3 round trips an LLVector3 through the reader", "[LLSDMessageBuilder]")
-         // Vector3
     {
       LLVector3 outValue, inValue = LLVector3(1,2,3);
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addVector3("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getVector3("block", "var", outValue);
-      UNSCOPED_INFO("Ensure Vector3");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addVector4 round trips an LLVector4 through the reader", "[LLSDMessageBuilder]")
-         // Vector4
     {
       LLVector4 outValue, inValue = LLVector4(1,2,3,4);
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addVector4("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getVector4("block", "var", outValue);
-      UNSCOPED_INFO("Ensure Vector4");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addVector3d round trips an LLVector3d through the reader", "[LLSDMessageBuilder]")
-         // Vector3d
     {
       LLVector3d outValue, inValue = LLVector3d(1,2,3);
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addVector3d("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getVector3d("block", "var", outValue);
-      UNSCOPED_INFO("Ensure Vector3d");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addQuat round trips an LLQuaternion through the reader", "[LLSDMessageBuilder]")
-         // Quaternion
     {
       LLQuaternion outValue, inValue = LLQuaternion(1,LLVector3(2,3,4));
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addQuat("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getQuat("block", "var", outValue);
-      UNSCOPED_INFO("Ensure Quaternion");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addUUID round trips a generated UUID through the reader", "[LLSDMessageBuilder]")
-         // UUID
     {
       LLUUID outValue, inValue;
       inValue.generate();
@@ -284,31 +257,26 @@ namespace
       builder.addUUID("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getUUID("block", "var", outValue);
-      UNSCOPED_INFO("Ensure UUID");
       CHECK(inValue == outValue);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addIPAddr round trips an address through the reader", "[LLSDMessageBuilder]")
-         // IPAddr
     {
       U32 outValue, inValue = 12344556;
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addIPAddr("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getIPAddr("block", "var", outValue);
-      UNSCOPED_INFO("Ensure IPAddr");
       CHECK(inValue == outValue);
     }
 
      TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: addIPPort round trips a port through the reader", "[LLSDMessageBuilder]")
-         // IPPort
     {
          U16 outValue, inValue = 80;
       LLSDMessageBuilder builder = defaultBuilder();
       builder.addIPPort("var", inValue);
       LLSDMessageReader reader = setReader(builder);
       reader.getIPPort("block", "var", outValue);
-      UNSCOPED_INFO("Ensure IPPort");
       CHECK(inValue == outValue);
     }
 
@@ -321,7 +289,6 @@ namespace
       char buffer[MAX_STRING];
       reader.getString("block", "var", MAX_STRING, buffer);
       outValue = buffer;
-      UNSCOPED_INFO("Ensure String");
       CHECK(inValue == outValue);
     }
 
@@ -335,11 +302,9 @@ namespace
       builder.copyFromMessageData(*md);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure message block created when copied from legacy message to llsd");
-      REQUIRE(output["testBlock"].isDefined());
+      CHECK(output["testBlock"].isDefined());
     }
 
-    // MVT_FIXED
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_FIXED as binary", "[LLSDMessageBuilder]")
     {
       char binData[] = "abcdefghijklmnop";
@@ -352,14 +317,11 @@ namespace
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      UNSCOPED_INFO("Ensure MVT_S16Array data copied from legacy to llsd give a valid vector");
       REQUIRE(v.size() > 0);
 
-      UNSCOPED_INFO("Ensure fixed binary data works in a message copied from legacy to llsd");
-      REQUIRE_THAT(ll_test::Memory(&v[0], sizeof(binData)), ll_test::MemoryMatches(binData, sizeof(binData)));
+      CHECK_THAT(ll_test::Memory(&v[0], sizeof(binData)), ll_test::MemoryMatches(binData, sizeof(binData)));
     }
 
-    // MVT_VARIABLE data_size 1 (U8's)
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData of MVT_VARIABLE data_size 1 is commented out", "[LLSDMessageBuilder]")
     {
      /* U8 binData[] = "abcdefghijklmnop";
@@ -378,7 +340,6 @@ namespace
           &v[0], sizeof(binData), binData, sizeof(binData));*/
     }
 
-    // MVT_VARIABLE data_size 2 (U16's)
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_VARIABLE data_size 2 U16s as binary", "[LLSDMessageBuilder]")
     {
       U16 binData[] = {1,2,3,4,5,6,7,8,9}; //9 shorts
@@ -391,14 +352,11 @@ namespace
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      UNSCOPED_INFO("Ensure MVT_S16Array data copied from legacy to llsd give a valid vector");
       REQUIRE(v.size() > 0);
 
-      UNSCOPED_INFO("Ensure MVT_VARIABLE U16 binary data works in a message copied from legacy to llsd");
-      REQUIRE_THAT(ll_test::Memory(&v[0], sizeof(binData) >> 1), ll_test::MemoryMatches(binData, sizeof(binData) >> 1));
+      CHECK_THAT(ll_test::Memory(&v[0], sizeof(binData) >> 1), ll_test::MemoryMatches(binData, sizeof(binData) >> 1));
     }
 
-    // MVT_VARIABLE data_size 4 (S32's)
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_VARIABLE data_size 4 U32s as binary", "[LLSDMessageBuilder]")
     {
       U32 binData[] = {9,8,7,6,5,4,3,2,1};
@@ -411,14 +369,11 @@ namespace
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      UNSCOPED_INFO("Ensure MVT_S16Array data copied from legacy to llsd give a valid vector");
       REQUIRE(v.size() > 0);
 
-      UNSCOPED_INFO("Ensure MVT_VARIABLE S32 binary data works in a message copied from legacy to llsd");
-      REQUIRE_THAT(ll_test::Memory(&v[0], sizeof(binData) >> 2), ll_test::MemoryMatches(binData, sizeof(binData) >> 2));
+      CHECK_THAT(ll_test::Memory(&v[0], sizeof(binData) >> 2), ll_test::MemoryMatches(binData, sizeof(binData) >> 2));
     }
 
-    // MVT_U8
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_U8 as an integer", "[LLSDMessageBuilder]")
     {
       U8 data = 0xa5;
@@ -430,11 +385,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_U8 data works in a message copied from legacy to llsd");
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == data);
     }
 
-    // MVT_U16
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_U16 as an integer", "[LLSDMessageBuilder]")
     {
       U16 data = 0xa55a;
@@ -446,11 +399,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_U16 data works in a message copied from legacy to llsd");
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == data);
     }
 
-    // MVT_U32
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_U32 for ll_U32_from_sd", "[LLSDMessageBuilder]")
     {
       U32 data = 0xa55a7117;
@@ -462,7 +413,6 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_U32 data works in a message copied from legacy to llsd");
       CHECK(ll_U32_from_sd(output["testBlock"][0]["testBinData"]) == data);
     }
 
@@ -477,11 +427,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_U64 data works in a message copied from legacy to llsd");
       CHECK(ll_U64_from_sd(output["testBlock"][0]["testBinData"]) == data);
     }
 
-    // MVT_S8
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_S8 as an integer", "[LLSDMessageBuilder]")
     {
       S8 data = -31;
@@ -493,11 +441,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_S8 data works in a message copied from legacy to llsd");
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == data);
     }
 
-    // MVT_S16
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_S16 as an integer", "[LLSDMessageBuilder]")
     {
       S16 data = -31;
@@ -509,11 +455,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_S16 data works in a message copied from legacy to llsd");
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == data);
     }
 
-    // MVT_S32
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_S32 as an integer", "[LLSDMessageBuilder]")
     {
       S32 data = -3100;
@@ -525,7 +469,6 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_S32 data works in a message copied from legacy to llsd");
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == data);
     }
 
@@ -541,11 +484,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_S64 data works in a message copied from legacy to llsd");
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == (S32)data);
     }
 
-    // MVT_F32
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_F32 as a real", "[LLSDMessageBuilder]")
     {
       F32 data = 1234.1234f;
@@ -557,11 +498,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_F32 data works in a message copied from legacy to llsd");
       CHECK(output["testBlock"][0]["testBinData"].asReal() == data);
     }
 
-    // MVT_F64
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_F64 as a real", "[LLSDMessageBuilder]")
     {
       F64 data = 1234.1234;
@@ -573,11 +512,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_F64 data works in a message copied from legacy to llsd");
       CHECK(output["testBlock"][0]["testBinData"].asReal() == data);
     }
 
-    // MVT_LLVector3
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_LLVector3 for ll_vector3_from_sd", "[LLSDMessageBuilder]")
     {
       LLVector3 data(1,2,3);
@@ -589,11 +526,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_LLVector3 data works in a message copied from legacy to llsd");
       CHECK(ll_vector3_from_sd(output["testBlock"][0]["testBinData"]) == data);
     }
 
-    // MVT_LLVector3d
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_LLVector3d for ll_vector3d_from_sd", "[LLSDMessageBuilder]")
     {
       LLVector3d data(1,2,3);
@@ -605,11 +540,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_LLVector3 data works in a message copied from legacy to llsd");
       CHECK(ll_vector3d_from_sd(output["testBlock"][0]["testBinData"]) == data);
     }
 
-    // MVT_LLVector4
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_LLVector4 as ll_sd_from_vector4 does", "[LLSDMessageBuilder]")
     {
       LLVector4 data(1,2,3,4);
@@ -622,11 +555,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_LLVector4 data works in a message copied from legacy to llsd");
       CHECK_THAT(output["testBlock"][0]["testBinData"], ll_test::LLSDEquals(v));
     }
 
-    // MVT_LLQuaternion
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData unpacks MVT_LLQuaternion from a packed vector", "[LLSDMessageBuilder]")
     {
       LLQuaternion data(0.3713907f, 0.5570861f, 0.7427813f,0.0f);
@@ -641,11 +572,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_LLQuaternion data works in a message copied from legacy to llsd");
       CHECK(ll_quaternion_from_sd(output["testBlock"][0]["testBinData"]) == data);
     }
 
-    // MVT_LLUUID
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_LLUUID as a UUID", "[LLSDMessageBuilder]")
     {
       LLUUID data("01234567-0123-0123-0123-234567abcdef");
@@ -659,11 +588,9 @@ namespace
 
       std::string v = output["testBlock"][0]["testBinData"].asUUID().asString();
 
-      UNSCOPED_INFO("Ensure MVT_LLUUID data works in a message copied from legacy to llsd");
       CHECK(output["testBlock"][0]["testBinData"].asUUID() == data);
     }
 
-    // MVT_BOOL
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_BOOL true and false", "[LLSDMessageBuilder]")
     {
       bool valueTrue = true;
@@ -679,14 +606,10 @@ namespace
       builder.copyFromMessageData(*md);
       LLSD output = builder.getMessage();
 
-      {
-          INFO("Ensure bools work in a message copied from legacy to llsd");
-          CHECK(output["testBlock"][0]["testBoolTrue"].asBoolean());
-          CHECK_FALSE(output["testBlock"][0]["testBoolFalse"].asBoolean());
-      }
+      CHECK(output["testBlock"][0]["testBoolTrue"].asBoolean());
+      CHECK_FALSE(output["testBlock"][0]["testBoolFalse"].asBoolean());
     }
 
-    // MVT_IP_ADDR
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_IP_ADDR as ll_sd_from_ipaddr does", "[LLSDMessageBuilder]")
     {
       U32 data(0xff887766);
@@ -699,11 +622,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_IP_ADDR data works in a message copied from legacy to llsd");
       CHECK_THAT(output["testBlock"][0]["testBinData"], ll_test::LLSDEquals(v));
     }
 
-    // MVT_IP_PORT
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_IP_PORT as an integer", "[LLSDMessageBuilder]")
     {
       U16 data = 0xff88;
@@ -715,11 +636,9 @@ namespace
       builder.copyFromMessageData(*messageData);
       LLSD output = builder.getMessage();
 
-      UNSCOPED_INFO("Ensure MVT_IP_PORT data works in a message copied from legacy to llsd");
       CHECK(output["testBlock"][0]["testBinData"].asInteger() == data);
     }
 
-    // MVT_U16Vec3
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_U16Vec3 as six bytes", "[LLSDMessageBuilder]")
     {
       U16 data[3] = {0,1,2};
@@ -732,14 +651,11 @@ namespace
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      UNSCOPED_INFO("Ensure MVT_U16Vec3 data copied from legacy to llsd give a valid vector");
       REQUIRE(v.size() > 0);
 
-      UNSCOPED_INFO("Ensure MVT_U16Vec3 data works in a message copied from legacy to llsd");
-      REQUIRE_THAT(ll_test::Memory((U16*)&v[0], 6), ll_test::MemoryMatches(data, 6));
+      CHECK_THAT(ll_test::Memory((U16*)&v[0], 6), ll_test::MemoryMatches(data, 6));
     }
 
-    // MVT_U16Quat
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_U16Quat as eight bytes", "[LLSDMessageBuilder]")
     {
       U16 data[4] = {0,1,2,4};
@@ -752,14 +668,11 @@ namespace
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      UNSCOPED_INFO("Ensure MVT_U16Quat data copied from legacy to llsd give a valid vector");
       REQUIRE(v.size() > 0);
 
-      UNSCOPED_INFO("Ensure MVT_U16Quat data works in a message copied from legacy to llsd");
-      REQUIRE_THAT(ll_test::Memory((U16*)&v[0], 8), ll_test::MemoryMatches(data, 8));
+      CHECK_THAT(ll_test::Memory((U16*)&v[0], 8), ll_test::MemoryMatches(data, 8));
     }
 
-    // MVT_S16Array
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies MVT_S16Array as binary", "[LLSDMessageBuilder]")
     {
       S16 data[19] = {0,-1,2,-4,5,-6,7,-8,9,-10,11,-12,13,-14,15,16,17,18};
@@ -772,11 +685,9 @@ namespace
       LLSD output = builder.getMessage();
 
       std::vector<U8> v = output["testBlock"][0]["testBinData"].asBinary();
-      UNSCOPED_INFO("Ensure MVT_S16Array data copied from legacy to llsd give a valid vector");
       REQUIRE(v.size() > 0);
 
-      UNSCOPED_INFO("Ensure MVT_S16Array data works in a message copied from legacy to llsd");
-      REQUIRE_THAT(ll_test::Memory((U16*)&v[0], 19), ll_test::MemoryMatches(data, 19));
+      CHECK_THAT(ll_test::Memory((U16*)&v[0], 19), ll_test::MemoryMatches(data, 19));
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData copies a U8 from an LLTemplateMessageBuilder", "[LLSDMessageBuilder]")
@@ -822,10 +733,8 @@ namespace
         builder.copyFromMessageData(*messageData);
         LLSD output = builder.getMessage();
 
-        UNSCOPED_INFO("Ensure empty variable copied from legacy to llsd is present");
-        REQUIRE(output["testBlock"][0]["testBinData"].isDefined());
-        UNSCOPED_INFO("Ensure empty variable copied from legacy to llsd is empty");
-        REQUIRE(output["testBlock"][0]["testBinData"].asBinary().size() == (size_t)0);
+        CHECK(output["testBlock"][0]["testBinData"].isDefined());
+        CHECK(output["testBlock"][0]["testBinData"].asBinary().size() == (size_t)0);
     }
 
     TEST_CASE_METHOD(LLSDMessageBuilderTestData, "LLSDMessageBuilder: copyFromMessageData skips a placeholder variable never filled", "[LLSDMessageBuilder]")
@@ -846,10 +755,8 @@ namespace
         sd_builder.copyFromMessageData(*builder->getCurrentMessage());
         LLSD output = sd_builder.getMessage();
 
-        UNSCOPED_INFO("Ensure filled variable copied");
         CHECK(output["Test0"][0]["Test0"].asInteger() == 7);
-        UNSCOPED_INFO("Ensure unfilled placeholder variable not copied");
-        REQUIRE_FALSE(output["Test0"][0].has("Test1"));
+        CHECK_FALSE(output["Test0"][0].has("Test1"));
     }
 
 }

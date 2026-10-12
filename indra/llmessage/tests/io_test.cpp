@@ -72,12 +72,10 @@ namespace
         LLChannelDescriptors ch = mBuffer.nextChannel();
         mBuffer.append(ch.in(), (U8*)HELLO_WORLD, str_len);
         S32 count = mBuffer.countAfter(ch.in(), NULL);
-        UNSCOPED_INFO("total append size");
         CHECK(count == str_len);
         LLBufferArray::segment_iterator_t it = mBuffer.beginSegment();
         U8* first = (*it).data();
         count = mBuffer.countAfter(ch.in(), first);
-        UNSCOPED_INFO("offset append size");
         CHECK(count == str_len - 1);
     }
 
@@ -89,12 +87,10 @@ namespace
         mBuffer.append(ch.in(), (U8*)HELLO_WORLD, str_len);
         mBuffer.append(ch.in(), (U8*)HELLO_WORLD, str_len);
         S32 count = mBuffer.countAfter(ch.in(), NULL);
-        UNSCOPED_INFO("total append size");
         CHECK(count == 2 * str_len);
         LLBufferArray::segment_iterator_t it = mBuffer.beginSegment();
         U8* first = (*it).data();
         count = mBuffer.countAfter(ch.in(), first);
-        UNSCOPED_INFO("offset append size");
         CHECK(count == (2 * str_len) - 1);
     }
 
@@ -113,7 +109,6 @@ namespace
         CHECK(len == 6);
         buffer[len] = '\0';
         std::string actual(buffer);
-        UNSCOPED_INFO("read");
         CHECK(actual == expected);
     }
 
@@ -132,7 +127,6 @@ namespace
         CHECK(len == 6);
         buffer[len] = '\0';
         std::string actual(buffer);
-        UNSCOPED_INFO("read");
         CHECK(actual == expected);
     }
 
@@ -152,7 +146,6 @@ namespace
         CHECK(len == 5);
         buffer[len] = '\0';
         std::string actual(buffer);
-        UNSCOPED_INFO("read");
         CHECK(actual == expected);
     }
 
@@ -173,12 +166,10 @@ namespace
         mBuffer.prepend(ch.out(), (U8*)head.c_str(), static_cast<S32>(head.length()));
         char buffer[1024];  /* Flawfinder: ignore */
         S32 len = static_cast<S32>(response.size() + head.length());
-        UNSCOPED_INFO("same length");
-        REQUIRE(len == (S32)expected.str().length());
+        CHECK(len == (S32)expected.str().length());
         mBuffer.readAfter(ch.out(), NULL, (U8*)buffer, len);
         buffer[len] = '\0';
         std::string actual(buffer);
-        UNSCOPED_INFO("threaded writes");
         CHECK(actual == expected.str());
     }
 
@@ -213,9 +204,7 @@ namespace
             ++newline;
             *newline = '\0';
             last_line.assign(buf);
-            std::ostringstream message;
-            message << "line reads in line["     << i << "]";
-            UNSCOPED_INFO(message.str().c_str());
+            CAPTURE(i);
             REQUIRE(last_line == lines[i]);
             last = mBuffer.seek(ch.in(), last, offset);
         }
@@ -230,11 +219,9 @@ namespace
         mBuffer.takeContents(buffer);
         mBuffer.append(ch.in(), (U8*)"3", 1);
         S32 count = mBuffer.countAfter(ch.in(), NULL);
-        UNSCOPED_INFO("buffer size");
-        CHECK(count == 3);
+        REQUIRE(count == 3);
         U8* temp = new U8[count];
         mBuffer.readAfter(ch.in(), NULL, temp, count);
-        UNSCOPED_INFO("buffer content");
         CHECK(memcmp(temp, (void*)"123", 3) == 0);
         delete[] temp;
     }
@@ -244,7 +231,6 @@ namespace
         LLChannelDescriptors ch = mBuffer.nextChannel();
         mBuffer.append(ch.in(), (U8*)"1", 1);
         S32 capacity = mBuffer.capacity();
-        UNSCOPED_INFO("has capacity");
         CHECK(capacity > 0);
         U8* temp = new U8[capacity - 1];
         mBuffer.append(ch.in(), temp, capacity - 1);
@@ -252,7 +238,6 @@ namespace
         UNSCOPED_INFO("has capacity when full");
         CHECK(capacity > 0);
         S32 used = mBuffer.countAfter(ch.in(), NULL);
-        UNSCOPED_INFO("used equals capacity");
         CHECK(used == capacity);
 
         LLBufferArray::segment_iterator_t iter = mBuffer.beginSegment();
@@ -262,7 +247,6 @@ namespace
         }
 
         used = mBuffer.countAfter(ch.in(), NULL);
-        UNSCOPED_INFO("used is zero");
         CHECK(used == 0);
         S32 capacity2 = mBuffer.capacity();
         UNSCOPED_INFO("capacity the same after erase");
@@ -337,9 +321,7 @@ namespace
         std::string hello;
         std::string world;
         str >> hello >> world;
-        UNSCOPED_INFO("first word");
         CHECK(hello == std::string("hello"));
-        UNSCOPED_INFO("second word");
         CHECK(world == std::string("world"));
     }
 
@@ -360,13 +342,9 @@ namespace
         std::string shorts;
         std::string homer;
         str >> eat >> my >> shorts >> homer;
-        UNSCOPED_INFO("word1");
         CHECK(eat == std::string("Eat"));
-        UNSCOPED_INFO("word2");
         CHECK(my == std::string("my"));
-        UNSCOPED_INFO("word3");
         CHECK(shorts == std::string("shorts"));
-        UNSCOPED_INFO("word4");
         CHECK(homer == std::string("homer"));
     }
 
@@ -384,14 +362,12 @@ namespace
         last = mBuffer.readAfter(CHANNEL, last, (U8*)buf, len);
         buf[len] = '\0';
         std::string actual(buf);
-        UNSCOPED_INFO("first read");
         CHECK(actual == std::string("junk in the"));
         last = mBuffer.seek(CHANNEL, last, -6);
         len = 12;
         last = mBuffer.readAfter(CHANNEL, last, (U8*)buf, len);
         buf[len] = '\0';
         actual.assign(buf);
-        UNSCOPED_INFO("seek and read");
         CHECK(actual == std::string("in the trunk"));
     }
 
@@ -408,14 +384,11 @@ namespace
         LLBufferArray::segment_iterator_t it = mBuffer.beginSegment();
         LLBufferArray::segment_iterator_t end = mBuffer.endSegment();
         std::string first((char*)((*it).data()), (*it).size());
-        UNSCOPED_INFO("first part");
         CHECK(first == std::string("zippity"));
         ++it;
         std::string second((char*)((*it).data()), (*it).size());
-        UNSCOPED_INFO("second part");
         CHECK(second == std::string(" do da!"));
         ++it;
-        UNSCOPED_INFO("iterators equal");
         CHECK(it == end);
     }
 
@@ -434,11 +407,9 @@ namespace
         S32 actual_len = BUF_LEN;
         S32 expected_len = static_cast<S32>(h1.size() + h2.size());
         (void) mBuffer.readAfter(ch.out(), NULL, (U8*)buf, actual_len);
-        UNSCOPED_INFO("streamed size");
-        CHECK(actual_len == expected_len);
+        REQUIRE(actual_len == expected_len);
         buf[actual_len] = '\0';
         std::string actual(buf);
-        UNSCOPED_INFO("streamed to buf");
         CHECK(actual == expected);
     }
 
@@ -482,9 +453,7 @@ namespace
         buf[actual_len] = '\0';
         std::string actual(buf);
         std::string expected(ostr.str());
-        UNSCOPED_INFO("size of string in seek");
-        REQUIRE(actual.size() == expected.size());
-        UNSCOPED_INFO("seek in ostream");
+        CHECK(actual.size() == expected.size());
         CHECK(actual == expected);
     }
 
@@ -495,22 +464,18 @@ namespace
         bstr << "1";
         bstr.flush();
         S32 count = mBuffer.countAfter(ch.out(), NULL);
-        UNSCOPED_INFO("buffer size 1");
         CHECK(count == 1);
         LLBufferArray buffer;
         buffer.append(ch.out(), (U8*)"2", 1);
         mBuffer.takeContents(buffer);
         count = mBuffer.countAfter(ch.out(), NULL);
-        UNSCOPED_INFO("buffer size 2");
         CHECK(count == 2);
         bstr << "3";
         bstr.flush();
         count = mBuffer.countAfter(ch.out(), NULL);
-        UNSCOPED_INFO("buffer size 3");
-        CHECK(count == 3);
+        REQUIRE(count == 3);
         U8* temp = new U8[count];
         mBuffer.readAfter(ch.out(), NULL, temp, count);
-        UNSCOPED_INFO("buffer content");
         CHECK(memcmp(temp, (void*)"123", 3) == 0);
         delete[] temp;
     }
@@ -556,29 +521,19 @@ namespace
         // now that we have a bunch of data on a stream, parse it all.
         ch = mBuffer.nextChannel();
         S32 count = mBuffer.countAfter(ch.in(), NULL);
-        UNSCOPED_INFO("size of buffer");
         CHECK(count == total_size);
         LLBufferStream istr(ch, &mBuffer);
         LLSD data;
         count = LLSDSerialize::fromNotation(data, istr, total_size);
-        UNSCOPED_INFO("sd parsed");
         REQUIRE(data.isDefined());
 
         for(S32 j = 0; j < 3; ++j)
         {
-            std::ostringstream name;
+            CAPTURE(j);
             LLSD child(data[j]);
-            name << "found buffer " << j;
-            UNSCOPED_INFO(name.str());
             REQUIRE(child.isDefined());
             source = child.asBinary();
-            name.str("");
-            name << "buffer " << j << " size";
-            UNSCOPED_INFO(name.str().c_str());
             REQUIRE(source.size() == actual[j].size());
-            name.str("");
-            name << "buffer " << j << " contents";
-            UNSCOPED_INFO(name.str());
             REQUIRE(memcmp(&source[0], &actual[j][0], source.size()) == 0);
         }
     }
@@ -623,13 +578,11 @@ namespace
         // now that we have a bunch of data on a stream, parse it all.
         ch = mBuffer.nextChannel();
         S32 count = mBuffer.countAfter(ch.in(), NULL);
-        UNSCOPED_INFO("size of buffer");
         CHECK(count == total_size);
         LLBufferStream istr(ch, &mBuffer);
         LLSD data;
         count = LLSDSerialize::fromNotation(data, istr, total_size);
-        UNSCOPED_INFO("sd parsed");
-        REQUIRE(data.isDefined());
+        CHECK(data.isDefined());
     }
 
     TEST_CASE_METHOD(buffer_and_stream_data, "buffer_stream: a notation login request parses from the stream", "[buffer_stream]")
@@ -670,18 +623,12 @@ namespace
             data,
             istr,
             mBuffer.count(ch.in()));
-        UNSCOPED_INFO("parsed something");
         CHECK(count > 0);
-        UNSCOPED_INFO("sd parsed");
         REQUIRE(data.isDefined());
-        UNSCOPED_INFO("sd type");
         CHECK(data.type() == LLSD::TypeMap);
-        UNSCOPED_INFO("has method");
-        REQUIRE(data.has("method"));
-        UNSCOPED_INFO("has parameter");
+        CHECK(data.has("method"));
         REQUIRE(data.has("parameter"));
         LLSD parameter = data["parameter"];
-        UNSCOPED_INFO("parameter is array");
         CHECK(parameter.type() == LLSD::TypeArray);
         LLSD agent_params = parameter[2];
         std::string s_value;
@@ -703,15 +650,12 @@ namespace
 
         LLUUID agent_id("0e346d8b-4433-4d66-a6b0-fd37083abc4c");
         LLUUID id = agent_params["agent_id"];
-        UNSCOPED_INFO("agent id");
         CHECK(id == agent_id);
         LLUUID session_id("324cfa9f-fe5d-4d1c-a317-35f20a86a4d1");
         id = agent_params["session_id"];
-        UNSCOPED_INFO("session id");
         CHECK(id == session_id);
         LLUUID group_id ("8615c885-9cf0-bf0a-6e40-0c11462aa652");
         id = agent_params["group_id"];
-        UNSCOPED_INFO("group id");
         CHECK(id == group_id);
 
         S32 i_val = agent_params["limited_to_estate"];
@@ -730,10 +674,8 @@ namespace
         istr.str(val);
         LLSD sd;
         S32 count = LLSDSerialize::fromNotation(sd, istr, val.size());
-        UNSCOPED_INFO("parser error return value");
         CHECK(count == -1);
-        UNSCOPED_INFO("data undefined");
-        REQUIRE(sd.isUndefined());
+        CHECK(sd.isUndefined());
     }
 
     TEST_CASE_METHOD(buffer_and_stream_data, "buffer_stream: fromNotation fails on garbage nested in arrays and maps", "[buffer_stream]")
@@ -746,22 +688,20 @@ namespace
         istr.str(val);
         LLSD sd;
         S32 count = LLSDSerialize::fromNotation(sd, istr, val.size());
-        UNSCOPED_INFO("parser error return value");
         CHECK(count == -1);
-        UNSCOPED_INFO("data undefined");
-        REQUIRE(sd.isUndefined());
+        CHECK(sd.isUndefined());
     }
 
     TEST_CASE_METHOD(heap_buffer_data, "heap_buffer: capacity does not change when a segment is made", "[heap_buffer]")
     {
         const S32 BUF_SIZE = 100;
         mBuffer = new LLHeapBuffer(BUF_SIZE);
-        UNSCOPED_INFO("empty buffer capacity");
+        UNSCOPED_INFO("before any segment");
         CHECK(mBuffer->capacity() == BUF_SIZE);
         const S32 SEGMENT_SIZE = 50;
         LLSegment segment;
         mBuffer->createSegment(0, SEGMENT_SIZE, segment);
-        UNSCOPED_INFO("used buffer capacity");
+        UNSCOPED_INFO("after a segment");
         CHECK(mBuffer->capacity() == BUF_SIZE);
     }
 
@@ -771,16 +711,14 @@ namespace
         mBuffer = new LLHeapBuffer(BUF_SIZE);
         LLSegment segment;
         mBuffer->createSegment(0, BUF_SIZE, segment);
-        UNSCOPED_INFO("segment is in buffer");
         CHECK(mBuffer->containsSegment(segment));
-        UNSCOPED_INFO("buffer consumed");
         CHECK(mBuffer->bytesLeft() == 0);
         bool  created;
         created = mBuffer->createSegment(0, 0, segment);
-        UNSCOPED_INFO("Create zero size segment fails");
+        UNSCOPED_INFO("zero size segment");
         CHECK_FALSE(created);
         created = mBuffer->createSegment(0, BUF_SIZE, segment);
-        UNSCOPED_INFO("Create segment fails");
+        UNSCOPED_INFO("segment in a full buffer");
         CHECK_FALSE(created);
     }
 
@@ -790,21 +728,17 @@ namespace
         mBuffer = new LLHeapBuffer(BUF_SIZE);
         LLSegment segment;
         mBuffer->createSegment(0, BUF_SIZE, segment);
-        UNSCOPED_INFO("segment is in buffer");
         CHECK(mBuffer->containsSegment(segment));
-        UNSCOPED_INFO("buffer consumed");
         CHECK(mBuffer->bytesLeft() == 0);
         bool reclaimed = mBuffer->reclaimSegment(segment);
-        UNSCOPED_INFO("buffer reclaimed.");
         CHECK(reclaimed);
-        UNSCOPED_INFO("buffer available");
         CHECK(mBuffer->bytesLeft() == BUF_SIZE);
         bool  created;
         created = mBuffer->createSegment(0, 0, segment);
-        UNSCOPED_INFO("Create zero size segment fails");
+        UNSCOPED_INFO("zero size segment");
         CHECK_FALSE(created);
         created = mBuffer->createSegment(0, BUF_SIZE, segment);
-        UNSCOPED_INFO("Create another segment succeeds");
+        UNSCOPED_INFO("full size segment after the reclaim");
         CHECK(created);
     }
 
@@ -815,43 +749,33 @@ namespace
         mBuffer = new LLHeapBuffer(BUF_SIZE);
         LLSegment seg1;
         mBuffer->createSegment(0, SEGMENT_SIZE, seg1);
-        UNSCOPED_INFO("segment is in buffer");
         CHECK(mBuffer->containsSegment(seg1));
         LLSegment seg2;
         mBuffer->createSegment(0, SEGMENT_SIZE, seg2);
-        UNSCOPED_INFO("segment is in buffer");
         CHECK(mBuffer->containsSegment(seg2));
         LLSegment seg3;
         mBuffer->createSegment(0, SEGMENT_SIZE, seg3);
-        UNSCOPED_INFO("segment is in buffer");
         CHECK(mBuffer->containsSegment(seg3));
         UNSCOPED_INFO("segment is truncated");
-        REQUIRE(seg3.size() == 2);
+        CHECK(seg3.size() == 2);
         LLSegment seg4;
         bool created;
         created = mBuffer->createSegment(0, SEGMENT_SIZE, seg4);
-        UNSCOPED_INFO("Create segment fails");
+        UNSCOPED_INFO("fourth segment in a full buffer");
         CHECK_FALSE(created);
         bool reclaimed;
         reclaimed = mBuffer->reclaimSegment(seg1);
-        UNSCOPED_INFO("buffer reclaim succeed.");
         CHECK(reclaimed);
-        UNSCOPED_INFO("no buffer available");
         CHECK(mBuffer->bytesLeft() == 0);
         reclaimed = mBuffer->reclaimSegment(seg2);
-        UNSCOPED_INFO("buffer reclaim succeed.");
         CHECK(reclaimed);
-        UNSCOPED_INFO("buffer reclaimed");
         CHECK(mBuffer->bytesLeft() == 0);
         reclaimed = mBuffer->reclaimSegment(seg3);
-        UNSCOPED_INFO("buffer reclaim succeed.");
         CHECK(reclaimed);
-        UNSCOPED_INFO("buffer reclaimed");
         CHECK(mBuffer->bytesLeft() == BUF_SIZE);
         created = mBuffer->createSegment(0, SEGMENT_SIZE, seg1);
-        UNSCOPED_INFO("segment is in buffer");
         CHECK(mBuffer->containsSegment(seg1));
-        UNSCOPED_INFO("Create segment succeds");
+        UNSCOPED_INFO("segment after every reclaim");
         CHECK(created);
     }
 
@@ -1012,7 +936,6 @@ namespace
         LLSocket::ptr_t client = LLSocket::create(mPool, LLSocket::STREAM_TCP);
         LLHost server_host("127.0.0.1", mServerPort);
         bool connected = client->blockingConnect(server_host);
-        UNSCOPED_INFO("Connected to server");
         CHECK(connected);
         LL_DEBUGS() << "connected" << LL_ENDL;
 
@@ -1028,7 +951,6 @@ namespace
         // Now, the server should immediately send the data, but we'll
         // never read it. pump for a bit
         F32 elapsed = pump_loop(mPump, 2.0f);
-        UNSCOPED_INFO("Did not take too long");
         CHECK(elapsed < 3.0f);
     }
 
@@ -1056,7 +978,6 @@ namespace
         LLSocket::ptr_t client = LLSocket::create(mPool, LLSocket::STREAM_TCP);
         LLHost server_host("127.0.0.1", mServerPort);
         bool connected = client->blockingConnect(server_host);
-        UNSCOPED_INFO("Connected to server");
         CHECK(connected);
         LL_DEBUGS() << "connected" << LL_ENDL;
 
@@ -1072,7 +993,6 @@ namespace
         // Now, the server should immediately send the data, but we'll
         // never read it. pump for a bit
         F32 elapsed = pump_loop(mPump, SHORT_CHAIN_EXPIRY_SECS * 2.0f);
-        UNSCOPED_INFO("Did not take too long");
         CHECK(elapsed < 3.0f);
     }
 
@@ -1100,7 +1020,6 @@ namespace
         LLSocket::ptr_t client = LLSocket::create(mPool, LLSocket::STREAM_TCP);
         LLHost server_host("127.0.0.1", mServerPort);
         bool connected = client->blockingConnect(server_host);
-        UNSCOPED_INFO("Connected to server");
         CHECK(connected);
         LL_DEBUGS() << "connected" << LL_ENDL;
 
@@ -1116,7 +1035,6 @@ namespace
         // Now, the server should immediately send the data, but we'll
         // never read it. pump for a bit
         F32 elapsed = pump_loop(mPump, SHORT_CHAIN_EXPIRY_SECS * 2.0f + 1.0f);
-        UNSCOPED_INFO("Did not take too long");
         CHECK(elapsed < 4.0f);
     }
 
@@ -1144,7 +1062,6 @@ namespace
         LLSocket::ptr_t client = LLSocket::create(mPool, LLSocket::STREAM_TCP);
         LLHost server_host("127.0.0.1", mServerPort);
         bool connected = client->blockingConnect(server_host);
-        UNSCOPED_INFO("Connected to server");
         CHECK(connected);
         LL_DEBUGS() << "connected" << LL_ENDL;
 
@@ -1160,7 +1077,6 @@ namespace
         // Now, the server should immediately send the data, but we'll
         // never read it. pump for a bit
         F32 elapsed = pump_loop(mPump, SHORT_CHAIN_EXPIRY_SECS + 3.0f);
-        UNSCOPED_INFO("Did not take too long");
         CHECK(elapsed < DEFAULT_CHAIN_EXPIRY_SECS);
     }
 
@@ -1189,12 +1105,11 @@ namespace
         LLSocket::ptr_t client = LLSocket::create(mPool, LLSocket::STREAM_TCP);
         LLHost server_host("127.0.0.1", mServerPort);
         bool connected = client->blockingConnect(server_host);
-        UNSCOPED_INFO("Connected to server");
         CHECK(connected);
         LL_DEBUGS() << "connected" << LL_ENDL;
         pump_loop(mPump,0.1f);
         count = mPump->runningChains();
-        UNSCOPED_INFO("server chain onboard");
+        UNSCOPED_INFO("accepted socket chain onboard");
         CHECK(count == 2);
         LL_DEBUGS() << "** Client is connected." << LL_ENDL;
 
@@ -1218,14 +1133,14 @@ namespace
         // server socket should not be closed yet.
         pump_loop(mPump,0.2f);
         count = mPump->runningChains();
-        UNSCOPED_INFO("client chain timed out ");
+        UNSCOPED_INFO("client chain timed out");
         CHECK(count == 2);
         LL_DEBUGS() << "** client chain should be closed." << LL_ENDL;
 
         // At this point, the socket should be closed by the timeout
         pump_loop(mPump,1.0f);
         count = mPump->runningChains();
-        UNSCOPED_INFO("accepted socked close");
+        UNSCOPED_INFO("accepted socket closed");
         CHECK(count == 1);
         LL_DEBUGS() << "** Sleeper should have timed out.." << LL_ENDL;
     }
@@ -1247,9 +1162,7 @@ namespace
             mPump->callback();
         }
 
-        UNSCOPED_INFO("reading string finished");
         CHECK(extractor->done());
-        UNSCOPED_INFO("string was empty");
         CHECK(extractor->string() == "");
     }
 }

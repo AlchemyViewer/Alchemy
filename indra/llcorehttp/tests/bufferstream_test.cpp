@@ -50,19 +50,12 @@ TEST_CASE("BufferStream Tests: BufferArrayStreamBuf over a NULL BufferArray fail
     BufferArrayStreamBuf * bsb = new BufferArrayStreamBuf(NULL);
 
     // Not much will work with a NULL
-    UNSCOPED_INFO("underflow() on NULL fails");
     CHECK(tst_traits_t::eof() == bsb->underflow());
-    UNSCOPED_INFO("uflow() on NULL fails");
     CHECK(tst_traits_t::eof() == bsb->uflow());
-    UNSCOPED_INFO("pbackfail() on NULL fails");
     CHECK(tst_traits_t::eof() == bsb->pbackfail('c'));
-    UNSCOPED_INFO("showmanyc() on NULL fails");
     CHECK(bsb->showmanyc() == -1);
-    UNSCOPED_INFO("overflow() on NULL fails");
     CHECK(tst_traits_t::eof() == bsb->overflow('c'));
-    UNSCOPED_INFO("xsputn() on NULL fails");
     CHECK(bsb->xsputn("blah", 4) == 0);
-    UNSCOPED_INFO("seekoff() on NULL fails");
     CHECK(bsb->seekoff(0, std::ios_base::beg, std::ios_base::in) == std::streampos(-1));
 
     // release the implicit reference, causing the object to be released
@@ -77,11 +70,8 @@ TEST_CASE("BufferStream Tests: BufferArrayStream over a NULL BufferArray starts 
     BufferArrayStream * bas = new BufferArrayStream(NULL);
 
     // Not much will work with a NULL here
-    UNSCOPED_INFO("eof() is false on NULL");
     CHECK_FALSE(bas->eof());
-    UNSCOPED_INFO("fail() is false on NULL");
     CHECK_FALSE(bas->fail());
-    UNSCOPED_INFO("good() on NULL");
     CHECK(bas->good());
 
     // release the implicit reference, causing the object to be released
@@ -138,19 +128,13 @@ TEST_CASE("BufferStream Tests: BufferArrayStreamBuf reads and appends and seeks 
     ba = NULL;
 
     // Various static state
-    UNSCOPED_INFO("underflow() returns 'T'");
     CHECK(bsb->underflow() == 'T');
-    UNSCOPED_INFO("underflow() returns 'T' again");
+    UNSCOPED_INFO("underflow() does not advance");
     CHECK(bsb->underflow() == 'T');
-    UNSCOPED_INFO("uflow() returns 'T'");
     CHECK(bsb->uflow() == 'T');
-    UNSCOPED_INFO("uflow() returns 'h'");
     CHECK(bsb->uflow() == 'h');
-    UNSCOPED_INFO("pbackfail('i') fails");
     CHECK(tst_traits_t::eof() == bsb->pbackfail('i'));
-    UNSCOPED_INFO("pbackfail('T') fails");
     CHECK(tst_traits_t::eof() == bsb->pbackfail('T'));
-    UNSCOPED_INFO("pbackfail('h') succeeds");
     CHECK(bsb->pbackfail('h') == 'h');
     UNSCOPED_INFO("showmanyc() is everything but the 'T'");
     CHECK(bsb->showmanyc() == (c_len - 1));
@@ -158,19 +142,15 @@ TEST_CASE("BufferStream Tests: BufferArrayStreamBuf reads and appends and seeks 
     CHECK(bsb->overflow('c') == 'c');
     UNSCOPED_INFO("showmanyc() reflects append");
     CHECK(bsb->showmanyc() == (c_len - 1 + 1));
-    UNSCOPED_INFO("xsputn() appends some more");
+    UNSCOPED_INFO("xsputn() appends");
     CHECK(bsb->xsputn("bla!", 4) == 4);
     UNSCOPED_INFO("showmanyc() reflects 2nd append");
     CHECK(bsb->showmanyc() == (c_len - 1 + 5));
-    UNSCOPED_INFO("seekoff() succeeds");
     CHECK(bsb->seekoff(0, std::ios_base::beg, std::ios_base::in) == std::streampos(0));
-    UNSCOPED_INFO("seekoff() succeeds 2");
     CHECK(bsb->seekoff(4, std::ios_base::cur, std::ios_base::in) == std::streampos(4));
     UNSCOPED_INFO("showmanyc() picks up seekoff");
     CHECK(bsb->showmanyc() == (c_len + 5 - 4));
-    UNSCOPED_INFO("seekoff() succeeds 3");
     CHECK(bsb->seekoff(0, std::ios_base::end, std::ios_base::in) == std::streampos(c_len + 4));
-    UNSCOPED_INFO("pbackfail('!') succeeds");
     CHECK(tst_traits_t::eof() == bsb->pbackfail('!'));
 
     // release the implicit reference, causing the object to be released
@@ -193,12 +173,10 @@ TEST_CASE("BufferStream Tests: BufferArrayStream writes to and reads back a Buff
 
         // Basic operations
         bas << "Hello" << 27 << ".";
-        UNSCOPED_INFO("BA length 8");
-        REQUIRE(ba->size() == 8);
+        CHECK(ba->size() == 8);
 
         std::string str;
         bas >> str;
-        UNSCOPED_INFO("reads correctly");
         CHECK(str == "Hello27.");
     }
 
@@ -237,8 +215,7 @@ TEST_CASE("BufferStream Tests: BufferArrayStream with LLSD serialization", "[Buf
         std::string str;
         bas >> str;
         // std::cout << "SERIALIZED LLSD:  " << str << std::endl;
-        UNSCOPED_INFO("Extracted string has reasonable length");
-        REQUIRE(str.size() > 60);
+        CHECK(str.size() > 60);
     }
 
     // release the implicit reference, causing the object to be released

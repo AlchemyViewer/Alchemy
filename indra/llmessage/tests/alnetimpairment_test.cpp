@@ -74,7 +74,6 @@ namespace
 
     TEST_CASE_METHOD(impairment_data, "ALNetImpairment: idle by default and lets everything through while off", "[ALNetImpairment]")
     {
-        UNSCOPED_INFO("not active until configured");
         CHECK_FALSE(mImpairment.isActive());
 
         S32 dropped = 0; F32 run = 0.f;
@@ -86,8 +85,7 @@ namespace
         UNSCOPED_INFO("nothing is held when reordering is zero");
         CHECK_FALSE(mImpairment.hold(numbered(1)));
         mImpairment.advance(released);
-        UNSCOPED_INFO("and nothing comes back");
-        REQUIRE(released.empty());
+        CHECK(released.empty());
     }
 
     TEST_CASE_METHOD(impairment_data, "ALNetImpairment: loss rate follows the setting", "[ALNetImpairment]")
@@ -103,7 +101,7 @@ namespace
             measureLoss(count, dropped, run);
 
             const F32 realised = 100.f * (F32)dropped / (F32)count;
-            UNSCOPED_INFO(llformat("loss near %.0f%%, got %.2f%%", target, realised).c_str());
+            CAPTURE(target, realised);
             REQUIRE(fabsf(realised - target) < llmax(0.5f, target * 0.1f));
         }
     }
@@ -125,9 +123,9 @@ namespace
             measureLoss(count, dropped, run);
 
             const F32 realised = 100.f * (F32)dropped / (F32)count;
-            UNSCOPED_INFO(llformat("burst %.0f still loses ~10%%, got %.2f%%", burst, realised).c_str());
+            CAPTURE(burst, realised);
             REQUIRE(fabsf(realised - 10.f) < 1.5f);
-            UNSCOPED_INFO(llformat("run length near %.0f, got %.2f", burst, run).c_str());
+            CAPTURE(run);
             REQUIRE(fabsf(run - burst) < llmax(0.35f, burst * 0.15f));
         }
     }
@@ -148,7 +146,6 @@ namespace
 
             if (i == 0)
             {
-                UNSCOPED_INFO("first packet is held");
                 REQUIRE(mImpairment.hold(numbered(i)));
             }
             else
@@ -164,20 +161,13 @@ namespace
             }
         }
 
-        UNSCOPED_INFO("everything arrived");
         REQUIRE((S32)delivered.size() == 6);
         // 1, 2, 3, then the held 0, then 4, 5.
-        UNSCOPED_INFO("overtaken by 1");
         CHECK(delivered[0] == 1);
-        UNSCOPED_INFO("overtaken by 2");
         CHECK(delivered[1] == 2);
-        UNSCOPED_INFO("overtaken by 3");
         CHECK(delivered[2] == 3);
-        UNSCOPED_INFO("held packet lands out of sequence");
         CHECK(delivered[3] == 0);
-        UNSCOPED_INFO("stream continues");
         CHECK(delivered[4] == 4);
-        UNSCOPED_INFO("stream continues");
         CHECK(delivered[5] == 5);
     }
 
@@ -188,13 +178,11 @@ namespace
 
         for (S32 i = 0; i < 10; ++i)
         {
-            UNSCOPED_INFO("held");
             REQUIRE(mImpairment.hold(numbered(i)));
         }
 
         std::vector<LLPacketBuffer> released;
         mImpairment.flush(released);
-        UNSCOPED_INFO("every held packet comes back");
         REQUIRE((S32)released.size() == 10);
         for (S32 i = 0; i < 10; ++i)
         {
@@ -204,8 +192,8 @@ namespace
 
         released.clear();
         mImpairment.advance(released);
-        UNSCOPED_INFO("and the queue is empty afterwards");
-        REQUIRE(released.empty());
+        UNSCOPED_INFO("flush left nothing queued");
+        CHECK(released.empty());
     }
 
     TEST_CASE_METHOD(impairment_data, "ALNetImpairment: the hold queue has a ceiling", "[ALNetImpairment]")
@@ -219,7 +207,6 @@ namespace
             if (mImpairment.hold(numbered((S32)i))) { ++held; }
         }
 
-        UNSCOPED_INFO("stops holding at the ceiling");
         CHECK((size_t)held == ALNetImpairment::MAX_HELD_PACKETS);
     }
 }
@@ -228,17 +215,13 @@ namespace
 
 // Nothing to test in a build the impairment is compiled out of, but the test binary still has to
 // link and report success.
-namespace tut
-{
 namespace
 {
     struct impairment_data {};
-}
 
     TEST_CASE_METHOD(impairment_data, "ALNetImpairment: compiled out of release builds", "[ALNetImpairment]")
     {
-        UNSCOPED_INFO("nothing to check");
-        REQUIRE(true);
+        CHECK(true);
     }
 }
 

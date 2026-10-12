@@ -44,7 +44,6 @@ namespace
         }
 
         LLXfer_File xff(oversized_filename, false, 1);
-        UNSCOPED_INFO("oversized local_filename nul-terminated");
-        REQUIRE(xff.getFileName().length() < LL_MAX_PATH);
+        CHECK(xff.getFileName().length() < LL_MAX_PATH);
     }
 }

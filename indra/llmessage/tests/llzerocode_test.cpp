@@ -50,9 +50,10 @@ namespace
     // asserts the round trip reproduces src exactly, including untouched header bits other
     // than the zero-code flag. When compression is not expected to help, asserts encode()
     // refuses it.
-    static void ensureRoundTrip(const char* msg, U32 header_size, U8 header0,
-                                 const std::vector<U8>& body, bool expect_compressed)
+    static void require_round_trip(const char* what, U32 header_size, U8 header0,
+                                   const std::vector<U8>& body, bool expect_compressed)
     {
+        INFO(what);
         std::vector<U8> src = makeBuffer(header_size, header0, body);
         std::vector<U8> enc(2 * src.size() + 16, 0xAA);
 
@@ -61,20 +62,17 @@ namespace
 
         if (!expect_compressed)
         {
-            UNSCOPED_INFO(std::string(msg) + ": encode should refuse (no benefit)");
+            UNSCOPED_INFO("encode refuses: no benefit");
             REQUIRE(enc_size < 0);
             return;
         }
 
-        UNSCOPED_INFO(std::string(msg) + ": encode should succeed");
         REQUIRE(enc_size >= 0);
-        UNSCOPED_INFO(std::string(msg) + ": encoded size should be smaller");
         REQUIRE((U32)enc_size < src.size());
-        UNSCOPED_INFO(std::string(msg) + ": FLAG should be set on encoded output");
         REQUIRE((enc[0] & LLZeroCode::FLAG) != 0);
         if (header_size > 0)
         {
-            UNSCOPED_INFO(std::string(msg) + ": non-flag header bits preserved on encode");
+            UNSCOPED_INFO("encode keeps the header bits other than FLAG");
             REQUIRE((U8)(enc[0] & ~LLZeroCode::FLAG) == (U8)(header0 & ~LLZeroCode::FLAG));
         }
 
@@ -82,33 +80,30 @@ namespace
         bool overflow = false;
         U32 dec_size = LLZeroCode::decode(enc.data(), (U32)enc_size,
                                            dec.data(), (U32)dec.size(), header_size, overflow);
-        UNSCOPED_INFO(std::string(msg) + ": decode should not overflow");
         REQUIRE_FALSE(overflow);
-        UNSCOPED_INFO(std::string(msg) + ": decoded size should match original");
         REQUIRE(dec_size == (U32)src.size());
-        UNSCOPED_INFO(std::string(msg) + ": decoded bytes should match original");
         REQUIRE(memcmp(dec.data(), src.data(), src.size()) == 0);
     }
 
     // Basic mixed body; header carries an unrelated flag bit (0x40) that must survive untouched.
     TEST_CASE("LLZeroCode: a mixed body round-trips and keeps other header bits", "[LLZeroCode]")
     {
-        ensureRoundTrip("mixed body", 6, 0x40,
-                        {0,0,0,5,0,0,0,0,0,0,7,8,9,0,0}, true);
+        require_round_trip("mixed body", 6, 0x40,
+                           {0,0,0,5,0,0,0,0,0,0,7,8,9,0,0}, true);
     }
 
     // A body with no zero bytes at all cannot benefit from zero-coding.
     TEST_CASE("LLZeroCode: encode refuses a body with no zero bytes", "[LLZeroCode]")
     {
-        ensureRoundTrip("no zero bytes", 1, 0x00, {1,2,3,4,5,6,7,8,9}, false);
+        require_round_trip("no zero bytes", 1, 0x00, {1,2,3,4,5,6,7,8,9}, false);
     }
 
     // Isolated zero-byte runs of length 1 or 2 cost as much or more than they save
     // (marker + terminator == 2 bytes), so encode must refuse them.
     TEST_CASE("LLZeroCode: encode refuses isolated runs of one or two zeros", "[LLZeroCode]")
     {
-        ensureRoundTrip("isolated single zero", 1, 0x00, {5, 0}, false);
-        ensureRoundTrip("isolated double zero", 1, 0x00, {5, 0, 0, 9}, false);
+        require_round_trip("isolated single zero", 1, 0x00, {5, 0}, false);
+        require_round_trip("isolated double zero", 1, 0x00, {5, 0, 0, 9}, false);
     }
 
     // A long enough zero run followed by other data pays off.
@@ -116,7 +111,7 @@ namespace
     {
         std::vector<U8> body(20, 0);
         body.push_back(99);
-        ensureRoundTrip("long zero run", 1, 0x00, body, true);
+        require_round_trip("long zero run", 1, 0x00, body, true);
     }
 
     // Wrap boundary: runs are split into chunks of at most 255 zero bytes each
@@ -127,9 +122,10 @@ namespace
         static const U32 lengths[] = {1, 2, 253, 254, 255, 256, 257, 300, 509, 510, 511, 1000};
         for (U32 n : lengths)
         {
+            CAPTURE(n);
             std::vector<U8> body(n, 0);
             body.push_back(42); // trailing nonzero byte
-            ensureRoundTrip("wrap boundary (with trailing byte)", 1, 0x00, body, n > 2);
+            require_round_trip("wrap boundary (with trailing byte)", 1, 0x00, body, n > 2);
         }
     }
 
@@ -140,8 +136,9 @@ namespace
         static const U32 lengths[] = {1, 2, 254, 255, 256, 300};
         for (U32 n : lengths)
         {
+            CAPTURE(n);
             std::vector<U8> body(n, 0);
-            ensureRoundTrip("wrap boundary (end-of-buffer flush)", 1, 0x00, body, n > 2);
+            require_round_trip("wrap boundary (end-of-buffer flush)", 1, 0x00, body, n > 2);
         }
     }
 
@@ -158,15 +155,13 @@ namespace
         bool overflow = false;
         U32 dec_size = LLZeroCode::decode(encoded.data(), (U32)encoded.size(),
                                            dec.data(), (U32)dec.size(), 1, overflow);
-        UNSCOPED_INFO("wrap format: no overflow");
         CHECK_FALSE(overflow);
-        UNSCOPED_INFO("wrap format: decoded size");
         CHECK(dec_size == (U32)262);
-        UNSCOPED_INFO("wrap format: FLAG cleared on header");
+        UNSCOPED_INFO("decode clears FLAG on the header");
         CHECK(dec[0] == (U8)0x00);
         for (U32 i = 1; i < dec_size; ++i)
         {
-            UNSCOPED_INFO("wrap format: decoded byte is zero");
+            CAPTURE(i);
             REQUIRE(dec[i] == (U8)0);
         }
     }
@@ -179,9 +174,7 @@ namespace
         bool overflow = false;
         U32 dec_size = LLZeroCode::decode(src.data(), (U32)src.size(),
                                            dec.data(), (U32)dec.size(), 6, overflow);
-        UNSCOPED_INFO("not zero-coded: decode returns 0");
         CHECK(dec_size == (U32)0);
-        UNSCOPED_INFO("not zero-coded: no overflow");
         CHECK_FALSE(overflow);
     }
 
@@ -192,7 +185,6 @@ namespace
         std::vector<U8> src = makeBuffer(1, 0, body);
         std::vector<U8> enc(src.size(), 0); // smaller than the required 2 * src_size
         S32 r = LLZeroCode::encode(src.data(), (U32)src.size(), enc.data(), (U32)enc.size(), 1);
-        UNSCOPED_INFO("encode: capacity guard rejects undersized dst");
         CHECK(r < 0);
     }
 
@@ -204,16 +196,14 @@ namespace
         std::vector<U8> src = makeBuffer(1, 0, body);
         std::vector<U8> enc(2 * src.size() + 16, 0);
         S32 enc_size = LLZeroCode::encode(src.data(), (U32)src.size(), enc.data(), (U32)enc.size(), 1);
-        UNSCOPED_INFO("decode overflow setup: encode succeeded");
         CHECK(enc_size >= 0);
 
         std::vector<U8> dec(1, 0); // capacity == header_size exactly
         bool overflow = false;
         U32 dec_size = LLZeroCode::decode(enc.data(), (U32)enc_size,
                                            dec.data(), (U32)dec.size(), 1, overflow);
-        UNSCOPED_INFO("decode overflow (minimal capacity): overflow flagged");
         CHECK(overflow);
-        UNSCOPED_INFO("decode overflow (minimal capacity): partial output discarded");
+        UNSCOPED_INFO("the partial output is discarded");
         CHECK(dec_size == 0u);
     }
 
@@ -224,16 +214,14 @@ namespace
         std::vector<U8> src = makeBuffer(1, 0, body);
         std::vector<U8> enc(2 * src.size() + 16, 0);
         S32 enc_size = LLZeroCode::encode(src.data(), (U32)src.size(), enc.data(), (U32)enc.size(), 1);
-        UNSCOPED_INFO("decode overflow setup: encode succeeded");
         CHECK(enc_size >= 0);
 
         std::vector<U8> dec(300, 0); // > 256, but less than the true decoded size (~501)
         bool overflow = false;
         U32 dec_size = LLZeroCode::decode(enc.data(), (U32)enc_size,
                                            dec.data(), (U32)dec.size(), 1, overflow);
-        UNSCOPED_INFO("decode overflow (insufficient capacity): overflow flagged");
         CHECK(overflow);
-        UNSCOPED_INFO("decode overflow (insufficient capacity): partial output discarded");
+        UNSCOPED_INFO("the partial output is discarded");
         CHECK(dec_size == 0u);
     }
 
@@ -248,6 +236,6 @@ namespace
             body.push_back(0);
             body.push_back((U8)(i + 1));
         }
-        ensureRoundTrip("alternating pattern", 1, 0x00, body, false);
+        require_round_trip("alternating pattern", 1, 0x00, body, false);
     }
 }

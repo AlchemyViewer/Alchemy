@@ -33,7 +33,6 @@
 
 namespace
 {
-    //encrypt->decrypt
     TEST_CASE("cipher: encrypt then decrypt with the same pad round-trips the data", "[cipher]")
     {
         const U32 len = 3;
@@ -46,20 +45,15 @@ namespace
         LLXORCipher xorCipher1(pad, len);
 
         U32 length = xorCipher.requiredEncryptionSpace(50);
-        UNSCOPED_INFO("requiredEncryptionSpace() function failed");
         CHECK(length == 50);
 
         U32 lenEncrypted = xorCipher.encrypt((U8 *) str, str_len, encrypted, str_len);
-        UNSCOPED_INFO("Encryption failed");
         CHECK(lenEncrypted == str_len);
         U32 lenDecrypted = xorCipher1.decrypt(encrypted, str_len, decrypted, str_len);
-        UNSCOPED_INFO("Decryption failed");
         CHECK(lenDecrypted == str_len);
-        UNSCOPED_INFO("LLXORCipher Encrypt/Decrypt failed");
         CHECK_THAT(ll_test::Memory(str, str_len), ll_test::MemoryMatches(decrypted, lenDecrypted));
     }
 
-    // operator=
     TEST_CASE("cipher: operator= copies the pad so the copy decrypts", "[cipher]")
     {
         const U8 pad[] = "ABCDEFGHIJKLMNOPQ"; // pad len longer than data to be ciphered
@@ -79,11 +73,9 @@ namespace
         // encrypted using xorCipher
         xorCipher1 = xorCipher;
         U32 lenDecrypted = xorCipher1.decrypt(encrypted, str_len, decrypted, str_len);
-        UNSCOPED_INFO("LLXORCipher operator= failed");
         CHECK_THAT(ll_test::Memory(str, str_len), ll_test::MemoryMatches(decrypted, lenDecrypted));
     }
 
-    //in place encrypt->decrypt
     TEST_CASE("cipher: in-place encrypt changes the data and decrypt restores it", "[cipher]")
     {
         U32 padNum = 0x12349087;
@@ -97,11 +89,9 @@ namespace
         LLXORCipher xorCipher1(pad, pad_len);
         xorCipher.encrypt((U8 *) str, str_len);
         // it should not be the same as original data!
-        UNSCOPED_INFO("LLXORCipher: In Place encrypt failed");
         CHECK(memcmp(str, str1, str_len) != 0);
         xorCipher1.decrypt((U8 *) str, str_len);
         // it should not be the same as original data!
-        UNSCOPED_INFO("LLXORCipher: In Place decrypt failed");
         CHECK_THAT(ll_test::Memory(str, str_len), ll_test::MemoryMatches(str1, str_len));
     }
 }

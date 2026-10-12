@@ -449,9 +449,7 @@ namespace
         }
         const std::string name = "origin_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(std::make_shared<LLWebsocketMgr::WSServer>(name, port, true)));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         const int program = TestClient().open(port);
@@ -482,9 +480,7 @@ namespace
         LL::WorkQueue     mainloop("mainloop");
         const std::string name = "rpc_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(std::make_shared<TestRPCServer>(name, port, true)));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         TestClient client;
@@ -504,9 +500,7 @@ namespace
         std::ostringstream here;
         here << std::this_thread::get_id();
         LLSD answer;
-        UNSCOPED_INFO("opened");
         CHECK(opened);
-        UNSCOPED_INFO("sent");
         CHECK(sent);
         UNSCOPED_INFO("closed by the client");
         CHECK(closed);
@@ -531,9 +525,7 @@ namespace
         }
         const std::string name    = "http_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(std::make_shared<LLWebsocketMgr::WSServer>(name, port, true)));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         const int status = TestClient().get(port);
@@ -553,9 +545,7 @@ namespace
         const std::string name    = "close_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(server));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         TestClient client;
@@ -583,17 +573,13 @@ namespace
         const bool told = waitFor([&]() { return server->closed() == 1; });
         manager.removeServer(name);
 
-        UNSCOPED_INFO("opened");
         CHECK(opened);
-        UNSCOPED_INFO("sent");
         CHECK(sent);
         UNSCOPED_INFO("the messages first, in order");
         CHECK(in_order);
         UNSCOPED_INFO("then the close");
         CHECK(last.closed);
-        UNSCOPED_INFO("with its code");
         CHECK(last.code == U16(1000));
-        UNSCOPED_INFO("and its reason");
         CHECK(last.reason == std::string("done"));
         UNSCOPED_INFO("a send after the close refused");
         CHECK_FALSE(after_close);
@@ -611,9 +597,7 @@ namespace
         const std::string name    = "threads_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(server));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         TestClient client;
@@ -659,7 +643,6 @@ namespace
         const bool closed = opened && client.close();
         manager.removeServer(name);
 
-        UNSCOPED_INFO("opened");
         CHECK(opened);
         UNSCOPED_INFO("closed by the client");
         CHECK(closed);
@@ -681,9 +664,7 @@ namespace
         const std::string name    = "stop_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(server));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         TestClient client;
@@ -700,18 +681,15 @@ namespace
         const bool running = server->isRunning();
         manager.removeServer(name);
 
-        UNSCOPED_INFO("opened");
         CHECK(opened);
-        UNSCOPED_INFO("the client closed");
         CHECK(received.closed);
         UNSCOPED_INFO("as going away");
         CHECK(received.code == U16(1001));
         UNSCOPED_INFO("the server told, once");
         CHECK(closed == 1);
-        UNSCOPED_INFO("stopped");
         CHECK_FALSE(running);
         UNSCOPED_INFO("without waiting out the deadline");
-        CHECK((took < std::chrono::milliseconds(900)));
+        CHECK(took < std::chrono::milliseconds(900));
     }
 
     TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: stopping waits little on a client that never answers yet says it closed", "[LLWebsocketMgr_Tests]")
@@ -724,9 +702,7 @@ namespace
         const std::string name    = "deadline_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(server));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         // Opened, and then never read again.
@@ -738,12 +714,11 @@ namespace
         const int  closed = server->closed();
         manager.removeServer(name);
 
-        UNSCOPED_INFO("opened");
         CHECK(opened);
         UNSCOPED_INFO("the server told, once");
         CHECK(closed == 1);
         UNSCOPED_INFO("within about the deadline");
-        CHECK((took < std::chrono::milliseconds(2500)));
+        CHECK(took < std::chrono::milliseconds(2500));
     }
 
     TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a port another socket listens on fails the start", "[LLWebsocketMgr_Tests]")
@@ -773,15 +748,12 @@ namespace
         const std::string name    = "busy_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<LLWebsocketMgr::WSServer>(name, port, true);
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(server));
         const bool started = manager.startServer(name);
         const bool running = server->isRunning();
         manager.removeServer(name);
 
-        UNSCOPED_INFO("not started");
         CHECK_FALSE(started);
-        UNSCOPED_INFO("not running");
         CHECK_FALSE(running);
     }
 
@@ -795,9 +767,7 @@ namespace
         const std::string name    = "restart_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(server));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         TestClient first;
@@ -810,11 +780,9 @@ namespace
         const int  second    = TestClient().open(port);
         manager.removeServer(name);
 
-        UNSCOPED_INFO("opened");
         CHECK(opened);
-        UNSCOPED_INFO("started again");
         CHECK(restarted);
-        UNSCOPED_INFO("and opens a connection");
+        UNSCOPED_INFO("a new connection opens after the restart");
         CHECK(second == 101);
     }
 
@@ -828,9 +796,7 @@ namespace
         const std::string name    = "backlog_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(server));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         // Opened, and then never read.
@@ -849,9 +815,7 @@ namespace
         const bool dropped = waitFor([&]() { return server->closed() == 1; });
         manager.removeServer(name);
 
-        UNSCOPED_INFO("opened");
         CHECK(opened);
-        UNSCOPED_INFO("dropped");
         CHECK(dropped);
         UNSCOPED_INFO("before all 128 MB were taken");
         CHECK(sent < 128);
@@ -867,9 +831,7 @@ namespace
         const std::string name    = "stuck_close_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(server));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         TestClient client;
@@ -892,12 +854,10 @@ namespace
         const auto took    = std::chrono::steady_clock::now() - began;
         manager.removeServer(name);
 
-        UNSCOPED_INFO("opened");
         CHECK(opened);
-        UNSCOPED_INFO("dropped");
         CHECK(dropped);
         UNSCOPED_INFO("at the deadline, not before");
-        CHECK((took > std::chrono::seconds(3)));
+        CHECK(took > std::chrono::seconds(3));
     }
 
     TEST_CASE_METHOD(WebsocketMgrTestData, "LLWebsocketMgr Tests: a message within a connection's limit is taken and one past it closes it", "[LLWebsocketMgr_Tests]")
@@ -911,9 +871,7 @@ namespace
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<RecordingServer>(name, port, true);
         server->mLimit            = 1024;
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(server));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         TestClient client;
@@ -931,7 +889,6 @@ namespace
         const bool closed = taken && waitFor([&]() { return server->closed() == 1; });
         manager.removeServer(name);
 
-        UNSCOPED_INFO("opened");
         CHECK(opened);
         UNSCOPED_INFO("the small one taken");
         CHECK(taken);
@@ -952,9 +909,7 @@ namespace
         }
         const std::string name    = "crowd_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(std::make_shared<LLWebsocketMgr::WSServer>(name, port, true)));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         // Thirty-two connections that never ask for anything: each holds
@@ -994,9 +949,7 @@ namespace
         LL::WorkQueue     mainloop("mainloop");
         const std::string name    = "malformed_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(std::make_shared<TestRPCServer>(name, port, true)));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         TestClient client;
@@ -1018,15 +971,12 @@ namespace
         manager.removeServer(name);
         mainloop.close();
 
-        UNSCOPED_INFO("opened");
         CHECK(opened);
-        UNSCOPED_INFO("the malformed one answered");
         CHECK(read_malformed);
         UNSCOPED_INFO("as an invalid request");
         CHECK(malformed["error"]["code"].asInteger() == LLSD::Integer(-32600));
         UNSCOPED_INFO("with its id");
         CHECK(malformed["id"].asString() == std::string("bad"));
-        UNSCOPED_INFO("the notification sent");
         CHECK(sent_notification);
         UNSCOPED_INFO("something answered after it");
         CHECK(read_next);
@@ -1045,9 +995,7 @@ namespace
         const std::string name    = "gated_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<GatedRPCServer>(name, port, true);
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(server));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         TestClient client;
@@ -1072,17 +1020,14 @@ namespace
         manager.removeServer(name);
         mainloop.close();
 
-        UNSCOPED_INFO("opened");
         CHECK(opened);
         UNSCOPED_INFO("answered");
         CHECK(read);
         UNSCOPED_INFO("as unauthorized");
         CHECK(refusal["error"]["code"].asInteger() == LLSD::Integer(-32002));
-        UNSCOPED_INFO("the one within the limit read");
         CHECK(read_within);
         UNSCOPED_INFO("and answered as not JSON");
         CHECK(parse_error["error"]["code"].asInteger() == LLSD::Integer(-32700));
-        UNSCOPED_INFO("the connection open after it");
         CHECK(open_after);
         UNSCOPED_INFO("and closed by the one past it");
         CHECK(closed);
@@ -1098,9 +1043,7 @@ namespace
         LL::WorkQueue     mainloop("mainloop");
         const std::string name    = "throw_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(std::make_shared<TestRPCServer>(name, port, true)));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         TestClient client;
@@ -1119,23 +1062,21 @@ namespace
         manager.removeServer(name);
         mainloop.close();
 
-        UNSCOPED_INFO("opened");
         CHECK(opened);
         for (const auto& [what, read, answer] : { std::tuple{ "run where it came in", read_sync, sync_answer },
                                                   std::tuple{ "run on the main thread", read_async, async_answer } })
         {
-            UNSCOPED_INFO(std::string(what) + ": answered");
+            INFO(what);
+            UNSCOPED_INFO("answered");
             REQUIRE(read);
-            UNSCOPED_INFO(std::string(what) + ": as an internal error");
+            UNSCOPED_INFO("as an internal error");
             REQUIRE(answer["error"]["code"].asInteger() == LLSD::Integer(-32603));
-            UNSCOPED_INFO(std::string(what) + ": and nothing more");
+            UNSCOPED_INFO("and nothing more");
             REQUIRE(answer["error"]["message"].asString() == std::string("Internal error"));
         }
-        UNSCOPED_INFO("the refusal answered");
         CHECK(read_refusal);
         UNSCOPED_INFO("as invalid params");
         CHECK(refusal["error"]["code"].asInteger() == LLSD::Integer(-32602));
-        UNSCOPED_INFO("saying why");
         CHECK_THAT(refusal["error"]["message"].asString(), Catch::Matchers::ContainsSubstring("no such script"));
     }
 
@@ -1176,9 +1117,7 @@ namespace
         const std::string name    = "held_test";
         LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
         auto              server  = std::make_shared<HeldServer>(name, port, true);
-        UNSCOPED_INFO("added");
         CHECK(manager.addServer(server));
-        UNSCOPED_INFO("started");
         CHECK(manager.startServer(name));
 
         TestClient client;
@@ -1197,13 +1136,10 @@ namespace
         const bool dropped = waitFor([&]() { return server->mClosed == 1; });
         manager.removeServer(name);
 
-        UNSCOPED_INFO("opened");
         CHECK(opened);
         UNSCOPED_INFO("taken up to the most it may hold");
         CHECK(sent == 31);
-        UNSCOPED_INFO("and refused after");
         CHECK(refused);
-        UNSCOPED_INFO("dropped");
         CHECK(dropped);
     }
 }

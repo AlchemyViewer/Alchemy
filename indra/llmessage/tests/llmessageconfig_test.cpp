@@ -90,9 +90,7 @@ namespace
         LLSD config;
         config["serverDefaults"]["simulator"] = "template";
         LLMessageConfig::useConfig(config);
-        UNSCOPED_INFO("Ensure server default is not template");
-        CHECK(LLMessageConfig::getServerDefaultFlavor() ==
-                      LLMessageConfig::TEMPLATE_FLAVOR);
+        CHECK(LLMessageConfig::getServerDefaultFlavor() == LLMessageConfig::TEMPLATE_FLAVOR);
     }
 
     TEST_CASE_METHOD(LLMessageConfigTestData, "LLMessageConfig: each message takes the flavor its entry names", "[LLMessageConfig]")
@@ -103,12 +101,8 @@ namespace
         config["messages"]["msg1"]["flavor"] = "template";
         config["messages"]["msg2"]["flavor"] = "llsd";
         LLMessageConfig::useConfig(config);
-        UNSCOPED_INFO("Ensure msg template flavor");
-        CHECK(LLMessageConfig::getMessageFlavor("msg1") ==
-                      LLMessageConfig::TEMPLATE_FLAVOR);
-        UNSCOPED_INFO("Ensure msg llsd flavor");
-        CHECK(LLMessageConfig::getMessageFlavor("msg2") ==
-                      LLMessageConfig::LLSD_FLAVOR);
+        CHECK(LLMessageConfig::getMessageFlavor("msg1") == LLMessageConfig::TEMPLATE_FLAVOR);
+        CHECK(LLMessageConfig::getMessageFlavor("msg2") == LLMessageConfig::LLSD_FLAVOR);
     }
 
     TEST_CASE_METHOD(LLMessageConfigTestData, "LLMessageConfig: trusted-sender sets a message's sender trustedness", "[LLMessageConfig]")
@@ -121,15 +115,10 @@ namespace
         config["messages"]["msg2"]["flavor"] = "llsd";
         config["messages"]["msg2"]["trusted-sender"] = true;
         LLMessageConfig::useConfig(config);
-        UNSCOPED_INFO("Ensure untrusted is untrusted");
-        CHECK(LLMessageConfig::getSenderTrustedness("msg1") ==
-                      LLMessageConfig::UNTRUSTED);
-        UNSCOPED_INFO("Ensure trusted is trusted");
-        CHECK(LLMessageConfig::getSenderTrustedness("msg2") ==
-                      LLMessageConfig::TRUSTED);
-        UNSCOPED_INFO("Ensure missing trustedness is NOT_SET");
-        CHECK(LLMessageConfig::getSenderTrustedness("msg3") ==
-                      LLMessageConfig::NOT_SET);
+        CHECK(LLMessageConfig::getSenderTrustedness("msg1") == LLMessageConfig::UNTRUSTED);
+        CHECK(LLMessageConfig::getSenderTrustedness("msg2") == LLMessageConfig::TRUSTED);
+        UNSCOPED_INFO("a message not in the config");
+        CHECK(LLMessageConfig::getSenderTrustedness("msg3") == LLMessageConfig::NOT_SET);
     }
 
     TEST_CASE_METHOD(LLMessageConfigTestData, "LLMessageConfig: a message with no flavor entry has NO_FLAVOR", "[LLMessageConfig]")
@@ -139,15 +128,11 @@ namespace
         config["serverDefaults"]["simulator"] = "llsd";
         config["messages"]["msg1"]["trusted-sender"] = true;
         LLMessageConfig::useConfig(config);
-        UNSCOPED_INFO("Ensure missing message gives no flavor");
-        CHECK(LLMessageConfig::getMessageFlavor("Test") ==
-                      LLMessageConfig::NO_FLAVOR);
-        UNSCOPED_INFO("Ensure missing flavor is NO_FLAVOR even with sender trustedness set");
-        CHECK(LLMessageConfig::getMessageFlavor("msg1") ==
-                      LLMessageConfig::NO_FLAVOR);
-        UNSCOPED_INFO("Ensure server default is llsd");
-        CHECK(LLMessageConfig::getServerDefaultFlavor() ==
-                      LLMessageConfig::LLSD_FLAVOR);
+        UNSCOPED_INFO("a message not in the config");
+        CHECK(LLMessageConfig::getMessageFlavor("Test") == LLMessageConfig::NO_FLAVOR);
+        UNSCOPED_INFO("a message with only its sender trustedness set");
+        CHECK(LLMessageConfig::getMessageFlavor("msg1") == LLMessageConfig::NO_FLAVOR);
+        CHECK(LLMessageConfig::getServerDefaultFlavor() == LLMessageConfig::LLSD_FLAVOR);
     }
 
     TEST_CASE_METHOD(LLMessageConfigTestData, "LLMessageConfig: a message with only a flavor has trustedness NOT_SET", "[LLMessageConfig]")
@@ -157,12 +142,8 @@ namespace
         config["serverDefaults"]["simulator"] = "template";
         config["messages"]["msg1"]["flavor"] = "llsd";
         LLMessageConfig::useConfig(config);
-        UNSCOPED_INFO("Ensure msg1 exists, has llsd flavor");
-        CHECK(LLMessageConfig::getMessageFlavor("msg1") ==
-                      LLMessageConfig::LLSD_FLAVOR);
-        UNSCOPED_INFO("Ensure missing trusted is not set");
-        CHECK(LLMessageConfig::getSenderTrustedness("msg1") ==
-                      LLMessageConfig::NOT_SET);
+        CHECK(LLMessageConfig::getMessageFlavor("msg1") == LLMessageConfig::LLSD_FLAVOR);
+        CHECK(LLMessageConfig::getSenderTrustedness("msg1") == LLMessageConfig::NOT_SET);
     }
 
     TEST_CASE_METHOD(LLMessageConfigTestData, "LLMessageConfig: capBans says which caps are banned", "[LLMessageConfig]")
@@ -171,12 +152,8 @@ namespace
         config["capBans"]["MapLayer"] = true;
         config["capBans"]["MapLayerGod"] = false;
         LLMessageConfig::useConfig(config);
-        UNSCOPED_INFO("Ensure cap ban true MapLayer");
-        CHECK(LLMessageConfig::isCapBanned("MapLayer") ==
-                      true);
-        UNSCOPED_INFO("Ensure cap ban false");
-        CHECK(LLMessageConfig::isCapBanned("MapLayerGod") ==
-                      false);
+        CHECK(LLMessageConfig::isCapBanned("MapLayer"));
+        CHECK_FALSE(LLMessageConfig::isCapBanned("MapLayerGod"));
     }
 
     TEST_CASE_METHOD(LLMessageConfigTestData, "LLMessageConfig: a changed config file is reloaded after a wait", "[LLMessageConfig]")
@@ -189,9 +166,7 @@ namespace
         // wait for it to reload after N seconds
         ms_sleep(6*1000);
         LLFrameTimer::updateFrameTime();
-        UNSCOPED_INFO("Ensure reload after 6 seconds");
-        CHECK(LLMessageConfig::getServerDefaultFlavor() ==
-                      LLMessageConfig::LLSD_FLAVOR);
+        CHECK(LLMessageConfig::getServerDefaultFlavor() == LLMessageConfig::LLSD_FLAVOR);
     }
 
     TEST_CASE_METHOD(LLMessageConfigTestData, "LLMessageConfig: only-send-latest sets onlySendLatest per message", "[LLMessageConfig]")
@@ -204,12 +179,8 @@ namespace
         config["messages"]["msg2"]["flavor"] = "llsd";
         config["messages"]["msg2"]["only-send-latest"] = false;
         LLMessageConfig::useConfig(config);
-        UNSCOPED_INFO("Ensure msg1 exists, sent latest-only");
-        CHECK(LLMessageConfig::onlySendLatest("msg1") ==
-                      true);
-        UNSCOPED_INFO("Ensure msg2 exists, sent latest-only");
-        CHECK(LLMessageConfig::onlySendLatest("msg2") ==
-                      false);
+        CHECK(LLMessageConfig::onlySendLatest("msg1"));
+        CHECK_FALSE(LLMessageConfig::onlySendLatest("msg2"));
     }
 
     TEST_CASE_METHOD(LLMessageConfigTestData, "LLMessageConfig: maxQueuedEvents is read from the config and defaults to 100", "[LLMessageConfig]")
@@ -218,14 +189,10 @@ namespace
         LLSD config;
         config["maxQueuedEvents"] = 200;
         LLMessageConfig::useConfig(config);
-        UNSCOPED_INFO("Ensure setting maxQueuedEvents");
-        CHECK(LLMessageConfig::getMaxQueuedEvents() ==
-                      200);
+        CHECK(LLMessageConfig::getMaxQueuedEvents() == 200);
 
         LLMessageConfig::useConfig(LLSD());
-        UNSCOPED_INFO("Ensure default of event queue max 100");
-        CHECK(LLMessageConfig::getMaxQueuedEvents() ==
-                      100);
+        CHECK(LLMessageConfig::getMaxQueuedEvents() == 100);
     }
 
     TEST_CASE_METHOD(LLMessageConfigTestData, "LLMessageConfig: initClass with another directory reads that directory's file", "[LLMessageConfig]")
@@ -245,7 +212,6 @@ namespace
         const LLMessageConfig::Flavor flavor = LLMessageConfig::getServerDefaultFlavor();
         LLFile::remove(other_dir + "/message.xml");
         LLFile::remove(other_dir);
-        UNSCOPED_INFO("the config of the directory named last");
         CHECK(flavor == LLMessageConfig::LLSD_FLAVOR);
     }
 }

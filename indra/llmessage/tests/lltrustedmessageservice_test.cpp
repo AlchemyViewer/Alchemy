@@ -115,8 +115,8 @@ namespace
         LLTrustedMessageService adapter;
         adapter.post(response, context, input);
         // test original ting got called wit nowt, ya get me blood?
-        CHECK(messageDispatched == true);
-        REQUIRE(lastLLSD.has("body"));
+        CHECK(messageDispatched);
+        CHECK(lastLLSD.has("body"));
     }
 
     // test that llsd wrapped binary-template-data messages are
@@ -130,7 +130,6 @@ namespace
         LLTrustedMessageService adapter;
 
         adapter.post(response, context, input);
-        UNSCOPED_INFO("check template-binary-data message was dispatched as binary");
         CHECK(messageDispatchedAsBinary);
         CHECK(lastLLSD["body"]["binary-template-data"].asString() == "10001010110");
         // test somit got called with "10001010110" (something like LLMessageSystem::dispatchTemplate(blah))

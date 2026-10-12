@@ -139,7 +139,6 @@ namespace
             LLMessageSystem system("notafile", NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
             UNSCOPED_INFO("not OK without its template");
             CHECK_FALSE(system.isOK());
-            UNSCOPED_INFO("its socket opened");
             CHECK(system.mSocket >= 0);
             port = system.getListenPort();
         }
@@ -197,9 +196,8 @@ namespace
 
         UNSCOPED_INFO("no port to bind");
         CHECK(result == 3);
-        UNSCOPED_INFO("and no socket returned");
         CHECK(socket == -1);
-        UNSCOPED_INFO("nor one left open");
+        UNSCOPED_INFO("no descriptor left open");
         CHECK(after == before);
     }
 #endif

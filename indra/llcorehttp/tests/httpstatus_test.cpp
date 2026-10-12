@@ -52,28 +52,29 @@ TEST_CASE_METHOD(HttpStatusTestData, "HttpStatus Tests: success converts to true
 
     status = HttpStatus(HttpStatus::EXT_CURL_EASY, 0);
 
-    REQUIRE(bool(status));
-    CHECK_FALSE(!(status));
+    // operator! is a function of its own, so each status checks it as well as operator bool
+    CHECK(bool(status));
+    CHECK_FALSE(!status);
 
     status = HttpStatus(HttpStatus::EXT_CURL_MULTI, 0);
 
-    REQUIRE(bool(status));
-    CHECK_FALSE(!(status));
+    CHECK(bool(status));
+    CHECK_FALSE(!status);
 
     status = HttpStatus(HttpStatus::LLCORE, HE_SUCCESS);
 
-    REQUIRE(bool(status));
-    CHECK_FALSE(!(status));
+    CHECK(bool(status));
+    CHECK_FALSE(!status);
 
     status = HttpStatus(HttpStatus::EXT_CURL_MULTI, -1);
 
-    REQUIRE_FALSE(bool(status));
-    CHECK(!(status));
+    CHECK_FALSE(bool(status));
+    CHECK(!status);
 
     status = HttpStatus(HttpStatus::EXT_CURL_EASY, CURLE_BAD_DOWNLOAD_RESUME);
 
-    REQUIRE_FALSE(bool(status));
-    CHECK(!(status));
+    CHECK_FALSE(bool(status));
+    CHECK(!status);
 }
 
 
@@ -95,22 +96,22 @@ TEST_CASE_METHOD(HttpStatusTestData, "HttpStatus Tests: toString is empty on suc
     HttpStatus status = HttpStatus(HttpStatus::EXT_CURL_EASY, 0);
     std::string msg = status.toString();
     // std::cout << "Result:  " << msg << std::endl;
-    REQUIRE(msg.empty());
+    CHECK(msg.empty());
 
     status = HttpStatus(HttpStatus::EXT_CURL_EASY, CURLE_BAD_FUNCTION_ARGUMENT);
     msg = status.toString();
     // std::cout << "Result:  " << msg << std::endl;
-    REQUIRE_FALSE(msg.empty());
+    CHECK_FALSE(msg.empty());
 
     status = HttpStatus(HttpStatus::EXT_CURL_MULTI, CURLM_OUT_OF_MEMORY);
     msg = status.toString();
     // std::cout << "Result:  " << msg << std::endl;
-    REQUIRE_FALSE(msg.empty());
+    CHECK_FALSE(msg.empty());
 
     status = HttpStatus(HttpStatus::LLCORE, HE_SHUTTING_DOWN);
     msg = status.toString();
     // std::cout << "Result:  " << msg << std::endl;
-    REQUIRE_FALSE(msg.empty());
+    CHECK_FALSE(msg.empty());
 }
 
 
@@ -119,17 +120,17 @@ TEST_CASE_METHOD(HttpStatusTestData, "HttpStatus Tests: toString says something 
     HttpStatus status = HttpStatus(HttpStatus::EXT_CURL_EASY, 32726);
     std::string msg = status.toString();
     // std::cout << "Result:  " << msg << std::endl;
-    REQUIRE_FALSE(msg.empty());
+    CHECK_FALSE(msg.empty());
 
     status = HttpStatus(HttpStatus::EXT_CURL_MULTI, -470);
     msg = status.toString();
     // std::cout << "Result:  " << msg << std::endl;
-    REQUIRE_FALSE(msg.empty());
+    CHECK_FALSE(msg.empty());
 
     status = HttpStatus(HttpStatus::LLCORE, 923);
     msg = status.toString();
     // std::cout << "Result:  " << msg << std::endl;
-    REQUIRE_FALSE(msg.empty());
+    CHECK_FALSE(msg.empty());
 }
 
 TEST_CASE_METHOD(HttpStatusTestData, "HttpStatus Tests: statuses of different types compare unequal", "[HttpStatus_Tests]")
@@ -154,14 +155,14 @@ TEST_CASE_METHOD(HttpStatusTestData, "HttpStatus Tests: an HTTP status carries i
 
     status = HttpStatus(200, HE_SUCCESS);
     std::string msg = status.toString();
-    REQUIRE(msg.empty());
-    REQUIRE(bool(status));
+    CHECK(msg.empty());
+    CHECK(bool(status));
 
     // Normally a success but application says error
     status = HttpStatus(200, HE_REPLY_ERROR);
     msg = status.toString();
-    REQUIRE_FALSE(msg.empty());
-    REQUIRE_FALSE(bool(status));
+    CHECK_FALSE(msg.empty());
+    CHECK_FALSE(bool(status));
     CHECK(status.toULong() > 1UL);             // Biggish number, not a bool-to-ulong
 
     // Same statuses with distinct success/fail are distinct
@@ -172,8 +173,8 @@ TEST_CASE_METHOD(HttpStatusTestData, "HttpStatus Tests: an HTTP status carries i
     // Normally an error but application says okay
     status = HttpStatus(406, HE_SUCCESS);
     msg = status.toString();
-    REQUIRE(msg.empty());
-    REQUIRE(bool(status));
+    CHECK(msg.empty());
+    CHECK(bool(status));
 
     // Different statuses but both successful are distinct
     status = HttpStatus(200, HE_SUCCESS);
@@ -190,12 +191,12 @@ TEST_CASE_METHOD(HttpStatusTestData, "HttpStatus Tests: toString gives the HTTP 
 {
     HttpStatus status(100, HE_REPLY_ERROR);
     std::string msg(status.toString());
-    REQUIRE_FALSE(msg.empty());              // Should be something
+    CHECK_FALSE(msg.empty());              // Should be something
     CHECK(msg == "Continue");
 
     status = HttpStatus(200, HE_SUCCESS);
     msg = status.toString();
-    REQUIRE(msg.empty());                // Success is empty
+    CHECK(msg.empty());                // Success is empty
 
     status = HttpStatus(199, HE_REPLY_ERROR);
     msg = status.toString();
@@ -229,13 +230,11 @@ TEST_CASE_METHOD(HttpStatusTestData, "HttpStatus Tests: toTerseString names the 
     HttpStatus status(404);
     std::string msg = status.toTerseString();
     // std::cout << "Result:  " << msg << std::endl;
-    UNSCOPED_INFO("Normal HTTP 404");
     CHECK(msg == "Http_404");
 
     status = HttpStatus(200);
     msg = status.toTerseString();
     // std::cout << "Result:  " << msg << std::endl;
-    UNSCOPED_INFO("Normal HTTP 200");
     CHECK(msg == "Http_200");
 
     status = HttpStatus(200, HE_REPLY_ERROR);

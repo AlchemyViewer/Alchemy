@@ -38,23 +38,17 @@ namespace
     TEST_CASE("LLHost: a default host is zero and not ok", "[LLHost]")
     {
         LLHost host;
-        {
-            INFO("IP address is not NULL");
-            CHECK(host.getAddress() == 0);
-            CHECK(host.getPort() == 0);
-            CHECK_FALSE(host.isOk());
-        }
+        CHECK(host.getAddress() == 0);
+        CHECK(host.getPort() == 0);
+        CHECK_FALSE(host.isOk());
     }
     TEST_CASE("LLHost: constructing from an address and port sets both and is ok", "[LLHost]")
     {
         U32 ip_addr = 0xc098017d;
         U32 port = 8080;
         LLHost host(ip_addr, port);
-        UNSCOPED_INFO("IP address is invalid");
         CHECK(ip_addr == host.getAddress());
-        UNSCOPED_INFO("Port Number is invalid");
         CHECK(port == host.getPort());
-        UNSCOPED_INFO("IP address and port number both should be ok");
         CHECK(host.isOk());
     }
 
@@ -63,9 +57,7 @@ namespace
         const char* str = "192.168.1.1";
         U32 port = 8080;
         LLHost host(str, port);
-        UNSCOPED_INFO("IP address could not be processed");
         CHECK(host.getAddress() == ip_string_to_u32(str));
-        UNSCOPED_INFO("Port Number is invalid");
         CHECK(port == host.getPort());
     }
 
@@ -75,9 +67,7 @@ namespace
         U32 port = 22;
         U64 ip_port = (((U64) ip) << 32) | port;
         LLHost host(ip_port);
-        UNSCOPED_INFO("IP address is invalid");
         CHECK(ip == host.getAddress());
-        UNSCOPED_INFO("Port Number is invalid");
         CHECK(port == host.getPort());
     }
 
@@ -88,9 +78,7 @@ namespace
         U32 port = 8080;
 
         LLHost host(ip_port_string);
-        UNSCOPED_INFO("IP address from IP:port is invalid");
         CHECK(ip == host.getAddress());
-        UNSCOPED_INFO("Port Number from from IP:port is invalid");
         CHECK(port == host.getPort());
     }
 
@@ -99,9 +87,7 @@ namespace
         U32 ip = 0xc098017d, port = 8080;
         LLHost host;
         host.set(ip,port);
-        UNSCOPED_INFO("IP address is invalid");
         CHECK(ip == host.getAddress());
-        UNSCOPED_INFO("Port Number is invalid");
         CHECK(port == host.getPort());
     }
 
@@ -112,31 +98,24 @@ namespace
         LLHost host;
         host.set(str,port);
         ip = ip_string_to_u32(str);
-        UNSCOPED_INFO("IP address is invalid");
         CHECK(ip == host.getAddress());
-        UNSCOPED_INFO("Port Number is invalid");
         CHECK(port == host.getPort());
 
         str = "64.233.187.99";
         ip = ip_string_to_u32(str);
         host.setAddress(str);
-        UNSCOPED_INFO("IP address is invalid");
         CHECK(ip == host.getAddress());
 
         ip = 0xc098017b;
         host.setAddress(ip);
-        UNSCOPED_INFO("IP address is invalid");
         CHECK(ip == host.getAddress());
         // should still use the old port
-        UNSCOPED_INFO("Port Number is invalid");
         CHECK(port == host.getPort());
 
         port = 8084;
         host.setPort(port);
-        UNSCOPED_INFO("Port Number is invalid");
         CHECK(port == host.getPort());
         // should still use the old address
-        UNSCOPED_INFO("IP address is invalid");
         CHECK(ip == host.getAddress());
     }
 
@@ -148,11 +127,9 @@ namespace
         host.set(str,port);
 
         std::string ip_string = host.getIPString();
-        UNSCOPED_INFO("Function Failed");
         CHECK(ip_string == str);
 
         std::string ip_string_port = host.getIPandPort();
-        UNSCOPED_INFO("Function Failed");
         CHECK(ip_string_port == "192.168.1.1:8080");
     }
 
@@ -209,7 +186,6 @@ namespace
         std::string hostStr = "64.233.167.99";
         LLHost host;
         host.setHostByName(hostStr);
-        UNSCOPED_INFO("SetHostByName for dotted IP Address failed");
         CHECK(host.getAddress() == ip_string_to_u32(hostStr.c_str()));
     }
 
@@ -217,9 +193,7 @@ namespace
     {
         LLHost host1(0xc098017d, 8080);
         LLHost host2 = host1;
-        UNSCOPED_INFO("Both IP addresses are not same");
         CHECK(host1.getAddress() == host2.getAddress());
-        UNSCOPED_INFO("Both port numbers are not same");
         CHECK(host1.getPort() == host2.getPort());
     }
 
@@ -229,7 +203,6 @@ namespace
         std::string str1 = "192.168.1.1:8080";
         std::ostringstream stream;
         stream << host1;
-        UNSCOPED_INFO("Operator << failed");
         CHECK(stream.str()== str1);
 
         // There is no istream >> llhost operator.
@@ -246,27 +219,22 @@ namespace
         U32 port = 8080;
         LLHost host1(ip_addr, port);
         LLHost host2(ip_addr, port);
-        UNSCOPED_INFO("operator== failed");
         CHECK(host1 == host2);
 
         // change port
         host2.setPort(7070);
-        UNSCOPED_INFO("operator!= failed");
         CHECK(host1 != host2);
 
         // set port back to 8080 and change IP address now
         host2.setPort(8080);
         host2.setAddress(ip_addr+10);
-        UNSCOPED_INFO("operator!= failed");
         CHECK(host1 != host2);
 
-        UNSCOPED_INFO("operator<  failed");
         CHECK(host1 < host2);
 
         // set IP address back to same value and change port
         host2.setAddress(ip_addr);
         host2.setPort(host1.getPort() + 10);
-        UNSCOPED_INFO("operator<  failed");
         CHECK(host1 < host2);
     }
 
@@ -274,15 +242,15 @@ namespace
     TEST_CASE("LLHost: isOk tells valid address strings from invalid ones", "[LLHost]")
     {
         LLHost host1("10.0.1.2", 6143);
-        UNSCOPED_INFO("10.0.1.2 should be a valid address");
+        UNSCOPED_INFO("10.0.1.2 is a valid address");
         CHECK(host1.isOk());
 
         LLHost host2("booger-brains", 6143);
-        UNSCOPED_INFO("booger-brains should be an invalid ip addess");
+        UNSCOPED_INFO("booger-brains is not an address");
         CHECK_FALSE(host2.isOk());
 
         LLHost host3("255.255.255.255", 6143);
-        UNSCOPED_INFO("255.255.255.255 should be valid broadcast address");
+        UNSCOPED_INFO("255.255.255.255 is the valid broadcast address");
         CHECK(host3.isOk());
     }
 }

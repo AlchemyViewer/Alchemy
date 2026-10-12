@@ -96,7 +96,6 @@ namespace
             });
 
         sync.yield();
-        UNSCOPED_INFO("coprocedure failed to update foo");
         CHECK(foo == 1);
 
         LLCoprocedureManager::instance().close("PoolName");
@@ -169,7 +168,6 @@ namespace
         worker.join();
 
         LL_INFOS("CoMain") << "checking count" << LL_ENDL;
-        UNSCOPED_INFO("coprocedure failed to update counter");
         CHECK(counter == 5);
     }
 }  // anonymous namespace

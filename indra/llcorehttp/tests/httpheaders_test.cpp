@@ -42,8 +42,7 @@ TEST_CASE("HttpHeaders Tests: a new HttpHeaders is empty", "[HttpHeaders_Tests]"
 {
     // create a new ref counted object with an implicit reference
     HttpHeaders::ptr_t headers = HttpHeaders::ptr_t(new HttpHeaders());
-    UNSCOPED_INFO("Nothing in headers");
-    REQUIRE(headers->size() == 0);
+    CHECK(headers->size() == 0);
 
     // release the implicit reference, causing the object to be released
     headers.reset();
@@ -63,17 +62,12 @@ TEST_CASE("HttpHeaders Tests: append keeps names and values in order", "[HttpHea
         std::string str2v("application/json");
         headers->append(str2n, str2v);
 
-        UNSCOPED_INFO("Headers retained");
         REQUIRE(headers->size() == 2);
         HttpHeaders::container_t & c(headers->getContainerTESTONLY());
 
-        UNSCOPED_INFO("First name is first name");
         CHECK(c[0].first == str1n);
-        UNSCOPED_INFO("First value is first value");
         CHECK(c[0].second == str1v);
-        UNSCOPED_INFO("Second name is second name");
         CHECK(c[1].first == str2n);
-        UNSCOPED_INFO("Second value is second value");
         CHECK(c[1].second == str2v);
     }
 
@@ -98,30 +92,27 @@ TEST_CASE("HttpHeaders Tests: find matches whole names case-sensitively", "[Http
         std::string str3v("trois gymnopedie");
         headers->append(str3n, str3v);
 
-        UNSCOPED_INFO("Headers retained");
-        REQUIRE(headers->size() == 3);
+        CHECK(headers->size() == 3);
 
         const std::string * result(NULL);
 
         // Find a header
         result = headers->find("TRES");
-        UNSCOPED_INFO("Found the last item");
         REQUIRE(result != NULL);
-        UNSCOPED_INFO("Last item is a nice");
-        REQUIRE((result != NULL && str3v == *result));
+        CHECK((result != NULL && str3v == *result));
 
         // appends above are raw and find is case sensitive
         result = headers->find("TReS");
-        UNSCOPED_INFO("Last item not found due to case");
-        REQUIRE(result == NULL);
+        UNSCOPED_INFO("the case differs");
+        CHECK(result == NULL);
 
         result = headers->find("TRE");
-        UNSCOPED_INFO("Last item not found due to prefixing (1)");
-        REQUIRE(result == NULL);
+        UNSCOPED_INFO("a prefix of the name");
+        CHECK(result == NULL);
 
         result = headers->find("TRESS");
-        UNSCOPED_INFO("Last item not found due to prefixing (2)");
-        REQUIRE(result == NULL);
+        UNSCOPED_INFO("the name and more");
+        CHECK(result == NULL);
     }
 
     // release the implicit reference, causing the object to be released
@@ -138,105 +129,81 @@ TEST_CASE("HttpHeaders Tests: appendNormal splits and cleans raw header lines", 
         static char line1v[] = "image/yourfacehere";
         headers->appendNormal(line1, sizeof(line1) - 1);
 
-        UNSCOPED_INFO("First append worked in some fashion");
-        REQUIRE(headers->size() == 1);
+        CHECK(headers->size() == 1);
 
         const std::string * result(NULL);
 
         // Find a header
         result = headers->find("accept");
-        UNSCOPED_INFO("Found 'accept'");
         REQUIRE(result != NULL);
-        UNSCOPED_INFO("accept value has face");
-        REQUIRE((result != NULL && *result == line1v));
+        CHECK((result != NULL && *result == line1v));
 
         // Left-clean on value
         static char line2[] = " next : \t\tlinejunk \t";
         headers->appendNormal(line2, sizeof(line2) - 1);
-        UNSCOPED_INFO("Second append worked");
-        REQUIRE(headers->size() == 2);
+        CHECK(headers->size() == 2);
         result = headers->find("next");
-        UNSCOPED_INFO("Found 'next'");
         REQUIRE(result != NULL);
-        UNSCOPED_INFO("next value is left-clean");
-        REQUIRE((result != NULL &&
+        UNSCOPED_INFO("the value is trimmed on the left only");
+        CHECK((result != NULL &&
                *result == "linejunk \t"));
 
         // First value unmolested
         result = headers->find("accept");
-        UNSCOPED_INFO("Found 'accept' again");
         REQUIRE(result != NULL);
-        UNSCOPED_INFO("accept value has face");
-        REQUIRE((result != NULL && *result == line1v));
+        CHECK((result != NULL && *result == line1v));
 
         // Colons in value are okay
         static char line3[] = "FancY-PANTs::plop:-neuf-=vleem=";
         static char line3v[] = ":plop:-neuf-=vleem=";
         headers->appendNormal(line3, sizeof(line3) - 1);
-        UNSCOPED_INFO("Third append worked");
-        REQUIRE(headers->size() == 3);
+        CHECK(headers->size() == 3);
         result = headers->find("fancy-pants");
-        UNSCOPED_INFO("Found 'fancy-pants'");
         REQUIRE(result != NULL);
-        UNSCOPED_INFO("fancy-pants value has colons");
-        REQUIRE((result != NULL && *result == line3v));
+        UNSCOPED_INFO("colons in the value are kept");
+        CHECK((result != NULL && *result == line3v));
 
         // Zero-length value
         static char line4[] = "all-talk-no-walk:";
         headers->appendNormal(line4, sizeof(line4) - 1);
-        UNSCOPED_INFO("Fourth append worked");
-        REQUIRE(headers->size() == 4);
+        CHECK(headers->size() == 4);
         result = headers->find("all-talk-no-walk");
-        UNSCOPED_INFO("Found 'all-talk'");
         REQUIRE(result != NULL);
-        UNSCOPED_INFO("al-talk value is zero-length");
-        REQUIRE((result != NULL && result->size() == 0));
+        CHECK((result != NULL && result->size() == 0));
 
         // Zero-length name
         static char line5[] = ":all-talk-no-walk";
         static char line5v[] = "all-talk-no-walk";
         headers->appendNormal(line5, sizeof(line5) - 1);
-        UNSCOPED_INFO("Fifth append worked");
-        REQUIRE(headers->size() == 5);
+        CHECK(headers->size() == 5);
         result = headers->find("");
-        UNSCOPED_INFO("Found no-name");
         REQUIRE(result != NULL);
-        UNSCOPED_INFO("no-name value is something");
-        REQUIRE((result != NULL && *result == line5v));
+        CHECK((result != NULL && *result == line5v));
 
         // Lone colon is still something
         headers->clear();
         static char line6[] = "  :";
         headers->appendNormal(line6, sizeof(line6) - 1);
-        UNSCOPED_INFO("Sixth append worked");
-        REQUIRE(headers->size() == 1);
+        CHECK(headers->size() == 1);
         result = headers->find("");
-        UNSCOPED_INFO("Found 2nd no-name");
         REQUIRE(result != NULL);
-        UNSCOPED_INFO("2nd no-name value is nothing");
-        REQUIRE((result != NULL && result->size() == 0));
+        CHECK((result != NULL && result->size() == 0));
 
         // Line without colons is taken as-is and unstripped in name
         static char line7[] = " \toskdgioasdghaosdghoowg28342908tg8902hg0hwedfhqew890v7qh0wdebv78q0wdevbhq>?M>BNM<ZV>?NZ? \t";
         headers->appendNormal(line7, sizeof(line7) - 1);
-        UNSCOPED_INFO("Seventh append worked");
-        REQUIRE(headers->size() == 2);
+        CHECK(headers->size() == 2);
         result = headers->find(line7);
-        UNSCOPED_INFO("Found whatsit line");
         REQUIRE(result != NULL);
-        UNSCOPED_INFO("Whatsit line has no value");
-        REQUIRE((result != NULL && result->size() == 0));
+        CHECK((result != NULL && result->size() == 0));
 
         // Normaling interface heeds the byte count, doesn't look for NUL-terminator
         static char line8[] = "binary:ignorestuffontheendofthis";
         headers->appendNormal(line8, 13);
-        UNSCOPED_INFO("Eighth append worked");
-        REQUIRE(headers->size() == 3);
+        CHECK(headers->size() == 3);
         result = headers->find("binary");
-        UNSCOPED_INFO("Found 'binary'");
         REQUIRE(result != NULL);
-        UNSCOPED_INFO("binary value was limited to 'ignore'");
-        REQUIRE((result != NULL &&
+        CHECK((result != NULL &&
                *result == "ignore"));
 
     }
@@ -252,14 +219,11 @@ TEST_CASE("HttpHeaders Tests: iterators visit every entry in order", "[HttpHeade
     HttpHeaders::ptr_t headers = HttpHeaders::ptr_t(new HttpHeaders());
 
     HttpHeaders::iterator end(headers->end()), begin(headers->begin());
-    UNSCOPED_INFO("Empty container has equal begin/end const iterators");
     CHECK(end == begin);
     HttpHeaders::const_iterator cend(headers->end()), cbegin(headers->begin());
-    UNSCOPED_INFO("Empty container has equal rbegin/rend const iterators");
     CHECK(cend == cbegin);
 
-    UNSCOPED_INFO("Empty container has equal begin/end iterators");
-    REQUIRE(headers->end() == headers->begin());
+    CHECK(headers->end() == headers->begin());
 
     {
         static char line1[] = " AcCePT : image/yourfacehere";
@@ -286,7 +250,6 @@ TEST_CASE("HttpHeaders Tests: iterators visit every entry in order", "[HttpHeade
         static char line6v[] = "";
         headers->appendNormal(line6, sizeof(line6) - 1);
 
-        UNSCOPED_INFO("All entries accounted for");
         REQUIRE(headers->size() == 6);
 
         static char * values[] = {
@@ -304,9 +267,7 @@ TEST_CASE("HttpHeaders Tests: iterators visit every entry in order", "[HttpHeade
              cend != it;
              ++it, ++i)
         {
-            std::ostringstream str;
-            str << "Const Iterator value # " << i << " was " << values[i];
-            UNSCOPED_INFO(str.str());
+            CAPTURE(i);
             REQUIRE((*it).second == values[i]);
         }
 
@@ -317,9 +278,7 @@ TEST_CASE("HttpHeaders Tests: iterators visit every entry in order", "[HttpHeade
              end != it;
              ++it, ++i)
         {
-            std::ostringstream str;
-            str << "Const Iterator value # " << i << " was " << values[i];
-            UNSCOPED_INFO(str.str());
+            CAPTURE(i);
             REQUIRE((*it).second == values[i]);
         }
     }
@@ -335,10 +294,8 @@ TEST_CASE("HttpHeaders Tests: reverse iterators visit every entry in reverse ord
     HttpHeaders::ptr_t headers = HttpHeaders::ptr_t(new HttpHeaders());
 
     HttpHeaders::reverse_iterator rend(headers->rend()), rbegin(headers->rbegin());
-    UNSCOPED_INFO("Empty container has equal rbegin/rend const iterators");
     CHECK(rend == rbegin);
     HttpHeaders::const_reverse_iterator crend(headers->rend()), crbegin(headers->rbegin());
-    UNSCOPED_INFO("Empty container has equal rbegin/rend const iterators");
     CHECK(crend == crbegin);
 
     {
@@ -366,7 +323,6 @@ TEST_CASE("HttpHeaders Tests: reverse iterators visit every entry in reverse ord
         static char line6v[] = "";
         headers->appendNormal(line6, sizeof(line6) - 1);
 
-        UNSCOPED_INFO("All entries accounted for");
         REQUIRE(headers->size() == 6);
 
         static char * values[] = {
@@ -384,9 +340,7 @@ TEST_CASE("HttpHeaders Tests: reverse iterators visit every entry in reverse ord
              cend != it;
              ++it, ++i)
         {
-            std::ostringstream str;
-            str << "Const Iterator value # " << i << " was " << values[i];
-            UNSCOPED_INFO(str.str());
+            CAPTURE(i);
             REQUIRE((*it).second == values[i]);
         }
 
@@ -397,9 +351,7 @@ TEST_CASE("HttpHeaders Tests: reverse iterators visit every entry in reverse ord
              end != it;
              ++it, ++i)
         {
-            std::ostringstream str;
-            str << "Iterator value # " << i << " was " << values[i];
-            UNSCOPED_INFO(str.str());
+            CAPTURE(i);
             REQUIRE((*it).second == values[i]);
         }
     }

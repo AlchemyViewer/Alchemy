@@ -103,7 +103,6 @@ namespace
 
 namespace
 {
-    // does an empty message stop processing?
     TEST_CASE_METHOD(LLTemplateMessageDispatcherData, "LLTemplateMessageDispatcher: an empty message stops processing", "[LLTemplateMessageDispatcher]")
     {
         LLTemplateMessageReader* pReader = NULL;
@@ -123,11 +122,9 @@ namespace
         fillVector(vector_data, gBinaryTemplateData);
         mMessage["body"]["binary-template-data"] = vector_data;
         t.dispatch(mMessageName, mMessage, mResponsePtr);
-        UNSCOPED_INFO("udp dispatch was called");
         CHECK(gUdpDispatchWasCalled);
     }
 
-    // what if the message wasn't valid? We would hope the message gets cleared!
     TEST_CASE_METHOD(LLTemplateMessageDispatcherData, "LLTemplateMessageDispatcher: an invalid message gets cleared", "[LLTemplateMessageDispatcher]")
     {
         LLTemplateMessageReader* pReader = NULL;
@@ -137,11 +134,9 @@ namespace
         mMessage["body"]["binary-template-data"] = vector_data;
         gValidateMessage = false;
         t.dispatch(mMessageName, mMessage, mResponsePtr);
-        UNSCOPED_INFO("clear received message was called");
         CHECK(gClearRecvWasCalled);
     }
 
-    // is the binary data passed through correctly?
     TEST_CASE_METHOD(LLTemplateMessageDispatcherData, "LLTemplateMessageDispatcher: the binary data passes through unchanged", "[LLTemplateMessageDispatcher]")
     {
         LLTemplateMessageReader* pReader = NULL;
@@ -151,7 +146,6 @@ namespace
         fillVector(vector_data, gBinaryTemplateData);
         mMessage["body"]["binary-template-data"] = vector_data;
         t.dispatch(mMessageName, mMessage, mResponsePtr);
-        UNSCOPED_INFO("data couriered correctly");
         CHECK(std::string_view(gBinaryTemplateData) == std::string_view(gUdpDispatchedData));
     }
 }

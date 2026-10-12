@@ -41,21 +41,18 @@ namespace
         valid = max_age_from_cache_control("max-age=3600", &max_age);
         UNSCOPED_INFO("typical input valid");
         CHECK(valid);
-        UNSCOPED_INFO("typical input parsed");
         CHECK(max_age == 3600);
 
         valid = max_age_from_cache_control(
             " max-age=600 , no-cache,private=\"stuff\" ", &max_age);
         UNSCOPED_INFO("complex input valid");
         CHECK(valid);
-        UNSCOPED_INFO("complex input parsed");
         CHECK(max_age == 600);
 
         valid = max_age_from_cache_control(
             "no-cache, max-age = 123 ", &max_age);
         UNSCOPED_INFO("complex input 2 valid");
         CHECK(valid);
-        UNSCOPED_INFO("complex input 2 parsed");
         CHECK(max_age == 123);
     }
 
