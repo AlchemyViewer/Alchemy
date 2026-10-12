@@ -750,6 +750,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptConvertUuidKeys</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua holds the script's own keys as SLua's uuids: its key variables, its functions' and handlers' key parameters, and what its functions give. Off, as text, as LSL held them, so that a key given "" or any other text keeps it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptConvertKeyTextAny</key>
         <map>
             <key>Comment</key>

@@ -72,6 +72,12 @@ public:
         // detected[i + 1]:getKey() -- where the call stands in the handler,
         // rather than through llcompat.Detected*.
         bool detectedTable = true;
+        // The script's own keys as SLua's uuids: its key variables, the
+        // parameters of its functions and handlers, and what its functions
+        // give. Off, held as text, as LSL held them: what SLua gives as a
+        // uuid made text where one is given it, a cast to a key the text as
+        // it is, and text given where ll takes a key.
+        bool uuidKeys = true;
         // SLua's ll rather than llcompat where it means the same: a boolean
         // answer, a constant index moved on by one, a find's answer read
         // against nil, and the script's time, where it resets it, read
@@ -114,6 +120,7 @@ public:
             o.detectedTable = false;
             o.sluaCalls     = false;
             o.idioms        = false;
+            o.uuidKeys      = false;
             return o;
         }
     };

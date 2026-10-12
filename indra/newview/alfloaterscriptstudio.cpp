@@ -8190,6 +8190,7 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     options.detectedTable = gSavedSettings.getBOOL("ALScriptConvertDetectedTable");
     options.sluaCalls     = gSavedSettings.getBOOL("ALScriptConvertSLuaCalls");
     options.idioms        = gSavedSettings.getBOOL("ALScriptConvertIdioms");
+    options.uuidKeys      = gSavedSettings.getBOOL("ALScriptConvertUuidKeys");
     options.handlers      = gSavedSettings.getBOOL("ALScriptConvertHandlerFields") ? ALLSLToSLua::Options::Handlers::Field : ALLSLToSLua::Options::Handlers::On;
     options.types         = gSavedSettings.getBOOL("ALScriptConvertTypes");
     options.keyTextAny    = gSavedSettings.getBOOL("ALScriptConvertKeyTextAny");

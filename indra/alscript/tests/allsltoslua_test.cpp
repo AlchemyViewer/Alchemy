@@ -3415,4 +3415,52 @@ namespace tut
         ensure("NULL_KEY, as LSL's text: " + r.text, has(r, "if tostring(NULL_KEY) ~= \"\" then"));
         checksClean(r);
     }
+    template<> template<>
+    void allsltoslua_object::test<102>()
+    {
+        set_test_name("with uuidKeys off, every key of the script's own held as text, as LSL held them (Tapple's preference): its "
+                      "variables, its functions' and handlers' parameters, what its functions give, a cast to a key; what SLua gives as "
+                      "a uuid made text, text given ll as it is; closeToLSL the same");
+        const std::string lsl = "key gOwner;\n"
+                                "key pick() { return llGetOwner(); }\n"
+                                "integer mine(key who) { return who == gOwner; }\n"
+                                "default {\n"
+                                "    state_entry() {\n"
+                                "        key k = \"\";\n"
+                                "        llOwnerSay((string)(k == \"\"));\n"
+                                "        gOwner = llGetOwner();\n"
+                                "        string s = llGetObjectDesc();\n"
+                                "        key cast = (key)s;\n"
+                                "        if (gOwner) llDialog(gOwner, \"hi\", [\"OK\"], -5);\n"
+                                "        if (gOwner != NULL_KEY && mine(pick())) llOwnerSay((string)cast + (string)((key)\"\"));\n"
+                                "    }\n"
+                                "    listen(integer c, string n, key id, string m) {\n"
+                                "        if (id == gOwner) llOwnerSay(m);\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLToSLua::Options o;
+        o.uuidKeys                  = false;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        ensure("converted: " + (r.problems.empty() ? std::string() : r.problems.front().message), r.converted);
+        ensure("Tapple's: " + r.text, has(r, "local k: string = \"\"\n") && has(r, "print(tostring(if k == \"\" then 1 else 0))"));
+        ensure("a global, LSL's default: " + r.text, has(r, "local gOwner: string = \"\"\n") && has(r, "gOwner = tostring(ll.GetOwner())"));
+        ensure("what a function gives: " + r.text, has(r, "local function pick(): string\n    return tostring(ll.GetOwner())"));
+        ensure("a parameter: " + r.text, has(r, "local function mine(who: string): boolean") && has(r, "who == gOwner"));
+        ensure("a cast, the text as it is: " + r.text, has(r, "local cast: string = s\n") && has(r, "print(cast .. \"\")") && !has(r, "uuid(s)") && !has(r, "uuid(\"\")"));
+        ensure("its truth as LSL's: " + r.text, has(r, "if (touuid(gOwner) or NULL_KEY).istruthy then"));
+        ensure("given ll as it is: " + r.text, has(r, "ll.Dialog(gOwner :: any, \"hi\""));
+        ensure("against NULL_KEY, as text: " + r.text, has(r, "gOwner ~= tostring(NULL_KEY)"));
+        ensure("a handler's key, made text as it begins: " + r.text, has(r, "function(c: number, n: string, idKey: uuid, m: string)") &&
+                                                                   has(r, "local id: string = tostring(idKey)") && has(r, "if id == gOwner then"));
+        ensure("nothing said of NULL_KEY: " + r.text, !noted(r, "SluaKeyEmpty"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result close = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
+        ensure("closeToLSL the same: " + close.text, close.converted && has(close, "local gOwner = \"\"\n") && has(close, "local cast = s\n"));
+        checksClean(close);
+
+        const ALLSLToSLua::Result uuids = convert(lsl);
+        ensure("uuids by default: " + uuids.text, has(uuids, "local gOwner = NULL_KEY\n") && has(uuids, "local cast = uuid(s)"));
+    }
 }

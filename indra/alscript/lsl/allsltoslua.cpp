@@ -931,6 +931,13 @@ namespace
         {
             return var && (mTextKeys.contains(var) || mTextParams.contains(var)) ? LST_STRING : lsl;
         }
+        // What a function of the script's own gives, as SLua holds it: a
+        // key as text where the script's keys are.
+        LSLIType givenType(LSLSymbol* function) const
+        {
+            const LSLIType lsl = function ? function->getIType() : LST_NULL;
+            return lsl == LST_KEY && !mOptions.uuidKeys ? LST_STRING : lsl;
+        }
 
         // x = x op y, which Luau writes x op= y: the compound operator and
         // what follows it -- for a string, each piece of s = s + a + b, as
@@ -4214,6 +4221,12 @@ namespace
         const LSLIType to    = e->getIType();
         const LSLIType from  = slType(child);
         const Expr     v     = value(child);
+        if (to == LST_KEY && !mOptions.uuidKeys)
+        {
+            // A key held as text, as LSL's was: text as it is, a uuid made
+            // text.
+            return from == LST_KEY ? Expr{ "tostring(" + v.text + ")" } : v;
+        }
         if (to == from)
         {
             return v;
@@ -5106,7 +5119,7 @@ namespace
                 // LSL's string.
                 const std::string given = isNull(e)             ? std::string()
                                           : boolean(mFunction) ? truthOf(e)
-                                          : mFunction          ? coerced(e, mFunction->getIType()).text
+                                          : mFunction          ? coerced(e, givenType(mFunction)).text
                                                                : value(e).text;
                 const std::string said  = isNull(e) ? "return" : "return " + given;
                 line(last ? said : "do " + said + " end");
@@ -7403,6 +7416,14 @@ namespace
             return LST_KEY;
         }
         LSLExpression* inner = unbracketed(e);
+        // Where the script's keys are held as text: a cast to a key, and a
+        // call of its own that gives one.
+        if (!mOptions.uuidKeys && inner && e->getIType() == LST_KEY &&
+            (inner->getNodeSubType() == NODE_TYPECAST_EXPRESSION ||
+             (inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION && readOf(inner))))
+        {
+            return LST_STRING;
+        }
         if (inner && inner->getNodeSubType() == NODE_LVALUE_EXPRESSION && isNull(static_cast<LSLLValueExpression*>(inner)->getMember()))
         {
             return varType(static_cast<LSLLValueExpression*>(inner)->getIdentifier()->getSymbol(), e->getIType());
@@ -7412,6 +7433,17 @@ namespace
 
     void Writer::findTextKeys()
     {
+        // Every key of the script's own, where they are held as text.
+        if (!mOptions.uuidKeys)
+        {
+            walk(mScript, [&](LSLASTNode* node) {
+                LSLSymbol* symbol = node->getNodeType() == NODE_IDENTIFIER ? static_cast<LSLIdentifier*>(node)->getSymbol() : nullptr;
+                if (symbol && symbol->getSymbolType() == SYM_VARIABLE && symbol->getSubType() != SYM_BUILTIN && symbol->getIType() == LST_KEY)
+                {
+                    mTextKeys.insert(symbol);
+                }
+            });
+        }
         walk(mScript, [&](LSLASTNode* node) {
             if (node->getNodeType() != NODE_EVENT_HANDLER)
             {
@@ -7610,7 +7642,7 @@ namespace
             mFunction = f->getSymbol();
             commentsBefore(f);
             line(std::string(forward.contains(mFunction) ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +
-                 (boolean(mFunction) ? std::string(mOptions.types ? ": boolean" : "") : typed(f->getIdentifier()->getIType())));
+                 (boolean(mFunction) ? std::string(mOptions.types ? ": boolean" : "") : typed(givenType(mFunction))));
             trail(f->getStatements());
             ++mDepth;
             prepareBody(f->getStatements());

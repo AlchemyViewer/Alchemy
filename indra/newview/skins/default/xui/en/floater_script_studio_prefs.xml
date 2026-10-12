@@ -1728,6 +1728,17 @@ end</floater.string>
              top_pad="4"
              width="700" />
             <check_box
+             control_name="ALScriptConvertUuidKeys"
+             follows="left|top"
+             height="20"
+             label="The script's keys as SLua's uuids"
+             layout="topleft"
+             left="12"
+             name="convert_uuid_keys"
+             tool_tip="local owner: uuid = ll.GetOwner(). Off: every key the script has held as text, as LSL held them -- local owner: string = tostring(ll.GetOwner()) -- so that a key given &quot;&quot;, or any other text, keeps it, compares with it and is sent on as it."
+             top_pad="4"
+             width="700" />
+            <check_box
              control_name="ALScriptConvertHandlerFields"
              follows="left|top"
              height="20"
