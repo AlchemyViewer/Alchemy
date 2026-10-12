@@ -223,11 +223,10 @@ namespace
         mRoot.addNode("greek/alpha", alphaNode);
         mRoot.addNode("greek/beta", betaNode);
 
-        mRoot.addNode("greek/gamma", gammaNode);
-        mRoot.addNode("greek/gamma", gamma2Node.get());
-        const bool refused = gamma2Node->rootNode() == gamma2Node.get();
-        CHECK(refused);
-        if (!refused)
+        CHECK(mRoot.addNode("greek/gamma", gammaNode));
+        const bool taken = mRoot.addNode("greek/gamma", gamma2Node.get());
+        CHECK_FALSE(taken);
+        if (taken)
         {
             (void)gamma2Node.release(); // mRoot took it, and deletes it
         }
@@ -371,6 +370,29 @@ namespace
             LLSD result = post("web/echo", stuff);
             CHECK_THAT(result, ll_test::LLSDEquals(stuff));
         }
+    }
+
+    // Counts the nodes alive, to show that one buildAllServices refuses is deleted.
+    struct CountedNode : public LLHTTPNode
+    {
+        CountedNode() { ++sLive; }
+        ~CountedNode() override { --sLive; }
+
+        static int sLive;
+    };
+    int CountedNode::sLive = 0;
+
+    TEST_CASE_METHOD(HTTPNodeTestData, "http node: buildAllServices deletes a node whose path is taken", "[http_node]")
+    {
+        static LLHTTPRegistration<CountedNode> counted("/test/registrar/counted");
+
+        LLHTTPRegistrar::buildAllServices(mRoot);
+        const int live = CountedNode::sLive;
+        CHECK(live > 0);
+
+        // Every path is taken now, so every node built is refused.
+        LLHTTPRegistrar::buildAllServices(mRoot);
+        CHECK(CountedNode::sLive == live);
     }
 
     TEST_CASE_METHOD(HTTPNodeTestData, "http node: web/server/api lists the registered paths", "[http_node]")
