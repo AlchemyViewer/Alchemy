@@ -211,6 +211,7 @@ namespace ALLookFormat
     // where it is given, until the name escaped as a file name
     // (LLURI::escape, which makes three of a byte outside ASCII) is no
     // longer than `escaped_limit`. Empty for n below 1, for a name that is
-    // nothing, and where the limit leaves no room for any of the name.
+    // nothing, where the limit leaves no room for any of the name, and where
+    // what the cut leaves draws nothing or is a device's name.
     std::string numberedLookName(const std::string& wanted, S32 n, size_t escaped_limit = std::numeric_limits<size_t>::max());
 }

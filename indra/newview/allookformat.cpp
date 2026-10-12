@@ -914,9 +914,10 @@ std::string ALLookFormat::numberedLookName(const std::string& wanted, S32 n, siz
     {
         base = trimmedOfSpaces(utf8str_truncate(base, static_cast<S32>(base.size()) - 1));
     }
-    // And something left that draws: the cut can take a name's one letter
-    // and leave the marks around it.
-    if (!drawsSomething(base))
+    // And something left that draws -- the cut can take a name's one letter
+    // and leave the marks around it -- and not a device's name, which the
+    // cut can leave of a name that was none ("NUL" and then a word).
+    if (!drawsSomething(base) || isWindowsDeviceName(base + suffix))
     {
         return std::string();
     }

@@ -792,6 +792,10 @@ namespace tut
         }
         ensure_equals("thirty-one marks and a letter take a key", ALLookFormat::lookNameKey(marks + "a"), "a");
         ensure_equals("cut to the marks, nothing is left", ALLookFormat::numberedLookName(marks + "a", 1, 180), "");
+        // Nor a device's name, which a cut can leave of a name that was none.
+        ensure_equals("a device's name and a word is a name", ALLookFormat::lookNameFromUntrustedText("NUL words"), "NUL words");
+        ensure_equals("cut to the device's name, nothing is left", ALLookFormat::numberedLookName("NUL words", 1, 5), "");
+        ensure_equals("numbered, it is a name again", ALLookFormat::numberedLookName("NUL words", 2, 13), "NUL (2)");
         ensure_equals("no room for any of it is nothing", ALLookFormat::numberedLookName("Sunset", 2, 8), "");
     }
 
