@@ -88,6 +88,19 @@ namespace
         CHECK(service.hasBuiltins());
     }
 
+    TEST_CASE_METHOD(allslservice_data, "allslservice: a second service loading the same builtins has them too", "[allslservice]")
+    {
+        // Every name it declares is in Tailslide's table already, so none
+        // is loaded again; the service has them all the same.
+        REQUIRE(loaded);
+        ALLSLService again;
+        std::string  why;
+        const bool   read = again.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", why);
+        CAPTURE(why);
+        CHECK(read);
+        CHECK(again.hasBuiltins());
+    }
+
     TEST_CASE_METHOD(allslservice_data, "allslservice: a script that is right checks clean", "[allslservice]")
     {
         UNSCOPED_INFO("builtins load: " + error);
