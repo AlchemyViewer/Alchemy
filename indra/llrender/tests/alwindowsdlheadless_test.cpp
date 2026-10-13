@@ -31,12 +31,35 @@
 
 #include "llwindow.h"
 
+#if LL_DARWIN
+#include <OpenGL/OpenGL.h>
+#elif LL_LINUX
+#include "SDL3/SDL_video.h"
+#endif
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <thread>
 
 namespace
 {
+    // Whether a GL context is current on the calling thread, as the platform
+    // reports it: a worker's shared context is made outside SDL, so SDL's own
+    // record of the current context never names it.
+    bool contextCurrentHere()
+    {
+#if LL_WINDOWS
+        return wglGetCurrentContext() != nullptr;
+#elif LL_DARWIN
+        return CGLGetCurrentContext() != nullptr;
+#else
+        // EGL, reached through SDL as the shared contexts themselves are.
+        using GetCurrentContext = void* (*)();
+        const auto get_current = reinterpret_cast<GetCurrentContext>(SDL_EGL_GetProcAddress("eglGetCurrentContext"));
+        return get_current && get_current() != nullptr;
+#endif
+    }
+
     struct alwindowsdlheadless_data
     {
         // The window is the shared context's, which has the image, render
@@ -62,7 +85,7 @@ namespace
         // createWindow would have returned null on an invalid one; what is
         // left to see is the SDL window behind it.
         UNSCOPED_INFO("there is an SDL window behind it");
-        REQUIRE(window->getPlatformWindow() != nullptr);
+        CHECK(window->getPlatformWindow() != nullptr);
 
         LLCoordWindow size;
         REQUIRE(window->getSize(&size));
@@ -81,26 +104,37 @@ namespace
         void* shared = window->createSharedContext();
         REQUIRE(shared != nullptr);
 
+        // What the worker saw, checked on this thread once it has ended.
+        bool current_on_worker = false;
         GLuint name = 0;
         GLenum worker_error = GL_NO_ERROR;
         std::thread worker([&]
         {
             window->makeContextCurrent(shared);
 
-            glGenTextures(1, &name);
-            glBindTexture(GL_TEXTURE_2D, name);
-            const U8 texel[4] = { 0x12, 0x34, 0x56, 0x78 };
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, texel);
-            glBindTexture(GL_TEXTURE_2D, 0);
-            // The object is complete and visible to the share group once the
-            // commands that made it have run.
-            glFinish();
-            worker_error = glGetError();
+            // With no context current, GL does nothing -- or, on macOS,
+            // crashes -- so the worker makes nothing unless the bind took.
+            current_on_worker = contextCurrentHere();
+            if (current_on_worker)
+            {
+                glGenTextures(1, &name);
+                glBindTexture(GL_TEXTURE_2D, name);
+                const U8 texel[4] = { 0x12, 0x34, 0x56, 0x78 };
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, texel);
+                glBindTexture(GL_TEXTURE_2D, 0);
+                // The object is complete and visible to the share group once
+                // the commands that made it have run.
+                glFinish();
+                worker_error = glGetError();
+            }
 
             window->destroySharedContext(shared);
         });
         worker.join();
 
+        // Unless the shared context was current there, the worker's error
+        // and texture say nothing.
+        REQUIRE(current_on_worker);
         CHECK(worker_error == (GLenum)GL_NO_ERROR);
         UNSCOPED_INFO("the worker made a texture");
         CHECK(name != 0);

@@ -117,8 +117,8 @@ namespace
             }
         }
 
-        // Compute in use and two R32F targets with a mip level beyond the first, or the case skipped where the
-        // context has no images.
+        // Compute in use, an R32F target with a mip level beyond the first and an RGBA16F one without, or the case
+        // skipped where the context has no compute.
         void require_targets()
         {
             if (!ll_test::contextHasCompute())

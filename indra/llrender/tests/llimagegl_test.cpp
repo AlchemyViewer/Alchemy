@@ -42,6 +42,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstring>
@@ -83,13 +84,22 @@ namespace
             glGetTexImage(GL_TEXTURE_2D, level, format, type, out);
         }
 
-        // The texel at (x, y) of level 0 of an RGBA8 texture.
+        // The texel at (x, y) of level 0 of an RGBA8 texture, which must lie in the level. The level is read at the
+        // size GL holds it at, which need not be the size the image reports. Called inside a check, so it asserts
+        // only on failure: an assertion that passed would take the check's UNSCOPED_INFO.
         static U32 readTexelRGBA(const LLImageGL* img, S32 x, S32 y)
         {
-            const S32 w = img->getWidth();
-            const S32 h = img->getHeight();
+            bindForRead(img);
+            GLint w = 0;
+            GLint h = 0;
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
+            if (x >= w || y >= h)
+            {
+                FAIL("texel (" << x << ", " << y << ") is outside the " << w << "x" << h << " level");
+            }
             std::vector<U8> px(static_cast<size_t>(w) * h * 4);
-            readTexture(img, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
             U32 texel = 0;
             std::memcpy(&texel, px.data() + (static_cast<size_t>(y) * w + x) * 4, 4);
             return texel;
@@ -112,8 +122,8 @@ namespace
 
     // destroyGLTexture must drop the GL name. Subsequent reads see
     // mTexName == 0 and getHasGLTexture() == false; the LLImageGL
-    // instance itself remains usable (could be re-uploaded).
-    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: destroyGLTexture drops the GL name", "[LLImageGL]")
+    // instance itself remains usable: it takes a new upload.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: destroyGLTexture drops the GL name and the image takes a new upload", "[LLImageGL]")
     {
         LLPointer<LLImageRaw> raw = makeRaw(16, 16, 4, /*fill=*/0x80);
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
@@ -124,6 +134,11 @@ namespace
 
         CHECK((S32)img->getTexName() == 0);
         CHECK_FALSE(img->getHasGLTexture());
+
+        // Uploaded again, it holds a texture again.
+        CHECK(img->createGLTexture(0, raw.get()));
+        UNSCOPED_INFO("re-uploaded");
+        CHECK(img->getHasGLTexture());
     }
 
     // Regression for 8e85c68d69 — the partial-rect setSubImage path
@@ -138,9 +153,12 @@ namespace
         REQUIRE(img->createGLTexture(0, raw.get()));
 
         // Bind the new texture to unit 0 the same way the renderer
-        // would, then snapshot what GL_TEXTURE_BINDING_2D points at.
+        // would, through its slot, then snapshot what
+        // GL_TEXTURE_BINDING_2D points at. createGLTexture ends by
+        // unbinding the slot, so the texture is there only if the
+        // slot's bind reached GL.
+        gGL.getTextureSlot(0)->bind(img.get());
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, img->getTexName());
 
         GLint bound_before = 0;
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound_before);
@@ -268,11 +286,13 @@ namespace
         CHECK((S32)img4->getPrimaryFormat() == (S32)GL_RGBA);
     }
 
-    // usemipmaps=true must wire the auto-mipmap path through to GL —
-    // verify by reading the bound texture's mip 1 dimensions back. Mip
-    // 1 of an 8x8 base is 4x4; if mipmaps weren't generated the level
-    // would have width 0.
-    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a texture made with usemipmaps has a mip chain in GL", "[LLImageGL]")
+    // usemipmaps=true must wire the auto-mipmap path through to GL. The
+    // storage holds the chain: mip 1 of an 8x8 base is 4x4, where a
+    // texture made without mips has no level 1. That alone does not say
+    // the mips were generated, since glTexStorage2D allocates every
+    // level whether or not anything is written to it; but mip 1 of a
+    // flat base holds the base's value only once it has been.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a texture made with usemipmaps has a generated mip chain in GL", "[LLImageGL]")
     {
         LLPointer<LLImageRaw> raw = makeRaw(8, 8, 4, /*fill=*/0x80);
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/true);
@@ -283,8 +303,16 @@ namespace
         glBindTexture(GL_TEXTURE_2D, img->getTexName());
 
         GLint mip1_w = 0;
+        GLint mip1_h = 0;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 1, GL_TEXTURE_WIDTH, &mip1_w);
-        CHECK((S32)mip1_w == 4);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 1, GL_TEXTURE_HEIGHT, &mip1_h);
+        REQUIRE((S32)mip1_w == 4);
+        REQUIRE((S32)mip1_h == 4);
+
+        std::vector<U8> mip1((size_t)4 * 4 * 4, 0);
+        readTexture(img, GL_RGBA, GL_UNSIGNED_BYTE, mip1.data(), /*level=*/1);
+        UNSCOPED_INFO("bytes of mip 1 that are not the base's");
+        CHECK(std::count_if(mip1.begin(), mip1.end(), [](U8 byte) { return byte != 0x80; }) == 0);
     }
 
     // Regression for 2d4e2a60ea — GL_TEXTURE_SWIZZLE_RGBA must be set
@@ -423,8 +451,11 @@ namespace
 
         bindForRead(img);
         GLint w = 0;
+        GLint h = 0;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
         REQUIRE((S32)w == (S32)W / 2);
+        REQUIRE((S32)h == (S32)H / 2);
 
         GLint mask[4] = { 0, 0, 0, 0 };
         glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, mask);
@@ -499,8 +530,12 @@ namespace
         img->endUpload();
 
         REQUIRE(read);
-        UNSCOPED_INFO("read at the size on screen");
-        REQUIRE((S32)dst->getWidth() == (S32)W);
+        {
+            INFO("read at the size on screen");
+            REQUIRE((S32)dst->getWidth() == (S32)W);
+            REQUIRE((S32)dst->getHeight() == (S32)H);
+        }
+        REQUIRE((S32)dst->getComponents() == 4);
         UNSCOPED_INFO("and reads what is on screen");
         CHECK(std::memcmp(dst->getData(), sd, (size_t)W * H * 4) == 0);
     }

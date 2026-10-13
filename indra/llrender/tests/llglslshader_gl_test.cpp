@@ -732,13 +732,25 @@ namespace
             return glGetUniformLocation(mShader.mProgramObject, name);
         }
 
+        // The location of an active uniform. At -1 the read back raises an error and fills nothing, so every
+        // expectation of 0 would be met.
+        GLint require_location(const char* name) const
+        {
+            const GLint loc = location(name);
+            CAPTURE(name);
+            REQUIRE(loc >= 0);
+            return loc;
+        }
+
         // What the program holds at a uniform, as GL reads it back, against what a check expects of its first
-        // components. Floats are compared by their bits, so a check is exact.
+        // components, at most four. Floats are compared by their bits, so a check is exact.
         void require_ints(const std::string& what, const char* name, std::initializer_list<GLint> expected) const
         {
             INFO(what);
+            const GLint loc = require_location(name);
             std::array<GLint, 4> held = {};
-            glGetUniformiv(mShader.mProgramObject, location(name), held.data());
+            REQUIRE(expected.size() <= held.size());
+            glGetUniformiv(mShader.mProgramObject, loc, held.data());
             size_t component = 0;
             for (const GLint value : expected)
             {
@@ -751,8 +763,10 @@ namespace
         void require_uints(const std::string& what, const char* name, std::initializer_list<GLuint> expected) const
         {
             INFO(what);
+            const GLint loc = require_location(name);
             std::array<GLuint, 4> held = {};
-            glGetUniformuiv(mShader.mProgramObject, location(name), held.data());
+            REQUIRE(expected.size() <= held.size());
+            glGetUniformuiv(mShader.mProgramObject, loc, held.data());
             size_t component = 0;
             for (const GLuint value : expected)
             {
@@ -765,8 +779,10 @@ namespace
         void require_floats(const std::string& what, const char* name, std::initializer_list<F32> expected) const
         {
             INFO(what);
+            const GLint loc = require_location(name);
             std::array<F32, 4> held = {};
-            glGetUniformfv(mShader.mProgramObject, location(name), held.data());
+            REQUIRE(expected.size() <= held.size());
+            glGetUniformfv(mShader.mProgramObject, loc, held.data());
             size_t component = 0;
             for (const F32 value : expected)
             {
@@ -1309,6 +1325,7 @@ namespace
                              { { "test/compactV.glsl", GL_VERTEX_SHADER }, { "test/compactF.glsl", GL_FRAGMENT_SHADER } },
                              430));
         const S32 point = mShaders.getStorageBlockBinding(TEST_DRAW_LIST);
+        REQUIRE(point >= 0);
         UNSCOPED_INFO("the kernel's list at the table's point");
         CHECK(mCompute.getStorageBinding(TEST_DRAW_LIST) == point);
         UNSCOPED_INFO("and the draw's");
@@ -1390,6 +1407,7 @@ namespace
         setUpCompute();
         REQUIRE(buildProgram(mCompute, "block remap (test)", { { "test/remapC.glsl", GL_COMPUTE_SHADER } }));
         const S32 first = mShaders.getStorageBlockBinding(TEST_BLOCK_FIRST);
+        REQUIRE(first >= 0);
         UNSCOPED_INFO("the first block at its point");
         CHECK(mCompute.getStorageBinding(TEST_BLOCK_FIRST) == first);
         UNSCOPED_INFO("the second at the next");
@@ -1531,9 +1549,9 @@ namespace
         REQUIRE(buildProgram(mDraw3, "integer sample (test)",
                              { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intSampleF.glsl", GL_FRAGMENT_SHADER } }));
         UNSCOPED_INFO("the unsigned sampler has a unit");
-        CHECK(mDraw3.getTextureChannel(TEST_UINT_MAP) >= 0);
+        REQUIRE(mDraw3.getTextureChannel(TEST_UINT_MAP) >= 0);
         UNSCOPED_INFO("the signed sampler has a unit");
-        CHECK(mDraw3.getTextureChannel(TEST_INT_MAP) >= 0);
+        REQUIRE(mDraw3.getTextureChannel(TEST_INT_MAP) >= 0);
 
         LLGLDisable blend(GL_BLEND);
         for (U32 source = 0; source < 2; ++source)
@@ -1733,6 +1751,8 @@ namespace
         REQUIRE(buildProgram(mCompute2, "first and counts (test)", { { "test/firstAndCountsC.glsl", GL_COMPUTE_SHADER } }));
         const S32 first = mShaders.getStorageBlockBinding(TEST_BLOCK_FIRST);
         const S32 counts = mShaders.getStorageBlockBinding(TEST_COUNTS);
+        REQUIRE(first >= 0);
+        REQUIRE(counts >= 0);
         UNSCOPED_INFO("the first program's block at the table's point");
         CHECK(mCompute.getStorageBinding(TEST_BLOCK_FIRST) == first);
         UNSCOPED_INFO("the second's too");
@@ -1925,6 +1945,10 @@ namespace
                              { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intSampleF.glsl", GL_FRAGMENT_SHADER } }));
         REQUIRE(buildProgram(mDraw2, "depth read (test)",
                              { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/sampleF.glsl", GL_FRAGMENT_SHADER } }));
+        // The units the reads below bind the texture at. At -1 the bind would go to LLRender's dummy slot and the mode
+        // to whatever texture the active unit holds.
+        REQUIRE(mDraw.getTextureChannel(TEST_UINT_MAP) >= 0);
+        REQUIRE(mDraw2.getTextureChannel(TEST_SOURCE_MAP) >= 0);
 
         GLuint texture = 0;
         glGenTextures(1, &texture);

@@ -66,10 +66,15 @@ namespace
             return words;
         }
 
+        // What the buffer holds. Called inside a check, so it asserts only on failure: an assertion that passed would
+        // take the check's UNSCOPED_INFO.
         std::vector<U32> readAll(const ALGPUBuffer& buffer)
         {
             std::vector<U32> words(buffer.size() / sizeof(U32), 0xFFFFFFFFu);
-            buffer.read(0, words.data(), words.size() * sizeof(U32));
+            if (!buffer.read(0, words.data(), words.size() * sizeof(U32)))
+            {
+                FAIL_CHECK("the buffer's read failed");
+            }
             return words;
         }
 

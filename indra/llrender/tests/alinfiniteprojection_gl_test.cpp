@@ -104,6 +104,10 @@ namespace
         // program the tests change go back with mGL.
         ~alinfiniteprojection_data()
         {
+            if (mQuery)
+            {
+                glDeleteQueries(1, &mQuery);
+            }
             if (mFBO)
             {
                 glDeleteFramebuffers(1, &mFBO);
@@ -196,6 +200,8 @@ namespace
         GLuint mDepth = 0;
         GLuint mVAO = 0;
         GLuint mProgram = 0;
+        // A samples-passed query, for the cases that count what a pass shades.
+        GLuint mQuery = 0;
     };
 
 
@@ -332,19 +338,18 @@ namespace
     {
         setUp();
         const LLMatrix4a proj = infinite();
-        GLuint query = 0;
-        glGenQueries(1, &query);
+        glGenQueries(1, &mQuery);
         const auto sky_samples = [&]()
         {
             glDepthFunc(GL_GEQUAL);
             glDepthMask(GL_FALSE);
-            glBeginQuery(GL_SAMPLES_PASSED, query);
+            glBeginQuery(GL_SAMPLES_PASSED, mQuery);
             draw(proj, 1000.f, true);
             glEndQuery(GL_SAMPLES_PASSED);
             glDepthMask(GL_TRUE);
             glDepthFunc(GL_GREATER);
             GLuint samples = 0;
-            glGetQueryObjectuiv(query, GL_QUERY_RESULT, &samples);
+            glGetQueryObjectuiv(mQuery, GL_QUERY_RESULT, &samples);
             return samples;
         };
 
@@ -365,7 +370,6 @@ namespace
             REQUIRE(sky_samples() == (GLuint)0);
         }
 
-        glDeleteQueries(1, &query);
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
@@ -377,19 +381,18 @@ namespace
         const LLMatrix4a proj = infinite();
         UNSCOPED_INFO("in front of the far plane is LESS under reverse-Z");
         CHECK((U32)LLGLDepthTest::remap(GL_GREATER) == (U32)GL_LESS);
-        GLuint query = 0;
-        glGenQueries(1, &query);
+        glGenQueries(1, &mQuery);
         const auto haze_samples = [&]()
         {
             glDepthFunc(LLGLDepthTest::remap(GL_GREATER));
             glDepthMask(GL_FALSE);
-            glBeginQuery(GL_SAMPLES_PASSED, query);
+            glBeginQuery(GL_SAMPLES_PASSED, mQuery);
             draw(proj, 1000.f, true);
             glEndQuery(GL_SAMPLES_PASSED);
             glDepthMask(GL_TRUE);
             glDepthFunc(GL_GREATER);
             GLuint samples = 0;
-            glGetQueryObjectuiv(query, GL_QUERY_RESULT, &samples);
+            glGetQueryObjectuiv(mQuery, GL_QUERY_RESULT, &samples);
             return samples;
         };
 
@@ -414,7 +417,6 @@ namespace
         UNSCOPED_INFO("haze over the geometry's half alone");
         CHECK(haze_samples() == (GLuint)(SIZE * SIZE / 2));
 
-        glDeleteQueries(1, &query);
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
@@ -425,19 +427,18 @@ namespace
     {
         setUp();
         const LLMatrix4a proj = infinite();
-        GLuint query = 0;
-        glGenQueries(1, &query);
+        glGenQueries(1, &mQuery);
         const auto samples = [&](GLenum func)
         {
             glDepthFunc(LLGLDepthTest::remap(func));
             glDepthMask(GL_FALSE);
-            glBeginQuery(GL_SAMPLES_PASSED, query);
+            glBeginQuery(GL_SAMPLES_PASSED, mQuery);
             draw(proj, 1000.f, true);
             glEndQuery(GL_SAMPLES_PASSED);
             glDepthMask(GL_TRUE);
             glDepthFunc(GL_GREATER);
             GLuint passed = 0;
-            glGetQueryObjectuiv(query, GL_QUERY_RESULT, &passed);
+            glGetQueryObjectuiv(mQuery, GL_QUERY_RESULT, &passed);
             return passed;
         };
 
@@ -470,7 +471,6 @@ namespace
         UNSCOPED_INFO("every pixel shaded once");
         CHECK(lit + sky == (GLuint)(SIZE * SIZE));
 
-        glDeleteQueries(1, &query);
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 }
