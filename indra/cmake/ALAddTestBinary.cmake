@@ -30,17 +30,18 @@ endif()
 # own, since every other test links the code it tests.
 #
 # Each test file is a CTest entry, <name>/<file stem>, that runs the file's
-# test cases -- chosen by the tag Catch2's --filenames-as-tags gives each case
-# from the name of its file -- in one process, as an executable to a test file
-# ran them. Naming a tag would also choose the file's hidden cases, such as its
-# benchmarks, so the filter leaves those out, as a run with no filter does. A
-# filter that matches nothing exits 2, so a file whose test cases went missing
-# fails rather than passing empty. A stem names one file in a binary, and a
-# file belongs to one binary, or to one at each ISA tier. The tag is the
-# file's name less its last extension, the stem here too. A case written in a
-# header, or in a SUPPORT library, is tagged with that file's name and no
-# file's entry would run it, so <name>/stray_cases fails when the binary has
-# one: it runs whatever no file's tag names, and expects nothing to run.
+# test cases -- chosen by the tag the main gives each case from the name of
+# its file, as Catch2's --filenames-as-tags does -- in one process, as an
+# executable to a test file ran them. Naming a tag would also choose the
+# file's hidden cases, such as its benchmarks, so the filter leaves those out,
+# as a run with no filter does. A filter that matches nothing exits 2, so a
+# file whose test cases went missing fails rather than passing empty. A stem
+# names one file in a binary, and a file belongs to one binary, or to one at
+# each ISA tier. The tag is the file's name less its last extension, the stem
+# here too. A case written in a header, or in a SUPPORT library, is tagged
+# with that file's name and no file's entry would run it, so
+# <name>/stray_cases fails when the binary has one: it runs whatever no file's
+# tag names, and expects nothing to run.
 #
 # <name>/combined runs all of them in one process. It is labelled
 # combined_pending and manual, which the default run leaves out, until the
@@ -247,7 +248,7 @@ function(al_add_test_binary name)
     foreach(stem IN LISTS stems)
       add_test(
         NAME ${target}/${stem}
-        COMMAND ${arg_LAUNCHER} $<TARGET_FILE:${target}> --filenames-as-tags "[#${stem}]~[.]" ${arguments}
+        COMMAND ${arg_LAUNCHER} $<TARGET_FILE:${target}> "[#${stem}]~[.]" ${arguments}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
       )
       set_tests_properties(
@@ -276,8 +277,8 @@ function(al_add_test_binary name)
     add_test(
       NAME ${target}/stray_cases
       COMMAND
-        ${CMAKE_COMMAND} "-DEXE=$<TARGET_FILE:${target}>" "-DARGS=--filenames-as-tags|${strays}~[.]"
-        -DEXPECT_EXIT=2 -P ${INDRA_SOURCE_DIR}/test/run_and_expect.cmake
+        ${CMAKE_COMMAND} "-DEXE=$<TARGET_FILE:${target}>" "-DARGS=${strays}~[.]" -DEXPECT_EXIT=2 -P
+        ${INDRA_SOURCE_DIR}/test/run_and_expect.cmake
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
     set_tests_properties(
