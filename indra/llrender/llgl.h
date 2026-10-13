@@ -143,6 +143,9 @@ public:
     // the entry point has actually resolved, so callers may trust it directly. Absent on
     // macOS GL 4.1, which stays forward-Z.
     bool mHasClipControl = false;
+    // GL_EXT_depth_bounds_test: passing a fragment only where the depth already stored under it lies in a range.
+    // Never core. Only true once glDepthBoundsEXT has resolved, so callers may trust it directly. See ALDepthBounds.
+    bool mHasDepthBoundsTest = false;
     // Compute shaders, shader storage buffers, image load/store and indirect dispatch: core in 4.3.
     // Only true once every entry point the compute path calls has resolved (glDispatchCompute,
     // glDispatchComputeIndirect, glMemoryBarrier, glBindImageTexture, glShaderStorageBlockBinding,

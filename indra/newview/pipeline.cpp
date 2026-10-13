@@ -53,6 +53,7 @@
 #include "v3color.h"
 #include "llui.h"
 #include "llglheaders.h"
+#include "aldepthbounds.h"
 #include "alsamplerstate.h"
 #include "aluniformbuffer.h"
 #include "alwhitebalancesolver.h"
@@ -6196,6 +6197,20 @@ static F32 light_fade_brightness(F32 fade)
     return llclamp(fade >= 0.f ? fade / LIGHT_FADE_TIME : 1.f + fade / LIGHT_FADE_TIME, 0.f, 1.f);
 }
 
+// Holds a light's draw to the stored depths its light reaches: its sphere, `size` around its view-space centre (the
+// light shaders' cutoff), widened a little for what reconstruction loses. To everything drawn where the projection
+// cannot say.
+static void bound_to_light(ALDepthBounds& bounds, const LLMatrix4a& proj, F32 view_z, F32 size)
+{
+    const F32 reach = size * 1.01f + 0.01f;
+    F64 zmin, zmax;
+    if (!ALDepthBounds::viewSpan(proj, view_z + reach, view_z - reach, zmin, zmax))
+    {
+        ALDepthBounds::drawn(zmin, zmax);
+    }
+    bounds.set(zmin, zmax);
+}
+
 void LLPipeline::calcNearbyLights(LLCamera& camera)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
@@ -11053,6 +11068,10 @@ void LLPipeline::renderDeferredLighting()
 
     llassert(!sRenderingHUDs);
 
+    // Read here, ahead of every pass that holds to it: the lighting and, through renderGeomPostDeferred, the haze.
+    static LLCachedControl<bool> depth_bounds(gSavedSettings, "AlchemyRenderDepthBoundsTest", true);
+    ALDepthBounds::sEnabled = depth_bounds;
+
     F32 light_scale = 1.f;
 
     if (gCubeSnapshot)
@@ -11127,7 +11146,7 @@ void LLPipeline::renderDeferredLighting()
                     // depth: only geometry is shadowed and occluded, and the sky keeps the clear's white, which
                     // nothing reads there (the soften pass's sky program lights nothing).
                     LLGLDisable   blend(GL_BLEND);
-                    LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
+                    ALDrawnOnly   drawn;
                     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                 }
 
@@ -11176,7 +11195,7 @@ void LLPipeline::renderDeferredLighting()
             // in either target.
             {
                 LLGLDisable   blend(GL_BLEND);
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
+                ALDrawnOnly   drawn;
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
@@ -11192,7 +11211,7 @@ void LLPipeline::renderDeferredLighting()
 
             {
                 LLGLDisable   blend(GL_BLEND);
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
+                ALDrawnOnly   drawn;
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
@@ -11230,7 +11249,7 @@ void LLPipeline::renderDeferredLighting()
             // not, so no sky pixel pays for the G-buffer decode and atmospherics it would throw away.
             LLGLDisable blend(GL_BLEND);
             {
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
+                ALDrawnOnly drawn;
 
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
@@ -11294,6 +11313,16 @@ void LLPipeline::renderDeferredLighting()
                 mCubeVB->setBuffer();
 
                 LLGLDepthTest depth(GL_TRUE, GL_FALSE);
+                // Each volume is held to the depths its light reaches as well: its depth test passes everything
+                // behind it, which the light does not.
+                const LLMatrix4a& proj = LLViewerCamera::getCurrent().getProjection();
+                std::optional<ALDepthBounds> bounds;
+                if (ALDepthBounds::available())
+                {
+                    F64 zmin, zmax;
+                    ALDepthBounds::drawn(zmin, zmax);
+                    bounds.emplace(zmin, zmax);
+                }
                 // mNearbyLights already includes distance calculation and excludes muted avatars.
                 // It is calculated from mLights
                 // mNearbyLights also provides fade value to gracefully fade-out out of range lights
@@ -11367,6 +11396,13 @@ void LLPipeline::renderDeferredLighting()
                         light_shader.uniform3fv(LLShaderMgr::DIFFUSE_COLOR, 1, col.mV);
                         light_shader.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
 
+                        if (bounds)
+                        {
+                            LLVector4a view;
+                            mat.affineTransform(center, view);
+                            bound_to_light(*bounds, proj, view[2], s);
+                        }
+
                         gGL.syncMatrices();
 
                         mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(camera, center));
@@ -11399,6 +11435,15 @@ void LLPipeline::renderDeferredLighting()
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - projectors");
                 LL_PROFILE_GPU_ZONE("projectors");
                 LLGLDepthTest depth(GL_TRUE, GL_FALSE);
+                // Held to the depths each projector reaches, as the point lights are.
+                const LLMatrix4a& proj = LLViewerCamera::getCurrent().getProjection();
+                std::optional<ALDepthBounds> bounds;
+                if (ALDepthBounds::available())
+                {
+                    F64 zmin, zmax;
+                    ALDepthBounds::drawn(zmin, zmax);
+                    bounds.emplace(zmin, zmax);
+                }
                 LLGLSLShader& spot_shader = *gDeferredSpotLightProgram.selectVariant();
                 bindDeferredShader(spot_shader);
 
@@ -11425,6 +11470,13 @@ void LLPipeline::renderDeferredLighting()
                     spot_shader.uniform3fv(LLShaderMgr::DIFFUSE_COLOR, 1, spot.col.mV);
                     spot_shader.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
 
+                    if (bounds)
+                    {
+                        LLVector4a view;
+                        mat.affineTransform(center, view);
+                        bound_to_light(*bounds, proj, view[2], s);
+                    }
+
                     gGL.syncMatrices();
 
                     mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(camera, center));
@@ -11436,8 +11488,11 @@ void LLPipeline::renderDeferredLighting()
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - fullscreen lights");
                 // On the far plane (multiPointLightV.glsl): only where the world drew something, so no light is
-                // shaded over the sky.
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
+                // shaded over the sky. Under the depth bounds test each draw is held as well to the depths its lights
+                // reach, from the eye, which they surround, out to the farthest of them.
+                ALDrawnOnly drawn;
+                ALDepthBounds* bounds = drawn.bounds();
+                const LLMatrix4a& proj = LLViewerCamera::getCurrent().getProjection();
                 LL_PROFILE_GPU_ZONE("fullscreen lights");
 
                 U32 count = 0;
@@ -11468,6 +11523,15 @@ void LLPipeline::renderDeferredLighting()
                         multi_light_shader.uniform4fv(LLShaderMgr::MULTI_LIGHT, count, light[0].mV);
                         multi_light_shader.uniform4fv(LLShaderMgr::MULTI_LIGHT_COL, count, col[0].mV);
                         multi_light_shader.uniform1f(LLShaderMgr::MULTI_LIGHT_FAR_Z, far_z);
+                        if (bounds)
+                        {   // far_z is the farthest of the lights' spheres, as the shader's cut is
+                            F64 zmin, zmax;
+                            if (!ALDepthBounds::viewSpan(proj, 0.f, far_z * 1.01f - 0.01f, zmin, zmax))
+                            {
+                                ALDepthBounds::drawn(zmin, zmax);
+                            }
+                            bounds->set(zmin, zmax);
+                        }
                         far_z = 0.f;
                         count = 0;
                         mScreenTriangleVB->setBuffer();
@@ -11495,6 +11559,11 @@ void LLPipeline::renderDeferredLighting()
 
                     LLVector4a tc;
                     mat.affineTransform(LLVector4a(center.mV[0], center.mV[1], center.mV[2], 1.f), tc);
+
+                    if (bounds)
+                    {
+                        bound_to_light(*bounds, proj, tc[2], light_size_final);
+                    }
 
                     setupSpotLight(multi_spot_shader, drawablep);
 
@@ -11613,10 +11682,10 @@ void LLPipeline::doAtmospherics()
 
         LL_PROFILE_GPU_ZONE("haze");
 
-        // The triangle lies on the far plane (hazeV.glsl), level with the depth the sky leaves cleared: the test
-        // passes only where the world drew something, so the sky is rejected before it is shaded. The screen
-        // target shares the G-buffer's depth; the shader reads its copy in mWaterDis.
-        LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
+        // The triangle lies on the far plane (hazeV.glsl), level with the depth the sky leaves cleared: it passes
+        // only where the world drew something, so the sky is rejected before it is shaded. The screen target shares
+        // the G-buffer's depth; the shader reads its copy in mWaterDis.
+        ALDrawnOnly drawn;
 
         const auto apply_haze = [this](LLGLSLShader& haze_shader, bool on_water)
         {

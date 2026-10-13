@@ -2152,6 +2152,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyRenderDepthBoundsTest</key>
+        <map>
+            <key>Comment</key>
+            <string>Hold the full-screen lighting and haze passes, and each local light, to the depths they reach with the depth bounds test where the GPU has it (GL_EXT_depth_bounds_test); off, they keep to the depth test. For diagnosing a driver. Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderFarPlaneForce</key>
         <map>
             <key>Comment</key>

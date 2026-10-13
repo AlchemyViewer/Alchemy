@@ -2,6 +2,7 @@
 
 set(
   llrender_SOURCES
+  aldepthbounds.cpp
   algpubuffer.cpp
   alimageslot.cpp
   alprimitiveplot.cpp
@@ -39,6 +40,7 @@ set(
 
 set(
   llrender_HEADERS
+  aldepthbounds.h
   algpubuffer.h
   alimageslot.h
   alprimitiveplot.h
@@ -182,6 +184,8 @@ if(AL_BUILD_TESTS)
   al_add_test(altessellation_gl GL PROJECT llrender LIBRARIES llrender)
   # Infinite reverse-Z projection: stored depth, round trip and depth order out to 100 km.
   al_add_test(alinfiniteprojection_gl GL PROJECT llrender LIBRARIES llrender)
+  # The depth bounds test against the depth test it stands in for, and the depths a light's sphere spans.
+  al_add_test(aldepthbounds_gl GL PROJECT llrender LIBRARIES llrender)
   # Which fragment output reaches a render target's colour attachment, and integer attachments cleared and drawn.
   al_add_test(llrendertarget_gl GL PROJECT llrender LIBRARIES llrender)
   # LLRender's cached clear colour and scissor box, and LLGLSScissor.
