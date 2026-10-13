@@ -152,6 +152,7 @@ namespace
             REQUIRE(s.kind == Kind::Comment);
             REQUIRE(s.closed);
             REQUIRE(s.close == 0);
+            REQUIRE(s.end < text.size());
             CHECK(text[s.end] == '\n');
             CHECK(s.open == 2);
         }

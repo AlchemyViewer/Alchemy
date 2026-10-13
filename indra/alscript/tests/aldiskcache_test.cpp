@@ -140,7 +140,9 @@ namespace
 
         s.write("a/.luaurc", "{}");
         s.write("a/b/c/.luaurc", "{}");
-        const std::vector<std::string>& up = cache.upwards(s.at("a/b/c"), ".luaurc", 1, 10.0);
+        // A copy: upwards() answers with what it keeps, which a later call
+        // for the same folder fills again.
+        const std::vector<std::string> up = cache.upwards(s.at("a/b/c"), ".luaurc", 1, 10.0);
         {
             INFO("nearest first, to the root");
             REQUIRE(up.size() >= 2);
@@ -150,7 +152,9 @@ namespace
         s.write("a/b/.luaurc", "{}");
         UNSCOPED_INFO("kept a moment");
         REQUIRE(cache.upwards(s.at("a/b/c"), ".luaurc", 1, 11.0).size() == up.size());
+        const std::vector<std::string>& later = cache.upwards(s.at("a/b/c"), ".luaurc", 1, 10.0 + ALDiskCache::FRESH_SECONDS + 1.0);
+        REQUIRE(later.size() > 1);
         UNSCOPED_INFO("then found");
-        CHECK(cache.upwards(s.at("a/b/c"), ".luaurc", 1, 10.0 + ALDiskCache::FRESH_SECONDS + 1.0)[1] == s.at("a/b/.luaurc"));
+        CHECK(later[1] == s.at("a/b/.luaurc"));
     }
 }

@@ -423,6 +423,7 @@ namespace tut
         facts.noFolders        = false;
         facts.inWorld          = [](const std::string& name) { return name == "lib.lsl"; };
         ALIncludeSearch::explainMissing(problems, facts);
+        REQUIRE(problems.size() == size_t(3));
         UNSCOPED_INFO("the silence said first");
         CHECK(problems.front().key == std::string("PreprocObjectUnanswered"));
         UNSCOPED_INFO("one in the world, not taken from");
@@ -435,6 +436,7 @@ namespace tut
         facts.disk      = true;
         facts.noFolders = true;
         ALIncludeSearch::explainMissing(problems, facts);
+        REQUIRE(problems.size() == size_t(2));
         UNSCOPED_INFO("no folder of the scripter's: the disk not looked in");
         CHECK(problems[0].key == std::string("PreprocModuleNotOnDisk"));
         UNSCOPED_INFO("but one asked from a file on disk is not second-guessed");
@@ -992,6 +994,7 @@ namespace tut
         ALIncludeSearch::explainMissing(problems, facts);
         {
             INFO("the disk not looked in");
+            REQUIRE(problems.size() == size_t(1));
             CHECK(problems[0].key == "PreprocModuleNotOnDisk");
             CHECK(problems[0].args == std::vector<std::string>{ "./nowhere" });
         }
@@ -1059,8 +1062,10 @@ namespace tut
                                                     ALPreprocessor::Found::Yes);
             }
         }
+        const std::vector<ALRequireNavigation::Suggestion> in_lib = search.suggest(own.self, "./lib/", true, own, disk);
+        REQUIRE(in_lib.size() > 1);
         UNSCOPED_INFO("each one's whole path");
-        CHECK(search.suggest(own.self, "./lib/", true, own, disk)[1].path == std::string("./lib/http"));
+        CHECK(in_lib[1].path == std::string("./lib/http"));
 
         // An include's: the file's own folder, by its search, names whole --
         // an include's own `.lslh` and `.lsli` as well as `.lsl`.

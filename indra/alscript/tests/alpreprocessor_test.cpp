@@ -202,8 +202,9 @@ namespace
         {
             ALLSLService service;
             std::string  error;
+            const bool   loaded = service.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error);
             INFO("builtins: " << error);
-            REQUIRE(service.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error));
+            REQUIRE(loaded);
         }
 
         // The same but the notes of a require nothing reads, which a script
@@ -364,15 +365,20 @@ namespace
         CHECK(squeeze(r.text) == std::string("yes\nyes2\nyes3\nyes4\nyes5\nyes6\nend\n"));
         std::istringstream in(r.text);
         std::string        line;
-        S32                n = 0;
+        S32                n    = 0;
+        S32                yes4 = -1;
         while (std::getline(in, line))
         {
+            if (line == "yes4")
+            {
+                yes4 = n;
+            }
             ++n;
         }
         UNSCOPED_INFO("one line each");
         CHECK(n == 37);
         UNSCOPED_INFO("yes4 on its line");
-        CHECK(r.text.find("yes4") == r.text.find("yes4"));
+        CHECK(yes4 == 19);
         ALSourceMap::Loc loc = r.map.toSource(19, 0);
         UNSCOPED_INFO("yes4 from line 19");
         CHECK(loc.line == 19);
@@ -605,8 +611,12 @@ namespace
                                              "local a = require(1)\nlocal b = require(2)\nlocal x = require(name)\n");
         CHECK(r.text == bundled);
         REQUIRE(r.includes.size() == 2u);
-        UNSCOPED_INFO("b mapped to its file");
-        CHECK(r.map.files()[r.map.toSource(7, 0).file].name == std::string("b"));
+        const ALSourceMap::Loc in_b = r.map.toSource(7, 0);
+        {
+            INFO("b mapped to its file");
+            REQUIRE(in_b.found());
+            CHECK(r.map.files()[in_b.file].name == std::string("b"));
+        }
         // The modules' own lines, which the studio shows nothing of: not
         // the table's, which are no one's, nor the script's.
         std::string others;
@@ -1416,6 +1426,7 @@ namespace
         }
         UNSCOPED_INFO("the whole said");
         REQUIRE(sizes != nullptr);
+        REQUIRE(sizes->args.size() == size_t(5));
         UNSCOPED_INFO("in code");
         CHECK(sizes->args[2] == std::to_string(r.codeBefore));
         UNSCOPED_INFO("on its target");
@@ -1597,6 +1608,7 @@ namespace
         {
             INFO("ran away: " << messages(r));
             CHECK(r.overran);
+            REQUIRE_FALSE(r.problems.empty());
             CHECK(r.problems.back().key == std::string("PreprocTooMuch"));
         }
         UNSCOPED_INFO("and gave the source back");
@@ -1613,6 +1625,7 @@ namespace
         {
             INFO("pasting stopped: " << messages(r));
             CHECK(r.overran);
+            REQUIRE_FALSE(r.problems.empty());
             CHECK(r.problems.back().key == std::string("PreprocTokenTooLong"));
         }
 
@@ -1626,6 +1639,7 @@ namespace
         {
             INFO("stringizing stopped: " << messages(r));
             CHECK(r.overran);
+            REQUIRE_FALSE(r.problems.empty());
             CHECK(r.problems.back().key == std::string("PreprocTokenTooLong"));
         }
 
@@ -1637,6 +1651,7 @@ namespace
         {
             INFO("the bytes: " << messages(r));
             CHECK(r.overran);
+            REQUIRE_FALSE(r.problems.empty());
             CHECK(r.problems.back().key == std::string("PreprocTooMuch"));
         }
         r = ALPreprocessor::run("#define L \"" + std::string(100, 'a') + "\"\nL L\n", small);
@@ -1684,6 +1699,7 @@ namespace
         {
             INFO("stopped at the depth: " << messages(r));
             CHECK(r.overran);
+            REQUIRE_FALSE(r.problems.empty());
             CHECK(r.problems.back().key == std::string("PreprocNestsTooDeep"));
         }
 
@@ -2358,8 +2374,9 @@ namespace
         const std::string script    = "--!strict\nlocal util = require(\"util\")\n\nlocal deep = require(\"deep\")\nprint(util.f(), deep.k)\n";
         ALPreprocessor::Result r    = ALPreprocessor::run(script, lua);
         CHECK(messages(r) == std::string());
+        bool reads = readsTrue(r, "main.luau", why);
         UNSCOPED_INFO("the reader finds every line: " << why);
-        CHECK(readsTrue(r, "main.luau", why));
+        CHECK(reads);
         UNSCOPED_INFO("the header still first: " << r.text);
         CHECK(r.text.rfind("--!strict\ndo\n", 0) == 0);
         UNSCOPED_INFO("a module's first: " << r.text);
@@ -2383,8 +2400,9 @@ namespace
         lsl.lineComments            = true;
         r = ALPreprocessor::run("integer a;\n#include \"inc.lsl\"\n#if 0\ninteger gone;\n\n#endif\n#define TWICE(v) \\\n    ((v) * 2)\ninteger b = TWICE(3);\ndefault { state_entry() { } }\n", lsl);
         CHECK(messages(r) == std::string());
+        reads = readsTrue(r, "main.lsl", why);
         UNSCOPED_INFO("the reader finds every line: " << why);
-        CHECK(readsTrue(r, "main.lsl", why));
+        CHECK(reads);
         UNSCOPED_INFO("in LSL's comment: " << r.text);
         REQUIRE(r.text.find("// @line 1 \"inc.lsl\"\ninteger x;\n") != std::string::npos);
 
@@ -2456,6 +2474,7 @@ namespace
             INFO("in its file, at its require");
             REQUIRE(said[0]->file == "disk:/lib/wrap.luau");
             REQUIRE(said[0]->line == 0);
+            REQUIRE(said[0]->args.size() == 3);
             CHECK(said[0]->args[0] == "inner");
         }
     }
