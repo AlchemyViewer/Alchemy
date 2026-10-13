@@ -278,7 +278,17 @@ void LLDrawPoolTerrain::renderFullShader()
         // Use materials
         U32 paint_type = use_local_materials ? gLocalTerrainMaterials.getPaintType() : compp->getPaintType();
         paint_type = llclamp(paint_type, 0, TERRAIN_PAINT_TYPE_COUNT - 1);
-        sShader = gDeferredPBRTerrainProgram[paint_type].selectVariant();
+        // Only a masked material sets a cutoff a pixel can fall below (renderFullShaderPBR), so only then is the
+        // program that can discard bound; the other keeps its depth writes ahead of shading.
+        const LLPointer<LLFetchedGLTFMaterial> (&materials)[LLVLComposition::ASSET_COUNT] =
+            use_local_materials ? gLocalTerrainMaterials.mDetailRenderMaterials : compp->mDetailRenderMaterials;
+        bool alpha_mask = false;
+        for (const LLPointer<LLFetchedGLTFMaterial>& material : materials)
+        {
+            alpha_mask = alpha_mask || (material.notNull() && material->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK);
+        }
+        LLGLSLShader* programs = alpha_mask ? gDeferredPBRTerrainAlphaMaskProgram : gDeferredPBRTerrainProgram;
+        sShader = programs[paint_type].selectVariant();
         sShader->bind();
         bindSurface(sShader);
         bindParcelOverlay(sShader);

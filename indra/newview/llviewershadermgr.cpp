@@ -218,6 +218,7 @@ LLGLSLShader            gDeferredDiffuseAlphaMaskProgram;
 LLGLSLShader            gDeferredNonIndexedDiffuseAlphaMaskProgram;
 LLGLSLShader            gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram;
 LLGLSLShader            gDeferredBumpProgram;
+LLGLSLShader            gDeferredBumpAlphaMaskProgram;
 LLGLSLShader            gDeferredTerrainProgram;
 LLGLSLShader            gDeferredTreeProgram;
 LLGLSLShader            gDeferredTreeShadowProgram;
@@ -309,11 +310,14 @@ LLGLSLShader            gHUDPBROpaqueProgram;
 LLGLSLShader            gPBRGlowProgram;
 LLGLSLShader            gPBRGlowIndexedProgram; // multi-material indexed PBR glow
 LLGLSLShader            gDeferredPBROpaqueProgram;
+LLGLSLShader            gDeferredPBRAlphaMaskProgram;
 LLGLSLShader            gDeferredPBROpaqueIndexedProgram;
+LLGLSLShader            gDeferredPBRAlphaMaskIndexedProgram;
 LLGLSLShader            gHUDPBRAlphaProgram;
 LLGLSLShader            gDeferredPBRAlphaProgram;
 LLGLSLShader            gDeferredPBRAlphaImpostorProgram;
 LLGLSLShader            gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
+LLGLSLShader            gDeferredPBRTerrainAlphaMaskProgram[TERRAIN_PAINT_TYPE_COUNT];
 
 // Mirror corners are only reachable during the hero-probe mirror pass, which RenderMirrors
 // gates entirely; toggling it re-runs setShaders (handleReflectionProbeDetailChanged), so
@@ -1413,6 +1417,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredNonIndexedDiffuseAlphaMaskProgram.unload();
         gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.unload();
         gDeferredBumpProgram.unload();
+        gDeferredBumpAlphaMaskProgram.unload();
         gDeferredImpostorProgram.unload();
         gDeferredTerrainProgram.unload();
         gDeferredLightProgram.unload();
@@ -1499,12 +1504,15 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gPBRGlowProgram.unload();
         gPBRGlowIndexedProgram.unload();
         gDeferredPBROpaqueProgram.unload();
+        gDeferredPBRAlphaMaskProgram.unload();
         gDeferredPBROpaqueIndexedProgram.unload();
+        gDeferredPBRAlphaMaskIndexedProgram.unload();
         gDeferredPBRAlphaProgram.unload();
         gDeferredPBRAlphaImpostorProgram.unload();
         for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
         {
             gDeferredPBRTerrainProgram[paint_type].unload();
+            gDeferredPBRTerrainAlphaMaskProgram[paint_type].unload();
         }
 
 // [RLVa:KB] - @setsphere
@@ -1579,17 +1587,27 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         llassert(success);
     }
 
-    if (success)
+    // The bump pass draws the faces whose texture can fall below their cutoff with the program that discards, and the
+    // rest with one that cannot (LLDrawPoolBump::renderDeferred).
+    for (LLGLSLShader* shader : { &gDeferredBumpProgram, &gDeferredBumpAlphaMaskProgram })
     {
-        gDeferredBumpProgram.mName = "Deferred Bump Shader";
-        gDeferredBumpProgram.mShaderFiles.clear();
-        gDeferredBumpProgram.mShaderFiles.push_back(make_pair("deferred/bumpV.glsl", GL_VERTEX_SHADER));
-        gDeferredBumpProgram.mShaderFiles.push_back(make_pair("deferred/bumpF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredBumpProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        add_common_permutations(&gDeferredBumpProgram);
-        gDeferredBumpProgram.addPermutation("LINEAR_DIFFUSE", "1");
-        success = gDeferredBumpProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
-        llassert(success);
+        if (success)
+        {
+            const bool alpha_mask = shader == &gDeferredBumpAlphaMaskProgram;
+            shader->mName = alpha_mask ? "Deferred Bump Alpha Mask Shader" : "Deferred Bump Shader";
+            shader->mShaderFiles.clear();
+            shader->mShaderFiles.push_back(make_pair("deferred/bumpV.glsl", GL_VERTEX_SHADER));
+            shader->mShaderFiles.push_back(make_pair("deferred/bumpF.glsl", GL_FRAGMENT_SHADER));
+            shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            add_common_permutations(shader);
+            shader->addPermutation("LINEAR_DIFFUSE", "1");
+            if (alpha_mask)
+            {
+                shader->addPermutation("HAS_ALPHA_MASK", "1");
+            }
+            success = shader->createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
+            llassert(success);
+        }
     }
 
     gDeferredMaterialProgram[1].mFeatures.hasLighting = false;
@@ -1730,52 +1748,72 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         }
     }
 
-    if (success)
+    // The opaque pass's program cannot discard; the alpha-mask pass has its own (LLDrawPoolGLTFPBR::renderDeferred).
+    for (LLGLSLShader* shader : { &gDeferredPBROpaqueProgram, &gDeferredPBRAlphaMaskProgram })
     {
-        gDeferredPBROpaqueProgram.mName = "Deferred PBR Opaque Shader";
-        gDeferredPBROpaqueProgram.mFeatures.hasSrgb = true;
+        if (success)
+        {
+            const bool alpha_mask = shader == &gDeferredPBRAlphaMaskProgram;
+            shader->mName = alpha_mask ? "Deferred PBR Alpha Mask Shader" : "Deferred PBR Opaque Shader";
+            shader->mFeatures.hasSrgb = true;
 
-        gDeferredPBROpaqueProgram.mShaderFiles.clear();
-        gDeferredPBROpaqueProgram.mShaderFiles.push_back(make_pair("deferred/pbropaqueV.glsl", GL_VERTEX_SHADER));
-        gDeferredPBROpaqueProgram.mShaderFiles.push_back(make_pair("deferred/pbropaqueF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredPBROpaqueProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredPBROpaqueProgram.clearPermutations();
+            shader->mShaderFiles.clear();
+            shader->mShaderFiles.push_back(make_pair("deferred/pbropaqueV.glsl", GL_VERTEX_SHADER));
+            shader->mShaderFiles.push_back(make_pair("deferred/pbropaqueF.glsl", GL_FRAGMENT_SHADER));
+            shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            shader->clearPermutations();
 
-        add_common_permutations(&gDeferredPBROpaqueProgram);
+            add_common_permutations(shader);
+            if (alpha_mask)
+            {
+                shader->addPermutation("HAS_ALPHA_MASK", "1");
+            }
 
-        success = gDeferredPBROpaqueProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
-        llassert(success);
+            success = shader->createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
+            llassert(success);
+        }
     }
 
     if (success && LLGLSLShader::sIndexedGLTFChannels >= 2)
     {
-        // Indexed (multi-material) PBR opaque. Optional acceleration: failure here
+        // Indexed (multi-material) PBR, opaque and alpha mask. Optional acceleration: failure here
         // disables GLTF batching but must NOT fail overall shader loading, so the
         // result is kept out of the `success` chain.
-        gDeferredPBROpaqueIndexedProgram.mName = "Deferred PBR Opaque Indexed Shader";
-        gDeferredPBROpaqueIndexedProgram.mFeatures.hasSrgb = true;
-        gDeferredPBROpaqueIndexedProgram.mShaderFiles.clear();
-        gDeferredPBROpaqueIndexedProgram.mShaderFiles.push_back(make_pair("deferred/pbropaqueIndexedV.glsl", GL_VERTEX_SHADER));
-        gDeferredPBROpaqueIndexedProgram.mShaderFiles.push_back(make_pair("deferred/pbropaqueIndexedF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredPBROpaqueIndexedProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredPBROpaqueIndexedProgram.clearPermutations();
-        gDeferredPBROpaqueIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
-        add_common_permutations(&gDeferredPBROpaqueIndexedProgram);
-
-        // rigged (skinned) variant for animesh / avatar attachments
-        bool indexed_ok = gDeferredPBROpaqueIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
-
-        if (indexed_ok)
+        bool indexed_ok = true;
+        for (LLGLSLShader* shader : { &gDeferredPBROpaqueIndexedProgram, &gDeferredPBRAlphaMaskIndexedProgram })
         {
-            // Map each slot's four material samplers to texture units, on every variant.
-            const S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            gDeferredPBROpaqueIndexedProgram.forEachVariant([n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, true); });
+            const bool alpha_mask = shader == &gDeferredPBRAlphaMaskIndexedProgram;
+            shader->mName = alpha_mask ? "Deferred PBR Alpha Mask Indexed Shader" : "Deferred PBR Opaque Indexed Shader";
+            shader->mFeatures.hasSrgb = true;
+            shader->mShaderFiles.clear();
+            shader->mShaderFiles.push_back(make_pair("deferred/pbropaqueIndexedV.glsl", GL_VERTEX_SHADER));
+            shader->mShaderFiles.push_back(make_pair("deferred/pbropaqueIndexedF.glsl", GL_FRAGMENT_SHADER));
+            shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            shader->clearPermutations();
+            shader->addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
+            add_common_permutations(shader);
+            if (alpha_mask)
+            {
+                shader->addPermutation("HAS_ALPHA_MASK", "1");
+            }
+
+            // rigged (skinned) variant for animesh / avatar attachments
+            indexed_ok = indexed_ok && shader->createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
+
+            if (indexed_ok)
+            {
+                // Map each slot's four material samplers to texture units, on every variant.
+                const S32 n = LLGLSLShader::sIndexedGLTFChannels;
+                shader->forEachVariant([n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, true); });
+            }
         }
-        else
+
+        if (!indexed_ok)
         {
             // Degrade gracefully: route all PBR faces back to the scalar path.
             LL_WARNS("ShaderLoading") << "Indexed PBR shader failed to load; GLTF batching disabled." << LL_ENDL;
             gDeferredPBROpaqueIndexedProgram.unload();
+            gDeferredPBRAlphaMaskIndexedProgram.unload();
             LLGLSLShader::sIndexedGLTFChannels = 0;
 
             // The legacy material indexed programs were built earlier (above) with the
@@ -1987,15 +2025,20 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         // Read by pbrterrainUtilF, a shared object, so the define that matters is the global one
         // set above; the program's copy keeps its name and hash honest.
         const bool hex_tiling = gSavedSettings.getBOOL("AlchemyRenderTerrainHexTiling");
-        for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
+        // A region whose materials include a masked one is drawn by the program that can discard; every other by one
+        // that cannot (LLDrawPoolTerrain::renderDeferred).
+        for (U32 program = 0; program < 2 * TERRAIN_PAINT_TYPE_COUNT; ++program)
         {
-            LLGLSLShader* shader = &gDeferredPBRTerrainProgram[paint_type];
-            shader->mName = llformat("Deferred PBR Terrain Shader %d %s %s %s%s",
+            const U32 paint_type = program % TERRAIN_PAINT_TYPE_COUNT;
+            const bool alpha_mask = program >= TERRAIN_PAINT_TYPE_COUNT;
+            LLGLSLShader* shader = alpha_mask ? &gDeferredPBRTerrainAlphaMaskProgram[paint_type] : &gDeferredPBRTerrainProgram[paint_type];
+            shader->mName = llformat("Deferred PBR Terrain Shader %d %s %s %s%s%s",
                     detail,
                     (paint_type == TERRAIN_PAINT_TYPE_PBR_PAINTMAP ? "paintmap" : "heightmap-with-noise"),
                     (mapping == 1 ? "flat" : "triplanar"),
                     (flat_normals ? "faceted" : "smooth"),
-                    (hex_tiling ? " hex" : ""));
+                    (hex_tiling ? " hex" : ""),
+                    (alpha_mask ? " alpha mask" : ""));
             shader->mFeatures.hasSrgb = true;
             shader->mFeatures.isAlphaLighting = true;
             shader->mFeatures.calculatesAtmospherics = true;
@@ -2021,6 +2064,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             if (hex_tiling)
             {
                 shader->addPermutation("TERRAIN_HEX_TILING", "1");
+            }
+            if (alpha_mask)
+            {
+                shader->addPermutation("HAS_ALPHA_MASK", "1");
             }
 
             add_common_permutations(shader);

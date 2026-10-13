@@ -162,6 +162,8 @@ Key shader groups: GBuffer write (`gDeferredDiffuseProgram`, `gDeferredPBROpaque
 
 **Spatial partitioning** uses an octree. `LLSpatialPartition` (`indra/newview/llspatialpartition.h`) is the base, with specialized partitions: `LLVolumePartition`, `LLTerrainPartition`, `LLTreePartition`, `LLGrassPartition`, `LLParticlePartition`. `LLSpatialGroup` is an octree node grouping drawable geometry. `LLDrawInfo` encapsulates a single draw call (vertex buffer, index range, textures, material, blend mode, skin info). `LLCullResult` stores per-frame visible geometry organized by render type.
 
+The G-buffer writers that can discard are kept to the passes that need it: the opaque PBR, bump and PBR terrain programs have alpha-mask twins (`HAS_ALPHA_MASK`), bound only for masked content, since a program that can discard has its depth written after it shades.
+
 ### PBR Materials & Reflection Probes
 
 **PBR:** GLTF PBR metallic-roughness workflow. `LLFetchedGLTFMaterial` (`llfetchedgltfmaterial.h`) wraps material data (base color, normal, metallic/roughness, emissive, occlusion textures). `LLGLTFMaterialList` manages the material registry. Terrain also supports PBR via `gDeferredPBRTerrainProgram[]`. BRDF LUT generated at startup via `gDeferredGenBrdfLutProgram`.

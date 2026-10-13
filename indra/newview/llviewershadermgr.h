@@ -197,6 +197,7 @@ extern LLGLSLShader         gDeferredDiffuseAlphaMaskProgram;
 extern LLGLSLShader         gDeferredNonIndexedDiffuseAlphaMaskProgram;
 extern LLGLSLShader         gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram;
 extern LLGLSLShader         gDeferredBumpProgram;
+extern LLGLSLShader         gDeferredBumpAlphaMaskProgram; // the bump faces that can discard
 extern LLGLSLShader         gDeferredTerrainProgram;
 extern LLGLSLShader         gDeferredTreeProgram;
 extern LLGLSLShader         gDeferredTreeShadowProgram;
@@ -293,7 +294,9 @@ extern LLGLSLShader         gHUDPBROpaqueProgram;
 extern LLGLSLShader         gPBRGlowProgram;
 extern LLGLSLShader         gPBRGlowIndexedProgram; // multi-material indexed PBR glow
 extern LLGLSLShader         gDeferredPBROpaqueProgram;
+extern LLGLSLShader         gDeferredPBRAlphaMaskProgram;
 extern LLGLSLShader         gDeferredPBROpaqueIndexedProgram; // multi-material indexed PBR opaque
+extern LLGLSLShader         gDeferredPBRAlphaMaskIndexedProgram; // multi-material indexed PBR alpha mask
 extern LLGLSLShader         gDeferredPBRAlphaProgram;
 extern LLGLSLShader         gDeferredPBRAlphaImpostorProgram;
 extern LLGLSLShader         gHUDPBRAlphaProgram;
@@ -329,4 +332,5 @@ enum TerrainPaintType : U32
     TERRAIN_PAINT_TYPE_COUNT                = 2,
 };
 extern LLGLSLShader         gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
+extern LLGLSLShader         gDeferredPBRTerrainAlphaMaskProgram[TERRAIN_PAINT_TYPE_COUNT]; // a region with a masked material
 #endif
