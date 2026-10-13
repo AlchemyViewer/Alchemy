@@ -752,7 +752,7 @@ std::string LLURI::mapToQueryString(const LLSD& queryMap)
     return query_string;
 }
 
-bool operator!=(const LLURI& first, const LLURI& second)
+bool operator==(const LLURI& first, const LLURI& second)
 {
-    return (first.asString() != second.asString());
+    return first.asString() == second.asString();
 }

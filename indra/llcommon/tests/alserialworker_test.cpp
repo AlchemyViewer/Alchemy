@@ -30,7 +30,7 @@
 #include "../llevents.h"
 #include "../llsdutil.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -38,7 +38,7 @@
 #include <thread>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct alserialworker_data
     {
@@ -71,31 +71,28 @@ namespace tut
             return false;
         }
     };
-    typedef test_group<alserialworker_data> alserialworker_group;
-    typedef alserialworker_group::object    alserialworker_object;
-    alserialworker_group                    alserialworker_instance("alserialworker");
 
-    template<> template<>
-    void alserialworker_object::test<1>()
+    TEST_CASE_METHOD(alserialworker_data, "alserialworker: jobs run in order on one thread of their own", "[alserialworker]")
     {
-        set_test_name("jobs run one after another, on a thread of their own");
         ALSerialWorker worker("alserialworker_test_1");
         for (int n = 0; n < 50; ++n)
         {
-            ensure("taken", worker.post([this, n] { note(n); }));
+            REQUIRE(worker.post([this, n] { note(n); }));
         }
-        ensure("all done", waitFor(50));
+        REQUIRE(waitFor(50));
         for (int n = 0; n < 50; ++n)
         {
-            ensure("in the order posted", done[n] == n);
-            ensure("on one thread, not this one", where[n] == where[0] && where[n] != std::this_thread::get_id());
+            REQUIRE(done[n] == n);
+            {
+                INFO("on one thread, not this one");
+                REQUIRE(where[n] == where[0]);
+                REQUIRE(where[n] != std::this_thread::get_id());
+            }
         }
     }
 
-    template<> template<>
-    void alserialworker_object::test<2>()
+    TEST_CASE_METHOD(alserialworker_data, "alserialworker: close stops the running job and drops waiting and later ones", "[alserialworker]")
     {
-        set_test_name("closed: the running job is stopped by the owner's stop, what waits is passed over, and a job after is refused");
         std::atomic<bool> running{ false };
         std::atomic<bool> stopped{ false };
         ALSerialWorker    worker("alserialworker_test_2", [&stopped] { stopped = true; });
@@ -116,27 +113,34 @@ namespace tut
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        ensure("the first is running", running.load());
+        UNSCOPED_INFO("the first is running");
+        CHECK(running.load());
         worker.close();
-        ensure("told to stop", stopped.load() && worker.closing());
-        ensure_equals("it returned, and nothing waiting ran", done.size(), size_t(1));
+        {
+            INFO("told to stop");
+            CHECK(stopped.load());
+            CHECK(worker.closing());
+        }
+        UNSCOPED_INFO("it returned, and nothing waiting ran");
+        REQUIRE(done.size() == size_t(1));
         bool ran = false;
-        ensure("refused after", !worker.post([&ran] { ran = true; }) && !ran);
+        CHECK_FALSE(worker.post([&ran] { ran = true; }));
+        CHECK_FALSE(ran);
         worker.close();
-        ensure("closed twice is closed", worker.closing());
+        UNSCOPED_INFO("closed twice is closed");
+        CHECK(worker.closing());
     }
 
-    template<> template<>
-    void alserialworker_object::test<3>()
+    TEST_CASE_METHOD(alserialworker_data, "alserialworker: the viewer starting to quit closes it at once", "[alserialworker]")
     {
-        set_test_name("the viewer starting to quit closes it at once");
         ALSerialWorker worker("alserialworker_test_3");
-        ensure("taken", worker.post([this] { note(1); }));
-        ensure("done", waitFor(1));
+        CHECK(worker.post([this] { note(1); }));
+        CHECK(waitFor(1));
         LLEventPumps::instance().obtain("LLApp").post(llsd::map("status", "running"));
-        ensure("running is nothing", !worker.closing());
+        UNSCOPED_INFO("running is nothing");
+        CHECK_FALSE(worker.closing());
         LLEventPumps::instance().obtain("LLApp").post(llsd::map("status", "quitting"));
-        ensure("closed", worker.closing());
-        ensure("refused", !worker.post([this] { note(2); }));
+        CHECK(worker.closing());
+        CHECK_FALSE(worker.post([this] { note(2); }));
     }
 }

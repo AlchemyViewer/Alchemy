@@ -12,7 +12,9 @@ endif()
 # al_add_test_binary(<name> PROJECT <project> SOURCES <test file>... [UNIT <file>...]
 #                    [LIBRARIES <target>...] [SUPPORT <object library>...]
 #                    [INCLUDES <dir>...] [DEFINES <define>...] [ENVIRONMENT <VAR=value>...]
-#                    [GL] [PYTHON] [ISA_TIER <tier>] [RESOURCE_LOCK <name>...] [COMBINED])
+#                    [GL] [PYTHON] [ISA_TIER <tier>] [RESOURCE_LOCK <name>...] [LAUNCHER <command>...]
+#                    [RERUN <run> RERUN_SOURCES <test file>... RERUN_ENVIRONMENT <VAR=value>...]
+#                    [COMBINED])
 #
 # Builds the test files into one Catch2 executable, <name>, with the harness
 # (al_test_support: the main, the listeners and the matchers) and SUPPORT's
@@ -29,17 +31,18 @@ endif()
 # own, since every other test links the code it tests.
 #
 # Each test file is a CTest entry, <name>/<file stem>, that runs the file's
-# test cases -- chosen by the tag Catch2's --filenames-as-tags gives each case
-# from the name of its file -- in one process, as an executable to a test file
-# ran them. Naming a tag would also choose the file's hidden cases, such as its
-# benchmarks, so the filter leaves those out, as a run with no filter does. A
-# filter that matches nothing exits 2, so a file whose test cases went missing
-# fails rather than passing empty. A stem names one file in a binary, and a
-# file belongs to one binary, or to one at each ISA tier. The tag is the
-# file's name less its last extension, the stem here too. A case written in a
-# header, or in a SUPPORT library, is tagged with that file's name and no
-# file's entry would run it, so <name>/stray_cases fails when the binary has
-# one: it runs whatever no file's tag names, and expects nothing to run.
+# test cases -- chosen by the tag the main gives each case from the name of
+# its file, as Catch2's --filenames-as-tags does -- in one process, as an
+# executable to a test file ran them. Naming a tag would also choose the
+# file's hidden cases, such as its benchmarks, so the filter leaves those out,
+# as a run with no filter does. A filter that matches nothing exits 2, so a
+# file whose test cases went missing fails rather than passing empty. A stem
+# names one file in a binary, and a file belongs to one binary, or to one at
+# each ISA tier. The tag is the file's name less its last extension, the stem
+# here too. A case written in a header, or in a SUPPORT library, is tagged
+# with that file's name and no file's entry would run it, so
+# <name>/stray_cases fails when the binary has one: it runs whatever no file's
+# tag names, and expects nothing to run.
 #
 # <name>/combined runs all of them in one process. It is labelled
 # combined_pending and manual, which the default run leaves out, until the
@@ -56,14 +59,23 @@ endif()
 # ISA_TIER binary is built at that x86-64 tier, named <name>_<tier>, labelled
 # isa, and skips on a host below it -- or below the tree's own tier, since it
 # links the tree's libraries, built at that one. RESOURCE_LOCK names what the binary's
-# entries hold that no two may hold at once, such as a fixed port.
+# entries hold that no two may hold at once, such as a fixed port. LAUNCHER is
+# a command each entry runs the binary through, its path and arguments after
+# the command's own: llcorehttp's tests run under the Python peer that serves
+# their requests. A per-case entry, and its discovery, go through it too.
+#
+# RERUN runs some of the files a second time, each in a process of its own,
+# with RERUN_ENVIRONMENT added to the binary's: <name>_<run>/<file stem>, or
+# with AL_TEST_PER_CASE each of their cases as <name>_<run>/<case>. alscript's
+# tests that check SLua run again under Luau's new type solver, as a scripter
+# may choose it.
 function(al_add_test_binary name)
   cmake_parse_arguments(
     PARSE_ARGV 1
     arg
     "GL;PYTHON;COMBINED"
-    "PROJECT;ISA_TIER"
-    "SOURCES;UNIT;LIBRARIES;SUPPORT;INCLUDES;DEFINES;ENVIRONMENT;RESOURCE_LOCK"
+    "PROJECT;ISA_TIER;RERUN"
+    "SOURCES;UNIT;LIBRARIES;SUPPORT;INCLUDES;DEFINES;ENVIRONMENT;RESOURCE_LOCK;LAUNCHER;RERUN_SOURCES;RERUN_ENVIRONMENT"
   )
   if(NOT arg_PROJECT)
     message(FATAL_ERROR "al_add_test_binary(${name}): PROJECT is required")
@@ -76,6 +88,12 @@ function(al_add_test_binary name)
       FATAL_ERROR
       "al_add_test_binary(${name}): unexpected arguments: ${arg_UNPARSED_ARGUMENTS}"
     )
+  endif()
+  if(arg_RERUN_SOURCES AND NOT arg_RERUN)
+    message(FATAL_ERROR "al_add_test_binary(${name}): RERUN_SOURCES needs RERUN to name the run")
+  endif()
+  if(arg_RERUN AND NOT arg_RERUN_SOURCES)
+    message(FATAL_ERROR "al_add_test_binary(${name}): RERUN ${arg_RERUN} names no RERUN_SOURCES")
   endif()
   set(target ${name})
   if(arg_ISA_TIER)
@@ -112,6 +130,17 @@ function(al_add_test_binary name)
     endif()
     set_property(GLOBAL PROPERTY AL_TEST_SOURCE_${key} ${target})
   endforeach()
+  set(rerun_stems)
+  foreach(source IN LISTS arg_RERUN_SOURCES)
+    get_filename_component(stem "${source}" NAME_WLE)
+    if(NOT stem IN_LIST stems)
+      message(
+        FATAL_ERROR
+        "al_add_test_binary(${name}): RERUN_SOURCES' ${source} is not one of its SOURCES"
+      )
+    endif()
+    list(APPEND rerun_stems ${stem})
+  endforeach()
 
   # vcpkg's toolchain hangs an app-local copy step on every executable it
   # sees declared; a test runs from the build tree, as al_add_test explains.
@@ -119,6 +148,9 @@ function(al_add_test_binary name)
   add_executable(${target} ${arg_SOURCES} ${arg_UNIT})
   target_link_libraries(${target} PRIVATE al::flags al_test_support ${arg_SUPPORT} ${arg_LIBRARIES})
   target_include_directories(${target} PRIVATE ${arg_INCLUDES} ${INDRA_SOURCE_DIR}/test)
+  # For the helpers in test/ that TUT tests still share, so each fails a
+  # test the way its framework does.
+  target_compile_definitions(${target} PRIVATE AL_TEST_CATCH2=1)
   if(arg_UNIT)
     target_include_directories(
       ${target}
@@ -175,6 +207,13 @@ function(al_add_test_binary name)
     endif()
   endif()
 
+  # The runs, each a prefix to its entries' names: the binary's own, and
+  # RERUN's of its files.
+  set(prefixes ${target})
+  if(arg_RERUN)
+    list(APPEND prefixes ${target}_${arg_RERUN})
+  endif()
+
   if(AL_TEST_PER_CASE)
     # Beside Catch2's package config, where vcpkg puts it, and not on the
     # module path.
@@ -190,67 +229,96 @@ function(al_add_test_binary name)
       DISABLED
       ${disabled}
     )
-    # The main makes Catch2's "all skipped" CTest's 125, so a skip is not
-    # left to the discovery's own code for it.
-    catch_discover_tests(
-      ${target}
-      TEST_PREFIX "${target}/"
-      TEST_LIST ${target}_cases
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      EXTRA_ARGS ${arguments}
-      DISCOVERY_MODE PRE_TEST
-      SKIP_IS_FAILURE
-      DL_PATHS ${SHARED_LIB_STAGING_DIR}
-      PROPERTIES ${per_case_properties}
-    )
-    # The environment, labels and lock a file's entry has are lists, which
-    # catch_discover_tests flattens with the rest of its PROPERTIES, and a
-    # CTest script cannot append to a property: a script run after the
-    # discovery sets them on each case whole. The labels are a file entry's,
-    # not the cases' Catch2 tags, so that -L and -LE choose alike either way.
-    # The library path is DL_PATHS', and not AL_TEST_ENVIRONMENT's, whose
-    # generator expressions a script written here would leave unevaluated.
-    set(case_script "${CMAKE_CURRENT_BINARY_DIR}/${target}_cases.cmake")
-    set(case_properties "LABELS [==[${labels}]==]")
-    if(environment)
-      string(APPEND case_properties " ENVIRONMENT [==[${environment}]==]")
+    # Catch.cmake runs the discovery and each case through the target's
+    # emulator, which CMake's own add_test leaves alone in a native build.
+    if(arg_LAUNCHER)
+      set_target_properties(${target} PROPERTIES CROSSCOMPILING_EMULATOR "${arg_LAUNCHER}")
     endif()
-    if(arg_RESOURCE_LOCK)
-      string(APPEND case_properties " RESOURCE_LOCK [==[${arg_RESOURCE_LOCK}]==]")
-    endif()
-    # The list holds each name as Catch2 escaped it for a list: [ and ] as
-    # the bytes 2 and 3. The test is registered under the name itself.
-    file(
-      WRITE "${case_script}"
-      "string(ASCII 2 open)\n"
-      "string(ASCII 3 close)\n"
-      "foreach(case IN LISTS ${target}_cases)\n"
-      "  string(REPLACE \"\${open}\" \"[\" case \"\${case}\")\n"
-      "  string(REPLACE \"\${close}\" \"]\" case \"\${case}\")\n"
-      "  set_tests_properties(\"\${case}\" PROPERTIES ${case_properties})\n"
-      "endforeach()\n"
-    )
-    set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${case_script}")
-  else()
-    foreach(stem IN LISTS stems)
-      add_test(
-        NAME ${target}/${stem}
-        COMMAND $<TARGET_FILE:${target}> --filenames-as-tags "[#${stem}]~[.]" ${arguments}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      )
-      set_tests_properties(
-        ${target}/${stem}
-        PROPERTIES
-          ENVIRONMENT "${environment}"
-          ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
-          LABELS "${labels}"
-          DISABLED ${disabled}
-          SKIP_RETURN_CODE 125
-          TIMEOUT ${timeout}
-      )
-      if(arg_RESOURCE_LOCK)
-        set_tests_properties(${target}/${stem} PROPERTIES RESOURCE_LOCK "${arg_RESOURCE_LOCK}")
+    foreach(prefix IN LISTS prefixes)
+      # A rerun's cases are its files', by the tag each file's name gives
+      # them, its hidden ones left out as the binary's own run leaves them.
+      set(spec)
+      set(run_environment ${environment})
+      if(NOT prefix STREQUAL target)
+        set(files)
+        foreach(stem IN LISTS rerun_stems)
+          list(APPEND files "[#${stem}]~[.]")
+        endforeach()
+        list(JOIN files "," files)
+        set(spec "${files}")
+        list(APPEND run_environment ${arg_RERUN_ENVIRONMENT})
       endif()
+      # The main makes Catch2's "all skipped" CTest's 125, so a skip is not
+      # left to the discovery's own code for it.
+      catch_discover_tests(
+        ${target}
+        TEST_PREFIX "${prefix}/"
+        TEST_LIST ${prefix}_cases
+        TEST_SPEC ${spec}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        EXTRA_ARGS ${arguments}
+        DISCOVERY_MODE PRE_TEST
+        SKIP_IS_FAILURE
+        DL_PATHS ${SHARED_LIB_STAGING_DIR}
+        PROPERTIES ${per_case_properties}
+      )
+      # The environment, labels and lock a file's entry has are lists, which
+      # catch_discover_tests flattens with the rest of its PROPERTIES, and a
+      # CTest script cannot append to a property: a script run after the
+      # discovery sets them on each case whole. The labels are a file entry's,
+      # not the cases' Catch2 tags, so that -L and -LE choose alike either way.
+      # The library path is DL_PATHS', and not AL_TEST_ENVIRONMENT's, whose
+      # generator expressions a script written here would leave unevaluated.
+      set(case_script "${CMAKE_CURRENT_BINARY_DIR}/${prefix}_cases.cmake")
+      set(case_properties "LABELS [==[${labels}]==]")
+      if(run_environment)
+        string(APPEND case_properties " ENVIRONMENT [==[${run_environment}]==]")
+      endif()
+      if(arg_RESOURCE_LOCK)
+        string(APPEND case_properties " RESOURCE_LOCK [==[${arg_RESOURCE_LOCK}]==]")
+      endif()
+      # The list holds each name as Catch2 escaped it for a list: [ and ] as
+      # the bytes 2 and 3. The test is registered under the name itself.
+      file(
+        WRITE "${case_script}"
+        "string(ASCII 2 open)\n"
+        "string(ASCII 3 close)\n"
+        "foreach(case IN LISTS ${prefix}_cases)\n"
+        "  string(REPLACE \"\${open}\" \"[\" case \"\${case}\")\n"
+        "  string(REPLACE \"\${close}\" \"]\" case \"\${case}\")\n"
+        "  set_tests_properties(\"\${case}\" PROPERTIES ${case_properties})\n"
+        "endforeach()\n"
+      )
+      set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${case_script}")
+    endforeach()
+  else()
+    foreach(prefix IN LISTS prefixes)
+      set(run_stems ${stems})
+      set(run_environment ${environment})
+      if(NOT prefix STREQUAL target)
+        set(run_stems ${rerun_stems})
+        list(APPEND run_environment ${arg_RERUN_ENVIRONMENT})
+      endif()
+      foreach(stem IN LISTS run_stems)
+        add_test(
+          NAME ${prefix}/${stem}
+          COMMAND ${arg_LAUNCHER} $<TARGET_FILE:${target}> "[#${stem}]~[.]" ${arguments}
+          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        )
+        set_tests_properties(
+          ${prefix}/${stem}
+          PROPERTIES
+            ENVIRONMENT "${run_environment}"
+            ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+            LABELS "${labels}"
+            DISABLED ${disabled}
+            SKIP_RETURN_CODE 125
+            TIMEOUT ${timeout}
+        )
+        if(arg_RESOURCE_LOCK)
+          set_tests_properties(${prefix}/${stem} PROPERTIES RESOURCE_LOCK "${arg_RESOURCE_LOCK}")
+        endif()
+      endforeach()
     endforeach()
 
     # Every case no file's tag names: a filter of nothing but exclusions
@@ -264,8 +332,8 @@ function(al_add_test_binary name)
     add_test(
       NAME ${target}/stray_cases
       COMMAND
-        ${CMAKE_COMMAND} "-DEXE=$<TARGET_FILE:${target}>" "-DARGS=--filenames-as-tags|${strays}~[.]"
-        -DEXPECT_EXIT=2 -P ${INDRA_SOURCE_DIR}/test/run_and_expect.cmake
+        ${CMAKE_COMMAND} "-DEXE=$<TARGET_FILE:${target}>" "-DARGS=${strays}~[.]" -DEXPECT_EXIT=2 -P
+        ${INDRA_SOURCE_DIR}/test/run_and_expect.cmake
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
     set_tests_properties(
@@ -287,7 +355,7 @@ function(al_add_test_binary name)
       endif()
       add_test(
         NAME ${target}/combined
-        COMMAND $<TARGET_FILE:${target}> ${arguments}
+        COMMAND ${arg_LAUNCHER} $<TARGET_FILE:${target}> ${arguments}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
       )
       set_tests_properties(

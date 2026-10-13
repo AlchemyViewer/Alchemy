@@ -29,22 +29,11 @@
 
 #include "../llxfer_file.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
-{
 namespace
 {
-    struct llxfer_data
-    {
-    };
-    typedef test_group<llxfer_data> llxfer_test;
-    typedef llxfer_test::object llxfer_object;
-    tut::llxfer_test llxfer("LLXferFile");
-}
-
-    template<> template<>
-    void llxfer_object::test<1>()
+    TEST_CASE("LLXferFile: an oversized local filename is cut short of LL_MAX_PATH", "[LLXferFile]")
     {
         // test that we handle an oversized filename correctly.
         std::string oversized_filename;
@@ -55,7 +44,6 @@ namespace
         }
 
         LLXfer_File xff(oversized_filename, false, 1);
-        ensure("oversized local_filename nul-terminated",
-               xff.getFileName().length() < LL_MAX_PATH);
+        CHECK(xff.getFileName().length() < LL_MAX_PATH);
     }
 }

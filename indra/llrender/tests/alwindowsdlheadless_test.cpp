@@ -31,14 +31,35 @@
 
 #include "llwindow.h"
 
-#include "../test/lltut.h"
+#if LL_DARWIN
+#include <OpenGL/OpenGL.h>
+#elif LL_LINUX
+#include "SDL3/SDL_video.h"
+#endif
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <thread>
 
-namespace tut
-{
 namespace
 {
+    // Whether a GL context is current on the calling thread, as the platform
+    // reports it: a worker's shared context is made outside SDL, so SDL's own
+    // record of the current context never names it.
+    bool contextCurrentHere()
+    {
+#if LL_WINDOWS
+        return wglGetCurrentContext() != nullptr;
+#elif LL_DARWIN
+        return CGLGetCurrentContext() != nullptr;
+#else
+        // EGL, reached through SDL as the shared contexts themselves are.
+        using GetCurrentContext = void* (*)();
+        const auto get_current = reinterpret_cast<GetCurrentContext>(SDL_EGL_GetProcAddress("eglGetCurrentContext"));
+        return get_current && get_current() != nullptr;
+#endif
+    }
+
     struct alwindowsdlheadless_data
     {
         // The window is the shared context's, which has the image, render
@@ -53,65 +74,72 @@ namespace
         alwindowsdlheadless_data() { gl(); }
     };
 
-    typedef test_group<alwindowsdlheadless_data> alwindowsdlheadless_test;
-    typedef alwindowsdlheadless_test::object     alwindowsdlheadless_object;
-    tut::alwindowsdlheadless_test alwindowsdlheadless_testcase("ALWindowSDLHeadless");
-}
 
     // The window the manager handed the fixture is the hidden backend, valid,
     // with an SDL window behind it and the size that was asked for.
-    template<> template<>
-    void alwindowsdlheadless_object::test<1>()
+    TEST_CASE_METHOD(alwindowsdlheadless_data, "ALWindowSDLHeadless: the fixture's window is the hidden backend at the size asked for", "[ALWindowSDLHeadless]")
     {
         LLWindow* window = gl().window();
-        ensure("a window", window != nullptr);
-        ensure("the hidden backend was asked for",
-               LLWindowManager::getBackend() == ALWindowBackend::Hidden);
+        REQUIRE(window != nullptr);
+        CHECK(LLWindowManager::getBackend() == ALWindowBackend::Hidden);
         // createWindow would have returned null on an invalid one; what is
         // left to see is the SDL window behind it.
-        ensure("there is an SDL window behind it", window->getPlatformWindow() != nullptr);
+        UNSCOPED_INFO("there is an SDL window behind it");
+        CHECK(window->getPlatformWindow() != nullptr);
 
         LLCoordWindow size;
-        ensure("the size can be read", window->getSize(&size));
-        ensure_equals("width as asked",  size.mX, ll_test::HeadlessGL::WIDTH);
-        ensure_equals("height as asked", size.mY, ll_test::HeadlessGL::HEIGHT);
+        REQUIRE(window->getSize(&size));
+        CHECK(size.mX == ll_test::HeadlessGL::WIDTH);
+        CHECK(size.mY == ll_test::HeadlessGL::HEIGHT);
     }
 
     // A worker thread's shared context, as LLImageGLThread and the VBO
     // streaming thread use it: made on the main thread, bound and released
     // on the worker, and the texture the worker makes on it is the same
     // object on the main thread's context afterwards.
-    template<> template<>
-    void alwindowsdlheadless_object::test<2>()
+    TEST_CASE_METHOD(alwindowsdlheadless_data, "ALWindowSDLHeadless: a texture made on a worker's shared context is the main one's too", "[ALWindowSDLHeadless]")
     {
         LLWindow* window = gl().window();
 
         void* shared = window->createSharedContext();
-        ensure("a shared context was made", shared != nullptr);
+        REQUIRE(shared != nullptr);
 
+        // What the worker saw, checked on this thread once it has ended.
+        bool current_on_worker = false;
         GLuint name = 0;
         GLenum worker_error = GL_NO_ERROR;
         std::thread worker([&]
         {
             window->makeContextCurrent(shared);
 
-            glGenTextures(1, &name);
-            glBindTexture(GL_TEXTURE_2D, name);
-            const U8 texel[4] = { 0x12, 0x34, 0x56, 0x78 };
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, texel);
-            glBindTexture(GL_TEXTURE_2D, 0);
-            // The object is complete and visible to the share group once the
-            // commands that made it have run.
-            glFinish();
-            worker_error = glGetError();
+            // With no context current, GL does nothing -- or, on macOS,
+            // crashes -- so the worker makes nothing unless the bind took.
+            current_on_worker = contextCurrentHere();
+            if (current_on_worker)
+            {
+                glGenTextures(1, &name);
+                glBindTexture(GL_TEXTURE_2D, name);
+                const U8 texel[4] = { 0x12, 0x34, 0x56, 0x78 };
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, texel);
+                glBindTexture(GL_TEXTURE_2D, 0);
+                // The object is complete and visible to the share group once
+                // the commands that made it have run.
+                glFinish();
+                worker_error = glGetError();
+            }
 
             window->destroySharedContext(shared);
         });
         worker.join();
 
-        ensure_equals("the worker's GL calls raised no error", worker_error, (GLenum)GL_NO_ERROR);
-        ensure("the worker made a texture", name != 0);
-        ensure("the main context sees the worker's texture", glIsTexture(name) == GL_TRUE);
+        // Unless the shared context was current there, the worker's error
+        // and texture say nothing.
+        REQUIRE(current_on_worker);
+        CHECK(worker_error == (GLenum)GL_NO_ERROR);
+        UNSCOPED_INFO("the worker made a texture");
+        CHECK(name != 0);
+        UNSCOPED_INFO("the main context sees the worker's texture");
+        CHECK(glIsTexture(name) == GL_TRUE);
 
         // The shared context's texture slots cache what they bound, so the
         // read puts back the texture it found.
@@ -121,20 +149,21 @@ namespace
         GLint width = 0;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
         glBindTexture(GL_TEXTURE_2D, prior);
-        ensure_equals("with the storage the worker gave it", width, 1);
-        ensure_equals("and no error on this side", glGetError(), (GLenum)GL_NO_ERROR);
+        UNSCOPED_INFO("with the storage the worker gave it");
+        CHECK(width == 1);
+        UNSCOPED_INFO("no error on the main context");
+        CHECK(glGetError() == (GLenum)GL_NO_ERROR);
 
         glDeleteTextures(1, &name);
     }
 
-    // A shared context nobody bound is still a shared context to destroy.
-    template<> template<>
-    void alwindowsdlheadless_object::test<3>()
+    TEST_CASE_METHOD(alwindowsdlheadless_data, "ALWindowSDLHeadless: a shared context nobody bound can still be destroyed", "[ALWindowSDLHeadless]")
     {
         LLWindow* window = gl().window();
         void* shared = window->createSharedContext();
-        ensure("a shared context was made", shared != nullptr);
+        REQUIRE(shared != nullptr);
         window->destroySharedContext(shared);
-        ensure_equals("the main context is untouched", glGetError(), (GLenum)GL_NO_ERROR);
+        UNSCOPED_INFO("the main context is untouched");
+        CHECK(glGetError() == (GLenum)GL_NO_ERROR);
     }
 }

@@ -26,13 +26,13 @@
  * $/LicenseInfo$
  */
 
-#include <tut/tut.hpp>
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 #include "linden_common.h"
 #include "llfile.h"
 #include "lluuid.h"
 
-namespace tut
+namespace
 {
     static void clear_entire_dir(const std::filesystem::path& dir_path)
     {
@@ -73,100 +73,105 @@ namespace tut
             clear_entire_dir(get_testdir_unicode(tempdir, unique));
         }
     };
-    typedef test_group<llfile_test> llfile_test_t;
-    typedef llfile_test_t::object   llfile_test_object_t;
-    tut::llfile_test_t              tut_llfile_test("llfile_test");
 
-    template<> template<>
-    void llfile_test_object_t::test<1>()
+    TEST_CASE_METHOD(llfile_test, "llfile_test: exists isdir and isfile follow mkdir write and remove", "[llfile_test]")
     {
         // Test creating directories and files and deleting them and checking if the
         // relevant status functions work as expected
-        ensure("LLFile::tmpdir() empty", !tempdir.empty());
-        ensure("LLFile::tmpdir() doesn't exist", LLFile::exists(tempdir));
-        ensure("LLFile::tmpdir() is not a directory", LLFile::isdir(tempdir));
-        ensure("LLFile::tmpdir() should not be a file", !LLFile::isfile(tempdir));
+        REQUIRE_FALSE(tempdir.empty());
+        CHECK(LLFile::exists(tempdir));
+        CHECK(LLFile::isdir(tempdir));
+        CHECK_FALSE(LLFile::isfile(tempdir));
 
         // Make sure there is nothing left from a previous test run
         clear_entire_dir(testdir);
-        ensure("llfile_test should not exist anymore", !LLFile::exists(testdir));
+        CHECK_FALSE(LLFile::exists(testdir));
 
         int rc = LLFile::mkdir(testdir);
-        ensure("LLFile::mkdir() failed", rc == 0);
-        ensure("llfile_test should be a directory", LLFile::isdir(testdir));
+        UNSCOPED_INFO("mkdir");
+        CHECK(rc == 0);
+        CHECK(LLFile::isdir(testdir));
         rc = LLFile::mkdir(testdir);
-        ensure("LLFile::mkdir() should not fail when the directory already exists", rc == 0);
+        UNSCOPED_INFO("mkdir of a directory that exists");
+        CHECK(rc == 0);
 
         std::filesystem::path testfile1 = testdir;
         testfile1.append("llfile_test.dat");
-        ensure("llfile_test1.dat should not yet exist", !LLFile::exists(testfile1));
+        CHECK_FALSE(LLFile::exists(testfile1));
 
         const char* testdata = "testdata";
-        S64 bytes = LLFile::write(testfile1, testdata, 0, sizeof(testdata));
-        ensure("LLFile::write() did not write correctly", bytes == sizeof(testdata));
+        S64 bytes = LLFile::write(testfile1, testdata, 0, strlen(testdata));
+        CHECK(bytes == (S64)strlen(testdata));
+        CHECK(LLFile::isfile(testfile1));
 
         rc = LLFile::remove(testfile1);
-        ensure("LLFile::remove() for file test_file.dat", rc == 0);
-        ensure("llfile_test.dat should not exist anymore", !LLFile::exists(testfile1));
-        ensure("llfile_test.dat should not be a file", !LLFile::isfile(testfile1));
-        ensure("llfile_test.dat should not be a directory", !LLFile::isdir(testfile1));
-        ensure("llfile_test.dat should not be a symlink", !LLFile::islink(testfile1));
+        UNSCOPED_INFO("remove of the file");
+        CHECK(rc == 0);
+        CHECK_FALSE(LLFile::exists(testfile1));
+        CHECK_FALSE(LLFile::isfile(testfile1));
+        CHECK_FALSE(LLFile::isdir(testfile1));
+        CHECK_FALSE(LLFile::islink(testfile1));
 
         rc = LLFile::remove(testdir);
-        ensure("LLFile::remove() for directory llfile_test failed", rc == 0);
-        ensure("llfile_test should not exist anymore", !LLFile::exists(testdir));
+        UNSCOPED_INFO("remove of the directory");
+        CHECK(rc == 0);
+        CHECK_FALSE(LLFile::exists(testdir));
     }
 
-    template<> template<>
-    void llfile_test_object_t::test<2>()
+    TEST_CASE_METHOD(llfile_test, "llfile_test: the static write size getContents and read agree on a file", "[llfile_test]")
     {
         // High level static file IO functions to read and write data files
         LLFile::mkdir(testdir);
-        ensure("llfile_test should exist", LLFile::isdir(testdir));
+        CHECK(LLFile::isdir(testdir));
 
         std::filesystem::path testfile1 = testdir;
         testfile1.append("llfile_test.dat");
 
         std::string testdata1("testdata");
         std::string testdata2("datateststuff");
-        std::time_t current = time(nullptr);
         S64 bytes = LLFile::write(testfile1, testdata1.c_str(), 0, testdata1.length());
-        ensure("LLFile::write() did not write correctly", bytes == testdata1.length());
-        ensure("llfile_test.dat should exist", LLFile::exists(testfile1));
-        ensure("llfile_test.dat should be a file", LLFile::isfile(testfile1));
-        ensure("llfile_test.dat should not be a directory", !LLFile::isdir(testfile1));
+        UNSCOPED_INFO("write");
+        CHECK(bytes == testdata1.length());
+        CHECK(LLFile::exists(testfile1));
+        CHECK(LLFile::isfile(testfile1));
+        CHECK_FALSE(LLFile::isdir(testfile1));
 
         bytes = LLFile::size(testfile1);
-        ensure("LLFile::size() did not return the correct size", bytes == testdata1.length());
+        UNSCOPED_INFO("size");
+        CHECK(bytes == testdata1.length());
 
         std::string data = LLFile::getContents(testfile1);
-        ensure("LLFile::getContents() did not return the correct size data", data.length() == testdata1.length());
-        ensure_memory_matches("LLFile::getContents() did not read correct data", testdata1.c_str(), (U32)testdata1.length(), data.c_str(), (U32)data.length());
+        CHECK(data.length() == testdata1.length());
+        CHECK_THAT(ll_test::Memory(testdata1.c_str(), (U32)testdata1.length()), ll_test::MemoryMatches(data.c_str(), (U32)data.length()));
 
         char buffer[1024];
         bytes = LLFile::read(testfile1, buffer, 0, testdata1.length());
-        ensure("LLFile:read() did not return the correct size", bytes == testdata1.length());
-        ensure_memory_matches("LLFile::read() did not read correct data", testdata1.c_str(), (U32)bytes, buffer, (U32)bytes);
+        UNSCOPED_INFO("read");
+        REQUIRE(bytes == testdata1.length());
+        CHECK_THAT(ll_test::Memory(testdata1.c_str(), (U32)bytes), ll_test::MemoryMatches(buffer, (U32)bytes));
 
         // What if we try to read more data than there is in the file?
         bytes = LLFile::read(testfile1, buffer, 0, bytes + 10);
-        ensure("LLFile:read() did not correctly stop on eof", bytes == testdata1.length());
-        ensure_memory_matches("LLFile::read() did not read correct data", testdata1.c_str(), (U32)bytes, buffer, (U32)bytes);
+        UNSCOPED_INFO("read past the end of the file");
+        REQUIRE(bytes == testdata1.length());
+        CHECK_THAT(ll_test::Memory(testdata1.c_str(), (U32)bytes), ll_test::MemoryMatches(buffer, (U32)bytes));
 
         // Let's append more data
         bytes = LLFile::write(testfile1, testdata2.c_str(), -1, testdata2.length());
-        ensure("LLFile::write() did not write correctly", bytes == testdata2.length());
+        UNSCOPED_INFO("append");
+        CHECK(bytes == testdata2.length());
 
         bytes = LLFile::size(testfile1);
-        ensure("LLFile::size() did not return the correct size", bytes == testdata1.length() + testdata2.length());
+        UNSCOPED_INFO("size after the append");
+        REQUIRE(bytes == testdata1.length() + testdata2.length());
         bytes = LLFile::read(testfile1, buffer, 0, bytes);
-        ensure("LLFile:read() did not read correct number of bytes", bytes == testdata1.length() + testdata2.length());
-        ensure_memory_matches("LLFile:read() did not read correct testdata1", testdata1.c_str(), (U32)testdata1.length(), buffer, (U32)testdata1.length());
-        ensure_memory_matches("LLFile:read() did not read correct testdata2", testdata2.c_str(), (U32)testdata2.length(), buffer + testdata1.length(), (U32)testdata2.length());
+        UNSCOPED_INFO("read after the append");
+        CHECK(bytes == testdata1.length() + testdata2.length());
+        CHECK_THAT(ll_test::Memory(testdata1.c_str(), (U32)testdata1.length()), ll_test::MemoryMatches(buffer, (U32)testdata1.length()));
+        CHECK_THAT(ll_test::Memory(testdata2.c_str(), (U32)testdata2.length()), ll_test::MemoryMatches(buffer + testdata1.length(), (U32)testdata2.length()));
     }
 
-    template<> template<>
-    void llfile_test_object_t::test<3>()
+    TEST_CASE_METHOD(llfile_test, "llfile_test: an LLFile writes reads seeks and tells", "[llfile_test]")
     {
         const size_t numints = 1024;
 
@@ -183,59 +188,74 @@ namespace tut
 
         std::error_code ec;
         LLFile fileout(testfile, LLFile::out, ec);
-        ensure("LLFile constructor did not open correctly", (bool)fileout);
-        ensure("error_code from LLFile constructor should not indicate an error", !ec);
+        REQUIRE((bool)fileout);
+        UNSCOPED_INFO("constructor");
+        CHECK_FALSE(ec);
         if (fileout)
         {
             S64 length = fileout.size(ec);
-            ensure("freshly created file should be empty", length == 0);
-            ensure("error_code from LLFile::size() should not indicate an error", !ec);
+            CHECK(length == 0);
+            UNSCOPED_INFO("size");
+            CHECK_FALSE(ec);
             S64 bytes = fileout.write(data, sizeof(data), ec);
-            ensure("LLFile::write() did not write correctly", bytes == sizeof(data));
-            ensure("error_code from LLFile::write() should not indicate an error", !ec);
+            UNSCOPED_INFO("write");
+            CHECK(bytes == sizeof(data));
+            UNSCOPED_INFO("write");
+            CHECK_FALSE(ec);
             bytes = fileout.write(data, sizeof(data), ec);
-            ensure("LLFile::write() did not write correctly", bytes == sizeof(data));
-            ensure("error_code from LLFile::write() should not indicate an error", !ec);
+            UNSCOPED_INFO("second write");
+            CHECK(bytes == sizeof(data));
+            UNSCOPED_INFO("second write");
+            CHECK_FALSE(ec);
             bytes = fileout.size(ec);
-            ensure("LLFile::size() returned wrong size", bytes == 2 * sizeof(data));
-            ensure("error_code from LLFile::size() should not indicate an error", !ec);
+            UNSCOPED_INFO("size after the writes");
+            CHECK(bytes == 2 * sizeof(data));
+            UNSCOPED_INFO("size after the writes");
+            CHECK_FALSE(ec);
             fileout.close();
         }
 
         LLFile filein(testfile, LLFile::in, ec);
-        ensure("LLFile constructor did not open correctly", (bool)filein);
-        ensure("error_code from LLFile constructor should not indicate an error", !ec);
+        REQUIRE((bool)filein);
+        UNSCOPED_INFO("constructor");
+        CHECK_FALSE(ec);
         if (filein)
         {
             S64 length = filein.size(ec);
-            ensure("LLFile::size() returned wrong size", length == 2 * sizeof(data));
-            ensure("error_code from LLFile::size() should not indicate an error", !ec);
+            REQUIRE(length == 2 * sizeof(data));
+            UNSCOPED_INFO("size");
+            CHECK_FALSE(ec);
             char* buffer = (char*)malloc(length);
             S64 bytes  = filein.read(buffer, length, ec);
-            ensure("LLFile::read() did not read correctly", bytes == length);
-            ensure("error_code from LLFile::read() should not indicate an error", !ec);
-            ensure_memory_matches("LLFile:read() did not read correct data1", data, (U32)sizeof(data), buffer, (U32)sizeof(data));
-            ensure_memory_matches("LLFile:read() did not read correct data2", data, (U32)sizeof(data), buffer + sizeof(data), (U32)sizeof(data));
+            UNSCOPED_INFO("read");
+            CHECK(bytes == length);
+            UNSCOPED_INFO("read");
+            CHECK_FALSE(ec);
+            CHECK_THAT(ll_test::Memory(data, (U32)sizeof(data)), ll_test::MemoryMatches(buffer, (U32)sizeof(data)));
+            CHECK_THAT(ll_test::Memory(data, (U32)sizeof(data)), ll_test::MemoryMatches(buffer + sizeof(data), (U32)sizeof(data)));
             S64 offset = filein.tell(ec);
-            ensure("LLFile::tell() returned a bad offset", offset == length);
-            ensure("error_code from LLFile::read() should not indicate an error", !ec);
+            CHECK(offset == length);
+            UNSCOPED_INFO("tell");
+            CHECK_FALSE(ec);
             offset = sizeof(data) / 2;
             int rc = filein.seek(offset, ec);
-            ensure("LLFile::seek() indicated an error", rc == 0);
-            ensure("error_code from LLFile::seek() should not indicate an error", !ec);
+            CHECK(rc == 0);
+            UNSCOPED_INFO("seek");
+            CHECK_FALSE(ec);
             bytes = filein.read(buffer, 2 * sizeof(data), ec);
-            ensure("LLFile::read() did not read correctly", bytes == sizeof(data) + offset);
-            ensure("error_code from LLFile::read() should not indicate an error", !ec);
-            ensure_memory_matches("LLFile:read() did not read correct data3", (char*)data + offset, (U32)offset, buffer, (U32)offset);
-            ensure_memory_matches("LLFile:read() did not read correct data4", (char*)data, (U32)sizeof(data), buffer + offset, (U32)sizeof(data));
+            UNSCOPED_INFO("read from the middle");
+            CHECK(bytes == sizeof(data) + offset);
+            UNSCOPED_INFO("read from the middle");
+            CHECK_FALSE(ec);
+            CHECK_THAT(ll_test::Memory((char*)data + offset, (U32)offset), ll_test::MemoryMatches(buffer, (U32)offset));
+            CHECK_THAT(ll_test::Memory((char*)data, (U32)sizeof(data)), ll_test::MemoryMatches(buffer + offset, (U32)sizeof(data)));
             filein.close();
 
             free(buffer);
         }
     }
 
-    template<> template<>
-    void llfile_test_object_t::test<4>()
+    TEST_CASE_METHOD(llfile_test, "llfile_test: LLFile refuses conflicting flags and missing paths", "[llfile_test]")
     {
         // Testing the LLFile class implementation with wrong paths and parameters
         std::filesystem::path testfile = testdir;
@@ -248,29 +268,32 @@ namespace tut
 
         std::error_code ec;
         LLFile file(testfile, LLFile::out | LLFile::noreplace, ec);
-        ensure("LLFile constructor should not have opened the already existing file", !file);
-        ensure("error_code from LLFile constructor should indicate an error", (bool)ec);
+        UNSCOPED_INFO("noreplace on a file that exists");
+        CHECK_FALSE(file);
+        CHECK((bool)ec);
 
         LLFile::remove(testfile);
         file = LLFile(testfile, LLFile::out | LLFile::app | LLFile::trunc, ec);
-        ensure("LLFile constructor should not have opened the file with conflicting flags", !file);
-        ensure("error_code from LLFile constructor should indicate an error", (bool)ec);
+        UNSCOPED_INFO("app with trunc");
+        CHECK_FALSE(file);
+        CHECK((bool)ec);
 
         file = LLFile(testfile, LLFile::out | LLFile::app | LLFile::noreplace, ec);
-        ensure("LLFile constructor should not have opened the file with conflicting flags", !file);
-        ensure("error_code from LLFile constructor should indicate an error", (bool)ec);
+        UNSCOPED_INFO("app with noreplace");
+        CHECK_FALSE(file);
+        CHECK((bool)ec);
 
         testfile = testdir;
         testfile.append("llfile_test");
         testfile.append("llfile_test.bin");
 
         file = LLFile(testfile, LLFile::in, ec);
-        ensure("LLFile constructor should not have been able to open the file in the non-existing directory", !file);
-        ensure("error_code from LLFile constructor should indicate an error", (bool)ec);
+        UNSCOPED_INFO("a directory that does not exist");
+        CHECK_FALSE(file);
+        CHECK((bool)ec);
     }
 
-    template<> template<>
-    void llfile_test_object_t::test<5>()
+    TEST_CASE_METHOD(llfile_test, "llfile_test: mkdir write read and remove work with Unicode names", "[llfile_test]")
     {
         // Test file and directory operations with Unicode paths and filenames
         std::filesystem::path testdir_unicode = get_testdir_unicode(tempdir, unique);
@@ -282,150 +305,162 @@ namespace tut
 
         // Clean up any previous test artifacts
         clear_entire_dir(testdir_unicode);
-        ensure("Unicode test directory should not exist", !LLFile::exists(testdir_unicode));
+        CHECK_FALSE(LLFile::exists(testdir_unicode));
 
         // Create the Unicode directory
         int rc = LLFile::mkdir(testdir_unicode);
-        ensure("LLFile::mkdir() failed for Unicode directory", rc == 0);
-        ensure("Unicode test directory should exist", LLFile::isdir(testdir_unicode));
+        UNSCOPED_INFO("mkdir");
+        CHECK(rc == 0);
+        CHECK(LLFile::isdir(testdir_unicode));
 
 
-        ensure("Unicode test file should not exist", !LLFile::exists(testfile_unicode));
+        CHECK_FALSE(LLFile::exists(testfile_unicode));
 
         // Write to the Unicode file
         const char* testdata = "unicode_testdata";
         S64 bytes = LLFile::write(testfile_unicode, testdata, 0, strlen(testdata));
-        ensure("Unicode test file should exist", LLFile::exists(testfile_unicode));
-        ensure("Unicode test file should be a file", LLFile::isfile(testfile_unicode));
-        ensure("LLFile::write() did not write correctly to Unicode file", bytes == (S64)strlen(testdata));
+        CHECK(LLFile::exists(testfile_unicode));
+        CHECK(LLFile::isfile(testfile_unicode));
+        UNSCOPED_INFO("write");
+        CHECK(bytes == (S64)strlen(testdata));
 
         // Read back the data
         char buffer[64] = {};
         bytes = LLFile::read(testfile_unicode, buffer, 0, sizeof(buffer));
-        ensure("LLFile::read() did not read correctly from Unicode file", bytes == (S64)strlen(testdata));
-        ensure_memory_matches("LLFile::read() did not read correct Unicode data", testdata, (U32)bytes, buffer, (U32)bytes);
+        UNSCOPED_INFO("read");
+        REQUIRE(bytes == (S64)strlen(testdata));
+        CHECK_THAT(ll_test::Memory(testdata, (U32)bytes), ll_test::MemoryMatches(buffer, (U32)bytes));
 
         // Remove the file and directory
         rc = LLFile::remove(testfile_unicode);
-        ensure("LLFile::remove() failed for Unicode file", rc == 0);
-        ensure("Unicode test file should not exist after removal", !LLFile::exists(testfile_unicode));
+        UNSCOPED_INFO("remove of the file");
+        CHECK(rc == 0);
+        CHECK_FALSE(LLFile::exists(testfile_unicode));
 
         rc = LLFile::remove(testdir_unicode);
-        ensure("LLFile::remove() failed for Unicode directory", rc == 0);
-        ensure("Unicode test directory should not exist after removal", !LLFile::exists(testdir_unicode));
+        UNSCOPED_INFO("remove of the directory");
+        CHECK(rc == 0);
+        CHECK_FALSE(LLFile::exists(testdir_unicode));
     }
 
-    template<> template<>
-    void llfile_test_object_t::test<6>()
+    TEST_CASE_METHOD(llfile_test, "llfile_test: isSafeFileName accepts ordinary file names", "[llfile_test]")
     {
         // Ordinary file names pass isSafeFileName()
-        ensure("xml", LLFile::isSafeFileName("lsl_keywords.xml"));
-        ensure("two extensions", LLFile::isSafeFileName("secondlife.d.luau"));
-        ensure("no extension", LLFile::isSafeFileName("keywords"));
-        ensure("inner dots", LLFile::isSafeFileName("a..b"));
-        ensure("inner space", LLFile::isSafeFileName("my file.txt"));
-        ensure("hidden", LLFile::isSafeFileName(".luaurc"));
-        ensure("leading dots", LLFile::isSafeFileName("..name"));
-        ensure("unicode", LLFile::isSafeFileName("\xE3\x83\x95\xE3\x82\xA1\xE3\x82\xA4\xE3\x83\xAB.bin"));
+        CHECK(LLFile::isSafeFileName("lsl_keywords.xml"));
+        CHECK(LLFile::isSafeFileName("secondlife.d.luau"));
+        CHECK(LLFile::isSafeFileName("keywords"));
+        CHECK(LLFile::isSafeFileName("a..b"));
+        CHECK(LLFile::isSafeFileName("my file.txt"));
+        UNSCOPED_INFO("hidden");
+        CHECK(LLFile::isSafeFileName(".luaurc"));
+        CHECK(LLFile::isSafeFileName("..name"));
+        UNSCOPED_INFO("unicode");
+        CHECK(LLFile::isSafeFileName("\xE3\x83\x95\xE3\x82\xA1\xE3\x82\xA4\xE3\x83\xAB.bin"));
     }
 
-    template<> template<>
-    void llfile_test_object_t::test<7>()
+    TEST_CASE_METHOD(llfile_test, "llfile_test: isSafeFileName refuses empty and dot names and ones Windows trims", "[llfile_test]")
     {
         // Nothing, the directory itself or its parent, and names Windows would
         // shorten when creating them
-        ensure("empty", !LLFile::isSafeFileName(""));
-        ensure("dot", !LLFile::isSafeFileName("."));
-        ensure("dot dot", !LLFile::isSafeFileName(".."));
-        ensure("three dots", !LLFile::isSafeFileName("..."));
-        ensure("trailing dot", !LLFile::isSafeFileName("name."));
-        ensure("trailing space", !LLFile::isSafeFileName("name.xml "));
+        CHECK_FALSE(LLFile::isSafeFileName(""));
+        CHECK_FALSE(LLFile::isSafeFileName("."));
+        CHECK_FALSE(LLFile::isSafeFileName(".."));
+        CHECK_FALSE(LLFile::isSafeFileName("..."));
+        CHECK_FALSE(LLFile::isSafeFileName("name."));
+        UNSCOPED_INFO("trailing space");
+        CHECK_FALSE(LLFile::isSafeFileName("name.xml "));
     }
 
-    template<> template<>
-    void llfile_test_object_t::test<8>()
+    TEST_CASE_METHOD(llfile_test, "llfile_test: isSafeFileName refuses path separators of either platform", "[llfile_test]")
     {
         // Separators of either platform, at either end or inside
-        ensure("parent posix", !LLFile::isSafeFileName("../../evil.xml"));
-        ensure("parent windows", !LLFile::isSafeFileName("..\\..\\evil.xml"));
-        ensure("absolute posix", !LLFile::isSafeFileName("/etc/evil"));
-        ensure("absolute windows", !LLFile::isSafeFileName("\\Windows\\evil.dll"));
-        ensure("unc", !LLFile::isSafeFileName("\\\\host\\share\\evil"));
-        ensure("subdirectory posix", !LLFile::isSafeFileName("sub/evil.xml"));
-        ensure("subdirectory windows", !LLFile::isSafeFileName("sub\\evil.xml"));
-        ensure("trailing separator", !LLFile::isSafeFileName("evil/"));
+        CHECK_FALSE(LLFile::isSafeFileName("../../evil.xml"));
+        CHECK_FALSE(LLFile::isSafeFileName("..\\..\\evil.xml"));
+        CHECK_FALSE(LLFile::isSafeFileName("/etc/evil"));
+        CHECK_FALSE(LLFile::isSafeFileName("\\Windows\\evil.dll"));
+        UNSCOPED_INFO("unc");
+        CHECK_FALSE(LLFile::isSafeFileName("\\\\host\\share\\evil"));
+        CHECK_FALSE(LLFile::isSafeFileName("sub/evil.xml"));
+        CHECK_FALSE(LLFile::isSafeFileName("sub\\evil.xml"));
+        CHECK_FALSE(LLFile::isSafeFileName("evil/"));
     }
 
-    template<> template<>
-    void llfile_test_object_t::test<9>()
+    TEST_CASE_METHOD(llfile_test, "llfile_test: isSafeFileName refuses colons reserved characters and controls", "[llfile_test]")
     {
         // Drive and stream colons, the rest of what Windows refuses in a name,
         // and control characters, a NUL above all: a C string would cut a
         // harmless prefix off a harmful name there
-        ensure("drive absolute", !LLFile::isSafeFileName("C:\\evil.dll"));
-        ensure("drive relative", !LLFile::isSafeFileName("C:evil.dll"));
-        ensure("stream", !LLFile::isSafeFileName("name.xml:evil"));
-        ensure("star", !LLFile::isSafeFileName("a*b"));
-        ensure("question", !LLFile::isSafeFileName("a?b"));
-        ensure("quote", !LLFile::isSafeFileName("a\"b"));
-        ensure("less", !LLFile::isSafeFileName("a<b"));
-        ensure("greater", !LLFile::isSafeFileName("a>b"));
-        ensure("pipe", !LLFile::isSafeFileName("a|b"));
-        ensure("tab", !LLFile::isSafeFileName("a\tb"));
-        ensure("newline", !LLFile::isSafeFileName("a\nb"));
-        ensure("unit separator", !LLFile::isSafeFileName("a\x1F" "b"));
-        ensure("only nul", !LLFile::isSafeFileName(std::string(1, '\0')));
-        ensure("inner nul", !LLFile::isSafeFileName(std::string("name.xml\0evil", 13)));
-        ensure("trailing nul", !LLFile::isSafeFileName(std::string("name.xml\0", 9)));
+        UNSCOPED_INFO("drive absolute");
+        CHECK_FALSE(LLFile::isSafeFileName("C:\\evil.dll"));
+        UNSCOPED_INFO("drive relative");
+        CHECK_FALSE(LLFile::isSafeFileName("C:evil.dll"));
+        UNSCOPED_INFO("stream");
+        CHECK_FALSE(LLFile::isSafeFileName("name.xml:evil"));
+        CHECK_FALSE(LLFile::isSafeFileName("a*b"));
+        CHECK_FALSE(LLFile::isSafeFileName("a?b"));
+        CHECK_FALSE(LLFile::isSafeFileName("a\"b"));
+        CHECK_FALSE(LLFile::isSafeFileName("a<b"));
+        CHECK_FALSE(LLFile::isSafeFileName("a>b"));
+        CHECK_FALSE(LLFile::isSafeFileName("a|b"));
+        CHECK_FALSE(LLFile::isSafeFileName("a\tb"));
+        CHECK_FALSE(LLFile::isSafeFileName("a\nb"));
+        UNSCOPED_INFO("unit separator");
+        CHECK_FALSE(LLFile::isSafeFileName("a\x1F" "b"));
+        CHECK_FALSE(LLFile::isSafeFileName(std::string(1, '\0')));
+        CHECK_FALSE(LLFile::isSafeFileName(std::string("name.xml\0evil", 13)));
+        CHECK_FALSE(LLFile::isSafeFileName(std::string("name.xml\0", 9)));
     }
 
-    template<> template<>
-    void llfile_test_object_t::test<10>()
+    TEST_CASE_METHOD(llfile_test, "llfile_test: isSafeFileName allows up to 255 bytes", "[llfile_test]")
     {
         // The length limit is inclusive
-        ensure("at limit", LLFile::isSafeFileName(std::string(255, 'a')));
-        ensure("over limit", !LLFile::isSafeFileName(std::string(256, 'a')));
+        CHECK(LLFile::isSafeFileName(std::string(255, 'a')));
+        CHECK_FALSE(LLFile::isSafeFileName(std::string(256, 'a')));
     }
 
-    template<> template<>
-    void llfile_test_object_t::test<11>()
+    TEST_CASE_METHOD(llfile_test, "llfile_test: isSafeFileName refuses Windows device names", "[llfile_test]")
     {
         // Windows device names, in any case, with or without an extension
-        ensure("con", !LLFile::isSafeFileName("CON"));
-        ensure("prn", !LLFile::isSafeFileName("PRN"));
-        ensure("aux", !LLFile::isSafeFileName("AUX"));
-        ensure("nul", !LLFile::isSafeFileName("NUL"));
-        ensure("conin", !LLFile::isSafeFileName("CONIN$"));
-        ensure("conout", !LLFile::isSafeFileName("CONOUT$"));
-        ensure("com0", !LLFile::isSafeFileName("COM0"));
-        ensure("com9", !LLFile::isSafeFileName("COM9"));
-        ensure("lpt0", !LLFile::isSafeFileName("LPT0"));
-        ensure("lpt9", !LLFile::isSafeFileName("LPT9"));
-        ensure("com superscript one", !LLFile::isSafeFileName("COM\xC2\xB9"));
-        ensure("lpt superscript three", !LLFile::isSafeFileName("LPT\xC2\xB3"));
+        CHECK_FALSE(LLFile::isSafeFileName("CON"));
+        CHECK_FALSE(LLFile::isSafeFileName("PRN"));
+        CHECK_FALSE(LLFile::isSafeFileName("AUX"));
+        CHECK_FALSE(LLFile::isSafeFileName("NUL"));
+        CHECK_FALSE(LLFile::isSafeFileName("CONIN$"));
+        CHECK_FALSE(LLFile::isSafeFileName("CONOUT$"));
+        CHECK_FALSE(LLFile::isSafeFileName("COM0"));
+        CHECK_FALSE(LLFile::isSafeFileName("COM9"));
+        CHECK_FALSE(LLFile::isSafeFileName("LPT0"));
+        CHECK_FALSE(LLFile::isSafeFileName("LPT9"));
+        UNSCOPED_INFO("com superscript one");
+        CHECK_FALSE(LLFile::isSafeFileName("COM\xC2\xB9"));
+        UNSCOPED_INFO("lpt superscript three");
+        CHECK_FALSE(LLFile::isSafeFileName("LPT\xC2\xB3"));
 
-        ensure("lower case", !LLFile::isSafeFileName("con"));
-        ensure("mixed case", !LLFile::isSafeFileName("cOm1"));
-        ensure("lower case conout", !LLFile::isSafeFileName("conout$"));
+        CHECK_FALSE(LLFile::isSafeFileName("con"));
+        CHECK_FALSE(LLFile::isSafeFileName("cOm1"));
+        CHECK_FALSE(LLFile::isSafeFileName("conout$"));
 
-        ensure("extension", !LLFile::isSafeFileName("NUL.xml"));
-        ensure("two extensions", !LLFile::isSafeFileName("nul.tar.gz"));
-        ensure("superscript with extension", !LLFile::isSafeFileName("com\xC2\xB2.txt"));
-        ensure("spaces before extension", !LLFile::isSafeFileName("CON  .xml"));
+        CHECK_FALSE(LLFile::isSafeFileName("NUL.xml"));
+        CHECK_FALSE(LLFile::isSafeFileName("nul.tar.gz"));
+        UNSCOPED_INFO("superscript with extension");
+        CHECK_FALSE(LLFile::isSafeFileName("com\xC2\xB2.txt"));
+        UNSCOPED_INFO("spaces before extension");
+        CHECK_FALSE(LLFile::isSafeFileName("CON  .xml"));
     }
 
-    template<> template<>
-    void llfile_test_object_t::test<12>()
+    TEST_CASE_METHOD(llfile_test, "llfile_test: isSafeFileName accepts names that only look like devices", "[llfile_test]")
     {
         // Names that only look like devices are files
-        ensure("longer word", LLFile::isSafeFileName("CONSOLE.xml"));
-        ensure("two digits", LLFile::isSafeFileName("COM10"));
-        ensure("no digit", LLFile::isSafeFileName("LPT"));
-        ensure("device prefix", LLFile::isSafeFileName("nul_keywords.xml"));
-        ensure("device suffix", LLFile::isSafeFileName("icon.xml"));
-        ensure("device extension", LLFile::isSafeFileName("keywords.con"));
-        ensure("leading space", LLFile::isSafeFileName(" CON"));
-        ensure("only spaces before extension", LLFile::isSafeFileName(" .xml"));
-        ensure("hidden device", LLFile::isSafeFileName(".con"));
+        CHECK(LLFile::isSafeFileName("CONSOLE.xml"));
+        CHECK(LLFile::isSafeFileName("COM10"));
+        CHECK(LLFile::isSafeFileName("LPT"));
+        CHECK(LLFile::isSafeFileName("nul_keywords.xml"));
+        CHECK(LLFile::isSafeFileName("icon.xml"));
+        CHECK(LLFile::isSafeFileName("keywords.con"));
+        UNSCOPED_INFO("leading space");
+        CHECK(LLFile::isSafeFileName(" CON"));
+        UNSCOPED_INFO("only spaces before extension");
+        CHECK(LLFile::isSafeFileName(" .xml"));
+        CHECK(LLFile::isSafeFileName(".con"));
     }
-} // namespace tut
+} // anonymous namespace

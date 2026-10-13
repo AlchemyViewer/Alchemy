@@ -212,15 +212,17 @@ int LLBufferStreamBuf::sync()
     address = mBuffer->seek(mChannels.out(), address, -1);
     if(address)
     {
-        LLBufferArray::segment_iterator_t it;
-        it = mBuffer->splitAfter(address);
         LLBufferArray::segment_iterator_t end = mBuffer->endSegment();
+        LLBufferArray::segment_iterator_t it = mBuffer->getSegment(address);
         if(it != end)
         {
-            ++it;
-            if(it != end)
+            // Give back what the put area did not use. A write that
+            // filled its segment left nothing over, and the segment
+            // after that one is not the put area's to erase.
+            if(address != ((*it).data() + (*it).size() - 1))
             {
-                mBuffer->eraseSegment(it);
+                it = mBuffer->splitAfter(address);
+                mBuffer->eraseSegment(++it);
             }
             return_value = 0;
         }

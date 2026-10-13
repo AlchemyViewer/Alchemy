@@ -30,7 +30,7 @@
 #include "../lscript_library.h"
 #include "lltimer.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 
@@ -93,20 +93,10 @@ namespace
     constexpr size_t NER = 92;
 }
 
-namespace tut
+namespace
 {
-    struct allslreference_data
+    TEST_CASE("allslreference: a script compiles to a whole LSO image and to CIL named from its id", "[allslreference]")
     {
-    };
-
-    typedef test_group<allslreference_data> allslreference_group;
-    typedef allslreference_group::object    allslreference_object;
-    allslreference_group                    allslreference_instance("allslreference");
-
-    template<> template<>
-    void allslreference_object::test<1>()
-    {
-        set_test_name("a script compiles to a whole LSO image, and to CIL whose class is named from the script's id");
         const std::string text = "integer g = 3;\n"
                                  "default\n"
                                  "{\n"
@@ -116,26 +106,35 @@ namespace tut
                                  "    }\n"
                                  "}\n";
         const ALLSLReference::Result lso = ALLSLReference::compile(text, Target::LSO);
-        ensure("LSO: " + lso.messages, lso.ok);
-        ensure_equals("the image fills LSO's memory", lso.image.size(), (size_t)16384);
-        ensure_equals("top of memory", reg32(lso.image, TM), 16384);
-        ensure_equals("LSO2", reg32(lso.image, VN), 0x0200);
-        ensure_equals("the default state handles state_entry", reg64(lso.image, NER), (U64)0x1);
+        UNSCOPED_INFO("LSO: " + lso.messages);
+        CHECK(lso.ok);
+        UNSCOPED_INFO("the image fills LSO's memory");
+        REQUIRE(lso.image.size() == (size_t)16384);
+        UNSCOPED_INFO("top of memory");
+        CHECK(reg32(lso.image, TM) == 16384);
+        UNSCOPED_INFO("LSO2");
+        CHECK(reg32(lso.image, VN) == 0x0200);
+        UNSCOPED_INFO("the default state handles state_entry");
+        CHECK(reg64(lso.image, NER) == (U64)0x1);
         // LL's compiler calls every library function by its two-byte form.
-        ensure("llSay is library function 23", holds(lso.image, { 0xd1, 0x00, 23 }));
+        UNSCOPED_INFO("llSay is library function 23");
+        CHECK(holds(lso.image, { 0xd1, 0x00, 23 }));
 
         const ALLSLReference::Result cil = ALLSLReference::compile(text, Target::CIL);
-        ensure("CIL: " + cil.messages, cil.ok);
-        ensure("the class: " + cil.cil, has(cil.cil, ".class public auto ansi serializable beforefieldinit LSL_00000000_0000_0000_0000_000000000000 extends"));
-        ensure("the global a field: " + cil.cil, has(cil.cil, ".field public int32 'g'"));
-        ensure("the handler a method: " + cil.cil, has(cil.cil, "instance default void edefaultstate_entry() cil managed"));
-        ensure("llSay called by name: " + cil.cil, has(cil.cil, "Library::'llSay'(int32, string)"));
+        UNSCOPED_INFO("CIL: " + cil.messages);
+        CHECK(cil.ok);
+        UNSCOPED_INFO("the class: " + cil.cil);
+        CHECK(has(cil.cil, ".class public auto ansi serializable beforefieldinit LSL_00000000_0000_0000_0000_000000000000 extends"));
+        UNSCOPED_INFO("the global a field: " + cil.cil);
+        CHECK(has(cil.cil, ".field public int32 'g'"));
+        UNSCOPED_INFO("the handler a method: " + cil.cil);
+        CHECK(has(cil.cil, "instance default void edefaultstate_entry() cil managed"));
+        UNSCOPED_INFO("llSay called by name: " + cil.cil);
+        CHECK(has(cil.cil, "Library::'llSay'(int32, string)"));
     }
 
-    template<> template<>
-    void allslreference_object::test<2>()
+    TEST_CASE("allslreference: the grid's definitions: a post-2015 function at its number and new constants", "[allslreference]")
     {
-        set_test_name("the grid's definitions: a function newer than the 2015 table at its own number, and constants newer than the 2015 lexer");
         const std::string text = "default\n"
                                  "{\n"
                                  "    state_entry()\n"
@@ -145,20 +144,24 @@ namespace tut
                                  "    }\n"
                                  "}\n";
         const ALLSLReference::Result lso = ALLSLReference::compile(text, Target::LSO);
-        ensure("LSO: " + lso.messages, lso.ok);
-        ensure("llLinksetDataWrite is library function 650", holds(lso.image, { 0xd1, 0x02, 0x8a }));
+        UNSCOPED_INFO("LSO: " + lso.messages);
+        CHECK(lso.ok);
+        UNSCOPED_INFO("llLinksetDataWrite is library function 650");
+        CHECK(holds(lso.image, { 0xd1, 0x02, 0x8a }));
 
         const ALLSLReference::Result cil = ALLSLReference::compile(text, Target::CIL);
-        ensure("CIL: " + cil.messages, cil.ok);
-        ensure("llLinksetDataWrite: " + cil.cil, has(cil.cil, "Library::'llLinksetDataWrite'(string, string)"));
-        ensure("PRIM_GLTF_BASE_COLOR is 48: " + cil.cil, has(cil.cil, "ldc.i4 48"));
-        ensure("OBJECT_DAMAGE is 51: " + cil.cil, has(cil.cil, "ldc.i4 51"));
+        UNSCOPED_INFO("CIL: " + cil.messages);
+        CHECK(cil.ok);
+        UNSCOPED_INFO("llLinksetDataWrite: " + cil.cil);
+        CHECK(has(cil.cil, "Library::'llLinksetDataWrite'(string, string)"));
+        UNSCOPED_INFO("PRIM_GLTF_BASE_COLOR is 48: " + cil.cil);
+        CHECK(has(cil.cil, "ldc.i4 48"));
+        UNSCOPED_INFO("OBJECT_DAMAGE is 51: " + cil.cil);
+        CHECK(has(cil.cil, "ldc.i4 51"));
     }
 
-    template<> template<>
-    void allslreference_object::test<3>()
+    TEST_CASE("allslreference: the events new since 2015 compile and LSO's default state has each one's bit", "[allslreference]")
     {
-        set_test_name("the events new since 2015 compile, and LSO's default state carries each one's bit");
         const std::string text = "default\n"
                                  "{\n"
                                  "    experience_permissions(key agent) {}\n"
@@ -172,24 +175,26 @@ namespace tut
                                  "    final_damage(integer n) {}\n"
                                  "}\n";
         const ALLSLReference::Result lso = ALLSLReference::compile(text, Target::LSO);
-        ensure("LSO: " + lso.messages, lso.ok);
+        UNSCOPED_INFO("LSO: " + lso.messages);
+        REQUIRE(lso.ok);
         // Events 35 to 43, bits 34 to 42.
-        ensure_equals("their bits", reg64(lso.image, NER), (U64)0x1ff << 34);
+        UNSCOPED_INFO("their bits");
+        CHECK(reg64(lso.image, NER) == (U64)0x1ff << 34);
 
         const ALLSLReference::Result cil = ALLSLReference::compile(text, Target::CIL);
-        ensure("CIL: " + cil.messages, cil.ok);
+        UNSCOPED_INFO("CIL: " + cil.messages);
+        CHECK(cil.ok);
         for (const char* handler : { "edefaultexperience_permissions(", "edefaulttransaction_result(", "edefaultpath_update(",
                                      "edefaultexperience_permissions_denied(", "edefaultlinkset_data(", "edefaultgame_control(",
                                      "edefaulton_death(", "edefaulton_damage(", "edefaultfinal_damage(" })
         {
-            ensure(std::string(handler) + ": " + cil.cil, has(cil.cil, handler));
+            INFO(handler << ": " << cil.cil);
+            REQUIRE(has(cil.cil, handler));
         }
     }
 
-    template<> template<>
-    void allslreference_object::test<4>()
+    TEST_CASE("allslreference: globals read in functions and events and remote_data compile and free cleanly", "[allslreference]")
     {
-        set_test_name("a global read in a function and an event, and a remote_data handler, compile and free cleanly");
         const std::string text = "integer g = 1;\n"
                                  "integer f() { return g + 1; }\n"
                                  "default\n"
@@ -200,43 +205,53 @@ namespace tut
         for (Target target : { Target::LSO, Target::CIL })
         {
             const ALLSLReference::Result r = ALLSLReference::compile(text, target);
-            ensure("compiles: " + r.messages, r.ok);
+            UNSCOPED_INFO("compiles: " + r.messages);
+            REQUIRE(r.ok);
         }
     }
 
-    template<> template<>
-    void allslreference_object::test<5>()
+    TEST_CASE("allslreference: LL's compiler rejects bad syntax and on LSO a list or unset global in a list", "[allslreference]")
     {
-        set_test_name("what LL's compiler rejects: a syntax error; and, building LSO's image alone, a list or an unset global in a global's list");
         const ALLSLReference::Result syntax = ALLSLReference::compile("default { state_entry() { integer = 1; } }\n", Target::LSO);
-        ensure("a syntax error: " + syntax.messages, !syntax.ok && has(syntax.messages, "ERROR : Syntax error"));
+        {
+            INFO("a syntax error: " + syntax.messages);
+            CHECK_FALSE(syntax.ok);
+            CHECK(has(syntax.messages, "ERROR : Syntax error"));
+        }
 
         // A global list's elements are checked as LSO's image lays them out
         // (LSCP_LIST_BUILD_SIMPLE), a pass the CIL never runs.
         const std::string nested = "list a = [1];\nlist b = [a];\ndefault { state_entry() { llOwnerSay((string)b); } }\n";
         const ALLSLReference::Result nested_lso = ALLSLReference::compile(nested, Target::LSO);
-        ensure("LSO rejects a list in a global's list: " + nested_lso.messages,
-               !nested_lso.ok && has(nested_lso.messages, "Lists can't be included in lists"));
+        {
+            INFO("LSO rejects a list in a global's list: " + nested_lso.messages);
+            CHECK_FALSE(nested_lso.ok);
+            CHECK(has(nested_lso.messages, "Lists can't be included in lists"));
+        }
         const ALLSLReference::Result nested_cil = ALLSLReference::compile(nested, Target::CIL);
-        ensure("CIL takes it: " + nested_cil.messages, nested_cil.ok);
+        UNSCOPED_INFO("CIL takes it: " + nested_cil.messages);
+        CHECK(nested_cil.ok);
 
         const std::string unset = "string s;\nlist l = [s];\ndefault { state_entry() { llOwnerSay((string)l); } }\n";
         const ALLSLReference::Result unset_lso = ALLSLReference::compile(unset, Target::LSO);
-        ensure("LSO rejects an unset global in a global's list: " + unset_lso.messages,
-               !unset_lso.ok && has(unset_lso.messages, "Unitialized variables can't be included in lists"));
+        {
+            INFO("LSO rejects an unset global in a global's list: " + unset_lso.messages);
+            CHECK_FALSE(unset_lso.ok);
+            CHECK(has(unset_lso.messages, "Unitialized variables can't be included in lists"));
+        }
         const ALLSLReference::Result unset_cil = ALLSLReference::compile(unset, Target::CIL);
-        ensure("CIL takes it: " + unset_cil.messages, unset_cil.ok);
+        UNSCOPED_INFO("CIL takes it: " + unset_cil.messages);
+        CHECK(unset_cil.ok);
     }
 
-    template<> template<>
-    void allslreference_object::test<6>()
+    TEST_CASE("allslreference: LL's VM runs compiled state_entry code with a stand-in answering llSay", "[allslreference]")
     {
-        set_test_name("LL's VM runs a compiled image's state_entry, a global, a function and a cast in it, its library call answered by a stand-in");
         const std::string text = "integer g = 6;\n"
                                  "integer twice(integer n) { return n * 2; }\n"
                                  "default { state_entry() { llSay(0, (string)(twice(g) * 3 + 6)); } }\n";
         const ALLSLReference::Result lso = ALLSLReference::compile(text, Target::LSO);
-        ensure("LSO: " + lso.messages, lso.ok);
+        UNSCOPED_INFO("LSO: " + lso.messages);
+        REQUIRE(lso.ok);
 
         // llSay is function 23: heard here for the run, as it was after.
         gSaid.clear();
@@ -251,9 +266,9 @@ namespace tut
                 vm.runQuanta(FALSE, LLUUID::null, &error, 1.f, events, timer);
             }
         }
-        ensure("no fault: " + std::string(error ? error : ""), !error);
-        ensure_equals("one handler run", events, (U32)1);
-        ensure_equals("said once", gSaid.size(), (size_t)1);
-        ensure_equals("what it worked out", gSaid[0], std::string("42"));
+        CHECK_FALSE(error);
+        CHECK(events == (U32)1);
+        REQUIRE(gSaid.size() == (size_t)1);
+        CHECK(gSaid[0] == std::string("42"));
     }
 }

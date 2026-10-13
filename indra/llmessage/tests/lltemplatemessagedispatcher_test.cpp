@@ -1,6 +1,6 @@
 /**
- * @file lltrustedmessageservice_test.cpp
- * @brief LLTrustedMessageService unit tests
+ * @file lltemplatemessagedispatcher_test.cpp
+ * @brief LLTemplateMessageDispatcher unit tests
  *
  * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -25,7 +25,8 @@
  */
 
 #include "lltemplatemessagedispatcher.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <string_view>
 
 #include "llhttpnode.h"
 #include "llhost.h"
@@ -78,8 +79,45 @@ const LLHost& LLMessageSystem::getSender() const
     return host;
 }
 
-namespace tut
+// The rest of the reader, which this binary does not link, so the dispatcher
+// can be given a real one. The dispatcher calls none of it.
+LLMessageReader::~LLMessageReader() {}
+LLTemplateMessageReader::LLTemplateMessageReader(message_template_number_map_t& number_template_map) :
+    mReceiveSize(0),
+    mCurrentRMessageTemplate(nullptr),
+    mCurrentRMessageData(nullptr),
+    mMessageNumbers(number_template_map)
 {
+}
+LLTemplateMessageReader::~LLTemplateMessageReader() {}
+void LLTemplateMessageReader::getBinaryData(const char*, const char*, void*, S32, S32, S32) {}
+void LLTemplateMessageReader::getBOOL(const char*, const char*, bool&, S32) {}
+void LLTemplateMessageReader::getS8(const char*, const char*, S8&, S32) {}
+void LLTemplateMessageReader::getU8(const char*, const char*, U8&, S32) {}
+void LLTemplateMessageReader::getS16(const char*, const char*, S16&, S32) {}
+void LLTemplateMessageReader::getU16(const char*, const char*, U16&, S32) {}
+void LLTemplateMessageReader::getS32(const char*, const char*, S32&, S32) {}
+void LLTemplateMessageReader::getF32(const char*, const char*, F32&, S32) {}
+void LLTemplateMessageReader::getU32(const char*, const char*, U32&, S32) {}
+void LLTemplateMessageReader::getU64(const char*, const char*, U64&, S32) {}
+void LLTemplateMessageReader::getF64(const char*, const char*, F64&, S32) {}
+void LLTemplateMessageReader::getVector3(const char*, const char*, LLVector3&, S32) {}
+void LLTemplateMessageReader::getVector4(const char*, const char*, LLVector4&, S32) {}
+void LLTemplateMessageReader::getVector3d(const char*, const char*, LLVector3d&, S32) {}
+void LLTemplateMessageReader::getQuat(const char*, const char*, LLQuaternion&, S32) {}
+void LLTemplateMessageReader::getUUID(const char*, const char*, LLUUID&, S32) {}
+void LLTemplateMessageReader::getIPAddr(const char*, const char*, U32&, S32) {}
+void LLTemplateMessageReader::getIPPort(const char*, const char*, U16&, S32) {}
+void LLTemplateMessageReader::getString(const char*, const char*, S32, char*, S32) {}
+void LLTemplateMessageReader::getString(const char*, const char*, std::string&, S32) {}
+S32 LLTemplateMessageReader::getNumberOfBlocks(const char*) { return 0; }
+S32 LLTemplateMessageReader::getSize(const char*, const char*) { return 0; }
+S32 LLTemplateMessageReader::getSize(const char*, S32, const char*) { return 0; }
+void LLTemplateMessageReader::clearMessage() {}
+const char* LLTemplateMessageReader::getMessageName() const { return ""; }
+S32 LLTemplateMessageReader::getMessageSize() const { return 0; }
+void LLTemplateMessageReader::copyToBuilder(LLMessageBuilder&) const {}
+
 namespace
 {
         static LLTemplateMessageReader::message_template_number_map_t numberMap;
@@ -92,77 +130,60 @@ namespace
                 gUdpDispatchWasCalled = false;
                 gClearRecvWasCalled = false;
                 gValidateMessage = false;
+                gUdpDispatchedData[0] = '\0';
                 mMessage["body"]["binary-template-data"] = std::vector<U8>();
             }
 
+            LLTemplateMessageReader mReader{numberMap};
             LLSD mMessage;
             LLHTTPNode::ResponsePtr mResponsePtr;
             std::string mMessageName;
         };
 
-    typedef test_group<LLTemplateMessageDispatcherData> factory;
-    typedef factory::object object;
-}
 }
 
 namespace
 {
-    tut::factory tf("LLTemplateMessageDispatcher");
-}
-
-namespace tut
-{
-    // does an empty message stop processing?
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(LLTemplateMessageDispatcherData, "LLTemplateMessageDispatcher: an empty message stops processing", "[LLTemplateMessageDispatcher]")
     {
-        LLTemplateMessageReader* pReader = NULL;
-        LLTemplateMessageDispatcher t(*pReader);
+        LLTemplateMessageDispatcher t(mReader);
         t.dispatch(mMessageName, mMessage, mResponsePtr);
-        ensure(! gUdpDispatchWasCalled);
-        ensure(! gClearRecvWasCalled);
+        CHECK_FALSE(gUdpDispatchWasCalled);
+        CHECK_FALSE(gClearRecvWasCalled);
     }
 
-    // does the disaptch invoke the udp send method?
-    template<> template<>
-    void object::test<2>()
+    // does dispatch hand a message that validates to the reader?
+    TEST_CASE_METHOD(LLTemplateMessageDispatcherData, "LLTemplateMessageDispatcher: dispatch hands a valid message to the reader", "[LLTemplateMessageDispatcher]")
     {
-        LLTemplateMessageReader* pReader = NULL;
-        LLTemplateMessageDispatcher t(*pReader);
+        LLTemplateMessageDispatcher t(mReader);
         gValidateMessage = true;
         std::vector<U8> vector_data;
         fillVector(vector_data, gBinaryTemplateData);
         mMessage["body"]["binary-template-data"] = vector_data;
         t.dispatch(mMessageName, mMessage, mResponsePtr);
-        ensure("udp dispatch was called", gUdpDispatchWasCalled);
+        CHECK(gUdpDispatchWasCalled);
     }
 
-    // what if the message wasn't valid? We would hope the message gets cleared!
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE_METHOD(LLTemplateMessageDispatcherData, "LLTemplateMessageDispatcher: an invalid message gets cleared", "[LLTemplateMessageDispatcher]")
     {
-        LLTemplateMessageReader* pReader = NULL;
-        LLTemplateMessageDispatcher t(*pReader);
+        LLTemplateMessageDispatcher t(mReader);
         std::vector<U8> vector_data;
         fillVector(vector_data, gBinaryTemplateData);
         mMessage["body"]["binary-template-data"] = vector_data;
         gValidateMessage = false;
         t.dispatch(mMessageName, mMessage, mResponsePtr);
-        ensure("clear received message was called", gClearRecvWasCalled);
+        CHECK(gClearRecvWasCalled);
     }
 
-    // is the binary data passed through correctly?
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE_METHOD(LLTemplateMessageDispatcherData, "LLTemplateMessageDispatcher: the binary data passes through unchanged", "[LLTemplateMessageDispatcher]")
     {
-        LLTemplateMessageReader* pReader = NULL;
-        LLTemplateMessageDispatcher t(*pReader);
+        LLTemplateMessageDispatcher t(mReader);
         gValidateMessage = true;
         std::vector<U8> vector_data;
         fillVector(vector_data, gBinaryTemplateData);
         mMessage["body"]["binary-template-data"] = vector_data;
         t.dispatch(mMessageName, mMessage, mResponsePtr);
-        ensure("data couriered correctly", strcmp(gBinaryTemplateData, gUdpDispatchedData) == 0);
+        CHECK(std::string_view(gBinaryTemplateData) == std::string_view(gUdpDispatchedData));
     }
 }
 

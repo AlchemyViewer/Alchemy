@@ -32,16 +32,14 @@
 
 #include "llheadlessgl_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <type_traits>
 #include <vector>
 
-namespace tut
+namespace
 {
-    namespace
-    {
         constexpr U32 SIZE = 4;
 
         // A triangle over the viewport.
@@ -102,12 +100,13 @@ namespace tut
 
         // Every texel of `texels` is `expected`.
         template <typename T>
-        void ensureEvery(const std::string& what, const std::vector<T>& texels, const T (&expected)[4])
+        void require_every(const std::string& what, const std::vector<T>& texels, const T (&expected)[4])
         {
+            INFO(what);
             for (size_t i = 0; i < texels.size(); ++i)
             {
-                ensure_equals(what + ", texel " + std::to_string(i / 4) + " channel " + std::to_string(i % 4), texels[i],
-                              expected[i % 4]);
+                INFO("texel " << i / 4 << " channel " << i % 4);
+                REQUIRE(texels[i] == expected[i % 4]);
             }
         }
 
@@ -143,11 +142,15 @@ namespace tut
         }
 
         // The integer program, linked.
-        GLuint linkInteger()
+        GLuint require_integer_program()
         {
             const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kVertex);
             const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kIntegerFragment);
-            ensure("integer shaders compile", vs && fs);
+            {
+                INFO("integer shaders compile");
+                REQUIRE(vs);
+                REQUIRE(fs);
+            }
             const GLuint program = glCreateProgram();
             glAttachShader(program, vs);
             glAttachShader(program, fs);
@@ -156,7 +159,7 @@ namespace tut
             glDeleteShader(fs);
             GLint linked = GL_FALSE;
             glGetProgramiv(program, GL_LINK_STATUS, &linked);
-            ensure("integer program links", linked == GL_TRUE);
+            REQUIRE(linked == GL_TRUE);
             return program;
         }
 
@@ -164,7 +167,11 @@ namespace tut
         {
             const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kVertex);
             const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kFragment);
-            ensure("shaders compile", vs && fs);
+            {
+                INFO("shaders compile");
+                REQUIRE(vs);
+                REQUIRE(fs);
+            }
             mProgram = glCreateProgram();
             glAttachShader(mProgram, vs);
             glAttachShader(mProgram, fs);
@@ -173,10 +180,10 @@ namespace tut
             glDeleteShader(fs);
             GLint linked = GL_FALSE;
             glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
-            ensure("program links", linked == GL_TRUE);
+            REQUIRE(linked == GL_TRUE);
             glGenVertexArrays(1, &mVAO);
 
-            ensure("target allocates", mTarget.allocate(SIZE, SIZE, GL_RGBA8));
+            REQUIRE(mTarget.allocate(SIZE, SIZE, GL_RGBA8));
         }
 
         // What the target holds after the triangle draws into it, its draw buffers set to output `output`, or left as
@@ -214,66 +221,65 @@ namespace tut
         GLuint mIntegerProgram = 0;
     };
 
-    typedef test_group<llrendertarget_data> llrendertarget_t;
-    typedef llrendertarget_t::object llrendertarget_object_t;
-    tut::llrendertarget_t tut_llrendertarget("llrendertarget_gl");
-    }
 
     // setDrawOutput: a single-attachment target takes the output it names and none of the others, and the next
     // bindTarget gives it output 0 again.
-    template<> template<>
-    void llrendertarget_object_t::test<1>()
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: setDrawOutput sends the named output to a single-attachment target", "[llrendertarget_gl]")
     {
         setUp();
-        ensure_equals("bound: output 0", drawn(-1), OUTPUT_COLOURS[0]);
+        UNSCOPED_INFO("bound: output 0");
+        CHECK(drawn(-1) == OUTPUT_COLOURS[0]);
         for (S32 output = 0; output < 4; ++output)
         {
-            ensure_equals("output " + std::to_string(output), drawn(output), OUTPUT_COLOURS[output]);
+            CAPTURE(output);
+            REQUIRE(drawn(output) == OUTPUT_COLOURS[output]);
         }
-        ensure_equals("rebound: output 0 again", drawn(-1), OUTPUT_COLOURS[0]);
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        UNSCOPED_INFO("rebound: output 0 again");
+        CHECK(drawn(-1) == OUTPUT_COLOURS[0]);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
     // Integer attachments: R32UI, RG16I and RGBA32UI allocate as themselves beside a depth buffer. clear takes each to
     // the clear colour rounded to integers -- an unsigned one held at 0 below and at its top above -- and leaves them
     // alone when only the depth is asked for; a program's integer outputs reach them exactly.
-    template<> template<>
-    void llrendertarget_object_t::test<2>()
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: integer attachments keep their formats through clear and draw", "[llrendertarget_gl]")
     {
-        mIntegerProgram = linkInteger();
+        mIntegerProgram = require_integer_program();
         glGenVertexArrays(1, &mVAO);
-        ensure("R32UI target allocates", mInteger.allocate(INT_W, INT_H, GL_R32UI, /*depth=*/true));
-        ensure("RG16I attaches", mInteger.addColorAttachment(GL_RG16I));
-        ensure("RGBA32UI attaches", mInteger.addColorAttachment(GL_RGBA32UI));
+        REQUIRE(mInteger.allocate(INT_W, INT_H, GL_R32UI, /*depth=*/true));
+        CHECK(mInteger.addColorAttachment(GL_RG16I));
+        CHECK(mInteger.addColorAttachment(GL_RGBA32UI));
 
         const GLenum formats[] = { GL_R32UI, GL_RG16I, GL_RGBA32UI };
         for (U32 attachment = 0; attachment < 3; ++attachment)
         {
-            ensure_equals("attachment " + std::to_string(attachment) + " recorded", mInteger.getInternalFormat(attachment),
-                          (U32)formats[attachment]);
+            CAPTURE(attachment);
+            UNSCOPED_INFO("the target's record");
+            REQUIRE(mInteger.getInternalFormat(attachment) == (U32)formats[attachment]);
             gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mInteger.getTexture(attachment));
             GLint format = 0;
             glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
-            ensure_equals("attachment " + std::to_string(attachment) + " storage", (U32)format, (U32)formats[attachment]);
+            UNSCOPED_INFO("the texture's storage");
+            REQUIRE((U32)format == (U32)formats[attachment]);
         }
         gGL.getTextureSlot(0)->unbind();
 
         mInteger.bindTarget();
-        ensure_equals("complete", (U32)glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER), (U32)GL_FRAMEBUFFER_COMPLETE);
+        CHECK((U32)glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == (U32)GL_FRAMEBUFFER_COMPLETE);
 
         gGL.setClearColor(LLColor4(7.f, 9.f, 11.f, 13.f));
         mInteger.clear();
-        ensureEvery<U32>("R32UI cleared", readInteger<U32>(0), { 7u, 0u, 0u, 1u });
-        ensureEvery<S32>("RG16I cleared", readInteger<S32>(1), { 7, 9, 0, 1 });
-        ensureEvery<U32>("RGBA32UI cleared", readInteger<U32>(2), { 7u, 9u, 11u, 13u });
+        require_every<U32>("R32UI cleared", readInteger<U32>(0), { 7u, 0u, 0u, 1u });
+        require_every<S32>("RG16I cleared", readInteger<S32>(1), { 7, 9, 0, 1 });
+        require_every<U32>("RGBA32UI cleared", readInteger<U32>(2), { 7u, 9u, 11u, 13u });
 
         gGL.setClearColor(LLColor4(-5.4f, -6.6f, 1.e10f, 0.4f));
         mInteger.clear(GL_DEPTH_BUFFER_BIT);
-        ensureEvery<U32>("R32UI left alone by a depth clear", readInteger<U32>(0), { 7u, 0u, 0u, 1u });
+        require_every<U32>("R32UI left alone by a depth clear", readInteger<U32>(0), { 7u, 0u, 0u, 1u });
         mInteger.clear();
-        ensureEvery<U32>("R32UI held at 0", readInteger<U32>(0), { 0u, 0u, 0u, 1u });
-        ensureEvery<S32>("RG16I below 0", readInteger<S32>(1), { -5, -7, 0, 1 });
-        ensureEvery<U32>("RGBA32UI held at its top", readInteger<U32>(2), { 0u, 0u, 0xFFFFFFFFu, 0u });
+        require_every<U32>("R32UI held at 0", readInteger<U32>(0), { 0u, 0u, 0u, 1u });
+        require_every<S32>("RG16I below 0", readInteger<S32>(1), { -5, -7, 0, 1 });
+        require_every<U32>("RGBA32UI held at its top", readInteger<U32>(2), { 0u, 0u, 0xFFFFFFFFu, 0u });
 
         LLGLDisable depth_test(GL_DEPTH_TEST);
         glUseProgram(mIntegerProgram);
@@ -290,27 +296,33 @@ namespace tut
         {
             for (U32 x = 0; x < INT_W; ++x)
             {
-                const std::string at = " at " + std::to_string(x) + "," + std::to_string(y);
+                CAPTURE(x, y);
                 const size_t i = ((size_t)y * INT_W + x) * 4;
-                ensure_equals("R32UI drawn" + at, uints[i], 0x01000001u + y * 1000u + x);
-                ensure_equals("RG16I r drawn" + at, ints[i], -1 - (S32)x);
-                ensure_equals("RG16I g drawn" + at, ints[i + 1], (S32)y * 300 - 1000);
-                ensure_equals("RGBA32UI r drawn" + at, wide[i], x);
-                ensure_equals("RGBA32UI g drawn" + at, wide[i + 1], y);
-                ensure_equals("RGBA32UI b drawn" + at, wide[i + 2], 0xFFFFFFFFu - x);
-                ensure_equals("RGBA32UI a drawn" + at, wide[i + 3], 0x80000000u + y);
+                UNSCOPED_INFO("R32UI drawn");
+                REQUIRE(uints[i] == 0x01000001u + y * 1000u + x);
+                UNSCOPED_INFO("RG16I r drawn");
+                REQUIRE(ints[i] == -1 - (S32)x);
+                UNSCOPED_INFO("RG16I g drawn");
+                REQUIRE(ints[i + 1] == (S32)y * 300 - 1000);
+                UNSCOPED_INFO("RGBA32UI r drawn");
+                REQUIRE(wide[i] == x);
+                UNSCOPED_INFO("RGBA32UI g drawn");
+                REQUIRE(wide[i + 1] == y);
+                UNSCOPED_INFO("RGBA32UI b drawn");
+                REQUIRE(wide[i + 2] == 0xFFFFFFFFu - x);
+                UNSCOPED_INFO("RGBA32UI a drawn");
+                REQUIRE(wide[i + 3] == 0x80000000u + y);
             }
         }
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
     // A target of both kinds: clear takes the float attachment to the clear colour and the integer one to its integers,
     // and with the draw buffers narrowed to the first it clears that one alone, as it would a target of one kind.
-    template<> template<>
-    void llrendertarget_object_t::test<3>()
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: a mixed float and integer target clears each attachment as its kind", "[llrendertarget_gl]")
     {
-        ensure("RGBA8 target allocates", mMixed.allocate(INT_W, INT_H, GL_RGBA8));
-        ensure("R32UI attaches", mMixed.addColorAttachment(GL_R32UI));
+        REQUIRE(mMixed.allocate(INT_W, INT_H, GL_RGBA8));
+        CHECK(mMixed.addColorAttachment(GL_R32UI));
 
         mMixed.bindTarget();
         gGL.setClearColor(LLColor4(1.f, 0.f, 1.f, 1.f));
@@ -318,42 +330,41 @@ namespace tut
         std::vector<U8> rgba((size_t)INT_W * INT_H * 4, 0x55);
         glReadBuffer(GL_COLOR_ATTACHMENT0);
         glReadPixels(0, 0, INT_W, INT_H, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
-        ensureEvery<U8>("RGBA8 cleared", rgba, { 255, 0, 255, 255 });
-        ensureEvery<U32>("R32UI cleared", readInteger<U32>(1), { 1u, 0u, 0u, 1u });
+        require_every<U8>("RGBA8 cleared", rgba, { 255, 0, 255, 255 });
+        require_every<U32>("R32UI cleared", readInteger<U32>(1), { 1u, 0u, 0u, 1u });
 
         mMixed.setDrawBuffers(1);
         gGL.setClearColor(LLColor4::transparent);
         mMixed.clear();
         glReadPixels(0, 0, INT_W, INT_H, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
-        ensureEvery<U8>("RGBA8 cleared again", rgba, { 0, 0, 0, 0 });
-        ensureEvery<U32>("R32UI not drawn to, so left", readInteger<U32>(1), { 1u, 0u, 0u, 1u });
+        require_every<U8>("RGBA8 cleared again", rgba, { 0, 0, 0, 0 });
+        require_every<U32>("R32UI not drawn to, so left", readInteger<U32>(1), { 1u, 0u, 0u, 1u });
         mMixed.flush();
 
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
     // A texture lent by setColorAttachment answers for its format as one the target allocated does, so an integer one
     // clears to its integers; and returning it forgets the format.
-    template<> template<>
-    void llrendertarget_object_t::test<4>()
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: a texture lent by setColorAttachment has its format until returned", "[llrendertarget_gl]")
     {
         const std::vector<U32> zeros((size_t)INT_W * INT_H, 0u);
         mLentImage = new LLImageGL(INT_W, INT_H, 1, /*usemipmaps=*/false);
         mLentImage->setExplicitFormat(GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT);
-        ensure("R32UI image created", mLentImage->createGLTexture(0, reinterpret_cast<const U8*>(zeros.data())));
+        CHECK(mLentImage->createGLTexture(0, reinterpret_cast<const U8*>(zeros.data())));
 
         LLRenderTarget::sUseFBO = true;
         mLent.setColorAttachment(mLentImage.get());
-        ensure_equals("the lent texture's format", mLent.getInternalFormat(0), (U32)GL_R32UI);
+        CHECK(mLent.getInternalFormat(0) == (U32)GL_R32UI);
 
         mLent.bindTarget();
         gGL.setClearColor(LLColor4(5.f, 6.f, 7.f, 8.f));
         mLent.clear();
-        ensureEvery<U32>("R32UI cleared to its integers", readInteger<U32>(0), { 5u, 0u, 0u, 1u });
+        require_every<U32>("R32UI cleared to its integers", readInteger<U32>(0), { 5u, 0u, 0u, 1u });
         mLent.flush();
 
         mLent.releaseColorAttachment();
-        ensure_equals("returned, its format forgotten", mLent.getInternalFormat(0), 0u);
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        CHECK(mLent.getInternalFormat(0) == 0u);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 }

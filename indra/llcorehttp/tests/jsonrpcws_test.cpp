@@ -1,10 +1,11 @@
 /**
- * @file test_jsonrpcws.hpp
+ * @file jsonrpcws_test.cpp
  * @brief unit tests for LLJSONRPCConnection helpers and dispatch behavior
  */
 
-#ifndef TEST_LLCORE_JSONRPCWS_H_
-#define TEST_LLCORE_JSONRPCWS_H_
+#include "linden_common.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 #include "lljsonrpcws.h"
 #include "lltimer.h"
@@ -28,52 +29,32 @@ public:
 };
 }
 
-namespace tut
-{
 namespace
 {
-    struct JSONRPCWSTestData
+    TEST_CASE("LLJSONRPCConnection Tests: makeEnvelope notification omits id", "[LLJSONRPCConnection_Tests]")
     {
-    };
-
-    typedef test_group<JSONRPCWSTestData> JSONRPCWSTestGroupType;
-    typedef JSONRPCWSTestGroupType::object JSONRPCWSTestObjectType;
-    JSONRPCWSTestGroupType JSONRPCWSTestGroup("LLJSONRPCConnection Tests");
-}
-
-    template<> template<>
-    void JSONRPCWSTestObjectType::test<1>()
-    {
-        set_test_name("makeEnvelope notification omits id");
-
         LLSD params;
         params["value"] = 42;
         LLSD env = LLJSONRPCConnection::makeEnvelope(LLSD(), "runtime.debug", params, LLSD(), LLSD());
 
-        ensure("jsonrpc field should exist", env.has("jsonrpc"));
-        ensure_equals("jsonrpc version", env["jsonrpc"].asString(), "2.0");
-        ensure("notification should omit id", !env.has("id"));
-        ensure_equals("method", env["method"].asString(), "runtime.debug");
-        ensure_equals("param round trip", env["params"]["value"].asInteger(), 42);
+        CHECK(env.has("jsonrpc"));
+        CHECK(env["jsonrpc"].asString() == "2.0");
+        CHECK_FALSE(env.has("id"));
+        CHECK(env["method"].asString() == "runtime.debug");
+        CHECK(env["params"]["value"].asInteger() == 42);
     }
 
-    template<> template<>
-    void JSONRPCWSTestObjectType::test<2>()
+    TEST_CASE("LLJSONRPCConnection Tests: makeEnvelope response keeps id slot", "[LLJSONRPCConnection_Tests]")
     {
-        set_test_name("makeEnvelope response keeps id slot");
-
         LLSD env = LLJSONRPCConnection::makeEnvelope(LLSD(), std::string(), LLSD(), LLSD("ok"), LLSD());
 
-        ensure("response should include id", env.has("id"));
-        ensure("response should not include method", !env.has("method"));
-        ensure_equals("result", env["result"].asString(), "ok");
+        CHECK(env.has("id"));
+        CHECK_FALSE(env.has("method"));
+        CHECK(env["result"].asString() == "ok");
     }
 
-    template<> template<>
-    void JSONRPCWSTestObjectType::test<3>()
+    TEST_CASE("LLJSONRPCConnection Tests: validateMessage accepts valid request and rejects invalid params", "[LLJSONRPCConnection_Tests]")
     {
-        set_test_name("validateMessage accepts valid request and rejects invalid params");
-
         TestJSONRPCConnection conn;
 
         LLSD valid;
@@ -82,18 +63,15 @@ namespace
         LLSD params = LLSD::emptyMap();
         params["timestamp"] = 123;
         valid["params"] = params;
-        ensure("valid request should pass", conn.validateMessage(valid, true));
+        CHECK(conn.validateMessage(valid, true));
 
         LLSD invalid = valid;
         invalid["params"] = "not-an-array-or-object";
-        ensure("invalid params type should fail", !conn.validateMessage(invalid, true));
+        CHECK_FALSE(conn.validateMessage(invalid, true));
     }
 
-    template<> template<>
-    void JSONRPCWSTestObjectType::test<4>()
+    TEST_CASE("LLJSONRPCConnection Tests: processMessage dispatches a notification to its handler", "[LLJSONRPCConnection_Tests]")
     {
-        set_test_name("processMessage dispatches notification handler");
-
         TestJSONRPCConnection conn;
 
         bool called = false;
@@ -103,7 +81,7 @@ namespace
             [&](const std::string& method, const LLSD& id, const LLSD& params) -> LLSD
             {
                 called = true;
-                ensure_equals("method propagated", method, "runtime.debug");
+                REQUIRE(method == "runtime.debug");
                 seen_id = id;
                 seen_params = params;
                 return LLSD();
@@ -114,16 +92,13 @@ namespace
         LLSD notification = LLJSONRPCConnection::makeEnvelope(LLSD(), "runtime.debug", params, LLSD(), LLSD());
         conn.processMessage(notification);
 
-        ensure("handler should be called", called);
-        ensure("notification id should be undefined", seen_id.isUndefined());
-        ensure_equals("payload should be forwarded", seen_params["message"].asString(), "hello");
+        CHECK(called);
+        CHECK(seen_id.isUndefined());
+        CHECK(seen_params["message"].asString() == "hello");
     }
 
-    template<> template<>
-    void JSONRPCWSTestObjectType::test<5>()
+    TEST_CASE("LLJSONRPCConnection Tests: sweepTimeouts expires overdue callbacks", "[LLJSONRPCConnection_Tests]")
     {
-        set_test_name("sweepTimeouts expires overdue callbacks");
-
         TestJSONRPCConnection conn;
 
         bool callback_called = false;
@@ -133,26 +108,22 @@ namespace
             [&](const LLSD& result, const LLSD& error)
             {
                 callback_called = true;
-                ensure("timed out result should be undefined", result.isUndefined());
-                ensure_equals(
-                    "timeout code",
-                    error["code"].asInteger(),
+                REQUIRE(result.isUndefined());
+                REQUIRE(error["code"].asInteger() ==
                     LLJSONRPCConnection::RPCError::REQUEST_TIMEOUT);
             });
 
-        ensure_equals("pending request should be tracked", conn.testPendingRequestCount(), (size_t)1);
+        CHECK(conn.testPendingRequestCount() == (size_t)1);
         conn.testSweepTimeouts();
-        ensure("timeout callback should be called", callback_called);
-        ensure_equals("pending request should be removed", conn.testPendingRequestCount(), (size_t)0);
+        CHECK(callback_called);
+        CHECK(conn.testPendingRequestCount() == (size_t)0);
     }
 
-    template<> template<>
-    void JSONRPCWSTestObjectType::test<6>()
+    TEST_CASE("LLJSONRPCConnection Tests: an unauthenticated connection dispatches nothing until authenticated", "[LLJSONRPCConnection_Tests]")
     {
-        set_test_name("a connection not yet authenticated dispatches nothing, and everything once it is");
-
         TestJSONRPCConnection conn;
-        ensure("authenticated unless it says otherwise", conn.isAuthenticated());
+        UNSCOPED_INFO("authenticated by default");
+        CHECK(conn.isAuthenticated());
 
         int calls = 0;
         conn.registerMethod("object.list",
@@ -163,23 +134,20 @@ namespace
             });
 
         conn.setAuthenticated(false);
-        ensure("not authenticated", !conn.isAuthenticated());
+        CHECK_FALSE(conn.isAuthenticated());
         const LLSD request = LLJSONRPCConnection::makeEnvelope(LLSD("req_1"), "object.list", LLSD::emptyMap(), LLSD(), LLSD());
         conn.processMessage(request);
         const LLSD notification = LLJSONRPCConnection::makeEnvelope(LLSD(), "object.list", LLSD::emptyMap(), LLSD(), LLSD());
         conn.processMessage(notification);
-        ensure_equals("neither a request nor a notification reaches the handler", calls, 0);
+        CHECK(calls == 0);
 
         conn.setAuthenticated(true);
         conn.processMessage(request);
-        ensure_equals("dispatched once authenticated", calls, 1);
+        CHECK(calls == 1);
     }
 
-    template<> template<>
-    void JSONRPCWSTestObjectType::test<7>()
+    TEST_CASE("LLJSONRPCConnection Tests: an unauthenticated connection still takes answers to its own calls", "[LLJSONRPCConnection_Tests]")
     {
-        set_test_name("a connection not yet authenticated still takes the answers to its own calls");
-
         TestJSONRPCConnection conn;
         conn.setAuthenticated(false);
 
@@ -189,22 +157,19 @@ namespace
             LLTimer::getTotalSeconds() + 60.0,
             [&](const LLSD& result, const LLSD& error)
             {
-                ensure("no error", error.isUndefined());
+                REQUIRE(error.isUndefined());
                 answer = result;
             });
 
         LLSD result;
         result["challenge_response"] = "secret";
         conn.processMessage(LLJSONRPCConnection::makeEnvelope(LLSD("rpc_1"), std::string(), LLSD(), result, LLSD()));
-        ensure_equals("the answer reached the caller", answer["challenge_response"].asString(), std::string("secret"));
-        ensure("and it is answered", conn.testPendingRequestCount() == 0);
+        CHECK(answer["challenge_response"].asString() == std::string("secret"));
+        CHECK(conn.testPendingRequestCount() == 0);
     }
 
-    template<> template<>
-    void JSONRPCWSTestObjectType::test<8>()
+    TEST_CASE("LLJSONRPCConnection Tests: a closed connection tells its waiting calls and refuses new ones", "[LLJSONRPCConnection_Tests]")
     {
-        set_test_name("a closed connection tells whatever waits on it, and takes no call that would wait for good");
-
         TestJSONRPCConnection conn;
         LLSD told;
         conn.testInjectPendingRequest(
@@ -213,16 +178,16 @@ namespace
             [&](const LLSD&, const LLSD& error) { told = error; });
 
         conn.onClose();
-        ensure("closed", conn.isClosed());
-        ensure_equals("the waiting call told it closed", told["code"].asInteger(), LLJSONRPCConnection::RPCError::CONNECTION_CLOSED);
+        CHECK(conn.isClosed());
+        CHECK(told["code"].asInteger() == LLJSONRPCConnection::RPCError::CONNECTION_CLOSED);
 
         bool called = false;
         const LLSD id = conn.call("session.handshake", LLSD(), [&](const LLSD&, const LLSD&) { called = true; }, 30.0);
-        ensure("not sent", id.isUndefined());
-        ensure_equals("and nothing waiting", conn.testPendingRequestCount(), (size_t)0);
+        UNSCOPED_INFO("the call was not sent");
+        CHECK(id.isUndefined());
+        CHECK(conn.testPendingRequestCount() == (size_t)0);
         conn.testSweepTimeouts();
-        ensure("so nothing is ever told", !called);
+        UNSCOPED_INFO("a refused call is never told");
+        CHECK_FALSE(called);
     }
 }
-
-#endif

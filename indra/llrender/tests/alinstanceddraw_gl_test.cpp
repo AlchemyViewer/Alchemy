@@ -33,12 +33,10 @@
 
 #include "llheadlessgl_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
-    namespace
-    {
         constexpr S32 W = 16;
         constexpr S32 H = 16;
 
@@ -96,18 +94,24 @@ namespace tut
         {
             const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kGridVertex);
             const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kGridFragment);
-            ensure("grid shaders compile", vs && fs);
+            {
+                INFO("grid shaders compile");
+                REQUIRE(vs);
+                REQUIRE(fs);
+            }
             mProgram.mProgramObject = glCreateProgram();
             mProgram.mName = "attribute-less grid (test)";
             mProgram.attachObject(vs);
             mProgram.attachObject(fs);
-            ensure("grid program links", mProgram.mapAttributes());
+            UNSCOPED_INFO("grid program links");
+            REQUIRE(mProgram.mapAttributes());
             glDeleteShader(vs);
             glDeleteShader(fs);
-            ensure("grid program maps", mProgram.mapUniforms());
-            ensure_equals("the grid program has no vertex inputs", mProgram.mAttributeMask, 0U);
+            REQUIRE(mProgram.mapUniforms());
+            UNSCOPED_INFO("the grid program has no vertex inputs");
+            REQUIRE(mProgram.mAttributeMask == 0U);
 
-            ensure("target allocates", mTarget.allocate(W, H, GL_RGBA8));
+            REQUIRE(mTarget.allocate(W, H, GL_RGBA8));
             mTarget.bindTarget();
             gGL.setClearColor(LLColor4::black);
             mTarget.clear();
@@ -148,36 +152,33 @@ namespace tut
         LLRenderTarget         mTarget;
     };
 
-    typedef test_group<alinstanceddraw_data> alinstanceddraw_t;
-    typedef alinstanceddraw_t::object alinstanceddraw_object_t;
-    tut::alinstanceddraw_t tut_alinstanceddraw("alinstanceddraw_gl");
-    }
 
     // Three instances of a four-vertex strip cover the first three cells of the bottom row and nothing else.
-    template<> template<>
-    void alinstanceddraw_object_t::test<1>()
+    TEST_CASE_METHOD(alinstanceddraw_data, "alinstanceddraw_gl: three instanced strips cover the bottom row's first three cells only", "[alinstanceddraw_gl]")
     {
         setUp();
         gGL.loadMatrix(grid(0.f));
         gGL.drawArraysInstanced(LLRender::TRIANGLE_STRIP, 0, 4, 3);
-        ensure_equals("cells covered", covered(), 0x7U);
+        CHECK(covered() == 0x7U);
     }
 
     // The draw syncs the matrices: a projection loaded after one draw places the next. The raw draw, which does not
     // sync, still places it by the projection the first draw left in the block.
-    template<> template<>
-    void alinstanceddraw_object_t::test<2>()
+    TEST_CASE_METHOD(alinstanceddraw_data, "alinstanceddraw_gl: drawArraysInstanced syncs the matrices and a raw draw does not", "[alinstanceddraw_gl]")
     {
         setUp();
         gGL.loadMatrix(grid(0.f));
         gGL.drawArraysInstanced(LLRender::TRIANGLE_STRIP, 0, 4, 1);
-        ensure_equals("first draw on the bottom row", covered(), 0x1U);
+        UNSCOPED_INFO("first draw on the bottom row");
+        CHECK(covered() == 0x1U);
 
         gGL.loadMatrix(grid(2.f));
         glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, 2);
-        ensure_equals("the raw draw lands where the last synced projection put it", covered(), 0x3U);
+        UNSCOPED_INFO("the raw draw lands where the last synced projection put it");
+        CHECK(covered() == 0x3U);
 
         gGL.drawArraysInstanced(LLRender::TRIANGLE_STRIP, 0, 4, 2);
-        ensure_equals("the synced draw lands on the third row", covered(), 0x3U | 0x300U);
+        UNSCOPED_INFO("the synced draw lands on the third row");
+        CHECK(covered() == (0x3U | 0x300U));
     }
 }

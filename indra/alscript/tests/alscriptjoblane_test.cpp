@@ -26,7 +26,7 @@
 
 #include "../preprocessor/alscriptjoblane.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <stdexcept>
 #include <vector>
@@ -43,7 +43,7 @@ namespace
     typedef ALScriptJobLane<FakeJob> Lane;
 }
 
-namespace tut
+namespace
 {
     struct alscriptjoblane_data
     {
@@ -71,55 +71,72 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptjoblane_data> alscriptjoblane_group;
-    typedef alscriptjoblane_group::object    alscriptjoblane_object;
-    alscriptjoblane_group                    alscriptjoblane_instance("alscriptjoblane");
-
-    template<> template<>
-    void alscriptjoblane_object::test<1>()
+    TEST_CASE_METHOD(alscriptjoblane_data, "alscriptjoblane: runs go before checks in order and the worker starts once per drain", "[alscriptjoblane]")
     {
-        set_test_name("runs before checks, each in the order put in; the worker started once while it drains");
-        ensure("the first starts the worker", lane.put(queued("check a", "a", true), take));
-        ensure("the rest do not", !lane.put(queued("run b", "b", false), take) && !lane.put(queued("check c", "c", true), take) &&
-                                      !lane.put(queued("run d", "d", false), take));
+        UNSCOPED_INFO("the first starts the worker");
+        CHECK(lane.put(queued("check a", "a", true), take));
+        {
+            INFO("the rest do not");
+            CHECK_FALSE(lane.put(queued("run b", "b", false), take));
+            CHECK_FALSE(lane.put(queued("check c", "c", true), take));
+            CHECK_FALSE(lane.put(queued("run d", "d", false), take));
+        }
         lane.drain();
-        ensure("runs first", ran == std::vector<std::string>({ "run b", "run d", "check a", "check c" }));
-        ensure("drained: the next starts it again", lane.put(queued("run e", "e", false), take));
+        UNSCOPED_INFO("runs first");
+        CHECK(ran == std::vector<std::string>({ "run b", "run d", "check a", "check c" }));
+        UNSCOPED_INFO("drained: the next starts it again");
+        CHECK(lane.put(queued("run e", "e", false), take));
     }
 
-    template<> template<>
-    void alscriptjoblane_object::test<2>()
+    TEST_CASE_METHOD(alscriptjoblane_data, "alscriptjoblane: a later check replaces a waiting one and stops a running one; runs never do", "[alscriptjoblane]")
     {
-        set_test_name("a later check of a script stands for the one waiting, and tells the one running; a run is no check's to stand for");
         lane.put(queued("check a1", "a", true), take);
         lane.put(queued("check b", "b", true), take);
         lane.put(queued("check a2", "a", true), take);
-        ensure("the waiting one taken", jobs[0]->taken && !jobs[0]->stopped && !jobs[1]->taken);
-        ensure_equals("and let go of", lane.waiting(), size_t(2));
+        {
+            INFO("the waiting one taken");
+            CHECK(jobs[0]->taken);
+            CHECK_FALSE(jobs[0]->stopped);
+            CHECK_FALSE(jobs[1]->taken);
+        }
+        UNSCOPED_INFO("and let go of");
+        CHECK(lane.waiting() == size_t(2));
         lane.put(queued("run a", "a", false), take);
-        ensure("a run takes nothing", !jobs[2]->taken);
+        UNSCOPED_INFO("a run takes nothing");
+        CHECK_FALSE(jobs[2]->taken);
 
         // Put in while the first is running: the running one told.
         Lane lane2;
         lane2.put(queued("check x1", "x", true, [this, &lane2]() { lane2.put(queued("check x2", "x", true), &alscriptjoblane_data::take); }), take);
         lane2.drain();
-        ensure("the running one told to stop", jobs.back()->name == "check x2" && jobs[jobs.size() - 2]->taken && jobs[jobs.size() - 2]->stopped);
-        ensure("and the later one ran after", ran.back() == "check x2");
+        {
+            INFO("the running one told to stop");
+            REQUIRE(jobs.back()->name == "check x2");
+            CHECK(jobs[jobs.size() - 2]->taken);
+            CHECK(jobs[jobs.size() - 2]->stopped);
+        }
+        UNSCOPED_INFO("and the later one ran after");
+        CHECK(ran.back() == "check x2");
     }
 
-    template<> template<>
-    void alscriptjoblane_object::test<3>()
+    TEST_CASE_METHOD(alscriptjoblane_data, "alscriptjoblane: a throwing job is logged and the next goes on; a closed lane takes nothing", "[alscriptjoblane]")
     {
-        set_test_name("a job that throws is said, and the next goes on; closed, nothing more is taken");
         lane.put(queued("throws", "a", false, []() { throw std::runtime_error("nope"); }), take);
         lane.put(queued("next", "b", false), take);
         lane.drain();
-        ensure("the next ran", ran == std::vector<std::string>({ "throws", "next" }));
+        UNSCOPED_INFO("the next ran");
+        CHECK(ran == std::vector<std::string>({ "throws", "next" }));
         lane.put(queued("left", "c", false), take);
         lane.close();
-        ensure("let go of", lane.waiting() == 0);
-        ensure("nothing taken once closed", !lane.put(queued("late", "d", false), take) && lane.waiting() == 0);
+        UNSCOPED_INFO("let go of");
+        CHECK(lane.waiting() == 0);
+        {
+            INFO("nothing taken once closed");
+            CHECK_FALSE(lane.put(queued("late", "d", false), take));
+            CHECK(lane.waiting() == 0);
+        }
         lane.drain();
-        ensure("and nothing run", ran.size() == 2);
+        UNSCOPED_INFO("and nothing run");
+        REQUIRE(ran.size() == 2);
     }
 }

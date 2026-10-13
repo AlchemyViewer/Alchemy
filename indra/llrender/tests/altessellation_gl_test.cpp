@@ -34,16 +34,14 @@
 
 #include "llheadlessgl_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <array>
 #include <vector>
 
-namespace tut
+namespace
 {
-    namespace
-    {
         // The stages the terrain program has: a pass-through vertex shader, a
         // control shader that takes its levels from uniforms, an evaluation
         // shader that bilinearly places the quad, and a flat fragment shader.
@@ -273,65 +271,68 @@ namespace tut
         U32    mPriorArrays = 0;
     };
 
-    typedef test_group<altessellation_data> altessellation_test;
-    typedef altessellation_test::object     altessellation_object;
-    tut::altessellation_test altessellation_testcase("ALTessellation");
-    }
 
     // The context compiles both tessellation stages and links them with a
     // vertex and fragment shader. Everything below assumes this.
-    template<> template<>
-    void altessellation_object::test<1>()
+    TEST_CASE_METHOD(altessellation_data, "ALTessellation: the context compiles and links a four-stage tessellation program", "[ALTessellation]")
     {
-        ensure("all four stages compiled", mCompiled);
-        ensure("four-stage program linked", mLinked);
-        ensure("outer levels uniform found", mOuter >= 0);
-        ensure("inner levels uniform found", mInner >= 0);
+        CHECK(mCompiled);
+        CHECK(mLinked);
+        UNSCOPED_INFO("outer levels uniform found");
+        CHECK(mOuter >= 0);
+        UNSCOPED_INFO("inner levels uniform found");
+        CHECK(mInner >= 0);
     }
 
     // At level 1 everywhere a counter-clockwise patch is two triangles over
     // the whole framebuffer, and back-face culling keeps them.
-    template<> template<>
-    void altessellation_object::test<2>()
+    TEST_CASE_METHOD(altessellation_data, "ALTessellation: at level 1 a counter-clockwise patch covers the whole framebuffer", "[ALTessellation]")
     {
-        ensure("program linked", mLinked);
+        REQUIRE(mLinked);
         setLevels(1, 1, 1, 1, 1, 1);
         const std::vector<U8> px = draw(kCCW);
-        ensure("bottom-left covered",  white(px, 1, 1));
-        ensure("bottom-right covered", white(px, W - 2, 1));
-        ensure("top-right covered",    white(px, W - 2, H - 2));
-        ensure("top-left covered",     white(px, 1, H - 2));
-        ensure("centre covered",       white(px, W / 2, H / 2));
+        UNSCOPED_INFO("bottom-left covered");
+        CHECK(white(px, 1, 1));
+        UNSCOPED_INFO("bottom-right covered");
+        CHECK(white(px, W - 2, 1));
+        UNSCOPED_INFO("top-right covered");
+        CHECK(white(px, W - 2, H - 2));
+        UNSCOPED_INFO("top-left covered");
+        CHECK(white(px, 1, H - 2));
+        UNSCOPED_INFO("centre covered");
+        CHECK(white(px, W / 2, H / 2));
     }
 
     // The same corners clockwise are back faces: `layout(ccw)` with u along
     // x and v along y is the winding the pipeline's cull expects.
-    template<> template<>
-    void altessellation_object::test<3>()
+    TEST_CASE_METHOD(altessellation_data, "ALTessellation: the same corners clockwise are culled as back faces", "[ALTessellation]")
     {
-        ensure("program linked", mLinked);
+        REQUIRE(mLinked);
         setLevels(1, 1, 1, 1, 1, 1);
         const std::vector<U8> px = draw(kCW);
-        ensure("bottom-left culled",  black(px, 1, 1));
-        ensure("top-right culled",    black(px, W - 2, H - 2));
-        ensure("centre culled",       black(px, W / 2, H / 2));
+        UNSCOPED_INFO("bottom-left culled");
+        CHECK(black(px, 1, 1));
+        UNSCOPED_INFO("top-right culled");
+        CHECK(black(px, W - 2, H - 2));
+        UNSCOPED_INFO("centre culled");
+        CHECK(black(px, W / 2, H / 2));
     }
 
     // Subdivided with fractional spacing the patch still covers every pixel:
     // no cracks between the pieces, at integer and at fractional levels.
-    template<> template<>
-    void altessellation_object::test<4>()
+    TEST_CASE_METHOD(altessellation_data, "ALTessellation: subdivided with fractional spacing the patch still covers every pixel", "[ALTessellation]")
     {
-        ensure("program linked", mLinked);
+        REQUIRE(mLinked);
         for (const F32 level : { 4.f, 2.5f, 7.25f })
         {
+            CAPTURE(level);
             setLevels(level, level, level, level, level, level);
             const std::vector<U8> px = draw(kCCW);
             size_t uncovered = 0;
             for (S32 y = 0; y < H; ++y)
                 for (S32 x = 0; x < W; ++x)
                     if (!white(px, x, y)) ++uncovered;
-            ensure_equals("every pixel covered at level " + std::to_string(level), uncovered, size_t(0));
+            REQUIRE(uncovered == size_t(0));
         }
     }
 
@@ -339,27 +340,25 @@ namespace tut
     // honours the levels and transform feedback sees what it emits. Odd
     // spacing rounds a level up to the next odd integer, so 3 is the smallest
     // level above 1 whose segments are all equal and whose count is exact.
-    template<> template<>
-    void altessellation_object::test<5>()
+    TEST_CASE_METHOD(altessellation_data, "ALTessellation: the tessellator emits two triangles at level 1 and eighteen at level 3", "[ALTessellation]")
     {
-        ensure("program linked", mLinked);
+        REQUIRE(mLinked);
         GLuint triangles = 0;
         setLevels(1, 1, 1, 1, 1, 1);
         capture(kCCW, triangles);
-        ensure_equals("level 1 is two triangles", triangles, GLuint(2));
+        CHECK(triangles == GLuint(2));
         setLevels(3, 3, 3, 3, 3, 3);
         capture(kCCW, triangles);
-        ensure_equals("level 3 is eighteen triangles", triangles, GLuint(18));
+        CHECK(triangles == GLuint(18));
     }
 
     // Which outer level drives which edge. Raising one outer level to 3 puts
     // four distinct vertices on exactly one side of the patch and leaves two
     // on every other. Outer[0] is the u = 0 edge (x = -1), [1] the v = 0 edge
     // (y = -1), [2] u = 1 (x = +1), [3] v = 1 (y = +1).
-    template<> template<>
-    void altessellation_object::test<6>()
+    TEST_CASE_METHOD(altessellation_data, "ALTessellation: each outer level splits only its own edge of the patch", "[ALTessellation]")
     {
-        ensure("program linked", mLinked);
+        REQUIRE(mLinked);
         // Edge i of the patch, as outer[i] should see it.
         struct Edge { int axis; F32 value; const char* name; };
         const Edge edges[4] = {
@@ -377,26 +376,27 @@ namespace tut
             const std::vector<Vertex> verts = capture(kCCW, triangles);
             for (int i = 0; i < 4; ++i)
             {
+                CAPTURE(i);
                 const size_t expected = i == raised ? 4 : 2;
-                ensure_equals(std::string(edges[raised].name) + (i == raised ? "" : ": other side unsplit"),
-                              distinctOn(verts, edges[i].axis, edges[i].value), expected);
+                UNSCOPED_INFO(edges[raised].name << (i == raised ? "" : ": other side unsplit"));
+                REQUIRE(distinctOn(verts, edges[i].axis, edges[i].value) == expected);
             }
         }
     }
 
     // Profiling a tessellated draw must still render. Apple's Metal-backed
     // OpenGL driver aborts when GL_PRIMITIVES_GENERATED is active here.
-    template<> template<>
-    void altessellation_object::test<7>()
+    TEST_CASE_METHOD(altessellation_data, "ALTessellation: a profiled tessellated draw still renders", "[ALTessellation]")
     {
-        ensure("program linked", mLinked);
+        REQUIRE(mLinked);
         // Viewer programs do not capture transform feedback. Declaring a
         // captured varying takes a different Apple driver path and hides the crash.
         glTransformFeedbackVaryings(mProgram, 0, nullptr, GL_INTERLEAVED_ATTRIBS);
         glLinkProgram(mProgram);
         GLint linked = GL_FALSE;
         glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
-        ensure("program linked without transform feedback", linked == GL_TRUE);
+        UNSCOPED_INFO("program linked without transform feedback");
+        REQUIRE(linked == GL_TRUE);
         mOuter = glGetUniformLocation(mProgram, "outer");
         mInner = glGetUniformLocation(mProgram, "inner");
         setLevels(3, 3, 3, 3, 3, 3);
@@ -410,9 +410,12 @@ namespace tut
         LLGLSLShader::sProfileEnabled = false;
         const GLuint queries[] = { profile.mTimerQuery, profile.mSamplesQuery, profile.mPrimitivesQuery };
         glDeleteQueries(3, queries);
-        ensure("profile read completed", read);
-        ensure("profiled terrain covers centre", white(px, W / 2, H / 2));
-        ensure("sample query still counts fragments", profile.mSamplesDrawn > 0);
-        ensure_equals("profiling leaves no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("profile read completed");
+        CHECK(read);
+        UNSCOPED_INFO("profiled terrain covers centre");
+        CHECK(white(px, W / 2, H / 2));
+        UNSCOPED_INFO("sample query still counts fragments");
+        CHECK(profile.mSamplesDrawn > 0);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 }

@@ -10,7 +10,8 @@ decided by the types clang resolved, not by its text:
                each case as TUT built it for each test; or a plain
                TEST_CASE("<group>: <name>", "[<group tag>]") where the struct
                holds nothing and nothing else names it, and the struct goes.
-               The name is, first, one --names gives; then the test's
+               The name is, first, one --names gives (for #if twins, a
+               list, one a twin in declaration order); then the test's
                set_test_name literal; then the first sentence of the
                comment written above the test, where that is prose; else
                #N. " #N" is added to a name another case of the file has
@@ -2280,7 +2281,10 @@ class Converter:
     def name_tests(self):
         for data, group in self.groups.items():
             seen = []  # (the #if branches around a case, its name)
-            for test in sorted(group.tests, key=lambda t: t.n):
+            twins = {}  # test<N> -> how many of its #if twins came before
+            for test in sorted(group.tests, key=lambda t: (t.n, -1 if t.start is None else t.start)):
+                twin = twins.get(test.n, 0)
+                twins[test.n] = twin + 1
                 if test.macro:
                     test.tut_name = None  # left as it is: no case, and parity says so
                     continue
@@ -2306,6 +2310,8 @@ class Converter:
                 # A name given in --names wins; then set_test_name's; then the
                 # first sentence of the comment written above the test.
                 given = self.name_overrides.get((group.name, test.n))
+                if isinstance(given, list):
+                    given = given[twin] if twin < len(given) else None
                 if given is None and text_name is None:
                     given = self.comment_name(test)
                 if given is not None:
@@ -3232,7 +3238,9 @@ def tut_friends():
 
 
 def load_names(path):
-    """--names: {"<file from the root>": {"<group>": {"<n>": "<name>"}}}."""
+    """--names: {"<file from the root>": {"<group>": {"<n>": "<name>"}}}, or
+    for a test<N> defined in branches of one #if, a list of names, one a
+    twin in the order the file declares them."""
     if not path:
         return {}
     with open(path) as f:
@@ -3241,6 +3249,8 @@ def load_names(path):
     for file, groups in data.items():
         for group, tests in groups.items():
             for n, name in tests.items():
+                if not isinstance(name, str) and not (isinstance(name, list) and all(isinstance(x, str) for x in name)):
+                    raise SystemExit(f"--names: {file} {group} {n}: a name, or a list of names, not {name!r}")
                 out[(os.path.normpath(file), group, int(n))] = name
     return out
 
@@ -3348,7 +3358,8 @@ def main():
     parser.add_argument("--jobs", type=int, default=1, help="files to convert at once")
     parser.add_argument("--quiet", action="store_true", help="print only the marks and the totals")
     parser.add_argument("--names", help='cases\' names, as JSON: {"<file from the root>": {"<group>": '
-                        '{"<n>": "<name>"}}}; each wins over the test\'s own')
+                        '{"<n>": "<name>"}}}, or a list of names for a test<N> in branches of one #if, '
+                        'one a twin in the order the file declares them; each wins over the test\'s own')
     args = parser.parse_args()
 
     files = [os.path.abspath(f) for f in args.files]

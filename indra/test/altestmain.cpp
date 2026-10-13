@@ -27,6 +27,7 @@
 #include "linden_common.h"
 
 #include "altestfatal.h"
+#include "altesthelper.h"
 #include "altestlogreplay.h"
 #include "alteststateguard.h"
 #include "altestteardown.h"
@@ -92,6 +93,21 @@ namespace
             LLError::logToFile(llformat("%s.%d.log", executable, LLApp::getPid()));
         }
     }
+
+    // What a test run and a helper both find: APR, LLError as LL code
+    // expects it, LL_ERRS throwing, and LLTrace's master recorder.
+    void setUpProcess(const char* executable, bool log_to_file)
+    {
+        ll_init_apr();
+        setUpLogging(executable, log_to_file);
+        ll_test::installFatalFunction();
+        ll_test::installTerminateHandler();
+
+        // LLTrace needs a master recorder before any thread records. Never
+        // freed, as the TUT runner never freed it: static destructors that
+        // record would find it gone.
+        LLTrace::set_master_thread_recorder(new LLTrace::ThreadRecorder());
+    }
 }
 
 int main(int argc, char* argv[])
@@ -100,6 +116,17 @@ int main(int argc, char* argv[])
     // (https://github.com/wolfpld/tracy/issues/196).
     LL_PROFILER_FRAME_END;
     LL_PROFILER_SET_THREAD_NAME("App");
+
+    // A helper a test launched from this binary runs alone, and Catch2 never
+    // sees its argument.
+    if (const char* helper = ll_test::Helper::named(argc, argv))
+    {
+        setUpProcess(argv[0], false);
+        const int result = ll_test::Helper::run(helper);
+        ll_test::Teardown::runAll();
+        ll_cleanup_apr();
+        return result;
+    }
 
     Catch::Session session;
 
@@ -118,6 +145,10 @@ int main(int argc, char* argv[])
     // Declared order, as TUT ran a group's tests, until no test leans on the
     // ones before it. --order on the command line still wins.
     session.configData().runOrder = Catch::TestRunOrder::Declared;
+    // Every case tagged with its file's name, [#<file stem>], as
+    // --filenames-as-tags tags them: a test file's run names its file with
+    // one tag, and a filter of several files is one argument.
+    session.configData().filenamesAsTags = true;
 
     if (const int result = session.applyCommandLine(argc, argv); result != 0)
     {
@@ -139,16 +170,7 @@ int main(int argc, char* argv[])
         return 125;
     }
 
-    ll_init_apr();
-    setUpLogging(argv[0], log_to_file);
-    ll_test::installFatalFunction();
-    ll_test::installTerminateHandler();
-
-    // LLTrace needs a master recorder before any thread records. Never freed,
-    // as the TUT runner never freed it: static destructors that record would
-    // find it gone.
-    LLTrace::set_master_thread_recorder(new LLTrace::ThreadRecorder());
-
+    setUpProcess(argv[0], log_to_file);
     ll_test::StateGuard::addCommonChecks();
 
     int result = session.run();

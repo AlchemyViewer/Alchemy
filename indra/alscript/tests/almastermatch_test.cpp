@@ -29,7 +29,7 @@
 #include "fsyspath.h"
 #include "llfile.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -76,7 +76,7 @@ namespace
     using Aliases = std::vector<std::pair<std::string, std::string>>;
 }
 
-namespace tut
+namespace
 {
     struct almastermatch_data
     {
@@ -103,21 +103,19 @@ namespace tut
         }
     };
 
-    typedef test_group<almastermatch_data> almastermatch_group;
-    typedef almastermatch_group::object    almastermatch_object;
-    almastermatch_group                    almastermatch_instance("almastermatch");
-
-    template<> template<>
-    void almastermatch_object::test<1>()
+    TEST_CASE_METHOD(almastermatch_data, "almastermatch: a hint is an @file comment in the first ten lines or an upload header's", "[almastermatch]")
     {
-        set_test_name("a hint is an @file comment among the first ten lines of the source, else an upload header's");
-        ensure_equals("LSL's", ALMasterMatch::hintOf("// @file net/door.lsl\ndefault {}\n", "", false).value_or("-"), std::string("net/door.lsl"));
-        ensure_equals("SLua's", ALMasterMatch::hintOf("-- @file net/door.luau\nprint(1)\n", "", true).value_or("-"), std::string("net/door.luau"));
-        ensure_equals("indented, close up, in any case, the line's end trimmed",
-                      ALMasterMatch::hintOf("  //@FILE\tnet/door.lsl  \r\n", "", false).value_or("-"), std::string("net/door.lsl"));
-        ensure_equals("quoted for its spaces", ALMasterMatch::hintOf("// @file \"my scripts/door.lsl\"\n", "", false).value_or("-"),
+        UNSCOPED_INFO("LSL's");
+        CHECK(ALMasterMatch::hintOf("// @file net/door.lsl\ndefault {}\n", "", false).value_or("-") == std::string("net/door.lsl"));
+        UNSCOPED_INFO("SLua's");
+        CHECK(ALMasterMatch::hintOf("-- @file net/door.luau\nprint(1)\n", "", true).value_or("-") == std::string("net/door.luau"));
+        UNSCOPED_INFO("indented, close up, in any case, the line's end trimmed");
+        CHECK(ALMasterMatch::hintOf("  //@FILE\tnet/door.lsl  \r\n", "", false).value_or("-") == std::string("net/door.lsl"));
+        UNSCOPED_INFO("quoted for its spaces");
+        CHECK(ALMasterMatch::hintOf("// @file \"my scripts/door.lsl\"\n", "", false).value_or("-") ==
                       std::string("my scripts/door.lsl"));
-        ensure_equals("past a byte order mark", ALMasterMatch::hintOf("\xEF\xBB\xBF// @file door.lsl\n", "", false).value_or("-"),
+        UNSCOPED_INFO("past a byte order mark");
+        CHECK(ALMasterMatch::hintOf("\xEF\xBB\xBF// @file door.lsl\n", "", false).value_or("-") ==
                       std::string("door.lsl"));
 
         std::string ninth;
@@ -125,15 +123,22 @@ namespace tut
         {
             ninth += "integer x" + std::to_string(line) + ";\n";
         }
-        ensure_equals("the tenth line", ALMasterMatch::hintOf(ninth + "// @file late.lsl\n", "", false).value_or("-"), std::string("late.lsl"));
-        ensure("not the eleventh", !ALMasterMatch::hintOf(ninth + "\n// @file late.lsl\n", "", false));
-        ensure("not the other language's comment", !ALMasterMatch::hintOf("// @file door.luau\n", "", true));
-        ensure("nor code", !ALMasterMatch::hintOf("string f = \"// @file door.lsl\";\n", "", false));
-        ensure("nor a word that only begins so", !ALMasterMatch::hintOf("// @filename door.lsl\n", "", false));
-        ensure("nor a doc comment's third dash", !ALMasterMatch::hintOf("--- @file door.luau\n", "", true));
-        ensure("nor one naming nothing", !ALMasterMatch::hintOf("// @file   \n", "", false));
-        ensure_equals("passing one naming nothing for the next",
-                      ALMasterMatch::hintOf("// @file\t\n// @file door.lsl\n", "", false).value_or("-"), std::string("door.lsl"));
+        UNSCOPED_INFO("the tenth line");
+        CHECK(ALMasterMatch::hintOf(ninth + "// @file late.lsl\n", "", false).value_or("-") == std::string("late.lsl"));
+        UNSCOPED_INFO("not the eleventh");
+        REQUIRE_FALSE(ALMasterMatch::hintOf(ninth + "\n// @file late.lsl\n", "", false));
+        UNSCOPED_INFO("not the other language's comment");
+        REQUIRE_FALSE(ALMasterMatch::hintOf("// @file door.luau\n", "", true));
+        UNSCOPED_INFO("nor code");
+        REQUIRE_FALSE(ALMasterMatch::hintOf("string f = \"// @file door.lsl\";\n", "", false));
+        UNSCOPED_INFO("nor a word that only begins so");
+        REQUIRE_FALSE(ALMasterMatch::hintOf("// @filename door.lsl\n", "", false));
+        UNSCOPED_INFO("nor a doc comment's third dash");
+        REQUIRE_FALSE(ALMasterMatch::hintOf("--- @file door.luau\n", "", true));
+        UNSCOPED_INFO("nor one naming nothing");
+        REQUIRE_FALSE(ALMasterMatch::hintOf("// @file   \n", "", false));
+        UNSCOPED_INFO("passing one naming nothing for the next");
+        CHECK(ALMasterMatch::hintOf("// @file\t\n// @file door.lsl\n", "", false).value_or("-") == std::string("door.lsl"));
 
         const std::string ours = "// ================ alchemy meta ================\n"
                                  "// @file net/door.lsl\n"
@@ -143,23 +148,27 @@ namespace tut
                                    "-- @file src/door.luau\n"
                                    "-- @hash 00\n"
                                    "-- ==================================================\n";
-        ensure_equals("our header in the compiled half", ALMasterMatch::hintOf("default {}\n", ours + "default {}\n", false).value_or("-"),
+        UNSCOPED_INFO("our header in the compiled half");
+        CHECK(ALMasterMatch::hintOf("default {}\n", ours + "default {}\n", false).value_or("-") ==
                       std::string("net/door.lsl"));
-        ensure_equals("past the target line", ALMasterMatch::hintOf("default {}\n", "//mono\n" + ours + "default {}\n", false).value_or("-"),
+        UNSCOPED_INFO("past the target line");
+        CHECK(ALMasterMatch::hintOf("default {}\n", "//mono\n" + ours + "default {}\n", false).value_or("-") ==
                       std::string("net/door.lsl"));
-        ensure_equals("the plugin's", ALMasterMatch::hintOf("print(1)\n", "--luau\n" + theirs + "print(1)\n", true).value_or("-"),
+        UNSCOPED_INFO("the plugin's");
+        CHECK(ALMasterMatch::hintOf("print(1)\n", "--luau\n" + theirs + "print(1)\n", true).value_or("-") ==
                       std::string("src/door.luau"));
-        ensure_equals("the source's own first", ALMasterMatch::hintOf("// @file mine.lsl\n", ours, false).value_or("-"), std::string("mine.lsl"));
-        ensure("not a header further down", !ALMasterMatch::hintOf("default {}\n", "default {}\n" + ours, false));
-        ensure("nor one with no @file",
-               !ALMasterMatch::hintOf("x\n", "// ================ alchemy meta ================\n// @hash xxh128:00\n// ====\n", false));
-        ensure("nothing where nothing says", !ALMasterMatch::hintOf("default {}\n", "default {}\n", false));
+        UNSCOPED_INFO("the source's own first");
+        CHECK(ALMasterMatch::hintOf("// @file mine.lsl\n", ours, false).value_or("-") == std::string("mine.lsl"));
+        UNSCOPED_INFO("not a header further down");
+        REQUIRE_FALSE(ALMasterMatch::hintOf("default {}\n", "default {}\n" + ours, false));
+        UNSCOPED_INFO("nor one with no @file");
+        REQUIRE_FALSE(ALMasterMatch::hintOf("x\n", "// ================ alchemy meta ================\n// @hash xxh128:00\n// ====\n", false));
+        UNSCOPED_INFO("nothing where nothing says");
+        REQUIRE_FALSE(ALMasterMatch::hintOf("default {}\n", "default {}\n", false));
     }
 
-    template<> template<>
-    void almastermatch_object::test<2>()
+    TEST_CASE_METHOD(almastermatch_data, "almastermatch: a relative hint resolves in the first blessed folder that has it", "[almastermatch]")
     {
-        set_test_name("a relative hint is looked for in each blessed folder in turn, and the first found wins");
         Scratch           s;
         const std::string first = s.write("a/net/door.lsl");
         const std::string only  = s.write("b/only.lsl");
@@ -168,26 +177,32 @@ namespace tut
         blessed.bless(s.at("a"));
         blessed.bless(s.at("b"));
 
-        ensure_equals("in both, the first folder's", almastermatch_data::resolved("net/door.lsl", blessed, false), first);
-        ensure_equals("with Windows's separators", almastermatch_data::resolved("net\\door.lsl", blessed, false), first);
-        ensure_equals("in the second only, the second's", almastermatch_data::resolved("only.lsl", blessed, false), only);
-        ensure_equals("a `.` on the way", almastermatch_data::resolved("./net/./door.lsl", blessed, false), first);
-        ensure_equals("in neither", almastermatch_data::resolved("missing.lsl", blessed, false),
+        UNSCOPED_INFO("in both, the first folder's");
+        CHECK(almastermatch_data::resolved("net/door.lsl", blessed, false) == first);
+        UNSCOPED_INFO("with Windows's separators");
+        CHECK(almastermatch_data::resolved("net\\door.lsl", blessed, false) == first);
+        UNSCOPED_INFO("in the second only, the second's");
+        CHECK(almastermatch_data::resolved("only.lsl", blessed, false) == only);
+        UNSCOPED_INFO("a `.` on the way");
+        CHECK(almastermatch_data::resolved("./net/./door.lsl", blessed, false) == first);
+        UNSCOPED_INFO("in neither");
+        CHECK(almastermatch_data::resolved("missing.lsl", blessed, false) ==
                       std::string("- 'missing.lsl' is not a file in the include folders, or not an ordinary file of at most 4 MB"));
         fs::create_directories(s.under("a/folder.lsl"));
-        ensure_equals("a folder is no file, whatever it is called", almastermatch_data::resolved("folder.lsl", blessed, false).substr(0, 1),
+        UNSCOPED_INFO("a folder is no file, whatever it is called");
+        CHECK(almastermatch_data::resolved("folder.lsl", blessed, false).substr(0, 1) ==
                       std::string("-"));
 
         ALDiskIncludes none;
-        ensure_equals("no folder blessed, looked for nowhere", almastermatch_data::resolved("only.lsl", none, false),
+        UNSCOPED_INFO("no folder blessed, looked for nowhere");
+        CHECK(almastermatch_data::resolved("only.lsl", none, false) ==
                       std::string("- no include folders are set, so 'only.lsl' is looked for nowhere"));
-        ensure_equals("a hint naming nothing", almastermatch_data::resolved("  ", blessed, false), std::string("- the @file hint names no file"));
+        UNSCOPED_INFO("a hint naming nothing");
+        CHECK(almastermatch_data::resolved("  ", blessed, false) == std::string("- the @file hint names no file"));
     }
 
-    template<> template<>
-    void almastermatch_object::test<3>()
+    TEST_CASE_METHOD(almastermatch_data, "almastermatch: no climb or root or link or share reaches outside the blessed folders", "[almastermatch]")
     {
-        set_test_name("nothing is reached outside the blessed folders: not by climbing, from a root, through a link, nor a share");
         Scratch           s;
         const std::string secret = s.write("private/secret.lsl", "// the author's own\n");
         const std::string inside = s.write("a/net/door.lsl");
@@ -196,51 +211,60 @@ namespace tut
         blessed.bless(s.at("a"));
         blessed.bless(s.at("b"));
 
-        ensure_equals("climbing out of every blessed folder", almastermatch_data::resolved("../private/secret.lsl", blessed, false),
+        UNSCOPED_INFO("climbing out of every blessed folder");
+        CHECK(almastermatch_data::resolved("../private/secret.lsl", blessed, false) ==
                       std::string("- '../private/secret.lsl' is outside the include folders"));
-        ensure_equals("however deep it starts", almastermatch_data::resolved("net/../../private/secret.lsl", blessed, false),
+        UNSCOPED_INFO("however deep it starts");
+        CHECK(almastermatch_data::resolved("net/../../private/secret.lsl", blessed, false) ==
                       std::string("- 'net/../../private/secret.lsl' is outside the include folders"));
-        ensure_equals("climbing within one is no climb", almastermatch_data::resolved("net/../net/door.lsl", blessed, false), inside);
-        ensure_equals("nor into another blessed folder, as an include could read it",
-                      almastermatch_data::resolved("../b/other.lsl", blessed, false), other);
+        UNSCOPED_INFO("climbing within one is no climb");
+        CHECK(almastermatch_data::resolved("net/../net/door.lsl", blessed, false) == inside);
+        UNSCOPED_INFO("nor into another blessed folder, as an include could read it");
+        CHECK(almastermatch_data::resolved("../b/other.lsl", blessed, false) == other);
 
-        ensure_equals("from a root, under a blessed folder", almastermatch_data::resolved(inside, blessed, false), inside);
-        ensure_equals("from a root, outside", almastermatch_data::resolved(secret, blessed, false),
+        UNSCOPED_INFO("from a root, under a blessed folder");
+        CHECK(almastermatch_data::resolved(inside, blessed, false) == inside);
+        UNSCOPED_INFO("from a root, outside");
+        CHECK(almastermatch_data::resolved(secret, blessed, false) ==
                       "- '" + secret + "' is outside the include folders");
-        ensure_equals("from a root, climbing out", almastermatch_data::resolved(s.at("a/../private/secret.lsl"), blessed, false).substr(0, 1),
+        UNSCOPED_INFO("from a root, climbing out");
+        CHECK(almastermatch_data::resolved(s.at("a/../private/secret.lsl"), blessed, false).substr(0, 1) ==
                       std::string("-"));
         for (const char* elsewhere : { "\\\\host\\share\\door.lsl", "//host/share/door.lsl", "\\\\?\\UNC\\host\\share\\door.lsl", "C:\\door.lsl",
                                        "c:door.lsl" })
         {
-            ensure_equals(std::string("never asked of: ") + elsewhere, almastermatch_data::resolved(elsewhere, blessed, false),
+            CAPTURE(elsewhere);
+            REQUIRE(almastermatch_data::resolved(elsewhere, blessed, false) ==
                           "- '" + std::string(elsewhere) + "' is outside the include folders");
         }
-        ensure_equals("nor a home folder", almastermatch_data::resolved("~/door.lsl", blessed, false),
+        UNSCOPED_INFO("nor a home folder");
+        CHECK(almastermatch_data::resolved("~/door.lsl", blessed, false) ==
                       std::string("- '~/door.lsl' is from a home folder, which a hint is not followed to"));
 
         std::error_code ec;
         fs::create_symlink(fsyspath(secret), s.root / "a" / "innocent.lsl", ec);
         if (!ec)
         {
-            ensure_equals("a link out of the folder", almastermatch_data::resolved("innocent.lsl", blessed, false).substr(0, 1), std::string("-"));
+            UNSCOPED_INFO("a link out of the folder");
+            CHECK(almastermatch_data::resolved("innocent.lsl", blessed, false).substr(0, 1) == std::string("-"));
         }
         fs::create_directory_symlink(s.root / "private", s.root / "a" / "door", ec);
         if (!ec)
         {
-            ensure_equals("nor a file through a linked folder", almastermatch_data::resolved("door/secret.lsl", blessed, false).substr(0, 1),
+            UNSCOPED_INFO("nor a file through a linked folder");
+            CHECK(almastermatch_data::resolved("door/secret.lsl", blessed, false).substr(0, 1) ==
                           std::string("-"));
         }
         fs::create_symlink(fsyspath(other), s.root / "a" / "inward.lsl", ec);
         if (!ec)
         {
-            ensure_equals("a link to another blessed folder is followed", almastermatch_data::resolved("inward.lsl", blessed, false), other);
+            UNSCOPED_INFO("a link to another blessed folder is followed");
+            CHECK(almastermatch_data::resolved("inward.lsl", blessed, false) == other);
         }
     }
 
-    template<> template<>
-    void almastermatch_object::test<4>()
+    TEST_CASE_METHOD(almastermatch_data, "almastermatch: only a script of the item's language and a sensible size", "[almastermatch]")
     {
-        set_test_name("only a script of the item's language, of a sensible size");
         Scratch           s;
         const std::string notes  = s.write("a/notes.txt", "keys\n");
         const std::string door   = s.write("a/door.lsl");
@@ -251,37 +275,46 @@ namespace tut
         ALDiskIncludes blessed;
         blessed.bless(s.at("a"));
 
-        ensure_equals("not another kind of file", almastermatch_data::resolved("notes.txt", blessed, false),
+        UNSCOPED_INFO("not another kind of file");
+        CHECK(almastermatch_data::resolved("notes.txt", blessed, false) ==
                       std::string("- 'notes.txt' is not an LSL script (.lsl, .lslh or .lsli)"));
-        ensure_equals("nor a name with no extension", almastermatch_data::resolved("door", blessed, false).substr(0, 1), std::string("-"));
-        ensure_equals("LSL's own", almastermatch_data::resolved("door.lsl", blessed, false), door);
+        UNSCOPED_INFO("nor a name with no extension");
+        CHECK(almastermatch_data::resolved("door", blessed, false).substr(0, 1) == std::string("-"));
+        UNSCOPED_INFO("LSL's own");
+        CHECK(almastermatch_data::resolved("door.lsl", blessed, false) == door);
         // As the disk finds it: where it is the same file in any case, by
         // the case the disk keeps it in.
         const std::string upper = almastermatch_data::resolved("door.LSL", blessed, false);
-        ensure("an extension in any case", fs::exists(s.under("a/door.LSL")) ? upper == door : upper.substr(0, 1) == "-");
-        ensure_equals("and its includes'", almastermatch_data::resolved("lib.lslh", blessed, false), header);
-        ensure_equals("not SLua's for LSL", almastermatch_data::resolved("util.luau", blessed, false),
+        UNSCOPED_INFO("an extension in any case");
+        CHECK((fs::exists(s.under("a/door.LSL")) ? upper == door : upper.substr(0, 1) == "-"));
+        UNSCOPED_INFO("and its includes'");
+        CHECK(almastermatch_data::resolved("lib.lslh", blessed, false) == header);
+        UNSCOPED_INFO("not SLua's for LSL");
+        CHECK(almastermatch_data::resolved("util.luau", blessed, false) ==
                       std::string("- 'util.luau' is not an LSL script (.lsl, .lslh or .lsli)"));
-        ensure_equals("nor LSL's for SLua", almastermatch_data::resolved("door.lsl", blessed, true),
+        UNSCOPED_INFO("nor LSL's for SLua");
+        CHECK(almastermatch_data::resolved("door.lsl", blessed, true) ==
                       std::string("- 'door.lsl' is not an SLua script (.luau or .lua)"));
-        ensure_equals("SLua's own", almastermatch_data::resolved("util.luau", blessed, true), util);
-        ensure_equals("and its older", almastermatch_data::resolved("old.lua", blessed, true), old);
-        ensure_equals("not one too big", almastermatch_data::resolved("big.lsl", blessed, false),
+        UNSCOPED_INFO("SLua's own");
+        CHECK(almastermatch_data::resolved("util.luau", blessed, true) == util);
+        UNSCOPED_INFO("and its older");
+        CHECK(almastermatch_data::resolved("old.lua", blessed, true) == old);
+        UNSCOPED_INFO("not one too big");
+        CHECK(almastermatch_data::resolved("big.lsl", blessed, false) ==
                       std::string("- 'big.lsl' is not a file in the include folders, or not an ordinary file of at most 4 MB"));
 
         std::error_code ec;
         fs::create_symlink(fsyspath(notes), s.root / "a" / "fake.lsl", ec);
         if (!ec)
         {
-            ensure_equals("a script's name for another kind of file", almastermatch_data::resolved("fake.lsl", blessed, false),
+            UNSCOPED_INFO("a script's name for another kind of file");
+            CHECK(almastermatch_data::resolved("fake.lsl", blessed, false) ==
                           std::string("- 'fake.lsl' leads to a file that is not an LSL script (.lsl, .lslh or .lsli)"));
         }
     }
 
-    template<> template<>
-    void almastermatch_object::test<5>()
+    TEST_CASE_METHOD(almastermatch_data, "almastermatch: an alias names a folder but is held to the blessed folders all the same", "[almastermatch]")
     {
-        set_test_name("an alias names a folder of the studio's or a configuration's, and is held to the blessed folders all the same");
         Scratch           s;
         const std::string util = s.write("a/lib/util.luau", "return {}\n");
         s.write("private/x.luau", "return {}\n");
@@ -289,23 +322,28 @@ namespace tut
         blessed.bless(s.at("a"));
         const Aliases aliases{ { "lib", s.at("a/lib") }, { "@out", s.at("private") }, { "loose", "lib" } };
 
-        ensure_equals("through the alias", almastermatch_data::resolved("@lib/util.luau", blessed, true, aliases), util);
-        ensure_equals("named in any case", almastermatch_data::resolved("@LIB/util.luau", blessed, true, aliases), util);
-        ensure_equals("one not set", almastermatch_data::resolved("@nope/util.luau", blessed, true, aliases),
+        UNSCOPED_INFO("through the alias");
+        CHECK(almastermatch_data::resolved("@lib/util.luau", blessed, true, aliases) == util);
+        UNSCOPED_INFO("named in any case");
+        CHECK(almastermatch_data::resolved("@LIB/util.luau", blessed, true, aliases) == util);
+        UNSCOPED_INFO("one not set");
+        CHECK(almastermatch_data::resolved("@nope/util.luau", blessed, true, aliases) ==
                       std::string("- '@nope/util.luau' names the alias @nope, which is not set"));
-        ensure_equals("one whose folder is not blessed", almastermatch_data::resolved("@out/x.luau", blessed, true, aliases),
+        UNSCOPED_INFO("one whose folder is not blessed");
+        CHECK(almastermatch_data::resolved("@out/x.luau", blessed, true, aliases) ==
                       std::string("- '@out/x.luau' is outside the include folders"));
-        ensure_equals("one climbed out of", almastermatch_data::resolved("@lib/../../private/x.luau", blessed, true, aliases),
+        UNSCOPED_INFO("one climbed out of");
+        CHECK(almastermatch_data::resolved("@lib/../../private/x.luau", blessed, true, aliases) ==
                       std::string("- '@lib/../../private/x.luau' is outside the include folders"));
-        ensure_equals("one that is no folder on disk", almastermatch_data::resolved("@loose/util.luau", blessed, true, aliases),
+        UNSCOPED_INFO("one that is no folder on disk");
+        CHECK(almastermatch_data::resolved("@loose/util.luau", blessed, true, aliases) ==
                       std::string("- the alias @loose is no folder on disk"));
-        ensure_equals("the alias alone is no file", almastermatch_data::resolved("@lib", blessed, true, aliases).substr(0, 1), std::string("-"));
+        UNSCOPED_INFO("the alias alone is no file");
+        CHECK(almastermatch_data::resolved("@lib", blessed, true, aliases).substr(0, 1) == std::string("-"));
     }
 
-    template<> template<>
-    void almastermatch_object::test<6>()
+    TEST_CASE_METHOD(almastermatch_data, "almastermatch: byName lists <name>.<ext> then the plugin's loose forms best first", "[almastermatch]")
     {
-        set_test_name("by name: <name>.<ext> anywhere under a blessed folder, then the plugin's loose forms, every one best first");
         Scratch           s;
         const std::string door     = s.write("a/door.lsl");
         const std::string net_door = s.write("a/net/door.lsl");
@@ -322,34 +360,42 @@ namespace tut
         blessed.bless(s.at("a"));
         blessed.bless(s.at("b"));
 
-        ensure_equals("the folder blessed first, then the nearer its top; none hidden, none not blessed",
-                      almastermatch_data::joined(ALMasterMatch::byName("door", blessed, false)),
+        UNSCOPED_INFO("the folder blessed first, then the nearer its top; none hidden, none not blessed");
+        CHECK(almastermatch_data::joined(ALMasterMatch::byName("door", blessed, false)) ==
                       almastermatch_data::joined({ door, net_door, b_door }));
-        ensure_equals("a name with a folder in it, by its last parts", almastermatch_data::joined(ALMasterMatch::byName("net/door", blessed, false)),
+        UNSCOPED_INFO("a name with a folder in it, by its last parts");
+        CHECK(almastermatch_data::joined(ALMasterMatch::byName("net/door", blessed, false)) ==
                       net_door);
-        ensure_equals("a name with its extension already", almastermatch_data::joined(ALMasterMatch::byName("door.lsl", blessed, false)),
+        UNSCOPED_INFO("a name with its extension already");
+        CHECK(almastermatch_data::joined(ALMasterMatch::byName("door.lsl", blessed, false)) ==
                       almastermatch_data::joined({ door, net_door, b_door }));
-        ensure_equals("a name, then its folders run into it with _", almastermatch_data::joined(ALMasterMatch::byName("net_gate", blessed, false)),
+        UNSCOPED_INFO("a name, then its folders run into it with _");
+        CHECK(almastermatch_data::joined(ALMasterMatch::byName("net_gate", blessed, false)) ==
                       almastermatch_data::joined({ flat, gate }));
-        ensure_equals("or with nothing", almastermatch_data::joined(ALMasterMatch::byName("netgate", blessed, false)), gate);
-        ensure_equals("or with a space", almastermatch_data::joined(ALMasterMatch::byName("net gate", blessed, false)), gate);
-        ensure_equals("its own case first, then any", almastermatch_data::joined(ALMasterMatch::byName("lamp", blessed, false)),
+        UNSCOPED_INFO("or with nothing");
+        CHECK(almastermatch_data::joined(ALMasterMatch::byName("netgate", blessed, false)) == gate);
+        UNSCOPED_INFO("or with a space");
+        CHECK(almastermatch_data::joined(ALMasterMatch::byName("net gate", blessed, false)) == gate);
+        UNSCOPED_INFO("its own case first, then any");
+        CHECK(almastermatch_data::joined(ALMasterMatch::byName("lamp", blessed, false)) ==
                       almastermatch_data::joined({ lamp, big_lamp }));
-        ensure("not an include's header", ALMasterMatch::byName("util", blessed, false).empty());
-        ensure("nor for no name", ALMasterMatch::byName("", blessed, false).empty());
-        ensure("nor in no folder", ALMasterMatch::byName("door", ALDiskIncludes(), false).empty());
+        UNSCOPED_INFO("not an include's header");
+        REQUIRE(ALMasterMatch::byName("util", blessed, false).empty());
+        UNSCOPED_INFO("nor for no name");
+        REQUIRE(ALMasterMatch::byName("", blessed, false).empty());
+        UNSCOPED_INFO("nor in no folder");
+        REQUIRE(ALMasterMatch::byName("door", ALDiskIncludes(), false).empty());
 
         const std::vector<ALDiskIncludes::Listed> listed = ALMasterMatch::listing(blessed, false);
-        ensure_equals("listed once for many names, the same",
-                      almastermatch_data::joined(ALMasterMatch::byName("door", listed, false)),
+        UNSCOPED_INFO("listed once for many names, the same");
+        CHECK(almastermatch_data::joined(ALMasterMatch::byName("door", listed, false)) ==
                       almastermatch_data::joined(ALMasterMatch::byName("door", blessed, false)));
-        ensure("and given up where asked", ALMasterMatch::listing(blessed, false, [] { return true; }).empty());
+        UNSCOPED_INFO("and given up where asked");
+        REQUIRE(ALMasterMatch::listing(blessed, false, [] { return true; }).empty());
     }
 
-    template<> template<>
-    void almastermatch_object::test<7>()
+    TEST_CASE_METHOD(almastermatch_data, "almastermatch: by name in SLua: .luau then .lua", "[almastermatch]")
     {
-        set_test_name("by name in SLua: .luau, then .lua");
         Scratch           s;
         const std::string luau = s.write("a/util.luau", "return {}\n");
         const std::string lua  = s.write("a/util.lua", "return {}\n");
@@ -357,20 +403,19 @@ namespace tut
         s.write("a/util.lsl");
         ALDiskIncludes blessed;
         blessed.bless(s.at("a"));
-        ensure_equals("the modern first, nearer the top first among those",
-                      almastermatch_data::joined(ALMasterMatch::byName("util", blessed, true)), almastermatch_data::joined({ luau, deep, lua }));
-        ensure_equals("and LSL's for LSL", ALMasterMatch::byName("util", blessed, false).size(), size_t(1));
+        UNSCOPED_INFO("the modern first, nearer the top first among those");
+        CHECK(almastermatch_data::joined(ALMasterMatch::byName("util", blessed, true)) == almastermatch_data::joined({ luau, deep, lua }));
+        UNSCOPED_INFO("and LSL's for LSL");
+        REQUIRE(ALMasterMatch::byName("util", blessed, false).size() == size_t(1));
     }
 
-    template<> template<>
-    void almastermatch_object::test<8>()
+    TEST_CASE_METHOD(almastermatch_data, "almastermatch: a notecard's master is text or notecard or JSON in any case; never a script", "[almastermatch]")
     {
-        set_test_name("a notecard's master is text, a notecard's own, or JSON, in any case, and never a script");
         const std::vector<std::string>& notecards = ALMasterMatch::notecardExtensions();
-        ensure("text", ALDiskIncludes::extensionOf("readme.txt", notecards) != 0);
-        ensure("a notecard", ALDiskIncludes::extensionOf("Config.NOTECARD", notecards) != 0);
-        ensure("JSON", ALDiskIncludes::extensionOf("data/settings.json", notecards) != 0);
-        ensure("not a script", ALDiskIncludes::extensionOf("door.lsl", notecards) == 0);
-        ensure("nor SLua", ALDiskIncludes::extensionOf("door.luau", notecards) == 0);
+        CHECK(ALDiskIncludes::extensionOf("readme.txt", notecards) != 0);
+        CHECK(ALDiskIncludes::extensionOf("Config.NOTECARD", notecards) != 0);
+        CHECK(ALDiskIncludes::extensionOf("data/settings.json", notecards) != 0);
+        CHECK(ALDiskIncludes::extensionOf("door.lsl", notecards) == 0);
+        CHECK(ALDiskIncludes::extensionOf("door.luau", notecards) == 0);
     }
 }

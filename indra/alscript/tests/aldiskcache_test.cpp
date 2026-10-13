@@ -29,7 +29,7 @@
 #include "fsyspath.h"
 #include "llfile.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -69,20 +69,10 @@ namespace
     };
 }
 
-namespace tut
+namespace
 {
-    struct aldiskcache_data
+    TEST_CASE("aldiskcache: what is blessed and admitted kept until stale or the settings move", "[aldiskcache]")
     {
-    };
-
-    typedef test_group<aldiskcache_data> aldiskcache_group;
-    typedef aldiskcache_group::object    aldiskcache_object;
-    aldiskcache_group                    aldiskcache_instance("aldiskcache");
-
-    template<> template<>
-    void aldiskcache_object::test<1>()
-    {
-        set_test_name("the folders blessed as the preprocessor blesses them, kept a moment or until the settings move; what they admit kept with them");
         Scratch           s;
         const std::string part = s.write("includes/lib/part.lsl", "integer part;\n");
         s.write("includes/.lslrc", "{\"include\": [\"lib\"]}");
@@ -91,51 +81,80 @@ namespace tut
         const std::vector<std::string> own{ s.at("includes") };
 
         ALDiskCache::Blessed& first = cache.blessed(own, true, s.at("project/a"), {}, 1, 100.0);
-        ensure_equals("the scripter's, and what its .lslrc lists", first.includes.folders().size(), size_t(2));
-        ensure_equals("a file under them admitted", cache.admits(first, part).value_or(""), part);
-        ensure("what is not there, not", !cache.admits(first, s.at("includes/lib/none.lsl")));
+        UNSCOPED_INFO("the scripter's, and what its .lslrc lists");
+        REQUIRE(first.includes.folders().size() == size_t(2));
+        UNSCOPED_INFO("a file under them admitted");
+        CHECK(cache.admits(first, part).value_or("") == part);
+        UNSCOPED_INFO("what is not there, not");
+        REQUIRE_FALSE(cache.admits(first, s.at("includes/lib/none.lsl")));
 
         // Taken away: still admitted while what is kept is fresh, and the
         // folders as they were.
         fs::remove(s.under("includes/lib/part.lsl"));
         ALDiskCache::Blessed& again = cache.blessed(own, true, s.at("project/a"), {}, 1, 101.0);
-        ensure("the same kept", &again == &first && cache.admits(again, part).has_value());
+        {
+            INFO("the same kept");
+            CHECK(&again == &first);
+            REQUIRE(cache.admits(again, part).has_value());
+        }
         std::string text;
-        ensure("but not read", !cache.read(part, text));
+        UNSCOPED_INFO("but not read");
+        CHECK_FALSE(cache.read(part, text));
 
         ALDiskCache::Blessed& later = cache.blessed(own, true, s.at("project/a"), {}, 1, 100.0 + ALDiskCache::FRESH_SECONDS + 0.5);
-        ensure("a moment later, asked again", !cache.admits(later, part));
+        UNSCOPED_INFO("a moment later, asked again");
+        REQUIRE_FALSE(cache.admits(later, part));
         s.write("includes/lib/part.lsl", "integer part;\n");
-        ensure("kept as asked until then", !cache.admits(later, part));
+        UNSCOPED_INFO("kept as asked until then");
+        REQUIRE_FALSE(cache.admits(later, part));
         ALDiskCache::Blessed& moved = cache.blessed(own, true, s.at("project/a"), {}, 2, 103.0);
-        ensure("the settings moved: asked again at once", cache.admits(moved, part).has_value());
+        UNSCOPED_INFO("the settings moved: asked again at once");
+        REQUIRE(cache.admits(moved, part).has_value());
 
         ALDiskCache::Blessed& plain = cache.blessed(own, false, s.at("project/a"), {}, 2, 103.0);
-        ensure_equals("SLua's: no .lslrc read", plain.includes.folders().size(), size_t(1));
+        UNSCOPED_INFO("SLua's: no .lslrc read");
+        REQUIRE(plain.includes.folders().size() == size_t(1));
         ALDiskCache::Blessed& aliased = cache.blessed(own, false, std::string(), { s.at("project") }, 2, 103.0);
-        ensure_equals("an alias's folder blessed outright", aliased.includes.folders().size(), size_t(2));
-        ensure_equals("the file at the top of each that has it", cache.atTop(moved, ".lslrc").size(), size_t(1));
+        UNSCOPED_INFO("an alias's folder blessed outright");
+        REQUIRE(aliased.includes.folders().size() == size_t(2));
+        UNSCOPED_INFO("the file at the top of each that has it");
+        REQUIRE(cache.atTop(moved, ".lslrc").size() == size_t(1));
     }
 
-    template<> template<>
-    void aldiskcache_object::test<2>()
+    TEST_CASE("aldiskcache: a text read again once its time or size changes; upwards kept a moment", "[aldiskcache]")
     {
-        set_test_name("a text read again only once its time or size changes; the configurations up the folders found once a moment");
         Scratch           s;
         const std::string file = s.write("lib/util.lsl", "integer one;\n");
         ALDiskCache       cache;
         std::string       text;
-        ensure("read", cache.read(file, text) && text == "integer one;\n");
+        REQUIRE(cache.read(file, text));
+        CHECK(text == "integer one;\n");
         s.write("lib/util.lsl", "integer three;\n");
-        ensure("read again once it changed", cache.read(file, text) && text == "integer three;\n");
-        ensure("nothing where nothing is", !cache.read(s.at("lib/none.lsl"), text));
+        {
+            INFO("read again once it changed");
+            CHECK(cache.read(file, text));
+            CHECK(text == "integer three;\n");
+        }
+        UNSCOPED_INFO("nothing where nothing is");
+        CHECK_FALSE(cache.read(s.at("lib/none.lsl"), text));
 
         s.write("a/.luaurc", "{}");
         s.write("a/b/c/.luaurc", "{}");
-        const std::vector<std::string>& up = cache.upwards(s.at("a/b/c"), ".luaurc", 1, 10.0);
-        ensure("nearest first, to the root", up.size() >= 2 && up[0] == s.at("a/b/c/.luaurc") && up[1] == s.at("a/.luaurc"));
+        // A copy: upwards() answers with what it keeps, which a later call
+        // for the same folder fills again.
+        const std::vector<std::string> up = cache.upwards(s.at("a/b/c"), ".luaurc", 1, 10.0);
+        {
+            INFO("nearest first, to the root");
+            REQUIRE(up.size() >= 2);
+            CHECK(up[0] == s.at("a/b/c/.luaurc"));
+            CHECK(up[1] == s.at("a/.luaurc"));
+        }
         s.write("a/b/.luaurc", "{}");
-        ensure_equals("kept a moment", cache.upwards(s.at("a/b/c"), ".luaurc", 1, 11.0).size(), up.size());
-        ensure("then found", cache.upwards(s.at("a/b/c"), ".luaurc", 1, 10.0 + ALDiskCache::FRESH_SECONDS + 1.0)[1] == s.at("a/b/.luaurc"));
+        UNSCOPED_INFO("kept a moment");
+        REQUIRE(cache.upwards(s.at("a/b/c"), ".luaurc", 1, 11.0).size() == up.size());
+        const std::vector<std::string>& later = cache.upwards(s.at("a/b/c"), ".luaurc", 1, 10.0 + ALDiskCache::FRESH_SECONDS + 1.0);
+        REQUIRE(later.size() > 1);
+        UNSCOPED_INFO("then found");
+        CHECK(later[1] == s.at("a/b/.luaurc"));
     }
 }
