@@ -110,6 +110,7 @@ namespace
         REQUIRE(ft->getGlyphInfo(rocket, EFontGlyphType::Color) != nullptr);
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
+        REQUIRE(cache != nullptr);
         CHECK(cache->getNumBitmaps(EFontGlyphType::Color) == 1u);
     }
 
@@ -146,6 +147,7 @@ namespace
         REQUIRE(ft.notNull());
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
+        REQUIRE(cache != nullptr);
         const S32 gen_before = cache->getCacheGeneration();
 
         LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
@@ -171,7 +173,9 @@ namespace
             SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        REQUIRE(face.notNull());
         hb_font_t* hb_font = face->getHbFont();
+        REQUIRE(hb_font != nullptr);
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
@@ -215,37 +219,32 @@ namespace
         CHECK(page->getTexName() != 0);
     }
 
-    // Force-monochrome static is wired in at the LLFontGL render-call layer.
-    // We can't directly drive a render call from here without the full UI
-    // bringup, but we *can* pin the static's existence + mutability and
-    // verify that the Grayscale routing works while it's set, which is
-    // what the call-site code does at llfontgl.cpp:560/715/862. Save and
-    // restore the static so the test doesn't perturb sibling tests.
-    TEST_CASE_METHOD(alfontcolrv1_render_data, "ALFontColrV1Render: with sForceMonochromeEmoji set the emoji is looked up as Grayscale", "[ALFontColrV1Render]")
+    // Force-monochrome static is wired in at the LLFontGL render-call layer:
+    // renderUTF8 and renderGlyphRuns ask for Grayscale glyphs rather than
+    // Color while it is set, and getGlyphInfo never reads it. We can't
+    // drive a render call from here without the full UI bringup, so the
+    // case pins the static's existence + mutability and that the Grayscale
+    // routing those call sites go on to ask for works while it's set. The
+    // static is put back however the case ends, so it doesn't perturb
+    // sibling tests.
+    TEST_CASE_METHOD(alfontcolrv1_render_data, "ALFontColrV1Render: with sForceMonochromeEmoji set a Grayscale lookup paints Grayscale", "[ALFontColrV1Render]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
             SKIP("Noto-COLRv1.ttf not present");
 
-        const bool saved = LLFontGL::sForceMonochromeEmoji;
+        struct ForceMonoRestore
+        {
+            const bool mSaved = LLFontGL::sForceMonochromeEmoji;
+            ~ForceMonoRestore() { LLFontGL::sForceMonochromeEmoji = mSaved; }
+        } restore;
         LLFontGL::sForceMonochromeEmoji = true;
 
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
         REQUIRE(ft.notNull());
 
-        // Simulate the render-call selector at llfontgl.cpp:560 with
-        // use_color=true and force_mono=true → request Grayscale.
-        const EFontGlyphType requested =
-            (!/*use_color*/true || LLFontGL::sForceMonochromeEmoji)
-                ? EFontGlyphType::Grayscale : EFontGlyphType::Color;
-        UNSCOPED_INFO("force-mono toggle downgrades Color to Grayscale at "
-                      "the request layer");
-        CHECK((S32)requested == (S32)EFontGlyphType::Grayscale);
-
-        LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, requested);
+        LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, EFontGlyphType::Grayscale);
         REQUIRE(gi != nullptr);
         CHECK((S32)gi->mGlyphType == (S32)EFontGlyphType::Grayscale);
-
-        LLFontGL::sForceMonochromeEmoji = saved;
     }
 }

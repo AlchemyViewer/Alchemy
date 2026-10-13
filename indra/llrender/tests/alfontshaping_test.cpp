@@ -53,6 +53,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <cmath>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -182,11 +183,12 @@ namespace
     }
 
     // Cache hit contract: shaping the same (slice, root_face) twice
-    // yields a glyph stream that's bit-for-bit identical to the first.
-    // This is what callers depend on across frames (pen positions and
-    // glyph ids must not drift), and it's the load-bearing invariant
-    // for the LRU's reuse semantics.
-    TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: shaping the same slice twice gives a bit-identical glyph stream", "[ALFontShaping]")
+    // hits the cache and yields a glyph stream that's bit-for-bit
+    // identical to the first. This is what callers depend on across
+    // frames (pen positions and glyph ids must not drift), and it's the
+    // load-bearing invariant for the LRU's reuse semantics. A hit is told
+    // by cacheMutationCount, which every miss advances and no hit does.
+    TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: shaping the same slice again hits the cache with identical glyphs", "[ALFontShaping]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -197,9 +199,13 @@ namespace
         const Text s = text('h','e','l','l','o');
         std::vector<ALShapedGlyph> first;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), first);
+        REQUIRE_FALSE(first.empty());
+        const size_t mutations = ALFontShaping::cacheMutationCount();
 
         std::vector<ALShapedGlyph> second;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), second);
+        UNSCOPED_INFO("the second shape is a cache hit");
+        CHECK(ALFontShaping::cacheMutationCount() == mutations);
         REQUIRE(second.size() == first.size());
         for (size_t i = 0; i < first.size(); ++i)
         {
@@ -213,13 +219,13 @@ namespace
     // clearCacheForFace purges only the entries owned by the named
     // face — entries from other heads must persist. Verify by populating
     // the cache from two distinct faces and checking both round-trip
-    // via shapeLine; clear face A's cache and verify A's cluster
-    // identity is gone (next shape rebuilds) while B's persists.
+    // via shapeLine; clear face A's cache and verify A's entry is gone
+    // (the next shape of A misses and rebuilds it) while B's persists.
     //
-    // Without instrumentation we observe "cache cleared" indirectly
-    // by checking the returned reference identity from shapeLine —
-    // a cleared entry rebuilds to a fresh storage location.
-    TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: clearCacheForFace on one face leaves another face's entry in place", "[ALFontShaping]")
+    // A miss is told by cacheMutationCount, which every miss advances,
+    // not by the rebuilt entry's address: the allocator may hand the
+    // freed storage straight back.
+    TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: clearCacheForFace drops one face's entry and leaves another's", "[ALFontShaping]")
     {
         const std::string a_path = std::string(kFontDir) + "DejaVuSans.woff2";
         const std::string b_path = std::string(kFontDir) + "InterVariable.woff2";
@@ -245,13 +251,17 @@ namespace
         CHECK(a_second.data() == a_addr0);
 
         ALFontShaping::clearCacheForFace(a);
+        UNSCOPED_INFO("clearCacheForFace(A) dropped one of the two entries");
+        CHECK(ALFontShaping::cacheSize() == 1u);
 
-        // After clearing A: B's entry survives — its storage address
-        // is unchanged. (Whether A's entry got reused at the same
-        // address by the allocator after clear is implementation-
-        // defined and not part of the contract.)
+        // After clearing A: shaping A again misses, so A's entry was
+        // the one dropped, and B's entry survives — its storage address
+        // is unchanged.
+        const size_t mutations = ALFontShaping::cacheMutationCount();
         const auto& a_after = ALFontShaping::shapeLine(a, s, 0, s.size());
         CHECK_FALSE(a_after.empty());
+        UNSCOPED_INFO("A's entry was dropped: shaping A again rebuilt it");
+        CHECK(ALFontShaping::cacheMutationCount() != mutations);
 
         const auto& b_after = ALFontShaping::shapeLine(b, s, 0, s.size());
         UNSCOPED_INFO("B cache survived clearCacheForFace(A)");
@@ -335,11 +345,11 @@ namespace
         REQUIRE_FALSE(first.empty());
         UNSCOPED_INFO("first shape leaves one entry");
         CHECK(ALFontShaping::cacheSize() == 1u);
-        // Snapshot the size BEFORE clearCache invalidates `first` —
+        // Copy the glyphs BEFORE clearCache invalidates `first` —
         // shapeLine returns a reference into the LRU, so the entry's
         // storage is gone the moment the LRU is cleared. Reading
-        // first.size() afterward would be a use-after-free.
-        const size_t first_size = first.size();
+        // `first` afterward would be a use-after-free.
+        const std::vector<ALShapedGlyph> first_glyphs = first;
         const void* addr0 = first.data();
 
         // Cache hit: same storage AND the entry count stays at one.
@@ -360,7 +370,14 @@ namespace
         UNSCOPED_INFO("post-clear miss repopulated to one entry");
         CHECK(ALFontShaping::cacheSize() == 1u);
         UNSCOPED_INFO("post-clear shape has as many glyphs as the first");
-        CHECK(after.size() == first_size);
+        REQUIRE(after.size() == first_glyphs.size());
+        for (size_t i = 0; i < after.size(); ++i)
+        {
+            CAPTURE(i);
+            CHECK(after[i].glyph_id == first_glyphs[i].glyph_id);
+            CHECK(after[i].cluster == first_glyphs[i].cluster);
+            CHECK(after[i].x_advance == first_glyphs[i].x_advance);
+        }
     }
 
     // Multi-hop shape run: ASCII + CJK + Emoji through a head (DejaVu)
@@ -368,10 +385,11 @@ namespace
     // itemizes by face coverage so each cluster routes to the right
     // face. Pins gap audit #3 — multi-hop selectShapingFace was
     // untested, the existing fallback tests use a single hop only.
+    // SourceHanSans ships as a collection; loadFt opens its first face.
     TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: ASCII then CJK then emoji route to the head and each of two fallbacks", "[ALFontShaping]")
     {
         const std::string dejavu = std::string(kFontDir) + "DejaVuSans.woff2";
-        const std::string han    = std::string(kFontDir) + "SourceHanSans-Regular.woff2";
+        const std::string han    = std::string(kFontDir) + "SourceHanSans-VF.otf.ttc";
         const std::string emoji  = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(dejavu) || !fileExists(han) || !fileExists(emoji))
             SKIP("DejaVuSans + SourceHanSans + Noto-COLRv1 required");
@@ -446,10 +464,10 @@ namespace
     // dropped by clearCacheForFace(A). The shape LRU is keyed on root
     // face only (alfontshaping.cpp:62-64); B's own entries (if any)
     // survive — we don't double-purge across heads sharing fallbacks.
-    TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: clearCacheForFace on a head keeps the entry of its fallback face", "[ALFontShaping]")
+    TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: clearCacheForFace on a head keeps its fallback face's entry", "[ALFontShaping]")
     {
         const std::string a_path = std::string(kFontDir) + "DejaVuSans.woff2";
-        const std::string b_path = std::string(kFontDir) + "SourceHanSans-Regular.woff2";
+        const std::string b_path = std::string(kFontDir) + "SourceHanSans-VF.otf.ttc";
         if (!fileExists(a_path) || !fileExists(b_path))
             SKIP("DejaVuSans + SourceHanSans required");
 
@@ -466,27 +484,28 @@ namespace
         const auto& b_first = ALFontShaping::shapeLine(b, s, 0, s.size());
         REQUIRE_FALSE(a_first.empty());
         REQUIRE_FALSE(b_first.empty());
-        const void* a_addr = a_first.data();
         const void* b_addr = b_first.data();
 
+        // One of the two entries goes. Which one is told by B's shape
+        // below hitting, not by A's address: whether A's rebuilt entry
+        // lands where the old one was is the allocator's business.
         ALFontShaping::clearCacheForFace(a);
+        UNSCOPED_INFO("clearCacheForFace(A) dropped one of the two entries");
+        CHECK(ALFontShaping::cacheSize() == 1u);
 
-        // B's entry survives clearCacheForFace(A): its storage stays
-        // at the same address. (Whether A's entry got reused by the
-        // allocator at the same address is implementation-defined and
-        // not load-bearing for the contract; B's survival is.)
         const auto& a_after = ALFontShaping::shapeLine(a, s, 0, s.size());
-        const auto& b_after = ALFontShaping::shapeLine(b, s, 0, s.size());
         CHECK_FALSE(a_after.empty());
-        // b_first is a reference into the cache: it dangles unless B's
-        // entry survived, so this REQUIRE guards the read below.
-        UNSCOPED_INFO("B's entry survived clearCacheForFace(A)");
-        REQUIRE(b_after.data() == b_addr);
-        // Sanity: the data we read out of the survived B entry is the
-        // same B stream we observed before — a hidden cross-purge would
-        // have reset it.
-        UNSCOPED_INFO("B output unchanged across A's cache flush");
-        CHECK(b_after.size() == b_first.size());
+
+        // B's entry survives clearCacheForFace(A): shaping B again is a
+        // hit, which leaves cacheMutationCount alone where a purged and
+        // rebuilt entry would have advanced it, and finds B's storage at
+        // the same address.
+        const size_t mutations = ALFontShaping::cacheMutationCount();
+        const auto& b_after = ALFontShaping::shapeLine(b, s, 0, s.size());
+        UNSCOPED_INFO("B's entry survived clearCacheForFace(A): shaping B again hit it");
+        CHECK(ALFontShaping::cacheMutationCount() == mutations);
+        UNSCOPED_INFO("B's entry survived clearCacheForFace(A): same storage");
+        CHECK(b_after.data() == b_addr);
     }
 
     // notdef contract: shaping a codepoint through a head with NO
@@ -775,7 +794,7 @@ namespace
         // up to N glyphs, but never MORE than the input length (which
         // would mean glyph duplication).
         UNSCOPED_INFO("output glyph count never exceeds input codepoint count");
-        CHECK(out.size() <= s.size());
+        CHECK(out.size() <= s.codepoints());
     }
 
     // Cell-alignment probe. For each monospace face shipped in
@@ -832,7 +851,6 @@ namespace
             // sets the canonical cell. Deliberately don't use
             // ft->getXAdvance — that path asserts !mIsFallback and
             // the probe loads as fallback to skip GL pre-warm.
-            REQUIRE_FALSE(out.empty());
             const F32 ref_advance = out[0].x_advance;
             REQUIRE(ref_advance > 0.f);
 
@@ -942,11 +960,14 @@ namespace
     // routing monospace through HB, the mark / mkmk features stay enabled
     // (they're not in kFixedWidthStrict), so HB applies GPOS to position
     // the mark over its base. Pin: shape "a" + U+0301 (combining acute
-    // accent) on a monospace face; the cluster has 2 glyphs sharing one
-    // cluster index, the second has zero x_advance (mark consumes no
-    // cell), and the mark has non-zero positioning (offset OR cluster
-    // composition through ccmp into a precomposed 'á').
-    TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: a combining acute on monospace composes or sits as a zero-advance mark", "[ALFontShaping]")
+    // accent) on a monospace face; either it composes into a precomposed
+    // 'á', or the cluster has 2 glyphs sharing one cluster index, the
+    // second has zero x_advance (mark consumes no cell), and GPOS moves
+    // the mark back over its base (a negative x_offset). HarfBuzz's
+    // normaliser composes "a" + U+0301 whenever the face has U+00E1, as
+    // DejaVuSansMono does, so the mark path is pinned again with "q" +
+    // U+0301, which has no precomposed form.
+    TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: a monospace combining acute composes or sits as a GPOS-placed mark", "[ALFontShaping]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSansMono.woff2";
         if (!fileExists(path))
@@ -969,7 +990,7 @@ namespace
         }
         REQUIRE_FALSE(out.empty());
         // Expected outcomes:
-        //  (a) ccmp composed to precomposed 'á' → 1 glyph, full cell advance.
+        //  (a) composed to precomposed 'á' → 1 glyph, full cell advance.
         //  (b) Two glyphs (a + acute) in one HB cluster → first carries
         //      full advance, second has zero advance and the mark
         //      positioned via GPOS.
@@ -979,7 +1000,7 @@ namespace
         CHECK(ref_advance > 0.f);
         if (out.size() == 1)
         {
-            // ccmp composition path. One cell, no second glyph.
+            // Composition path. One cell, no second glyph.
             UNSCOPED_INFO("cluster index is 0 (base)");
             CHECK(out[0].cluster == 0);
         }
@@ -992,12 +1013,25 @@ namespace
             CHECK(out[1].cluster == out[0].cluster);
             UNSCOPED_INFO("mark glyph has zero advance");
             CHECK(out[1].x_advance == 0.f);
+            UNSCOPED_INFO("GPOS moved the mark back over its base");
+            CHECK(out[1].x_offset < 0.f);
         }
         else
         {
             UNSCOPED_INFO("combining cluster produced unexpected glyph count");
             CHECK(false);
         }
+
+        // "q" + U+0301 cannot compose, so it always takes path (b).
+        const Text q = text(L'q', 0x0301);
+        ALFontShaping::shapeRun(ft, q, 0, q.size(), out);
+        REQUIRE(out.size() == 2u);
+        UNSCOPED_INFO("mark shares base cluster");
+        CHECK(out[1].cluster == out[0].cluster);
+        UNSCOPED_INFO("mark glyph has zero advance");
+        CHECK(out[1].x_advance == 0.f);
+        UNSCOPED_INFO("GPOS moved the mark back over its base");
+        CHECK(out[1].x_offset < 0.f);
     }
 
     // -----------------------------------------------------------------
@@ -1077,6 +1111,7 @@ namespace
         REQUIRE(ft.notNull());
 
         const ALFontFace* face = ft->getFontFace();
+        REQUIRE(face != nullptr);
         FT_Face ftf = face->face();
         const FT_Int32 load_flags = static_cast<FT_Int32>(face->hinting());
 
@@ -1099,29 +1134,31 @@ namespace
     }
 
     // HB's reported load flags after construction must equal what the
-    // FT renderGlyph path uses. Both are casts of mHinting; any
-    // refactor that splits the casts asymmetrically breaks shaped vs
-    // codepoint advance consistency. hb_ft_font_get_load_flags has
-    // existed since HB 1.7 — the codebase requires newer than that.
+    // FT renderGlyph path uses. Both are casts of the hinting the face
+    // was loaded with; any refactor that splits the casts asymmetrically
+    // breaks shaped vs codepoint advance consistency. The face loads at
+    // LIGHT, not the default, so a hinting dropped on its way to either
+    // cannot pass for it. hb_ft_font_get_load_flags has existed since
+    // HB 1.7 — the codebase requires newer than that.
     TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: HB's load flags are the hinting FT renders glyphs with", "[ALFontShaping]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
-        LLPointer<LLFontFreetype> ft = loadFt(path);
+        constexpr EFontHinting hinting = EFontHinting::LIGHT;
+        LLPointer<LLFontFreetype> ft = loadFt(path, /*is_fallback=*/true, /*point_size=*/14.f, /*weight=*/-1, hinting);
         REQUIRE(ft.notNull());
 
         const ALFontFace* face = ft->getFontFace();
+        REQUIRE(face != nullptr);
         hb_font_t* hbf = face->getHbFont();
         REQUIRE(hbf != nullptr);
 
         const int hb_flags = hb_ft_font_get_load_flags(hbf);
-        const int expected = static_cast<int>(face->hinting());
-        CHECK(hb_flags == expected);
-        // And confirm the cast equivalence between the two surfaces
-        // (HB takes int, FT takes FT_Int32) hasn't drifted.
-        CHECK(static_cast<int>(face->hinting()) ==
-                      (int)static_cast<FT_Int32>(face->hinting()));
+        CHECK(hb_flags == static_cast<int>(face->hinting()));
+        // LLFontFreetype::renderGlyph loads with (FT_Int32) of the hinting
+        // the face was loaded with.
+        CHECK(hb_flags == static_cast<int>(static_cast<FT_Int32>(hinting)));
     }
 
     // HB must see the same OT-VAR design coordinates that FT was
@@ -1149,6 +1186,7 @@ namespace
                             /*flags=*/0, va));
 
         const ALFontFace* face = ft->getFontFace();
+        REQUIRE(face != nullptr);
         FT_Face ftf = face->face();
         hb_font_t* hbf = face->getHbFont();
         REQUIRE(hbf != nullptr);
@@ -1156,6 +1194,9 @@ namespace
         FT_MM_Var* mm = nullptr;
         CHECK(FT_Get_MM_Var(ftf, &mm) == 0);
         REQUIRE(mm != nullptr);
+        // Freed however the case ends, a failed REQUIRE below included.
+        const std::unique_ptr<FT_MM_Var, void (*)(FT_MM_Var*)> mm_owner(
+            mm, [](FT_MM_Var* p) { FT_Done_MM_Var(gFTLibrary, p); });
         const FT_UInt num_axis = mm->num_axis;
         CHECK(num_axis >= 1u);
 
@@ -1177,8 +1218,6 @@ namespace
             // 1/65536 to cover any internal float-conversion rounding.
             REQUIRE(delta < (1.f / 65536.f) + 1e-6f);
         }
-
-        FT_Done_MM_Var(gFTLibrary, mm);
     }
 
     // Stem darkening must be disabled on every FT hinter module — the
@@ -1221,6 +1260,7 @@ namespace
         REQUIRE(ft.notNull());
 
         const ALFontFace* face = ft->getFontFace();
+        REQUIRE(face != nullptr);
         FT_Face ftf = face->face();
         REQUIRE(ftf->charmap != nullptr);
         CHECK((int)ftf->charmap->encoding == (int)FT_ENCODING_UNICODE);
@@ -1400,7 +1440,7 @@ namespace
     TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: addFallbackFont drops cached shapes so the new fallback is used", "[ALFontShaping]")
     {
         const std::string a_path = std::string(kFontDir) + "DejaVuSans.woff2";
-        const std::string b_path = std::string(kFontDir) + "SourceHanSans-Regular.woff2";
+        const std::string b_path = std::string(kFontDir) + "SourceHanSans-VF.otf.ttc";
         if (!fileExists(a_path) || !fileExists(b_path))
             SKIP("DejaVuSans + SourceHanSans required");
 

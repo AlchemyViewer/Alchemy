@@ -119,8 +119,8 @@ namespace
     // (not the legacy `kern` table), so the observable signal is that
     // the AV-as-pair advance differs from the sum of solo-A and solo-V
     // advances. A regression that disabled GPOS unconditionally would
-    // make these equal. Skip if no Latin kern pair fires (test
-    // verifies nothing then).
+    // make these equal for every pair. DejaVuSans's GPOS kerns several
+    // of them (AV among them), so none kerning fails the case.
     TEST_CASE_METHOD(alfontshaping_gl_data, "ALFontShapingGL: GPOS kerning reaches HB shaping for some Latin pair in DejaVuSans", "[ALFontShapingGL]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
@@ -159,9 +159,7 @@ namespace
                 break;
             }
         }
-        if (!found_kerned)
-            SKIP("DejaVuSans lacks a measurable Latin kern pair");
-
+        UNSCOPED_INFO("some pair advances differently shaped together than its halves shaped alone");
         CHECK(found_kerned);
     }
 }

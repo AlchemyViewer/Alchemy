@@ -36,8 +36,10 @@
 
 #include <hb.h>
 #include <hb-ft.h>
+#include <hb-ot.h>
 
 #include <cstring>
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -232,7 +234,9 @@ namespace
     // call's result must reflect the second glyph (not the first
     // — a staging-buffer leak would surface as the second result
     // pointing at stale first-glyph bytes when dimensions match).
-    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: one painter paints two different emoji one after the other", "[ALFontColrV1]")
+    // The reference is the second glyph painted by a painter that
+    // never painted the first.
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: one painter paints a second emoji exactly as a fresh painter does", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -244,12 +248,13 @@ namespace
         REQUIRE(face.notNull());
         CHECK(face->isValid());
         hb_font_t* hb_font = face->getHbFont();
+        REQUIRE(hb_font != nullptr);
 
         // Two distinct emoji: fire (U+1F525) and red heart (U+2764).
         // Both should rasterize cleanly through Noto-COLRv1's paint
-        // walker. We don't assert the dimensions match (different
-        // glyphs render to different surfaces) — just that both
-        // succeed and produce live bitmaps.
+        // walker. Their surfaces differ in size (different glyphs
+        // render to different surfaces), so the second result is
+        // compared with the heart painted alone, not with the fire.
         const LLColor4U fg(255, 255, 255, 255);
 
         hb_codepoint_t fire = 0;
@@ -270,19 +275,27 @@ namespace
         REQUIRE(r2.mBitmap != nullptr);
         CHECK(r2.mWidth > 0);
         CHECK(r2.mHeight > 0);
+
+        ALFontColrV1Painter fresh;
+        ALFontColrV1Painter::Result ref;
+        REQUIRE(fresh.paintGlyph(hb_font, heart, 14.f, fg, 0, ref));
+        REQUIRE(ref.mBitmap != nullptr);
+        CHECK(r2.mWidth == ref.mWidth);
+        // The memcmp below reads r2 for ref's pitch times height.
+        REQUIRE(r2.mHeight == ref.mHeight);
+        REQUIRE(r2.mPitch == ref.mPitch);
+        UNSCOPED_INFO("the second paint holds the heart, byte for byte");
+        CHECK(std::memcmp(r2.mBitmap, ref.mBitmap, (size_t)ref.mPitch * ref.mHeight) == 0);
     }
 
     // 2-em-square surface fallback (88585ff86d): a glyph with no
     // ClipBox AND no FT extents lands the painter on a synthetic
     // 2-em surface so it still produces SOMETHING rather than
-    // returning a 0×0 bitmap. We can't naturally trigger this with
-    // Noto-COLRv1 (every emoji has extents); the test instead pins
-    // the public contract via a positive-extent glyph and confirms
-    // the surface size is on the order of (point_size, point_size)
-    // rather than 0×0 — i.e. the path that runs when extents work
-    // also produces a sized bitmap. A negative version (synthetic
-    // glyph forcing the fallback) requires a hand-built TTF and
-    // is left for the integration suite.
+    // returning a 0×0 bitmap. Noto-COLRv1 gives every emoji extents,
+    // so this case cannot reach the fallback; the no-scale case below
+    // drives it by taking the font's scale away. This one pins the
+    // path that runs when extents work: the surface size is on the
+    // order of (point_size, point_size) rather than 0×0.
     TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: the fire emoji's surface is sized on the order of the point size", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
@@ -295,6 +308,7 @@ namespace
         REQUIRE(face.notNull());
         CHECK(face->isValid());
         hb_font_t* hb_font = face->getHbFont();
+        REQUIRE(hb_font != nullptr);
 
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
@@ -312,11 +326,11 @@ namespace
         // size. A regression where the path returned 0×0 would fail
         // the lower bound; a regression that ballooned to 2× the
         // 2-em square (32×32 fallback for 14pt) would fail the upper
-        // bound (~3× point_size).
+        // bound (3× point_size).
         CHECK(result.mWidth >= 4);
-        CHECK(result.mWidth <= (S32)(point_size * 4.f));
+        CHECK(result.mWidth <= (S32)(point_size * 3.f));
         CHECK(result.mHeight >= 4);
-        CHECK(result.mHeight <= (S32)(point_size * 4.f));
+        CHECK(result.mHeight <= (S32)(point_size * 3.f));
     }
 
     // (Test 9 removed: pinned the mForegroundOnly flag on the painter
@@ -335,7 +349,9 @@ namespace
             SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        REQUIRE(face.notNull());
         hb_font_t* hb_font = face->getHbFont();
+        REQUIRE(hb_font != nullptr);
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
@@ -376,8 +392,8 @@ namespace
     // the fire emoji once with palette 0 and once with palette 1. If
     // Noto-COLRv1 ships >= 2 CPAL palettes, the resulting bytes must
     // differ at non-zero-alpha positions. Skip if only one palette is
-    // present (no observable difference, but the code path is exercised
-    // either way).
+    // present: the painter clamps palette 1 to 0 then, so the two paints
+    // match and say nothing.
     TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: palette_index reaches hb_font_paint_glyph: palette 1 paints differently", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
@@ -385,11 +401,15 @@ namespace
             SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        REQUIRE(face.notNull());
         hb_font_t* hb_font = face->getHbFont();
+        REQUIRE(hb_font != nullptr);
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
             SKIP("Noto-COLRv1 has no fire emoji");
+        if (hb_ot_color_palette_get_count(hb_font_get_face(hb_font)) < 2)
+            SKIP("Noto-COLRv1 ships only one CPAL palette");
 
         const LLColor4U fg(255, 255, 255, 255);
 
@@ -403,9 +423,8 @@ namespace
         REQUIRE(r0.mWidth == r1.mWidth);
         REQUIRE(r0.mHeight == r1.mHeight);
 
-        // Compare bytes — if the font has only one palette, hb resolves
-        // both calls against palette 0 and the bitmaps match. Skip in
-        // that case; the test would be vacuous.
+        // Compare bytes — palette 1 exists, so the two paints must differ
+        // somewhere either of them covers.
         bool any_diff = false;
         for (S32 y = 0; y < r0.mHeight && !any_diff; ++y)
         {
@@ -422,9 +441,6 @@ namespace
                 }
             }
         }
-        if (!any_diff)
-            SKIP("Noto-COLRv1 ships only one CPAL palette");
-
         CHECK(any_diff);
     }
 
@@ -439,7 +455,9 @@ namespace
             SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        REQUIRE(face.notNull());
         hb_font_t* hb_font = face->getHbFont();
+        REQUIRE(hb_font != nullptr);
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
@@ -452,6 +470,7 @@ namespace
                                   /*palette=*/0,
                                   ALFontColrV1Painter::OutputFormat::Gray,
                                   result));
+        REQUIRE(result.mBitmap != nullptr);
         CHECK((S32)result.mFormat == (S32)ALFontColrV1Painter::OutputFormat::Gray);
         CHECK(result.mWidth > 0);
         CHECK(result.mHeight > 0);
@@ -484,7 +503,9 @@ namespace
             SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        REQUIRE(face.notNull());
         hb_font_t* hb_font = face->getHbFont();
+        REQUIRE(hb_font != nullptr);
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
@@ -494,6 +515,7 @@ namespace
         ALFontColrV1Painter::Result rgba_r, gray_r;
         const LLColor4U fg(255, 255, 255, 255);
         REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0, rgba_r));
+        REQUIRE(rgba_r.mBitmap != nullptr);
         // Stash the BGRA bytes — the next paintGlyph call invalidates
         // mBitmap (it points back into mStaging which we overwrite below).
         std::vector<U8> bgra_bytes(rgba_r.mBitmap,
@@ -504,6 +526,7 @@ namespace
         REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0,
                                   ALFontColrV1Painter::OutputFormat::Gray,
                                   gray_r));
+        REQUIRE(gray_r.mBitmap != nullptr);
         // The comparison below walks the Gray bitmap at the BGRA size.
         REQUIRE(gray_r.mWidth == bgra_w);
         REQUIRE(gray_r.mHeight == bgra_h);
@@ -533,12 +556,13 @@ namespace
     }
 
     // Hybrid floor pin: scan the BGRA result for fully-saturated palette
-    // black pixels (R=G=B=0, A>200) and assert the corresponding Gray
+    // black pixels (R=G=B=0, A>200) and assert every corresponding Gray
     // byte is >= floor (≈ 38 * a / 256) rather than zero. If no such
     // pixel exists across the test glyphs, skip — the floor invariant
-    // still holds, just isn't observable here. The point of the test is
-    // to lock the constant against future tweaks that would silently
-    // crush dark CPAL details.
+    // still holds, just isn't observable here. The dark sunglasses'
+    // lenses are palette black, so Noto-COLRv1 has some. The point of
+    // the test is to lock the constant against future tweaks that would
+    // silently crush dark CPAL details.
     TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: Gray keeps an alpha floor under saturated black palette pixels", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
@@ -546,15 +570,23 @@ namespace
             SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        REQUIRE(face.notNull());
         hb_font_t* hb_font = face->getHbFont();
+        REQUIRE(hb_font != nullptr);
 
         // Sweep a handful of likely candidates: emoji that commonly carry
-        // black eye/outline detail in Noto's palette. First one with a
-        // fully-saturated black pixel wins; otherwise the test skips.
+        // black eye/outline detail in Noto's palette. Every
+        // fully-saturated black pixel of every one is checked; if none
+        // has one, the test skips.
         const hb_codepoint_t cps[] = { 0x1F600 /*grinning face*/,
                                        0x1F602 /*face with tears of joy*/,
                                        0x1F525 /*fire*/,
-                                       0x2764  /*red heart*/ };
+                                       0x2764  /*red heart*/,
+                                       0x1F576 /*dark sunglasses*/ };
+        S32 black = 0;            // fully-saturated black pixels seen
+        S32 under_floor = 0;      // of those, Gray bytes below the floor
+        hb_codepoint_t first_cp = 0;
+        S32 first_x = -1, first_y = -1;
         for (hb_codepoint_t cp : cps)
         {
             hb_codepoint_t gid = 0;
@@ -566,6 +598,7 @@ namespace
             const LLColor4U fg(255, 255, 255, 255);
             if (!painter.paintGlyph(hb_font, gid, 32.f, fg, 0, rgba_r))
                 continue;
+            REQUIRE(rgba_r.mBitmap != nullptr);
             std::vector<U8> bgra_bytes(rgba_r.mBitmap,
                                        rgba_r.mBitmap + (size_t)rgba_r.mPitch * rgba_r.mHeight);
             const S32 bgra_w = rgba_r.mWidth, bgra_h = rgba_r.mHeight;
@@ -574,6 +607,11 @@ namespace
                                     ALFontColrV1Painter::OutputFormat::Gray,
                                     gray_r))
                 continue;
+            REQUIRE(gray_r.mBitmap != nullptr);
+            // The scan below walks the Gray bitmap at the BGRA size.
+            CAPTURE(cp);
+            REQUIRE(gray_r.mWidth == bgra_w);
+            REQUIRE(gray_r.mHeight == bgra_h);
 
             for (S32 y = 0; y < bgra_h; ++y)
             {
@@ -587,15 +625,23 @@ namespace
                     const U32 a = bgra_row[x*4 + 3];
                     if (r == 0 && g == 0 && b == 0 && a > 200)
                     {
+                        ++black;
                         const U32 expected_floor = (a * 38u) >> 8;
-                        CAPTURE(cp, x, y);
-                        REQUIRE((U32)gray_row[x] + 1u >= expected_floor);
-                        return;
+                        if ((U32)gray_row[x] + 1u < expected_floor && under_floor++ == 0)
+                        {
+                            first_cp = cp;
+                            first_x  = x;
+                            first_y  = y;
+                        }
                     }
                 }
             }
         }
-        SKIP("no fully-saturated-black palette pixel found across test glyphs");
+        if (black == 0)
+            SKIP("no fully-saturated-black palette pixel found across test glyphs");
+        // The first pixel under the floor, if any.
+        CAPTURE(black, first_cp, first_x, first_y);
+        CHECK(under_floor == 0);
     }
 
     // Out-of-range palette_index clamps to 0 deterministically. Paint
@@ -609,7 +655,9 @@ namespace
             SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        REQUIRE(face.notNull());
         hb_font_t* hb_font = face->getHbFont();
+        REQUIRE(hb_font != nullptr);
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
@@ -620,6 +668,8 @@ namespace
         const LLColor4U fg(255, 255, 255, 255);
         REQUIRE(painter_a.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/0u, r_zero));
         REQUIRE(painter_b.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/99u, r_huge));
+        REQUIRE(r_zero.mBitmap != nullptr);
+        REQUIRE(r_huge.mBitmap != nullptr);
         CHECK(r_huge.mWidth == r_zero.mWidth);
         // The memcmp below reads r_huge for r_zero's pitch times height.
         REQUIRE(r_huge.mHeight == r_zero.mHeight);
@@ -629,28 +679,32 @@ namespace
         CHECK(std::memcmp(r_zero.mBitmap, r_huge.mBitmap, bytes) == 0);
     }
 
-    // Fallback point_size kicks in when the hb_font has ppem unset.
-    // Synthesize that condition by zeroing the hb_font scale before
-    // calling paintGlyph; the painter must still produce a sized
-    // bitmap rather than returning false. Specifically targets the
-    // 2-em fallback inside the empty-bbox branch — without the
-    // fallback point_size override, that branch would return false.
-    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: with ppem unset paintGlyph sizes from the fallback point size or fails", "[ALFontColrV1]")
+    // Fallback point_size kicks in when the hb_font has ppem unset and
+    // gives the glyph no extents. Synthesize that condition by zeroing
+    // the hb_font scale before calling paintGlyph (a fresh hb_font has
+    // no ppem already); the painter must still produce a bitmap sized
+    // from the fallback rather than returning false. Specifically
+    // targets the 2-em fallback inside the empty-bbox branch — without
+    // the fallback point_size override, that branch would return false.
+    // Nothing is painted at scale 0; the surface is what is checked.
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: with no scale or ppem paintGlyph sizes 2 em of the fallback point size", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
             SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        // Build a dedicated hb_font on top of the same FT_Face so we can
-        // mutate its ppem without affecting the face cache shared with
-        // other tests in this group.
+        REQUIRE(face.notNull());
+        // Build a dedicated hb_font on top of the same hb_face so we can
+        // mutate its scale without affecting the face cache shared with
+        // other tests in this group. Destroyed however the case ends.
         hb_font_t* shared = face->getHbFont();
         REQUIRE(shared != nullptr);
         hb_face_t* hb_face = hb_font_get_face(shared);
-        hb_font_t* hb_font = hb_font_create(hb_face);
+        const std::unique_ptr<hb_font_t, void (*)(hb_font_t*)> owned(hb_font_create(hb_face), hb_font_destroy);
+        hb_font_t* hb_font = owned.get();
         REQUIRE(hb_font != nullptr);
-        hb_font_set_ppem(hb_font, 0, 0);
+        hb_font_set_scale(hb_font, 0, 0);
         unsigned px = 1, py = 1;
         hb_font_get_ppem(hb_font, &px, &py);
         CHECK(px == 0);
@@ -663,31 +717,21 @@ namespace
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(shared, 0x1F525, &fire);
         if (fire == 0)
-        {
-            hb_font_destroy(hb_font);
             SKIP("Noto-COLRv1 has no fire emoji");
-        }
 
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
-        // fallback_point_size = 14: should drive the empty-bbox branch
-        // to size against ~14 px instead of returning false.
-        const bool ok = painter.paintGlyph(hb_font, fire,
-                                           /*fallback_point_size=*/14.f, fg,
-                                           /*palette=*/0u, result);
-        // The walker may still bail on other grounds for this unscaled
-        // font (some paint commands depend on scale-derived coords), so
-        // the strict assertion is "doesn't crash and returns either a
-        // valid bitmap or a clean false." A regression that returned
-        // false when fallback_point_size would have rescued it is the
-        // failure mode we're protecting against.
-        if (ok)
-        {
-            CHECK(result.mWidth > 0);
-            CHECK(result.mHeight > 0);
-        }
-        hb_font_destroy(hb_font);
+        // fallback_point_size = 14: drives the empty-bbox branch to size
+        // against 14 px instead of returning false.
+        constexpr F32 fallback_point_size = 14.f;
+        REQUIRE(painter.paintGlyph(hb_font, fire, fallback_point_size, fg,
+                                   /*palette=*/0u, result));
+        // Two ems of the fallback size, and the painter's 2 px pad on
+        // every side.
+        constexpr S32 expected = 2 * (S32)fallback_point_size + 2 * 2;
+        CHECK(result.mWidth == expected);
+        CHECK(result.mHeight == expected);
     }
 
     // GLYPH_PAD bump (§10.2): outermost row/column of a rendered glyph
@@ -703,7 +747,9 @@ namespace
             SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        REQUIRE(face.notNull());
         hb_font_t* hb_font = face->getHbFont();
+        REQUIRE(hb_font != nullptr);
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
