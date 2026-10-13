@@ -2332,7 +2332,7 @@ namespace tut
                     const F32* p = points.data() + t + k * components;
                     f.mCorner[k].set(p[0], p[1], p[2]);
                 }
-                // An instance not drawn, its vertices at one point, and a ring quad's empty third triangle.
+                // An instance not drawn, its vertices at one point, and a ring quad's empty first triangle.
                 const LLVector3d u = f.mCorner[1] - f.mCorner[0];
                 const LLVector3d v = f.mCorner[2] - f.mCorner[0];
                 if (std::fabs(u.mdV[VX] * v.mdV[VY] - v.mdV[VX] * u.mdV[VY]) > 1e-6)

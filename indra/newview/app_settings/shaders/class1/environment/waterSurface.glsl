@@ -303,7 +303,8 @@ bool water_vertex(int part, int instance, int vertex, out vec3 pos)
     vec2 hi = clamp((vec2(at) - 1.0) * s, -rim, rim);
     bool drawn = void_drawn && !(ring == 0 && edge >= 0);
     // Three triangles: with an edge to split, that edge south, its middle m, the west triangle, the middle one and the
-    // east one; without, two halves and an empty third.
+    // east one; without, an empty first and two halves. The empty one comes first: llvmpipe draws nothing of an
+    // instance whose last triangle is empty.
     int tri = vertex / 3;
     int k = vertex - tri * 3;
     vec2 t;
@@ -327,15 +328,15 @@ bool water_vertex(int part, int instance, int vertex, out vec3 pos)
     {
         if (tri == 0)
         {
-            t = k == 0 ? vec2(0.0, 0.0) : (k == 1 ? vec2(1.0, 0.0) : vec2(1.0, 1.0));
+            t = vec2(0.0);
         }
         else if (tri == 1)
         {
-            t = k == 0 ? vec2(0.0, 0.0) : (k == 1 ? vec2(1.0, 1.0) : vec2(0.0, 1.0));
+            t = k == 0 ? vec2(0.0, 0.0) : (k == 1 ? vec2(1.0, 0.0) : vec2(1.0, 1.0));
         }
         else
         {
-            t = vec2(0.0);
+            t = k == 0 ? vec2(0.0, 0.0) : (k == 1 ? vec2(1.0, 1.0) : vec2(0.0, 1.0));
         }
     }
     pos = vec3(centre + (drawn ? water_between(lo, hi, t) : vec2(0.0)), waterDefaultHeight);
