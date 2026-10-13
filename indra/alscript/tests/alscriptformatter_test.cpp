@@ -26,9 +26,9 @@
 
 #include "../core/alscriptformatter.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alscriptformatter_data
     {
@@ -44,13 +44,9 @@ namespace tut
             return ALScriptFormatter::format(text, options);
         }
     };
-    typedef test_group<alscriptformatter_data> alscriptformatter_group;
-    typedef alscriptformatter_group::object    alscriptformatter_object;
-    tut::alscriptformatter_group               alscriptformatter_instance("alscriptformatter");
 
     // LSL: braces, a hanging statement, a list across lines, a directive.
-    template<> template<>
-    void alscriptformatter_object::test<1>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: LSL: braces; a hanging statement; a list across lines; a directive", "[alscriptformatter]")
     {
         const std::string in =
             "#define X 1\n"
@@ -86,31 +82,34 @@ namespace tut
             "        }\n"
             "    }\n"
             "}\n";
-        ensure_equals("lsl structure", lsl(in), want);
+        CHECK(lsl(in) == want);
     }
 
     // LSL spacing: operators, unary signs, vectors, casts, comments.
-    template<> template<>
-    void alscriptformatter_object::test<2>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: LSL spacing: operators; unary signs; vectors; casts; comments", "[alscriptformatter]")
     {
-        ensure_equals("binary", lsl("x=a+b*c;\n"), std::string("x = a + b * c;\n"));
-        ensure_equals("unary", lsl("x = -a * -b;\n"), std::string("x = -a * -b;\n"));
-        ensure_equals("not", lsl("if(!x)y=~z;\n"), std::string("if (!x) y = ~z;\n"));
-        ensure_equals("vector", lsl("v=<1,-2,3>*<0,0,1>;\n"), std::string("v = <1, -2, 3> * <0, 0, 1>;\n"));
-        ensure_equals("comparison", lsl("if(a<b&&c>d)x++;\n"), std::string("if (a < b && c > d) x++;\n"));
-        ensure_equals("cast kept", lsl("x=(integer)y;\n"), std::string("x = (integer)y;\n"));
-        ensure_equals("cast spaced kept", lsl("x=(integer) y;\n"), std::string("x = (integer) y;\n"));
-        ensure_equals("for", lsl("for(i=0;i<n;i++){}\n"), std::string("for (i = 0; i < n; i++) {}\n"));
-        ensure_equals("trailing comment kept", lsl("x = 1;   // one\n"), std::string("x = 1;   // one\n"));
-        ensure_equals("string kept", lsl("s=\"a  +  b\";\n"), std::string("s = \"a  +  b\";\n"));
-        ensure_equals("label", lsl("@loop;jump loop;\n"), std::string("@loop; jump loop;\n"));
-        ensure_equals("braces on a line", lsl("if (x){llSay(0,\"a\");}\n"), std::string("if (x) { llSay(0, \"a\"); }\n"));
+        CHECK(lsl("x=a+b*c;\n") == std::string("x = a + b * c;\n"));
+        CHECK(lsl("x = -a * -b;\n") == std::string("x = -a * -b;\n"));
+        CHECK(lsl("if(!x)y=~z;\n") == std::string("if (!x) y = ~z;\n"));
+        CHECK(lsl("v=<1,-2,3>*<0,0,1>;\n") == std::string("v = <1, -2, 3> * <0, 0, 1>;\n"));
+        CHECK(lsl("if(a<b&&c>d)x++;\n") == std::string("if (a < b && c > d) x++;\n"));
+        UNSCOPED_INFO("cast kept");
+        CHECK(lsl("x=(integer)y;\n") == std::string("x = (integer)y;\n"));
+        UNSCOPED_INFO("cast spaced kept");
+        CHECK(lsl("x=(integer) y;\n") == std::string("x = (integer) y;\n"));
+        CHECK(lsl("for(i=0;i<n;i++){}\n") == std::string("for (i = 0; i < n; i++) {}\n"));
+        UNSCOPED_INFO("trailing comment kept");
+        CHECK(lsl("x = 1;   // one\n") == std::string("x = 1;   // one\n"));
+        UNSCOPED_INFO("string kept");
+        CHECK(lsl("s=\"a  +  b\";\n") == std::string("s = \"a  +  b\";\n"));
+        CHECK(lsl("@loop;jump loop;\n") == std::string("@loop; jump loop;\n"));
+        UNSCOPED_INFO("braces on a line");
+        CHECK(lsl("if (x){llSay(0,\"a\");}\n") == std::string("if (x) { llSay(0, \"a\"); }\n"));
     }
 
     // Luau: blocks by keyword, a function in a call, a table, and the
     // spacing that is its own.
-    template<> template<>
-    void alscriptformatter_object::test<3>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: Luau: blocks by keyword; a function in a call; a table; its own spacing", "[alscriptformatter]")
     {
         const std::string in =
             "local function f(a,b)\n"
@@ -150,62 +149,73 @@ namespace tut
             "    a = 1,\n"
             "    b = { 1, 2 },\n"
             "}\n";
-        ensure_equals("luau structure", lua(in), want);
-        ensure_equals("generics kept", lua("local x: Array<number> = {}\n"), std::string("local x: Array<number> = {}\n"));
-        ensure_equals("method kept", lua("obj:method(1)\n"), std::string("obj:method(1)\n"));
-        ensure_equals("not", lua("if not(x)then end\n"), std::string("if not (x) then end\n"));
-        ensure_equals("long string kept", lua("s = [[\n  a\n]]\nx=1\n"), std::string("s = [[\n  a\n]]\nx = 1\n"));
+        CHECK(lua(in) == want);
+        UNSCOPED_INFO("generics kept");
+        CHECK(lua("local x: Array<number> = {}\n") == std::string("local x: Array<number> = {}\n"));
+        UNSCOPED_INFO("method kept");
+        CHECK(lua("obj:method(1)\n") == std::string("obj:method(1)\n"));
+        CHECK(lua("if not(x)then end\n") == std::string("if not (x) then end\n"));
+        UNSCOPED_INFO("long string kept");
+        CHECK(lua("s = [[\n  a\n]]\nx=1\n") == std::string("s = [[\n  a\n]]\nx = 1\n"));
     }
 
     // Blank lines, trailing whitespace, and the end of the file.
-    template<> template<>
-    void alscriptformatter_object::test<4>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: blank lines; trailing whitespace; the end of the file", "[alscriptformatter]")
     {
-        ensure_equals("blanks shortened", lsl("\n\nx = 1;   \n\n\n\n\ny = 2;\n\n\n"), std::string("x = 1;\n\n\ny = 2;\n"));
-        ensure_equals("a newline added", lsl("x = 1;"), std::string("x = 1;\n"));
-        ensure_equals("tabs", [] {
+        UNSCOPED_INFO("blanks shortened");
+        CHECK(lsl("\n\nx = 1;   \n\n\n\n\ny = 2;\n\n\n") == std::string("x = 1;\n\n\ny = 2;\n"));
+        UNSCOPED_INFO("a newline added");
+        CHECK(lsl("x = 1;") == std::string("x = 1;\n"));
+        UNSCOPED_INFO("tabs");
+        CHECK([] {
             ALScriptFormatter::Options options;
             options.tabs = true;
             return ALScriptFormatter::format("{\nx;\n}\n", options);
-        }(), std::string("{\n\tx;\n}\n"));
+        }() == std::string("{\n\tx;\n}\n"));
     }
 
     // Only some lines, the rest as written and every line kept.
-    template<> template<>
-    void alscriptformatter_object::test<5>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: only some lines formatted with the rest as written and every line kept", "[alscriptformatter]")
     {
         const std::string in = "default\n{\nstate_entry()\n{\n\n\nx=1;\n}\n}\n";
         ALScriptFormatter::Options options;
-        ensure_equals("one line", ALScriptFormatter::formatLines(in, options, 6, 6), std::string("default\n{\nstate_entry()\n{\n\n\n        x = 1;\n}\n}\n"));
-        ensure_equals("blanks kept", ALScriptFormatter::formatLines(in, options, 4, 7), std::string("default\n{\nstate_entry()\n{\n\n\n        x = 1;\n    }\n}\n"));
+        UNSCOPED_INFO("one line");
+        CHECK(ALScriptFormatter::formatLines(in, options, 6, 6) == std::string("default\n{\nstate_entry()\n{\n\n\n        x = 1;\n}\n}\n"));
+        UNSCOPED_INFO("blanks kept");
+        CHECK(ALScriptFormatter::formatLines(in, options, 4, 7) == std::string("default\n{\nstate_entry()\n{\n\n\n        x = 1;\n    }\n}\n"));
         // A string across lines is one line to the formatter, left alone
         // unless the whole of it is asked for.
         const std::string across = "x = \"a\nb\";\ny=2;\n";
-        ensure_equals("across, partly", ALScriptFormatter::formatLines(across, options, 1, 2), std::string("x = \"a\nb\";\ny = 2;\n"));
-        ensure_equals("across, whole", ALScriptFormatter::formatLines(across, options, 0, 1), std::string("x = \"a\nb\";\ny=2;\n"));
+        UNSCOPED_INFO("across, partly");
+        CHECK(ALScriptFormatter::formatLines(across, options, 1, 2) == std::string("x = \"a\nb\";\ny = 2;\n"));
+        UNSCOPED_INFO("across, whole");
+        CHECK(ALScriptFormatter::formatLines(across, options, 0, 1) == std::string("x = \"a\nb\";\ny=2;\n"));
     }
 
     // Luau's own: an if-expression opens no block, `const` and `export`
     // read as the keywords they are, and a function's body starts afresh.
-    template<> template<>
-    void alscriptformatter_object::test<6>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: Luau: an if-expression opens no block and `const` and `export` are keywords", "[alscriptformatter]")
     {
-        ensure_equals("an if-expression", lua("local x = if a then 1 else 2\ny = 3\n"), std::string("local x = if a then 1 else 2\ny = 3\n"));
-        ensure_equals("chained", lua("local x = if a then 1 elseif b then 2 else 3\ny = 3\n"), std::string("local x = if a then 1 elseif b then 2 else 3\ny = 3\n"));
-        ensure_equals("else if, as one expression", lua("return if a then 1 else if b then 2 else 3\n"), std::string("return if a then 1 else if b then 2 else 3\n"));
-        ensure_equals("across lines", lua("local x =\nif a then 1\nelse 2\ny = 3\n"), std::string("local x =\nif a then 1\nelse 2\ny = 3\n"));
-        ensure_equals("a statement if still opens its block", lua("if a then\nx = 1\nelse\nx = 2\nend\ny = 3\n"),
+        UNSCOPED_INFO("an if-expression");
+        CHECK(lua("local x = if a then 1 else 2\ny = 3\n") == std::string("local x = if a then 1 else 2\ny = 3\n"));
+        UNSCOPED_INFO("chained");
+        CHECK(lua("local x = if a then 1 elseif b then 2 else 3\ny = 3\n") == std::string("local x = if a then 1 elseif b then 2 else 3\ny = 3\n"));
+        UNSCOPED_INFO("else if, as one expression");
+        CHECK(lua("return if a then 1 else if b then 2 else 3\n") == std::string("return if a then 1 else if b then 2 else 3\n"));
+        UNSCOPED_INFO("across lines");
+        CHECK(lua("local x =\nif a then 1\nelse 2\ny = 3\n") == std::string("local x =\nif a then 1\nelse 2\ny = 3\n"));
+        UNSCOPED_INFO("a statement if still opens its block");
+        CHECK(lua("if a then\nx = 1\nelse\nx = 2\nend\ny = 3\n") ==
                       std::string("if a then\n    x = 1\nelse\n    x = 2\nend\ny = 3\n"));
-        ensure_equals("a statement if inside a function inside an expression",
-                      lua("local f = if a then function()\nif b then\nreturn 1\nend\nend else nil\ny = 3\n"),
+        UNSCOPED_INFO("a statement if inside a function inside an expression");
+        CHECK(lua("local f = if a then function()\nif b then\nreturn 1\nend\nend else nil\ny = 3\n") ==
                       std::string("local f = if a then function()\n    if b then\n        return 1\n    end\nend else nil\ny = 3\n"));
-        ensure_equals("const and export", lua("export const n=1\nconst function f(a,b)\nreturn a+b\nend\n"),
+        UNSCOPED_INFO("const and export");
+        CHECK(lua("export const n=1\nconst function f(a,b)\nreturn a+b\nend\n") ==
                       std::string("export const n = 1\nconst function f(a, b)\n    return a + b\nend\n"));
     }
-    template<> template<>
-    void alscriptformatter_object::test<7>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: a continued directive's braces open and close nothing of the script's", "[alscriptformatter]")
     {
-        set_test_name("a directive continued over several lines is the directive's: its braces open and close nothing of the script's");
         const std::string text =
             "#define BLOCK(x) { \\\n"
             "      llSay(0, x); \\\n"
@@ -218,8 +228,8 @@ namespace tut
             "}\n"
             "}\n";
         const std::string out = lsl(text);
-        ensure_equals("the macro as written, the script as it should be",
-                      out,
+        UNSCOPED_INFO("the macro as written, the script as it should be");
+        CHECK(out ==
                       std::string("#define BLOCK(x) { \\\n"
                                   "      llSay(0, x); \\\n"
                                   "}\n"
@@ -232,14 +242,12 @@ namespace tut
                                   "}\n"));
         // SLua's are written --#, and are as written too: a function-like
         // macro's ( stays against its name, and a # is no operator's.
-        ensure_equals("SLua's directives as written, the script as it should be",
-                      lua("--#define SQUARE(x) ((x)*(x))\n--#define LEN(t) #t\nlocal function f(a)\nreturn SQUARE(a)+LEN(a)\nend\n"),
+        UNSCOPED_INFO("SLua's directives as written, the script as it should be");
+        CHECK(lua("--#define SQUARE(x) ((x)*(x))\n--#define LEN(t) #t\nlocal function f(a)\nreturn SQUARE(a)+LEN(a)\nend\n") ==
                       std::string("--#define SQUARE(x) ((x)*(x))\n--#define LEN(t) #t\nlocal function f(a)\n    return SQUARE(a) + LEN(a)\nend\n"));
     }
-    template<> template<>
-    void alscriptformatter_object::test<8>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: breaksInStrings marks line breaks inside strings and not inside comments", "[alscriptformatter]")
     {
-        set_test_name("the line breaks that stand inside a string are known, so that tidying lines leaves them and the blanks before them alone");
         const auto marked = [](const std::vector<bool>& breaks) {
             std::string out;
             for (const bool in : breaks)
@@ -250,41 +258,40 @@ namespace tut
         };
         // A Luau long string over five lines, with blank lines in it; a long
         // comment is not a string.
-        ensure_equals("a long string", marked(ALScriptFormatter::breaksInStrings("local s = [[\n  a  \n\n\n\nb]]\nprint(s)\n", true)), std::string("11111000"));
-        ensure_equals("a long comment", marked(ALScriptFormatter::breaksInStrings("--[[\n\n]]\nprint(1)\n", true)), std::string("00000"));
-        ensure_equals("a string continued by a backslash", marked(ALScriptFormatter::breaksInStrings("print(\"a \\\nb\")\n", true)), std::string("100"));
+        UNSCOPED_INFO("a long string");
+        CHECK(marked(ALScriptFormatter::breaksInStrings("local s = [[\n  a  \n\n\n\nb]]\nprint(s)\n", true)) == std::string("11111000"));
+        UNSCOPED_INFO("a long comment");
+        CHECK(marked(ALScriptFormatter::breaksInStrings("--[[\n\n]]\nprint(1)\n", true)) == std::string("00000"));
+        UNSCOPED_INFO("a string continued by a backslash");
+        CHECK(marked(ALScriptFormatter::breaksInStrings("print(\"a \\\nb\")\n", true)) == std::string("100"));
         // LSL: a break written into a string, an escaped quote that does not
         // end it, and quotes in comments that begin nothing.
-        ensure_equals("an LSL string", marked(ALScriptFormatter::breaksInStrings("string s = \"a  \n\n\nb\";\n// \"not\n/* \" */ integer i;\n", false)),
+        UNSCOPED_INFO("an LSL string");
+        CHECK(marked(ALScriptFormatter::breaksInStrings("string s = \"a  \n\n\nb\";\n// \"not\n/* \" */ integer i;\n", false)) ==
                       std::string("1110000"));
-        ensure_equals("an escaped quote", marked(ALScriptFormatter::breaksInStrings("string s = \"a\\\"\nb\";\n", false)), std::string("100"));
+        UNSCOPED_INFO("an escaped quote");
+        CHECK(marked(ALScriptFormatter::breaksInStrings("string s = \"a\\\"\nb\";\n", false)) == std::string("100"));
     }
-    template<> template<>
-    void alscriptformatter_object::test<9>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: a comment-only line is indented as a statement there would be", "[alscriptformatter]")
     {
-        set_test_name("a line holding nothing but a comment keeps it, indented as a statement there would be");
-        ensure_equals("LSL",
-                      lsl("// first\ndefault\n{\n// a note\nstate_entry()\n{\n/* over\n   lines */\nif (x)\n// why\nllSay(0, \"a\");\n}\n}\n"),
+        CHECK(lsl("// first\ndefault\n{\n// a note\nstate_entry()\n{\n/* over\n   lines */\nif (x)\n// why\nllSay(0, \"a\");\n}\n}\n") ==
                       std::string("// first\ndefault\n{\n    // a note\n    state_entry()\n    {\n        /* over\n   lines */\n        if (x)\n"
                                   "            // why\n            llSay(0, \"a\");\n    }\n}\n"));
-        ensure_equals("Luau",
-                      lua("-- first\nlocal function f()\n-- a note\nreturn 1\nend\n--[[ over\n   lines ]]\n"),
+        CHECK(lua("-- first\nlocal function f()\n-- a note\nreturn 1\nend\n--[[ over\n   lines ]]\n") ==
                       std::string("-- first\nlocal function f()\n    -- a note\n    return 1\nend\n--[[ over\n   lines ]]\n"));
         // Some lines asked for, as the studio asks for all of a script's:
         // every line kept, the comments too.
         ALScriptFormatter::Options options;
-        ensure_equals("LSL, by lines", ALScriptFormatter::formatLines("{\n// note\n/* a\nb */\n}\n", options, 0, 5),
+        UNSCOPED_INFO("LSL, by lines");
+        CHECK(ALScriptFormatter::formatLines("{\n// note\n/* a\nb */\n}\n", options, 0, 5) ==
                       std::string("{\n    // note\n    /* a\nb */\n}\n"));
         options.lua = true;
-        ensure_equals("Luau, by lines", ALScriptFormatter::formatLines("do\n-- note\nend\n", options, 0, 3), std::string("do\n    -- note\nend\n"));
+        UNSCOPED_INFO("Luau, by lines");
+        CHECK(ALScriptFormatter::formatLines("do\n-- note\nend\n", options, 0, 3) == std::string("do\n    -- note\nend\n"));
     }
 
-    template<> template<>
-    void alscriptformatter_object::test<10>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: a line past the width breaks at the commas of its widest bracket", "[alscriptformatter]")
     {
-        set_test_name("a line past the width broken at the commas of its widest bracket, or of the table a call ends with on the call's "
-                      "line, each part a level further in and broken again where still too long, its comment after the last; formatted "
-                      "again, the same; not where no width is set, nor by formatLines; formatEach gives it as one line's");
         ALScriptFormatter::Options options;
         options.lua   = true;
         options.width = 100;
@@ -318,31 +325,39 @@ namespace tut
                                  "    print(\"a string with no comma in it that is longer than the width of one hundred columns, and so on\")\n"
                                  "end\n";
         const std::string out = ALScriptFormatter::format(in, options);
-        ensure_equals("broken", out, want);
-        ensure_equals("the same again", ALScriptFormatter::format(out, options), want);
+        UNSCOPED_INFO("broken");
+        CHECK(out == want);
+        UNSCOPED_INFO("the same again");
+        CHECK(ALScriptFormatter::format(out, options) == want);
 
         ALScriptFormatter::Options none = options;
         none.width                      = 0;
-        ensure("no width, no break", ALScriptFormatter::format(in, none).find("{\n") == std::string::npos);
+        UNSCOPED_INFO("no width, no break");
+        REQUIRE(ALScriptFormatter::format(in, none).find("{\n") == std::string::npos);
         const std::string lines = ALScriptFormatter::formatLines(in, options, 0, 5);
-        ensure_equals("formatLines keeps every line's number", std::count(lines.begin(), lines.end(), '\n'), std::count(in.begin(), in.end(), '\n'));
+        UNSCOPED_INFO("formatLines keeps every line's number");
+        CHECK(std::count(lines.begin(), lines.end(), '\n') == std::count(in.begin(), in.end(), '\n'));
 
         const std::vector<std::string> each = ALScriptFormatter::formatEach(in, options, 0, 5);
-        ensure_equals("one a line, and the empty one after the last break", each.size(), size_t(6));
-        ensure_equals("the broken line's, breaks and all", each[1] + "\n", want.substr(want.find("    local r"), want.find("    print(string") - want.find("    local r")));
-        ensure_equals("a line asked for", ALScriptFormatter::formatEach(in, options, 2, 2)[1], in.substr(in.find("    local r"), in.find(" -- sent") + 8 - in.find("    local r")));
+        UNSCOPED_INFO("one a line, and the empty one after the last break");
+        REQUIRE(each.size() == size_t(6));
+        UNSCOPED_INFO("the broken line's, breaks and all");
+        CHECK(each[1] + "\n" == want.substr(want.find("    local r"), want.find("    print(string") - want.find("    local r")));
+        const std::vector<std::string> asked = ALScriptFormatter::formatEach(in, options, 2, 2);
+        REQUIRE(asked.size() > size_t(1));
+        UNSCOPED_INFO("a line not asked for: as written");
+        CHECK(asked[1] == in.substr(in.find("    local r"), in.find(" -- sent") + 8 - in.find("    local r")));
         // From below the first line: every line still one of its own, the
         // blank ones that the whole text's runs would take out too.
         const std::vector<std::string> blanks = ALScriptFormatter::formatEach("\n\n\n\n\nprint(1)\n", options, -1, 5);
-        ensure_equals("a line each, blank or not", blanks.size(), size_t(7));
-        ensure_equals("the code where it was", blanks[5], std::string("print(1)"));
+        UNSCOPED_INFO("a line each, blank or not");
+        REQUIRE(blanks.size() == size_t(7));
+        UNSCOPED_INFO("the code where it was");
+        CHECK(blanks[5] == std::string("print(1)"));
     }
 
-    template<> template<>
-    void alscriptformatter_object::test<11>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: LSL past the width: vectors stay whole and tabs count a level wide", "[alscriptformatter]")
     {
-        set_test_name("LSL past the width: a vector or rotation never broken, nor spaced inside where a line begins with one; a call's list "
-                      "on the call's line; tabs a level wide; not a line with a comment inside it");
         ALScriptFormatter::Options options;
         options.width        = 100;
         const std::string in = "default\n{\n    state_entry()\n    {\n"
@@ -368,26 +383,27 @@ namespace tut
                                  "<1, 1, 1>, 1.0);\n"
                                  "    }\n}\n";
         const std::string out = ALScriptFormatter::format(in, options);
-        ensure_equals("broken", out, want);
-        ensure_equals("the same again", ALScriptFormatter::format(out, options), want);
+        UNSCOPED_INFO("broken");
+        CHECK(out == want);
+        UNSCOPED_INFO("the same again");
+        CHECK(ALScriptFormatter::format(out, options) == want);
 
         // With tabs, each a level's width: 2 levels of 4 and the call's 92
         // are 100, which fits; at 99 it does not.
         ALScriptFormatter::Options tabs = options;
         tabs.tabs                       = true;
         const std::string call = "llSay(0, \"" + std::string(92 - 13, 'x') + "\");";
-        ensure_equals("a call of 92", call.size(), size_t(92));
+        REQUIRE(call.size() == size_t(92));
         const std::string tabbed = "default\n{\n    state_entry()\n    {\n        " + call + "\n    }\n}\n";
-        ensure("fits", ALScriptFormatter::format(tabbed, tabs).find("\t\t" + call + "\n") != std::string::npos);
+        UNSCOPED_INFO("fits");
+        REQUIRE(ALScriptFormatter::format(tabbed, tabs).find("\t\t" + call + "\n") != std::string::npos);
         tabs.width = 99;
-        ensure("does not", ALScriptFormatter::format(tabbed, tabs).find("\t\tllSay(\n\t\t\t0,\n") != std::string::npos);
+        UNSCOPED_INFO("does not");
+        REQUIRE(ALScriptFormatter::format(tabbed, tabs).find("\t\tllSay(\n\t\t\t0,\n") != std::string::npos);
     }
 
-    template<> template<>
-    void alscriptformatter_object::test<12>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: braceSpaces spaces Luau's braces inside but not {} or interpolation or LSL's", "[alscriptformatter]")
     {
-        set_test_name("Luau's braces spaced inside as asked, whatever stands next to them, a table type's too; never {} nor an "
-                      "interpolated string's; a type's colon before a bracket spaced as written; LSL's braces as they were");
         const std::string in   = "local states: {[string]: {[string]:(...any) -> ()}} = {}\n"
                                  "local t = {{1}, {2, 3}, [k] = v, -1, #t}\n"
                                  "local params: { any } = ll.ParseStringKeepNulls(msg, { \"\\n\" }, {})\n"
@@ -398,68 +414,72 @@ namespace tut
                                  "local params: { any } = ll.ParseStringKeepNulls(msg, { \"\\n\" }, {})\n"
                                  "print(`a {b} c {{d}}`, `{ {1} }`)\n"
                                  "local f: (number) -> () = obj:method(1)\n";
-        ensure_equals("StyLua's, by default", lua(in), want);
+        UNSCOPED_INFO("StyLua's, by default");
+        CHECK(lua(in) == want);
         ALScriptFormatter::Options none;
         none.lua         = true;
         none.braceSpaces = false;
-        ensure_equals("none", ALScriptFormatter::format(in, none),
+        UNSCOPED_INFO("none");
+        CHECK(ALScriptFormatter::format(in, none) ==
                       std::string("local states: {[string]: {[string]:(...any) -> ()}} = {}\n"
                                   "local t = {{1}, {2, 3}, [k] = v, -1, #t}\n"
                                   "local params: {any} = ll.ParseStringKeepNulls(msg, {\"\\n\"}, {})\n"
                                   "print(`a {b} c {{d}}`, `{ {1} }`)\n"
                                   "local f: (number) -> () = obj:method(1)\n"));
-        ensure_equals("a type's colon, spaced", lua("local states: {[string]: (...any) -> ()} = {}\n"),
+        UNSCOPED_INFO("a type's colon, spaced");
+        CHECK(lua("local states: {[string]: (...any) -> ()} = {}\n") ==
                       std::string("local states: { [string]: (...any) -> () } = {}\n"));
         ALScriptFormatter::Options lsl_none;
         lsl_none.braceSpaces = false;
-        ensure_equals("LSL's braces", ALScriptFormatter::format("default { state_entry() { llSay(0, \"a\"); } }\n", lsl_none),
+        UNSCOPED_INFO("LSL's braces");
+        CHECK(ALScriptFormatter::format("default { state_entry() { llSay(0, \"a\"); } }\n", lsl_none) ==
                       std::string("default { state_entry() { llSay(0, \"a\"); } }\n"));
     }
 
-    template<> template<>
-    void alscriptformatter_object::test<13>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: a sign hugs the bracket after it and is spaced from a < or minus before it", "[alscriptformatter]")
     {
-        set_test_name("a sign against the bracket or brace after it, and after a < that compares or a minus that subtracts, spaced "
-                      "from it: -(a), #{ 1 }, i < -1, x - #t, in Luau and in LSL; LSL's vector's first sign still against its <");
-        ensure_equals("Luau", lua("local x = - (a)\nlocal y = # (t)\nlocal z = # {1}\nif i <#t and i <-1 and i > - (2) then end\n"
-                                  "local w = not (a)\nlocal q = a - (b)\nreturn -(x)\nlocal d = #{1} -#{2} - -#t + -#t\n"),
+        CHECK(lua("local x = - (a)\nlocal y = # (t)\nlocal z = # {1}\nif i <#t and i <-1 and i > - (2) then end\n"
+                                  "local w = not (a)\nlocal q = a - (b)\nreturn -(x)\nlocal d = #{1} -#{2} - -#t + -#t\n") ==
                       std::string("local x = -(a)\nlocal y = #(t)\nlocal z = #{ 1 }\nif i < #t and i < -1 and i > -(2) then end\n"
                                   "local w = not (a)\nlocal q = a - (b)\nreturn -(x)\nlocal d = #{ 1 } - #{ 2 } - -#t + -#t\n"));
-        ensure_equals("LSL", lsl("default { state_entry() { integer x = - (a); vector v = < -1, 0, 0 >; if (i <-1) x = ! (b); } }\n"),
+        CHECK(lsl("default { state_entry() { integer x = - (a); vector v = < -1, 0, 0 >; if (i <-1) x = ! (b); } }\n") ==
                       std::string("default { state_entry() { integer x = -(a); vector v = <-1, 0, 0>; if (i < -1) x = !(b); } }\n"));
-        ensure_equals("a list of vectors", lsl("list l = [<-1, 0, 0>, < -2, 0, 0 >];\n"), std::string("list l = [<-1, 0, 0>, <-2, 0, 0>];\n"));
+        UNSCOPED_INFO("a list of vectors");
+        CHECK(lsl("list l = [<-1, 0, 0>, < -2, 0, 0 >];\n") == std::string("list l = [<-1, 0, 0>, <-2, 0, 0>];\n"));
     }
 
-    template<> template<>
-    void alscriptformatter_object::test<14>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: what the author lined up stays lined up: runs of = and trailing comments", "[alscriptformatter]")
     {
-        set_test_name("what the author lined up stays lined up: a run's =, at the author's column or past the longest, a comment on a line "
-                      "of its own going on past; a run's trailing comments where its code changed; not equal columns by chance; tabs to "
-                      "their stops");
         const std::string lined = "local CHANNEL       = 1 -- channel\n"
                                   "local OWNER_ONLY    = true -- owner\n"
                                   "-- a note over the next\n"
                                   "local USE_OWNER_SAY = true -- say\n";
-        ensure_equals("as it was", lua(lined), lined);
-        ensure_equals("spaced afresh, lined up again", lua("local a   =1      -- one\nlocal bbb = {2,3} -- two\n"),
+        UNSCOPED_INFO("as it was");
+        CHECK(lua(lined) == lined);
+        UNSCOPED_INFO("spaced afresh, lined up again");
+        CHECK(lua("local a   =1      -- one\nlocal bbb = {2,3} -- two\n") ==
                       std::string("local a   = 1        -- one\nlocal bbb = { 2, 3 } -- two\n"));
-        ensure_equals("the author's column", lua("local a     = 1\nlocal bb    = 2\n"), std::string("local a     = 1\nlocal bb    = 2\n"));
-        ensure_equals("past the longest", lua("t[i+1]  = 1\nt[ii]   = 2\n"), std::string("t[i + 1] = 1\nt[ii]    = 2\n"));
-        ensure_equals("not by chance", lua("ab=1\nc = 2\n"), std::string("ab = 1\nc = 2\n"));
-        ensure_equals("not across a blank line", lua("local a  = 1\n\nlocal bb = 2\n"), std::string("local a = 1\n\nlocal bb = 2\n"));
+        UNSCOPED_INFO("the author's column");
+        CHECK(lua("local a     = 1\nlocal bb    = 2\n") == std::string("local a     = 1\nlocal bb    = 2\n"));
+        UNSCOPED_INFO("past the longest");
+        CHECK(lua("t[i+1]  = 1\nt[ii]   = 2\n") == std::string("t[i + 1] = 1\nt[ii]    = 2\n"));
+        UNSCOPED_INFO("not by chance");
+        CHECK(lua("ab=1\nc = 2\n") == std::string("ab = 1\nc = 2\n"));
+        UNSCOPED_INFO("not across a blank line");
+        CHECK(lua("local a  = 1\n\nlocal bb = 2\n") == std::string("local a = 1\n\nlocal bb = 2\n"));
         const std::string fields = "local t = {\n    alpha   = 1,\n    b       = 2,\n}\n";
-        ensure_equals("a table's fields", lua(fields), fields);
-        ensure_equals("LSL, by tabs", lsl("integer a\t= 1;\ninteger bb\t= 2;\n"), std::string("integer a   = 1;\ninteger bb  = 2;\n"));
+        UNSCOPED_INFO("a table's fields");
+        CHECK(lua(fields) == fields);
+        UNSCOPED_INFO("LSL, by tabs");
+        CHECK(lsl("integer a\t= 1;\ninteger bb\t= 2;\n") == std::string("integer a   = 1;\ninteger bb  = 2;\n"));
         // The formatter's own, again: the same.
-        ensure_equals("again", lua(lua("local a   =1      -- one\nlocal bbb = {2,3} -- two\n")),
+        UNSCOPED_INFO("again");
+        CHECK(lua(lua("local a   =1      -- one\nlocal bbb = {2,3} -- two\n")) ==
                       std::string("local a   = 1        -- one\nlocal bbb = { 2, 3 } -- two\n"));
     }
 
-    template<> template<>
-    void alscriptformatter_object::test<15>()
+    TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: a comment before elseif or else or until or end keeps the author's depth", "[alscriptformatter]")
     {
-        set_test_name("a comment the author wrote out of the block over an elseif, else, until or end stays as far in as that line; one "
-                      "written in the block stays in it; in an empty block, as written where the text is indented; flat text, in");
         const std::string chain = "if a then\n"
                                   "    x()\n"
                                   "-- about b\n"
@@ -469,15 +489,18 @@ namespace tut
                                   "else\n"
                                   "    z()\n"
                                   "end\n";
-        ensure_equals("as written", lua(chain), chain);
+        UNSCOPED_INFO("as written");
+        CHECK(lua(chain) == chain);
         const std::string repeat = "local function f()\n"
                                    "    repeat\n"
                                    "    -- why\n"
                                    "    until x\n"
                                    "end\n";
-        ensure_equals("an empty block, indented", lua(repeat), repeat);
-        ensure_equals("flat", lua("if a then\nx()\n-- note\nend\n"), std::string("if a then\n    x()\n    -- note\nend\n"));
-        ensure_equals("LSL", lsl("default\n{\n    touch_start(integer n)\n    {\n        x();\n    // about the end\n    }\n}\n"),
+        UNSCOPED_INFO("an empty block, indented");
+        CHECK(lua(repeat) == repeat);
+        UNSCOPED_INFO("flat");
+        CHECK(lua("if a then\nx()\n-- note\nend\n") == std::string("if a then\n    x()\n    -- note\nend\n"));
+        CHECK(lsl("default\n{\n    touch_start(integer n)\n    {\n        x();\n    // about the end\n    }\n}\n") ==
                       std::string("default\n{\n    touch_start(integer n)\n    {\n        x();\n    // about the end\n    }\n}\n"));
     }
 }

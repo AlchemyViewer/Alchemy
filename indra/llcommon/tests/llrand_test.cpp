@@ -26,7 +26,7 @@
  */
 
 #include "linden_common.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "../test/alrandomreseed.h"
 
 #include "../llrand.h"
@@ -42,17 +42,16 @@
 // In llrand.h, every function is documented to return less than the high end
 // -- specifically, because you can pass a negative extent, they're documented
 // never to return a value equal to the extent.
-// So that we don't need two different versions of ensure_in_range(), when
+// So that we don't need two different versions of require_in_range(), when
 // testing extent < 0, negate the return value and the extent before passing
-// into ensure_in_range().
+// into require_in_range().
 template <typename NUMBER>
-static void ensure_in_range(const std::string_view& name,
-                            NUMBER value, NUMBER low, NUMBER high)
+static void require_in_range(const std::string_view& name,
+                             NUMBER value, NUMBER low, NUMBER high)
 {
-    auto failmsg{ stringize(name, " >= ", low, " (", value, ')') };
-    tut::ensure(failmsg, (value >= low));
-    failmsg = stringize(name, " < ", high, " (", value, ')');
-    tut::ensure(failmsg, (value < high));
+    INFO(name);
+    REQUIRE(value >= low);
+    REQUIRE(value < high);
 }
 
 namespace
@@ -75,7 +74,7 @@ namespace
     }
 
     // That `draws` spread over `counts` as evenly as chance allows.
-    void ensure_uniform(const std::string& name, const std::vector<U64>& counts, U64 draws)
+    void require_uniform(const std::string& name, const std::vector<U64>& counts, U64 draws)
     {
         const F64 expected = F64(draws) / F64(counts.size());
         F64 stat = 0.0;
@@ -85,11 +84,12 @@ namespace
             stat += off * off / expected;
         }
         const F64 limit = chi_square_limit(counts.size() - 1);
-        tut::ensure(stringize(name, ": chi-square ", stat, " under ", limit), stat < limit);
+        INFO(name << ": chi-square");
+        REQUIRE(stat < limit);
     }
 
     // That draws uniform over [0, 1) have its mean, 1/2, and variance, 1/12.
-    void ensure_unit_moments(const std::string& name, F64 sum, F64 sum_of_squares, U64 draws)
+    void require_unit_moments(const std::string& name, F64 sum, F64 sum_of_squares, U64 draws)
     {
         const F64 n        = F64(draws);
         const F64 mean     = sum / n;
@@ -98,8 +98,10 @@ namespace
         // fourth central moment, 1/80, less its square, over n.
         const F64 mean_bound     = ONE_IN_A_MILLION_Z * std::sqrt(1.0 / 12.0 / n);
         const F64 variance_bound = ONE_IN_A_MILLION_Z * std::sqrt((1.0 / 80.0 - 1.0 / 144.0) / n);
-        tut::ensure(stringize(name, ": mean ", mean), std::fabs(mean - 0.5) < mean_bound);
-        tut::ensure(stringize(name, ": variance ", variance), std::fabs(variance - 1.0 / 12.0) < variance_bound);
+        INFO(name);
+        CAPTURE(mean, variance);
+        REQUIRE(std::fabs(mean - 0.5) < mean_bound);
+        REQUIRE(std::fabs(variance - 1.0 / 12.0) < variance_bound);
     }
 
     // Every kind of draw, interleaved, so a sequence differs if any of them
@@ -130,7 +132,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct random
     {
@@ -138,126 +140,111 @@ namespace tut
         ~random() { ll_test::reseedRandomFromEntropy(); }
     };
 
-    typedef test_group<random> random_t;
-    typedef random_t::object random_object_t;
-    tut::random_t tut_random("LLSeedRand");
-
-    template<> template<>
-    void random_object_t::test<1>()
+    TEST_CASE_METHOD(random, "LLSeedRand: frand() draws at least 0 and under 1", "[LLSeedRand]")
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
-            ensure_in_range("frand", ll_frand(), 0.0f, 1.0f);
+            require_in_range("frand", ll_frand(), 0.0f, 1.0f);
         }
     }
 
-    template<> template<>
-    void random_object_t::test<2>()
+    TEST_CASE_METHOD(random, "LLSeedRand: drand() draws at least 0 and under 1", "[LLSeedRand]")
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
-            ensure_in_range("drand", ll_drand(), 0.0, 1.0);
+            require_in_range("drand", ll_drand(), 0.0, 1.0);
         }
     }
 
-    template<> template<>
-    void random_object_t::test<3>()
+    TEST_CASE_METHOD(random, "LLSeedRand: frand(2.0f) draws at least 0 and under 2", "[LLSeedRand]")
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
-            ensure_in_range("frand(2.0f)", ll_frand(2.0f) - 1.0f, -1.0f, 1.0f);
+            require_in_range("frand(2.0f)", ll_frand(2.0f) - 1.0f, -1.0f, 1.0f);
         }
     }
 
-    template<> template<>
-    void random_object_t::test<4>()
+    TEST_CASE_METHOD(random, "LLSeedRand: frand(-7.0) draws at most 0 and over -7", "[LLSeedRand]")
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
             // Negate the result so we don't have to allow a templated low-end
             // comparison as well.
-            ensure_in_range("-frand(-7.0)", -ll_frand(-7.0), 0.0f, 7.0f);
+            require_in_range("-frand(-7.0)", -ll_frand(-7.0), 0.0f, 7.0f);
         }
     }
 
-    template<> template<>
-    void random_object_t::test<5>()
+    TEST_CASE_METHOD(random, "LLSeedRand: drand(-2.0) draws at most 0 and over -2", "[LLSeedRand]")
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
-            ensure_in_range("-drand(-2.0)", -ll_drand(-2.0), 0.0, 2.0);
+            require_in_range("-drand(-2.0)", -ll_drand(-2.0), 0.0, 2.0);
         }
     }
 
-    template<> template<>
-    void random_object_t::test<6>()
+    TEST_CASE_METHOD(random, "LLSeedRand: rand(100) draws at least 0 and under 100", "[LLSeedRand]")
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
-            ensure_in_range("rand(100)", ll_rand(100), 0, 100);
+            require_in_range("rand(100)", ll_rand(100), 0, 100);
         }
     }
 
-    template<> template<>
-    void random_object_t::test<7>()
+    TEST_CASE_METHOD(random, "LLSeedRand: rand(-127) draws at most 0 and over -127", "[LLSeedRand]")
     {
         for(S32 ii = 0; ii < 100000; ++ii)
         {
-            ensure_in_range("-rand(-127)", -ll_rand(-127), 0, 127);
+            require_in_range("-rand(-127)", -ll_rand(-127), 0, 127);
         }
     }
 
-    // Tests 8 to 15 hold for any generator under llrand. Tests 16 to 18 are
-    // what the generator itself draws, and change when it does.
+    // The cases from here to the one on scaling unit values hold for any
+    // generator under llrand. The last three are what the generator itself
+    // draws, and change when it does.
 
-    template<> template<>
-    void random_object_t::test<8>()
+    TEST_CASE_METHOD(random, "LLSeedRand: extents of zero or one give zero and the widest extents stay in range", "[LLSeedRand]")
     {
-        set_test_name("an extent of zero or one gives zero, and the widest extents hold their draws");
         ll_rand_seed(8);
         for (S32 ii = 0; ii < 10000; ++ii)
         {
-            ensure_equals("rand(0)", ll_rand(0), 0);
-            ensure_equals("rand(1)", ll_rand(1), 0);
-            ensure_equals("rand(-1)", ll_rand(-1), 0);
-            ensure_equals("frand(0)", ll_frand(0.f), 0.f);
-            ensure_equals("drand(0)", ll_drand(0.0), 0.0);
+            REQUIRE(ll_rand(0) == 0);
+            REQUIRE(ll_rand(1) == 0);
+            REQUIRE(ll_rand(-1) == 0);
+            REQUIRE(ll_frand(0.f) == 0.f);
+            REQUIRE(ll_drand(0.0) == 0.0);
 
-            ensure_in_range("rand(INT_MAX)", ll_rand(INT_MAX), 0, INT_MAX);
+            require_in_range("rand(INT_MAX)", ll_rand(INT_MAX), 0, INT_MAX);
             const S32 lowest = ll_rand(INT_MIN);
-            ensure(stringize("rand(INT_MIN) in (INT_MIN, 0] (", lowest, ')'), lowest > INT_MIN && lowest <= 0);
+            CAPTURE(lowest);
+            REQUIRE((lowest > INT_MIN && lowest <= 0));
 
-            ensure_in_range("frand(FLT_MAX)", ll_frand(std::numeric_limits<F32>::max()), 0.f, std::numeric_limits<F32>::max());
-            ensure_in_range("frand(FLT_MIN)", ll_frand(std::numeric_limits<F32>::min()), 0.f, std::numeric_limits<F32>::min());
-            ensure_in_range("drand(DBL_MAX)", ll_drand(std::numeric_limits<F64>::max()), 0.0, std::numeric_limits<F64>::max());
-            ensure_in_range("drand(DBL_MIN)", ll_drand(std::numeric_limits<F64>::min()), 0.0, std::numeric_limits<F64>::min());
+            require_in_range("frand(FLT_MAX)", ll_frand(std::numeric_limits<F32>::max()), 0.f, std::numeric_limits<F32>::max());
+            require_in_range("frand(FLT_MIN)", ll_frand(std::numeric_limits<F32>::min()), 0.f, std::numeric_limits<F32>::min());
+            require_in_range("drand(DBL_MAX)", ll_drand(std::numeric_limits<F64>::max()), 0.0, std::numeric_limits<F64>::max());
+            require_in_range("drand(DBL_MIN)", ll_drand(std::numeric_limits<F64>::min()), 0.0, std::numeric_limits<F64>::min());
         }
     }
 
-    template<> template<>
-    void random_object_t::test<9>()
+    TEST_CASE_METHOD(random, "LLSeedRand: a seed repeats its draws on any thread and another seed differs", "[LLSeedRand]")
     {
-        set_test_name("a seed draws the same again, on any thread, and another seed draws otherwise");
         ll_rand_seed(1234);
         const std::vector<F64> first = draw_each(16);
         ll_rand_seed(1234);
-        ensure("the same seed draws the same", draw_each(16) == first);
+        CHECK(draw_each(16) == first);
 
         std::vector<F64> elsewhere;
         std::thread([&elsewhere] {
             ll_rand_seed(1234);
             elsewhere = draw_each(16);
         }).join();
-        ensure("on another thread too", elsewhere == first);
+        CHECK(elsewhere == first);
 
         ll_rand_seed(1235);
-        ensure("another seed draws otherwise", draw_each(16) != first);
+        CHECK(draw_each(16) != first);
     }
 
-    template<> template<>
-    void random_object_t::test<10>()
+    TEST_CASE_METHOD(random, "LLSeedRand: rand(n) draws each of its n values as often as the others", "[LLSeedRand]")
     {
-        set_test_name("rand(n) draws each of its n values as often as the others");
         ll_rand_seed(10);
         const U64 draws = 256000;
         for (const S32 n : { 2, 3, 7, 100, 256 })
@@ -267,7 +254,7 @@ namespace tut
             {
                 ++counts.at(ll_rand(n));
             }
-            ensure_uniform(stringize("rand(", n, ")"), counts, draws);
+            require_uniform(stringize("rand(", n, ")"), counts, draws);
         }
 
         std::vector<U64> counts(7);
@@ -275,13 +262,11 @@ namespace tut
         {
             ++counts.at(-ll_rand(-7));
         }
-        ensure_uniform("rand(-7)", counts, draws);
+        require_uniform("rand(-7)", counts, draws);
     }
 
-    template<> template<>
-    void random_object_t::test<11>()
+    TEST_CASE_METHOD(random, "LLSeedRand: frand() and drand() spread evenly over the unit interval", "[LLSeedRand]")
     {
-        set_test_name("frand() and drand() spread evenly over [0, 1)");
         ll_rand_seed(11);
         const U64        draws = 1 << 20;
         std::vector<U64> frand_bins(64);
@@ -300,16 +285,14 @@ namespace tut
             drand_sum += d;
             drand_squares += d * d;
         }
-        ensure_uniform("frand", frand_bins, draws);
-        ensure_uniform("drand", drand_bins, draws);
-        ensure_unit_moments("frand", frand_sum, frand_squares, draws);
-        ensure_unit_moments("drand", drand_sum, drand_squares, draws);
+        require_uniform("frand", frand_bins, draws);
+        require_uniform("drand", drand_bins, draws);
+        require_unit_moments("frand", frand_sum, frand_squares, draws);
+        require_unit_moments("drand", drand_sum, drand_squares, draws);
     }
 
-    template<> template<>
-    void random_object_t::test<12>()
+    TEST_CASE_METHOD(random, "LLSeedRand: rand_u32() draws each byte evenly and sets each bit half the time", "[LLSeedRand]")
     {
-        set_test_name("rand_u32() draws each of its bytes evenly and sets each bit half the time");
         ll_rand_seed(12);
         const U64                     draws = 256000;
         std::vector<std::vector<U64>> bytes(4, std::vector<U64>(256));
@@ -328,32 +311,29 @@ namespace tut
         }
         for (U32 byte = 0; byte < 4; ++byte)
         {
-            ensure_uniform(stringize("byte ", byte), bytes[byte], draws);
+            require_uniform(stringize("byte ", byte), bytes[byte], draws);
         }
         for (U32 bit = 0; bit < 32; ++bit)
         {
-            ensure_uniform(stringize("bit ", bit), { ones[bit], draws - ones[bit] }, draws);
+            require_uniform(stringize("bit ", bit), { ones[bit], draws - ones[bit] }, draws);
         }
     }
 
-    template<> template<>
-    void random_object_t::test<13>()
+    TEST_CASE_METHOD(random, "LLSeedRand: a thread that was never seeded draws apart from every other", "[LLSeedRand]")
     {
-        set_test_name("a thread that was never seeded draws apart from every other");
         std::vector<F64> one, two;
         std::thread      first([&one] { one = draw_drand(8); });
         std::thread      second([&two] { two = draw_drand(8); });
         first.join();
         second.join();
         const std::vector<F64> here = draw_drand(8);
-        ensure("two threads draw apart", one != two);
-        ensure("and apart from this one", one != here && two != here);
+        CHECK(one != two);
+        CHECK(one != here);
+        CHECK(two != here);
     }
 
-    template<> template<>
-    void random_object_t::test<14>()
+    TEST_CASE_METHOD(random, "LLSeedRand: seeding and drawing on another thread leaves this thread's draws alone", "[LLSeedRand]")
     {
-        set_test_name("seeding and drawing on another thread leaves this thread's draws alone");
         ll_rand_seed(14);
         std::vector<F64> drawn = draw_drand(4);
         std::thread([] {
@@ -364,67 +344,70 @@ namespace tut
         drawn.insert(drawn.end(), after.begin(), after.end());
 
         ll_rand_seed(14);
-        ensure("this thread's draws went on as if alone", draw_drand(8) == drawn);
+        CHECK(draw_drand(8) == drawn);
     }
 
-    template<> template<>
-    void random_object_t::test<15>()
+    TEST_CASE_METHOD(random, "LLSeedRand: unit values scale short of the extent and integers truncate toward zero", "[LLSeedRand]")
     {
-        set_test_name("a unit value scales to each extent, an integer truncated toward zero, and never reaches it");
         using namespace ALRandMap;
         const F64 top53 = 1.0 - 0x1p-53;
         const F64 top48 = 1.0 - 0x1p-48;
 
-        ensure_equals("0 of 100", extentS32(0.0, 100), 0);
-        ensure_equals("a half of 100", extentS32(0.5, 100), 50);
-        ensure_equals("the top of 100, to 48 bits", extentS32(top48, 100), 99);
-        ensure_equals("the top of 100, to 53 bits", extentS32(top53, 100), 99);
-        ensure_equals("the top of INT_MAX", extentS32(top53, INT_MAX), INT_MAX - 1);
-        ensure_equals("the top of 2^30", extentS32(top53, 1 << 30), (1 << 30) - 1);
-        ensure_equals("a half of -7, toward zero", extentS32(0.5, -7), -3);
-        ensure_equals("the top of -7", extentS32(top53, -7), -6);
-        ensure_equals("the top of INT_MIN", extentS32(top53, INT_MIN), INT_MIN + 1);
-        ensure_equals("a unit of 1 gives 0, not the extent", extentS32(1.0, 100), 0);
-        ensure_equals("nor the negative extent", extentS32(1.0, -100), 0);
+        CHECK(extentS32(0.0, 100) == 0);
+        CHECK(extentS32(0.5, 100) == 50);
+        CHECK(extentS32(top48, 100) == 99);
+        CHECK(extentS32(top53, 100) == 99);
+        CHECK(extentS32(top53, INT_MAX) == INT_MAX - 1);
+        CHECK(extentS32(top53, 1 << 30) == (1 << 30) - 1);
+        CHECK(extentS32(0.5, -7) == -3);
+        CHECK(extentS32(top53, -7) == -6);
+        CHECK(extentS32(top53, INT_MIN) == INT_MIN + 1);
+        UNSCOPED_INFO("a unit of 1 gives 0, not the extent");
+        CHECK(extentS32(1.0, 100) == 0);
+        UNSCOPED_INFO("a unit of 1 gives 0, not the negative extent");
+        CHECK(extentS32(1.0, -100) == 0);
 
-        ensure_equals("a half of 2", extentReal<F32>(0.5f, 2.f), 1.f);
-        ensure_equals("a half of -7", extentReal<F32>(0.5f, -7.f), -3.5f);
-        ensure_equals("0 of 0", extentReal<F64>(0.5, 0.0), 0.0);
-        ensure("the top F32 of 3 stays under 3", extentReal<F32>(1.f - 0x1p-24f, 3.f) < 3.f);
-        ensure("the top F64 of 3 stays under 3", extentReal<F64>(top53, 3.0) < 3.0);
-        ensure("the top F64 of -3 stays over -3", extentReal<F64>(top53, -3.0) > -3.0);
-        ensure_equals("a unit of 1 gives 0, not the extent", extentReal<F32>(1.f, 2.f), 0.f);
-        ensure_equals("nor the negative extent", extentReal<F64>(1.0, -2.0), 0.0);
+        CHECK(extentReal<F32>(0.5f, 2.f) == 1.f);
+        CHECK(extentReal<F32>(0.5f, -7.f) == -3.5f);
+        CHECK(extentReal<F64>(0.5, 0.0) == 0.0);
+        CHECK(extentReal<F32>(1.f - 0x1p-24f, 3.f) < 3.f);
+        CHECK(extentReal<F64>(top53, 3.0) < 3.0);
+        CHECK(extentReal<F64>(top53, -3.0) > -3.0);
+        UNSCOPED_INFO("a unit of 1 gives 0, not the extent");
+        CHECK(extentReal<F32>(1.f, 2.f) == 0.f);
+        UNSCOPED_INFO("a unit of 1 gives 0, not the negative extent");
+        CHECK(extentReal<F64>(1.0, -2.0) == 0.0);
     }
 
-    template<> template<>
-    void random_object_t::test<16>()
+    TEST_CASE_METHOD(random, "LLSeedRand: unitF64/unitF32/bitsU32 take exactly a draw's top 53/24/32 bits", "[LLSeedRand]")
     {
-        set_test_name("a draw's top 53 bits are the F64, its top 24 the F32 and its top 32 the U32, each exact");
         using namespace ALRandMap;
         const U64 all = ~U64(0);
 
-        ensure_equals("0", unitF64(0), 0.0);
-        ensure_equals("a half", unitF64(U64(1) << 63), 0.5);
-        ensure_equals("the top", unitF64(all), 1.0 - 0x1p-53);
-        ensure_equals("the low 11 bits are passed over", unitF64(0x7FF), 0.0);
-        ensure_equals("the lowest bit used", unitF64(0x800), 0x1p-53);
+        CHECK(unitF64(0) == 0.0);
+        CHECK(unitF64(U64(1) << 63) == 0.5);
+        CHECK(unitF64(all) == 1.0 - 0x1p-53);
+        UNSCOPED_INFO("the low 11 bits are passed over");
+        CHECK(unitF64(0x7FF) == 0.0);
+        UNSCOPED_INFO("the lowest bit used");
+        CHECK(unitF64(0x800) == 0x1p-53);
 
-        ensure_equals("0", unitF32(0), 0.f);
-        ensure_equals("a half", unitF32(U64(1) << 63), 0.5f);
-        ensure_equals("the top, which does not round up to 1", unitF32(all), 1.f - 0x1p-24f);
-        ensure_equals("the low 40 bits are passed over", unitF32((U64(1) << 40) - 1), 0.f);
-        ensure_equals("the lowest bit used", unitF32(U64(1) << 40), 0x1p-24f);
+        CHECK(unitF32(0) == 0.f);
+        CHECK(unitF32(U64(1) << 63) == 0.5f);
+        UNSCOPED_INFO("the top, which does not round up to 1");
+        CHECK(unitF32(all) == 1.f - 0x1p-24f);
+        UNSCOPED_INFO("the low 40 bits are passed over");
+        CHECK(unitF32((U64(1) << 40) - 1) == 0.f);
+        UNSCOPED_INFO("the lowest bit used");
+        CHECK(unitF32(U64(1) << 40) == 0x1p-24f);
 
-        ensure_equals("the bits of 0", bitsU32(0), 0u);
-        ensure_equals("the top 32 bits", bitsU32(0x123456789ABCDEF0), 0x12345678u);
-        ensure_equals("the bits of the top", bitsU32(all), 0xFFFFFFFFu);
+        CHECK(bitsU32(0) == 0u);
+        CHECK(bitsU32(0x123456789ABCDEF0) == 0x12345678u);
+        CHECK(bitsU32(all) == 0xFFFFFFFFu);
     }
 
-    template<> template<>
-    void random_object_t::test<17>()
+    TEST_CASE_METHOD(random, "LLSeedRand: seed 42 draws what std::mt19937_64 does under every standard library", "[LLSeedRand]")
     {
-        set_test_name("seed 42 draws what std::mt19937_64 does, from every standard library");
         const F64 drand[] = { 0x1.82a3befaddcbcp-1, 0x1.472f1f73724ap-1,  0x1.81192cfe1cbcfp-1, 0x1.171621fc50d68p-3,
                               0x1.ce79451c9a6c3p-1, 0x1.814dc629c7f48p-4, 0x1.262e1432cba84p-1, 0x1.7dd645e8fadeep-2 };
         const F32 frand[] = { 0x1.82a3bep-1f, 0x1.472f1ep-1f, 0x1.81192cp-1f, 0x1.17162p-3f,
@@ -435,43 +418,50 @@ namespace tut
         ll_rand_seed(42);
         for (S32 ii = 0; ii < 8; ++ii)
         {
-            ensure_equals(stringize("drand ", ii), ll_drand(), drand[ii]);
+            CAPTURE(ii);
+            REQUIRE(ll_drand() == drand[ii]);
         }
         ll_rand_seed(42);
         for (S32 ii = 0; ii < 8; ++ii)
         {
-            ensure_equals(stringize("frand ", ii), ll_frand(), frand[ii]);
+            CAPTURE(ii);
+            REQUIRE(ll_frand() == frand[ii]);
         }
         ll_rand_seed(42);
         for (S32 ii = 0; ii < 8; ++ii)
         {
-            ensure_equals(stringize("rand(100) ", ii), ll_rand(100), rand100[ii]);
+            CAPTURE(ii);
+            REQUIRE(ll_rand(100) == rand100[ii]);
         }
         ll_rand_seed(42);
         for (S32 ii = 0; ii < 8; ++ii)
         {
-            ensure_equals(stringize("rand_u32 ", ii), ll_rand_u32(), u32[ii]);
+            CAPTURE(ii);
+            REQUIRE(ll_rand_u32() == u32[ii]);
         }
     }
 
-    template<> template<>
-    void random_object_t::test<18>()
+    TEST_CASE_METHOD(random, "LLSeedRand: drand() draws to 53 bits and frand() to 24 and each uses all of them", "[LLSeedRand]")
     {
-        set_test_name("drand() draws to 53 bits and frand() to 24, and each uses all of its bits");
         ll_rand_seed(18);
         bool drand_last_bit = false;
         bool frand_last_bit = false;
         for (S32 ii = 0; ii < 100000; ++ii)
         {
+            CAPTURE(ii);
             const F64 drawn = std::ldexp(ll_drand(), 53);
-            ensure(stringize("drand ", ii, " is a multiple of 2^-53"), drawn == std::floor(drawn));
+            UNSCOPED_INFO("drand is a multiple of 2^-53");
+            REQUIRE(drawn == std::floor(drawn));
             drand_last_bit = drand_last_bit || std::fmod(drawn, 2.0) != 0.0;
 
             const F64 drawn_f = std::ldexp(F64(ll_frand()), 24);
-            ensure(stringize("frand ", ii, " is a multiple of 2^-24"), drawn_f == std::floor(drawn_f));
+            UNSCOPED_INFO("frand is a multiple of 2^-24");
+            REQUIRE(drawn_f == std::floor(drawn_f));
             frand_last_bit = frand_last_bit || std::fmod(drawn_f, 2.0) != 0.0;
         }
-        ensure("some drand sets the 53rd bit", drand_last_bit);
-        ensure("some frand sets the 24th bit", frand_last_bit);
+        UNSCOPED_INFO("some drand sets the 53rd bit");
+        CHECK(drand_last_bit);
+        UNSCOPED_INFO("some frand sets the 24th bit");
+        CHECK(frand_last_bit);
     }
 }

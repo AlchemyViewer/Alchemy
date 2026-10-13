@@ -295,89 +295,100 @@ target_link_libraries(
 )
 
 if(AL_BUILD_TESTS)
-  # No unit tests: the harness itself links llcommon, so a test of one of its
-  # files could not stand alone. Every test here links the library.
-  foreach(
-    test
-    alfilewrite
-    alrecoverystore
-    alregex
-    alsavehistory
-    alserialworker
-    alwatchedfile
-    apply
-    bitpack
-    classic_callback
-    commonmisc
-    lazyeventapi
-    llapp
-    llbase64
-    llcond
-    lldate
-    lldeadmantimer
-    lldependencies
-    lldoubledispatch
-    llerror
-    lleventcoro
-    lleventdispatcher
-    lleventfilter
-    llevents
-    llfile
-    llframetimer
-    llhttpdate
-    llheteromap
-    llinitparam
-    llinstancetracker
-    llmainthreadtask
-    llmutex
-    llpounceable
-    llprocessor
-    llprocinfo
-    llptrto
-    llrand
-    llsd
-    llsdjson
-    llsdutil
-    llsingleton
-    llstreamtools
-    llstring
-    llstring_utf
-    lltimer
-    lltrace
-    lltreeiterators
-    llunits
-    lluri
-    lluuid
-    stringize
-    threadsafeschedule
-    tuple
-    workqueue
+  # The state guard's checks on what llcommon keeps for the process, and the
+  # event pumps' end after every case, in every binary of llcommon's tests
+  # that shares a process between files.
+  add_library(llcommon_test_checks OBJECT tests/llcommon_test_checks.cpp)
+  target_link_libraries(llcommon_test_checks PRIVATE al::flags al_test_support llcommon)
+  set_target_properties(llcommon_test_checks PROPERTIES FOLDER "Tests/llcommon")
+
+  # One Catch2 binary for llcommon's tests, each test file run in a process
+  # of its own. None of them may delete every singleton: the files will
+  # share a process.
+  al_add_test_binary(
+    llcommon_tests
+    PROJECT llcommon
+    SOURCES
+      tests/alfilewrite_test.cpp
+      tests/alrecoverystore_test.cpp
+      tests/alregex_test.cpp
+      tests/alsavehistory_test.cpp
+      tests/alserialworker_test.cpp
+      tests/alsimd_test.cpp
+      tests/alwatchedfile_test.cpp
+      tests/apply_test.cpp
+      tests/bitpack_test.cpp
+      tests/classic_callback_test.cpp
+      tests/commonmisc_test.cpp
+      tests/lazyeventapi_test.cpp
+      tests/llbase64_test.cpp
+      tests/llcond_test.cpp
+      tests/lldate_test.cpp
+      tests/lldeadmantimer_test.cpp
+      tests/lldependencies_test.cpp
+      tests/lldoubledispatch_test.cpp
+      tests/llerror_test.cpp
+      tests/lleventcoro_test.cpp
+      tests/lleventdispatcher_test.cpp
+      tests/lleventfilter_test.cpp
+      tests/llevents_test.cpp
+      tests/llfile_test.cpp
+      tests/llframetimer_test.cpp
+      tests/llheteromap_test.cpp
+      tests/llhttpdate_test.cpp
+      tests/llinitparam_test.cpp
+      tests/llinstancetracker_test.cpp
+      tests/llmainthreadtask_test.cpp
+      tests/llmutex_test.cpp
+      tests/llpounceable_test.cpp
+      tests/llprocessor_test.cpp
+      tests/llprocinfo_test.cpp
+      tests/llptrto_test.cpp
+      tests/llrand_test.cpp
+      tests/llsd_test.cpp
+      tests/llsdjson_test.cpp
+      tests/llsdserialize_test.cpp
+      tests/llsdutil_test.cpp
+      tests/llstreamtools_test.cpp
+      tests/llstring_test.cpp
+      tests/llstring_utf_test.cpp
+      tests/lltimer_test.cpp
+      tests/lltrace_test.cpp
+      tests/lltreeiterators_test.cpp
+      tests/llunits_test.cpp
+      tests/lluri_test.cpp
+      tests/lluuid_test.cpp
+      tests/stringize_test.cpp
+      tests/threadsafeschedule_test.cpp
+      tests/tuple_test.cpp
+      tests/workqueue_test.cpp
+    SUPPORT llcommon_test_checks
+    LIBRARIES llcommon
   )
-    al_add_test(${test} PROJECT llcommon LIBRARIES llcommon)
-  endforeach()
 
   # These drive a Python peer: LEAP's protocol is to an external script,
-  # llprocess spawns one, and llsdserialize round-trips through the llsd
-  # package as an independent implementation. A peer that imports a script a
-  # test wrote to the temp folder would leave its bytecode there.
-  foreach(test llleap llprocess llsdserialize)
-    al_add_test(
-      ${test}
-      PROJECT llcommon
-      LIBRARIES llcommon
-      PYTHON
-      ENVIRONMENT PYTHONDONTWRITEBYTECODE=1
-    )
-  endforeach()
+  # llprocess spawns one, and llsdserialize_python round-trips through the
+  # llsd package as an independent implementation. A peer that imports a
+  # script a test wrote to the temp folder would leave its bytecode there.
+  al_add_test_binary(
+    llcommon_python_tests
+    PROJECT llcommon
+    SOURCES tests/llleap_test.cpp tests/llprocess_test.cpp tests/llsdserialize_python_test.cpp
+    SUPPORT llcommon_test_checks
+    LIBRARIES llcommon
+    PYTHON
+    ENVIRONMENT PYTHONDONTWRITEBYTECODE=1
+  )
 
-  # The SIMD ops layer, at the tree's tier and, where the tiers differ, at
-  # each of them; a variant the host cannot run skips.
-  al_add_test(alsimd PROJECT llcommon LIBRARIES llcommon)
-  if(BUILD_TARGET_IS_X86_64 AND NOT DARWIN)
-    foreach(tier baseline v2 v3 v4)
-      al_add_test(alsimd PROJECT llcommon LIBRARIES llcommon ISA_TIER ${tier})
-    endforeach()
-  endif()
+  # Alone: llsingleton's tests delete every singleton, and llapp's make and
+  # destroy the process's LLApp, by design.
+  al_add_test_binary(
+    llsingleton_test
+    PROJECT llcommon
+    SOURCES tests/llsingleton_test.cpp
+    LIBRARIES llcommon
+  )
+  al_add_test_binary(llapp_test PROJECT llcommon SOURCES tests/llapp_test.cpp LIBRARIES llcommon)
 
   # The ops layer's assembly, one function per op, compiled with the tree's
   # flags and read by AlSimdAsmCheck.cmake for a table lookup, a call or a

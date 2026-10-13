@@ -30,12 +30,12 @@
 #include "llfile.h"
 #include "lluuid.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 #include <fstream>
 
-namespace tut
+namespace
 {
     struct alscripttempfiles_data
     {
@@ -67,48 +67,46 @@ namespace tut
         static bool there(const std::string& path) { return LLFile::isfile(path); }
     };
 
-    typedef test_group<alscripttempfiles_data> alscripttempfiles_group;
-    typedef alscripttempfiles_group::object    alscripttempfiles_object;
-    alscripttempfiles_group                    alscripttempfiles_instance("alscripttempfiles");
-
-    template<> template<>
-    void alscripttempfiles_object::test<1>()
+    TEST_CASE_METHOD(alscripttempfiles_data, "alscripttempfiles: a copy's name is the cleaned script name and id and language's extension", "[alscripttempfiles]")
     {
-        set_test_name("a copy's name: the script's without what a file system refuses, the id, the language's extension");
-        ensure_equals("LSL", ALScriptTempFiles::nameFor("/tmp", "My Script", "abc", false), std::string("/tmp/sl_script_My Script_abc.lsl"));
-        ensure_equals("SLua, the name cleaned", ALScriptTempFiles::nameFor("/tmp/", "a/b:c?", "abc", true),
+        CHECK(ALScriptTempFiles::nameFor("/tmp", "My Script", "abc", false) == std::string("/tmp/sl_script_My Script_abc.lsl"));
+        UNSCOPED_INFO("SLua, the name cleaned");
+        CHECK(ALScriptTempFiles::nameFor("/tmp/", "a/b:c?", "abc", true) ==
                       std::string("/tmp/sl_script_abc_abc.luau"));
-        ensure_equals("nothing left of the name", ALScriptTempFiles::nameFor("/tmp/", "<>*", "abc", false), std::string("/tmp/sl_script_abc.lsl"));
-        ensure("a copy", ALScriptTempFiles::isCopy("/tmp/sl_script_x_abc.lsl.log"));
-        ensure("a notecard's", ALScriptTempFiles::isCopy("/tmp/sl_notecard_n_abc.txt"));
-        ensure("not one", !ALScriptTempFiles::isCopy("/tmp/notes_sl_script_.txt"));
+        UNSCOPED_INFO("nothing left of the name");
+        CHECK(ALScriptTempFiles::nameFor("/tmp/", "<>*", "abc", false) == std::string("/tmp/sl_script_abc.lsl"));
+        UNSCOPED_INFO("a copy");
+        CHECK(ALScriptTempFiles::isCopy("/tmp/sl_script_x_abc.lsl.log"));
+        UNSCOPED_INFO("a notecard's");
+        CHECK(ALScriptTempFiles::isCopy("/tmp/sl_notecard_n_abc.txt"));
+        UNSCOPED_INFO("not one");
+        CHECK_FALSE(ALScriptTempFiles::isCopy("/tmp/notes_sl_script_.txt"));
     }
 
-    template<> template<>
-    void alscripttempfiles_object::test<2>()
+    TEST_CASE_METHOD(alscripttempfiles_data, "alscripttempfiles: two editors of one script share a copy that goes with the last of them", "[alscripttempfiles]")
     {
-        set_test_name("two editors of one script hold one copy, and it goes with the last of them, whichever that is");
         ALScriptTempFiles files(lists, "one");
         const std::string copy = ALScriptTempFiles::nameFor(temp, "s", "id", false);
         std::shared_ptr<ALScriptTempFiles::Claim> studio = files.claim(copy);
         std::shared_ptr<ALScriptTempFiles::Claim> window = files.claim(copy);
-        ensure("one hold", studio == window);
+        UNSCOPED_INFO("one hold");
+        CHECK(studio == window);
         put(copy);
         studio.reset();
-        ensure("the other still has it", there(copy));
+        UNSCOPED_INFO("the other still has it");
+        CHECK(there(copy));
         window.reset();
-        ensure("gone with the last", !there(copy));
+        UNSCOPED_INFO("gone with the last");
+        CHECK_FALSE(there(copy));
 
         // Held again after it went: written again, and listed once.
         std::shared_ptr<ALScriptTempFiles::Claim> again = files.claim(copy);
         put(copy);
-        ensure("there", there(copy));
+        CHECK(there(copy));
     }
 
-    template<> template<>
-    void alscripttempfiles_object::test<3>()
+    TEST_CASE_METHOD(alscripttempfiles_data, "alscripttempfiles: a sweep takes what ended sessions left but not what a running one lists", "[alscripttempfiles]")
     {
-        set_test_name("a sweep takes what sessions that are over left, and leaves what a running one lists, and what is no copy");
         // A session that crashed: its list, and its lock that nobody holds.
         const std::string left     = ALScriptTempFiles::nameFor(temp, "left", "1", false);
         const std::string left_log = left + ".log";
@@ -130,33 +128,52 @@ namespace tut
         std::shared_ptr<ALScriptTempFiles::Claim> held = running.claim(shared);
 
         ALScriptTempFiles sweeper(lists, "now");
-        ensure_equals("three went", sweeper.sweep(), size_t(3));
-        ensure("the crashed one's copy", !there(left));
-        ensure("and its log", !there(left_log));
-        ensure("the older one's", !there(older));
-        ensure("one a running session lists stays", there(shared));
-        ensure("what is no copy stays", there(notes));
-        ensure("the crashed one's list and lock gone", !there(lists + "crashed.list") && !there(lists + "crashed.lock"));
-        ensure("and the older one's list", !there(lists + "older.list"));
-        ensure("the running one's kept", there(lists + "running.list") && there(lists + "running.lock"));
+        CHECK(sweeper.sweep() == size_t(3));
+        UNSCOPED_INFO("the crashed one's copy");
+        CHECK_FALSE(there(left));
+        UNSCOPED_INFO("and its log");
+        CHECK_FALSE(there(left_log));
+        UNSCOPED_INFO("the older one's");
+        CHECK_FALSE(there(older));
+        UNSCOPED_INFO("one a running session lists stays");
+        CHECK(there(shared));
+        UNSCOPED_INFO("what is no copy stays");
+        CHECK(there(notes));
+        {
+            INFO("the crashed one's list and lock gone");
+            CHECK_FALSE(there(lists + "crashed.list"));
+            CHECK_FALSE(there(lists + "crashed.lock"));
+        }
+        UNSCOPED_INFO("and the older one's list");
+        CHECK_FALSE(there(lists + "older.list"));
+        {
+            INFO("the running one's kept");
+            CHECK(there(lists + "running.list"));
+            CHECK(there(lists + "running.lock"));
+        }
 
-        ensure_equals("swept again, nothing", sweeper.sweep(), size_t(0));
-        ensure("the running one's still", there(shared));
+        UNSCOPED_INFO("swept again, nothing");
+        CHECK(sweeper.sweep() == size_t(0));
+        UNSCOPED_INFO("the running one's still");
+        CHECK(there(shared));
     }
 
-    template<> template<>
-    void alscripttempfiles_object::test<4>()
+    TEST_CASE_METHOD(alscripttempfiles_data, "alscripttempfiles: a session that lets go of everything leaves no list or lock or copy", "[alscripttempfiles]")
     {
-        set_test_name("a session that ends letting go of everything leaves no list, no lock, and no copy");
         const std::string copy = ALScriptTempFiles::nameFor(temp, "s", "id", false);
         {
             ALScriptTempFiles                         files(lists, "clean");
             std::shared_ptr<ALScriptTempFiles::Claim> held = files.claim(copy);
             put(copy);
-            ensure("listed", there(lists + "clean.list") && there(lists + "clean.lock"));
+            {
+                INFO("listed");
+                CHECK(there(lists + "clean.list"));
+                CHECK(there(lists + "clean.lock"));
+            }
         }
-        ensure("no copy", !there(copy));
-        ensure("no list, no lock", !there(lists + "clean.list") && !there(lists + "clean.lock"));
+        CHECK_FALSE(there(copy));
+        CHECK_FALSE(there(lists + "clean.list"));
+        CHECK_FALSE(there(lists + "clean.lock"));
 
         // One that let go of the store first, a hold outliving it: the
         // lock is kept until the hold goes.
@@ -167,9 +184,16 @@ namespace tut
             put(copy);
         }
         ALScriptTempFiles sweeper(lists, "now");
-        ensure_equals("still running, as far as a sweep can tell", sweeper.sweep(), size_t(0));
-        ensure("its copy kept", there(copy));
+        UNSCOPED_INFO("still running, as far as a sweep can tell");
+        CHECK(sweeper.sweep() == size_t(0));
+        UNSCOPED_INFO("its copy kept");
+        CHECK(there(copy));
         held.reset();
-        ensure("gone with the hold", !there(copy) && !there(lists + "late.list") && !there(lists + "late.lock"));
+        {
+            INFO("gone with the hold");
+            CHECK_FALSE(there(copy));
+            CHECK_FALSE(there(lists + "late.list"));
+            CHECK_FALSE(there(lists + "late.lock"));
+        }
     }
 }

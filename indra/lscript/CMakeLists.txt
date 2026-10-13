@@ -172,17 +172,17 @@ endif()
 set_source_files_properties(${lscript_sources} PROPERTIES COMPILE_OPTIONS "${lscript_ieee_options}")
 
 # tests
-# LL's compiler over a handful of scripts, each to LSO and to CIL.
-al_add_test(allslreference PROJECT lscript LIBRARIES lscript llcommon)
+# LL's compiler over a handful of scripts, each to LSO and to CIL; and
 # Tailslide's LSO images and CIL, and the Mono weigher, held against LL's
-# compiler's over Tailslide's test scripts.
-al_add_test(
-  allslreferencecheck
+# compiler's over Tailslide's test scripts. One Catch2 binary, each file run
+# in a process of its own.
+al_add_test_binary(
+  lscript_tests
   PROJECT lscript
+  SOURCES tests/allslreference_test.cpp tests/allslreferencecheck_test.cpp
+  SUPPORT alscript_test_checks llcommon_test_checks
   LIBRARIES lscript alscript llcommon
   DEFINES
     "AL_LSL_DEFINITIONS_DIR=\"${LSL_DEFINITIONS_DIR}\""
     "AL_ALSCRIPT_TEST_DIR=\"${INDRA_SOURCE_DIR}/alscript/tests\""
 )
-
-

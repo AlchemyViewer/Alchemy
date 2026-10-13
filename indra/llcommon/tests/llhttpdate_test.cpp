@@ -26,7 +26,8 @@
  */
 
 #include "linden_common.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <string_view>
 
 #include "lldate.h"
 #include "llcommon.h"
@@ -35,7 +36,7 @@
 #include <time.h>
 #include <locale.h>
 
-namespace tut
+namespace
 {
     struct httpdate_data
     {
@@ -47,30 +48,24 @@ namespace tut
         }
         LLDate some_date;
     };
-    typedef test_group<httpdate_data> httpdate_test;
-    typedef httpdate_test::object httpdate_object;
-    tut::httpdate_test httpdate("httpdate");
 
-    template<> template<>
-    void httpdate_object::test<1>()
+    TEST_CASE_METHOD(httpdate_data, "httpdate: asRFC1123 formats the epoch", "[httpdate]")
     {
 
         static std::string epoch_expected = "Thursday, 01 Jan 1970 00:00:00 GMT" ;
-        ensure("Check Epoch in RFC 1123", ( epoch_expected == some_date.asRFC1123()));
+        CHECK(epoch_expected == some_date.asRFC1123());
     }
 
-    template<> template<>
-    void httpdate_object::test<2>()
+    TEST_CASE_METHOD(httpdate_data, "httpdate: asRFC1123 formats a timestamp", "[httpdate]")
     {
 
         static std::string expected = "Wednesday, 18 Jul 2007 22:17:24 GMT" ;
         some_date = LLDate(1184797044.037586);
-        ensure("Check some timestamp in RFC 1123", ( expected == some_date.asRFC1123()));
+        CHECK(expected == some_date.asRFC1123());
     }
 
     // This test of course most generic.. runs off current time
-    template<> template<>
-    void httpdate_object::test<3>()
+    TEST_CASE_METHOD(httpdate_data, "httpdate: asRFC1123 of the current time matches strftime", "[httpdate]")
     {
 
         //F64 sometime = LLFrameTimer::getTotalSeconds();
@@ -96,41 +91,37 @@ namespace tut
         strftime(expected, 255, "%A, %d %b %Y %H:%M:%S GMT", result);
         actual = some_date.asRFC1123();
         // probably not a good idea to use strcmp but this is just a unit test
-        ensure("Current time in RFC 1123", (strcmp(expected, actual.c_str()) == 0));
+        CHECK(std::string_view(expected) == std::string_view(actual.c_str()));
     }
 
-    namespace
+    // LC_TIME, LLStringUtil's locale and the one LLDate last set LC_TIME
+    // to, put back as they were however the test ends. LLDate sets LC_TIME
+    // itself when the locale it saw last changes, so one date formatted in
+    // the restored locale brings it up to date before LC_TIME is restored.
+    struct TimeLocaleRestore
     {
-        // LC_TIME, LLStringUtil's locale and the one LLDate last set LC_TIME
-        // to, put back as they were however the test ends. LLDate sets LC_TIME
-        // itself when the locale it saw last changes, so one date formatted in
-        // the restored locale brings it up to date before LC_TIME is restored.
-        struct TimeLocaleRestore
+        std::string mLocale{ LLStringUtil::getLocale() };
+        std::string mTimeLocale{ setlocale(LC_TIME, NULL) };
+
+        ~TimeLocaleRestore()
         {
-            std::string mLocale{ LLStringUtil::getLocale() };
-            std::string mTimeLocale{ setlocale(LC_TIME, NULL) };
+            LLStringUtil::setLocale(mLocale);
+            struct tm any{};
+            LLDate::toHTTPDateString(&any, "%Y");
+            setlocale(LC_TIME, mTimeLocale.c_str());
+        }
+    };
 
-            ~TimeLocaleRestore()
-            {
-                LLStringUtil::setLocale(mLocale);
-                struct tm any{};
-                LLDate::toHTTPDateString(&any, "%Y");
-                setlocale(LC_TIME, mTimeLocale.c_str());
-            }
-        };
-    } // anonymous namespace
-
-    static void test_date_string(const std::string &locale, struct tm *t,
-                                 const std::string &fmt, const std::string &expected)
+    static void require_http_date_string(const std::string &locale, struct tm *t,
+                                         const std::string &fmt, const std::string &expected)
     {
         std::string result = LLDate::toHTTPDateString(t, fmt);
         LLStringUtil::toLower(result);
-        std::string label = std::string("toHTTPDateString - ") + locale;
-        ensure_equals(label.c_str(), result, expected);
+        CAPTURE(locale, fmt);
+        REQUIRE(result == expected);
     }
 
-    template<> template<>
-    void httpdate_object::test<4>()
+    TEST_CASE_METHOD(httpdate_data, "httpdate: toHTTPDateString formats in English and French locales", "[httpdate]")
     {
         // test localization of http dates
         const char *en_locale = "en_US.UTF-8";
@@ -143,34 +134,34 @@ namespace tut
         setlocale(LC_TIME, en_locale);
         if (strcmp(setlocale(LC_TIME, NULL), en_locale) != 0)
         {
-            skip("Cannot set English locale");
+            SKIP("Cannot set English locale");
         }
 
         LLStringUtil::setLocale(en_locale);
-        test_date_string(en_locale, t, "%d %B %Y - %H:%M", "08 september 2009 - 01:40");
-        test_date_string(en_locale, t, "%H", "01");
-        test_date_string(en_locale, t, "%M", "40");
-        test_date_string(en_locale, t, "%I", "01");
-        test_date_string(en_locale, t, "%d", "08");
-        test_date_string(en_locale, t, "%Y", "2009");
-        test_date_string(en_locale, t, "%p", "am");
-        test_date_string(en_locale, t, "%A", "tuesday");
-        test_date_string(en_locale, t, "%B", "september");
+        require_http_date_string(en_locale, t, "%d %B %Y - %H:%M", "08 september 2009 - 01:40");
+        require_http_date_string(en_locale, t, "%H", "01");
+        require_http_date_string(en_locale, t, "%M", "40");
+        require_http_date_string(en_locale, t, "%I", "01");
+        require_http_date_string(en_locale, t, "%d", "08");
+        require_http_date_string(en_locale, t, "%Y", "2009");
+        require_http_date_string(en_locale, t, "%p", "am");
+        require_http_date_string(en_locale, t, "%A", "tuesday");
+        require_http_date_string(en_locale, t, "%B", "september");
 
         setlocale(LC_TIME, fr_locale);
         if (strcmp(setlocale(LC_TIME, NULL), fr_locale) != 0)
         {
-            skip("Cannot set French locale");
+            SKIP("Cannot set French locale");
         }
 
         LLStringUtil::setLocale(fr_locale);
-        test_date_string(fr_locale, t, "%d %B %Y - %H:%M", "08 septembre 2009 - 01:40");
-        test_date_string(fr_locale, t, "%H", "01");
-        test_date_string(fr_locale, t, "%M", "40");
-        test_date_string(fr_locale, t, "%I", "01");
-        test_date_string(fr_locale, t, "%d", "08");
-        test_date_string(fr_locale, t, "%Y", "2009");
-        test_date_string(fr_locale, t, "%A", "mardi");
-        test_date_string(fr_locale, t, "%B", "septembre");
+        require_http_date_string(fr_locale, t, "%d %B %Y - %H:%M", "08 septembre 2009 - 01:40");
+        require_http_date_string(fr_locale, t, "%H", "01");
+        require_http_date_string(fr_locale, t, "%M", "40");
+        require_http_date_string(fr_locale, t, "%I", "01");
+        require_http_date_string(fr_locale, t, "%d", "08");
+        require_http_date_string(fr_locale, t, "%Y", "2009");
+        require_http_date_string(fr_locale, t, "%A", "mardi");
+        require_http_date_string(fr_locale, t, "%B", "septembre");
     }
 }

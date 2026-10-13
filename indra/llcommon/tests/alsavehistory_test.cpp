@@ -30,12 +30,12 @@
 #include "fsyspath.h"
 #include "llfile.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 #include <fstream>
 
-namespace tut
+namespace
 {
     struct alsavehistory_data
     {
@@ -70,61 +70,66 @@ namespace tut
         }
 
         // A key's texts, newest first, each read whole.
-        static std::string texts(const ALSaveHistory& history, const std::string& key)
+        static std::string require_texts(const ALSaveHistory& history, const std::string& key)
         {
+            CAPTURE(key);
             std::string out;
             for (ALSavedText one : history.list(key))
             {
-                ensure("read whole", history.load(one));
+                REQUIRE(history.load(one));
                 out += (out.empty() ? "" : "|") + one.text;
             }
             return out;
         }
     };
 
-    typedef test_group<alsavehistory_data> alsavehistory_group;
-    typedef alsavehistory_group::object    alsavehistory_object;
-    tut::alsavehistory_group               alsavehistory_test("ALSaveHistory");
-
-    template<> template<>
-    void alsavehistory_object::test<1>()
+    TEST_CASE_METHOD(alsavehistory_data, "ALSaveHistory: saves list newest first per key and the text is read on asking", "[ALSaveHistory]")
     {
-        set_test_name("kept, and listed newest first as far as a listing reads; the text read on asking; each key its own");
         ALSaveHistory history(folder);
         // Within the age: dated from now.
         const F64 now = LLDate::now().secondsSinceEpoch();
-        ensure("kept", history.keep(saved("item:a", "one", now - 60.0)));
-        ensure("kept", history.keep(saved("item:a", "two", now - 30.0)));
-        ensure("another's", history.keep(saved("item:b", "other", now - 45.0)));
+        CHECK(history.keep(saved("item:a", "one", now - 60.0)));
+        CHECK(history.keep(saved("item:a", "two", now - 30.0)));
+        CHECK(history.keep(saved("item:b", "other", now - 45.0)));
         const std::vector<ALSavedText> listed = history.list("item:a");
-        ensure_equals("two of its own", listed.size(), 2U);
-        ensure("newest first", listed[0].when.secondsSinceEpoch() > listed[1].when.secondsSinceEpoch());
-        ensure("what a listing reads", listed[0].name == "Door" && listed[0].objectName == "House" && listed[0].region == "Ahern" &&
-                                           listed[0].asset == LLUUID::generateNewID("two") && listed[0].bytes == 3);
-        ensure("and not the text", !listed[0].whole && listed[0].text.empty());
-        ensure_equals("read on asking", texts(history, "item:a"), std::string("two|one"));
-        ensure_equals("the other key's", texts(history, "item:b"), std::string("other"));
-        ensure("none for a key never saved", history.list("item:c").empty());
+        REQUIRE(listed.size() == 2U);
+        CHECK(listed[0].when.secondsSinceEpoch() > listed[1].when.secondsSinceEpoch());
+        {
+            INFO("what a listing reads");
+            CHECK(listed[0].name == "Door");
+            CHECK(listed[0].objectName == "House");
+            CHECK(listed[0].region == "Ahern");
+            CHECK(listed[0].asset == LLUUID::generateNewID("two"));
+            CHECK(listed[0].bytes == 3);
+        }
+        {
+            INFO("and not the text");
+            CHECK_FALSE(listed[0].whole);
+            REQUIRE(listed[0].text.empty());
+        }
+        UNSCOPED_INFO("read on asking");
+        CHECK(require_texts(history, "item:a") == std::string("two|one"));
+        CHECK(require_texts(history, "item:b") == std::string("other"));
+        UNSCOPED_INFO("none for a key never saved");
+        REQUIRE(history.list("item:c").empty());
     }
 
-    template<> template<>
-    void alsavehistory_object::test<2>()
+    TEST_CASE_METHOD(alsavehistory_data, "ALSaveHistory: the text kept last is not kept again but a change back is", "[ALSaveHistory]")
     {
-        set_test_name("the text kept last is not kept again; one kept before that is, since it is a change back");
         ALSaveHistory history(folder);
         const F64     now = LLDate::now().secondsSinceEpoch();
-        ensure("kept", history.keep(saved("item:a", "one", now - 60.0)));
-        ensure("not again", !history.keep(saved("item:a", "one", now - 50.0)));
-        ensure("kept", history.keep(saved("item:a", "two", now - 40.0)));
-        ensure("back to one is a change", history.keep(saved("item:a", "one", now - 30.0)));
-        ensure_equals("three", texts(history, "item:a"), std::string("one|two|one"));
-        ensure("no key, nothing", !history.keep(saved("", "x", now)));
+        CHECK(history.keep(saved("item:a", "one", now - 60.0)));
+        CHECK_FALSE(history.keep(saved("item:a", "one", now - 50.0)));
+        CHECK(history.keep(saved("item:a", "two", now - 40.0)));
+        UNSCOPED_INFO("back to one is a change");
+        CHECK(history.keep(saved("item:a", "one", now - 30.0)));
+        CHECK(require_texts(history, "item:a") == std::string("one|two|one"));
+        UNSCOPED_INFO("no key, nothing");
+        CHECK_FALSE(history.keep(saved("", "x", now)));
     }
 
-    template<> template<>
-    void alsavehistory_object::test<3>()
+    TEST_CASE_METHOD(alsavehistory_data, "ALSaveHistory: the oldest go past so many for a key or past the age at a prune", "[ALSaveHistory]")
     {
-        set_test_name("past so many for a key, the oldest go as the next is kept; past the age, as it is pruned");
         ALSaveHistory history(folder);
         history.limit(3, ALSaveHistory::MAX_AGE, ALSaveHistory::MAX_BYTES);
         const F64 now = LLDate::now().secondsSinceEpoch();
@@ -132,25 +137,27 @@ namespace tut
         {
             history.keep(saved("item:a", std::to_string(i), now - 100.0 + i));
         }
-        ensure_equals("the newest three", texts(history, "item:a"), std::string("5|4|3"));
+        CHECK(require_texts(history, "item:a") == std::string("5|4|3"));
 
         ALSaveHistory aged(folder + "/aged");
         aged.limit(50, 10.0 * DAY, ALSaveHistory::MAX_BYTES);
         aged.keep(saved("item:a", "old", THEN));
         aged.keep(saved("item:a", "new", THEN + 8.0 * DAY));
         aged.prune(LLDate(THEN + 9.0 * DAY));
-        ensure_equals("both within the age", texts(aged, "item:a"), std::string("new|old"));
+        UNSCOPED_INFO("both within the age");
+        CHECK(require_texts(aged, "item:a") == std::string("new|old"));
         aged.prune(LLDate(THEN + 12.0 * DAY));
-        ensure_equals("the old one past it", texts(aged, "item:a"), std::string("new"));
+        UNSCOPED_INFO("the old one past it");
+        CHECK(require_texts(aged, "item:a") == std::string("new"));
         aged.prune(LLDate(THEN + 30.0 * DAY));
-        ensure("and then the other", aged.list("item:a").empty());
-        ensure("its folder gone with it", std::filesystem::is_empty(fsyspath(folder + "/aged")));
+        UNSCOPED_INFO("and then the other");
+        REQUIRE(aged.list("item:a").empty());
+        UNSCOPED_INFO("its folder gone with it");
+        CHECK(std::filesystem::is_empty(fsyspath(folder + "/aged")));
     }
 
-    template<> template<>
-    void alsavehistory_object::test<4>()
+    TEST_CASE_METHOD(alsavehistory_data, "ALSaveHistory: past so much in all the oldest of any key go first", "[ALSaveHistory]")
     {
-        set_test_name("past so much in all, the oldest of any key go first");
         ALSaveHistory history(folder);
         const F64     now = LLDate::now().secondsSinceEpoch();
         history.keep(saved("item:a", "aaaaaaaaaa", now - 40.0));
@@ -161,34 +168,35 @@ namespace tut
         const size_t room = size(history.list("item:a").front()) + size(history.list("item:b").front());
         history.limit(50, 1e12, room);
         history.prune();
-        ensure_equals("the oldest gone", texts(history, "item:a"), std::string("cccccccccc"));
-        ensure_equals("another key's newer one kept", texts(history, "item:b"), std::string("bbbbbbbbbb"));
+        UNSCOPED_INFO("the oldest gone");
+        CHECK(require_texts(history, "item:a") == std::string("cccccccccc"));
+        UNSCOPED_INFO("another key's newer one kept");
+        CHECK(require_texts(history, "item:b") == std::string("bbbbbbbbbb"));
     }
 
-    template<> template<>
-    void alsavehistory_object::test<5>()
+    TEST_CASE_METHOD(alsavehistory_data, "ALSaveHistory: rekey moves a key's saves behind another's under the new key", "[ALSaveHistory]")
     {
-        set_test_name("a key's saves moved to another, behind what that has, saying the new key; the old one empty");
         ALSaveHistory history(folder);
         const F64     now = LLDate::now().secondsSinceEpoch();
         history.keep(saved("task:p:old", "one", now - 60.0));
         history.keep(saved("task:p:old", "two", now - 50.0));
         history.keep(saved("task:p:new", "three", now - 40.0));
-        ensure("moved", history.rekey("task:p:old", "task:p:new"));
-        ensure("none left", history.list("task:p:old").empty());
-        ensure_equals("all under the new, in time's order", texts(history, "task:p:new"), std::string("three|two|one"));
+        CHECK(history.rekey("task:p:old", "task:p:new"));
+        REQUIRE(history.list("task:p:old").empty());
+        UNSCOPED_INFO("all under the new, in time's order");
+        CHECK(require_texts(history, "task:p:new") == std::string("three|two|one"));
         for (const ALSavedText& one : history.list("task:p:new"))
         {
-            ensure_equals("saying the new key", one.key, std::string("task:p:new"));
+            REQUIRE(one.key == std::string("task:p:new"));
         }
-        ensure("nothing to move", !history.rekey("task:p:gone", "task:p:new"));
-        ensure("not to itself", !history.rekey("task:p:new", "task:p:new"));
+        UNSCOPED_INFO("nothing to move");
+        CHECK_FALSE(history.rekey("task:p:gone", "task:p:new"));
+        UNSCOPED_INFO("not to itself");
+        CHECK_FALSE(history.rekey("task:p:new", "task:p:new"));
     }
 
-    template<> template<>
-    void alsavehistory_object::test<6>()
+    TEST_CASE_METHOD(alsavehistory_data, "ALSaveHistory: an unreadable file is passed over and a half write is swept", "[ALSaveHistory]")
     {
-        set_test_name("a file that cannot be read is passed over, and what a write cut short is swept");
         ALSaveHistory history(folder);
         const F64     now = LLDate::now().secondsSinceEpoch();
         history.keep(saved("item:a", "one", now - 60.0));
@@ -202,39 +210,40 @@ namespace tut
             llofstream half(dir + "2.llsd" + std::string(ALFileWrite::BESIDE));
             half << "{'key':'item:a'";
         }
-        ensure_equals("the one readable", history.list("item:a").size(), 1U);
+        UNSCOPED_INFO("the one readable");
+        REQUIRE(history.list("item:a").size() == 1U);
         history.prune();
-        ensure("the half-written swept", !LLFile::isfile(dir + "2.llsd" + std::string(ALFileWrite::BESIDE)));
-        ensure_equals("the save still there", texts(history, "item:a"), std::string("one"));
+        UNSCOPED_INFO("the half-written swept");
+        CHECK_FALSE(LLFile::isfile(dir + "2.llsd" + std::string(ALFileWrite::BESIDE)));
+        UNSCOPED_INFO("the save still there");
+        CHECK(require_texts(history, "item:a") == std::string("one"));
     }
 
-    template<> template<>
-    void alsavehistory_object::test<7>()
+    TEST_CASE_METHOD(alsavehistory_data, "ALSaveHistory: count counts a key's saves by file name and not half writes", "[ALSaveHistory]")
     {
-        set_test_name("a key's saves counted by their files' names, each key its own; what is no save of the name not counted");
         ALSaveHistory history(folder);
         const F64     now = LLDate::now().secondsSinceEpoch();
-        ensure_equals("none for a key never saved", history.count("item:a"), 0U);
-        ensure_equals("none for no key", history.count(""), 0U);
+        UNSCOPED_INFO("none for a key never saved");
+        REQUIRE(history.count("item:a") == 0U);
+        REQUIRE(history.count("") == 0U);
         history.keep(saved("item:a", "one", now - 60.0));
         history.keep(saved("item:a", "two", now - 50.0));
         history.keep(saved("item:b", "other", now - 40.0));
-        ensure_equals("as many as listed", history.count("item:a"), history.list("item:a").size());
-        ensure_equals("two", history.count("item:a"), 2U);
-        ensure_equals("the other key's", history.count("item:b"), 1U);
+        REQUIRE(history.count("item:a") == history.list("item:a").size());
+        REQUIRE(history.count("item:a") == 2U);
+        REQUIRE(history.count("item:b") == 1U);
         const std::string kept = history.list("item:a").front().path;
         const std::string dir  = kept.substr(0, kept.find_last_of('/') + 1);
         {
             llofstream half(dir + "3.llsd" + std::string(ALFileWrite::BESIDE));
             half << "{'key':'item:a'";
         }
-        ensure_equals("what a write cut short is none", history.count("item:a"), 2U);
+        UNSCOPED_INFO("what a write cut short is none");
+        REQUIRE(history.count("item:a") == 2U);
     }
 
-    template<> template<>
-    void alsavehistory_object::test<8>()
+    TEST_CASE_METHOD(alsavehistory_data, "ALSaveHistory: holds finds a text by its asset or its text among a key's newest", "[ALSaveHistory]")
     {
-        set_test_name("a text kept already, by the asset its save made or by the text, among a key's newest; not past them, nor another key's");
         ALSaveHistory history(folder);
         const F64     now = LLDate::now().secondsSinceEpoch();
         history.keep(saved("item:a", "one", now - 60.0));
@@ -242,19 +251,30 @@ namespace tut
         history.keep(saved("item:a", "three", now - 40.0));
         history.keep(saved("item:b", "other", now - 30.0));
         const LLUUID elsewhere = LLUUID::generateNewID("elsewhere");
-        ensure("by the asset its save made, whatever the text", history.holds("item:a", LLUUID::generateNewID("two"), "not it", 10));
+        UNSCOPED_INFO("by the asset its save made, whatever the text");
+        CHECK(history.holds("item:a", LLUUID::generateNewID("two"), "not it", 10));
         // The same text sent again made another asset, and was not kept
         // again: found by the text.
-        ensure("by the text, under an asset no save made", history.holds("item:a", elsewhere, "one", 10));
-        ensure("a text of the same length that is not one", !history.holds("item:a", elsewhere, "owe", 10));
-        ensure("nor one never kept", !history.holds("item:a", elsewhere, "four", 10));
-        ensure("nor without an asset", !history.holds("item:a", LLUUID::null, "four", 10));
+        UNSCOPED_INFO("by the text, under an asset no save made");
+        CHECK(history.holds("item:a", elsewhere, "one", 10));
+        UNSCOPED_INFO("a text of the same length that is not one");
+        CHECK_FALSE(history.holds("item:a", elsewhere, "owe", 10));
+        UNSCOPED_INFO("nor one never kept");
+        CHECK_FALSE(history.holds("item:a", elsewhere, "four", 10));
+        UNSCOPED_INFO("nor without an asset");
+        CHECK_FALSE(history.holds("item:a", LLUUID::null, "four", 10));
         // Among the newest two only: "one" is the third.
-        ensure("the newest", history.holds("item:a", elsewhere, "three", 2));
-        ensure("past the newest, by the text", !history.holds("item:a", elsewhere, "one", 2));
-        ensure("past the newest, by the asset", !history.holds("item:a", LLUUID::generateNewID("one"), "x", 2));
-        ensure("another key's is not this one's", !history.holds("item:a", LLUUID::generateNewID("other"), "other", 10));
-        ensure("nothing for a key never saved", !history.holds("item:c", LLUUID::generateNewID("one"), "one", 10));
-        ensure("nor for no key", !history.holds("", LLUUID::generateNewID("one"), "one", 10));
+        UNSCOPED_INFO("the newest");
+        CHECK(history.holds("item:a", elsewhere, "three", 2));
+        UNSCOPED_INFO("past the newest, by the text");
+        CHECK_FALSE(history.holds("item:a", elsewhere, "one", 2));
+        UNSCOPED_INFO("past the newest, by the asset");
+        CHECK_FALSE(history.holds("item:a", LLUUID::generateNewID("one"), "x", 2));
+        UNSCOPED_INFO("another key's is not this one's");
+        CHECK_FALSE(history.holds("item:a", LLUUID::generateNewID("other"), "other", 10));
+        UNSCOPED_INFO("nothing for a key never saved");
+        CHECK_FALSE(history.holds("item:c", LLUUID::generateNewID("one"), "one", 10));
+        UNSCOPED_INFO("nor for no key");
+        CHECK_FALSE(history.holds("", LLUUID::generateNewID("one"), "one", 10));
     }
 }

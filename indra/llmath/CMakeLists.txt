@@ -137,17 +137,18 @@ if(AL_BUILD_TESTS)
     LIBRARIES llmath llcommon
   )
 
-  # The batch kernels again at each other x86-64 tier, one binary a tier: code
-  # the linker folds across files would otherwise run one tier's instructions
-  # in another's test. The tree's own tier is llmath_tests'; a variant the
-  # host cannot run skips.
+  # llcommon's SIMD ops layer and the batch kernels again at each other
+  # x86-64 tier, one binary a tier: code the linker folds across files would
+  # otherwise run one tier's instructions in another's test. The tree's own
+  # tier is llcommon_tests' and llmath_tests'; a variant the host cannot run
+  # skips.
   if(BUILD_TARGET_IS_X86_64 AND NOT DARWIN)
     foreach(tier baseline v2 v3 v4)
       if(NOT tier STREQUAL AL_ISA_TIER)
         al_add_test_binary(
           simd_tests
           PROJECT llmath
-          SOURCES tests/alsimdkernels_test.cpp
+          SOURCES tests/alsimdkernels_test.cpp ${INDRA_SOURCE_DIR}/llcommon/tests/alsimd_test.cpp
           LIBRARIES llmath llcommon
           ISA_TIER ${tier}
         )

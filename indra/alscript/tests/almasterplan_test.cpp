@@ -26,12 +26,12 @@
 
 #include "../masters/almasterplan.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct almasterplan_data
     {
@@ -55,14 +55,8 @@ namespace tut
         }
     };
 
-    typedef test_group<almasterplan_data> almasterplan_group;
-    typedef almasterplan_group::object    almasterplan_object;
-    almasterplan_group                    almasterplan_instance("almasterplan");
-
-    template<> template<>
-    void almasterplan_object::test<1>()
+    TEST_CASE_METHOD(almasterplan_data, "almasterplan: every send for every state of the world and the file and either setting", "[almasterplan]")
     {
-        set_test_name("every send, every state of the world and the file, and the setting");
         using Send = almasterplan_data::Send;
         using Do   = almasterplan_data::Do;
         struct Row
@@ -114,49 +108,59 @@ namespace tut
             { Send::Derived, true,  true,  true,     false, Do::Skip },
             { Send::Derived, true,  true,  true,     true,  Do::Skip },
         };
-        ensure_equals("every row", sizeof(table) / sizeof(table[0]), size_t(32));
+        UNSCOPED_INFO("every row");
+        CHECK(sizeof(table) / sizeof(table[0]) == size_t(32));
         for (const Row& row : table)
         {
-            const std::string name = std::string(row.kind == Send::Direct ? "direct" : "derived") + (row.moved ? ", moved" : ", not moved") +
-                                     (row.same ? ", the same" : ", not the same") + (row.unchanged ? ", unchanged" : ", changed") +
-                                     (row.skip ? ", skipping" : ", not skipping");
-            ensure_equals(name, almasterplan_data::nameOf(ALMasterPlan::decide(row.kind, row.moved, row.same, row.unchanged, row.skip)),
+            CAPTURE(row.kind == Send::Direct, row.moved, row.same, row.unchanged, row.skip);
+            REQUIRE(almasterplan_data::nameOf(ALMasterPlan::decide(row.kind, row.moved, row.same, row.unchanged, row.skip)) ==
                           almasterplan_data::nameOf(row.expected));
         }
     }
 
-    template<> template<>
-    void almasterplan_object::test<2>()
+    TEST_CASE_METHOD(almasterplan_data, "almasterplan: askFirst: past the count or across two objects; never with none changing", "[almasterplan]")
     {
-        set_test_name("an include's users are asked about over the count, or across two objects; never with none changing");
-        ensure("none changing, nothing to ask", !ALMasterPlan::askFirst(0, 0, 8));
-        ensure("one in one object", !ALMasterPlan::askFirst(1, 1, 8));
-        ensure("exactly the count is not over it", !ALMasterPlan::askFirst(8, 1, 8));
-        ensure("one past it is", ALMasterPlan::askFirst(9, 1, 8));
-        ensure("many in one object", ALMasterPlan::askFirst(40, 1, 8));
-        ensure("two in two objects", ALMasterPlan::askFirst(2, 2, 8));
-        ensure("a count of none asks for one", ALMasterPlan::askFirst(1, 1, 0));
-        ensure("and not for none", !ALMasterPlan::askFirst(0, 1, 0));
-        ensure("objects counted for nothing changing ask nothing", !ALMasterPlan::askFirst(0, 3, 8));
+        UNSCOPED_INFO("none changing, nothing to ask");
+        CHECK_FALSE(ALMasterPlan::askFirst(0, 0, 8));
+        UNSCOPED_INFO("one in one object");
+        CHECK_FALSE(ALMasterPlan::askFirst(1, 1, 8));
+        UNSCOPED_INFO("exactly the count is not over it");
+        CHECK_FALSE(ALMasterPlan::askFirst(8, 1, 8));
+        UNSCOPED_INFO("one past it is");
+        CHECK(ALMasterPlan::askFirst(9, 1, 8));
+        UNSCOPED_INFO("many in one object");
+        CHECK(ALMasterPlan::askFirst(40, 1, 8));
+        UNSCOPED_INFO("two in two objects");
+        CHECK(ALMasterPlan::askFirst(2, 2, 8));
+        UNSCOPED_INFO("a count of none asks for one");
+        CHECK(ALMasterPlan::askFirst(1, 1, 0));
+        UNSCOPED_INFO("and not for none");
+        CHECK_FALSE(ALMasterPlan::askFirst(0, 1, 0));
+        UNSCOPED_INFO("objects counted for nothing changing ask nothing");
+        CHECK_FALSE(ALMasterPlan::askFirst(0, 3, 8));
     }
 
-    template<> template<>
-    void almasterplan_object::test<3>()
+    TEST_CASE_METHOD(almasterplan_data, "almasterplan: objectsOf counts each object once and the inventory as one", "[almasterplan]")
     {
-        set_test_name("the objects scripts are in, each once, the inventory one of them");
         const LLUUID door("00000001-0000-4000-8000-000000000000");
         const LLUUID lamp("00000002-0000-4000-8000-000000000000");
-        ensure_equals("none", ALMasterPlan::objectsOf({}), size_t(0));
-        ensure_equals("one script", ALMasterPlan::objectsOf({ door }), size_t(1));
-        ensure_equals("many scripts in one object", ALMasterPlan::objectsOf({ door, door, door, door, door }), size_t(1));
-        ensure_equals("the inventory once", ALMasterPlan::objectsOf({ LLUUID::null, LLUUID::null }), size_t(1));
-        ensure_equals("and as one beside the others", ALMasterPlan::objectsOf({ door, LLUUID::null, lamp, door, LLUUID::null }), size_t(3));
+        CHECK(ALMasterPlan::objectsOf({}) == size_t(0));
+        CHECK(ALMasterPlan::objectsOf({ door }) == size_t(1));
+        UNSCOPED_INFO("many scripts in one object");
+        CHECK(ALMasterPlan::objectsOf({ door, door, door, door, door }) == size_t(1));
+        UNSCOPED_INFO("the inventory once");
+        CHECK(ALMasterPlan::objectsOf({ LLUUID::null, LLUUID::null }) == size_t(1));
+        UNSCOPED_INFO("and as one beside the others");
+        CHECK(ALMasterPlan::objectsOf({ door, LLUUID::null, lamp, door, LLUUID::null }) == size_t(3));
 
         // Twenty scripts in one object do not ask until past the count;
         // two in two objects do at once.
         std::vector<LLUUID> one(20, door);
-        ensure("twenty in one object, over eight", ALMasterPlan::askFirst(one.size(), ALMasterPlan::objectsOf(one), 8));
-        ensure("eight in one object, not", !ALMasterPlan::askFirst(8, ALMasterPlan::objectsOf(std::vector<LLUUID>(8, door)), 8));
-        ensure("two in the inventory and an object", ALMasterPlan::askFirst(2, ALMasterPlan::objectsOf({ LLUUID::null, lamp }), 8));
+        UNSCOPED_INFO("twenty in one object, over eight");
+        CHECK(ALMasterPlan::askFirst(one.size(), ALMasterPlan::objectsOf(one), 8));
+        UNSCOPED_INFO("eight in one object, not");
+        CHECK_FALSE(ALMasterPlan::askFirst(8, ALMasterPlan::objectsOf(std::vector<LLUUID>(8, door)), 8));
+        UNSCOPED_INFO("two in the inventory and an object");
+        CHECK(ALMasterPlan::askFirst(2, ALMasterPlan::objectsOf({ LLUUID::null, lamp }), 8));
     }
 }

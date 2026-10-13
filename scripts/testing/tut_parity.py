@@ -10,9 +10,15 @@ Two steps, either side of scripts/testing/tut2catch.py:
            A test TUT never reported (a dummy test<N> slot) is not a test.
            With them it keeps the sha256 of the TUT source, the one
            indra/**/tests/<stem>.cpp git tracks, and it refuses an
-           executable built before that source last changed. A test built at other
+           executable built before that source last changed: the entry's
+           own target, wherever it is in the command (llcorehttp's runs
+           under a Python peer), as check finds a Catch2 entry's binary. A
+           test built at other
            x86-64 tiers too (an entry ending _baseline, _v2, _v3, _v4) is
-           kept a tier apart, under <stem>@<tier>.
+           kept a tier apart, under <stem>@<tier>; so is a second run of a
+           test's executable under another environment, an entry named for
+           the executable's test, an underscore and the run (alscript's
+           <test>_newsolver), under <stem>@<run>.
   check    after converting and building: runs each converted file's CTest
            entry, <binary>/<file stem>, as XML, and matches the cases to the
            TUT results through tut2catch.py's mapping. tut2catch.py must be
@@ -22,6 +28,8 @@ Two steps, either side of scripts/testing/tut2catch.py:
            tier; the tree's own binary is held to TUT's untiered run (or,
            where there is none, its run at the tree's tier, AL_ISA_TIER). A
            tier the host does not run skips on both sides, which is listed.
+           A file run a second time has an entry <binary>_<run>/<file stem>
+           (al_add_test_binary's RERUN), held to TUT's run of that name.
 
 Parity holds for a file when:
   - its inputs are the ones the run is of: the converted file is no newer
@@ -35,7 +43,9 @@ Parity holds for a file when:
     of the file is one of its TUT tests;
   - each pair agrees: ok is a pass, a TUT skip is a Catch2 skip, and every
     TUT failure (fail, exception, abnormal end) is a Catch2 failure; and the
-    name TUT printed is the one the mapping folded into the case's;
+    name TUT printed is the one the mapping folded into the case's, but
+    where a test skipped or failed before its set_test_name ran, and so
+    printed none, which is listed;
   - the cases run in the order TUT ran their tests, groups by name and
     each group's tests by number, since a test may lean on what the ones
     before it left;
@@ -65,7 +75,11 @@ Parity holds for a file when:
     have stopped early, so neither is held to it; nor is one the build
     leaves out, which the file's compile command in the build's
     compile_commands.json, run as clang++ -E, says. Where there is no such
-    command, one under an #if that never ran is listed.
+    command, one under an #if that never ran is listed. So is one --unrun
+    names, reviewed as never running in a passing case on this host: in a
+    loop that should not turn, or a branch of an if constexpr the build
+    discards -- or, named for one run of the file, in a branch only the
+    other runs take;
 
 A test the mapping says TUT never ran (past its group's limit) or this host
 does not compile is listed, not counted against parity, as is an assertion
@@ -175,13 +189,40 @@ def isa_tier(name):
     return m.group(1) if m else None
 
 
-def tut_identity(name):
-    """The test file a TUT CTest entry runs, by stem, and its ISA tier."""
+def tut_identity(name, command=()):
+    """The test file a TUT CTest entry runs, by stem, and which of its runs
+    the entry is: its ISA tier, or the name of a second run of the test's
+    executable under another environment -- the entry is named for the
+    executable's test, an underscore and the run, which the command, where
+    given, tells from a test whose own name has an underscore. None for the
+    test's own run."""
     m = re.search(r"TEST_RUNNER_(\w+)$", name) or re.search(r"_TEST_(\w+)$", name)
     if not m:
         return name, None
-    tier = isa_tier(m.group(1))
-    return (m.group(1)[:-len(tier) - 1] if tier else m.group(1)) + "_test", tier
+    test = m.group(1)
+    tier = isa_tier(test)
+    if tier:
+        return test[:-len(tier) - 1] + "_test", tier
+    for word in command:
+        runs = re.search(r"_TEST_(\w+)$", os.path.splitext(os.path.basename(word))[0])
+        if runs and test.startswith(runs.group(1) + "_"):
+            return runs.group(1) + "_test", test[len(runs.group(1)) + 1:]
+    return test + "_test", None
+
+
+def executable_in(command, target):
+    """The file in an entry's command named for its target, wherever a
+    launcher put it; else the command's first word."""
+    for word in command:
+        if os.path.splitext(os.path.basename(word))[0] == target and os.path.isfile(word):
+            return word
+    return command[0] if command else None
+
+
+def tut_executable(name, command):
+    """The test executable in a TUT entry's command: INTEGRATION_TEST_<test>
+    for INTEGRATION_TEST_RUNNER_<test>, and the entry's own name otherwise."""
+    return executable_in(command, name.replace("INTEGRATION_TEST_RUNNER_", "INTEGRATION_TEST_", 1))
 
 
 def tut_source(stem):
@@ -214,7 +255,8 @@ def record(args):
         if test is None:
             print(f"{name}: no such CTest entry", file=sys.stderr)
             return 2
-        stem, tier = tut_identity(name)
+        stem, variant = tut_identity(name, test["command"])
+        tier = variant if variant in TIERS else None
         # What the results are of, so that check can tell they are of the
         # source the mapping was made from.
         source, digest = tut_source(stem)
@@ -223,10 +265,10 @@ def record(args):
                   file=sys.stderr)
         # An executable older than its source is not of it: its results
         # would stand for tests the file no longer has.
-        command = test["command"]
-        if source is not None and command and os.path.isfile(command[0]) and \
-                os.path.getmtime(os.path.join(ROOT, source)) > os.path.getmtime(command[0]):
-            print(f"{name}: {source} changed since {command[0]} was built; build it again to record it",
+        executable = tut_executable(name, test["command"])
+        if source is not None and executable and os.path.isfile(executable) and \
+                os.path.getmtime(os.path.join(ROOT, source)) > os.path.getmtime(executable):
+            print(f"{name}: {source} changed since {executable} was built; build it again to record it",
                   file=sys.stderr)
             return 2
         code, text = run(test, ["-v"], args.timeout)
@@ -240,9 +282,11 @@ def record(args):
                             "result": {"ok": "ok", "skipped known failure": "skip"}.get(result, "fail"),
                             "said": line[m.start("result"):].strip()})
         # Each tier's run is kept apart: one the host cannot run exits 125
-        # with no results, which must not stand for the others.
-        out[f"{stem}@{tier}" if tier else stem] = {"ctest": name, "tier": tier, "exit": code, "tut_file": source,
-                                                   "tut_sha256": digest, "results": results}
+        # with no results, which must not stand for the others. So is each
+        # second run, whose results are of its own environment.
+        out[f"{stem}@{variant}" if variant else stem] = {"ctest": name, "stem": stem, "variant": variant,
+                                                         "tier": tier, "exit": code, "tut_file": source,
+                                                         "tut_sha256": digest, "results": results}
         counts = {}
         for r in results:
             counts[r["result"]] = counts.get(r["result"], 0) + 1
@@ -256,6 +300,31 @@ def record(args):
 # --------------------------------------------------------------------------
 # check
 # --------------------------------------------------------------------------
+class LegalXml:
+    """A Catch2 XML report as a file to parse. Catch2 writes a value it
+    prints as XML, \\xNN for a control character or a byte that is not
+    UTF-8, but lets through vertical tab, form feed and a UTF-8 surrogate,
+    which XML forbids too: a check on bytes that hold one, as commonmisc's
+    binary LLSD does, would leave its report unreadable. Those are read as
+    Catch2 writes the rest."""
+
+    FORBIDDEN = re.compile(rb"[\x0b\x0c]|\xed[\xa0-\xbf][\x80-\xbf]")
+
+    def __init__(self, raw):
+        self.raw = raw
+
+    def read(self, size=-1):
+        data = self.raw.read(size)
+        # A surrogate's three bytes may straddle two reads; 0xED leads one
+        # and is never a later byte of any.
+        while b"\xed" in data[-2:]:
+            more = self.raw.read(2)
+            if not more:
+                break
+            data += more
+        return self.FORBIDDEN.sub(lambda m: "".join(f"\\x{b:02X}" for b in m.group()).encode(), data)
+
+
 def catch2_results(test, timeout):
     """The cases a Catch2 entry ran, as XML with its passing assertions too
     (-s), in the order it ran them: each {name, tags, line, result: ok | skip
@@ -269,28 +338,29 @@ def catch2_results(test, timeout):
         cases = []
         case = None
         try:
-            for event, element in ElementTree.iterparse(report, events=("start", "end")):
-                if event == "start":
-                    if element.tag == "TestCase":
-                        case = {"name": element.get("name"), "tags": element.get("tags", ""),
-                                "line": int(element.get("line", "0")), "result": "fail", "ran": set()}
-                    continue
-                if case is None:
-                    continue
-                if element.tag in RAN_ELEMENTS:
-                    case["ran"].add((element.get("filename", ""), int(element.get("line", "0"))))
-                    element.clear()
-                elif element.tag == "OverallResult":
-                    if element.get("success") != "true":
-                        case["result"] = "fail"
-                    elif int(element.get("skips", "0")) > 0:
-                        case["result"] = "skip"
-                    else:
-                        case["result"] = "ok"
-                elif element.tag == "TestCase":
-                    cases.append(case)
-                    case = None
-                    element.clear()
+            with open(report, "rb") as raw:
+                for event, element in ElementTree.iterparse(LegalXml(raw), events=("start", "end")):
+                    if event == "start":
+                        if element.tag == "TestCase":
+                            case = {"name": element.get("name"), "tags": element.get("tags", ""),
+                                    "line": int(element.get("line", "0")), "result": "fail", "ran": set()}
+                        continue
+                    if case is None:
+                        continue
+                    if element.tag in RAN_ELEMENTS:
+                        case["ran"].add((element.get("filename", ""), int(element.get("line", "0"))))
+                        element.clear()
+                    elif element.tag == "OverallResult":
+                        if element.get("success") != "true":
+                            case["result"] = "fail"
+                        elif int(element.get("skips", "0")) > 0:
+                            case["result"] = "skip"
+                        else:
+                            case["result"] = "ok"
+                    elif element.tag == "TestCase":
+                        cases.append(case)
+                        case = None
+                        element.clear()
         except (ElementTree.ParseError, FileNotFoundError):
             return code, None, text
         return code, cases, text
@@ -512,6 +582,22 @@ def read_mapping(path):
     return mapping["tests"], {record["file"]: record for record in mapping.get("files", [])}
 
 
+def catch2_variant(binary, command):
+    """Which run of a file a Catch2 entry under <binary>/ is: the ISA tier
+    the binary's name ends in, or, where the name is the binary's own
+    executable's, an underscore and more, a second run of it under another
+    environment (al_add_test_binary's RERUN), that run's name. None for the
+    file's own run."""
+    tier = isa_tier(binary)
+    if tier:
+        return tier
+    for word in command:
+        target = os.path.splitext(os.path.basename(word))[0]
+        if binary.startswith(target + "_") and os.path.isfile(word):
+            return binary[len(target) + 1:]
+    return None
+
+
 def tree_tier(build_dir):
     """The ISA tier the build tree is built for: AL_ISA_TIER in its cache."""
     try:
@@ -531,10 +617,14 @@ def check_run(args, label, path, entry_name, test, recorded, entries, file_cases
     first_problem = len(problems)
     # A converted file changed since its binary was built is not what the
     # binary runs: its cases, lines and counts would not be the run's.
-    command = test["command"]
-    if command and os.path.isfile(command[0]) and \
-            os.path.getmtime(os.path.join(ROOT, path)) > os.path.getmtime(command[0]):
-        problems.append(f"{label}: changed since {command[0]} was built; build it again to check it")
+    binary = entry_name.split("/", 1)[0]
+    variant = catch2_variant(binary, test["command"])
+    if variant and variant not in TIERS:
+        binary = binary[:-len(variant) - 1]
+    executable = executable_in(test["command"], binary)
+    if executable and os.path.isfile(executable) and \
+            os.path.getmtime(os.path.join(ROOT, path)) > os.path.getmtime(executable):
+        problems.append(f"{label}: changed since {executable} was built; build it again to check it")
         return None
     code, cases, output = catch2_results(test, args.timeout)
     # Where the host cannot run a tier, either side exits with the skip code
@@ -603,7 +693,13 @@ def check_run(args, label, path, entry_name, test, recorded, entries, file_cases
                 continue
             here = compiled(first, last, bool(blocks - body["held"]))
             if here:
-                problems.append(f"{label}: {case['name']!r} passed without running the {macro} on line {first}")
+                # Reviewed for this run of the file, or for every run.
+                why = args.expect_unrun.get(label, {}).get(str(first)) or \
+                    args.expect_unrun.get(path, {}).get(str(first))
+                if why:
+                    notes.append(f"{case['name']!r}: the {macro} on line {first} never ran, as reviewed: {why}")
+                else:
+                    problems.append(f"{label}: {case['name']!r} passed without running the {macro} on line {first}")
             elif here is None:
                 notes.append(f"{case['name']!r}: the {macro} on line {first} never ran, and is under an #if no "
                              f"compile command here says this build compiles")
@@ -648,8 +744,13 @@ def check_run(args, label, path, entry_name, test, recorded, entries, file_cases
         paired[name] = key
         matched += 1
         if e.get("tut_name") is not None and e["tut_name"] != t["name"]:
-            problems.append(f"{label}: {e['group']} test<{e['n']}>: TUT named it {t['name']!r}, "
-                            f"the mapping {e['tut_name']!r}")
+            # TUT prints a test's name once its set_test_name has run: one
+            # that skipped or failed before that printed none.
+            if not t["name"] and t["result"] != "ok":
+                listed.append(f"{e['group']} {e['n']}: ended before its set_test_name, so TUT printed no name")
+            else:
+                problems.append(f"{label}: {e['group']} test<{e['n']}>: TUT named it {t['name']!r}, "
+                                f"the mapping {e['tut_name']!r}")
         if by_name[name]["result"] == t["result"]:
             agree += 1
         else:
@@ -691,14 +792,22 @@ def check_run(args, label, path, entry_name, test, recorded, entries, file_cases
 
 def check(args):
     mapping, file_records = read_mapping(args.mapping)
+    args.expect_unrun = {}
+    if args.unrun:
+        with open(args.unrun) as f:
+            args.expect_unrun = json.load(f)
     with open(args.tut) as f:
         tut = json.load(f)
-    # By stem and tier, the tier read from each record's CTest name: results
-    # recorded before they were kept by tier, the last tier's under the stem,
-    # still say which tier they are of.
+    # By stem and run, which each record names; one recorded before records
+    # did has its tier read from its CTest name: results recorded before they
+    # were kept by tier, the last tier's under the stem, still say which tier
+    # they are of.
     records = {}
     for key, recorded in tut.items():
-        records[tut_identity(recorded["ctest"]) if recorded.get("ctest") else (key, None)] = recorded
+        if "variant" in recorded:
+            records[(recorded["stem"], recorded["variant"])] = recorded
+        else:
+            records[tut_identity(recorded["ctest"]) if recorded.get("ctest") else (key, None)] = recorded
     own_tier = tree_tier(args.build_dir)
     tests = ctest_tests(args.build_dir, args.config)
     compiled_lines = CompiledLines(args.build_dir, args.config)
@@ -748,16 +857,17 @@ def check(args):
         # is built for: one at the tree's own, checked against TUT's
         # untiered entry (or, where there is none, its entry at the tree's
         # tier), and at most one, <binary>_<tier>, at each other tier,
-        # checked against TUT's entry at that tier.
+        # checked against TUT's entry at that tier. A second run of the
+        # binary, <binary>_<run>, is checked against TUT's run of that name.
         runs = {}
         for name in tests:
             if name.endswith("/" + stem):
-                runs.setdefault(isa_tier(name[:-len(stem) - 1]), []).append(name)
+                runs.setdefault(catch2_variant(name[:-len(stem) - 1], tests[name]["command"]), []).append(name)
         if len(runs.get(None, [])) != 1:
             file_problems.append(f"{path}: {len(runs.get(None, []))} Catch2 CTest entries end in /{stem}")
         used = set()
         file_rows = []
-        for tier in sorted(runs, key=lambda t: TIERS.index(t) + 1 if t else 0):
+        for tier in sorted(runs, key=lambda t: (t in TIERS, TIERS.index(t) if t in TIERS else 0, t or "")):
             label = f"{path} ({tier})" if tier else path
             if len(runs[tier]) != 1:
                 if tier:
@@ -767,7 +877,8 @@ def check(args):
             if tier is None and key not in records and (stem, own_tier) in records:
                 key = (stem, own_tier)
             if key not in records:
-                file_problems.append(f"{label}: no TUT results recorded for {stem}" + (f" at {tier}" if tier else ""))
+                file_problems.append(f"{label}: no TUT results recorded for {stem}" + (f" at {tier}" if tier in TIERS else
+                                                                                       f" in its {tier} run" if tier else ""))
                 continue
             used.add(key)
             row = check_run(args, label, path, runs[tier][0], tests[runs[tier][0]], records[key], entries,
@@ -781,7 +892,8 @@ def check(args):
                 print(f"{path}: listed: TUT's run at {own_tier}, the tree's own tier: {runs[None][0]} runs that "
                       f"tier, and was checked against TUT's untiered run")
             else:
-                file_problems.append(f"{path}: TUT ran {stem} " + (f"at {key[1]}" if key[1] else "untiered")
+                file_problems.append(f"{path}: TUT ran {stem} " + (f"at {key[1]}" if key[1] in TIERS else
+                                                                     f"in its {key[1]} run" if key[1] else "untiered")
                                      + f" ({records[key]['ctest']}), and no Catch2 entry does")
         problems.extend(file_problems)
         for row in file_rows:
@@ -812,6 +924,10 @@ def main():
     chk.add_argument("--recounted", action="store_true",
                      help="the files were edited by hand since conversion: list each case's assertion count "
                           "rather than hold it to the mapping's (names and results still must match)")
+    chk.add_argument("--unrun", help="JSON of assertion sites reviewed as never running in a passing case on "
+                     "this host, {file: {line: why}}: each is listed rather than a mismatch. A key may name "
+                     "one run of a file, as the table does (\"<file> (newsolver)\"), for a site only that run "
+                     "leaves out")
     chk.add_argument("files", nargs="*", help="only these converted files (default: all the mapping has)")
     args = parser.parse_args()
     return record(args) if args.step == "record" else check(args)

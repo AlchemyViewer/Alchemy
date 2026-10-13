@@ -30,7 +30,8 @@
 #include "../llsd.h"
 #include "../lltimer.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 
 // Convert between floating point time deltas and U64 time deltas.
 // Reflects an implementation detail inside lldeadmantimer.cpp
@@ -46,7 +47,7 @@ static F64 u64_time_to_float(LLDeadmanTimer::time_type delta)
 }
 
 
-namespace tut
+namespace
 {
 
 struct deadmantimer_test
@@ -58,13 +59,8 @@ struct deadmantimer_test
         }
 };
 
-typedef test_group<deadmantimer_test> deadmantimer_group_t;
-typedef deadmantimer_group_t::object deadmantimer_object_t;
-tut::deadmantimer_group_t deadmantimer_instance("LLDeadmanTimer");
-
 // Basic construction test and isExpired() call
-template<> template<>
-void deadmantimer_object_t::test<1>()
+TEST_CASE_METHOD(deadmantimer_test, "LLDeadmanTimer: a new timer is not expired and isExpired changes nothing", "[LLDeadmanTimer]")
 {
     {
         // Without cpu metrics
@@ -72,10 +68,10 @@ void deadmantimer_object_t::test<1>()
         U64 count(U64L(8));
         LLDeadmanTimer timer(10.0, false);
 
-        ensure_equals("WOCM isExpired() returns false after ctor()", timer.isExpired(0, started, stopped, count), false);
-        ensure_approximately_equals("WOCM t1 - isExpired() does not modify started", started, F64(42.0), 2);
-        ensure_approximately_equals("WOCM t1 - isExpired() does not modify stopped", stopped, F64(97.0), 2);
-        ensure_equals("WOCM t1 - isExpired() does not modify count", count, U64L(8));
+        CHECK_FALSE(timer.isExpired(0, started, stopped, count));
+        CHECK_THAT(started, ll_test::WithinBits(F64(42.0), 2));
+        CHECK_THAT(stopped, ll_test::WithinBits(F64(97.0), 2));
+        CHECK(count == U64L(8));
     }
 
     {
@@ -84,19 +80,18 @@ void deadmantimer_object_t::test<1>()
         U64 count(U64L(8)), user_cpu(29000), sys_cpu(57000);
         LLDeadmanTimer timer(10.0, true);
 
-        ensure_equals("WCM isExpired() returns false after ctor()", timer.isExpired(0, started, stopped, count, user_cpu, sys_cpu), false);
-        ensure_approximately_equals("WCM t1 - isExpired() does not modify started", started, F64(42.0), 2);
-        ensure_approximately_equals("WCM t1 - isExpired() does not modify stopped", stopped, F64(97.0), 2);
-        ensure_equals("WCM t1 - isExpired() does not modify count", count, U64L(8));
-        ensure_equals("WCM t1 - isExpired() does not modify user_cpu", user_cpu, U64L(29000));
-        ensure_equals("WCM t1 - isExpired() does not modify sys_cpu", sys_cpu, U64L(57000));
+        CHECK_FALSE(timer.isExpired(0, started, stopped, count, user_cpu, sys_cpu));
+        CHECK_THAT(started, ll_test::WithinBits(F64(42.0), 2));
+        CHECK_THAT(stopped, ll_test::WithinBits(F64(97.0), 2));
+        CHECK(count == U64L(8));
+        CHECK(user_cpu == U64L(29000));
+        CHECK(sys_cpu == U64L(57000));
     }
 }
 
 
 // Construct with zero horizon - not useful generally but will be useful in testing
-template<> template<>
-void deadmantimer_object_t::test<2>()
+TEST_CASE_METHOD(deadmantimer_test, "LLDeadmanTimer: an unstarted zero-horizon timer is not expired", "[LLDeadmanTimer]")
 {
     {
         // Without cpu metrics
@@ -104,8 +99,7 @@ void deadmantimer_object_t::test<2>()
         U64 count(U64L(8));
         LLDeadmanTimer timer(0.0, false);           // Zero is pre-expired
 
-        ensure_equals("WOCM isExpired() still returns false with 0.0 time ctor()",
-                      timer.isExpired(0, started, stopped, count), false);
+        CHECK_FALSE(timer.isExpired(0, started, stopped, count));
     }
 
     {
@@ -114,16 +108,14 @@ void deadmantimer_object_t::test<2>()
         U64 count(U64L(8)), user_cpu(29000), sys_cpu(57000);
         LLDeadmanTimer timer(0.0, true);            // Zero is pre-expired
 
-        ensure_equals("WCM isExpired() still returns false with 0.0 time ctor()",
-                      timer.isExpired(0, started, stopped, count, user_cpu, sys_cpu), false);
+        CHECK_FALSE(timer.isExpired(0, started, stopped, count, user_cpu, sys_cpu));
     }
 }
 
 
 // "pre-expired" timer - starting a timer with a 0.0 horizon will result in
 // expiration on first test.
-template<> template<>
-void deadmantimer_object_t::test<3>()
+TEST_CASE_METHOD(deadmantimer_test, "LLDeadmanTimer: a started zero-horizon timer expires at the first test", "[LLDeadmanTimer]")
 {
     {
         // Without cpu metrics
@@ -132,9 +124,9 @@ void deadmantimer_object_t::test<3>()
         LLDeadmanTimer timer(0.0, false);
 
         timer.start(0);
-        ensure_equals("WOCM isExpired() returns true with 0.0 horizon time",
-                      timer.isExpired(0, started, stopped, count), true);
-        ensure_approximately_equals("WOCM expired timer with no bell ringing has stopped == started", started, stopped, 8);
+        CHECK(timer.isExpired(0, started, stopped, count));
+        UNSCOPED_INFO("with no bell rung, stopped stays equal to started");
+        CHECK_THAT(started, ll_test::WithinBits(stopped, 8));
     }
     {
         // With cpu metrics
@@ -143,16 +135,15 @@ void deadmantimer_object_t::test<3>()
         LLDeadmanTimer timer(0.0, true);
 
         timer.start(0);
-        ensure_equals("WCM isExpired() returns true with 0.0 horizon time",
-                      timer.isExpired(0, started, stopped, count, user_cpu, sys_cpu), true);
-        ensure_approximately_equals("WCM expired timer with no bell ringing has stopped == started", started, stopped, 8);
+        CHECK(timer.isExpired(0, started, stopped, count, user_cpu, sys_cpu));
+        UNSCOPED_INFO("with no bell rung, stopped stays equal to started");
+        CHECK_THAT(started, ll_test::WithinBits(stopped, 8));
     }
 }
 
 
 // "pre-expired" timer - bell rings are ignored as we're already expired.
-template<> template<>
-void deadmantimer_object_t::test<4>()
+TEST_CASE_METHOD(deadmantimer_test, "LLDeadmanTimer: a pre-expired timer ignores the bell", "[LLDeadmanTimer]")
 {
     {
         // Without cpu metrics
@@ -162,9 +153,9 @@ void deadmantimer_object_t::test<4>()
 
         timer.start(0);
         timer.ringBell(LLDeadmanTimer::getNow() + float_time_to_u64(1000.0), 1);
-        ensure_equals("WOCM isExpired() returns true with 0.0 horizon time after bell ring",
-                      timer.isExpired(0, started, stopped, count), true);
-        ensure_approximately_equals("WOCM ringBell has no impact on expired timer leaving stopped == started", started, stopped, 8);
+        CHECK(timer.isExpired(0, started, stopped, count));
+        UNSCOPED_INFO("the bell leaves stopped equal to started");
+        CHECK_THAT(started, ll_test::WithinBits(stopped, 8));
     }
     {
         // With cpu metrics
@@ -174,16 +165,15 @@ void deadmantimer_object_t::test<4>()
 
         timer.start(0);
         timer.ringBell(LLDeadmanTimer::getNow() + float_time_to_u64(1000.0), 1);
-        ensure_equals("WCM isExpired() returns true with 0.0 horizon time after bell ring",
-                      timer.isExpired(0, started, stopped, count, user_cpu, sys_cpu), true);
-        ensure_approximately_equals("WCM ringBell has no impact on expired timer leaving stopped == started", started, stopped, 8);
+        CHECK(timer.isExpired(0, started, stopped, count, user_cpu, sys_cpu));
+        UNSCOPED_INFO("the bell leaves stopped equal to started");
+        CHECK_THAT(started, ll_test::WithinBits(stopped, 8));
     }
 }
 
 
 // start(0) test - unexpired timer reports unexpired
-template<> template<>
-void deadmantimer_object_t::test<5>()
+TEST_CASE_METHOD(deadmantimer_test, "LLDeadmanTimer: start(0) leaves a timer unexpired and isExpired changes nothing", "[LLDeadmanTimer]")
 {
     {
         // Without cpu metrics
@@ -192,11 +182,10 @@ void deadmantimer_object_t::test<5>()
         LLDeadmanTimer timer(10.0, false);
 
         timer.start(0);
-        ensure_equals("WOCM isExpired() returns false after starting with 10.0 horizon time",
-                      timer.isExpired(0, started, stopped, count), false);
-        ensure_approximately_equals("WOCM t5 - isExpired() does not modify started", started, F64(42.0), 2);
-        ensure_approximately_equals("WOCM t5 - isExpired() does not modify stopped", stopped, F64(97.0), 2);
-        ensure_equals("WOCM t5 - isExpired() does not modify count", count, U64L(8));
+        CHECK_FALSE(timer.isExpired(0, started, stopped, count));
+        CHECK_THAT(started, ll_test::WithinBits(F64(42.0), 2));
+        CHECK_THAT(stopped, ll_test::WithinBits(F64(97.0), 2));
+        CHECK(count == U64L(8));
     }
     {
         // With cpu metrics
@@ -205,20 +194,18 @@ void deadmantimer_object_t::test<5>()
         LLDeadmanTimer timer(10.0, true);
 
         timer.start(0);
-        ensure_equals("WCM isExpired() returns false after starting with 10.0 horizon time",
-                      timer.isExpired(0, started, stopped, count, user_cpu, sys_cpu), false);
-        ensure_approximately_equals("WCM t5 - isExpired() does not modify started", started, F64(42.0), 2);
-        ensure_approximately_equals("WCM t5 - isExpired() does not modify stopped", stopped, F64(97.0), 2);
-        ensure_equals("WCM t5 - isExpired() does not modify count", count, U64L(8));
-        ensure_equals("WCM t5 - isExpired() does not modify user_cpu", user_cpu, U64L(29000));
-        ensure_equals("WCM t5 - isExpired() does not modify sys_cpu", sys_cpu, U64L(57000));
+        CHECK_FALSE(timer.isExpired(0, started, stopped, count, user_cpu, sys_cpu));
+        CHECK_THAT(started, ll_test::WithinBits(F64(42.0), 2));
+        CHECK_THAT(stopped, ll_test::WithinBits(F64(97.0), 2));
+        CHECK(count == U64L(8));
+        CHECK(user_cpu == U64L(29000));
+        CHECK(sys_cpu == U64L(57000));
     }
 }
 
 
 // start() test - start in the past but not beyond 1 horizon
-template<> template<>
-void deadmantimer_object_t::test<6>()
+TEST_CASE_METHOD(deadmantimer_test, "LLDeadmanTimer: a timer started less than a horizon ago is not expired", "[LLDeadmanTimer]")
 {
     {
         // Without cpu metrics
@@ -233,11 +220,10 @@ void deadmantimer_object_t::test<6>()
         LLDeadmanTimer::time_type the_past(LLDeadmanTimer::getNow());
         LLDeadmanTimer::time_type now(the_past + float_time_to_u64(5.0));
         timer.start(the_past);
-        ensure_equals("WOCM t6 - isExpired() returns false with 10.0 horizon time starting 5.0 in past",
-                      timer.isExpired(now, started, stopped, count), false);
-        ensure_approximately_equals("WOCM t6 - isExpired() does not modify started", started, F64(42.0), 2);
-        ensure_approximately_equals("WOCM t6 - isExpired() does not modify stopped", stopped, F64(97.0), 2);
-        ensure_equals("WOCM t6 - isExpired() does not modify count", count, U64L(8));
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count));
+        CHECK_THAT(started, ll_test::WithinBits(F64(42.0), 2));
+        CHECK_THAT(stopped, ll_test::WithinBits(F64(97.0), 2));
+        CHECK(count == U64L(8));
     }
     {
         // With cpu metrics
@@ -252,20 +238,18 @@ void deadmantimer_object_t::test<6>()
         LLDeadmanTimer::time_type the_past(LLDeadmanTimer::getNow());
         LLDeadmanTimer::time_type now(the_past + float_time_to_u64(5.0));
         timer.start(the_past);
-        ensure_equals("WCM t6 - isExpired() returns false with 10.0 horizon time starting 5.0 in past",
-                      timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu), false);
-        ensure_approximately_equals("WCM t6 - isExpired() does not modify started", started, F64(42.0), 2);
-        ensure_approximately_equals("WCM t6 - isExpired() does not modify stopped", stopped, F64(97.0), 2);
-        ensure_equals("t6 - isExpired() does not modify count", count, U64L(8));
-        ensure_equals("WCM t6 - isExpired() does not modify user_cpu", user_cpu, U64L(29000));
-        ensure_equals("WCM t6 - isExpired() does not modify sys_cpu", sys_cpu, U64L(57000));
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
+        CHECK_THAT(started, ll_test::WithinBits(F64(42.0), 2));
+        CHECK_THAT(stopped, ll_test::WithinBits(F64(97.0), 2));
+        CHECK(count == U64L(8));
+        CHECK(user_cpu == U64L(29000));
+        CHECK(sys_cpu == U64L(57000));
     }
 }
 
 
 // start() test - start in the past but well beyond 1 horizon
-template<> template<>
-void deadmantimer_object_t::test<7>()
+TEST_CASE_METHOD(deadmantimer_test, "LLDeadmanTimer: a timer started more than a horizon ago is expired", "[LLDeadmanTimer]")
 {
     {
         // Without cpu metrics
@@ -280,9 +264,9 @@ void deadmantimer_object_t::test<7>()
         LLDeadmanTimer::time_type the_past(LLDeadmanTimer::getNow());
         LLDeadmanTimer::time_type now(the_past + float_time_to_u64(20.0));
         timer.start(the_past);
-        ensure_equals("WOCM t7 - isExpired() returns true with 10.0 horizon time starting 20.0 in past",
-                      timer.isExpired(now,started, stopped, count), true);
-        ensure_approximately_equals("WOCM t7 - starting before horizon still gives equal started / stopped", started, stopped, 8);
+        CHECK(timer.isExpired(now,started, stopped, count));
+        UNSCOPED_INFO("starting before the horizon still gives equal started and stopped");
+        CHECK_THAT(started, ll_test::WithinBits(stopped, 8));
     }
     {
         // With cpu metrics
@@ -297,16 +281,15 @@ void deadmantimer_object_t::test<7>()
         LLDeadmanTimer::time_type the_past(LLDeadmanTimer::getNow());
         LLDeadmanTimer::time_type now(the_past + float_time_to_u64(20.0));
         timer.start(the_past);
-        ensure_equals("WCM t7 - isExpired() returns true with 10.0 horizon time starting 20.0 in past",
-                      timer.isExpired(now,started, stopped, count, user_cpu, sys_cpu), true);
-        ensure_approximately_equals("WOCM t7 - starting before horizon still gives equal started / stopped", started, stopped, 8);
+        CHECK(timer.isExpired(now,started, stopped, count, user_cpu, sys_cpu));
+        UNSCOPED_INFO("starting before the horizon still gives equal started and stopped");
+        CHECK_THAT(started, ll_test::WithinBits(stopped, 8));
     }
 }
 
 
 // isExpired() test - results are read-once.  Probes after first true are false.
-template<> template<>
-void deadmantimer_object_t::test<8>()
+TEST_CASE_METHOD(deadmantimer_test, "LLDeadmanTimer: isExpired reports an expiry once and then changes nothing", "[LLDeadmanTimer]")
 {
     {
         // Without cpu metrics
@@ -321,17 +304,15 @@ void deadmantimer_object_t::test<8>()
         LLDeadmanTimer::time_type the_past(LLDeadmanTimer::getNow());
         LLDeadmanTimer::time_type now(the_past + float_time_to_u64(20.0));
         timer.start(the_past);
-        ensure_equals("WOCM t8 - isExpired() returns true with 10.0 horizon time starting 20.0 in past",
-                      timer.isExpired(now, started, stopped, count), true);
+        CHECK(timer.isExpired(now, started, stopped, count));
 
         started = 42.0;
         stopped = 97.0;
         count = U64L(8);
-        ensure_equals("WOCM t8 - second isExpired() returns false after true",
-                      timer.isExpired(now, started, stopped, count), false);
-        ensure_approximately_equals("WOCM t8 - 2nd isExpired() does not modify started", started, F64(42.0), 2);
-        ensure_approximately_equals("WOCM t8 - 2nd isExpired() does not modify stopped", stopped, F64(97.0), 2);
-        ensure_equals("WOCM t8 - 2nd isExpired() does not modify count", count, U64L(8));
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count));
+        CHECK_THAT(started, ll_test::WithinBits(F64(42.0), 2));
+        CHECK_THAT(stopped, ll_test::WithinBits(F64(97.0), 2));
+        CHECK(count == U64L(8));
     }
     {
         // With cpu metrics
@@ -346,28 +327,25 @@ void deadmantimer_object_t::test<8>()
         LLDeadmanTimer::time_type the_past(LLDeadmanTimer::getNow());
         LLDeadmanTimer::time_type now(the_past + float_time_to_u64(20.0));
         timer.start(the_past);
-        ensure_equals("WCM t8 - isExpired() returns true with 10.0 horizon time starting 20.0 in past",
-                      timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu), true);
+        CHECK(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
 
         started = 42.0;
         stopped = 97.0;
         count = U64L(8);
         user_cpu = 29000;
         sys_cpu = 57000;
-        ensure_equals("WCM t8 - second isExpired() returns false after true",
-                      timer.isExpired(now, started, stopped, count), false);
-        ensure_approximately_equals("WCM t8 - 2nd isExpired() does not modify started", started, F64(42.0), 2);
-        ensure_approximately_equals("WCM t8 - 2nd isExpired() does not modify stopped", stopped, F64(97.0), 2);
-        ensure_equals("WCM t8 - 2nd isExpired() does not modify count", count, U64L(8));
-        ensure_equals("WCM t8 - 2nd isExpired() does not modify user_cpu", user_cpu, U64L(29000));
-        ensure_equals("WCM t8 - 2nd isExpired() does not modify sys_cpu", sys_cpu, U64L(57000));
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
+        CHECK_THAT(started, ll_test::WithinBits(F64(42.0), 2));
+        CHECK_THAT(stopped, ll_test::WithinBits(F64(97.0), 2));
+        CHECK(count == U64L(8));
+        CHECK(user_cpu == U64L(29000));
+        CHECK(sys_cpu == U64L(57000));
     }
 }
 
 
 // ringBell() test - see that we can keep a timer from expiring
-template<> template<>
-void deadmantimer_object_t::test<9>()
+TEST_CASE_METHOD(deadmantimer_test, "LLDeadmanTimer: ringing the bell keeps a timer from expiring", "[LLDeadmanTimer]")
 {
     {
         // Without cpu metrics
@@ -399,18 +377,17 @@ void deadmantimer_object_t::test<9>()
         timer.ringBell(now, 1);
         now += float_time_to_u64(1.0);
         timer.ringBell(now, 1);
-        ensure_equals("WOCM t9 - 5.0 horizon timer has not timed out after 10 1-second bell rings",
-                      timer.isExpired(now, started, stopped, count), false);
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count));
         F64 last_good_ring(u64_time_to_float(now));
 
         // Jump forward and expire
         now += float_time_to_u64(10.0);
-        ensure_equals("WOCM t9 - 5.0 horizon timer expires on 10-second jump",
-                      timer.isExpired(now, started, stopped, count), true);
-        ensure_approximately_equals("WOCM t9 - started matches start() time", started, real_start, 4);
-        ensure_approximately_equals("WOCM t9 - stopped matches last ringBell() time", stopped, last_good_ring, 4);
-        ensure_equals("WOCM t9 - 10 good ringBell()s", count, U64L(10));
-        ensure_equals("WOCM t9 - single read only", timer.isExpired(now, started, stopped, count), false);
+        CHECK(timer.isExpired(now, started, stopped, count));
+        CHECK_THAT(started, ll_test::WithinBits(real_start, 4));
+        CHECK_THAT(stopped, ll_test::WithinBits(last_good_ring, 4));
+        CHECK(count == U64L(10));
+        UNSCOPED_INFO("an expiry is reported once");
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count));
     }
     {
         // With cpu metrics
@@ -442,25 +419,23 @@ void deadmantimer_object_t::test<9>()
         timer.ringBell(now, 1);
         now += float_time_to_u64(1.0);
         timer.ringBell(now, 1);
-        ensure_equals("WCM t9 - 5.0 horizon timer has not timed out after 10 1-second bell rings",
-                      timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu), false);
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
         F64 last_good_ring(u64_time_to_float(now));
 
         // Jump forward and expire
         now += float_time_to_u64(10.0);
-        ensure_equals("WCM t9 - 5.0 horizon timer expires on 10-second jump",
-                      timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu), true);
-        ensure_approximately_equals("WCM t9 - started matches start() time", started, real_start, 4);
-        ensure_approximately_equals("WCM t9 - stopped matches last ringBell() time", stopped, last_good_ring, 4);
-        ensure_equals("WCM t9 - 10 good ringBell()s", count, U64L(10));
-        ensure_equals("WCM t9 - single read only", timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu), false);
+        CHECK(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
+        CHECK_THAT(started, ll_test::WithinBits(real_start, 4));
+        CHECK_THAT(stopped, ll_test::WithinBits(last_good_ring, 4));
+        CHECK(count == U64L(10));
+        UNSCOPED_INFO("an expiry is reported once");
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
     }
 }
 
 
 // restart after expiration test - verify that restarts behave well
-template<> template<>
-void deadmantimer_object_t::test<10>()
+TEST_CASE_METHOD(deadmantimer_test, "LLDeadmanTimer: a timer restarted after expiring times the new run", "[LLDeadmanTimer]")
 {
     {
         // Without cpu metrics
@@ -492,18 +467,17 @@ void deadmantimer_object_t::test<10>()
         timer.ringBell(now, 1);
         now += float_time_to_u64(1.0);
         timer.ringBell(now, 1);
-        ensure_equals("WOCM t10 - 5.0 horizon timer has not timed out after 10 1-second bell rings",
-                      timer.isExpired(now, started, stopped, count), false);
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count));
         F64 last_good_ring(u64_time_to_float(now));
 
         // Jump forward and expire
         now += float_time_to_u64(10.0);
-        ensure_equals("WOCM t10 - 5.0 horizon timer expires on 10-second jump",
-                      timer.isExpired(now, started, stopped, count), true);
-        ensure_approximately_equals("WOCM t10 - started matches start() time", started, real_start, 4);
-        ensure_approximately_equals("WOCM t10 - stopped matches last ringBell() time", stopped, last_good_ring, 4);
-        ensure_equals("WOCM t10 - 10 good ringBell()s", count, U64L(10));
-        ensure_equals("WOCM t10 - single read only", timer.isExpired(now, started, stopped, count), false);
+        CHECK(timer.isExpired(now, started, stopped, count));
+        CHECK_THAT(started, ll_test::WithinBits(real_start, 4));
+        CHECK_THAT(stopped, ll_test::WithinBits(last_good_ring, 4));
+        CHECK(count == U64L(10));
+        UNSCOPED_INFO("an expiry is reported once");
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count));
 
         // Jump forward and restart
         now += float_time_to_u64(1.0);
@@ -527,19 +501,17 @@ void deadmantimer_object_t::test<10>()
         timer.ringBell(now, 1);
         now += float_time_to_u64(1.0);
         timer.ringBell(now, 1);
-        ensure_equals("WOCM t10 - 5.0 horizon timer has not timed out after 8 1-second bell rings",
-                      timer.isExpired(now, started, stopped, count), false);
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count));
         last_good_ring = u64_time_to_float(now);
 
         // Jump forward and expire
         now += float_time_to_u64(10.0);
-        ensure_equals("WOCM t10 - 5.0 horizon timer expires on 8-second jump",
-                      timer.isExpired(now, started, stopped, count), true);
-        ensure_approximately_equals("WOCM t10 - 2nd started matches start() time", started, real_start, 4);
-        ensure_approximately_equals("WOCM t10 - 2nd stopped matches last ringBell() time", stopped, last_good_ring, 4);
-        ensure_equals("WOCM t10 - 8 good ringBell()s", count, U64L(8));
-        ensure_equals("WOCM t10 - single read only - 2nd start",
-                      timer.isExpired(now, started, stopped, count), false);
+        CHECK(timer.isExpired(now, started, stopped, count));
+        CHECK_THAT(started, ll_test::WithinBits(real_start, 4));
+        CHECK_THAT(stopped, ll_test::WithinBits(last_good_ring, 4));
+        CHECK(count == U64L(8));
+        UNSCOPED_INFO("an expiry is reported once after the restart");
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count));
     }
     {
         // With cpu metrics
@@ -572,18 +544,17 @@ void deadmantimer_object_t::test<10>()
         timer.ringBell(now, 1);
         now += float_time_to_u64(1.0);
         timer.ringBell(now, 1);
-        ensure_equals("WCM t10 - 5.0 horizon timer has not timed out after 10 1-second bell rings",
-                      timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu), false);
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
         F64 last_good_ring(u64_time_to_float(now));
 
         // Jump forward and expire
         now += float_time_to_u64(10.0);
-        ensure_equals("WCM t10 - 5.0 horizon timer expires on 10-second jump",
-                      timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu), true);
-        ensure_approximately_equals("WCM t10 - started matches start() time", started, real_start, 4);
-        ensure_approximately_equals("WCM t10 - stopped matches last ringBell() time", stopped, last_good_ring, 4);
-        ensure_equals("WCM t10 - 10 good ringBell()s", count, U64L(10));
-        ensure_equals("WCM t10 - single read only", timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu), false);
+        CHECK(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
+        CHECK_THAT(started, ll_test::WithinBits(real_start, 4));
+        CHECK_THAT(stopped, ll_test::WithinBits(last_good_ring, 4));
+        CHECK(count == U64L(10));
+        UNSCOPED_INFO("an expiry is reported once");
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
 
         // Jump forward and restart
         now += float_time_to_u64(1.0);
@@ -607,22 +578,20 @@ void deadmantimer_object_t::test<10>()
         timer.ringBell(now, 1);
         now += float_time_to_u64(1.0);
         timer.ringBell(now, 1);
-        ensure_equals("WCM t10 - 5.0 horizon timer has not timed out after 8 1-second bell rings",
-                      timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu), false);
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
         last_good_ring = u64_time_to_float(now);
 
         // Jump forward and expire
         now += float_time_to_u64(10.0);
-        ensure_equals("WCM t10 - 5.0 horizon timer expires on 8-second jump",
-                      timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu), true);
-        ensure_approximately_equals("WCM t10 - 2nd started matches start() time", started, real_start, 4);
-        ensure_approximately_equals("WCM t10 - 2nd stopped matches last ringBell() time", stopped, last_good_ring, 4);
-        ensure_equals("WCM t10 - 8 good ringBell()s", count, U64L(8));
-        ensure_equals("WCM t10 - single read only - 2nd start",
-                      timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu), false);
+        CHECK(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
+        CHECK_THAT(started, ll_test::WithinBits(real_start, 4));
+        CHECK_THAT(stopped, ll_test::WithinBits(last_good_ring, 4));
+        CHECK(count == U64L(8));
+        UNSCOPED_INFO("an expiry is reported once after the restart");
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
     }
 }
 
 
 
-} // end namespace tut
+} // anonymous namespace

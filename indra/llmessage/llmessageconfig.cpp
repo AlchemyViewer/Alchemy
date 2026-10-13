@@ -34,6 +34,20 @@
 #include "llsdserialize.h"
 #include "message.h"
 
+#include <memory>
+
+namespace
+{
+    std::string sServerName;
+    std::string sConfigDir;
+
+    // The file of the directory initClass last named. An LLLiveFile watches
+    // the one path it was made with, so another directory gets another
+    // file: one that kept watching the first directory's file would reload
+    // only when that changed, and then read the new directory's.
+    std::unique_ptr<LLMessageConfigFile> sConfigFile;
+}
+
 std::string LLMessageConfigFile::filename()
 {
     std::ostringstream ostr;
@@ -44,9 +58,12 @@ std::string LLMessageConfigFile::filename()
 
 LLMessageConfigFile& LLMessageConfigFile::instance()
 {
-    static LLMessageConfigFile the_file;
-    the_file.checkAndReload();
-    return the_file;
+    if (!sConfigFile)
+    {
+        sConfigFile = std::make_unique<LLMessageConfigFile>();
+    }
+    sConfigFile->checkAndReload();
+    return *sConfigFile;
 }
 
 // virtual
@@ -153,7 +170,11 @@ void LLMessageConfig::initClass(const std::string& server_name,
                                 const std::string& config_dir)
 {
     sServerName = server_name;
-    sConfigDir = config_dir;
+    if (config_dir != sConfigDir)
+    {
+        sConfigDir = config_dir;
+        sConfigFile.reset();
+    }
     (void) LLMessageConfigFile::instance();
     LL_DEBUGS("AppInit") << "LLMessageConfig::initClass config file "
             << config_dir << "/" << messageConfigFileName << LL_ENDL;

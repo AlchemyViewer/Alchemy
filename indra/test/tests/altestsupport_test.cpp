@@ -28,11 +28,13 @@
 #include "linden_common.h"
 
 #include "altestfatal.h"
+#include "altesthelper.h"
 #include "altestmatchers.h"
 #include "altestname.h"
 #include "alteststateguard.h"
 #include "altestteardown.h"
 
+#include "llapr.h"
 #include "llerror.h"
 #include "llsd.h"
 
@@ -43,6 +45,7 @@
 #include <catch2/reporters/catch_reporter_registrars.hpp>
 
 #include <cstdlib>
+#include <iostream>
 #include <limits>
 #include <thread>
 #include <vector>
@@ -83,6 +86,14 @@ namespace
 }
 
 CATCH_REGISTER_LISTENER(LibraryChecks)
+
+// The helper the helper_* entries run, which says whether it found the
+// process set up as a test would, and exits with a code no test run gives.
+AL_TEST_HELPER(altestsupport_exit)
+{
+    std::cout << "the helper ran, " << (gAPRPoolp ? "with" : "without") << " APR up" << std::endl;
+    return 37;
+}
 
 TEST_CASE("WithinBits holds to the bits asked for, and no further", "[altestsupport]")
 {

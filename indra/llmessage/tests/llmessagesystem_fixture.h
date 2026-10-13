@@ -56,17 +56,10 @@ namespace ll_test
 
         ~MessageSystemScope()
         {
-            LLMessageSystem* system = gMessageSystem;
-            // Without its template the system is not OK, and a system that is
-            // not OK leaves its socket open when it is deleted, so the scope
-            // closes it. A socket that never opened is still 0.
-            if (system && !system->isOK() && system->mSocket > 0)
-            {
-                end_net(system->mSocket);
-            }
-            // Not end_messaging_system(): a system that is not OK never
-            // started the transfer manager that would end.
-            delete system;
+            // Not end_messaging_system(): a system that is not OK, as one
+            // without its template is, never started the transfer manager
+            // that would end. Deleting it closes its socket.
+            delete gMessageSystem;
             gMessageSystem = mPrior;
         }
 

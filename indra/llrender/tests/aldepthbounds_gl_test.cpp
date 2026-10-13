@@ -34,50 +34,49 @@
 
 #include "llheadlessgl_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
 #include <limits>
+#include <string>
 #include <vector>
 
 // Each case lays a row of pixels down with a depth apiece, by scissored clears, so every depth is exactly what the
 // case asked for, then draws one triangle over the row and reads back which pixels it reached. The stored depths are
 // worked out here from the projection's own formula, not by the code under test.
-namespace tut
+namespace
 {
-    namespace
+    constexpr F32 NEAR_PLANE = 0.1f;
+    constexpr F32 FOV = 1.0f;
+    constexpr F32 FORWARD_FAR = 512.f;
+
+    const char* kVertex =
+        "#version 400\n"
+        "uniform float far_ndc;\n"
+        "void main()\n"
+        "{\n"
+        "    vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0;\n"
+        "    gl_Position = vec4(p, far_ndc, 1.0);\n"
+        "}\n";
+
+    const char* kFragment =
+        "#version 400\n"
+        "out vec4 frag_color;\n"
+        "void main() { frag_color = vec4(1.0); }\n";
+
+    // What the main view stores at view distance `dist`: near / dist under the infinite reverse-Z projection,
+    // the forward finite projection's window depth otherwise.
+    F64 stored_depth(bool reverse, F64 dist)
     {
-        constexpr F32 NEAR_PLANE = 0.1f;
-        constexpr F32 FOV = 1.0f;
-        constexpr F32 FORWARD_FAR = 512.f;
-
-        const char* kVertex =
-            "#version 400\n"
-            "uniform float far_ndc;\n"
-            "void main()\n"
-            "{\n"
-            "    vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0;\n"
-            "    gl_Position = vec4(p, far_ndc, 1.0);\n"
-            "}\n";
-
-        const char* kFragment =
-            "#version 400\n"
-            "out vec4 frag_color;\n"
-            "void main() { frag_color = vec4(1.0); }\n";
-
-        // What the main view stores at view distance `dist`: near / dist under the infinite reverse-Z projection,
-        // the forward finite projection's window depth otherwise.
-        F64 stored_depth(bool reverse, F64 dist)
+        if (reverse)
         {
-            if (reverse)
-            {
-                return NEAR_PLANE / dist;
-            }
-            const F64 n = NEAR_PLANE;
-            const F64 f = FORWARD_FAR;
-            const F64 ndc = (f + n) / (f - n) - 2.0 * f * n / ((f - n) * dist);
-            return ndc * 0.5 + 0.5;
+            return NEAR_PLANE / dist;
         }
+        const F64 n = NEAR_PLANE;
+        const F64 f = FORWARD_FAR;
+        const F64 ndc = (f + n) / (f - n) - 2.0 * f * n / ((f - n) * dist);
+        return ndc * 0.5 + 0.5;
+    }
 
     struct aldepthbounds_data
     {
@@ -118,7 +117,7 @@ namespace tut
         {
             if (!ALDepthBounds::available())
             {
-                skip("no GL_EXT_depth_bounds_test on this context");
+                SKIP("no GL_EXT_depth_bounds_test on this context");
             }
         }
 
@@ -128,7 +127,7 @@ namespace tut
         {
             if (reverse && !gGLManager.mHasClipControl)
             {
-                skip("no clip control: reverse-Z is unavailable on this context");
+                SKIP("no clip control: reverse-Z is unavailable on this context");
             }
             mReverse = reverse;
             mWidth = width;
@@ -137,7 +136,11 @@ namespace tut
             {
                 const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kVertex);
                 const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kFragment);
-                ensure("shaders compile", vs && fs);
+                {
+                    INFO("shaders compile");
+                    REQUIRE(vs);
+                    REQUIRE(fs);
+                }
                 mProgram = glCreateProgram();
                 glAttachShader(mProgram, vs);
                 glAttachShader(mProgram, fs);
@@ -146,7 +149,7 @@ namespace tut
                 glDeleteShader(fs);
                 GLint linked = GL_FALSE;
                 glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
-                ensure("program links", linked == GL_TRUE);
+                REQUIRE(linked == GL_TRUE);
                 glGenVertexArrays(1, &mVAO);
             }
 
@@ -176,7 +179,7 @@ namespace tut
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, mDepth, 0);
             glDrawBuffer(GL_COLOR_ATTACHMENT0);
             glReadBuffer(GL_COLOR_ATTACHMENT0);
-            ensure_equals("complete", (U32)glCheckFramebufferStatus(GL_FRAMEBUFFER), (U32)GL_FRAMEBUFFER_COMPLETE);
+            REQUIRE((U32)glCheckFramebufferStatus(GL_FRAMEBUFFER) == (U32)GL_FRAMEBUFFER_COMPLETE);
             glViewport(0, 0, width, 1);
 
             LLRender::sReverseZ = reverse;
@@ -190,7 +193,7 @@ namespace tut
         // Pixel i holds depths[i].
         void lay(const std::vector<F64>& depths)
         {
-            ensure_equals("one depth a pixel", (S32)depths.size(), mWidth);
+            REQUIRE((S32)depths.size() == mWidth);
             glEnable(GL_SCISSOR_TEST);
             for (S32 i = 0; i < mWidth; ++i)
             {
@@ -229,7 +232,10 @@ namespace tut
         std::vector<bool> drawSphere(const LLMatrix4a& proj, F32 dist, F32 radius)
         {
             F64 zmin = 0.0, zmax = 0.0;
-            ensure("the projection's depth is view z's alone", ALDepthBounds::viewSpan(proj, -dist + radius, -dist - radius, zmin, zmax));
+            {
+                INFO("the projection's depth is view z's alone");
+                REQUIRE(ALDepthBounds::viewSpan(proj, -dist + radius, -dist - radius, zmin, zmax));
+            }
             LLGLDepthTest depth(GL_FALSE, GL_FALSE);
             ALDepthBounds bounds(zmin, zmax);
             return draw();
@@ -241,16 +247,10 @@ namespace tut
         }
     };
 
-    typedef test_group<aldepthbounds_data> aldepthbounds_t;
-    typedef aldepthbounds_t::object aldepthbounds_object_t;
-    tut::aldepthbounds_t tut_aldepthbounds("aldepthbounds_gl");
-    }
-
     // ALDrawnOnly reaches what the depth test on the far plane reached before it, under reverse-Z: every pixel the
     // world drew, out as far as reconstruction reaches, and none the sky holds. Nothing the viewer draws lies past
     // that; a surface 100,000 km out stores 1e-9, which Mesa's llvmpipe has the bounds turn away.
-    template<> template<>
-    void aldepthbounds_object_t::test<1>()
+    TEST_CASE_METHOD(aldepthbounds_data, "aldepthbounds_gl: under reverse-Z the drawn pixels are the depth test's, and no sky", "[aldepthbounds_gl]")
     {
         requireBounds();
         setUp(true, 7);
@@ -273,22 +273,24 @@ namespace tut
         std::vector<bool> drawn;
         {
             ALDrawnOnly scope;
-            ensure("the scope holds the bounds", scope.bounds() != nullptr);
+            {
+                INFO("the scope holds the bounds");
+                CHECK(scope.bounds() != nullptr);
+            }
             drawn = draw();
         }
 
         for (size_t i = 0; i < depths.size(); ++i)
         {
-            const std::string at = "pixel " + std::to_string(i);
-            ensure_equals("reached where the world drew at " + at, (bool)drawn[i], depths[i] != 0.0);
-            ensure_equals("as the depth test reached at " + at, (bool)drawn[i], (bool)reference[i]);
+            INFO("pixel " << i);
+            CHECK((bool)drawn[i] == (depths[i] != 0.0));
+            CHECK((bool)drawn[i] == (bool)reference[i]);
         }
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
     // The same forward, where the 24-bit depth's last step short of the clear is geometry and the clear is sky.
-    template<> template<>
-    void aldepthbounds_object_t::test<2>()
+    TEST_CASE_METHOD(aldepthbounds_data, "aldepthbounds_gl: forward the drawn pixels are the depth test's, and no sky", "[aldepthbounds_gl]")
     {
         requireBounds();
         setUp(false, 6);
@@ -316,22 +318,20 @@ namespace tut
 
         for (size_t i = 0; i < depths.size(); ++i)
         {
-            const std::string at = "pixel " + std::to_string(i);
-            ensure_equals("reached where the world drew at " + at, (bool)drawn[i], depths[i] != 1.0);
-            ensure_equals("as the depth test reached at " + at, (bool)drawn[i], (bool)reference[i]);
+            INFO("pixel " << i);
+            CHECK((bool)drawn[i] == (depths[i] != 1.0));
+            CHECK((bool)drawn[i] == (bool)reference[i]);
         }
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
     // A light's sphere 3 m around a point 20 m out: the bounds pass what lies within its span of view depth and
     // nothing in front of it, behind it or of the sky, under either convention.
-    template<> template<>
-    void aldepthbounds_object_t::test<3>()
+    TEST_CASE_METHOD(aldepthbounds_data, "aldepthbounds_gl: a light's sphere keeps to its span of depth", "[aldepthbounds_gl]")
     {
         requireBounds();
         for (bool reverse : { true, false })
         {
-            const std::string convention = reverse ? "reverse-Z" : "forward";
             setUp(reverse, 7);
             const F64 sky = reverse ? 0.0 : 1.0;
             const F64 distances[] = { 16.9, 17.1, 20.0, 22.9, 23.1, 100.0 };
@@ -347,21 +347,19 @@ namespace tut
             const bool expected[] = { false, true, true, true, false, false, false };
             for (size_t i = 0; i < depths.size(); ++i)
             {
-                const std::string at = convention + ", pixel " + std::to_string(i);
-                ensure_equals("within the sphere's span at " + at, (bool)reached[i], expected[i]);
+                INFO((reverse ? "reverse-Z" : "forward") << ", pixel " << i);
+                CHECK((bool)reached[i] == expected[i]);
             }
         }
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
     // A sphere around the eye spans from the near plane out to its far side.
-    template<> template<>
-    void aldepthbounds_object_t::test<4>()
+    TEST_CASE_METHOD(aldepthbounds_data, "aldepthbounds_gl: a sphere around the eye spans from the near plane out", "[aldepthbounds_gl]")
     {
         requireBounds();
         for (bool reverse : { true, false })
         {
-            const std::string convention = reverse ? "reverse-Z" : "forward";
             setUp(reverse, 5);
             const F64 sky = reverse ? 0.0 : 1.0;
             const std::vector<F64> depths = {
@@ -378,30 +376,40 @@ namespace tut
             const bool expected[] = { true, true, true, false, false };
             for (size_t i = 0; i < depths.size(); ++i)
             {
-                const std::string at = convention + ", pixel " + std::to_string(i);
-                ensure_equals("from the eye out at " + at, (bool)reached[i], expected[i]);
+                INFO((reverse ? "reverse-Z" : "forward") << ", pixel " << i);
+                CHECK((bool)reached[i] == expected[i]);
             }
         }
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
     // A span past the forward projection's far plane still leaves the sky out, and an oblique projection, whose depth
     // moves across the view, gives no span at all.
-    template<> template<>
-    void aldepthbounds_object_t::test<5>()
+    TEST_CASE_METHOD(aldepthbounds_data, "aldepthbounds_gl: past the far plane the sky stays out, and an oblique projection has no span", "[aldepthbounds_gl]")
     {
         requireBounds();
         setUp(false, 3);
         lay({ stored_depth(false, 505.0), stored_depth(false, FORWARD_FAR - 0.5), 1.0 });
         const std::vector<bool> reached = drawSphere(projection(), FORWARD_FAR, 10.f);
-        ensure("geometry inside the span", reached[0] && reached[1]);
-        ensure("not the sky beyond the far plane", !reached[2]);
+        {
+            INFO("geometry inside the span");
+            CHECK(reached[0]);
+            CHECK(reached[1]);
+        }
+        {
+            INFO("not the sky beyond the far plane");
+            CHECK(!reached[2]);
+        }
 
         LLMatrix4a oblique = projection();
         oblique.getF32ptr()[2] = 0.25f;
         F64 zmin = -1.0, zmax = -1.0;
-        ensure("no span under an oblique projection", !ALDepthBounds::viewSpan(oblique, -10.f, -20.f, zmin, zmax));
-        ensure("nothing set", zmin == -1.0 && zmax == -1.0);
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        CHECK(!ALDepthBounds::viewSpan(oblique, -10.f, -20.f, zmin, zmax));
+        {
+            INFO("nothing set");
+            CHECK(zmin == -1.0);
+            CHECK(zmax == -1.0);
+        }
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 }

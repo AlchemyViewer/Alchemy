@@ -222,11 +222,13 @@ public:
          Usually, child nodes are add through LLHTTPRegistration, not
          by calling this interface directly.
 
-         The added node will be now owned by the parent node.
+         The added node will be now owned by the parent node. A path
+         that already has a node is refused: addNode returns false, and
+         the node it was given is still the caller's.
     */
     //@{
 
-    virtual void addNode(const std::string& path, LLHTTPNode* nodeToAdd);
+    virtual bool addNode(const std::string& path, LLHTTPNode* nodeToAdd);
 
     LLSD allNodePaths() const;
         ///< Returns an arrary of node paths at and under this node
