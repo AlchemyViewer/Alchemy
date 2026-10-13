@@ -34,16 +34,15 @@
 
 #include "llheadlessgl_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 
 #include <cmath>
 #include <limits>
 
 // Numbers and bounds from an independent double-precision reference of the projection.
-namespace tut
+namespace
 {
-    namespace
-    {
         constexpr S32 SIZE = 8;
         constexpr F32 NEAR_PLANE = 0.1f;
         constexpr F32 FOV = 1.0f;
@@ -105,6 +104,10 @@ namespace tut
         // program the tests change go back with mGL.
         ~alinfiniteprojection_data()
         {
+            if (mQuery)
+            {
+                glDeleteQueries(1, &mQuery);
+            }
             if (mFBO)
             {
                 glDeleteFramebuffers(1, &mFBO);
@@ -128,12 +131,16 @@ namespace tut
         {
             if (!gGLManager.mHasClipControl)
             {
-                skip("no clip control: reverse-Z is unavailable on this context");
+                SKIP("no clip control: reverse-Z is unavailable on this context");
             }
 
             const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kVertex);
             const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kFragment);
-            ensure("shaders compile", vs && fs);
+            {
+                INFO("shaders compile");
+                REQUIRE(vs);
+                REQUIRE(fs);
+            }
             mProgram = glCreateProgram();
             glAttachShader(mProgram, vs);
             glAttachShader(mProgram, fs);
@@ -142,7 +149,7 @@ namespace tut
             glDeleteShader(fs);
             GLint linked = GL_FALSE;
             glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
-            ensure("program links", linked == GL_TRUE);
+            REQUIRE(linked == GL_TRUE);
 
             glGenVertexArrays(1, &mVAO);
             glGenTextures(1, &mDepth);
@@ -156,7 +163,7 @@ namespace tut
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, mDepth, 0);
             glDrawBuffer(GL_NONE);
             glReadBuffer(GL_NONE);
-            ensure_equals("complete", (U32)glCheckFramebufferStatus(GL_FRAMEBUFFER), (U32)GL_FRAMEBUFFER_COMPLETE);
+            REQUIRE((U32)glCheckFramebufferStatus(GL_FRAMEBUFFER) == (U32)GL_FRAMEBUFFER_COMPLETE);
 
             glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
             glViewport(0, 0, SIZE, SIZE);
@@ -193,76 +200,56 @@ namespace tut
         GLuint mDepth = 0;
         GLuint mVAO = 0;
         GLuint mProgram = 0;
+        // A samples-passed query, for the cases that count what a pass shades.
+        GLuint mQuery = 0;
     };
 
-    typedef test_group<alinfiniteprojection_data> alinfiniteprojection_t;
-    typedef alinfiniteprojection_t::object alinfiniteprojection_object_t;
-    tut::alinfiniteprojection_t tut_alinfiniteprojection("alinfiniteprojection_gl");
-    }
 
     // The matrix: recognised as infinite, stores near / distance, and its inverse gives w = 0 at the cleared
     // depth, which the reconstruction floor turns into MAX_RECONSTRUCT_DISTANCE. Finite and forward matrices are not.
-    template<> template<>
-    void alinfiniteprojection_object_t::test<1>()
+    TEST_CASE_METHOD(alinfiniteprojection_data, "alinfiniteprojection_gl: the infinite matrix stores near over distance and its far end is floored", "[alinfiniteprojection_gl]")
     {
         const LLMatrix4a proj = infinite();
-        ensure("infinite", al_projection_is_infinite(proj));
-        ensure("finite reversed is not", !al_projection_is_infinite(al_perspective(FOV, 1.f, NEAR_PLANE, 1024.f)));
-        ensure("ortho is not", !al_projection_is_infinite(al_ortho(-1.f, 1.f, -1.f, 1.f, 0.f, 10.f)));
+        CHECK(al_projection_is_infinite(proj));
+        UNSCOPED_INFO("finite reversed is not");
+        CHECK_FALSE(al_projection_is_infinite(al_perspective(FOV, 1.f, NEAR_PLANE, 1024.f)));
+        CHECK_FALSE(al_projection_is_infinite(al_ortho(-1.f, 1.f, -1.f, 1.f, 0.f, 10.f)));
 
         for (F32 dist : DISTANCES)
         {
+            CAPTURE(dist);
             LLVector4a clip;
             proj.transform4(LLVector4a(0.f, 0.f, -dist, 1.f), clip);
-            ensure_equals("clip z is the near plane", clip[2], NEAR_PLANE);
-            ensure_equals("clip w is the distance", clip[3], dist);
+            REQUIRE(clip[2] == NEAR_PLANE);
+            REQUIRE(clip[3] == dist);
         }
 
         LLMatrix4a inv = proj;
         inv.invert();
         LLVector4a far_point;
         inv.transform4(LLVector4a(0.f, 0.f, 0.f, 1.f), far_point);
-        ensure("cleared depth unprojects to w = 0", fabsf(far_point[3]) < 1e-12f);
-        ensure_approximately_equals("floored to MAX_RECONSTRUCT_DISTANCE", reconstruct(inv, 0.f), MAX_RECONSTRUCT_DISTANCE, 8);
+        UNSCOPED_INFO("cleared depth unprojects to w = 0");
+        CHECK(fabsf(far_point[3]) < 1e-12f);
+        CHECK_THAT(reconstruct(inv, 0.f), ll_test::WithinBits(MAX_RECONSTRUCT_DISTANCE, 8));
 
         // The floor leaves a finite projection alone: its cleared depth still reconstructs at its far plane.
         LLMatrix4a inv_finite = al_perspective(FOV, 1.f, NEAR_PLANE, 1024.f);
         inv_finite.invert();
         LLVector4a raw;
         inv_finite.transform4(LLVector4a(0.f, 0.f, 0.f, 1.f), raw);
-        ensure_equals("finite far untouched by the floor", reconstruct(inv_finite, 0.f), -raw[2] / raw[3]);
-        ensure("finite far is about 1024 m", fabsf(-raw[2] / raw[3] - 1024.f) < 1.f);
+        CHECK(reconstruct(inv_finite, 0.f) == -raw[2] / raw[3]);
+        CHECK(fabsf(-raw[2] / raw[3] - 1024.f) < 1.f);
 
         LLRender::sReverseZ = false;
         const LLMatrix4a forward = al_perspective(FOV, 1.f, NEAR_PLANE, std::numeric_limits<F32>::infinity());
-        ensure("forward falls back to a finite plane", !al_projection_is_infinite(forward) && std::isfinite(forward.getColumn<2>()[2]));
+        CHECK_FALSE(al_projection_is_infinite(forward));
+        CHECK(std::isfinite(forward.getColumn<2>()[2]));
         LLRender::sReverseZ = true;
-    }
-
-    // Forward-Z cannot hold an infinite plane in 24-bit depth, so an infinite request falls back to the old
-    // fixed plane rather than MAX_FAR_PLANE, and depth beyond it is clipped as before.
-    template<> template<>
-    void alinfiniteprojection_object_t::test<4>()
-    {
-        LLRender::sReverseZ = false;
-        const LLMatrix4a forward = al_perspective(FOV, 1.f, NEAR_PLANE, std::numeric_limits<F32>::infinity());
-        const LLMatrix4a legacy = al_perspective(FOV, 1.f, NEAR_PLANE, FINITE_PROJECTION_FAR);
-        LLRender::sReverseZ = true;
-        for (S32 i = 0; i < 16; ++i)
-        {
-            ensure_equals("same as the old fixed plane", forward.getF32ptr()[i], legacy.getF32ptr()[i]);
-        }
-        LLVector4a clip;
-        forward.transform4(LLVector4a(0.f, 0.f, -FINITE_PROJECTION_FAR, 1.f), clip);
-        ensure("far plane at the old fixed plane", fabsf(clip[2] / clip[3] - 1.f) < 1e-5f);
-        forward.transform4(LLVector4a(0.f, 0.f, -2.f * FINITE_PROJECTION_FAR, 1.f), clip);
-        ensure("past it is clipped", clip[2] / clip[3] > 1.f);
     }
 
     // Draw at each distance: the stored depth is near / distance (oracle), nothing is clipped far, and the
     // reconstructed distance is within the oracle's bound (0.29 mm, 3.9 mm, 9.3 mm, 45 mm).
-    template<> template<>
-    void alinfiniteprojection_object_t::test<2>()
+    TEST_CASE_METHOD(alinfiniteprojection_data, "alinfiniteprojection_gl: drawn depth is near over distance and round-trips within the bound", "[alinfiniteprojection_gl]")
     {
         setUp();
         const LLMatrix4a proj = infinite();
@@ -273,33 +260,35 @@ namespace tut
         for (size_t i = 0; i < std::size(DISTANCES); ++i)
         {
             const F32 dist = DISTANCES[i];
-            const std::string at = std::to_string((S32)dist) + " m";
+            CAPTURE(dist);
             glClear(GL_DEPTH_BUFFER_BIT);
             draw(proj, dist);
             const F32 d = centreDepth();
-            ensure("drawn at " + at, d > 0.f);
-            ensure("stored depth at " + at, fabsf(d - oracle_depth[i]) <= oracle_depth[i] * 1e-6f);
+            UNSCOPED_INFO("drawn");
+            REQUIRE(d > 0.f);
+            REQUIRE(fabsf(d - oracle_depth[i]) <= oracle_depth[i] * 1e-6f);
             const F64 err = fabs((F64)reconstruct(inv, d) - dist);
-            ensure("round trip at " + at + ": " + std::to_string(err * 1000.0) + " mm", err <= bound(dist, d));
+            UNSCOPED_INFO("round trip error " << err * 1000.0 << " mm");
+            REQUIRE(err <= bound(dist, d));
         }
 
         // Past every reach and still not clipped: 1000 km.
         glClear(GL_DEPTH_BUFFER_BIT);
         draw(proj, 1.0e6f);
-        ensure("1000 km is not clipped", centreDepth() > 0.f);
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        UNSCOPED_INFO("1000 km is not clipped");
+        CHECK(centreDepth() > 0.f);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
     // Two surfaces four depth steps apart at each distance: the nearer one wins whichever is drawn first.
-    template<> template<>
-    void alinfiniteprojection_object_t::test<3>()
+    TEST_CASE_METHOD(alinfiniteprojection_data, "alinfiniteprojection_gl: surfaces four depth steps apart resolve in either draw order", "[alinfiniteprojection_gl]")
     {
         setUp();
         const LLMatrix4a proj = infinite();
 
         for (F32 dist : DISTANCES)
         {
-            const std::string at = std::to_string((S32)dist) + " m";
+            CAPTURE(dist);
             const F32 gap = (F32)(4.0 * depthStep(NEAR_PLANE / dist)) + (std::nextafter(dist, 2.f * dist) - dist);
             const F32 nearer = dist - gap;
 
@@ -308,90 +297,116 @@ namespace tut
             const F32 d_far = centreDepth();
             draw(proj, nearer);
             const F32 d_near = centreDepth();
-            ensure("nearer drawn second wins at " + at, d_near > d_far);
+            UNSCOPED_INFO("nearer drawn second wins");
+            REQUIRE(d_near > d_far);
 
             glClear(GL_DEPTH_BUFFER_BIT);
             draw(proj, nearer);
             draw(proj, dist);
-            ensure_equals("farther drawn second loses at " + at, centreDepth(), d_near);
+            UNSCOPED_INFO("farther drawn second loses");
+            REQUIRE(centreDepth() == d_near);
         }
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // Forward-Z cannot hold an infinite plane in 24-bit depth, so an infinite request falls back to the old
+    // fixed plane rather than MAX_FAR_PLANE, and depth beyond it is clipped as before.
+    TEST_CASE_METHOD(alinfiniteprojection_data, "alinfiniteprojection_gl: forward-Z falls back to the old fixed plane and clips past it", "[alinfiniteprojection_gl]")
+    {
+        LLRender::sReverseZ = false;
+        const LLMatrix4a forward = al_perspective(FOV, 1.f, NEAR_PLANE, std::numeric_limits<F32>::infinity());
+        const LLMatrix4a legacy = al_perspective(FOV, 1.f, NEAR_PLANE, FINITE_PROJECTION_FAR);
+        LLRender::sReverseZ = true;
+        for (S32 i = 0; i < 16; ++i)
+        {
+            CAPTURE(i);
+            REQUIRE(forward.getF32ptr()[i] == legacy.getF32ptr()[i]);
+        }
+        LLVector4a clip;
+        forward.transform4(LLVector4a(0.f, 0.f, -FINITE_PROJECTION_FAR, 1.f), clip);
+        UNSCOPED_INFO("far plane at the old fixed plane");
+        CHECK(fabsf(clip[2] / clip[3] - 1.f) < 1e-5f);
+        forward.transform4(LLVector4a(0.f, 0.f, -2.f * FINITE_PROJECTION_FAR, 1.f), clip);
+        UNSCOPED_INFO("past it is clipped");
+        CHECK(clip[2] / clip[3] > 1.f);
     }
 
     // The sky draws last, on the far plane, writing no depth, and the depth test spares it every pixel the world
     // covered (skyV.glsl). Under the infinite projection the far plane is the cleared depth exactly and geometry as
     // far out as reconstruction reaches still stores more, so the sky passes where nothing was drawn and nowhere else.
-    template<> template<>
-    void alinfiniteprojection_object_t::test<5>()
+    TEST_CASE_METHOD(alinfiniteprojection_data, "alinfiniteprojection_gl: the sky on the far plane passes only where nothing was drawn", "[alinfiniteprojection_gl]")
     {
         setUp();
         const LLMatrix4a proj = infinite();
-        GLuint query = 0;
-        glGenQueries(1, &query);
+        glGenQueries(1, &mQuery);
         const auto sky_samples = [&]()
         {
             glDepthFunc(GL_GEQUAL);
             glDepthMask(GL_FALSE);
-            glBeginQuery(GL_SAMPLES_PASSED, query);
+            glBeginQuery(GL_SAMPLES_PASSED, mQuery);
             draw(proj, 1000.f, true);
             glEndQuery(GL_SAMPLES_PASSED);
             glDepthMask(GL_TRUE);
             glDepthFunc(GL_GREATER);
             GLuint samples = 0;
-            glGetQueryObjectuiv(query, GL_QUERY_RESULT, &samples);
+            glGetQueryObjectuiv(mQuery, GL_QUERY_RESULT, &samples);
             return samples;
         };
 
         glClear(GL_DEPTH_BUFFER_BIT);
-        ensure_equals("the sky fills an empty frame", sky_samples(), (GLuint)(SIZE * SIZE));
-        ensure_equals("the sky leaves the cleared depth", centreDepth(), 0.f);
+        UNSCOPED_INFO("the sky fills an empty frame");
+        CHECK(sky_samples() == (GLuint)(SIZE * SIZE));
+        UNSCOPED_INFO("the sky leaves the cleared depth");
+        CHECK(centreDepth() == 0.f);
 
         for (F32 dist : { 1000.f, 100000.f, MAX_RECONSTRUCT_DISTANCE })
         {
-            const std::string at = std::to_string((S32)dist) + " m";
+            CAPTURE(dist);
             glClear(GL_DEPTH_BUFFER_BIT);
             draw(proj, dist);
-            ensure("geometry at " + at + " stores more than the far plane", centreDepth() > 0.f);
-            ensure_equals("the sky stays behind geometry at " + at, sky_samples(), (GLuint)0);
+            UNSCOPED_INFO("geometry stores more than the far plane");
+            REQUIRE(centreDepth() > 0.f);
+            UNSCOPED_INFO("the sky stays behind geometry");
+            REQUIRE(sky_samples() == (GLuint)0);
         }
 
-        glDeleteQueries(1, &query);
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
     // The haze pass draws on the far plane too (hazeV.glsl), testing the other way (LLPipeline::doAtmospherics): only
     // in front of the far plane, so it shades every pixel geometry covers, however far out, and no pixel of sky.
-    template<> template<>
-    void alinfiniteprojection_object_t::test<6>()
+    TEST_CASE_METHOD(alinfiniteprojection_data, "alinfiniteprojection_gl: the haze pass on the far plane shades all geometry and no sky", "[alinfiniteprojection_gl]")
     {
         setUp();
         const LLMatrix4a proj = infinite();
-        ensure_equals("in front of the far plane is LESS under reverse-Z", (U32)LLGLDepthTest::remap(GL_GREATER), (U32)GL_LESS);
-        GLuint query = 0;
-        glGenQueries(1, &query);
+        UNSCOPED_INFO("in front of the far plane is LESS under reverse-Z");
+        CHECK((U32)LLGLDepthTest::remap(GL_GREATER) == (U32)GL_LESS);
+        glGenQueries(1, &mQuery);
         const auto haze_samples = [&]()
         {
             glDepthFunc(LLGLDepthTest::remap(GL_GREATER));
             glDepthMask(GL_FALSE);
-            glBeginQuery(GL_SAMPLES_PASSED, query);
+            glBeginQuery(GL_SAMPLES_PASSED, mQuery);
             draw(proj, 1000.f, true);
             glEndQuery(GL_SAMPLES_PASSED);
             glDepthMask(GL_TRUE);
             glDepthFunc(GL_GREATER);
             GLuint samples = 0;
-            glGetQueryObjectuiv(query, GL_QUERY_RESULT, &samples);
+            glGetQueryObjectuiv(mQuery, GL_QUERY_RESULT, &samples);
             return samples;
         };
 
         glClear(GL_DEPTH_BUFFER_BIT);
-        ensure_equals("no haze on an empty frame", haze_samples(), (GLuint)0);
+        UNSCOPED_INFO("no haze on an empty frame");
+        CHECK(haze_samples() == (GLuint)0);
 
         for (F32 dist : { 1.f, 1000.f, 100000.f, MAX_RECONSTRUCT_DISTANCE })
         {
-            const std::string at = std::to_string((S32)dist) + " m";
+            CAPTURE(dist);
             glClear(GL_DEPTH_BUFFER_BIT);
             draw(proj, dist);
-            ensure_equals("haze over all of the geometry at " + at, haze_samples(), (GLuint)(SIZE * SIZE));
+            UNSCOPED_INFO("haze over all of the geometry");
+            REQUIRE(haze_samples() == (GLuint)(SIZE * SIZE));
         }
 
         // Pixel by pixel: geometry over the left half only, sky over the right.
@@ -399,47 +414,49 @@ namespace tut
         glViewport(0, 0, SIZE / 2, SIZE);
         draw(proj, MAX_RECONSTRUCT_DISTANCE);
         glViewport(0, 0, SIZE, SIZE);
-        ensure_equals("haze over the geometry's half alone", haze_samples(), (GLuint)(SIZE * SIZE / 2));
+        UNSCOPED_INFO("haze over the geometry's half alone");
+        CHECK(haze_samples() == (GLuint)(SIZE * SIZE / 2));
 
-        glDeleteQueries(1, &query);
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
     // The soften pass draws on the far plane twice (softenLightV.glsl, LLPipeline::renderDeferredLighting): its lit
     // program in front of the far plane, as the haze does, and its sky program on it. Between them every pixel is
     // shaded once, by the program for what it is, however far out the geometry lies.
-    template<> template<>
-    void alinfiniteprojection_object_t::test<7>()
+    TEST_CASE_METHOD(alinfiniteprojection_data, "alinfiniteprojection_gl: the soften pass shades every pixel once as lit or as sky", "[alinfiniteprojection_gl]")
     {
         setUp();
         const LLMatrix4a proj = infinite();
-        GLuint query = 0;
-        glGenQueries(1, &query);
+        glGenQueries(1, &mQuery);
         const auto samples = [&](GLenum func)
         {
             glDepthFunc(LLGLDepthTest::remap(func));
             glDepthMask(GL_FALSE);
-            glBeginQuery(GL_SAMPLES_PASSED, query);
+            glBeginQuery(GL_SAMPLES_PASSED, mQuery);
             draw(proj, 1000.f, true);
             glEndQuery(GL_SAMPLES_PASSED);
             glDepthMask(GL_TRUE);
             glDepthFunc(GL_GREATER);
             GLuint passed = 0;
-            glGetQueryObjectuiv(query, GL_QUERY_RESULT, &passed);
+            glGetQueryObjectuiv(mQuery, GL_QUERY_RESULT, &passed);
             return passed;
         };
 
         glClear(GL_DEPTH_BUFFER_BIT);
-        ensure_equals("nothing lit on an empty frame", samples(GL_GREATER), (GLuint)0);
-        ensure_equals("all sky on an empty frame", samples(GL_EQUAL), (GLuint)(SIZE * SIZE));
+        UNSCOPED_INFO("nothing lit on an empty frame");
+        CHECK(samples(GL_GREATER) == (GLuint)0);
+        UNSCOPED_INFO("all sky on an empty frame");
+        CHECK(samples(GL_EQUAL) == (GLuint)(SIZE * SIZE));
 
         for (F32 dist : { 1.f, 1000.f, 100000.f, MAX_RECONSTRUCT_DISTANCE })
         {
-            const std::string at = std::to_string((S32)dist) + " m";
+            CAPTURE(dist);
             glClear(GL_DEPTH_BUFFER_BIT);
             draw(proj, dist);
-            ensure_equals("all lit over geometry at " + at, samples(GL_GREATER), (GLuint)(SIZE * SIZE));
-            ensure_equals("no sky over geometry at " + at, samples(GL_EQUAL), (GLuint)0);
+            UNSCOPED_INFO("all lit over geometry");
+            REQUIRE(samples(GL_GREATER) == (GLuint)(SIZE * SIZE));
+            UNSCOPED_INFO("no sky over geometry");
+            REQUIRE(samples(GL_EQUAL) == (GLuint)0);
         }
 
         // Pixel by pixel: geometry at the reconstruction floor over the left half only, sky over the right.
@@ -449,10 +466,11 @@ namespace tut
         glViewport(0, 0, SIZE, SIZE);
         const GLuint lit = samples(GL_GREATER);
         const GLuint sky = samples(GL_EQUAL);
-        ensure_equals("lit over the geometry's half", lit, (GLuint)(SIZE * SIZE / 2));
-        ensure_equals("every pixel shaded once", lit + sky, (GLuint)(SIZE * SIZE));
+        UNSCOPED_INFO("lit over the geometry's half");
+        CHECK(lit == (GLuint)(SIZE * SIZE / 2));
+        UNSCOPED_INFO("every pixel shaded once");
+        CHECK(lit + sky == (GLuint)(SIZE * SIZE));
 
-        glDeleteQueries(1, &query);
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 }

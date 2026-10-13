@@ -32,94 +32,67 @@
 
 #include "../llfontbitmapcache.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
-{
 namespace
 {
-    // Pure-CPU fixture: no GL context required. The tests in this group
-    // touch only the bookkeeping state that LLFontBitmapCache maintains
-    // independently of any GL allocation.
-    struct llfontbitmapcache_data
-    {
-    };
-
-    typedef test_group<llfontbitmapcache_data> llfontbitmapcache_test;
-    typedef llfontbitmapcache_test::object     llfontbitmapcache_object;
-    tut::llfontbitmapcache_test llfontbitmapcache_testcase("LLFontBitmapCache");
-}
-
     // Construction takes a fresh value from sNextGeneration. Two
     // back-to-back instances must therefore land on distinct
     // generations — without per-instance uniqueness, vertex buffers
     // comparing their stored mLastFontCacheGen across an in-place
     // font reload would false-match (see llfontbitmapcache.h:139-147).
-    template<> template<>
-    void llfontbitmapcache_object::test<1>()
+    TEST_CASE("LLFontBitmapCache: each new cache takes a fresh and higher generation", "[LLFontBitmapCache]")
     {
         LLFontBitmapCache a;
         LLFontBitmapCache b;
-        ensure_not_equals("two instances get distinct generations",
-                          a.getCacheGeneration(), b.getCacheGeneration());
-        ensure("first generation > 0",  a.getCacheGeneration() > 0);
-        ensure("second generation > first",
-               b.getCacheGeneration() > a.getCacheGeneration());
+        CHECK(a.getCacheGeneration() != b.getCacheGeneration());
+        CHECK(a.getCacheGeneration() > 0);
+        CHECK(b.getCacheGeneration() > a.getCacheGeneration());
     }
 
     // Static getGlobalGeneration must reflect the last sNextGeneration
     // bump. Constructing a new cache bumps the counter, so the global
     // tick must equal the new instance's mGeneration immediately after.
-    template<> template<>
-    void llfontbitmapcache_object::test<2>()
+    TEST_CASE("LLFontBitmapCache: getGlobalGeneration is the newest cache's generation", "[LLFontBitmapCache]")
     {
         const S32 before = LLFontBitmapCache::getGlobalGeneration();
         LLFontBitmapCache c;
         const S32 after  = LLFontBitmapCache::getGlobalGeneration();
-        ensure("global generation strictly increased on construction",
-               after > before);
-        ensure_equals("global generation matches new instance's gen",
-                      after, c.getCacheGeneration());
+        CHECK(after > before);
+        CHECK(after == c.getCacheGeneration());
     }
 
     // init() seeds mBitmapWidth/Height; reset() clears them back to 0
     // and bumps the generation counter. Verify both ends.
-    template<> template<>
-    void llfontbitmapcache_object::test<3>()
+    TEST_CASE("LLFontBitmapCache: init sizes the sheets; reset clears them and bumps the generation", "[LLFontBitmapCache]")
     {
         LLFontBitmapCache c;
-        const S32 gen_init0 = c.getCacheGeneration();
-
         c.init(/*max_char_width=*/2, /*max_char_height=*/2);
         // 2*40=80 → next pow2 ≥ 80 → 128, capped at 1024.
-        ensure_equals("bitmap width set by init",  c.getBitmapWidth(),  128);
-        ensure_equals("bitmap height set by init", c.getBitmapHeight(), 128);
+        CHECK(c.getBitmapWidth() == 128);
+        CHECK(c.getBitmapHeight() == 128);
+        // Read after init, which resets and so bumps it too.
+        const S32 gen_before_reset = c.getCacheGeneration();
 
         c.reset();
-        ensure_equals("bitmap width cleared by reset",  c.getBitmapWidth(),  0);
-        ensure_equals("bitmap height cleared by reset", c.getBitmapHeight(), 0);
-        ensure("reset bumped generation",
-               c.getCacheGeneration() > gen_init0);
+        CHECK(c.getBitmapWidth() == 0);
+        CHECK(c.getBitmapHeight() == 0);
+        CHECK(c.getCacheGeneration() > gen_before_reset);
     }
 
     // Out-of-range queries on a freshly-constructed (or reset) cache
     // must return safe defaults, not crash. EFontGlyphType::Count is
     // a sentinel — every accessor must reject it.
-    template<> template<>
-    void llfontbitmapcache_object::test<4>()
+    TEST_CASE("LLFontBitmapCache: queries out of range or on an empty cache return safe defaults", "[LLFontBitmapCache]")
     {
         LLFontBitmapCache c;
-        ensure_equals("getNumBitmaps(Count) returns 0",
-                      c.getNumBitmaps(EFontGlyphType::Count), 0u);
-        ensure("getImageRaw(Count, 0) returns null",
-               c.getImageRaw(EFontGlyphType::Count, 0) == nullptr);
-        ensure("getImageGL(Count, 0) returns null",
-               c.getImageGL(EFontGlyphType::Count, 0) == nullptr);
-        ensure("getImageRaw on empty Grayscale returns null",
-               c.getImageRaw(EFontGlyphType::Grayscale, 0) == nullptr);
-        ensure_equals("getSheetLastUsedTime out-of-range == 0",
-                      c.getSheetLastUsedTime(EFontGlyphType::Grayscale, 0), 0.0);
-        ensure("isSheetReleased on empty cache reports false (slot doesn't exist)",
-               !c.isSheetReleased(EFontGlyphType::Grayscale, 0));
+        CHECK(c.getNumBitmaps(EFontGlyphType::Count) == 0u);
+        CHECK(c.getImageRaw(EFontGlyphType::Count, 0) == nullptr);
+        CHECK(c.getImageGL(EFontGlyphType::Count, 0) == nullptr);
+        UNSCOPED_INFO("an empty Grayscale vector");
+        CHECK(c.getImageRaw(EFontGlyphType::Grayscale, 0) == nullptr);
+        CHECK(c.getSheetLastUsedTime(EFontGlyphType::Grayscale, 0) == 0.0);
+        UNSCOPED_INFO("a slot that does not exist is not released");
+        CHECK_FALSE(c.isSheetReleased(EFontGlyphType::Grayscale, 0));
     }
 }
