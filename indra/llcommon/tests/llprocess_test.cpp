@@ -114,10 +114,15 @@ static std::string readfile(const std::filesystem::path& pathname, const std::st
     return output;
 }
 
-#if LL_WINDOWS
-static std::string readfile_if_present(const std::string& pathname)
+/**
+ * Read the whole of the specified file, or "" if it cannot be opened. Unlike
+ * readfile(), an empty file is not an error: a loop polling a file that a
+ * script rewrites can read it between the script's truncating open and its
+ * write.
+ */
+static std::string readfile_if_present(const std::filesystem::path& pathname)
 {
-    std::ifstream inf(pathname.c_str());
+    std::ifstream inf(pathname);
     if (!inf.is_open())
     {
         return "";
@@ -125,7 +130,6 @@ static std::string readfile_if_present(const std::string& pathname)
     return std::string((std::istreambuf_iterator<char>(inf)),
                        std::istreambuf_iterator<char>());
 }
-#endif
 
 /// Looping on LLProcess::isRunning() must now be accompanied by pumping
 /// "mainloop" -- otherwise the status won't update and you get an infinite
@@ -442,6 +446,13 @@ namespace
         return {};
     }
 
+    // Closes a process handle however the test leaves the scope holding it.
+    struct HandleCloser
+    {
+        void operator()(HANDLE handle) const { CloseHandle(handle); }
+    };
+    using ScopedHandle = std::unique_ptr<void, HandleCloser>;
+
     void verify_autokill_on_helper_exit(const std::string& desc, int child_count)
     {
         NamedExtTempFile child_script("py",
@@ -463,16 +474,16 @@ namespace
         REQUIRE(bool(helper));
 
         std::vector<DWORD> pids = wait_for_helper_pids(pidfile.getPath().string(), child_count);
-        std::vector<HANDLE> handles;
+        std::vector<ScopedHandle> handles;
         handles.reserve(pids.size());
         for (DWORD pid : pids)
         {
             // SYNCHRONIZE lets the test wait for the child to terminate, while
             // PROCESS_QUERY_LIMITED_INFORMATION keeps the requested access minimal.
-            HANDLE handle = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+            ScopedHandle handle(OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, false, pid));
             CAPTURE(pid);
             REQUIRE(handle != nullptr);
-            handles.push_back(handle);
+            handles.push_back(std::move(handle));
         }
 
         {
@@ -483,11 +494,10 @@ namespace
         waitfor(*helper);
         CHECK(helper->getStatus().mState == LLProcess::EXITED);
 
-        for (HANDLE handle : handles)
+        for (const ScopedHandle& handle : handles)
         {
             UNSCOPED_INFO("autokilled child exited");
-            REQUIRE(WaitForSingleObject(handle, AUTOKILL_CHILD_TERMINATION_TIMEOUT_MS) == WAIT_OBJECT_0);
-            CloseHandle(handle);
+            REQUIRE(WaitForSingleObject(handle.get(), AUTOKILL_CHILD_TERMINATION_TIMEOUT_MS) == WAIT_OBJECT_0);
         }
     }
 }
@@ -803,55 +813,48 @@ namespace tut
 
         // Beyond merely executing all the above successfully, verify that we
         // obtained expected output -- and that we duly got control while
-        // waiting, proving the non-blocking nature of these pipes.
-        try
+        // waiting, proving the non-blocking nature of these pipes. Any check
+        // below that fails reports whatever we did get, to help diagnose.
+        std::ostringstream dump;
+        dump << "History:\n";
+        for (const Item& item : history)
         {
-            // Perform these require_equals_() within this try/catch so that if
-            // we don't get expected results, we'll dump whatever we did get
-            // to help diagnose.
-            require_equals_(wi.why, APR_PROC_EXIT);
-            require_equals_(wi.rc, 0);
-
-            unsigned i = 0;
-            UNSCOPED_INFO("blocking I/O on child pipe (0)");
-            CHECK(history[i].tries);
-            require_equals_(history[i].which, "out");
-            require_equals_(history[i].what,  "stdout after wait" EOL);
-//          ++i;
-//          require_equals_(history[i].which, "out");
-//          require_equals_(history[i].what,  "*eof*");
-            ++i;
-            UNSCOPED_INFO("blocking I/O on child pipe (1)");
-            CHECK(history[i].tries);
-            require_equals_(history[i].which, "err");
-            require_equals_(history[i].what,  "stderr after wait" EOL);
-//          ++i;
-//          require_equals_(history[i].which, "err");
-//          require_equals_(history[i].what,  "*eof*");
-        }
-        catch (const ll_test::Failure&)
-        {
-            std::cout << "History:\n";
-            for (const Item& item : history)
+            std::string what(item.what);
+            if ((! what.empty()) && what[what.length() - 1] == '\n')
             {
-                std::string what(item.what);
-                if ((! what.empty()) && what[what.length() - 1] == '\n')
+                what.erase(what.length() - 1);
+                if ((! what.empty()) && what[what.length() - 1] == '\r')
                 {
                     what.erase(what.length() - 1);
-                    if ((! what.empty()) && what[what.length() - 1] == '\r')
-                    {
-                        what.erase(what.length() - 1);
-                        what.append("\\r");
-                    }
-                    what.append("\\n");
+                    what.append("\\r");
                 }
-                std::cout << "  " << item.which << ": '" << what << "' ("
-                          << item.tries << " tries)\n";
+                what.append("\\n");
             }
-            std::cout << std::flush;
-            // re-raise same error; just want to enrich the output
-            throw;
+            dump << "  " << item.which << ": '" << what << "' ("
+                 << item.tries << " tries)\n";
         }
+        INFO(dump.str());
+
+        require_equals_(wi.why, APR_PROC_EXIT);
+        require_equals_(wi.rc, 0);
+
+        unsigned i = 0;
+        UNSCOPED_INFO("blocking I/O on child pipe (0)");
+        CHECK(history[i].tries);
+        require_equals_(history[i].which, "out");
+        require_equals_(history[i].what,  "stdout after wait" EOL);
+//      ++i;
+//      require_equals_(history[i].which, "out");
+//      require_equals_(history[i].what,  "*eof*");
+        // history[1] exists: reading the whole line above pushed it
+        ++i;
+        UNSCOPED_INFO("blocking I/O on child pipe (1)");
+        CHECK(history[i].tries);
+        require_equals_(history[i].which, "err");
+        require_equals_(history[i].what,  "stderr after wait" EOL);
+//      ++i;
+//      require_equals_(history[i].which, "err");
+//      require_equals_(history[i].what,  "*eof*");
     }
 
     TEST_CASE_METHOD(llprocess_data, "llprocess: cwd sets the child's working directory", "[llprocess]")
@@ -974,7 +977,7 @@ namespace tut
         for ( ; i < timeout; ++i)
         {
             yield();
-            if (readfile(out.getPath(), "from kill() script") == "ok")
+            if (readfile_if_present(out.getPath()) == "ok")
                 break;
         }
         // If we broke this loop because of the counter, something's wrong
@@ -1021,7 +1024,7 @@ namespace tut
             for ( ; i < timeout; ++i)
             {
                 yield();
-                if (readfile(out.getPath(), "from kill() script") == "ok")
+                if (readfile_if_present(out.getPath()) == "ok")
                     break;
             }
             // If we broke this loop because of the counter, something's wrong
@@ -1074,7 +1077,7 @@ namespace tut
             for ( ; i < timeout; ++i)
             {
                 yield();
-                if (readfile(from.getPath(), "from autokill script") == "ok")
+                if (readfile_if_present(from.getPath()) == "ok")
                     break;
             }
             // If we broke this loop because of the counter, something's wrong
@@ -1136,7 +1139,7 @@ namespace tut
             for ( ; i < timeout; ++i)
             {
                 yield();
-                if (readfile(from.getPath(), "from autokill script") == "ok")
+                if (readfile_if_present(from.getPath()) == "ok")
                     break;
             }
             // If we broke this loop because of the counter, something's wrong
@@ -1560,7 +1563,7 @@ namespace tut
         CHECK(childout.find("d", 27) == LLProcess::ReadPipe::npos);
         CHECK(childout.find('d', 27) == LLProcess::ReadPipe::npos);
         CHECK(childout.find("ghi") == 6);
-        CHECK(childout.find("ghi") == 6);
+        CHECK(childout.find("ghi", 6) == 6);
         CHECK(childout.find("ghi", 7) == LLProcess::ReadPipe::npos);
         CHECK(childout.find("ghi", 26) == LLProcess::ReadPipe::npos);
         CHECK(childout.find("ghi", 27) == LLProcess::ReadPipe::npos);
@@ -2070,7 +2073,7 @@ namespace tut
             for ( ; i < timeout; ++i)
             {
                 yield();
-                if (readfile(out.getPath(), "from kill() script") == "ok")
+                if (readfile_if_present(out.getPath()) == "ok")
                     break;
             }
             UNSCOPED_INFO("script never started");

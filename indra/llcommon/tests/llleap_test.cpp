@@ -119,7 +119,7 @@ namespace tut
                    "    hdr = []\n"
                    "    while b':' not in hdr and len(hdr) < 20:\n"
                    "        hdr.append(sys.stdin.buffer.read(1))\n"
-                   "        if not hdr:\n"
+                   "        if not hdr[-1]:\n"
                    "            sys.exit(0)\n"
                    "    if not hdr[-1] == b':':\n"
                    "        raise ProtocolError('Expected len:data, got %r' % hdr, hdr)\n"
@@ -443,6 +443,8 @@ namespace tut
     static void test_large_message(const std::string& PYTHON, const std::string& reader_module,
                                    const std::string& test_name, size_t size)
     {
+        // test_or_split() runs this at several sizes: say which one failed
+        CAPTURE(size);
         ReqIDAPI api;
         Result result;
         NamedExtTempFile script("py",
@@ -498,6 +500,7 @@ namespace tut
                                 "        send('" << result.getName() << "',\n"
                                 "             'at offset %s, expected %r but got %r' %\n"
                                 "             (start, large[start:end], echoed[start:end]))\n"
+                                "        break\n"
                                 "sys.exit(1)\n";});
         waitfor(LLLeap::create(test_name,
                                StringVec{PYTHON, script.getPath().string(), stringize(size)}),
@@ -572,7 +575,9 @@ namespace tut
     // test_large_message() can succeed. We still want the overall test to
     // fail; otherwise we won't get the coder's attention -- but if
     // test_large_message() fails, try to find a plausible size at which it
-    // DOES work.
+    // DOES work. Catch2 records a failed REQUIRE before it throws, so every
+    // size the search tries and fails is reported as a failure of its own,
+    // naming that size; the exception rethrown below only ends the case.
     static void test_or_split(const std::string& PYTHON, const std::string& reader_module,
                               const std::string& test_name, size_t size)
     {

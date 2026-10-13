@@ -51,17 +51,21 @@
 #define INVALID_DATE_EMPTY                          ""
 
 // invalid values
-// apr 1.1.1 seems to not care about constraining the date to valid
-// dates. Put these back when the parser checks.
+// LLDate::fromStream checks only the format: it hands the fields to timegm,
+// which normalizes a value out of range rather than rejecting it (24:00:00 is
+// the next day's midnight, 2003-02-29 is 2003-03-01). Turn the case below on
+// when the parser checks the ranges.
 #define LL_DATE_PARSER_CHECKS_BOUNDARY 0
-//#define INVALID_DATE_24HOUR_BOUNDARY              "2003-04-30T24:00:00Z"
-//#define INVALID_DATE_LEAP                         "2003-04-29T04:00:00Z"
-//#define INVALID_DATE_HOUR                         "2003-04-30T24:59:59Z"
-//#define INVALID_DATE_MIN                          "2003-04-30T22:69:59Z"
-//#define INVALID_DATE_SEC                          "2003-04-30T22:59:69Z"
-//#define INVALID_DATE_YEAR                         "0-04-30T22:59:59Z"
-//#define INVALID_DATE_MONTH                            "2003-13-30T22:59:59Z"
-//#define INVALID_DATE_DAY                          "2003-04-35T22:59:59Z"
+#if LL_DATE_PARSER_CHECKS_BOUNDARY
+#define INVALID_DATE_24HOUR_BOUNDARY                "2003-04-30T24:00:00Z"
+#define INVALID_DATE_LEAP                           "2003-02-29T04:00:00Z"
+#define INVALID_DATE_HOUR                           "2003-04-30T24:59:59Z"
+#define INVALID_DATE_MIN                            "2003-04-30T22:69:59Z"
+#define INVALID_DATE_SEC                            "2003-04-30T22:59:69Z"
+#define INVALID_DATE_YEAR                           "0-04-30T22:59:59Z"
+#define INVALID_DATE_MONTH                          "2003-13-30T22:59:59Z"
+#define INVALID_DATE_DAY                            "2003-04-35T22:59:59Z"
+#endif
 
 namespace tut
 {
@@ -133,12 +137,11 @@ namespace tut
         CHECK_FALSE(result);
     }
 
+#if LL_DATE_PARSER_CHECKS_BOUNDARY
     /* Invalid Value Handling */
     TEST_CASE("LLDate: fromString rejects out-of-range field values", "[LLDate]")
     {
-#if LL_DATE_PARSER_CHECKS_BOUNDARY
         LLDate date;
-        std::string  expected_string;
         bool result;
 
         result = date.fromString(INVALID_DATE_24HOUR_BOUNDARY);
@@ -174,8 +177,8 @@ namespace tut
         result = date.fromString(INVALID_DATE_DAY);
         UNSCOPED_INFO("INVALID_DATE_DAY should have failed");
         CHECK_FALSE(result);
-#endif
     }
+#endif // LL_DATE_PARSER_CHECKS_BOUNDARY
 
     /* API checks */
     TEST_CASE("LLDate: fromStream reads a date", "[LLDate]")
@@ -266,9 +269,12 @@ namespace tut
         LLDate d;
         CHECK(d.toLocalDateString(std::string("%Y-%m-%d")).size() > 0);
         CHECK(d.toHTTPDateString(std::string("%Y-%m-%d")).size() > 0);
-        // RFC1123 wraps toHTTPDateString; verifies the day-of-week token
-        // is present (a strftime success indicator that doesn't pin locale).
+        // RFC1123 wraps toHTTPDateString as "%A, %d %b %Y %H:%M:%S GMT".
+        // The day-of-week token, whatever the locale names it, comes before
+        // the first ", ": a strftime success indicator that doesn't pin locale.
         std::string rfc = d.asRFC1123();
-        CHECK(rfc.size() > 0);
+        const size_t day_end = rfc.find(", ");
+        CHECK(day_end != std::string::npos);
+        CHECK(day_end > 0);
     }
 }

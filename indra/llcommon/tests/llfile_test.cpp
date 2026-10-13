@@ -100,8 +100,9 @@ namespace
         CHECK_FALSE(LLFile::exists(testfile1));
 
         const char* testdata = "testdata";
-        S64 bytes = LLFile::write(testfile1, testdata, 0, sizeof(testdata));
-        CHECK(bytes == sizeof(testdata));
+        S64 bytes = LLFile::write(testfile1, testdata, 0, strlen(testdata));
+        CHECK(bytes == (S64)strlen(testdata));
+        CHECK(LLFile::isfile(testfile1));
 
         rc = LLFile::remove(testfile1);
         UNSCOPED_INFO("remove of the file");
@@ -128,7 +129,6 @@ namespace
 
         std::string testdata1("testdata");
         std::string testdata2("datateststuff");
-        std::time_t current = time(nullptr);
         S64 bytes = LLFile::write(testfile1, testdata1.c_str(), 0, testdata1.length());
         UNSCOPED_INFO("write");
         CHECK(bytes == testdata1.length());

@@ -334,7 +334,7 @@ TEST_CASE_METHOD(deadmantimer_test, "LLDeadmanTimer: isExpired reports an expiry
         count = U64L(8);
         user_cpu = 29000;
         sys_cpu = 57000;
-        CHECK_FALSE(timer.isExpired(now, started, stopped, count));
+        CHECK_FALSE(timer.isExpired(now, started, stopped, count, user_cpu, sys_cpu));
         CHECK_THAT(started, ll_test::WithinBits(F64(42.0), 2));
         CHECK_THAT(stopped, ll_test::WithinBits(F64(97.0), 2));
         CHECK(count == U64L(8));

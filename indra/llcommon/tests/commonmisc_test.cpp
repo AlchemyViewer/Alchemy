@@ -1,8 +1,8 @@
 /**
- * @file common.cpp
+ * @file commonmisc_test.cpp
  * @author Phoenix
  * @date 2005-10-12
- * @brief Common templates for test framework
+ * @brief Tests of llhash, LLMemoryStream, LLSD notation and the U64 conversions
  *
  * $LicenseInfo:firstyear=2005&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -26,12 +26,6 @@
  * $/LicenseInfo$
  */
 
-/**
- *
- * THOROUGH_DESCRIPTION of common.cpp
- *
- */
-
 #include <algorithm>
 #include <iomanip>
 #include <iterator>
@@ -45,32 +39,6 @@
 #include "../llhash.h"
 
 #include <catch2/catch_test_macros.hpp>
-
-namespace
-{
-/*
-    template<> template<>
-    void sd_object::test<16>()
-    {
-    }
-*/
-}
-
-#if 0
-'{\'task_id\':u1fd77b79-a8e7-25a5-9454-02a4d948ba1c}\n{\n\tname\tObject|\n\tpermissions 0\n\t{\n\t\tbase_mask\t7fffffff\n\t\towner_mask\t7fffffff\n\t\tgroup_mask\t00000000\n\t\teveryone_mask\t00000000\n\t\tnext_owner_mask\t00082000\n\t\tcreator_id\t3c115e51-04f4-523c-9fa6-98aff1034730\n\t\towner_id\t3c115e51-04f4-523c-9fa6-98aff1034730\n\t\tlast_owner_id\t00000000-0000-0000-0000-000000000000\n\t\tgroup_id\t00000000-0000-0000-0000-000000000000\n\t}\n\tlocal_id\t10284\n\ttotal_crc\t35\n\ttype\t1\n\ttask_valid\t2\n\ttravel_access\t21\n\tdisplayopts\t2\n\tdisplaytype\tv\n\tpos\t0\t0\t0\n\toldpos\t0\t0\t0\n\trotation\t4.371139183945160766597837e-08\t1\t4.371139183945160766597837e-08\t0\n\tvelocity\t0\t0\t0\n\tangvel\t0\t0\t0\n\tscale\t0.2816932\t0.2816932\t0.2816932\n\tsit_offset\t0\t0\t0\n\tcamera_eye_offset\t0\t0\t0\n\tcamera_at_offset\t0\t0\t0\n\tsit_quat\t0\t0\t0\t1\n\tsit_hint\t0\n\tstate\t80\n\tmaterial\t3\n\tsoundid\t00000000-0000-0000-0000-000000000000\n\tsoundgain\t0\n\tsoundradius\t0\n\tsoundflags\t0\n\ttextcolor\t0 0 0 1\n\tselected\t0\n\tselector\t00000000-0000-0000-0000-000000000000\n\tusephysics\t0\n\trotate_x\t1\n\trotate_y\t1\n\trotate_z\t1\n\tphantom\t0\n\tremote_script_access_pin\t0\n\tvolume_detect\t0\n\tblock_grabs\t0\n\tdie_at_edge\t0\n\treturn_at_edge\t0\n\ttemporary\t0\n\tsandbox\t0\n\tsandboxhome\t0\t0\t0\n\tshape 0\n\t{\n\t\tpath 0\n\t\t{\n\t\t\tcurve\t16\n\t\t\tbegin\t0\n\t\t\tend\t1\n\t\t\tscale_x\t1\n\t\t\tscale_y\t1\n\t\t\tshear_x\t0\n\t\t\tshear_y\t0\n\t\t\ttwist\t0\n\t\t\ttwist_begin\t0\n\t\t\tradius_offset\t0\n\t\t\ttaper_x\t0\n\t\t\ttaper_y\t0\n\t\t\trevolutions\t1\n\t\t\tskew\t0\n\t\t}\n\t\tprofile 0\n\t\t{\n\t\t\tcurve\t1\n\t\t\tbegin\t0\n\t\t\tend\t1\n\t\t\thollow\t0\n\t\t}\n\t}\n\tfaces\t6\n\t{\n\t\timageid\t89556747-24cb-43ed-920b-47caed15465f\n\t\tcolors\t1 1 1 1\n\t\tscales\t0.56\n\t\tscalet\t0.56\n\t\toffsets\t0\n\t\toffsett\t0\n\t\timagerot\t0\n\t\tbump\t0\n\t\tfullbright\t0\n\t\tmedia_flags\t0\n\t}\n\t{\n\t\timageid\t89556747-24cb-43ed-920b-47caed15465f\n\t\tcolors\t1 1 1 1\n\t\tscales\t0.56\n\t\tscalet\t0.56\n\t\toffsets\t0\n\t\toffsett\t0\n\t\timagerot\t0\n\t\tbump\t0\n\t\tfullbright\t0\n\t\tmedia_flags\t0\n\t}\n\t{\n\t\timageid\t89556747-24cb-43ed-920b-47caed15465f\n\t\tcolors\t1 1 1 1\n\t\tscales\t0.56\n\t\tscalet\t0.56\n\t\toffsets\t0\n\t\toffsett\t0\n\t\timagerot\t0\n\t\tbump\t0\n\t\tfullbright\t0\n\t\tmedia_flags\t0\n\t}\n\t{\n\t\timageid\t89556747-24cb-43ed-920b-47caed15465f\n\t\tcolors\t1 1 1 1\n\t\tscales\t0.56\n\t\tscalet\t0.56\n\t\toffsets\t0\n\t\toffsett\t0\n\t\timagerot\t0\n\t\tbump\t0\n\t\tfullbright\t0\n\t\tmedia_flags\t0\n\t}\n\t{\n\t\timageid\t89556747-24cb-43ed-920b-47caed15465f\n\t\tcolors\t1 1 1 1\n\t\tscales\t0.56\n\t\tscalet\t0.56\n\t\toffsets\t0\n\t\toffsett\t0\n\t\timagerot\t0\n\t\tbump\t0\n\t\tfullbright\t0\n\t\tmedia_flags\t0\n\t}\n\t{\n\t\timageid\t89556747-24cb-43ed-920b-47caed15465f\n\t\tcolors\t1 1 1 1\n\t\tscales\t0.56\n\t\tscalet\t0.56\n\t\toffsets\t0\n\t\toffsett\t0\n\t\timagerot\t0\n\t\tbump\t0\n\t\tfullbright\t0\n\t\tmedia_flags\t0\n\t}\n\tps_next_crc\t1\n\tgpw_bias\t1\n\tip\t0\n\tcomplete\tTRUE\n\tdelay\t50000\n\tnextstart\t1132625972249870\n\tbirthtime\t1132625953120694\n\treztime\t1132625953120694\n\tparceltime\t1132625953120694\n\ttax_rate\t1.01615\n\tnamevalue\tAttachmentOrientation VEC3 RW DS -3.141593, 0.000000, -3.141593\n\tnamevalue\tAttachmentOffset VEC3 RW DS 0.000000, 0.000000, 0.000000\n\tnamevalue\tAttachPt U32 RW S 5\n\tnamevalue\tAttachItemID STRING RW SV 1f9975c0-2951-1b93-dd83-46e2b932fcc8\n\tscratchpad\t0\n\t{\n\t\n\t}\n\tsale_info\t0\n\t{\n\t\tsale_type\tnot\n\t\tsale_price\t10\n\t}\n\torig_asset_id\t52019cdd-b464-ba19-e66d-3da751fef9da\n\torig_item_id\t1f9975c0-2951-1b93-dd83-46e2b932fcc8\n\tcorrect_family_id\t00000000-0000-0000-0000-000000000000\n\thas_rezzed\t0\n\tpre_link_base_mask\t7fffffff\n\tdefault_pay_price\t-2\t1\t5\t10\t20\n}\n'
-#endif
-
-namespace
-{
-}
-
-namespace
-{
-    // llstrtou64
-    // seems to be deprecated - could not find it being used
-    // anywhere in the tarball - skipping unit tests for now
-}
-
 
 namespace
 {
@@ -128,7 +96,6 @@ namespace
     TEST_CASE("LLSD: binary writes to notation as b(6) and parses back", "[LLSD]")
     {
         const std::string decoded("random");
-        //const std::string encoded("cmFuZG9t\n");
         const std::string streamed("b(6)\"random\"");
         typedef std::vector<U8> buf_t;
         buf_t buf;
@@ -293,11 +260,8 @@ namespace
         REQUIRE(sd.size() == 4);
         CHECK(sd["label"].asString() ==
             "short binary test");
-        std::vector<U8> bin =  sd["singlebinary"].asBinary();
-        std::vector<U8> expected;
-        expected.resize(1);
-        expected[0] = 'A';
-        CHECK(memcmp(&bin[0], &expected[0], 1) == 0);
+        const std::vector<U8> expected{'A'};
+        CHECK(sd["singlebinary"].asBinary() == expected);
         CHECK(sd["singlerawstring"].asString() ==
             std::string("A"));
         CHECK(sd["endoftest"].asString() == "end");
@@ -359,47 +323,15 @@ namespace
             std::stringstream str;
             str << "'" << LLSDNotationFormatter::escapeString(expected) << "'";
             LLSD sd;
-            S32 count = LLSDSerialize::fromNotation(sd, str, expected.size());
+            S32 count = LLSDSerialize::fromNotation(sd, str, str.str().size());
             REQUIRE(count == 1);
             std::string actual = sd.asString();
-/*
-            if(actual != expected)
-            {
-                LL_WARNS() << "iteration " << i << LL_ENDL;
-                std::ostringstream e_str;
-                std::string::iterator iter = expected.begin();
-                std::string::iterator end = expected.end();
-                for(; iter != end; ++iter)
-                {
-                    e_str << (S32)((U8)(*iter)) << " ";
-                }
-                e_str << std::endl;
-                llsd_serialize_string(e_str, expected);
-                LL_WARNS() << "expected size: " << expected.size() << LL_ENDL;
-                LL_WARNS() << "expected:      " << e_str.str() << LL_ENDL;
-
-                std::ostringstream a_str;
-                iter = actual.begin();
-                end = actual.end();
-                for(; iter != end; ++iter)
-                {
-                    a_str << (S32)((U8)(*iter)) << " ";
-                }
-                a_str << std::endl;
-                llsd_serialize_string(a_str, actual);
-                LL_WARNS() << "actual size:   " << actual.size() << LL_ENDL;
-                LL_WARNS() << "actual:      " << a_str.str() << LL_ENDL;
-            }
-*/
             REQUIRE(actual == expected);
         }
     }
 
     TEST_CASE("LLSD: an instant message parameter array parses", "[LLSD]")
     {
-//#if LL_WINDOWS && _MSC_VER >= 1400
-//        skip_fail("Fails on VS2005 due to broken LLSDSerialize::fromNotation() parser.");
-//#endif
         std::string param = "[{'version':i1},{'data':{'binary_bucket':b(0)\"\"},'from_id':u3c115e51-04f4-523c-9fa6-98aff1034730,'from_name':'Phoenix Linden','id':u004e45e5-5576-277a-fba7-859d6a4cb5c8,'message':'hey','offline':i0,'timestamp':i0,'to_id':u3c5f1bb4-5182-7546-6401-1d329b4ff2f8,'type':i0},{'agent_id':u3c115e51-04f4-523c-9fa6-98aff1034730,'god_level':i0,'limited_to_estate':i1}]";
         std::istringstream istr;
         istr.str(param);
