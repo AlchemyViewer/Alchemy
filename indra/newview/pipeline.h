@@ -830,8 +830,6 @@ public:
     /// whoever sets a bit owns clearing it -- see ~ALFloaterLightBox.
     static U32              sGradeBypassMask;
 
-    static LLTrace::EventStatHandle<S64> sStatBatchSize;
-
     class RenderTargetPack
     {
     public:

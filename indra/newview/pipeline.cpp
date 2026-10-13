@@ -253,7 +253,6 @@ bool LLPipeline::RenderMirrors;
 S32 LLPipeline::RenderHeroProbeUpdateRate;
 S32 LLPipeline::RenderHeroProbeConservativeUpdateMultiplier;
 bool LLPipeline::RenderAvatarCloth;
-LLTrace::EventStatHandle<S64> LLPipeline::sStatBatchSize("renderbatchsize");
 
 const U32 LLPipeline::MAX_PREVIEW_WIDTH = 512;
 
@@ -2572,6 +2571,8 @@ void LLPipeline::resetFrameStats()
 
     sCompiles        = 0;
     mNumVisibleFaces = 0;
+    LLRender::sDrawCalls    = 0;
+    LLRender::sDrawElements = 0;
 
     if (mOldRenderDebugMask != mRenderDebugMask)
     {
