@@ -1,23 +1,14 @@
 /**
  * @file llfonttextcache_test.cpp
- * @brief Smoke tests for LLFontTextCache + LLFontTextCache.
+ * @brief Tests for LLFontTextCache, which keeps what one piece of text
+ *        costs to draw and to measure.
  *
- * The deeper cache-invalidation invariants (geometry vs color
- * regen, mLastFontCacheGen, mLastUsesColorAtlas) are private to
- * LLFontTextCache, and the public render() entry point dives into
- * gGL.pushUIMatrix and drawGlyph — code paths that the
- * headless harness doesn't have populated (no UI matrix stack,
- * no shader bindings to draw with). A test for the recolor fast
- * path proper would need a full viewer-scale GL bring-up that the
- * llrender harness can't supply.
- *
- * What this file does instead is smoke the API surface that doesn't
- * touch the render-time path: construct/destruct, reset(),
- * enable*() static toggles. That at least catches link-time
- * regressions and obvious lifecycle bugs (double-free in dtor,
- * etc.). LLFontTextCache's measurement path is also covered
- * lightly — it's invoked via fontp->getWidthF32, which uses the
- * shape layout but doesn't hit gGL drawing primitives.
+ * Its lifecycle (construct, reset, destroy) and its static toggles; its
+ * width slots, held against the font's own measurement; and its draws,
+ * through the shared context's UI program. Which way a draw went -- a
+ * replay, a recolor in place, or a rebuild -- is private to the cache,
+ * and is read off LLFontTextCache::regenCount(), which only a rebuild
+ * moves, and off the pixels the draw left.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -97,6 +88,26 @@ namespace
         initialized = true;
     }
 
+    // Draws until a draw replays rather than rebuilds, as the viewer's frames
+    // do, at most eight times. A first draw can rasterize a glyph that shaping
+    // substituted, which moves the font's cache generation under the geometry
+    // it just captured, and that geometry is deliberately not trusted for a
+    // second frame. A cache that never replays is left for the checks after
+    // this to report.
+    template <typename DRAW>
+    void settleDraws(DRAW&& draw)
+    {
+        for (int i = 0; i < 8; ++i)
+        {
+            const U64 before = LLFontTextCache::regenCount();
+            draw();
+            if (LLFontTextCache::regenCount() == before)
+            {
+                return;
+            }
+        }
+    }
+
     // Fixture: minimal — just gates the static toggles and ensures the
     // shared GL fixture is up. The actual HeadlessGL instance lives in
     // ll_test::sharedHeadlessGL() and stays alive for the whole
@@ -122,61 +133,85 @@ namespace
     // Default construction must not crash and must leave the buffer
     // in a destructible state. Catches uninitialized-member regressions
     // that surface as a crash in ~LLFontTextCache trying to free
-    // a garbage list.
+    // a garbage list. There is nothing to ask of it: the case passes by
+    // returning, and a crash in the destructor is its failure.
     TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: a default-constructed cache destroys cleanly", "[LLFontTextCache]")
     {
         LLFontTextCache vb;
-        CHECK(true);
-        // Implicit destruct at scope exit; assertion above catches any
-        // crash during dtor by being unreached.
     }
 
-    // reset() on a freshly-constructed buffer must be a safe no-op.
+    // reset() on a freshly-constructed buffer must be a safe no-op. The case
+    // passes by returning.
     TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: reset on a fresh cache is safe to call twice", "[LLFontTextCache]")
     {
         LLFontTextCache vb;
         vb.reset();
         vb.reset();  // idempotent
-        CHECK(true);
     }
 
-    // Static toggles round-trip without affecting later test setup.
-    // The assertions confirm the calls compile and link; observable
-    // round-trip would require accessing the private statics.
+    // The static toggles take effect, and turning one back on restores what
+    // it turned off, which every later case relies on. Their statics are
+    // private, so each is read off what a draw does: with buffer collection
+    // off a draw goes straight to the font and captures nothing, so nothing
+    // is rebuilt; with the colour-only fast path on, a colour change is
+    // recolored in place rather than rebuilt. What the fast path does when it
+    // is off is the render group's to check.
     TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: enableBufferCollection and enableColorOnlyRegen toggle off and on", "[LLFontTextCache]")
     {
+        if (!fileExists(kFontsXml))
+            SKIP("fonts.xml not present in test data dir");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        REQUIRE(font != nullptr);
+        font->generateASCIIglyphs();
+        const std::string s = "Hi";
+
+        auto draw = [&](LLFontTextCache& cache, const LLColor4& color)
+        {
+            cache.renderBytes(font, s, 0, 100.f, 100.f, color,
+                              LLFontGL::LEFT, LLFontGL::BASELINE,
+                              LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+            // An uncollected draw leaves its quads in gGL's batch.
+            gGL.flush();
+        };
+
         LLFontTextCache::enableBufferCollection(false);
+        LLFontTextCache off;
+        const U64 uncollected = LLFontTextCache::regenCount();
+        draw(off, LLColor4::white);
+        UNSCOPED_INFO("with buffer collection off a draw captures nothing");
+        CHECK(LLFontTextCache::regenCount() == uncollected);
+
+        // A fresh cache, whose first draw is a capture whenever collection is on.
         LLFontTextCache::enableBufferCollection(true);
+        LLFontTextCache on;
+        const U64 collected = LLFontTextCache::regenCount();
+        draw(on, LLColor4::white);
+        UNSCOPED_INFO("turned back on, a draw is captured");
+        CHECK(LLFontTextCache::regenCount() > collected);
+
         LLFontTextCache::enableColorOnlyRegen(false);
         LLFontTextCache::enableColorOnlyRegen(true);
-        CHECK(true);
+        settleDraws([&] { draw(on, LLColor4::white); });
+        const U64 before_recolor = LLFontTextCache::regenCount();
+        draw(on, LLColor4::red);
+        UNSCOPED_INFO("turned back on, the colour-only fast path recolors without a rebuild");
+        CHECK(LLFontTextCache::regenCount() == before_recolor);
     }
 
-    // LLFontTextCache parallel: construct + reset.
-    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: a cache resets twice and outlives a buffer collection toggle", "[LLFontTextCache]")
-    {
-        LLFontTextCache wb;
-        wb.reset();
-        wb.reset();
-        CHECK(true);
-        LLFontTextCache::enableBufferCollection(false);
-        LLFontTextCache::enableBufferCollection(true);
-    }
-
-    // LLFontTextCache constructed alongside LLFontTextCache:
-    // multiple coexisting instances don't share static state in a way
-    // that breaks lifecycle. Pin two buffers in flight at once.
+    // Several caches in flight at once: none shares state with another in a
+    // way that breaks construction, reset or destruction. The case passes by
+    // returning; that one cache's reset leaves another's answers alone is
+    // checked in the width group.
     TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: four caches in flight at once each reset cleanly", "[LLFontTextCache]")
     {
         LLFontTextCache a;
         LLFontTextCache b;
-        LLFontTextCache  w1;
-        LLFontTextCache  w2;
+        LLFontTextCache c;
+        LLFontTextCache d;
         a.reset();
         b.reset();
-        w1.reset();
-        w2.reset();
-        CHECK(true);
+        c.reset();
+        d.reset();
     }
 
     // ===================================================================
@@ -251,23 +286,57 @@ namespace
     }
 
     // Cache miss when the font's cache generation advances between
-    // calls (a fallback face's atlas mutation, for example). Pins
-    // mLastFontCacheGen at llfonttextcache.cpp:524.
-    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: getWidthBytes agrees with the font across an atlas generation tick", "[LLFontTextCache]")
+    // calls (a fallback face's atlas mutation, for example): the width the
+    // cache holds is measured again. Whether it was is read off the shaper,
+    // which a measurement asks and an answer from the cache's own slot does
+    // not -- so with the shape cache emptied, a measurement shows as a shape.
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: getWidthBytes measures again after a generation tick and agrees", "[LLFontTextCache]")
     {
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         REQUIRE(font != nullptr);
+        const LLFontFreetype* ft = font->getFontFreetype();
+        REQUIRE(ft != nullptr);
+        REQUIRE(ft->getFontFace() != nullptr);
         const std::string s = "Hi";
+
+        // A glyph of the font's own face that nothing has rasterized yet, so
+        // that asking for it has to take an atlas slot. A fixed one could
+        // already have been drawn by any case before this.
+        llwchar fresh = 0;
+        for (llwchar cp = 0x100; cp < 0x180 && fresh == 0; ++cp)
+        {
+            const U32 index = ft->getCharGlyphIndex(cp);
+            if (index != 0 && !ft->getFontFace()->findGlyphInfo(index, EFontGlyphType::Grayscale))
+            {
+                fresh = cp;
+            }
+        }
+        if (fresh == 0)
+            SKIP("every Latin Extended-A glyph is already rasterized");
 
         LLFontTextCache wb;
         const F32 first = wb.getWidthBytes(font, s, 0, 2, false);
-        // Force a generation tick by rasterizing a fresh glyph through
-        // the font (atlas allocation bumps the global counter).
-        font->getFontFreetype()->getGlyphInfo(L'É', // 'É'
-                                              EFontGlyphType::Grayscale);
+
+        // Nothing moved, so a repeat is answered from the cache's slot.
+        ALFontShaping::clearCache();
+        const size_t shaped_before_repeat = ALFontShaping::cacheMutationCount();
+        (void)wb.getWidthBytes(font, s, 0, 2, false);
+        UNSCOPED_INFO("with nothing changed the cache answers without measuring");
+        CHECK(ALFontShaping::cacheMutationCount() == shaped_before_repeat);
+
+        // Force a generation tick by rasterizing the fresh glyph through the
+        // font: its atlas allocation moves the font's cache generation.
+        const U64 gen_before = font->getCacheGeneration();
+        ft->getGlyphInfo(fresh, EFontGlyphType::Grayscale);
+        UNSCOPED_INFO("rasterizing a new glyph moves the font's cache generation");
+        CHECK(font->getCacheGeneration() > gen_before);
+
+        const size_t shaped_before_tick = ALFontShaping::cacheMutationCount();
         const F32 second = wb.getWidthBytes(font, s, 0, 2, false);
+        UNSCOPED_INFO("after the tick the cache measures again");
+        CHECK(ALFontShaping::cacheMutationCount() > shaped_before_tick);
         // Held against the font rather than against the buffer's own earlier
         // answer. Comparing a cache to itself passes whether it invalidated,
         // recomputed, or returned a stale value -- the only reading that can
@@ -302,21 +371,38 @@ namespace
     }
 
     // Multiple LLFontTextCache instances stay independent: cache
-    // state in instance A doesn't affect instance B.
+    // state in instance A doesn't affect instance B. The two hold different
+    // texts over the same span, and width slots are keyed on the span, so a
+    // slot the two shared would hand one of them the other's width.
     TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: one cache's reset leaves another's width unchanged", "[LLFontTextCache]")
     {
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         REQUIRE(font != nullptr);
-        const std::string s = "Hi";
+        const std::string sa = "Hi";
+        const std::string sb = "WW";
 
         LLFontTextCache a, b;
-        const F32 wa = a.getWidthBytes(font, s, 0, 2, false);
+        const F32 wa = a.getWidthBytes(font, sa, 0, 2, false);
+        const F32 wb_val = b.getWidthBytes(font, sb, 0, 2, false);
+        UNSCOPED_INFO("the two texts differ in width, so a shared slot would show");
+        CHECK(wa != wb_val);
+        UNSCOPED_INFO("instance B answers for its own text");
+        CHECK(wb_val == font->getWidthF32Bytes(sb, 0, 2, false));
+
+        // Whether B kept its answer is read off the shaper: with the shape
+        // cache emptied, B measuring again would shape, and B answering from
+        // its own slot does not.
         a.reset();
-        const F32 wb_val = b.getWidthBytes(font, s, 0, 2, false);
-        UNSCOPED_INFO("instance B unaffected by A's reset");
-        CHECK(wa == wb_val);
+        ALFontShaping::clearCache();
+        const size_t shaped = ALFontShaping::cacheMutationCount();
+        const F32 wb_again = b.getWidthBytes(font, sb, 0, 2, false);
+        UNSCOPED_INFO("instance B unaffected by A's reset: it answers from its own slot");
+        CHECK(ALFontShaping::cacheMutationCount() == shaped);
+        CHECK(wb_again == wb_val);
+        UNSCOPED_INFO("and A answers for its own text again");
+        CHECK(a.getWidthBytes(font, sa, 0, 2, false) == wa);
     }
 
     // The bound the cache is keyed on, over text where a byte is not a
@@ -449,12 +535,11 @@ namespace
         CHECK(n == 5);
     }
 
-    // Color-only fast path (b317778477): same render twice with same
-    // geometry but different color. Second call goes through
-    // recolorBuffers — no genBuffers, no atlas alloc. The global
-    // generation counter must NOT advance between the first and second
-    // calls (atlas already populated; recolor doesn't allocate).
-    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a repeated identical render allocates nothing in the atlas", "[LLFontTextCacheRender]")
+    // An identical render replays: same geometry, same colour, so the second
+    // call has nothing to rebuild and nothing to recolor, and the atlas is
+    // not touched. The global generation counter must NOT advance across the
+    // repeat, and the rebuild count must not move.
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a repeated identical render replays and allocates nothing", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
@@ -463,31 +548,37 @@ namespace
         const std::string s = "Hello";
 
         LLFontTextCache vb;
-        // Pre-rasterize all glyphs of "Hello" so neither call grows
-        // the atlas (otherwise both calls would bump the gen counter
-        // and the test would be a no-op).
+        // Pre-rasterize all glyphs of "Hello" so the repeat cannot grow
+        // the atlas (otherwise it would bump the gen counter and the
+        // test would be a no-op).
         font->generateASCIIglyphs();
-        vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
-                  LLFontGL::LEFT, LLFontGL::BASELINE,
-                  LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
+        settleDraws([&] {
+            vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
+                           LLFontGL::LEFT, LLFontGL::BASELINE,
+                           LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
+        });
 
         const S32 gen_before = LLFontBitmapCache::getGlobalGeneration();
-        // Second call: same geometry, same color. Should be a no-regen
-        // replay — neither genBuffers nor recolorBuffers fires.
+        const U64 regen_before = LLFontTextCache::regenCount();
+        // Same geometry, same color. Should be a no-regen replay —
+        // neither genBuffers nor recolorBuffers fires.
         vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
                   LLFontGL::LEFT, LLFontGL::BASELINE,
                   LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
         const S32 gen_after = LLFontBitmapCache::getGlobalGeneration();
+        UNSCOPED_INFO("the repeat replays: nothing is rebuilt");
+        CHECK(LLFontTextCache::regenCount() == regen_before);
         UNSCOPED_INFO("no atlas alloc on repeat render (gen counter stable)");
         CHECK(gen_after == gen_before);
     }
 
     // Color change with same geometry: takes the recolor fast path —
     // recolorBuffers walks the captured streams and rewrites the color
-    // attribute, no genBuffers. Pins llfonttextcache.cpp:203-210.
-    // Observable: global generation counter doesn't advance (no atlas
-    // mutation), and the call returns the same character count.
-    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a color change alone keeps the count and allocates nothing", "[LLFontTextCacheRender]")
+    // attribute, no genBuffers. Observable: nothing is rebuilt, the global
+    // generation counter doesn't advance (no atlas mutation), the call
+    // returns the same character count, and the text comes out in the new
+    // colour -- which a replay of the white capture would not.
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a color change alone recolors in place without rebuilding or allocating", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
@@ -497,26 +588,59 @@ namespace
 
         LLFontTextCache vb;
         font->generateASCIIglyphs();
-        const S32 n_white = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
-                                      LLFontGL::LEFT, LLFontGL::BASELINE,
-                                      LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
+        S32 n_white = 0;
+        settleDraws([&] {
+            n_white = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
+                                     LLFontGL::LEFT, LLFontGL::BASELINE,
+                                     LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
+        });
+
+        gl.clearFramebuffer();
         const S32 gen_before = LLFontBitmapCache::getGlobalGeneration();
+        const U64 regen_before = LLFontTextCache::regenCount();
         const S32 n_red = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::red,
                                     LLFontGL::LEFT, LLFontGL::BASELINE,
                                     LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
         const S32 gen_after = LLFontBitmapCache::getGlobalGeneration();
+        const U64 regen_after = LLFontTextCache::regenCount();
+
+        // Over a black frame, red text leaves only red; anything with green or
+        // blue in it is the white the geometry was captured in.
+        glFinish();
+        const std::vector<U8> px = ll_test::readFramebufferRGBA(ll_test::HeadlessGL::WIDTH,
+                                                                ll_test::HeadlessGL::HEIGHT);
+        size_t red = 0;
+        size_t not_red = 0;
+        for (size_t i = 0; i + 3 < px.size(); i += 4)
+        {
+            if (px[i + 1] != 0 || px[i + 2] != 0)
+            {
+                ++not_red;
+            }
+            else if (px[i] != 0)
+            {
+                ++red;
+            }
+        }
+
         UNSCOPED_INFO("color change preserves char count");
         CHECK(n_red == n_white);
+        UNSCOPED_INFO("recolor fast path: nothing rebuilt");
+        CHECK(regen_after == regen_before);
         UNSCOPED_INFO("recolor fast path: no atlas mutation");
         CHECK(gen_after == gen_before);
+        UNSCOPED_INFO("the text is drawn in the new colour");
+        CHECK(red > 0u);
+        UNSCOPED_INFO("and nothing is left of the colour it was captured in");
+        CHECK(not_red == 0u);
     }
 
     // Geometry change forces full regen: render at x=100, then at
-    // x=200. Both calls succeed; the global generation counter still
-    // shouldn't advance (nothing about geometry change touches the
-    // atlas), but the buffer cache had to rebuild. The post-render
-    // render-target reflects the second position.
-    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a render moved to another x returns the same count", "[LLFontTextCacheRender]")
+    // x=200. The global generation counter still shouldn't advance
+    // (nothing about geometry change touches the atlas), but the buffer
+    // cache has to rebuild, and the run it draws ends where the second
+    // position puts it (right_x) rather than where the first capture did.
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a render moved to another x rebuilds there and allocates nothing", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
@@ -527,22 +651,35 @@ namespace
         LLFontTextCache vb;
         font->generateASCIIglyphs();
 
-        const S32 n1 = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
-                                 LLFontGL::LEFT, LLFontGL::BASELINE,
-                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+        S32 n1 = 0;
+        F32 right1 = 0.f;
+        settleDraws([&] {
+            n1 = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
+                                LLFontGL::LEFT, LLFontGL::BASELINE,
+                                LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2, S32_MAX, &right1);
+        });
+        const S32 gen_before = LLFontBitmapCache::getGlobalGeneration();
+        const U64 regen_before = LLFontTextCache::regenCount();
+        F32 right2 = 0.f;
         const S32 n2 = vb.renderBytes(font, s, 0, 200.f, 100.f, LLColor4::white,
                                  LLFontGL::LEFT, LLFontGL::BASELINE,
-                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2, S32_MAX, &right2);
         UNSCOPED_INFO("char count stable after geometry change");
         CHECK(n1 == n2);
         CHECK(n1 > 0);
+        UNSCOPED_INFO("moving the text rebuilds it");
+        CHECK(LLFontTextCache::regenCount() > regen_before);
+        UNSCOPED_INFO("a move allocates nothing in the atlas");
+        CHECK(LLFontBitmapCache::getGlobalGeneration() == gen_before);
+        UNSCOPED_INFO("the moved run ends 100 px further right");
+        CHECK(right2 == right1 + 100.f);
     }
 
     // enableColorOnlyRegen(false) disables the fast path entirely:
     // a same-geometry color-change call falls through to genBuffers
-    // (full regen). The static toggle pins the flag-controlled branch
-    // at llfonttextcache.cpp:210. Restore the flag in dtor.
-    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: with enableColorOnlyRegen off a color change still draws every byte", "[LLFontTextCacheRender]")
+    // (full regen), where with it on the change is recolored in place.
+    // The fixture puts the flag back whatever happens here.
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: with enableColorOnlyRegen off a color change rebuilds every byte", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
@@ -552,25 +689,32 @@ namespace
 
         LLFontTextCache vb;
         font->generateASCIIglyphs();
-        vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
-                  LLFontGL::LEFT, LLFontGL::BASELINE,
-                  LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+        settleDraws([&] {
+            vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
+                           LLFontGL::LEFT, LLFontGL::BASELINE,
+                           LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+        });
 
         LLFontTextCache::enableColorOnlyRegen(false);
         // Same geometry, different color — with fast path off, this
-        // should still complete cleanly through genBuffers.
+        // goes through genBuffers.
+        const U64 regen_before = LLFontTextCache::regenCount();
         const S32 n = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::red,
                                 LLFontGL::LEFT, LLFontGL::BASELINE,
                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+        const U64 regen_after = LLFontTextCache::regenCount();
         LLFontTextCache::enableColorOnlyRegen(true);
+        UNSCOPED_INFO("with the fast path off a colour change rebuilds");
+        CHECK(regen_after > regen_before);
         UNSCOPED_INFO("render with fast path disabled still returns 2");
         CHECK(n == 2);
     }
 
     // Style flip NORMAL → BOLD forces full regen — different glyph
-    // index stream. Pins 00f3a4e93d (style invalidation in geometry-
-    // invalid check at llfonttextcache.cpp:175).
-    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a style flip from NORMAL to BOLD keeps the count", "[LLFontTextCacheRender]")
+    // index stream. Pins 00f3a4e93d (style invalidation in the cache's
+    // geometry check); where the registry has a bold face the flip also
+    // changes the font drawing it, which rebuilds as well.
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a style flip from NORMAL to BOLD rebuilds and keeps the count", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
@@ -580,12 +724,18 @@ namespace
 
         LLFontTextCache vb;
         font->generateASCIIglyphs();
-        const S32 n_norm = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
-                                     LLFontGL::LEFT, LLFontGL::BASELINE,
-                                     LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+        S32 n_norm = 0;
+        settleDraws([&] {
+            n_norm = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
+                                    LLFontGL::LEFT, LLFontGL::BASELINE,
+                                    LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+        });
+        const U64 regen_before = LLFontTextCache::regenCount();
         const S32 n_bold = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
                                      LLFontGL::LEFT, LLFontGL::BASELINE,
                                      LLFontGL::BOLD, LLFontGL::NO_SHADOW, 2);
+        UNSCOPED_INFO("the style flip rebuilds");
+        CHECK(LLFontTextCache::regenCount() > regen_before);
         UNSCOPED_INFO("char count stable across style flip");
         CHECK(n_norm == n_bold);
         CHECK(n_norm > 0);

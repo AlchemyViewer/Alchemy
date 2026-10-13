@@ -6,10 +6,11 @@
  * LLFontGL::initClass through the explicit-fonts.xml-path overload,
  * and verifies the GL-backed atlas pipeline produces a live texture.
  *
- * The single fixture instance shared across test methods (see
- * llheadlessgl_fixture.h) keeps the context creation cost
- * out of every test — but each test method still gets a fresh
- * sFontRegistry, so font-state mutations don't leak.
+ * The context is the binary's shared one (see llheadlessgl_fixture.h),
+ * and so is LLFontGL's registry: the first case to call initClass makes
+ * it, and it stays for every case after, llfonttextcache's too, since
+ * LLFontGL's getters cache the fonts it holds. A case leaves the fonts,
+ * their DPI and their scale as it found them.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -43,6 +44,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstdio>
 #include <functional>
 
@@ -187,6 +189,8 @@ namespace
         REQUIRE(big   != nullptr);
         const LLFontFreetype* fs = small->getFontFreetype();
         const LLFontFreetype* fb = big->getFontFreetype();
+        REQUIRE(fs != nullptr);
+        REQUIRE(fb != nullptr);
         CHECK(fs->getLineHeight() > 0.f);
         CHECK(fb->getLineHeight() > 0.f);
         CHECK(fb->getLineHeight() > fs->getLineHeight());
@@ -222,7 +226,9 @@ namespace
 
         font->generateASCIIglyphs();
         const LLFontFreetype* ft    = font->getFontFreetype();
+        REQUIRE(ft != nullptr);
         const LLFontBitmapCache* bc = ft->getFontBitmapCache();
+        REQUIRE(bc != nullptr);
         const U32 sheets_after_first = bc->getNumBitmaps(EFontGlyphType::Grayscale);
         CHECK(sheets_after_first >= 1u);
 
@@ -1034,10 +1040,16 @@ namespace
             "times at any sensible chat width at all.";
 
         // One pass of LLTextBase's wrap loop over one segment, counting the
-        // shapes it costs. Mirrors LLNormalTextSegment::getNumBytes followed
-        // by getDimensionsF32.
-        auto wrap_once = [&](F32 width) -> size_t
+        // shapes it costs and the lines it makes. Mirrors
+        // LLNormalTextSegment::getNumBytes followed by getDimensionsF32.
+        struct Wrap
         {
+            size_t shapes = 0;
+            size_t lines  = 0;
+        };
+        auto wrap_once = [&](F32 width) -> Wrap
+        {
+            Wrap wrap;
             const size_t before = ALFontShaping::cacheMutationCount();
             S32 at = 0;
             while (at < (S32)paragraph.size())
@@ -1054,19 +1066,21 @@ namespace
                 // asks for next to place the line.
                 (void)font->getWidthF32Bytes(paragraph, at, fits, true);
                 at += fits;
+                ++wrap.lines;
             }
-            return ALFontShaping::cacheMutationCount() - before;
+            wrap.shapes = ALFontShaping::cacheMutationCount() - before;
+            return wrap;
         };
 
         // Cold, so every distinct slice counts.
         ALFontShaping::clearCache();
-        const size_t first = wrap_once(220.f);
+        const size_t first = wrap_once(220.f).shapes;
         UNSCOPED_INFO("wrapping shapes something");
         CHECK(first > 0);
 
         // The same width again: every slice is already cached, so a repeated
         // reflow at an unchanged width must cost nothing.
-        const size_t again = wrap_once(220.f);
+        const size_t again = wrap_once(220.f).shapes;
         UNSCOPED_INFO("re-wrapping at the same width re-shapes nothing");
         CHECK(again == size_t(0));
 
@@ -1075,21 +1089,24 @@ namespace
         // last frame cached. This is what a resize costs per frame per
         // segment, and it is the number worth watching.
         size_t dragging = 0;
+        size_t drag_lines = 0;
         for (S32 px = 219; px >= 200; --px)
         {
-            dragging += wrap_once((F32)px);
+            const Wrap wrap = wrap_once((F32)px);
+            dragging += wrap.shapes;
+            drag_lines += wrap.lines;
         }
 
         // Not an assertion about a good number -- an assertion that the number
         // is bounded by the work there is to do. Twenty widths over a
         // paragraph that wraps into a handful of lines: if this ever exceeds
         // two shapes per line per width, the two callers have stopped agreeing
-        // on their slices again.
-        const size_t lines_per_wrap = first;
-        std::printf("[reflow shaping] cold=%zu same-width=%zu drag-20px=%zu\n",
-                    first, again, dragging);
+        // on their slices again. The lines are each width's own, counted as
+        // the wrap makes them.
+        std::printf("[reflow shaping] cold=%zu same-width=%zu drag-20px=%zu over %zu lines\n",
+                    first, again, dragging, drag_lines);
         UNSCOPED_INFO("the drag stays within two shapes per line per width");
-        CHECK(dragging <= 2 * lines_per_wrap * 20);
+        CHECK(dragging <= 2 * drag_lines);
     }
 
     // First end-to-end render() call with LEFT/BASELINE places glyph
@@ -1150,6 +1167,7 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
+        REQUIRE(font != nullptr);
         const std::string s = "ABC";
 
         const S32 n_left = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
@@ -1169,18 +1187,22 @@ namespace
 
     // VAlign branches: render() must complete through TOP, VCENTER,
     // BASELINE, and BOTTOM without crashing; return value matches
-    // requested char count for each. Pins the valign switch at
-    // llfonttextcache.cpp:123-138.
+    // requested char count for each. Pins the valign switch in
+    // LLFontGL::renderBytes.
     TEST_CASE_METHOD(llfontgl_render_data, "LLFontGLRender: renderBytes draws every byte whatever the vertical alignment", "[LLFontGLRender]")
     {
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
+        REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
         const S32 n_top = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
                                        LLFontGL::LEFT, LLFontGL::TOP,
                                        LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+        const S32 n_vcen = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
+                                        LLFontGL::LEFT, LLFontGL::VCENTER,
+                                        LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
         const S32 n_bs  = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
                                        LLFontGL::LEFT, LLFontGL::BASELINE,
                                        LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
@@ -1189,6 +1211,7 @@ namespace
                                        LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
         gGL.flush();
         CHECK(n_top == 2);
+        CHECK(n_vcen == 2);
         CHECK(n_bs == 2);
         CHECK(n_btm == 2);
     }
@@ -1201,6 +1224,7 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
+        REQUIRE(font != nullptr);
         const std::string s = "Hello";
 
         const S32 n_norm = font->renderBytes(s, 0, 50.f, 100.f, LLColor4::white,
@@ -1230,6 +1254,7 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
+        REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
         const S32 n_no = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
@@ -1306,8 +1331,9 @@ namespace
             REQUIRE(latin_gi->mSourceFace);
         }
         const auto& latin_entry = latin_gi->mPhaseSlots[0].mBitmapEntry;
-        LLImageGL* latin_img = latin_gi->mSourceFace->getBitmapCache()->getImageGL(
-            latin_entry.first, (U32)latin_entry.second);
+        const LLFontBitmapCache* latin_cache = latin_gi->mSourceFace->getBitmapCache();
+        REQUIRE(latin_cache != nullptr);
+        LLImageGL* latin_img = latin_cache->getImageGL(latin_entry.first, (U32)latin_entry.second);
         UNSCOPED_INFO("latin atlas page live");
         REQUIRE(latin_img != nullptr);
         const U32 latin_tex = latin_img->getTexName();
@@ -1319,8 +1345,9 @@ namespace
             REQUIRE(emoji_gi->mSourceFace);
         }
         const auto& emoji_entry = emoji_gi->mPhaseSlots[0].mBitmapEntry;
-        LLImageGL* emoji_img = emoji_gi->mSourceFace->getBitmapCache()->getImageGL(
-            emoji_entry.first, (U32)emoji_entry.second);
+        const LLFontBitmapCache* emoji_cache = emoji_gi->mSourceFace->getBitmapCache();
+        REQUIRE(emoji_cache != nullptr);
+        LLImageGL* emoji_img = emoji_cache->getImageGL(emoji_entry.first, (U32)emoji_entry.second);
         UNSCOPED_INFO("emoji atlas page live");
         REQUIRE(emoji_img != nullptr);
         const U32 emoji_tex = emoji_img->getTexName();
@@ -1501,6 +1528,7 @@ namespace
             std::string("."),
         };
 
+        S32 measured = 0;
         for (const std::string& s : samples)
         {
             CAPTURE(s);
@@ -1510,7 +1538,8 @@ namespace
             // what the padded form adds on top.
             const F32 expect = font->getWidthF32Bytes(s, 0, total, true);
             if (expect <= 0.f)
-                continue;
+                continue;   // a script the test's fonts do not cover
+            ++measured;
 
             F32 right_x = 0.f;
             font->renderBytes(s, 0, 40.f, 60.f, LLColor4::white,
@@ -1523,6 +1552,8 @@ namespace
             UNSCOPED_INFO("the drawn run ends where the measurement says");
             REQUIRE(right_x == 40.f + expect);
         }
+        UNSCOPED_INFO("some sample had a width to hold the drawn run against");
+        CHECK(measured > 0);
     }
 
     // An ellipsized draw buys itself padding by measuring "....", and that
@@ -1597,6 +1628,32 @@ namespace
             }
             return false;
         };
+        // Where two frames differ: how many pixels, and the first of them, so
+        // a failure names a place rather than printing both frames whole.
+        struct FrameDiff
+        {
+            size_t pixels  = 0;
+            S32    first_x = -1;
+            S32    first_y = -1;
+        };
+        const auto differ = [&](const std::vector<U8>& a, const std::vector<U8>& b) {
+            FrameDiff d;
+            const size_t common = std::min(a.size(), b.size());
+            for (size_t i = 0; i + 3 < common; i += 4)
+            {
+                if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2] || a[i + 3] != b[i + 3])
+                {
+                    if (d.pixels++ == 0)
+                    {
+                        d.first_x = (S32)((i / 4) % (size_t)w);
+                        d.first_y = (S32)((i / 4) / (size_t)w);
+                    }
+                }
+            }
+            // Frames of different sizes are different frames.
+            d.pixels += (std::max(a.size(), b.size()) - common + 3) / 4;
+            return d;
+        };
         const LLFontGL::HAlign aligns[] = { LLFontGL::LEFT, LLFontGL::RIGHT, LLFontGL::HCENTER };
         for (LLFontGL* font : { LLFontGL::getFontMonospace(), LLFontGL::getFontSansSerif() })
         {
@@ -1615,8 +1672,10 @@ namespace
                     const std::vector<U8>         drawn = frame([&] { font->renderGlyphs(placed.data(), colors.data(), placed.size(), 128.f + shift, 100.f); });
                     UNSCOPED_INFO("drawn at all");
                     REQUIRE(lit(said));
+                    const FrameDiff d = differ(said, drawn);
+                    CAPTURE(d.first_x, d.first_y);
                     UNSCOPED_INFO("the same pixels");
-                    REQUIRE(said == drawn);
+                    REQUIRE(d.pixels == 0u);
                 }
             }
         }
@@ -1636,7 +1695,9 @@ namespace
         const std::vector<U8> together = frame([&] { font->renderGlyphRuns(runs, 2); });
         UNSCOPED_INFO("runs drawn at all");
         CHECK(lit(apiece));
+        const FrameDiff d = differ(apiece, together);
+        CAPTURE(d.first_x, d.first_y);
         UNSCOPED_INFO("runs in one call are the runs apiece");
-        CHECK(apiece == together);
+        CHECK(d.pixels == 0u);
     }
 }
