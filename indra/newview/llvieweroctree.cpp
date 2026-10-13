@@ -1206,7 +1206,11 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
                         mOcclusionQuery[LLViewerCamera::sCurCameraID] = getNewOcclusionQueryObjectName();
                     }
 
-                    U32 mode = gGLManager.mGLVersion >= 3.3f ? GL_ANY_SAMPLES_PASSED : GL_SAMPLES_PASSED;
+                    // Conservative from 4.3: the GPU may answer from its coarse depth alone, and a query allowed
+                    // to err only toward "visible" costs at most a group drawn that the scene hid.
+                    U32 mode = gGLManager.mGLVersion >= 4.29f ? GL_ANY_SAMPLES_PASSED_CONSERVATIVE
+                             : gGLManager.mGLVersion >= 3.3f  ? GL_ANY_SAMPLES_PASSED
+                                                              : GL_SAMPLES_PASSED;
 
 #if LL_TRACK_PENDING_OCCLUSION_QUERIES
                     sPendingQueries.insert(mOcclusionQuery[LLViewerCamera::sCurCameraID]);
