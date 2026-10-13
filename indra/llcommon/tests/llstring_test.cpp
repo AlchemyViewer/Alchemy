@@ -30,85 +30,12 @@
 
 #include "../llstring.h"
 #include "../llsd.h"
-#include "StringVec.h"                  // must come BEFORE lltut.h
+#include "StringVec.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string_view>
 
 namespace
 {
-    TEST_CASE("LLString: std::string constructors give the expected text and size", "[LLString]")
-    {
-        std::string llstr1;
-        {
-            INFO("default-constructed");
-            CHECK(llstr1.size() == 0);
-            CHECK(llstr1.empty());
-        }
-
-        std::string llstr2("Hello");
-        {
-            INFO("from a C string");
-            CHECK(std::string_view(llstr2.c_str()) == "Hello");
-            CHECK(llstr2.size() == 5);
-            CHECK_FALSE(llstr2.empty());
-        }
-
-        std::string llstr3(llstr2);
-        {
-            INFO("copy");
-            CHECK(std::string_view(llstr3.c_str()) == "Hello");
-            CHECK(llstr3.size() == 5);
-            CHECK_FALSE(llstr3.empty());
-        }
-
-        std::string str("Hello World");
-        std::string llstr4(str, 6);
-        {
-            INFO("from a position");
-            CHECK(std::string_view(llstr4.c_str()) == "World");
-            CHECK(llstr4.size() == 5);
-            CHECK_FALSE(llstr4.empty());
-        }
-
-        std::string llstr5(str, str.size());
-        {
-            INFO("from the end position");
-            CHECK(llstr5.size() == 0);
-            CHECK(llstr5.empty());
-        }
-
-        std::string llstr6(5, 'A');
-        {
-            INFO("count copies of a character");
-            CHECK(std::string_view(llstr6.c_str()) == "AAAAA");
-            CHECK(llstr6.size() == 5);
-            CHECK_FALSE(llstr6.empty());
-        }
-
-        std::string llstr7("Hello World", 5);
-        {
-            INFO("the first n characters");
-            CHECK(std::string_view(llstr7.c_str()) == "Hello");
-            CHECK(llstr7.size() == 5);
-            CHECK_FALSE(llstr7.empty());
-        }
-
-        std::string llstr8("Hello World", 6, 5);
-        {
-            INFO("n characters from a position");
-            CHECK(std::string_view(llstr8.c_str()) == "World");
-            CHECK(llstr8.size() == 5);
-            CHECK_FALSE(llstr8.empty());
-        }
-
-        std::string llstr9("Hello World", sizeof("Hello World")-1, 5); // go past end
-        {
-            INFO("from the end position, asking for more");
-            CHECK(llstr9.size() == 0);
-            CHECK(llstr9.empty());
-        }
-    }
-
     TEST_CASE("LLString: isValidIndex accepts indexes up to and including the length", "[LLString]")
     {
         std::string str("Len=5");
@@ -157,7 +84,7 @@ namespace
         LLStringUtil::truncate(str, 6);
         CHECK(str == "Second");
 
-        // further truncate more than the length
+        // and to nothing at all
         LLStringUtil::truncate(str, 0);
         CHECK(str == "");
     }
@@ -223,7 +150,6 @@ namespace
         std::string str_val("Hello.\n\t\r\nABCDEFGHIABABAB");
         LLStringUtil::replaceChar(str_val, 'A', 'X');
         CHECK(str_val == "Hello.\n\t\r\nXBCDEFGHIXBXBXB");
-        std::string str_val1("Hello.\n\t\r\nABCDEFGHIABABAB");
     }
 
     TEST_CASE("LLString: containsNonprintable finds controls and separators but not text", "[LLString]")
@@ -482,7 +408,7 @@ namespace
         CHECK_FALSE(LLStringUtil::convertToS32(str_val, value));
     }
 
-    TEST_CASE("LLString: convertToF32 reads decimals and exponents and signs", "[LLString]")
+    TEST_CASE("LLString: convertToF32 reads decimals and exponents and signs from -F32_MAX to F32_MAX only", "[LLString]")
     {
         F32 value;
         std::string str_val("2147483647"); //0x7FFFFFFF
@@ -493,16 +419,22 @@ namespace
         CHECK(LLStringUtil::convertToF32(str_val, value));
         CHECK(value == 0);
 
-        /* Need to find max/min F32 values
-        str_val = "-2147483648";
-        ensure("3: convertToF32 failed", LLStringUtil::convertToF32(str_val, value)  && value == -2147483648);
+        // The limits are F32_MAX either way, written as the shortest
+        // decimal that reads back as exactly F32_MAX. Past them is a
+        // failure, not an infinity.
+        str_val = "3.4028234663852886e38";
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == F32_MAX);
 
-        str_val = "2147483648";
-        ensure("4: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
+        str_val = "-3.4028234663852886e38";
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == -F32_MAX);
 
-        str_val = "-2147483649";
-        ensure("5: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
-        */
+        str_val = "3.5e38";
+        CHECK_FALSE(LLStringUtil::convertToF32(str_val, value));
+
+        str_val = "-3.5e38";
+        CHECK_FALSE(LLStringUtil::convertToF32(str_val, value));
 
         // The reals go through fast_float now. Decimals, exponents, a sign and
         // a leading '+' all read the same as they did through the stream, and
@@ -531,7 +463,7 @@ namespace
         CHECK_FALSE(LLStringUtil::convertToF32(str_val, value));
     }
 
-    TEST_CASE("LLString: convertToF64 reads a large integer and zero", "[LLString]")
+    TEST_CASE("LLString: convertToF64 accepts -F64_MAX to F64_MAX only", "[LLString]")
     {
         F64 value;
         std::string str_val("9223372036854775807"); //0x7FFFFFFFFFFFFFFF
@@ -542,16 +474,22 @@ namespace
         CHECK(LLStringUtil::convertToF64(str_val, value));
         CHECK(value == 0.0F);
 
-        /* Need to find max/min F64 values
-        str_val = "-2147483648";
-        ensure("3: convertToF32 failed", LLStringUtil::convertToF32(str_val, value)  && value == -2147483648);
+        // The limits are F64_MAX either way, written as the shortest decimal
+        // that reads back as exactly F64_MAX. Past them is a failure, not an
+        // infinity.
+        str_val = "1.7976931348623157e308";
+        CHECK(LLStringUtil::convertToF64(str_val, value));
+        CHECK(value == F64_MAX);
 
-        str_val = "2147483648";
-        ensure("4: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
+        str_val = "-1.7976931348623157e308";
+        CHECK(LLStringUtil::convertToF64(str_val, value));
+        CHECK(value == -F64_MAX);
 
-        str_val = "-2147483649";
-        ensure("5: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
-        */
+        str_val = "1e309";
+        CHECK_FALSE(LLStringUtil::convertToF64(str_val, value));
+
+        str_val = "-1e309";
+        CHECK_FALSE(LLStringUtil::convertToF64(str_val, value));
     }
 
     TEST_CASE("LLString: compareStrings puts null after text and compares text", "[LLString]")
@@ -741,12 +679,13 @@ namespace
         for (LLStringUtil::format_map_t::const_iterator iter = fmt_map.begin(); iter != fmt_map.end(); ++iter)
         {
             // Test when source string is entirely one key
-            std::string s1 = (std::string)iter->first;
+            const std::string key = (std::string)iter->first;
+            std::string s1 = key;
             std::string s2 = (std::string)iter->second;
-            CAPTURE(s1);
+            CAPTURE(key);
             subcount = LLStringUtil::format(s1, fmt_map);
             REQUIRE(s1 == s2);
-            if (s1 == "?" || s1 == "[]") // no interp expected
+            if (key == "?" || key == "[]") // no interp expected
             {
                 REQUIRE(0 == subcount);
             }

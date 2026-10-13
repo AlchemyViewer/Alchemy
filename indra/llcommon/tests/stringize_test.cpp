@@ -91,7 +91,9 @@ namespace
         CHECK(stringize(f) == "3.14159");
         CHECK(stringize(d) == "3.14159");
         CHECK(stringize(abc) == "abc def");
-        //ensure_equals(stringize(def),  "def ghi"); //Will generate LL_WARNS() due to narrowing.
+#if LL_WINDOWS // only Windows converts between std::wstring and std::string
+        CHECK(stringize(def) == "def ghi");
+#endif
         // LLSDNotationFormatter emits Reals at full round-trip precision
         CHECK(stringize(llsd) == "{'abc':'abc def','d':r3.14159265358979,'i':i34}");
     }
@@ -102,10 +104,22 @@ namespace
         CHECK(STRINGIZE(std::setprecision(4) << d) == "3.142");
     }
 
-    TEST_CASE_METHOD(stringize_data, "stringize_h: wstringize renders each type on Windows", "[stringize_h]")
+    TEST_CASE_METHOD(stringize_data, "stringize_h: wstringize renders each type", "[stringize_h]")
     {
-        //Tests rely on validity of wstring_to_utf8str()
+        // Numbers and characters are streamed into a std::wostringstream, and
+        // a std::wstring is passed through, so none of these converts between
+        // narrow and wide and all of them work everywhere.
+        CHECK(wstringize(c) == L"c");
+        CHECK(wstringize(s) == L"17");
+        CHECK(wstringize(i) == L"34");
+        CHECK(wstringize(l) == L"68");
+        CHECK(wstringize(f) == L"3.14159");
+        CHECK(wstringize(d) == L"3.14159");
+        CHECK(wstringize(def) == L"def ghi");
 #if LL_WINDOWS // Windows wstring is a 2byte UTF16 type
+        // A narrow string is converted to wide, which ll_convert does only on
+        // Windows, as is ll_convert<std::string>(std::wstring), which these
+        // compare through.
         CHECK(ll_convert<std::string>(wstringize(c)) == ll_convert<std::string>(std::wstring(L"c")));
         CHECK(ll_convert<std::string>(wstringize(s)) == ll_convert<std::string>(std::wstring(L"17")));
         CHECK(ll_convert<std::string>(wstringize(i)) == ll_convert<std::string>(std::wstring(L"34")));
@@ -115,17 +129,6 @@ namespace
         CHECK(ll_convert<std::string>(wstringize(abc)) == ll_convert<std::string>(std::wstring(L"abc def")));
         CHECK(ll_convert<std::string>(wstringize(abc)) == ll_convert<std::string>(wstringize(abc.c_str())));
         CHECK(ll_convert<std::string>(wstringize(def)) == ll_convert<std::string>(std::wstring(L"def ghi")));
-#else
-        // ensure_equals(ll_convert<std::string>(wstringize(c)),    wstring_to_utf8str(U"c"));
-        // ensure_equals(ll_convert<std::string>(wstringize(s)),    wstring_to_utf8str(U"17"));
-        // ensure_equals(ll_convert<std::string>(wstringize(i)),    wstring_to_utf8str(U"34"));
-        // ensure_equals(ll_convert<std::string>(wstringize(l)),    wstring_to_utf8str(U"68"));
-        // ensure_equals(ll_convert<std::string>(wstringize(f)),    wstring_to_utf8str(U"3.14159"));
-        // ensure_equals(ll_convert<std::string>(wstringize(d)),    wstring_to_utf8str(U"3.14159"));
-        // ensure_equals(ll_convert<std::string>(wstringize(abc)),  wstring_to_utf8str(U"abc def"));
-        // ensure_equals(ll_convert<std::string>(wstringize(abc)),  wstring_to_utf8str(wstringize(abc.c_str())));
-        // ensure_equals(ll_convert<std::string>(wstringize(def)),  wstring_to_utf8str(U"def ghi"));
 #endif
- //       ensure_equals(wstring_to_utf8str(wstringize(llsd)), wstring_to_utf8str(L"{'abc':'abc def','d':r3.14159,'i':i34}"));
     }
 } // anonymous namespace

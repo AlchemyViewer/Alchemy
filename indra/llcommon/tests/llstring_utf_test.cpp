@@ -217,7 +217,7 @@ namespace
     //   9x  shaping          (cluster walker: wstring_find_emoji_clusters)
     //   10x grapheme         (step + align + range_at)
     //   11x utf8str helpers  (substChar/makeASCII/removeCRLF/split/preview)
-    //   12x utf8 walkers     (byte-offset segmentation against its wide twin)
+    //   12x utf8 walkers     (byte-offset segmentation, offsets written out)
     //   14x trim             (Unicode whitespace, and what is not whitespace)
     // Keep this index in sync with the categories used below.
 
@@ -225,7 +225,10 @@ namespace
     //                      round-trip coverage
     // ---------------------------------------------------------------
 
-    // Pure ASCII: all six conversion directions must round-trip byte-for-byte.
+    // Pure ASCII: each of the three conversions llstring has -- UTF-8 to
+    // codepoints (utf8str_decode_at, under to_u32), codepoints to UTF-8
+    // (utf8str_append_cp, under to_utf8) and UTF-16 to UTF-8 -- keeps every
+    // character.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: ASCII converts in every direction", "[LLStringUTF]")
     {
         const std::string ascii = "Hello, World!";
@@ -295,7 +298,8 @@ namespace
         CHECK(utf16str_to_utf8str(llutf16string()) == std::string());
     }
 
-    // Round-trip via rawstr_to_utf8 (utf8 -> std::u32string -> utf8) preserves valid input.
+    // rawstr_to_utf8 repairs through utf8str_sanitize, which hands valid input
+    // back as it is.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: rawstr_to_utf8 leaves valid UTF-8 as it is", "[LLStringUTF]")
     {
         const std::string mixed = "A\xE6\x97\xA5\xF0\x9F\x9A\x80" "B";
@@ -532,9 +536,10 @@ namespace
 
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_trim and utf8str_tolower keep non-ASCII text", "[LLStringUTF]")
     {
-        // These compose utf8str_to_wstring + wstring_to_utf8str. Covered here
-        // so composition regressions surface before we diagnose them through
-        // callers.
+        // Both work on the UTF-8 itself -- trim by the offsets of its
+        // whitespace, tolower through LLStringUtil::toLower. Covered here so a
+        // regression that breaks a character surfaces before we diagnose it
+        // through callers.
         const std::string mixed = "H\xC3\xA9LLO \xE6\x97\xA5";
         CHECK(utf8str_trim(mixed) == mixed);
         CHECK(utf8str_tolower(mixed) == std::string("h\xC3\xA9llo \xE6\x97\xA5"));
@@ -578,8 +583,7 @@ namespace
     }
 
     // wstring_remove_emojis must strip consecutive emojis without skipping
-    // the following code point (the implementation uses i-- after erase to
-    // re-check the new index).
+    // the code point that follows them.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: wstring_remove_emojis strips consecutive emoji and keeps what follows", "[LLStringUTF]")
     {
         std::u32string ws = { (llwchar)'H', (llwchar)0x1F680, (llwchar)0x1F681, (llwchar)'i' };
@@ -602,9 +606,8 @@ namespace
         CHECK_FALSE(utf8str_remove_emojis(clean));
         CHECK(clean == std::string("Hello"));
 
-        // Heart-on-fire ❤️‍🔥 round-trips through utf8 encoding without
-        // the wstring layer disagreeing with the byte layer about cluster
-        // bounds. UTF-8 byte sequence: U+2764 (E2 9D A4) U+FE0F (EF B8 8F)
+        // Heart-on-fire ❤️‍🔥 goes as one cluster, bytes and all.
+        // UTF-8 byte sequence: U+2764 (E2 9D A4) U+FE0F (EF B8 8F)
         // U+200D (E2 80 8D) U+1F525 (F0 9F 94 A5).
         std::string fire = "A" "\xE2\x9D\xA4" "\xEF\xB8\x8F" "\xE2\x80\x8D" "\xF0\x9F\x94\xA5" "B";
         CHECK(utf8str_remove_emojis(fire));
@@ -991,7 +994,8 @@ namespace
         std::u32string lone_ri = { (llwchar)0x1F1FA };
         CHECK(wstring_find_emoji_clusters(lone_ri).size() == size_t(0));
 
-        // Range boundaries on isPictographBase's astral / BMP windows.
+        // Just either side of the BMP window the old range test had. Neither
+        // is pictographic.
         std::u32string just_below_astral = { (llwchar)0x1FFF };
         CHECK(wstring_find_emoji_clusters(just_below_astral).size() == size_t(0));
         std::u32string just_above_bmp    = { (llwchar)0x3300 };
@@ -1047,8 +1051,8 @@ namespace
     }
 
     // BMP pictograph + VS16 + ZWJ + astral emoji (❤️‍🔥 = U+2764 U+FE0F
-    // U+200D U+1F525). The base ❤ is outside LLStringOps::isEmoji's astral
-    // range, but the shaping detector must still pick up the whole sequence
+    // U+200D U+1F525). The base ❤ is not one LLStringOps::isEmoji accepts,
+    // but the shaping detector must still pick up the whole sequence
     // so HarfBuzz gets to compose the "heart on fire" glyph instead of
     // leaving ❤ and 🔥 as disjoint codepoints.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: heart-on-fire is one cluster though its base is in the BMP", "[LLStringUTF]")
@@ -1149,6 +1153,8 @@ namespace
         // ZWJ and VS-16 are extenders, not bases.
         CHECK_FALSE(LLStringOps::isPictographBase((llwchar)0x200D));
         CHECK_FALSE(LLStringOps::isPictographBase((llwchar)0xFE0F));
+        // Just outside the windows the old range test had: a CJK ideograph
+        // past the astral one, and either side of the BMP one.
         CHECK_FALSE(LLStringOps::isPictographBase((llwchar)0x20000));
         CHECK_FALSE(LLStringOps::isPictographBase((llwchar)0x1FFF));
         CHECK_FALSE(LLStringOps::isPictographBase((llwchar)0x3300));
@@ -1232,8 +1238,8 @@ namespace
         CHECK(f1.second == size_t(2));
 
         // BMP pictographs — the orthodox cross bug. isPictographBase accepts
-        // U+2000..U+33FF plus © U+00A9 and ® U+00AE; isEmoji rejects them.
-        // Tooltip lookup must still find them.
+        // them, being Extended_Pictographic, as it does © U+00A9 and ®
+        // U+00AE; isEmoji rejects them. Tooltip lookup must still find them.
         auto require_single_range = [](llwchar cp, const char* tag) {
             std::u32string ws { cp };
             auto r = wstring_emoji_range_at(ws, 0);
@@ -1247,9 +1253,9 @@ namespace
         require_single_range((llwchar)0x2764, "heart");
         require_single_range((llwchar)0x2693, "anchor");
 
-        // Bare extenders / out-of-range codepoints get an empty range —
-        // isPictographBase explicitly rejects these so they don't trigger
-        // a tooltip lookup on their own.
+        // Bare extenders, and codepoints just outside the old range test's
+        // windows, get an empty range — isPictographBase rejects these so
+        // they don't trigger a tooltip lookup on their own.
         auto require_no_range = [](llwchar cp, const char* tag) {
             std::u32string ws { cp };
             auto r = wstring_emoji_range_at(ws, 0);
@@ -1262,9 +1268,9 @@ namespace
         require_no_range((llwchar)0x20E3, "bare keycap combiner");
         require_no_range((llwchar)0x1F3FB, "bare skintone");
         require_no_range((llwchar)0xE0067, "bare tag char");
-        require_no_range((llwchar)0x1FFF, "U+1FFF below astral");
-        require_no_range((llwchar)0x3300, "U+3300 above BMP");
-        require_no_range((llwchar)0x20000, "U+20000 above astral");
+        require_no_range((llwchar)0x1FFF, "U+1FFF below the old BMP window");
+        require_no_range((llwchar)0x3300, "U+3300 above the old BMP window");
+        require_no_range((llwchar)0x20000, "U+20000 above the old astral window");
 
         // Back-to-back flags 🇺🇸🇯🇵 — pos lookup must find the *second* run
         // when pos has passed the first. Exercises the ordered-iteration
@@ -1446,9 +1452,9 @@ namespace
 
     // ---------------------------------------------------------------
     // Pin overload-equivalence: the no-clusters and with-clusters forms
-    // of wstring_emoji_range_at must produce identical results for the
+    // of utf8str_emoji_range_at must produce identical results for the
     // same input. The with-clusters overload exists to let callers
-    // amortise the wstring_find_emoji_clusters scan across many lookups,
+    // amortise the utf8str_find_emoji_clusters scan across many lookups,
     // so any future change that updates one body without the other
     // (e.g. a bug fix in the loop) needs to fail loudly here.
     // ---------------------------------------------------------------
@@ -1489,8 +1495,8 @@ namespace
     }
 
     // utf8str_substChar replaces every occurrence of a code point (incl.
-    // astrals) with another code point, routing through std::u32string so the
-    // byte-length change is handled for us.
+    // astrals) with another code point, decoding and re-encoding each one so
+    // the byte-length change is handled for us.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_substChar replaces every occurrence of a code point", "[LLStringUTF]")
     {
         const std::string in  = "A\xF0\x9F\x9A\x80" "B\xF0\x9F\x9A\x80" "C";
@@ -2112,10 +2118,10 @@ namespace
         CHECK(utf8str_grapheme_align_backward(std::string(), 0) == size_t(0));
     }
 
-    // The walkers work in UTF-8 and the wide entry points are adapters over
-    // them, so walking the same text both ways has to land in the same places.
-    // Text with a byte per codepoint, three, two, and a two-codepoint cluster,
-    // so the two index spaces disagree everywhere after the first space.
+    // The walkers work in UTF-8, so every boundary is written out here in
+    // bytes. Text with a byte per codepoint, three, two, and a two-codepoint
+    // cluster, so byte and codepoint offsets disagree everywhere after the
+    // first space.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: the UTF-8 walkers find every boundary in mixed text", "[LLStringUTF]")
     {
         const std::string utf8 =
@@ -2207,9 +2213,8 @@ namespace
     //                 12x  utf8 walkers
     // ---------------------------------------------------------------
 
-    // The two cluster walkers are one set of rules instantiated twice, so
-    // every run the wide walker finds has to be the same run in the UTF-8
-    // walker's byte coordinates, and there must be no extra ones.
+    // Over a corpus of text, the cluster walker finds each run at the byte
+    // offsets written out for it, and no extra ones.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_find_emoji_clusters finds each run in bytes", "[LLStringUTF]")
     {
         const std::vector<std::u32string> corpus = {
@@ -2264,8 +2269,7 @@ namespace
         }
     }
 
-    // Byte coordinates pinned outright, so a change that moved both walkers
-    // the same wrong way is still caught. A ZWJ pair sitting behind an
+    // Byte coordinates pinned outright: a ZWJ pair sitting behind an
     // ideograph starts at byte 4, not codepoint 2.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: a run after an ideograph is placed in bytes not codepoints", "[LLStringUTF]")
     {
@@ -2391,9 +2395,9 @@ namespace
         CHECK(utf8str_codepoint_count("\xF0\x9F") == size_t(2));
     }
 
-    // The UTF-16 pair has to agree with the wide forms it stands beside: the
-    // Win32 IME hands offsets in code units and the editors index bytes, so a
-    // disagreement here is a caret landing in the wrong place mid-composition.
+    // The UTF-16 pair converts between code units and bytes: the Win32 IME
+    // hands offsets in code units and the editors index bytes, so a wrong
+    // answer here is a caret landing in the wrong place mid-composition.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: UTF-16 unit counts and byte counts convert both ways", "[LLStringUTF]")
     {
         // 'a', e-acute, an ideograph, an astral emoji (a surrogate pair), 'z'.
@@ -2566,9 +2570,9 @@ namespace
     }
 
     // The word walkers driven by their own offsets. The tests beside these go
-    // through the wstring_* adapters, which prove the ALUtf8View index map is
-    // self-consistent -- not that a byte offset supplied by a caller is read
-    // correctly, which is what every caller in llui now passes.
+    // through this file's wstring_* adapters, which turn codepoint indexes
+    // into bytes and back -- not a byte offset supplied by a caller, which is
+    // what every caller in llui now passes.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: the UTF-8 word walkers read byte offsets", "[LLStringUTF]")
     {
         // ASCII first, so the byte answers can be read against the wide test.

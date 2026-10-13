@@ -40,7 +40,6 @@ namespace
         char arr[255];
         std::string str;
         std::string expected_result;
-        std::string actual_result;
         std::istringstream is;
 
         is.str(str = "");
@@ -76,6 +75,7 @@ namespace
         skip_whitespace(is);
         is.get(arr, 255, '\0');
         expected_result = "\r\nSecondLife is a 3D World";
+        UNSCOPED_INFO("stops at a carriage return");
         CHECK(arr == expected_result);
     }
 
@@ -84,7 +84,6 @@ namespace
         char arr[255];
         std::string str;
         std::string expected_result;
-        std::string actual_result;
         std::istringstream is;
         bool ret;
 
@@ -124,7 +123,6 @@ namespace
         char arr[255];
         std::string str;
         std::string expected_result;
-        std::string actual_result;
         std::istringstream is;
         bool ret;
 
@@ -175,7 +173,6 @@ namespace
         char arr[255];
         std::string str;
         std::string expected_result;
-        std::string actual_result;
         std::istringstream is;
         bool ret;
 
@@ -213,7 +210,6 @@ namespace
         char arr[255];
         std::string str;
         std::string expected_result;
-        std::string actual_result;
         std::istringstream is;
         bool ret;
 
@@ -261,7 +257,6 @@ namespace
         char arr[255];
         std::string str;
         std::string expected_result;
-        std::string actual_result;
         std::istringstream is;
         bool ret;
 
@@ -270,6 +265,7 @@ namespace
         ret = skip_to_end_of_next_keyword("FIRSTKEY", is);
         is.get(arr, 255, '\0');
         expected_result = " followed by second delimiter\nSECONDKEY\t SecondValue followed by third delimiter   \nSECONDKEY\nFOURTHKEY FOURTHVALUEis a 3DWorld.";
+        CHECK(ret);
         CHECK(arr == expected_result);
 
         is.clear();
@@ -277,6 +273,7 @@ namespace
         ret = skip_to_end_of_next_keyword("SECONDKEY", is);
         is.get(arr, 255, '\0');
         expected_result = "\t SecondValue followed by third delimiter   \nSECONDKEY\nFOURTHKEY FOURTHVALUEis a 3DWorld.";
+        CHECK(ret);
         CHECK(arr == expected_result);
 
         is.clear();
@@ -284,6 +281,7 @@ namespace
         ret = skip_to_end_of_next_keyword("SECONDKEY", is);
         is.get(arr, 255, '\0');
         expected_result = "\nFOURTHKEY FOURTHVALUEis a 3DWorld.";
+        CHECK(ret);
         CHECK(arr == expected_result);
 
         is.clear();
@@ -291,6 +289,7 @@ namespace
         ret = skip_to_end_of_next_keyword("FOURTHKEY", is);
         is.get(arr, 255, '\0');
         expected_result = " FOURTHVALUEis a 3DWorld.";
+        CHECK(ret);
         CHECK(arr == expected_result);
 
         is.clear();
@@ -298,8 +297,11 @@ namespace
         ret = skip_to_end_of_next_keyword("{", is);
         is.get(arr, 255, '\0');
         expected_result = " Does it?\n";
-        UNSCOPED_INFO("several matches on the same line");
-        CHECK(arr == expected_result);
+        {
+            INFO("a match not followed by whitespace is passed over");
+            CHECK(ret);
+            CHECK(arr == expected_result);
+        }
 
         is.clear();
         is.str(str = "Delim { could not be found at start");
@@ -334,16 +336,19 @@ namespace
         ret = get_word(actual_result, is);
         expected_result = "First";
         CHECK(actual_result == expected_result);
+        CHECK(ret);
 
         actual_result = "";
         ret = get_word(actual_result, is);
         expected_result = "Second";
         CHECK(actual_result == expected_result);
+        CHECK(ret);
 
         actual_result = "";
         ret = get_word(actual_result, is);
         expected_result = "Third";
         CHECK(actual_result == expected_result);
+        CHECK(ret);
 
         // the current implementation of get_word seems inconsistent with
         // skip_to_next_word. skip_to_next_word treats any character other
@@ -355,11 +360,14 @@ namespace
         ret = get_word(actual_result, is); // will copy Fourth-ShouldThisBePartOfFourth
         expected_result = "Fourth-ShouldThisBePartOfFourth"; // as per current impl.
         CHECK(actual_result == expected_result);
+        CHECK(ret);
 
         actual_result = "";
         ret = get_word(actual_result, is); // will copy Fifth
         expected_result = "Fifth"; // as per current impl.
         CHECK(actual_result == expected_result);
+        // the newline after it is still to be read
+        CHECK(ret);
 
         is.clear();
         is.str(str = "  \t \r  \n ");
@@ -376,46 +384,56 @@ namespace
         CHECK_FALSE(ret);
     }
 
-    TEST_CASE("streamtools: get_word and skip_to_next_word reach the same fifth word", "[streamtools]")
+    TEST_CASE("streamtools: get_word splits only at whitespace where skip_to_next_word splits at anything but a letter digit or underscore", "[streamtools]")
     {
+        // get_word() treats only isspace() characters (space, form feed,
+        // newline, carriage return, horizontal and vertical tab) as
+        // delimiters, while skip_to_next_word treats any character other
+        // than a letter, a digit or '_' as one. So a hyphen splits a word for
+        // skip_to_next_word but not for get_word, and an underscore splits it
+        // for neither.
         std::string str;
-        std::string expected_result;
-        std::string actual_result;
+        std::string fifth_by_get_word;
+        std::string fifth_by_skipping;
+        std::string word;
         std::istringstream is;
 
         is.clear();
         is.str(str = "  First Second \t \r  \n Third  Fourth-ShouldThisBePartOfFourth  Fifth\n");
-        actual_result = "";
-        get_word(actual_result, is); // First
-        actual_result = "";
-        get_word(actual_result, is); // Second
-        actual_result = "";
-        get_word(actual_result, is); // Third
-
-        // the current implementation of get_word seems inconsistent with
-        // skip_to_next_word. skip_to_next_word treats any character other
-        // than alhpa-numeric and '_' as a delimter, while get_word()
-        // treats only isspace() (i.e. space,  form-feed('\f'),  newline  ('\n'),
-        // carriage  return ('\r'), horizontal tab ('\t'), and vertical tab ('\v')
-        // as delimiters
-        actual_result = "";
-        get_word(actual_result, is); // will copy Fourth-ShouldThisBePartOfFourth
-
-        actual_result = "";
-        get_word(actual_result, is); // will copy Fifth
+        get_word(word, is); // First
+        word = "";
+        get_word(word, is); // Second
+        word = "";
+        get_word(word, is); // Third
+        word = "";
+        get_word(word, is); // Fourth-ShouldThisBePartOfFourth
+        get_word(fifth_by_get_word, is);
+        CHECK(fifth_by_get_word == "Fifth");
 
         is.clear();
-        is.str(str = "  First Second \t \r  \n Third  Fourth_ShouldThisBePartOfFourth Fifth\n");
+        is.str(str);
         skip_to_next_word(is);  // should now point to First
         skip_to_next_word(is);  // should now point to Second
         skip_to_next_word(is);  // should now point to Third
         skip_to_next_word(is);  // should now point to Fourth
         skip_to_next_word(is);  // should now point to ShouldThisBePartOfFourth
-        expected_result = "";
-        // will copy ShouldThisBePartOfFourth, the fifth word,
-        // while using get_word above five times result in getting "Fifth"
-        get_word(expected_result, is);
-        CHECK(actual_result == expected_result);
+        get_word(fifth_by_skipping, is);
+        UNSCOPED_INFO("skip_to_next_word splits at the hyphen");
+        CHECK(fifth_by_skipping == "ShouldThisBePartOfFourth");
+
+        // With an underscore in place of the hyphen, skip_to_next_word's fifth
+        // word is "Fifth" too.
+        is.clear();
+        is.str(str = "  First Second \t \r  \n Third  Fourth_ShouldThisBePartOfFourth Fifth\n");
+        skip_to_next_word(is);  // should now point to First
+        skip_to_next_word(is);  // should now point to Second
+        skip_to_next_word(is);  // should now point to Third
+        skip_to_next_word(is);  // should now point to Fourth_ShouldThisBePartOfFourth
+        skip_to_next_word(is);  // should now point to Fifth
+        fifth_by_skipping = "";
+        get_word(fifth_by_skipping, is);
+        UNSCOPED_INFO("skip_to_next_word keeps an underscore in the word");
+        CHECK(fifth_by_skipping == "Fifth");
     }
 
     TEST_CASE("streamtools: get_word with a limit stops after n characters", "[streamtools]")
@@ -432,27 +450,32 @@ namespace
         ret = get_word(actual_result, is, 255);
         expected_result = "First";
         CHECK(actual_result == expected_result);
+        CHECK(ret);
 
         actual_result = "";
         ret = get_word(actual_result, is, 4);
         expected_result = "Seco"; // should be cut short
         CHECK(actual_result == expected_result);
+        CHECK(ret);
 
         actual_result = "";
         ret = get_word(actual_result, is, 255);
         expected_result = "nd"; // get remainder of Second
         CHECK(actual_result == expected_result);
+        CHECK(ret);
 
         actual_result = "";
         ret = get_word(actual_result, is, 0); // 0 size string
-        expected_result = ""; // get remainder of Second
+        expected_result = ""; // reads nothing, though it still skips the whitespace before Third
         UNSCOPED_INFO("a limit of zero");
         CHECK(actual_result == expected_result);
+        CHECK(ret);
 
         actual_result = "";
         ret = get_word(actual_result, is, 255);
         expected_result = "Third";
         CHECK(actual_result == expected_result);
+        CHECK(ret);
 
         is.clear();
         is.str(str = "  \t \r  \n ");
@@ -536,7 +559,7 @@ namespace
         std::string actual_result;
         std::istringstream is;
 
-        // need to be check if this test case is wrong or the implementation is wrong.
+        // A line ends only at '\n', so a '\r' on its own is part of the line.
         is.clear();
         is.str(str = "Should not skip lone \r.\r\n");
         actual_result = "";
@@ -632,6 +655,7 @@ namespace
         ret = remove_last_char('d',str);
         expected_result = "SecondLife is a 3D Worl";
         CHECK(str == expected_result);
+        CHECK(ret);
 
         str = "SecondLife is a 3D World";
         ret = remove_last_char('W',str);
@@ -785,11 +809,8 @@ namespace
         str = "SecondLife is a \"3D world";
         remove_double_quotes(str);
         expected_result = "SecondLife is a 3D world";
+        UNSCOPED_INFO("a lone quote is removed too");
         CHECK(str == expected_result);
-    }
-
-    TEST_CASE("streamtools: get_brace_count has no checks yet", "[streamtools]")
-    {
     }
 
     TEST_CASE("streamtools: get_keyword_and_value splits off the first word as the keyword", "[streamtools]")
@@ -845,8 +866,8 @@ namespace
         std::istringstream is(str);
         char buf[255] = {0};
 
-        fullread(is, buf, 255);
-        CHECK_THAT(ll_test::Memory(buf, str.size()-1), ll_test::MemoryMatches(str.c_str(), str.size()-1));
+        CHECK(fullread(is, buf, 255) == std::streamsize(str.size()));
+        CHECK_THAT(ll_test::Memory(buf, str.size()), ll_test::MemoryMatches(str.c_str(), str.size()));
 
         is.clear();
         is.str(str = "First Line.\nSecond Line\n");
@@ -854,7 +875,7 @@ namespace
 
         char expected_string[] = "First Line.\nSecond";
         int len = sizeof(expected_string)-1;
-        fullread(is, buf, len);
+        CHECK(fullread(is, buf, len) == len);
         CHECK_THAT(ll_test::Memory(buf, len), ll_test::MemoryMatches(expected_string, len));
     }
 
