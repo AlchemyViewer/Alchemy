@@ -33,15 +33,13 @@
 #include "../llvertexbuffer.h"
 #include "llimage.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cstring>
 #include <functional>
 #include <list>
 #include <vector>
 
-namespace tut
-{
 namespace
 {
     struct llrender2dutils_data
@@ -123,28 +121,24 @@ namespace
 
         static void ensureNear(const std::string& what, F32 actual, F32 expected)
         {
-            ensure(what + ": " + std::to_string(actual) + " vs " + std::to_string(expected),
-                   fabsf(actual - expected) < 1e-3f);
+            UNSCOPED_INFO(what + ": " + std::to_string(actual) + " vs " + std::to_string(expected));
+            REQUIRE(fabsf(actual - expected) < 1e-3f);
         }
     };
 
-    typedef test_group<llrender2dutils_data> llrender2dutils_test;
-    typedef llrender2dutils_test::object     llrender2dutils_object;
-    tut::llrender2dutils_test llrender2dutils_testcase("llrender2dutils_gl");
-}
 
     // A rotated image turns about its own centre and keeps its size. An
     // odd-sized image at a quarter turn covers the same pixels it does
     // unrotated -- an open folder arrow sits where the closed one did.
-    template<> template<>
-    void llrender2dutils_object::test<1>()
+    TEST_CASE_METHOD(llrender2dutils_data, "llrender2dutils_gl: a rotated image turns about its own centre and keeps its size", "[llrender2dutils_gl]")
     {
         LLPointer<LLGLTexture> texture = makeTexture(4, 4);
 
         const Bounds flat = boundsOf([&]() {
             gl_draw_scaled_rotated_image(10, 20, 9, 9, 0.f, texture.get());
         });
-        ensure_equals("unrotated, one quad", flat.count, (size_t)6);
+        UNSCOPED_INFO("unrotated, one quad");
+        REQUIRE(flat.count == (size_t)6);
         ensureNear("unrotated left", flat.min_x, 10.f);
         ensureNear("unrotated right", flat.max_x, 19.f);
         ensureNear("unrotated bottom", flat.min_y, 20.f);
@@ -153,7 +147,8 @@ namespace
         const Bounds turned = boundsOf([&]() {
             gl_draw_scaled_rotated_image(10, 20, 9, 9, 90.f, texture.get());
         });
-        ensure_equals("turned, one quad", turned.count, (size_t)6);
+        UNSCOPED_INFO("turned, one quad");
+        REQUIRE(turned.count == (size_t)6);
         ensureNear("turned left", turned.min_x, flat.min_x);
         ensureNear("turned right", turned.max_x, flat.max_x);
         ensureNear("turned bottom", turned.min_y, flat.min_y);
@@ -162,15 +157,15 @@ namespace
 
     // The turn is a turn: at a quarter turn a wide image stands tall, and
     // it does so about the centre of the rect it was asked to fill.
-    template<> template<>
-    void llrender2dutils_object::test<2>()
+    TEST_CASE_METHOD(llrender2dutils_data, "llrender2dutils_gl: a quarter turn stands a wide image tall about the rect's centre", "[llrender2dutils_gl]")
     {
         LLPointer<LLGLTexture> texture = makeTexture(4, 4);
 
         const Bounds turned = boundsOf([&]() {
             gl_draw_scaled_rotated_image(10, 20, 8, 2, 90.f, texture.get());
         });
-        ensure_equals("one quad", turned.count, (size_t)6);
+        UNSCOPED_INFO("one quad");
+        REQUIRE(turned.count == (size_t)6);
         // Centre (14, 21); half extents swap to (1, 4).
         ensureNear("left", turned.min_x, 13.f);
         ensureNear("right", turned.max_x, 15.f);
@@ -179,8 +174,7 @@ namespace
     }
     // Rectangles added to one batch are one draw, where gl_rect_2d makes
     // a draw of each; and they are the same rectangles.
-    template<> template<>
-    void llrender2dutils_object::test<3>()
+    TEST_CASE_METHOD(llrender2dutils_data, "llrender2dutils_gl: gl_rect_2d_in_batch draws the same rectangles as gl_rect_2d in one draw", "[llrender2dutils_gl]")
     {
         const auto count_draws = [](const std::function<void()>& draw) {
             std::list<LLVertexBufferData> capture;
@@ -210,9 +204,12 @@ namespace
             }
             gGL.end();
         });
-        ensure_equals("a draw apiece", apiece.first, (size_t)40);
-        ensure_equals("one draw in a batch", batched.first, (size_t)1);
-        ensure_equals("the same vertices", batched.second, apiece.second);
+        UNSCOPED_INFO("a draw apiece");
+        CHECK(apiece.first == (size_t)40);
+        UNSCOPED_INFO("one draw in a batch");
+        CHECK(batched.first == (size_t)1);
+        UNSCOPED_INFO("the same vertices");
+        CHECK(batched.second == apiece.second);
 
         const Bounds b = boundsOf([] {
             gGL.getTextureSlot(0)->unbind();
@@ -231,8 +228,7 @@ namespace
     // nothing else: at the window's corner too, where a line along the
     // edge of a pixel landing outside the rect is not drawn at all; and
     // with the UI scaled up, a screen pixel thick, not a unit.
-    template<> template<>
-    void llrender2dutils_object::test<4>()
+    TEST_CASE_METHOD(llrender2dutils_data, "llrender2dutils_gl: a rect's outline lights only the pixels just inside its edges", "[llrender2dutils_gl]")
     {
         constexpr S32 W = ll_test::HeadlessGL::WIDTH;
         constexpr S32 H = ll_test::HeadlessGL::HEIGHT;
@@ -264,7 +260,7 @@ namespace
                         const U8   red    = rgba[(static_cast<size_t>(y) * W + x) * 4];
                         if ((red == 255) != edge)
                         {
-                            fail("at " + std::to_string(x) + "," + std::to_string(y) + " of the outline at " + std::to_string(rect.mLeft) + "," +
+                            FAIL("at " + std::to_string(x) + "," + std::to_string(y) + " of the outline at " + std::to_string(rect.mLeft) + "," +
                                  std::to_string(rect.mBottom) + ", scaled " + std::to_string(scale) + ": " + std::to_string(red));
                         }
                     }

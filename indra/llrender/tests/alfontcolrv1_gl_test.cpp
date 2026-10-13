@@ -36,15 +36,13 @@
 #include "llfonttest_helpers.h"
 #include "llheadlessgl_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <hb.h>
 #include <hb-ft.h>
 
 #include <cstring>
 
-namespace tut
-{
 namespace
 {
     using namespace ll_test;
@@ -62,91 +60,94 @@ namespace
         ll_test::FontStateScope font_scope;
     };
 
-    typedef test_group<alfontcolrv1_render_data> alfontcolrv1_render_test;
-    typedef alfontcolrv1_render_test::object     alfontcolrv1_render_object;
-    tut::alfontcolrv1_render_test alfontcolrv1_render_testcase("ALFontColrV1Render");
-}
 
     // End-to-end: requesting a Color glyph for the fire emoji on
     // Noto-COLRv1 must route through renderColrV1Glyph → painter →
     // setSubImageBGRA → Color atlas. Verify the returned info has
     // Color glyph type and the cache's Color page has a live GL
     // texture name.
-    template<> template<>
-    void alfontcolrv1_render_object::test<1>()
+    TEST_CASE_METHOD(alfontcolrv1_render_data, "ALFontColrV1Render: a Color fire emoji is painted onto a live Color atlas page", "[ALFontColrV1Render]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+        UNSCOPED_INFO("Noto-COLRv1 loaded as head");
+        REQUIRE(ft.notNull());
 
         LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
-        ensure("getGlyphInfo returned an entry for fire emoji", gi != nullptr);
-        ensure_equals("delivered glyph type is Color (COLRv1 raster)",
-                      (S32)gi->mGlyphType, (S32)EFontGlyphType::Color);
-        ensure("glyph has positive width",   gi->mWidth   > 0);
-        ensure("glyph has positive height",  gi->mHeight  > 0);
+        UNSCOPED_INFO("getGlyphInfo returned an entry for fire emoji");
+        REQUIRE(gi != nullptr);
+        UNSCOPED_INFO("delivered glyph type is Color (COLRv1 raster)");
+        CHECK((S32)gi->mGlyphType == (S32)EFontGlyphType::Color);
+        UNSCOPED_INFO("glyph has positive width");
+        CHECK(gi->mWidth   > 0);
+        UNSCOPED_INFO("glyph has positive height");
+        CHECK(gi->mHeight  > 0);
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
-        ensure("bitmap cache present", cache != nullptr);
-        ensure("Color atlas allocated at least one sheet",
-               cache->getNumBitmaps(EFontGlyphType::Color) >= 1u);
+        UNSCOPED_INFO("bitmap cache present");
+        REQUIRE(cache != nullptr);
+        UNSCOPED_INFO("Color atlas allocated at least one sheet");
+        CHECK(cache->getNumBitmaps(EFontGlyphType::Color) >= 1u);
 
         LLImageGL* page = cache->getImageGL(EFontGlyphType::Color, 0);
-        ensure("Color sheet 0 LLImageGL present", page != nullptr);
-        ensure("Color sheet 0 has a live GL texture name",
-               page->getTexName() != 0);
+        UNSCOPED_INFO("Color sheet 0 LLImageGL present");
+        REQUIRE(page != nullptr);
+        UNSCOPED_INFO("Color sheet 0 has a live GL texture name");
+        CHECK(page->getTexName() != 0);
     }
 
     // Several COLRv1 emojis in a row share the Color atlas — a single
     // 1024² Color sheet has plenty of room for many small color
     // bitmaps. Pins that the painter+atlas integration doesn't
     // allocate an extra sheet per glyph.
-    template<> template<>
-    void alfontcolrv1_render_object::test<2>()
+    TEST_CASE_METHOD(alfontcolrv1_render_data, "ALFontColrV1Render: three COLRv1 emoji share one Color atlas sheet", "[ALFontColrV1Render]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+        UNSCOPED_INFO("Noto-COLRv1 loaded as head");
+        REQUIRE(ft.notNull());
 
         const llwchar fire    = 0x1F525;
         const llwchar heart   = 0x2764;
         const llwchar rocket  = 0x1F680;
 
-        ensure("fire glyph allocated",
-               ft->getGlyphInfo(fire,   EFontGlyphType::Color) != nullptr);
-        ensure("heart glyph allocated",
-               ft->getGlyphInfo(heart,  EFontGlyphType::Color) != nullptr);
-        ensure("rocket glyph allocated",
-               ft->getGlyphInfo(rocket, EFontGlyphType::Color) != nullptr);
+        UNSCOPED_INFO("fire glyph allocated");
+        REQUIRE(ft->getGlyphInfo(fire,   EFontGlyphType::Color) != nullptr);
+        UNSCOPED_INFO("heart glyph allocated");
+        REQUIRE(ft->getGlyphInfo(heart,  EFontGlyphType::Color) != nullptr);
+        UNSCOPED_INFO("rocket glyph allocated");
+        REQUIRE(ft->getGlyphInfo(rocket, EFontGlyphType::Color) != nullptr);
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
-        ensure_equals("three Color glyphs share a single Color atlas sheet",
-                      cache->getNumBitmaps(EFontGlyphType::Color), 1u);
+        UNSCOPED_INFO("three Color glyphs share a single Color atlas sheet");
+        CHECK(cache->getNumBitmaps(EFontGlyphType::Color) == 1u);
     }
 
     // Repeat lookup is a cache hit, not a re-rasterize. Returning
     // the same LLFontGlyphInfo pointer pins the head's char_glyph
     // info cache (so each render call doesn't rebuild the painter
     // input on every frame).
-    template<> template<>
-    void alfontcolrv1_render_object::test<3>()
+    TEST_CASE_METHOD(alfontcolrv1_render_data, "ALFontColrV1Render: a repeat Color lookup returns the same cached LLFontGlyphInfo", "[ALFontColrV1Render]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+        UNSCOPED_INFO("Noto-COLRv1 loaded as head");
+        REQUIRE(ft.notNull());
 
         LLFontGlyphInfo* first  = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
         LLFontGlyphInfo* second = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
-        ensure("first lookup non-null", first  != nullptr);
-        ensure("second lookup non-null", second != nullptr);
-        ensure_equals("repeat lookup returns same LLFontGlyphInfo pointer",
-                      first, second);
+        UNSCOPED_INFO("first lookup non-null");
+        REQUIRE(first  != nullptr);
+        UNSCOPED_INFO("second lookup non-null");
+        REQUIRE(second != nullptr);
+        UNSCOPED_INFO("repeat lookup returns same LLFontGlyphInfo pointer");
+        REQUIRE(first == second);
     }
 
     // Color atlas generation counter advances on the first emoji
@@ -154,24 +155,25 @@ namespace
     // buffer captured before the rasterize would invalidate. Pins
     // the global-generation contract that LLFontBitmapCache holds
     // for COLRv1 atlases too — not just Grayscale.
-    template<> template<>
-    void alfontcolrv1_render_object::test<4>()
+    TEST_CASE_METHOD(alfontcolrv1_render_data, "ALFontColrV1Render: the first Color raster advances the bitmap cache's generation", "[ALFontColrV1Render]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+        UNSCOPED_INFO("Noto-COLRv1 loaded as head");
+        REQUIRE(ft.notNull());
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
         const S32 gen_before = cache->getCacheGeneration();
 
         LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
-        ensure("glyph allocated", gi != nullptr);
+        UNSCOPED_INFO("glyph allocated");
+        REQUIRE(gi != nullptr);
 
         const S32 gen_after = cache->getCacheGeneration();
-        ensure("cache generation advanced after Color rasterize",
-               gen_after > gen_before);
+        UNSCOPED_INFO("cache generation advanced after Color rasterize");
+        CHECK(gen_after > gen_before);
     }
 
     // (Test 5 removed: pinned LLFontGlyphInfo::mTintWithForeground
@@ -183,30 +185,31 @@ namespace
     // doesn't accumulate state across calls (e.g., a regression that
     // grew the staging buffer on every call would still produce a
     // valid bitmap but mWidth/mHeight could drift).
-    template<> template<>
-    void alfontcolrv1_render_object::test<6>()
+    TEST_CASE_METHOD(alfontcolrv1_render_data, "ALFontColrV1Render: one painter paints the same glyph twice at the same size", "[ALFontColrV1Render]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
-            skip("Noto-COLRv1 has no fire emoji");
+            SKIP("Noto-COLRv1 has no fire emoji");
 
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result r1, r2;
         const LLColor4U fg(255, 255, 255, 255);
-        ensure("first paintGlyph succeeded",
-               painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r1));
+        UNSCOPED_INFO("first paintGlyph succeeded");
+        REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r1));
         const S32 w1 = r1.mWidth, h1 = r1.mHeight;
-        ensure("second paintGlyph (same glyph) succeeded",
-               painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r2));
-        ensure_equals("repeat paint width matches",  r2.mWidth,  w1);
-        ensure_equals("repeat paint height matches", r2.mHeight, h1);
+        UNSCOPED_INFO("second paintGlyph (same glyph) succeeded");
+        REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r2));
+        UNSCOPED_INFO("repeat paint width matches");
+        CHECK(r2.mWidth == w1);
+        UNSCOPED_INFO("repeat paint height matches");
+        CHECK(r2.mHeight == h1);
     }
 
     // Grayscale-COLRv1 routing: requesting EFontGlyphType::Grayscale on a
@@ -215,30 +218,35 @@ namespace
     // change in renderGlyph drops the bitmap_type==Color restriction, so
     // Grayscale lookups on COLRv1 faces produce a luminance-shaded mask
     // in the LA atlas instead of an empty / outline-only glyph.
-    template<> template<>
-    void alfontcolrv1_render_object::test<7>()
+    TEST_CASE_METHOD(alfontcolrv1_render_data, "ALFontColrV1Render: a Grayscale lookup on a COLRv1 face paints into the Grayscale atlas", "[ALFontColrV1Render]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+        UNSCOPED_INFO("Noto-COLRv1 loaded as head");
+        REQUIRE(ft.notNull());
 
         LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, EFontGlyphType::Grayscale);
-        ensure("Grayscale lookup returns an entry", gi != nullptr);
-        ensure_equals("delivered glyph type is Grayscale (LA atlas)",
-                      (S32)gi->mGlyphType, (S32)EFontGlyphType::Grayscale);
-        ensure("Grayscale glyph has positive width",  gi->mWidth  > 0);
-        ensure("Grayscale glyph has positive height", gi->mHeight > 0);
+        UNSCOPED_INFO("Grayscale lookup returns an entry");
+        REQUIRE(gi != nullptr);
+        UNSCOPED_INFO("delivered glyph type is Grayscale (LA atlas)");
+        CHECK((S32)gi->mGlyphType == (S32)EFontGlyphType::Grayscale);
+        UNSCOPED_INFO("Grayscale glyph has positive width");
+        CHECK(gi->mWidth  > 0);
+        UNSCOPED_INFO("Grayscale glyph has positive height");
+        CHECK(gi->mHeight > 0);
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
-        ensure("bitmap cache present", cache != nullptr);
-        ensure("Grayscale atlas allocated at least one sheet",
-               cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
+        UNSCOPED_INFO("bitmap cache present");
+        REQUIRE(cache != nullptr);
+        UNSCOPED_INFO("Grayscale atlas allocated at least one sheet");
+        CHECK(cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
         LLImageGL* page = cache->getImageGL(EFontGlyphType::Grayscale, 0);
-        ensure("Grayscale sheet 0 LLImageGL present", page != nullptr);
-        ensure("Grayscale sheet 0 has a live GL texture name",
-               page->getTexName() != 0);
+        UNSCOPED_INFO("Grayscale sheet 0 LLImageGL present");
+        REQUIRE(page != nullptr);
+        UNSCOPED_INFO("Grayscale sheet 0 has a live GL texture name");
+        CHECK(page->getTexName() != 0);
     }
 
     // Force-monochrome static is wired in at the LLFontGL render-call layer.
@@ -247,33 +255,34 @@ namespace
     // verify that the Grayscale routing works while it's set, which is
     // what the call-site code does at llfontgl.cpp:560/715/862. Save and
     // restore the static so the test doesn't perturb sibling tests.
-    template<> template<>
-    void alfontcolrv1_render_object::test<8>()
+    TEST_CASE_METHOD(alfontcolrv1_render_data, "ALFontColrV1Render: with sForceMonochromeEmoji set the emoji is looked up as Grayscale", "[ALFontColrV1Render]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
 
         const bool saved = LLFontGL::sForceMonochromeEmoji;
         LLFontGL::sForceMonochromeEmoji = true;
 
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("Noto-COLRv1 loaded as head", ft.notNull());
+        UNSCOPED_INFO("Noto-COLRv1 loaded as head");
+        REQUIRE(ft.notNull());
 
         // Simulate the render-call selector at llfontgl.cpp:560 with
         // use_color=true and force_mono=true → request Grayscale.
         const EFontGlyphType requested =
             (!/*use_color*/true || LLFontGL::sForceMonochromeEmoji)
                 ? EFontGlyphType::Grayscale : EFontGlyphType::Color;
-        ensure_equals("force-mono toggle downgrades Color to Grayscale at "
-                      "the request layer", (S32)requested,
+        UNSCOPED_INFO("force-mono toggle downgrades Color to Grayscale at "
+                      "the request layer");
+        CHECK((S32)requested ==
                       (S32)EFontGlyphType::Grayscale);
 
         LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, requested);
-        ensure("Grayscale lookup under force-mono returns an entry",
-               gi != nullptr);
-        ensure_equals("Grayscale path landed in Grayscale atlas",
-                      (S32)gi->mGlyphType, (S32)EFontGlyphType::Grayscale);
+        UNSCOPED_INFO("Grayscale lookup under force-mono returns an entry");
+        REQUIRE(gi != nullptr);
+        UNSCOPED_INFO("Grayscale path landed in Grayscale atlas");
+        CHECK((S32)gi->mGlyphType == (S32)EFontGlyphType::Grayscale);
 
         LLFontGL::sForceMonochromeEmoji = saved;
     }

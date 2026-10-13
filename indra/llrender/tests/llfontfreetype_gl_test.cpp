@@ -34,12 +34,10 @@
 #include "llfonttest_helpers.h"
 #include "llheadlessgl_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
-{
 namespace
 {
     using namespace ll_test;
@@ -56,32 +54,32 @@ namespace
         ll_test::FontStateScope font_scope;
     };
 
-    typedef test_group<llfontfreetype_render_data> llfontfreetype_render_test;
-    typedef llfontfreetype_render_test::object     llfontfreetype_render_object;
-    tut::llfontfreetype_render_test llfontfreetype_render_testcase("LLFontFreetypeRender");
-}
 
     // After getGlyphInfo for an ASCII glyph, the bitmap cache has at
     // least one Grayscale page, and the returned info has positive
     // metrics (the FT raster actually ran).
-    template<> template<>
-    void llfontfreetype_render_object::test<1>()
+    TEST_CASE_METHOD(llfontfreetype_render_data, "LLFontFreetypeRender: getGlyphInfo rasterizes an ASCII glyph onto a Grayscale sheet", "[LLFontFreetypeRender]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
-            skip("DejaVuSans.woff2 not present");
+            SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("DejaVuSans loaded as head", ft.notNull());
+        UNSCOPED_INFO("DejaVuSans loaded as head");
+        REQUIRE(ft.notNull());
 
         LLFontGlyphInfo* gi = ft->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
-        ensure("getGlyphInfo returned an entry", gi != nullptr);
-        ensure("glyph has positive width",   gi->mWidth > 0);
-        ensure("glyph has positive advance", gi->mXAdvance > 0.f);
+        UNSCOPED_INFO("getGlyphInfo returned an entry");
+        REQUIRE(gi != nullptr);
+        UNSCOPED_INFO("glyph has positive width");
+        CHECK(gi->mWidth > 0);
+        UNSCOPED_INFO("glyph has positive advance");
+        CHECK(gi->mXAdvance > 0.f);
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
-        ensure("bitmap cache present", cache != nullptr);
-        ensure("cache has at least one Grayscale sheet",
-               cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
+        UNSCOPED_INFO("bitmap cache present");
+        REQUIRE(cache != nullptr);
+        UNSCOPED_INFO("cache has at least one Grayscale sheet");
+        CHECK(cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
     }
 
     // collectGarbage is throttled — calling it twice in immediate
@@ -91,14 +89,14 @@ namespace
     // would invalidate sheets if there were anything to evict).
     // Pins 169390b593 — the cache-sweep gating moved out of the
     // render hot path.
-    template<> template<>
-    void llfontfreetype_render_object::test<2>()
+    TEST_CASE_METHOD(llfontfreetype_render_data, "LLFontFreetypeRender: two collectGarbage calls in a row return cleanly", "[LLFontFreetypeRender]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
-            skip("DejaVuSans.woff2 not present");
+            SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("DejaVuSans loaded as head", ft.notNull());
+        UNSCOPED_INFO("DejaVuSans loaded as head");
+        REQUIRE(ft.notNull());
         // Force at least one glyph onto the atlas so collectGarbage
         // has something to consider.
         (void)ft->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
@@ -107,7 +105,8 @@ namespace
         // doing real work. Both must complete without crashing.
         ft->collectGarbage();
         ft->collectGarbage();
-        ensure("collectGarbage throttled call returned cleanly", true);
+        UNSCOPED_INFO("collectGarbage throttled call returned cleanly");
+        CHECK(true);
     }
 
     // LLFontManager::collectGarbage drops face cache entries with
@@ -116,40 +115,48 @@ namespace
     // 'A' holds an entry for it, and a face loaded fresh holds none. The
     // address of the evicted face is no evidence -- the allocator may hand
     // the same block straight back to the reload.
-    template<> template<>
-    void llfontfreetype_render_object::test<3>()
+    TEST_CASE_METHOD(llfontfreetype_render_data, "LLFontFreetypeRender: LLFontManager::collectGarbage evicts only faces nothing else holds", "[LLFontFreetypeRender]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
-            skip("DejaVuSans.woff2 not present");
+            SKIP("DejaVuSans.woff2 not present");
 
         // A head over the face rasterizes 'A' into the face's glyph cache;
         // loadFtHead's parameters are makeKey's, so the manager hands the
         // head and this lookup the same face.
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("DejaVuSans loaded as head", ft.notNull());
+        UNSCOPED_INFO("DejaVuSans loaded as head");
+        REQUIRE(ft.notNull());
         (void)ft->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        ensure("face loaded", face.notNull() && face->isValid());
+        {
+            INFO("face loaded");
+            REQUIRE(face.notNull());
+            CHECK(face->isValid());
+        }
         const U32 glyph_a = face->getCharGlyphIndex(L'A');
-        ensure("the head rasterized into this face",
-               face->findGlyphInfo(glyph_a, EFontGlyphType::Grayscale) != nullptr);
+        UNSCOPED_INFO("the head rasterized into this face");
+        REQUIRE(face->findGlyphInfo(glyph_a, EFontGlyphType::Grayscale) != nullptr);
 
         // Held by the head and by us: survives a sweep, glyph and all.
         gFontManagerp->collectGarbage();
-        ensure("a held face keeps its glyphs across GC",
-               face->findGlyphInfo(glyph_a, EFontGlyphType::Grayscale) != nullptr);
-        ensure_equals("a held face is still the cached one",
-                      gFontManagerp->getOrCreateFace(makeKey(path)).get(), face.get());
+        UNSCOPED_INFO("a held face keeps its glyphs across GC");
+        REQUIRE(face->findGlyphInfo(glyph_a, EFontGlyphType::Grayscale) != nullptr);
+        UNSCOPED_INFO("a held face is still the cached one");
+        REQUIRE(gFontManagerp->getOrCreateFace(makeKey(path)).get() == face.get());
 
         // Held by the cache alone: swept, so the reload is a fresh face.
         ft = nullptr;
         face = nullptr;
         gFontManagerp->collectGarbage();
         LLPointer<ALFontFace> reloaded = gFontManagerp->getOrCreateFace(makeKey(path));
-        ensure("face reloaded", reloaded.notNull() && reloaded->isValid());
-        ensure("the reloaded face has no glyphs: the cached one was evicted",
-               reloaded->findGlyphInfo(glyph_a, EFontGlyphType::Grayscale) == nullptr);
+        {
+            INFO("face reloaded");
+            REQUIRE(reloaded.notNull());
+            CHECK(reloaded->isValid());
+        }
+        UNSCOPED_INFO("the reloaded face has no glyphs: the cached one was evicted");
+        REQUIRE(reloaded->findGlyphInfo(glyph_a, EFontGlyphType::Grayscale) == nullptr);
     }
 
     // After two getGlyphInfo calls in a row, both glyphs end up in
@@ -159,26 +166,29 @@ namespace
     // font-atlas layer (the disable-on-setSubImage regression would
     // surface as a crash or as a generation skip on the second
     // upload).
-    template<> template<>
-    void llfontfreetype_render_object::test<4>()
+    TEST_CASE_METHOD(llfontfreetype_render_data, "LLFontFreetypeRender: two ASCII glyphs rasterized in a row share one sheet", "[LLFontFreetypeRender]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
-            skip("DejaVuSans.woff2 not present");
+            SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("DejaVuSans loaded as head", ft.notNull());
+        UNSCOPED_INFO("DejaVuSans loaded as head");
+        REQUIRE(ft.notNull());
 
         LLFontGlyphInfo* g1 = ft->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
         LLFontGlyphInfo* g2 = ft->getGlyphInfo(L'B', EFontGlyphType::Grayscale);
-        ensure("first glyph allocated",  g1 != nullptr);
-        ensure("second glyph allocated", g2 != nullptr);
+        UNSCOPED_INFO("first glyph allocated");
+        REQUIRE(g1 != nullptr);
+        UNSCOPED_INFO("second glyph allocated");
+        REQUIRE(g2 != nullptr);
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
-        ensure("bitmap cache present", cache != nullptr);
+        UNSCOPED_INFO("bitmap cache present");
+        REQUIRE(cache != nullptr);
         // Both glyphs should land in sheet 0 (a single 1024² sheet
         // can hold thousands of small ASCII glyphs).
-        ensure_equals("two ASCII glyphs share sheet 0",
-                      cache->getNumBitmaps(EFontGlyphType::Grayscale), 1u);
+        UNSCOPED_INFO("two ASCII glyphs share sheet 0");
+        CHECK(cache->getNumBitmaps(EFontGlyphType::Grayscale) == 1u);
     }
 
     // Variable-axis weight metric effect: loading InterVariable at
@@ -191,36 +201,37 @@ namespace
     // a >1px advance gap at 32pt 96dpi. Small point sizes can collapse
     // the diff under FT's grid-fitting; this guards explicitly against
     // that edge case.
-    template<> template<>
-    void llfontfreetype_render_object::test<5>()
+    TEST_CASE_METHOD(llfontfreetype_render_data, "LLFontFreetypeRender: InterVariable at weight 900 has a wider 'A' than at weight 300", "[LLFontFreetypeRender]")
     {
         const std::string path = std::string(kFontDir) + "InterVariable.woff2";
         if (!fileExists(path))
-            skip("InterVariable.woff2 not present");
+            SKIP("InterVariable.woff2 not present");
 
         ALFontVarAxes va_light;
         va_light.wght = 300.f; va_light.wght_set = true;
         LLPointer<LLFontFreetype> ft_light = new LLFontFreetype;
-        ensure("weight=300 load",
-               ft_light->loadFace(path, 32.f, 96.f, 96.f,
+        UNSCOPED_INFO("weight=300 load");
+        CHECK(ft_light->loadFace(path, 32.f, 96.f, 96.f,
                                   /*is_fallback=*/false, 0,
                                   EFontHinting::DEFAULT, /*flags=*/0, va_light));
         ALFontVarAxes va_black;
         va_black.wght = 900.f; va_black.wght_set = true;
         LLPointer<LLFontFreetype> ft_black = new LLFontFreetype;
-        ensure("weight=900 load",
-               ft_black->loadFace(path, 32.f, 96.f, 96.f,
+        UNSCOPED_INFO("weight=900 load");
+        CHECK(ft_black->loadFace(path, 32.f, 96.f, 96.f,
                                   /*is_fallback=*/false, 0,
                                   EFontHinting::DEFAULT, /*flags=*/0, va_black));
 
         const F32 adv_light = ft_light->getXAdvance(L'A');
         const F32 adv_black = ft_black->getXAdvance(L'A');
-        ensure("light advance positive", adv_light > 0.f);
-        ensure("black advance positive", adv_black > 0.f);
+        UNSCOPED_INFO("light advance positive");
+        CHECK(adv_light > 0.f);
+        UNSCOPED_INFO("black advance positive");
+        CHECK(adv_black > 0.f);
         // Heavier weight produces wider 'A'. The diff at 32pt 96dpi
         // between weight=300 and weight=900 is ~1.5-2 px for Inter.
-        ensure("weight=900 'A' advance > weight=300 'A' advance",
-               adv_black > adv_light + 0.5f);
+        UNSCOPED_INFO("weight=900 'A' advance > weight=300 'A' advance");
+        CHECK(adv_black > adv_light + 0.5f);
     }
 
     // Sheet re-entry through the rasterizer: rasterize onto sheet 0,
@@ -229,23 +240,25 @@ namespace
     // across eviction cycles) and getCacheGeneration advances so
     // captured vertex buffers rebuild. Pins slot recycling through the
     // rasterizer layer (the cache-layer tests pin it at nextOpenPos).
-    template<> template<>
-    void llfontfreetype_render_object::test<6>()
+    TEST_CASE_METHOD(llfontfreetype_render_data, "LLFontFreetypeRender: a glyph after sheet 0's release reuses the slot and bumps the generation", "[LLFontFreetypeRender]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
-            skip("DejaVuSans.woff2 not present");
+            SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("DejaVuSans loaded as head", ft.notNull());
+        UNSCOPED_INFO("DejaVuSans loaded as head");
+        REQUIRE(ft.notNull());
 
         LLFontGlyphInfo* g1 = ft->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
-        ensure("first glyph allocated", g1 != nullptr);
+        UNSCOPED_INFO("first glyph allocated");
+        REQUIRE(g1 != nullptr);
         // Use getBitmapCache() (non-const) for releaseSheet; the const
         // overload exposed via getFontBitmapCache() is for queries only.
         LLFontBitmapCache* cache = ft->getBitmapCache();
-        ensure("bitmap cache present", cache != nullptr);
-        ensure_equals("started with one Grayscale sheet",
-                      cache->getNumBitmaps(EFontGlyphType::Grayscale), 1u);
+        UNSCOPED_INFO("bitmap cache present");
+        REQUIRE(cache != nullptr);
+        UNSCOPED_INFO("started with one Grayscale sheet");
+        CHECK(cache->getNumBitmaps(EFontGlyphType::Grayscale) == 1u);
 
         const S32 gen_before = cache->getCacheGeneration();
         // Honor the purge-before-release contract the production sweep
@@ -265,19 +278,20 @@ namespace
                 return false;
             });
         cache->releaseSheet(EFontGlyphType::Grayscale, 0);
-        ensure("sheet 0 reports released",
-               cache->isSheetReleased(EFontGlyphType::Grayscale, 0));
+        UNSCOPED_INFO("sheet 0 reports released");
+        CHECK(cache->isSheetReleased(EFontGlyphType::Grayscale, 0));
 
         // New glyph rebuilds into the recycled slot. Picking a glyph not
         // already cached avoids hitting the cmap-cache branch.
         LLFontGlyphInfo* g2 = ft->getGlyphInfo(L'B', EFontGlyphType::Grayscale);
-        ensure("second glyph allocated post-release", g2 != nullptr);
-        ensure_equals("released slot recycled (no sheet-vector growth)",
-                      cache->getNumBitmaps(EFontGlyphType::Grayscale), 1u);
-        ensure("recycled slot is live again",
-               !cache->isSheetReleased(EFontGlyphType::Grayscale, 0));
-        ensure("cache generation advanced after release+alloc",
-               cache->getCacheGeneration() > gen_before);
+        UNSCOPED_INFO("second glyph allocated post-release");
+        REQUIRE(g2 != nullptr);
+        UNSCOPED_INFO("released slot recycled (no sheet-vector growth)");
+        CHECK(cache->getNumBitmaps(EFontGlyphType::Grayscale) == 1u);
+        UNSCOPED_INFO("recycled slot is live again");
+        CHECK_FALSE(cache->isSheetReleased(EFontGlyphType::Grayscale, 0));
+        UNSCOPED_INFO("cache generation advanced after release+alloc");
+        CHECK(cache->getCacheGeneration() > gen_before);
     }
 
     // Cross-instance global generation contention: rasterizing on
@@ -286,25 +300,30 @@ namespace
     // ticks across faces (llfontbitmapcache.h:81-90) so that vertex
     // buffers using face B's atlas can detect changes that fired on
     // any face.
-    template<> template<>
-    void llfontfreetype_render_object::test<7>()
+    TEST_CASE_METHOD(llfontfreetype_render_data, "LLFontFreetypeRender: rasterizing on each of two faces bumps the global generation", "[LLFontFreetypeRender]")
     {
         const std::string a_path = std::string(kFontDir) + "DejaVuSans.woff2";
         const std::string b_path = std::string(kFontDir) + "InterVariable.woff2";
         if (!fileExists(a_path) || !fileExists(b_path))
-            skip("DejaVuSans + InterVariable required");
+            SKIP("DejaVuSans + InterVariable required");
 
         LLPointer<LLFontFreetype> head_a = loadFtHead(a_path);
         LLPointer<LLFontFreetype> head_b = loadFtHead(b_path);
-        ensure("both heads loaded", head_a.notNull() && head_b.notNull());
+        {
+            INFO("both heads loaded");
+            REQUIRE(head_a.notNull());
+            REQUIRE(head_b.notNull());
+        }
 
         const S32 gen0 = LLFontBitmapCache::getGlobalGeneration();
         (void)head_a->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
         const S32 gen1 = LLFontBitmapCache::getGlobalGeneration();
-        ensure("gen advanced after head_a raster", gen1 > gen0);
+        UNSCOPED_INFO("gen advanced after head_a raster");
+        CHECK(gen1 > gen0);
         (void)head_b->getGlyphInfo(L'B', EFontGlyphType::Grayscale);
         const S32 gen2 = LLFontBitmapCache::getGlobalGeneration();
-        ensure("gen advanced after head_b raster", gen2 > gen1);
+        UNSCOPED_INFO("gen advanced after head_b raster");
+        CHECK(gen2 > gen1);
     }
 
     // Cross-head sheet eviction: when one freetype's collectGarbage
@@ -318,31 +337,40 @@ namespace
     // "glyphs unload after long idle and never reload"). The fix routes
     // every lookup through the face's owned cache so all freetypes that
     // share the face observe the eviction consistently.
-    template<> template<>
-    void llfontfreetype_render_object::test<8>()
+    TEST_CASE_METHOD(llfontfreetype_render_data, "LLFontFreetypeRender: a sibling head gets a live glyph after the other evicts its sheet", "[LLFontFreetypeRender]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
-            skip("DejaVuSans.woff2 not present");
+            SKIP("DejaVuSans.woff2 not present");
 
         LLPointer<LLFontFreetype> head_a = loadFtHead(path);
         LLPointer<LLFontFreetype> head_b = loadFtHead(path);
-        ensure("both heads loaded", head_a.notNull() && head_b.notNull());
+        {
+            INFO("both heads loaded");
+            REQUIRE(head_a.notNull());
+            REQUIRE(head_b.notNull());
+        }
         // Same ALFontFaceKey -> shared ALFontFace via getOrCreateFace.
-        ensure_equals("siblings share the underlying face wrapper",
-                      head_a->getFontFace(), head_b->getFontFace());
+        UNSCOPED_INFO("siblings share the underlying face wrapper");
+        REQUIRE(head_a->getFontFace() == head_b->getFontFace());
 
         // Cache a glyph through both heads. Face dedup means both
         // calls return the same entry pointer.
         LLFontGlyphInfo* a_gi = head_a->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
         LLFontGlyphInfo* b_gi = head_b->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
-        ensure("head_a got glyph", a_gi != nullptr);
-        ensure("head_b got glyph", b_gi != nullptr);
-        ensure_equals("shared face returns the same glyph entry", a_gi, b_gi);
+        UNSCOPED_INFO("head_a got glyph");
+        REQUIRE(a_gi != nullptr);
+        UNSCOPED_INFO("head_b got glyph");
+        REQUIRE(b_gi != nullptr);
+        UNSCOPED_INFO("shared face returns the same glyph entry");
+        REQUIRE(a_gi == b_gi);
 
         const auto pre_entry = a_gi->mPhaseSlots[0].mBitmapEntry;
-        ensure("phase 0 bitmap entry references a real sheet",
-               pre_entry.first == EFontGlyphType::Grayscale && pre_entry.second >= 0);
+        {
+            INFO("phase 0 bitmap entry references a real sheet");
+            CHECK(pre_entry.first == EFontGlyphType::Grayscale);
+            CHECK(pre_entry.second >= 0);
+        }
 
         // Simulate head_a's collectGarbage path on the shared face:
         // delete face-owned entries that reference this sheet, then
@@ -351,7 +379,8 @@ namespace
         // pointer; post-fix there is no per-head cache to leak.
         const auto target = pre_entry;
         LLFontBitmapCache* cache = head_a->getBitmapCache();
-        ensure("bitmap cache present", cache != nullptr);
+        UNSCOPED_INFO("bitmap cache present");
+        REQUIRE(cache != nullptr);
         head_a->getFontFace()->erase_glyph_entries(
             [target](const LLFontGlyphInfo* gi)
             {
@@ -364,19 +393,19 @@ namespace
                 return false;
             });
         cache->releaseSheet(target.first, static_cast<U32>(target.second));
-        ensure("target sheet reports released",
-               cache->isSheetReleased(target.first, static_cast<U32>(target.second)));
+        UNSCOPED_INFO("target sheet reports released");
+        CHECK(cache->isSheetReleased(target.first, static_cast<U32>(target.second)));
 
         // head_b looks up the same glyph again. The lookup must:
         //   1. not crash on a dangling pointer,
         //   2. produce a non-null entry,
         //   3. land on a live sheet (not the just-released one).
         LLFontGlyphInfo* b_gi2 = head_b->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
-        ensure("head_b got fresh glyph after sibling-driven eviction",
-               b_gi2 != nullptr);
+        UNSCOPED_INFO("head_b got fresh glyph after sibling-driven eviction");
+        REQUIRE(b_gi2 != nullptr);
         const auto post_entry = b_gi2->mPhaseSlots[0].mBitmapEntry;
-        ensure("post-eviction phase 0 references a live sheet",
-               !cache->isSheetReleased(post_entry.first,
+        UNSCOPED_INFO("post-eviction phase 0 references a live sheet");
+        CHECK_FALSE(cache->isSheetReleased(post_entry.first,
                                        static_cast<U32>(post_entry.second)));
     }
 
@@ -386,21 +415,25 @@ namespace
     // on a live sheet. (The pre-fix bug bit only the cross-head
     // scenario, but this test pins the single-head invariant so future
     // refactors of the eviction path don't silently regress.)
-    template<> template<>
-    void llfontfreetype_render_object::test<9>()
+    TEST_CASE_METHOD(llfontfreetype_render_data, "LLFontFreetypeRender: a glyph evicted with its sheet comes back on a live sheet", "[LLFontFreetypeRender]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
-            skip("DejaVuSans.woff2 not present");
+            SKIP("DejaVuSans.woff2 not present");
 
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("ft loaded", ft.notNull());
+        UNSCOPED_INFO("ft loaded");
+        REQUIRE(ft.notNull());
 
         LLFontGlyphInfo* g1 = ft->getGlyphInfo(L'Z', EFontGlyphType::Grayscale);
-        ensure("got glyph", g1 != nullptr);
+        UNSCOPED_INFO("got glyph");
+        REQUIRE(g1 != nullptr);
         const auto target = g1->mPhaseSlots[0].mBitmapEntry;
-        ensure("bitmap entry valid",
-               target.first == EFontGlyphType::Grayscale && target.second >= 0);
+        {
+            INFO("bitmap entry valid");
+            CHECK(target.first == EFontGlyphType::Grayscale);
+            CHECK(target.second >= 0);
+        }
 
         // Run the same delete + release dance the GC path uses.
         ft->getFontFace()->erase_glyph_entries(
@@ -421,10 +454,11 @@ namespace
         // (now empty for this glyph), falls through to addShapedGlyphFromFont,
         // and rasterizes onto a live sheet.
         LLFontGlyphInfo* g2 = ft->getGlyphInfo(L'Z', EFontGlyphType::Grayscale);
-        ensure("re-requested glyph allocated post-eviction", g2 != nullptr);
+        UNSCOPED_INFO("re-requested glyph allocated post-eviction");
+        REQUIRE(g2 != nullptr);
         const auto post = g2->mPhaseSlots[0].mBitmapEntry;
-        ensure("post-eviction bitmap entry references a live sheet",
-               !ft->getBitmapCache()->isSheetReleased(
+        UNSCOPED_INFO("post-eviction bitmap entry references a live sheet");
+        CHECK_FALSE(ft->getBitmapCache()->isSheetReleased(
                    post.first, static_cast<U32>(post.second)));
     }
 }

@@ -42,7 +42,7 @@
 
 #include "llheadlessgl_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <array>
@@ -53,10 +53,8 @@
 #include <utility>
 #include <vector>
 
-namespace tut
+namespace
 {
-    namespace
-    {
         const char* kVertex =
             "#version 330\n"
             "void main() { gl_Position = vec4(0.0, 0.0, 0.0, 1.0); }\n";
@@ -643,13 +641,15 @@ namespace tut
         // builds a program.
         void setUpShaders()
         {
-            ensure_equals("the test's names follow the product's", mShaders.mReservedUniforms.size(),
+            UNSCOPED_INFO("the test's names follow the product's");
+            REQUIRE(mShaders.mReservedUniforms.size() ==
                           size_t(LLShaderMgr::END_RESERVED_UNIFORMS));
             for (const char* name : kTestReservedNames)
             {
                 mShaders.mReservedUniforms.push_back(name);
             }
-            ensure_equals("the test's blocks follow the product's", mShaders.mReservedStorageBlocks.size(),
+            UNSCOPED_INFO("the test's blocks follow the product's");
+            REQUIRE(mShaders.mReservedStorageBlocks.size() ==
                           size_t(LLShaderMgr::END_RESERVED_STORAGE_BLOCKS));
             for (const auto& block : kTestStorageBlocks)
             {
@@ -658,8 +658,8 @@ namespace tut
             for (const auto& object : kStubObjects)
             {
                 S32 level = 1;
-                ensure(std::string("compiled ") + object.first,
-                       mShaders.loadShaderFile(object.first, level, object.second) != 0);
+                UNSCOPED_INFO(std::string("compiled ") + object.first);
+                REQUIRE(mShaders.loadShaderFile(object.first, level, object.second) != 0);
             }
         }
 
@@ -668,7 +668,7 @@ namespace tut
         {
             if (!ll_test::contextHasCompute())
             {
-                skip("the context has no compute");
+                SKIP("the context has no compute");
             }
             LLRender::sCompute = true;
             setUpShaders();
@@ -685,7 +685,11 @@ namespace tut
 
             const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kVertex);
             const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kFragment);
-            ensure("shaders compile", vs && fs);
+            {
+                INFO("shaders compile");
+                REQUIRE(vs);
+                REQUIRE(fs);
+            }
             mShader.mProgramObject = glCreateProgram();
             mShader.mName = "uniform cache (test)";
             mShader.attachObject(vs);
@@ -693,8 +697,10 @@ namespace tut
             const bool linked = mShader.mapAttributes();
             glDeleteShader(vs);
             glDeleteShader(fs);
-            ensure("program links", linked);
-            ensure("program maps", mShader.mapUniforms());
+            UNSCOPED_INFO("program links");
+            REQUIRE(linked);
+            UNSCOPED_INFO("program maps");
+            REQUIRE(mShader.mapUniforms());
             mShader.bind();
         }
 
@@ -739,7 +745,8 @@ namespace tut
             size_t i = 0;
             for (const GLint value : expected)
             {
-                ensure_equals(what + ", component " + std::to_string(i), held[i], value);
+                UNSCOPED_INFO(what + ", component " + std::to_string(i));
+                REQUIRE(held[i] == value);
                 ++i;
             }
         }
@@ -751,7 +758,8 @@ namespace tut
             size_t i = 0;
             for (const GLuint value : expected)
             {
-                ensure_equals(what + ", component " + std::to_string(i), held[i], value);
+                UNSCOPED_INFO(what + ", component " + std::to_string(i));
+                REQUIRE(held[i] == value);
                 ++i;
             }
         }
@@ -763,8 +771,8 @@ namespace tut
             size_t i = 0;
             for (const F32 value : expected)
             {
-                ensure_equals(what + ", component " + std::to_string(i) + " bits",
-                              std::bit_cast<U32>(held[i]), std::bit_cast<U32>(value));
+                UNSCOPED_INFO(what + ", component " + std::to_string(i) + " bits");
+                REQUIRE(std::bit_cast<U32>(held[i]) == std::bit_cast<U32>(value));
                 ++i;
             }
         }
@@ -784,15 +792,10 @@ namespace tut
         LLPointer<LLImageGL> mUintImage;
     };
 
-    typedef test_group<llglslshader_data> llglslshader_t;
-    typedef llglslshader_t::object llglslshader_object_t;
-    tut::llglslshader_t tut_llglslshader("llglslshader_gl");
-    }
 
     // Ints and uints arrive exactly past 2^24: each set below differs from the one before only in values that
     // convert to the same float, and only in some of its components.
-    template<> template<>
-    void llglslshader_object_t::test<1>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: ints and uints arrive exactly past 2^24", "[llglslshader_gl]")
     {
         setUp();
 
@@ -821,13 +824,13 @@ namespace tut
         mShader.uniform4uiv(LLShaderMgr::CAS_PARAM_0, 1, next);
         ensureUints("uvec4, w alone changed", "cas_param_0", { 0x3F800000u, 0x3F800000u, 0x3F800000u, 0x3F800001u });
 
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // A, then B, then A again holds A, for every kind of set: each upload replaces what its location's slot holds,
     // so the third set is compared with B. The pairs mix a setter's value and array forms, which share a kind.
-    template<> template<>
-    void llglslshader_object_t::test<2>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: setting A then B then A again holds A for every uniform type", "[llglslshader_gl]")
     {
         setUp();
 
@@ -878,18 +881,19 @@ namespace tut
         mShader.uniform1ui(LLShaderMgr::FRAME_ID, 7u);
         ensureUints("uint A again", "uFrameId", { 7u });
 
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // A float set twice holds its value, and a new value replaces it. Raw uploads behind the cache's back show
     // which sets reached GL: just after a link the cache holds nothing, not a zero, so a set of 0 uploads; and a set
     // of the value last uploaded does not.
-    template<> template<>
-    void llglslshader_object_t::test<3>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a float set skips GL only when it repeats the last value uploaded", "[llglslshader_gl]")
     {
         setUp();
         const GLint loc = location("env_intensity");
-        ensure("env_intensity is active", loc >= 0);
+        UNSCOPED_INFO("env_intensity is active");
+        CHECK(loc >= 0);
 
         glUniform1f(loc, 5.f);
         mShader.uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, 0.f);
@@ -906,36 +910,37 @@ namespace tut
         mShader.uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, 0.75f);
         ensureFloats("a new value replaces it", "env_intensity", { 0.75f });
 
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // LLGLSLShader::link forgets the cache: the relink resets every uniform to 0, and the value set before it,
     // set again, arrives.
-    template<> template<>
-    void llglslshader_object_t::test<4>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: LLGLSLShader::link resets uniforms to 0 and forgets the cache", "[llglslshader_gl]")
     {
         setUp();
         const GLint before = location("color");
         mShader.uniform4f(LLShaderMgr::DIFFUSE_COLOR, 0.25f, 0.5f, 0.75f, 1.f);
         ensureFloats("set before the relink", "color", { 0.25f, 0.5f, 0.75f, 1.f });
 
-        ensure("program relinks", mShader.link());
+        UNSCOPED_INFO("program relinks");
+        CHECK(mShader.link());
         if (location("color") != before)
         {
-            skip("the relink moved the uniform, so a stale slot would not be consulted");
+            SKIP("the relink moved the uniform, so a stale slot would not be consulted");
         }
         ensureFloats("the relink reset it", "color", { 0.f, 0.f, 0.f, 0.f });
 
         mShader.uniform4f(LLShaderMgr::DIFFUSE_COLOR, 0.25f, 0.5f, 0.75f, 1.f);
         ensureFloats("set again after the relink", "color", { 0.25f, 0.5f, 0.75f, 1.f });
 
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // mapUniforms forgets the cache, and setMinimumAlpha's own: a new program, linked by GL alone and mapped, holds
     // the values set again after it, though they are the ones set on the program it replaced.
-    template<> template<>
-    void llglslshader_object_t::test<5>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: mapUniforms forgets the uniform cache and setMinimumAlpha's own", "[llglslshader_gl]")
     {
         setUp();
         const GLint before = location("color");
@@ -945,17 +950,19 @@ namespace tut
         ensureFloats("minimum alpha on the old program", "minimum_alpha", { 0.5f });
 
         const GLuint fresh = linkRaw();
-        ensure("the new program links", fresh != 0);
+        UNSCOPED_INFO("the new program links");
+        CHECK(fresh != 0);
         LLGLSLShader::unbind();
         const GLuint old = mShader.mProgramObject;
         mShader.mProgramObject = fresh;
         forget_program_samplers(old);
         glDeleteProgram(old);
-        ensure("the new program maps", mShader.mapUniforms());
+        UNSCOPED_INFO("the new program maps");
+        CHECK(mShader.mapUniforms());
         mShader.bind();
         if (location("color") != before)
         {
-            skip("the new program put the uniform elsewhere, so a stale slot would not be consulted");
+            SKIP("the new program put the uniform elsewhere, so a stale slot would not be consulted");
         }
         ensureFloats("the new program starts at 0", "color", { 0.f, 0.f, 0.f, 0.f });
 
@@ -964,14 +971,14 @@ namespace tut
         mShader.setMinimumAlpha(0.5f);
         ensureFloats("minimum alpha set again", "minimum_alpha", { 0.5f });
 
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // A bool takes the int setters and the float ones, and holds whichever set it last, the int set after a float
     // one included. INT_MIN and -0.0 share their bits: true as an int, false as a float, so only the kind a slot
     // records tells the float set from the int one before it.
-    template<> template<>
-    void llglslshader_object_t::test<6>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a bool takes int and float setters and holds whichever set it last", "[llglslshader_gl]")
     {
         setUp();
 
@@ -990,12 +997,12 @@ namespace tut
         mShader.uniform1f(LLShaderMgr::GRAIN_ANIMATE, negative_zero);
         ensureInts("false by -0.0, the same bits", "uGrainAnimate", { 0 });
 
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // The reserved index and the name of one uniform share its slot: A by index, B by name, then A by index holds A.
-    template<> template<>
-    void llglslshader_object_t::test<7>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: the reserved index and the name of one uniform share its cache slot", "[llglslshader_gl]")
     {
         setUp();
         const LLStaticHashedString light_count("light_count");
@@ -1008,13 +1015,13 @@ namespace tut
         mShader.uniform1i(light_count, 4);
         ensureInts("by name after the index", "light_count", { 4 });
 
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // The fast setters upload without comparing and leave the cache describing what they uploaded: a cached set of
     // the value before a fast one arrives.
-    template<> template<>
-    void llglslshader_object_t::test<8>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: fast setters upload unconditionally and leave the cache matching GL", "[llglslshader_gl]")
     {
         setUp();
 
@@ -1032,14 +1039,14 @@ namespace tut
         mShader.uniform4fv(LLShaderMgr::SPECULAR_COLOR, 1, a);
         ensureFloats("cached vec4 after the fast one", "specular_color", { 0.25f, 0.5f, 0.75f, 1.f });
 
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // An array set uploads every time and forgets what its location held: element 0 set alone, then the array over
     // it, then element 0 alone again holds element 0's value; and an array whose element 0 is unchanged still
     // reaches GL.
-    template<> template<>
-    void llglslshader_object_t::test<9>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: an array set uploads every time and forgets what its location held", "[llglslshader_gl]")
     {
         setUp();
 
@@ -1060,62 +1067,84 @@ namespace tut
         ensureFloats("element 1 by an array whose element 0 did not change", "light_diffuse[1]",
                      { 0.25f, 0.25f, 0.25f, 0.25f });
 
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // Where the context has compute, its limits are at least what GL 4.3 promises, which is what the features size
     // themselves by.
-    template<> template<>
-    void llglslshader_object_t::test<10>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: compute limits are at least what GL 4.3 promises", "[llglslshader_gl]")
     {
         if (!gGLManager.mHasCompute)
         {
-            skip("the context has no compute");
+            SKIP("the context has no compute");
         }
         for (U32 i = 0; i < 3; ++i)
         {
-            ensure("work group count " + std::to_string(i), gGLManager.mMaxComputeWorkGroupCount[i] >= 65535);
+            UNSCOPED_INFO("work group count " + std::to_string(i));
+            REQUIRE(gGLManager.mMaxComputeWorkGroupCount[i] >= 65535);
         }
-        ensure("work group size x", gGLManager.mMaxComputeWorkGroupSize[0] >= 1024);
-        ensure("work group size y", gGLManager.mMaxComputeWorkGroupSize[1] >= 1024);
-        ensure("work group size z", gGLManager.mMaxComputeWorkGroupSize[2] >= 64);
-        ensure("invocations", gGLManager.mMaxComputeWorkGroupInvocations >= 1024);
-        ensure("shared memory", gGLManager.mMaxComputeSharedMemorySize >= 32768);
-        ensure("image units", gGLManager.mMaxImageUnits >= 8);
-        ensure("compute storage blocks", gGLManager.mMaxComputeShaderStorageBlocks >= 8);
-        ensure("storage bindings", gGLManager.mMaxShaderStorageBufferBindings >= 8);
-        ensure("storage block size", gGLManager.mMaxShaderStorageBlockSize >= (S64(1) << 27));
+        UNSCOPED_INFO("work group size x");
+        CHECK(gGLManager.mMaxComputeWorkGroupSize[0] >= 1024);
+        UNSCOPED_INFO("work group size y");
+        CHECK(gGLManager.mMaxComputeWorkGroupSize[1] >= 1024);
+        UNSCOPED_INFO("work group size z");
+        CHECK(gGLManager.mMaxComputeWorkGroupSize[2] >= 64);
+        UNSCOPED_INFO("invocations");
+        CHECK(gGLManager.mMaxComputeWorkGroupInvocations >= 1024);
+        UNSCOPED_INFO("shared memory");
+        CHECK(gGLManager.mMaxComputeSharedMemorySize >= 32768);
+        UNSCOPED_INFO("image units");
+        CHECK(gGLManager.mMaxImageUnits >= 8);
+        UNSCOPED_INFO("compute storage blocks");
+        CHECK(gGLManager.mMaxComputeShaderStorageBlocks >= 8);
+        UNSCOPED_INFO("storage bindings");
+        CHECK(gGLManager.mMaxShaderStorageBufferBindings >= 8);
+        UNSCOPED_INFO("storage block size");
+        CHECK(gGLManager.mMaxShaderStorageBlockSize >= (S64(1) << 27));
         const S32 alignment = gGLManager.mShaderStorageBufferOffsetAlignment;
-        ensure("storage offset alignment a power of two", alignment > 0 && (alignment & (alignment - 1)) == 0);
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        {
+            INFO("storage offset alignment a power of two");
+            CHECK(alignment > 0);
+            CHECK((alignment & (alignment - 1)) == 0);
+        }
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // A compute program built through createShader links -- which GL refuses a compute object beside any other, so the
     // features' graphics objects stayed away -- from its compute object at #version 430, which it holds no longer
     // once linked; its work group size reads back; its block takes the table's point; and dispatchThreads over a count
     // that is not a multiple of the group size reaches each index exactly once.
-    template<> template<>
-    void llglslshader_object_t::test<11>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: createShader builds a compute program that reaches each index once", "[llglslshader_gl]")
     {
         setUpCompute();
-        ensure_equals("a compute stage at GLSL 4.30",
-                      compiledVersion(mShaders, "test/countC.glsl", GL_COMPUTE_SHADER, 0), std::string("#version 430"));
-        ensure("count program builds",
-               buildProgram(mCompute, "count (test)", { { "test/countC.glsl", GL_COMPUTE_SHADER } }));
-        ensure("it is compute", mCompute.isCompute());
-        ensure("it holds no object once linked", attachedNames(mCompute.mProgramObject).empty());
+        UNSCOPED_INFO("a compute stage at GLSL 4.30");
+        CHECK(compiledVersion(mShaders, "test/countC.glsl", GL_COMPUTE_SHADER, 0) == std::string("#version 430"));
+        UNSCOPED_INFO("count program builds");
+        CHECK(buildProgram(mCompute, "count (test)", { { "test/countC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("it is compute");
+        CHECK(mCompute.isCompute());
+        UNSCOPED_INFO("it holds no object once linked");
+        REQUIRE(attachedNames(mCompute.mProgramObject).empty());
 
-        ensure_equals("local size x", mCompute.mComputeLocalSize[0], 64u);
-        ensure_equals("local size y", mCompute.mComputeLocalSize[1], 1u);
-        ensure_equals("local size z", mCompute.mComputeLocalSize[2], 1u);
-        ensure("the table gives its block a point", mShaders.getStorageBlockBinding(TEST_COUNTS) >= 0);
-        ensure_equals("its block is at the table's point", mCompute.getStorageBinding(TEST_COUNTS),
+        UNSCOPED_INFO("local size x");
+        CHECK(mCompute.mComputeLocalSize[0] == 64u);
+        UNSCOPED_INFO("local size y");
+        CHECK(mCompute.mComputeLocalSize[1] == 1u);
+        UNSCOPED_INFO("local size z");
+        CHECK(mCompute.mComputeLocalSize[2] == 1u);
+        UNSCOPED_INFO("the table gives its block a point");
+        CHECK(mShaders.getStorageBlockBinding(TEST_COUNTS) >= 0);
+        UNSCOPED_INFO("its block is at the table's point");
+        CHECK(mCompute.getStorageBinding(TEST_COUNTS) ==
                       mShaders.getStorageBlockBinding(TEST_COUNTS));
 
         // 15.6 groups' worth, in a buffer with room for 17.
         constexpr U32 COUNT = 1000;
         constexpr U32 WORDS = 17 * 64;
-        ensure("counts allocate", mBuffers[0].allocate(WORDS * sizeof(U32), 0, nullptr, "counts (test)"));
+        UNSCOPED_INFO("counts allocate");
+        CHECK(mBuffers[0].allocate(WORDS * sizeof(U32), 0, nullptr, "counts (test)"));
         mBuffers[0].clear();
 
         mCompute.bind();
@@ -1126,46 +1155,49 @@ namespace tut
         const std::vector<U32> hits = readWords(mBuffers[0], WORDS);
         for (U32 i = 0; i < WORDS; ++i)
         {
-            ensure_equals("index " + std::to_string(i) + (i < COUNT ? " once" : " untouched"), hits[i],
-                          i < COUNT ? 1u : 0u);
+            UNSCOPED_INFO("index " + std::to_string(i) + (i < COUNT ? " once" : " untouched"));
+            REQUIRE(hits[i] ==
+                          (i < COUNT ? 1u : 0u));
         }
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // The #version a stage compiles at: the usual one for an ordinary program's own stage, never raised, and for the
     // shared objects likewise; 4.30 for a stage asking for it. A program whose stage reads a storage block builds only
     // when its features ask for 4.30, which createShader hands its own stages, and links with shared objects at the
     // usual version. On a context below 4.30 a compute program, or one asking for 4.30, does not build.
-    template<> template<>
-    void llglslshader_object_t::test<12>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: stages compile at the usual GLSL version unless they ask for 4.30", "[llglslshader_gl]")
     {
         setUpShaders();
         if (gGLManager.mGLSLVersionMajor < 4)
         {
-            skip("the context's GLSL is below 4.00");
+            SKIP("the context's GLSL is below 4.00");
         }
         const std::string usual = gGLManager.mGLSLVersionMinor >= 20 ? "#version 420" : "#version 400";
 
-        ensure("ordinary program builds",
-               buildProgram(mDraw, "ladder (test)",
+        UNSCOPED_INFO("ordinary program builds");
+        CHECK(buildProgram(mDraw, "ladder (test)",
                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/solidF.glsl", GL_FRAGMENT_SHADER } }));
-        ensure_equals("an ordinary stage at the usual version",
-                      compiledVersion(mShaders, "test/solidF.glsl", GL_FRAGMENT_SHADER, 0), usual);
+        UNSCOPED_INFO("an ordinary stage at the usual version");
+        CHECK(compiledVersion(mShaders, "test/solidF.glsl", GL_FRAGMENT_SHADER, 0) == usual);
         size_t shared = 0;
         for (const auto& stage : mShaders.mShaderObjects)
         {
             for (const auto& object : stage)
             {
-                ensure_equals(object.first + " at the usual version", firstSourceLine(object.second), usual);
+                UNSCOPED_INFO(object.first + " at the usual version");
+                REQUIRE(firstSourceLine(object.second) == usual);
                 ++shared;
             }
         }
-        ensure_equals("the three shared objects", shared, size_t(3));
+        UNSCOPED_INFO("the three shared objects");
+        CHECK(shared == size_t(3));
 
         if (ll_test::contextHasCompute())
         {
-            ensure_equals("a stage asking for 4.30 at 4.30",
-                          compiledVersion(mShaders, "test/solidF.glsl", GL_FRAGMENT_SHADER, 430),
+            UNSCOPED_INFO("a stage asking for 4.30 at 4.30");
+            CHECK(compiledVersion(mShaders, "test/solidF.glsl", GL_FRAGMENT_SHADER, 430) ==
                           std::string("#version 430"));
             if (gGLManager.mMaxVertexShaderStorageBlocks >= 1)
             {
@@ -1174,10 +1206,10 @@ namespace tut
                     { "test/compactV.glsl", GL_VERTEX_SHADER },
                     { "test/compactF.glsl", GL_FRAGMENT_SHADER },
                 };
-                ensure("a storage-block reader does not build at the usual version",
-                       !buildProgram(mDraw2, "ladder reader (test)", reader));
-                ensure("it builds asking for 4.30, beside the shared objects at the usual version",
-                       buildProgram(mDraw2, "ladder reader 430 (test)", reader, 430));
+                UNSCOPED_INFO("a storage-block reader does not build at the usual version");
+                CHECK_FALSE(buildProgram(mDraw2, "ladder reader (test)", reader));
+                UNSCOPED_INFO("it builds asking for 4.30, beside the shared objects at the usual version");
+                CHECK(buildProgram(mDraw2, "ladder reader 430 (test)", reader, 430));
             }
         }
 
@@ -1194,39 +1226,47 @@ namespace tut
                          430);
         gGLManager.mGLSLVersionMajor = major;
         gGLManager.mGLSLVersionMinor = minor;
-        ensure("no compute program below 4.30", !compute_built);
-        ensure("no program asking for 4.30 below it", !raised_built);
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no compute program below 4.30");
+        CHECK_FALSE(compute_built);
+        UNSCOPED_INFO("no program asking for 4.30 below it");
+        CHECK_FALSE(raised_built);
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // A kernel stores into an R32F and an RGBA16F target through their programs' image units. Past the barriers the
     // textures hold the pattern, read back directly and sampled by a fragment program.
-    template<> template<>
-    void llglslshader_object_t::test<13>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a kernel stores into R32F and RGBA16F targets through image units", "[llglslshader_gl]")
     {
         setUpCompute();
         constexpr U32 W = 37;
         constexpr U32 H = 23;
-        ensure("R32F target allocates", mTargets[0].allocate(W, H, GL_R32F));
-        ensure("RGBA16F target allocates", mTargets[1].allocate(W, H, GL_RGBA16F));
-        ensure("output target allocates", mTargets[2].allocate(W, H, GL_RGBA32F));
-        ensure("store program builds",
-               buildProgram(mCompute, "image store (test)", { { "test/imageStoreC.glsl", GL_COMPUTE_SHADER } }));
-        ensure("sample program builds",
-               buildProgram(mDraw, "image sample (test)",
+        UNSCOPED_INFO("R32F target allocates");
+        CHECK(mTargets[0].allocate(W, H, GL_R32F));
+        UNSCOPED_INFO("RGBA16F target allocates");
+        CHECK(mTargets[1].allocate(W, H, GL_RGBA16F));
+        UNSCOPED_INFO("output target allocates");
+        CHECK(mTargets[2].allocate(W, H, GL_RGBA32F));
+        UNSCOPED_INFO("store program builds");
+        CHECK(buildProgram(mCompute, "image store (test)", { { "test/imageStoreC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("sample program builds");
+        CHECK(buildProgram(mDraw, "image sample (test)",
                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/sampleF.glsl", GL_FRAGMENT_SHADER } }));
 
         const S32 r32f_unit = mCompute.getImageUnit(TEST_IMAGE_R32F);
         const S32 rgba_unit = mCompute.getImageUnit(TEST_IMAGE_RGBA16F);
-        ensure("R32F image has a unit", r32f_unit >= 0);
-        ensure("RGBA16F image has a unit", rgba_unit >= 0);
-        ensure("the units differ", r32f_unit != rgba_unit);
+        UNSCOPED_INFO("R32F image has a unit");
+        CHECK(r32f_unit >= 0);
+        UNSCOPED_INFO("RGBA16F image has a unit");
+        CHECK(rgba_unit >= 0);
+        UNSCOPED_INFO("the units differ");
+        CHECK(r32f_unit != rgba_unit);
 
         mCompute.bind();
-        ensure_equals("R32F bound at its unit",
-                      mCompute.bindImage(TEST_IMAGE_R32F, &mTargets[0], ALImageSlot::WRITE_ONLY), r32f_unit);
-        ensure_equals("RGBA16F bound at its unit",
-                      mCompute.bindImage(TEST_IMAGE_RGBA16F, &mTargets[1], ALImageSlot::WRITE_ONLY), rgba_unit);
+        UNSCOPED_INFO("R32F bound at its unit");
+        CHECK(mCompute.bindImage(TEST_IMAGE_R32F, &mTargets[0], ALImageSlot::WRITE_ONLY) == r32f_unit);
+        UNSCOPED_INFO("RGBA16F bound at its unit");
+        CHECK(mCompute.bindImage(TEST_IMAGE_RGBA16F, &mTargets[1], ALImageSlot::WRITE_ONLY) == rgba_unit);
         mCompute.dispatchThreads(W, H);
         gGL.memoryBarrier(LLRender::BARRIER_TEXTURE_FETCH | LLRender::BARRIER_TEXTURE_UPDATE);
         mCompute.unbindImage(TEST_IMAGE_R32F);
@@ -1240,11 +1280,16 @@ namespace tut
             {
                 const std::string at = " at " + std::to_string(x) + "," + std::to_string(y);
                 const size_t i = (size_t)y * W + x;
-                ensure_equals("R32F" + at, r32f[i], F32(x * 1000 + y));
-                ensure_equals("RGBA16F r" + at, rgba[i * 4 + 0], F32(x) * 0.125f);
-                ensure_equals("RGBA16F g" + at, rgba[i * 4 + 1], F32(y) * 0.125f);
-                ensure_equals("RGBA16F b" + at, rgba[i * 4 + 2], 0.25f);
-                ensure_equals("RGBA16F a" + at, rgba[i * 4 + 3], 1.f);
+                UNSCOPED_INFO("R32F" + at);
+                REQUIRE(r32f[i] == F32(x * 1000 + y));
+                UNSCOPED_INFO("RGBA16F r" + at);
+                REQUIRE(rgba[i * 4 + 0] == F32(x) * 0.125f);
+                UNSCOPED_INFO("RGBA16F g" + at);
+                REQUIRE(rgba[i * 4 + 1] == F32(y) * 0.125f);
+                UNSCOPED_INFO("RGBA16F b" + at);
+                REQUIRE(rgba[i * 4 + 2] == 0.25f);
+                UNSCOPED_INFO("RGBA16F a" + at);
+                REQUIRE(rgba[i * 4 + 3] == 1.f);
             }
         }
 
@@ -1255,7 +1300,8 @@ namespace tut
             gGL.setClearColor(LLColor4::transparent);
             mTargets[2].clear();
             mDraw.bind();
-            ensure("source bound", mDraw.bindTexture(TEST_SOURCE_MAP, &mTargets[source], ALSamplers::PointClamp) >= 0);
+            UNSCOPED_INFO("source bound");
+            REQUIRE(mDraw.bindTexture(TEST_SOURCE_MAP, &mTargets[source], ALSamplers::PointClamp) >= 0);
             gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
             const std::vector<F32> drawn = readBoundTarget(W, H, 4, GL_RGBA);
             mTargets[2].flush();
@@ -1277,25 +1323,26 @@ namespace tut
                     };
                     for (U32 c = 0; c < 4; ++c)
                     {
-                        ensure_equals("component " + std::to_string(c) + at, drawn[i + c], expected[c]);
+                        UNSCOPED_INFO("component " + std::to_string(c) + at);
+                        REQUIRE(drawn[i + c] == expected[c]);
                     }
                 }
             }
         }
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // GPU compaction drawn indirectly: a kernel keeps the ids passing a test, counting them into the instance count
     // of the draw command at the head of their list; past the barriers an indirect draw, whose vertex stage reads the
     // same buffer as a storage block, puts one point at each kept id's pixel and none anywhere else. The list is bound
     // once, for the kernel, and the draw finds it at the same point.
-    template<> template<>
-    void llglslshader_object_t::test<14>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a compacted id list drawn indirectly puts one point at each kept id", "[llglslshader_gl]")
     {
         setUpCompute();
         if (gGLManager.mMaxVertexShaderStorageBlocks < 1)
         {
-            skip("the context's vertex stage reads no storage blocks");
+            SKIP("the context's vertex stage reads no storage blocks");
         }
         constexpr U32 COUNT = 100;
         constexpr U32 SIDE = 16;
@@ -1304,17 +1351,21 @@ namespace tut
         // One vertex a point, no instances yet, then room for every id.
         std::vector<U32> list(4 + COUNT, 0u);
         list[0] = 1u;
-        ensure("list allocates", mBuffers[0].allocate(list.size() * sizeof(U32), 0, list.data(), "compaction (test)"));
-        ensure("output target allocates", mTargets[0].allocate(SIDE, SIDE, GL_R32F));
-        ensure("compaction builds",
-               buildProgram(mCompute, "compaction (test)", { { "test/compactC.glsl", GL_COMPUTE_SHADER } }));
-        ensure("draw builds",
-               buildProgram(mDraw, "compaction draw (test)",
+        UNSCOPED_INFO("list allocates");
+        REQUIRE(mBuffers[0].allocate(list.size() * sizeof(U32), 0, list.data(), "compaction (test)"));
+        UNSCOPED_INFO("output target allocates");
+        CHECK(mTargets[0].allocate(SIDE, SIDE, GL_R32F));
+        UNSCOPED_INFO("compaction builds");
+        CHECK(buildProgram(mCompute, "compaction (test)", { { "test/compactC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("draw builds");
+        CHECK(buildProgram(mDraw, "compaction draw (test)",
                             { { "test/compactV.glsl", GL_VERTEX_SHADER }, { "test/compactF.glsl", GL_FRAGMENT_SHADER } },
                             430));
         const S32 point = mShaders.getStorageBlockBinding(TEST_DRAW_LIST);
-        ensure_equals("the kernel's list at the table's point", mCompute.getStorageBinding(TEST_DRAW_LIST), point);
-        ensure_equals("and the draw's", mDraw.getStorageBinding(TEST_DRAW_LIST), point);
+        UNSCOPED_INFO("the kernel's list at the table's point");
+        CHECK(mCompute.getStorageBinding(TEST_DRAW_LIST) == point);
+        UNSCOPED_INFO("and the draw's");
+        CHECK(mDraw.getStorageBinding(TEST_DRAW_LIST) == point);
 
         mCompute.bind();
         mCompute.uniform1i(TEST_COUNT, (GLint)COUNT);
@@ -1328,7 +1379,8 @@ namespace tut
         mTargets[0].clear();
         mDraw.bind();
         mDraw.uniform1i(TEST_WIDTH, (GLint)SIDE);
-        ensure_equals("the list still bound for the draw", gGL.getStorageBuffer((U32)point), mBuffers[0].getGLName());
+        UNSCOPED_INFO("the list still bound for the draw");
+        CHECK(gGL.getStorageBuffer((U32)point) == mBuffers[0].getGLName());
         gGL.drawArraysIndirect(LLRender::POINTS, mBuffers[0], 0);
         const std::vector<F32> drawn = readBoundTarget(SIDE, SIDE, 1, GL_RED);
         mTargets[0].flush();
@@ -1336,26 +1388,30 @@ namespace tut
         for (U32 id = 0; id < SIDE * SIDE; ++id)
         {
             const bool kept = id < COUNT && id % 3 == 0;
-            ensure_equals("id " + std::to_string(id) + (kept ? " drawn" : " not drawn"), drawn[id],
-                          kept ? F32(id + 1) : 0.f);
+            UNSCOPED_INFO("id " + std::to_string(id) + (kept ? " drawn" : " not drawn"));
+            REQUIRE(drawn[id] ==
+                          (kept ? F32(id + 1) : 0.f));
         }
-        ensure_equals("instances counted", readWords(mBuffers[0], 2)[1], KEPT);
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("instances counted");
+        CHECK(readWords(mBuffers[0], 2)[1] == KEPT);
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // dispatchIndirect runs the group counts a buffer holds, here written by a kernel before it 16 bytes in: every
     // invocation of 5 x 2 x 1 groups of 4 counted once, and the last group seen in each direction.
-    template<> template<>
-    void llglslshader_object_t::test<15>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: dispatchIndirect runs the group counts a buffer holds", "[llglslshader_gl]")
     {
         setUpCompute();
         const std::vector<U32> zeros(8, 0u);
-        ensure("command buffer allocates", mBuffers[0].allocate(8 * sizeof(U32), 0, zeros.data(), "dispatch (test)"));
-        ensure("counts allocate", mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "counts (test)"));
-        ensure("writer builds",
-               buildProgram(mCompute, "dispatch writer (test)", { { "test/indirectWriteC.glsl", GL_COMPUTE_SHADER } }));
-        ensure("counter builds",
-               buildProgram(mCompute2, "dispatch counter (test)", { { "test/indirectCountC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("command buffer allocates");
+        CHECK(mBuffers[0].allocate(8 * sizeof(U32), 0, zeros.data(), "dispatch (test)"));
+        UNSCOPED_INFO("counts allocate");
+        CHECK(mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "counts (test)"));
+        UNSCOPED_INFO("writer builds");
+        CHECK(buildProgram(mCompute, "dispatch writer (test)", { { "test/indirectWriteC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("counter builds");
+        CHECK(buildProgram(mCompute2, "dispatch counter (test)", { { "test/indirectCountC.glsl", GL_COMPUTE_SHADER } }));
 
         mCompute.bind();
         mCompute.uniform1i(TEST_COUNT, 5);
@@ -1368,40 +1424,56 @@ namespace tut
         mCompute2.dispatchIndirect(mBuffers[0], 16);
 
         const std::vector<U32> command = readWords(mBuffers[0], 7);
-        ensure_equals("command x", command[4], 5u);
-        ensure_equals("command y", command[5], 2u);
-        ensure_equals("command z", command[6], 1u);
+        UNSCOPED_INFO("command x");
+        CHECK(command[4] == 5u);
+        UNSCOPED_INFO("command y");
+        CHECK(command[5] == 2u);
+        UNSCOPED_INFO("command z");
+        CHECK(command[6] == 1u);
         const std::vector<U32> hits = readWords(mBuffers[1], 4);
-        ensure_equals("invocations", hits[0], 5u * 2u * 1u * 4u);
-        ensure_equals("groups in x", hits[1], 5u);
-        ensure_equals("groups in y", hits[2], 2u);
-        ensure_equals("groups in z", hits[3], 1u);
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("invocations");
+        CHECK(hits[0] == 5u * 2u * 1u * 4u);
+        UNSCOPED_INFO("groups in x");
+        CHECK(hits[1] == 5u);
+        UNSCOPED_INFO("groups in y");
+        CHECK(hits[2] == 2u);
+        UNSCOPED_INFO("groups in z");
+        CHECK(hits[3] == 1u);
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // Two storage blocks declared in the order opposite to the table's take the table's points, which run in its
     // order, and bindStorageBuffer routes each buffer to its own block: swapping the buffers swaps what each holds.
-    template<> template<>
-    void llglslshader_object_t::test<16>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: storage blocks declared out of the table's order still take its points", "[llglslshader_gl]")
     {
         setUpCompute();
-        ensure("remap builds", buildProgram(mCompute, "block remap (test)", { { "test/remapC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("remap builds");
+        CHECK(buildProgram(mCompute, "block remap (test)", { { "test/remapC.glsl", GL_COMPUTE_SHADER } }));
         const S32 first = mShaders.getStorageBlockBinding(TEST_BLOCK_FIRST);
-        ensure_equals("the first block at its point", mCompute.getStorageBinding(TEST_BLOCK_FIRST), first);
-        ensure_equals("the second at the next", mCompute.getStorageBinding(TEST_BLOCK_SECOND), first + 1);
-        ensure_equals("an undeclared block has none", mCompute.getStorageBinding(TEST_COUNTS), -1);
-        ensure_equals("nor does an index past the table", mCompute.getStorageBinding(TEST_STORAGE_END), -1);
+        UNSCOPED_INFO("the first block at its point");
+        CHECK(mCompute.getStorageBinding(TEST_BLOCK_FIRST) == first);
+        UNSCOPED_INFO("the second at the next");
+        CHECK(mCompute.getStorageBinding(TEST_BLOCK_SECOND) == first + 1);
+        UNSCOPED_INFO("an undeclared block has none");
+        CHECK(mCompute.getStorageBinding(TEST_COUNTS) == -1);
+        UNSCOPED_INFO("nor does an index past the table");
+        CHECK(mCompute.getStorageBinding(TEST_STORAGE_END) == -1);
 
         const std::vector<U32> zeros(4, 0u);
-        ensure("a allocates", mBuffers[0].allocate(4 * sizeof(U32), 0, zeros.data(), "a (test)"));
-        ensure("b allocates", mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "b (test)"));
+        UNSCOPED_INFO("a allocates");
+        CHECK(mBuffers[0].allocate(4 * sizeof(U32), 0, zeros.data(), "a (test)"));
+        UNSCOPED_INFO("b allocates");
+        CHECK(mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "b (test)"));
 
         mCompute.bind();
         mCompute.bindStorageBuffer(TEST_BLOCK_FIRST, mBuffers[0]);
         mCompute.bindStorageBuffer(TEST_BLOCK_SECOND, mBuffers[1]);
         mCompute.dispatch(1);
-        ensure_equals("a holds the first block", readWords(mBuffers[0], 1)[0], 111u);
-        ensure_equals("b holds the second block", readWords(mBuffers[1], 1)[0], 222u);
+        UNSCOPED_INFO("a holds the first block");
+        CHECK(readWords(mBuffers[0], 1)[0] == 111u);
+        UNSCOPED_INFO("b holds the second block");
+        CHECK(readWords(mBuffers[1], 1)[0] == 222u);
 
         mBuffers[0].clear();
         mBuffers[1].clear();
@@ -1409,31 +1481,42 @@ namespace tut
         mCompute.bindStorageBuffer(TEST_BLOCK_FIRST, mBuffers[1]);
         mCompute.bindStorageBuffer(TEST_BLOCK_SECOND, mBuffers[0]);
         mCompute.dispatch(1);
-        ensure_equals("swapped, a holds the second block", readWords(mBuffers[0], 1)[0], 222u);
-        ensure_equals("swapped, b holds the first block", readWords(mBuffers[1], 1)[0], 111u);
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("swapped, a holds the second block");
+        CHECK(readWords(mBuffers[0], 1)[0] == 222u);
+        UNSCOPED_INFO("swapped, b holds the first block");
+        CHECK(readWords(mBuffers[1], 1)[0] == 111u);
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // Two image uniforms, declared the opposite way round, take distinct units in reserved order, and bindImage
     // routes each texture to its own.
-    template<> template<>
-    void llglslshader_object_t::test<17>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: image uniforms declared out of order take units in reserved order", "[llglslshader_gl]")
     {
         setUpCompute();
         constexpr U32 SIDE = 16;
-        ensure("units builds",
-               buildProgram(mCompute, "image units (test)", { { "test/imageUnitsC.glsl", GL_COMPUTE_SHADER } }));
-        ensure_equals("the first reserved image first", mCompute.getImageUnit(TEST_IMAGE_A), 0);
-        ensure_equals("the second reserved image second", mCompute.getImageUnit(TEST_IMAGE_B), 1);
-        ensure_equals("an undeclared image has none", mCompute.getImageUnit(TEST_IMAGE_R32F), -1);
-        ensure_equals("a sampler has none", mCompute.getImageUnit(LLShaderMgr::DIFFUSE_MAP), -1);
-        ensure_equals("nor a texture unit", mCompute.getTextureChannel(TEST_IMAGE_A), -1);
+        UNSCOPED_INFO("units builds");
+        CHECK(buildProgram(mCompute, "image units (test)", { { "test/imageUnitsC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("the first reserved image first");
+        CHECK(mCompute.getImageUnit(TEST_IMAGE_A) == 0);
+        UNSCOPED_INFO("the second reserved image second");
+        CHECK(mCompute.getImageUnit(TEST_IMAGE_B) == 1);
+        UNSCOPED_INFO("an undeclared image has none");
+        CHECK(mCompute.getImageUnit(TEST_IMAGE_R32F) == -1);
+        UNSCOPED_INFO("a sampler has none");
+        CHECK(mCompute.getImageUnit(LLShaderMgr::DIFFUSE_MAP) == -1);
+        UNSCOPED_INFO("nor a texture unit");
+        CHECK(mCompute.getTextureChannel(TEST_IMAGE_A) == -1);
 
-        ensure("a allocates", mTargets[0].allocate(SIDE, SIDE, GL_R32F));
-        ensure("b allocates", mTargets[1].allocate(SIDE, SIDE, GL_R32F));
+        UNSCOPED_INFO("a allocates");
+        CHECK(mTargets[0].allocate(SIDE, SIDE, GL_R32F));
+        UNSCOPED_INFO("b allocates");
+        CHECK(mTargets[1].allocate(SIDE, SIDE, GL_R32F));
         mCompute.bind();
-        ensure_equals("a bound", mCompute.bindImage(TEST_IMAGE_A, &mTargets[0], ALImageSlot::WRITE_ONLY), 0);
-        ensure_equals("b bound", mCompute.bindImage(TEST_IMAGE_B, &mTargets[1], ALImageSlot::WRITE_ONLY), 1);
+        UNSCOPED_INFO("a bound");
+        CHECK(mCompute.bindImage(TEST_IMAGE_A, &mTargets[0], ALImageSlot::WRITE_ONLY) == 0);
+        UNSCOPED_INFO("b bound");
+        CHECK(mCompute.bindImage(TEST_IMAGE_B, &mTargets[1], ALImageSlot::WRITE_ONLY) == 1);
         mCompute.dispatchThreads(SIDE, SIDE);
         gGL.memoryBarrier(LLRender::BARRIER_TEXTURE_UPDATE);
         mCompute.unbindImage(TEST_IMAGE_A);
@@ -1443,26 +1526,30 @@ namespace tut
         const std::vector<F32> b = readTexture<F32>(mTargets[1].getTexture(), SIDE, SIDE, 1, GL_RED, GL_FLOAT);
         for (U32 i = 0; i < SIDE * SIDE; ++i)
         {
-            ensure_equals("a holds image A at " + std::to_string(i), a[i], 1.f);
-            ensure_equals("b holds image B at " + std::to_string(i), b[i], 2.f);
+            UNSCOPED_INFO("a holds image A at " + std::to_string(i));
+            REQUIRE(a[i] == 1.f);
+            UNSCOPED_INFO("b holds image B at " + std::to_string(i));
+            REQUIRE(b[i] == 2.f);
         }
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // A usampler2D under a reserved name gets a texture unit, the one after a float sampler's, and reads an R32UI
     // texture's values exactly, past what eight bits could hold.
-    template<> template<>
-    void llglslshader_object_t::test<18>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a usampler2D takes the unit after a float one and reads R32UI exactly", "[llglslshader_gl]")
     {
         setUpCompute();
         constexpr U32 W = 13;
         constexpr U32 H = 7;
-        ensure("sample builds",
-               buildProgram(mCompute, "uint sample (test)", { { "test/uintSampleC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("sample builds");
+        CHECK(buildProgram(mCompute, "uint sample (test)", { { "test/uintSampleC.glsl", GL_COMPUTE_SHADER } }));
         const S32 float_unit = mCompute.getTextureChannel(LLShaderMgr::DIFFUSE_MAP);
         const S32 uint_unit = mCompute.getTextureChannel(TEST_UINT_MAP);
-        ensure_equals("the float sampler first", float_unit, 0);
-        ensure_equals("the unsigned one after it", uint_unit, 1);
+        UNSCOPED_INFO("the float sampler first");
+        CHECK(float_unit == 0);
+        UNSCOPED_INFO("the unsigned one after it");
+        CHECK(uint_unit == 1);
 
         std::vector<U32> values(W * H);
         for (U32 i = 0; i < W * H; ++i)
@@ -1471,17 +1558,21 @@ namespace tut
         }
         mUintImage = new LLImageGL(W, H, 1, /*usemipmaps=*/false);
         mUintImage->setExplicitFormat(GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT);
-        ensure("R32UI image created", mUintImage->createGLTexture(0, reinterpret_cast<const U8*>(values.data())));
-        ensure("RGBA8 target allocates", mTargets[1].allocate(W, H, GL_RGBA8));
-        ensure("out allocates", mBuffers[0].allocate(W * H * sizeof(U32), 0, nullptr, "uint sample (test)"));
+        UNSCOPED_INFO("R32UI image created");
+        CHECK(mUintImage->createGLTexture(0, reinterpret_cast<const U8*>(values.data())));
+        UNSCOPED_INFO("RGBA8 target allocates");
+        CHECK(mTargets[1].allocate(W, H, GL_RGBA8));
+        UNSCOPED_INFO("out allocates");
+        CHECK(mBuffers[0].allocate(W * H * sizeof(U32), 0, nullptr, "uint sample (test)"));
         mBuffers[0].clear(0xFFFFFFFFu);
 
         mCompute.bind();
         mCompute.uniform1i(TEST_COUNT, 1);
-        ensure_equals("float texture bound", mCompute.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mTargets[1], ALSamplers::PointClamp),
+        UNSCOPED_INFO("float texture bound");
+        CHECK(mCompute.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mTargets[1], ALSamplers::PointClamp) ==
                       float_unit);
-        ensure("unsigned texture bound",
-               gGL.getTextureSlot((U32)uint_unit)->bindSampled(mUintImage.get(), ALSamplers::PointClamp));
+        UNSCOPED_INFO("unsigned texture bound");
+        CHECK(gGL.getTextureSlot((U32)uint_unit)->bindSampled(mUintImage.get(), ALSamplers::PointClamp));
         mCompute.bindStorageBuffer(TEST_COUNTS, mBuffers[0]);
         mCompute.dispatchThreads(W, H);
         mCompute.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
@@ -1490,36 +1581,43 @@ namespace tut
         const std::vector<U32> read = readWords(mBuffers[0], W * H);
         for (U32 i = 0; i < W * H; ++i)
         {
-            ensure_equals("texel " + std::to_string(i), read[i], values[i]);
+            UNSCOPED_INFO("texel " + std::to_string(i));
+            REQUIRE(read[i] == values[i]);
         }
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // Integer targets read through bindTexture with no sampler named: an R32UI and an RG16I target, each written by a
     // program's integer output, come back texel for texel through a usampler2D and an isampler2D. A filtering sampler
     // leaves an integer texture incomplete, reading 0, so the default for an integer attachment is point, attachment 0
     // included.
-    template<> template<>
-    void llglslshader_object_t::test<19>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: bindTexture with no sampler named point-samples integer targets", "[llglslshader_gl]")
     {
         setUpShaders();
         constexpr U32 W = 11;
         constexpr U32 H = 6;
-        ensure("R32UI target allocates", mTargets[0].allocate(W, H, GL_R32UI));
-        ensure("RG16I target allocates", mTargets[1].allocate(W, H, GL_RG16I));
-        ensure("output target allocates", mTargets[2].allocate(W, H, GL_RGBA32UI));
-        ensure("its signed attachment", mTargets[2].addColorAttachment(GL_RGBA32I));
-        ensure("unsigned writer builds",
-               buildProgram(mDraw, "uint write (test)",
+        UNSCOPED_INFO("R32UI target allocates");
+        CHECK(mTargets[0].allocate(W, H, GL_R32UI));
+        UNSCOPED_INFO("RG16I target allocates");
+        CHECK(mTargets[1].allocate(W, H, GL_RG16I));
+        UNSCOPED_INFO("output target allocates");
+        CHECK(mTargets[2].allocate(W, H, GL_RGBA32UI));
+        UNSCOPED_INFO("its signed attachment");
+        CHECK(mTargets[2].addColorAttachment(GL_RGBA32I));
+        UNSCOPED_INFO("unsigned writer builds");
+        CHECK(buildProgram(mDraw, "uint write (test)",
                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/uintWriteF.glsl", GL_FRAGMENT_SHADER } }));
-        ensure("signed writer builds",
-               buildProgram(mDraw2, "int write (test)",
+        UNSCOPED_INFO("signed writer builds");
+        CHECK(buildProgram(mDraw2, "int write (test)",
                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intWriteF.glsl", GL_FRAGMENT_SHADER } }));
-        ensure("reader builds",
-               buildProgram(mDraw3, "integer sample (test)",
+        UNSCOPED_INFO("reader builds");
+        CHECK(buildProgram(mDraw3, "integer sample (test)",
                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intSampleF.glsl", GL_FRAGMENT_SHADER } }));
-        ensure("the unsigned sampler has a unit", mDraw3.getTextureChannel(TEST_UINT_MAP) >= 0);
-        ensure("the signed sampler has a unit", mDraw3.getTextureChannel(TEST_INT_MAP) >= 0);
+        UNSCOPED_INFO("the unsigned sampler has a unit");
+        CHECK(mDraw3.getTextureChannel(TEST_UINT_MAP) >= 0);
+        UNSCOPED_INFO("the signed sampler has a unit");
+        CHECK(mDraw3.getTextureChannel(TEST_INT_MAP) >= 0);
 
         LLGLDisable blend(GL_BLEND);
         for (U32 source = 0; source < 2; ++source)
@@ -1532,8 +1630,10 @@ namespace tut
 
         mTargets[2].bindTarget();
         mDraw3.bind();
-        ensure("unsigned source bound", mDraw3.bindTexture(TEST_UINT_MAP, &mTargets[0]) >= 0);
-        ensure("signed source bound", mDraw3.bindTexture(TEST_INT_MAP, &mTargets[1]) >= 0);
+        UNSCOPED_INFO("unsigned source bound");
+        CHECK(mDraw3.bindTexture(TEST_UINT_MAP, &mTargets[0]) >= 0);
+        UNSCOPED_INFO("signed source bound");
+        CHECK(mDraw3.bindTexture(TEST_INT_MAP, &mTargets[1]) >= 0);
 
         // Read off GL, since a driver may read an integer texture under a filtering sampler texel by texel anyway.
         for (const S32 uniform : { (S32)TEST_UINT_MAP, (S32)TEST_INT_MAP })
@@ -1546,8 +1646,10 @@ namespace tut
             glGetSamplerParameteriv((GLuint)sampler, GL_TEXTURE_MIN_FILTER, &min_filter);
             glGetSamplerParameteriv((GLuint)sampler, GL_TEXTURE_MAG_FILTER, &mag_filter);
             const std::string which = uniform == TEST_UINT_MAP ? "the unsigned source's" : "the signed source's";
-            ensure_equals(which + " sampler magnifies by the nearest texel", (U32)mag_filter, (U32)GL_NEAREST);
-            ensure_equals(which + " sampler minifies by the nearest texel", (U32)min_filter,
+            UNSCOPED_INFO(which + " sampler magnifies by the nearest texel");
+            REQUIRE((U32)mag_filter == (U32)GL_NEAREST);
+            UNSCOPED_INFO(which + " sampler minifies by the nearest texel");
+            REQUIRE((U32)min_filter ==
                           (U32)GL_NEAREST_MIPMAP_NEAREST);
         }
         glActiveTexture(GL_TEXTURE0 + gGL.getCurrentTexUnitIndex());
@@ -1558,8 +1660,10 @@ namespace tut
         mDraw3.bindTexture(TEST_UINT_MAP, &mTargets[0], ALSamplers::BilinearClamp);
         const bool filtered_valid = validate_bound_samplers();
         gDebugGL = false;
-        ensure("the debug validator passes the binds", samplers_valid);
-        ensure("and refuses a filtering sampler over an integer texture", !filtered_valid);
+        UNSCOPED_INFO("the debug validator passes the binds");
+        CHECK(samplers_valid);
+        UNSCOPED_INFO("and refuses a filtering sampler over an integer texture");
+        CHECK_FALSE(filtered_valid);
         mDraw3.bindTexture(TEST_UINT_MAP, &mTargets[0]);
 
         gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
@@ -1583,12 +1687,15 @@ namespace tut
                 const S32 int_expected[4] = { -1 - (S32)x, (S32)y * 300 - 1000, 0, 1 };
                 for (U32 c = 0; c < 4; ++c)
                 {
-                    ensure_equals("unsigned component " + std::to_string(c) + at, uints[i + c], uint_expected[c]);
-                    ensure_equals("signed component " + std::to_string(c) + at, ints[i + c], int_expected[c]);
+                    UNSCOPED_INFO("unsigned component " + std::to_string(c) + at);
+                    REQUIRE(uints[i + c] == uint_expected[c]);
+                    UNSCOPED_INFO("signed component " + std::to_string(c) + at);
+                    REQUIRE(ints[i + c] == int_expected[c]);
                 }
             }
         }
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // A shared object is the shader manager's, not the programs' that attach it. Two programs built through
@@ -1598,16 +1705,17 @@ namespace tut
     // built after both are gone attaches the shared object again and links. One that fails to link deletes its own
     // objects all the same. clearShaderObjects deletes every shared object at once, as no linked program holds one,
     // and the programs draw on without them.
-    template<> template<>
-    void llglslshader_object_t::test<20>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a shared object belongs to the shader manager and not to its programs", "[llglslshader_gl]")
     {
         setUpShaders();
         constexpr U32 SIDE = 4;
-        ensure("output target allocates", mTargets[0].allocate(SIDE, SIDE, GL_RGBA32F));
+        UNSCOPED_INFO("output target allocates");
+        CHECK(mTargets[0].allocate(SIDE, SIDE, GL_RGBA32F));
 
         const auto& fragments = mShaders.mShaderObjects[LLShaderMgr::STAGE_FRAGMENT];
         const auto found = fragments.find("deferred/globalF.glsl");
-        ensure("the shared object compiled", found != fragments.end());
+        UNSCOPED_INFO("the shared object compiled");
+        REQUIRE(found != fragments.end());
         const GLuint shared = found->second;
 
         const std::initializer_list<std::pair<std::string, GLenum>> files =
@@ -1632,41 +1740,58 @@ namespace tut
             const F32 expected[4] = { 0.25f, 0.5f, 0.75f, 1.f };
             for (size_t i = 0; i < drawn.size(); ++i)
             {
-                ensure_equals(what + ", component " + std::to_string(i), drawn[i], expected[i % 4]);
+                UNSCOPED_INFO(what + ", component " + std::to_string(i));
+                REQUIRE(drawn[i] == expected[i % 4]);
             }
         };
 
-        ensure("A builds", buildProgram(mDraw, "shared A (test)", files));
-        ensure("B builds", buildProgram(mDraw2, "shared B (test)", files));
-        ensure("A holds no object once linked", attachedNames(mDraw.mProgramObject).empty());
-        ensure("nor does B", attachedNames(mDraw2.mProgramObject).empty());
-        ensure_equals("their own objects deleted", LLShaderMgr::sLiveObjects, live);
-        ensure("a program's own stage is not shared", !fragments.contains("test/globalCallF.glsl"));
-        ensure("the shared object stays", glIsShader(shared) == GL_TRUE);
-        ensure("not even flagged for deletion", !flaggedForDeletion(shared));
+        UNSCOPED_INFO("A builds");
+        CHECK(buildProgram(mDraw, "shared A (test)", files));
+        UNSCOPED_INFO("B builds");
+        CHECK(buildProgram(mDraw2, "shared B (test)", files));
+        UNSCOPED_INFO("A holds no object once linked");
+        REQUIRE(attachedNames(mDraw.mProgramObject).empty());
+        UNSCOPED_INFO("nor does B");
+        REQUIRE(attachedNames(mDraw2.mProgramObject).empty());
+        UNSCOPED_INFO("their own objects deleted");
+        CHECK(LLShaderMgr::sLiveObjects == live);
+        UNSCOPED_INFO("a program's own stage is not shared");
+        CHECK_FALSE(fragments.contains("test/globalCallF.glsl"));
+        UNSCOPED_INFO("the shared object stays");
+        CHECK(glIsShader(shared) == GL_TRUE);
+        UNSCOPED_INFO("not even flagged for deletion");
+        CHECK_FALSE(flaggedForDeletion(shared));
         ensureDraws("A draws", mDraw);
 
         mDraw.unload();
-        ensure("unloading A leaves the shared object", glIsShader(shared) == GL_TRUE && !flaggedForDeletion(shared));
+        UNSCOPED_INFO("unloading A leaves the shared object");
+        CHECK((glIsShader(shared) == GL_TRUE && !flaggedForDeletion(shared)));
         glValidateProgram(mDraw2.mProgramObject);
         GLint valid = GL_FALSE;
         glGetProgramiv(mDraw2.mProgramObject, GL_VALIDATE_STATUS, &valid);
-        ensure("B validates", valid == GL_TRUE);
+        UNSCOPED_INFO("B validates");
+        CHECK(valid == GL_TRUE);
         ensureDraws("B draws", mDraw2);
 
         mDraw2.unload();
-        ensure("C builds afterwards", buildProgram(mDraw3, "shared C (test)", files));
-        ensure("C holds no object once linked", attachedNames(mDraw3.mProgramObject).empty());
+        UNSCOPED_INFO("C builds afterwards");
+        CHECK(buildProgram(mDraw3, "shared C (test)", files));
+        UNSCOPED_INFO("C holds no object once linked");
+        REQUIRE(attachedNames(mDraw3.mProgramObject).empty());
         ensureDraws("C draws", mDraw3);
 
         // Without the shared object to call into, the stage cannot link, at any class.
-        ensure("D does not link", !buildProgram(mDraw, "unlinked D (test)", files, 0, /*attach_nothing=*/true));
-        ensure_equals("and its own objects are deleted all the same", LLShaderMgr::sLiveObjects, live);
+        UNSCOPED_INFO("D does not link");
+        CHECK_FALSE(buildProgram(mDraw, "unlinked D (test)", files, 0, /*attach_nothing=*/true));
+        UNSCOPED_INFO("and its own objects are deleted all the same");
+        CHECK(LLShaderMgr::sLiveObjects == live);
 
         S32 level = 1;
         const GLuint loose = mShaders.loadShaderFile("test/solidF.glsl", level, GL_FRAGMENT_SHADER);
-        ensure("an object no program holds", loose != 0 && glIsShader(loose) == GL_TRUE);
-        ensure_equals("counted live", LLShaderMgr::sLiveObjects, live + 1);
+        UNSCOPED_INFO("an object no program holds");
+        CHECK((loose != 0 && glIsShader(loose) == GL_TRUE));
+        UNSCOPED_INFO("counted live");
+        CHECK(LLShaderMgr::sLiveObjects == live + 1);
 
         size_t held = 0;
         for (const auto& stage : mShaders.mShaderObjects)
@@ -1676,13 +1801,18 @@ namespace tut
         mShaders.clearShaderObjects();
         for (const auto& stage : mShaders.mShaderObjects)
         {
-            ensure("the manager holds no object", stage.empty());
+            UNSCOPED_INFO("the manager holds no object");
+            REQUIRE(stage.empty());
         }
-        ensure("one no program ever held goes at once", glIsShader(loose) == GL_FALSE);
-        ensure("and one programs linked with", glIsShader(shared) == GL_FALSE);
-        ensure_equals("none counted live", LLShaderMgr::sLiveObjects, live + 1 - (U32)held);
+        UNSCOPED_INFO("one no program ever held goes at once");
+        CHECK(glIsShader(loose) == GL_FALSE);
+        UNSCOPED_INFO("and one programs linked with");
+        CHECK(glIsShader(shared) == GL_FALSE);
+        UNSCOPED_INFO("none counted live");
+        CHECK(LLShaderMgr::sLiveObjects == live + 1 - (U32)held);
         ensureDraws("C still draws", mDraw3);
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // A buffer bound once at a reserved block's point serves every program after it: one program declaring the block
@@ -1690,23 +1820,27 @@ namespace tut
     // between -- where a numbering by program would put the shared block at point 0 for the first, the second block's
     // place. And LLRender keeps the points: a bind of what a point holds issues nothing, which a bind made behind its
     // back shows, and refreshState puts back what it holds.
-    template<> template<>
-    void llglslshader_object_t::test<21>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a buffer bound once at a block's point serves every program after it", "[llglslshader_gl]")
     {
         setUpCompute();
-        ensure("first-only builds",
-               buildProgram(mCompute, "first only (test)", { { "test/firstOnlyC.glsl", GL_COMPUTE_SHADER } }));
-        ensure("first-and-counts builds",
-               buildProgram(mCompute2, "first and counts (test)", { { "test/firstAndCountsC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("first-only builds");
+        CHECK(buildProgram(mCompute, "first only (test)", { { "test/firstOnlyC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("first-and-counts builds");
+        CHECK(buildProgram(mCompute2, "first and counts (test)", { { "test/firstAndCountsC.glsl", GL_COMPUTE_SHADER } }));
         const S32 first = mShaders.getStorageBlockBinding(TEST_BLOCK_FIRST);
         const S32 counts = mShaders.getStorageBlockBinding(TEST_COUNTS);
-        ensure_equals("the first program's block at the table's point", mCompute.getStorageBinding(TEST_BLOCK_FIRST), first);
-        ensure_equals("the second's too", mCompute2.getStorageBinding(TEST_BLOCK_FIRST), first);
-        ensure("the two blocks apart", first != counts);
+        UNSCOPED_INFO("the first program's block at the table's point");
+        CHECK(mCompute.getStorageBinding(TEST_BLOCK_FIRST) == first);
+        UNSCOPED_INFO("the second's too");
+        CHECK(mCompute2.getStorageBinding(TEST_BLOCK_FIRST) == first);
+        UNSCOPED_INFO("the two blocks apart");
+        CHECK(first != counts);
 
         const std::vector<U32> zeros(4, 0u);
-        ensure("first allocates", mBuffers[0].allocate(4 * sizeof(U32), 0, zeros.data(), "first (test)"));
-        ensure("counts allocate", mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "counts (test)"));
+        UNSCOPED_INFO("first allocates");
+        CHECK(mBuffers[0].allocate(4 * sizeof(U32), 0, zeros.data(), "first (test)"));
+        UNSCOPED_INFO("counts allocate");
+        CHECK(mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "counts (test)"));
 
         mCompute.bind();
         gGL.bindStorageBuffer((U32)first, mBuffers[0]);
@@ -1716,9 +1850,12 @@ namespace tut
         mCompute2.dispatch(1);
 
         const std::vector<U32> held_first = readWords(mBuffers[0], 2);
-        ensure_equals("the first program wrote the first block", held_first[0], 7u);
-        ensure_equals("the second program wrote it too", held_first[1], 9u);
-        ensure_equals("and its counts", readWords(mBuffers[1], 1)[0], 5u);
+        UNSCOPED_INFO("the first program wrote the first block");
+        CHECK(held_first[0] == 7u);
+        UNSCOPED_INFO("the second program wrote it too");
+        CHECK(held_first[1] == 9u);
+        UNSCOPED_INFO("and its counts");
+        CHECK(readWords(mBuffers[1], 1)[0] == 5u);
 
         // Behind LLRender's back, then the bind it holds already: nothing issued, so GL keeps the other buffer.
         auto bound_at = [](S32 point)
@@ -1729,90 +1866,114 @@ namespace tut
         };
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, (GLuint)first, mBuffers[1].getGLName());
         gGL.bindStorageBuffer((U32)first, mBuffers[0]);
-        ensure_equals("a bind of what the point holds issues nothing", bound_at(first), mBuffers[1].getGLName());
+        UNSCOPED_INFO("a bind of what the point holds issues nothing");
+        CHECK(bound_at(first) == mBuffers[1].getGLName());
         gGL.refreshState();
-        ensure_equals("refreshState puts back what it holds", bound_at(first), mBuffers[0].getGLName());
+        UNSCOPED_INFO("refreshState puts back what it holds");
+        CHECK(bound_at(first) == mBuffers[0].getGLName());
 
         // A range, at a multiple of the context's alignment at least 16 bytes in, is a different bind from the whole
         // buffer.
         const size_t alignment = (size_t)gGLManager.mShaderStorageBufferOffsetAlignment;
         const size_t offset = (16 + alignment - 1) / alignment * alignment;
         ALGPUBuffer wide;
-        ensure("wide allocates", wide.allocate(offset + 4 * sizeof(U32), 0, nullptr, "wide (test)"));
+        UNSCOPED_INFO("wide allocates");
+        REQUIRE(wide.allocate(offset + 4 * sizeof(U32), 0, nullptr, "wide (test)"));
         wide.clear();
         mCompute.bind();
         gGL.bindStorageBuffer((U32)first, wide, offset, 4 * sizeof(U32));
         mCompute.dispatch(1);
         std::vector<U32> words((offset + 4 * sizeof(U32)) / sizeof(U32), 0xFFFFFFFFu);
         wide.read(0, words.data(), words.size() * sizeof(U32));
-        ensure_equals("the range's first word written", words[offset / sizeof(U32)], 7u);
-        ensure_equals("the word before it not", words[offset / sizeof(U32) - 1], 0u);
+        UNSCOPED_INFO("the range's first word written");
+        CHECK(words[offset / sizeof(U32)] == 7u);
+        UNSCOPED_INFO("the word before it not");
+        CHECK(words[offset / sizeof(U32) - 1] == 0u);
 
         // Releasing a bound buffer forgets it.
         wide.release();
-        ensure_equals("a released buffer leaves its point empty", gGL.getStorageBuffer((U32)first), 0u);
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("a released buffer leaves its point empty");
+        CHECK(gGL.getStorageBuffer((U32)first) == 0u);
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // An array of blocks takes one point per element from the table's start for it, and bindStorageBuffer names the
     // element: each of two buffers takes its element's writes. A program reading only the second element finds it
     // at its point all the same, though GL may report no first element for it.
-    template<> template<>
-    void llglslshader_object_t::test<22>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a block array takes consecutive points and binds buffers by element", "[llglslshader_gl]")
     {
         setUpCompute();
-        ensure("array program builds",
-               buildProgram(mCompute, "block array (test)", { { "test/blockArrayC.glsl", GL_COMPUTE_SHADER } }));
-        ensure("second-element program builds",
-               buildProgram(mCompute2, "block array one (test)", { { "test/blockArrayOneC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("array program builds");
+        CHECK(buildProgram(mCompute, "block array (test)", { { "test/blockArrayC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("second-element program builds");
+        CHECK(buildProgram(mCompute2, "block array one (test)", { { "test/blockArrayOneC.glsl", GL_COMPUTE_SHADER } }));
         const S32 base = mShaders.getStorageBlockBinding(TEST_BLOCK_ARRAY);
-        ensure("the table gives the array a point", base >= 0);
-        ensure_equals("element 0 at it", mCompute.getStorageBinding(TEST_BLOCK_ARRAY, 0), base);
-        ensure_equals("element 1 at the next", mCompute.getStorageBinding(TEST_BLOCK_ARRAY, 1), base + 1);
-        ensure_equals("no element 2", mCompute.getStorageBinding(TEST_BLOCK_ARRAY, 2), -1);
-        ensure_equals("the second-element program's element 1 there too", mCompute2.getStorageBinding(TEST_BLOCK_ARRAY, 1),
+        UNSCOPED_INFO("the table gives the array a point");
+        CHECK(base >= 0);
+        UNSCOPED_INFO("element 0 at it");
+        CHECK(mCompute.getStorageBinding(TEST_BLOCK_ARRAY, 0) == base);
+        UNSCOPED_INFO("element 1 at the next");
+        CHECK(mCompute.getStorageBinding(TEST_BLOCK_ARRAY, 1) == base + 1);
+        UNSCOPED_INFO("no element 2");
+        CHECK(mCompute.getStorageBinding(TEST_BLOCK_ARRAY, 2) == -1);
+        UNSCOPED_INFO("the second-element program's element 1 there too");
+        CHECK(mCompute2.getStorageBinding(TEST_BLOCK_ARRAY, 1) ==
                       base + 1);
 
         const std::vector<U32> zeros(4, 0u);
-        ensure("a allocates", mBuffers[0].allocate(4 * sizeof(U32), 0, zeros.data(), "element 0 (test)"));
-        ensure("b allocates", mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "element 1 (test)"));
+        UNSCOPED_INFO("a allocates");
+        CHECK(mBuffers[0].allocate(4 * sizeof(U32), 0, zeros.data(), "element 0 (test)"));
+        UNSCOPED_INFO("b allocates");
+        CHECK(mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "element 1 (test)"));
 
         mCompute.bind();
         mCompute.bindStorageBuffer(TEST_BLOCK_ARRAY, mBuffers[0], 0);
         mCompute.bindStorageBuffer(TEST_BLOCK_ARRAY, mBuffers[1], 1);
         mCompute.dispatch(1);
-        ensure_equals("element 0's buffer", readWords(mBuffers[0], 1)[0], 11u);
-        ensure_equals("element 1's buffer", readWords(mBuffers[1], 1)[0], 22u);
+        UNSCOPED_INFO("element 0's buffer");
+        CHECK(readWords(mBuffers[0], 1)[0] == 11u);
+        UNSCOPED_INFO("element 1's buffer");
+        CHECK(readWords(mBuffers[1], 1)[0] == 22u);
 
         mCompute2.bind();
         mCompute2.dispatch(1);
-        ensure_equals("the second element's writer reaches element 1's buffer", readWords(mBuffers[1], 1)[0], 33u);
-        ensure_equals("and not element 0's", readWords(mBuffers[0], 1)[0], 11u);
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("the second element's writer reaches element 1's buffer");
+        CHECK(readWords(mBuffers[1], 1)[0] == 33u);
+        UNSCOPED_INFO("and not element 0's");
+        CHECK(readWords(mBuffers[0], 1)[0] == 11u);
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // An image array takes its units in reserved order like any image, though GL names it by its first element: it is
     // before testImageA in the table, so its two elements take units 0 and 1 and testImageA 2. bindImage names the
     // element, and each target takes its element's stores.
-    template<> template<>
-    void llglslshader_object_t::test<23>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: an image array takes its units in reserved order like any image", "[llglslshader_gl]")
     {
         setUpCompute();
         constexpr U32 SIDE = 8;
-        ensure("image array builds",
-               buildProgram(mCompute, "image array (test)", { { "test/imageArrayC.glsl", GL_COMPUTE_SHADER } }));
-        ensure_equals("element 0 first", mCompute.getImageUnit(TEST_IMAGES, 0), 0);
-        ensure_equals("element 1 next", mCompute.getImageUnit(TEST_IMAGES, 1), 1);
-        ensure_equals("the single image after the array", mCompute.getImageUnit(TEST_IMAGE_A), 2);
+        UNSCOPED_INFO("image array builds");
+        CHECK(buildProgram(mCompute, "image array (test)", { { "test/imageArrayC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("element 0 first");
+        CHECK(mCompute.getImageUnit(TEST_IMAGES, 0) == 0);
+        UNSCOPED_INFO("element 1 next");
+        CHECK(mCompute.getImageUnit(TEST_IMAGES, 1) == 1);
+        UNSCOPED_INFO("the single image after the array");
+        CHECK(mCompute.getImageUnit(TEST_IMAGE_A) == 2);
 
         for (U32 i = 0; i < 3; ++i)
         {
-            ensure("target allocates", mTargets[i].allocate(SIDE, SIDE, GL_R32F));
+            UNSCOPED_INFO("target allocates");
+            REQUIRE(mTargets[i].allocate(SIDE, SIDE, GL_R32F));
         }
         mCompute.bind();
-        ensure_equals("A bound", mCompute.bindImage(TEST_IMAGE_A, &mTargets[0], ALImageSlot::WRITE_ONLY), 2);
-        ensure_equals("element 0 bound", mCompute.bindImage(TEST_IMAGES, &mTargets[1], ALImageSlot::WRITE_ONLY, 0, 0, 0), 0);
-        ensure_equals("element 1 bound", mCompute.bindImage(TEST_IMAGES, &mTargets[2], ALImageSlot::WRITE_ONLY, 0, 0, 1), 1);
+        UNSCOPED_INFO("A bound");
+        CHECK(mCompute.bindImage(TEST_IMAGE_A, &mTargets[0], ALImageSlot::WRITE_ONLY) == 2);
+        UNSCOPED_INFO("element 0 bound");
+        CHECK(mCompute.bindImage(TEST_IMAGES, &mTargets[1], ALImageSlot::WRITE_ONLY, 0, 0, 0) == 0);
+        UNSCOPED_INFO("element 1 bound");
+        CHECK(mCompute.bindImage(TEST_IMAGES, &mTargets[2], ALImageSlot::WRITE_ONLY, 0, 0, 1) == 1);
         mCompute.dispatchThreads(SIDE, SIDE);
         gGL.memoryBarrier(LLRender::BARRIER_TEXTURE_UPDATE);
         mCompute.unbindImage(TEST_IMAGE_A);
@@ -1824,23 +1985,26 @@ namespace tut
             const std::vector<F32> held = readTexture<F32>(mTargets[t].getTexture(), SIDE, SIDE, 1, GL_RED, GL_FLOAT);
             for (U32 i = 0; i < SIDE * SIDE; ++i)
             {
-                ensure_equals("target " + std::to_string(t) + " at " + std::to_string(i), held[i], expected[t]);
+                UNSCOPED_INFO("target " + std::to_string(t) + " at " + std::to_string(i));
+                REQUIRE(held[i] == expected[t]);
             }
         }
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // The debug validator reads image units as it reads texture units: a signed integer image over a float format is
     // undefined and refused, over a signed integer one passed, and an empty unit is fine.
-    template<> template<>
-    void llglslshader_object_t::test<24>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: the debug validator reads image units as it reads texture units", "[llglslshader_gl]")
     {
         setUpCompute();
         constexpr U32 SIDE = 4;
-        ensure("signed image builds",
-               buildProgram(mCompute, "int image (test)", { { "test/imageIntC.glsl", GL_COMPUTE_SHADER } }));
-        ensure("float target allocates", mTargets[0].allocate(SIDE, SIDE, GL_R32F));
-        ensure("signed target allocates", mTargets[1].allocate(SIDE, SIDE, GL_R32I));
+        UNSCOPED_INFO("signed image builds");
+        CHECK(buildProgram(mCompute, "int image (test)", { { "test/imageIntC.glsl", GL_COMPUTE_SHADER } }));
+        UNSCOPED_INFO("float target allocates");
+        CHECK(mTargets[0].allocate(SIDE, SIDE, GL_R32F));
+        UNSCOPED_INFO("signed target allocates");
+        CHECK(mTargets[1].allocate(SIDE, SIDE, GL_R32I));
 
         mCompute.bind();
         gDebugGL = true;
@@ -1852,28 +2016,31 @@ namespace tut
         gDebugGL = false;
         mCompute.unbindImage(TEST_IMAGE_INT);
 
-        ensure("an empty image unit passes", empty_valid);
-        ensure("a signed image over a float format is refused", !float_valid);
-        ensure("over a signed format it passes", signed_valid);
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("an empty image unit passes");
+        CHECK(empty_valid);
+        UNSCOPED_INFO("a signed image over a float format is refused");
+        CHECK_FALSE(float_valid);
+        UNSCOPED_INFO("over a signed format it passes");
+        CHECK(signed_valid);
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // A depth-stencil texture reads as its depth until GL 4.3's stencil texturing turns it to its stencil: the debug
     // validator refuses an unsigned sampler over it as depth and passes it as stencil, and the reverse for a float
     // sampler.
-    template<> template<>
-    void llglslshader_object_t::test<25>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: the debug validator reads a depth-stencil texture by its texture mode", "[llglslshader_gl]")
     {
         setUpShaders();
         if (gGLManager.mGLVersion < 4.29f)
         {
-            skip("the context has no stencil texturing");
+            SKIP("the context has no stencil texturing");
         }
-        ensure("unsigned reader builds",
-               buildProgram(mDraw, "stencil read (test)",
+        UNSCOPED_INFO("unsigned reader builds");
+        CHECK(buildProgram(mDraw, "stencil read (test)",
                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intSampleF.glsl", GL_FRAGMENT_SHADER } }));
-        ensure("float reader builds",
-               buildProgram(mDraw2, "depth read (test)",
+        UNSCOPED_INFO("float reader builds");
+        CHECK(buildProgram(mDraw2, "depth read (test)",
                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/sampleF.glsl", GL_FRAGMENT_SHADER } }));
 
         GLuint texture = 0;
@@ -1901,36 +2068,46 @@ namespace tut
             return valid;
         };
 
-        ensure("an unsigned sampler over the depth refused",
-               !validates(mDraw, TEST_UINT_MAP, GL_DEPTH_COMPONENT));
-        ensure("over the stencil passed", validates(mDraw, TEST_UINT_MAP, GL_STENCIL_INDEX));
-        ensure("a float sampler over the stencil refused", !validates(mDraw2, TEST_SOURCE_MAP, GL_STENCIL_INDEX));
-        ensure("over the depth passed", validates(mDraw2, TEST_SOURCE_MAP, GL_DEPTH_COMPONENT));
+        UNSCOPED_INFO("an unsigned sampler over the depth refused");
+        CHECK_FALSE(validates(mDraw, TEST_UINT_MAP, GL_DEPTH_COMPONENT));
+        UNSCOPED_INFO("over the stencil passed");
+        CHECK(validates(mDraw, TEST_UINT_MAP, GL_STENCIL_INDEX));
+        UNSCOPED_INFO("a float sampler over the stencil refused");
+        CHECK_FALSE(validates(mDraw2, TEST_SOURCE_MAP, GL_STENCIL_INDEX));
+        UNSCOPED_INFO("over the depth passed");
+        CHECK(validates(mDraw2, TEST_SOURCE_MAP, GL_DEPTH_COMPONENT));
 
         glDeleteTextures(1, &texture);
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // Every kind of sampler takes a texture unit, in reserved order, an array included under its bare name though GL
     // names it by its first element: the two-element array first, then the array texture, the unsigned sampler and
     // the integer buffer.
-    template<> template<>
-    void llglslshader_object_t::test<26>()
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: every kind of sampler takes a texture unit in reserved order", "[llglslshader_gl]")
     {
         setUpShaders();
-        ensure("sampler types build",
-               buildProgram(mDraw, "sampler types (test)",
+        UNSCOPED_INFO("sampler types build");
+        CHECK(buildProgram(mDraw, "sampler types (test)",
                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/samplerTypesF.glsl", GL_FRAGMENT_SHADER } }));
-        ensure_equals("the array first", mDraw.getTextureChannel(TEST_SAMPLERS), 0);
-        ensure_equals("the array texture after its two units", mDraw.getTextureChannel(TEST_SOURCE_MAP), 2);
-        ensure_equals("the unsigned sampler next", mDraw.getTextureChannel(TEST_UINT_MAP), 3);
-        ensure_equals("the integer buffer last", mDraw.getTextureChannel(TEST_INT_MAP), 4);
+        UNSCOPED_INFO("the array first");
+        CHECK(mDraw.getTextureChannel(TEST_SAMPLERS) == 0);
+        UNSCOPED_INFO("the array texture after its two units");
+        CHECK(mDraw.getTextureChannel(TEST_SOURCE_MAP) == 2);
+        UNSCOPED_INFO("the unsigned sampler next");
+        CHECK(mDraw.getTextureChannel(TEST_UINT_MAP) == 3);
+        UNSCOPED_INFO("the integer buffer last");
+        CHECK(mDraw.getTextureChannel(TEST_INT_MAP) == 4);
 
         GLint units[2] = { -1, -1 };
         glGetUniformiv(mDraw.mProgramObject, glGetUniformLocation(mDraw.mProgramObject, "testSamplers[1]"), &units[1]);
         glGetUniformiv(mDraw.mProgramObject, glGetUniformLocation(mDraw.mProgramObject, "testSamplers[0]"), &units[0]);
-        ensure_equals("the array's first element at its unit", units[0], 0);
-        ensure_equals("its second at the next", units[1], 1);
-        ensure_equals("no GL error", glGetError(), GLenum(GL_NO_ERROR));
+        UNSCOPED_INFO("the array's first element at its unit");
+        CHECK(units[0] == 0);
+        UNSCOPED_INFO("its second at the next");
+        CHECK(units[1] == 1);
+        UNSCOPED_INFO("no GL error");
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 }

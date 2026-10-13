@@ -40,7 +40,7 @@
 #include "llxmlnode.h"
 #include "llsd.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cstring>
 
@@ -163,130 +163,127 @@ namespace tut
         }
     };
 
-    // 128 slots: TUT defaults to 50; we already have 50+ tests and want
-    // headroom before the silent-drop threshold bites again.
-    typedef test_group<llfontregistry_data, 128> llfontregistry_test;
-    typedef llfontregistry_test::object     llfontregistry_object;
-namespace
-{
-    tut::llfontregistry_test llfontregistry_testcase("LLFontRegistry");
-}
-
     // ===================================================================
     // Group 1: LLFontDescriptor (pure)
     // ===================================================================
 
     // normalize() pulls an embedded "Huge"/"Large"/etc. out of the name and
     // moves it into the size slot, leaving the family stem behind.
-    template<> template<>
-    void llfontregistry_object::test<1>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: normalize moves a size suffix like Huge from the name to the size", "[LLFontRegistry]")
     {
         LLFontDescriptor desc("SansSerifHuge", "", 0);
         LLFontDescriptor n = desc.normalize();
-        ensure_equals("name keeps stem", n.getName(), std::string("SansSerif"));
-        ensure_equals("size becomes Huge", n.getSize(), std::string("Huge"));
-        ensure_equals("style stays NORMAL", (S32)n.getStyle(), 0);
+        UNSCOPED_INFO("name keeps stem");
+        CHECK(n.getName() == std::string("SansSerif"));
+        UNSCOPED_INFO("size becomes Huge");
+        CHECK(n.getSize() == std::string("Huge"));
+        UNSCOPED_INFO("style stays NORMAL");
+        CHECK((S32)n.getStyle() == 0);
     }
 
     // "Big" is the legacy alias for "Large" — verify the rewrite happens.
-    template<> template<>
-    void llfontregistry_object::test<2>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: normalize rewrites the legacy size suffix Big to Large", "[LLFontRegistry]")
     {
         LLFontDescriptor n = LLFontDescriptor("SansSerifBig", "", 0).normalize();
-        ensure_equals("Big maps to Large", n.getSize(), std::string("Large"));
-        ensure_equals("name stripped", n.getName(), std::string("SansSerif"));
+        UNSCOPED_INFO("Big maps to Large");
+        CHECK(n.getSize() == std::string("Large"));
+        UNSCOPED_INFO("name stripped");
+        CHECK(n.getName() == std::string("SansSerif"));
     }
 
     // "Bold"/"Italic" suffixes set the style flags AND get stripped from
     // the name (the leading inline comment in normalize() claims the name
     // is preserved, but the code definitively removes the substring).
-    template<> template<>
-    void llfontregistry_object::test<3>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: normalize strips a Bold suffix from the name and sets the BOLD flag", "[LLFontRegistry]")
     {
         LLFontDescriptor n = LLFontDescriptor("SansSerifBold", "", 0).normalize();
-        ensure_equals("Bold stripped from name",
-                      n.getName(), std::string("SansSerif"));
-        ensure_equals("size defaults to Small (no size suffix in input)",
-                      n.getSize(), std::string("Small"));
-        ensure_equals("BOLD flag set", (S32)n.getStyle(), (S32)LLFontGL::BOLD);
+        UNSCOPED_INFO("Bold stripped from name");
+        CHECK(n.getName() == std::string("SansSerif"));
+        UNSCOPED_INFO("size defaults to Small (no size suffix in input)");
+        CHECK(n.getSize() == std::string("Small"));
+        UNSCOPED_INFO("BOLD flag set");
+        CHECK((S32)n.getStyle() == (S32)LLFontGL::BOLD);
     }
 
     // Bold + Italic combine; other style bits (UNDERLINE) get filtered.
-    template<> template<>
-    void llfontregistry_object::test<4>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: normalize combines Bold and Italic and drops the UNDERLINE bit", "[LLFontRegistry]")
     {
         LLFontDescriptor desc("SansSerifBoldItalic", "",
                               static_cast<U8>(LLFontGL::UNDERLINE));
         LLFontDescriptor n = desc.normalize();
-        ensure_equals("BOLD|ITALIC flags",
-                      (S32)n.getStyle(),
+        UNSCOPED_INFO("BOLD|ITALIC flags");
+        CHECK((S32)n.getStyle() ==
                       (S32)(LLFontGL::BOLD | LLFontGL::ITALIC));
     }
 
     // "Monospace" is preserved as both name and size — the special-case
     // branch in normalize() exists because stripping it would leave "".
-    template<> template<>
-    void llfontregistry_object::test<5>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: normalize keeps Monospace as both the name and the size", "[LLFontRegistry]")
     {
         LLFontDescriptor n = LLFontDescriptor("Monospace", "", 0).normalize();
-        ensure_equals("name preserved", n.getName(), std::string("Monospace"));
-        ensure_equals("size becomes Monospace", n.getSize(), std::string("Monospace"));
+        UNSCOPED_INFO("name preserved");
+        CHECK(n.getName() == std::string("Monospace"));
+        UNSCOPED_INFO("size becomes Monospace");
+        CHECK(n.getSize() == std::string("Monospace"));
     }
 
     // Empty size + non-Monospace name → "Small" default.
-    template<> template<>
-    void llfontregistry_object::test<6>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: normalize defaults an empty size to Small", "[LLFontRegistry]")
     {
         LLFontDescriptor n = LLFontDescriptor("SansSerif", "", 0).normalize();
-        ensure_equals("default size is Small", n.getSize(), std::string("Small"));
+        UNSCOPED_INFO("default size is Small");
+        CHECK(n.getSize() == std::string("Small"));
     }
 
     // Files attached to a descriptor survive the normalize() round-trip.
-    template<> template<>
-    void llfontregistry_object::test<7>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: normalize keeps the descriptor's font files", "[LLFontRegistry]")
     {
         LLFontDescriptor desc("SansSerif", "", 0);
         desc.addFontFile("Foo.ttf", EFontHinting::DEFAULT, 0, 0.f);
         LLFontDescriptor n = desc.normalize();
-        ensure_equals("file count preserved", (S32)n.getFontFiles().size(), 1);
-        ensure_equals("file name preserved",
-                      n.getFontFiles()[0].FileName, std::string("Foo.ttf"));
+        UNSCOPED_INFO("file count preserved");
+        REQUIRE((S32)n.getFontFiles().size() == 1);
+        UNSCOPED_INFO("file name preserved");
+        CHECK(n.getFontFiles()[0].FileName == std::string("Foo.ttf"));
     }
 
     // operator== compares (name, style, size). Different files but same
     // identity-tuple still compare equal — that's intentional, the file
     // list is treated as data the descriptor carries, not part of identity.
-    template<> template<>
-    void llfontregistry_object::test<8>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: operator== and hash_value ignore the font file list", "[LLFontRegistry]")
     {
         LLFontDescriptor a("SansSerif", "Medium", 0);
         LLFontDescriptor b("SansSerif", "Medium", 0);
         a.addFontFile("a.ttf", EFontHinting::DEFAULT, 0, 0.f);
         b.addFontFile("b.ttf", EFontHinting::DEFAULT, 0, 0.f);
-        ensure("equal regardless of files", a == b);
-        ensure_equals("hash matches", hash_value(a), hash_value(b));
+        UNSCOPED_INFO("equal regardless of files");
+        CHECK(a == b);
+        UNSCOPED_INFO("hash matches");
+        CHECK(hash_value(a) == hash_value(b));
     }
 
     // operator< orders lexicographically by (name, style, size). Style
     // comparisons happen ahead of size — verify by holding name fixed.
-    template<> template<>
-    void llfontregistry_object::test<9>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: operator< orders descriptors that differ only in style", "[LLFontRegistry]")
     {
         LLFontDescriptor a("SansSerif", "Medium", 0);
         LLFontDescriptor b("SansSerif", "Medium", LLFontGL::BOLD);
-        ensure("style breaks tie before size", a < b);
-        ensure("strict weak ordering", !(b < a));
+        UNSCOPED_INFO("style breaks tie before size");
+        CHECK(a < b);
+        UNSCOPED_INFO("strict weak ordering");
+        CHECK_FALSE(b < a);
     }
 
     // The "TEMPLATE" sentinel marks descriptors that exist only as the
     // post-XML template (no concrete point size yet).
-    template<> template<>
-    void llfontregistry_object::test<10>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: isTemplate is true only for the TEMPLATE size sentinel", "[LLFontRegistry]")
     {
         LLFontDescriptor t("SansSerif", "TEMPLATE", 0);
         LLFontDescriptor n("SansSerif", "Medium", 0);
-        ensure("template sentinel detected", t.isTemplate());
-        ensure("non-template not flagged", !n.isTemplate());
+        UNSCOPED_INFO("template sentinel detected");
+        CHECK(t.isTemplate());
+        UNSCOPED_INFO("non-template not flagged");
+        CHECK_FALSE(n.isTemplate());
     }
 
     // ===================================================================
@@ -295,28 +292,32 @@ namespace
 
     // <font_size> populates the global size table; nameToSize hits it
     // when no per-family override applies.
-    template<> template<>
-    void llfontregistry_object::test<11>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: <font_size> fills the global table that nameToSize reads", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
             "  <font_size name='Medium' size='12.0'/>"
             "  <font_size name='Large'  size='14.0'/>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         F32 sz = 0.f;
-        ensure("Medium found", reg.nameToSize("Medium", sz));
-        ensure_equals("Medium = 12", sz, 12.0f);
-        ensure("Large found", reg.nameToSize("Large", sz));
-        ensure_equals("Large = 14", sz, 14.0f);
-        ensure("Huge missing", !reg.nameToSize("Huge", sz));
+        UNSCOPED_INFO("Medium found");
+        CHECK(reg.nameToSize("Medium", sz));
+        UNSCOPED_INFO("Medium = 12");
+        CHECK(sz == 12.0f);
+        UNSCOPED_INFO("Large found");
+        CHECK(reg.nameToSize("Large", sz));
+        UNSCOPED_INFO("Large = 14");
+        CHECK(sz == 14.0f);
+        UNSCOPED_INFO("Huge missing");
+        CHECK_FALSE(reg.nameToSize("Huge", sz));
     }
 
     // New-format <style> blocks produce one descriptor per (family, style).
     // file_hinting+font_weight inherited from the family-level attributes
     // unless the file overrides — verify both routes.
-    template<> template<>
-    void llfontregistry_object::test<12>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: <style> files take family weight and hinting unless they override", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -329,31 +330,33 @@ namespace
             "    </style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         const LLFontDescriptor* normal = templateFor("Inter", LLFontGL::NORMAL);
         const LLFontDescriptor* bold   = templateFor("Inter", LLFontGL::BOLD);
-        ensure("NORMAL template present", normal != nullptr);
-        ensure("BOLD template present",   bold != nullptr);
-        ensure("NORMAL inherits family wght set",
-               normal->getFontFiles()[0].mVarAxes.wght_set);
-        ensure_equals("NORMAL inherits family weight 400",
-                      normal->getFontFiles()[0].mVarAxes.wght, 400.f);
-        ensure_equals("NORMAL inherits family hinting light",
-                      (S32)normal->getFontFiles()[0].mHinting,
+        UNSCOPED_INFO("NORMAL template present");
+        REQUIRE(normal != nullptr);
+        UNSCOPED_INFO("BOLD template present");
+        REQUIRE(bold != nullptr);
+        UNSCOPED_INFO("NORMAL inherits family wght set");
+        CHECK(normal->getFontFiles()[0].mVarAxes.wght_set);
+        UNSCOPED_INFO("NORMAL inherits family weight 400");
+        CHECK(normal->getFontFiles()[0].mVarAxes.wght == 400.f);
+        UNSCOPED_INFO("NORMAL inherits family hinting light");
+        CHECK((S32)normal->getFontFiles()[0].mHinting ==
                       (S32)EFontHinting::LIGHT);
-        ensure("BOLD has wght set after override",
-               bold->getFontFiles()[0].mVarAxes.wght_set);
-        ensure_equals("BOLD overrides weight to 700",
-                      bold->getFontFiles()[0].mVarAxes.wght, 700.f);
-        ensure_equals("BOLD inherits family hinting",
-                      (S32)bold->getFontFiles()[0].mHinting,
+        UNSCOPED_INFO("BOLD has wght set after override");
+        CHECK(bold->getFontFiles()[0].mVarAxes.wght_set);
+        UNSCOPED_INFO("BOLD overrides weight to 700");
+        CHECK(bold->getFontFiles()[0].mVarAxes.wght == 700.f);
+        UNSCOPED_INFO("BOLD inherits family hinting");
+        CHECK((S32)bold->getFontFiles()[0].mHinting ==
                       (S32)EFontHinting::LIGHT);
     }
 
     // <size> children inside <font> populate the per-family override table
     // that nameToSize(family, size) consults before the global table.
-    template<> template<>
-    void llfontregistry_object::test<13>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a family's <size> overrides the global size for that family only", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -363,22 +366,24 @@ namespace
             "    <style name='NORMAL'><file>DejaVuSans.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         F32 sz = 0.f;
-        ensure("DejaVu Medium hits family override",
-               reg.nameToSize("DejaVu", "Medium", sz));
-        ensure_equals("DejaVu Medium = 8.6", sz, 8.6f);
+        UNSCOPED_INFO("DejaVu Medium hits family override");
+        CHECK(reg.nameToSize("DejaVu", "Medium", sz));
+        UNSCOPED_INFO("DejaVu Medium = 8.6");
+        CHECK(sz == 8.6f);
         F32 sz2 = 0.f;
-        ensure("Other family Medium falls back to global",
-               reg.nameToSize("SansSerif", "Medium", sz2));
-        ensure_equals("Global Medium unchanged", sz2, 12.0f);
+        UNSCOPED_INFO("Other family Medium falls back to global");
+        CHECK(reg.nameToSize("SansSerif", "Medium", sz2));
+        UNSCOPED_INFO("Global Medium unchanged");
+        CHECK(sz2 == 12.0f);
     }
 
     // Family-level ligatures="on" propagates to every file unless the
     // file overrides. The flag lives on LLFontFileInfo (it controls the
     // freetype-level setAllowMonospaceLigatures call later on).
-    template<> template<>
-    void llfontregistry_object::test<14>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a family's ligatures=on carries to its files", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -386,17 +391,18 @@ namespace
             "    <style name='NORMAL'><file>FiraCode.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         const LLFontDescriptor* d = templateFor("Mono", LLFontGL::NORMAL);
-        ensure("template present", d != nullptr);
-        ensure("ligatures inherited",
-               d->getFontFiles()[0].mMonospaceLigatures);
+        UNSCOPED_INFO("template present");
+        REQUIRE(d != nullptr);
+        UNSCOPED_INFO("ligatures inherited");
+        CHECK(d->getFontFiles()[0].mMonospaceLigatures);
     }
 
     // load_collection on the family is inherited by every file; file-level
     // load_collection overrides per-file. Verify both paths.
-    template<> template<>
-    void llfontregistry_object::test<15>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: load_collection works on the family and on a single file", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -407,18 +413,18 @@ namespace
             "    <style name='NORMAL'><file load_collection='true'>OnlyOne.ttc</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
-        ensure("family-level load_collection inherited",
-               templateFor("CJK")->getFontFiles()[0].mLoadCollection);
-        ensure("file-level load_collection works alone",
-               templateFor("Mono")->getFontFiles()[0].mLoadCollection);
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
+        UNSCOPED_INFO("family-level load_collection inherited");
+        CHECK(templateFor("CJK")->getFontFiles()[0].mLoadCollection);
+        UNSCOPED_INFO("file-level load_collection works alone");
+        CHECK(templateFor("Mono")->getFontFiles()[0].mLoadCollection);
     }
 
     // flags="bold" forces LLFontGL::BOLD into the file's flags so that
     // a single .woff2 carrying multiple weights still lights up callers'
     // BOLD checks.
-    template<> template<>
-    void llfontregistry_object::test<16>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a file's flags=bold sets BOLD in its flags", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -428,18 +434,19 @@ namespace
             "    </style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         const LLFontDescriptor* d = templateFor("Inter", LLFontGL::BOLD);
-        ensure("template present", d != nullptr);
-        ensure_equals("BOLD bit set on file flags",
-                      d->getFontFiles()[0].mFlags & LLFontGL::BOLD,
+        UNSCOPED_INFO("template present");
+        REQUIRE(d != nullptr);
+        UNSCOPED_INFO("BOLD bit set on file flags");
+        CHECK((d->getFontFiles()[0].mFlags & LLFontGL::BOLD) ==
                       (S32)LLFontGL::BOLD);
     }
 
     // unicode_ranges parses comma-separated U+lo-U+hi tokens into a
     // CharFunctor that returns true for matching codepoints.
-    template<> template<>
-    void llfontregistry_object::test<17>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: unicode_ranges builds a CharFunctor from U+ ranges and code points", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -449,21 +456,28 @@ namespace
             "    </style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         const auto& cf = templateFor("Emoji")->getFontFiles()[0].CharFunctor;
-        ensure("functor present", static_cast<bool>(cf));
-        ensure("U+2600 inside range",   cf(0x2600));
-        ensure("U+27BF inside range",   cf(0x27BF));
-        ensure("U+27C0 outside range", !cf(0x27C0));
-        ensure("U+1F525 single CP",     cf(0x1F525));
-        ensure("0x200D via 0x prefix",  cf(0x200D));
-        ensure("U+0000 nowhere covered", !cf(0));
+        UNSCOPED_INFO("functor present");
+        REQUIRE(static_cast<bool>(cf));
+        UNSCOPED_INFO("U+2600 inside range");
+        CHECK(cf(0x2600));
+        UNSCOPED_INFO("U+27BF inside range");
+        CHECK(cf(0x27BF));
+        UNSCOPED_INFO("U+27C0 outside range");
+        CHECK_FALSE(cf(0x27C0));
+        UNSCOPED_INFO("U+1F525 single CP");
+        CHECK(cf(0x1F525));
+        UNSCOPED_INFO("0x200D via 0x prefix");
+        CHECK(cf(0x200D));
+        UNSCOPED_INFO("U+0000 nowhere covered");
+        CHECK_FALSE(cf(0));
     }
 
     // Malformed unicode_ranges tokens get skipped with a log, but the
     // remaining valid tokens still build a functor.
-    template<> template<>
-    void llfontregistry_object::test<18>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: unicode_ranges skips malformed tokens and keeps the valid ones", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -473,16 +487,18 @@ namespace
             "    </style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         const auto& cf = templateFor("Frag")->getFontFiles()[0].CharFunctor;
-        ensure("functor still built", static_cast<bool>(cf));
-        ensure("valid range survives", cf(0x2700));
+        UNSCOPED_INFO("functor still built");
+        REQUIRE(static_cast<bool>(cf));
+        UNSCOPED_INFO("valid range survives");
+        CHECK(cf(0x2700));
     }
 
     // size_delta carries to the file unchanged. createFont adds it to
     // the resolved point size when loading a face.
-    template<> template<>
-    void llfontregistry_object::test<19>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: size_delta carries to the file unchanged", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -492,15 +508,15 @@ namespace
             "    </style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
-        ensure_equals("size_delta preserved",
-                      templateFor("X")->getFontFiles()[0].mSizeDelta, -1.5f);
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
+        UNSCOPED_INFO("size_delta preserved");
+        CHECK(templateFor("X")->getFontFiles()[0].mSizeDelta == -1.5f);
     }
 
     // Family metadata: label / user_selectable / monospace flow into
     // mFamilyMeta where getAvailableFamilies reads them.
-    template<> template<>
-    void llfontregistry_object::test<20>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: getAvailableFamilies reports labels and hides user_selectable=false", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -514,25 +530,28 @@ namespace
             "    <style name='NORMAL'><file>H.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto fams = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::ANY);
         // Hidden filtered out; Inter + Mono remain. Stable sort by label.
-        ensure_equals("Hidden filtered + 2 visible families", (S32)fams.size(), 2);
+        UNSCOPED_INFO("Hidden filtered + 2 visible families");
+        REQUIRE((S32)fams.size() == 2);
         bool sawInter = false, sawMono = false;
         for (const auto& f : fams)
         {
-            if (f.name == "Inter") { sawInter = true; ensure_equals("Inter label", f.label, std::string("Inter Display")); }
+            if (f.name == "Inter") { sawInter = true; UNSCOPED_INFO("Inter label"); REQUIRE(f.label == std::string("Inter Display")); }
             if (f.name == "Mono")  { sawMono  = true; }
         }
-        ensure("Inter present", sawInter);
-        ensure("Mono present",  sawMono);
+        UNSCOPED_INFO("Inter present");
+        CHECK(sawInter);
+        UNSCOPED_INFO("Mono present");
+        CHECK(sawMono);
     }
 
     // Two consecutive init_from_xml calls (mimicking cross-skin layering)
     // PREPEND the second layer's files onto an existing same-key entry.
-    template<> template<>
-    void llfontregistry_object::test<21>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a second init_from_xml layer prepends its files to the family", "[LLFontRegistry]")
     {
         const char* base =
             "<fonts>"
@@ -546,12 +565,17 @@ namespace
             "    <style name='NORMAL'><file>Overlay.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("base parse",    loadXml(base));
-        ensure("overlay parse", loadXml(overlay));
+        UNSCOPED_INFO("base parse");
+        CHECK(loadXml(base));
+        UNSCOPED_INFO("overlay parse");
+        CHECK(loadXml(overlay));
         auto names = fileNames("SansSerif");
-        ensure_equals("two files merged", (S32)names.size(), 2);
-        ensure_equals("overlay prepended", names[0], std::string("Overlay.woff2"));
-        ensure_equals("base kept as fallback", names[1], std::string("Base.woff2"));
+        UNSCOPED_INFO("two files merged");
+        REQUIRE((S32)names.size() == 2);
+        UNSCOPED_INFO("overlay prepended");
+        CHECK(names[0] == std::string("Overlay.woff2"));
+        UNSCOPED_INFO("base kept as fallback");
+        CHECK(names[1] == std::string("Base.woff2"));
     }
 
     // ===================================================================
@@ -560,8 +584,7 @@ namespace
 
     // Simple <use family="B"/> appends B's files onto A's chain at the
     // matching style.
-    template<> template<>
-    void llfontregistry_object::test<22>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: <use> appends the used family's files after the family's own", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -573,18 +596,21 @@ namespace
             "    <style name='NORMAL'><file>B.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto names = fileNames("A");
-        ensure_equals("A then B", (S32)names.size(), 2);
-        ensure_equals("A own first", names[0], std::string("A.woff2"));
-        ensure_equals("B appended",  names[1], std::string("B.woff2"));
+        UNSCOPED_INFO("A then B");
+        REQUIRE((S32)names.size() == 2);
+        UNSCOPED_INFO("A own first");
+        CHECK(names[0] == std::string("A.woff2"));
+        UNSCOPED_INFO("B appended");
+        CHECK(names[1] == std::string("B.woff2"));
     }
 
     // Style fallback: A wants B at BOLD, B only declares NORMAL.
     // Resolver should pull B's NORMAL files into A's BOLD chain.
-    template<> template<>
-    void llfontregistry_object::test<23>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: <use> of a family without BOLD fills the BOLD chain from its NORMAL", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -596,19 +622,22 @@ namespace
             "    <style name='NORMAL'><file>B-Regular.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto names = fileNames("A", LLFontGL::BOLD);
-        ensure_equals("A-Bold then B-Regular fallback", (S32)names.size(), 2);
-        ensure_equals("A's bold first", names[0], std::string("A-Bold.woff2"));
-        ensure_equals("B NORMAL fallback", names[1], std::string("B-Regular.woff2"));
+        UNSCOPED_INFO("A-Bold then B-Regular fallback");
+        REQUIRE((S32)names.size() == 2);
+        UNSCOPED_INFO("A's bold first");
+        CHECK(names[0] == std::string("A-Bold.woff2"));
+        UNSCOPED_INFO("B NORMAL fallback");
+        CHECK(names[1] == std::string("B-Regular.woff2"));
     }
 
     // Cycle A→B + B→A: each family's chain ends with the other's files
     // exactly once. Without the visited-set guard this would recurse
     // infinitely or duplicate.
-    template<> template<>
-    void llfontregistry_object::test<24>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a two-family <use> cycle puts each file on each chain once", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -621,18 +650,22 @@ namespace
             "    <style name='NORMAL'><file>B.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
-        ensure_equals("A.woff2 once on A", countFile("A", "A.woff2"), 1);
-        ensure_equals("B.woff2 once on A", countFile("A", "B.woff2"), 1);
-        ensure_equals("B.woff2 once on B", countFile("B", "B.woff2"), 1);
-        ensure_equals("A.woff2 once on B", countFile("B", "A.woff2"), 1);
+        UNSCOPED_INFO("A.woff2 once on A");
+        CHECK(countFile("A", "A.woff2") == 1);
+        UNSCOPED_INFO("B.woff2 once on A");
+        CHECK(countFile("A", "B.woff2") == 1);
+        UNSCOPED_INFO("B.woff2 once on B");
+        CHECK(countFile("B", "B.woff2") == 1);
+        UNSCOPED_INFO("A.woff2 once on B");
+        CHECK(countFile("B", "A.woff2") == 1);
     }
 
     // Diamond A→B, A→C, B→D, C→D: D must appear exactly once on A's
     // chain — the visited set is shared across the whole walk.
-    template<> template<>
-    void llfontregistry_object::test<25>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <use> diamond puts the shared family on the chain once", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -653,17 +686,19 @@ namespace
             "    <style name='NORMAL'><file>D.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
-        ensure_equals("D.woff2 appears exactly once on A",
-                      countFile("A", "D.woff2"), 1);
-        ensure_equals("B.woff2 once on A", countFile("A", "B.woff2"), 1);
-        ensure_equals("C.woff2 once on A", countFile("A", "C.woff2"), 1);
+        UNSCOPED_INFO("D.woff2 appears exactly once on A");
+        CHECK(countFile("A", "D.woff2") == 1);
+        UNSCOPED_INFO("B.woff2 once on A");
+        CHECK(countFile("A", "B.woff2") == 1);
+        UNSCOPED_INFO("C.woff2 once on A");
+        CHECK(countFile("A", "C.woff2") == 1);
     }
 
     // Self-reference <use family="self"/> logs and is skipped.
-    template<> template<>
-    void llfontregistry_object::test<26>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <use> of the family itself is skipped", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -672,17 +707,17 @@ namespace
             "    <style name='NORMAL'><file>A.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
-        ensure_equals("only A's own file remains",
-                      countFile("A", "A.woff2"), 1);
-        ensure_equals("nothing else added",
-                      (S32)fileNames("A").size(), 1);
+        UNSCOPED_INFO("only A's own file remains");
+        CHECK(countFile("A", "A.woff2") == 1);
+        UNSCOPED_INFO("nothing else added");
+        REQUIRE((S32)fileNames("A").size() == 1);
     }
 
     // <use family="ghost"/> targeting an undeclared family is skipped.
-    template<> template<>
-    void llfontregistry_object::test<27>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <use> of an undeclared family is skipped", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -691,16 +726,16 @@ namespace
             "    <style name='NORMAL'><file>A.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
-        ensure_equals("undeclared use skipped",
-                      (S32)fileNames("A").size(), 1);
+        UNSCOPED_INFO("undeclared use skipped");
+        REQUIRE((S32)fileNames("A").size() == 1);
     }
 
     // <use>-only family (no <style> blocks declared): style descriptors
     // are synthesized from whichever styles the referenced family covers.
-    template<> template<>
-    void llfontregistry_object::test<28>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a use-only family gets a template for each style its <use> declares", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -712,22 +747,23 @@ namespace
             "    <style name='BOLD'><file>Inner-B.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
-        ensure("Wrapper NORMAL synthesized",
-               templateFor("Wrapper", LLFontGL::NORMAL) != nullptr);
-        ensure("Wrapper BOLD synthesized",
-               templateFor("Wrapper", LLFontGL::BOLD) != nullptr);
+        UNSCOPED_INFO("Wrapper NORMAL synthesized");
+        REQUIRE(templateFor("Wrapper", LLFontGL::NORMAL) != nullptr);
+        UNSCOPED_INFO("Wrapper BOLD synthesized");
+        REQUIRE(templateFor("Wrapper", LLFontGL::BOLD) != nullptr);
         auto bold = fileNames("Wrapper", LLFontGL::BOLD);
-        ensure_equals("Wrapper BOLD pulls Inner-B", (S32)bold.size(), 1);
-        ensure_equals("...and the file is Inner-B",
-                      bold[0], std::string("Inner-B.woff2"));
+        UNSCOPED_INFO("Wrapper BOLD pulls Inner-B");
+        REQUIRE((S32)bold.size() == 1);
+        UNSCOPED_INFO("...and the file is Inner-B");
+        CHECK(bold[0] == std::string("Inner-B.woff2"));
     }
 
     // inherit="true" on BOLD appends the family's NORMAL files.
     // Verify: BOLD's chain ends with NORMAL's contents.
-    template<> template<>
-    void llfontregistry_object::test<29>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: inherit=true on BOLD appends the family's NORMAL files", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -736,12 +772,16 @@ namespace
             "    <style name='BOLD' inherit='true'><file>F-B.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto names = fileNames("F", LLFontGL::BOLD);
-        ensure_equals("BOLD then NORMAL via inherit", (S32)names.size(), 2);
-        ensure_equals("BOLD first", names[0], std::string("F-B.woff2"));
-        ensure_equals("NORMAL appended", names[1], std::string("F-R.woff2"));
+        UNSCOPED_INFO("BOLD then NORMAL via inherit");
+        REQUIRE((S32)names.size() == 2);
+        UNSCOPED_INFO("BOLD first");
+        CHECK(names[0] == std::string("F-B.woff2"));
+        UNSCOPED_INFO("NORMAL appended");
+        CHECK(names[1] == std::string("F-R.woff2"));
     }
 
     // <use> applies per-style before inherit; then inherit appends NORMAL's
@@ -751,8 +791,7 @@ namespace
     // resolveFontReferences drops the second B because chain[0..2] already
     // covers everything the duplicate would; it just wastes the renderer's
     // per-codepoint chain walk to look up a face it'll handle the same way.
-    template<> template<>
-    void llfontregistry_object::test<30>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: BOLD inherit after <use> keeps one copy of the used family's file", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -765,24 +804,27 @@ namespace
             "    <style name='NORMAL'><file>B.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto bold = fileNames("F", LLFontGL::BOLD);
-        ensure_equals("3 files post-dedup: own bold + B from <use> + NORMAL inherit",
-                      (S32)bold.size(), 3);
-        ensure_equals("F-B first",        bold[0], std::string("F-B.woff2"));
-        ensure_equals("B from <use>",     bold[1], std::string("B.woff2"));
-        ensure_equals("F-R inherited",    bold[2], std::string("F-R.woff2"));
-        ensure_equals("duplicate B from NORMAL's <use> deduped out",
-                      countFile("F", "B.woff2", LLFontGL::BOLD), 1);
+        UNSCOPED_INFO("3 files post-dedup: own bold + B from <use> + NORMAL inherit");
+        REQUIRE((S32)bold.size() == 3);
+        UNSCOPED_INFO("F-B first");
+        CHECK(bold[0] == std::string("F-B.woff2"));
+        UNSCOPED_INFO("B from <use>");
+        CHECK(bold[1] == std::string("B.woff2"));
+        UNSCOPED_INFO("F-R inherited");
+        CHECK(bold[2] == std::string("F-R.woff2"));
+        UNSCOPED_INFO("duplicate B from NORMAL's <use> deduped out");
+        CHECK(countFile("F", "B.woff2", LLFontGL::BOLD) == 1);
     }
 
     // Calling resolve() a second time is a no-op — mFamilyUses /
     // mInheritFlags are consumed at the end of the first call. Per-
     // family sizes (mFamilySizes) and per-file source-family tags
     // survive — those are runtime data, not parse state.
-    template<> template<>
-    void llfontregistry_object::test<31>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a second resolveFontReferences call adds nothing", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -794,13 +836,14 @@ namespace
             "    <style name='NORMAL'><file>B.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto first = fileNames("A");
         resolve(); // second call must not re-append
         auto second = fileNames("A");
-        ensure_equals("size unchanged across re-resolve",
-                      (S32)first.size(), (S32)second.size());
+        UNSCOPED_INFO("size unchanged across re-resolve");
+        REQUIRE((S32)first.size() == (S32)second.size());
     }
 
     // ===================================================================
@@ -810,8 +853,7 @@ namespace
     // Family→family override: target's chain becomes [source files...,
     // target's own files] so source wins for the head face but target
     // fallbacks remain available behind it.
-    template<> template<>
-    void llfontregistry_object::test<32>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a family override puts the source's files ahead of the target's", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -822,23 +864,26 @@ namespace
             "    <style name='NORMAL'><file>Alt.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         LLSD overrides;
         overrides["UI"] = "Alt";
         applyOverrides(overrides);
         auto names = fileNames("UI");
-        ensure_equals("source prepended + target preserved", (S32)names.size(), 2);
-        ensure_equals("Alt prepended", names[0], std::string("Alt.woff2"));
-        ensure_equals("UI fallback kept", names[1], std::string("UI.woff2"));
+        UNSCOPED_INFO("source prepended + target preserved");
+        REQUIRE((S32)names.size() == 2);
+        UNSCOPED_INFO("Alt prepended");
+        CHECK(names[0] == std::string("Alt.woff2"));
+        UNSCOPED_INFO("UI fallback kept");
+        CHECK(names[1] == std::string("UI.woff2"));
     }
 
     // Family→file override: the override value isn't a known family, so
     // it's treated as a literal file path. The synthesized LLFontFileInfo
     // inherits hinting/weight/flags from the target's first file so the
     // swap behaves like a drop-in replacement.
-    template<> template<>
-    void llfontregistry_object::test<33>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a file override copies hinting/weight/ligatures from the target", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -846,24 +891,27 @@ namespace
             "    <style name='NORMAL'><file>UI.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         LLSD overrides;
         overrides["UI"] = "user-supplied.ttf";
         applyOverrides(overrides);
         const auto& files = templateFor("UI")->getFontFiles();
-        ensure_equals("file added in front", files[0].FileName,
+        UNSCOPED_INFO("file added in front");
+        CHECK(files[0].FileName ==
                       std::string("user-supplied.ttf"));
-        ensure_equals("hinting inherited from target's first file",
-                      (S32)files[0].mHinting, (S32)EFontHinting::LIGHT);
-        ensure_equals("weight inherited", files[0].mVarAxes.wght, 400.f);
-        ensure("ligatures inherited",      files[0].mMonospaceLigatures);
+        UNSCOPED_INFO("hinting inherited from target's first file");
+        CHECK((S32)files[0].mHinting == (S32)EFontHinting::LIGHT);
+        UNSCOPED_INFO("weight inherited");
+        CHECK(files[0].mVarAxes.wght == 400.f);
+        UNSCOPED_INFO("ligatures inherited");
+        CHECK(files[0].mMonospaceLigatures);
     }
 
     // Self-override (target == source string) is rejected — the override
     // would otherwise prepend the target's own files onto itself.
-    template<> template<>
-    void llfontregistry_object::test<34>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: an override of a family to itself is ignored", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -871,18 +919,19 @@ namespace
             "    <style name='NORMAL'><file>UI.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         LLSD overrides;
         overrides["UI"] = "UI";
         applyOverrides(overrides);
         auto names = fileNames("UI");
-        ensure_equals("self-override skipped", (S32)names.size(), 1);
+        UNSCOPED_INFO("self-override skipped");
+        REQUIRE((S32)names.size() == 1);
     }
 
     // Unknown target family: skipped, no phantom entries created.
-    template<> template<>
-    void llfontregistry_object::test<35>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: an override of an undeclared family creates no template", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -890,36 +939,39 @@ namespace
             "    <style name='NORMAL'><file>R.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         LLSD overrides;
         overrides["Phantom"] = "Real";
         applyOverrides(overrides);
-        ensure("no template materialized for Phantom",
-               templateFor("Phantom") == nullptr);
-        ensure_equals("Real untouched",
-                      (S32)fileNames("Real").size(), 1);
+        UNSCOPED_INFO("no template materialized for Phantom");
+        REQUIRE(templateFor("Phantom") == nullptr);
+        UNSCOPED_INFO("Real untouched");
+        REQUIRE((S32)fileNames("Real").size() == 1);
     }
 
     // overridesEqual: snapshot of last-applied overrides updates with
     // each call to resolveFontReferences (which calls applyFamilyOverrides
     // and stashes the LLSD).
-    template<> template<>
-    void llfontregistry_object::test<36>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: overridesEqual compares against the overrides last resolved", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
             "  <font name='UI'><style name='NORMAL'><file>U.woff2</file></style></font>"
             "  <font name='Alt'><style name='NORMAL'><file>A.woff2</file></style></font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         LLSD ovr1;
         ovr1["UI"] = "Alt";
         resolve(ovr1);
-        ensure("identical maps compare equal", reg.overridesEqual(ovr1));
+        UNSCOPED_INFO("identical maps compare equal");
+        CHECK(reg.overridesEqual(ovr1));
         LLSD ovr2;
         ovr2["UI"] = "Different";
-        ensure("different value differs", !reg.overridesEqual(ovr2));
+        UNSCOPED_INFO("different value differs");
+        CHECK_FALSE(reg.overridesEqual(ovr2));
     }
 
     // applyOverrides prepends source files onto the target's chain. The
@@ -929,8 +981,7 @@ namespace
     // own <size> (or global) is what nameToSize returns. This pins the
     // post-redesign behavior: per-family size is absolute for THAT family
     // only, never propagated cross-family.
-    template<> template<>
-    void llfontregistry_object::test<37>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: override files carry the source family while nameToSize stays put", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -943,7 +994,8 @@ namespace
             "    <style name='NORMAL'><file>A.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         LLSD overrides;
         overrides["UI"] = "Alt";
@@ -951,30 +1003,31 @@ namespace
         // nameToSize for UI returns UI's own pin; the override does NOT
         // route this lookup through Alt.
         F32 sz = 0.f;
-        ensure(reg.nameToSize("UI", "Custom", sz));
-        ensure_equals("UI Custom = own 9.5 (override does NOT route nameToSize)",
-                      sz, 9.5f);
+        CHECK(reg.nameToSize("UI", "Custom", sz));
+        UNSCOPED_INFO("UI Custom = own 9.5 (override does NOT route nameToSize)");
+        CHECK(sz == 9.5f);
         // The override DID prepend Alt's file onto UI's chain, with
         // mSourceFamily=Alt — so per-file pin lookup at render time
         // would use Alt's <size> for that prepended file.
         const auto& files = templateFor("UI")->getFontFiles();
-        ensure("UI chain has at least one file", !files.empty());
-        ensure_equals("first file = Alt's prepended file",
-                      files[0].FileName, std::string("A.woff2"));
-        ensure_equals("prepended file tagged with source family Alt",
-                      files[0].mSourceFamily, std::string("Alt"));
+        UNSCOPED_INFO("UI chain has at least one file");
+        REQUIRE_FALSE(files.empty());
+        UNSCOPED_INFO("first file = Alt's prepended file");
+        CHECK(files[0].FileName == std::string("A.woff2"));
+        UNSCOPED_INFO("prepended file tagged with source family Alt");
+        CHECK(files[0].mSourceFamily == std::string("Alt"));
         // Alt's pin is intact for per-file lookup.
         F32 alt_pin = 0.f;
-        ensure(familySizePt("Alt", "Custom", alt_pin));
-        ensure_equals("Alt Custom pin = 11.5 (createFont uses this for Alt's file)",
-                      alt_pin, 11.5f);
+        CHECK(familySizePt("Alt", "Custom", alt_pin));
+        UNSCOPED_INFO("Alt Custom pin = 11.5 (createFont uses this for Alt's file)");
+        CHECK(alt_pin == 11.5f);
 
         // Clear the override; UI's own pin still applies.
         applyOverrides(LLSD());
         F32 sz2 = 0.f;
-        ensure(reg.nameToSize("UI", "Custom", sz2));
-        ensure_equals("UI Custom = own 9.5 (override cleared)",
-                      sz2, 9.5f);
+        CHECK(reg.nameToSize("UI", "Custom", sz2));
+        UNSCOPED_INFO("UI Custom = own 9.5 (override cleared)");
+        CHECK(sz2 == 9.5f);
     }
 
     // ===================================================================
@@ -983,8 +1036,7 @@ namespace
 
     // getMatchingFontDesc applies normalize() to its argument, so passing
     // an unnormalized "SansSerifHuge" finds the {SansSerif, Huge} template.
-    template<> template<>
-    void llfontregistry_object::test<38>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: getMatchingFontDesc finds a declared template and misses an absent one", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -992,18 +1044,20 @@ namespace
             "    <style name='NORMAL'><file>S.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         LLFontDescriptor query("SansSerif", "TEMPLATE", 0);
-        ensure("template lookup hits", reg.getMatchingFontDesc(query) != nullptr);
+        UNSCOPED_INFO("template lookup hits");
+        REQUIRE(reg.getMatchingFontDesc(query) != nullptr);
         LLFontDescriptor miss("Nope", "TEMPLATE", 0);
-        ensure("absent name misses", reg.getMatchingFontDesc(miss) == nullptr);
+        UNSCOPED_INFO("absent name misses");
+        REQUIRE(reg.getMatchingFontDesc(miss) == nullptr);
     }
 
     // getClosestFontTemplate prefers the entry whose style bits overlap
     // most with the requested style, with BOLD as a tiebreaker.
-    template<> template<>
-    void llfontregistry_object::test<39>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: getClosestFontTemplate takes an exact style and breaks ties toward BOLD", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1013,29 +1067,32 @@ namespace
             "    <style name='ITALIC'><file>F-I.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         // Asking for BOLD: exact match wins.
         LLFontDescriptor want_bold("F", "TEMPLATE", LLFontGL::BOLD);
         const LLFontDescriptor* best = reg.getClosestFontTemplate(want_bold);
-        ensure("bold exact",  best != nullptr);
-        ensure_equals("bold style", (S32)best->getStyle(), (S32)LLFontGL::BOLD);
+        UNSCOPED_INFO("bold exact");
+        REQUIRE(best != nullptr);
+        UNSCOPED_INFO("bold style");
+        CHECK((S32)best->getStyle() == (S32)LLFontGL::BOLD);
 
         // Asking for BOLD|ITALIC with no BOLD|ITALIC entry: the BOLD
         // tiebreaker should prefer BOLD over ITALIC at equal bit-count.
         LLFontDescriptor want_bi("F", "TEMPLATE",
                                  (U8)(LLFontGL::BOLD | LLFontGL::ITALIC));
         best = reg.getClosestFontTemplate(want_bi);
-        ensure("BI fallback hit", best != nullptr);
-        ensure_equals("BOLD wins tiebreak",
-                      (S32)best->getStyle(), (S32)LLFontGL::BOLD);
+        UNSCOPED_INFO("BI fallback hit");
+        REQUIRE(best != nullptr);
+        UNSCOPED_INFO("BOLD wins tiebreak");
+        CHECK((S32)best->getStyle() == (S32)LLFontGL::BOLD);
     }
 
     // getClosestFontTemplate REJECTS entries that have style bits the
     // request didn't ask for. Asking for NORMAL must not return a BOLD
     // template even if the family has only BOLD.
-    template<> template<>
-    void llfontregistry_object::test<40>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: getClosestFontTemplate never returns a style the request lacks", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1043,17 +1100,17 @@ namespace
             "    <style name='BOLD'><file>F-B.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         LLFontDescriptor want_normal("F", "TEMPLATE", 0);
-        ensure("no NORMAL match returned",
-               reg.getClosestFontTemplate(want_normal) == nullptr);
+        UNSCOPED_INFO("no NORMAL match returned");
+        REQUIRE(reg.getClosestFontTemplate(want_normal) == nullptr);
     }
 
     // Empty-family overload of nameToSize skips the per-family path
     // entirely and only consults the global table.
-    template<> template<>
-    void llfontregistry_object::test<41>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: nameToSize without a family reads only the global table", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1063,14 +1120,17 @@ namespace
             "    <style name='NORMAL'><file>F.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         F32 sz = 0.f;
-        ensure("empty-family overload finds Medium",
-               reg.nameToSize("Medium", sz));
-        ensure_equals("...and gets the global value", sz, 12.0f);
+        UNSCOPED_INFO("empty-family overload finds Medium");
+        CHECK(reg.nameToSize("Medium", sz));
+        UNSCOPED_INFO("...and gets the global value");
+        CHECK(sz == 12.0f);
         F32 sz2 = 0.f;
         reg.nameToSize("F", "Medium", sz2);
-        ensure_equals("family overload still gets per-family value", sz2, 9.0f);
+        UNSCOPED_INFO("family overload still gets per-family value");
+        CHECK(sz2 == 9.0f);
     }
 
     // ===================================================================
@@ -1079,8 +1139,7 @@ namespace
 
     // ANY filter returns both monospace and proportional, "default" and
     // user_selectable=false are excluded, and result is sorted by label.
-    template<> template<>
-    void llfontregistry_object::test<42>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: getAvailableFamilies ANY drops hidden and default and sorts by label", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1097,20 +1156,21 @@ namespace
             "    <style name='NORMAL'><file>D.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto fams = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::ANY);
-        ensure_equals("only 2 selectable families", (S32)fams.size(), 2);
-        ensure_equals("sorted by label, Apple first",
-                      fams[0].name, std::string("Apple"));
-        ensure_equals("Zebra second",
-                      fams[1].name, std::string("Zebra"));
+        UNSCOPED_INFO("only 2 selectable families");
+        REQUIRE((S32)fams.size() == 2);
+        UNSCOPED_INFO("sorted by label, Apple first");
+        CHECK(fams[0].name == std::string("Apple"));
+        UNSCOPED_INFO("Zebra second");
+        CHECK(fams[1].name == std::string("Zebra"));
     }
 
     // MONOSPACE filter returns only families with monospace="true";
     // PROPORTIONAL is the inverse.
-    template<> template<>
-    void llfontregistry_object::test<43>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: getAvailableFamilies MONOSPACE and PROPORTIONAL split on monospace", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1121,22 +1181,24 @@ namespace
             "    <style name='NORMAL'><file>M.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto mono = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::MONOSPACE);
-        ensure_equals("MONOSPACE: 1 family", (S32)mono.size(), 1);
-        ensure_equals("MONOSPACE returns Mono",
-                      mono[0].name, std::string("Mono"));
+        UNSCOPED_INFO("MONOSPACE: 1 family");
+        REQUIRE((S32)mono.size() == 1);
+        UNSCOPED_INFO("MONOSPACE returns Mono");
+        CHECK(mono[0].name == std::string("Mono"));
         auto prop = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::PROPORTIONAL);
-        ensure_equals("PROPORTIONAL: 1 family", (S32)prop.size(), 1);
-        ensure_equals("PROPORTIONAL returns Sans",
-                      prop[0].name, std::string("Sans"));
+        UNSCOPED_INFO("PROPORTIONAL: 1 family");
+        REQUIRE((S32)prop.size() == 1);
+        UNSCOPED_INFO("PROPORTIONAL returns Sans");
+        CHECK(prop[0].name == std::string("Sans"));
     }
 
     // Family without a label attribute defaults its UI label to the
     // family name.
-    template<> template<>
-    void llfontregistry_object::test<44>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a family without a label uses its name as the label", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1144,20 +1206,21 @@ namespace
             "    <style name='NORMAL'><file>P.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto fams = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::ANY);
-        ensure_equals("one family", (S32)fams.size(), 1);
-        ensure_equals("label defaults to name",
-                      fams[0].label, std::string("Plain"));
+        UNSCOPED_INFO("one family");
+        REQUIRE((S32)fams.size() == 1);
+        UNSCOPED_INFO("label defaults to name");
+        CHECK(fams[0].label == std::string("Plain"));
     }
 
     // <use family='A'/> inside <font name='A'> — literal self-reference
     // by name, distinct from the 'self' alias path (test 26). The cycle
     // detector must skip both. The post-resolve chain should contain
     // only A's own files, with no duplicate insertion.
-    template<> template<>
-    void llfontregistry_object::test<45>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <use> naming the family itself leaves only the family's own file", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1166,13 +1229,14 @@ namespace
             "    <style name='NORMAL'><file>M.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto names = fileNames("Mono");
-        ensure_equals("self-reference by literal name doesn't duplicate files",
-                      (S32)names.size(), 1);
-        ensure_equals("only the family's own file in chain",
-                      names[0], std::string("M.woff2"));
+        UNSCOPED_INFO("self-reference by literal name doesn't duplicate files");
+        REQUIRE((S32)names.size() == 1);
+        UNSCOPED_INFO("only the family's own file in chain");
+        CHECK(names[0] == std::string("M.woff2"));
     }
 
     // Empty <fonts/> root with no children is a degenerate but valid
@@ -1180,15 +1244,15 @@ namespace
     // and leave the registry's font map empty. Pins safe handling of
     // an empty skin layer (e.g., when a skin overrides only the metric
     // table and leaves families to inherit from a lower layer).
-    template<> template<>
-    void llfontregistry_object::test<46>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: an empty <fonts> root parses and resolves to no families", "[LLFontRegistry]")
     {
         const char* xml = "<fonts></fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto fams = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::ANY);
-        ensure_equals("empty XML produces empty available-families list",
-                      (S32)fams.size(), 0);
+        UNSCOPED_INFO("empty XML produces empty available-families list");
+        REQUIRE((S32)fams.size() == 0);
     }
 
     // applyOverrides called twice with different LLSD maps: the second
@@ -1198,8 +1262,7 @@ namespace
     // via the per-file source-family on the prepended head file (the
     // override target's chain head should reflect ONLY the most recent
     // override's source).
-    template<> template<>
-    void llfontregistry_object::test<47>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: applyOverrides twice replaces the first override instead of merging", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1216,7 +1279,8 @@ namespace
             "    <style name='NORMAL'><file>B.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
 
         // First override: UI → AltA. UI's chain head becomes AltA's file.
@@ -1224,11 +1288,12 @@ namespace
         ovr1["UI"] = "AltA";
         applyOverrides(ovr1);
         const auto& files_a = templateFor("UI")->getFontFiles();
-        ensure("UI chain non-empty after first override", !files_a.empty());
-        ensure_equals("UI head = AltA's file",
-                      files_a[0].FileName, std::string("A.woff2"));
-        ensure_equals("head's mSourceFamily = AltA",
-                      files_a[0].mSourceFamily, std::string("AltA"));
+        UNSCOPED_INFO("UI chain non-empty after first override");
+        REQUIRE_FALSE(files_a.empty());
+        UNSCOPED_INFO("UI head = AltA's file");
+        CHECK(files_a[0].FileName == std::string("A.woff2"));
+        UNSCOPED_INFO("head's mSourceFamily = AltA");
+        CHECK(files_a[0].mSourceFamily == std::string("AltA"));
 
         // Second override: UI → AltB. The earlier UI→AltA mapping must
         // be replaced, not merged — UI's head is now AltB.
@@ -1236,11 +1301,12 @@ namespace
         ovr2["UI"] = "AltB";
         applyOverrides(ovr2);
         const auto& files_b = templateFor("UI")->getFontFiles();
-        ensure("UI chain non-empty after second override", !files_b.empty());
-        ensure_equals("UI head = AltB's file (replaced AltA)",
-                      files_b[0].FileName, std::string("B.woff2"));
-        ensure_equals("head's mSourceFamily = AltB",
-                      files_b[0].mSourceFamily, std::string("AltB"));
+        UNSCOPED_INFO("UI chain non-empty after second override");
+        REQUIRE_FALSE(files_b.empty());
+        UNSCOPED_INFO("UI head = AltB's file (replaced AltA)");
+        CHECK(files_b[0].FileName == std::string("B.woff2"));
+        UNSCOPED_INFO("head's mSourceFamily = AltB");
+        CHECK(files_b[0].mSourceFamily == std::string("AltB"));
     }
 
     // Override on a base family must propagate through <use> chains to
@@ -1256,8 +1322,7 @@ namespace
     //   Plain -- <use Base/> + <use Latin/>
     //   Menu  -- <use Base/> + <use Latin/> + <use Mark/>
     // Override Base → Custom must end up in BOTH Plain and Menu.
-    template<> template<>
-    void llfontregistry_object::test<48>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: an override on a base family reaches every family that <use>s it", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1286,35 +1351,36 @@ namespace
             "    <use family='Mark'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
 
         LLSD overrides;
         overrides["Base"] = "Custom";
         resolve(overrides);
 
         // Direct target picks up the override.
-        ensure_equals("Base[0] is the override file",
-                      fileNames("Base").size() > 0u
+        UNSCOPED_INFO("Base[0] is the override file");
+        REQUIRE((fileNames("Base").size() > 0u
                           ? fileNames("Base")[0]
-                          : std::string(),
+                          : std::string()) ==
                       std::string("Custom.woff2"));
         // Both dependents see Custom.woff2 in their chain — that's the
         // load-bearing assertion. A regression to the old order
         // (overrides applied after <use> resolution) would leave them
         // without Custom.woff2 entirely.
-        ensure("Plain chain includes Custom.woff2 via Base",
-               countFile("Plain", "Custom.woff2") >= 1);
-        ensure("Menu chain includes Custom.woff2 via Base",
-               countFile("Menu", "Custom.woff2") >= 1);
+        UNSCOPED_INFO("Plain chain includes Custom.woff2 via Base");
+        CHECK(countFile("Plain", "Custom.woff2") >= 1);
+        UNSCOPED_INFO("Menu chain includes Custom.woff2 via Base");
+        CHECK(countFile("Menu", "Custom.woff2") >= 1);
         // The chain after the override-driven Base files must still
         // carry Source (Base's own <use>) and the sibling <use>s — the
         // override prepends, doesn't replace.
-        ensure("Plain chain still has Source.woff2",
-               countFile("Plain", "Source.woff2") >= 1);
-        ensure("Plain chain still has Latin.woff2",
-               countFile("Plain", "Latin.woff2") >= 1);
-        ensure("Menu chain still has Mark.woff2",
-               countFile("Menu", "Mark.woff2") >= 1);
+        UNSCOPED_INFO("Plain chain still has Source.woff2");
+        CHECK(countFile("Plain", "Source.woff2") >= 1);
+        UNSCOPED_INFO("Plain chain still has Latin.woff2");
+        CHECK(countFile("Plain", "Latin.woff2") >= 1);
+        UNSCOPED_INFO("Menu chain still has Mark.woff2");
+        CHECK(countFile("Menu", "Mark.woff2") >= 1);
 
         // Position pin: the override file MUST be at index 0 of every
         // dependent chain. The renderer treats position 0 as the head
@@ -1323,14 +1389,16 @@ namespace
         // somewhere later than 0, the original Source.woff2 still wins
         // for every glyph it covers and the user observes "no change."
         const auto plain_files = fileNames("Plain");
-        ensure("Plain chain non-empty", !plain_files.empty());
-        ensure_equals("Plain[0] must be the override file",
-                      plain_files.empty() ? std::string() : plain_files[0],
+        UNSCOPED_INFO("Plain chain non-empty");
+        REQUIRE_FALSE(plain_files.empty());
+        UNSCOPED_INFO("Plain[0] must be the override file");
+        REQUIRE((plain_files.empty() ? std::string() : plain_files[0]) ==
                       std::string("Custom.woff2"));
         const auto menu_files = fileNames("Menu");
-        ensure("Menu chain non-empty", !menu_files.empty());
-        ensure_equals("Menu[0] must be the override file",
-                      menu_files.empty() ? std::string() : menu_files[0],
+        UNSCOPED_INFO("Menu chain non-empty");
+        REQUIRE_FALSE(menu_files.empty());
+        UNSCOPED_INFO("Menu[0] must be the override file");
+        REQUIRE((menu_files.empty() ? std::string() : menu_files[0]) ==
                       std::string("Custom.woff2"));
     }
 
@@ -1339,8 +1407,7 @@ namespace
     // appends the parent NORMAL chain after the variant's own files.
     // Verify the override (which prepends to the BOLD template) still
     // ends up at position 0 of dependent chains for the BOLD style.
-    template<> template<>
-    void llfontregistry_object::test<49>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: an override on a base family leads the BOLD chains that <use> it", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1363,7 +1430,8 @@ namespace
             "    <use family='Latin'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
 
         LLSD overrides;
         overrides["Base"] = "Custom";
@@ -1371,14 +1439,15 @@ namespace
 
         // BOLD variant of Menu must lead with the override's BOLD file.
         const auto menu_bold = fileNames("Menu", LLFontGL::BOLD);
-        ensure("Menu BOLD chain non-empty", !menu_bold.empty());
-        ensure_equals("Menu BOLD[0] must be override BOLD file",
-                      menu_bold.empty() ? std::string() : menu_bold[0],
+        UNSCOPED_INFO("Menu BOLD chain non-empty");
+        REQUIRE_FALSE(menu_bold.empty());
+        UNSCOPED_INFO("Menu BOLD[0] must be override BOLD file");
+        REQUIRE((menu_bold.empty() ? std::string() : menu_bold[0]) ==
                       std::string("Custom-Bold.woff2"));
         // NORMAL variant unchanged invariant.
         const auto menu_normal = fileNames("Menu", LLFontGL::NORMAL);
-        ensure_equals("Menu NORMAL[0] must be override NORMAL file",
-                      menu_normal.empty() ? std::string() : menu_normal[0],
+        UNSCOPED_INFO("Menu NORMAL[0] must be override NORMAL file");
+        REQUIRE((menu_normal.empty() ? std::string() : menu_normal[0]) ==
                       std::string("Custom-Regular.woff2"));
     }
 
@@ -1389,8 +1458,7 @@ namespace
     // user picks one font in the picker, then picks a different one —
     // each setting change drives LLFontRegistry::reload(font_overrides)
     // which clears mFontMap before re-parsing.
-    template<> template<>
-    void llfontregistry_object::test<50>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a reload with a new override leaves no trace of the old one", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1412,55 +1480,56 @@ namespace
             "</fonts>";
 
         // First load: override Base -> AltA.
-        ensure("first parse ok", loadXml(xml));
+        UNSCOPED_INFO("first parse ok");
+        CHECK(loadXml(xml));
         LLSD ovr_a;
         ovr_a["Base"] = "AltA";
         resolve(ovr_a);
 
         const auto menu_after_a = fileNames("Menu");
-        ensure("Menu chain non-empty after override A",
-               !menu_after_a.empty());
-        ensure_equals("Menu[0] is AltA after first override",
-                      menu_after_a.empty() ? std::string() : menu_after_a[0],
+        UNSCOPED_INFO("Menu chain non-empty after override A");
+        REQUIRE_FALSE(menu_after_a.empty());
+        UNSCOPED_INFO("Menu[0] is AltA after first override");
+        REQUIRE((menu_after_a.empty() ? std::string() : menu_after_a[0]) ==
                       std::string("AltA.woff2"));
-        ensure("Menu chain has Source after first override",
-               countFile("Menu", "Source.woff2") >= 1);
+        UNSCOPED_INFO("Menu chain has Source after first override");
+        CHECK(countFile("Menu", "Source.woff2") >= 1);
 
         // Simulate reload: wipe parse-time state, re-parse, apply
         // override B. AltA must be GONE from the chain — a regression
         // would leak the prior override into the new resolution.
         simulateReload();
-        ensure("re-parse ok after simulated reload", loadXml(xml));
+        UNSCOPED_INFO("re-parse ok after simulated reload");
+        CHECK(loadXml(xml));
         LLSD ovr_b;
         ovr_b["Base"] = "AltB";
         resolve(ovr_b);
 
         const auto menu_after_b = fileNames("Menu");
-        ensure("Menu chain non-empty after override B",
-               !menu_after_b.empty());
-        ensure_equals("Menu[0] is AltB after second override",
-                      menu_after_b.empty() ? std::string() : menu_after_b[0],
+        UNSCOPED_INFO("Menu chain non-empty after override B");
+        REQUIRE_FALSE(menu_after_b.empty());
+        UNSCOPED_INFO("Menu[0] is AltB after second override");
+        REQUIRE((menu_after_b.empty() ? std::string() : menu_after_b[0]) ==
                       std::string("AltB.woff2"));
-        ensure_equals("AltA must NOT appear in Menu chain after replace",
-                      countFile("Menu", "AltA.woff2"), 0);
-        ensure("Menu chain still has Source after replace",
-               countFile("Menu", "Source.woff2") >= 1);
+        UNSCOPED_INFO("AltA must NOT appear in Menu chain after replace");
+        CHECK(countFile("Menu", "AltA.woff2") == 0);
+        UNSCOPED_INFO("Menu chain still has Source after replace");
+        CHECK(countFile("Menu", "Source.woff2") >= 1);
         // Same checks for the direct target — Base itself must show
         // only the new override at chain[0], no residue from AltA.
         const auto base_after_b = fileNames("Base");
-        ensure_equals("Base[0] is AltB after second override",
-                      base_after_b.empty() ? std::string() : base_after_b[0],
+        UNSCOPED_INFO("Base[0] is AltB after second override");
+        REQUIRE((base_after_b.empty() ? std::string() : base_after_b[0]) ==
                       std::string("AltB.woff2"));
-        ensure_equals("AltA must NOT appear in Base chain after replace",
-                      countFile("Base", "AltA.woff2"), 0);
+        UNSCOPED_INFO("AltA must NOT appear in Base chain after replace");
+        CHECK(countFile("Base", "AltA.woff2") == 0);
     }
 
     // Reload-and-clear: existing registry has override A, then user picks
     // "(default)" in the picker which writes an empty overrides map.
     // Reload with empty overrides must restore the original chain — no
     // override file lingers from the prior resolution.
-    template<> template<>
-    void llfontregistry_object::test<51>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a reload with no overrides restores the original chain head", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1478,27 +1547,30 @@ namespace
             "  </font>"
             "</fonts>";
 
-        ensure("first parse ok", loadXml(xml));
+        UNSCOPED_INFO("first parse ok");
+        CHECK(loadXml(xml));
         LLSD ovr_a;
         ovr_a["Base"] = "AltA";
         resolve(ovr_a);
-        ensure_equals("Menu[0] is AltA before clear",
-                      fileNames("Menu").empty()
+        UNSCOPED_INFO("Menu[0] is AltA before clear");
+        REQUIRE((fileNames("Menu").empty()
                           ? std::string()
-                          : fileNames("Menu")[0],
+                          : fileNames("Menu")[0]) ==
                       std::string("AltA.woff2"));
 
         // Reload with empty overrides — picker's "(default)" sentinel.
         simulateReload();
-        ensure("re-parse ok", loadXml(xml));
+        UNSCOPED_INFO("re-parse ok");
+        CHECK(loadXml(xml));
         resolve(LLSD::emptyMap());
 
         const auto menu = fileNames("Menu");
-        ensure("Menu non-empty after clear", !menu.empty());
-        ensure_equals("Menu[0] returns to Source after override clear",
-                      menu[0], std::string("Source.woff2"));
-        ensure_equals("AltA gone from Menu after clear",
-                      countFile("Menu", "AltA.woff2"), 0);
+        UNSCOPED_INFO("Menu non-empty after clear");
+        REQUIRE_FALSE(menu.empty());
+        UNSCOPED_INFO("Menu[0] returns to Source after override clear");
+        CHECK(menu[0] == std::string("Source.woff2"));
+        UNSCOPED_INFO("AltA gone from Menu after clear");
+        CHECK(countFile("Menu", "AltA.woff2") == 0);
     }
 
     // Dedup pin: when the override source is also reachable through the
@@ -1509,8 +1581,7 @@ namespace
     // is functionally redundant since chain[0] already covers everything
     // the duplicate would, and the duplicated entry just wastes the
     // renderer's per-codepoint walk.
-    template<> template<>
-    void llfontregistry_object::test<52>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: an override source also reached by <use> appears once in the chain", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1528,7 +1599,8 @@ namespace
             "    <use family='DejaVu'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
 
         LLSD overrides;
         overrides["Base"] = "DejaVu";
@@ -1536,14 +1608,15 @@ namespace
 
         // Without dedup, Menu would be [DejaVu(override), Source,
         // DejaVu(<use>), …]. With dedup, the second DejaVu is dropped.
-        ensure_equals("Menu chain has DejaVu exactly once",
-                      countFile("Menu", "DejaVu.woff2"), 1);
-        ensure("Menu chain still has Source",
-               countFile("Menu", "Source.woff2") >= 1);
+        UNSCOPED_INFO("Menu chain has DejaVu exactly once");
+        CHECK(countFile("Menu", "DejaVu.woff2") == 1);
+        UNSCOPED_INFO("Menu chain still has Source");
+        CHECK(countFile("Menu", "Source.woff2") >= 1);
         const auto menu = fileNames("Menu");
-        ensure("Menu non-empty", !menu.empty());
-        ensure_equals("Menu[0] is the override file",
-                      menu[0], std::string("DejaVu.woff2"));
+        UNSCOPED_INFO("Menu non-empty");
+        REQUIRE_FALSE(menu.empty());
+        UNSCOPED_INFO("Menu[0] is the override file");
+        CHECK(menu[0] == std::string("DejaVu.woff2"));
     }
 
     // Pure <use> diamond, no override. A reaches D twice — once through
@@ -1553,8 +1626,7 @@ namespace
     // also operates on plain chain composition with no override
     // involved, so a future regression that gates dedup on "did
     // applyFamilyOverrides run?" would fail here.
-    template<> template<>
-    void llfontregistry_object::test<53>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a plain <use> diamond with no override is deduplicated too", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1572,17 +1644,18 @@ namespace
             "    <use family='C'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
 
         // A reaches D twice (via B and via C). Pre-dedup the chain
         // would be [D, D]; post-dedup [D] — first hit wins, second
         // copy dropped.
-        ensure_equals("A chain has D exactly once",
-                      countFile("A", "D.woff2"), 1);
+        UNSCOPED_INFO("A chain has D exactly once");
+        CHECK(countFile("A", "D.woff2") == 1);
         const auto a_files = fileNames("A");
-        ensure_equals("A chain length post-dedup",
-                      (S32)a_files.size(), 1);
+        UNSCOPED_INFO("A chain length post-dedup");
+        REQUIRE((S32)a_files.size() == 1);
     }
 
     // Two functored entries with the same filename must NOT collapse.
@@ -1599,8 +1672,7 @@ namespace
     // `static_cast<bool>(a.CharFunctor) != static_cast<bool>(...)`
     // check passes (both are non-null), so the inner guard is the only
     // line keeping them apart.
-    template<> template<>
-    void llfontregistry_object::test<54>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: two entries of one file with different CharFunctors are both kept", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1619,23 +1691,23 @@ namespace
             "    <use family='EmojiGated'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
 
         // Both entries reference the same filename and carry a non-null
         // CharFunctor. Dedup must keep both — collapsing would route
         // every codepoint through whichever functor survived, breaking
         // coverage for the dropped range.
-        ensure_equals("Combined keeps both functored entries",
-                      countFile("Combined", "Shared.ttf"), 2);
+        UNSCOPED_INFO("Combined keeps both functored entries");
+        CHECK(countFile("Combined", "Shared.ttf") == 2);
     }
 
     // simulateReload + re-parse with new sizes must update nameToSize for
     // both the global <font_size> table and per-family <size> children.
     // Live-fonts.xml-edit reload depends on this — without it, the rest
     // of reload() would swap freetypes at the OLD point sizes.
-    template<> template<>
-    void llfontregistry_object::test<55>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a reload with new sizes updates nameToSize for global and family sizes", "[LLFontRegistry]")
     {
         const char* xml_v1 =
             "<fonts>"
@@ -1645,13 +1717,16 @@ namespace
             "    <style name='NORMAL'><file>Inter.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse v1 ok", loadXml(xml_v1));
+        UNSCOPED_INFO("parse v1 ok");
+        CHECK(loadXml(xml_v1));
         resolve();
         F32 sz = 0.f;
-        ensure(reg.nameToSize("Inter", "Foo", sz));
-        ensure_equals("v1: Foo (global) = 10.0", sz, 10.0f);
-        ensure(reg.nameToSize("Inter", "Bar", sz));
-        ensure_equals("v1: Bar (per-family) = 8.0", sz, 8.0f);
+        CHECK(reg.nameToSize("Inter", "Foo", sz));
+        UNSCOPED_INFO("v1: Foo (global) = 10.0");
+        CHECK(sz == 10.0f);
+        CHECK(reg.nameToSize("Inter", "Bar", sz));
+        UNSCOPED_INFO("v1: Bar (per-family) = 8.0");
+        CHECK(sz == 8.0f);
 
         // Now simulate a runtime fonts.xml edit: wipe state, re-parse.
         simulateReload();
@@ -1663,12 +1738,15 @@ namespace
             "    <style name='NORMAL'><file>Inter.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse v2 ok", loadXml(xml_v2));
+        UNSCOPED_INFO("parse v2 ok");
+        CHECK(loadXml(xml_v2));
         resolve();
-        ensure(reg.nameToSize("Inter", "Foo", sz));
-        ensure_equals("v2: Foo (global) updated to 20.0", sz, 20.0f);
-        ensure(reg.nameToSize("Inter", "Bar", sz));
-        ensure_equals("v2: Bar (per-family) updated to 14.5", sz, 14.5f);
+        CHECK(reg.nameToSize("Inter", "Foo", sz));
+        UNSCOPED_INFO("v2: Foo (global) updated to 20.0");
+        CHECK(sz == 20.0f);
+        CHECK(reg.nameToSize("Inter", "Bar", sz));
+        UNSCOPED_INFO("v2: Bar (per-family) updated to 14.5");
+        CHECK(sz == 14.5f);
     }
 
     // ===================================================================
@@ -1679,8 +1757,7 @@ namespace
     // table. No head-face chain walk, no override-source routing. Pin
     // assertions stay on per-file rendering (createFont path), not on
     // chain-head pt resolution.
-    template<> template<>
-    void llfontregistry_object::test<56>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a use-only family's nameToSize reads the global table", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1693,15 +1770,17 @@ namespace
             "    <use family='HeadFace'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         F32 sz = 0.f;
-        ensure(reg.nameToSize("UseOnly", "Large", sz));
-        ensure_equals("UseOnly Large = global 11.0 (no chain walk)",
-                      sz, 11.0f);
+        CHECK(reg.nameToSize("UseOnly", "Large", sz));
+        UNSCOPED_INFO("UseOnly Large = global 11.0 (no chain walk)");
+        CHECK(sz == 11.0f);
         // HeadFace's own <size> still applies for direct queries.
-        ensure(reg.nameToSize("HeadFace", "Large", sz));
-        ensure_equals("HeadFace Large = own 12.0", sz, 12.0f);
+        CHECK(reg.nameToSize("HeadFace", "Large", sz));
+        UNSCOPED_INFO("HeadFace Large = own 12.0");
+        CHECK(sz == 12.0f);
     }
 
     // AlchemyUIFontOverrides changes the file list but does NOT route
@@ -1710,8 +1789,7 @@ namespace
     // for SansSerifBase still returns its own table or global —
     // OpenDyslexic's <size> applies only to OD's own files (verified
     // by the per-file pin tests below).
-    template<> template<>
-    void llfontregistry_object::test<57>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: an override does not route the target's nameToSize to the source", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1724,27 +1802,27 @@ namespace
             "    <style name='NORMAL'><file>SS.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         // Baseline: SansSerifBase has no <size>, falls to global.
         F32 sz = 0.f;
-        ensure(reg.nameToSize("SansSerifBase", "Large", sz));
-        ensure_equals("baseline SansSerifBase Large = global 11.0",
-                      sz, 11.0f);
+        CHECK(reg.nameToSize("SansSerifBase", "Large", sz));
+        UNSCOPED_INFO("baseline SansSerifBase Large = global 11.0");
+        CHECK(sz == 11.0f);
         // Apply override; nameToSize result must NOT change.
         LLSD overrides;
         overrides["SansSerifBase"] = "OpenDyslexic";
         applyOverrides(overrides);
         F32 sz2 = 0.f;
-        ensure(reg.nameToSize("SansSerifBase", "Large", sz2));
-        ensure_equals("override DOES NOT route nameToSize through OD",
-                      sz2, 11.0f);
+        CHECK(reg.nameToSize("SansSerifBase", "Large", sz2));
+        UNSCOPED_INFO("override DOES NOT route nameToSize through OD");
+        CHECK(sz2 == 11.0f);
     }
 
     // Per-family <size> on multiple distinct families: each pins its own
     // family's files. The data is keyed correctly per family.
-    template<> template<>
-    void llfontregistry_object::test<58>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: each family's <size> pin is stored under that family", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1758,13 +1836,16 @@ namespace
             "    <style name='NORMAL'><file>B.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         F32 a_sz = 0.f, b_sz = 0.f;
-        ensure(familySizePt("A", "Large", a_sz));
-        ensure(familySizePt("B", "Large", b_sz));
-        ensure_equals("A Large pin = 8.0",  a_sz, 8.0f);
-        ensure_equals("B Large pin = 13.0", b_sz, 13.0f);
+        CHECK(familySizePt("A", "Large", a_sz));
+        CHECK(familySizePt("B", "Large", b_sz));
+        UNSCOPED_INFO("A Large pin = 8.0");
+        CHECK(a_sz == 8.0f);
+        UNSCOPED_INFO("B Large pin = 13.0");
+        CHECK(b_sz == 13.0f);
     }
 
     // Per-family <size> from a <use>'d family is preserved on its files
@@ -1772,8 +1853,7 @@ namespace
     // has <size>; A's resolved chain has B's file with mSourceFamily=B,
     // and mFamilySizes[B] still has B's pin. createFont's per-file
     // lookup will use B's pin for B's file, regardless of A's chain pt.
-    template<> template<>
-    void llfontregistry_object::test<59>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <use>d family's files keep their source family and its size pin", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1787,18 +1867,21 @@ namespace
             "    <style name='NORMAL'><file>A.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         const auto& a_files = templateFor("A")->getFontFiles();
-        ensure_equals("A chain has 2 files", (S32)a_files.size(), 2);
-        ensure_equals("A's own file tagged 'A'",
-                      a_files[0].mSourceFamily, std::string("A"));
-        ensure_equals("B's file tagged 'B' through <use>",
-                      a_files[1].mSourceFamily, std::string("B"));
+        UNSCOPED_INFO("A chain has 2 files");
+        REQUIRE((S32)a_files.size() == 2);
+        UNSCOPED_INFO("A's own file tagged 'A'");
+        CHECK(a_files[0].mSourceFamily == std::string("A"));
+        UNSCOPED_INFO("B's file tagged 'B' through <use>");
+        CHECK(a_files[1].mSourceFamily == std::string("B"));
         F32 b_sz = 0.f;
-        ensure("B's pin still in mFamilySizes",
-               familySizePt("B", "Large", b_sz));
-        ensure_equals("B's pin = 8.0", b_sz, 8.0f);
+        UNSCOPED_INFO("B's pin still in mFamilySizes");
+        CHECK(familySizePt("B", "Large", b_sz));
+        UNSCOPED_INFO("B's pin = 8.0");
+        CHECK(b_sz == 8.0f);
     }
 
     // Hot-reload of a per-family <size> pin: edit the pin on a fallback
@@ -1806,8 +1889,7 @@ namespace
     // in mFamilySizes. createFont's per-file lookup will then pick up
     // the new pin on the next load. Pins the runtime-edit path that
     // matters for fonts.xml live editing.
-    template<> template<>
-    void llfontregistry_object::test<62>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a reload picks up an edited per-family <size> pin", "[LLFontRegistry]")
     {
         const char* xml_v1 =
             "<fonts>"
@@ -1817,11 +1899,13 @@ namespace
             "    <style name='NORMAL'><file>B.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse v1 ok", loadXml(xml_v1));
+        UNSCOPED_INFO("parse v1 ok");
+        CHECK(loadXml(xml_v1));
         resolve();
         F32 v1 = 0.f;
-        ensure(familySizePt("B", "Large", v1));
-        ensure_equals("v1: B Large pin = 8.0", v1, 8.0f);
+        CHECK(familySizePt("B", "Large", v1));
+        UNSCOPED_INFO("v1: B Large pin = 8.0");
+        CHECK(v1 == 8.0f);
 
         // Edit and reload — the new pin should land in mFamilySizes.
         simulateReload();
@@ -1833,11 +1917,13 @@ namespace
             "    <style name='NORMAL'><file>B.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse v2 ok", loadXml(xml_v2));
+        UNSCOPED_INFO("parse v2 ok");
+        CHECK(loadXml(xml_v2));
         resolve();
         F32 v2 = 0.f;
-        ensure(familySizePt("B", "Large", v2));
-        ensure_equals("v2: B Large pin = 13.5 (hot-reloaded)", v2, 13.5f);
+        CHECK(familySizePt("B", "Large", v2));
+        UNSCOPED_INFO("v2: B Large pin = 13.5 (hot-reloaded)");
+        CHECK(v2 == 13.5f);
     }
 
     // ===================================================================
@@ -1847,8 +1933,7 @@ namespace
     // <font> without a `name` attribute (new format): processNewFormatFont
     // logs a warning and bails before registering anything. No template
     // entry is created; sibling well-formed fonts still parse cleanly.
-    template<> template<>
-    void llfontregistry_object::test<64>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <font> without a name is dropped and its siblings still parse", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1859,18 +1944,18 @@ namespace
             "    <style name='NORMAL'><file>Good.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         // Empty-name template not created. The well-formed sibling is.
-        ensure("nameless not registered",
-               templateFor("", LLFontGL::NORMAL) == nullptr);
-        ensure("well-formed sibling parsed",
-               templateFor("Good", LLFontGL::NORMAL) != nullptr);
+        UNSCOPED_INFO("nameless not registered");
+        REQUIRE(templateFor("", LLFontGL::NORMAL) == nullptr);
+        UNSCOPED_INFO("well-formed sibling parsed");
+        REQUIRE(templateFor("Good", LLFontGL::NORMAL) != nullptr);
     }
 
     // <font_size> missing either attribute is silently dropped (parser
     // checks both before insert). The well-formed entry parses normally.
-    template<> template<>
-    void llfontregistry_object::test<65>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <font_size> missing its name or size is dropped", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1878,17 +1963,20 @@ namespace
             "  <font_size size='10.0'/>"
             "  <font_size name='Both' size='13.0'/>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         F32 sz = 0.f;
-        ensure("OnlyName not added",   !reg.nameToSize("OnlyName", sz));
-        ensure("Both registered",       reg.nameToSize("Both", sz));
-        ensure_equals("Both = 13.0",   sz, 13.0f);
+        UNSCOPED_INFO("OnlyName not added");
+        CHECK_FALSE(reg.nameToSize("OnlyName", sz));
+        UNSCOPED_INFO("Both registered");
+        CHECK(reg.nameToSize("Both", sz));
+        UNSCOPED_INFO("Both = 13.0");
+        CHECK(sz == 13.0f);
     }
 
     // <use> without a `family` attribute logs a warning and is skipped.
     // The chain reflects only well-formed entries.
-    template<> template<>
-    void llfontregistry_object::test<66>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <use> without a family is skipped and the rest still resolve", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1901,19 +1989,21 @@ namespace
             "    <style name='NORMAL'><file>A.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto names = fileNames("A");
-        ensure_equals("A own + Target via well-formed <use>",
-                      (S32)names.size(), 2);
-        ensure_equals("A own first",  names[0], std::string("A.woff2"));
-        ensure_equals("Target second", names[1], std::string("Target.woff2"));
+        UNSCOPED_INFO("A own + Target via well-formed <use>");
+        REQUIRE((S32)names.size() == 2);
+        UNSCOPED_INFO("A own first");
+        CHECK(names[0] == std::string("A.woff2"));
+        UNSCOPED_INFO("Target second");
+        CHECK(names[1] == std::string("Target.woff2"));
     }
 
     // <size> missing name or size is dropped from the per-family table
     // with a warning. Sibling well-formed <size> still applies.
-    template<> template<>
-    void llfontregistry_object::test<67>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <size> missing its name or size is dropped from the family table", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1925,14 +2015,15 @@ namespace
             "    <style name='NORMAL'><file>F.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         F32 sz = 0.f;
-        ensure(reg.nameToSize("F", "Foo", sz));
-        ensure_equals("F Foo = own 8.0 (well-formed entry takes effect)",
-                      sz, 8.0f);
-        ensure("Malformed name 'OnlyName' did not register on F",
-               !reg.nameToSize("F", "OnlyName", sz));
+        CHECK(reg.nameToSize("F", "Foo", sz));
+        UNSCOPED_INFO("F Foo = own 8.0 (well-formed entry takes effect)");
+        CHECK(sz == 8.0f);
+        UNSCOPED_INFO("Malformed name 'OnlyName' did not register on F");
+        CHECK_FALSE(reg.nameToSize("F", "OnlyName", sz));
     }
 
     // <style> with no <file> children produces an empty descriptor.
@@ -1940,8 +2031,7 @@ namespace
     // hang chain references on it. The use-chain provides files; the
     // composite's nameToSize falls through to global because per-family
     // <size> never propagates across families.
-    template<> template<>
-    void llfontregistry_object::test<68>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: an empty <style> takes its files from <use> and its size from global", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1955,37 +2045,38 @@ namespace
             "    <style name='NORMAL'/>"  // no <file>: empty descriptor
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         // Empty <style> -> the use-chain is the only file source.
         auto names = fileNames("Empty");
-        ensure_equals("Empty pulled Pickup via <use>",
-                      (S32)names.size(), 1);
-        ensure_equals("Pickup file present", names[0], std::string("Pickup.woff2"));
+        UNSCOPED_INFO("Empty pulled Pickup via <use>");
+        REQUIRE((S32)names.size() == 1);
+        UNSCOPED_INFO("Pickup file present");
+        CHECK(names[0] == std::string("Pickup.woff2"));
         // No cross-family propagation: Empty's nameToSize falls through
         // to global. Pickup's <size X=6> would still pin the Pickup
         // file at 6pt at createFont time (per-file pin), but the chain
         // head's pt is global.
         F32 sz = 0.f;
-        ensure(reg.nameToSize("Empty", "X", sz));
-        ensure_equals("Empty's X = global 10.0 (no cross-family flow)",
-                      sz, 10.0f);
+        CHECK(reg.nameToSize("Empty", "X", sz));
+        UNSCOPED_INFO("Empty's X = global 10.0 (no cross-family flow)");
+        CHECK(sz == 10.0f);
         // Pickup's <size> survives — per-file pin at render time.
         F32 pickup_pin = 0.f;
-        ensure(familySizePt("Pickup", "X", pickup_pin));
-        ensure_equals("Pickup's X pin still 6.0 (createFont uses for Pickup file)",
-                      pickup_pin, 6.0f);
+        CHECK(familySizePt("Pickup", "X", pickup_pin));
+        UNSCOPED_INFO("Pickup's X pin still 6.0 (createFont uses for Pickup file)");
+        CHECK(pickup_pin == 6.0f);
         // The Pickup file in Empty's chain carries mSourceFamily=Pickup.
         const auto& files = templateFor("Empty")->getFontFiles();
-        ensure_equals("Pickup file tagged with source family",
-                      files[0].mSourceFamily, std::string("Pickup"));
+        UNSCOPED_INFO("Pickup file tagged with source family");
+        CHECK(files[0].mSourceFamily == std::string("Pickup"));
     }
 
     // <style name="..."> with an unrecognized style string maps to NORMAL
     // (LLFontGL::getStyleFromString returns 0 for unknown names). The
     // resulting descriptor is keyed at NORMAL.
-    template<> template<>
-    void llfontregistry_object::test<69>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: an unrecognized <style> name maps to NORMAL", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -1993,18 +2084,18 @@ namespace
             "    <style name='WEIRD'><file>Q.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
-        ensure("'WEIRD' style mapped to NORMAL",
-               templateFor("Quirky", LLFontGL::NORMAL) != nullptr);
-        ensure("no BOLD template synthesized for unrecognized style",
-               templateFor("Quirky", LLFontGL::BOLD) == nullptr);
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
+        UNSCOPED_INFO("'WEIRD' style mapped to NORMAL");
+        REQUIRE(templateFor("Quirky", LLFontGL::NORMAL) != nullptr);
+        UNSCOPED_INFO("no BOLD template synthesized for unrecognized style");
+        REQUIRE(templateFor("Quirky", LLFontGL::BOLD) == nullptr);
     }
 
     // Three-level <use> cycle (A -> B -> C -> A). Visited set must
     // terminate the walk; each family contributes its own files exactly
     // once on every other family's chain.
-    template<> template<>
-    void llfontregistry_object::test<70>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a three-family <use> cycle puts each file on the chain once", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2021,20 +2112,24 @@ namespace
             "    <style name='NORMAL'><file>C.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         // Each chain should contain exactly one of each file, in the
         // walk order starting from the queried family.
-        ensure_equals("A: A.woff2 once", countFile("A", "A.woff2"), 1);
-        ensure_equals("A: B.woff2 once", countFile("A", "B.woff2"), 1);
-        ensure_equals("A: C.woff2 once", countFile("A", "C.woff2"), 1);
-        ensure_equals("A chain length 3", (S32)fileNames("A").size(), 3);
+        UNSCOPED_INFO("A: A.woff2 once");
+        CHECK(countFile("A", "A.woff2") == 1);
+        UNSCOPED_INFO("A: B.woff2 once");
+        CHECK(countFile("A", "B.woff2") == 1);
+        UNSCOPED_INFO("A: C.woff2 once");
+        CHECK(countFile("A", "C.woff2") == 1);
+        UNSCOPED_INFO("A chain length 3");
+        REQUIRE((S32)fileNames("A").size() == 3);
     }
 
     // Deep linear chain (5 levels). Walker descends without depth
     // restriction; final chain has each family's file exactly once.
-    template<> template<>
-    void llfontregistry_object::test<71>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a five-level <use> chain collects every file in order", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2058,22 +2153,28 @@ namespace
             "    <style name='NORMAL'><file>F5.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto names = fileNames("F1");
-        ensure_equals("F1 chain has all 5 files", (S32)names.size(), 5);
-        ensure_equals("F1 own first",  names[0], std::string("F1.woff2"));
-        ensure_equals("F2 next",       names[1], std::string("F2.woff2"));
-        ensure_equals("F3 next",       names[2], std::string("F3.woff2"));
-        ensure_equals("F4 next",       names[3], std::string("F4.woff2"));
-        ensure_equals("F5 last",       names[4], std::string("F5.woff2"));
+        UNSCOPED_INFO("F1 chain has all 5 files");
+        REQUIRE((S32)names.size() == 5);
+        UNSCOPED_INFO("F1 own first");
+        CHECK(names[0] == std::string("F1.woff2"));
+        UNSCOPED_INFO("F2 next");
+        CHECK(names[1] == std::string("F2.woff2"));
+        UNSCOPED_INFO("F3 next");
+        CHECK(names[2] == std::string("F3.woff2"));
+        UNSCOPED_INFO("F4 next");
+        CHECK(names[3] == std::string("F4.woff2"));
+        UNSCOPED_INFO("F5 last");
+        CHECK(names[4] == std::string("F5.woff2"));
     }
 
     // inherit="true" on a non-NORMAL style with no NORMAL parent declared
     // logs a warning and is a no-op for that variant. The variant's chain
     // contains only its own files, not anything synthesized.
-    template<> template<>
-    void llfontregistry_object::test<72>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: inherit=true with no NORMAL style leaves the variant's own files", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2083,13 +2184,14 @@ namespace
             "    </style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         auto bold = fileNames("Lonely", LLFontGL::BOLD);
-        ensure_equals("BOLD has only its own file (no NORMAL to inherit)",
-                      (S32)bold.size(), 1);
-        ensure_equals("Lonely-Bold present",
-                      bold[0], std::string("Lonely-Bold.woff2"));
+        UNSCOPED_INFO("BOLD has only its own file (no NORMAL to inherit)");
+        REQUIRE((S32)bold.size() == 1);
+        UNSCOPED_INFO("Lonely-Bold present");
+        CHECK(bold[0] == std::string("Lonely-Bold.woff2"));
     }
 
     // Synthesis fires only for styles explicitly authored somewhere in
@@ -2099,8 +2201,7 @@ namespace
     // (which accepts NORMAL as the closest match for any style request),
     // so request-time fallback handles the missing-style case rather
     // than synthesis aliasing every style to NORMAL.
-    template<> template<>
-    void llfontregistry_object::test<73>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a use-only family gets no template for styles its chain lacks", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2115,22 +2216,58 @@ namespace
             "    <style name='NORMAL'><file>C-Reg.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
-        ensure("A NORMAL synthesized (NORMAL declared in chain)",
-               templateFor("A", LLFontGL::NORMAL) != nullptr);
-        ensure("A BOLD NOT synthesized (no BOLD in chain)",
-               templateFor("A", LLFontGL::BOLD) == nullptr);
-        ensure("A ITALIC NOT synthesized (no ITALIC in chain)",
-               templateFor("A", LLFontGL::ITALIC) == nullptr);
-        ensure("A BOLD|ITALIC NOT synthesized",
-               templateFor("A",
+        UNSCOPED_INFO("A NORMAL synthesized (NORMAL declared in chain)");
+        REQUIRE(templateFor("A", LLFontGL::NORMAL) != nullptr);
+        UNSCOPED_INFO("A BOLD NOT synthesized (no BOLD in chain)");
+        REQUIRE(templateFor("A", LLFontGL::BOLD) == nullptr);
+        UNSCOPED_INFO("A ITALIC NOT synthesized (no ITALIC in chain)");
+        REQUIRE(templateFor("A", LLFontGL::ITALIC) == nullptr);
+        UNSCOPED_INFO("A BOLD|ITALIC NOT synthesized");
+        REQUIRE(templateFor("A",
                            static_cast<U8>(LLFontGL::BOLD | LLFontGL::ITALIC))
                    == nullptr);
         // NORMAL synthesizes from B and C:
         auto normal = fileNames("A", LLFontGL::NORMAL);
-        ensure_equals("A NORMAL pulls both fallbacks",
-                      (S32)normal.size(), 2);
+        UNSCOPED_INFO("A NORMAL pulls both fallbacks");
+        REQUIRE((S32)normal.size() == 2);
+    }
+
+    // Override that points to a use-only family: applyFamilyOverrides
+    // recognizes the source as a known family (via mFontMap template
+    // presence) and prepends its resolved file list. Pins the case
+    // where the override source is itself a composite use-only family
+    // — the override should still propagate the source's chain head.
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: an override whose source is a use-only family prepends its chain", "[LLFontRegistry]")
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Inner'>"
+            "    <style name='NORMAL'><file>Inner.woff2</file></style>"
+            "  </font>"
+            "  <font name='Composite'>"  // use-only, source of override
+            "    <use family='Inner'/>"
+            "  </font>"
+            "  <font name='Target'>"
+            "    <style name='NORMAL'><file>Target.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
+        resolve();
+        LLSD overrides;
+        overrides["Target"] = "Composite";
+        applyOverrides(overrides);
+        auto names = fileNames("Target");
+        // Override prepends Composite's resolved chain (= Inner's files).
+        UNSCOPED_INFO("Target chain after override is non-empty");
+        REQUIRE_FALSE(names.empty());
+        UNSCOPED_INFO("Inner.woff2 prepended via Composite override");
+        CHECK(names[0] == std::string("Inner.woff2"));
+        UNSCOPED_INFO("Target's own file kept as fallback behind override");
+        CHECK(countFile("Target", "Target.woff2") == 1);
     }
 
     // <size> entries round-trip through the parser into mFamilySizes,
@@ -2138,8 +2275,7 @@ namespace
     // the family name so createFont can later look up the per-family
     // pin at render time. Every <size> is an absolute pin — no force
     // attribute needed.
-    template<> template<>
-    void llfontregistry_object::test<75>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: <size> pins reach mFamilySizes and files carry their source family", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2149,30 +2285,33 @@ namespace
             "    <style name='NORMAL'><file>Pinned.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
 
         // <size> entries land in mFamilySizes.
         F32 large = 0.f, medium = 0.f;
-        ensure(familySizePt("Pinned", "Large", large));
-        ensure_equals("Large = 8.0",  large, 8.0f);
-        ensure(familySizePt("Pinned", "Medium", medium));
-        ensure_equals("Medium = 7.0", medium, 7.0f);
+        CHECK(familySizePt("Pinned", "Large", large));
+        UNSCOPED_INFO("Large = 8.0");
+        CHECK(large == 8.0f);
+        CHECK(familySizePt("Pinned", "Medium", medium));
+        UNSCOPED_INFO("Medium = 7.0");
+        CHECK(medium == 7.0f);
 
         // Files contributed by Pinned's <style> block carry mSourceFamily.
         auto names = fileNames("Pinned");
-        ensure_equals("one file", (S32)names.size(), 1);
+        UNSCOPED_INFO("one file");
+        REQUIRE((S32)names.size() == 1);
         const auto& files = templateFor("Pinned")->getFontFiles();
-        ensure_equals("file's mSourceFamily = Pinned",
-                      files[0].mSourceFamily, std::string("Pinned"));
+        UNSCOPED_INFO("file's mSourceFamily = Pinned");
+        CHECK(files[0].mSourceFamily == std::string("Pinned"));
     }
 
     // mSourceFamily is preserved when files flow through a <use> chain.
     // A <use>s B; B's file appears in A's chain with mSourceFamily=B.
     // This is the plumbing that lets createFont look up B's per-family
     // pin when B-contributed files render under A's head.
-    template<> template<>
-    void llfontregistry_object::test<76>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: mSourceFamily survives a <use> into another family's chain", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2185,14 +2324,16 @@ namespace
             "    <style name='NORMAL'><file>A.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         const auto& files = templateFor("A")->getFontFiles();
-        ensure_equals("A chain length 2", (S32)files.size(), 2);
-        ensure_equals("A's own file tagged 'A'",
-                      files[0].mSourceFamily, std::string("A"));
-        ensure_equals("B's file tagged 'B' (preserved through <use>)",
-                      files[1].mSourceFamily, std::string("B"));
+        UNSCOPED_INFO("A chain length 2");
+        REQUIRE((S32)files.size() == 2);
+        UNSCOPED_INFO("A's own file tagged 'A'");
+        CHECK(files[0].mSourceFamily == std::string("A"));
+        UNSCOPED_INFO("B's file tagged 'B' (preserved through <use>)");
+        CHECK(files[1].mSourceFamily == std::string("B"));
     }
 
     // Override SWAP between two distinct pinned sources, mirroring the
@@ -2208,8 +2349,7 @@ namespace
     //     after the reload (parse-time data, persists).
     //   - Target's own nameToSize is unaffected by either override —
     //     no cross-family routing.
-    template<> template<>
-    void llfontregistry_object::test<77>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a reload swapping pinned override sources drops the first source's file", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2228,90 +2368,60 @@ namespace
             "</fonts>";
 
         // Boot state: override Target -> SourceA via reload-equivalent.
-        ensure("parse v1 ok", loadXml(xml));
+        UNSCOPED_INFO("parse v1 ok");
+        CHECK(loadXml(xml));
         LLSD ovr_a;
         ovr_a["Target"] = "SourceA";
         resolve(ovr_a);
         const auto& a_files = templateFor("Target")->getFontFiles();
-        ensure("Target chain non-empty after first override",
-               !a_files.empty());
-        ensure_equals("Target head = SourceA's file",
-                      a_files[0].FileName, std::string("SourceA.woff2"));
-        ensure_equals("head's mSourceFamily = SourceA",
-                      a_files[0].mSourceFamily, std::string("SourceA"));
+        UNSCOPED_INFO("Target chain non-empty after first override");
+        REQUIRE_FALSE(a_files.empty());
+        UNSCOPED_INFO("Target head = SourceA's file");
+        CHECK(a_files[0].FileName == std::string("SourceA.woff2"));
+        UNSCOPED_INFO("head's mSourceFamily = SourceA");
+        CHECK(a_files[0].mSourceFamily == std::string("SourceA"));
 
         // Picker swap: production calls reload() which wipes mFontMap +
         // re-parses + re-resolves with the new override. simulateReload
         // mirrors the wipe; loadXml + resolve mirrors the re-parse +
         // re-resolve.
         simulateReload();
-        ensure("parse v2 ok", loadXml(xml));
+        UNSCOPED_INFO("parse v2 ok");
+        CHECK(loadXml(xml));
         LLSD ovr_b;
         ovr_b["Target"] = "SourceB";
         resolve(ovr_b);
         const auto& b_files = templateFor("Target")->getFontFiles();
-        ensure("Target chain non-empty after swap",
-               !b_files.empty());
-        ensure_equals("Target head = SourceB's file (clean swap)",
-                      b_files[0].FileName, std::string("SourceB.woff2"));
-        ensure_equals("head's mSourceFamily = SourceB",
-                      b_files[0].mSourceFamily, std::string("SourceB"));
+        UNSCOPED_INFO("Target chain non-empty after swap");
+        REQUIRE_FALSE(b_files.empty());
+        UNSCOPED_INFO("Target head = SourceB's file (clean swap)");
+        CHECK(b_files[0].FileName == std::string("SourceB.woff2"));
+        UNSCOPED_INFO("head's mSourceFamily = SourceB");
+        CHECK(b_files[0].mSourceFamily == std::string("SourceB"));
         // After the reload-driven swap, SourceA's file is gone — no
         // leftover state from the prior override.
-        ensure_equals("SourceA's file is not in the post-swap chain",
-                      countFile("Target", "SourceA.woff2"), 0);
+        UNSCOPED_INFO("SourceA's file is not in the post-swap chain");
+        CHECK(countFile("Target", "SourceA.woff2") == 0);
 
         // Both source families' pins remain queryable in mFamilySizes
         // post-reload. createFont uses the head's mSourceFamily to
         // decide its render pt: under ovr_a that hits SourceA's 10,
         // under ovr_b that hits SourceB's 14.
         F32 a_pin = 0.f, b_pin = 0.f;
-        ensure(familySizePt("SourceA", "Large", a_pin));
-        ensure_equals("SourceA pin = 10.0", a_pin, 10.0f);
-        ensure(familySizePt("SourceB", "Large", b_pin));
-        ensure_equals("SourceB pin = 14.0", b_pin, 14.0f);
+        CHECK(familySizePt("SourceA", "Large", a_pin));
+        UNSCOPED_INFO("SourceA pin = 10.0");
+        CHECK(a_pin == 10.0f);
+        CHECK(familySizePt("SourceB", "Large", b_pin));
+        UNSCOPED_INFO("SourceB pin = 14.0");
+        CHECK(b_pin == 14.0f);
 
         // Target's own nameToSize is unaffected by either override —
         // it falls through to global because Target has no own <size>.
         // Pins the "no cross-family routing" rule.
         F32 sz = 0.f;
-        ensure(reg.nameToSize("Target", "Large", sz));
-        ensure_equals("Target Large = global 11.0 (override does not route)",
-                      sz, 11.0f);
-    }
-
-    // Override that points to a use-only family: applyFamilyOverrides
-    // recognizes the source as a known family (via mFontMap template
-    // presence) and prepends its resolved file list. Pins the case
-    // where the override source is itself a composite use-only family
-    // — the override should still propagate the source's chain head.
-    template<> template<>
-    void llfontregistry_object::test<74>()
-    {
-        const char* xml =
-            "<fonts>"
-            "  <font name='Inner'>"
-            "    <style name='NORMAL'><file>Inner.woff2</file></style>"
-            "  </font>"
-            "  <font name='Composite'>"  // use-only, source of override
-            "    <use family='Inner'/>"
-            "  </font>"
-            "  <font name='Target'>"
-            "    <style name='NORMAL'><file>Target.woff2</file></style>"
-            "  </font>"
-            "</fonts>";
-        ensure("parse ok", loadXml(xml));
-        resolve();
-        LLSD overrides;
-        overrides["Target"] = "Composite";
-        applyOverrides(overrides);
-        auto names = fileNames("Target");
-        // Override prepends Composite's resolved chain (= Inner's files).
-        ensure("Target chain after override is non-empty", !names.empty());
-        ensure_equals("Inner.woff2 prepended via Composite override",
-                      names[0], std::string("Inner.woff2"));
-        ensure("Target's own file kept as fallback behind override",
-               countFile("Target", "Target.woff2") == 1);
+        CHECK(reg.nameToSize("Target", "Large", sz));
+        UNSCOPED_INFO("Target Large = global 11.0 (override does not route)");
+        CHECK(sz == 11.0f);
     }
 
     // LLFontDescriptor equality and hash are keyed on (name, style, size)
@@ -2323,8 +2433,7 @@ namespace
     // file lists into the key, every chain mutation in the resolver becomes
     // a hash-bucket walk and lookups by request desc start missing. This
     // test fails noisily in that scenario.
-    template<> template<>
-    void llfontregistry_object::test<78>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: descriptor identity is name/style/size and a no-file lookup hits", "[LLFontRegistry]")
     {
         font_file_info_vec_t files_a;
         files_a.emplace_back("A.woff2", EFontHinting::FORCE_AUTOHINT, 0, 0.f);
@@ -2335,18 +2444,18 @@ namespace
         LLFontDescriptor a("SansSerif", "Small", 0, files_a);
         LLFontDescriptor b("SansSerif", "Small", 0, files_b);
 
-        ensure("same (name,style,size) compares equal regardless of files",
-               a == b);
-        ensure_equals("same (name,style,size) hashes the same regardless of files",
-                      hash_value(a), hash_value(b));
+        UNSCOPED_INFO("same (name,style,size) compares equal regardless of files");
+        CHECK(a == b);
+        UNSCOPED_INFO("same (name,style,size) hashes the same regardless of files");
+        CHECK(hash_value(a) == hash_value(b));
 
         // Sanity: vary each component, equality breaks.
-        ensure("different name is not equal",
-               !(a == LLFontDescriptor("Other", "Small", 0, files_a)));
-        ensure("different style is not equal",
-               !(a == LLFontDescriptor("SansSerif", "Small", LLFontGL::BOLD, files_a)));
-        ensure("different size is not equal",
-               !(a == LLFontDescriptor("SansSerif", "Large", 0, files_a)));
+        UNSCOPED_INFO("different name is not equal");
+        CHECK_FALSE(a == LLFontDescriptor("Other", "Small", 0, files_a));
+        UNSCOPED_INFO("different style is not equal");
+        CHECK_FALSE(a == LLFontDescriptor("SansSerif", "Small", LLFontGL::BOLD, files_a));
+        UNSCOPED_INFO("different size is not equal");
+        CHECK_FALSE(a == LLFontDescriptor("SansSerif", "Large", 0, files_a));
 
         // Lookup by no-files descriptor must hit a stored with-files entry.
         // This is what getMatchingFontDesc relies on at runtime.
@@ -2354,39 +2463,41 @@ namespace
         m[a] = 1;
         LLFontDescriptor lookup("SansSerif", "Small", 0); // no files
         auto it = m.find(lookup);
-        ensure("lookup by no-files descriptor finds a stored with-files entry",
-               it != m.end());
+        UNSCOPED_INFO("lookup by no-files descriptor finds a stored with-files entry");
+        REQUIRE(it != m.end());
     }
 
     // overridesEqual: extra coverage beyond test<36>'s identical/different
     // value pair. Pin the LLSD-comparison semantics initClass relies on
     // when deciding fast-DPI vs full-reload: empty-map and undefined-LLSD
     // are distinct values, and map equality is order-independent.
-    template<> template<>
-    void llfontregistry_object::test<79>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: overridesEqual tells empty from undefined and ignores key order", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
             "  <font name='UI'><style name='NORMAL'><file>U.woff2</file></style></font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
 
         // Resolve with empty-map; mLastFontOverrides becomes empty-map.
         LLSD empty_map = LLSD::emptyMap();
         resolve(empty_map);
-        ensure("empty map equals empty map", reg.overridesEqual(empty_map));
+        UNSCOPED_INFO("empty map equals empty map");
+        CHECK(reg.overridesEqual(empty_map));
 
         // Undefined LLSD is distinct from empty-map per llsd_equals.
         LLSD undef;
-        ensure("empty map differs from undefined LLSD",
-               !reg.overridesEqual(undef));
+        UNSCOPED_INFO("empty map differs from undefined LLSD");
+        CHECK_FALSE(reg.overridesEqual(undef));
 
         // Map equality is keyed by (key,value) pairs regardless of LLSD's
         // internal iteration order. Pin so a re-ordered override map
         // (e.g. picker rebuilds the map in different order) doesn't trip
         // the fast-path and force a redundant full reload.
         simulateReload();
-        ensure("re-parse ok", loadXml(xml));
+        UNSCOPED_INFO("re-parse ok");
+        CHECK(loadXml(xml));
         LLSD ovr1;
         ovr1["UI"] = "Alt";
         ovr1["Other"] = "Pick";
@@ -2394,8 +2505,8 @@ namespace
         ovr2["Other"] = "Pick";
         ovr2["UI"] = "Alt";
         resolve(ovr1);
-        ensure("LLSD map equality is order-independent",
-               reg.overridesEqual(ovr2));
+        UNSCOPED_INFO("LLSD map equality is order-independent");
+        CHECK(reg.overridesEqual(ovr2));
     }
 
     // sweepGlyphCaches must not dereference NULL-valued template entries.
@@ -2404,25 +2515,25 @@ namespace
     // sweep during early frames before any head exists. The NULL guard at
     // llfontregistry.cpp:1595 covers heads; this test pins the empty-
     // fallback-cache path too. Crash here = regression.
-    template<> template<>
-    void llfontregistry_object::test<80>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: sweepGlyphCaches survives a registry holding only templates", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
             "  <font name='UI'><style name='NORMAL'><file>U.woff2</file></style></font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         // No heads instantiated, no fallback-cache entries.
         reg.sweepGlyphCaches();
-        ensure("registry survives sweep with templates only", true);
+        UNSCOPED_INFO("registry survives sweep with templates only");
+        CHECK(true);
     }
 
     // OpenType variation axes plumbed through XML parse. Family-level
     // font_italic / font_width / font_slant cascade to child <file>
     // entries that don't override; per-file overrides win when present.
-    template<> template<>
-    void llfontregistry_object::test<81>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: font_italic/font_width/font_slant cascade to files unless overridden", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2435,44 +2546,51 @@ namespace
             "    </style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
 
         const LLFontDescriptor* normal = templateFor("Demo", LLFontGL::NORMAL);
-        ensure("NORMAL template present", normal != nullptr);
+        UNSCOPED_INFO("NORMAL template present");
+        REQUIRE(normal != nullptr);
         const auto& nfiles = normal->getFontFiles();
-        ensure_equals("NORMAL has one file", nfiles.size(), 1u);
-        ensure("NORMAL inherits family ital",
-               nfiles[0].mVarAxes.ital_set);
-        ensure_equals("NORMAL ital == 1.0", nfiles[0].mVarAxes.ital, 1.0f);
-        ensure("NORMAL inherits family wdth",
-               nfiles[0].mVarAxes.wdth_set);
-        ensure_equals("NORMAL wdth == 87.5", nfiles[0].mVarAxes.wdth, 87.5f);
-        ensure("NORMAL inherits family slnt",
-               nfiles[0].mVarAxes.slnt_set);
-        ensure_equals("NORMAL slnt == -12.0", nfiles[0].mVarAxes.slnt, -12.0f);
+        UNSCOPED_INFO("NORMAL has one file");
+        REQUIRE(nfiles.size() == 1u);
+        UNSCOPED_INFO("NORMAL inherits family ital");
+        CHECK(nfiles[0].mVarAxes.ital_set);
+        UNSCOPED_INFO("NORMAL ital == 1.0");
+        CHECK(nfiles[0].mVarAxes.ital == 1.0f);
+        UNSCOPED_INFO("NORMAL inherits family wdth");
+        CHECK(nfiles[0].mVarAxes.wdth_set);
+        UNSCOPED_INFO("NORMAL wdth == 87.5");
+        CHECK(nfiles[0].mVarAxes.wdth == 87.5f);
+        UNSCOPED_INFO("NORMAL inherits family slnt");
+        CHECK(nfiles[0].mVarAxes.slnt_set);
+        UNSCOPED_INFO("NORMAL slnt == -12.0");
+        CHECK(nfiles[0].mVarAxes.slnt == -12.0f);
 
         // Per-file override on wdth wins; ital/slnt still inherit.
         const LLFontDescriptor* bold = templateFor("Demo", LLFontGL::BOLD);
-        ensure("BOLD template present", bold != nullptr);
+        UNSCOPED_INFO("BOLD template present");
+        REQUIRE(bold != nullptr);
         const auto& wfiles = bold->getFontFiles();
-        ensure_equals("BOLD has one file", wfiles.size(), 1u);
-        ensure_equals("BOLD overrides wdth to 125.0",
-                      wfiles[0].mVarAxes.wdth, 125.0f);
-        ensure("BOLD keeps inherited ital",
-               wfiles[0].mVarAxes.ital_set);
-        ensure_equals("BOLD inherited ital still 1.0",
-                      wfiles[0].mVarAxes.ital, 1.0f);
-        ensure("BOLD keeps inherited slnt",
-               wfiles[0].mVarAxes.slnt_set);
-        ensure_equals("BOLD inherited slnt still -12.0",
-                      wfiles[0].mVarAxes.slnt, -12.0f);
+        UNSCOPED_INFO("BOLD has one file");
+        REQUIRE(wfiles.size() == 1u);
+        UNSCOPED_INFO("BOLD overrides wdth to 125.0");
+        CHECK(wfiles[0].mVarAxes.wdth == 125.0f);
+        UNSCOPED_INFO("BOLD keeps inherited ital");
+        CHECK(wfiles[0].mVarAxes.ital_set);
+        UNSCOPED_INFO("BOLD inherited ital still 1.0");
+        CHECK(wfiles[0].mVarAxes.ital == 1.0f);
+        UNSCOPED_INFO("BOLD keeps inherited slnt");
+        CHECK(wfiles[0].mVarAxes.slnt_set);
+        UNSCOPED_INFO("BOLD inherited slnt still -12.0");
+        CHECK(wfiles[0].mVarAxes.slnt == -12.0f);
     }
 
     // Files without any axis attribute leave ALFontVarAxes at its
     // default (no *_set flags). Pins the negative path that the cache
     // key + face-load skip rely on.
-    template<> template<>
-    void llfontregistry_object::test<82>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a file with no axis attributes leaves every ALFontVarAxes flag unset", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2480,22 +2598,28 @@ namespace
             "    <style name='NORMAL'><file>Plain.ttf</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         const LLFontDescriptor* d = templateFor("Plain", LLFontGL::NORMAL);
-        ensure("template present", d != nullptr);
+        UNSCOPED_INFO("template present");
+        REQUIRE(d != nullptr);
         const auto& f = d->getFontFiles()[0];
-        ensure("no wght", !f.mVarAxes.wght_set);
-        ensure("no opsz", !f.mVarAxes.opsz_set);
-        ensure("no ital", !f.mVarAxes.ital_set);
-        ensure("no wdth", !f.mVarAxes.wdth_set);
-        ensure("no slnt", !f.mVarAxes.slnt_set);
+        UNSCOPED_INFO("no wght");
+        CHECK_FALSE(f.mVarAxes.wght_set);
+        UNSCOPED_INFO("no opsz");
+        CHECK_FALSE(f.mVarAxes.opsz_set);
+        UNSCOPED_INFO("no ital");
+        CHECK_FALSE(f.mVarAxes.ital_set);
+        UNSCOPED_INFO("no wdth");
+        CHECK_FALSE(f.mVarAxes.wdth_set);
+        UNSCOPED_INFO("no slnt");
+        CHECK_FALSE(f.mVarAxes.slnt_set);
     }
 
     // font_optical_size cascades family -> file the same way
     // font_weight does. Per-file override wins; absence at file level
     // inherits the family value. Pins the new opsz axis plumbing.
-    template<> template<>
-    void llfontregistry_object::test<83>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: font_optical_size cascades to files unless a file overrides it", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2508,32 +2632,36 @@ namespace
             "    </style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
 
         const LLFontDescriptor* normal = templateFor("Demo", LLFontGL::NORMAL);
-        ensure("NORMAL template present", normal != nullptr);
+        UNSCOPED_INFO("NORMAL template present");
+        REQUIRE(normal != nullptr);
         const auto& nfiles = normal->getFontFiles();
-        ensure_equals("NORMAL has one file", nfiles.size(), 1u);
-        ensure("NORMAL inherits family opsz",
-               nfiles[0].mVarAxes.opsz_set);
-        ensure_equals("NORMAL opsz == 14.0",
-                      nfiles[0].mVarAxes.opsz, 14.0f);
+        UNSCOPED_INFO("NORMAL has one file");
+        REQUIRE(nfiles.size() == 1u);
+        UNSCOPED_INFO("NORMAL inherits family opsz");
+        CHECK(nfiles[0].mVarAxes.opsz_set);
+        UNSCOPED_INFO("NORMAL opsz == 14.0");
+        CHECK(nfiles[0].mVarAxes.opsz == 14.0f);
 
         const LLFontDescriptor* bold = templateFor("Demo", LLFontGL::BOLD);
-        ensure("BOLD template present", bold != nullptr);
+        UNSCOPED_INFO("BOLD template present");
+        REQUIRE(bold != nullptr);
         const auto& bfiles = bold->getFontFiles();
-        ensure_equals("BOLD has one file", bfiles.size(), 1u);
-        ensure("BOLD has opsz set after override",
-               bfiles[0].mVarAxes.opsz_set);
-        ensure_equals("BOLD overrides opsz to 28.0",
-                      bfiles[0].mVarAxes.opsz, 28.0f);
+        UNSCOPED_INFO("BOLD has one file");
+        REQUIRE(bfiles.size() == 1u);
+        UNSCOPED_INFO("BOLD has opsz set after override");
+        CHECK(bfiles[0].mVarAxes.opsz_set);
+        UNSCOPED_INFO("BOLD overrides opsz to 28.0");
+        CHECK(bfiles[0].mVarAxes.opsz == 28.0f);
     }
 
     // replace_first=true on a family→family override drops the target's
     // head file before prepending the source. Mirror of test<32> with
     // the new map shape.
-    template<> template<>
-    void llfontregistry_object::test<84>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: replace_first drops the target's head before prepending the source", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2544,7 +2672,8 @@ namespace
             "    <style name='NORMAL'><file>Alt.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         LLSD overrides;
         LLSD entry = LLSD::emptyMap();
@@ -2553,15 +2682,15 @@ namespace
         overrides["UI"] = entry;
         applyOverrides(overrides);
         auto names = fileNames("UI");
-        ensure_equals("head replaced -> only one file remains",
-                      (S32)names.size(), 1);
-        ensure_equals("Alt is the head", names[0], std::string("Alt.woff2"));
+        UNSCOPED_INFO("head replaced -> only one file remains");
+        REQUIRE((S32)names.size() == 1);
+        UNSCOPED_INFO("Alt is the head");
+        CHECK(names[0] == std::string("Alt.woff2"));
     }
 
     // replace_first=true preserves orig_files[1..]. Verifies the
     // tail-merge contract: drop only the head, keep DejaVu/Emoji/CJK.
-    template<> template<>
-    void llfontregistry_object::test<85>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: replace_first keeps the target's fallbacks after its head", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2576,13 +2705,15 @@ namespace
             "    <style name='NORMAL'><file>Alt.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         // Sanity: post-resolve UI's chain is [UI.woff2, DejaVu.woff2].
         auto pre_names = fileNames("UI");
-        ensure_equals("UI starts with 2 files", (S32)pre_names.size(), 2);
-        ensure_equals("UI head is UI.woff2",
-                      pre_names[0], std::string("UI.woff2"));
+        UNSCOPED_INFO("UI starts with 2 files");
+        REQUIRE((S32)pre_names.size() == 2);
+        UNSCOPED_INFO("UI head is UI.woff2");
+        CHECK(pre_names[0] == std::string("UI.woff2"));
 
         LLSD overrides;
         LLSD entry = LLSD::emptyMap();
@@ -2592,18 +2723,18 @@ namespace
         applyOverrides(overrides);
 
         auto names = fileNames("UI");
-        ensure_equals("[Alt, DejaVu] -> 2 files",
-                      (S32)names.size(), 2);
-        ensure_equals("Alt is the head", names[0], std::string("Alt.woff2"));
-        ensure_equals("DejaVu fallback preserved",
-                      names[1], std::string("DejaVu.woff2"));
+        UNSCOPED_INFO("[Alt, DejaVu] -> 2 files");
+        REQUIRE((S32)names.size() == 2);
+        UNSCOPED_INFO("Alt is the head");
+        CHECK(names[0] == std::string("Alt.woff2"));
+        UNSCOPED_INFO("DejaVu fallback preserved");
+        CHECK(names[1] == std::string("DejaVu.woff2"));
     }
 
     // replace_first=true with family→file override: the target's head
     // is dropped and the synthesized override file takes its slot;
     // tail still preserved.
-    template<> template<>
-    void llfontregistry_object::test<86>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: replace_first with a file override puts the file in the head's slot", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2615,7 +2746,8 @@ namespace
             "    <style name='NORMAL'><file>UI.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
 
         LLSD overrides;
@@ -2626,19 +2758,19 @@ namespace
         applyOverrides(overrides);
 
         auto names = fileNames("UI");
-        ensure_equals("[user.ttf, DejaVu] -> 2 files",
-                      (S32)names.size(), 2);
-        ensure_equals("user.ttf head", names[0], std::string("user.ttf"));
-        ensure_equals("DejaVu fallback preserved",
-                      names[1], std::string("DejaVu.woff2"));
+        UNSCOPED_INFO("[user.ttf, DejaVu] -> 2 files");
+        REQUIRE((S32)names.size() == 2);
+        UNSCOPED_INFO("user.ttf head");
+        CHECK(names[0] == std::string("user.ttf"));
+        UNSCOPED_INFO("DejaVu fallback preserved");
+        CHECK(names[1] == std::string("DejaVu.woff2"));
     }
 
     // replace_first=false in the map shape behaves identically to the
     // bare string shape: the override is prepended onto the chain and
     // the target's head stays as a fallback. Pin the legacy semantics
     // on the new map shape so it can't accidentally diverge.
-    template<> template<>
-    void llfontregistry_object::test<87>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: replace_first=false prepends like the bare string shape", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2649,7 +2781,8 @@ namespace
             "    <style name='NORMAL'><file>Alt.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
 
         LLSD overrides;
@@ -2660,17 +2793,17 @@ namespace
         applyOverrides(overrides);
 
         auto names = fileNames("UI");
-        ensure_equals("map(replace_first=false) -> [Alt, UI]",
-                      (S32)names.size(), 2);
-        ensure_equals("Alt prepended", names[0], std::string("Alt.woff2"));
-        ensure_equals("UI head preserved as fallback (no replace)",
-                      names[1], std::string("UI.woff2"));
+        UNSCOPED_INFO("map(replace_first=false) -> [Alt, UI]");
+        REQUIRE((S32)names.size() == 2);
+        UNSCOPED_INFO("Alt prepended");
+        CHECK(names[0] == std::string("Alt.woff2"));
+        UNSCOPED_INFO("UI head preserved as fallback (no replace)");
+        CHECK(names[1] == std::string("UI.woff2"));
     }
 
     // String shape continues to prepend (no replace). Regression guard
     // for the most common user-facing override path.
-    template<> template<>
-    void llfontregistry_object::test<88>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a bare string override still prepends without replacing", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2681,16 +2814,19 @@ namespace
             "    <style name='NORMAL'><file>Alt.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         LLSD overrides;
         overrides["UI"] = "Alt";  // bare string
         applyOverrides(overrides);
         auto names = fileNames("UI");
-        ensure_equals("string shape -> [Alt, UI]", (S32)names.size(), 2);
-        ensure_equals("Alt prepended", names[0], std::string("Alt.woff2"));
-        ensure_equals("UI head preserved as fallback",
-                      names[1], std::string("UI.woff2"));
+        UNSCOPED_INFO("string shape -> [Alt, UI]");
+        REQUIRE((S32)names.size() == 2);
+        UNSCOPED_INFO("Alt prepended");
+        CHECK(names[0] == std::string("Alt.woff2"));
+        UNSCOPED_INFO("UI head preserved as fallback");
+        CHECK(names[1] == std::string("UI.woff2"));
     }
 
     // <use unicode_ranges="..."/> attaches a CharFunctor to every file
@@ -2698,8 +2834,7 @@ namespace
     // `<use family="EmojiBase" unicode_ranges="U+1F000-U+1FFFF"/>`
     // ends up with EmojiBase's file gated by that range — accepts an
     // astral codepoint, rejects ASCII.
-    template<> template<>
-    void llfontregistry_object::test<89>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: <use unicode_ranges> gates the used family's files with a CharFunctor", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2711,27 +2846,31 @@ namespace
             "    <style name='NORMAL'><file>UI.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         const LLFontDescriptor* d = templateFor("Consumer");
-        ensure("template present", d != nullptr);
+        UNSCOPED_INFO("template present");
+        REQUIRE(d != nullptr);
         const auto& files = d->getFontFiles();
-        ensure_equals("Consumer has 2 files", (S32)files.size(), 2);
-        ensure_equals("UI head", files[0].FileName, std::string("UI.woff2"));
-        ensure_equals("Noto from EmojiBase", files[1].FileName, std::string("Noto.ttf"));
-        ensure("Noto has a use-level functor",
-               static_cast<bool>(files[1].CharFunctor));
-        ensure("functor accepts U+1F600",
-               files[1].CharFunctor((llwchar)0x1F600));
-        ensure("functor rejects ASCII",
-               !files[1].CharFunctor((llwchar)0x0041));
+        UNSCOPED_INFO("Consumer has 2 files");
+        REQUIRE((S32)files.size() == 2);
+        UNSCOPED_INFO("UI head");
+        CHECK(files[0].FileName == std::string("UI.woff2"));
+        UNSCOPED_INFO("Noto from EmojiBase");
+        CHECK(files[1].FileName == std::string("Noto.ttf"));
+        UNSCOPED_INFO("Noto has a use-level functor");
+        REQUIRE(static_cast<bool>(files[1].CharFunctor));
+        UNSCOPED_INFO("functor accepts U+1F600");
+        CHECK(files[1].CharFunctor((llwchar)0x1F600));
+        UNSCOPED_INFO("functor rejects ASCII");
+        CHECK_FALSE(files[1].CharFunctor((llwchar)0x0041));
     }
 
     // Composition: file's own unicode_ranges intersects with the
     // use-level filter. Both gates must accept a codepoint for it to
     // pass.
-    template<> template<>
-    void llfontregistry_object::test<90>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a file's unicode_ranges and the <use> filter must both accept", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2744,26 +2883,28 @@ namespace
             "    <use family='Source' unicode_ranges='U+1F500-U+1F5FF'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         const LLFontDescriptor* d = templateFor("Consumer");
-        ensure("template present", d != nullptr);
+        UNSCOPED_INFO("template present");
+        REQUIRE(d != nullptr);
         const auto& files = d->getFontFiles();
-        ensure_equals("Consumer has 1 file", (S32)files.size(), 1);
-        ensure("composed functor accepts U+1F500 (in both)",
-               files[0].CharFunctor((llwchar)0x1F500));
-        ensure("composed functor rejects U+1F100 (in file, NOT in use)",
-               !files[0].CharFunctor((llwchar)0x1F100));
-        ensure("composed functor rejects U+1F900 (in use, NOT in file)",
-               !files[0].CharFunctor((llwchar)0x1F900));
-        ensure("composed functor rejects U+0041 (in neither)",
-               !files[0].CharFunctor((llwchar)0x0041));
+        UNSCOPED_INFO("Consumer has 1 file");
+        REQUIRE((S32)files.size() == 1);
+        UNSCOPED_INFO("composed functor accepts U+1F500 (in both)");
+        CHECK(files[0].CharFunctor((llwchar)0x1F500));
+        UNSCOPED_INFO("composed functor rejects U+1F100 (in file, NOT in use)");
+        CHECK_FALSE(files[0].CharFunctor((llwchar)0x1F100));
+        UNSCOPED_INFO("composed functor rejects U+1F900 (in use, NOT in file)");
+        CHECK_FALSE(files[0].CharFunctor((llwchar)0x1F900));
+        UNSCOPED_INFO("composed functor rejects U+0041 (in neither)");
+        CHECK_FALSE(files[0].CharFunctor((llwchar)0x0041));
     }
 
     // Two consumers share one source with different filters. Each
     // resolved chain has its own functor — no cross-talk.
-    template<> template<>
-    void llfontregistry_object::test<91>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: two <use>rs of one family keep their own filters", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2777,27 +2918,33 @@ namespace
             "    <use family='EmojiBase' unicode_ranges='U+1F600-U+1F6FF'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
 
         const auto& bf = templateFor("Broad")->getFontFiles();
         const auto& nf = templateFor("Narrow")->getFontFiles();
-        ensure_equals("Broad has 1 file", (S32)bf.size(), 1);
-        ensure_equals("Narrow has 1 file", (S32)nf.size(), 1);
+        UNSCOPED_INFO("Broad has 1 file");
+        REQUIRE((S32)bf.size() == 1);
+        UNSCOPED_INFO("Narrow has 1 file");
+        REQUIRE((S32)nf.size() == 1);
         // Broad accepts U+1F100; Narrow doesn't.
-        ensure("Broad accepts U+1F100", bf[0].CharFunctor((llwchar)0x1F100));
-        ensure("Narrow rejects U+1F100", !nf[0].CharFunctor((llwchar)0x1F100));
+        UNSCOPED_INFO("Broad accepts U+1F100");
+        CHECK(bf[0].CharFunctor((llwchar)0x1F100));
+        UNSCOPED_INFO("Narrow rejects U+1F100");
+        CHECK_FALSE(nf[0].CharFunctor((llwchar)0x1F100));
         // Both accept U+1F600 (in their own range).
-        ensure("Broad accepts U+1F600", bf[0].CharFunctor((llwchar)0x1F600));
-        ensure("Narrow accepts U+1F600", nf[0].CharFunctor((llwchar)0x1F600));
+        UNSCOPED_INFO("Broad accepts U+1F600");
+        CHECK(bf[0].CharFunctor((llwchar)0x1F600));
+        UNSCOPED_INFO("Narrow accepts U+1F600");
+        CHECK(nf[0].CharFunctor((llwchar)0x1F600));
     }
 
     // Single override on the source family propagates to every consumer
     // with each consumer's filter intact. This is the load-bearing
     // motivation for use-level filters: one override entry, two chains
     // updated, each with its own glyph gate.
-    template<> template<>
-    void llfontregistry_object::test<92>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: an override on a used family reaches each <use>r with its filter", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2811,7 +2958,8 @@ namespace
             "    <use family='EmojiBase' unicode_ranges='U+1F600-U+1F6FF'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
 
         // Override at the SOURCE — EmojiBase gets prepended with Twemoji.
         // Apply BEFORE resolveFontReferences so the consumers' use chains
@@ -2827,27 +2975,26 @@ namespace
         // Each consumer sees BOTH files (Twemoji prepended onto the
         // EmojiBase chain by the override; Noto preserved behind it),
         // each with the consumer's filter applied.
-        ensure_equals("Broad has 2 files (Twemoji + Noto)",
-                      (S32)bf.size(), 2);
-        ensure_equals("Broad head is Twemoji",
-                      bf[0].FileName, std::string("Twemoji.ttf"));
-        ensure_equals("Narrow has 2 files",
-                      (S32)nf.size(), 2);
-        ensure_equals("Narrow head is Twemoji",
-                      nf[0].FileName, std::string("Twemoji.ttf"));
+        UNSCOPED_INFO("Broad has 2 files (Twemoji + Noto)");
+        REQUIRE((S32)bf.size() == 2);
+        UNSCOPED_INFO("Broad head is Twemoji");
+        CHECK(bf[0].FileName == std::string("Twemoji.ttf"));
+        UNSCOPED_INFO("Narrow has 2 files");
+        REQUIRE((S32)nf.size() == 2);
+        UNSCOPED_INFO("Narrow head is Twemoji");
+        CHECK(nf[0].FileName == std::string("Twemoji.ttf"));
         // Filter still gates each consumer independently.
-        ensure("Broad's Twemoji accepts U+1F100",
-               bf[0].CharFunctor((llwchar)0x1F100));
-        ensure("Narrow's Twemoji rejects U+1F100",
-               !nf[0].CharFunctor((llwchar)0x1F100));
+        UNSCOPED_INFO("Broad's Twemoji accepts U+1F100");
+        CHECK(bf[0].CharFunctor((llwchar)0x1F100));
+        UNSCOPED_INFO("Narrow's Twemoji rejects U+1F100");
+        CHECK_FALSE(nf[0].CharFunctor((llwchar)0x1F100));
     }
 
     // Combined replace_first + EmojiBase: { value: "Twemoji.ttf",
     // replace_first: true } on EmojiBase fully displaces Noto rather
     // than prepending in front of it. Each consumer's chain ends up
     // with just the override file gated by the consumer's filter.
-    template<> template<>
-    void llfontregistry_object::test<93>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: replace_first on a used family displaces its file in every <use>r", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2861,7 +3008,8 @@ namespace
             "    <use family='EmojiBase' unicode_ranges='U+1F600-U+1F6FF'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
 
         LLSD overrides;
         LLSD entry = LLSD::emptyMap();
@@ -2874,21 +3022,23 @@ namespace
         const auto& nf = templateFor("Narrow")->getFontFiles();
         // replace_first dropped Noto from EmojiBase's chain; consumers
         // pull just Twemoji through their respective use-level filters.
-        ensure_equals("Broad has 1 file (Noto displaced)",
-                      (S32)bf.size(), 1);
-        ensure_equals("Broad head is Twemoji",
-                      bf[0].FileName, std::string("Twemoji.ttf"));
-        ensure_equals("Narrow has 1 file (Noto displaced)",
-                      (S32)nf.size(), 1);
-        ensure_equals("Narrow head is Twemoji",
-                      nf[0].FileName, std::string("Twemoji.ttf"));
-        ensure("Broad's Twemoji accepts U+1F100",
-               bf[0].CharFunctor((llwchar)0x1F100));
-        ensure("Narrow's Twemoji rejects U+1F100",
-               !nf[0].CharFunctor((llwchar)0x1F100));
-        ensure("Both accept U+1F600",
-               bf[0].CharFunctor((llwchar)0x1F600)
-            && nf[0].CharFunctor((llwchar)0x1F600));
+        UNSCOPED_INFO("Broad has 1 file (Noto displaced)");
+        REQUIRE((S32)bf.size() == 1);
+        UNSCOPED_INFO("Broad head is Twemoji");
+        CHECK(bf[0].FileName == std::string("Twemoji.ttf"));
+        UNSCOPED_INFO("Narrow has 1 file (Noto displaced)");
+        REQUIRE((S32)nf.size() == 1);
+        UNSCOPED_INFO("Narrow head is Twemoji");
+        CHECK(nf[0].FileName == std::string("Twemoji.ttf"));
+        UNSCOPED_INFO("Broad's Twemoji accepts U+1F100");
+        CHECK(bf[0].CharFunctor((llwchar)0x1F100));
+        UNSCOPED_INFO("Narrow's Twemoji rejects U+1F100");
+        CHECK_FALSE(nf[0].CharFunctor((llwchar)0x1F100));
+        {
+            INFO("Both accept U+1F600");
+            CHECK(bf[0].CharFunctor((llwchar)0x1F600));
+            CHECK(nf[0].CharFunctor((llwchar)0x1F600));
+        }
     }
 
     // No-cascade regression: a use-level filter applies ONLY to the
@@ -2897,8 +3047,7 @@ namespace
     // explicit design rule (filter is local to the use site) — pin it
     // so a future "fix" that propagates the filter through the chain
     // doesn't silently change semantics for existing chains.
-    template<> template<>
-    void llfontregistry_object::test<94>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <use> filter does not cascade into the used family's own <use>s", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2913,14 +3062,17 @@ namespace
             "    <use family='Mid' unicode_ranges='U+1F000-U+1FFFF'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         const LLFontDescriptor* d = templateFor("Outer");
-        ensure("Outer template present", d != nullptr);
+        UNSCOPED_INFO("Outer template present");
+        REQUIRE(d != nullptr);
         const auto& files = d->getFontFiles();
         // Outer pulls Mid's own files (Mid.ttf) PLUS Mid's <use> chain
         // (Inner.ttf). The filter applies only to Mid's direct files.
-        ensure_equals("Outer has 2 files", (S32)files.size(), 2);
+        UNSCOPED_INFO("Outer has 2 files");
+        REQUIRE((S32)files.size() == 2);
 
         // Locate the entries by filename rather than positional index —
         // collect_chain orders direct files before use-chain files
@@ -2933,17 +3085,121 @@ namespace
             if (f.FileName == "Mid.ttf")   mid = &f;
             if (f.FileName == "Inner.ttf") inner = &f;
         }
-        ensure("Mid.ttf contributed",   mid   != nullptr);
-        ensure("Inner.ttf contributed", inner != nullptr);
+        UNSCOPED_INFO("Mid.ttf contributed");
+        REQUIRE(mid   != nullptr);
+        UNSCOPED_INFO("Inner.ttf contributed");
+        REQUIRE(inner != nullptr);
 
         // Mid is filtered (use-level filter applied to its own files).
-        ensure("Mid has functor",            static_cast<bool>(mid->CharFunctor));
-        ensure("Mid functor accepts U+1F600", mid->CharFunctor((llwchar)0x1F600));
-        ensure("Mid functor rejects U+0041", !mid->CharFunctor((llwchar)0x0041));
+        UNSCOPED_INFO("Mid has functor");
+        REQUIRE(static_cast<bool>(mid->CharFunctor));
+        UNSCOPED_INFO("Mid functor accepts U+1F600");
+        CHECK(mid->CharFunctor((llwchar)0x1F600));
+        UNSCOPED_INFO("Mid functor rejects U+0041");
+        CHECK_FALSE(mid->CharFunctor((llwchar)0x0041));
 
         // Inner is NOT filtered — the use-level filter doesn't cascade.
-        ensure("Inner has no functor (no cascade)",
-               !static_cast<bool>(inner->CharFunctor));
+        UNSCOPED_INFO("Inner has no functor (no cascade)");
+        REQUIRE_FALSE(static_cast<bool>(inner->CharFunctor));
+    }
+
+    // emoji="true" attribute parses; getAvailableFamilies(EMOJI) returns
+    // only emoji-flagged families. PROPORTIONAL and MONOSPACE filter
+    // emoji families OUT so they don't surface in regular text-font
+    // pickers (a color-emoji file shouldn't appear as a UI choice).
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: emoji=true families list under EMOJI and drop out of the others", "[LLFontRegistry]")
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Sans'>"
+            "    <style name='NORMAL'><file>S.woff2</file></style>"
+            "  </font>"
+            "  <font name='Mono' monospace='true'>"
+            "    <style name='NORMAL'><file>M.woff2</file></style>"
+            "  </font>"
+            "  <font name='NotoEmoji' emoji='true'>"
+            "    <style name='NORMAL'><file>N.ttf</file></style>"
+            "  </font>"
+            "  <font name='Twemoji' emoji='true'>"
+            "    <style name='NORMAL'><file>T.woff2</file></style>"
+            "  </font>"
+            "</fonts>";
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
+        resolve();
+
+        // EMOJI returns the two emoji families, sorted by label.
+        auto em = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::EMOJI);
+        UNSCOPED_INFO("EMOJI: 2 families");
+        REQUIRE((S32)em.size() == 2);
+        std::set<std::string> em_names;
+        for (const auto& f : em) em_names.insert(f.name);
+        UNSCOPED_INFO("EMOJI returns NotoEmoji");
+        REQUIRE(em_names.count("NotoEmoji") == 1);
+        UNSCOPED_INFO("EMOJI returns Twemoji");
+        REQUIRE(em_names.count("Twemoji")   == 1);
+
+        // PROPORTIONAL excludes both monospace AND emoji.
+        auto prop = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::PROPORTIONAL);
+        UNSCOPED_INFO("PROPORTIONAL: 1 family (just Sans)");
+        REQUIRE((S32)prop.size() == 1);
+        UNSCOPED_INFO("PROPORTIONAL returns Sans");
+        CHECK(prop[0].name == std::string("Sans"));
+
+        // MONOSPACE excludes emoji families even if they were also
+        // marked monospace=true (emoji wins for filter routing).
+        auto mono = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::MONOSPACE);
+        UNSCOPED_INFO("MONOSPACE: 1 family (just Mono)");
+        REQUIRE((S32)mono.size() == 1);
+        UNSCOPED_INFO("MONOSPACE returns Mono");
+        CHECK(mono[0].name == std::string("Mono"));
+    }
+
+    // emoji="true" + monospace="true" on the same family routes to
+    // EMOJI only, not MONOSPACE. Locks the "emoji wins" rule from the
+    // FamilyFilter docs.
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a family both emoji and monospace lists under EMOJI only", "[LLFontRegistry]")
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='WeirdMonoEmoji' monospace='true' emoji='true'>"
+            "    <style name='NORMAL'><file>W.ttf</file></style>"
+            "  </font>"
+            "</fonts>";
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
+        resolve();
+        auto em = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::EMOJI);
+        UNSCOPED_INFO("EMOJI returns the dual-flagged family");
+        REQUIRE((S32)em.size() == 1);
+        auto mono = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::MONOSPACE);
+        UNSCOPED_INFO("MONOSPACE excludes the dual-flagged family");
+        REQUIRE((S32)mono.size() == 0);
+    }
+
+    // user_selectable="false" still hides a family from EMOJI just like
+    // it hides from PROPORTIONAL/MONOSPACE. Pin so internal aliases
+    // (EmojiBase, Emoji, LimitedEmoji) don't surface even if some
+    // future change marks them emoji=true.
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: user_selectable=false hides a family from EMOJI too", "[LLFontRegistry]")
+    {
+        const char* xml =
+            "<fonts>"
+            "  <font name='Public' emoji='true'>"
+            "    <style name='NORMAL'><file>P.ttf</file></style>"
+            "  </font>"
+            "  <font name='Internal' emoji='true' user_selectable='false'>"
+            "    <style name='NORMAL'><file>I.ttf</file></style>"
+            "  </font>"
+            "</fonts>";
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
+        resolve();
+        auto em = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::EMOJI);
+        UNSCOPED_INFO("EMOJI: only the user-selectable family");
+        REQUIRE((S32)em.size() == 1);
+        UNSCOPED_INFO("EMOJI returns Public");
+        CHECK(em[0].name == std::string("Public"));
     }
 
     // Baseline: a use-only EmojiBase that <use>s NotoEmoji, consumed
@@ -2951,8 +3207,7 @@ namespace
     // contains exactly one Noto file (contributed via the deepest <use>
     // step, with no filter — the use-level range is dropped on
     // recursion per the explicit design rule, see test<94>).
-    template<> template<>
-    void llfontregistry_object::test<98>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <use> filter on a use-only family leaves the deeper file unfiltered", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -2966,15 +3221,16 @@ namespace
             "    <use family='EmojiBase' unicode_ranges='U+1F000-U+1FFFF'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         resolve();
         const auto& files = templateFor("Emoji")->getFontFiles();
-        ensure_equals("Emoji has exactly 1 file (baseline)",
-                      (S32)files.size(), 1);
-        ensure_equals("the file is Noto.ttf",
-                      files[0].FileName, std::string("Noto.ttf"));
-        ensure("Noto fallback has NO functor (recursion dropped use-level filter)",
-               !static_cast<bool>(files[0].CharFunctor));
+        UNSCOPED_INFO("Emoji has exactly 1 file (baseline)");
+        REQUIRE((S32)files.size() == 1);
+        UNSCOPED_INFO("the file is Noto.ttf");
+        CHECK(files[0].FileName == std::string("Noto.ttf"));
+        UNSCOPED_INFO("Noto fallback has NO functor (recursion dropped use-level filter)");
+        REQUIRE_FALSE(static_cast<bool>(files[0].CharFunctor));
     }
 
     // Override target already <use>s the override source: a use-only
@@ -2996,8 +3252,7 @@ namespace
     // the shape-itemizer priority (priority-1 functored hit before the
     // priority-3 no-functor hit) and is observable as differing emoji
     // metrics through the codepoint vs shape paths.
-    template<> template<>
-    void llfontregistry_object::test<99>()
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: an override to a family the target already <use>s adds no file", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
@@ -3011,7 +3266,8 @@ namespace
             "    <use family='EmojiBase' unicode_ranges='U+1F000-U+1FFFF'/>"
             "  </font>"
             "</fonts>";
-        ensure("parse ok", loadXml(xml));
+        UNSCOPED_INFO("parse ok");
+        CHECK(loadXml(xml));
         LLSD overrides;
         LLSD entry = LLSD::emptyMap();
         entry["value"] = "NotoEmoji";
@@ -3020,104 +3276,8 @@ namespace
         resolve(overrides);
 
         const auto& files = templateFor("Emoji")->getFontFiles();
-        ensure_equals("Emoji chain length unchanged by no-op override "
-                      "(EmojiBase already <use>s NotoEmoji)",
-                      (S32)files.size(), 1);
-    }
-
-    // emoji="true" attribute parses; getAvailableFamilies(EMOJI) returns
-    // only emoji-flagged families. PROPORTIONAL and MONOSPACE filter
-    // emoji families OUT so they don't surface in regular text-font
-    // pickers (a color-emoji file shouldn't appear as a UI choice).
-    template<> template<>
-    void llfontregistry_object::test<95>()
-    {
-        const char* xml =
-            "<fonts>"
-            "  <font name='Sans'>"
-            "    <style name='NORMAL'><file>S.woff2</file></style>"
-            "  </font>"
-            "  <font name='Mono' monospace='true'>"
-            "    <style name='NORMAL'><file>M.woff2</file></style>"
-            "  </font>"
-            "  <font name='NotoEmoji' emoji='true'>"
-            "    <style name='NORMAL'><file>N.ttf</file></style>"
-            "  </font>"
-            "  <font name='Twemoji' emoji='true'>"
-            "    <style name='NORMAL'><file>T.woff2</file></style>"
-            "  </font>"
-            "</fonts>";
-        ensure("parse ok", loadXml(xml));
-        resolve();
-
-        // EMOJI returns the two emoji families, sorted by label.
-        auto em = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::EMOJI);
-        ensure_equals("EMOJI: 2 families", (S32)em.size(), 2);
-        std::set<std::string> em_names;
-        for (const auto& f : em) em_names.insert(f.name);
-        ensure("EMOJI returns NotoEmoji", em_names.count("NotoEmoji") == 1);
-        ensure("EMOJI returns Twemoji",   em_names.count("Twemoji")   == 1);
-
-        // PROPORTIONAL excludes both monospace AND emoji.
-        auto prop = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::PROPORTIONAL);
-        ensure_equals("PROPORTIONAL: 1 family (just Sans)",
-                      (S32)prop.size(), 1);
-        ensure_equals("PROPORTIONAL returns Sans",
-                      prop[0].name, std::string("Sans"));
-
-        // MONOSPACE excludes emoji families even if they were also
-        // marked monospace=true (emoji wins for filter routing).
-        auto mono = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::MONOSPACE);
-        ensure_equals("MONOSPACE: 1 family (just Mono)",
-                      (S32)mono.size(), 1);
-        ensure_equals("MONOSPACE returns Mono",
-                      mono[0].name, std::string("Mono"));
-    }
-
-    // emoji="true" + monospace="true" on the same family routes to
-    // EMOJI only, not MONOSPACE. Locks the "emoji wins" rule from the
-    // FamilyFilter docs.
-    template<> template<>
-    void llfontregistry_object::test<96>()
-    {
-        const char* xml =
-            "<fonts>"
-            "  <font name='WeirdMonoEmoji' monospace='true' emoji='true'>"
-            "    <style name='NORMAL'><file>W.ttf</file></style>"
-            "  </font>"
-            "</fonts>";
-        ensure("parse ok", loadXml(xml));
-        resolve();
-        auto em = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::EMOJI);
-        ensure_equals("EMOJI returns the dual-flagged family",
-                      (S32)em.size(), 1);
-        auto mono = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::MONOSPACE);
-        ensure_equals("MONOSPACE excludes the dual-flagged family",
-                      (S32)mono.size(), 0);
-    }
-
-    // user_selectable="false" still hides a family from EMOJI just like
-    // it hides from PROPORTIONAL/MONOSPACE. Pin so internal aliases
-    // (EmojiBase, Emoji, LimitedEmoji) don't surface even if some
-    // future change marks them emoji=true.
-    template<> template<>
-    void llfontregistry_object::test<97>()
-    {
-        const char* xml =
-            "<fonts>"
-            "  <font name='Public' emoji='true'>"
-            "    <style name='NORMAL'><file>P.ttf</file></style>"
-            "  </font>"
-            "  <font name='Internal' emoji='true' user_selectable='false'>"
-            "    <style name='NORMAL'><file>I.ttf</file></style>"
-            "  </font>"
-            "</fonts>";
-        ensure("parse ok", loadXml(xml));
-        resolve();
-        auto em = reg.getAvailableFamilies(LLFontRegistry::FamilyFilter::EMOJI);
-        ensure_equals("EMOJI: only the user-selectable family",
-                      (S32)em.size(), 1);
-        ensure_equals("EMOJI returns Public",
-                      em[0].name, std::string("Public"));
+        UNSCOPED_INFO("Emoji chain length unchanged by no-op override "
+                      "(EmojiBase already <use>s NotoEmoji)");
+        REQUIRE((S32)files.size() == 1);
     }
 }

@@ -40,7 +40,7 @@
 
 #include "llimage.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -50,8 +50,6 @@
 #include <utility>
 #include <vector>
 
-namespace tut
-{
 namespace
 {
     struct llimagegl_data
@@ -98,47 +96,41 @@ namespace
         }
     };
 
-    typedef test_group<llimagegl_data> llimagegl_test;
-    typedef llimagegl_test::object     llimagegl_object;
-    tut::llimagegl_test llimagegl_testcase("LLImageGL");
-}
 
     // createGLTexture(LLImageRaw) allocates immutable storage under a
     // fresh GL name. After it succeeds the instance reports
     // getHasGLTexture() and a non-zero texname.
-    template<> template<>
-    void llimagegl_object::test<1>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: createGLTexture(LLImageRaw) makes a texture under a fresh GL name", "[LLImageGL]")
     {
         LLPointer<LLImageRaw> raw = makeRaw(16, 16, 4, /*fill=*/0x80);
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
 
-        ensure("createGLTexture succeeded",
-               img->createGLTexture(/*discard_level=*/0, raw.get()));
-        ensure("texname allocated",
-               img->getTexName() != 0);
-        ensure("getHasGLTexture reports true",
-               img->getHasGLTexture());
+        UNSCOPED_INFO("createGLTexture succeeded");
+        CHECK(img->createGLTexture(/*discard_level=*/0, raw.get()));
+        UNSCOPED_INFO("texname allocated");
+        CHECK(img->getTexName() != 0);
+        UNSCOPED_INFO("getHasGLTexture reports true");
+        CHECK(img->getHasGLTexture());
     }
 
     // destroyGLTexture must drop the GL name. Subsequent reads see
     // mTexName == 0 and getHasGLTexture() == false; the LLImageGL
     // instance itself remains usable (could be re-uploaded).
-    template<> template<>
-    void llimagegl_object::test<2>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: destroyGLTexture drops the GL name", "[LLImageGL]")
     {
         LLPointer<LLImageRaw> raw = makeRaw(16, 16, 4, /*fill=*/0x80);
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
-        ensure("createGLTexture succeeded",
-               img->createGLTexture(0, raw.get()));
-        ensure("texname allocated before destroy",
-               img->getTexName() != 0);
+        UNSCOPED_INFO("createGLTexture succeeded");
+        CHECK(img->createGLTexture(0, raw.get()));
+        UNSCOPED_INFO("texname allocated before destroy");
+        CHECK(img->getTexName() != 0);
 
         img->destroyGLTexture();
 
-        ensure_equals("texname cleared after destroy",
-                      (S32)img->getTexName(), 0);
-        ensure("getHasGLTexture false after destroy",
-               !img->getHasGLTexture());
+        UNSCOPED_INFO("texname cleared after destroy");
+        CHECK((S32)img->getTexName() == 0);
+        UNSCOPED_INFO("getHasGLTexture false after destroy");
+        CHECK_FALSE(img->getHasGLTexture());
     }
 
     // Regression for 8e85c68d69 — the partial-rect setSubImage path
@@ -146,13 +138,12 @@ namespace
     // batch flush bound to nothing (one-frame glyph flicker on cache
     // miss). Verify the GL texture binding survives a setSubImage that
     // skips unbind.
-    template<> template<>
-    void llimagegl_object::test<3>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a partial setSubImage leaves the texture bound to unit 0", "[LLImageGL]")
     {
         LLPointer<LLImageRaw> raw = makeRaw(32, 32, 4, /*fill=*/0x80);
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
-        ensure("createGLTexture succeeded",
-               img->createGLTexture(0, raw.get()));
+        UNSCOPED_INFO("createGLTexture succeeded");
+        CHECK(img->createGLTexture(0, raw.get()));
 
         // Bind the new texture to unit 0 the same way the renderer
         // would, then snapshot what GL_TEXTURE_BINDING_2D points at.
@@ -161,8 +152,8 @@ namespace
 
         GLint bound_before = 0;
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound_before);
-        ensure_equals("texture is bound to unit 0 before setSubImage",
-                      (S32)bound_before, (S32)img->getTexName());
+        UNSCOPED_INFO("texture is bound to unit 0 before setSubImage");
+        CHECK((S32)bound_before == (S32)img->getTexName());
 
         // Partial-rect upload — this is the path that used to
         // disable() the unit on its way out. The source raw must
@@ -171,8 +162,8 @@ namespace
         // offset, so a 32x32 source matching the destination is
         // simplest.
         LLPointer<LLImageRaw> patch = makeRaw(32, 32, 4, /*fill=*/0xFF);
-        ensure("setSubImage succeeded",
-               img->setSubImage(patch.get(),
+        UNSCOPED_INFO("setSubImage succeeded");
+        CHECK(img->setSubImage(patch.get(),
                                 /*x_pos=*/4, /*y_pos=*/4,
                                 /*width=*/8, /*height=*/8,
                                 /*force_fast_update=*/true, 0, true));
@@ -180,8 +171,8 @@ namespace
         glActiveTexture(GL_TEXTURE0);
         GLint bound_after = 0;
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound_after);
-        ensure_equals("texture still bound to unit 0 after setSubImage",
-                      (S32)bound_after, (S32)img->getTexName());
+        UNSCOPED_INFO("texture still bound to unit 0 after setSubImage");
+        CHECK((S32)bound_after == (S32)img->getTexName());
     }
 
     // Regression for 444c29b161 — setExplicitFormat used to leave
@@ -189,35 +180,34 @@ namespace
     // GL_LUMINANCE, GL_ALPHA) which then leaked into setSubImage /
     // readBackRaw and tripped GL_INVALID_ENUM in core. Now
     // resolveDeprecatedFormat rewrites them at format-set time.
-    template<> template<>
-    void llimagegl_object::test<4>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: setExplicitFormat rewrites deprecated formats and keeps modern ones", "[LLImageGL]")
     {
         if (gGLManager.mGLVersion < 3.29f)
         {
-            skip("resolveDeprecatedFormat is gated on GL >= 3.3");
+            SKIP("resolveDeprecatedFormat is gated on GL >= 3.3");
             return;
         }
 
         LLPointer<LLImageGL> la = new LLImageGL(/*usemipmaps=*/false);
         la->setExplicitFormat(GL_LUMINANCE_ALPHA, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE);
-        ensure_equals("LUMINANCE_ALPHA primary rewrites to GL_RG",
-                      (S32)la->getPrimaryFormat(), (S32)GL_RG);
+        UNSCOPED_INFO("LUMINANCE_ALPHA primary rewrites to GL_RG");
+        CHECK((S32)la->getPrimaryFormat() == (S32)GL_RG);
 
         LLPointer<LLImageGL> lum = new LLImageGL(/*usemipmaps=*/false);
         lum->setExplicitFormat(GL_LUMINANCE, GL_LUMINANCE, GL_UNSIGNED_BYTE);
-        ensure_equals("LUMINANCE primary rewrites to GL_RED",
-                      (S32)lum->getPrimaryFormat(), (S32)GL_RED);
+        UNSCOPED_INFO("LUMINANCE primary rewrites to GL_RED");
+        CHECK((S32)lum->getPrimaryFormat() == (S32)GL_RED);
 
         LLPointer<LLImageGL> alpha = new LLImageGL(/*usemipmaps=*/false);
         alpha->setExplicitFormat(GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE);
-        ensure_equals("ALPHA primary rewrites to GL_RED",
-                      (S32)alpha->getPrimaryFormat(), (S32)GL_RED);
+        UNSCOPED_INFO("ALPHA primary rewrites to GL_RED");
+        CHECK((S32)alpha->getPrimaryFormat() == (S32)GL_RED);
 
         // Modern formats shouldn't be touched.
         LLPointer<LLImageGL> rgba = new LLImageGL(/*usemipmaps=*/false);
         rgba->setExplicitFormat(GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
-        ensure_equals("RGBA primary preserved",
-                      (S32)rgba->getPrimaryFormat(), (S32)GL_RGBA);
+        UNSCOPED_INFO("RGBA primary preserved");
+        CHECK((S32)rgba->getPrimaryFormat() == (S32)GL_RGBA);
     }
 
     // Pure-CPU sanity: dataFormatBits/Bytes/Components match the
@@ -225,74 +215,72 @@ namespace
     // multiple. These are static helpers; no GL state involved, but
     // they live here so the table stays close to the formats the
     // upload paths exercise.
-    template<> template<>
-    void llimagegl_object::test<5>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: dataFormatBits/Bytes/Components give the documented host and VRAM sizes", "[LLImageGL]")
     {
-        ensure_equals("RGBA8 -> 32 bits",
-                      LLImageGL::dataFormatBits(GL_RGBA8), 32);
-        ensure_equals("RG8 -> 16 bits",
-                      LLImageGL::dataFormatBits(GL_RG8), 16);
-        ensure_equals("R8 -> 8 bits",
-                      LLImageGL::dataFormatBits(GL_R8), 8);
-        ensure_equals("RGBA16F -> 64 bits",
-                      LLImageGL::dataFormatBits(GL_RGBA16F), 64);
+        UNSCOPED_INFO("RGBA8 -> 32 bits");
+        CHECK(LLImageGL::dataFormatBits(GL_RGBA8) == 32);
+        UNSCOPED_INFO("RG8 -> 16 bits");
+        CHECK(LLImageGL::dataFormatBits(GL_RG8) == 16);
+        UNSCOPED_INFO("R8 -> 8 bits");
+        CHECK(LLImageGL::dataFormatBits(GL_R8) == 8);
+        UNSCOPED_INFO("RGBA16F -> 64 bits");
+        CHECK(LLImageGL::dataFormatBits(GL_RGBA16F) == 64);
 
-        ensure_equals("RGBA components == 4",
-                      LLImageGL::dataFormatComponents(GL_RGBA), 4);
-        ensure_equals("LUMINANCE_ALPHA components == 2",
-                      LLImageGL::dataFormatComponents(GL_LUMINANCE_ALPHA), 2);
-        ensure_equals("RED components == 1",
-                      LLImageGL::dataFormatComponents(GL_RED), 1);
+        UNSCOPED_INFO("RGBA components == 4");
+        CHECK(LLImageGL::dataFormatComponents(GL_RGBA) == 4);
+        UNSCOPED_INFO("LUMINANCE_ALPHA components == 2");
+        CHECK(LLImageGL::dataFormatComponents(GL_LUMINANCE_ALPHA) == 2);
+        UNSCOPED_INFO("RED components == 1");
+        CHECK(LLImageGL::dataFormatComponents(GL_RED) == 1);
 
         // 16x16 RGBA8 = 16*16*4 = 1024 bytes, already 4-aligned.
-        ensure_equals("16x16 RGBA8 = 1024 bytes",
-                      (S32)LLImageGL::dataFormatBytes(GL_RGBA8, 16, 16), 1024);
+        UNSCOPED_INFO("16x16 RGBA8 = 1024 bytes");
+        CHECK((S32)LLImageGL::dataFormatBytes(GL_RGBA8, 16, 16) == 1024);
         // 5x3 R8 = 15 bytes; rounds up to 16 (4-aligned).
-        ensure_equals("5x3 R8 byte count rounds to 4-aligned 16",
-                      (S32)LLImageGL::dataFormatBytes(GL_R8, 5, 3), 16);
+        UNSCOPED_INFO("5x3 R8 byte count rounds to 4-aligned 16");
+        CHECK((S32)LLImageGL::dataFormatBytes(GL_R8, 5, 3) == 16);
 
         // Host vs. VRAM split: dataFormatBits returns the tight host
         // layout (used for CPU upload-buffer math); dataFormatVRAMBits
         // returns the padded driver allocation (used for VRAM stats).
         // For formats drivers don't pad, the two agree.
-        ensure_equals("RGB8 host -> 24 bits (tight)",
-                      LLImageGL::dataFormatBits(GL_RGB8), 24);
-        ensure_equals("RGB8 VRAM -> 32 bits (padded to RGBX)",
-                      LLImageGL::dataFormatVRAMBits(GL_RGB8), 32);
-        ensure_equals("RGB16F host -> 48 bits (tight)",
-                      LLImageGL::dataFormatBits(GL_RGB16F), 48);
-        ensure_equals("RGB16F VRAM -> 64 bits (padded to RGBA16F)",
-                      LLImageGL::dataFormatVRAMBits(GL_RGB16F), 64);
-        ensure_equals("RGB32F host -> 96 bits (tight)",
-                      LLImageGL::dataFormatBits(GL_RGB32F), 96);
-        ensure_equals("RGB32F VRAM -> 128 bits (padded to RGBA32F)",
-                      LLImageGL::dataFormatVRAMBits(GL_RGB32F), 128);
-        ensure_equals("DEPTH_COMPONENT24 host -> 24 bits (tight)",
-                      LLImageGL::dataFormatBits(GL_DEPTH_COMPONENT24), 24);
-        ensure_equals("DEPTH_COMPONENT24 VRAM -> 32 bits (padded)",
-                      LLImageGL::dataFormatVRAMBits(GL_DEPTH_COMPONENT24), 32);
+        UNSCOPED_INFO("RGB8 host -> 24 bits (tight)");
+        CHECK(LLImageGL::dataFormatBits(GL_RGB8) == 24);
+        UNSCOPED_INFO("RGB8 VRAM -> 32 bits (padded to RGBX)");
+        CHECK(LLImageGL::dataFormatVRAMBits(GL_RGB8) == 32);
+        UNSCOPED_INFO("RGB16F host -> 48 bits (tight)");
+        CHECK(LLImageGL::dataFormatBits(GL_RGB16F) == 48);
+        UNSCOPED_INFO("RGB16F VRAM -> 64 bits (padded to RGBA16F)");
+        CHECK(LLImageGL::dataFormatVRAMBits(GL_RGB16F) == 64);
+        UNSCOPED_INFO("RGB32F host -> 96 bits (tight)");
+        CHECK(LLImageGL::dataFormatBits(GL_RGB32F) == 96);
+        UNSCOPED_INFO("RGB32F VRAM -> 128 bits (padded to RGBA32F)");
+        CHECK(LLImageGL::dataFormatVRAMBits(GL_RGB32F) == 128);
+        UNSCOPED_INFO("DEPTH_COMPONENT24 host -> 24 bits (tight)");
+        CHECK(LLImageGL::dataFormatBits(GL_DEPTH_COMPONENT24) == 24);
+        UNSCOPED_INFO("DEPTH_COMPONENT24 VRAM -> 32 bits (padded)");
+        CHECK(LLImageGL::dataFormatVRAMBits(GL_DEPTH_COMPONENT24) == 32);
 
         // VRAM bytes path applies the same 4-byte alignment as the
         // host bytes path and routes unpadded formats through the
         // host table — so RGBA8 matches between the two.
-        ensure_equals("16x16 RGBA8 VRAM = 1024 bytes (matches host)",
-                      (S32)LLImageGL::dataFormatVRAMBytes(GL_RGBA8, 16, 16), 1024);
+        UNSCOPED_INFO("16x16 RGBA8 VRAM = 1024 bytes (matches host)");
+        CHECK((S32)LLImageGL::dataFormatVRAMBytes(GL_RGBA8, 16, 16) == 1024);
         // 16x16 RGB8: host 16*16*3 = 768; VRAM 16*16*4 = 1024.
-        ensure_equals("16x16 RGB8 host = 768 bytes",
-                      (S32)LLImageGL::dataFormatBytes(GL_RGB8, 16, 16), 768);
-        ensure_equals("16x16 RGB8 VRAM = 1024 bytes (padded)",
-                      (S32)LLImageGL::dataFormatVRAMBytes(GL_RGB8, 16, 16), 1024);
+        UNSCOPED_INFO("16x16 RGB8 host = 768 bytes");
+        CHECK((S32)LLImageGL::dataFormatBytes(GL_RGB8, 16, 16) == 768);
+        UNSCOPED_INFO("16x16 RGB8 VRAM = 1024 bytes (padded)");
+        CHECK((S32)LLImageGL::dataFormatVRAMBytes(GL_RGB8, 16, 16) == 1024);
     }
 
     // When no explicit format is set, createGLTexture derives one from
     // the raw's component count. With deprecated rewrites enabled this
     // means: 1 -> GL_RED, 2 -> GL_RG, 3 -> GL_RGB, 4 -> GL_RGBA.
-    template<> template<>
-    void llimagegl_object::test<6>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: createGLTexture picks the primary format from the component count", "[LLImageGL]")
     {
         if (gGLManager.mGLVersion < 3.29f)
         {
-            skip("resolveDeprecatedFormat is gated on GL >= 3.3");
+            SKIP("resolveDeprecatedFormat is gated on GL >= 3.3");
             return;
         }
 
@@ -302,39 +290,39 @@ namespace
         // to 2 component").
         LLPointer<LLImageRaw> raw2 = makeRaw(8, 8, 2, /*fill=*/0x80);
         LLPointer<LLImageGL> img2 = new LLImageGL(/*usemipmaps=*/false);
-        ensure("createGLTexture 2-component succeeded",
-               img2->createGLTexture(0, raw2.get()));
-        ensure_equals("2 components -> GL_RG primary",
-                      (S32)img2->getPrimaryFormat(), (S32)GL_RG);
+        UNSCOPED_INFO("createGLTexture 2-component succeeded");
+        CHECK(img2->createGLTexture(0, raw2.get()));
+        UNSCOPED_INFO("2 components -> GL_RG primary");
+        CHECK((S32)img2->getPrimaryFormat() == (S32)GL_RG);
 
         LLPointer<LLImageRaw> raw4 = makeRaw(8, 8, 4, /*fill=*/0x80);
         LLPointer<LLImageGL> img4 = new LLImageGL(/*usemipmaps=*/false);
-        ensure("createGLTexture 4-component succeeded",
-               img4->createGLTexture(0, raw4.get()));
-        ensure_equals("4 components -> GL_RGBA primary",
-                      (S32)img4->getPrimaryFormat(), (S32)GL_RGBA);
+        UNSCOPED_INFO("createGLTexture 4-component succeeded");
+        CHECK(img4->createGLTexture(0, raw4.get()));
+        UNSCOPED_INFO("4 components -> GL_RGBA primary");
+        CHECK((S32)img4->getPrimaryFormat() == (S32)GL_RGBA);
     }
 
     // usemipmaps=true must wire the auto-mipmap path through to GL —
     // verify by reading the bound texture's mip 1 dimensions back. Mip
     // 1 of an 8x8 base is 4x4; if mipmaps weren't generated the level
     // would have width 0.
-    template<> template<>
-    void llimagegl_object::test<7>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a texture made with usemipmaps has a mip chain in GL", "[LLImageGL]")
     {
         LLPointer<LLImageRaw> raw = makeRaw(8, 8, 4, /*fill=*/0x80);
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/true);
-        ensure("createGLTexture mipmapped succeeded",
-               img->createGLTexture(0, raw.get()));
-        ensure("getUseMipMaps reports true",
-               img->getUseMipMaps());
+        UNSCOPED_INFO("createGLTexture mipmapped succeeded");
+        CHECK(img->createGLTexture(0, raw.get()));
+        UNSCOPED_INFO("getUseMipMaps reports true");
+        CHECK(img->getUseMipMaps());
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, img->getTexName());
 
         GLint mip1_w = 0;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 1, GL_TEXTURE_WIDTH, &mip1_w);
-        ensure_equals("mip 1 width == 4 for an 8x8 base", (S32)mip1_w, 4);
+        UNSCOPED_INFO("mip 1 width == 4 for an 8x8 base");
+        CHECK((S32)mip1_w == 4);
     }
 
     // Regression for 2d4e2a60ea — GL_TEXTURE_SWIZZLE_RGBA must be set
@@ -342,12 +330,11 @@ namespace
     // sees (R, R, R, A) for a 2-component LUMINANCE_ALPHA upload even
     // though the texture is now stored as GL_RG. Verifies the swizzle
     // mask matches applySwizzleForDeprecatedFormat's table.
-    template<> template<>
-    void llimagegl_object::test<8>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: createGLTexture sets the RRRA swizzle for luminance-alpha", "[LLImageGL]")
     {
         if (gGLManager.mGLVersion < 3.29f)
         {
-            skip("swizzle apply is gated on GL >= 3.3");
+            SKIP("swizzle apply is gated on GL >= 3.3");
             return;
         }
 
@@ -356,8 +343,8 @@ namespace
         // createGLTexture then applies the matching swizzle.
         LLPointer<LLImageRaw> raw = makeRaw(8, 8, 2, /*fill=*/0x80);
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
-        ensure("createGLTexture 2-component succeeded",
-               img->createGLTexture(0, raw.get()));
+        UNSCOPED_INFO("createGLTexture 2-component succeeded");
+        CHECK(img->createGLTexture(0, raw.get()));
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, img->getTexName());
@@ -365,18 +352,21 @@ namespace
         GLint mask[4] = { 0, 0, 0, 0 };
         glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, mask);
 
-        ensure_equals("R swizzle == GL_RED",   (S32)mask[0], (S32)GL_RED);
-        ensure_equals("G swizzle == GL_RED",   (S32)mask[1], (S32)GL_RED);
-        ensure_equals("B swizzle == GL_RED",   (S32)mask[2], (S32)GL_RED);
-        ensure_equals("A swizzle == GL_GREEN", (S32)mask[3], (S32)GL_GREEN);
+        UNSCOPED_INFO("R swizzle == GL_RED");
+        CHECK((S32)mask[0] == (S32)GL_RED);
+        UNSCOPED_INFO("G swizzle == GL_RED");
+        CHECK((S32)mask[1] == (S32)GL_RED);
+        UNSCOPED_INFO("B swizzle == GL_RED");
+        CHECK((S32)mask[2] == (S32)GL_RED);
+        UNSCOPED_INFO("A swizzle == GL_GREEN");
+        CHECK((S32)mask[3] == (S32)GL_GREEN);
     }
 
     // Round-trip: upload a known pattern, glGetTexImage it back, and
     // verify byte-for-byte. Covers the createGLTexture upload path and
     // readBackRaw together. RGBA chosen so no deprecated rewrite kicks
     // in — that path is covered separately by test<4> and test<6>.
-    template<> template<>
-    void llimagegl_object::test<9>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: readBackRaw returns the bytes createGLTexture uploaded", "[LLImageGL]")
     {
         constexpr U16 W = 8, H = 8;
         constexpr S8  C = 4;
@@ -388,17 +378,17 @@ namespace
             sd[i] = (U8)(i & 0xFF);
 
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
-        ensure("createGLTexture succeeded",
-               img->createGLTexture(0, src.get()));
+        UNSCOPED_INFO("createGLTexture succeeded");
+        CHECK(img->createGLTexture(0, src.get()));
 
         LLPointer<LLImageRaw> dst = new LLImageRaw(W, H, C);
         std::memset(dst->getData(), 0, (size_t)W * H * C);
-        ensure("readBackRaw succeeded",
-               img->readBackRaw(0, dst.get(), /*compressed_ok=*/false));
+        UNSCOPED_INFO("readBackRaw succeeded");
+        CHECK(img->readBackRaw(0, dst.get(), /*compressed_ok=*/false));
 
-        ensure_equals("readback bytes match upload",
-                      std::memcmp(src->getData(), dst->getData(),
-                                  (size_t)W * H * C),
+        UNSCOPED_INFO("readback bytes match upload");
+        CHECK(std::memcmp(src->getData(), dst->getData(),
+                                  (size_t)W * H * C) ==
                       0);
     }
 
@@ -408,8 +398,7 @@ namespace
     // main thread on Windows off Intel, on Linux with NVIDIA, on macOS with AMD --
     // stepped through rows by component count times a per-type width that had no
     // entry for it, and died. Where the slicing is off this passes either way.
-    template<> template<>
-    void llimagegl_object::test<10>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a packed pixel type uploads and updates as one value a pixel", "[LLImageGL]")
     {
         // 64 rows, a multiple of 32: the full upload takes the batched slices.
         constexpr U16 W = 64, H = 64;
@@ -420,20 +409,21 @@ namespace
 
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
         img->setExplicitFormat(GL_RGBA8, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
-        ensure("createGLTexture succeeded", img->createGLTexture(0, src.get()));
+        UNSCOPED_INFO("createGLTexture succeeded");
+        CHECK(img->createGLTexture(0, src.get()));
 
         std::vector<U8> got((size_t)W * H * 4);
         readTexture(img, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, got.data());
-        ensure_equals("full upload reads back",
-                      std::memcmp(got.data(), sd, got.size()), 0);
+        UNSCOPED_INFO("full upload reads back");
+        REQUIRE(std::memcmp(got.data(), sd, got.size()) == 0);
 
         // A partial-width update, which slices one row at a time.
         LLPointer<LLImageRaw> patch = new LLImageRaw(W, H, 4);
         U8* pd = patch->getData();
         for (size_t i = 0; i < (size_t)W * H * 4; ++i)
             pd[i] = (U8)(0xFF - (i & 0xFF));
-        ensure("setSubImage succeeded",
-               img->setSubImage(patch.get(), /*x_pos=*/8, /*y_pos=*/4,
+        UNSCOPED_INFO("setSubImage succeeded");
+        CHECK(img->setSubImage(patch.get(), /*x_pos=*/8, /*y_pos=*/4,
                                 /*width=*/16, /*height=*/8,
                                 /*force_fast_update=*/true));
 
@@ -448,7 +438,8 @@ namespace
                 match = std::memcmp(got.data() + at, (in_patch ? pd : sd) + at, 4) == 0;
             }
         }
-        ensure("the update lands where it was asked and nowhere else", match);
+        UNSCOPED_INFO("the update lands where it was asked and nowhere else");
+        CHECK(match);
     }
 
     // scaleDown builds a new texture object, and texture-object state does not
@@ -456,8 +447,7 @@ namespace
     // back red and luminance-alpha opaque. The FBO method -- the default -- could
     // not have kept the channels either, since it samples THROUGH the swizzle and
     // copies back by position, so these take the PBO copy whatever the setting.
-    template<> template<>
-    void llimagegl_object::test<11>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: scaleDown keeps a deprecated-format texture's swizzle and channels", "[LLImageGL]")
     {
         constexpr U16 W = 16, H = 16;
         LLPointer<LLImageRaw> raw = new LLImageRaw(W, H, 2);
@@ -469,26 +459,34 @@ namespace
         }
 
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/true);
-        ensure("createGLTexture succeeded", img->createGLTexture(0, raw.get()));
+        UNSCOPED_INFO("createGLTexture succeeded");
+        CHECK(img->createGLTexture(0, raw.get()));
 
         const U32 method = gGLManager.mDownScaleMethod;
         gGLManager.mDownScaleMethod = 0;
         const bool scaled = img->scaleDown(1);
         gGLManager.mDownScaleMethod = method;
-        ensure("scaleDown succeeded", scaled);
-        ensure_equals("discard level follows", img->getDiscardLevel(), 1);
+        UNSCOPED_INFO("scaleDown succeeded");
+        CHECK(scaled);
+        UNSCOPED_INFO("discard level follows");
+        CHECK(img->getDiscardLevel() == 1);
 
         bindForRead(img);
         GLint w = 0;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
-        ensure_equals("the new texture is half size", (S32)w, (S32)W / 2);
+        UNSCOPED_INFO("the new texture is half size");
+        CHECK((S32)w == (S32)W / 2);
 
         GLint mask[4] = { 0, 0, 0, 0 };
         glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, mask);
-        ensure_equals("R swizzle == GL_RED",   (S32)mask[0], (S32)GL_RED);
-        ensure_equals("G swizzle == GL_RED",   (S32)mask[1], (S32)GL_RED);
-        ensure_equals("B swizzle == GL_RED",   (S32)mask[2], (S32)GL_RED);
-        ensure_equals("A swizzle == GL_GREEN", (S32)mask[3], (S32)GL_GREEN);
+        UNSCOPED_INFO("R swizzle == GL_RED");
+        CHECK((S32)mask[0] == (S32)GL_RED);
+        UNSCOPED_INFO("G swizzle == GL_RED");
+        CHECK((S32)mask[1] == (S32)GL_RED);
+        UNSCOPED_INFO("B swizzle == GL_RED");
+        CHECK((S32)mask[2] == (S32)GL_RED);
+        UNSCOPED_INFO("A swizzle == GL_GREEN");
+        CHECK((S32)mask[3] == (S32)GL_GREEN);
 
         std::vector<U8> got((size_t)(W / 2) * (H / 2) * 2);
         glGetTexImage(GL_TEXTURE_2D, 0, GL_RG, GL_UNSIGNED_BYTE, got.data());
@@ -497,18 +495,18 @@ namespace
         {
             match = got[i] == 0x40 && got[i + 1] == 0xC0;
         }
-        ensure("luminance and alpha both survive the copy", match);
+        UNSCOPED_INFO("luminance and alpha both survive the copy");
+        CHECK(match);
     }
 
     // scaleDown waits out an upload in flight: the LLImageGL thread is writing the
     // discard level and storage state it reads and replaces, and that upload's
     // publish would then install its texture under the discard level set here.
-    template<> template<>
-    void llimagegl_object::test<12>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: scaleDown waits until an upload in flight has ended", "[LLImageGL]")
     {
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/true);
-        ensure("createGLTexture succeeded",
-               img->createGLTexture(0, makeRaw(16, 16, 4, 0x80).get()));
+        UNSCOPED_INFO("createGLTexture succeeded");
+        CHECK(img->createGLTexture(0, makeRaw(16, 16, 4, 0x80).get()));
         const U32 name = img->getTexName();
 
         // The PBO copy needs no framebuffer of its own.
@@ -523,9 +521,12 @@ namespace
 
         gGLManager.mDownScaleMethod = method;
 
-        ensure("refused while an upload is in flight", !during);
-        ensure_equals("texture untouched meanwhile", (S32)name_during, (S32)name);
-        ensure("done once the upload has ended", after);
+        UNSCOPED_INFO("refused while an upload is in flight");
+        CHECK_FALSE(during);
+        UNSCOPED_INFO("texture untouched meanwhile");
+        CHECK((S32)name_during == (S32)name);
+        UNSCOPED_INFO("done once the upload has ended");
+        CHECK(after);
     }
 
     // While an upload is in flight the members describe the texture being built.
@@ -533,8 +534,7 @@ namespace
     // level, so it read the old texture's level 0 at the new texture's size.
     // Asset 64x64, on screen at discard 2 (a 16x16 texture), the upload in flight
     // building discard 0.
-    template<> template<>
-    void llimagegl_object::test<13>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: readBackRaw during an upload reads the texture on screen", "[LLImageGL]")
     {
         constexpr U16 W = 16, H = 16;
         LLPointer<LLImageRaw> src = new LLImageRaw(W, H, 4);
@@ -543,8 +543,10 @@ namespace
             sd[i] = (U8)(i & 0xFF);
 
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
-        ensure("createGLTexture succeeded", img->createGLTexture(2, src.get()));
-        ensure_equals("on screen at 16 wide", img->getWidth(), 16);
+        UNSCOPED_INFO("createGLTexture succeeded");
+        CHECK(img->createGLTexture(2, src.get()));
+        UNSCOPED_INFO("on screen at 16 wide");
+        CHECK(img->getWidth() == 16);
 
         img->beginUpload();
         img->setDiscardLevel(0); // what the worker's createGLTexture writes first
@@ -555,116 +557,132 @@ namespace
         img->setDiscardLevel(2);
         img->endUpload();
 
-        ensure("readBackRaw succeeded", read);
-        ensure_equals("read at the size on screen", (S32)dst->getWidth(), (S32)W);
-        ensure_equals("and reads what is on screen",
-                      std::memcmp(dst->getData(), sd, (size_t)W * H * 4), 0);
+        UNSCOPED_INFO("readBackRaw succeeded");
+        CHECK(read);
+        UNSCOPED_INFO("read at the size on screen");
+        CHECK((S32)dst->getWidth() == (S32)W);
+        UNSCOPED_INFO("and reads what is on screen");
+        CHECK(std::memcmp(dst->getData(), sd, (size_t)W * H * 4) == 0);
     }
 
     // The pick mask of a texture still being uploaded waits for that texture:
     // getMask answers for the one on screen, and off the main thread building the
     // mask in place freed the buffer getMask was reading. It publishes with the
     // texture, and an upload that never publishes leaves it alone.
-    template<> template<>
-    void llimagegl_object::test<14>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: the pick mask of an upload in flight publishes with its texture", "[LLImageGL]")
     {
         constexpr U16 W = 16, H = 16;
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
-        ensure("createGLTexture succeeded",
-               img->createGLTexture(0, makeRaw(W, H, 4, 0xFF).get()));
+        UNSCOPED_INFO("createGLTexture succeeded");
+        CHECK(img->createGLTexture(0, makeRaw(W, H, 4, 0xFF).get()));
         const LLVector2 centre(0.5f, 0.5f);
-        ensure("opaque texture picks", img->getMask(centre));
+        UNSCOPED_INFO("opaque texture picks");
+        CHECK(img->getMask(centre));
 
         LLPointer<LLImageRaw> clear = makeRaw(W, H, 4, 0x00);
 
         img->beginUpload();
         img->updatePickMask(W, H, clear->getData());
-        ensure("the mask on screen answers while the upload is in flight",
-               img->getMask(centre));
+        UNSCOPED_INFO("the mask on screen answers while the upload is in flight");
+        CHECK(img->getMask(centre));
         img->endUpload();
-        ensure("an upload that never published leaves the mask alone",
-               img->getMask(centre));
+        UNSCOPED_INFO("an upload that never published leaves the mask alone");
+        CHECK(img->getMask(centre));
 
         img->beginUpload();
         img->updatePickMask(W, H, clear->getData());
         img->syncTexName(img->getTexName());
-        ensure("the new mask publishes with its texture", !img->getMask(centre));
+        UNSCOPED_INFO("the new mask publishes with its texture");
+        CHECK_FALSE(img->getMask(centre));
     }
 
     // An edit writes through the ACTIVE unit, and a bind that finds the texture
     // already cached on slot 0 skips activating it. With another unit left active
     // the write went to whatever that unit held. The glyph atlas does exactly this:
     // still on slot 0 from the text being drawn when a new glyph arrives.
-    template<> template<>
-    void llimagegl_object::test<15>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: an edit reaches its own texture while another unit is active", "[LLImageGL]")
     {
         constexpr U16 W = 32, H = 32;
         LLPointer<LLImageGL> a = new LLImageGL(/*usemipmaps=*/false);
         LLPointer<LLImageGL> b = new LLImageGL(/*usemipmaps=*/false);
-        ensure("create a", a->createGLTexture(0, makeRaw(W, H, 4, 0x10).get()));
-        ensure("create b", b->createGLTexture(0, makeRaw(W, H, 4, 0x20).get()));
+        UNSCOPED_INFO("create a");
+        CHECK(a->createGLTexture(0, makeRaw(W, H, 4, 0x10).get()));
+        UNSCOPED_INFO("create b");
+        CHECK(b->createGLTexture(0, makeRaw(W, H, 4, 0x20).get()));
 
         // Partial update, as the glyph atlas does it. Forcing the slot 1 bind is what
         // leaves unit 1 active, cached or not.
         gGL.getTextureSlot(0)->bind(a.get());
         gGL.getTextureSlot(1)->bind(b.get(), false, /*forceBind=*/true);
-        ensure("setSubImage succeeded",
-               a->setSubImage(makeRaw(W, H, 4, 0xFF).get(), 4, 4, 8, 8,
+        UNSCOPED_INFO("setSubImage succeeded");
+        CHECK(a->setSubImage(makeRaw(W, H, 4, 0xFF).get(), 4, 4, 8, 8,
                               /*force_fast_update=*/true));
-        ensure_equals("the update reached a", readTexelRGBA(a, 5, 5), 0xFFFFFFFFu);
-        ensure_equals("and not b", readTexelRGBA(b, 5, 5), 0x20202020u);
+        UNSCOPED_INFO("the update reached a");
+        CHECK(readTexelRGBA(a, 5, 5) == 0xFFFFFFFFu);
+        UNSCOPED_INFO("and not b");
+        CHECK(readTexelRGBA(b, 5, 5) == 0x20202020u);
 
         // Re-upload in place, through setImage.
         gGL.getTextureSlot(0)->bind(a.get());
         gGL.getTextureSlot(1)->bind(b.get(), false, /*forceBind=*/true);
-        ensure("re-upload succeeded", a->createGLTexture(0, makeRaw(W, H, 4, 0x77).get()));
-        ensure_equals("the re-upload reached a", readTexelRGBA(a, 5, 5), 0x77777777u);
-        ensure_equals("and not b", readTexelRGBA(b, 5, 5), 0x20202020u);
+        UNSCOPED_INFO("re-upload succeeded");
+        CHECK(a->createGLTexture(0, makeRaw(W, H, 4, 0x77).get()));
+        UNSCOPED_INFO("the re-upload reached a");
+        CHECK(readTexelRGBA(a, 5, 5) == 0x77777777u);
+        UNSCOPED_INFO("and not b");
+        CHECK(readTexelRGBA(b, 5, 5) == 0x20202020u);
     }
 
     // A re-upload at the same discard level wrote into the live texture in place,
     // on the word of the discard level alone. Immutable storage cannot follow a new
     // size or format: the write was rejected, or dropped the channel that did not
     // fit, and the image went on describing a texture GL never had.
-    template<> template<>
-    void llimagegl_object::test<16>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a re-upload at the same discard level takes a new size or format", "[LLImageGL]")
     {
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
-        ensure("create 32x32", img->createGLTexture(0, makeRaw(32, 32, 4, 0x11).get()));
-        ensure("re-create 64x64", img->createGLTexture(0, makeRaw(64, 64, 4, 0x22).get()));
+        UNSCOPED_INFO("create 32x32");
+        CHECK(img->createGLTexture(0, makeRaw(32, 32, 4, 0x11).get()));
+        UNSCOPED_INFO("re-create 64x64");
+        CHECK(img->createGLTexture(0, makeRaw(64, 64, 4, 0x22).get()));
 
         bindForRead(img);
         GLint w = 0;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
-        ensure_equals("the texture took the new size", (S32)w, 64);
-        ensure_equals("and the new pixels", readTexelRGBA(img, 40, 40), 0x22222222u);
+        UNSCOPED_INFO("the texture took the new size");
+        CHECK((S32)w == 64);
+        UNSCOPED_INFO("and the new pixels");
+        CHECK(readTexelRGBA(img, 40, 40) == 0x22222222u);
 
         // Same size, an alpha channel the old storage has no room for.
         LLPointer<LLImageGL> rgb = new LLImageGL(/*usemipmaps=*/false);
-        ensure("create RGB", rgb->createGLTexture(0, makeRaw(16, 16, 3, 0x33).get()));
-        ensure("re-create RGBA", rgb->createGLTexture(0, makeRaw(16, 16, 4, 0x44).get()));
+        UNSCOPED_INFO("create RGB");
+        CHECK(rgb->createGLTexture(0, makeRaw(16, 16, 3, 0x33).get()));
+        UNSCOPED_INFO("re-create RGBA");
+        CHECK(rgb->createGLTexture(0, makeRaw(16, 16, 4, 0x44).get()));
 
         bindForRead(rgb);
         GLint format = 0;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
-        ensure_equals("the texture took the new format", (S32)format, (S32)GL_SRGB8_ALPHA8);
-        ensure_equals("and the new pixels", readTexelRGBA(rgb, 3, 3), 0x44444444u);
+        UNSCOPED_INFO("the texture took the new format");
+        CHECK((S32)format == (S32)GL_SRGB8_ALPHA8);
+        UNSCOPED_INFO("and the new pixels");
+        CHECK(readTexelRGBA(rgb, 3, 3) == 0x44444444u);
     }
 
     // A deleted texture's name may come back out of glGenTextures, and a slot whose
     // bind cache still held it would take the new texture for bound already and skip
     // the bind -- sampling texture 0 in its place, since deleting the old one put the
     // binding back to 0. The cache forgets the name when the texture goes.
-    template<> template<>
-    void llimagegl_object::test<17>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a slot's bind cache forgets a deleted texture's name", "[LLImageGL]")
     {
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
-        ensure("createGLTexture succeeded",
-               img->createGLTexture(0, makeRaw(16, 16, 4, 0x80).get()));
+        UNSCOPED_INFO("createGLTexture succeeded");
+        CHECK(img->createGLTexture(0, makeRaw(16, 16, 4, 0x80).get()));
         const U32 name = img->getTexName();
 
         gGL.getTextureSlot(3)->bind(img.get());
-        ensure_equals("slot 3 caches it", gGL.getTextureSlot(3)->getCurrTexture(), name);
+        UNSCOPED_INFO("slot 3 caches it");
+        CHECK(gGL.getTextureSlot(3)->getCurrTexture() == name);
 
         img->destroyGLTexture();
         // However many frames the delete is held back for.
@@ -673,44 +691,48 @@ namespace
             LLImageGL::updateClass();
         }
 
-        ensure_equals("the cache let go of the deleted name",
-                      gGL.getTextureSlot(3)->getCurrTexture(), 0u);
+        UNSCOPED_INFO("the cache let go of the deleted name");
+        CHECK(gGL.getTextureSlot(3)->getCurrTexture() == 0u);
     }
 
     // Generated mips fill the whole pyramid the storage holds, and sampling can
     // reach it. MAX_LEVEL stayed at the discard levels -- five below 256x256 -- so
     // glGenerateMipmap stopped there and distant surfaces minified no further.
-    template<> template<>
-    void llimagegl_object::test<18>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: generated mips fill the whole pyramid and sampling reaches it", "[LLImageGL]")
     {
         constexpr U16 W = 256, H = 256;
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/true);
-        ensure("createGLTexture succeeded",
-               img->createGLTexture(0, makeRaw(W, H, 4, 0x80).get()));
+        UNSCOPED_INFO("createGLTexture succeeded");
+        CHECK(img->createGLTexture(0, makeRaw(W, H, 4, 0x80).get()));
 
         bindForRead(img);
         GLint max_level = 0;
         glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, &max_level);
         const S32 last = LLImageGL::calcMipLevelCount(W, H) - 1;
-        ensure_equals("sampling reaches the 1x1 level", (S32)max_level, last);
+        UNSCOPED_INFO("sampling reaches the 1x1 level");
+        CHECK((S32)max_level == last);
 
         U8 px[4] = { 0, 0, 0, 0 };
         glGetTexImage(GL_TEXTURE_2D, last, GL_RGBA, GL_UNSIGNED_BYTE, px);
-        ensure("and the 1x1 level was generated",
-               px[0] == 0x80 && px[1] == 0x80 && px[2] == 0x80 && px[3] == 0x80);
+        {
+            INFO("and the 1x1 level was generated");
+            CHECK(px[0] == 0x80);
+            CHECK(px[1] == 0x80);
+            CHECK(px[2] == 0x80);
+            CHECK(px[3] == 0x80);
+        }
     }
 
     // gGL is thread_local and outlives a context, as it does across these tests,
     // and init left the slots' bind caches as the last context had them. A fresh
     // context hands out the same first names, so its first texture read as bound
     // already on a slot that had held its namesake, and the bind was skipped.
-    template<> template<>
-    void llimagegl_object::test<19>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a new context starts with clear bind caches and unit 0 active", "[LLImageGL]")
     {
         {
             LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
-            ensure("createGLTexture succeeded",
-                   img->createGLTexture(0, makeRaw(16, 16, 4, 0x80).get()));
+            UNSCOPED_INFO("createGLTexture succeeded");
+            CHECK(img->createGLTexture(0, makeRaw(16, 16, 4, 0x80).get()));
             gGL.getTextureSlot(2)->bind(img.get());
         }
 
@@ -718,26 +740,26 @@ namespace
         gl.reset();
         gl = std::make_unique<ll_test::HeadlessGL>();
 
-        ensure_equals("unit 2's cache starts empty",
-                      gGL.getTextureSlot(2)->getCurrTexture(), 0u);
-        ensure_equals("and unit 0 is the active one",
-                      gGL.getCurrentTexUnitIndex(), 0u);
+        UNSCOPED_INFO("unit 2's cache starts empty");
+        CHECK(gGL.getTextureSlot(2)->getCurrTexture() == 0u);
+        UNSCOPED_INFO("and unit 0 is the active one");
+        CHECK(gGL.getCurrentTexUnitIndex() == 0u);
 
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
-        ensure("createGLTexture succeeded in the new context",
-               img->createGLTexture(0, makeRaw(16, 16, 4, 0x40).get()));
+        UNSCOPED_INFO("createGLTexture succeeded in the new context");
+        CHECK(img->createGLTexture(0, makeRaw(16, 16, 4, 0x40).get()));
         gGL.getTextureSlot(2)->bind(img.get());
         GLint bound = 0;
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound);
-        ensure_equals("the bind reached GL", (U32)bound, img->getTexName());
+        UNSCOPED_INFO("the bind reached GL");
+        CHECK((U32)bound == img->getTexName());
     }
 
     // The same for the blend and colour-mask caches. A context left blending
     // BT_ALPHA made init's own setSceneBlendType(BT_ALPHA) look redundant, so the
     // next context kept GL's ONE, ZERO while gGL believed it was alpha blending;
     // and a mask left off read as still off on a context writing every channel.
-    template<> template<>
-    void llimagegl_object::test<20>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a new context's blend and colour-mask caches match GL", "[LLImageGL]")
     {
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
         gGL.setColorMask(false, false);
@@ -750,27 +772,36 @@ namespace
         GLint dst = 0;
         glGetIntegerv(GL_BLEND_SRC_RGB, &src);
         glGetIntegerv(GL_BLEND_DST_RGB, &dst);
-        ensure_equals("init's alpha blending reached GL: source",
-                      (S32)src, (S32)GL_SRC_ALPHA);
-        ensure_equals("init's alpha blending reached GL: destination",
-                      (S32)dst, (S32)GL_ONE_MINUS_SRC_ALPHA);
+        UNSCOPED_INFO("init's alpha blending reached GL: source");
+        CHECK((S32)src == (S32)GL_SRC_ALPHA);
+        UNSCOPED_INFO("init's alpha blending reached GL: destination");
+        CHECK((S32)dst == (S32)GL_ONE_MINUS_SRC_ALPHA);
 
         bool mask[4] = { false, false, false, false };
         gGL.getColorMask(mask);
-        ensure("the colour mask cache says what GL starts with",
-               mask[0] && mask[1] && mask[2] && mask[3]);
+        {
+            INFO("the colour mask cache says what GL starts with");
+            CHECK(mask[0]);
+            CHECK(mask[1]);
+            CHECK(mask[2]);
+            CHECK(mask[3]);
+        }
         GLboolean gl_mask[4] = { GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE };
         glGetBooleanv(GL_COLOR_WRITEMASK, gl_mask);
-        ensure("and GL agrees",
-               gl_mask[0] && gl_mask[1] && gl_mask[2] && gl_mask[3]);
+        {
+            INFO("and GL agrees");
+            CHECK(gl_mask[0]);
+            CHECK(gl_mask[1]);
+            CHECK(gl_mask[2]);
+            CHECK(gl_mask[3]);
+        }
     }
 
     // And for vertex buffer names, which LLVertexBuffer pools per thread as
     // LLImageGL pools texture names. The pool was never emptied with its context,
     // so the next context bound a name it had never generated -- which a core
     // profile refuses -- and the buffer was never allocated.
-    template<> template<>
-    void llimagegl_object::test<21>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a new context binds vertex buffer names it made itself", "[LLImageGL]")
     {
         // A buffer of three vertices, written and unmapped as a caller does. Where the
         // name comes from the pool differs: the default VBO pool draws it when it
@@ -779,9 +810,11 @@ namespace
         // after the unmap is the name this buffer drew from the pool.
         auto fill = [](LLVertexBuffer* vb, const std::string& when)
         {
-            ensure("allocateBuffer succeeded " + when, vb->allocateBuffer(3, 0));
+            UNSCOPED_INFO("allocateBuffer succeeded " + when);
+            REQUIRE(vb->allocateBuffer(3, 0));
             LLStrider<LLVector3> verts;
-            ensure("getVertexStrider succeeded " + when, vb->getVertexStrider(verts));
+            UNSCOPED_INFO("getVertexStrider succeeded " + when);
+            REQUIRE(vb->getVertexStrider(verts));
             for (S32 i = 0; i < 3; ++i)
             {
                 verts[i] = LLVector3((F32)i, 0.f, 0.f);
@@ -803,8 +836,10 @@ namespace
         fill(vb, "in the new context");
         GLint bound = 0;
         glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &bound);
-        ensure("a buffer is bound", bound != 0);
-        ensure("and it is one this context made", glIsBuffer((GLuint)bound) == GL_TRUE);
+        UNSCOPED_INFO("a buffer is bound");
+        CHECK(bound != 0);
+        UNSCOPED_INFO("and it is one this context made");
+        CHECK(glIsBuffer((GLuint)bound) == GL_TRUE);
         LLVertexBuffer::unbind();
     }
 
@@ -812,8 +847,7 @@ namespace
     // out the GPU: it fences, hands over, and moves on, and the main thread
     // publishes the texture once the fence has signalled. Until then the image
     // goes on showing the texture it had, and the caller's completion waits.
-    template<> template<>
-    void llimagegl_object::test<22>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: an upload on the LLImageGL thread publishes once its fence signals", "[LLImageGL]")
     {
         // The queue the upload thread hands its results back on, as the viewer's.
         // It has to exist before the image, which looks it up when built.
@@ -830,8 +864,8 @@ namespace
         } thread_end;
 
         LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
-        ensure("createGLTexture succeeded",
-               img->createGLTexture(0, makeRaw(16, 16, 4, 0x11).get()));
+        UNSCOPED_INFO("createGLTexture succeeded");
+        CHECK(img->createGLTexture(0, makeRaw(16, 16, 4, 0x11).get()));
         const U32 old_name = img->getTexName();
 
         LLPointer<LLImageRaw> raw = makeRaw(32, 32, 4, 0x55);
@@ -853,8 +887,10 @@ namespace
         }
         // The handover was posted before worker_done was raised.
         mainloop.runPending();
-        ensure("the worker finished", worker_done.load());
-        ensure("and its createGLTexture succeeded", worker_ok.load());
+        UNSCOPED_INFO("the worker finished");
+        CHECK(worker_done.load());
+        UNSCOPED_INFO("and its createGLTexture succeeded");
+        CHECK(worker_ok.load());
 
         bool completed = false;
         U32 name_at_completion = 0;
@@ -864,9 +900,12 @@ namespace
             name_at_completion = img->getTexName();
         });
 
-        ensure("not published before its fence is seen", !completed);
-        ensure_equals("the texture on screen is the old one", img->getTexName(), old_name);
-        ensure_equals("at its own size", img->getWidth(), 16);
+        UNSCOPED_INFO("not published before its fence is seen");
+        CHECK_FALSE(completed);
+        UNSCOPED_INFO("the texture on screen is the old one");
+        CHECK(img->getTexName() == old_name);
+        UNSCOPED_INFO("at its own size");
+        CHECK(img->getWidth() == 16);
 
         while (LLImageGL::publishUploads() > 0 && std::chrono::steady_clock::now() < deadline)
         {
@@ -875,18 +914,22 @@ namespace
 
         LLImageGLThread::deleteSingleton();
 
-        ensure("the completion ran", completed);
-        ensure("after the new texture published", name_at_completion != old_name);
-        ensure_equals("which is what the image names", img->getTexName(), name_at_completion);
-        ensure_equals("at its new size", img->getWidth(), 32);
-        ensure_equals("holding the upload", readTexelRGBA(img, 5, 5), 0x55555555u);
+        UNSCOPED_INFO("the completion ran");
+        CHECK(completed);
+        UNSCOPED_INFO("after the new texture published");
+        CHECK(name_at_completion != old_name);
+        UNSCOPED_INFO("which is what the image names");
+        CHECK(img->getTexName() == name_at_completion);
+        UNSCOPED_INFO("at its new size");
+        CHECK(img->getWidth() == 32);
+        UNSCOPED_INFO("holding the upload");
+        CHECK(readTexelRGBA(img, 5, 5) == 0x55555555u);
     }
 
     // And the rest of what LLRender's setters cache. A polygon offset or patch
     // size the last context was left with made the same setting on the next one
     // look redundant, so the fresh context kept GL's initial value instead.
-    template<> template<>
-    void llimagegl_object::test<23>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a new context takes the polygon offset and patch size set on it", "[LLImageGL]")
     {
         gGL.setPolygonOffset(1.f, 2.f);
         gGL.setPatchVertices(4);
@@ -903,19 +946,21 @@ namespace
         GLfloat units = 0.f;
         glGetFloatv(GL_POLYGON_OFFSET_FACTOR, &factor);
         glGetFloatv(GL_POLYGON_OFFSET_UNITS, &units);
-        ensure_equals("the polygon offset reached the new context: factor", (F32)factor, sign * 1.f);
-        ensure_equals("the polygon offset reached the new context: units", (F32)units, sign * 2.f);
+        UNSCOPED_INFO("the polygon offset reached the new context: factor");
+        CHECK((F32)factor == sign * 1.f);
+        UNSCOPED_INFO("the polygon offset reached the new context: units");
+        CHECK((F32)units == sign * 2.f);
 
         GLint patch = 0;
         glGetIntegerv(GL_PATCH_VERTICES, &patch);
-        ensure_equals("and the patch size", (S32)patch, 4);
+        UNSCOPED_INFO("and the patch size");
+        CHECK((S32)patch == 4);
     }
 
     // Which vertex attribute arrays are enabled is vertex-array-object state, and
     // a fresh context's VAO has none. LLVertexBuffer's cache of them outlived the
     // context, so the next context's first draw skipped enabling the arrays it read.
-    template<> template<>
-    void llimagegl_object::test<24>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: setupClientArrays enables the position array again on a new context", "[LLImageGL]")
     {
         LLVertexBuffer::setupClientArrays(LLVertexBuffer::MAP_VERTEX);
 
@@ -928,19 +973,20 @@ namespace
         glGetVertexAttribiv(LLVertexBuffer::TYPE_VERTEX, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled);
         LLVertexBuffer::setupClientArrays(0);
 
-        ensure("the position array is enabled on the new context", enabled == GL_TRUE);
+        UNSCOPED_INFO("the position array is enabled on the new context");
+        CHECK(enabled == GL_TRUE);
     }
 
     // A worker ends by destroying its shared context on its own thread, where
     // it is current, as LLImageGLThread does. On EGL that only marked it for
     // destruction, and the context held its display past the window, so the
     // next window was made on the stale display, and failed.
-    template<> template<>
-    void llimagegl_object::test<25>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a window can be made after a worker destroyed its shared context", "[LLImageGL]")
     {
         LLWindow* window = gl->window();
         void* shared = window->createSharedContext();
-        ensure("a shared context was made", shared != nullptr);
+        UNSCOPED_INFO("a shared context was made");
+        REQUIRE(shared != nullptr);
         std::thread worker([window, shared]
         {
             window->makeContextCurrent(shared);
@@ -955,15 +1001,14 @@ namespace
         }
         catch (const std::exception& e)
         {
-            fail(std::string("the next window: ") + e.what());
+            FAIL(std::string("the next window: ") + e.what());
         }
     }
 
     // The integer formats through LLImageGL. R32UI, RG16I and RGBA32UI allocate as themselves, hold what was uploaded
     // bit for bit -- past 2^24, and below 0 -- and take a partial update; each is accounted at its texels' size; and
     // the one asked for with mips holds level 0 alone, since GL neither builds nor filters an integer texture's mips.
-    template<> template<>
-    void llimagegl_object::test<26>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: integer formats allocate as themselves and hold their texels exactly", "[LLImageGL]")
     {
         constexpr U16 W = 13, H = 7;
         constexpr size_t N = (size_t)W * H;
@@ -976,23 +1021,29 @@ namespace
         LLPointer<LLImageGL> r32ui = new LLImageGL(W, H, 1, /*usemipmaps=*/true);
         r32ui->setExplicitFormat(GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT);
         U64 before = LLImageGL::getTextureBytesAllocated();
-        ensure("R32UI created", r32ui->createGLTexture(0, reinterpret_cast<const U8*>(uints.data())));
-        ensure_equals("R32UI accounted at four bytes a texel",
-                      (S64)(LLImageGL::getTextureBytesAllocated() - before), (S64)N * 4);
-        ensure_equals("and its host bytes", (S64)r32ui->getMipBytes(0), (S64)N * 4);
-        ensure("no mips asked of it", !r32ui->getUseMipMaps());
+        UNSCOPED_INFO("R32UI created");
+        CHECK(r32ui->createGLTexture(0, reinterpret_cast<const U8*>(uints.data())));
+        UNSCOPED_INFO("R32UI accounted at four bytes a texel");
+        CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == (S64)N * 4);
+        UNSCOPED_INFO("and its host bytes");
+        CHECK((S64)r32ui->getMipBytes(0) == (S64)N * 4);
+        UNSCOPED_INFO("no mips asked of it");
+        CHECK_FALSE(r32ui->getUseMipMaps());
 
         bindForRead(r32ui);
         GLint format = 0;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
-        ensure_equals("R32UI storage", (S32)format, (S32)GL_R32UI);
+        UNSCOPED_INFO("R32UI storage");
+        CHECK((S32)format == (S32)GL_R32UI);
         GLint level1_width = -1;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 1, GL_TEXTURE_WIDTH, &level1_width);
-        ensure_equals("no level past the first", (S32)level1_width, 0);
+        UNSCOPED_INFO("no level past the first");
+        CHECK((S32)level1_width == 0);
 
         std::vector<U32> got_uints(N, 0);
         readTexture(r32ui, GL_RED_INTEGER, GL_UNSIGNED_INT, got_uints.data());
-        ensure("R32UI holds the upload", got_uints == uints);
+        UNSCOPED_INFO("R32UI holds the upload");
+        CHECK(got_uints == uints);
 
         // A partial update, its rows read from a wider source as the glyph atlas updates.
         std::vector<U32> patch(N);
@@ -1000,8 +1051,8 @@ namespace
         {
             patch[i] = 0xF0000000u + (U32)i;
         }
-        ensure("R32UI partial update",
-               r32ui->setSubImage(reinterpret_cast<const U8*>(patch.data()), W, H, 2, 1, 4, 3, /*force_fast_update=*/true));
+        UNSCOPED_INFO("R32UI partial update");
+        CHECK(r32ui->setSubImage(reinterpret_cast<const U8*>(patch.data()), W, H, 2, 1, 4, 3, /*force_fast_update=*/true));
         readTexture(r32ui, GL_RED_INTEGER, GL_UNSIGNED_INT, got_uints.data());
         for (U32 y = 0; y < H; ++y)
         {
@@ -1009,8 +1060,9 @@ namespace
             {
                 const size_t i = (size_t)y * W + x;
                 const bool in_patch = x >= 2 && x < 6 && y >= 1 && y < 4;
-                ensure_equals("R32UI texel " + std::to_string(x) + "," + std::to_string(y), got_uints[i],
-                              in_patch ? patch[i] : uints[i]);
+                UNSCOPED_INFO("R32UI texel " + std::to_string(x) + "," + std::to_string(y));
+                REQUIRE(got_uints[i] ==
+                              (in_patch ? patch[i] : uints[i]));
             }
         }
 
@@ -1023,15 +1075,18 @@ namespace
         LLPointer<LLImageGL> rg16i = new LLImageGL(W, H, 2, /*usemipmaps=*/false);
         rg16i->setExplicitFormat(GL_RG16I, GL_RG_INTEGER, GL_SHORT);
         before = LLImageGL::getTextureBytesAllocated();
-        ensure("RG16I created", rg16i->createGLTexture(0, reinterpret_cast<const U8*>(shorts.data())));
-        ensure_equals("RG16I accounted at four bytes a texel",
-                      (S64)(LLImageGL::getTextureBytesAllocated() - before), (S64)N * 4);
+        UNSCOPED_INFO("RG16I created");
+        CHECK(rg16i->createGLTexture(0, reinterpret_cast<const U8*>(shorts.data())));
+        UNSCOPED_INFO("RG16I accounted at four bytes a texel");
+        CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == (S64)N * 4);
         bindForRead(rg16i);
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
-        ensure_equals("RG16I storage", (S32)format, (S32)GL_RG16I);
+        UNSCOPED_INFO("RG16I storage");
+        CHECK((S32)format == (S32)GL_RG16I);
         std::vector<S16> got_shorts(N * 2, 0);
         readTexture(rg16i, GL_RG_INTEGER, GL_SHORT, got_shorts.data());
-        ensure("RG16I holds the upload", got_shorts == shorts);
+        UNSCOPED_INFO("RG16I holds the upload");
+        CHECK(got_shorts == shorts);
 
         std::vector<U32> wide(N * 4);
         for (size_t i = 0; i < N; ++i)
@@ -1044,28 +1099,33 @@ namespace
         LLPointer<LLImageGL> rgba32ui = new LLImageGL(W, H, 4, /*usemipmaps=*/false);
         rgba32ui->setExplicitFormat(GL_RGBA32UI, GL_RGBA_INTEGER, GL_UNSIGNED_INT);
         before = LLImageGL::getTextureBytesAllocated();
-        ensure("RGBA32UI created", rgba32ui->createGLTexture(0, reinterpret_cast<const U8*>(wide.data())));
-        ensure_equals("RGBA32UI accounted at sixteen bytes a texel",
-                      (S64)(LLImageGL::getTextureBytesAllocated() - before), (S64)N * 16);
+        UNSCOPED_INFO("RGBA32UI created");
+        CHECK(rgba32ui->createGLTexture(0, reinterpret_cast<const U8*>(wide.data())));
+        UNSCOPED_INFO("RGBA32UI accounted at sixteen bytes a texel");
+        CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == (S64)N * 16);
         bindForRead(rgba32ui);
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
-        ensure_equals("RGBA32UI storage", (S32)format, (S32)GL_RGBA32UI);
+        UNSCOPED_INFO("RGBA32UI storage");
+        CHECK((S32)format == (S32)GL_RGBA32UI);
         std::vector<U32> got_wide(N * 4, 0);
         readTexture(rgba32ui, GL_RGBA_INTEGER, GL_UNSIGNED_INT, got_wide.data());
-        ensure("RGBA32UI holds the upload", got_wide == wide);
+        UNSCOPED_INFO("RGBA32UI holds the upload");
+        CHECK(got_wide == wide);
 
         // What an LLImageRaw cannot hold, readBackRaw does not read: it has a byte a component.
         LLPointer<LLImageRaw> raw = new LLImageRaw();
-        ensure("no byte image of R32UI", !r32ui->readBackRaw(0, raw.get(), /*compressed_ok=*/false));
-        ensure("nor a downscale", !r32ui->scaleDown(1));
+        UNSCOPED_INFO("no byte image of R32UI");
+        CHECK_FALSE(r32ui->readBackRaw(0, raw.get(), /*compressed_ok=*/false));
+        UNSCOPED_INFO("nor a downscale");
+        CHECK_FALSE(r32ui->scaleDown(1));
 
-        ensure_equals("no GL error", (U32)glGetError(), (U32)GL_NO_ERROR);
+        UNSCOPED_INFO("no GL error");
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
     // The integer formats in the size and channel tables: the sized ones at their texels' bits, the three-channel ones
     // padded in VRAM as RGB8 is, and the pixel formats their data comes in at their channel counts.
-    template<> template<>
-    void llimagegl_object::test<27>()
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: the size and channel tables cover the integer formats", "[LLImageGL]")
     {
         const std::pair<GLenum, S32> bits[] =
         {
@@ -1080,9 +1140,11 @@ namespace
         for (const auto& entry : bits)
         {
             const std::string name = "format " + std::to_string(entry.first);
-            ensure_equals(name + " host bits", LLImageGL::dataFormatBits(entry.first), entry.second);
+            UNSCOPED_INFO(name + " host bits");
+            REQUIRE(LLImageGL::dataFormatBits(entry.first) == entry.second);
             const S32 vram = entry.second == 24 ? 32 : entry.second == 48 ? 64 : entry.second == 96 ? 128 : entry.second;
-            ensure_equals(name + " VRAM bits", LLImageGL::dataFormatVRAMBits(entry.first), vram);
+            UNSCOPED_INFO(name + " VRAM bits");
+            REQUIRE(LLImageGL::dataFormatVRAMBits(entry.first) == vram);
         }
 
         const std::pair<GLenum, S32> components[] =
@@ -1092,8 +1154,8 @@ namespace
         };
         for (const auto& entry : components)
         {
-            ensure_equals("pixel format " + std::to_string(entry.first) + " components",
-                          LLImageGL::dataFormatComponents(entry.first), entry.second);
+            UNSCOPED_INFO("pixel format " + std::to_string(entry.first) + " components");
+            REQUIRE(LLImageGL::dataFormatComponents(entry.first) == entry.second);
         }
     }
 }

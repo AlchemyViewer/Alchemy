@@ -46,7 +46,7 @@
 
 #include "llheadlessgl_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cstdio>
 
@@ -73,8 +73,6 @@ namespace
     }
 }
 
-namespace tut
-{
 namespace
 {
     // Shared GL context + LLFontGL bring-up. One per binary. TUT
@@ -120,55 +118,51 @@ namespace
         }
     };
 
-    typedef test_group<llfonttextcache_data> llfonttextcache_test;
-    typedef llfonttextcache_test::object     llfonttextcache_object;
-    tut::llfonttextcache_test llfonttextcache_testcase("LLFontTextCache");
-}
 
     // Default construction must not crash and must leave the buffer
     // in a destructible state. Catches uninitialized-member regressions
     // that surface as a crash in ~LLFontTextCache trying to free
     // a garbage list.
-    template<> template<>
-    void llfonttextcache_object::test<1>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: a default-constructed cache destroys cleanly", "[LLFontTextCache]")
     {
         LLFontTextCache vb;
-        ensure("default-constructed buffer reaches end-of-scope", true);
+        UNSCOPED_INFO("default-constructed buffer reaches end-of-scope");
+        CHECK(true);
         // Implicit destruct at scope exit; assertion above catches any
         // crash during dtor by being unreached.
     }
 
     // reset() on a freshly-constructed buffer must be a safe no-op.
-    template<> template<>
-    void llfonttextcache_object::test<2>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: reset on a fresh cache is safe to call twice", "[LLFontTextCache]")
     {
         LLFontTextCache vb;
         vb.reset();
         vb.reset();  // idempotent
-        ensure("reset on fresh buffer returns cleanly", true);
+        UNSCOPED_INFO("reset on fresh buffer returns cleanly");
+        CHECK(true);
     }
 
     // Static toggles round-trip without affecting later test setup.
     // The assertions confirm the calls compile and link; observable
     // round-trip would require accessing the private statics.
-    template<> template<>
-    void llfonttextcache_object::test<3>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: enableBufferCollection and enableColorOnlyRegen toggle off and on", "[LLFontTextCache]")
     {
         LLFontTextCache::enableBufferCollection(false);
         LLFontTextCache::enableBufferCollection(true);
         LLFontTextCache::enableColorOnlyRegen(false);
         LLFontTextCache::enableColorOnlyRegen(true);
-        ensure("static toggles set/reset without crash", true);
+        UNSCOPED_INFO("static toggles set/reset without crash");
+        CHECK(true);
     }
 
     // LLFontTextCache parallel: construct + reset.
-    template<> template<>
-    void llfonttextcache_object::test<4>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: a cache resets twice and outlives a buffer collection toggle", "[LLFontTextCache]")
     {
         LLFontTextCache wb;
         wb.reset();
         wb.reset();
-        ensure("LLFontTextCache construct + reset return cleanly", true);
+        UNSCOPED_INFO("LLFontTextCache construct + reset return cleanly");
+        CHECK(true);
         LLFontTextCache::enableBufferCollection(false);
         LLFontTextCache::enableBufferCollection(true);
     }
@@ -176,8 +170,7 @@ namespace
     // LLFontTextCache constructed alongside LLFontTextCache:
     // multiple coexisting instances don't share static state in a way
     // that breaks lifecycle. Pin two buffers in flight at once.
-    template<> template<>
-    void llfonttextcache_object::test<5>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: four caches in flight at once each reset cleanly", "[LLFontTextCache]")
     {
         LLFontTextCache a;
         LLFontTextCache b;
@@ -187,7 +180,8 @@ namespace
         b.reset();
         w1.reset();
         w2.reset();
-        ensure("multiple coexisting buffers reset cleanly", true);
+        UNSCOPED_INFO("multiple coexisting buffers reset cleanly");
+        CHECK(true);
     }
 
     // ===================================================================
@@ -198,54 +192,58 @@ namespace
 
     // First call computes; second call with identical params is a cache
     // hit and returns the same value. Both must equal fontp->getWidthF32.
-    template<> template<>
-    void llfonttextcache_object::test<6>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: getWidthBytes matches the font and repeats its answer", "[LLFontTextCache]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
         const std::string s = "Hello";
 
         LLFontTextCache wb;
         const F32 first  = wb.getWidthBytes(font, s, 0, 5, false);
         const F32 second = wb.getWidthBytes(font, s, 0, 5, false);
         const F32 ref    = font->getWidthF32Bytes(s, 0, 5, false);
-        ensure("first width matches getWidthF32", first == ref);
-        ensure("second call same as first (cache hit)",
-               second == first);
-        ensure("width is positive", first > 0.f);
+        UNSCOPED_INFO("first width matches getWidthF32");
+        CHECK(first == ref);
+        UNSCOPED_INFO("second call same as first (cache hit)");
+        CHECK(second == first);
+        UNSCOPED_INFO("width is positive");
+        CHECK(first > 0.f);
     }
 
     // Cache miss when geometry differs: changing max_chars between
     // calls forces recompute. The cache key includes max_chars at
     // llfonttextcache.cpp:517.
-    template<> template<>
-    void llfonttextcache_object::test<7>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: getWidthBytes recomputes for a new max_chars and repeats for the same", "[LLFontTextCache]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
         const std::string s = "Hello";
 
         LLFontTextCache wb;
         const F32 w_5 = wb.getWidthBytes(font, s, 0, 5, false);
         const F32 w_3 = wb.getWidthBytes(font, s, 0, 3, false);
-        ensure("width(5) > width(3)", w_5 > w_3);
+        UNSCOPED_INFO("width(5) > width(3)");
+        CHECK(w_5 > w_3);
         const F32 w_3_again = wb.getWidthBytes(font, s, 0, 3, false);
-        ensure_equals("identical max_chars hits cache", w_3_again, w_3);
+        UNSCOPED_INFO("identical max_chars hits cache");
+        CHECK(w_3_again == w_3);
     }
 
     // Cache miss when LLFontGL::sScaleX changes between calls. Pins
     // mLastScaleX in the cache key (llfonttextcache.cpp:519).
-    template<> template<>
-    void llfonttextcache_object::test<8>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: getWidthBytes recomputes when LLFontGL::sScaleX changes", "[LLFontTextCache]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
         const F32 saved_scale = LLFontGL::sScaleX;
@@ -258,20 +256,20 @@ namespace
 
         // Width should scale roughly with sScaleX (within FP rounding
         // noise). The cache key invalidation is the load-bearing pin.
-        ensure("scale=0.5 produced different width than scale=1.0",
-               std::abs(w_1 - w_half) > 0.01f);
+        UNSCOPED_INFO("scale=0.5 produced different width than scale=1.0");
+        CHECK(std::abs(w_1 - w_half) > 0.01f);
     }
 
     // Cache miss when the font's cache generation advances between
     // calls (a fallback face's atlas mutation, for example). Pins
     // mLastFontCacheGen at llfonttextcache.cpp:524.
-    template<> template<>
-    void llfonttextcache_object::test<9>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: getWidthBytes agrees with the font across an atlas generation tick", "[LLFontTextCache]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
         LLFontTextCache wb;
@@ -285,51 +283,53 @@ namespace
         // answer. Comparing a cache to itself passes whether it invalidated,
         // recomputed, or returned a stale value -- the only reading that can
         // fail is one where the buffer and the font disagree.
-        ensure_equals("width survives an atlas generation tick",
-                      first, second);
-        ensure_equals("and still agrees with the font it came from",
-                      second, font->getWidthF32Bytes(s, 0, 2, false));
+        UNSCOPED_INFO("width survives an atlas generation tick");
+        CHECK(first == second);
+        UNSCOPED_INFO("and still agrees with the font it came from");
+        CHECK(second == font->getWidthF32Bytes(s, 0, 2, false));
     }
 
     // reset() clears the cache — next call recomputes. Pins
     // llfonttextcache.cpp:480-493.
-    template<> template<>
-    void llfonttextcache_object::test<10>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: getWidthBytes after reset() still agrees with the font", "[LLFontTextCache]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
         LLFontTextCache wb;
         const F32 first = wb.getWidthBytes(font, s, 0, 2, false);
         wb.reset();
         const F32 after = wb.getWidthBytes(font, s, 0, 2, false);
-        ensure_equals("width survives reset()", first, after);
+        UNSCOPED_INFO("width survives reset()");
+        CHECK(first == after);
         // Again, against the font: a reset that failed to clear and a reset
         // that recomputed correctly both return the earlier value, and only
         // one of those also matches an independent measurement.
-        ensure_equals("and still agrees with the font it came from",
-                      after, font->getWidthF32Bytes(s, 0, 2, false));
+        UNSCOPED_INFO("and still agrees with the font it came from");
+        CHECK(after == font->getWidthF32Bytes(s, 0, 2, false));
     }
 
     // Multiple LLFontTextCache instances stay independent: cache
     // state in instance A doesn't affect instance B.
-    template<> template<>
-    void llfonttextcache_object::test<11>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: one cache's reset leaves another's width unchanged", "[LLFontTextCache]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
         LLFontTextCache a, b;
         const F32 wa = a.getWidthBytes(font, s, 0, 2, false);
         a.reset();
         const F32 wb_val = b.getWidthBytes(font, s, 0, 2, false);
-        ensure_equals("instance B unaffected by A's reset", wa, wb_val);
+        UNSCOPED_INFO("instance B unaffected by A's reset");
+        CHECK(wa == wb_val);
     }
 
     // The bound the cache is keyed on, over text where a byte is not a
@@ -337,18 +337,18 @@ namespace
     // count, a character count and a glyph count are the same number, so a
     // cache keyed in the wrong one of them hits and misses identically on all
     // of them and every assertion still passes.
-    template<> template<>
-    void llfonttextcache_object::test<12>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: getWidthBytes keys its cache on bytes over multi-byte text", "[LLFontTextCache]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
 
         // "A", a three-byte character, "B": five bytes, three characters.
         const std::string s = "A\xE6\x97\xA5" "B";
         if (font->getWidthF32Bytes(s, 0, (S32)s.size(), false) <= 0.f)
-            skip("font produced no width for the sample");
+            SKIP("font produced no width for the sample");
 
         // Every bound, boundary or not, has to agree with the font. A bound of
         // 1 and a bound of 4 are one character apart and three bytes apart;
@@ -358,17 +358,18 @@ namespace
         for (S32 bound : { 0, 1, 4, 5 })
         {
             const F32 cached = wb.getWidthBytes(font, s, 0, bound, false);
-            ensure_equals("cached width agrees with the font",
-                          cached, font->getWidthF32Bytes(s, 0, bound, false));
+            UNSCOPED_INFO("cached width agrees with the font");
+            REQUIRE(cached == font->getWidthF32Bytes(s, 0, bound, false));
             // And again, now that it is cached.
-            ensure_equals("and still agrees on the second reading",
-                          wb.getWidthBytes(font, s, 0, bound, false), cached);
+            UNSCOPED_INFO("and still agrees on the second reading");
+            REQUIRE(wb.getWidthBytes(font, s, 0, bound, false) == cached);
         }
 
         // Distinct bounds must not collapse onto one entry.
         const F32 w1 = wb.getWidthBytes(font, s, 0, 1, false);
         const F32 w4 = wb.getWidthBytes(font, s, 0, 4, false);
-        ensure("one character in is narrower than two", w1 < w4);
+        UNSCOPED_INFO("one character in is narrower than two");
+        CHECK(w1 < w4);
     }
 
     // The guard that says a cache is being asked about the text it was named
@@ -381,38 +382,39 @@ namespace
     // at one end or the other. Two long strings differing only in the middle
     // read as the same text, deliberately, and this is the whole of what that
     // bound gives up.
-    template<> template<>
-    void llfonttextcache_object::test<13>()
+    TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: ALFontCacheKey tells recorded text apart by length and both ends", "[LLFontTextCache]")
     {
         ALFontCacheKey key;
-        ensure("the first text asked about is the one recorded",
-               key.sameTextAsRecorded("Inventory"));
-        ensure("and reads as the same text when asked again",
-               key.sameTextAsRecorded("Inventory"));
+        UNSCOPED_INFO("the first text asked about is the one recorded");
+        REQUIRE(key.sameTextAsRecorded("Inventory"));
+        UNSCOPED_INFO("and reads as the same text when asked again");
+        CHECK(key.sameTextAsRecorded("Inventory"));
 
         // What a password field does: one bullet per character, three bytes
         // apiece, over text that is one byte per character.
-        ensure("a substituted string is not the text behind it",
-               !key.sameTextAsRecorded("\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2"));
+        UNSCOPED_INFO("a substituted string is not the text behind it");
+        CHECK_FALSE(key.sameTextAsRecorded("\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2"));
 
         // Same length, differing at the front and at the back -- the second is
         // what a sample taken only from the front would miss.
         ALFontCacheKey front;
-        ensure("records", front.sameTextAsRecorded("Received Items"));
-        ensure("a different string of the same length is caught",
-               !front.sameTextAsRecorded("Xeceived Items"));
+        UNSCOPED_INFO("records");
+        REQUIRE(front.sameTextAsRecorded("Received Items"));
+        UNSCOPED_INFO("a different string of the same length is caught");
+        CHECK_FALSE(front.sameTextAsRecorded("Xeceived Items"));
 
         ALFontCacheKey back;
         const std::string common(64, 'a');
-        ensure("records", back.sameTextAsRecorded(common + "tail"));
-        ensure("a difference past the sampled front is caught",
-               !back.sameTextAsRecorded(common + "tai1"));
+        UNSCOPED_INFO("records");
+        REQUIRE(back.sameTextAsRecorded(common + "tail"));
+        UNSCOPED_INFO("a difference past the sampled front is caught");
+        CHECK_FALSE(back.sameTextAsRecorded(common + "tai1"));
 
         // Naming a new source is what clears the recorded text, so the next
         // string asked about becomes the one this is holding.
         key.forgetSource();
-        ensure("a forgotten source records whatever is asked next",
-               key.sameTextAsRecorded("\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2"));
+        UNSCOPED_INFO("a forgotten source records whatever is asked next");
+        CHECK(key.sameTextAsRecorded("\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2"));
     }
 
     // ===================================================================
@@ -422,8 +424,6 @@ namespace
     // framebuffer.
     // ===================================================================
 
-namespace
-{
     struct llfonttextcache_render_data
     {
         ll_test::HeadlessGL& gl = ll_test::sharedHeadlessGL();
@@ -441,21 +441,17 @@ namespace
         }
     };
 
-    typedef test_group<llfonttextcache_render_data> llfonttextcache_render_test;
-    typedef llfonttextcache_render_test::object     llfonttextcache_render_object;
-    tut::llfonttextcache_render_test llfonttextcache_render_testcase("LLFontTextCacheRender");
-}
 
     // First render() populates the buffer cache and returns the
     // character count rendered. Pins genBuffers + drawBuffer end-to-end
     // through the stub UI shader.
-    template<> template<>
-    void llfonttextcache_render_object::test<1>()
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: renderBytes on a fresh cache returns the bytes it drew", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
         const std::string s = "Hello";
 
         gl.clearFramebuffer();
@@ -466,7 +462,8 @@ namespace
                                 LLFontGL::LEFT, LLFontGL::BASELINE,
                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
                                 /*max_chars=*/5);
-        ensure_equals("render returned 5 chars", n, 5);
+        UNSCOPED_INFO("render returned 5 chars");
+        CHECK(n == 5);
     }
 
     // Color-only fast path (b317778477): same render twice with same
@@ -474,13 +471,13 @@ namespace
     // recolorBuffers — no genBuffers, no atlas alloc. The global
     // generation counter must NOT advance between the first and second
     // calls (atlas already populated; recolor doesn't allocate).
-    template<> template<>
-    void llfonttextcache_render_object::test<2>()
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a repeated identical render allocates nothing in the atlas", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
         const std::string s = "Hello";
 
         LLFontTextCache vb;
@@ -499,8 +496,8 @@ namespace
                   LLFontGL::LEFT, LLFontGL::BASELINE,
                   LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
         const S32 gen_after = LLFontBitmapCache::getGlobalGeneration();
-        ensure_equals("no atlas alloc on repeat render (gen counter stable)",
-                      gen_after, gen_before);
+        UNSCOPED_INFO("no atlas alloc on repeat render (gen counter stable)");
+        CHECK(gen_after == gen_before);
     }
 
     // Color change with same geometry: takes the recolor fast path —
@@ -508,13 +505,13 @@ namespace
     // attribute, no genBuffers. Pins llfonttextcache.cpp:203-210.
     // Observable: global generation counter doesn't advance (no atlas
     // mutation), and the call returns the same character count.
-    template<> template<>
-    void llfonttextcache_render_object::test<3>()
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a color change alone keeps the count and allocates nothing", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
         const std::string s = "Hello";
 
         LLFontTextCache vb;
@@ -527,10 +524,10 @@ namespace
                                     LLFontGL::LEFT, LLFontGL::BASELINE,
                                     LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
         const S32 gen_after = LLFontBitmapCache::getGlobalGeneration();
-        ensure_equals("color change preserves char count",
-                      n_red, n_white);
-        ensure_equals("recolor fast path: no atlas mutation",
-                      gen_after, gen_before);
+        UNSCOPED_INFO("color change preserves char count");
+        CHECK(n_red == n_white);
+        UNSCOPED_INFO("recolor fast path: no atlas mutation");
+        CHECK(gen_after == gen_before);
     }
 
     // Geometry change forces full regen: render at x=100, then at
@@ -538,13 +535,13 @@ namespace
     // shouldn't advance (nothing about geometry change touches the
     // atlas), but the buffer cache had to rebuild. The post-render
     // render-target reflects the second position.
-    template<> template<>
-    void llfonttextcache_render_object::test<4>()
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a render moved to another x returns the same count", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
         const std::string s = "AB";
 
         LLFontTextCache vb;
@@ -556,21 +553,23 @@ namespace
         const S32 n2 = vb.renderBytes(font, s, 0, 200.f, 100.f, LLColor4::white,
                                  LLFontGL::LEFT, LLFontGL::BASELINE,
                                  LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
-        ensure_equals("char count stable after geometry change", n1, n2);
-        ensure("both calls returned positive count", n1 > 0);
+        UNSCOPED_INFO("char count stable after geometry change");
+        CHECK(n1 == n2);
+        UNSCOPED_INFO("both calls returned positive count");
+        CHECK(n1 > 0);
     }
 
     // enableColorOnlyRegen(false) disables the fast path entirely:
     // a same-geometry color-change call falls through to genBuffers
     // (full regen). The static toggle pins the flag-controlled branch
     // at llfonttextcache.cpp:210. Restore the flag in dtor.
-    template<> template<>
-    void llfonttextcache_render_object::test<5>()
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: with enableColorOnlyRegen off a color change still draws every byte", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
         LLFontTextCache vb;
@@ -586,19 +585,20 @@ namespace
                                 LLFontGL::LEFT, LLFontGL::BASELINE,
                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
         LLFontTextCache::enableColorOnlyRegen(true);
-        ensure_equals("render with fast path disabled still returns 2", n, 2);
+        UNSCOPED_INFO("render with fast path disabled still returns 2");
+        CHECK(n == 2);
     }
 
     // Style flip NORMAL → BOLD forces full regen — different glyph
     // index stream. Pins 00f3a4e93d (style invalidation in geometry-
     // invalid check at llfonttextcache.cpp:175).
-    template<> template<>
-    void llfonttextcache_render_object::test<6>()
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a style flip from NORMAL to BOLD keeps the count", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
         LLFontTextCache vb;
@@ -609,8 +609,10 @@ namespace
         const S32 n_bold = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
                                      LLFontGL::LEFT, LLFontGL::BASELINE,
                                      LLFontGL::BOLD, LLFontGL::NO_SHADOW, 2);
-        ensure_equals("char count stable across style flip", n_norm, n_bold);
-        ensure("both renders returned positive", n_norm > 0);
+        UNSCOPED_INFO("char count stable across style flip");
+        CHECK(n_norm == n_bold);
+        UNSCOPED_INFO("both renders returned positive");
+        CHECK(n_norm > 0);
     }
 
     // Truncated DROP_SHADOW_SOFT render with use_ellipses=true: the
@@ -619,13 +621,13 @@ namespace
     // outer's on_pass_boundary callback and routed its shadow batch
     // into mForegroundBufferList — visible as off-color shadow tinting
     // in the recolor fast path. Fix renders the ellipsis with NO_SHADOW.
-    template<> template<>
-    void llfonttextcache_render_object::test<7>()
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: an ellipsized DROP_SHADOW_SOFT render adds no shadow quads for the dots", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
 
         ll_test::FontStateScope scope;
 
@@ -648,8 +650,11 @@ namespace
                                 /*right_x=*/nullptr,
                                 /*use_ellipses=*/true,
                                 /*use_color=*/true);
-        ensure("truncation actually happened (n < full string)",
-               n > 0 && n < (S32)s.length());
+        {
+            INFO("truncation actually happened (n < full string)");
+            CHECK(n > 0);
+            REQUIRE(n < (S32)s.length());
+        }
 
         const auto counts = ll_test::VertexBufferProbe::count(vb);
 
@@ -657,25 +662,25 @@ namespace
         // NOT add to this list — the ellipsis render is single-pass
         // (NO_SHADOW) post-fix.
         const size_t expected_shadow = static_cast<size_t>(n) * 5u;
-        ensure_equals("shadow list = visible chars * 5 (ellipsis adds 0)",
-                      counts.shadow_quads, expected_shadow);
+        UNSCOPED_INFO("shadow list = visible chars * 5 (ellipsis adds 0)");
+        CHECK(counts.shadow_quads == expected_shadow);
 
         // Foreground: 1 quad per visible char + 3 ellipsis chars.
         const size_t expected_fg = static_cast<size_t>(n) + 3u;
-        ensure_equals("foreground list = visible + 3 ellipsis foreground",
-                      counts.foreground_quads, expected_fg);
+        UNSCOPED_INFO("foreground list = visible + 3 ellipsis foreground");
+        CHECK(counts.foreground_quads == expected_fg);
     }
 
     // Sanity check on chars_drawn: when use_ellipses=true triggers
     // truncation, render's return value reports only the visible
     // pre-ellipsis character count, not including the appended "...".
-    template<> template<>
-    void llfonttextcache_render_object::test<8>()
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: an ellipsized render counts the visible bytes and not the dots", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
 
         ll_test::FontStateScope scope;
 
@@ -693,8 +698,11 @@ namespace
                                           nullptr,
                                           /*use_ellipses=*/true,
                                           true);
-        ensure("truncated count is positive but less than full string",
-               n_truncated > 0 && n_truncated < (S32)s.length());
+        {
+            INFO("truncated count is positive but less than full string");
+            CHECK(n_truncated > 0);
+            REQUIRE(n_truncated < (S32)s.length());
+        }
 
         // Same render with max_pixels wide enough to fit the whole
         // string. No truncation, no ellipsis path; full count returned.
@@ -709,8 +717,8 @@ namespace
                                       nullptr,
                                       /*use_ellipses=*/true,
                                       true);
-        ensure_equals("full-fit render returns the entire string length",
-                      n_full, (S32)s.length());
+        UNSCOPED_INFO("full-fit render returns the entire string length");
+        REQUIRE(n_full == (S32)s.length());
     }
 
     // Moving text does not rebuild it. Glyph geometry is built relative to the
@@ -718,13 +726,13 @@ namespace
     // floater drag or a resize replays the capture under a new transform. That
     // was not true while the origin was added into the vertices: everything
     // visible in a moving container was reshaped every frame.
-    template<> template<>
-    void llfonttextcache_render_object::test<9>()
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: moving text does not rebuild it", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
 
         ll_test::FontStateScope scope;
 
@@ -777,13 +785,15 @@ namespace
 
         LLFontGL::sCurOrigin = saved_origin;
 
-        ensure("the first draw builds", after_settle > before);
+        UNSCOPED_INFO("the first draw builds");
+        CHECK(after_settle > before);
         // And without this it would hold for a cache that never replays at all.
-        ensure("an unmoved redraw eventually replays", settled);
-        ensure_equals("moving the text replays rather than rebuilds",
-                      after_moves, after_settle);
-        ensure("a draw somewhere else still rebuilds",
-               after_real_change > after_moves);
+        UNSCOPED_INFO("an unmoved redraw eventually replays");
+        CHECK(settled);
+        UNSCOPED_INFO("moving the text replays rather than rebuilds");
+        CHECK(after_moves == after_settle);
+        UNSCOPED_INFO("a draw somewhere else still rebuilds");
+        CHECK(after_real_change > after_moves);
     }
 
     // Text that shapes to no geometry settles too. A cell with nothing in it
@@ -792,13 +802,13 @@ namespace
     // and a scroll list draws a cell per column whether or not it holds
     // anything. Such a piece of text reshaped itself on every frame it stayed
     // on screen, and the count is the only place it showed.
-    template<> template<>
-    void llfonttextcache_render_object::test<10>()
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: text that shapes to no geometry stops rebuilding too", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
 
         ll_test::FontStateScope scope;
         font->generateASCIIglyphs();
@@ -822,7 +832,8 @@ namespace
 
         const std::string nothing;
         LLFontTextCache blank;
-        ensure("an empty cell stops rebuilding", settle([&]()
+        UNSCOPED_INFO("an empty cell stops rebuilding");
+        CHECK(settle([&]()
         {
             blank.setSource(&nothing, 0);
             blank.renderBytes(font, nothing, 0, 12.f, 34.f, LLColor4::white,
@@ -832,7 +843,8 @@ namespace
 
         const std::string clipped = "Nothing of this fits";
         LLFontTextCache narrow;
-        ensure("text with no room to draw stops rebuilding", settle([&]()
+        UNSCOPED_INFO("text with no room to draw stops rebuilding");
+        CHECK(settle([&]()
         {
             narrow.setSource(&clipped, 0);
             narrow.renderBytes(font, clipped, 0, 12.f, 34.f, LLColor4::white,
@@ -849,8 +861,8 @@ namespace
                            LLFontGL::LEFT, LLFontGL::BASELINE,
                            LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
                            S32_MAX, /*max_pixels=*/2000);
-        ensure("room to draw rebuilds",
-               LLFontTextCache::regenCount() > before_visible);
+        UNSCOPED_INFO("room to draw rebuilds");
+        CHECK(LLFontTextCache::regenCount() > before_visible);
     }
 
     // A width and a draw come off the same glyphs, so the state the font
@@ -860,13 +872,13 @@ namespace
     // box, the ellipsis fit, the auto-resize. Without the other half being
     // dropped alongside, the draw was told nothing had moved and replayed a
     // capture whose glyphs had been rebuilt underneath it.
-    template<> template<>
-    void llfonttextcache_render_object::test<11>()
+    TEST_CASE_METHOD(llfonttextcache_render_data, "LLFontTextCacheRender: a resolution change a measurement saw still rebuilds the draw", "[LLFontTextCacheRender]")
     {
         if (!fileExists(kFontsXml))
-            skip("fonts.xml not present in test data dir");
+            SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        ensure("font available", font != nullptr);
+        UNSCOPED_INFO("font available");
+        REQUIRE(font != nullptr);
 
         ll_test::FontStateScope scope;
         font->generateASCIIglyphs();
@@ -895,7 +907,8 @@ namespace
             draw();
             settled = (LLFontTextCache::regenCount() == before_draw);
         }
-        ensure("measure then draw eventually replays", settled);
+        UNSCOPED_INFO("measure then draw eventually replays");
+        CHECK(settled);
 
         const S32 saved_res_gen = LLFontGL::sResolutionGeneration;
         ++LLFontGL::sResolutionGeneration;
@@ -908,7 +921,7 @@ namespace
 
         LLFontGL::sResolutionGeneration = saved_res_gen;
 
-        ensure("a draw after a measurement saw the same change rebuilds",
-               after_stale_draw > before_stale_draw);
+        UNSCOPED_INFO("a draw after a measurement saw the same change rebuilds");
+        CHECK(after_stale_draw > before_stale_draw);
     }
 }

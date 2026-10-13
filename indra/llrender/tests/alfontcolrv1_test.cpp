@@ -32,7 +32,7 @@
 
 #include "llfonttest_helpers.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <hb.h>
 #include <hb-ft.h>
@@ -61,8 +61,6 @@ namespace
     }
 }
 
-namespace tut
-{
 namespace
 {
     using namespace ll_test;
@@ -83,63 +81,67 @@ namespace
         }
     };
 
-    typedef test_group<alfontcolrv1_data> alfontcolrv1_test;
-    typedef alfontcolrv1_test::object     alfontcolrv1_object;
-    tut::alfontcolrv1_test alfontcolrv1_testcase("ALFontColrV1");
-}
 
     // Painter input validation: null hb_font fails cleanly without a crash.
     // Doesn't need a real font, so this test runs even when the test data
     // dir is empty (e.g., a stripped CI checkout).
-    template<> template<>
-    void alfontcolrv1_object::test<1>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: paintGlyph with a null hb_font returns false and an empty result", "[ALFontColrV1]")
     {
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
-        ensure("paintGlyph(null hb_font) returns false",
-               !painter.paintGlyph(nullptr, /*glyph_index=*/0,
+        UNSCOPED_INFO("paintGlyph(null hb_font) returns false");
+        REQUIRE_FALSE(painter.paintGlyph(nullptr, /*glyph_index=*/0,
                                    /*point_size=*/14.f, fg,
                                    /*palette_index=*/0, result));
-        ensure("Result.mBitmap stays null on failure",
-               result.mBitmap == nullptr);
-        ensure_equals("Result.mWidth stays zero on failure",
-                      result.mWidth, 0);
+        UNSCOPED_INFO("Result.mBitmap stays null on failure");
+        REQUIRE(result.mBitmap == nullptr);
+        UNSCOPED_INFO("Result.mWidth stays zero on failure");
+        CHECK(result.mWidth == 0);
     }
 
     // hasColrV1 is the in-tree probe for "FreeType's FT_LOAD_COLOR can't
     // rasterise this — route through the paint walker." Verify it fires
     // for Noto-COLRv1.ttf, which ships a COLRv1 paint table.
-    template<> template<>
-    void alfontcolrv1_object::test<2>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: hasColrV1 and hasColor are true for Noto-COLRv1", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
         {
-            skip("Noto-COLRv1.ttf not present in test data dir");
+            SKIP("Noto-COLRv1.ttf not present in test data dir");
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        ensure("Noto-COLRv1 loaded", face.notNull() && face->isValid());
-        ensure("Noto-COLRv1 hasColrV1 == true", face->hasColrV1());
-        ensure("Noto-COLRv1 hasColor == true (general flag)", face->hasColor());
+        {
+            INFO("Noto-COLRv1 loaded");
+            REQUIRE(face.notNull());
+            CHECK(face->isValid());
+        }
+        UNSCOPED_INFO("Noto-COLRv1 hasColrV1 == true");
+        CHECK(face->hasColrV1());
+        UNSCOPED_INFO("Noto-COLRv1 hasColor == true (general flag)");
+        CHECK(face->hasColor());
     }
 
     // Negative: InterVariable.woff2 is a plain text font with no COLR
     // table, so hasColrV1 must stay false. Guards against the probe
     // false-positiving on any FT_HAS_COLOR-y face.
-    template<> template<>
-    void alfontcolrv1_object::test<3>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: hasColrV1 is false for a plain text face with no COLR table", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "InterVariable.woff2";
         if (!fileExists(path))
         {
-            skip("InterVariable.woff2 not present in test data dir");
+            SKIP("InterVariable.woff2 not present in test data dir");
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        ensure("Inter loaded", face.notNull() && face->isValid());
-        ensure("Inter hasColrV1 == false", !face->hasColrV1());
+        {
+            INFO("Inter loaded");
+            REQUIRE(face.notNull());
+            CHECK(face->isValid());
+        }
+        UNSCOPED_INFO("Inter hasColrV1 == false");
+        CHECK_FALSE(face->hasColrV1());
     }
 
     // Painter end-to-end: feed a known emoji glyph (fire, U+1F525) through
@@ -147,66 +149,80 @@ namespace
     // one non-zero-alpha pixel. Also exercises the FT_Get_Color_Glyph_ClipBox
     // path (Noto-COLRv1 ships clip boxes for its glyphs) and the BGRA atlas
     // packing logic in paintGlyph.
-    template<> template<>
-    void alfontcolrv1_object::test<4>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: paintGlyph paints the fire emoji into a BGRA bitmap with some alpha", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
         {
-            skip("Noto-COLRv1.ttf not present in test data dir");
+            SKIP("Noto-COLRv1.ttf not present in test data dir");
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        ensure("face loaded",     face.notNull() && face->isValid());
-        ensure("face has COLRv1", face->hasColrV1());
+        {
+            INFO("face loaded");
+            REQUIRE(face.notNull());
+            CHECK(face->isValid());
+        }
+        UNSCOPED_INFO("face has COLRv1");
+        CHECK(face->hasColrV1());
 
         hb_font_t* hb_font = face->getHbFont();
-        ensure("hb_font available", hb_font != nullptr);
+        UNSCOPED_INFO("hb_font available");
+        REQUIRE(hb_font != nullptr);
 
         // Resolve the fire emoji's glyph index via the cmap. Avoids hardcoding
         // a glyph_id that could shift across font versions.
         const hb_codepoint_t fire_cp = 0x1F525;
         hb_codepoint_t       fire_gid = 0;
-        ensure("cmap maps U+1F525 to a glyph",
-               hb_font_get_nominal_glyph(hb_font, fire_cp, &fire_gid)
-               && fire_gid != 0);
+        {
+            INFO("cmap maps U+1F525 to a glyph");
+            CHECK(hb_font_get_nominal_glyph(hb_font, fire_cp, &fire_gid));
+            CHECK(fire_gid != 0);
+        }
 
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
         const bool ok = painter.paintGlyph(hb_font, fire_gid, /*point_size=*/14.f,
                                            fg, /*palette_index=*/0, result);
-        ensure("paintGlyph succeeded", ok);
-        ensure("painter produced bitmap",
-               result.mBitmap != nullptr
-            && result.mWidth > 0 && result.mHeight > 0
-            && result.mPitch != 0);
-        ensure("painter drew non-zero alpha somewhere",
-               anyAlpha(result.mBitmap, result.mWidth, result.mHeight, result.mPitch));
+        UNSCOPED_INFO("paintGlyph succeeded");
+        CHECK(ok);
+        {
+            INFO("painter produced bitmap");
+            REQUIRE(result.mBitmap != nullptr);
+            CHECK(result.mWidth > 0);
+            CHECK(result.mHeight > 0);
+            CHECK(result.mPitch != 0);
+        }
+        UNSCOPED_INFO("painter drew non-zero alpha somewhere");
+        CHECK(anyAlpha(result.mBitmap, result.mWidth, result.mHeight, result.mPitch));
     }
 
     // VS-16 cmap absence is the trigger for shape_sub_run's stripping path.
     // Verify Noto-COLRv1 actually has the shape we expect: ZWJ in cmap but
     // VS-16 not. Other emoji fonts that ship VS-16 (e.g. Twemoji) take the
     // no-strip path; the shape pipeline branches on this flag per-face.
-    template<> template<>
-    void alfontcolrv1_object::test<5>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: Noto-COLRv1's cmap has ZWJ but no VS-16", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
         {
-            skip("Noto-COLRv1.ttf not present in test data dir");
+            SKIP("Noto-COLRv1.ttf not present in test data dir");
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        ensure("face loaded", face.notNull() && face->isValid());
+        {
+            INFO("face loaded");
+            REQUIRE(face.notNull());
+            CHECK(face->isValid());
+        }
 
         // ZWJ should resolve to a real glyph (cmap entry present).
-        ensure("Noto cmap has ZWJ glyph",
-               face->getCharGlyphIndex(0x200D) != 0u);
+        UNSCOPED_INFO("Noto cmap has ZWJ glyph");
+        CHECK(face->getCharGlyphIndex(0x200D) != 0u);
         // VS-16 should NOT — shape_sub_run keys VS-16 stripping on this.
-        ensure_equals("Noto cmap has no VS-16 glyph",
-                      face->getCharGlyphIndex(0xFE0F), 0u);
+        UNSCOPED_INFO("Noto cmap has no VS-16 glyph");
+        CHECK(face->getCharGlyphIndex(0xFE0F) == 0u);
     }
 
     // paintGlyph on an out-of-range glyph index (beyond the font's
@@ -214,19 +230,23 @@ namespace
     // hb_font_paint_glyph which returns 0 for unknown glyphs; the
     // wrapper turns that into a Result with mBitmap=null and
     // mWidth=0.
-    template<> template<>
-    void alfontcolrv1_object::test<6>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: paintGlyph fails cleanly on a glyph index past the font's glyphs", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
         {
-            skip("Noto-COLRv1.ttf not present in test data dir");
+            SKIP("Noto-COLRv1.ttf not present in test data dir");
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        ensure("face loaded", face.notNull() && face->isValid());
+        {
+            INFO("face loaded");
+            REQUIRE(face.notNull());
+            CHECK(face->isValid());
+        }
         hb_font_t* hb_font = face->getHbFont();
-        ensure("hb_font available", hb_font != nullptr);
+        UNSCOPED_INFO("hb_font available");
+        REQUIRE(hb_font != nullptr);
 
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result result;
@@ -237,12 +257,12 @@ namespace
         const bool ok = painter.paintGlyph(hb_font,
                                            /*glyph_index=*/0xFFFFFFFE,
                                            14.f, fg, 0, result);
-        ensure("paintGlyph on out-of-range glyph index fails cleanly",
-               !ok);
-        ensure("result.mBitmap stays null on out-of-range",
-               result.mBitmap == nullptr);
-        ensure_equals("result.mWidth zero on out-of-range",
-                      result.mWidth, 0);
+        UNSCOPED_INFO("paintGlyph on out-of-range glyph index fails cleanly");
+        CHECK_FALSE(ok);
+        UNSCOPED_INFO("result.mBitmap stays null on out-of-range");
+        REQUIRE(result.mBitmap == nullptr);
+        UNSCOPED_INFO("result.mWidth zero on out-of-range");
+        CHECK(result.mWidth == 0);
     }
 
     // Painter staging surface reuse: paint two different emoji
@@ -250,17 +270,20 @@ namespace
     // call's result must reflect the second glyph (not the first
     // — a staging-buffer leak would surface as the second result
     // pointing at stale first-glyph bytes when dimensions match).
-    template<> template<>
-    void alfontcolrv1_object::test<7>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: one painter paints two different emoji one after the other", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
         {
-            skip("Noto-COLRv1.ttf not present in test data dir");
+            SKIP("Noto-COLRv1.ttf not present in test data dir");
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        ensure("face loaded", face.notNull() && face->isValid());
+        {
+            INFO("face loaded");
+            REQUIRE(face.notNull());
+            CHECK(face->isValid());
+        }
         hb_font_t* hb_font = face->getHbFont();
 
         // Two distinct emoji: fire (U+1F525) and red heart (U+2764).
@@ -275,19 +298,27 @@ namespace
         hb_codepoint_t heart = 0;
         hb_font_get_nominal_glyph(hb_font, 0x2764, &heart);
         if (fire == 0 || heart == 0)
-            skip("Noto-COLRv1 missing one of the test emoji codepoints");
+            SKIP("Noto-COLRv1 missing one of the test emoji codepoints");
 
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result r1, r2;
-        ensure("first paintGlyph (fire) succeeded",
-               painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r1));
-        ensure("first painter produced bitmap",
-               r1.mBitmap != nullptr && r1.mWidth > 0 && r1.mHeight > 0);
+        UNSCOPED_INFO("first paintGlyph (fire) succeeded");
+        REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r1));
+        {
+            INFO("first painter produced bitmap");
+            REQUIRE(r1.mBitmap != nullptr);
+            CHECK(r1.mWidth > 0);
+            CHECK(r1.mHeight > 0);
+        }
 
-        ensure("second paintGlyph (heart) succeeded on same painter",
-               painter.paintGlyph(hb_font, heart, 14.f, fg, 0, r2));
-        ensure("second painter produced bitmap",
-               r2.mBitmap != nullptr && r2.mWidth > 0 && r2.mHeight > 0);
+        UNSCOPED_INFO("second paintGlyph (heart) succeeded on same painter");
+        REQUIRE(painter.paintGlyph(hb_font, heart, 14.f, fg, 0, r2));
+        {
+            INFO("second painter produced bitmap");
+            REQUIRE(r2.mBitmap != nullptr);
+            CHECK(r2.mWidth > 0);
+            CHECK(r2.mHeight > 0);
+        }
     }
 
     // 2-em-square surface fallback (88585ff86d): a glyph with no
@@ -301,30 +332,33 @@ namespace
     // also produces a sized bitmap. A negative version (synthetic
     // glyph forcing the fallback) requires a hand-built TTF and
     // is left for the integration suite.
-    template<> template<>
-    void alfontcolrv1_object::test<8>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: the fire emoji's surface is sized on the order of the point size", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
         {
-            skip("Noto-COLRv1.ttf not present in test data dir");
+            SKIP("Noto-COLRv1.ttf not present in test data dir");
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        ensure("face loaded", face.notNull() && face->isValid());
+        {
+            INFO("face loaded");
+            REQUIRE(face.notNull());
+            CHECK(face->isValid());
+        }
         hb_font_t* hb_font = face->getHbFont();
 
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
-            skip("Noto-COLRv1 has no fire emoji");
+            SKIP("Noto-COLRv1 has no fire emoji");
 
         constexpr F32 point_size = 14.f;
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
-        ensure("paintGlyph succeeded",
-               painter.paintGlyph(hb_font, fire, point_size, fg, 0, result));
+        UNSCOPED_INFO("paintGlyph succeeded");
+        REQUIRE(painter.paintGlyph(hb_font, fire, point_size, fg, 0, result));
         // Surface dimensions are on the order of point_size — the
         // ClipBox / FT-extents path produces a bitmap whose width and
         // height are within a small multiple of the requested point
@@ -332,10 +366,16 @@ namespace
         // the lower bound; a regression that ballooned to 2× the
         // 2-em square (32×32 fallback for 14pt) would fail the upper
         // bound (~3× point_size).
-        ensure("surface width is in a reasonable range for 14pt",
-               result.mWidth >= 4 && result.mWidth <= (S32)(point_size * 4.f));
-        ensure("surface height is in a reasonable range for 14pt",
-               result.mHeight >= 4 && result.mHeight <= (S32)(point_size * 4.f));
+        {
+            INFO("surface width is in a reasonable range for 14pt");
+            CHECK(result.mWidth >= 4);
+            CHECK(result.mWidth <= (S32)(point_size * 4.f));
+        }
+        {
+            INFO("surface height is in a reasonable range for 14pt");
+            CHECK(result.mHeight >= 4);
+            CHECK(result.mHeight <= (S32)(point_size * 4.f));
+        }
     }
 
     // (Test 9 removed: pinned the mForegroundOnly flag on the painter
@@ -347,19 +387,18 @@ namespace
     // gradient sampling used the same color for every offset) would
     // produce a single solid color → 1 distinct triple. Real gradient
     // emojis show many colors. Pin >= 3.
-    template<> template<>
-    void alfontcolrv1_object::test<10>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: the fire emoji's gradients paint at least three distinct colours", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
-            skip("Noto-COLRv1 has no fire emoji");
+            SKIP("Noto-COLRv1 has no fire emoji");
 
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result result;
@@ -368,10 +407,14 @@ namespace
         // them away.
         constexpr F32 ps = 32.f;
         const LLColor4U fg(255, 255, 255, 255);
-        ensure("paintGlyph succeeded",
-               painter.paintGlyph(hb_font, fire, ps, fg, 0, result));
-        ensure("painter produced bitmap",
-               result.mBitmap != nullptr && result.mWidth > 0 && result.mHeight > 0);
+        UNSCOPED_INFO("paintGlyph succeeded");
+        REQUIRE(painter.paintGlyph(hb_font, fire, ps, fg, 0, result));
+        {
+            INFO("painter produced bitmap");
+            REQUIRE(result.mBitmap != nullptr);
+            CHECK(result.mWidth > 0);
+            CHECK(result.mHeight > 0);
+        }
 
         std::set<U32> distinct;  // packed BGR (alpha excluded)
         for (S32 y = 0; y < result.mHeight; ++y)
@@ -389,8 +432,8 @@ namespace
         }
         // Fire emoji has at minimum a yellow body + orange gradient +
         // red highlights; >= 3 distinct triples is a conservative bound.
-        ensure("fire emoji produces >= 3 distinct RGB triples (gradient)",
-               distinct.size() >= 3);
+        UNSCOPED_INFO("fire emoji produces >= 3 distinct RGB triples (gradient)");
+        REQUIRE(distinct.size() >= 3);
     }
 
     // palette_index argument propagates to hb_font_paint_glyph: paint
@@ -399,31 +442,34 @@ namespace
     // differ at non-zero-alpha positions. Skip if only one palette is
     // present (no observable difference, but the code path is exercised
     // either way).
-    template<> template<>
-    void alfontcolrv1_object::test<11>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: palette_index reaches hb_font_paint_glyph: palette 1 paints differently", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
-            skip("Noto-COLRv1 has no fire emoji");
+            SKIP("Noto-COLRv1 has no fire emoji");
 
         const LLColor4U fg(255, 255, 255, 255);
 
         ALFontColrV1Painter painter_a, painter_b;
         ALFontColrV1Painter::Result r0, r1;
-        ensure("palette=0 paintGlyph succeeded",
-               painter_a.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/0, r0));
-        ensure("palette=1 paintGlyph succeeded",
-               painter_b.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/1, r1));
-        ensure("both produced bitmaps",
-               r0.mBitmap && r1.mBitmap
-            && r0.mWidth == r1.mWidth && r0.mHeight == r1.mHeight);
+        UNSCOPED_INFO("palette=0 paintGlyph succeeded");
+        REQUIRE(painter_a.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/0, r0));
+        UNSCOPED_INFO("palette=1 paintGlyph succeeded");
+        REQUIRE(painter_b.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/1, r1));
+        {
+            INFO("both produced bitmaps");
+            REQUIRE(r0.mBitmap);
+            REQUIRE(r1.mBitmap);
+            CHECK(r0.mWidth == r1.mWidth);
+            CHECK(r0.mHeight == r1.mHeight);
+        }
 
         // Compare bytes — if the font has only one palette, hb resolves
         // both calls against palette 0 and the bitmaps match. Skip in
@@ -445,44 +491,47 @@ namespace
             }
         }
         if (!any_diff)
-            skip("Noto-COLRv1 ships only one CPAL palette");
+            SKIP("Noto-COLRv1 ships only one CPAL palette");
 
-        ensure("palette swap changed at least one painted pixel", any_diff);
+        UNSCOPED_INFO("palette swap changed at least one painted pixel");
+        CHECK(any_diff);
     }
 
     // OutputFormat::Gray basics: format selector hits the gray fold path
     // and returns a single-channel buffer with mPitch == width and
     // non-zero coverage somewhere in the bitmap. Pins the §1/§2 contract
     // that Gray output is single-channel, top-row first, tightly packed.
-    template<> template<>
-    void alfontcolrv1_object::test<12>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: OutputFormat::Gray paints a tightly packed one-channel bitmap", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
-            skip("Noto-COLRv1 has no fire emoji");
+            SKIP("Noto-COLRv1 has no fire emoji");
 
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
-        ensure("paintGlyph(format=Gray) succeeded",
-               painter.paintGlyph(hb_font, fire, /*point_size=*/14.f, fg,
+        UNSCOPED_INFO("paintGlyph(format=Gray) succeeded");
+        REQUIRE(painter.paintGlyph(hb_font, fire, /*point_size=*/14.f, fg,
                                   /*palette=*/0,
                                   ALFontColrV1Painter::OutputFormat::Gray,
                                   result));
-        ensure_equals("Result.mFormat == Gray",
-                      (S32)result.mFormat,
+        UNSCOPED_INFO("Result.mFormat == Gray");
+        CHECK((S32)result.mFormat ==
                       (S32)ALFontColrV1Painter::OutputFormat::Gray);
-        ensure("Gray output has positive dims",
-               result.mWidth > 0 && result.mHeight > 0);
-        ensure_equals("Gray pitch is width (tightly packed single channel)",
-                      result.mPitch, result.mWidth);
+        {
+            INFO("Gray output has positive dims");
+            CHECK(result.mWidth > 0);
+            CHECK(result.mHeight > 0);
+        }
+        UNSCOPED_INFO("Gray pitch is width (tightly packed single channel)");
+        CHECK(result.mPitch == result.mWidth);
 
         bool any_nonzero = false;
         for (S32 y = 0; y < result.mHeight && !any_nonzero; ++y)
@@ -493,8 +542,8 @@ namespace
                 if (row[x] != 0) { any_nonzero = true; break; }
             }
         }
-        ensure("Gray output has at least one non-zero coverage pixel",
-               any_nonzero);
+        UNSCOPED_INFO("Gray output has at least one non-zero coverage pixel");
+        CHECK(any_nonzero);
     }
 
     // Gray-fold formula pin: paint the same glyph in BGRA and Gray and
@@ -505,25 +554,24 @@ namespace
     // also verifies the foreground-collapses-to-alpha invariant since
     // Y == A and Y > A*0.15 holds, so the test is a strict superset of
     // the "fg-only collapses to alpha" case.
-    template<> template<>
-    void alfontcolrv1_object::test<13>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: each Gray byte is the hybrid luminance fold of the BGRA paint", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
-            skip("Noto-COLRv1 has no fire emoji");
+            SKIP("Noto-COLRv1 has no fire emoji");
 
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result rgba_r, gray_r;
         const LLColor4U fg(255, 255, 255, 255);
-        ensure("BGRA paint succeeded",
-               painter.paintGlyph(hb_font, fire, 14.f, fg, 0, rgba_r));
+        UNSCOPED_INFO("BGRA paint succeeded");
+        REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0, rgba_r));
         // Stash the BGRA bytes — the next paintGlyph call invalidates
         // mBitmap (it points back into mStaging which we overwrite below).
         std::vector<U8> bgra_bytes(rgba_r.mBitmap,
@@ -531,12 +579,14 @@ namespace
         const S32 bgra_w = rgba_r.mWidth, bgra_h = rgba_r.mHeight;
         const S32 bgra_pitch = rgba_r.mPitch;
 
-        ensure("Gray paint succeeded",
-               painter.paintGlyph(hb_font, fire, 14.f, fg, 0,
+        UNSCOPED_INFO("Gray paint succeeded");
+        REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0,
                                   ALFontColrV1Painter::OutputFormat::Gray,
                                   gray_r));
-        ensure_equals("Gray and BGRA produce same width",  gray_r.mWidth,  bgra_w);
-        ensure_equals("Gray and BGRA produce same height", gray_r.mHeight, bgra_h);
+        UNSCOPED_INFO("Gray and BGRA produce same width");
+        CHECK(gray_r.mWidth == bgra_w);
+        UNSCOPED_INFO("Gray and BGRA produce same height");
+        CHECK(gray_r.mHeight == bgra_h);
 
         S32 mismatches = 0;
         for (S32 y = 0; y < bgra_h; ++y)
@@ -559,8 +609,8 @@ namespace
                     ++mismatches;
             }
         }
-        ensure_equals("every Gray byte matches the hybrid fold formula",
-                      mismatches, 0);
+        UNSCOPED_INFO("every Gray byte matches the hybrid fold formula");
+        CHECK(mismatches == 0);
     }
 
     // Hybrid floor pin: scan the BGRA result for fully-saturated palette
@@ -570,12 +620,11 @@ namespace
     // still holds, just isn't observable here. The point of the test is
     // to lock the constant against future tweaks that would silently
     // crush dark CPAL details.
-    template<> template<>
-    void alfontcolrv1_object::test<14>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: Gray keeps an alpha floor under saturated black palette pixels", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
@@ -620,49 +669,51 @@ namespace
                     if (r == 0 && g == 0 && b == 0 && a > 200)
                     {
                         const U32 expected_floor = (a * 38u) >> 8;
-                        ensure("Gray byte at saturated-black palette pixel "
-                               "≥ alpha*floor (no crush to zero)",
-                               (U32)gray_row[x] + 1u >= expected_floor);
+                        UNSCOPED_INFO("Gray byte at saturated-black palette pixel "
+                               "≥ alpha*floor (no crush to zero)");
+                        REQUIRE((U32)gray_row[x] + 1u >= expected_floor);
                         return;
                     }
                 }
             }
         }
-        skip("no fully-saturated-black palette pixel found across test glyphs");
+        SKIP("no fully-saturated-black palette pixel found across test glyphs");
     }
 
     // Out-of-range palette_index clamps to 0 deterministically. Paint
     // fire with palette=0 and palette=99; the resulting bitmaps must
     // be byte-identical (the painter clamps any oversized index to 0
     // before calling hb_font_paint_glyph).
-    template<> template<>
-    void alfontcolrv1_object::test<15>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: an out-of-range palette_index paints byte for byte as palette 0", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
-            skip("Noto-COLRv1 has no fire emoji");
+            SKIP("Noto-COLRv1 has no fire emoji");
 
         ALFontColrV1Painter painter_a, painter_b;
         ALFontColrV1Painter::Result r_zero, r_huge;
         const LLColor4U fg(255, 255, 255, 255);
-        ensure("palette=0 paint succeeded",
-               painter_a.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/0u, r_zero));
-        ensure("palette=99 paint succeeded (clamps to 0)",
-               painter_b.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/99u, r_huge));
-        ensure_equals("clamped result has same width",  r_huge.mWidth,  r_zero.mWidth);
-        ensure_equals("clamped result has same height", r_huge.mHeight, r_zero.mHeight);
-        ensure_equals("clamped result has same pitch",  r_huge.mPitch,  r_zero.mPitch);
+        UNSCOPED_INFO("palette=0 paint succeeded");
+        REQUIRE(painter_a.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/0u, r_zero));
+        UNSCOPED_INFO("palette=99 paint succeeded (clamps to 0)");
+        REQUIRE(painter_b.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/99u, r_huge));
+        UNSCOPED_INFO("clamped result has same width");
+        CHECK(r_huge.mWidth == r_zero.mWidth);
+        UNSCOPED_INFO("clamped result has same height");
+        CHECK(r_huge.mHeight == r_zero.mHeight);
+        UNSCOPED_INFO("clamped result has same pitch");
+        CHECK(r_huge.mPitch == r_zero.mPitch);
 
         const size_t bytes = (size_t)r_zero.mPitch * r_zero.mHeight;
-        ensure("clamped result is byte-identical to palette=0",
-               std::memcmp(r_zero.mBitmap, r_huge.mBitmap, bytes) == 0);
+        UNSCOPED_INFO("clamped result is byte-identical to palette=0");
+        CHECK(std::memcmp(r_zero.mBitmap, r_huge.mBitmap, bytes) == 0);
     }
 
     // Fallback point_size kicks in when the hb_font has ppem unset.
@@ -671,26 +722,31 @@ namespace
     // bitmap rather than returning false. Specifically targets the
     // 2-em fallback inside the empty-bbox branch — without the
     // fallback point_size override, that branch would return false.
-    template<> template<>
-    void alfontcolrv1_object::test<16>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: with ppem unset paintGlyph sizes from the fallback point size or fails", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         // Build a dedicated hb_font on top of the same FT_Face so we can
         // mutate its ppem without affecting the face cache shared with
         // other tests in this group.
         hb_font_t* shared = face->getHbFont();
-        ensure("shared hb_font available", shared != nullptr);
+        UNSCOPED_INFO("shared hb_font available");
+        REQUIRE(shared != nullptr);
         hb_face_t* hb_face = hb_font_get_face(shared);
         hb_font_t* hb_font = hb_font_create(hb_face);
-        ensure("derived hb_font allocated", hb_font != nullptr);
+        UNSCOPED_INFO("derived hb_font allocated");
+        REQUIRE(hb_font != nullptr);
         hb_font_set_ppem(hb_font, 0, 0);
         unsigned px = 1, py = 1;
         hb_font_get_ppem(hb_font, &px, &py);
-        ensure("ppem really is unset on derived font", px == 0 && py == 0);
+        {
+            INFO("ppem really is unset on derived font");
+            CHECK(px == 0);
+            CHECK(py == 0);
+        }
 
         // Pick a glyph by index — without a scale set, the cmap query
         // through hb_font_get_nominal_glyph may not work as expected, so
@@ -701,7 +757,7 @@ namespace
         if (fire == 0)
         {
             hb_font_destroy(hb_font);
-            skip("Noto-COLRv1 has no fire emoji");
+            SKIP("Noto-COLRv1 has no fire emoji");
         }
 
         ALFontColrV1Painter painter;
@@ -720,8 +776,11 @@ namespace
         // failure mode we're protecting against.
         if (ok)
         {
-            ensure("fallback path produced a sized bitmap",
-                   result.mWidth > 0 && result.mHeight > 0);
+            {
+                INFO("fallback path produced a sized bitmap");
+                CHECK(result.mWidth > 0);
+                CHECK(result.mHeight > 0);
+            }
         }
         hb_font_destroy(hb_font);
     }
@@ -732,43 +791,50 @@ namespace
     // post-transform paint commands. A regression that drops PAD back to
     // 1 (or below) would surface here as a fringe of non-zero pixels at
     // the buffer boundary that visually clips the glyph at the atlas.
-    template<> template<>
-    void alfontcolrv1_object::test<17>()
+    TEST_CASE_METHOD(alfontcolrv1_data, "ALFontColrV1: a painted glyph's outermost rows and columns have zero alpha", "[ALFontColrV1]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
-            skip("Noto-COLRv1.ttf not present");
+            SKIP("Noto-COLRv1.ttf not present");
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
-            skip("Noto-COLRv1 has no fire emoji");
+            SKIP("Noto-COLRv1 has no fire emoji");
 
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result r;
         const LLColor4U fg(255, 255, 255, 255);
-        ensure("paintGlyph succeeded",
-               painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r));
-        ensure("bitmap valid",
-               r.mBitmap && r.mWidth >= 4 && r.mHeight >= 4);
+        UNSCOPED_INFO("paintGlyph succeeded");
+        REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r));
+        {
+            INFO("bitmap valid");
+            REQUIRE(r.mBitmap);
+            CHECK(r.mWidth >= 4);
+            CHECK(r.mHeight >= 4);
+        }
 
         // First row, last row.
         for (S32 x = 0; x < r.mWidth; ++x)
         {
             const U8* top    = r.mBitmap                              + x*4;
             const U8* bottom = r.mBitmap + (ptrdiff_t)(r.mHeight-1)*r.mPitch + x*4;
-            ensure_equals("top row alpha is zero",    (S32)top[3],    0);
-            ensure_equals("bottom row alpha is zero", (S32)bottom[3], 0);
+            UNSCOPED_INFO("top row alpha is zero");
+            REQUIRE((S32)top[3] == 0);
+            UNSCOPED_INFO("bottom row alpha is zero");
+            REQUIRE((S32)bottom[3] == 0);
         }
         // First column, last column.
         for (S32 y = 0; y < r.mHeight; ++y)
         {
             const U8* left  = r.mBitmap + (ptrdiff_t)y*r.mPitch                + 0*4;
             const U8* right = r.mBitmap + (ptrdiff_t)y*r.mPitch + (r.mWidth-1)*4;
-            ensure_equals("left col alpha is zero",  (S32)left[3],  0);
-            ensure_equals("right col alpha is zero", (S32)right[3], 0);
+            UNSCOPED_INFO("left col alpha is zero");
+            REQUIRE((S32)left[3] == 0);
+            UNSCOPED_INFO("right col alpha is zero");
+            REQUIRE((S32)right[3] == 0);
         }
     }
 }
