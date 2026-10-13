@@ -313,6 +313,28 @@ namespace
         CHECK(after == before);
     }
 
+    // A second initClass through the explicit-path overload is ignored
+    // whole: the fonts already made keep the DPI and scale they were made
+    // at, which every later layout and measurement reads.
+    TEST_CASE_METHOD(llfontgl_data, "LLFontGL: a second initClass leaves the DPI and scale the fonts were made at", "[LLFontGL]")
+    {
+        if (!fileExists(kFontsXml))
+            SKIP("fonts.xml not found");
+        LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
+                            LLSD(), /*create_gl_textures=*/true);
+        const F32 horiz_dpi = LLFontGL::sHorizDPI;
+        const F32 vert_dpi  = LLFontGL::sVertDPI;
+        const F32 scale_x   = LLFontGL::sScaleX;
+        const F32 scale_y   = LLFontGL::sScaleY;
+
+        LLFontGL::initClass(72.f, 0.5f, 0.5f, kAppDir, kFontsXml,
+                            LLSD(), /*create_gl_textures=*/true);
+        CHECK(LLFontGL::sHorizDPI == horiz_dpi);
+        CHECK(LLFontGL::sVertDPI == vert_dpi);
+        CHECK(LLFontGL::sScaleX == scale_x);
+        CHECK(LLFontGL::sScaleY == scale_y);
+    }
+
     // Static getter family — every named getter must resolve to a
     // non-null LLFontGL after a successful initClass. Smoke check
     // that the default fonts.xml covers all the families exposed.
