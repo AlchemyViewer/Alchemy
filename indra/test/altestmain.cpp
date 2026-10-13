@@ -145,6 +145,10 @@ int main(int argc, char* argv[])
     // Declared order, as TUT ran a group's tests, until no test leans on the
     // ones before it. --order on the command line still wins.
     session.configData().runOrder = Catch::TestRunOrder::Declared;
+    // Every case tagged with its file's name, [#<file stem>], as
+    // --filenames-as-tags tags them: a test file's run names its file with
+    // one tag, and a filter of several files is one argument.
+    session.configData().filenamesAsTags = true;
 
     if (const int result = session.applyCommandLine(argc, argv); result != 0)
     {

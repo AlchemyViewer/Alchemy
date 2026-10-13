@@ -30,92 +30,159 @@
 
 #include "lluuid.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 
-namespace tut
+namespace
 {
-    struct alluauconfig_data
+    TEST_CASE("alluauconfig: aliases by lower-case name with their paths and the mode where it is said", "[alluauconfig]")
     {
-    };
-
-    typedef test_group<alluauconfig_data> alluauconfig_group;
-    typedef alluauconfig_group::object    alluauconfig_object;
-    alluauconfig_group                    alluauconfig_instance("alluauconfig");
-
-    template<> template<>
-    void alluauconfig_object::test<1>()
-    {
-        set_test_name("aliases come out by lower-case name with their paths, and the mode where it is said");
         ALLuauConfig config;
         std::string  error;
-        ensure("parses: " + error, ALLuauConfig::parse("{\n  \"languageMode\": \"strict\",\n  \"aliases\": { \"Lib\": \"./lib\", \"shared\": \"../shared\", \"abs\": \"/opt/lua\" }\n}\n", config, error));
-        ensure_equals("three aliases", config.aliases.size(), size_t(3));
-        ensure_equals("by lower-case name", config.aliases["lib"], std::string("./lib"));
-        ensure_equals("a path up", config.aliases["shared"], std::string("../shared"));
-        ensure_equals("an absolute one", config.aliases["abs"], std::string("/opt/lua"));
-        ensure_equals("the mode", config.mode, std::string("strict"));
-        ensure("no mode where none is said", ALLuauConfig::parse("{ \"aliases\": {} }", config, error) && config.mode.empty());
-        ensure("not a configuration", !ALLuauConfig::parse("{ \"aliases\": 3 }", config, error) && !error.empty());
-        ensure("nor an alias Luau refuses", !ALLuauConfig::parse("{ \"aliases\": { \"bad name\": \"x\" } }", config, error));
+        const bool   parsed = ALLuauConfig::parse("{\n  \"languageMode\": \"strict\",\n  \"aliases\": { \"Lib\": \"./lib\", \"shared\": \"../shared\", \"abs\": \"/opt/lua\" }\n}\n", config, error);
+        UNSCOPED_INFO("parses: " + error);
+        REQUIRE(parsed);
+        REQUIRE(config.aliases.size() == size_t(3));
+        UNSCOPED_INFO("by lower-case name");
+        CHECK(config.aliases["lib"] == std::string("./lib"));
+        UNSCOPED_INFO("a path up");
+        CHECK(config.aliases["shared"] == std::string("../shared"));
+        UNSCOPED_INFO("an absolute one");
+        CHECK(config.aliases["abs"] == std::string("/opt/lua"));
+        CHECK(config.mode == std::string("strict"));
+        {
+            INFO("no mode where none is said");
+            CHECK(ALLuauConfig::parse("{ \"aliases\": {} }", config, error));
+            REQUIRE(config.mode.empty());
+        }
+        {
+            INFO("not a configuration");
+            CHECK_FALSE(ALLuauConfig::parse("{ \"aliases\": 3 }", config, error));
+            REQUIRE_FALSE(error.empty());
+        }
+        UNSCOPED_INFO("nor an alias Luau refuses");
+        CHECK_FALSE(ALLuauConfig::parse("{ \"aliases\": { \"bad name\": \"x\" } }", config, error));
     }
 
-    template<> template<>
-    void alluauconfig_object::test<2>()
+    TEST_CASE("alluauconfig: aliasOf reads the @ name up to the slash; absolute paths and studio aliases", "[alluauconfig]")
     {
-        set_test_name("a require name's alias is what follows the @ up to the slash, and absolute paths are known on both platforms");
         std::string alias, rest;
-        ensure("found", ALLuauConfig::aliasOf("@Lib/util/strings", alias, rest));
-        ensure_equals("lower case", alias, std::string("lib"));
-        ensure_equals("the rest", rest, std::string("util/strings"));
-        ensure("the alias alone", ALLuauConfig::aliasOf("@lib", alias, rest) && alias == "lib" && rest.empty());
-        ensure("not without the @", !ALLuauConfig::aliasOf("lib/util", alias, rest));
-        ensure("not an empty one", !ALLuauConfig::aliasOf("@/util", alias, rest));
-        ensure("absolute on posix", ALLuauConfig::absolute("/opt/lua"));
-        ensure("absolute on windows", ALLuauConfig::absolute("C:\\lua") && ALLuauConfig::absolute("c:/lua"));
-        ensure("relative", !ALLuauConfig::absolute("./lib") && !ALLuauConfig::absolute("lib"));
+        REQUIRE(ALLuauConfig::aliasOf("@Lib/util/strings", alias, rest));
+        UNSCOPED_INFO("lower case");
+        CHECK(alias == std::string("lib"));
+        CHECK(rest == std::string("util/strings"));
+        {
+            INFO("the alias alone");
+            CHECK(ALLuauConfig::aliasOf("@lib", alias, rest));
+            CHECK(alias == "lib");
+            REQUIRE(rest.empty());
+        }
+        UNSCOPED_INFO("not without the @");
+        CHECK_FALSE(ALLuauConfig::aliasOf("lib/util", alias, rest));
+        UNSCOPED_INFO("not an empty one");
+        CHECK_FALSE(ALLuauConfig::aliasOf("@/util", alias, rest));
+        UNSCOPED_INFO("absolute on posix");
+        CHECK(ALLuauConfig::absolute("/opt/lua"));
+        {
+            INFO("absolute on windows");
+            CHECK(ALLuauConfig::absolute("C:\\lua"));
+            CHECK(ALLuauConfig::absolute("c:/lua"));
+        }
+        {
+            INFO("relative");
+            CHECK_FALSE(ALLuauConfig::absolute("./lib"));
+            CHECK_FALSE(ALLuauConfig::absolute("lib"));
+        }
 
         // Script Studio's own aliases: what Luau takes, not self, not sl-*.
-        ensure("a studio alias's name", ALLuauConfig::studioAliasName("lib") && ALLuauConfig::studioAliasName("My_Lib-2.x"));
-        ensure("not self, in any case", !ALLuauConfig::studioAliasName("self") && !ALLuauConfig::studioAliasName("Self"));
-        ensure("not sl-*", !ALLuauConfig::studioAliasName("sl-std") && !ALLuauConfig::studioAliasName("SL-x"));
-        ensure("nothing Luau refuses", !ALLuauConfig::studioAliasName("") && !ALLuauConfig::studioAliasName("a/b") &&
-                                           !ALLuauConfig::studioAliasName("a b") && !ALLuauConfig::studioAliasName(".."));
-        ensure_equals("a folder's name made one", ALLuauConfig::studioAliasFor("My Library", {}), std::string("my-library"));
-        ensure_equals("a number where it is taken, in any case", ALLuauConfig::studioAliasFor("lib", { "LIB", "lib2" }), std::string("lib3"));
-        ensure_equals("one that cannot be: lib", ALLuauConfig::studioAliasFor("self", {}), std::string("lib"));
+        {
+            INFO("a studio alias's name");
+            CHECK(ALLuauConfig::studioAliasName("lib"));
+            CHECK(ALLuauConfig::studioAliasName("My_Lib-2.x"));
+        }
+        {
+            INFO("not self, in any case");
+            CHECK_FALSE(ALLuauConfig::studioAliasName("self"));
+            CHECK_FALSE(ALLuauConfig::studioAliasName("Self"));
+        }
+        {
+            INFO("not sl-*");
+            CHECK_FALSE(ALLuauConfig::studioAliasName("sl-std"));
+            CHECK_FALSE(ALLuauConfig::studioAliasName("SL-x"));
+        }
+        {
+            INFO("nothing Luau refuses");
+            CHECK_FALSE(ALLuauConfig::studioAliasName(""));
+            CHECK_FALSE(ALLuauConfig::studioAliasName("a/b"));
+            CHECK_FALSE(ALLuauConfig::studioAliasName("a b"));
+            CHECK_FALSE(ALLuauConfig::studioAliasName(".."));
+        }
+        UNSCOPED_INFO("a folder's name made one");
+        CHECK(ALLuauConfig::studioAliasFor("My Library", {}) == std::string("my-library"));
+        UNSCOPED_INFO("a number where it is taken, in any case");
+        CHECK(ALLuauConfig::studioAliasFor("lib", { "LIB", "lib2" }) == std::string("lib3"));
+        UNSCOPED_INFO("one that cannot be: lib");
+        CHECK(ALLuauConfig::studioAliasFor("self", {}) == std::string("lib"));
     }
-    template<> template<>
-    void alluauconfig_object::test<3>()
+
+    TEST_CASE("alluauconfig: lints and globals come out as Luau reads them with its default lints", "[alluauconfig]")
     {
-        set_test_name("the lints and the globals come out as Luau reads them, the lints as its defaults where the file says nothing");
         ALLuauConfig config;
         std::string  error;
         const ALLuauConfig defaults;
-        ensure("parses: " + error, ALLuauConfig::parse("{\n  \"lint\": { \"LocalUnused\": false, \"LocalShadow\": true },\n  \"globals\": [\"Alchemy\", \"grid\"]\n}\n", config, error));
-        ensure_equals("two globals", config.globals.size(), size_t(2));
-        ensure_equals("in order", config.globals[0], std::string("Alchemy"));
+        const bool         parsed = ALLuauConfig::parse("{\n  \"lint\": { \"LocalUnused\": false, \"LocalShadow\": true },\n  \"globals\": [\"Alchemy\", \"grid\"]\n}\n", config, error);
+        UNSCOPED_INFO("parses: " + error);
+        REQUIRE(parsed);
+        REQUIRE(config.globals.size() == size_t(2));
+        UNSCOPED_INFO("in order");
+        CHECK(config.globals[0] == std::string("Alchemy"));
         // LocalUnused is code 7 and LocalShadow code 4 in Luau's numbering;
         // the second is off by default.
-        ensure("LocalUnused off", (config.lints & (1ull << 7)) == 0);
-        ensure("LocalShadow on", (config.lints & (1ull << 4)) != 0);
-        ensure("the rest as they were", (config.lints & ~((1ull << 7) | (1ull << 4))) == (defaults.lints & ~((1ull << 7) | (1ull << 4))));
-        ensure("none fatal, not every lint an error", config.fatalLints == 0 && !config.lintErrors);
-        ensure("said nothing: the defaults", ALLuauConfig::parse("{}", config, error) && config.lints == defaults.lints && config.fatalLints == 0 && config.globals.empty());
-        ensure("every lint an error where asked", ALLuauConfig::parse("{ \"lintErrors\": true }", config, error) && config.lintErrors);
+        UNSCOPED_INFO("LocalUnused off");
+        CHECK((config.lints & (1ull << 7)) == 0);
+        UNSCOPED_INFO("LocalShadow on");
+        CHECK((config.lints & (1ull << 4)) != 0);
+        UNSCOPED_INFO("the rest as they were");
+        CHECK((config.lints & ~((1ull << 7) | (1ull << 4))) == (defaults.lints & ~((1ull << 7) | (1ull << 4))));
+        {
+            INFO("none fatal, not every lint an error");
+            CHECK(config.fatalLints == 0);
+            CHECK_FALSE(config.lintErrors);
+        }
+        {
+            INFO("said nothing: the defaults");
+            CHECK(ALLuauConfig::parse("{}", config, error));
+            CHECK(config.lints == defaults.lints);
+            CHECK(config.fatalLints == 0);
+            REQUIRE(config.globals.empty());
+        }
+        {
+            INFO("every lint an error where asked");
+            CHECK(ALLuauConfig::parse("{ \"lintErrors\": true }", config, error));
+            CHECK(config.lintErrors);
+        }
     }
 
-    template<> template<>
-    void alluauconfig_object::test<4>()
+    TEST_CASE("alluauconfig: a .luaurc over a scripter's own lints and mode overrides only what it says", "[alluauconfig]")
     {
-        set_test_name("a .luaurc over a scripter's own lints and mode overrides only what it says");
         const uint64_t unused   = ALLuauConfig::lintBit("LocalUnused");
         const uint64_t function = ALLuauConfig::lintBit("FunctionUnused");
         const uint64_t shadow   = ALLuauConfig::lintBit("LocalShadow");
-        ensure("the lints have bits", unused && function && shadow && unused != function);
-        ensure("an unknown lint has none", ALLuauConfig::lintBit("NoSuchLint") == 0);
-        ensure("every lint is named", ALLuauConfig::lintNames().size() > 20 && ALLuauConfig::lintNames().front() == "UnknownGlobal");
+        {
+            INFO("the lints have bits");
+            CHECK(unused);
+            CHECK(function);
+            CHECK(shadow);
+            CHECK(unused != function);
+        }
+        UNSCOPED_INFO("an unknown lint has none");
+        CHECK(ALLuauConfig::lintBit("NoSuchLint") == 0);
+        {
+            INFO("every lint is named");
+            REQUIRE(ALLuauConfig::lintNames().size() > 20);
+            CHECK(ALLuauConfig::lintNames().front() == "UnknownGlobal");
+        }
 
         ALLuauConfig base;
         base.lints &= ~unused;          // the scripter turned it off
@@ -123,41 +190,61 @@ namespace tut
         base.mode = "strict";
         ALLuauConfig config;
         std::string  error;
-        ensure("an empty file", ALLuauConfig::parse("{}", config, error, &base));
-        ensure("keeps the lints off", (config.lints & unused) == 0 && (config.lints & function) != 0);
-        ensure("and the errors", (config.fatalLints & shadow) != 0);
-        ensure_equals("and the mode", config.mode, std::string("strict"));
+        UNSCOPED_INFO("an empty file");
+        REQUIRE(ALLuauConfig::parse("{}", config, error, &base));
+        {
+            INFO("keeps the lints off");
+            CHECK((config.lints & unused) == 0);
+            CHECK((config.lints & function) != 0);
+        }
+        UNSCOPED_INFO("and the errors");
+        CHECK((config.fatalLints & shadow) != 0);
+        UNSCOPED_INFO("and the mode");
+        CHECK(config.mode == std::string("strict"));
 
-        ensure("a file saying one lint", ALLuauConfig::parse("{ \"lint\": { \"LocalUnused\": true, \"FunctionUnused\": false }, \"languageMode\": \"nonstrict\" }", config, error, &base));
-        ensure("turns that one on", (config.lints & unused) != 0);
-        ensure("and that one off", (config.lints & function) == 0);
-        ensure("the rest as the scripter had them", (config.fatalLints & shadow) != 0);
-        ensure_equals("its mode over theirs", config.mode, std::string("nonstrict"));
+        UNSCOPED_INFO("a file saying one lint");
+        CHECK(ALLuauConfig::parse("{ \"lint\": { \"LocalUnused\": true, \"FunctionUnused\": false }, \"languageMode\": \"nonstrict\" }", config, error, &base));
+        UNSCOPED_INFO("turns that one on");
+        CHECK((config.lints & unused) != 0);
+        UNSCOPED_INFO("and that one off");
+        CHECK((config.lints & function) == 0);
+        UNSCOPED_INFO("the rest as the scripter had them");
+        CHECK((config.fatalLints & shadow) != 0);
+        UNSCOPED_INFO("its mode over theirs");
+        CHECK(config.mode == std::string("nonstrict"));
 
-        ensure("without a base, Luau's defaults", ALLuauConfig::parse("{}", config, error) && (config.lints & unused) != 0 && config.mode.empty());
+        {
+            INFO("without a base, Luau's defaults");
+            CHECK(ALLuauConfig::parse("{}", config, error));
+            CHECK((config.lints & unused) != 0);
+            REQUIRE(config.mode.empty());
+        }
     }
 
-    template<> template<>
-    void alluauconfig_object::test<5>()
+    TEST_CASE("alluauconfig: a file read over another adds to the globals and overrides the aliases", "[alluauconfig]")
     {
-        set_test_name("a file read over another adds its globals to the other's, and its aliases over the other's, as Luau reads a chain of them");
         ALLuauConfig outer;
         std::string  error;
-        ensure("the outer file", ALLuauConfig::parse("{ \"globals\": [\"shared\"], \"aliases\": { \"lib\": \"./lib\", \"util\": \"./util\" } }", outer, error));
+        UNSCOPED_INFO("the outer file");
+        REQUIRE(ALLuauConfig::parse("{ \"globals\": [\"shared\"], \"aliases\": { \"lib\": \"./lib\", \"util\": \"./util\" } }", outer, error));
         ALLuauConfig inner;
-        ensure("the inner over it", ALLuauConfig::parse("{ \"globals\": [\"mine\"], \"aliases\": { \"lib\": \"./mylib\" } }", inner, error, &outer));
-        ensure("both globals", inner.globals == std::vector<std::string>{ "shared", "mine" });
-        ensure_equals("the nearer alias", inner.aliases["lib"], std::string("./mylib"));
-        ensure_equals("the outer's kept", inner.aliases["util"], std::string("./util"));
+        UNSCOPED_INFO("the inner over it");
+        REQUIRE(ALLuauConfig::parse("{ \"globals\": [\"mine\"], \"aliases\": { \"lib\": \"./mylib\" } }", inner, error, &outer));
+        UNSCOPED_INFO("both globals");
+        CHECK(inner.globals == std::vector<std::string>{ "shared", "mine" });
+        UNSCOPED_INFO("the nearer alias");
+        CHECK(inner.aliases["lib"] == std::string("./mylib"));
+        UNSCOPED_INFO("the outer's kept");
+        CHECK(inner.aliases["util"] == std::string("./util"));
         ALLuauConfig quiet;
-        ensure("one saying nothing of them", ALLuauConfig::parse("{}", quiet, error, &outer));
-        ensure("keeps them", quiet.globals == std::vector<std::string>{ "shared" });
+        UNSCOPED_INFO("one saying nothing of them");
+        REQUIRE(ALLuauConfig::parse("{}", quiet, error, &outer));
+        UNSCOPED_INFO("keeps them");
+        CHECK(quiet.globals == std::vector<std::string>{ "shared" });
     }
 
-    template<> template<>
-    void alluauconfig_object::test<6>()
+    TEST_CASE("alluauconfig: parseChain: the nearest file to say a thing wins and globals add up", "[alluauconfig]")
     {
-        set_test_name("a chain of files, nearest first, read from the top down: the nearest to say a thing wins, and globals add up");
         const std::string root   = "{ \"languageMode\": \"strict\", \"globals\": [\"a\"], \"lint\": { \"LocalUnused\": false }, "
                                    "\"aliases\": { \"lib\": \"./rootlib\", \"root\": \"./r\" } }";
         const std::string broken = "{ not a configuration";
@@ -166,64 +253,116 @@ namespace tut
         const std::vector<std::string_view> chain{ nearby, middle, broken, root };
 
         ALLuauConfig merged;
-        ensure("parsed", ALLuauConfig::parseChain(chain, merged));
-        ensure_equals("the nearest mode", merged.mode, std::string("nonstrict"));
-        ensure("globals from every file, the furthest first", merged.globals == std::vector<std::string>{ "a", "b", "c" });
+        REQUIRE(ALLuauConfig::parseChain(chain, merged));
+        UNSCOPED_INFO("the nearest mode");
+        CHECK(merged.mode == std::string("nonstrict"));
+        UNSCOPED_INFO("globals from every file, the furthest first");
+        CHECK(merged.globals == std::vector<std::string>{ "a", "b", "c" });
         const uint64_t local_unused    = ALLuauConfig::lintBit("LocalUnused");
         const uint64_t function_unused = ALLuauConfig::lintBit("FunctionUnused");
-        ensure("a lint the root turned off and the nearest on", (merged.lints & local_unused) != 0);
-        ensure("one the middle turned off, off", (merged.lints & function_unused) == 0);
-        ensure_equals("an alias the middle says over the root's", merged.aliases["lib"], std::string("./midlib"));
-        ensure_equals("the root's own kept", merged.aliases["root"], std::string("./r"));
+        UNSCOPED_INFO("a lint the root turned off and the nearest on");
+        CHECK((merged.lints & local_unused) != 0);
+        UNSCOPED_INFO("one the middle turned off, off");
+        CHECK((merged.lints & function_unused) == 0);
+        UNSCOPED_INFO("an alias the middle says over the root's");
+        CHECK(merged.aliases["lib"] == std::string("./midlib"));
+        UNSCOPED_INFO("the root's own kept");
+        CHECK(merged.aliases["root"] == std::string("./r"));
 
 
         ALLuauConfig base;
         base.mode = "strict";
         ALLuauConfig none;
-        ensure("none that parse is no configuration", !ALLuauConfig::parseChain({ broken }, none, &base));
-        ensure_equals("and leaves the base", none.mode, std::string("strict"));
+        UNSCOPED_INFO("none that parse is no configuration");
+        REQUIRE_FALSE(ALLuauConfig::parseChain({ broken }, none, &base));
+        UNSCOPED_INFO("and leaves the base");
+        CHECK(none.mode == std::string("strict"));
     }
 
-    template<> template<>
-    void alluauconfig_object::test<7>()
+    TEST_CASE("alluauconfig: the studio's lints in a .luaurc are read apart from Luau's and * covers them", "[alluauconfig]")
     {
-        set_test_name("the studio's own lints in a .luaurc: taken out for Luau and said for the studio, first, last or alone, with the rest read whole; * says for them too");
         const uint64_t compound = ALScriptLintPass::bit("SlCompoundAssign");
-        ensure("a rule of the table", compound != 0 && (ALScriptLintPass::defaults() & compound) != 0);
+        {
+            INFO("a rule of the table");
+            CHECK(compound != 0);
+            CHECK((ALScriptLintPass::defaults() & compound) != 0);
+        }
         ALLuauConfig out;
         std::string  error;
-        ensure("beside Luau's: " + error,
-               ALLuauConfig::parse("{ \"languageMode\": \"strict\", \"lint\": { \"LocalUnused\": false, \"SlCompoundAssign\": false } }", out, error));
-        ensure("the rest read", out.mode == "strict" && (out.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
-        ensure("ours off", (out.slLints & compound) == 0);
-        ensure("alone: " + error, ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false } }", out, error) && (out.slLints & compound) == 0);
-        ensure("first: " + error, ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false, \"LocalUnused\": false }, \"globals\": [\"g\"] }", out, error) &&
-                                      (out.slLints & compound) == 0 && out.globals == std::vector<std::string>{ "g" } &&
-                                      (out.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
-        ensure("with // comments, over lines: " + error,
-               ALLuauConfig::parse("{\n  // c style\n  \"lint\": {\n    \"LocalUnused\": true,\n    \"SlCompoundAssign\": false\n  }\n}", out, error) &&
-                   (out.slLints & compound) == 0);
-        ensure("* for ours too: " + error, ALLuauConfig::parse("{ \"lint\": { \"*\": false } }", out, error) && out.slLints == 0 &&
-                                               (out.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
-        ensure("then one on: " + error,
-               ALLuauConfig::parse("{ \"lint\": { \"*\": false, \"SlCompoundAssign\": true } }", out, error) && out.slLints == compound);
-        ensure("an Sl name that is none", !ALLuauConfig::parse("{ \"lint\": { \"SlNope\": true } }", out, error) && error == "Unknown lint SlNope");
-        ensure("a value that is none", !ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": \"fatal\" } }", out, error) &&
-                                           error == "Bad setting 'fatal'.  Valid options are true and false");
-        ensure("Luau's words on the rest keep their lines: " + error,
-               !ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false },\n  \"globals\": 3 }", out, error) && error.find("line 2") != std::string::npos);
+        const bool   beside = ALLuauConfig::parse("{ \"languageMode\": \"strict\", \"lint\": { \"LocalUnused\": false, \"SlCompoundAssign\": false } }", out, error);
+        UNSCOPED_INFO("beside Luau's: " + error);
+        REQUIRE(beside);
+        {
+            INFO("the rest read");
+            CHECK(out.mode == "strict");
+            CHECK((out.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
+        }
+        UNSCOPED_INFO("ours off");
+        CHECK((out.slLints & compound) == 0);
+        {
+            const bool parsed = ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false } }", out, error);
+            INFO("alone: " + error);
+            CHECK(parsed);
+            CHECK((out.slLints & compound) == 0);
+        }
+        {
+            const bool parsed = ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false, \"LocalUnused\": false }, \"globals\": [\"g\"] }", out, error);
+            INFO("first: " + error);
+            CHECK(parsed);
+            CHECK((out.slLints & compound) == 0);
+            CHECK(out.globals == std::vector<std::string>{ "g" });
+            CHECK((out.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
+        }
+        {
+            const bool parsed = ALLuauConfig::parse("{\n  // c style\n  \"lint\": {\n    \"LocalUnused\": true,\n    \"SlCompoundAssign\": false\n  }\n}", out, error);
+            INFO("with // comments, over lines: " + error);
+            CHECK(parsed);
+            CHECK((out.slLints & compound) == 0);
+        }
+        {
+            const bool parsed = ALLuauConfig::parse("{ \"lint\": { \"*\": false } }", out, error);
+            INFO("* for ours too: " + error);
+            CHECK(parsed);
+            CHECK(out.slLints == 0);
+            CHECK((out.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
+        }
+        {
+            const bool parsed = ALLuauConfig::parse("{ \"lint\": { \"*\": false, \"SlCompoundAssign\": true } }", out, error);
+            INFO("then one on: " + error);
+            CHECK(parsed);
+            CHECK(out.slLints == compound);
+        }
+        {
+            INFO("an Sl name that is none");
+            CHECK_FALSE(ALLuauConfig::parse("{ \"lint\": { \"SlNope\": true } }", out, error));
+            CHECK(error == "Unknown lint SlNope");
+        }
+        {
+            INFO("a value that is none");
+            CHECK_FALSE(ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": \"fatal\" } }", out, error));
+            CHECK(error == "Bad setting 'fatal'.  Valid options are true and false");
+        }
+        {
+            const bool parsed = ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false },\n  \"globals\": 3 }", out, error);
+            INFO("Luau's words on the rest keep their lines: " + error);
+            CHECK_FALSE(parsed);
+            REQUIRE(error.find("line 2") != std::string::npos);
+        }
 
         ALLuauConfig base;
         base.slLints      = 0;
         base.slFatalLints = compound;
-        ensure("the base's where the file does not say: " + error,
-               ALLuauConfig::parse("{ \"languageMode\": \"strict\" }", out, error, &base) && out.slLints == 0 && out.slFatalLints == compound);
+        {
+            const bool parsed = ALLuauConfig::parse("{ \"languageMode\": \"strict\" }", out, error, &base);
+            INFO("the base's where the file does not say: " + error);
+            CHECK(parsed);
+            CHECK(out.slLints == 0);
+            CHECK(out.slFatalLints == compound);
+        }
     }
 
-    template<> template<>
-    void alluauconfig_object::test<8>()
+    TEST_CASE("alluauconfig: a .config.luau's luau table reads as the .luaurc that says the same", "[alluauconfig]")
     {
-        set_test_name("a .config.luau is run and its luau table read as the .luaurc that says the same: aliases, mode, lints and globals, the studio's lints among them");
         const char* const source =
             "local root = './lib'\n"
             "local lints = { LocalUnused = false, SlCompoundAssign = false }\n"
@@ -239,122 +378,234 @@ namespace tut
             "    other = { tool = true },\n"
             "}\n";
         std::string json, error;
-        ensure("ran: " + error, ALLuauConfigScript::asLuaurc(source, json, error));
+        const bool  ran = ALLuauConfigScript::asLuaurc(source, json, error);
+        UNSCOPED_INFO("ran: " + error);
+        REQUIRE(ran);
         ALLuauConfig config;
-        ensure("and parses as a .luaurc: " + error + " in " + json, ALLuauConfig::parse(json, config, error));
-        ensure_equals("its mode", config.mode, std::string("strict"));
-        ensure("its aliases, by name in lower case", config.aliases.size() == 2 && config.aliases["lib"] == "./lib" && config.aliases["shared"] == "./lib/shared");
-        ensure("its globals in order", config.globals == std::vector<std::string>{ "Alchemy", "grid" });
-        ensure("Luau's lint off", (config.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
-        ensure("and the studio's", (config.slLints & ALScriptLintPass::bit("SlCompoundAssign")) == 0);
-        ensure("every lint an error", config.lintErrors);
+        const bool   parsed = ALLuauConfig::parse(json, config, error);
+        UNSCOPED_INFO("and parses as a .luaurc: " + error + " in " + json);
+        REQUIRE(parsed);
+        CHECK(config.mode == std::string("strict"));
+        {
+            INFO("its aliases, by name in lower case");
+            REQUIRE(config.aliases.size() == 2);
+            CHECK(config.aliases["lib"] == "./lib");
+            CHECK(config.aliases["shared"] == "./lib/shared");
+        }
+        UNSCOPED_INFO("its globals in order");
+        CHECK(config.globals == std::vector<std::string>{ "Alchemy", "grid" });
+        UNSCOPED_INFO("Luau's lint off");
+        CHECK((config.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
+        UNSCOPED_INFO("and the studio's");
+        CHECK((config.slLints & ALScriptLintPass::bit("SlCompoundAssign")) == 0);
+        UNSCOPED_INFO("every lint an error");
+        CHECK(config.lintErrors);
 
-        ensure("no luau table: a configuration that says nothing", ALLuauConfigScript::asLuaurc("return { other = 1 }", json, error) && json == "{}");
-        ensure("an empty one the same", ALLuauConfigScript::asLuaurc("return { luau = {} }", json, error) &&
-                                            ALLuauConfig::parse(json, config, error) && config.aliases.empty());
-        ensure("no globals: an empty list", ALLuauConfigScript::asLuaurc("return { luau = { globals = {} } }", json, error) &&
-                                                ALLuauConfig::parse(json, config, error) && config.globals.empty());
+        {
+            INFO("no luau table: a configuration that says nothing");
+            CHECK(ALLuauConfigScript::asLuaurc("return { other = 1 }", json, error));
+            CHECK(json == "{}");
+        }
+        {
+            INFO("an empty one the same");
+            CHECK(ALLuauConfigScript::asLuaurc("return { luau = {} }", json, error));
+            CHECK(ALLuauConfig::parse(json, config, error));
+            REQUIRE(config.aliases.empty());
+        }
+        {
+            INFO("no globals: an empty list");
+            CHECK(ALLuauConfigScript::asLuaurc("return { luau = { globals = {} } }", json, error));
+            CHECK(ALLuauConfig::parse(json, config, error));
+            REQUIRE(config.globals.empty());
+        }
         // A .luaurc's strings are taken byte for byte: a backslash is kept
         // as it is, and what one cannot hold is refused.
-        ensure("a backslash kept: " + error, ALLuauConfigScript::asLuaurc("return { luau = { aliases = { q = 'C:\\\\lua\\\\lib' } } }", json, error) &&
-                                                 ALLuauConfig::parse(json, config, error) && config.aliases["q"] == "C:\\lua\\lib");
-        ensure("not a quote", !ALLuauConfigScript::asLuaurc("return { luau = { aliases = { q = 'a\"b' } } }", json, error) &&
-                                  error.find("may not hold a quote") != std::string::npos);
-        ensure("nor a break", !ALLuauConfigScript::asLuaurc("return { luau = { aliases = { q = 'a\\nb' } } }", json, error));
-        ensure("nor a backslash at the end", !ALLuauConfigScript::asLuaurc("return { luau = { aliases = { q = 'C:\\\\lua\\\\' } } }", json, error));
-        ensure("nor in a name", !ALLuauConfigScript::asLuaurc("return { luau = { aliases = { ['a\"'] = 'x' } } }", json, error));
+        {
+            INFO("a backslash kept");
+            const bool written = ALLuauConfigScript::asLuaurc("return { luau = { aliases = { q = 'C:\\\\lua\\\\lib' } } }", json, error);
+            UNSCOPED_INFO("ran: " + error);
+            CHECK(written);
+            const bool read = ALLuauConfig::parse(json, config, error);
+            UNSCOPED_INFO("parses: " + error);
+            CHECK(read);
+            CHECK(config.aliases["q"] == "C:\\lua\\lib");
+        }
+        {
+            INFO("not a quote");
+            CHECK_FALSE(ALLuauConfigScript::asLuaurc("return { luau = { aliases = { q = 'a\"b' } } }", json, error));
+            REQUIRE(error.find("may not hold a quote") != std::string::npos);
+        }
+        UNSCOPED_INFO("nor a break");
+        CHECK_FALSE(ALLuauConfigScript::asLuaurc("return { luau = { aliases = { q = 'a\\nb' } } }", json, error));
+        UNSCOPED_INFO("nor a backslash at the end");
+        CHECK_FALSE(ALLuauConfigScript::asLuaurc("return { luau = { aliases = { q = 'C:\\\\lua\\\\' } } }", json, error));
+        UNSCOPED_INFO("nor in a name");
+        CHECK_FALSE(ALLuauConfigScript::asLuaurc("return { luau = { aliases = { ['a\"'] = 'x' } } }", json, error));
         // Luau's own judgement of what the values say.
-        ensure("a mode that is none: Luau says so", ALLuauConfigScript::asLuaurc("return { luau = { languagemode = 'loose' } }", json, error) &&
-                                                       !ALLuauConfig::parse(json, config, error));
+        {
+            INFO("a mode that is none: Luau says so");
+            CHECK(ALLuauConfigScript::asLuaurc("return { luau = { languagemode = 'loose' } }", json, error));
+            CHECK_FALSE(ALLuauConfig::parse(json, config, error));
+        }
     }
 
-    template<> template<>
-    void alluauconfig_object::test<9>()
+    TEST_CASE("alluauconfig: a .config.luau that fails says why; and it cannot reach Eris", "[alluauconfig]")
     {
-        set_test_name("a .config.luau that fails says why: not compiling, an error, a yield, the wrong return, a value no configuration holds, too long, too much memory, "
-                      "too much moved at once; and it cannot reach Eris");
         std::string json, error;
-        ensure("does not compile", !ALLuauConfigScript::asLuaurc("return {", json, error) && !error.empty());
-        ensure("an error, in its words", !ALLuauConfigScript::asLuaurc("error('no config here')", json, error) && error.find("no config here") != std::string::npos);
-        ensure_equals("a yield", (ALLuauConfigScript::asLuaurc("coroutine.yield()", json, error), error), std::string("configuration execution cannot yield"));
-        ensure_equals("nothing returned", (ALLuauConfigScript::asLuaurc("local x = 1", json, error), error), std::string("configuration must return exactly one value"));
-        ensure_equals("two returned", (ALLuauConfigScript::asLuaurc("return {}, {}", json, error), error), std::string("configuration must return exactly one value"));
-        ensure_equals("not a table", (ALLuauConfigScript::asLuaurc("return 'x'", json, error), error), std::string("configuration did not return a table"));
-        ensure_equals("luau not a table", (ALLuauConfigScript::asLuaurc("return { luau = 3 }", json, error), error),
-                      std::string("configuration value for key \"luau\" must be a table"));
-        ensure("a function where a value goes", !ALLuauConfigScript::asLuaurc("return { luau = { aliases = { x = print } } }", json, error) &&
-                                                    error.find("must be strings, booleans") != std::string::npos);
+        {
+            INFO("does not compile");
+            REQUIRE_FALSE(ALLuauConfigScript::asLuaurc("return {", json, error));
+            REQUIRE_FALSE(error.empty());
+        }
+        {
+            INFO("an error, in its words");
+            CHECK_FALSE(ALLuauConfigScript::asLuaurc("error('no config here')", json, error));
+            REQUIRE(error.find("no config here") != std::string::npos);
+        }
+        UNSCOPED_INFO("a yield");
+        CHECK((ALLuauConfigScript::asLuaurc("coroutine.yield()", json, error), error) == std::string("configuration execution cannot yield"));
+        UNSCOPED_INFO("nothing returned");
+        CHECK((ALLuauConfigScript::asLuaurc("local x = 1", json, error), error) == std::string("configuration must return exactly one value"));
+        UNSCOPED_INFO("two returned");
+        CHECK((ALLuauConfigScript::asLuaurc("return {}, {}", json, error), error) == std::string("configuration must return exactly one value"));
+        UNSCOPED_INFO("not a table");
+        CHECK((ALLuauConfigScript::asLuaurc("return 'x'", json, error), error) == std::string("configuration did not return a table"));
+        UNSCOPED_INFO("luau not a table");
+        CHECK((ALLuauConfigScript::asLuaurc("return { luau = 3 }", json, error), error) == std::string("configuration value for key \"luau\" must be a table"));
+        {
+            INFO("a function where a value goes");
+            CHECK_FALSE(ALLuauConfigScript::asLuaurc("return { luau = { aliases = { x = print } } }", json, error));
+            REQUIRE(error.find("must be strings, booleans") != std::string::npos);
+        }
         // A .luaurc holds no numbers, and Luau's reading of one would stop
         // at it saying nothing of where: refused here, by its key.
-        ensure_equals("a number, by its key", (ALLuauConfigScript::asLuaurc("return { luau = { lint = { LocalUnused = 0 } } }", json, error), error),
+        UNSCOPED_INFO("a number, by its key");
+        CHECK((ALLuauConfigScript::asLuaurc("return { luau = { lint = { LocalUnused = 0 } } }", json, error), error) ==
                       std::string("configuration value for key \"LocalUnused\" must be a string or a boolean, not a number"));
-        ensure("in an array, by its place", !ALLuauConfigScript::asLuaurc("return { luau = { globals = { 'a', 2 } } }", json, error) &&
-                                                error.find("\"globals[2]\"") != std::string::npos);
-        ensure("at the top", !ALLuauConfigScript::asLuaurc("return { luau = { linterrors = 1 } }", json, error) &&
-                                 error.find("\"linterrors\"") != std::string::npos);
-        ensure("an array with a hole", !ALLuauConfigScript::asLuaurc("return { luau = { globals = { [1] = 'a', [3] = 'b' } } }", json, error) &&
-                                           error.find("invalid numeric key") != std::string::npos);
-        ensure("a table in itself, nesting forever", !ALLuauConfigScript::asLuaurc("local t = {} t.t = t return { luau = { aliases = t } }", json, error) &&
-                                                         error.find("nest too deeply") != std::string::npos);
+        {
+            INFO("in an array, by its place");
+            CHECK_FALSE(ALLuauConfigScript::asLuaurc("return { luau = { globals = { 'a', 2 } } }", json, error));
+            REQUIRE(error.find("\"globals[2]\"") != std::string::npos);
+        }
+        {
+            INFO("at the top");
+            CHECK_FALSE(ALLuauConfigScript::asLuaurc("return { luau = { linterrors = 1 } }", json, error));
+            REQUIRE(error.find("\"linterrors\"") != std::string::npos);
+        }
+        {
+            INFO("an array with a hole");
+            CHECK_FALSE(ALLuauConfigScript::asLuaurc("return { luau = { globals = { [1] = 'a', [3] = 'b' } } }", json, error));
+            REQUIRE(error.find("invalid numeric key") != std::string::npos);
+        }
+        {
+            INFO("a table in itself, nesting forever");
+            CHECK_FALSE(ALLuauConfigScript::asLuaurc("local t = {} t.t = t return { luau = { aliases = t } }", json, error));
+            REQUIRE(error.find("nest too deeply") != std::string::npos);
+        }
         // No metamethod runs as what it returned is read.
-        ensure("an __index that would loop is never asked",
-               ALLuauConfigScript::asLuaurc("return setmetatable({}, { __index = function() while true do end end })", json, error) && json == "{}");
+        {
+            INFO("an __index that would loop is never asked");
+            CHECK(ALLuauConfigScript::asLuaurc("return setmetatable({}, { __index = function() while true do end end })", json, error));
+            CHECK(json == "{}");
+        }
 
         // A run stopped by the deadline is kept a while, by its text: a text
         // of this run's own is run, not answered from what another test, or
         // this one before, asked.
         const std::string forever = "while true do end -- " + LLUUID::generateNewID().asString();
         const auto        started = std::chrono::steady_clock::now();
-        ensure_equals("a loop that never ends, stopped", (ALLuauConfigScript::asLuaurc(forever, json, error), error),
-                      std::string("configuration execution timed out"));
+        UNSCOPED_INFO("a loop that never ends, stopped");
+        CHECK((ALLuauConfigScript::asLuaurc(forever, json, error), error) == std::string("configuration execution timed out"));
         const F64 took = std::chrono::duration<F64>(std::chrono::steady_clock::now() - started).count();
-        ensure(llformat("stopped at its time, not long after: %.2f s", took), took >= ALLuauConfigScript::MOST_SECONDS && took < ALLuauConfigScript::MOST_SECONDS + 2.0);
-        ensure("asked again at once, kept for a while: no second wait", (ALLuauConfigScript::asLuaurc(forever, json, error),
-                                                                         std::chrono::duration<F64>(std::chrono::steady_clock::now() - started).count() < took + 0.1));
+        {
+            INFO("stopped at its time, not long after");
+            CHECK(took >= ALLuauConfigScript::MOST_SECONDS);
+            CHECK(took < ALLuauConfigScript::MOST_SECONDS + 2.0);
+        }
+        UNSCOPED_INFO("asked again at once, kept for a while: no second wait");
+        CHECK((ALLuauConfigScript::asLuaurc(forever, json, error),
+               std::chrono::duration<F64>(std::chrono::steady_clock::now() - started).count() < took + 0.1));
         // table.move's copy is a loop in C the deadline does not reach, and
         // nils moved into a table that holds none take no memory: held to so
         // many elements, at once.
         const auto moving = std::chrono::steady_clock::now();
-        ensure("two billion nils moved, refused at once: " + error,
-               !ALLuauConfigScript::asLuaurc("table.move({}, 1, 2147483646, 2) return {}", json, error) && error.find("table.move") != std::string::npos &&
-                   std::chrono::duration<F64>(std::chrono::steady_clock::now() - moving).count() < ALLuauConfigScript::MOST_SECONDS);
-        ensure("a move within it, as Luau's: " + error,
-               ALLuauConfigScript::asLuaurc("return { luau = { globals = table.move({ 'a', 'b' }, 1, 2, 2, { 'z' }) } }", json, error) &&
-                   json == "{\"globals\": [\"z\", \"a\", \"b\"]}");
-        ensure("memory past the most, refused",
-               !ALLuauConfigScript::asLuaurc("local t = {} for i = 1, 1e7 do t[i] = string.rep('x', 1000) .. i end return t", json, error) &&
-                   error.find("memory") != std::string::npos);
-        ensure("one string past it at once, refused", !ALLuauConfigScript::asLuaurc("return { luau = { x = string.rep('x', 64 * 1024 * 1024) } }", json, error) &&
-                                                          error.find("memory") != std::string::npos);
+        {
+            const bool ran = ALLuauConfigScript::asLuaurc("table.move({}, 1, 2147483646, 2) return {}", json, error);
+            INFO("two billion nils moved, refused at once: " + error);
+            CHECK_FALSE(ran);
+            REQUIRE(error.find("table.move") != std::string::npos);
+            CHECK(std::chrono::duration<F64>(std::chrono::steady_clock::now() - moving).count() < ALLuauConfigScript::MOST_SECONDS);
+        }
+        {
+            const bool ran = ALLuauConfigScript::asLuaurc("return { luau = { globals = table.move({ 'a', 'b' }, 1, 2, 2, { 'z' }) } }", json, error);
+            INFO("a move within it, as Luau's: " + error);
+            CHECK(ran);
+            CHECK(json == "{\"globals\": [\"z\", \"a\", \"b\"]}");
+        }
+        {
+            INFO("memory past the most, refused");
+            CHECK_FALSE(ALLuauConfigScript::asLuaurc("local t = {} for i = 1, 1e7 do t[i] = string.rep('x', 1000) .. i end return t", json, error));
+            REQUIRE(error.find("memory") != std::string::npos);
+        }
+        {
+            INFO("one string past it at once, refused");
+            CHECK_FALSE(ALLuauConfigScript::asLuaurc("return { luau = { x = string.rep('x', 64 * 1024 * 1024) } }", json, error));
+            REQUIRE(error.find("memory") != std::string::npos);
+        }
 
         // Second Life's VM opens Eris as `ares`; a configuration is run
         // without it. The rest of Luau's libraries are there.
-        ensure("no ares: " + error, ALLuauConfigScript::asLuaurc("return { luau = { languagemode = ares and 'strict' or 'nonstrict' } }", json, error) &&
-                                        json.find("nonstrict") != std::string::npos);
-        ensure("Luau's libraries: " + error,
-               ALLuauConfigScript::asLuaurc("return { luau = { globals = { string.upper('a'), tostring(math.max(1, 2)), table.concat({ 'x', 'y' }), buffer and 'b' or 'none' } } }",
-                                            json, error) &&
-                   json == "{\"globals\": [\"A\", \"2\", \"xy\", \"b\"]}");
+        {
+            const bool ran = ALLuauConfigScript::asLuaurc("return { luau = { languagemode = ares and 'strict' or 'nonstrict' } }", json, error);
+            INFO("no ares: " + error);
+            CHECK(ran);
+            REQUIRE(json.find("nonstrict") != std::string::npos);
+        }
+        {
+            const bool ran = ALLuauConfigScript::asLuaurc(
+                "return { luau = { globals = { string.upper('a'), tostring(math.max(1, 2)), table.concat({ 'x', 'y' }), buffer and 'b' or 'none' } } }", json, error);
+            INFO("Luau's libraries: " + error);
+            CHECK(ran);
+            CHECK(json == "{\"globals\": [\"A\", \"2\", \"xy\", \"b\"]}");
+        }
     }
 
-    template<> template<>
-    void alluauconfig_object::test<10>()
+    TEST_CASE("alluauconfig: a .config.luau's run leaves no JSON on failure and no error on success", "[alluauconfig]")
     {
-        set_test_name("a .config.luau's run says only what it came to: no JSON with a failure, begun or not, no error with a success, run or kept");
         const char* const failing = "return { luau = { languagemode = 'strict', lint = { LocalUnused = 0 } } }";
         std::string       json = "from before", error;
-        ensure("a failure part way through the writing", !ALLuauConfigScript::asLuaurc(failing, json, error) && !error.empty());
-        ensure_equals("leaves no JSON", json, std::string());
+        {
+            INFO("a failure part way through the writing");
+            REQUIRE_FALSE(ALLuauConfigScript::asLuaurc(failing, json, error));
+            REQUIRE_FALSE(error.empty());
+        }
+        UNSCOPED_INFO("leaves no JSON");
+        CHECK(json == std::string());
         json = "from before";
-        ensure("asked again, kept", !ALLuauConfigScript::asLuaurc(failing, json, error) && !error.empty());
-        ensure_equals("and no JSON still", json, std::string());
+        {
+            INFO("asked again, kept");
+            CHECK_FALSE(ALLuauConfigScript::asLuaurc(failing, json, error));
+            REQUIRE_FALSE(error.empty());
+        }
+        UNSCOPED_INFO("and no JSON still");
+        CHECK(json == std::string());
 
         const char* const working = "return { luau = { languagemode = 'strict' } }";
         error = "from before";
-        ensure("a success: " + json, ALLuauConfigScript::asLuaurc(working, json, error) && json == "{\"languageMode\": \"strict\"}");
-        ensure_equals("leaves no error", error, std::string());
+        {
+            INFO("a success");
+            CHECK(ALLuauConfigScript::asLuaurc(working, json, error));
+            CHECK(json == "{\"languageMode\": \"strict\"}");
+        }
+        UNSCOPED_INFO("leaves no error");
+        CHECK(error == std::string());
         error = "from before";
-        ensure("asked again, kept", ALLuauConfigScript::asLuaurc(working, json, error) && json == "{\"languageMode\": \"strict\"}");
-        ensure_equals("and no error still", error, std::string());
+        {
+            INFO("asked again, kept");
+            CHECK(ALLuauConfigScript::asLuaurc(working, json, error));
+            CHECK(json == "{\"languageMode\": \"strict\"}");
+        }
+        UNSCOPED_INFO("and no error still");
+        CHECK(error == std::string());
     }
 }

@@ -30,19 +30,22 @@
 #include "../lint/alscriptfixes.h"
 #include "../lint/alscriptlintpass.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <fstream>
 #include <sstream>
 
-namespace tut
+namespace
 {
     struct alscriptlintpass_data
     {
         ALLuauService luau;
         ALLSLService  lsl;
-        std::string   error;
+        // Each load's own: one shared would say the last load's error under
+        // another's name.
+        std::string   definitionsError;
+        std::string   builtinsError;
         bool          loaded    = false;
         bool          lslLoaded = false;
         // Luau's new type solver, where the run asks for it: CTest runs
@@ -54,9 +57,9 @@ namespace tut
             llifstream        in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
             std::stringstream text;
             text << in.rdbuf();
-            luau.setNewSolver(newSolver, error);
-            loaded    = luau.loadDefinitions(text.str(), error);
-            lslLoaded = lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error);
+            luau.setNewSolver(newSolver, definitionsError);
+            loaded    = luau.loadDefinitions(text.str(), definitionsError);
+            lslLoaded = lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", builtinsError);
         }
 
         // A rule both languages have is said by both: SLua's, or LSL's.
@@ -114,45 +117,44 @@ namespace tut
         // The problem keyed so, its preferred fix -- titled so, and safe or
         // not as said -- the text with it made, and that text checked again:
         // the problem gone, and no error in its place.
-        std::string fixed(const std::string& script, const std::string& key, const std::string& title, bool safe, bool lua = true)
+        std::string require_fixed(const std::string& script, const std::string& key, const std::string& title, bool safe, bool lua = true)
         {
             const ALScriptProblems problems = check(script, lua);
             const ALScriptProblem* problem  = keyed(problems, key);
-            ensure("said: " + key + "\n" + said(problems), problem != nullptr);
-            ensure("a fix: " + said(problems), !problem->fixes.empty());
+            CAPTURE(key);
+            INFO("said:\n" + said(problems));
+            REQUIRE(problem != nullptr);
+            REQUIRE_FALSE(problem->fixes.empty());
             const ALScriptFix& fix = problem->fixes.front();
-            ensure("preferred", fix.preferred);
-            ensure_equals("its words", fix.title, title);
-            ensure_equals("safe or not", fix.safe, safe);
+            REQUIRE(fix.preferred);
+            REQUIRE(fix.title == title);
+            REQUIRE(fix.safe == safe);
             const std::optional<std::string> made = ALScriptFixes::apply(script, fix);
-            ensure("applies", made.has_value());
+            REQUIRE(made.has_value());
             const ALScriptProblems after = check(*made, lua);
-            ensure("gone from:\n" + *made + "\n" + said(after), keyed(after, key) == nullptr);
-            ensure("no error in its place:\n" + *made + "\n" + said(after),
-                   errors(after) <= errors(problems) - (problem->severity == ALScriptProblem::Severity::Error ? 1 : 0));
+            INFO("made:\n" + *made + "\nsaid then:\n" + said(after));
+            REQUIRE(keyed(after, key) == nullptr);
+            UNSCOPED_INFO("no error in its place");
+            REQUIRE(errors(after) <= errors(problems) - (problem->severity == ALScriptProblem::Severity::Error ? 1 : 0));
             return *made;
         }
 
         // The problem keyed so is said, and offers no fix.
-        void unfixed(const std::string& script, const std::string& key, bool lua = true)
+        void require_unfixed(const std::string& script, const std::string& key, bool lua = true)
         {
             const ALScriptProblems problems = check(script, lua);
             const ALScriptProblem* problem  = keyed(problems, key);
-            ensure("said: " + key + "\n" + said(problems), problem != nullptr);
-            ensure("no fix: " + said(problems), problem->fixes.empty());
+            CAPTURE(key);
+            INFO("said:\n" + said(problems));
+            REQUIRE(problem != nullptr);
+            REQUIRE(problem->fixes.empty());
         }
     };
-    // Raised from TUT's fifty: stages C and D of the SLua help plan add a
-    // test for each rule.
-    typedef test_group<alscriptlintpass_data, 100> alscriptlintpass_group;
-    typedef alscriptlintpass_group::object         object;
-    tut::alscriptlintpass_group                    alscriptlintpass_test("ALScriptLintPass");
 
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlTableCompare: a table compared with {}; with items or a string no fix", "[ALScriptLintPass]")
     {
-        set_test_name("SlTableCompare: a table compared with {} on either side, by length where it is a list; with items, or a string, no fix");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local t = {1}\n"
                                        "if t == {} then print(1) end\n"
                                        "if {} ~= t then print(2) end\n"
@@ -164,26 +166,30 @@ namespace tut
                                        "local function f(l) return l ~= {} end\n"
                                        "if t == nil or t == d then print(f(t)) end\n",
                                        "SlTableCompare", ALScriptProblem::Severity::Error);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("1 LuauLintSlTableCompare|t|#t == 0\n"
                                   "2 LuauLintSlTableCompareAlways|t|#t > 0\n"
                                   "4 LuauLintSlTableCompare|d|next(d) == nil\n"
                                   "5 LuauLintSlTableCompareItems|t\n"
                                   "7 LuauLintSlTableCompareItems|s\n"
                                   "8 LuauLintSlTableCompareAlways|l|next(l) ~= nil\n"));
-        ensure_equals("a list", fixed("local t = {1}\nif t == {} then print(t) end\n", "LuauLintSlTableCompare", "Write it #t == 0", false),
-                      std::string("local t = {1}\nif #t == 0 then print(t) end\n"));
-        ensure_equals("a table, on the right, bracketed", fixed("local d = {a = 1}\nprint({} ~= (d))\n", "LuauLintSlTableCompareAlways", "Write it next(d) ~= nil", false),
-                      std::string("local d = {a = 1}\nprint(next(d) ~= nil)\n"));
-        unfixed("local t = {1}\nprint(t == {1})\n", "LuauLintSlTableCompareItems");
+        {
+            INFO("a list");
+            CHECK(require_fixed("local t = {1}\nif t == {} then print(t) end\n", "LuauLintSlTableCompare", "Write it #t == 0", false) ==
+                  std::string("local t = {1}\nif #t == 0 then print(t) end\n"));
+        }
+        {
+            INFO("a table, on the right, bracketed");
+            CHECK(require_fixed("local d = {a = 1}\nprint({} ~= (d))\n", "LuauLintSlTableCompareAlways", "Write it next(d) ~= nil", false) ==
+                  std::string("local d = {a = 1}\nprint(next(d) ~= nil)\n"));
+        }
+        require_unfixed("local t = {1}\nprint(t == {1})\n", "LuauLintSlTableCompareItems");
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlZeroIndex: counting from 0 in lists and loops and subs and finds", "[ALScriptLintPass]")
     {
-        set_test_name("SlZeroIndex: a list at 0, a loop from 0 to a length less 1 that indexes, string.sub and ll from 0, a find against 0; "
-                      "not a table keyed at 0, nor a loop given to llcompat");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local t = {1, 2}\n"
                                        "print(t[0])\n"
                                        "for i = 0, #t - 1 do print(t[i]) end\n"
@@ -198,7 +204,7 @@ namespace tut
                                        "h[0] = 2\n"
                                        "print(d[0], h[0], llcompat.SubStringIndex(s, \"a\") == 0)\n",
                                        "SlZeroIndex", ALScriptProblem::Severity::Warning);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("1 LuauLintSlZeroIndex|t\n"
                                   "2 LuauLintSlZeroIndexLoop|#t|t[i]|i\n"
                                   "3 LuauLintSlZeroIndexLoop|#t|t[i]|i\n"
@@ -210,31 +216,46 @@ namespace tut
                                   "7 LuauLintSlZeroIndexArg|ll.GetSubString\n"
                                   "8 LuauLintSlZeroIndexFound|ll.SubStringIndex(...)|ll.SubStringIndex\n"
                                   "8 LuauLintSlZeroIndexFound|table.find(...)|table.find\n"));
-        ensure_equals("a list", fixed("local t = {1}\nprint(t[0])\n", "LuauLintSlZeroIndex", "Write it t[1]", false),
-                      std::string("local t = {1}\nprint(t[1])\n"));
-        ensure_equals("a loop", fixed("local t = {1}\nfor i = 0, #t - 1 do print(t[i]) end\n", "LuauLintSlZeroIndexLoop", "Write it for i = 1, #t", false),
-                      std::string("local t = {1}\nfor i = 1, #t do print(t[i]) end\n"));
-        ensure_equals("a method to a length less 1", fixed("local s = \"abc\"\nprint(s:sub(0, #s - 1))\n", "LuauLintSlZeroIndexSub", "Write it s:sub(1, #s)", false),
-                      std::string("local s = \"abc\"\nprint(s:sub(1, #s))\n"));
-        ensure_equals("string's, to a number", fixed("print(string.sub(\"abc\", 0, 2))\n", "LuauLintSlZeroIndexSub", "Write it string.sub(\"abc\", 1, 3)", false),
-                      std::string("print(string.sub(\"abc\", 1, 3))\n"));
-        ensure_equals("ll's, one from the end kept", fixed("print(ll.GetSubString(\"abc\", 0, -1))\n", "LuauLintSlZeroIndexArg",
-                                                           "Write it ll.GetSubString(\"abc\", 1, -1)", false),
-                      std::string("print(ll.GetSubString(\"abc\", 1, -1))\n"));
-        ensure_equals("a find", fixed("print(ll.SubStringIndex(\"ab\", \"a\") == 0)\n", "LuauLintSlZeroIndexFound", "Write it ll.SubStringIndex(...) == 1", false),
-                      std::string("print(ll.SubStringIndex(\"ab\", \"a\") == 1)\n"));
-        unfixed("local t = {1}\nfor i = 0, #t - 1 do print(i, t[i]) end\n", "LuauLintSlZeroIndexLoop");
-        unfixed("local s = \"abc\"\nlocal n = 2\nprint(s:sub(0, n))\n", "LuauLintSlZeroIndexSub");
-        unfixed("local s = \"abc\"\nprint(ll.GetSubString(s, 0, #s))\n", "LuauLintSlZeroIndexArg");
+        {
+            INFO("a list");
+            CHECK(require_fixed("local t = {1}\nprint(t[0])\n", "LuauLintSlZeroIndex", "Write it t[1]", false) ==
+                  std::string("local t = {1}\nprint(t[1])\n"));
+        }
+        {
+            INFO("a loop");
+            CHECK(require_fixed("local t = {1}\nfor i = 0, #t - 1 do print(t[i]) end\n", "LuauLintSlZeroIndexLoop", "Write it for i = 1, #t", false) ==
+                  std::string("local t = {1}\nfor i = 1, #t do print(t[i]) end\n"));
+        }
+        {
+            INFO("a method to a length less 1");
+            CHECK(require_fixed("local s = \"abc\"\nprint(s:sub(0, #s - 1))\n", "LuauLintSlZeroIndexSub", "Write it s:sub(1, #s)", false) ==
+                  std::string("local s = \"abc\"\nprint(s:sub(1, #s))\n"));
+        }
+        {
+            INFO("string's, to a number");
+            CHECK(require_fixed("print(string.sub(\"abc\", 0, 2))\n", "LuauLintSlZeroIndexSub", "Write it string.sub(\"abc\", 1, 3)", false) ==
+                  std::string("print(string.sub(\"abc\", 1, 3))\n"));
+        }
+        {
+            INFO("ll's, one from the end kept");
+            CHECK(require_fixed("print(ll.GetSubString(\"abc\", 0, -1))\n", "LuauLintSlZeroIndexArg",
+                                "Write it ll.GetSubString(\"abc\", 1, -1)", false) ==
+                  std::string("print(ll.GetSubString(\"abc\", 1, -1))\n"));
+        }
+        {
+            INFO("a find");
+            CHECK(require_fixed("print(ll.SubStringIndex(\"ab\", \"a\") == 0)\n", "LuauLintSlZeroIndexFound", "Write it ll.SubStringIndex(...) == 1", false) ==
+                  std::string("print(ll.SubStringIndex(\"ab\", \"a\") == 1)\n"));
+        }
+        require_unfixed("local t = {1}\nfor i = 0, #t - 1 do print(i, t[i]) end\n", "LuauLintSlZeroIndexLoop");
+        require_unfixed("local s = \"abc\"\nlocal n = 2\nprint(s:sub(0, n))\n", "LuauLintSlZeroIndexSub");
+        require_unfixed("local s = \"abc\"\nprint(ll.GetSubString(s, 0, #s))\n", "LuauLintSlZeroIndexArg");
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlCompatCall: llcompat's where ll's means the same; not where it differs", "[ALScriptLintPass]")
     {
-        set_test_name("SlCompatCall: llcompat's where ll's means the same -- the same function, indexes that are numbers, a boolean against 1 "
-                      "or 0, a find against -1 or 0, an answer unread, one ll's only deprecates; not where ll deprecates one that differs, nor an "
-                      "answer read otherwise");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local s = \"abc\"\n"
                                        "llcompat.Say(0, s)\n"
                                        "print(llcompat.GetSubString(s, 0, -1))\n"
@@ -249,7 +270,7 @@ namespace tut
                                        "print(n, g, llcompat.ListFindList({1}, {1}) == -1)\n"
                                        "print(llcompat.List2Json(JSON_ARRAY, {s}))\n",
                                        "SlCompatCall", ALScriptProblem::Severity::Note);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("1 LuauLintSlCompatCall|llcompat.Say|ll.Say(...)\n"
                                   "2 LuauLintSlCompatCall|llcompat.GetSubString|ll.GetSubString(s, 1, -1)\n"
                                   "4 LuauLintSlCompatCall|llcompat.SameGroup|ll.SameGroup(...)\n"
@@ -258,26 +279,42 @@ namespace tut
                                   "7 LuauLintSlCompatCall|llcompat.SubStringIndex|ll.SubStringIndex(...) == nil\n"
                                   "8 LuauLintSlCompatCall|llcompat.SameGroup|ll.SameGroup(...)\n"
                                   "12 LuauLintSlCompatCall|llcompat.List2Json|ll.List2Json(...)\n"));
-        ensure_equals("the same", fixed("llcompat.Say(0, \"hi\")\n", "LuauLintSlCompatCall", "Write it ll.Say(...)", true),
-                      std::string("ll.Say(0, \"hi\")\n"));
-        ensure_equals("indexes", fixed("print(llcompat.GetSubString(\"abc\", 0, 1))\n", "LuauLintSlCompatCall", "Write it ll.GetSubString(\"abc\", 1, 2)", true),
-                      std::string("print(ll.GetSubString(\"abc\", 1, 2))\n"));
-        ensure_equals("a boolean on the right", fixed("print(0 == llcompat.SameGroup(ll.GetOwner()))\n", "LuauLintSlCompatCall", "Write it not ll.SameGroup(...)", true),
-                      std::string("print(not ll.SameGroup(ll.GetOwner()))\n"));
-        ensure_equals("a boolean", fixed("print(llcompat.SameGroup(ll.GetOwner()) ~= 0)\n", "LuauLintSlCompatCall", "Write it ll.SameGroup(...)", true),
-                      std::string("print(ll.SameGroup(ll.GetOwner()))\n"));
-        ensure_equals("a find, first", fixed("print(llcompat.SubStringIndex(\"ab\", \"a\") == 0)\n", "LuauLintSlCompatCall", "Write it ll.SubStringIndex(...) == 1", true),
-                      std::string("print(ll.SubStringIndex(\"ab\", \"a\") == 1)\n"));
-        ensure_equals("a find, on the right", fixed("print(-1 < llcompat.SubStringIndex(\"ab\", \"a\"))\n", "LuauLintSlCompatCall", "Write it ll.SubStringIndex(...) ~= nil", true),
-                      std::string("print(ll.SubStringIndex(\"ab\", \"a\") ~= nil)\n"));
+        {
+            INFO("the same");
+            CHECK(require_fixed("llcompat.Say(0, \"hi\")\n", "LuauLintSlCompatCall", "Write it ll.Say(...)", true) ==
+                  std::string("ll.Say(0, \"hi\")\n"));
+        }
+        {
+            INFO("indexes");
+            CHECK(require_fixed("print(llcompat.GetSubString(\"abc\", 0, 1))\n", "LuauLintSlCompatCall", "Write it ll.GetSubString(\"abc\", 1, 2)", true) ==
+                  std::string("print(ll.GetSubString(\"abc\", 1, 2))\n"));
+        }
+        {
+            INFO("a boolean on the right");
+            CHECK(require_fixed("print(0 == llcompat.SameGroup(ll.GetOwner()))\n", "LuauLintSlCompatCall", "Write it not ll.SameGroup(...)", true) ==
+                  std::string("print(not ll.SameGroup(ll.GetOwner()))\n"));
+        }
+        {
+            INFO("a boolean");
+            CHECK(require_fixed("print(llcompat.SameGroup(ll.GetOwner()) ~= 0)\n", "LuauLintSlCompatCall", "Write it ll.SameGroup(...)", true) ==
+                  std::string("print(ll.SameGroup(ll.GetOwner()))\n"));
+        }
+        {
+            INFO("a find, first");
+            CHECK(require_fixed("print(llcompat.SubStringIndex(\"ab\", \"a\") == 0)\n", "LuauLintSlCompatCall", "Write it ll.SubStringIndex(...) == 1", true) ==
+                  std::string("print(ll.SubStringIndex(\"ab\", \"a\") == 1)\n"));
+        }
+        {
+            INFO("a find, on the right");
+            CHECK(require_fixed("print(-1 < llcompat.SubStringIndex(\"ab\", \"a\"))\n", "LuauLintSlCompatCall", "Write it ll.SubStringIndex(...) ~= nil", true) ==
+                  std::string("print(ll.SubStringIndex(\"ab\", \"a\") ~= nil)\n"));
+        }
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlBooleanNumber: a boolean against a number; an if of 1 and 0 a note", "[ALScriptLintPass]")
     {
-        set_test_name("SlBooleanNumber: a boolean compared with a number, on either side, an error; an if-then-else of 1 and 0 compared with "
-                      "one, a note; not a number compared with one");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local on = false\n"
                                        "local n = 1\n"
                                        "if on == 1 or 0 ~= on then print(1) end\n"
@@ -285,29 +322,35 @@ namespace tut
                                        "if (if on then 1 else 0) == 1 or (if n > 2 then 0 else 1) ~= 0 then print(3) end\n"
                                        "if n == 1 or (if on then 2 else 0) == 1 then print(4) end\n",
                                        "SlBooleanNumber", ALScriptProblem::Severity::Error);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("2 LuauLintSlBooleanNumber|on|1\n"
                                   "2 LuauLintSlBooleanNumberAlways|on|0\n"
                                   "3 LuauLintSlBooleanNumber|ll.SameGroup(ll.GetOwner())|0\n"
                                   "3 LuauLintSlBooleanNumber|(n > 2)|5\n"
                                   "4 LuauLintSlBooleanNumberChoice|(if on then 1 else 0) == 1|on (another severity)\n"
                                   "4 LuauLintSlBooleanNumberChoice|(if n > 2 then 0 else 1) ~= 0|not (n > 2) (another severity)\n"));
-        ensure_equals("true", fixed("local on = false\nprint(on == 1)\n", "LuauLintSlBooleanNumber", "Write it on", false),
-                      std::string("local on = false\nprint(on)\n"));
-        ensure_equals("false, on the right", fixed("print(0 == ll.SameGroup(ll.GetOwner()))\n", "LuauLintSlBooleanNumber", "Write it not ll.SameGroup(ll.GetOwner())", false),
-                      std::string("print(not ll.SameGroup(ll.GetOwner()))\n"));
-        ensure_equals("a choice", fixed("local n = 1\nprint((if n > 2 then 0 else 1) ~= 0)\n", "LuauLintSlBooleanNumberChoice", "Write it not (n > 2)", false),
-                      std::string("local n = 1\nprint(not (n > 2))\n"));
-        unfixed("local n = 1\nprint((n > 2) == 5)\n", "LuauLintSlBooleanNumber");
+        {
+            INFO("true");
+            CHECK(require_fixed("local on = false\nprint(on == 1)\n", "LuauLintSlBooleanNumber", "Write it on", false) ==
+                  std::string("local on = false\nprint(on)\n"));
+        }
+        {
+            INFO("false, on the right");
+            CHECK(require_fixed("print(0 == ll.SameGroup(ll.GetOwner()))\n", "LuauLintSlBooleanNumber", "Write it not ll.SameGroup(ll.GetOwner())", false) ==
+                  std::string("print(not ll.SameGroup(ll.GetOwner()))\n"));
+        }
+        {
+            INFO("a choice");
+            CHECK(require_fixed("local n = 1\nprint((if n > 2 then 0 else 1) ~= 0)\n", "LuauLintSlBooleanNumberChoice", "Write it not (n > 2)", false) ==
+                  std::string("local n = 1\nprint(not (n > 2))\n"));
+        }
+        require_unfixed("local n = 1\nprint((n > 2) == 5)\n", "LuauLintSlBooleanNumber");
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlGlobalAssign: globals and global functions made local; not with _G", "[ALScriptLintPass]")
     {
-        set_test_name("SlGlobalAssign: a global made at the top, once, a note; a function made global in a block, a warning; a function "
-                      "at the top SlGlobalFunction's, a note, off on its own; not a name the script is given; each made local, in place or "
-                      "declared before it is first named, and not where _G is");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string script = "count = 0\n"
                                    "function bump() count += 1; total = count end\n"
                                    "local function early() return later end\n"
@@ -322,45 +365,58 @@ namespace tut
                                    "print(bump, early, outer, shared, total, x, y)\n"
                                    "count = 1\n";
         const std::string said = found(script, "SlGlobalAssign", ALScriptProblem::Severity::Warning);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("0 LuauLintSlGlobalAssign|count (another severity)\n"
                                   "1 LuauLintSlGlobalInFunction|total (another severity)\n"
                                   "3 LuauLintSlGlobalAssign|later (another severity)\n"
                                   "6 LuauLintSlGlobalFunctionInScope|inner\n"
                                   "7 LuauLintSlGlobalFunctionInScope|shared\n"
                                   "10 LuauLintSlGlobalAssign|x, y (another severity)\n"));
-        ensure_equals("the function at the top", found(script, "SlGlobalFunction", ALScriptProblem::Severity::Note),
+        UNSCOPED_INFO("the function at the top");
+        CHECK(found(script, "SlGlobalFunction", ALScriptProblem::Severity::Note) ==
                       std::string("1 LuauLintSlGlobalFunction|bump\n"));
-        ensure_equals("off on its own: the rest still said", found("--!nolint SlGlobalFunction\n" + script, "SlGlobalAssign", ALScriptProblem::Severity::Warning),
+        UNSCOPED_INFO("off on its own: the rest still said");
+        CHECK(found("--!nolint SlGlobalFunction\n" + script, "SlGlobalAssign", ALScriptProblem::Severity::Warning) ==
                       std::string("1 LuauLintSlGlobalAssign|count (another severity)\n"
                                   "2 LuauLintSlGlobalInFunction|total (another severity)\n"
                                   "4 LuauLintSlGlobalAssign|later (another severity)\n"
                                   "7 LuauLintSlGlobalFunctionInScope|inner\n"
                                   "8 LuauLintSlGlobalFunctionInScope|shared\n"
                                   "11 LuauLintSlGlobalAssign|x, y (another severity)\n"));
-        ensure("and it not", found("--!nolint SlGlobalFunction\n" + script, "SlGlobalFunction", ALScriptProblem::Severity::Note).empty());
-        ensure("nor the function where SlGlobalAssign alone is off",
-               found("--!nolint SlGlobalAssign\n" + script, "SlGlobalFunction", ALScriptProblem::Severity::Note) == "2 LuauLintSlGlobalFunction|bump\n");
-        ensure_equals("in place", fixed("count = 0\nprint(count)\n", "LuauLintSlGlobalAssign", "Write it local count", false),
-                      std::string("local count = 0\nprint(count)\n"));
-        ensure_equals("declared first", fixed("local function early() return later end\nlater = 5\nprint(early())\n", "LuauLintSlGlobalAssign",
-                                              "Declare local later before it is first named", false),
-                      std::string("local later\nlocal function early() return later end\nlater = 5\nprint(early())\n"));
-        ensure_equals("a function", fixed("function f() return 1 end\nprint(f())\n", "LuauLintSlGlobalFunction", "Write it local function f", false),
-                      std::string("local function f() return 1 end\nprint(f())\n"));
-        ensure_equals("in a block", fixed("local function outer()\n    function inner() return 1 end\n    return inner()\nend\nprint(outer())\n",
-                                          "LuauLintSlGlobalFunctionInScope", "Write it local function inner", false),
-                      std::string("local function outer()\n    local function inner() return 1 end\n    return inner()\nend\nprint(outer())\n"));
-        unfixed("local function outer()\n    function shared() return 2 end\nend\nprint(outer, shared)\n", "LuauLintSlGlobalFunctionInScope");
-        unfixed("print(_G)\ny = 2\n", "LuauLintSlGlobalAssign");
+        UNSCOPED_INFO("and it not");
+        REQUIRE(found("--!nolint SlGlobalFunction\n" + script, "SlGlobalFunction", ALScriptProblem::Severity::Note).empty());
+        UNSCOPED_INFO("nor the function where SlGlobalAssign alone is off");
+        CHECK(found("--!nolint SlGlobalAssign\n" + script, "SlGlobalFunction", ALScriptProblem::Severity::Note) == "2 LuauLintSlGlobalFunction|bump\n");
+        {
+            INFO("in place");
+            CHECK(require_fixed("count = 0\nprint(count)\n", "LuauLintSlGlobalAssign", "Write it local count", false) ==
+                  std::string("local count = 0\nprint(count)\n"));
+        }
+        {
+            INFO("declared first");
+            CHECK(require_fixed("local function early() return later end\nlater = 5\nprint(early())\n", "LuauLintSlGlobalAssign",
+                                "Declare local later before it is first named", false) ==
+                  std::string("local later\nlocal function early() return later end\nlater = 5\nprint(early())\n"));
+        }
+        {
+            INFO("a function");
+            CHECK(require_fixed("function f() return 1 end\nprint(f())\n", "LuauLintSlGlobalFunction", "Write it local function f", false) ==
+                  std::string("local function f() return 1 end\nprint(f())\n"));
+        }
+        {
+            INFO("in a block");
+            CHECK(require_fixed("local function outer()\n    function inner() return 1 end\n    return inner()\nend\nprint(outer())\n",
+                                "LuauLintSlGlobalFunctionInScope", "Write it local function inner", false) ==
+                  std::string("local function outer()\n    local function inner() return 1 end\n    return inner()\nend\nprint(outer())\n"));
+        }
+        require_unfixed("local function outer()\n    function shared() return 2 end\nend\nprint(outer, shared)\n", "LuauLintSlGlobalFunctionInScope");
+        require_unfixed("print(_G)\ny = 2\n", "LuauLintSlGlobalAssign");
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlParenCondition: a whole condition in brackets; taken out safely", "[ALScriptLintPass]")
     {
-        set_test_name("SlParenCondition: if, elseif, while, until and an if-then-else bracketed whole, a note; not brackets round a part; "
-                      "the brackets taken out, a blank kept where a word would run on, safe; selene's name allows it");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local x = true\n"
                                        "if (x) then print(1) elseif (not x) then print(2) end\n"
                                        "while(x)do break end\n"
@@ -369,27 +425,32 @@ namespace tut
                                        "if (x) and (x) then print(3) end\n"
                                        "if x then print(4) end\n",
                                        "SlParenCondition", ALScriptProblem::Severity::Note);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("1 LuauLintSlParenCondition|if\n"
                                   "1 LuauLintSlParenCondition|elseif\n"
                                   "2 LuauLintSlParenCondition|while\n"
                                   "3 LuauLintSlParenCondition|until\n"
                                   "4 LuauLintSlParenCondition|if\n"));
-        ensure_equals("spaced", fixed("local x = true\nif (x) then print(1) end\n", "LuauLintSlParenCondition", "Take out the brackets", true),
-                      std::string("local x = true\nif x then print(1) end\n"));
-        ensure_equals("run on", fixed("local x = true\nwhile(x)do break end\n", "LuauLintSlParenCondition", "Take out the brackets", true),
-                      std::string("local x = true\nwhile x do break end\n"));
-        ensure_equals("allowed by selene's name", found("local x = true\n-- selene: allow(parenthese_conditions)\nif (x) then print(1) end\n",
-                                                        "SlParenCondition", ALScriptProblem::Severity::Note),
+        {
+            INFO("spaced");
+            CHECK(require_fixed("local x = true\nif (x) then print(1) end\n", "LuauLintSlParenCondition", "Take out the brackets", true) ==
+                  std::string("local x = true\nif x then print(1) end\n"));
+        }
+        {
+            INFO("run on");
+            CHECK(require_fixed("local x = true\nwhile(x)do break end\n", "LuauLintSlParenCondition", "Take out the brackets", true) ==
+                  std::string("local x = true\nwhile x do break end\n"));
+        }
+        UNSCOPED_INFO("allowed by selene's name");
+        CHECK(found("local x = true\n-- selene: allow(parenthese_conditions)\nif (x) then print(1) end\n",
+                                                        "SlParenCondition", ALScriptProblem::Severity::Note) ==
                       std::string());
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlAlmostSwapped: a = b then b = a is a warning fixed as a swap", "[ALScriptLintPass]")
     {
-        set_test_name("SlAlmostSwapped: a = b then b = a, locals, globals or fields, a warning, fixed as a swap; not a swap, nor with "
-                      "something between");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local a, b = 1, 2\n"
                                        "a = b\n"
                                        "b = a\n"
@@ -400,19 +461,20 @@ namespace tut
                                        "print(a)\n"
                                        "b = a\n",
                                        "SlAlmostSwapped", ALScriptProblem::Severity::Warning);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("1 LuauLintSlAlmostSwapped|a|b|a, b = b, a\n"
                                   "4 LuauLintSlAlmostSwapped|t.x|t.y|t.x, t.y = t.y, t.x\n"));
-        ensure_equals("swapped", fixed("local a, b = 1, 2\na = b\nb = a\nprint(a, b)\n", "LuauLintSlAlmostSwapped", "Write it a, b = b, a", false),
-                      std::string("local a, b = 1, 2\na, b = b, a\nprint(a, b)\n"));
+        {
+            INFO("swapped");
+            CHECK(require_fixed("local a, b = 1, 2\na = b\nb = a\nprint(a, b)\n", "LuauLintSlAlmostSwapped", "Write it a, b = b, a", false) ==
+                  std::string("local a, b = 1, 2\na, b = b, a\nprint(a, b)\n"));
+        }
     }
 
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlMustUse: an answer left unread; given back to the first argument", "[ALScriptLintPass]")
     {
-        set_test_name("SlMustUse: ll's, llcompat's, a library's, a global's and a string's method that only answer, their answers unread; "
-                      "given back where the first given is a variable of the kind answered; not a call that does something");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local l = {1, 2}\n"
                                        "local s = \"abc\"\n"
                                        "ll.DeleteSubList(l, 1, 1)\n"
@@ -426,27 +488,31 @@ namespace tut
                                        "math.random()\n"
                                        "print(ll.DeleteSubList(l, 1, 1))\n",
                                        "SlMustUse", ALScriptProblem::Severity::Warning);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("2 LuauLintSlMustUse|ll.DeleteSubList\n"
                                   "3 LuauLintSlMustUse|string.upper\n"
                                   "4 LuauLintSlMustUse|s:lower\n"
                                   "5 LuauLintSlMustUse|string.len\n"
                                   "6 LuauLintSlMustUse|tostring\n"
                                   "7 LuauLintSlMustUse|llcompat.GetPos\n"));
-        ensure_equals("a list", fixed("local l = {1, 2}\nll.DeleteSubList(l, 1, 1)\nprint(l)\n", "LuauLintSlMustUse", "Write it l = ll.DeleteSubList(...)", false),
-                      std::string("local l = {1, 2}\nl = ll.DeleteSubList(l, 1, 1)\nprint(l)\n"));
-        ensure_equals("a method", fixed("local s = \"abc\"\ns:upper()\nprint(s)\n", "LuauLintSlMustUse", "Write it s = s:upper(...)", false),
-                      std::string("local s = \"abc\"\ns = s:upper()\nprint(s)\n"));
-        unfixed("local s = \"abc\"\nstring.len(s)\n", "LuauLintSlMustUse");
-        unfixed("string.upper(\"abc\")\n", "LuauLintSlMustUse");
+        {
+            INFO("a list");
+            CHECK(require_fixed("local l = {1, 2}\nll.DeleteSubList(l, 1, 1)\nprint(l)\n", "LuauLintSlMustUse", "Write it l = ll.DeleteSubList(...)", false) ==
+                  std::string("local l = {1, 2}\nl = ll.DeleteSubList(l, 1, 1)\nprint(l)\n"));
+        }
+        {
+            INFO("a method");
+            CHECK(require_fixed("local s = \"abc\"\ns:upper()\nprint(s)\n", "LuauLintSlMustUse", "Write it s = s:upper(...)", false) ==
+                  std::string("local s = \"abc\"\ns = s:upper()\nprint(s)\n"));
+        }
+        require_unfixed("local s = \"abc\"\nstring.len(s)\n", "LuauLintSlMustUse");
+        require_unfixed("string.upper(\"abc\")\n", "LuauLintSlMustUse");
     }
 
-    template<> template<>
-    void object::test<9>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlGeneralizedFor: pairs and ipairs and next in a for become the table", "[ALScriptLintPass]")
     {
-        set_test_name("SlGeneralizedFor: pairs, ipairs and next, t in a for, a note, fixed as the table itself, not safe; not a function "
-                      "of the script's, nor for over a table already");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local t = {1, 2}\n"
                                        "for k, v in pairs(t) do print(k, v) end\n"
                                        "for i, v in ipairs(t) do print(i, v) end\n"
@@ -455,22 +521,26 @@ namespace tut
                                        "for k, v in walk(t) do print(k, v) end\n"
                                        "for k, v in t do print(k, v) end\n",
                                        "SlGeneralizedFor", ALScriptProblem::Severity::Note);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("1 LuauLintSlGeneralizedFor|t|pairs(t)\n"
                                   "2 LuauLintSlGeneralizedForList|t|ipairs(t)\n"
                                   "3 LuauLintSlGeneralizedFor|t|next, t\n"));
-        ensure_equals("pairs", fixed("local t = {1}\nfor k, v in pairs(t) do print(k, v) end\n", "LuauLintSlGeneralizedFor", "Write it in t", false),
-                      std::string("local t = {1}\nfor k, v in t do print(k, v) end\n"));
-        ensure_equals("next", fixed("local t = {1}\nfor k, v in next, t do print(k, v) end\n", "LuauLintSlGeneralizedFor", "Write it in t", false),
-                      std::string("local t = {1}\nfor k, v in t do print(k, v) end\n"));
+        {
+            INFO("pairs");
+            CHECK(require_fixed("local t = {1}\nfor k, v in pairs(t) do print(k, v) end\n", "LuauLintSlGeneralizedFor", "Write it in t", false) ==
+                  std::string("local t = {1}\nfor k, v in t do print(k, v) end\n"));
+        }
+        {
+            INFO("next");
+            CHECK(require_fixed("local t = {1}\nfor k, v in next, t do print(k, v) end\n", "LuauLintSlGeneralizedFor", "Write it in t", false) ==
+                  std::string("local t = {1}\nfor k, v in t do print(k, v) end\n"));
+        }
     }
 
-    template<> template<>
-    void object::test<10>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlEmptyBlock: an empty block is a warning; an empty then or else fixed", "[ALScriptLintPass]")
     {
-        set_test_name("SlEmptyBlock: an empty if, elseif, else, while, for and repeat, a warning; not one holding a comment; an empty then "
-                      "before an else turned round, and an empty else taken out, safe; selene's names allow it");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local c = true\n"
                                        "if c then end\n"
                                        "if c then else print(1) end\n"
@@ -484,7 +554,7 @@ namespace tut
                                        "end\n"
                                        "while c do break end\n",
                                        "SlEmptyBlock", ALScriptProblem::Severity::Warning);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("1 LuauLintSlEmptyBlock|if\n"
                                   "2 LuauLintSlEmptyBlock|if\n"
                                   "3 LuauLintSlEmptyBlock|elseif\n"
@@ -493,23 +563,31 @@ namespace tut
                                   "6 LuauLintSlEmptyBlock|for\n"
                                   "7 LuauLintSlEmptyBlock|for\n"
                                   "8 LuauLintSlEmptyBlock|repeat\n"));
-        ensure_equals("turned round", fixed("local c = true\nif c then else print(1) end\n", "LuauLintSlEmptyBlock", "Write it if not c then", false),
-                      std::string("local c = true\nif not c then print(1) end\n"));
-        ensure_equals("an else", fixed("local c = true\nif c then print(3) else end\n", "LuauLintSlEmptyBlock", "Take out the empty else", true),
-                      std::string("local c = true\nif c then print(3) end\n"));
-        ensure_equals("an else on its own line", fixed("local c = true\nif c then\n    print(3)\nelse\nend\n", "LuauLintSlEmptyBlock", "Take out the empty else", true),
-                      std::string("local c = true\nif c then\n    print(3)\nend\n"));
-        ensure_equals("selene's names", found("local c = true\n-- selene: allow(empty_loop)\nwhile c do end\n-- selene: allow(empty_if)\nif c then end\n",
-                                              "SlEmptyBlock", ALScriptProblem::Severity::Warning),
+        {
+            INFO("turned round");
+            CHECK(require_fixed("local c = true\nif c then else print(1) end\n", "LuauLintSlEmptyBlock", "Write it if not c then", false) ==
+                  std::string("local c = true\nif not c then print(1) end\n"));
+        }
+        {
+            INFO("an else");
+            CHECK(require_fixed("local c = true\nif c then print(3) else end\n", "LuauLintSlEmptyBlock", "Take out the empty else", true) ==
+                  std::string("local c = true\nif c then print(3) end\n"));
+        }
+        {
+            INFO("an else on its own line");
+            CHECK(require_fixed("local c = true\nif c then\n    print(3)\nelse\nend\n", "LuauLintSlEmptyBlock", "Take out the empty else", true) ==
+                  std::string("local c = true\nif c then\n    print(3)\nend\n"));
+        }
+        UNSCOPED_INFO("selene's names");
+        CHECK(found("local c = true\n-- selene: allow(empty_loop)\nwhile c do end\n-- selene: allow(empty_if)\nif c then end\n",
+                                              "SlEmptyBlock", ALScriptProblem::Severity::Warning) ==
                       std::string());
     }
 
-    template<> template<>
-    void object::test<11>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlIndexDivision: a / in a list's index is a warning fixed as //", "[ALScriptLintPass]")
     {
-        set_test_name("SlIndexDivision: a / in what indexes a list, alone, bracketed or in a sum, read or written, a warning, fixed as //; "
-                      "not //, nor a table that is no list, nor a count");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local t = {1, 2, 3}\n"
                                        "local n = #t\n"
                                        "print(t[n / 2], t[(n + 1) / 2], t[n / 2 + 1], t[n // 2])\n"
@@ -517,22 +595,22 @@ namespace tut
                                        "local d = {a = 1}\n"
                                        "print(d[n / 2], string.rep(\"x\", n / 2))\n",
                                        "SlIndexDivision", ALScriptProblem::Severity::Warning);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("2 LuauLintSlIndexDivision|n / 2|n // 2\n"
                                   "2 LuauLintSlIndexDivision|(n + 1) / 2|(n + 1) // 2\n"
                                   "2 LuauLintSlIndexDivision|n / 2|n // 2\n"
                                   "3 LuauLintSlIndexDivision|n / 2|n // 2\n"));
-        ensure_equals("rounded down", fixed("local t = {1}\nlocal n = #t\nprint(t[n / 2])\n", "LuauLintSlIndexDivision", "Write it n // 2", false),
-                      std::string("local t = {1}\nlocal n = #t\nprint(t[n // 2])\n"));
+        {
+            INFO("rounded down");
+            CHECK(require_fixed("local t = {1}\nlocal n = #t\nprint(t[n / 2])\n", "LuauLintSlIndexDivision", "Write it n // 2", false) ==
+                  std::string("local t = {1}\nlocal n = #t\nprint(t[n // 2])\n"));
+        }
     }
 
-    template<> template<>
-    void object::test<12>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlVectorProduct: vectors' * as a number is vector.dot; % is vector.cross", "[ALScriptLintPass]")
     {
-        set_test_name("SlVectorProduct: two vectors multiplied where a number is wanted -- compared, added to one, given to math -- a "
-                      "warning, fixed as vector.dot; taken % each other, the cross product as in LSL, a note naming vector.cross; not a "
-                      "product kept a vector, nor by a number");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local a = vector(1, 0, 0)\n"
                                        "local b = vector(0, 1, 0)\n"
                                        "if a * b > 0.5 then print(1) end\n"
@@ -541,25 +619,30 @@ namespace tut
                                        "local s = a * b\n"
                                        "print(a * 2, s, c)\n",
                                        "SlVectorProduct", ALScriptProblem::Severity::Warning);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("2 LuauLintSlVectorProduct|a * b|a|b\n"
                                   "3 LuauLintSlVectorProduct|a * b|a|b\n"
                                   "3 LuauLintSlVectorProduct|a * b|a|b\n"
                                   "4 LuauLintSlVectorCross|a % b|a|b (another severity)\n"));
-        ensure_equals("a note", found("local a = vector(1, 0, 0)\nlocal c = a % a\nprint(c)\n", "SlVectorProduct", ALScriptProblem::Severity::Note),
+        UNSCOPED_INFO("a note");
+        CHECK(found("local a = vector(1, 0, 0)\nlocal c = a % a\nprint(c)\n", "SlVectorProduct", ALScriptProblem::Severity::Note) ==
                       std::string("1 LuauLintSlVectorCross|a % a|a|a\n"));
-        ensure_equals("dot", fixed("local a = vector(1, 0, 0)\nprint(a * a > 0.5)\n", "LuauLintSlVectorProduct", "Write it vector.dot(a, a)", false),
-                      std::string("local a = vector(1, 0, 0)\nprint(vector.dot(a, a) > 0.5)\n"));
-        ensure_equals("cross", fixed("local a = vector(1, 0, 0)\nlocal c = a % a\nprint(c)\n", "LuauLintSlVectorCross", "Write it vector.cross(a, a)", false),
-                      std::string("local a = vector(1, 0, 0)\nlocal c = vector.cross(a, a)\nprint(c)\n"));
+        {
+            INFO("dot");
+            CHECK(require_fixed("local a = vector(1, 0, 0)\nprint(a * a > 0.5)\n", "LuauLintSlVectorProduct", "Write it vector.dot(a, a)", false) ==
+                  std::string("local a = vector(1, 0, 0)\nprint(vector.dot(a, a) > 0.5)\n"));
+        }
+        {
+            INFO("cross");
+            CHECK(require_fixed("local a = vector(1, 0, 0)\nlocal c = a % a\nprint(c)\n", "LuauLintSlVectorCross", "Write it vector.cross(a, a)", false) ==
+                  std::string("local a = vector(1, 0, 0)\nlocal c = vector.cross(a, a)\nprint(c)\n"));
+        }
     }
 
-    template<> template<>
-    void object::test<13>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlSleepingCall in SLua: a sleeping call warned in loops; fixed as Fast", "[ALScriptLintPass]")
     {
-        set_test_name("SlSleepingCall in SLua: a call that sleeps where a Fast one does not, a note, and a warning in a loop or a timer; "
-                      "fixed as the Fast call, its arguments put in or, where only settled, written again; a texture's, no fix");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local v = vector(1, 2, 3)\n"
                                        "ll.SetPos(v)\n"
                                        "for i = 1, 3 do ll.SetRot(quaternion(0, 0, 0, 1)) end\n"
@@ -569,32 +652,39 @@ namespace tut
                                        "ll.SetLinkPrimitiveParamsFast(LINK_THIS, {})\n"
                                        "llcompat.SetPos(v)\n",
                                        "SlSleepingCall", ALScriptProblem::Severity::Note);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("1 LuauLintSlSleepingCall|ll.SetPos|0.2|ll.SetLinkPrimitiveParamsFast\n"
                                   "2 LuauLintSlSleepingCallOften|ll.SetRot|0.2|ll.SetLinkPrimitiveParamsFast (another severity)\n"
                                   "3 LuauLintSlSleepingCallOften|ll.SetPrimitiveParams|0.2|ll.SetLinkPrimitiveParamsFast (another severity)\n"
                                   "4 LuauLintSlSleepingTexture|ll.SetTexture|0.2|PRIM_TEXTURE\n"
                                   "5 LuauLintSlSleepingCall|ll.SetLinkRenderMaterial|0.2|ll.SetLinkPrimitiveParamsFast\n"
                                   "7 LuauLintSlSleepingCall|llcompat.SetPos|0.2|llcompat.SetLinkPrimitiveParamsFast\n"));
-        ensure_equals("put in", fixed("local v = vector(1, 2, 3)\nll.SetPos(v)\n", "LuauLintSlSleepingCall",
-                                      "Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_POSITION, v})", false),
-                      std::string("local v = vector(1, 2, 3)\nll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_POSITION, v})\n"));
-        ensure_equals("a link first, in a timer", fixed("LLTimers:every(1, function() ll.SetPrimitiveParams({}) end)\n", "LuauLintSlSleepingCallOften",
-                                                        "Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {})", false),
-                      std::string("LLTimers:every(1, function() ll.SetLinkPrimitiveParamsFast(LINK_THIS, {}) end)\n"));
-        ensure_equals("written again", fixed("ll.SetLinkRenderMaterial(LINK_THIS, \"m\", 0)\n", "LuauLintSlSleepingCall",
-                                             "Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_RENDER_MATERIAL, 0, \"m\"})", false),
-                      std::string("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_RENDER_MATERIAL, 0, \"m\"})\n"));
-        unfixed("ll.SetTexture(\"x\", 0)\n", "LuauLintSlSleepingTexture");
-        unfixed("ll.SetRenderMaterial(tostring(1), 0)\n", "LuauLintSlSleepingCall");
+        {
+            INFO("put in");
+            CHECK(require_fixed("local v = vector(1, 2, 3)\nll.SetPos(v)\n", "LuauLintSlSleepingCall",
+                                "Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_POSITION, v})", false) ==
+                  std::string("local v = vector(1, 2, 3)\nll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_POSITION, v})\n"));
+        }
+        {
+            INFO("a link first, in a timer");
+            CHECK(require_fixed("LLTimers:every(1, function() ll.SetPrimitiveParams({}) end)\n", "LuauLintSlSleepingCallOften",
+                                "Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {})", false) ==
+                  std::string("LLTimers:every(1, function() ll.SetLinkPrimitiveParamsFast(LINK_THIS, {}) end)\n"));
+        }
+        {
+            INFO("written again");
+            CHECK(require_fixed("ll.SetLinkRenderMaterial(LINK_THIS, \"m\", 0)\n", "LuauLintSlSleepingCall",
+                                "Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_RENDER_MATERIAL, 0, \"m\"})", false) ==
+                  std::string("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_RENDER_MATERIAL, 0, \"m\"})\n"));
+        }
+        require_unfixed("ll.SetTexture(\"x\", 0)\n", "LuauLintSlSleepingTexture");
+        require_unfixed("ll.SetRenderMaterial(tostring(1), 0)\n", "LuauLintSlSleepingCall");
     }
 
-    template<> template<>
-    void object::test<14>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlSleepingCall in LSL: the same; fixed over commas and comments", "[ALScriptLintPass]")
     {
-        set_test_name("SlSleepingCall in LSL: the same table, a warning in a loop or the timer event; fixed over the text, a vector's commas "
-                      "and a comment in the way");
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + builtinsError);
+        CHECK(lslLoaded);
         const std::string said = found("default {\n"
                                        "    state_entry() {\n"
                                        "        llSetPos(<1, 2, 3>);\n"
@@ -608,28 +698,31 @@ namespace tut
                                        "    }\n"
                                        "}\n",
                                        "SlSleepingCall", ALScriptProblem::Severity::Note, false);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("2 LSLSlSleepingCall|llSetPos|0.2|llSetLinkPrimitiveParamsFast\n"
                                   "4 LSLSlSleepingCallOften|llSetRot|0.2|llSetLinkPrimitiveParamsFast (another severity)\n"
                                   "5 LSLSlSleepingCall|llSetLinkRenderMaterial|0.2|llSetLinkPrimitiveParamsFast\n"
                                   "6 LSLSlSleepingTexture|llSetTexture|0.2|PRIM_TEXTURE\n"
                                   "9 LSLSlSleepingCallOften|llSetPrimitiveParams|0.2|llSetLinkPrimitiveParamsFast (another severity)\n"));
-        ensure_equals("put in", fixed("default { state_entry() { llSetPos( <1, 2, 3> /* here */ ); } }\n", "LSLSlSleepingCall",
-                                      "Write it llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_POSITION, <1, 2, 3> /* here */])", false, false),
-                      std::string("default { state_entry() { llSetLinkPrimitiveParamsFast( LINK_THIS, [PRIM_POSITION, <1, 2, 3> /* here */] ); } }\n"));
-        ensure_equals("written again", fixed("default { state_entry() { llSetLinkRenderMaterial(LINK_THIS, \"m\", ALL_SIDES); } }\n", "LSLSlSleepingCall",
-                                             "Write it llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_RENDER_MATERIAL, ALL_SIDES, \"m\"])", false, false),
-                      std::string("default { state_entry() { llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_RENDER_MATERIAL, ALL_SIDES, \"m\"]); } }\n"));
-        unfixed("default { state_entry() { llSetRenderMaterial(llGetInventoryName(INVENTORY_MATERIAL, 0), 0); } }\n", "LSLSlSleepingCall", false);
+        {
+            INFO("put in");
+            CHECK(require_fixed("default { state_entry() { llSetPos( <1, 2, 3> /* here */ ); } }\n", "LSLSlSleepingCall",
+                                "Write it llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_POSITION, <1, 2, 3> /* here */])", false, false) ==
+                  std::string("default { state_entry() { llSetLinkPrimitiveParamsFast( LINK_THIS, [PRIM_POSITION, <1, 2, 3> /* here */] ); } }\n"));
+        }
+        {
+            INFO("written again");
+            CHECK(require_fixed("default { state_entry() { llSetLinkRenderMaterial(LINK_THIS, \"m\", ALL_SIDES); } }\n", "LSLSlSleepingCall",
+                                "Write it llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_RENDER_MATERIAL, ALL_SIDES, \"m\"])", false, false) ==
+                  std::string("default { state_entry() { llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_RENDER_MATERIAL, ALL_SIDES, \"m\"]); } }\n"));
+        }
+        require_unfixed("default { state_entry() { llSetRenderMaterial(llGetInventoryName(INVENTORY_MATERIAL, 0), 0); } }\n", "LSLSlSleepingCall", false);
     }
 
-    template<> template<>
-    void object::test<15>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlMergeablePrimParams in SLua: a run of prim-params calls merged", "[ALScriptLintPass]")
     {
-        set_test_name("SlMergeablePrimParams in SLua: a run of the same prim-params call, its rules written out, a note; merged with "
-                      "PRIM_LINK_TARGET where the link changes, or a list sends its rules elsewhere; broken by anything between, a call "
-                      "whose arguments read the world, or another function");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_COLOR, ALL_SIDES, vector(1, 0, 0), 1})\n"
                                        "ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0.5})\n"
                                        "ll.SetLinkPrimitiveParamsFast(2, {PRIM_GLOW, ALL_SIDES, 0})\n"
@@ -639,26 +732,31 @@ namespace tut
                                        "ll.SetPrimitiveParams({PRIM_GLOW, ALL_SIDES, 0})\n"
                                        "ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0})\n",
                                        "SlMergeablePrimParams", ALScriptProblem::Severity::Note);
-        ensure_equals("each", said, std::string("0 LuauLintSlMergeablePrimParams|3|ll.SetLinkPrimitiveParamsFast\n"));
-        ensure_equals("a link changed", fixed("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0.5})\nll.SetLinkPrimitiveParamsFast(2, {PRIM_GLOW, ALL_SIDES, 0})\n",
-                                              "LuauLintSlMergeablePrimParams",
-                                              "Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0.5, PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 0})",
-                                              false),
-                      std::string("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0.5, PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 0})\n"));
-        ensure_equals("sent elsewhere, then back", fixed("ll.SetLinkPrimitiveParamsFast(1, {PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 1})\n"
-                                                         "ll.SetLinkPrimitiveParamsFast(1, {PRIM_GLOW, ALL_SIDES, 0})\n",
-                                                         "LuauLintSlMergeablePrimParams",
-                                                         "Write it ll.SetLinkPrimitiveParamsFast(1, {PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 1, PRIM_LINK_TARGET, 1, "
-                                                         "PRIM_GLOW, ALL_SIDES, 0})",
-                                                         false),
-                      std::string("ll.SetLinkPrimitiveParamsFast(1, {PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 1, PRIM_LINK_TARGET, 1, PRIM_GLOW, ALL_SIDES, 0})\n"));
+        CHECK(said == std::string("0 LuauLintSlMergeablePrimParams|3|ll.SetLinkPrimitiveParamsFast\n"));
+        {
+            INFO("a link changed");
+            CHECK(require_fixed("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0.5})\nll.SetLinkPrimitiveParamsFast(2, {PRIM_GLOW, ALL_SIDES, 0})\n",
+                                "LuauLintSlMergeablePrimParams",
+                                "Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0.5, PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 0})",
+                                false) ==
+                  std::string("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0.5, PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 0})\n"));
+        }
+        {
+            INFO("sent elsewhere, then back");
+            CHECK(require_fixed("ll.SetLinkPrimitiveParamsFast(1, {PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 1})\n"
+                                "ll.SetLinkPrimitiveParamsFast(1, {PRIM_GLOW, ALL_SIDES, 0})\n",
+                                "LuauLintSlMergeablePrimParams",
+                                "Write it ll.SetLinkPrimitiveParamsFast(1, {PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 1, PRIM_LINK_TARGET, 1, "
+                                "PRIM_GLOW, ALL_SIDES, 0})",
+                                false) ==
+                  std::string("ll.SetLinkPrimitiveParamsFast(1, {PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 1, PRIM_LINK_TARGET, 1, PRIM_GLOW, ALL_SIDES, 0})\n"));
+        }
     }
 
-    template<> template<>
-    void object::test<16>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlMergeablePrimParams in LSL: the same over the text keeping the last ;", "[ALScriptLintPass]")
     {
-        set_test_name("SlMergeablePrimParams in LSL: the same, over the text, each call's ; but the last's taken with it");
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + builtinsError);
+        CHECK(lslLoaded);
         const std::string said = found("default {\n"
                                        "    state_entry() {\n"
                                        "        llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_GLOW, ALL_SIDES, 0.5]);\n"
@@ -668,34 +766,40 @@ namespace tut
                                        "    }\n"
                                        "}\n",
                                        "SlMergeablePrimParams", ALScriptProblem::Severity::Note, false);
-        ensure_equals("each", said, std::string("2 LSLSlMergeablePrimParams|2|llSetLinkPrimitiveParamsFast\n"));
-        ensure_equals("a link changed", fixed("default { state_entry() {\n    llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_GLOW, ALL_SIDES, 0.5]);\n"
-                                              "    llSetLinkPrimitiveParamsFast(2, [ PRIM_GLOW, ALL_SIDES, 0.0 ]);\n} }\n",
-                                              "LSLSlMergeablePrimParams",
-                                              "Write it llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_GLOW, ALL_SIDES, 0.5, PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 0.0])",
-                                              false, false),
-                      std::string("default { state_entry() {\n    llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_GLOW, ALL_SIDES, 0.5, PRIM_LINK_TARGET, 2, "
-                                  "PRIM_GLOW, ALL_SIDES, 0.0]);\n} }\n"));
-        ensure_equals("no link", fixed("default { state_entry() { llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.5]); llSetPrimitiveParams([PRIM_COLOR, "
-                                       "ALL_SIDES, <1, 0, 0>, 1.0]); } }\n",
-                                       "LSLSlMergeablePrimParams", "Write it llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.5, PRIM_COLOR, ALL_SIDES, <1, 0, 0>, 1.0])",
-                                       false, false),
-                      std::string("default { state_entry() { llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.5, PRIM_COLOR, ALL_SIDES, <1, 0, 0>, 1.0]); } }\n"));
+        CHECK(said == std::string("2 LSLSlMergeablePrimParams|2|llSetLinkPrimitiveParamsFast\n"));
+        {
+            INFO("a link changed");
+            CHECK(require_fixed("default { state_entry() {\n    llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_GLOW, ALL_SIDES, 0.5]);\n"
+                                "    llSetLinkPrimitiveParamsFast(2, [ PRIM_GLOW, ALL_SIDES, 0.0 ]);\n} }\n",
+                                "LSLSlMergeablePrimParams",
+                                "Write it llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_GLOW, ALL_SIDES, 0.5, PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 0.0])",
+                                false, false) ==
+                  std::string("default { state_entry() {\n    llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_GLOW, ALL_SIDES, 0.5, PRIM_LINK_TARGET, 2, "
+                              "PRIM_GLOW, ALL_SIDES, 0.0]);\n} }\n"));
+        }
+        {
+            INFO("no link");
+            CHECK(require_fixed("default { state_entry() { llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.5]); llSetPrimitiveParams([PRIM_COLOR, "
+                                "ALL_SIDES, <1, 0, 0>, 1.0]); } }\n",
+                                "LSLSlMergeablePrimParams", "Write it llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.5, PRIM_COLOR, ALL_SIDES, <1, 0, 0>, 1.0])",
+                                false, false) ==
+                  std::string("default { state_entry() { llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.5, PRIM_COLOR, ALL_SIDES, <1, 0, 0>, 1.0]); } }\n"));
+        }
     }
 
-    template<> template<>
-    void object::test<17>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlCostlyListen and SlFastTimer and SlFastSensor: notes in both languages", "[ALScriptLintPass]")
     {
-        set_test_name("SlCostlyListen, SlFastTimer, SlFastSensor in both languages: notes, with no fix; not a listen narrowed, a timer "
-                      "stopped or of a tenth, nor a sensor once a second");
-        ensure("definitions: " + error, loaded);
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
+        UNSCOPED_INFO("builtins: " + builtinsError);
+        CHECK(lslLoaded);
         const auto three = [&](const std::string& script, bool lua) {
             return found(script, "SlCostlyListen", ALScriptProblem::Severity::Note, lua) +
                    found(script, "SlFastTimer", ALScriptProblem::Severity::Note, lua) +
                    found(script, "SlFastSensor", ALScriptProblem::Severity::Note, lua);
         };
-        ensure_equals("SLua", three("ll.Listen(0, \"\", NULL_KEY, \"\")\n"
+        UNSCOPED_INFO("SLua");
+        CHECK(three("ll.Listen(0, \"\", NULL_KEY, \"\")\n"
                                     "ll.Listen(PUBLIC_CHANNEL, \"\", \"\", \"hello\")\n"
                                     "ll.Listen(0, \"Bob\", NULL_KEY, \"\")\n"
                                     "ll.Listen(7, \"\", NULL_KEY, \"\")\n"
@@ -705,13 +809,14 @@ namespace tut
                                     "llcompat.SetTimerEvent(0)\n"
                                     "ll.SensorRepeat(\"\", NULL_KEY, AGENT, 10, PI, 0.5)\n"
                                     "ll.SensorRepeat(\"\", NULL_KEY, AGENT, 10, PI, 1)\n",
-                                    true),
+                                    true) ==
                       std::string("0 LuauLintSlCostlyListen\n"
                                   "1 LuauLintSlCostlyListen\n"
                                   "4 LuauLintSlFastTimer|0.05\n"
                                   "5 LuauLintSlFastTimer|0.02\n"
                                   "8 LuauLintSlFastSensor|0.5\n"));
-        ensure_equals("LSL", three("default {\n"
+        UNSCOPED_INFO("LSL");
+        CHECK(three("default {\n"
                                    "    state_entry() {\n"
                                    "        llListen(PUBLIC_CHANNEL, \"\", NULL_KEY, \"\");\n"
                                    "        llListen(0, \"\", llGetOwner(), \"\");\n"
@@ -720,20 +825,20 @@ namespace tut
                                    "        llSensorRepeat(\"\", NULL_KEY, AGENT, 10.0, PI, 0.25);\n"
                                    "    }\n"
                                    "}\n",
-                                   false),
+                                   false) ==
                       std::string("2 LSLSlCostlyListen\n"
                                   "4 LSLSlFastTimer|0.05\n"
                                   "6 LSLSlFastSensor|0.25\n"));
     }
 
-    template<> template<>
-    void object::test<18>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlStringBuild: a string grown in a loop; in SLua its pieces in a table", "[ALScriptLintPass]")
     {
-        set_test_name("SlStringBuild: a string joined to in a loop, from outside it, once for each string at its outermost loop, in both "
-                      "languages; in SLua put in a table where it is a local of the block read in the loop by its appends alone");
-        ensure("definitions: " + error, loaded);
-        ensure("builtins: " + error, lslLoaded);
-        ensure_equals("SLua", found("local s = \"\"\n"
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
+        UNSCOPED_INFO("builtins: " + builtinsError);
+        CHECK(lslLoaded);
+        UNSCOPED_INFO("SLua");
+        CHECK(found("local s = \"\"\n"
                                     "for i = 1, 3 do s ..= tostring(i) end\n"
                                     "local t = \"\"\n"
                                     "for i = 1, 3 do t = t .. i; print(t) end\n"
@@ -743,23 +848,30 @@ namespace tut
                                     "for i = 1, 2 do for j = 1, 2 do u ..= \"y\" end end\n"
                                     "for i = 1, 2 do local v = \"\"; v ..= \"z\"; print(v) end\n"
                                     "print(s, u)\n",
-                                    "SlStringBuild", ALScriptProblem::Severity::Note),
+                                    "SlStringBuild", ALScriptProblem::Severity::Note) ==
                       std::string("1 LuauLintSlStringBuild|s\n"
                                   "3 LuauLintSlStringBuild|t\n"
                                   "5 LuauLintSlStringBuild|g\n"
                                   "7 LuauLintSlStringBuild|u\n"));
-        ensure_equals("in a table", fixed("local s = \"\"\nfor i = 1, 3 do s ..= tostring(i) end\nprint(s)\n", "LuauLintSlStringBuild",
-                                          "Put s's pieces in a table, joined once after the loop", false),
-                      std::string("local s = \"\"\nlocal sParts = {}\nfor i = 1, 3 do table.insert(sParts, tostring(i)) end\ns ..= table.concat(sParts)\nprint(s)\n"));
-        ensure_equals("named anew, indented", fixed("local function f()\n    local s = \"\"\n    local sParts = 1\n    for i = 1, 3 do\n        s = s .. i\n    end\n"
-                                                    "    return s, sParts\nend\nprint(f())\n",
-                                                    "LuauLintSlStringBuild", "Put s's pieces in a table, joined once after the loop", false),
-                      std::string("local function f()\n    local s = \"\"\n    local sParts = 1\n    local sParts2 = {}\n    for i = 1, 3 do\n"
-                                  "        table.insert(sParts2, tostring(i))\n    end\n    s ..= table.concat(sParts2)\n    return s, sParts\nend\nprint(f())\n"));
-        unfixed("local t = \"\"\nfor i = 1, 3 do t = t .. i; print(t) end\n", "LuauLintSlStringBuild");
-        unfixed("local function f()\n    local s = \"\"\n    for i = 1, 3 do\n        s ..= i\n        if i > 1 then return s end\n    end\n    return s\nend\nprint(f())\n",
+        {
+            INFO("in a table");
+            CHECK(require_fixed("local s = \"\"\nfor i = 1, 3 do s ..= tostring(i) end\nprint(s)\n", "LuauLintSlStringBuild",
+                                "Put s's pieces in a table, joined once after the loop", false) ==
+                  std::string("local s = \"\"\nlocal sParts = {}\nfor i = 1, 3 do table.insert(sParts, tostring(i)) end\ns ..= table.concat(sParts)\nprint(s)\n"));
+        }
+        {
+            INFO("named anew, indented");
+            CHECK(require_fixed("local function f()\n    local s = \"\"\n    local sParts = 1\n    for i = 1, 3 do\n        s = s .. i\n    end\n"
+                                "    return s, sParts\nend\nprint(f())\n",
+                                "LuauLintSlStringBuild", "Put s's pieces in a table, joined once after the loop", false) ==
+                  std::string("local function f()\n    local s = \"\"\n    local sParts = 1\n    local sParts2 = {}\n    for i = 1, 3 do\n"
+                              "        table.insert(sParts2, tostring(i))\n    end\n    s ..= table.concat(sParts2)\n    return s, sParts\nend\nprint(f())\n"));
+        }
+        require_unfixed("local t = \"\"\nfor i = 1, 3 do t = t .. i; print(t) end\n", "LuauLintSlStringBuild");
+        require_unfixed("local function f()\n    local s = \"\"\n    for i = 1, 3 do\n        s ..= i\n        if i > 1 then return s end\n    end\n    return s\nend\nprint(f())\n",
                 "LuauLintSlStringBuild");
-        ensure_equals("LSL", found("default {\n"
+        UNSCOPED_INFO("LSL");
+        CHECK(found("default {\n"
                                    "    state_entry() {\n"
                                    "        string s;\n"
                                    "        integer i;\n"
@@ -770,19 +882,18 @@ namespace tut
                                    "        llOwnerSay(s + t);\n"
                                    "    }\n"
                                    "}\n",
-                                   "SlStringBuild", ALScriptProblem::Severity::Note, false),
+                                   "SlStringBuild", ALScriptProblem::Severity::Note, false) ==
                       std::string("4 LSLSlStringBuild|s\n"
                                   "6 LSLSlStringBuild|t\n"));
-        ensure("the converter's note names it", std::string(ALLSLToSLua::lintOf("SluaStringBuild")) == "SlStringBuild");
+        UNSCOPED_INFO("the converter's note names it");
+        CHECK(std::string(ALLSLToSLua::lintOf("SluaStringBuild")) == "SlStringBuild");
     }
 
-    template<> template<>
-    void object::test<19>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlRepeatedCall in SLua: a steady call made again kept in a local", "[ALScriptLintPass]")
     {
-        set_test_name("SlRepeatedCall in SLua: ll.GetOwner() and its kin called again in one function's body, not a nested one's; a "
-                      "note, fixed as a local before the body's first statement that calls it");
-        ensure("definitions: " + error, loaded);
-        ensure_equals("each", found("local function report()\n"
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
+        CHECK(found("local function report()\n"
                                     "    print(ll.GetOwner())\n"
                                     "    if ll.GetOwner() == ll.GetKey() then print(ll.GetOwner()) end\n"
                                     "    print(ll.GetKey())\n"
@@ -790,22 +901,23 @@ namespace tut
                                     "print(ll.GetOwner(), llcompat.GetOwner())\n"
                                     "LLEvents:on(\"touch_start\", function() print(ll.GetScriptName()) print(ll.GetScriptName()) end)\n"
                                     "print(report)\n",
-                                    "SlRepeatedCall", ALScriptProblem::Severity::Note),
+                                    "SlRepeatedCall", ALScriptProblem::Severity::Note) ==
                       std::string("1 LuauLintSlRepeatedCall|ll.GetOwner()|3\n"
                                   "2 LuauLintSlRepeatedCall|ll.GetKey()|2\n"
                                   "6 LuauLintSlRepeatedCall|ll.GetScriptName()|2\n"));
-        ensure_equals("kept", fixed("local function report()\n    print(ll.GetOwner())\n    print(ll.GetOwner())\nend\nprint(report)\n",
-                                    "LuauLintSlRepeatedCall", "Keep ll.GetOwner() in a local, owner", false),
-                      std::string("local function report()\n    local owner = ll.GetOwner()\n    print(owner)\n    print(owner)\nend\nprint(report)\n"));
+        {
+            INFO("kept");
+            CHECK(require_fixed("local function report()\n    print(ll.GetOwner())\n    print(ll.GetOwner())\nend\nprint(report)\n",
+                                "LuauLintSlRepeatedCall", "Keep ll.GetOwner() in a local, owner", false) ==
+                  std::string("local function report()\n    local owner = ll.GetOwner()\n    print(owner)\n    print(owner)\nend\nprint(report)\n"));
+        }
     }
 
-    template<> template<>
-    void object::test<20>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlRepeatedCall in LSL: steady and pure calls repeated kept in a local", "[ALScriptLintPass]")
     {
-        set_test_name("SlRepeatedCall in LSL: a steady call, and a pure one given what the body never changes, declared by the body before; "
-                      "not one given a loop's counter");
-        ensure("builtins: " + error, lslLoaded);
-        ensure_equals("each", found("default {\n"
+        UNSCOPED_INFO("builtins: " + builtinsError);
+        CHECK(lslLoaded);
+        CHECK(found("default {\n"
                                     "    touch_start(integer n) {\n"
                                     "        string s = llDetectedName(0);\n"
                                     "        llOwnerSay((string)llGetOwner());\n"
@@ -814,46 +926,52 @@ namespace tut
                                     "        for (i = 0; i < 2; ++i) llOwnerSay(llGetSubString(s, i, i) + llGetSubString(s, i, i));\n"
                                     "    }\n"
                                     "}\n",
-                                    "SlRepeatedCall", ALScriptProblem::Severity::Note, false),
+                                    "SlRepeatedCall", ALScriptProblem::Severity::Note, false) ==
                       std::string("3 LSLSlRepeatedCall|llGetOwner()|2\n"
                                   "4 LSLSlRepeatedCall|llToUpper(s)|2\n"));
-        ensure_equals("a steady one", fixed("default { touch_start(integer n) {\n    llOwnerSay((string)llGetOwner());\n    llOwnerSay((string)llGetOwner());\n} }\n",
-                                            "LSLSlRepeatedCall", "Keep llGetOwner() in a local, owner", false, false),
-                      std::string("default { touch_start(integer n) {\n    key owner = llGetOwner();\n    llOwnerSay((string)owner);\n    llOwnerSay((string)owner);\n} }\n"));
-        ensure_equals("a pure one", fixed("default { state_entry() {\n    string s = \"a\";\n    llOwnerSay(llToUpper(s) + llToUpper(s));\n} }\n",
-                                          "LSLSlRepeatedCall", "Keep llToUpper(s) in a local, toUpper", false, false),
-                      std::string("default { state_entry() {\n    string s = \"a\";\n    string toUpper = llToUpper(s);\n    llOwnerSay(toUpper + toUpper);\n} }\n"));
+        {
+            INFO("a steady one");
+            CHECK(require_fixed("default { touch_start(integer n) {\n    llOwnerSay((string)llGetOwner());\n    llOwnerSay((string)llGetOwner());\n} }\n",
+                                "LSLSlRepeatedCall", "Keep llGetOwner() in a local, owner", false, false) ==
+                  std::string("default { touch_start(integer n) {\n    key owner = llGetOwner();\n    llOwnerSay((string)owner);\n    llOwnerSay((string)owner);\n} }\n"));
+        }
+        {
+            INFO("a pure one");
+            CHECK(require_fixed("default { state_entry() {\n    string s = \"a\";\n    llOwnerSay(llToUpper(s) + llToUpper(s));\n} }\n",
+                                "LSLSlRepeatedCall", "Keep llToUpper(s) in a local, toUpper", false, false) ==
+                  std::string("default { state_entry() {\n    string s = \"a\";\n    string toUpper = llToUpper(s);\n    llOwnerSay(toUpper + toUpper);\n} }\n"));
+        }
     }
 
-    template<> template<>
-    void object::test<21>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: migration: migration lints and notes and llcompat calls left from LSL", "[ALScriptLintPass]")
     {
-        set_test_name("migration: a migration rule's lint, a converter's note and a call to llcompat are left from LSL; a performance "
-                      "rule's lint and ll's own deprecation are not");
         ALScriptProblem p;
         p.source = ALScriptProblem::Source::Lint;
         p.code   = "SlZeroIndex";
-        ensure("a migration rule's", ALScriptLintPass::migration(p));
+        UNSCOPED_INFO("a migration rule's");
+        CHECK(ALScriptLintPass::migration(p));
         p.code = "SlSleepingCall";
-        ensure("not a performance rule's", !ALScriptLintPass::migration(p));
+        UNSCOPED_INFO("not a performance rule's");
+        CHECK_FALSE(ALScriptLintPass::migration(p));
         p.code = "";
         p.key  = "LuauLintDeprecatedMemberUse";
         p.args = { "llcompat.Say" };
-        ensure("llcompat's", ALScriptLintPass::migration(p));
+        UNSCOPED_INFO("llcompat's");
+        CHECK(ALScriptLintPass::migration(p));
         p.args = { "ll.SetPrimitiveParams" };
-        ensure("not ll's", !ALScriptLintPass::migration(p));
+        UNSCOPED_INFO("not ll's");
+        CHECK_FALSE(ALScriptLintPass::migration(p));
         ALScriptProblem note;
         note.source = ALScriptProblem::Source::Assistant;
         note.key    = "SluaNote";
-        ensure("a note", ALScriptLintPass::migration(note));
+        UNSCOPED_INFO("a note");
+        CHECK(ALScriptLintPass::migration(note));
     }
 
-    template<> template<>
-    void object::test<22>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlForIndexAssign: a numeric for's variable set in its body is a warning", "[ALScriptLintPass]")
     {
-        set_test_name("SlForIndexAssign: a numeric for's variable set in its body, plainly or by +=, a warning at each, in a function it makes "
-                      "too; not a local of the same name in it, not a generic for's, not a while's; no fix");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local list = {\"a\", \"a\", \"b\"}\n"
                                        "local start = 1\n"
                                        "for i = 1, #list - 1 do\n"
@@ -874,20 +992,17 @@ namespace tut
                                        "local n = 1\n"
                                        "while n < 3 do n = n + 1 end\n",
                                        "SlForIndexAssign", ALScriptProblem::Severity::Warning);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("5 LuauLintSlForIndexAssign|i\n"
                                   "7 LuauLintSlForIndexAssign|i\n"
                                   "8 LuauLintSlForIndexAssign|i\n"));
-        unfixed("for i = 1, 3 do i = 2 end\n", "LuauLintSlForIndexAssign");
+        require_unfixed("for i = 1, 3 do i = 2 end\n", "LuauLintSlForIndexAssign");
     }
 
-    template<> template<>
-    void object::test<23>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlGlobalAssign: a global set in a function and named elsewhere goes local", "[ALScriptLintPass]")
     {
-        set_test_name("SlGlobalAssign: a global first set inside a function and named by more than one statement of the top, a note, "
-                      "declared local before the first; one function alone naming it left to Luau's GlobalUsedAsLocal; one set at the top "
-                      "said as before");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string shared = "function init()\n"
                                    "    count = 0\n"
                                    "end\n"
@@ -896,34 +1011,37 @@ namespace tut
                                    "    print(count)\n"
                                    "end)\n"
                                    "init()\n";
-        ensure_equals("set in one, named in another", found(shared, "SlGlobalAssign", ALScriptProblem::Severity::Note),
+        UNSCOPED_INFO("set in one, named in another");
+        CHECK(found(shared, "SlGlobalAssign", ALScriptProblem::Severity::Note) ==
                       std::string("1 LuauLintSlGlobalInFunction|count\n"));
-        ensure_equals("declared before the first that names it", fixed(shared, "LuauLintSlGlobalInFunction", "Declare local count before it is first named", false),
-                      std::string("local count\n") + shared);
-        ensure("one function alone: Luau's",
-               found("LLEvents:on(\"touch_start\", function(detected)\n    total = 1\n    print(total)\nend)\n", "SlGlobalAssign", ALScriptProblem::Severity::Note)
+        {
+            INFO("declared before the first that names it");
+            CHECK(require_fixed(shared, "LuauLintSlGlobalInFunction", "Declare local count before it is first named", false) ==
+                  std::string("local count\n") + shared);
+        }
+        UNSCOPED_INFO("one function alone: Luau's");
+        REQUIRE(found("LLEvents:on(\"touch_start\", function(detected)\n    total = 1\n    print(total)\nend)\n", "SlGlobalAssign", ALScriptProblem::Severity::Note)
                    .find("LuauLintSlGlobalInFunction") == std::string::npos);
-        ensure("set at the top too: said there, not here",
-               found("count = 0\nfunction bump() count += 1 end\nbump()\n", "SlGlobalAssign", ALScriptProblem::Severity::Note).find("LuauLintSlGlobalInFunction") ==
+        UNSCOPED_INFO("set at the top too: said there, not here");
+        REQUIRE(found("count = 0\nfunction bump() count += 1 end\nbump()\n", "SlGlobalAssign", ALScriptProblem::Severity::Note).find("LuauLintSlGlobalInFunction") ==
                    std::string::npos);
-        ensure("not where _G is",
-               found(std::string("print(_G)\n") + shared, "SlGlobalAssign", ALScriptProblem::Severity::Note).find("LuauLintSlGlobalInFunction") == std::string::npos);
-        ensure("set at the top in a block of it: not in a function",
-               found("if true then\n    x = 1\nend\nfunction f() x = 2 end\nf()\nprint(x)\n", "SlGlobalAssign", ALScriptProblem::Severity::Note)
+        UNSCOPED_INFO("not where _G is");
+        REQUIRE(found(std::string("print(_G)\n") + shared, "SlGlobalAssign", ALScriptProblem::Severity::Note).find("LuauLintSlGlobalInFunction") == std::string::npos);
+        UNSCOPED_INFO("set at the top in a block of it: not in a function");
+        REQUIRE(found("if true then\n    x = 1\nend\nfunction f() x = 2 end\nf()\nprint(x)\n", "SlGlobalAssign", ALScriptProblem::Severity::Note)
                    .find("LuauLintSlGlobalInFunction") == std::string::npos);
-        ensure("made by function f() at the top, its own lint off: made there",
-               found("--!nolint SlGlobalFunction\nfunction onTouch() end\nfunction reset() onTouch = nil end\nreset()\nonTouch()\n", "SlGlobalAssign",
+        UNSCOPED_INFO("made by function f() at the top, its own lint off: made there");
+        REQUIRE(found("--!nolint SlGlobalFunction\nfunction onTouch() end\nfunction reset() onTouch = nil end\nreset()\nonTouch()\n", "SlGlobalAssign",
                      ALScriptProblem::Severity::Note)
                    .find("LuauLintSlGlobalInFunction") == std::string::npos);
     }
 
-    template<> template<>
-    void object::test<24>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlIntegerPast32Bits: an integer literal past 0xFFFFFFFF reads as -1", "[ALScriptLintPass]")
     {
-        set_test_name("SlIntegerPast32Bits: a whole number past 0xFFFFFFFF, decimal or hexadecimal, read as -1 and as 1 with a minus before it; "
-                      "not one within 32 bits, a float, or one in a string or a comment");
-        ensure("builtins: " + error, lslLoaded);
-        ensure_equals("LSL", found("integer a = 4294967296;\n"
+        UNSCOPED_INFO("builtins: " + builtinsError);
+        CHECK(lslLoaded);
+        UNSCOPED_INFO("LSL");
+        CHECK(found("integer a = 4294967296;\n"
                                    "integer b = 0x100000000;\n"
                                    "integer c = -4294967296;\n"
                                    "integer d = 99999999999999999999999;\n"
@@ -934,23 +1052,21 @@ namespace tut
                                    "    vector v = <4294967296, 0, 0>;\n"
                                    "    llOwnerSay((string)(k + b + c + d + e + f + g) + (string)h + (string)i + j + (string)v);\n"
                                    "} }\n",
-                                   "SlIntegerPast32Bits", ALScriptProblem::Severity::Warning, false),
+                                   "SlIntegerPast32Bits", ALScriptProblem::Severity::Warning, false) ==
                       std::string("0 LSLSlIntegerPast32Bits|4294967296|-1\n"
                                   "1 LSLSlIntegerPast32Bits|0x100000000|-1\n"
                                   "2 LSLSlIntegerPast32Bits|-4294967296|1\n"
                                   "3 LSLSlIntegerPast32Bits|99999999999999999999999|-1\n"
                                   "7 LSLSlIntegerPast32Bits|4294967296|-1\n"
                                   "8 LSLSlIntegerPast32Bits|4294967296|-1\n"));
-        ensure_equals("not SLua's, whose numbers are doubles", found("local a = 4294967296\n", "SlIntegerPast32Bits", ALScriptProblem::Severity::Warning, true),
+        UNSCOPED_INFO("not SLua's, whose numbers are doubles");
+        CHECK(found("local a = 4294967296\n", "SlIntegerPast32Bits", ALScriptProblem::Severity::Warning, true) ==
                       std::string());
     }
-    template<> template<>
-    void object::test<25>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlNumberTruth beyond numbers: other types read as conditions are fixed", "[ALScriptLintPass]")
     {
-        set_test_name("SlNumberTruth beyond numbers: a uuid, a vector, a quaternion, a string, a list and an integer read as a condition, or "
-                      "under not, each fixed as LSL asked it; not a boolean, a table that is no list, nor what may be nil though typed not -- "
-                      "a table read by a key, a local declared with no value, or one given either");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local id = ll.GetOwner()\n"
                                        "local v = ll.GetPos()\n"
                                        "local r = ll.GetRot()\n"
@@ -972,7 +1088,7 @@ namespace tut
                                        "local b = true\n"
                                        "if t or b or ll.GetOwner() then print(t) end\n",
                                        "SlNumberTruth", ALScriptProblem::Severity::Warning);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("6 LuauLintSlUuidTruth|id|id.istruthy\n"
                                   "7 LuauLintSlVectorTruth|v|v ~= ZERO_VECTOR\n"
                                   "7 LuauLintSlStringTruth|s|s ~= \"\"\n"
@@ -986,34 +1102,56 @@ namespace tut
                                   "11 LuauLintSlQuaternionTruthNot|r|r == ZERO_ROTATION\n"
                                   "11 LuauLintSlIntegerTruthNot|i|i == 0i\n"
                                   "19 LuauLintSlUuidTruth|ll.GetOwner()|ll.GetOwner().istruthy\n"));
-        ensure_equals("a uuid", fixed("local id = ll.GetOwner()\nif id then print(id) end\n", "LuauLintSlUuidTruth", "Write it id.istruthy", false),
-                      std::string("local id = ll.GetOwner()\nif id.istruthy then print(id) end\n"));
-        ensure_equals("a uuid under not", fixed("if not ll.GetOwner() then print(1) end\n", "LuauLintSlUuidTruthNot", "Write it not ll.GetOwner().istruthy", false),
-                      std::string("if not ll.GetOwner().istruthy then print(1) end\n"));
-        ensure_equals("a vector", fixed("local v = ll.GetPos()\nwhile v do break end\n", "LuauLintSlVectorTruth", "Write it v ~= ZERO_VECTOR", false),
-                      std::string("local v = ll.GetPos()\nwhile v ~= ZERO_VECTOR do break end\n"));
-        ensure_equals("a quaternion", fixed("local r = ll.GetRot()\nprint(not r)\n", "LuauLintSlQuaternionTruthNot", "Write it r == ZERO_ROTATION", false),
-                      std::string("local r = ll.GetRot()\nprint(r == ZERO_ROTATION)\n"));
-        ensure_equals("a string, an if-then-else bracketed first", fixed("local c = true\nif (if c then \"a\" else \"\") then print(c) end\n",
-                                                                        "LuauLintSlStringTruth", "Write it (if c then \"a\" else \"\") ~= \"\"", false),
-                      std::string("local c = true\nif ((if c then \"a\" else \"\") ~= \"\") then print(c) end\n"));
-        ensure_equals("a list", fixed("local l = {1}\nif l then print(l) end\n", "LuauLintSlListTruth", "Write it #l > 0", false),
-                      std::string("local l = {1}\nif #l > 0 then print(l) end\n"));
-        ensure_equals("a list under not", fixed("local l = {1}\nprint(not l)\n", "LuauLintSlListTruthNot", "Write it #l == 0", false),
-                      std::string("local l = {1}\nprint(#l == 0)\n"));
-        ensure_equals("an integer", fixed("local i = 5i\nif i then print(i) end\n", "LuauLintSlIntegerTruth", "Write it i ~= 0i", false),
-                      std::string("local i = 5i\nif i ~= 0i then print(i) end\n"));
-        ensure_equals("a number read by a key: not said either", found("local counts: {[string]: number} = {}\nif counts[\"a\"] then print(1) end\n",
-                                                                          "SlNumberTruth", ALScriptProblem::Severity::Warning),
+        {
+            INFO("a uuid");
+            CHECK(require_fixed("local id = ll.GetOwner()\nif id then print(id) end\n", "LuauLintSlUuidTruth", "Write it id.istruthy", false) ==
+                  std::string("local id = ll.GetOwner()\nif id.istruthy then print(id) end\n"));
+        }
+        {
+            INFO("a uuid under not");
+            CHECK(require_fixed("if not ll.GetOwner() then print(1) end\n", "LuauLintSlUuidTruthNot", "Write it not ll.GetOwner().istruthy", false) ==
+                  std::string("if not ll.GetOwner().istruthy then print(1) end\n"));
+        }
+        {
+            INFO("a vector");
+            CHECK(require_fixed("local v = ll.GetPos()\nwhile v do break end\n", "LuauLintSlVectorTruth", "Write it v ~= ZERO_VECTOR", false) ==
+                  std::string("local v = ll.GetPos()\nwhile v ~= ZERO_VECTOR do break end\n"));
+        }
+        {
+            INFO("a quaternion");
+            CHECK(require_fixed("local r = ll.GetRot()\nprint(not r)\n", "LuauLintSlQuaternionTruthNot", "Write it r == ZERO_ROTATION", false) ==
+                  std::string("local r = ll.GetRot()\nprint(r == ZERO_ROTATION)\n"));
+        }
+        {
+            INFO("a string, an if-then-else bracketed first");
+            CHECK(require_fixed("local c = true\nif (if c then \"a\" else \"\") then print(c) end\n",
+                                "LuauLintSlStringTruth", "Write it (if c then \"a\" else \"\") ~= \"\"", false) ==
+                  std::string("local c = true\nif ((if c then \"a\" else \"\") ~= \"\") then print(c) end\n"));
+        }
+        {
+            INFO("a list");
+            CHECK(require_fixed("local l = {1}\nif l then print(l) end\n", "LuauLintSlListTruth", "Write it #l > 0", false) ==
+                  std::string("local l = {1}\nif #l > 0 then print(l) end\n"));
+        }
+        {
+            INFO("a list under not");
+            CHECK(require_fixed("local l = {1}\nprint(not l)\n", "LuauLintSlListTruthNot", "Write it #l == 0", false) ==
+                  std::string("local l = {1}\nprint(#l == 0)\n"));
+        }
+        {
+            INFO("an integer");
+            CHECK(require_fixed("local i = 5i\nif i then print(i) end\n", "LuauLintSlIntegerTruth", "Write it i ~= 0i", false) ==
+                  std::string("local i = 5i\nif i ~= 0i then print(i) end\n"));
+        }
+        UNSCOPED_INFO("a number read by a key: not said either");
+        CHECK(found("local counts: {[string]: number} = {}\nif counts[\"a\"] then print(1) end\n",
+                                                                          "SlNumberTruth", ALScriptProblem::Severity::Warning) ==
                       std::string());
     }
-    template<> template<>
-    void object::test<26>()
+    TEST_CASE_METHOD(alscriptlintpass_data, "ALScriptLintPass: SlMustUse over SLua's own types: their makers and readers left unread", "[ALScriptLintPass]")
     {
-        set_test_name("SlMustUse over SLua's own: integer's, a uuid, a vector and a quaternion made by calling their names or create, "
-                      "buffer's that read one or make one, and table.create, their answers unread; an integer's given back to it; not "
-                      "buffer's that write one, nor an answer read");
-        ensure("definitions: " + error, loaded);
+        UNSCOPED_INFO("definitions: " + definitionsError);
+        CHECK(loaded);
         const std::string said = found("local i = 5i\n"
                                        "local b = buffer.create(4)\n"
                                        "integer.add(i, 1)\n"
@@ -1030,7 +1168,7 @@ namespace tut
                                        "buffer.fill(b, 0, 0)\n"
                                        "print(integer.add(i, 1), buffer.readu8(b, 0), vector(1, 2, 3))\n",
                                        "SlMustUse", ALScriptProblem::Severity::Warning);
-        ensure_equals("each", said,
+        CHECK(said ==
                       std::string("2 LuauLintSlMustUse|integer.add\n"
                                   "3 LuauLintSlMustUse|uuid\n"
                                   "4 LuauLintSlMustUse|uuid.create\n"
@@ -1041,8 +1179,11 @@ namespace tut
                                   "9 LuauLintSlMustUse|buffer.len\n"
                                   "10 LuauLintSlMustUse|buffer.create\n"
                                   "11 LuauLintSlMustUse|table.create\n"));
-        ensure_equals("an integer's", fixed("local i = 5i\ninteger.band(i, 3i)\nprint(i)\n", "LuauLintSlMustUse", "Write it i = integer.band(...)", false),
-                      std::string("local i = 5i\ni = integer.band(i, 3i)\nprint(i)\n"));
-        unfixed("vector(1, 2, 3)\n", "LuauLintSlMustUse");
+        {
+            INFO("an integer's");
+            CHECK(require_fixed("local i = 5i\ninteger.band(i, 3i)\nprint(i)\n", "LuauLintSlMustUse", "Write it i = integer.band(...)", false) ==
+                  std::string("local i = 5i\ni = integer.band(i, 3i)\nprint(i)\n"));
+        }
+        require_unfixed("vector(1, 2, 3)\n", "LuauLintSlMustUse");
     }
 }

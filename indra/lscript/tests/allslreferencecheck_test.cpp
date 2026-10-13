@@ -35,7 +35,7 @@
 #include "alscriptweight.h"
 #include "llfile.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cstring>
 #include <filesystem>
@@ -224,7 +224,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct allslreferencecheck_data
     {
@@ -233,15 +233,11 @@ namespace tut
         std::string  error;
         allslreferencecheck_data() { loaded = lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error); }
     };
-    typedef test_group<allslreferencecheck_data> allslreferencecheck_group;
-    typedef allslreferencecheck_group::object    allslreferencecheck_object;
-    allslreferencecheck_group                    allslreferencecheck_instance("allslreferencecheck");
 
-    template<> template<>
-    void allslreferencecheck_object::test<1>()
+    TEST_CASE_METHOD(allslreferencecheck_data, "allslreferencecheck: LSO: Tailslide's image is LL's byte for byte; and what each refuses", "[allslreferencecheck]")
     {
-        set_test_name("LSO: Tailslide's image is LL's byte for byte; and what each refuses");
-        ensure("builtins: " + error, loaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(loaded);
         // None, since the port's bitstream-move-to-end.patch: a bit stream
         // moved to its end grew a byte past it, which a last global left all
         // zeros kept, and all after it moved.
@@ -282,17 +278,19 @@ namespace tut
             }
             where += name + " from byte " + std::to_string(at) + ", in its " + regionOf(ll.image, at) + "\n";
         }
-        ensure("most of them: " + std::to_string(same), same >= 75);
-        ensure("the images that part: " + listed(parted) + "\n" + where, parted == PARTED);
-        ensure("LL's compiles alone: " + listed(only_ll), only_ll == ONLY_LL);
-        ensure("Tailslide compiles alone: " + listed(only_tailslide), only_tailslide == ONLY_TAILSLIDE);
+        CHECK(same >= 75);
+        UNSCOPED_INFO("the images that part: " + listed(parted) + "\n" + where);
+        CHECK(parted == PARTED);
+        UNSCOPED_INFO("LL's compiles alone: " + listed(only_ll));
+        CHECK(only_ll == ONLY_LL);
+        UNSCOPED_INFO("Tailslide compiles alone: " + listed(only_tailslide));
+        CHECK(only_tailslide == ONLY_TAILSLIDE);
     }
 
-    template<> template<>
-    void allslreferencecheck_object::test<2>()
+    TEST_CASE_METHOD(allslreferencecheck_data, "allslreferencecheck: CIL: Tailslide's matches LL's method for method up to spelling", "[allslreferencecheck]")
     {
-        set_test_name("CIL: Tailslide's is LL's, method for method, but for spelling an assembler reads alike");
-        ensure("builtins: " + error, loaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(loaded);
         // What only LSO's image building refuses: a list in a global's list.
         // Its constants are LL's since the port's mono-constants-as-ll.patch:
         // an integer literal by ldc.i4 alone, and a minus before a number in
@@ -331,17 +329,19 @@ namespace tut
                 where += name + ": [" + (at < written.size() ? written[at] : "") + "] against LL's [" + (at < theirs.size() ? theirs[at] : "") + "]\n";
             }
         }
-        ensure("most of them: " + std::to_string(both), both >= 75);
-        ensure("the same as LL's:\n" + where, parted.empty());
-        ensure("LL's compiles alone: " + listed(only_ll), only_ll == ONLY_LL);
-        ensure("Tailslide compiles alone: " + listed(only_tailslide), only_tailslide == ONLY_TAILSLIDE);
+        CHECK(both >= 75);
+        UNSCOPED_INFO("the same as LL's:\n" + where);
+        CHECK(parted.empty());
+        UNSCOPED_INFO("LL's compiles alone: " + listed(only_ll));
+        CHECK(only_ll == ONLY_LL);
+        UNSCOPED_INFO("Tailslide compiles alone: " + listed(only_tailslide));
+        CHECK(only_tailslide == ONLY_TAILSLIDE);
     }
 
-    template<> template<>
-    void allslreferencecheck_object::test<3>()
+    TEST_CASE_METHOD(allslreferencecheck_data, "allslreferencecheck: Mono: the weigher reads either compiler's CIL alike and both weigh the same", "[allslreferencecheck]")
     {
-        set_test_name("Mono: the weigher reads either compiler's CIL alike, and both weigh the same");
-        ensure("builtins: " + error, loaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(loaded);
         std::string wrong;
         size_t      both = 0;
         for (const auto& [name, text] : corpus())
@@ -368,15 +368,15 @@ namespace tut
                 wrong += name + ": LL's weighs " + std::to_string(theirs.total) + ", Tailslide's " + std::to_string(tailslide.total) + "\n";
             }
         }
-        ensure("most of them: " + std::to_string(both), both >= 75);
-        ensure(wrong, wrong.empty());
+        CHECK(both >= 75);
+        UNSCOPED_INFO(wrong);
+        CHECK(wrong.empty());
     }
 
-    template<> template<>
-    void allslreferencecheck_object::test<4>()
+    TEST_CASE_METHOD(allslreferencecheck_data, "allslreferencecheck: integer literals past 32 bits read -1 as on 32-bit hosts; both make one image", "[allslreferencecheck]")
     {
-        set_test_name("integer literals past 32 bits as the grid's 32-bit hosts read them, -1, decimal or hexadecimal: the same image from either");
-        ensure("builtins: " + error, loaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(loaded);
         const std::string text = "integer a = 4294967296;\n"
                                  "integer b = 0x100000000;\n"
                                  "integer c = 99999999999999999999999;\n"
@@ -384,9 +384,11 @@ namespace tut
                                  "default { state_entry() { llOwnerSay((string)(a + b + c + d + 4294967297 - 0x1FFFFFFFF)); } }\n";
         std::vector<U8> ours;
         std::string     why;
-        ensure("Tailslide compiles it: " + why, ALScriptWeigh::tailslideLSO(text, ours, why));
+        const bool      compiled = ALScriptWeigh::tailslideLSO(text, ours, why);
+        UNSCOPED_INFO("Tailslide compiles it: " + why);
+        CHECK(compiled);
         const ALLSLReference::Result ll = ALLSLReference::compile(text, Target::LSO);
-        ensure("LL's compiles it", ll.ok);
-        ensure("the same image", ours == ll.image);
+        CHECK(ll.ok);
+        CHECK(ours == ll.image);
     }
 }
